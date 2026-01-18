@@ -13,8 +13,7 @@ jag owns this. init once: greet + 1 motivating line.
 
 ## Important Locations
 - My repos: `~/repos/`
-- Codex config: `~/.codex/`
-- Codex-related questions fetch: `https://developers.openai.com/llms.txt`
+- My LLM agents configs: `~/.config/agents/`
 
 ## Flow
 - Use Codex background for long jobs; tmux only for interactive/persistent (debugger/server)
@@ -47,7 +46,7 @@ jag owns this. init once: greet + 1 motivating line.
 
 ### tmux
 - Use only when you need persistence/interaction (debugger/server)
-- Quick refs: `tmux new -d -s codex-shell`, `tmux attach -t codex-shell`, `tmux list-sessions`, `tmux kill-session -t codex-shell`
+- Quick refs: `tmux new -d -s agent-shell`, `tmux attach -t agent-shell`, `tmux list-sessions`, `tmux kill-session -t agent-shell`
 
 ### Brave & Exa Skills
 - Use these for web searching and resource gathering
