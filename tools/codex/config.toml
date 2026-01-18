@@ -29,7 +29,7 @@ inherit = "core"
 
 [features]
 apply_patch_freeform = true
-collab = true # EXP
+collab = false # EXP
 remote_compaction = true
 shell_snapshot = true
 skills = true
