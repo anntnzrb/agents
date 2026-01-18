@@ -124,11 +124,15 @@ run_pairs() {
 }
 
 # asset_copies
-# Map assets to destinations
+# Map every asset directory to every tool home
 asset_copies() {
-  printf '%s\n' "${ASSETS_HOME}/skills ${CODEX_HOME}/skills"
-  printf '%s\n' "${ASSETS_HOME}/commands ${OPENCODE_HOME}/commands"
-  printf '%s\n' "${ASSETS_HOME}/agents ${OPENCODE_HOME}/agents"
+  for asset_path in "${ASSETS_HOME}"/*; do
+    [ -d "${asset_path}" ] || continue
+    asset_name="$(basename "${asset_path}")"
+    for tool_home in "${CLAUDE_HOME}" "${CODEX_HOME}" "${OPENCODE_HOME}"; do
+      printf '%s\n' "${asset_path} ${tool_home}/${asset_name}"
+    done
+  done
 }
 
 # agent_files
