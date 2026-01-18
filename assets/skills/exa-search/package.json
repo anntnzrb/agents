@@ -1,0 +1,21 @@
+{
+  "name": "exa-search",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Deep web research and content retrieval with Exa",
+  "author": "annt",
+  "license": "MIT",
+  "scripts": {
+    "lint": "bunx tsc -p tsconfig.json --noEmit",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "exa-js": "^2.0.12"
+  },
+  "devDependencies": {
+    "bun-types": "^1.1.0",
+    "typescript": "^5.5.4"
+  }
+}

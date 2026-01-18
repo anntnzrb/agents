@@ -1,0 +1,15 @@
+{
+  "search": {
+    "query": "<topic>",
+    "numResults": 5,
+    "includeContent": false
+  },
+  "searchWithContent": {
+    "query": "<topic>",
+    "numResults": 3,
+    "includeContent": true
+  },
+  "content": {
+    "url": "https://example.com/article"
+  }
+}
