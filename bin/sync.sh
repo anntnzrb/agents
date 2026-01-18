@@ -105,26 +105,6 @@ copy_dir_into() {
   note "copied: ${dst_dir} <- ${src_dir}"
 }
 
-# report_extra_files
-# Report files present in destination but missing in source
-report_extra_files() {
-  src_dir="${1}"
-  dst_dir="${2}"
-
-  is_dir "${dst_dir}" || return 0
-  is_dir "${src_dir}" || return 0
-
-  src_base="${src_dir%/}"
-  dst_base="${dst_dir%/}"
-  find "${dst_base}" -type f -print | while IFS= read -r dst_path; do
-    [ "${dst_path}" = "${dst_base}" ] && continue
-    rel="${dst_path#${dst_base}/}"
-    [ "${rel}" = "${dst_path}" ] && rel="${dst_path#${dst_base}}"
-    [ -e "${src_base}/${rel}" ] && continue
-    report "asset extra: ${dst_base}/${rel} missing in ${src_base}"
-  done
-}
-
 # tool_dirs
 # Map tool config directories to destinations
 tool_dirs() {
@@ -160,6 +140,5 @@ agent_files() {
 }
 
 tool_dirs | run_pairs copy_dir_into
-asset_copies | run_pairs report_extra_files
 asset_copies | run_pairs copy_dir_into
 agent_files | run_pairs copy_item
