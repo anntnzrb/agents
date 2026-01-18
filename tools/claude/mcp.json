@@ -1,0 +1,25 @@
+[
+  {
+    "name": "exa",
+    "url": "https://mcp.exa.ai/mcp"
+  },
+  {
+    "name": "context7",
+    "url": "https://mcp.context7.com/mcp",
+    "disabled": true
+  },
+  {
+    "name": "sequentialthinking",
+    "url": "https://remote.mcpservers.org/sequentialthinking/mcp",
+    "disabled": true
+  },
+  {
+    "name": "deepwiki",
+    "url": "https://mcp.deepwiki.com/mcp"
+  },
+  {
+    "name": "archon",
+    "url": "http://localhost:8051/mcp",
+    "disabled": true
+  }
+]
