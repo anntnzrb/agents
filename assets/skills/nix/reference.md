@@ -144,22 +144,22 @@
 
 **Query multiple repos when topics overlap.**
 
-## Parallel DeepWiki Queries
+## Parallel Context7 Queries
 
-Launch subagents to query relevant repos simultaneously:
+Launch subagents to query relevant library IDs simultaneously:
 
 ```
 // Single message with multiple parallel Task calls:
 task(
   subagent_type="general",
   description="Query nixpkgs docs",
-  prompt="Use deepwiki_ask_question to query repo 'NixOS/nixpkgs' with question: '<USER_QUESTION>'. Return the key findings."
+  prompt="Use query-docs with libraryId '/NixOS/nixpkgs' and query: '<USER_QUESTION>'. Return the key findings."
 )
 
 task(
   subagent_type="general",
   description="Query nix.dev docs",
-  prompt="Use deepwiki_ask_question to query repo 'NixOS/nix.dev' with question: '<USER_QUESTION>'. Return the key findings."
+  prompt="Use query-docs with libraryId '/NixOS/nix.dev' and query: '<USER_QUESTION>'. Return the key findings."
 )
 ```
 
@@ -189,15 +189,15 @@ task(
 → Query NixOS/nix.dev: "What are overlays and how to use them?"
 ```
 
-## DeepWiki Repos
+## Context7 Library IDs
 
-| Repo | Best For |
+| Library ID | Best For |
 |------|----------|
-| `NixOS/nix.dev` | Nix language, tutorials, flake basics, NixOS |
-| `NixOS/nixpkgs` | Package builders, stdenv, overrides, packaging patterns |
-| `nix-community/nix-init` | Auto-generating derivations from URLs |
-| `nix-community/home-manager` | User environment, dotfiles, program configs |
-| `Mic92/nix-update` | Bumping versions and updating hashes |
-| `Mic92/nixpkgs-review` | Testing PRs and local changes |
-| `hercules-ci/flake-parts` | Modular flake configuration, perSystem |
-| `nix-darwin/nix-darwin` | macOS system configuration, Darwin modules, launchd |
+| `/NixOS/nix.dev` | Nix language, tutorials, flake basics, NixOS |
+| `/NixOS/nixpkgs` | Package builders, stdenv, overrides, packaging patterns |
+| `/nix-community/nix-init` | Auto-generating derivations from URLs |
+| `/nix-community/home-manager` | User environment, dotfiles, program configs |
+| `/Mic92/nix-update` | Bumping versions and updating hashes |
+| `/Mic92/nixpkgs-review` | Testing PRs and local changes |
+| `/hercules-ci/flake-parts` | Modular flake configuration, perSystem |
+| `/nix-darwin/nix-darwin` | macOS system configuration, Darwin modules, launchd |

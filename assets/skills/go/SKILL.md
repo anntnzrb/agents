@@ -17,16 +17,16 @@ description: Develop Go applications using modern patterns, popular libraries, a
 Before implementing, gather context from authoritative sources:
 
 ```
-# DeepWiki for understanding specific repos
-deepwiki_ask_question("gin-gonic/gin", "how to set up middleware")
-deepwiki_ask_question("uber-go/zap", "structured logging setup")
+# Context7 query-docs for repo-specific docs
+query-docs({ libraryId: "/gin-gonic/gin", query: "how to set up middleware" })
+query-docs({ libraryId: "/uber-go/zap", query: "structured logging setup" })
 
 # gh search code for real-world implementation examples
 gh search code "ratelimit.New(" --language=go
 gh search code "errgroup.WithContext(" --language=go
 
 # For style/idiom questions
-deepwiki_read_wiki_contents("uber-go/guide")
+query-docs({ libraryId: "/uber-go/guide", query: "style guide patterns and idioms" })
 ```
 
 ## Notes

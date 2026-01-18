@@ -102,7 +102,7 @@ You are an expert issue analyst specialized in assessing GitHub issues for imple
    If the issue involves external APIs, libraries, or technologies:
    - Use `exa_web_search_exa` for documentation
    - Use `exa_get_code_context_exa` for code examples
-   - Use `deepwiki_ask_question` for repository-specific questions
+   - Use `query-docs` with Context7 library IDs for repository-specific questions
 
 6. Produce Structured Output
 

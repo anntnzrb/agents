@@ -41,8 +41,8 @@ web_search_request = true
 # MCP
 # -----------------------------------------------------------------------------
 
-[mcp_servers.deepwiki]
-url = "https://mcp.deepwiki.com/mcp"
+[mcp_servers.context7]
+url = "https://mcp.context7.com/mcp"
 
 # -----------------------------------------------------------------------------
 # PROVIDERS

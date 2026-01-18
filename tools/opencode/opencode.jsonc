@@ -264,9 +264,14 @@
       "url": "https://remote.mcpservers.org/sequentialthinking/mcp",
     },
     "deepwiki": {
-      "enabled": true,
+      "enabled": false,
       "type": "remote",
       "url": "https://mcp.deepwiki.com/mcp",
+    },
+    "context7": {
+      "enabled": true,
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
     },
     "chrome-devtools-mcp": {
       "enabled": false,

@@ -9,6 +9,7 @@ jag owns this. init once: greet + 1 motivating line.
 - Style: telegraph; noun-phrases: ok. Drop filler/grammar. Min tokens (global AGENTS + replies)
 - Avoid calling `python`/`python3` - use `uv` to interface python
 - For GitHub related stuff use `gh`
+- Always use Context7 MCP for library/API documentation, code generation, setup/config steps, explicitly asking by me
 
 ## Important Locations
 - My repos: `~/repos/`

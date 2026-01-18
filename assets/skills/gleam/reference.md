@@ -2,36 +2,36 @@
 
 ## Research
 
-**Priority**: `deepwiki_ask_question` → fallback to `gh` CLI
+**Priority**: `query-docs` → fallback to `gh` CLI
 
-### 1. DeepWiki (Primary)
+### 1. Context7 (Primary)
 
-Query official Gleam repos for accurate, up-to-date information:
+Query Context7 library IDs (GitHub project = libraryId) for accurate, up-to-date information:
 
-| Topic | Repo to Query |
+| Topic | Library ID |
 |-------|---------------|
-| Standard library (list, dict, result, option) | `gleam-lang/stdlib` |
-| Regular expressions | `gleam-lang/regexp` |
-| Practical code examples, recipes | `gleam-lang/cookbook` |
-| Testing with gleeunit | `lpil/gleeunit` |
-| HTTP types (Request, Response, Method) | `gleam-lang/http` |
-| Time, timestamps, durations, dates | `gleam-lang/time` |
-| JSON encoding/decoding | `gleam-lang/json` |
-| Data structures (heap, map, set, deque) | `schurhammer/gleamy_structures` |
-| HTTP server (mist, WebSocket, SSE) | `rawhat/mist` |
-| Package discovery, ecosystem | `gleam-lang/awesome-gleam` |
+| Standard library (list, dict, result, option) | `/gleam-lang/stdlib` |
+| Regular expressions | `/gleam-lang/regexp` |
+| Practical code examples, recipes | `/gleam-lang/cookbook` |
+| Testing with gleeunit | `/lpil/gleeunit` |
+| HTTP types (Request, Response, Method) | `/gleam-lang/http` |
+| Time, timestamps, durations, dates | `/gleam-lang/time` |
+| JSON encoding/decoding | `/gleam-lang/json` |
+| Data structures (heap, map, set, deque) | `/schurhammer/gleamy_structures` |
+| HTTP server (mist, WebSocket, SSE) | `/rawhat/mist` |
+| Package discovery, ecosystem | `/gleam-lang/awesome-gleam` |
 
 ```
 task(
   subagent_type="general",
   description="Query Gleam stdlib",
-  prompt="Use deepwiki_ask_question to query 'gleam-lang/stdlib': How does the list module handle sorting and filtering?"
+  prompt="Use query-docs with libraryId '/gleam-lang/stdlib' and query: 'How does the list module handle sorting and filtering?'"
 )
 ```
 
 ### 2. GitHub CLI (Fallback)
 
-When deepwiki is unavailable or lacks detail, use `gh` to search/read repos directly:
+When Context7 is unavailable or lacks detail, use `gh` to search/read repos directly:
 
 ```bash
 # Search code in a repo
@@ -179,4 +179,3 @@ create(name:, email: "a@b.com")
 | `list.at(items, n)` indexing | Pattern match or fold |
 | Nested `result.try` callbacks | `use` expressions |
 | Boolean flags for states | Sum types |
-
