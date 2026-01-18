@@ -24,6 +24,10 @@ OPENCODE_HOME="${HOME}/.config/opencode"
 # Claude config root
 CLAUDE_HOME="${HOME}/.claude"
 
+# PI_HOME
+# Pi config root
+PI_HOME="${HOME}/.config/pi/agent"
+
 # VERBOSE
 # Set to 1 to emit logs
 VERBOSE="${VERBOSE:-off}"
@@ -111,6 +115,7 @@ tool_dirs() {
   printf '%s\n' "${TOOLS_HOME}/claude ${CLAUDE_HOME}"
   printf '%s\n' "${TOOLS_HOME}/codex ${CODEX_HOME}"
   printf '%s\n' "${TOOLS_HOME}/opencode ${OPENCODE_HOME}"
+  printf '%s\n' "${TOOLS_HOME}/pi ${PI_HOME}"
 }
 
 # run_pairs
@@ -132,6 +137,9 @@ asset_copies() {
     for tool_home in "${CLAUDE_HOME}" "${CODEX_HOME}" "${OPENCODE_HOME}"; do
       printf '%s\n' "${asset_path} ${tool_home}/${asset_name}"
     done
+    pi_dest="${PI_HOME}/${asset_name}"
+    [ "${asset_name}" = "commands" ] && pi_dest="${PI_HOME}/prompts"
+    printf '%s\n' "${asset_path} ${pi_dest}"
   done
 }
 
@@ -141,6 +149,7 @@ agent_files() {
   printf '%s\n' "${AGENTS_HOME}/AGENTS.md ${CODEX_HOME}/AGENTS.md"
   printf '%s\n' "${AGENTS_HOME}/AGENTS.md ${OPENCODE_HOME}/AGENTS.md"
   printf '%s\n' "${AGENTS_HOME}/AGENTS.md ${CLAUDE_HOME}/CLAUDE.md"
+  printf '%s\n' "${AGENTS_HOME}/AGENTS.md ${PI_HOME}/AGENTS.md"
 }
 
 tool_dirs | run_pairs copy_dir_into

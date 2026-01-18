@@ -1,0 +1,16 @@
+{
+  "lastChangelogVersion": "0.49.0",
+  "theme": "light",
+  "skills": {
+    "enabled": true,
+    "enableCodexUser": false,
+    "enableClaudeUser": false,
+    "enableClaudeProject": false,
+    "enablePiUser": true,
+    "enablePiProject": true
+  },
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.2-codex",
+  "defaultThinkingLevel": "high",
+  "hideThinkingBlock": true
+}
