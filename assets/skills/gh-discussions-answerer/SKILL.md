@@ -1,7 +1,6 @@
 ---
 name: gh-discussions-answerer
 description: Find and answer unanswered GitHub discussions. Activate when user wants to contribute to open source discussions, help answer GitHub questions, or find discussions to answer. Delegates all work to subagents.
-allowed-tools: [task]
 ---
 
 # GitHub Discussions Answerer
