@@ -1,108 +1,35 @@
 ---
 name: exa-search
-description: Deep web research, structured answers, and content retrieval using Exa. Use for heavy research, multi-step synthesis, or rich structured outputs; optionally pair with brave-search for fast scoping but not required.
+description: Deep web research, structured answers, and content retrieval using Exa. Use for heavy research, multi-step synthesis, or rich structured outputs; optionally pair with brave-search for fast scoping but not required. Execute Exa MCP calls via MCPorter (load the mcporter skill).
 ---
 
-# Exa Search
+# Exa MCP
 
-Use Exa for deep search, content retrieval, and research tasks. Requires `EXA_API_KEY`.
+Use Exa for web search, code context, crawling, and research tasks. This skill documents Exa’s MCP surface; execute calls via MCPorter (see the mcporter skill for CLI mechanics).
 
-## Setup
-
-Assume `SKILL_DIR` points to this skill folder.
+## Quick start
 
 ```bash
-bun --cwd "$SKILL_DIR" install
-export EXA_API_KEY="your-key"
+mcporter list exa
+mcporter call exa.web_search_exa query="..." numResults=5 --output json
 ```
 
-Scripts: run `bun --cwd "$SKILL_DIR" scripts/doctor.ts` to verify env.
-
-References: see `references/tooling.md` for constraints and `references/flows.md` for minimal workflows.
-
-Assets: `assets/query-templates.json` contains reusable prompt templates.
-
-## Tools
-
-### search
+## Common calls
 
 ```bash
-bun --cwd "$SKILL_DIR" exa.ts search "query" -n 5 --type deep --text-max 2000
+mcporter call exa.get_code_context_exa query="..." tokensNum=5000 --output json
+mcporter call exa.crawling_exa url="https://example.com" maxCharacters=3000 --output json
+mcporter call exa.company_research_exa companyName="Exa AI" numResults=3 --output json
+mcporter call exa.deep_researcher_start instructions="..." model="exa-research" --output json
+mcporter call exa.deep_researcher_check taskId="..." --output json
 ```
 
-Options:
-- `-n <num>`
-- `--type <auto|fast|deep>`
-- `--text-max <num>`
+Poll `deep_researcher_check` until `status` is `completed`.
 
-### contents
+## Query templates
 
-```bash
-bun --cwd "$SKILL_DIR" exa.ts contents https://example.com --text-max 2000
-```
+See `assets/query-templates.json` for reusable parameter templates.
 
-Options:
-- `--text-max <num>`
+## Reference
 
-### answer
-
-```bash
-bun --cwd "$SKILL_DIR" exa.ts answer "question" --text
-```
-
-Options:
-- `--text`
-- `--system "instruction"`
-- `--schema '{"type":"object","properties":{...}}'`
-
-### research-start
-
-```bash
-bun --cwd "$SKILL_DIR" exa.ts research-start "instructions" --model exa-research
-```
-
-Options:
-- `--model <exa-research|exa-research-pro>`
-
-### research-check
-
-```bash
-bun --cwd "$SKILL_DIR" exa.ts research-check <task-id>
-```
-
-### deep-search
-
-```bash
-bun --cwd "$SKILL_DIR" exa.ts deep-search "objective" --queries "a,b,c"
-```
-
-Options:
-- `--queries a,b,c`
-
-### code-context
-
-```bash
-bun --cwd "$SKILL_DIR" exa.ts code-context "query"
-```
-
-Options:
-- `--tokens <1000-50000>` (default 50000)
-
-### company-research
-
-```bash
-bun --cwd "$SKILL_DIR" exa.ts company-research "company name" -n 3
-```
-
-Options:
-- `-n <num>`
-
-### linkedin-search
-
-```bash
-bun --cwd "$SKILL_DIR" exa.ts linkedin-search "query" --type profiles -n 3
-```
-
-Options:
-- `--type <profiles|companies|all>`
-- `-n <num>`
+See `reference.md` for server URL details, tool catalog, and defaults.

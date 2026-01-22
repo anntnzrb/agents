@@ -1,53 +1,18 @@
 {
   "search": {
     "query": "<topic>",
-    "type": "deep",
     "numResults": 5,
-    "textMax": 2000
+    "type": "deep",
+    "contextMaxCharacters": 10000
   },
-  "searchFast": {
+  "searchWithContent": {
     "query": "<topic>",
-    "type": "fast",
     "numResults": 3,
-    "textMax": 1200
+    "type": "deep",
+    "contextMaxCharacters": 20000
   },
-  "contents": {
-    "url": "https://example.com",
-    "textMax": 2000
-  },
-  "answer": {
-    "question": "<question>",
-    "text": true,
-    "system": "Be concise and cite sources."
-  },
-  "research": {
-    "instructions": "Summarize <topic> in 3 bullets.",
-    "model": "exa-research"
-  },
-  "researchDeep": {
-    "instructions": "Build a short brief on <topic> with key facts and sources.",
-    "model": "exa-research-pro"
-  },
-  "deepSearch": {
-    "objective": "<research objective>",
-    "queries": ["<query-1>", "<query-2>"]
-  },
-  "codeContext": {
-    "query": "<library> <topic>",
-    "tokens": 50000
-  },
-  "companyResearch": {
-    "companyName": "<company>",
-    "numResults": 3
-  },
-  "linkedinSearchProfiles": {
-    "query": "<role> at <company>",
-    "type": "profiles",
-    "numResults": 3
-  },
-  "linkedinSearchCompanies": {
-    "query": "<industry> startups",
-    "type": "companies",
-    "numResults": 3
+  "content": {
+    "url": "https://example.com/article",
+    "maxCharacters": 3000
   }
 }
