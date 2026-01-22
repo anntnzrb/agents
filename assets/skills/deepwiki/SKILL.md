@@ -1,0 +1,29 @@
+---
+name: deepwiki
+description: DeepWiki MCP for GitHub repository docs and Q&A. Use for deepwiki, repo docs, GitHub repository questions, or codebase queries. Execute DeepWiki MCP calls via MCPorter.
+---
+
+# DeepWiki MCP
+
+Use DeepWiki MCP for public GitHub repo documentation and Q&A. Load the mcporter skill to execute calls.
+
+## Quick start
+
+```bash
+read_wiki_structure repoName="owner/repo"
+```
+
+## Common calls
+
+```bash
+read_wiki_contents repoName="owner/repo"
+ask_question repoName="owner/repo" question="..."
+```
+
+## Query templates
+
+See `assets/query-templates.json` for reusable parameter templates.
+
+## Reference
+
+See `reference.md` for server URL details, tool catalog, and defaults.
