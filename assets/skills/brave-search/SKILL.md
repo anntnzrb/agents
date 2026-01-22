@@ -1,61 +1,34 @@
 ---
 name: brave-search
-description: Fast, lightweight web search and content extraction via Brave Search (HTML scrape). Use for quick lookups, scoping, or lightweight docs/fact checks; optionally pair with exa-search for deep multi-step research when needed.
+description: Fast, lightweight web search and content extraction via Brave Search. Use for quick lookups, scoping, or lightweight docs/fact checks; optionally pair with exa-search for deep research. Execute Brave MCP calls via MCPorter (load the mcporter skill).
 ---
 
-# Brave Search
+# Brave Search MCP
 
-Use Brave Search for headless web search and content extraction. Avoid browsers.
+Use Brave Search MCP for web, local, image, video, news, and summarization. This skill documents Brave’s MCP surface; run tool calls with MCPorter.
 
-## Setup
-
-Assume `SKILL_DIR` points to this skill folder.
+## Quick start
 
 ```bash
-bun --cwd "$SKILL_DIR" install
+mcporter list brave-search
+mcporter call brave-search.brave_web_search query="..." count=5 --output json
 ```
 
-No API key required (HTML scrape).
-
-Scripts: run `bun --cwd "$SKILL_DIR" scripts/doctor.ts` for a quick check.
-
-References: see `references/tooling.md` and `references/flows.md`.
-
-Assets: `assets/query-templates.json` contains reusable query templates.
-
-## Tools
-
-### search
+## Common calls
 
 ```bash
-bun --cwd "$SKILL_DIR" search.ts "query"                    # Basic search (5 results)
-bun --cwd "$SKILL_DIR" search.ts "query" -n 10              # More results
-bun --cwd "$SKILL_DIR" search.ts "query" --content          # Include page content as markdown
-bun --cwd "$SKILL_DIR" search.ts "query" -n 3 --content     # Combined
+mcporter call brave-search.brave_web_search query="..." count=5 summary=true --output json
+mcporter call brave-search.brave_local_search query="..." count=5 --output json
+mcporter call brave-search.brave_news_search query="..." count=5 freshness=pd --output json
+mcporter call brave-search.brave_image_search query="..." count=20 --output json
+mcporter call brave-search.brave_video_search query="..." count=20 --output json
+mcporter call brave-search.brave_summarizer key="..." inline_references=true --output json
 ```
 
-Options:
-- `-n <num>`
-- `--content`
+## Query templates
 
-### content
+See `assets/query-templates.json` for reusable parameter templates.
 
-```bash
-bun --cwd "$SKILL_DIR" content.ts https://example.com/article
-```
+## Reference
 
-Fetch a URL and extract readable content as markdown.
-
-## Output Format
-
-```
---- Result 1 ---
-Title: Page Title
-Link: https://example.com/page
-Snippet: Description from search results
-Content: (if --content flag used)
-  Markdown content extracted from the page...
-
---- Result 2 ---
-...
-```
+See `reference.md` for server setup, tool catalog, and defaults.
