@@ -15,6 +15,10 @@
       "env": {
         "BRAVE_API_KEY": "${BRAVE_API_KEY}"
       }
+    },
+    "deepwiki": {
+      "description": "DeepWiki MCP",
+      "serverUrl": "https://mcp.deepwiki.com/mcp"
     }
   }
 }
