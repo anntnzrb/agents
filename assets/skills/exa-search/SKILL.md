@@ -1,27 +1,26 @@
 ---
 name: exa-search
-description: Deep web research, structured answers, and content retrieval using Exa. Use for heavy research, multi-step synthesis, or rich structured outputs; optionally pair with brave-search for fast scoping but not required. Execute Exa MCP calls via MCPorter (load the mcporter skill).
+description: Primary search: deep web research, structured answers, and content retrieval using Exa. Use for heavy research, multi-step synthesis, or rich structured outputs. Load the mcporter skill to execute this skill’s MCP calls.
 ---
 
 # Exa MCP
 
-Use Exa for web search, code context, crawling, and research tasks. This skill documents Exa’s MCP surface; execute calls via MCPorter (see the mcporter skill for CLI mechanics).
+Use Exa for web search, code context, crawling, and research tasks. This skill documents Exa’s MCP surface and tool parameters.
 
 ## Quick start
 
 ```bash
-mcporter list exa
-mcporter call exa.web_search_exa query="..." numResults=5 --output json
+web_search_exa query="..." numResults=5
 ```
 
 ## Common calls
 
 ```bash
-mcporter call exa.get_code_context_exa query="..." tokensNum=5000 --output json
-mcporter call exa.crawling_exa url="https://example.com" maxCharacters=3000 --output json
-mcporter call exa.company_research_exa companyName="Exa AI" numResults=3 --output json
-mcporter call exa.deep_researcher_start instructions="..." model="exa-research" --output json
-mcporter call exa.deep_researcher_check taskId="..." --output json
+get_code_context_exa query="..." tokensNum=5000
+crawling_exa url="https://example.com" maxCharacters=3000
+company_research_exa companyName="Exa AI" numResults=3
+deep_researcher_start instructions="..." model="exa-research"
+deep_researcher_check taskId="..."
 ```
 
 Poll `deep_researcher_check` until `status` is `completed`.

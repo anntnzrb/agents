@@ -13,33 +13,6 @@ The official MCP server is `@brave/brave-search-mcp-server` (supports STDIO and 
 - `BRAVE_MCP_ENABLED_TOOLS` (whitelist)
 - `BRAVE_MCP_DISABLED_TOOLS` (blacklist)
 
-### MCPorter config examples
-
-STDIO:
-```json
-{
-  "mcpServers": {
-    "brave-search": {
-      "command": "npx",
-      "args": ["-y", "@brave/brave-search-mcp-server"],
-      "env": { "BRAVE_API_KEY": "YOUR_API_KEY" }
-    }
-  }
-}
-```
-
-HTTP:
-```json
-{
-  "mcpServers": {
-    "brave-search": {
-      "url": "http://localhost:8080/mcp",
-      "env": { "BRAVE_API_KEY": "YOUR_API_KEY" }
-    }
-  }
-}
-```
-
 ## Tool catalog
 
 ### brave_web_search
@@ -72,4 +45,3 @@ Summarize results using a summary key from `brave_web_search` with `summary=true
 
 Key params: `key`, `entity_info`, `inline_references`.
 
-Use `mcporter list brave-search --all-parameters` for full schemas.

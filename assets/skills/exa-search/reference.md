@@ -26,12 +26,3 @@
 - **deep_researcher_start**: Start a deep research job. Key params: `instructions`, `model` (`exa-research` | `exa-research-pro`).
 - **deep_researcher_check**: Poll for deep research completion. Key param: `taskId`.
 
-Use `mcporter list exa --all-parameters` to see the full schema for each tool.
-
-## Output guidance
-
-Prefer JSON output when calling tools via MCPorter:
-
-```
-mcporter call exa.web_search_exa query="..." --output json
-```

@@ -24,4 +24,3 @@ Ask a question about a GitHub repository.
 - `repoName` (required): `owner/repo`
 - `question` (required): question text
 
-Use `mcporter list deepwiki --all-parameters` for full schemas.
