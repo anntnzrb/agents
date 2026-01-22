@@ -7,6 +7,14 @@
     "context7": {
       "description": "Context7",
       "baseUrl": "https://mcp.context7.com/mcp"
+    },
+    "brave-search": {
+      "description": "Brave Search MCP",
+      "command": "bun",
+      "args": ["x", "@brave/brave-search-mcp-server"],
+      "env": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      }
     }
   }
 }
