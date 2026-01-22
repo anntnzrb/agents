@@ -28,6 +28,9 @@ CLAUDE_HOME="${HOME}/.claude"
 # Pi config root
 PI_HOME="${HOME}/.config/pi/agent"
 
+# MCPORTER_HOME
+MCPORTER_HOME="${HOME}/.mcporter"
+
 # VERBOSE
 # Set to 1 to emit logs
 VERBOSE="${VERBOSE:-off}"
@@ -152,6 +155,13 @@ agent_files() {
   printf '%s\n' "${AGENTS_HOME}/AGENTS.md ${PI_HOME}/AGENTS.md"
 }
 
+# config_files
+# Map standalone config files
+config_files() {
+  printf '%s\n' "${ASSETS_HOME}/mcporter.jsonc ${MCPORTER_HOME}/mcporter.json"
+}
+
 tool_dirs | run_pairs copy_dir_into
 asset_copies | run_pairs copy_dir_into
 agent_files | run_pairs copy_item
+config_files | run_pairs copy_item
