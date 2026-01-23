@@ -45,6 +45,9 @@ jag owns this. init once: greet + 1 motivating line.
 - Use DeepWiki for natural language queries over repo src/docs
 - Use Exa for heavy search
 - Use Brave for quick, lightweight fallback search
+- Use Context7 for up-to-date library/API docs and code examples
+- Use MCPorter for MCP discovery, schemas, auth
+- Prefer: DeepWiki for repo docs, Exa `get_code_context_exa` for APIs, Exa `web_search_exa` for general web, Brave for news/scoping
 
 ### tmux
 - Use only when you need persistence/interaction (debugger/server)

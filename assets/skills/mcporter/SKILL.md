@@ -7,6 +7,21 @@ description: "MCP (Model Context Protocol) CLI workflows via MCPorter. Use for M
 
 Use MCPorter to list MCP servers, call tools, and manage MCP config. Prefer `bun x mcporter` (fallback: `npx --yes mcporter`).
 
+## When to use
+
+- MCP discovery: list configured servers/tools
+- Schema checks: confirm required params and types
+- Auth/OAuth setup for HTTP servers
+- Ad-hoc servers (HTTP/SSE/stdio)
+
+## Discovery checklist
+
+```bash
+mcporter list                         # configured servers
+mcporter list <server> --schema       # required params + enums
+mcporter config list                  # config entries
+```
+
 ## Quick start
 
 ```bash

@@ -7,6 +7,19 @@ description: "Primary search: deep web research, structured answers, and content
 
 Use Exa for web search, code context, crawling, and research tasks. This skill documents Exa’s MCP surface and tool parameters.
 
+## When to use (decision guide)
+
+- `get_code_context_exa`: library/API docs, SDK usage, programming questions
+- `web_search_exa`: general web research + citations
+- `deep_researcher_start`: multi-source synthesis; complex topics
+- `crawling_exa`: extract full text from a known URL
+- Repo docs/Q&A: prefer DeepWiki first
+
+## Freshness tips
+
+- Use `livecrawl="preferred"` for newest pages
+- Use `type="deep"` for broader coverage
+
 ## Quick start
 
 ```bash

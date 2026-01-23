@@ -7,6 +7,19 @@ description: "Fallback search: fast, lightweight web search and content extracti
 
 Use Brave Search MCP for web, local, image, video, news, and summarization. This skill documents Brave’s MCP surface and tool parameters.
 
+## When to use
+
+- Fast scoping / quick lookups
+- News + recency filters
+- Image/video/local search
+- Fallback when Exa is overkill
+- For deep research or code docs, prefer Exa
+
+## Query tips
+
+- Use `freshness=` for news (e.g. `pd`, `pw`, `pm`, `py`)
+- Add `summary=true` for short snippets
+
 ## Quick start
 
 ```bash

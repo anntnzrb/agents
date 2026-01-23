@@ -7,6 +7,18 @@ description: "DeepWiki MCP for GitHub repo docs and Q&A. Use for deepwiki, repo 
 
 Use DeepWiki MCP for public GitHub repo documentation and Q&A.
 
+## Constraints
+
+- Public repos only (private needs Devin account)
+- `repoName` must be `owner/repo`
+
+## Suggested flow
+
+1) `read_wiki_structure` for topic map  
+2) `read_wiki_contents` for scoped docs  
+3) `ask_question` for targeted Q&A  
+If empty/insufficient: fall back to Exa/Brave.
+
 ## Quick start
 
 ```bash
