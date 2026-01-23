@@ -250,42 +250,6 @@
   },
 
   /* **************************************************************************
-   * MCPs
-   * ************************************************************************ */
-  "mcp": {
-    "exa": {
-      "enabled": true,
-      "type": "remote",
-      "url": "https://mcp.exa.ai/mcp?tools=web_search_exa,get_code_context_exa,crawling_exa,deep_researcher_start,deep_researcher_check",
-    },
-    "sequentialthinking": {
-      "enabled": false,
-      "type": "remote",
-      "url": "https://remote.mcpservers.org/sequentialthinking/mcp",
-    },
-    "deepwiki": {
-      "enabled": false,
-      "type": "remote",
-      "url": "https://mcp.deepwiki.com/mcp",
-    },
-    "context7": {
-      "enabled": true,
-      "type": "remote",
-      "url": "https://mcp.context7.com/mcp",
-    },
-    "chrome-devtools-mcp": {
-      "enabled": false,
-      "type": "local",
-      "command": ["bun", "x", "chrome-devtools-mcp@latest"],
-    },
-    "reddit-mcp-buddy": {
-      "enabled": false,
-      "type": "local",
-      "command": ["bun", "x", "reddit-mcp-buddy"],
-    },
-  },
-
-  /* **************************************************************************
    * MISC
    * ************************************************************************ */
   "default_agent": "plan",
