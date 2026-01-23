@@ -1,6 +1,6 @@
 ---
 name: exa-search
-description: Primary search: deep web research, structured answers, and content retrieval using Exa. Use for heavy research, multi-step synthesis, or rich structured outputs. Load the mcporter skill to execute this skill’s MCP calls.
+description: "Primary search: deep web research, structured answers, and content retrieval using Exa. Use for heavy research, multi-step synthesis, or rich structured outputs. Load the mcporter skill to execute this skill's MCP calls."
 ---
 
 # Exa MCP

@@ -1,6 +1,6 @@
 ---
 name: deepwiki
-description: DeepWiki MCP for GitHub repo docs and Q&A. Use for deepwiki, repo docs, GitHub repository questions, or codebase queries. Load the mcporter skill to execute this skill’s MCP calls.
+description: "DeepWiki MCP for GitHub repo docs and Q&A. Use for deepwiki, repo docs, GitHub repository questions, or codebase queries. Load the mcporter skill to execute this skill’s MCP calls."
 ---
 
 # DeepWiki MCP

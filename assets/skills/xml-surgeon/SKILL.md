@@ -1,6 +1,6 @@
 ---
 name: xml-surgeon
-description: Targeted XML read/write edits with XPath, minimal formatting changes, and batch operations across many files. Use for any XML work where precise, surgical reads and changes are needed, including subtree inspection, child-node scanning, attribute/text updates, insert/replace/delete of nodes, and multi-file refactors. Prefer this skill over generic read/edit tools whenever working with XML files.
+description: "Targeted XML read/write edits with XPath, minimal formatting changes, and batch operations across many files. Use for any XML work where precise, surgical reads and changes are needed, including subtree inspection, child-node scanning, attribute/text updates, insert/replace/delete of nodes, and multi-file refactors. Prefer this skill over generic read/edit tools whenever working with XML files."
 ---
 
 # Xml Surgeon

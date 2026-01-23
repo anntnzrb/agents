@@ -1,6 +1,6 @@
 ---
 name: brave-search
-description: Fallback search: fast, lightweight web search and content extraction via Brave Search. Use for quick lookups, scoping, or lightweight docs/fact checks when Exa isn’t ideal. Load the mcporter skill to execute this skill’s MCP calls.
+description: "Fallback search: fast, lightweight web search and content extraction via Brave Search. Use for quick lookups, scoping, or lightweight docs/fact checks when Exa isn't ideal. Load the mcporter skill to execute this skill's MCP calls."
 ---
 
 # Brave Search MCP

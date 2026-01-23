@@ -1,6 +1,6 @@
 ---
 name: clojure
-description: Develop Clojure applications using deps.edn, tools.deps, and functional patterns. Activate when working with .clj/.cljc/.cljs files, deps.edn, or user mentions Clojure, REPL, spec, transducers, reducers, or functional programming.
+description: "Develop Clojure applications using deps.edn, tools.deps, and functional patterns. Activate when working with .clj/.cljc/.cljs files, deps.edn, or user mentions Clojure, REPL, spec, transducers, reducers, or functional programming."
 ---
 
 # Clojure Development

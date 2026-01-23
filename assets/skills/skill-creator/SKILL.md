@@ -1,6 +1,6 @@
 ---
 name: skill-creator
-description: Create and optimize Agent skills interactively. Activate when user wants to create a new skill, write a SKILL.md, or mentions skill creation/optimization.
+description: "Create and optimize Agent skills interactively. Activate when user wants to create a new skill, write a SKILL.md, or mentions skill creation/optimization."
 ---
 
 # Skill Creator

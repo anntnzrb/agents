@@ -1,6 +1,6 @@
 ---
 name: rust-script
-description: Expert in rust-script for running Rust files as scripts without compilation setup. Activate when working with .rs or .ers script files, user mentions rust-script, cargo-script, or scripting Rust, writing one-off Rust scripts with dependencies, or using expr, loop, or inline dependency manifests. Proficient in idiomatic Rust patterns, error handling, async, and CLI tooling.
+description: "Expert in rust-script for running Rust files as scripts without compilation setup. Activate when working with .rs or .ers script files, user mentions rust-script, cargo-script, or scripting Rust, writing one-off Rust scripts with dependencies, or using expr, loop, or inline dependency manifests. Proficient in idiomatic Rust patterns, error handling, async, and CLI tooling."
 ---
 
 # rust-script Expert

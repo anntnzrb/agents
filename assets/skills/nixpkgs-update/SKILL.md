@@ -1,6 +1,6 @@
 ---
 name: nixpkgs-update
-description: Update nixpkgs packages with nix-update and nixpkgs-review. Activate when user wants to bump a package version, contribute to nixpkgs, update Nix packages, or mentions nix-update, nixpkgs-review, or nixpkgs contribution.
+description: "Update nixpkgs packages with nix-update and nixpkgs-review. Activate when user wants to bump a package version, contribute to nixpkgs, update Nix packages, or mentions nix-update, nixpkgs-review, or nixpkgs contribution."
 ---
 
 # Nixpkgs Package Update

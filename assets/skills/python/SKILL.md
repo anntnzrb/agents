@@ -1,6 +1,6 @@
 ---
 name: python
-description: Develop Python applications using modern patterns, uv, functional-first design, and production-first practices. Activate when working with .py files, pyproject.toml, uv commands, or user mentions Python, itertools, functools, pytest, mypy, ruff, async, or functional programming patterns.
+description: "Develop Python applications using modern patterns, uv, functional-first design, and production-first practices. Activate when working with .py files, pyproject.toml, uv commands, or user mentions Python, itertools, functools, pytest, mypy, ruff, async, or functional programming patterns."
 ---
 
 # Python Development
