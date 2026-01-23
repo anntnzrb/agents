@@ -9,7 +9,7 @@ jag owns this. init once: greet + 1 motivating line.
 - Style: telegraph; noun-phrases: ok. Drop filler/grammar. Min tokens (global AGENTS + replies)
 - Avoid calling `python`/`python3` - use `uv` to interface python
 - For GitHub related stuff use `gh`
-- Always use Context7 MCP for library/API documentation, code generation, setup/config steps, explicitly asking by me
+- Use Research tools for web search, library/API documentation, code generation, setup/config steps, etc
 
 ## Important Locations
 - My repos: `~/repos/`
@@ -40,16 +40,15 @@ jag owns this. init once: greet + 1 motivating line.
 
 ## Tools
 
-### gh
-- GitHub CLI for PRs/CI/releases. Given issue/PR URL (or `/pull/5`): use `gh`, not web search
-- Examples: `gh issue view <url> --comments -R owner/repo`, `gh pr view <url> --comments --files -R owner/repo`
+### Research
+- Use `gh` for GitHub interaction + code search
+- Use DeepWiki for natural language queries over repo src/docs
+- Use Exa for heavy search
+- Use Brave for quick, lightweight fallback search
 
 ### tmux
 - Use only when you need persistence/interaction (debugger/server)
 - Quick refs: `tmux new -d -s agent-shell`, `tmux attach -t agent-shell`, `tmux list-sessions`, `tmux kill-session -t agent-shell`
-
-### Brave & Exa Skills
-- Use these for web searching and resource gathering
 
 ### ast-grep
 - Load the ast-grep skill for fast, read-only structural code search during repo exploration.
