@@ -19,6 +19,10 @@
     "deepwiki": {
       "description": "DeepWiki MCP",
       "serverUrl": "https://mcp.deepwiki.com/mcp"
+    },
+    "grep": {
+      "description": "Grep.app MCP",
+      "serverUrl": "https://mcp.grep.app"
     }
   }
 }
