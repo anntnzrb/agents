@@ -33,9 +33,13 @@ collab = true # EXP
 remote_compaction = true
 shell_snapshot = true
 skills = true
-steer = true # ENTER = SEND ; TAB = queue
 unified_exec = true
-web_search_request = true
+
+# steer = ENTER ; queue = TAB
+steer = true
+
+# disable builtin web search, use research skills
+web_search_request = false
 
 # -----------------------------------------------------------------------------
 # MISC
