@@ -23,6 +23,18 @@
     "grep": {
       "description": "Grep.app MCP",
       "serverUrl": "https://mcp.grep.app"
+    },
+    "n8n": {
+      "description": "n8n MCP",
+      "command": "bun",
+      "args": [
+        "x",
+        "supergateway",
+        "--streamableHttp",
+        "${N8N_MCP_URL}",
+        "--header",
+        "Authorization: Bearer ${N8N_MCP_TOKEN}"
+      ]
     }
   }
 }
