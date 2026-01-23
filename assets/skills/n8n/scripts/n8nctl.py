@@ -109,6 +109,15 @@ def _require_workflow_fields(data: dict[str, Any], path: Path) -> dict[str, Any]
     return data
 
 
+def _workflow_payload(data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "name": data.get("name"),
+        "nodes": data.get("nodes"),
+        "connections": data.get("connections"),
+        "settings": data.get("settings"),
+    }
+
+
 def _validate_workflow_data(data: dict[str, Any], path: Path) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -190,12 +199,12 @@ def cmd_get(cfg: Config, args: argparse.Namespace) -> dict[str, Any]:
 
 
 def cmd_create(cfg: Config, args: argparse.Namespace) -> dict[str, Any]:
-    payload = _require_workflow_fields(_load_json(args.path), args.path)
+    payload = _workflow_payload(_require_workflow_fields(_load_json(args.path), args.path))
     return _request(cfg, "POST", "/api/v1/workflows", body=payload)
 
 
 def cmd_update(cfg: Config, args: argparse.Namespace) -> dict[str, Any]:
-    payload = _require_workflow_fields(_load_json(args.path), args.path)
+    payload = _workflow_payload(_require_workflow_fields(_load_json(args.path), args.path))
     return _request(cfg, "PUT", f"/api/v1/workflows/{args.workflow_id}", body=payload)
 
 
@@ -217,12 +226,14 @@ def cmd_mcp_enable(cfg: Config, args: argparse.Namespace) -> dict[str, Any]:
     wf = _request(cfg, "GET", f"/api/v1/workflows/{args.workflow_id}")
     settings = dict(wf.get("settings") or {})
     settings["availableInMCP"] = True
-    payload = {
-        "name": wf.get("name"),
-        "nodes": wf.get("nodes"),
-        "connections": wf.get("connections"),
-        "settings": settings,
-    }
+    payload = _workflow_payload(
+        {
+            "name": wf.get("name"),
+            "nodes": wf.get("nodes"),
+            "connections": wf.get("connections"),
+            "settings": settings,
+        }
+    )
     return _request(cfg, "PUT", f"/api/v1/workflows/{args.workflow_id}", body=payload)
 
 
