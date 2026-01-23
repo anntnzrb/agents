@@ -20,6 +20,11 @@ Use Exa for web search, code context, crawling, and research tasks. This skill d
 - Use `livecrawl="preferred"` for newest pages
 - Use `type="deep"` for broader coverage
 
+## Notes
+
+- `company_research_exa` and `linkedin_search_exa` are noisy + long; use only when user explicitly asks for company/people research.
+- `deep_researcher_start` is slow and may cite mixed-quality sources; cross-check key claims.
+
 ## Quick start
 
 ```bash

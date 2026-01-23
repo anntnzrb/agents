@@ -19,6 +19,10 @@ Use DeepWiki MCP for public GitHub repo documentation and Q&A.
 3) `ask_question` for targeted Q&A  
 If empty/insufficient: fall back to Exa/Brave.
 
+## Notes
+
+- `read_wiki_contents` can be large; use `ask_question` for narrow answers.
+
 ## Quick start
 
 ```bash

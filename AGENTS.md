@@ -48,7 +48,9 @@ jag owns this. init once: greet + 1 motivating line.
 - Use Context7 for up-to-date library/API docs and code examples
 - Use Grep.app MCP for public OSS code search (regex)
 - Use MCPorter for MCP discovery, schemas, auth
-- Prefer: DeepWiki for repo docs, Context7 for library docs, Exa `get_code_context_exa` for APIs, Exa `web_search_exa` for general web, Brave for news/scoping, Grep.app for OSS code search
+- Prefer: DeepWiki for repo docs, Context7 for library docs, Exa `get_code_context_exa` for APIs, Exa `web_search_exa` for general web, Brave for fast scoping, Grep.app for OSS code patterns
+- Exa `company_research_exa`/`linkedin_search_exa`: only if user explicitly asks for company/people research
+- Brave may return single best-hit; if you need multi-source coverage, switch to Exa
 
 ### tmux
 - Use only when you need persistence/interaction (debugger/server)

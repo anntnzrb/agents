@@ -19,6 +19,11 @@ Use Brave Search MCP for web, local, image, video, news, and summarization. This
 
 - Use `freshness=` for news (e.g. `pd`, `pw`, `pm`, `py`)
 - Add `summary=true` for short snippets
+- If summarizer fails or results are too thin, switch to Exa
+
+## Output notes
+
+- Some calls return a single top result (not an array). Treat as best-hit.
 
 ## Quick start
 
