@@ -30,7 +30,7 @@ TOOL_CONFIG: dict[str, ToolConfig] = {
     "claude": ToolConfig(Path.home() / ".claude", agent_file="CLAUDE.md"),
     "codex": ToolConfig(Path.home() / ".config" / "codex"),
     "opencode": ToolConfig(Path.home() / ".config" / "opencode"),
-    "pi": ToolConfig(Path.home() / ".config" / "pi" / "agent", asset_renames={"commands": "prompts"}),
+    "pi": ToolConfig(Path.home() / ".config" / "pi", asset_renames={"commands": "prompts"}),
 }
 
 
