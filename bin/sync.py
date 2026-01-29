@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import functools
 import itertools
+import os
 import shutil
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -21,6 +23,8 @@ TOOLS_HOME = AGENTS_HOME / "tools"
 MCPORTER_HOME = Path.home() / ".mcporter"
 
 DEFAULT_AGENT_FILE = "AGENTS.md"
+
+INSTALL_TIMEOUT_SECONDS = 120
 
 
 @dataclass(frozen=True)
@@ -203,10 +207,83 @@ def run_jobs(jobs: Iterable[Job]) -> bool:
     return all(HANDLERS[job.kind](job.src, job.dst) for job in jobs)
 
 
+def iter_extension_packages(root: Path) -> Iterator[Path]:
+    """Yield extension package roots below a given root."""
+    if not root.is_dir():
+        return
+    for current, dirnames, filenames in os.walk(root):
+        if "node_modules" in dirnames:
+            dirnames.remove("node_modules")
+        if "package.json" in filenames:
+            yield Path(current)
+
+
+def needs_node_install(package_dir: Path) -> bool:
+    """Return True if node dependencies should be installed."""
+    if not (package_dir / "package.json").is_file():
+        return False
+    return not (package_dir / "node_modules").exists()
+
+
+def choose_installer(package_dir: Path) -> list[str] | None:
+    """Pick a package manager based on lockfiles and availability."""
+    if (package_dir / "bun.lockb").exists() and shutil.which("bun"):
+        return ["bun", "install"]
+    if shutil.which("npm"):
+        return ["npm", "install"]
+    if shutil.which("bun"):
+        return ["bun", "install"]
+    return None
+
+
+def run_install(command: list[str], package_dir: Path) -> bool:
+    """Run a dependency install for a package directory."""
+    try:
+        result = subprocess.run(  # noqa: S603
+            command,
+            cwd=package_dir,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=INSTALL_TIMEOUT_SECONDS,
+        )
+    except FileNotFoundError:
+        err(f"missing installer: {command[0]}")
+        return False
+    except subprocess.TimeoutExpired:
+        err(f"deps install timed out in {package_dir}: {command[0]}")
+        return False
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip() or "unknown error"
+        err(f"deps install failed in {package_dir}: {command[0]} ({detail})")
+        return False
+    return True
+
+
+def install_extension_deps(root: Path) -> bool:
+    """Install node dependencies for extensions if needed."""
+    ok = True
+    for package_dir in iter_extension_packages(root):
+        if not needs_node_install(package_dir):
+            continue
+        command = choose_installer(package_dir)
+        if command is None:
+            err(f"no package manager available for {package_dir}")
+            ok = False
+            continue
+        if not run_install(command, package_dir):
+            ok = False
+            continue
+    return ok
+
+
 def main() -> int:
     """Run the sync and return an exit code."""
     builders = (tool_dirs, asset_copies, agent_files, config_files)
-    return 0 if run_jobs(iter_jobs(builders)) else 1
+    success = run_jobs(iter_jobs(builders))
+    if success and "pi" in TOOL_CONFIG:
+        success = install_extension_deps(tool_root(TOOL_CONFIG["pi"]) / "extensions")
+    return 0 if success else 1
 
 
 if __name__ == "__main__":
