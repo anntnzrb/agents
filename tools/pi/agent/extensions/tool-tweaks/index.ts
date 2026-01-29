@@ -26,16 +26,19 @@ const tools = (() => {
 const MAX_CALL_LENGTH = 120;
 const MAX_ARG_VALUE_LENGTH = 60;
 
+/** Truncate the args line to the max length. */
 const truncateArgs = (text: string, maxLength: number): string =>
   maxLength > 1 && text.length > maxLength
     ? `${text.slice(0, maxLength - 1)}…`
     : text;
 
+/** Truncate a single arg value. */
 const truncateValue = (text: string): string =>
   text.length > MAX_ARG_VALUE_LENGTH
     ? `${text.slice(0, MAX_ARG_VALUE_LENGTH - 1)}…`
     : text;
 
+/** Format a value for display in the call line. */
 const formatValue = (value: unknown): string => {
   if (typeof value === "string") return JSON.stringify(truncateValue(value));
   if (typeof value === "number" || typeof value === "boolean") return String(value);
@@ -47,6 +50,7 @@ const formatValue = (value: unknown): string => {
   return "";
 };
 
+/** Format a single key/value pair for display. */
 const formatArgEntry = (key: string, value: unknown): string | undefined =>
   pipe(
     Option.fromNullable(value),
@@ -58,6 +62,7 @@ const formatArgEntry = (key: string, value: unknown): string | undefined =>
     }),
   );
 
+/** Format tool args into a compact string. */
 const formatArgs = (args: ToolArgs): string | undefined => {
   const entries: string[] = [];
   for (const key in args) {
@@ -68,6 +73,7 @@ const formatArgs = (args: ToolArgs): string | undefined => {
   return entries.length > 0 ? entries.join(", ") : undefined;
 };
 
+/** Apply color styling to key/value args. */
 const colorizeArgs = (argsText: string, theme: Theme): string => {
   const parts = argsText.split(", ");
   const colored = parts.map((part) => {
@@ -84,6 +90,7 @@ const colorizeArgs = (argsText: string, theme: Theme): string => {
     theme.fg("muted", "}");
 };
 
+/** Render the minimal tool call header. */
 const renderHiddenCall = (toolName: string, args: ToolArgs, theme: Theme) => {
   const argsText = formatArgs(args);
   const titleText = argsText ? `${toolName}:` : toolName;
@@ -103,9 +110,11 @@ const renderHiddenCall = (toolName: string, args: ToolArgs, theme: Theme) => {
   return new Text(styled, 0, 0);
 };
 
+/** Render a minimal pending indicator while the tool is running. */
 const renderHiddenResult = (isPartial: boolean, theme: Theme) =>
   (isPartial ? new Text(theme.fg("muted", "…"), 0, 0) : undefined);
 
+/** Register the tool output suppression renderers. */
 export default function hideToolOutputExtension(pi: ExtensionAPI): void {
   for (const tool of tools) {
     pi.registerTool({
