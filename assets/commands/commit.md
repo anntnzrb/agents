@@ -1,9 +1,8 @@
 ---
 description: Create atomic git commits with conventional commits
-subtask: true
 ---
 
-Create atomic, logically-separated git commits using conventional commits.
+Create atomic, logically-separated git commits using conventional commits. Focus on the WHY rather than the WHAT using imperative mood. Use paragraphs instead of bullet points.
 
 WORKING DIRECTORY: ${1:-.} (defaults to current directory)
 
