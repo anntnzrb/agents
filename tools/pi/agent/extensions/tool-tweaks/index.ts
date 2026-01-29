@@ -47,7 +47,7 @@ const formatValue = (value: unknown): string => {
   return "";
 };
 
-const formatArgEntry = ([key, value]: [string, unknown]): string | undefined =>
+const formatArgEntry = (key: string, value: unknown): string | undefined =>
   pipe(
     Option.fromNullable(value),
     Option.map(formatValue),
@@ -58,13 +58,15 @@ const formatArgEntry = ([key, value]: [string, unknown]): string | undefined =>
     }),
   );
 
-const formatArgs = (args: ToolArgs): string | undefined =>
-  pipe(
-    Object.entries(args),
-    (entries) => entries.map(formatArgEntry),
-    (entries) => entries.filter((entry): entry is string => Boolean(entry)),
-    (entries) => (entries.length > 0 ? entries.join(", ") : undefined),
-  );
+const formatArgs = (args: ToolArgs): string | undefined => {
+  const entries: string[] = [];
+  for (const key in args) {
+    if (!Object.hasOwn(args, key)) continue;
+    const entry = formatArgEntry(key, args[key]);
+    if (entry) entries.push(entry);
+  }
+  return entries.length > 0 ? entries.join(", ") : undefined;
+};
 
 const colorizeArgs = (argsText: string, theme: Theme): string => {
   const parts = argsText.split(", ");
