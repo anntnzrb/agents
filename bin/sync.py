@@ -24,13 +24,18 @@ class ToolConfig:
     home: Path
     agent_file: str = DEFAULT_AGENT_FILE
     asset_renames: dict[str, str] = field(default_factory=dict)
+    tool_subdir: Path | None = None
 
 
 TOOL_CONFIG: dict[str, ToolConfig] = {
     "claude": ToolConfig(Path.home() / ".claude", agent_file="CLAUDE.md"),
     "codex": ToolConfig(Path.home() / ".config" / "codex"),
     "opencode": ToolConfig(Path.home() / ".config" / "opencode"),
-    "pi": ToolConfig(Path.home() / ".config" / "pi", asset_renames={"commands": "prompts"}),
+    "pi": ToolConfig(
+        Path.home() / ".config" / "pi" / "agent",
+        asset_renames={"commands": "prompts"},
+        tool_subdir=Path("agent"),
+    ),
 }
 
 
@@ -81,7 +86,13 @@ def rm_entry(path: Path) -> None:
 
 
 def tool_dirs() -> list[Job]:
-    return [Job(TOOLS_HOME / tool_name, tool.home, "dir") for tool_name, tool in TOOL_CONFIG.items()]
+    jobs: list[Job] = []
+    for tool_name, tool in TOOL_CONFIG.items():
+        src = TOOLS_HOME / tool_name
+        if tool.tool_subdir is not None:
+            src = src / tool.tool_subdir
+        jobs.append(Job(src, tool.home, "dir"))
+    return jobs
 
 
 def asset_copies() -> list[Job]:
