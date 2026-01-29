@@ -6,6 +6,11 @@
   "defaultThinkingLevel": "high",
   "hideThinkingBlock": true,
   "followUpMode": "all",
+  "showHardwareCursor": true,
+  "editorPaddingX": 1,
+  "steeringMode": "all",
+  "collapseChangelog": true,
+  "quietStartup": true,
   "skills": {
     "enabled": true,
     "enableCodexUser": false,
