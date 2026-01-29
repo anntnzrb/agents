@@ -1,0 +1,26 @@
+{
+  "name": "pi-footer-extension",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "scripts": {
+    "lint": "bun x @biomejs/biome lint .",
+    "fmt": "bun x @biomejs/biome format --write ."
+  },
+  "dependencies": {
+    "@mariozechner/pi-ai": "^0",
+    "@mariozechner/pi-coding-agent": "^0",
+    "@mariozechner/pi-tui": "^0",
+    "effect": "^3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2",
+    "@types/node": "^25",
+    "typescript": "^5"
+  }
+}
