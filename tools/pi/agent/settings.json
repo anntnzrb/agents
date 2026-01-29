@@ -1,6 +1,6 @@
 {
   "lastChangelogVersion": "0.50.3",
-  "theme": "dark",
+  "theme": "ef-elea-light",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.2-codex",
   "defaultThinkingLevel": "high",
