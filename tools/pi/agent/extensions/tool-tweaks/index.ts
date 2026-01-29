@@ -23,8 +23,8 @@ const tools = (() => {
   return [...map.values()];
 })();
 
-const MAX_CALL_LENGTH = 120;
-const MAX_ARG_VALUE_LENGTH = 60;
+const MAX_CALL_LENGTH = 180;
+const MAX_ARG_VALUE_LENGTH = 120;
 
 /** Truncate the args line to the max length. */
 const truncateArgs = (text: string, maxLength: number): string =>
@@ -86,14 +86,14 @@ const colorizeArgs = (argsText: string, theme: Theme): string => {
     return theme.fg("accent", key) + theme.fg("muted", ": ") +
       theme.fg("toolOutput", theme.italic(value));
   });
-  return theme.fg("muted", "{") + colored.join(theme.fg("muted", ", ")) +
-    theme.fg("muted", "}");
+  return theme.fg("muted", "{ ") + colored.join(theme.fg("muted", ", ")) +
+    theme.fg("muted", " }");
 };
 
 /** Render the minimal tool call header. */
 const renderHiddenCall = (toolName: string, args: ToolArgs, theme: Theme) => {
   const argsText = formatArgs(args);
-  const titleText = argsText ? `${toolName}:` : toolName;
+  const titleText = toolName;
 
   if (!argsText) {
     return new Text(theme.fg("toolTitle", titleText), 0, 0);
