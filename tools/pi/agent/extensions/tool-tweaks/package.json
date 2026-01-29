@@ -1,0 +1,23 @@
+{
+  "name": "pi-tool-tweaks",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "scripts": {
+    "lint": "biome lint .",
+    "fmt": "biome format --write ."
+  },
+  "dependencies": {
+    "@mariozechner/pi-coding-agent": "^0",
+    "@mariozechner/pi-tui": "^0",
+    "effect": "^3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2",
+    "@types/node": "^25",
+    "typescript": "^5"
+  }
+}
