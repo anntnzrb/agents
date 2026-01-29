@@ -9,7 +9,7 @@
     ]
   },
   "scripts": {
-    "lint": "biome lint .",
+    "lint": "biome lint . && eslint . --max-warnings 0",
     "fmt": "biome format --write ."
   },
   "dependencies": {
@@ -21,6 +21,9 @@
     "@mariozechner/pi-ai": "^0",
     "@mariozechner/pi-coding-agent": "^0",
     "@types/node": "^25",
+    "@typescript-eslint/parser": "^8",
+    "eslint": "^9",
+    "eslint-plugin-jsdoc": "^62",
     "typescript": "^5"
   }
 }
