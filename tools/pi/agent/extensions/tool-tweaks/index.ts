@@ -9,16 +9,13 @@ import { Text } from "@mariozechner/pi-tui";
 type Tool = ReturnType<typeof createCodingTools>[number];
 type ToolArgs = Record<string, unknown>;
 const tools = (() => {
-  const map = new Map<string, Tool>();
   // biome-ignore lint/correctness/noProcessGlobal: Node-only extension.
   const cwd = process.cwd();
-  for (const tool of createCodingTools(cwd)) {
-    map.set(tool.name, tool);
-  }
-  for (const tool of createReadOnlyTools(cwd)) {
-    map.set(tool.name, tool);
-  }
-  return [...map.values()];
+  return pipe(
+    [...createCodingTools(cwd), ...createReadOnlyTools(cwd)],
+    (toolList) => new Map(toolList.map((tool) => [tool.name, tool] as const)),
+    (toolMap) => [...toolMap.values()],
+  );
 })();
 
 const MAX_CALL_LENGTH = 180;
