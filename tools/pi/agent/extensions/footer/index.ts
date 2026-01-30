@@ -13,8 +13,7 @@ import type {
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 
 interface BranchSummary {
-  lastMessage: AssistantMessage | undefined;
-  thinkingLevel: string;
+  lastMessage: Option.Option<AssistantMessage>;
   totalInput: number;
 }
 
@@ -39,8 +38,7 @@ const formatNumber = (value: number): string => {
 };
 
 const emptySummary: BranchSummary = {
-  lastMessage: undefined,
-  thinkingLevel: "off",
+  lastMessage: Option.none(),
   totalInput: 0,
 };
 
@@ -53,10 +51,6 @@ const updateSummary = (summary: BranchSummary, entry: SessionEntry): BranchSumma
       totalInput: summary.totalInput + entry.message.usage.input,
       lastMessage: nextMessage,
     };
-  }
-
-  if (entry.type === "thinking_level_change") {
-    return { ...summary, thinkingLevel: entry.thinkingLevel };
   }
 
   return summary;
@@ -155,14 +149,39 @@ const buildFooterLine = (input: {
   cwd: string;
   home: string | undefined;
   model: ModelInfo | undefined;
+  thinkingLevel: string;
   width: number;
   theme: Theme;
-}): string => {
-  const summary = summarizeBranchEntries(input.branchEntries);
-  const { contextTokens, contextWindow } = resolveContextStats(
-    input.contextUsage,
-    getContextTokens(summary.lastMessage),
-    getContextWindow(input.model)
+}): string =>
+  pipe(
+    input,
+    (data) => ({
+      ...data,
+      summary: summarizeBranchEntries(data.branchEntries),
+    }),
+    (data) => {
+      const { contextTokens, contextWindow } = resolveContextStats(
+        data.contextUsage,
+        getContextTokens(data.summary.lastMessage),
+        getContextWindow(data.model)
+      );
+      const modelDisplay = getModelDisplay(data.model, data.thinkingLevel);
+      const shortCwd = getShortCwd(data.cwd, data.home);
+
+      const left =
+        data.theme.fg("muted", shortCwd) +
+        buildBranchStr(data.branch, data.theme) +
+        buildStatusStr(data.statuses, data.theme);
+
+      const right = buildRight(data.theme, {
+        contextTokens,
+        contextWindow,
+        totalInput: data.summary.totalInput,
+        modelDisplay,
+      });
+
+      return renderLine(left, right, data.width);
+    }
   );
   const modelDisplay = getModelDisplay(input.model, summary.thinkingLevel);
   const shortCwd = getShortCwd(input.cwd, input.home);
@@ -195,18 +214,23 @@ const footerExtension = (pi: ExtensionAPI): void => {
           // Intentionally empty.
         },
         render(width: number): string[] {
-          const footerLine = buildFooterLine({
-            branchEntries: ctx.sessionManager.getBranch(),
-            branch: footerData.getGitBranch() ?? undefined,
-            statuses: footerData.getExtensionStatuses(),
-            contextUsage: ctx.getContextUsage(),
-            cwd: ctx.cwd,
-            // biome-ignore lint/complexity/useLiteralKeys lint/correctness/noProcessGlobal: Node-only extension.
-            home: process.env["HOME"],
-            model: ctx.model as ModelInfo | undefined,
-            width,
-            theme,
-          });
+          const footerLine = pipe(
+            Effect.sync(() => ({
+              branchEntries: ctx.sessionManager.getBranch(),
+              branch: Option.fromNullable(footerData.getGitBranch()),
+              statuses: footerData.getExtensionStatuses(),
+              contextUsage: ctx.getContextUsage(),
+              cwd: ctx.cwd,
+              // biome-ignore lint/complexity/useLiteralKeys lint/correctness/noProcessGlobal: Node-only extension.
+              home: Option.fromNullable(process.env["HOME"]),
+              model: ctx.model as ModelInfo | undefined,
+              thinkingLevel: pi.getThinkingLevel(),
+              width,
+              theme,
+            })),
+            Effect.map(buildFooterLine),
+            Effect.runSync
+          );
 
           return [footerLine];
         },
