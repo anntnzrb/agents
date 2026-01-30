@@ -85,15 +85,16 @@ const formatArgEntry = (key: string, value: unknown): string | undefined => {
 };
 
 /** Format tool args into a compact string. */
-const formatArgs = (args: ToolArgs): string | undefined => {
-  const entries: string[] = [];
-  for (const key in args) {
-    if (!Object.hasOwn(args, key)) continue;
-    const entry = formatArgEntry(key, args[key]);
-    if (entry) entries.push(entry);
-  }
-  return entries.length > 0 ? entries.join(", ") : undefined;
-};
+const formatArgs = (args: ToolArgs): string | undefined =>
+  pipe(
+    Object.entries(args),
+    (entries) =>
+      entries.flatMap(([key, value]) => {
+        const entry = formatArgEntry(key, value);
+        return entry ? [entry] : [];
+      }),
+    (entries) => (entries.length > 0 ? entries.join(", ") : undefined),
+  );
 
 /** Apply color styling to key/value args. */
 const colorizeArgs = (argsText: string, theme: Theme): string => {
