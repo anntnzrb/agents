@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import functools
 import itertools
-import os
 import shutil
 import subprocess
 import sys
@@ -212,13 +211,18 @@ def run_jobs(jobs: Iterable[Job]) -> bool:
 
 def iter_extension_packages(root: Path) -> Iterator[Path]:
     """Yield extension package roots below a given root."""
-    if not root.is_dir():
-        return
-    for current, dirnames, filenames in os.walk(root):
-        if "node_modules" in dirnames:
-            dirnames.remove("node_modules")
-        if "package.json" in filenames:
-            yield Path(current)
+    def walk(current: Path) -> Iterator[Path]:
+        if (current / "package.json").is_file():
+            yield current
+        children = (
+            path
+            for path in current.iterdir()
+            if path.is_dir() and not path.is_symlink() and path.name != "node_modules"
+        )
+        for child in children:
+            yield from walk(child)
+
+    return walk(root) if root.is_dir() else iter(())
 
 
 def needs_node_install(package_dir: Path) -> bool:
