@@ -112,28 +112,31 @@ def tool_root(tool: ToolConfig) -> Path:
 
 def tool_dirs() -> list[Job]:
     """Build jobs to sync tool configs."""
-    jobs: list[Job] = []
-    for tool_name, tool in TOOL_CONFIG.items():
-        src = TOOLS_HOME / tool_name
-        dst = tool_root(tool)
-        if tool.tool_subdir is not None:
-            src = src / tool.tool_subdir
-        jobs.append(Job(src, dst, "dir"))
-    return jobs
+    return [
+        Job(
+            TOOLS_HOME / tool_name / tool.tool_subdir
+            if tool.tool_subdir is not None
+            else TOOLS_HOME / tool_name,
+            tool_root(tool),
+            "dir",
+        )
+        for tool_name, tool in TOOL_CONFIG.items()
+    ]
 
 
 def asset_copies() -> list[Job]:
     """Build jobs to sync assets into tool homes."""
     if not ASSETS_HOME.is_dir():
         return []
-    jobs: list[Job] = []
-    for asset_path in (path for path in ASSETS_HOME.iterdir() if path.is_dir()):
-        asset_name = asset_path.name
-        for tool in TOOL_CONFIG.values():
-            dest_root = tool_root(tool)
-            dest_name = tool.asset_renames.get(asset_name, asset_name)
-            jobs.append(Job(asset_path, dest_root / dest_name, "dir"))
-    return jobs
+    asset_dirs = [path for path in ASSETS_HOME.iterdir() if path.is_dir()]
+    return [
+        Job(
+            asset_path,
+            tool_root(tool) / tool.asset_renames.get(asset_path.name, asset_path.name),
+            "dir",
+        )
+        for asset_path, tool in itertools.product(asset_dirs, TOOL_CONFIG.values())
+    ]
 
 
 def agent_files() -> list[Job]:
