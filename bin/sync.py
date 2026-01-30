@@ -269,28 +269,29 @@ def run_install(command: list[str], package_dir: Path) -> bool:
 
 def install_extension_deps(root: Path) -> bool:
     """Install node dependencies for extensions if needed."""
-    ok = True
-    for package_dir in iter_extension_packages(root):
+    def install_one(package_dir: Path) -> bool:
         if not needs_node_install(package_dir):
-            continue
+            return True
         command = choose_installer(package_dir)
         if command is None:
             err(f"no package manager available for {package_dir}")
-            ok = False
-            continue
-        if not run_install(command, package_dir):
-            ok = False
-            continue
-    return ok
+            return False
+        return run_install(command, package_dir)
+
+    results = [install_one(package_dir) for package_dir in iter_extension_packages(root)]
+    return all(results)
 
 
 def main() -> int:
     """Run the sync and return an exit code."""
     builders = (tool_dirs, asset_copies, agent_files, config_files)
-    success = run_jobs(iter_jobs(builders))
-    if success and "pi" in TOOL_CONFIG:
-        success = install_extension_deps(tool_root(TOOL_CONFIG["pi"]) / "extensions")
-    return 0 if success else 1
+    base_success = run_jobs(iter_jobs(builders))
+    install_success = (
+        install_extension_deps(tool_root(TOOL_CONFIG["pi"]) / "extensions")
+        if base_success and "pi" in TOOL_CONFIG
+        else True
+    )
+    return 0 if base_success and install_success else 1
 
 
 if __name__ == "__main__":
