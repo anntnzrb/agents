@@ -154,3 +154,5 @@ const hideToolOutputExtension = (pi: ExtensionAPI): void => {
 };
 
 export default hideToolOutputExtension;
+  });
+}
