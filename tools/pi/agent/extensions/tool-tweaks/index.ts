@@ -24,38 +24,24 @@ const tools = (() => {
 const MAX_CALL_LENGTH = 180;
 const MAX_ARG_VALUE_LENGTH = 120;
 
-const countUnescapedQuotes = (text: string): number => {
-  let count = 0;
-  let escaped = false;
-  for (const char of text) {
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (char === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (char === "\"") count += 1;
-  }
-  return count;
-};
+const countUnescapedQuotes = (text: string): number =>
+  Array.from(text).reduce<[number, boolean]>(
+    ([count, escaped], char) =>
+      escaped
+        ? [count, false]
+        : char === "\\"
+          ? [count, true]
+          : char === "\""
+            ? [count + 1, false]
+            : [count, false],
+    [0, false],
+  )[0];
 
-const trimTrailingBackslashes = (text: string): string => {
-  let trimmed = text;
-  while (trimmed.endsWith("\\")) {
-    trimmed = trimmed.slice(0, -1);
-  }
-  return trimmed;
-};
+const trimTrailingBackslashes = (text: string): string => text.replace(/\\+$/, "");
 
 const endsWithUnescapedQuote = (text: string): boolean => {
-  if (!text.endsWith("\"")) return false;
-  let backslashes = 0;
-  for (let index = text.length - 2; index >= 0 && text[index] === "\\"; index -= 1) {
-    backslashes += 1;
-  }
-  return backslashes % 2 === 0;
+  const match = text.match(/(\\*)"$/);
+  return match ? match[1].length % 2 === 0 : false;
 };
 
 /** Truncate the args line to the max length. */
@@ -63,17 +49,17 @@ const truncateArgs = (text: string, maxLength: number): string => {
   if (!(maxLength > 1 && text.length > maxLength)) return text;
   if (maxLength <= 2) return "…";
 
-  let slice = text.slice(0, maxLength - 1);
-  if (countUnescapedQuotes(slice) % 2 === 0) {
-    if (endsWithUnescapedQuote(slice)) {
-      const trimmed = trimTrailingBackslashes(slice.slice(0, -1));
-      return `${trimmed}…"`;
-    }
-    return `${slice}…`;
-  }
+  const appendEllipsis = (value: string): string => `${value}…`;
+  const appendEllipsisQuote = (value: string): string =>
+    `${trimTrailingBackslashes(value)}…"`;
+  const slice = text.slice(0, maxLength - 1);
+  const isBalanced = countUnescapedQuotes(slice) % 2 === 0;
 
-  slice = trimTrailingBackslashes(text.slice(0, maxLength - 2));
-  return `${slice}…"`;
+  return isBalanced
+    ? endsWithUnescapedQuote(slice)
+      ? appendEllipsisQuote(slice.slice(0, -1))
+      : appendEllipsis(slice)
+    : appendEllipsisQuote(text.slice(0, maxLength - 2));
 };
 
 /** Truncate a single arg value. */
