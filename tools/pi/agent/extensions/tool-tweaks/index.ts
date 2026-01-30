@@ -26,11 +26,57 @@ const tools = (() => {
 const MAX_CALL_LENGTH = 180;
 const MAX_ARG_VALUE_LENGTH = 120;
 
+const countUnescapedQuotes = (text: string): number => {
+  let count = 0;
+  let escaped = false;
+  for (const char of text) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (char === "\"") count += 1;
+  }
+  return count;
+};
+
+const trimTrailingBackslashes = (text: string): string => {
+  let trimmed = text;
+  while (trimmed.endsWith("\\")) {
+    trimmed = trimmed.slice(0, -1);
+  }
+  return trimmed;
+};
+
+const endsWithUnescapedQuote = (text: string): boolean => {
+  if (!text.endsWith("\"")) return false;
+  let backslashes = 0;
+  for (let index = text.length - 2; index >= 0 && text[index] === "\\"; index -= 1) {
+    backslashes += 1;
+  }
+  return backslashes % 2 === 0;
+};
+
 /** Truncate the args line to the max length. */
-const truncateArgs = (text: string, maxLength: number): string =>
-  maxLength > 1 && text.length > maxLength
-    ? `${text.slice(0, maxLength - 1)}…`
-    : text;
+const truncateArgs = (text: string, maxLength: number): string => {
+  if (!(maxLength > 1 && text.length > maxLength)) return text;
+  if (maxLength <= 2) return "…";
+
+  let slice = text.slice(0, maxLength - 1);
+  if (countUnescapedQuotes(slice) % 2 === 0) {
+    if (endsWithUnescapedQuote(slice)) {
+      const trimmed = trimTrailingBackslashes(slice.slice(0, -1));
+      return `${trimmed}…"`;
+    }
+    return `${slice}…`;
+  }
+
+  slice = trimTrailingBackslashes(text.slice(0, maxLength - 2));
+  return `${slice}…"`;
+};
 
 /** Truncate a single arg value. */
 const truncateValue = (text: string): string =>
