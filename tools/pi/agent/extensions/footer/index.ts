@@ -183,7 +183,7 @@ const buildFooterLine = (input: {
 };
 
 /** Registers the footer extension with pi. */
-export default function footerExtension(pi: ExtensionAPI): void {
+const footerExtension = (pi: ExtensionAPI): void => {
   pi.on("session_start", (_event, ctx) => {
     if (!ctx.hasUI) return;
     ctx.ui.setFooter((tui, theme, footerData) => {
@@ -213,4 +213,6 @@ export default function footerExtension(pi: ExtensionAPI): void {
       };
     });
   });
-}
+};
+
+export default footerExtension;
