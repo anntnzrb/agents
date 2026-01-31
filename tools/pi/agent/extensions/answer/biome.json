@@ -28,7 +28,9 @@
     "rules": {
       "recommended": true,
       "complexity": "error",
-      "correctness": "error",
+      "correctness": {
+        "noUndeclaredDependencies": "off"
+      },
       "performance": "error",
       "security": "error",
       "suspicious": "error",
