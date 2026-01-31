@@ -78,7 +78,7 @@ def guard(func: Callable[..., bool]) -> Callable[..., bool]:
 
 def err(message: str) -> None:
     """Print a sync error to stderr."""
-    print(f"sync: {message}", file=sys.stderr)
+    sys.stderr.write(f"sync: {message}\n")
 
 
 def ensure_dir(path: Path) -> None:
