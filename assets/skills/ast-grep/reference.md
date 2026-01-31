@@ -1,8 +1,8 @@
 # Reference
 
 ## Command choice
-- Prefer `sg` if available. Fallback `ast-grep`. Last resort: `nix run nixpkgs#ast-grep --`.
-- Default command is `run` when `--pattern` is provided.
+- Prefer `sg` if available. Fallback `ast-grep run`. Last resort: `nix run nixpkgs#ast-grep -- run`.
+- `ast-grep` requires the `run` subcommand for one-off searches; `sg` implies `run`.
 
 ## Read-only mode
 - Do not use: `--rewrite`, `-r`, `--update-all`, `--interactive`.
@@ -36,15 +36,20 @@ Use strictness when patterns under/over-match.
 - Human: default colored diagnostics.
 - Files only: `--files-with-matches`.
 - JSON: `--json=pretty|stream|compact`.
+- Headings: `--heading=never|auto|always`.
 
 ## Filters and scope
 - Paths: pass directories or files.
 - Globs: `--globs 'src/**/*.ts' --globs '!**/*.test.ts'`.
 - Ignore control: `--no-ignore` (hidden, dot, vcs, etc.).
+- Follow symlinks: `--follow`.
 - Threads: `--threads 0` for auto.
 
+## Config
+- `--config <path>` to point at a specific `sgconfig.yml` root.
+
 ## Inspection
--- `--inspect summary|entity` to debug file filtering.
+- `--inspect summary|entity` to debug file filtering.
 
 ## Safety
 - Read-only search only; skip rewrite flags.

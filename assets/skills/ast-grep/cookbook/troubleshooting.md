@@ -8,10 +8,10 @@
 
 **Solution**:
 ```bash
-ast-grep -p 'pattern' -l ts src
+ast-grep run -p 'pattern' -l ts src
 ```
 
-**Tip**: If not installed, use `nix run nixpkgs#ast-grep -- -p 'pattern' -l ts src`.
+**Tip**: If not installed, use `nix run nixpkgs#ast-grep -- run -p 'pattern' -l ts src`.
 
 ---
 
