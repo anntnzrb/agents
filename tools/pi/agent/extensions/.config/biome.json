@@ -27,14 +27,19 @@
     "enabled": true,
     "rules": {
       "recommended": true,
-      "complexity": "error",
+      "complexity": {
+        "recommended": true,
+        "useArrowFunction": "error"
+      },
       "correctness": {
+        "recommended": true,
         "noUndeclaredDependencies": "off"
       },
       "performance": "error",
       "security": "error",
       "suspicious": "error",
-      "nursery": "off"
+      "style": "error",
+      "nursery": "error"
     }
   },
   "javascript": {
