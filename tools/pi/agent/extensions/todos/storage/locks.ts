@@ -9,24 +9,24 @@ import { LOCK_TTL_MS } from "../constants.ts";
 import type { LockInfo } from "../types.ts";
 import { displayTodoId } from "../utils.ts";
 
-function getLockPath(todosDir: string, id: string): string {
+const getLockPath = (todosDir: string, id: string): string => {
   return path.join(todosDir, `${id}.lock`);
-}
+};
 
-async function readLockInfo(lockPath: string): Promise<LockInfo | null> {
+const readLockInfo = async (lockPath: string): Promise<LockInfo | null> => {
   try {
     const raw = await fs.readFile(lockPath, "utf8");
     return JSON.parse(raw) as LockInfo;
   } catch {
     return null;
   }
-}
+};
 
-async function acquireLock(
+const acquireLock = async (
   todosDir: string,
   id: string,
   ctx: ExtensionContext
-): Promise<(() => Promise<void>) | { error: string }> {
+): Promise<(() => Promise<void>) | { error: string }> => {
   const lockPath = getLockPath(todosDir, id);
   const now = Date.now();
   const session = ctx.sessionManager.getSessionFile();
@@ -78,14 +78,14 @@ async function acquireLock(
   }
 
   return { error: `Failed to acquire lock for todo ${displayTodoId(id)}.` };
-}
+};
 
-export async function withTodoLock<T>(
+export const withTodoLock = async <T>(
   todosDir: string,
   id: string,
   ctx: ExtensionContext,
   fn: () => Promise<T>
-): Promise<T | { error: string }> {
+): Promise<T | { error: string }> => {
   const lock = await acquireLock(todosDir, id, ctx);
   if (typeof lock === "object" && "error" in lock) return lock;
   try {
@@ -93,4 +93,4 @@ export async function withTodoLock<T>(
   } finally {
     await lock();
   }
-}
+};

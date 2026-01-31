@@ -25,7 +25,7 @@ import { serializeTodoForAgent, serializeTodoListForAgent } from "./serialize.ts
 /**
  * Create the todo tool definition.
  */
-export function createTodoTool(todosDirLabel: string): ToolDefinition {
+export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
   return {
     name: "todo",
     label: "Todo",
@@ -321,4 +321,4 @@ export function createTodoTool(todosDirLabel: string): ToolDefinition {
       return new Text(text, 0, 0);
     },
   };
-}
+};

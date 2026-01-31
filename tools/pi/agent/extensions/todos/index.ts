@@ -16,7 +16,7 @@ import { getTodoArgumentCompletions, runTodosCommand } from "./command.ts";
 /**
  * Register the todo extension.
  */
-export default function todosExtension(pi: ExtensionAPI): void {
+const todosExtension = (pi: ExtensionAPI): void => {
   pi.on("session_start", async (_event, ctx) => {
     const todosDir = getTodosDir(ctx.cwd);
     await ensureTodosDir(todosDir);
@@ -35,4 +35,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
       await runTodosCommand(ctx, args);
     },
   });
-}
+};
+
+export default todosExtension;

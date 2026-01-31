@@ -12,23 +12,23 @@ import {
   splitTodosByAssignment,
 } from "./utils.ts";
 
-export function renderAssignmentSuffix(
+export const renderAssignmentSuffix = (
   theme: Theme,
   todo: TodoFrontMatter,
   currentSessionId?: string
-): string {
+): string => {
   if (!todo.assigned_to_session) return "";
   const isCurrent = todo.assigned_to_session === currentSessionId;
   const color = isCurrent ? "success" : "dim";
   const suffix = isCurrent ? ", current" : "";
   return theme.fg(color, ` (assigned: ${todo.assigned_to_session}${suffix})`);
-}
+};
 
-export function renderTodoHeading(
+export const renderTodoHeading = (
   theme: Theme,
   todo: TodoFrontMatter,
   currentSessionId?: string
-): string {
+): string => {
   const closed = isTodoClosed(getTodoStatus(todo));
   const titleColor = closed ? "dim" : "text";
   const tagText = todo.tags.length ? theme.fg("dim", ` [${todo.tags.join(", ")}]`) : "";
@@ -40,14 +40,14 @@ export function renderTodoHeading(
     tagText +
     assignmentText
   );
-}
+};
 
-export function renderTodoList(
+export const renderTodoList = (
   theme: Theme,
   todos: TodoFrontMatter[],
   expanded: boolean,
   currentSessionId?: string
-): string {
+): string => {
   if (!todos.length) return theme.fg("dim", "No todos");
 
   const { assignedTodos, openTodos, closedTodos } = splitTodosByAssignment(todos);
@@ -79,9 +79,9 @@ export function renderTodoList(
   });
 
   return lines.join("\n");
-}
+};
 
-export function renderTodoDetail(theme: Theme, todo: TodoRecord, expanded: boolean): string {
+export const renderTodoDetail = (theme: Theme, todo: TodoRecord, expanded: boolean): string => {
   const summary = renderTodoHeading(theme, todo);
   if (!expanded) return summary;
 
@@ -101,13 +101,13 @@ export function renderTodoDetail(theme: Theme, todo: TodoRecord, expanded: boole
   ];
 
   return lines.join("\n");
-}
+};
 
-export function appendExpandHint(theme: Theme, text: string): string {
+export const appendExpandHint = (theme: Theme, text: string): string => {
   return `${text}\n${theme.fg("dim", `(${keyHint("expandTools", "to expand")})`)}`;
-}
+};
 
-export function formatTodoList(todos: TodoFrontMatter[]): string {
+export const formatTodoList = (todos: TodoFrontMatter[]): string => {
   if (!todos.length) return "No todos.";
 
   const { assignedTodos, openTodos, closedTodos } = splitTodosByAssignment(todos);
@@ -127,4 +127,4 @@ export function formatTodoList(todos: TodoFrontMatter[]): string {
   pushSection("Open todos", openTodos);
   pushSection("Closed todos", closedTodos);
   return lines.join("\n");
-}
+};

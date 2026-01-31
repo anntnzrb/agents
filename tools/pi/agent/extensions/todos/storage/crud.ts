@@ -18,29 +18,29 @@ import { parseFrontMatter, parseTodoContent, serializeTodo, splitFrontMatter } f
 import { withTodoLock } from "./locks.ts";
 import { getTodoPath } from "./paths.ts";
 
-export async function ensureTodosDir(todosDir: string): Promise<void> {
+export const ensureTodosDir = async (todosDir: string): Promise<void> => {
   await fs.mkdir(todosDir, { recursive: true });
-}
+};
 
-async function readTodoFile(filePath: string, idFallback: string): Promise<TodoRecord> {
+const readTodoFile = async (filePath: string, idFallback: string): Promise<TodoRecord> => {
   const content = await fs.readFile(filePath, "utf8");
   return parseTodoContent(content, idFallback);
-}
+};
 
-async function writeTodoFile(filePath: string, todo: TodoRecord): Promise<void> {
+const writeTodoFile = async (filePath: string, todo: TodoRecord): Promise<void> => {
   await fs.writeFile(filePath, serializeTodo(todo), "utf8");
-}
+};
 
-export async function generateTodoId(todosDir: string): Promise<string> {
+export const generateTodoId = async (todosDir: string): Promise<string> => {
   for (let attempt = 0; attempt < 10; attempt += 1) {
     const id = crypto.randomBytes(4).toString("hex");
     const todoPath = getTodoPath(todosDir, id);
     if (!existsSync(todoPath)) return id;
   }
   throw new Error("Failed to generate unique todo id");
-}
+};
 
-export async function listTodos(todosDir: string): Promise<TodoFrontMatter[]> {
+export const listTodos = async (todosDir: string): Promise<TodoFrontMatter[]> => {
   let entries: string[] = [];
   try {
     entries = await fs.readdir(todosDir);
@@ -71,9 +71,9 @@ export async function listTodos(todosDir: string): Promise<TodoFrontMatter[]> {
   }
 
   return sortTodos(todos);
-}
+};
 
-export function listTodosSync(todosDir: string): TodoFrontMatter[] {
+export const listTodosSync = (todosDir: string): TodoFrontMatter[] => {
   let entries: string[] = [];
   try {
     entries = readdirSync(todosDir);
@@ -104,32 +104,32 @@ export function listTodosSync(todosDir: string): TodoFrontMatter[] {
   }
 
   return sortTodos(todos);
-}
+};
 
-export async function ensureTodoExists(
+export const ensureTodoExists = async (
   filePath: string,
   id: string
-): Promise<TodoRecord | null> {
+): Promise<TodoRecord | null> => {
   if (!existsSync(filePath)) return null;
   return readTodoFile(filePath, id);
-}
+};
 
-export async function appendTodoBody(
+export const appendTodoBody = async (
   filePath: string,
   todo: TodoRecord,
   text: string
-): Promise<TodoRecord> {
+): Promise<TodoRecord> => {
   const spacer = todo.body.trim().length ? "\n\n" : "";
   todo.body = `${todo.body.replace(/\s+$/, "")}${spacer}${text.trim()}\n`;
   await writeTodoFile(filePath, todo);
   return todo;
-}
+};
 
-export async function createTodo(
+export const createTodo = async (
   todosDir: string,
   todo: TodoRecord,
   ctx: ExtensionContext
-): Promise<TodoRecord | { error: string }> {
+): Promise<TodoRecord | { error: string }> => {
   await ensureTodosDir(todosDir);
   if (!todo.created_at) {
     todo.created_at = new Date().toISOString();
@@ -145,14 +145,14 @@ export async function createTodo(
   }
 
   return result;
-}
+};
 
-export async function updateTodo(
+export const updateTodo = async (
   todosDir: string,
   id: string,
   updates: Partial<Pick<TodoRecord, "title" | "status" | "tags" | "body">>,
   ctx: ExtensionContext
-): Promise<TodoRecord | { error: string }> {
+): Promise<TodoRecord | { error: string }> => {
   const validated = validateTodoId(id);
   if ("error" in validated) {
     return { error: validated.error };
@@ -184,14 +184,14 @@ export async function updateTodo(
   }
 
   return result;
-}
+};
 
-export async function appendTodo(
+export const appendTodo = async (
   todosDir: string,
   id: string,
   text: string,
   ctx: ExtensionContext
-): Promise<TodoRecord | { error: string }> {
+): Promise<TodoRecord | { error: string }> => {
   const validated = validateTodoId(id);
   if ("error" in validated) {
     return { error: validated.error };
@@ -214,14 +214,14 @@ export async function appendTodo(
   }
 
   return result;
-}
+};
 
-export async function updateTodoStatus(
+export const updateTodoStatus = async (
   todosDir: string,
   id: string,
   status: string,
   ctx: ExtensionContext
-): Promise<TodoRecord | { error: string }> {
+): Promise<TodoRecord | { error: string }> => {
   const validated = validateTodoId(id);
   if ("error" in validated) {
     return { error: validated.error };
@@ -246,14 +246,14 @@ export async function updateTodoStatus(
   }
 
   return result;
-}
+};
 
-export async function claimTodoAssignment(
+export const claimTodoAssignment = async (
   todosDir: string,
   id: string,
   ctx: ExtensionContext,
   force = false
-): Promise<TodoRecord | { error: string }> {
+): Promise<TodoRecord | { error: string }> => {
   const validated = validateTodoId(id);
   if ("error" in validated) {
     return { error: validated.error };
@@ -288,14 +288,14 @@ export async function claimTodoAssignment(
   }
 
   return result;
-}
+};
 
-export async function releaseTodoAssignment(
+export const releaseTodoAssignment = async (
   todosDir: string,
   id: string,
   ctx: ExtensionContext,
   force = false
-): Promise<TodoRecord | { error: string }> {
+): Promise<TodoRecord | { error: string }> => {
   const validated = validateTodoId(id);
   if ("error" in validated) {
     return { error: validated.error };
@@ -328,13 +328,13 @@ export async function releaseTodoAssignment(
   }
 
   return result;
-}
+};
 
-export async function deleteTodo(
+export const deleteTodo = async (
   todosDir: string,
   id: string,
   ctx: ExtensionContext
-): Promise<TodoRecord | { error: string }> {
+): Promise<TodoRecord | { error: string }> => {
   const validated = validateTodoId(id);
   if ("error" in validated) {
     return { error: validated.error };
@@ -357,4 +357,4 @@ export async function deleteTodo(
   }
 
   return result;
-}
+};

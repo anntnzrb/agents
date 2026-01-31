@@ -28,10 +28,10 @@ import { formatTodoList } from "./render.ts";
 /**
  * Build command argument completions.
  */
-export function getTodoArgumentCompletions(
+export const getTodoArgumentCompletions = (
   argumentPrefix: string,
   cwd: string
-): Array<{ value: string; label: string; description?: string }> | null {
+): Array<{ value: string; label: string; description?: string }> | null => {
   const todos = listTodosSync(getTodosDir(cwd));
   if (!todos.length) return null;
   const matches = filterTodos(todos, argumentPrefix);
@@ -45,15 +45,15 @@ export function getTodoArgumentCompletions(
       description: `${todo.status || "open"}${tags}`,
     };
   });
-}
+};
 
 /**
  * Handle the /todos command.
  */
-export async function runTodosCommand(
+export const runTodosCommand = async (
   ctx: ExtensionContext,
   args?: string | null
-): Promise<void> {
+): Promise<void> => {
   const todosDir = getTodosDir(ctx.cwd);
   const todos = await listTodos(todosDir);
   const currentSessionId = ctx.sessionManager.getSessionId();
@@ -320,4 +320,4 @@ export async function runTodosCommand(
     ctx.ui.setEditorText(nextPrompt);
     rootTui?.requestRender();
   }
-}
+};

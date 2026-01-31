@@ -6,11 +6,11 @@ import { fuzzyMatch } from "@mariozechner/pi-tui";
 import { TODO_ID_PATTERN, TODO_ID_PREFIX } from "./constants.ts";
 import type { TodoFrontMatter } from "./types.ts";
 
-export function formatTodoId(id: string): string {
+export const formatTodoId = (id: string): string => {
   return `${TODO_ID_PREFIX}${id}`;
-}
+};
 
-export function normalizeTodoId(id: string): string {
+export const normalizeTodoId = (id: string): string => {
   let trimmed = id.trim();
   if (trimmed.startsWith("#")) {
     trimmed = trimmed.slice(1);
@@ -19,31 +19,31 @@ export function normalizeTodoId(id: string): string {
     trimmed = trimmed.slice(TODO_ID_PREFIX.length);
   }
   return trimmed;
-}
+};
 
-export function validateTodoId(id: string): { id: string } | { error: string } {
+export const validateTodoId = (id: string): { id: string } | { error: string } => {
   const normalized = normalizeTodoId(id);
   if (!normalized || !TODO_ID_PATTERN.test(normalized)) {
     return { error: "Invalid todo id. Expected TODO-<hex>." };
   }
   return { id: normalized.toLowerCase() };
-}
+};
 
-export function displayTodoId(id: string): string {
+export const displayTodoId = (id: string): string => {
   return formatTodoId(normalizeTodoId(id));
-}
+};
 
-export function isTodoClosed(status: string): boolean {
+export const isTodoClosed = (status: string): boolean => {
   return ["closed", "done"].includes(status.toLowerCase());
-}
+};
 
-export function clearAssignmentIfClosed(todo: TodoFrontMatter): void {
+export const clearAssignmentIfClosed = (todo: TodoFrontMatter): void => {
   if (isTodoClosed(getTodoStatus(todo))) {
     todo.assigned_to_session = undefined;
   }
-}
+};
 
-export function sortTodos(todos: TodoFrontMatter[]): TodoFrontMatter[] {
+export const sortTodos = (todos: TodoFrontMatter[]): TodoFrontMatter[] => {
   return [...todos].sort((a, b) => {
     const aClosed = isTodoClosed(a.status);
     const bClosed = isTodoClosed(b.status);
@@ -53,15 +53,15 @@ export function sortTodos(todos: TodoFrontMatter[]): TodoFrontMatter[] {
     if (aAssigned !== bAssigned) return aAssigned ? -1 : 1;
     return (a.created_at || "").localeCompare(b.created_at || "");
   });
-}
+};
 
-export function buildTodoSearchText(todo: TodoFrontMatter): string {
+export const buildTodoSearchText = (todo: TodoFrontMatter): string => {
   const tags = todo.tags.join(" ");
   const assignment = todo.assigned_to_session ? `assigned:${todo.assigned_to_session}` : "";
   return `${formatTodoId(todo.id)} ${todo.id} ${todo.title} ${tags} ${todo.status} ${assignment}`.trim();
-}
+};
 
-export function filterTodos(todos: TodoFrontMatter[], query: string): TodoFrontMatter[] {
+export const filterTodos = (todos: TodoFrontMatter[], query: string): TodoFrontMatter[] => {
   const trimmed = query.trim();
   if (!trimmed) return todos;
 
@@ -101,38 +101,40 @@ export function filterTodos(todos: TodoFrontMatter[], query: string): TodoFrontM
       return a.score - b.score;
     })
     .map((match) => match.todo);
-}
+};
 
-export function getTodoTitle(todo: TodoFrontMatter): string {
+export const getTodoTitle = (todo: TodoFrontMatter): string => {
   return todo.title || "(untitled)";
-}
+};
 
-export function getTodoStatus(todo: TodoFrontMatter): string {
+export const getTodoStatus = (todo: TodoFrontMatter): string => {
   return todo.status || "open";
-}
+};
 
-export function formatAssignmentSuffix(todo: TodoFrontMatter): string {
+export const formatAssignmentSuffix = (todo: TodoFrontMatter): string => {
   return todo.assigned_to_session ? ` (assigned: ${todo.assigned_to_session})` : "";
-}
+};
 
-export function formatTodoHeading(todo: TodoFrontMatter): string {
+export const formatTodoHeading = (todo: TodoFrontMatter): string => {
   const tagText = todo.tags.length ? ` [${todo.tags.join(", ")}]` : "";
   return `${formatTodoId(todo.id)} ${getTodoTitle(todo)}${tagText}${formatAssignmentSuffix(todo)}`;
-}
+};
 
-export function buildRefinePrompt(todoId: string, title: string): string {
+export const buildRefinePrompt = (todoId: string, title: string): string => {
   return (
     `let's refine task ${formatTodoId(todoId)} "${title}": ` +
     "Ask me for the missing details needed to refine the todo together. Do not rewrite the todo yet and do not make assumptions. " +
     "Ask clear, concrete questions and wait for my answers before drafting any structured description.\n\n"
   );
-}
+};
 
-export function splitTodosByAssignment(todos: TodoFrontMatter[]): {
+export const splitTodosByAssignment = (
+  todos: TodoFrontMatter[]
+): {
   assignedTodos: TodoFrontMatter[];
   openTodos: TodoFrontMatter[];
   closedTodos: TodoFrontMatter[];
-} {
+} => {
   const assignedTodos: TodoFrontMatter[] = [];
   const openTodos: TodoFrontMatter[] = [];
   const closedTodos: TodoFrontMatter[] = [];
@@ -148,4 +150,4 @@ export function splitTodosByAssignment(todos: TodoFrontMatter[]): {
     }
   }
   return { assignedTodos, openTodos, closedTodos };
-}
+};

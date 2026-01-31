@@ -9,20 +9,20 @@ import type { TodoSettings } from "../types.ts";
 import { isTodoClosed } from "../utils.ts";
 import { parseFrontMatter, splitFrontMatter } from "./front-matter.ts";
 
-function getTodoSettingsPath(todosDir: string): string {
+const getTodoSettingsPath = (todosDir: string): string => {
   return path.join(todosDir, TODO_SETTINGS_NAME);
-}
+};
 
-function normalizeTodoSettings(raw: Partial<TodoSettings>): TodoSettings {
+const normalizeTodoSettings = (raw: Partial<TodoSettings>): TodoSettings => {
   const gc = raw.gc ?? DEFAULT_TODO_SETTINGS.gc;
   const gcDays = Number.isFinite(raw.gcDays) ? raw.gcDays : DEFAULT_TODO_SETTINGS.gcDays;
   return {
     gc: Boolean(gc),
     gcDays: Math.max(0, Math.floor(gcDays)),
   };
-}
+};
 
-export async function readTodoSettings(todosDir: string): Promise<TodoSettings> {
+export const readTodoSettings = async (todosDir: string): Promise<TodoSettings> => {
   const settingsPath = getTodoSettingsPath(todosDir);
   let data: Partial<TodoSettings> = {};
 
@@ -34,12 +34,12 @@ export async function readTodoSettings(todosDir: string): Promise<TodoSettings> 
   }
 
   return normalizeTodoSettings(data);
-}
+};
 
-export async function garbageCollectTodos(
+export const garbageCollectTodos = async (
   todosDir: string,
   settings: TodoSettings
-): Promise<void> {
+): Promise<void> => {
   if (!settings.gc) return;
 
   let entries: string[] = [];
@@ -71,4 +71,4 @@ export async function garbageCollectTodos(
         }
       })
   );
-}
+};

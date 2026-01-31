@@ -4,7 +4,7 @@
 
 import type { TodoFrontMatter, TodoRecord } from "../types.ts";
 
-export function parseFrontMatter(text: string, idFallback: string): TodoFrontMatter {
+export const parseFrontMatter = (text: string, idFallback: string): TodoFrontMatter => {
   const data: TodoFrontMatter = {
     id: idFallback,
     title: "",
@@ -35,9 +35,9 @@ export function parseFrontMatter(text: string, idFallback: string): TodoFrontMat
   }
 
   return data;
-}
+};
 
-function findJsonObjectEnd(content: string): number {
+const findJsonObjectEnd = (content: string): number => {
   let depth = 0;
   let inString = false;
   let escaped = false;
@@ -77,9 +77,11 @@ function findJsonObjectEnd(content: string): number {
   }
 
   return -1;
-}
+};
 
-export function splitFrontMatter(content: string): { frontMatter: string; body: string } {
+export const splitFrontMatter = (
+  content: string
+): { frontMatter: string; body: string } => {
   if (!content.startsWith("{")) {
     return { frontMatter: "", body: content };
   }
@@ -92,9 +94,9 @@ export function splitFrontMatter(content: string): { frontMatter: string; body: 
   const frontMatter = content.slice(0, endIndex + 1);
   const body = content.slice(endIndex + 1).replace(/^\r?\n+/, "");
   return { frontMatter, body };
-}
+};
 
-export function parseTodoContent(content: string, idFallback: string): TodoRecord {
+export const parseTodoContent = (content: string, idFallback: string): TodoRecord => {
   const { frontMatter, body } = splitFrontMatter(content);
   const parsed = parseFrontMatter(frontMatter, idFallback);
   return {
@@ -106,9 +108,9 @@ export function parseTodoContent(content: string, idFallback: string): TodoRecor
     assigned_to_session: parsed.assigned_to_session,
     body: body ?? "",
   };
-}
+};
 
-export function serializeTodo(todo: TodoRecord): string {
+export const serializeTodo = (todo: TodoRecord): string => {
   const frontMatter = JSON.stringify(
     {
       id: todo.id,
@@ -126,4 +128,4 @@ export function serializeTodo(todo: TodoRecord): string {
   const trimmedBody = body.replace(/^\n+/, "").replace(/\s+$/, "");
   if (!trimmedBody) return `${frontMatter}\n`;
   return `${frontMatter}\n\n${trimmedBody}\n`;
-}
+};

@@ -5,12 +5,12 @@
 import type { TodoFrontMatter, TodoRecord } from "./types.ts";
 import { formatTodoId, splitTodosByAssignment } from "./utils.ts";
 
-export function serializeTodoForAgent(todo: TodoRecord): string {
+export const serializeTodoForAgent = (todo: TodoRecord): string => {
   const payload = { ...todo, id: formatTodoId(todo.id) };
   return JSON.stringify(payload, null, 2);
-}
+};
 
-export function serializeTodoListForAgent(todos: TodoFrontMatter[]): string {
+export const serializeTodoListForAgent = (todos: TodoFrontMatter[]): string => {
   const { assignedTodos, openTodos, closedTodos } = splitTodosByAssignment(todos);
   const mapTodo = (todo: TodoFrontMatter) => ({ ...todo, id: formatTodoId(todo.id) });
   return JSON.stringify(
@@ -22,4 +22,4 @@ export function serializeTodoListForAgent(todos: TodoFrontMatter[]): string {
     null,
     2
   );
-}
+};
