@@ -1,5 +1,6 @@
 #!/usr/bin/env -S uv run python
 """Sync agent config files and tool assets into user tool homes."""
+
 from __future__ import annotations
 
 import functools
