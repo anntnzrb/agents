@@ -1,36 +1,24 @@
 # AGENTS.md
 
-jag owns this. init once: greet + 1 motivating line.
-
-## Protocol
-- Bugs: add regression test when it fits
-- Keep files <~500 LOC; split/refactor as needed
-- Web: search early; quote exact errors; prefer 2024–2025 sources
-- Style: telegraph; noun-phrases: ok. Drop filler/grammar. Min tokens (global AGENTS + replies)
-- Avoid calling `python`/`python3` - use `uv` to interface python
-- For GitHub related stuff use `gh`
-- Use Research tools for web search, library/API documentation, code generation, setup/config steps, etc
+annt owns this.
 
 ## Important Locations
 - My repos: `~/repos/`
-- My LLM agents configs: `~/.config/agents/`
+- My LLM agents configs: `~/.config/agents/` (SSOT)
+
+## Protocol
+- Bugs: add regression test when it fits
+- Keep files <~500 LOC; modularize/split/refactor as needed
+- Web: search early; quote exact errors; prefer 2024..2026 sources
+- Style: telegraph; noun-phrases: ok. Drop filler/grammar, min tokens
+- Avoid calling `python`/`python3` - use `uv` to interface python
+- For GitHub related stuff use `gh`
+- Use research tools for web search, library/API documentation, code generation, setup/config steps, etc
 
 ## Flow
-- Use Codex background for long jobs; tmux only for interactive/persistent (debugger/server)
-- Prioritize subagents to maximize throughput; only avoid if user explicitly asks not to delegate
-- Signals: research, tests, docs, review, parallel workstreams
-
-## Build / Test
+- Use tmux only for interactive/persistent
+- Prioritize subagents/parallism to maximize throughput; only avoid if user explicitly asks not to delegate
 - Before handoff: run full gate
-
-## Git
-- Commits: Conventional Commits styled; no amend unless asked
-- Safe by default: `git status/diff/log`. Push only when user asks
-- Don’t delete/rename unexpected stuff; stop + ask
-- No repo-wide S/R scripts; keep edits small/reviewable
-- Avoid manual `git stash`; if Git auto-stashes during pull/rebase, that’s fine (hint, not hard guardrail)
-- Big review: `git --no-pager diff --color=never`
-- Multi-agent: check `git status/diff` before edits; ship small commits
 
 ## Critical Thinking
 - Fix root cause (not band-aid)
@@ -41,20 +29,22 @@ jag owns this. init once: greet + 1 motivating line.
 ## Tools
 
 ### Research
-- Use `gh` for GitHub interaction + code search
-- Use DeepWiki for natural language queries over repo src/docs
-- Use Exa for heavy search
-- Use Brave for quick, lightweight fallback search
-- Use Context7 for up-to-date library/API docs and code examples
-- Use Grep.app MCP for public OSS code search (regex)
-- Use MCPorter for MCP discovery, schemas, auth
-- Prefer: DeepWiki for repo docs, Context7 for library docs, Exa `get_code_context_exa` for APIs, Exa `web_search_exa` for general web, Brave for fast scoping, Grep.app for OSS code patterns
-- Exa `company_research_exa`/`linkedin_search_exa`: only if user explicitly asks for company/people research
-- Brave may return single best-hit; if you need multi-source coverage, switch to Exa
+Load the following skills as needed:
+- `gh` for GitHub interaction + code search
+- `deepwiki` for natural language queries over repo src/docs
+- `exa` for heavy search
+- `brave` for quick, lightweight fallback search
+- `context7` for up-to-date library/API docs and code examples
+- `grep.app` MCP for public OSS code search (regex)
+- `mcporter` for MCP discovery, schemas, auth
+
+Prefer: `deepwiki` for repo docs, `context7` for library docs, `exa(get_code_context_exa`) for APIs, `exa(web_search_exa)` for general web, `brave` for fast scoping, `grep.app` for code patterns
+- `brave` may return single best-hit; if you need multi-source coverage, switch to `exa`
 
 ### tmux
-- Use only when you need persistence/interaction (debugger/server)
+- Use only when you need persistence/interaction
 - Quick refs: `tmux new -d -s agent-shell`, `tmux attach -t agent-shell`, `tmux list-sessions`, `tmux kill-session -t agent-shell`
 
-### ast-grep
-- Load the ast-grep skill for fast, read-only structural code search during repo exploration.
+### Navigation / Refactoring / Exploring
+#### AST Grep
+- Load skill: `ast-grep` for fast, read-only structural code search during repo exploration
