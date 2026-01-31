@@ -12,9 +12,9 @@ import type { ActiveModel, ExtractedQuestion } from "./types.ts";
 /**
  * Ensure UI and model are available for the /answer command.
  */
-function ensureInteractiveModel(
+const ensureInteractiveModel = (
   ctx: ExtensionContext
-): ctx is ExtensionContext & { model: ActiveModel } {
+): ctx is ExtensionContext & { model: ActiveModel } => {
   if (!ctx.hasUI) {
     ctx.ui.notify("answer requires interactive mode", "error");
     return false;
@@ -24,12 +24,12 @@ function ensureInteractiveModel(
     return false;
   }
   return true;
-}
+};
 
 /**
  * Resolve the last assistant text or notify on failure.
  */
-function resolveAssistantText(ctx: ExtensionContext): string | null {
+const resolveAssistantText = (ctx: ExtensionContext): string | null => {
   const result = findLastAssistantText(ctx.sessionManager.getBranch());
   if (result.status === "found") {
     return result.text;
@@ -40,24 +40,24 @@ function resolveAssistantText(ctx: ExtensionContext): string | null {
   }
   ctx.ui.notify("No assistant messages found", "error");
   return null;
-}
+};
 
 /**
  * Prompt the user to answer extracted questions.
  */
-function collectAnswers(
+const collectAnswers = (
   ctx: ExtensionContext,
   questions: ExtractedQuestion[]
-): Promise<string | null> {
+): Promise<string | null> => {
   return ctx.ui.custom<string | null>(
     (tui, _theme, _kb, done) => new QnAComponent(questions, tui, done)
   );
-}
+};
 
 /**
  * Send the compiled answers as a custom message.
  */
-function sendAnswers(pi: ExtensionAPI, answers: string): void {
+const sendAnswers = (pi: ExtensionAPI, answers: string): void => {
   pi.sendMessage(
     {
       customType: "answers",
@@ -66,12 +66,12 @@ function sendAnswers(pi: ExtensionAPI, answers: string): void {
     },
     { triggerTurn: true }
   );
-}
+};
 
 /**
  * Handle /answer interactions.
  */
-async function answerHandler(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
+const answerHandler = async (pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> => {
   if (!ensureInteractiveModel(ctx)) return;
 
   const assistantText = resolveAssistantText(ctx);
@@ -95,14 +95,16 @@ async function answerHandler(pi: ExtensionAPI, ctx: ExtensionContext): Promise<v
   }
 
   sendAnswers(pi, answersResult);
-}
+};
 
 /**
  * Register the /answer command.
  */
-export default function answerExtension(pi: ExtensionAPI): void {
+const answerExtension = (pi: ExtensionAPI): void => {
   pi.registerCommand("answer", {
     description: "Extract questions from last assistant message into interactive Q&A",
     handler: (_args, ctx) => answerHandler(pi, ctx),
   });
-}
+};
+
+export default answerExtension;

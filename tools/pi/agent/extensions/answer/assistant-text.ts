@@ -15,17 +15,21 @@ export type AssistantTextResult =
 /**
  * Join all text parts in a message into one string.
  */
-function extractMessageText(parts: readonly { type: string; text?: string }[]): string | null {
+const extractMessageText = (
+  parts: readonly { type: string; text?: string }[]
+): string | null => {
   const textParts = parts
     .filter((part): part is { type: "text"; text: string } => part.type === "text")
     .map((part) => part.text);
   return textParts.length > 0 ? textParts.join("\n") : null;
-}
+};
 
 /**
  * Find the most recent assistant text in the branch.
  */
-export function findLastAssistantText(entries: readonly SessionEntry[]): AssistantTextResult {
+export const findLastAssistantText = (
+  entries: readonly SessionEntry[]
+): AssistantTextResult => {
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i];
     if (entry.type !== "message") continue;
@@ -41,4 +45,4 @@ export function findLastAssistantText(entries: readonly SessionEntry[]): Assista
   }
 
   return { status: "missing" };
-}
+};
