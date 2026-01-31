@@ -140,7 +140,7 @@ def asset_copies() -> list[Job]:
 def agent_files() -> list[Job]:
     """Build jobs to sync agent instruction files."""
     return [
-        Job(AGENTS_HOME / DEFAULT_AGENT_FILE, tool_root(tool) / tool.agent_file, "file")
+        Job(ASSETS_HOME / DEFAULT_AGENT_FILE, tool_root(tool) / tool.agent_file, "file")
         for tool in TOOL_CONFIG.values()
     ]
 
