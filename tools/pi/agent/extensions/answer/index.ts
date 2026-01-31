@@ -55,10 +55,17 @@ function collectAnswers(
 }
 
 /**
- * Send the compiled answers as a user message.
+ * Send the compiled answers as a custom message.
  */
 function sendAnswers(pi: ExtensionAPI, answers: string): void {
-  pi.sendUserMessage(`${ANSWER_MESSAGE_PREFIX}${answers}`);
+  pi.sendMessage(
+    {
+      customType: "answers",
+      content: `${ANSWER_MESSAGE_PREFIX}${answers}`,
+      display: true,
+    },
+    { triggerTurn: true }
+  );
 }
 
 /**
