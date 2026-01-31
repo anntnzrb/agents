@@ -11,11 +11,9 @@ import type {
   ThemeColor,
 } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
-import { Effect, Option } from "effect";
-import { pipe } from "effect/Function";
 
 interface BranchSummary {
-  lastMessage: Option.Option<AssistantMessage>;
+  lastMessage: AssistantMessage | undefined;
   thinkingLevel: string;
   totalInput: number;
 }
@@ -41,7 +39,7 @@ const formatNumber = (value: number): string => {
 };
 
 const emptySummary: BranchSummary = {
-  lastMessage: Option.none(),
+  lastMessage: undefined,
   thinkingLevel: "off",
   totalInput: 0,
 };
@@ -49,8 +47,7 @@ const emptySummary: BranchSummary = {
 /** Updates aggregate summary values from a session entry. */
 const updateSummary = (summary: BranchSummary, entry: SessionEntry): BranchSummary => {
   if (entry.type === "message" && entry.message.role === "assistant") {
-    const nextMessage =
-      entry.message.stopReason !== "aborted" ? Option.some(entry.message) : summary.lastMessage;
+    const nextMessage = entry.message.stopReason !== "aborted" ? entry.message : summary.lastMessage;
     return {
       ...summary,
       totalInput: summary.totalInput + entry.message.usage.input,
@@ -67,48 +64,34 @@ const updateSummary = (summary: BranchSummary, entry: SessionEntry): BranchSumma
 
 /** Summarizes the current branch entries for footer stats. */
 const summarizeBranchEntries = (entries: readonly SessionEntry[]): BranchSummary =>
-  pipe(entries, (items) => items.reduce(updateSummary, emptySummary));
+  entries.reduce(updateSummary, emptySummary);
 
 /** Computes total context tokens for the last assistant message. */
-const getContextTokens = (lastMessage: Option.Option<AssistantMessage>): number =>
-  pipe(
-    lastMessage,
-    Option.map(
-      (message) =>
-        message.usage.input +
-        message.usage.output +
-        message.usage.cacheRead +
-        message.usage.cacheWrite
-    ),
-    Option.getOrElse(() => 0)
+const getContextTokens = (lastMessage: AssistantMessage | undefined): number => {
+  if (!lastMessage) return 0;
+  return (
+    lastMessage.usage.input +
+    lastMessage.usage.output +
+    lastMessage.usage.cacheRead +
+    lastMessage.usage.cacheWrite
   );
+};
 
 /** Reads the model context window size when available. */
-const getContextWindow = (model: ModelInfo | undefined): number =>
-  pipe(
-    Option.fromNullable(model),
-    Option.map((entry) => entry.contextWindow),
-    Option.getOrElse(() => 0)
-  );
+const getContextWindow = (model: ModelInfo | undefined): number => model?.contextWindow ?? 0;
 
 /** Formats the model label, including thinking level when active. */
-const getModelDisplay = (model: ModelInfo | undefined, thinkingLevel: string): string =>
-  pipe(
-    Option.fromNullable(model),
-    Option.map((entry) =>
-      entry.reasoning && thinkingLevel !== "off" ? `${entry.id} (${thinkingLevel})` : entry.id
-    ),
-    Option.getOrElse(() => "no-model")
-  );
+const getModelDisplay = (model: ModelInfo | undefined, thinkingLevel: string): string => {
+  if (!model) return "no-model";
+  if (model.reasoning && thinkingLevel !== "off") {
+    return `${model.id} (${thinkingLevel})`;
+  }
+  return model.id;
+};
 
 /** Shortens the working directory by replacing home with ~. */
-const getShortCwd = (cwd: string, home: Option.Option<string>): string =>
-  pipe(
-    home,
-    Option.filter((homeDir) => cwd.startsWith(homeDir)),
-    Option.map((homeDir) => `~${cwd.slice(homeDir.length)}`),
-    Option.getOrElse(() => cwd)
-  );
+const getShortCwd = (cwd: string, home: string | undefined): string =>
+  home && cwd.startsWith(home) ? `~${cwd.slice(home.length)}` : cwd;
 
 /** Resolves context stats from usage or fallback calculations. */
 const resolveContextStats = (
@@ -116,17 +99,9 @@ const resolveContextStats = (
   fallbackTokens: number,
   fallbackWindow: number
 ): { contextTokens: number; contextWindow: number } =>
-  pipe(
-    Option.fromNullable(usage),
-    Option.map((value) => ({
-      contextTokens: value.tokens,
-      contextWindow: value.contextWindow,
-    })),
-    Option.getOrElse(() => ({
-      contextTokens: fallbackTokens,
-      contextWindow: fallbackWindow,
-    }))
-  );
+  usage
+    ? { contextTokens: usage.tokens, contextWindow: usage.contextWindow }
+    : { contextTokens: fallbackTokens, contextWindow: fallbackWindow };
 
 /** Picks a color based on context usage percentage. */
 const getContextColor = (contextTokens: number, contextWindow: number): ThemeColor => {
@@ -137,20 +112,14 @@ const getContextColor = (contextTokens: number, contextWindow: number): ThemeCol
 };
 
 /** Builds the git branch segment for the footer. */
-const buildBranchStr = (branch: Option.Option<string>, theme: Theme): string =>
-  pipe(
-    branch,
-    Option.map((value) => separator(theme) + theme.fg("accent", value)),
-    Option.getOrElse(() => "")
-  );
+const buildBranchStr = (branch: string | undefined, theme: Theme): string =>
+  branch ? separator(theme) + theme.fg("accent", branch) : "";
 
 /** Builds the extension status segment for the footer. */
-const buildStatusStr = (statuses: ReadonlyMap<string, string>, theme: Theme): string =>
-  pipe(
-    [...statuses.values()],
-    (values) => values.map(sanitizeStatusText),
-    (parts) => (parts.length > 0 ? separator(theme) + parts.join(separator(theme)) : "")
-  );
+const buildStatusStr = (statuses: ReadonlyMap<string, string>, theme: Theme): string => {
+  const parts = [...statuses.values()].map(sanitizeStatusText);
+  return parts.length > 0 ? separator(theme) + parts.join(separator(theme)) : "";
+};
 
 /** Builds the right-hand side of the footer. */
 const buildRight = (
@@ -180,45 +149,38 @@ const renderLine = (left: string, right: string, width: number): string => {
 /** Composes the full footer line from runtime inputs. */
 const buildFooterLine = (input: {
   branchEntries: readonly SessionEntry[];
-  branch: Option.Option<string>;
+  branch: string | undefined;
   statuses: ReadonlyMap<string, string>;
   contextUsage: ContextUsage | undefined;
   cwd: string;
-  home: Option.Option<string>;
+  home: string | undefined;
   model: ModelInfo | undefined;
   width: number;
   theme: Theme;
-}): string =>
-  pipe(
-    input,
-    (data) => ({
-      ...data,
-      summary: summarizeBranchEntries(data.branchEntries),
-    }),
-    (data) => {
-      const { contextTokens, contextWindow } = resolveContextStats(
-        data.contextUsage,
-        getContextTokens(data.summary.lastMessage),
-        getContextWindow(data.model)
-      );
-      const modelDisplay = getModelDisplay(data.model, data.summary.thinkingLevel);
-      const shortCwd = getShortCwd(data.cwd, data.home);
-
-      const left =
-        data.theme.fg("muted", shortCwd) +
-        buildBranchStr(data.branch, data.theme) +
-        buildStatusStr(data.statuses, data.theme);
-
-      const right = buildRight(data.theme, {
-        contextTokens,
-        contextWindow,
-        totalInput: data.summary.totalInput,
-        modelDisplay,
-      });
-
-      return renderLine(left, right, data.width);
-    }
+}): string => {
+  const summary = summarizeBranchEntries(input.branchEntries);
+  const { contextTokens, contextWindow } = resolveContextStats(
+    input.contextUsage,
+    getContextTokens(summary.lastMessage),
+    getContextWindow(input.model)
   );
+  const modelDisplay = getModelDisplay(input.model, summary.thinkingLevel);
+  const shortCwd = getShortCwd(input.cwd, input.home);
+
+  const left =
+    input.theme.fg("muted", shortCwd) +
+    buildBranchStr(input.branch, input.theme) +
+    buildStatusStr(input.statuses, input.theme);
+
+  const right = buildRight(input.theme, {
+    contextTokens,
+    contextWindow,
+    totalInput: summary.totalInput,
+    modelDisplay,
+  });
+
+  return renderLine(left, right, input.width);
+};
 
 /** Registers the footer extension with pi. */
 export default function footerExtension(pi: ExtensionAPI): void {
@@ -233,22 +195,18 @@ export default function footerExtension(pi: ExtensionAPI): void {
           // Intentionally empty.
         },
         render(width: number): string[] {
-          const footerLine = pipe(
-            Effect.sync(() => ({
-              branchEntries: ctx.sessionManager.getBranch(),
-              branch: Option.fromNullable(footerData.getGitBranch()),
-              statuses: footerData.getExtensionStatuses(),
-              contextUsage: ctx.getContextUsage(),
-              cwd: ctx.cwd,
-              // biome-ignore lint/complexity/useLiteralKeys lint/correctness/noProcessGlobal: Node-only extension.
-              home: Option.fromNullable(process.env["HOME"]),
-              model: ctx.model as ModelInfo | undefined,
-              width,
-              theme,
-            })),
-            Effect.map(buildFooterLine),
-            Effect.runSync
-          );
+          const footerLine = buildFooterLine({
+            branchEntries: ctx.sessionManager.getBranch(),
+            branch: footerData.getGitBranch() ?? undefined,
+            statuses: footerData.getExtensionStatuses(),
+            contextUsage: ctx.getContextUsage(),
+            cwd: ctx.cwd,
+            // biome-ignore lint/complexity/useLiteralKeys lint/correctness/noProcessGlobal: Node-only extension.
+            home: process.env["HOME"],
+            model: ctx.model as ModelInfo | undefined,
+            width,
+            theme,
+          });
 
           return [footerLine];
         },
