@@ -44,7 +44,6 @@ TOOL_CONFIG: dict[str, ToolConfig] = {
     "opencode": ToolConfig(Path.home() / ".config" / "opencode"),
     "pi": ToolConfig(
         Path.home() / ".pi",
-        asset_renames={"commands": "prompts"},
         tool_subdir=Path("agent"),
     ),
 }
