@@ -154,7 +154,7 @@ const renderHiddenResult = (isPartial: boolean, theme: Theme) =>
   (isPartial ? new Text(theme.fg("muted", "…"), 0, 0) : undefined);
 
 /** Register the tool output suppression renderers. */
-export default function hideToolOutputExtension(pi: ExtensionAPI): void {
+const hideToolOutputExtension = (pi: ExtensionAPI): void => {
   for (const tool of tools) {
     pi.registerTool({
       name: tool.name,
@@ -167,4 +167,6 @@ export default function hideToolOutputExtension(pi: ExtensionAPI): void {
       renderResult: (_result, options, theme) => renderHiddenResult(options.isPartial, theme),
     });
   }
-}
+};
+
+export default hideToolOutputExtension;
