@@ -5,8 +5,6 @@
 import { createCodingTools, createReadOnlyTools } from "@mariozechner/pi-coding-agent";
 import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
-import { Option } from "effect";
-import { pipe } from "effect/Function";
 
 type Tool = ReturnType<typeof createCodingTools>[number];
 type ToolArgs = Record<string, unknown>;
@@ -97,16 +95,11 @@ const formatValue = (value: unknown): string => {
 };
 
 /** Format a single key/value pair for display. */
-const formatArgEntry = (key: string, value: unknown): string | undefined =>
-  pipe(
-    Option.fromNullable(value),
-    Option.map(formatValue),
-    Option.filter((text) => text.length > 0),
-    Option.match({
-      onNone: () => undefined,
-      onSome: (text) => `${key}: ${text}`,
-    }),
-  );
+const formatArgEntry = (key: string, value: unknown): string | undefined => {
+  if (value === null || value === undefined) return undefined;
+  const text = formatValue(value);
+  return text.length > 0 ? `${key}: ${text}` : undefined;
+};
 
 /** Format tool args into a compact string. */
 const formatArgs = (args: ToolArgs): string | undefined => {
