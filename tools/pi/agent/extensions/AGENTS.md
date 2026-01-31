@@ -13,5 +13,7 @@ Full gate for extensions (run from the specific extension dir):
 - `bun x biome lint . --config-path ../.config/biome.json`
 - `bun x --package eslint --package eslint-plugin-jsdoc --package @typescript-eslint/parser eslint . --max-warnings 0 --config ../.config/eslint.config.js --no-error-on-unmatched-pattern`
 - Verify guidelines criterion is met
+- Keep files between 500-1000 SLOC (excluding comments). Beyond 500L consider modularizing.
+- All extensions must include AGENTS.md with description + navigation.
 
 NOTE: Fallback to npm (`npx`) if `bun` is unavailable.
