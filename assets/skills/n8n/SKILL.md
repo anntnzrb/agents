@@ -22,11 +22,11 @@ Use **REST API** to create/update/activate workflows. Use **MCP** to list and ru
 
 ## Node discovery (tested)
 
-- Exa: built-in node library docs (`https://docs.n8n.io/integrations/builtin/node-types/`).
-- Context7: `/n8n-io/n8n-docs` for node docs + examples.
-- DeepWiki: repo Q&A over `n8n-io/n8n-docs`; pair with `gh` or workflow export to confirm `type` strings.
-- `gh`: list node folders, then search by keyword and open the `*.node.json` file to read the `node` field.
-- Export workflows to confirm exact `type` strings in your instance.
+- Exa: built-in node library docs (`https://docs.n8n.io/integrations/builtin/node-types/`)
+- Context7: `/n8n-io/n8n-docs` for node docs + examples
+- DeepWiki: repo Q&A over `n8n-io/n8n-docs`; pair with `gh` or workflow export to confirm `type` strings
+- `gh`: list node folders, then search by keyword and open the `*.node.json` file to read the `node` field
+- Export workflows to confirm exact `type` strings in your instance
 
 ## Quick start (REST)
 
@@ -54,10 +54,10 @@ bun x supergateway --streamableHttp "<N8N_MCP_URL>" \
 
 ## Notes
 
-- Workflows include a trigger node for MCP execution.
-- Keep `--header "Authorization: Bearer <...>"` as a single, quoted argument.
-- `n8nctl` uses REST endpoints and requires `N8N_BASE_URL` + `N8N_API_KEY`.
-- Replace `<N8N_CONTAINER>` with your Docker container name.
+- Workflows include a trigger node for MCP execution
+- Keep `--header "Authorization: Bearer <...>"` as a single, quoted argument
+- `n8nctl` uses REST endpoints and requires `N8N_BASE_URL` + `N8N_API_KEY`
+- Replace `<N8N_CONTAINER>` with your Docker container name
 
 ## CLI (self-hosted)
 

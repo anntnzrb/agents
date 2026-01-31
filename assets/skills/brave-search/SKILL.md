@@ -23,7 +23,7 @@ Use Brave Search MCP for web, local, image, video, news, and summarization. This
 
 ## Output notes
 
-- Some calls return a single top result (not an array). Treat as best-hit.
+- Some calls return a single top result (not an array). Treat as best-hit
 
 ## Quick start
 

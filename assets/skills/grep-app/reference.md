@@ -14,5 +14,5 @@ Search literal code patterns in public GitHub repos.
 Key params: `query`, `matchCase`, `matchWholeWords`, `useRegexp`, `repo`, `path`, `language`.
 
 Notes:
-- Use literal code strings (e.g., `useState(`).
-- For regex, set `useRegexp=true`; prefix `(?s)` to match across lines.
+- Use literal code strings (e.g., `useState(`)
+- For regex, set `useRegexp=true`; prefix `(?s)` to match across lines

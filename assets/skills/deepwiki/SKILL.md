@@ -21,7 +21,7 @@ If empty/insufficient: fall back to Exa/Brave.
 
 ## Notes
 
-- `read_wiki_contents` can be large; use `ask_question` for narrow answers.
+- `read_wiki_contents` can be large; use `ask_question` for narrow answers
 
 ## Quick start
 

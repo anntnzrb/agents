@@ -42,5 +42,5 @@ nlm chat <notebook-id>
 
 ## Notes
 
-- If user says "talk to my knowledge base", ask which notebook ID to use.
-- No implicit state: do not assume a last-used notebook.
+- If user says "talk to my knowledge base", ask which notebook ID to use
+- No implicit state: do not assume a last-used notebook

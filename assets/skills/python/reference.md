@@ -16,12 +16,12 @@
 
 ### When to Use What
 
-- **list**: Default mutable sequence. O(1) append, O(n) insert/delete.
-- **tuple**: Immutable, hashable. Use for fixed data, dict keys, return values.
-- **dict**: Key-value lookup. O(1) average access.
-- **set**: Membership testing O(1), deduplication, set operations.
-- **deque**: Fast append/pop from both ends. Use for queues.
-- **namedtuple/dataclass**: Structured data with named fields.
+- **list**: Default mutable sequence. O(1) append, O(n) insert/delete
+- **tuple**: Immutable, hashable. Use for fixed data, dict keys, return values
+- **dict**: Key-value lookup. O(1) average access
+- **set**: Membership testing O(1), deduplication, set operations
+- **deque**: Fast append/pop from both ends. Use for queues
+- **namedtuple/dataclass**: Structured data with named fields
 
 ## Naming Conventions (PEP 8)
 

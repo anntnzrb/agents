@@ -22,9 +22,9 @@ searchGitHub query="(?s)useEffect\\(\\(\\) => {.*removeEventListener" useRegexp=
 
 ## Notes
 
-- Filter with `repo`, `path`, `language` for precision.
-- Use `useRegexp=true` for regex; prefix `(?s)` to match across lines.
-- Public GitHub only; check licenses before reuse.
+- Filter with `repo`, `path`, `language` for precision
+- Use `useRegexp=true` for regex; prefix `(?s)` to match across lines
+- Public GitHub only; check licenses before reuse
 
 ## Query templates
 

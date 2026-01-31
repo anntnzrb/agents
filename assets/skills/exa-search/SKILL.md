@@ -22,8 +22,8 @@ Use Exa for web search, code context, crawling, and research tasks. This skill d
 
 ## Notes
 
-- `company_research_exa` and `linkedin_search_exa` are noisy + long; use only when user explicitly asks for company/people research.
-- `deep_researcher_start` is slow and may cite mixed-quality sources; cross-check key claims.
+- `company_research_exa` and `linkedin_search_exa` are noisy + long; use only when user explicitly asks for company/people research
+- `deep_researcher_start` is slow and may cite mixed-quality sources; cross-check key claims
 
 ## Quick start
 

@@ -16,18 +16,18 @@ Common endpoints:
 
 ## MCP (runtime)
 
-- Instance-level MCP for listing and running enabled workflows.
+- Instance-level MCP for listing and running enabled workflows
 
 Notes:
- - Use `supergateway` for streamable HTTP endpoints.
+ - Use `supergateway` for streamable HTTP endpoints
 
 ## Node lookup
 
-- Exa: built-in node library docs (`https://docs.n8n.io/integrations/builtin/node-types/`).
-- Context7: `/n8n-io/n8n-docs` for node docs + examples.
-- DeepWiki: repo Q&A over `n8n-io/n8n-docs`; pair with `gh` or workflow export to confirm `type` strings.
-- `gh`: list node folders, then search by keyword and open the `*.node.json` file to read the `node` field.
-- Inspect `type` fields from exported workflows to confirm exact identifiers.
+- Exa: built-in node library docs (`https://docs.n8n.io/integrations/builtin/node-types/`)
+- Context7: `/n8n-io/n8n-docs` for node docs + examples
+- DeepWiki: repo Q&A over `n8n-io/n8n-docs`; pair with `gh` or workflow export to confirm `type` strings
+- `gh`: list node folders, then search by keyword and open the `*.node.json` file to read the `node` field
+- Inspect `type` fields from exported workflows to confirm exact identifiers
 
 ## MCP config snippet (template)
 

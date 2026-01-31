@@ -11,6 +11,6 @@ Optional arguments: $ARGUMENTS
 
 ## Rules
 
-- Return only the result; no reasoning process, intermediate steps, or tool outputs.
-- Concise, actionable answer for the parent agent.
-- Batch independent tool calls in parallel.
+- Return only the result; no reasoning process, intermediate steps, or tool outputs
+- Concise, actionable answer for the parent agent
+- Batch independent tool calls in parallel

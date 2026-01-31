@@ -27,10 +27,10 @@ query-docs libraryId="/tanstack/react-query" query="invalidate a query"
 
 ## Notes
 
-- If you already have a library ID (`/org/project` or `/org/project/version`), skip resolve.
-- Otherwise call `resolve-library-id` before `query-docs`.
-- Follow tool limits: max 3 calls per question (per tool rules).
-- Prefer high reputation + higher snippet count when choosing a library ID.
+- If you already have a library ID (`/org/project` or `/org/project/version`), skip resolve
+- Otherwise call `resolve-library-id` before `query-docs`
+- Follow tool limits: max 3 calls per question (per tool rules)
+- Prefer high reputation + higher snippet count when choosing a library ID
 
 ## Query templates
 

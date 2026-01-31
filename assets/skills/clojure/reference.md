@@ -14,10 +14,10 @@
 
 ### When to Use What
 
-- **Vector**: Default choice for sequences. O(~1) indexed access and append.
-- **List**: When prepending is the primary operation (stacks, recursion).
-- **Map**: Key-value associations. Keywords as keys for named fields.
-- **Set**: Membership testing, deduplication, filtering.
+- **Vector**: Default choice for sequences. O(~1) indexed access and append
+- **List**: When prepending is the primary operation (stacks, recursion)
+- **Map**: Key-value associations. Keywords as keys for named fields
+- **Set**: Membership testing, deduplication, filtering
 
 ## Naming Conventions
 

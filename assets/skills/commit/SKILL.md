@@ -15,7 +15,7 @@ WORKING DIRECTORY: optional argument, default current directory.
 - If multiple logical units exist, create multiple commits; do not batch them into one
 - Renames/moves/structure-only changes are their own logical unit when separate from content changes
 - Use `git add -p` for mixed changes in a single file
-- Interactive staging via pipe: `printf 'y\nn\ny\n' | git add -p <file>`.
+- Interactive staging via pipe: `printf 'y\nn\ny\n' | git add -p <file>`
 - Verify with `git diff --cached` before each commit
 
 ## Format
