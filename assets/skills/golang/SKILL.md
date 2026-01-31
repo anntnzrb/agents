@@ -1,9 +1,9 @@
 ---
-name: go
-description: "Develop Go applications using modern patterns, popular libraries, and idiomatic design. Activate when working with .go files, go.mod, go.sum, or user mentions Go, Golang, goroutines, channels, or Go libraries like gin, cobra, gorm."
+name: golang
+description: "Develop Go (Golang) applications using modern patterns, popular libraries, and idiomatic design. Activate when working with .go files, go.mod, go.sum, or user mentions Go, Golang, goroutines, channels, or Go libraries like gin, cobra, gorm."
 ---
 
-# Go Development Skill
+# Golang Development Skill
 
 ## Activation Triggers
 
