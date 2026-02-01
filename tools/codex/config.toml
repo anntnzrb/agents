@@ -16,6 +16,7 @@ review_model = "gpt-5.2-codex"
 model_reasoning_effort = "high"
 model_verbosity = "low"
 model_reasoning_summary = "detailed"
+model_personality = "pragmatic"
 
 # -----------------------------------------------------------------------------
 # PERMISSIONS
@@ -37,11 +38,16 @@ inherit = "core"
 # -----------------------------------------------------------------------------
 
 [features]
-apply_patch_freeform = true
+apply_patch_freeform = true # EXP
+child_agents_md = true # EXP
 collab = true # EXP
+collaboration_modes = true # EXP
+personality = true # EXP
 remote_compaction = true
 shell_snapshot = true
 skills = true
+sqlite = true # EXP
+undo = true # EXP
 unified_exec = true
 
 # steer = ENTER ; queue = TAB
