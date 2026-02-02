@@ -86,4 +86,6 @@
     "disable_paste_summary": true,
     "continue_loop_on_deny": true,
   },
+  "formatter": false,
+  "lsp": false,
 }
