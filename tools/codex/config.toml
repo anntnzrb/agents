@@ -11,8 +11,8 @@ web_search = "disabled"
 # MODEL
 # -----------------------------------------------------------------------------
 
-model = "gpt-5.2-codex"
-review_model = "gpt-5.2-codex"
+model = "gpt-5.3-codex"
+review_model = "gpt-5.3-codex"
 model_reasoning_effort = "high"
 model_verbosity = "low"
 model_reasoning_summary = "detailed"

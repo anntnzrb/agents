@@ -2,7 +2,7 @@
   "lastChangelogVersion": "0.50.3",
   "theme": "ef-elea-light",
   "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.2-codex",
+  "defaultModel": "gpt-5.3-codex",
   "defaultThinkingLevel": "high",
   "hideThinkingBlock": true,
   "followUpMode": "all",
