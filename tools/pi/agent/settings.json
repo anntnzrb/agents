@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.50.3",
+  "lastChangelogVersion": "0.52.9",
   "theme": "ef-elea-light",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.3-codex",
