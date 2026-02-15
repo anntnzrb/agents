@@ -1,0 +1,73 @@
+{
+  "fetchedAtUtc": "2026-02-15T16:51:42+00:00",
+  "match": {
+    "home": "RB Leipzig",
+    "away": "VfL Wolfsburg"
+  },
+  "feedErrors": {},
+  "feeds": {
+    "sofascore": {"fetchedAtUtc": "2026-02-15T16:51:40+00:00"},
+    "espn": {"fetchedAtUtc": "2026-02-15T16:51:41+00:00"},
+    "ecuabet": {"fetchedAtUtc": "2026-02-15T16:51:39+00:00"},
+    "openMeteo": {"fetchedAtUtc": "2026-02-15T16:50:50+00:00"},
+    "understat": {"fetchedAtUtc": "2026-02-15T16:48:10+00:00"}
+  },
+  "decisionSummary": {
+    "statusBoard": {
+      "espn": {"clock": "21'"},
+      "ecuabet": {"liveTime": "21'"}
+    },
+    "scoreConsensus": {
+      "consensusScore": [0, 0]
+    },
+    "liveMetrics": {
+      "sofascore": {
+        "expectedGoals": {"homeValue": 0.77, "awayValue": 0.02},
+        "totalShots": {"homeValue": 4, "awayValue": 1},
+        "shotsOnTarget": {"homeValue": 2, "awayValue": 0},
+        "corners": {"homeValue": 4, "awayValue": 0},
+        "possession": {"homeValue": 55, "awayValue": 45}
+      }
+    },
+    "weather": {
+      "comfort": {"score": 65.0}
+    },
+    "understatForm": {
+      "teams": [
+        {
+          "team": "RasenBallsport Leipzig",
+          "seasonTotals": {"ppg": 1.857, "xGDiff": 13.314}
+        },
+        {
+          "team": "Wolfsburg",
+          "seasonTotals": {"ppg": 0.905, "xGDiff": -9.947}
+        }
+      ]
+    },
+    "ecuabetMarkets": {
+      "keyLines": {
+        "1x2": [
+          {"name": "RB Leipzig", "price": 1.5406, "impliedProbability": 0.649098},
+          {"name": "Empate", "price": 4.0, "impliedProbability": 0.25},
+          {"name": "Wolfsburgo", "price": 6.0, "impliedProbability": 0.166667}
+        ],
+        "btts": [
+          {"name": "No", "price": 1.8462, "impliedProbability": 0.541653},
+          {"name": "Sí", "price": 1.8889, "impliedProbability": 0.529409}
+        ],
+        "totals": [
+          {
+            "line": 2.5,
+            "over": {"name": "Más de 2.5", "price": 1.825, "impliedProbability": 0.547945},
+            "under": {"name": "Menos de 2.5", "price": 2.0, "impliedProbability": 0.5}
+          },
+          {
+            "line": 3.0,
+            "over": {"name": "Más de 3", "price": 2.3, "impliedProbability": 0.434783},
+            "under": {"name": "Menos de 3", "price": 1.5556, "impliedProbability": 0.642839}
+          }
+        ]
+      }
+    }
+  }
+}
