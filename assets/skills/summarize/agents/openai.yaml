@@ -1,0 +1,4 @@
+interface:
+  display_name: "Summarize CLI"
+  short_description: "Full @steipete/summarize CLI operator"
+  default_prompt: "Use $summarize to run bun x @steipete/summarize for summaries, extraction, slides, transcriber setup, and refresh-free workflows."
