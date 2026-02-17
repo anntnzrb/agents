@@ -40,7 +40,7 @@ inherit = "core"
 [features]
 apply_patch_freeform = true # EXP
 child_agents_md = true # EXP
-collab = true # EXP
+multi_agent = true # EXP
 collaboration_modes = true # EXP
 personality = true # EXP
 remote_compaction = true
