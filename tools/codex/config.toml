@@ -40,8 +40,8 @@ inherit = "core"
 [features]
 apply_patch_freeform = true # EXP
 child_agents_md = true # EXP
-multi_agent = true # EXP
 collaboration_modes = true # EXP
+multi_agent = true
 personality = true # EXP
 remote_compaction = true
 shell_snapshot = true
@@ -54,8 +54,20 @@ unified_exec = true
 steer = true
 
 # -----------------------------------------------------------------------------
+# AGENTS
+# -----------------------------------------------------------------------------
+
+[agents]
+max_threads = 12
+
+[agents.refactorer]
+config_file = "agents/refactorer.toml"
+description = "Use for improving code quality without changing external behavior."
+
+# -----------------------------------------------------------------------------
 # MISC
 # -----------------------------------------------------------------------------
+
 [history]
 persistence = "save-all"
 
