@@ -1,0 +1,73 @@
+{
+  "browseAllHot": {
+    "subreddit": "all",
+    "sort": "hot",
+    "limit": 25,
+    "include_nsfw": false
+  },
+  "browseSubredditTopWeek": {
+    "subreddit": "technology",
+    "sort": "top",
+    "time": "week",
+    "limit": 25,
+    "include_subreddit_info": true
+  },
+  "searchGlobal": {
+    "query": "<topic>",
+    "sort": "relevance",
+    "time": "all",
+    "limit": 25
+  },
+  "searchInSubreddits": {
+    "query": "<topic>",
+    "subreddits": ["cscareerquestions", "programming"],
+    "sort": "new",
+    "time": "month",
+    "limit": 25
+  },
+  "searchByAuthor": {
+    "query": "<topic>",
+    "author": "<username>",
+    "sort": "top",
+    "time": "year",
+    "limit": 25
+  },
+  "searchByFlair": {
+    "query": "<topic>",
+    "flair": "<flair text>",
+    "sort": "new",
+    "time": "year",
+    "limit": 25
+  },
+  "getPostDetailsByUrl": {
+    "url": "https://reddit.com/r/<subreddit>/comments/<post_id>/",
+    "comment_limit": 20,
+    "comment_sort": "best",
+    "comment_depth": 3
+  },
+  "getPostDetailsByIdAndSubreddit": {
+    "post_id": "<post_id>",
+    "subreddit": "<subreddit>",
+    "comment_limit": 20,
+    "comment_sort": "best",
+    "comment_depth": 3
+  },
+  "getPostDetailsWithLinks": {
+    "url": "https://reddit.com/r/<subreddit>/comments/<post_id>/",
+    "comment_limit": 20,
+    "comment_sort": "qa",
+    "comment_depth": 3,
+    "extract_links": true,
+    "max_top_comments": 5
+  },
+  "userAnalysisDefault": {
+    "username": "<username>",
+    "posts_limit": 10,
+    "comments_limit": 10,
+    "time_range": "month",
+    "top_subreddits_limit": 10
+  },
+  "redditExplainTerm": {
+    "term": "karma"
+  }
+}
