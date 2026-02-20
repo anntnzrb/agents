@@ -5,7 +5,7 @@
    * MODELS
    * ************************************************************************ */
 
-  "small_model": "chutes/zai-org/GLM-4.7-Flash",
+  "small_model": "kimi-for-coding/k2p5",
 
   /* **************************************************************************
    * AGENTS
@@ -21,7 +21,7 @@
     //   "variant": "high",
     // },
     "explore": {
-      "model": "zai-org/GLM-5-TEE",
+      "model": "kimi-for-coding/k2p5",
     },
    },
 
