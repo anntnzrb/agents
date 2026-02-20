@@ -12,12 +12,14 @@
    * ************************************************************************ */
 
    "agent": {
-    "plan": {
-      "model": "openai/gpt-5.3-codex",
-    },
-    "build": {
-      "model": "openai/gpt-5.3-codex",
-    },
+    // "plan": {
+    //   "model": "openai/gpt-5.3-codex",
+    //   "variant": "high",
+    // },
+    // "build": {
+    //   "model": "openai/gpt-5.3-codex",
+    //   "variant": "high",
+    // },
     "explore": {
       "model": "zai-org/GLM-5-TEE",
     },
