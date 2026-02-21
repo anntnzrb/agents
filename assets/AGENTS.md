@@ -26,15 +26,5 @@ annt owns this.
 - Conflicts: call out; pick safer path
 - Unrecognized changes: assume other agent; keep going; focus your changes. If it causes issues, stop + ask user
 
-## Tools
-
-### Research
+## Research
 When code, repo, web searches or user opinions (any kind of external exploration) are requested, load the research skill.
-
-### tmux
-- Use only when you need persistence/interaction
-- Quick refs: `tmux new -d -s agent-shell`, `tmux attach -t agent-shell`, `tmux list-sessions`, `tmux kill-session -t agent-shell`
-
-### Navigation / Refactoring / Exploring
-#### AST Grep
-- Load skill: `ast-grep` for fast, read-only structural code search during repo exploration
