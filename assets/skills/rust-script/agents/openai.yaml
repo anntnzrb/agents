@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rust Script Expert"
+  short_description: "Cargo script + rust-script expert"
+  default_prompt: "Use $rust-script to implement and debug Cargo single-file Rust scripts with -Zscript and shebang/frontmatter."

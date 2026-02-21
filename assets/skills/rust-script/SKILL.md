@@ -1,241 +1,166 @@
 ---
 name: rust-script
-description: "Expert in rust-script for running Rust files as scripts without compilation setup. Activate when working with .rs or .ers script files, user mentions rust-script, cargo-script, or scripting Rust, writing one-off Rust scripts with dependencies, or using expr, loop, or inline dependency manifests. Proficient in idiomatic Rust patterns, error handling, async, and CLI tooling."
+description: "Expert guide for Cargo single-file Rust scripts (`-Zscript`) and fallback `rust-script` usage. Use when users ask about Rust scripting, shebang scripts, embedded Cargo manifests/frontmatter, `--manifest-path` for script files, command support/limits, migration from Python/TypeScript scripts, or debugging Cargo script errors and stabilization status."
 ---
 
-# rust-script Expert
+# rust-script
 
-Run Rust script files without explicit compilation, with seamless dependency management via embedded manifests.
+Operate Rust scripting with Cargo-native scripts first, `rust-script` fallback second.
 
-## When This Skill Activates
+## Default Mode
 
-- Working with `.rs` or `.ers` script files intended for rust-script
-- User mentions `rust-script`, `cargo-script`, or "scripting Rust"
-- Writing one-off Rust scripts with crate dependencies
-- Using `--expr`, `--loop`, or inline `cargo` manifest blocks
-- Debugging rust-script execution or dependency issues
-
-## Quick Reference
-
-### Running Scripts
+Use Cargo script mode:
 
 ```sh
-# Basic execution
-rust-script script.rs
-
-# Evaluate expression (prints Debug output)
-rust-script -e '1 + 1'
-rust-script -e 'vec![1,2,3].iter().sum::<i32>()'
-
-# With dependencies
-rust-script -d serde -d "tokio=1" -e 'println!("deps loaded")'
-
-# Filter stdin line-by-line
-echo "hello" | rust-script -l '|line| line.to_uppercase()'
-
-# With line numbers
-cat file.txt | rust-script --count -l '|line, n| format!("{}: {}", n, line.trim())'
-
-# Run tests
-rust-script --test script.rs
-
-# Debug build
-rust-script --debug script.rs
-
-# Force rebuild
-rust-script --force script.rs
-
-# Show cargo output
-rust-script -c script.rs
-
-# Use specific toolchain
-rust-script -t nightly script.rs
-
-# Benchmark with wrapper
-rust-script --wrapper "hyperfine --runs 100" script.rs
-
-# Debug with lldb
-rust-script --debug --wrapper rust-lldb script.rs
-
-# Generate package only (don't run)
-rust-script --package script.rs
+<CARGO_SCRIPT_CMD> path/to/script.rs -- arg1 arg2
 ```
 
-### Dependency Manifest Syntax
+Use this for:
+- single-file scripts with compile-time guarantees
+- shebang executables
+- dependency management in embedded manifest frontmatter
+- script workflows close to regular Cargo projects
 
-Use doc comments with a cargo code block:
+Use `rust-script` only when user explicitly needs stable-only scripting ergonomics.
+
+## Choose `<CARGO_SCRIPT_CMD>`
+
+Set command prefix by toolchain model:
+
+- Rustup-managed toolchains:
+  - `CARGO_SCRIPT_CMD='cargo +nightly -Zscript'`
+- Nightly cargo already in PATH (common in Nix):
+  - `CARGO_SCRIPT_CMD='cargo -Zscript'`
+
+Detection hint:
+- if `cargo -Zscript ...` works, prefer it
+- if `cargo +nightly` errors with `no such command: +nightly`, do not use `+nightly`
+
+## Fast Decision Tree
+
+1. User asks for Rust scripting + accepts nightly:
+- choose `<CARGO_SCRIPT_CMD>`
+- prefer frontmatter manifest (`---cargo ... ---`)
+
+2. User wants stable-only and no nightly:
+- use `rust-script` fallback
+- explain tradeoff vs Cargo-native scripts
+
+3. User asks about publishing/installing script file directly:
+- explain current limitation (`package`/`publish` unsupported; `install --path file.rs` unsupported)
+- suggest converting to normal package (`cargo new --bin`)
+
+## Core Rules
+
+- Always pass `-Zscript` before script path.
+- For extensionless executable scripts, call with path (`./tool`), not bare token (`tool`).
+- For script args that look like Cargo flags, use `--` separator when needed.
+- Prefer explicit edition in frontmatter to avoid default-edition warning churn.
+- Treat Cargo scripts as single-file bin packages, not workspace members.
+
+## Minimal Working Patterns
+
+### Pattern A: run by path
+
+```sh
+<CARGO_SCRIPT_CMD> ./hello.rs
+```
+
+### Pattern B: shebang script
 
 ```rust
-#!/usr/bin/env rust-script
-//! ```cargo
-//! [dependencies]
-//! serde = { version = "1.0", features = ["derive"] }
-//! tokio = { version = "1", features = ["full"] }
-//! anyhow = "1.0"
-//! ```
+#!/usr/bin/env -S cargo -Zscript
+---cargo
+[package]
+edition = "2024"
 
-use serde::{Serialize, Deserialize};
+[dependencies]
+anyhow = "1"
+---
 
 fn main() {
-    // ...
+    println!("ok");
 }
 ```
 
-### Including Relative Files
+### Pattern C: command on script manifest
 
-```rust
-// Include a module relative to script location
-mod helper {
-    include!(concat!(env!("RUST_SCRIPT_BASE_PATH"), "/helper.rs"));
-}
-
-// Include text file
-let data = include_str!(concat!(env!("RUST_SCRIPT_BASE_PATH"), "/data.txt"));
-```
-
-## Writing Idiomatic rust-script Code
-
-### Error Handling
-
-Return `Result` from main for clean error propagation:
-
-```rust
-#!/usr/bin/env rust-script
-//! ```cargo
-//! [dependencies]
-//! anyhow = "1.0"
-//! ```
-
-use anyhow::Result;
-
-fn main() -> Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() < 2 {
-        anyhow::bail!("Usage: {} <filename>", args[0]);
-    }
-    let content = std::fs::read_to_string(&args[1])?;
-    println!("{}", content);
-    Ok(())
-}
-```
-
-### Async Scripts
-
-```rust
-#!/usr/bin/env rust-script
-//! ```cargo
-//! [dependencies]
-//! tokio = { version = "1", features = ["full"] }
-//! reqwest = "0.11"
-//! ```
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let resp = reqwest::get("https://httpbin.org/ip").await?.text().await?;
-    println!("{}", resp);
-    Ok(())
-}
-```
-
-### CLI Argument Parsing
-
-```rust
-#!/usr/bin/env rust-script
-//! ```cargo
-//! [dependencies]
-//! clap = { version = "4", features = ["derive"] }
-//! ```
-
-use clap::Parser;
-
-#[derive(Parser)]
-#[command(name = "myscript")]
-struct Args {
-    /// Input file
-    input: String,
-
-    /// Verbose output
-    #[arg(short, long)]
-    verbose: bool,
-}
-
-fn main() {
-    let args = Args::parse();
-    if args.verbose {
-        println!("Processing: {}", args.input);
-    }
-}
-```
-
-### Data Processing with Serde
-
-```rust
-#!/usr/bin/env rust-script
-//! ```cargo
-//! [dependencies]
-//! serde = { version = "1.0", features = ["derive"] }
-//! serde_json = "1.0"
-//! ```
-
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Config {
-    name: String,
-    values: Vec<i32>,
-}
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let json = r#"{"name": "test", "values": [1, 2, 3]}"#;
-    let config: Config = serde_json::from_str(json)?;
-    println!("{:?}", config);
-    Ok(())
-}
-```
-
-## Troubleshooting
-
-### Force Rebuild
-If the script behaves unexpectedly after changes:
 ```sh
-rust-script --force script.rs
+<CARGO_SCRIPT_CMD> check --manifest-path ./tool.rs
+<CARGO_SCRIPT_CMD> test --manifest-path ./tool.rs
+<CARGO_SCRIPT_CMD> add --manifest-path ./tool.rs clap --features derive
+<CARGO_SCRIPT_CMD> remove --manifest-path ./tool.rs clap
 ```
 
-### Clear Cache
-Remove all cached compilations:
+## Frontmatter Contract
+
+Accepted shape:
+- optional shebang on first line
+- optional blank lines
+- opening fence: `---` (or more dashes)
+- optional infostring: `cargo` (or empty)
+- TOML body
+- closing fence with matching dash count
+
+Rejected:
+- mismatched fence dash count
+- unsupported infostring attributes
+- multiple frontmatter blocks
+- disallowed manifest fields for single-file packages
+
+If a frontmatter parse error appears, inspect fence integrity first.
+
+## Load On Demand
+
+Read references only as needed:
+
+- `references/cargo-script-workflow.md`: end-to-end runbook and command recipes.
+- `references/command-support-matrix.md`: supported vs unsupported commands.
+- `references/error-catalog.md`: exact error -> fix mappings.
+- `references/upstream-status.md`: stabilization/tracking status.
+- `references/rust-script-fallback.md`: stable fallback mode (`rust-script` crate).
+
+## Agent Operating Procedure
+
+1. Detect user intent:
+- Cargo-native script mode or `rust-script` fallback.
+
+2. Validate command shape:
+- `-Zscript` position, path form, `--manifest-path` usage.
+
+3. Apply known limits:
+- block unsupported flows early (`package`, `publish`, `install --path file.rs`, path dependency on script).
+
+4. Provide fix-ready command:
+- return exact corrected command, no vague advice.
+
+5. If behavior seems new/regressed:
+- check `references/upstream-status.md`
+- then confirm live state with `gh issue view`.
+
+## Verification Checklist
+
+For new script setups, verify:
+
 ```sh
-rust-script --clear-cache
+<CARGO_SCRIPT_CMD> check --manifest-path ./script.rs
+<CARGO_SCRIPT_CMD> run --manifest-path ./script.rs -- --help
+<CARGO_SCRIPT_CMD> tree --manifest-path ./script.rs
 ```
 
-### View Cargo Output
-See compilation errors and warnings:
+For dependency editing:
+
 ```sh
-rust-script -c script.rs
+<CARGO_SCRIPT_CMD> add --manifest-path ./script.rs serde --features derive
+<CARGO_SCRIPT_CMD> remove --manifest-path ./script.rs serde
 ```
 
-### Debug Logging
-Set environment variable for verbose output:
-```sh
-RUST_LOG=rust_script=trace rust-script script.rs
-```
+## Primary Sources
 
-### Common Issues
-
-1. **Script not rebuilding after changes**: Use `--force` or check that file modification time updated
-
-2. **Dependencies not found**: Ensure proper manifest syntax - cargo block must be in doc comments (//! or ///)
-
-## Research Tools
-
-```
-# gh search code for rust examples
-gh search code "#[tokio::main]" --language=rust
-gh search code "clap::Parser" --language=rust
-gh search code "anyhow::Result" --language=rust
-```
-
-## Templates
-
-See `templates/` directory for ready-to-use examples:
-- `script.rs` - Standard script with dependencies
-- `async.rs` - Async script with tokio
+- Cargo unstable docs (`-Zscript`):
+  `https://doc.rust-lang.org/nightly/cargo/reference/unstable.html#script`
+- Tracking issue:
+  `https://github.com/rust-lang/cargo/issues/12207`
+- RFCs:
+  `https://github.com/rust-lang/rfcs/blob/master/text/3502-cargo-script.md`
+  `https://github.com/rust-lang/rfcs/blob/master/text/3503-frontmatter.md`
