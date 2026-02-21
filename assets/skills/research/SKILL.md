@@ -1,0 +1,66 @@
+---
+name: research
+description: "Research router for selecting the best source path across GitHub/repo docs, API/library docs, OSS code patterns, live web search, Reddit sentiment, and NotebookLM knowledge bases. Use when tasks involve research, fact-checking, source-backed comparisons, evidence gathering, trend checks, or confidence validation. Route code/docs work to gh+deepwiki+context7+grep-app, route web/live work to brave-search+exa-search, route sentiment/discussion to reddit, and route notebook sources to notebooklm. Exclude summarize from this router. Load the mcporter skill when executing MCP-backed routes."
+---
+
+# Research Router
+
+Route research requests to the right source class, then return source-backed answers with confidence and gaps.
+
+## Routing policy
+
+- Prefer live data for open-web questions.
+- Pick the smallest route set that can answer the question.
+- If evidence is thin, add a second source class for corroboration.
+- Keep source provenance explicit in final output.
+
+## Route map
+
+### Code/docs research
+
+- Use `gh` for GitHub repository inspection and code search.
+- Use `deepwiki` for repository docs/Q&A over `owner/repo`.
+- Use `context7` for up-to-date library/API docs and examples.
+- Use `grep-app` for public OSS code usage patterns.
+
+### Web/live research
+
+- Use `brave-search` for fast scoping and recency checks.
+- Use `exa-search` for deeper multi-source synthesis and richer retrieval.
+- Escalate from Brave to Exa when coverage or quality is weak.
+
+### Sentiment/discussion research
+
+- Use `reddit` for community sentiment, discussion trends, and user/topic signals.
+- Corroborate high-impact claims with one non-Reddit source class when feasible.
+
+### Knowledge-base research
+
+- Use `notebooklm` for user-owned notebook sources and internal knowledge corpora.
+
+### Exclusions
+
+- Do not route to `summarize` from this skill.
+
+## Router workflow
+
+1. Classify request: code/docs, web/live, sentiment, or notebook KB.
+2. Select primary route from the map above.
+3. Execute route tools and collect source evidence.
+4. Add corroboration route when confidence is low, sources conflict, or claim impact is high.
+5. Return answer with provenance, confidence, and explicit gaps.
+
+## Output contract
+
+- Answer: concise result.
+- Sources used: tool + why it was selected.
+- Confidence: high/medium/low with reason.
+- Gaps: unresolved uncertainty or missing evidence.
+- Next query: best follow-up when blocked.
+
+## Escalation rules
+
+- If library/API details are unclear, force `context7`.
+- If repo-specific behavior is unclear, force `deepwiki` and/or `gh`.
+- If web evidence is stale or shallow, escalate from `brave-search` to `exa-search`.
+- If sentiment claim drives decisions, include `reddit` plus one non-Reddit corroboration source.
