@@ -29,17 +29,7 @@ annt owns this.
 ## Tools
 
 ### Research
-Load the following skills as needed:
-- `gh` for GitHub interaction + code search
-- `deepwiki` for natural language queries over repo src/docs
-- `exa` for heavy search
-- `brave` for quick, lightweight fallback search
-- `context7` for up-to-date library/API docs and code examples
-- `grep.app` MCP for public OSS code search (regex)
-- `mcporter` for MCP discovery, schemas, auth
-
-Prefer: `deepwiki` for repo docs, `context7` for library docs, `exa(get_code_context_exa`) for APIs, `exa(web_search_exa)` for general web, `brave` for fast scoping, `grep.app` for code patterns
-- `brave` may return single best-hit; if you need multi-source coverage, switch to `exa`
+When code, repo, web searches or user opinions (any kind of external exploration) are requested, load the research skill.
 
 ### tmux
 - Use only when you need persistence/interaction
