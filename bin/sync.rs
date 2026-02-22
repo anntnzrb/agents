@@ -1,4 +1,4 @@
-#!/usr/bin/env -S cargo -Zscript
+#!/usr/bin/env -S cargo -q -Zscript run --release --manifest-path
 ---cargo
 [package]
 edition = "2024"
