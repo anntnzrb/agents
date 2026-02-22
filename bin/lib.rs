@@ -1,10 +1,13 @@
 use std::ffi::OsStr;
 use std::fs;
-use std::io::Read;
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use wait_timeout::ChildExt;
+use walkdir::WalkDir;
 const DEFAULT_AGENT_FILE: &str = "AGENTS.md";
 const INSTALL_TIMEOUT_SECONDS: u64 = 120;
 
@@ -54,7 +57,10 @@ impl SyncEnv {
         let home = std::env::var_os("HOME")
             .map(PathBuf::from)
             .ok_or_else(|| "missing HOME".to_string())?;
-        Ok(Self::from_home(home, Duration::from_secs(INSTALL_TIMEOUT_SECONDS)))
+        Ok(Self::from_home(
+            home,
+            Duration::from_secs(INSTALL_TIMEOUT_SECONDS),
+        ))
     }
 
     fn from_home(home: PathBuf, install_timeout: Duration) -> Self {
@@ -114,10 +120,10 @@ fn is_symlink(path: &Path) -> bool {
         .map(|metadata| metadata.file_type().is_symlink())
         .unwrap_or(false)
 }
-fn rm_entry(path: &Path) -> std::io::Result<()> {
+fn rm_entry(path: &Path) -> io::Result<()> {
     let metadata = match fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
         Err(error) => return Err(error),
     };
 
@@ -129,28 +135,37 @@ fn rm_entry(path: &Path) -> std::io::Result<()> {
     }
     fs::remove_file(path).or_else(ignore_not_found)
 }
-fn ignore_not_found(error: std::io::Error) -> std::io::Result<()> {
-    if error.kind() == std::io::ErrorKind::NotFound {
+fn ignore_not_found(error: io::Error) -> io::Result<()> {
+    if error.kind() == io::ErrorKind::NotFound {
         Ok(())
     } else {
         Err(error)
     }
 }
-fn copy_tree(src: &Path, dst: &Path) -> std::io::Result<()> {
+fn copy_tree(src: &Path, dst: &Path) -> io::Result<()> {
     let metadata = fs::metadata(src)?;
-    if metadata.is_dir() {
-        fs::create_dir_all(dst)?;
-        for entry_result in fs::read_dir(src)? {
-            let entry = entry_result?;
-            copy_tree(&entry.path(), &dst.join(entry.file_name()))?;
+    if !metadata.is_dir() {
+        if let Some(parent) = dst.parent() {
+            fs::create_dir_all(parent)?;
         }
+        fs::copy(src, dst)?;
         return Ok(());
     }
 
-    if let Some(parent) = dst.parent() {
-        fs::create_dir_all(parent)?;
+    fs::create_dir_all(dst)?;
+    for entry_result in WalkDir::new(src).follow_links(true).min_depth(1) {
+        let entry = entry_result.map_err(io::Error::other)?;
+        let relative = entry.path().strip_prefix(src).map_err(io::Error::other)?;
+        let target = dst.join(relative);
+        if entry.file_type().is_dir() {
+            fs::create_dir_all(&target)?;
+        } else {
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::copy(entry.path(), &target)?;
+        }
     }
-    fs::copy(src, dst)?;
     Ok(())
 }
 fn copy_item(src: &Path, dst: &Path) -> bool {
@@ -181,7 +196,6 @@ fn copy_item(src: &Path, dst: &Path) -> bool {
 
     true
 }
-
 fn copy_dir_into(src_dir: &Path, dst_dir: &Path) -> bool {
     if !src_dir.is_dir() {
         err(&format!("missing directory: {}", src_dir.display()));
@@ -200,7 +214,6 @@ fn copy_dir_into(src_dir: &Path, dst_dir: &Path) -> bool {
 
     true
 }
-
 fn run_job(job: &Job) -> bool {
     let (name, handler): (&str, fn(&Path, &Path) -> bool) = match job.kind {
         JobKind::Dir => ("copy_dir_into", copy_dir_into),
@@ -210,12 +223,14 @@ fn run_job(job: &Job) -> bool {
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| handler(&job.src, &job.dst))) {
         Ok(result) => result,
         Err(payload) => {
-            err(&format!("unexpected error in {name}: {}", panic_message(payload)));
+            err(&format!(
+                "unexpected error in {name}: {}",
+                panic_message(payload)
+            ));
             false
         }
     }
 }
-
 fn tool_dirs(sync_env: &SyncEnv) -> Vec<Job> {
     sync_env
         .tools
@@ -230,15 +245,18 @@ fn tool_dirs(sync_env: &SyncEnv) -> Vec<Job> {
         })
         .collect()
 }
-
 fn asset_copies(sync_env: &SyncEnv) -> Vec<Job> {
     if !sync_env.assets_home.is_dir() {
         return Vec::new();
     }
 
     let mut jobs = Vec::new();
-    for entry_result in fs::read_dir(&sync_env.assets_home).unwrap_or_else(|error| panic!("{error}")) {
-        let asset_path = entry_result.unwrap_or_else(|error| panic!("{error}")).path();
+    for entry_result in
+        fs::read_dir(&sync_env.assets_home).unwrap_or_else(|error| panic!("{error}"))
+    {
+        let asset_path = entry_result
+            .unwrap_or_else(|error| panic!("{error}"))
+            .path();
         if !asset_path.is_dir() {
             continue;
         }
@@ -256,7 +274,6 @@ fn asset_copies(sync_env: &SyncEnv) -> Vec<Job> {
     }
     jobs
 }
-
 fn agent_files(sync_env: &SyncEnv) -> Vec<Job> {
     sync_env
         .tools
@@ -268,7 +285,6 @@ fn agent_files(sync_env: &SyncEnv) -> Vec<Job> {
         })
         .collect()
 }
-
 fn config_files(sync_env: &SyncEnv) -> Vec<Job> {
     vec![Job {
         src: sync_env.assets_home.join("mcporter.jsonc"),
@@ -276,47 +292,47 @@ fn config_files(sync_env: &SyncEnv) -> Vec<Job> {
         kind: JobKind::File,
     }]
 }
-
 fn iter_jobs(sync_env: &SyncEnv) -> Vec<Job> {
-    let builders: [fn(&SyncEnv) -> Vec<Job>; 4] = [tool_dirs, asset_copies, agent_files, config_files];
+    let builders: [fn(&SyncEnv) -> Vec<Job>; 4] =
+        [tool_dirs, asset_copies, agent_files, config_files];
     let mut jobs = Vec::new();
     for builder in builders {
         jobs.extend(builder(sync_env));
     }
     jobs
 }
-
 fn run_jobs(jobs: &[Job]) -> bool {
     jobs.iter().all(run_job)
 }
-
 fn iter_extension_packages(root: &Path) -> Vec<PathBuf> {
-    fn walk(current: &Path, packages: &mut Vec<PathBuf>) {
-        if !current.is_dir() {
-            return;
-        }
+    if !root.is_dir() {
+        return Vec::new();
+    }
 
-        if current.join("package.json").is_file() {
-            packages.push(current.to_path_buf());
-        }
+    let walker = WalkDir::new(root)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|entry| {
+            !(entry.file_type().is_dir() && entry.file_name() == OsStr::new("node_modules"))
+        });
 
-        for child_result in fs::read_dir(current).unwrap_or_else(|error| panic!("{error}")) {
-            let child = child_result.unwrap_or_else(|error| panic!("{error}")).path();
-            if child.is_dir() && !is_symlink(&child) && child.file_name() != Some(OsStr::new("node_modules")) {
-                walk(&child, packages);
+    let mut packages = Vec::new();
+    for entry_result in walker {
+        let entry = entry_result.unwrap_or_else(|error| panic!("{error}"));
+        if entry.file_type().is_symlink() {
+            continue;
+        }
+        if entry.file_type().is_file() && entry.file_name() == OsStr::new("package.json") {
+            if let Some(parent) = entry.path().parent() {
+                packages.push(parent.to_path_buf());
             }
         }
     }
-
-    let mut packages = Vec::new();
-    walk(root, &mut packages);
     packages
 }
-
 fn needs_node_install(package_dir: &Path) -> bool {
     package_dir.join("package.json").is_file() && !package_dir.join("node_modules").exists()
 }
-
 fn command_exists(command: &str) -> bool {
     let Some(path_var) = std::env::var_os("PATH") else {
         return false;
@@ -339,7 +355,6 @@ fn command_exists(command: &str) -> bool {
         }
     })
 }
-
 fn choose_installer(package_dir: &Path) -> Option<Vec<String>> {
     if package_dir.join("bun.lockb").exists() && command_exists("bun") {
         return Some(vec!["bun".to_string(), "install".to_string()]);
@@ -352,7 +367,11 @@ fn choose_installer(package_dir: &Path) -> Option<Vec<String>> {
     }
     None
 }
-
+fn read_pipe<R: Read + Send + 'static>(mut reader: R) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    let _ = reader.read_to_end(&mut bytes);
+    bytes
+}
 fn run_install(command: &[String], package_dir: &Path, timeout: Duration) -> bool {
     let mut child = match Command::new(&command[0])
         .args(&command[1..])
@@ -363,36 +382,51 @@ fn run_install(command: &[String], package_dir: &Path, timeout: Duration) -> boo
         .spawn()
     {
         Ok(child) => child,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
             err(&format!("missing installer: {}", command[0]));
             return false;
         }
         Err(error) => panic!("{error}"),
     };
 
-    let mut stdout = child
+    let stdout = child
         .stdout
         .take()
         .unwrap_or_else(|| panic!("missing stdout pipe for {}", command[0]));
-    let mut stderr = child
+    let stderr = child
         .stderr
         .take()
         .unwrap_or_else(|| panic!("missing stderr pipe for {}", command[0]));
 
-    let stdout_handle = thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let _ = stdout.read_to_end(&mut bytes);
-        bytes
-    });
-    let stderr_handle = thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let _ = stderr.read_to_end(&mut bytes);
-        bytes
-    });
+    let stdout_handle = thread::spawn(move || read_pipe(stdout));
+    let stderr_handle = thread::spawn(move || read_pipe(stderr));
 
-    let start = Instant::now();
-    loop {
-        if start.elapsed() > timeout {
+    match child.wait_timeout(timeout) {
+        Ok(Some(status)) => {
+            let stdout_text =
+                String::from_utf8_lossy(&stdout_handle.join().unwrap_or_default()).into_owned();
+            let stderr_text =
+                String::from_utf8_lossy(&stderr_handle.join().unwrap_or_default()).into_owned();
+
+            if status.success() {
+                return true;
+            }
+
+            let detail = if !stderr_text.trim().is_empty() {
+                stderr_text.trim().to_string()
+            } else if !stdout_text.trim().is_empty() {
+                stdout_text.trim().to_string()
+            } else {
+                "unknown error".to_string()
+            };
+            err(&format!(
+                "deps install failed in {}: {} ({detail})",
+                package_dir.display(),
+                command[0]
+            ));
+            false
+        }
+        Ok(None) => {
             let _ = child.kill();
             let _ = child.wait();
             let _ = stdout_handle.join();
@@ -402,38 +436,11 @@ fn run_install(command: &[String], package_dir: &Path, timeout: Duration) -> boo
                 package_dir.display(),
                 command[0]
             ));
-            return false;
+            false
         }
-
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                let stdout_text = String::from_utf8_lossy(&stdout_handle.join().unwrap_or_default()).into_owned();
-                let stderr_text = String::from_utf8_lossy(&stderr_handle.join().unwrap_or_default()).into_owned();
-
-                if status.success() {
-                    return true;
-                }
-
-                let detail = if !stderr_text.trim().is_empty() {
-                    stderr_text.trim().to_string()
-                } else if !stdout_text.trim().is_empty() {
-                    stdout_text.trim().to_string()
-                } else {
-                    "unknown error".to_string()
-                };
-                err(&format!(
-                    "deps install failed in {}: {} ({detail})",
-                    package_dir.display(),
-                    command[0]
-                ));
-                return false;
-            }
-            Ok(None) => thread::sleep(Duration::from_millis(50)),
-            Err(error) => panic!("{error}"),
-        }
+        Err(error) => panic!("{error}"),
     }
 }
-
 fn install_extension_deps(root: &Path, timeout: Duration) -> bool {
     let mut results = Vec::new();
     for package_dir in iter_extension_packages(root) {
@@ -455,7 +462,6 @@ fn install_extension_deps(root: &Path, timeout: Duration) -> bool {
     }
     results.into_iter().all(std::convert::identity)
 }
-
 fn run_sync(sync_env: &SyncEnv) -> bool {
     let base_success = run_jobs(&iter_jobs(sync_env));
     let install_success = if base_success {
@@ -463,7 +469,9 @@ fn run_sync(sync_env: &SyncEnv) -> bool {
             .tools
             .iter()
             .find(|tool| tool.name == "pi")
-            .map(|tool| install_extension_deps(&tool.root().join("extensions"), sync_env.install_timeout))
+            .map(|tool| {
+                install_extension_deps(&tool.root().join("extensions"), sync_env.install_timeout)
+            })
             .unwrap_or(true)
     } else {
         true
@@ -471,7 +479,6 @@ fn run_sync(sync_env: &SyncEnv) -> bool {
 
     base_success && install_success
 }
-
 pub(crate) fn main() -> std::process::ExitCode {
     let sync_env = match SyncEnv::from_system() {
         Ok(sync_env) => sync_env,

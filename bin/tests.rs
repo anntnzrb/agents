@@ -159,7 +159,12 @@ fn run_sync_happy_path() {
     assert!(run_sync(&sync_env));
     assert!(home.join(".codex").join("AGENTS.md").is_file());
     assert!(home.join(".claude").join("CLAUDE.md").is_file());
-    assert!(home.join(".config").join("opencode").join("AGENTS.md").is_file());
+    assert!(
+        home.join(".config")
+            .join("opencode")
+            .join("AGENTS.md")
+            .is_file()
+    );
     assert!(home.join(".pi").join("agent").join("AGENTS.md").is_file());
     assert!(home.join(".mcporter").join("mcporter.json").is_file());
 }

@@ -3,6 +3,10 @@
 [package]
 edition = "2024"
 
+[dependencies]
+wait-timeout = "0.2"
+walkdir = "2"
+
 [dev-dependencies]
 tempfile = "3"
 
