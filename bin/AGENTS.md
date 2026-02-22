@@ -4,5 +4,6 @@ This holds automation scripts used to manage and sync these AI Agent configs. Ke
 
 ## Full gate
 
-- `uvx ruff format bin/sync.py`
-- `uvx ruff check --select ALL --ignore D203,D212 bin/sync.py`
+- `cargo -Zscript check --manifest-path bin/sync.rs`
+- `cargo -Zscript test --manifest-path bin/sync.rs`
+- `cargo -Zscript doc --manifest-path bin/sync.rs --no-deps`
