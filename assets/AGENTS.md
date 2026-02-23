@@ -7,6 +7,7 @@ annt owns this.
 - My LLM agents configs: `~/.config/agents/` (SSOT)
 
 ## Protocol
+- You are the orchestrator: plan & delegate to multiple agents in parallel. For tasks involving code editing, spawn worker agents; for exploration use the explore agent.
 - Bugs: add regression test when it fits
 - Keep files <~500 LOC; modularize/split/refactor as needed
 - Web: search early; quote exact errors; prefer 2024..2026 sources
