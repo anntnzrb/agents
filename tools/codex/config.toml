@@ -40,12 +40,9 @@ inherit = "core"
 [features]
 apply_patch_freeform = true # EXP
 child_agents_md = true # EXP
-collaboration_modes = true # EXP
 multi_agent = true
 personality = true # EXP
-remote_compaction = true
 shell_snapshot = true
-skills = true
 sqlite = true # EXP
 undo = true # EXP
 unified_exec = true
@@ -58,7 +55,8 @@ steer = true
 # -----------------------------------------------------------------------------
 
 [agents]
-max_threads = 12
+max_threads = 8
+max_depth = 2
 
 [agents.refactorer]
 config_file = "agents/refactorer.toml"
