@@ -1,47 +1,94 @@
-# Brave Search MCP Reference
+# Brave Search HTTP Reference
 
-## Server setup
+## Base URL
 
-The official MCP server is `@brave/brave-search-mcp-server` (supports STDIO and HTTP; default is STDIO).
+- `https://api.search.brave.com/res/v1`
+- Auth header: `X-Subscription-Token: <BRAVE_API_KEY>`
 
-### Environment variables
-- `BRAVE_API_KEY` (required)
-- `BRAVE_MCP_TRANSPORT` (`stdio` or `http`, default `stdio`)
-- `BRAVE_MCP_PORT` (HTTP port, default `8080`)
-- `BRAVE_MCP_HOST` (HTTP host, default `0.0.0.0`)
-- `BRAVE_MCP_LOG_LEVEL` (`debug|info|notice|warning|error|critical|alert|emergency`, default `info`)
-- `BRAVE_MCP_ENABLED_TOOLS` (whitelist)
-- `BRAVE_MCP_DISABLED_TOOLS` (blacklist)
+## Main endpoints
 
-## Tool catalog
+### Web search
+- `GET /web/search`
+- Required param: `q`
+- Common params: `count`, `offset`, `freshness`, `country`, `search_lang`, `ui_lang`, `safesearch`, `summary`
 
-### brave_web_search
-Web search with filtering, pagination, and optional summarization.
+Example:
 
-Key params: `query`, `count`, `country`, `search_lang`, `ui_lang`, `offset`, `safesearch`, `freshness`, `result_filter`, `summary`.
+```bash
+brave-search web "machine learning tutorials" count=5 freshness=pw
+```
 
-### brave_local_search
-Local business search (requires Pro for full local results; falls back to web search otherwise).
+### News search
+- `GET /news/search`
+- Required param: `q`
+- Common params: `count`, `freshness`, `country`, `search_lang`, `safesearch`
 
-Key params: same as `brave_web_search`.
+Example:
 
-### brave_image_search
-Image search.
+```bash
+brave-search news "bun runtime" count=5 freshness=pd
+```
 
-Key params: `query`, `count`, `country`, `search_lang`, `safesearch`.
+### Local search
+- `GET /local/search`
+- Required param: `q`
+- Common params: `count`, `country`, `search_lang`
 
-### brave_video_search
-Video search.
+Example:
 
-Key params: `query`, `count`, `country`, `search_lang`, `freshness`.
+```bash
+brave-search local "greek restaurants in san francisco" count=5
+```
 
-### brave_news_search
-News search.
+### Image search
+- `GET /images/search`
+- Required param: `q`
+- Common params: `count`, `country`, `search_lang`, `safesearch`
 
-Key params: `query`, `count`, `country`, `search_lang`, `freshness`, `safesearch`.
+Example:
 
-### brave_summarizer
-Summarize results using a summary key from `brave_web_search` with `summary=true`.
+```bash
+brave-search image "apollo 11" count=10 safesearch=strict
+```
 
-Key params: `key`, `entity_info`, `inline_references`.
+### Video search
+- `GET /videos/search`
+- Required param: `q`
+- Common params: `count`, `freshness`, `country`, `search_lang`
 
+Example:
+
+```bash
+brave-search video "zig build demo" count=10 freshness=pm
+```
+
+## Summarizer flow
+
+Brave's legacy summarizer is a two-step flow:
+
+1. Get a key from web search
+2. Fetch the summary from `/summarizer/search`
+
+```bash
+key="$(brave-search summarizer-key "what is the second highest mountain")"
+brave-search summarize "$key" inline_references=true entity_info=1
+```
+
+Common specialized endpoints:
+
+- `/summarizer/search`
+- `/summarizer/summary`
+- `/summarizer/summary_streaming`
+- `/summarizer/title`
+- `/summarizer/enrichments`
+- `/summarizer/followups`
+- `/summarizer/entity_info`
+
+Use `brave-search raw </path> key=<key> ...` for these.
+
+## Notes
+
+- Web search is the best default path.
+- `summary=1` on web search returns a `summarizer.key` when Brave can generate a summary.
+- Summarizer is deprecated in Brave's docs in favor of newer answer-oriented flows, but the HTTP endpoints still exist.
+- Keep queries URL-safe by always using the shell helper, which uses `--data-urlencode`.

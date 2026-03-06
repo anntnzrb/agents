@@ -1,104 +1,74 @@
-# Reddit MCP Reference
+# Reddit HTTP Reference
 
-## Server setup
+## Base URL
 
-- Package: `reddit-mcp-buddy`
-- Recommended MCPorter runtime: `bun x reddit-mcp-buddy`
-- Recommended server name: `reddit`
+- `https://www.reddit.com`
+- Use a User-Agent header. Recommended env var: `REDDIT_USER_AGENT`
 
-Example config entry:
+## Public JSON endpoints used by the skill
 
-```json
-{
-  "reddit": {
-    "description": "Reddit MCP Buddy",
-    "command": "bun",
-    "args": ["x", "reddit-mcp-buddy"]
-  }
-}
+### Browse subreddit
+- `GET /r/<subreddit>/<sort>.json`
+- Sorts: `hot`, `new`, `top`, `rising`, `controversial`
+- Common params: `limit`, `t`
+
+Example:
+
+```bash
+reddit browse technology top time=week limit=10
 ```
 
-Notes:
+### Search
+- `GET /search.json`
+- Common params: `q`, `sort`, `t`, `limit`
+- The helper can expand legacy args like `subreddits=`, `author=`, and `flair=` into Reddit search syntax.
 
-- Upstream docs often show `npx -y reddit-mcp-buddy`.
-- In WSL setups that hop into Windows Node, `npx` may fail with UNC/ESM path errors. Prefer `bun` when that appears.
+Example:
 
-## Tool catalog
+```bash
+reddit search "llm" subreddits='["programming"]' sort=new time=week limit=10
+```
 
-### browse_subreddit
+### Post + comments by subreddit/post id
+- `GET /r/<subreddit>/comments/<post_id>/.json`
+- Common params: `limit`, `sort`, `depth`
 
-Fetch posts from a subreddit sorted by `hot|new|top|rising|controversial`.
+Example:
 
-Key params: `subreddit` (required), `sort`, `time`, `limit`, `include_nsfw`, `include_subreddit_info`.
+```bash
+reddit post programming 1abcde comment_limit=20 comment_sort=top
+```
 
-### search_reddit
+### Post + comments by URL
+- Fetch `<reddit-url>.json`
+- Same comment params as above
 
-Search posts across all Reddit or selected subreddits.
+Example:
 
-Key params: `query` (required), `subreddits`, `sort`, `time`, `limit`, `author`, `flair`.
+```bash
+reddit post-url "https://reddit.com/r/programming/comments/1abcde/example/" comment_limit=20
+```
 
-### get_post_details
+### User profile + activity
+- `GET /user/<username>/about.json`
+- `GET /user/<username>/submitted.json`
+- `GET /user/<username>/comments.json`
 
-Fetch one post and comments.
+Examples:
 
-Key params: `url` or `post_id`, `subreddit` (optional but more efficient with `post_id`), `comment_limit`, `comment_sort`, `comment_depth`, `extract_links`, `max_top_comments`.
+```bash
+reddit user spez
+reddit user-posts spez limit=10
+reddit user-comments spez limit=10
+reddit user-analysis spez posts_limit=10 comments_limit=10 time_range=month
+```
 
-### user_analysis
+## Rate limits and auth
 
-Analyze a user profile and activity.
+- Anonymous read-only access works, but throughput is lower.
+- For this phase, the helper stays on direct public JSON endpoints.
+- If you need higher-throughput authenticated access later, add env-driven auth in phase 2.
 
-Key params: `username` (required), `posts_limit`, `comments_limit`, `time_range`, `top_subreddits_limit`.
+## Glossary helper
 
-### reddit_explain
-
-Explain Reddit terms and slang.
-
-Key params: `term` (required).
-
-## Environment variables
-
-### Authentication
-
-- `REDDIT_CLIENT_ID`: Reddit app client id
-- `REDDIT_CLIENT_SECRET`: Reddit app client secret
-- `REDDIT_USERNAME`: Reddit username
-- `REDDIT_PASSWORD`: Reddit password
-- `REDDIT_USER_AGENT`: optional user agent string
-
-Rate tiers:
-
-- Anonymous: ~10 requests/minute
-- App-only (`CLIENT_ID` + `CLIENT_SECRET`): ~60 requests/minute
-- Authenticated (all four auth vars): ~100 requests/minute
-
-### Server behavior
-
-- `REDDIT_BUDDY_HTTP`: run HTTP mode instead of stdio (`false` default)
-- `REDDIT_BUDDY_PORT`: HTTP port (`3000` default)
-- `REDDIT_BUDDY_NO_CACHE`: disable cache (`false` default)
-
-## Operational notes
-
-- Tools are read-only. No posting/moderation actions.
-- `get_post_details` should receive `subreddit` with `post_id` when possible to avoid extra lookup calls.
-
-## Troubleshooting
-
-### Bun/MCPorter cache copy error
-
-Symptom:
-
-- `FileNotFound: failed copying files from cache to destination for package ...`
-
-Recovery steps:
-
-1. Retry the same command once (often transient).
-2. Warm runtime tools:
-   - `bun x mcporter list reddit`
-   - `bun x reddit-mcp-buddy --version`
-3. Re-run the specific command (`list reddit` or exact `call`) instead of broad `list`.
-4. In WSL, run from Linux filesystem paths; avoid UNC/Windows path context where possible.
-
-### WSL + npx startup issue
-
-- If `npx -y reddit-mcp-buddy` fails with UNC/ESM path errors, keep using `bun x reddit-mcp-buddy`.
+`reddit explain <term>` is a local built-in glossary for common Reddit terms like `karma`, `cake day`, `AMA`, `OP`, `TLDR`, and `ELI5`.
