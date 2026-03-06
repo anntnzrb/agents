@@ -4,3 +4,5 @@ __pycache__/
 node_modules/
 bun.lock
 package-lock.json
+assets/skills/*/.env
+assets/skills/*/.env.local

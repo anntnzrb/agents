@@ -13,13 +13,38 @@ Define `exa-search` once per shell:
 
 ```bash
 exa-search() {
+  _exa_search_source_env() {
+    local env_path="${1:-}" had_allexport=0
+    [ -n "$env_path" ] || return 1
+    [ -f "$env_path" ] || return 1
+    case "$-" in *a*) had_allexport=1 ;; esac
+    set -a
+    . "$env_path"
+    [ "$had_allexport" -eq 1 ] || set +a
+  }
+
+  _exa_search_load_env() {
+    [ -n "${EXA_API_KEY:-${EXA_APIKEY:-}}" ] && return 0
+
+    _exa_search_source_env "${EXA_SEARCH_ENV_FILE:-}" && return 0
+    [ -n "${SKILLS_DIR:-}" ] && _exa_search_source_env "$SKILLS_DIR/exa-search/.env" && return 0
+
+    local dir="$PWD"
+    while [ "$dir" != "/" ]; do
+      _exa_search_source_env "$dir/skills/exa-search/.env" && return 0
+      dir="$(dirname "$dir")"
+    done
+  }
+
+  _exa_search_load_env
+
   local base_url="${EXA_BASE_URL:-https://api.exa.ai}"
   local api_key="${EXA_API_KEY:-${EXA_APIKEY:-}}"
   local cmd="${1:-}"
   shift || true
 
   [ -n "$api_key" ] || {
-    echo "EXA_API_KEY required" >&2
+    echo "EXA_API_KEY required (export it, source this skill's .env, or set EXA_SEARCH_ENV_FILE)" >&2
     return 2
   }
 
@@ -112,6 +137,15 @@ exa-search answer "What is the capital of France?"
 exa-search research "Summarize the current state of OpenTelemetry in the Java ecosystem" exa-research
 ```
 
+## Credentials
+
+- Keep `.env` beside this skill.
+- Helper lookup order:
+  - `EXA_SEARCH_ENV_FILE`
+  - `$SKILLS_DIR/exa-search/.env`
+  - nearest ancestor `skills/exa-search/.env`
+- Tracked template: `.env.example`
+
 ## Notes
 
 - Auth header: `x-api-key: $EXA_API_KEY`
@@ -126,6 +160,12 @@ exa-search research "Summarize the current state of OpenTelemetry in the Java ec
 exa-search post /search '{"query":"rust async channels","numResults":5}'
 exa-search post /contents '{"urls":["https://example.com/article"]}'
 exa-search post /answer '{"query":"What is Bun?"}'
+```
+
+## Validation
+
+```bash
+bash scripts/test-exa-http.sh
 ```
 
 ## Query templates

@@ -4,6 +4,8 @@
 
 Use `VERCEL_TOKEN` env var (not `--token` — it leaks in process listings). Use `--scope` if the token has access to multiple teams.
 
+Tracked template: `.env.example`
+
 ## The Standard CI Deploy Pattern
 
 ```bash

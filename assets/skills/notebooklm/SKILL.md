@@ -14,6 +14,7 @@ Use `nlm` to list notebooks, select a target, and ask questions via `generate-ch
 
 2) Verify auth
    - Check `~/.nlm/env` or env vars `NLM_AUTH_TOKEN`, `NLM_COOKIES`
+   - Tracked template: `.env.example` (usable as a local template or for `~/.nlm/env`)
    - If missing, run:
      - `nlm auth --all --notebooks`
      - If profiles are locked: `NLM_USE_ORIGINAL_PROFILE=1 nlm auth --all --notebooks --debug`
@@ -39,6 +40,16 @@ nlm list
 nlm generate-chat <notebook-id> "Question about my knowledge base"
 nlm chat <notebook-id>
 ```
+
+## Environment
+
+- Tracked template: `.env.example`
+- Common vars:
+  - `NLM_AUTH_TOKEN`
+  - `NLM_COOKIES`
+  - `NLM_BROWSER_PROFILE`
+  - `NLM_USE_ORIGINAL_PROFILE=1`
+- If you already use `~/.nlm/env`, keep that as the active auth file; the template is mainly a portable key list.
 
 ## Notes
 

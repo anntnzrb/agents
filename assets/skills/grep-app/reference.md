@@ -5,6 +5,11 @@
 - `https://grep.app/api/search`
 - No auth required for public searches
 
+## Environment
+
+- Tracked template: `.env.example`
+- Optional override: `GREP_APP_BASE_URL`
+
 ## Parameters
 
 ### Required

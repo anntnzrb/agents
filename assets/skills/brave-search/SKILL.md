@@ -13,13 +13,38 @@ Define `brave-search` once per shell:
 
 ```bash
 brave-search() {
+  _brave_search_source_env() {
+    local env_path="${1:-}" had_allexport=0
+    [ -n "$env_path" ] || return 1
+    [ -f "$env_path" ] || return 1
+    case "$-" in *a*) had_allexport=1 ;; esac
+    set -a
+    . "$env_path"
+    [ "$had_allexport" -eq 1 ] || set +a
+  }
+
+  _brave_search_load_env() {
+    [ -n "${BRAVE_API_KEY:-${BRAVE_SEARCH_API_KEY:-}}" ] && return 0
+
+    _brave_search_source_env "${BRAVE_SEARCH_ENV_FILE:-}" && return 0
+    [ -n "${SKILLS_DIR:-}" ] && _brave_search_source_env "$SKILLS_DIR/brave-search/.env" && return 0
+
+    local dir="$PWD"
+    while [ "$dir" != "/" ]; do
+      _brave_search_source_env "$dir/skills/brave-search/.env" && return 0
+      dir="$(dirname "$dir")"
+    done
+  }
+
+  _brave_search_load_env
+
   local base_url="${BRAVE_SEARCH_BASE_URL:-https://api.search.brave.com/res/v1}"
   local api_key="${BRAVE_API_KEY:-${BRAVE_SEARCH_API_KEY:-}}"
   local cmd="${1:-}"
   shift || true
 
   [ -n "$api_key" ] || {
-    echo "BRAVE_API_KEY required" >&2
+    echo "BRAVE_API_KEY required (export it, source this skill's .env, or set BRAVE_SEARCH_ENV_FILE)" >&2
     return 2
   }
 
@@ -148,6 +173,15 @@ brave-search summarize "$key" inline_references=true entity_info=1
 
 Use `brave-search raw /summarizer/title key="$key"` or other `/summarizer/*` paths for specialized endpoints.
 
+## Credentials
+
+- Keep `.env` beside this skill.
+- Helper lookup order:
+  - `BRAVE_SEARCH_ENV_FILE`
+  - `$SKILLS_DIR/brave-search/.env`
+  - nearest ancestor `skills/brave-search/.env`
+- Tracked template: `.env.example`
+
 ## Notes
 
 - Auth header: `X-Subscription-Token: $BRAVE_API_KEY`
@@ -155,6 +189,12 @@ Use `brave-search raw /summarizer/title key="$key"` or other `/summarizer/*` pat
 - Useful params: `count=`, `freshness=`, `country=`, `search_lang=`, `ui_lang=`, `safesearch=`, `summary=1`
 - `summary=1` on web search returns a summarizer key in the search response; fetch the full summary separately.
 - Prefer Exa for deeper multi-source synthesis.
+
+## Validation
+
+```bash
+bash scripts/test-brave-http.sh
+```
 
 ## Query templates
 

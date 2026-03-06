@@ -52,6 +52,20 @@ bun x supergateway --streamableHttp "<N8N_MCP_URL>" \
   --header "Authorization: Bearer <N8N_MCP_TOKEN>"
 ```
 
+## Environment
+
+- Tracked template: `.env.example`
+- Common vars:
+  - `N8N_BASE_URL`
+  - `N8N_API_KEY`
+  - `N8N_MCP_URL`
+  - `N8N_MCP_TOKEN`
+- `n8nctl.py` auto-loads from:
+  - `N8N_ENV_FILE`
+  - `$SKILLS_DIR/n8n/.env`
+  - nearest ancestor `skills/n8n/.env`
+- Raw `curl` / `supergateway` commands still read process env only; source `.env` yourself or use direnv.
+
 ## Notes
 
 - Workflows include a trigger node for MCP execution

@@ -60,6 +60,12 @@ Use this to route to the correct reference file:
 - **Global flags** → `references/global-options.md`
 - **First-time setup** → `references/getting-started.md`
 
+## Environment
+
+- Tracked template: `.env.example`
+- Primary non-interactive auth var: `VERCEL_TOKEN`
+- The CLI does not auto-load `.env`; source it yourself or use direnv when you need unattended auth.
+
 ## Anti-Patterns
 
 - **Wrong link type in monorepos with multiple projects**: `vercel link` creates `project.json`, which only tracks one project. Use `vercel link --repo` instead. When things break, check `.vercel/` first.

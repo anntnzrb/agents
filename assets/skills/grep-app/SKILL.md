@@ -72,6 +72,11 @@ Pass Grep.app filters as query params:
 - `case=true`
 - `words=true`
 
+## Environment
+
+- Tracked template: `.env.example`
+- Optional override: `GREP_APP_BASE_URL`
+
 ## Notes
 
 - Public GitHub repos only.

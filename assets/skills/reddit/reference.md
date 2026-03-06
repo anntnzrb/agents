@@ -5,6 +5,19 @@
 - `https://www.reddit.com`
 - Use a User-Agent header. Recommended env var: `REDDIT_USER_AGENT`
 
+## Environment
+
+Keep `.env` beside this skill and source it if you want persistent local defaults.
+
+Supported helper lookup order:
+- `REDDIT_ENV_FILE`
+- `$SKILLS_DIR/reddit/.env`
+- nearest ancestor `skills/reddit/.env`
+
+Common vars:
+- `REDDIT_USER_AGENT`
+- `REDDIT_BASE_URL`
+
 ## Public JSON endpoints used by the skill
 
 ### Browse subreddit
@@ -66,8 +79,8 @@ reddit user-analysis spez posts_limit=10 comments_limit=10 time_range=month
 ## Rate limits and auth
 
 - Anonymous read-only access works, but throughput is lower.
-- For this phase, the helper stays on direct public JSON endpoints.
-- If you need higher-throughput authenticated access later, add env-driven auth in phase 2.
+- Reddit's broader API surface uses OAuth2, but this skill intentionally stays on direct public JSON endpoints.
+- If you need private endpoints, write actions, or higher-throughput authenticated access, build that as a separate OAuth-backed mode instead of bolting it onto this helper.
 
 ## Glossary helper
 

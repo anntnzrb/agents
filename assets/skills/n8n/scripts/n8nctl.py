@@ -22,6 +22,7 @@ Usage:
 Environment:
   N8N_BASE_URL   Base URL like http://localhost:5678
   N8N_API_KEY    API key for X-N8N-API-KEY header
+  N8N_ENV_FILE   Optional env file override
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 import httpx
 
@@ -58,7 +59,47 @@ def _require_env(name: str, value: str | None) -> str:
     return value
 
 
+def _env_candidates() -> Iterable[Path]:
+    env_file = os.getenv("N8N_ENV_FILE")
+    if env_file:
+        yield Path(env_file).expanduser()
+
+    skills_dir = os.getenv("SKILLS_DIR")
+    if skills_dir:
+        yield Path(skills_dir).expanduser() / "n8n" / ".env"
+
+    for parent in (Path.cwd(), *Path.cwd().parents):
+        yield parent / "skills" / "n8n" / ".env"
+
+
+def _load_env_file() -> None:
+    if os.getenv("N8N_BASE_URL") and os.getenv("N8N_API_KEY"):
+        return
+
+    for path in _env_candidates():
+        if not path.is_file():
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        for raw_line in lines:
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("export "):
+                line = line[7:].strip()
+            key, sep, value = line.partition("=")
+            if sep == "":
+                continue
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            os.environ.setdefault(key, value)
+        return
+
+
 def load_config(args: argparse.Namespace) -> Config:
+    _load_env_file()
     base_url = args.base_url or os.getenv("N8N_BASE_URL")
     api_key = args.api_key or os.getenv("N8N_API_KEY")
     return Config(
@@ -84,7 +125,10 @@ def _request(
     if body is not None:
         headers["Content-Type"] = "application/json"
     with httpx.Client(timeout=30.0) as client:
-        resp = client.request(method, url, params=params, json=body, headers=headers)
+        try:
+            resp = client.request(method, url, params=params, json=body, headers=headers)
+        except httpx.HTTPError as exc:
+            _fail(f"request failed: {exc}")
     if resp.is_error:
         _fail(f"HTTP {resp.status_code} {resp.reason_phrase}: {resp.text}")
     return resp.json()

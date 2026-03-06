@@ -104,6 +104,8 @@ nlm add <notebook-id> file.xml -mime="text/xml"
 
 ## Environment variables
 
+Tracked template: `.env.example`
+
 ```bash
 NLM_AUTH_TOKEN
 NLM_COOKIES
@@ -114,6 +116,8 @@ NLM_USE_ORIGINAL_PROFILE=1
 NLM_BUILD_VERSION
 NLM_SESSION_ID
 ```
+
+If you rely on NotebookLM CLI's home-level auth file, mirror these into `~/.nlm/env` instead of a skill-local `.env`.
 
 ## Safety
 

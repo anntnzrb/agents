@@ -52,6 +52,21 @@ Add after you have the MCP URL and token:
 }
 ```
 
+## Environment
+
+Tracked template: `.env.example`
+
+Common vars:
+- `N8N_BASE_URL`
+- `N8N_API_KEY`
+- `N8N_MCP_URL`
+- `N8N_MCP_TOKEN`
+
+`n8nctl.py` lookup order:
+- `N8N_ENV_FILE`
+- `$SKILLS_DIR/n8n/.env`
+- nearest ancestor `skills/n8n/.env`
+
 ## n8nctl (uv script)
 
 The `scripts/n8nctl.py` helper wraps REST calls and avoids curl/jq.

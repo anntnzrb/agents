@@ -5,6 +5,19 @@
 - `https://api.exa.ai`
 - Auth header: `x-api-key: <EXA_API_KEY>`
 
+## Credentials
+
+Keep `.env` beside this skill and populate it from `.env.example`.
+
+Supported lookup order in the shell helper:
+- `EXA_SEARCH_ENV_FILE`
+- `$SKILLS_DIR/exa-search/.env`
+- nearest ancestor `skills/exa-search/.env`
+
+Direct env vars still win:
+- `EXA_API_KEY`
+- legacy alias: `EXA_APIKEY`
+
 ## Direct endpoints
 
 ### Search
@@ -74,3 +87,9 @@ exa-search post /answer '{"query":"What is Bun?"}'
 - `contents` is the direct replacement for a known-URL fetch workflow.
 - `research/v1` is the direct HTTP path for Exa's deeper synthesis mode.
 - For public OSS code-pattern lookup, `grep-app` is usually a better first tool than Exa.
+
+## Validation
+
+```bash
+bash scripts/test-exa-http.sh
+```

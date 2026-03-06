@@ -13,6 +13,29 @@ Define `reddit` once per shell:
 
 ```bash
 reddit() {
+  _reddit_source_env() {
+    local env_path="${1:-}" had_allexport=0
+    [ -n "$env_path" ] || return 1
+    [ -f "$env_path" ] || return 1
+    case "$-" in *a*) had_allexport=1 ;; esac
+    set -a
+    . "$env_path"
+    [ "$had_allexport" -eq 1 ] || set +a
+  }
+
+  _reddit_load_env() {
+    _reddit_source_env "${REDDIT_ENV_FILE:-}" && return 0
+    [ -n "${SKILLS_DIR:-}" ] && _reddit_source_env "$SKILLS_DIR/reddit/.env" && return 0
+
+    local dir="$PWD"
+    while [ "$dir" != "/" ]; do
+      _reddit_source_env "$dir/skills/reddit/.env" && return 0
+      dir="$(dirname "$dir")"
+    done
+  }
+
+  _reddit_load_env
+
   local base_url="${REDDIT_BASE_URL:-https://www.reddit.com}"
   local user_agent="${REDDIT_USER_AGENT:-agents-reddit/1.0}"
   local cmd="${1:-}"
@@ -273,11 +296,24 @@ reddit user-analysis spez posts_limit=5 comments_limit=5 time_range=month
 reddit explain "cake day"
 ```
 
+## Environment
+
+- Keep `.env` beside this skill if you want a stable local User-Agent.
+- Helper lookup order:
+  - `REDDIT_ENV_FILE`
+  - `$SKILLS_DIR/reddit/.env`
+  - nearest ancestor `skills/reddit/.env`
+- Tracked template: `.env.example`
+- Common vars:
+  - `REDDIT_USER_AGENT`
+  - `REDDIT_BASE_URL`
+
 ## Notes
 
 - Public JSON endpoints work anonymously for basic read-only use.
 - Set a custom `REDDIT_USER_AGENT` for better hygiene and fewer blocks.
-- Anonymous access is rate-limited; phase 2 can add richer auth/env handling.
+- Reddit also has OAuth-backed APIs, but this skill intentionally stays on public JSON endpoints for low-friction read-only access.
+- If you need authenticated/private/high-throughput access later, treat that as a separate OAuth feature instead of overloading this helper.
 - `search` accepts legacy convenience args:
   - `subreddits='["a","b"]'`
   - `author=<username>`
