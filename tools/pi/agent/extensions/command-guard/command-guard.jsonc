@@ -1,0 +1,101 @@
+{
+  // Generic agent bash policy.
+  // Add more rules here without touching the extension code.
+  "version": 1,
+  "agentBash": {
+    "rules": [
+      {
+        "id": "no-python",
+        "match": {
+          "type": "executable",
+          "names": [
+            "python",
+            "python3"
+          ],
+          "patterns": [
+            "^python3(?:\\.\\d+)+$"
+          ]
+        },
+        "action": {
+          "type": "block",
+          "message": "python/python3 is disabled. Load `/skill:python`."
+        }
+      },
+      {
+        "id": "no-pip",
+        "match": {
+          "type": "executable",
+          "names": [
+            "pip",
+            "pip3"
+          ],
+          "patterns": [
+            "^pip3(?:\\.\\d+)+$"
+          ]
+        },
+        "action": {
+          "type": "block",
+          "message": "pip/pip3 is disabled. Load `/skill:python`."
+        }
+      },
+      {
+        "id": "no-poetry",
+        "match": {
+          "type": "executable",
+          "names": [
+            "poetry"
+          ]
+        },
+        "action": {
+          "type": "block",
+          "message": "poetry is disabled. Load `/skill:python`."
+        }
+      },
+      {
+        "id": "no-python-m-pip",
+        "match": {
+          "type": "regex",
+          "pattern": "\\bpython(?:3(?:\\.\\d+)*)?\\b[^\\n;|&]*(?:\\s-m\\s*pip\\b|\\s-mpip\\b)"
+        },
+        "action": {
+          "type": "block",
+          "message": "`python -m pip` is disabled. Load `/skill:python`."
+        }
+      },
+      {
+        "id": "no-python-m-venv",
+        "match": {
+          "type": "regex",
+          "pattern": "\\bpython(?:3(?:\\.\\d+)*)?\\b[^\\n;|&]*(?:\\s-m\\s*venv\\b|\\s-mvenv\\b)"
+        },
+        "action": {
+          "type": "block",
+          "message": "`python -m venv` is disabled. Load `/skill:python`."
+        }
+      },
+      {
+        "id": "no-python-m-py-compile",
+        "match": {
+          "type": "regex",
+          "pattern": "\\bpython(?:3(?:\\.\\d+)*)?\\b[^\\n;|&]*(?:\\s-m\\s*py_compile\\b|\\s-mpy_compile\\b)"
+        },
+        "action": {
+          "type": "block",
+          "message": "`python -m py_compile` is disabled. Load `/skill:python`."
+        }
+      }
+      // Example future rules:
+      // ,{
+      //   "id": "no-rm-rf",
+      //   "match": {
+      //     "type": "regex",
+      //     "pattern": "\\brm\\s+-rf\\b"
+      //   },
+      //   "action": {
+      //     "type": "block",
+      //     "message": "Dangerous delete command blocked."
+      //   }
+      // }
+    ]
+  }
+}
