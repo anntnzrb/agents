@@ -1,6 +1,6 @@
 ---
 name: research
-description: "Research router for selecting the best source path across GitHub/repo docs, API/library docs, OSS code patterns, live web search, Reddit sentiment, and NotebookLM knowledge bases. Use when tasks involve research, fact-checking, source-backed comparisons, evidence gathering, trend checks, or confidence validation. Route code/docs work to gh+deepwiki+context7+grep-app, route web/live work to brave-search+exa-search, route sentiment/discussion to reddit, and route notebook sources to notebooklm. Exclude summarize from this router. Load the mcporter skill when executing MCP-backed routes."
+description: "Research router for selecting the best source path across GitHub/repo docs, API/library docs, OSS code patterns, live web search, Reddit sentiment, and NotebookLM knowledge bases. Use when tasks involve research, fact-checking, source-backed comparisons, evidence gathering, trend checks, or confidence validation. Route code/docs work to gh+deepwiki+context7+grep-app, route web/live work to brave-search+exa-search, route sentiment/discussion to reddit, and route notebook sources to notebooklm. Exclude summarize from this router."
 ---
 
 # Research Router
@@ -23,16 +23,22 @@ Route research requests to the right source class, then return source-backed ans
 - Use `context7` for up-to-date library/API docs and examples.
 - Use `grep-app` for public OSS code usage patterns.
 
+`context7` and `grep-app` are direct HTTP skills. `deepwiki` may still be MCP-backed until its direct equivalent reaches Q&A parity.
+
 ### Web/live research
 
 - Use `brave-search` for fast scoping and recency checks.
 - Use `exa-search` for deeper multi-source synthesis and richer retrieval.
 - Escalate from Brave to Exa when coverage or quality is weak.
 
+`brave-search` and `exa-search` are direct HTTP skills.
+
 ### Sentiment/discussion research
 
 - Use `reddit` for community sentiment, discussion trends, and user/topic signals.
 - Corroborate high-impact claims with one non-Reddit source class when feasible.
+
+`reddit` is direct HTTP via Reddit JSON endpoints.
 
 ### Knowledge-base research
 

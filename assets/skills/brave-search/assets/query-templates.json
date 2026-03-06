@@ -1,35 +1,46 @@
 {
   "webSearch": {
+    "command": "brave-search web \"<topic>\" count=5 safesearch=moderate",
     "query": "<topic>",
     "count": 5,
-    "safesearch": "moderate",
-    "summary": false
+    "safesearch": "moderate"
   },
   "webSearchWithSummary": {
+    "command": "brave-search web \"<topic>\" count=5 safesearch=moderate summary=1",
     "query": "<topic>",
     "count": 5,
     "safesearch": "moderate",
-    "summary": true
-  },
-  "localSearch": {
-    "query": "<business or place>",
-    "count": 5
+    "summary": 1
   },
   "newsSearch": {
+    "command": "brave-search news \"<topic>\" count=5 freshness=pd",
     "query": "<topic>",
     "count": 5,
     "freshness": "pd"
   },
+  "localSearch": {
+    "command": "brave-search local \"<business or place>\" count=5",
+    "query": "<business or place>",
+    "count": 5
+  },
   "imageSearch": {
+    "command": "brave-search image \"<topic>\" count=20 safesearch=strict",
     "query": "<topic>",
     "count": 20,
     "safesearch": "strict"
   },
   "videoSearch": {
+    "command": "brave-search video \"<topic>\" count=20",
     "query": "<topic>",
     "count": 20
   },
+  "summarizerKey": {
+    "command": "brave-search summarizer-key \"<topic>\" count=5",
+    "query": "<topic>",
+    "count": 5
+  },
   "summarizer": {
+    "command": "brave-search summarize \"<summary_key>\" inline_references=true",
     "key": "<summary_key>",
     "inline_references": true
   }

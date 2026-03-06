@@ -1,24 +1,8 @@
 {
   "mcpServers": {
-    "exa": {
-      "description": "Exa",
-      "baseUrl": "https://mcp.exa.ai/mcp?tools=web_search_exa,get_code_context_exa,crawling_exa,company_research_exa,linkedin_search_exa,deep_researcher_start,deep_researcher_check"
-    },
-    "brave-search": {
-      "description": "Brave Search MCP",
-      "command": "bun",
-      "args": ["x", "@brave/brave-search-mcp-server"],
-      "env": {
-        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
-      }
-    },
     "deepwiki": {
       "description": "DeepWiki MCP",
       "serverUrl": "https://mcp.deepwiki.com/mcp"
-    },
-    "grep": {
-      "description": "Grep.app MCP",
-      "serverUrl": "https://mcp.grep.app"
     },
     "n8n": {
       "description": "n8n MCP",
@@ -31,11 +15,6 @@
         "--header",
         "Authorization: Bearer ${N8N_MCP_TOKEN}"
       ]
-    },
-    "reddit": {
-      "description": "Reddit MCP Buddy",
-      "command": "bun",
-      "args": ["x", "reddit-mcp-buddy"]
     }
   }
 }

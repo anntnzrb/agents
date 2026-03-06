@@ -1,20 +1,26 @@
 {
   "searchLiteral": {
+    "command": "grep-app search \"<code pattern>\" f.lang=TypeScript",
     "query": "<code pattern>",
-    "matchCase": false,
-    "matchWholeWords": false,
-    "useRegexp": false,
-    "language": ["TypeScript", "TSX"]
+    "language": "TypeScript"
   },
   "searchRegex": {
-    "query": "(?s)<regex pattern>",
-    "useRegexp": true,
-    "language": ["TypeScript", "TSX"]
+    "command": "grep-app regex \"<regex pattern>\" f.lang=TSX",
+    "query": "<regex pattern>",
+    "regexp": true,
+    "language": "TSX"
   },
   "searchScoped": {
+    "command": "grep-app search \"<code pattern>\" f.repo=org/repo f.path=src/ f.lang=JavaScript",
     "query": "<code pattern>",
-    "repo": "org/",
-    "path": "/src/",
-    "language": ["JavaScript"]
+    "repo": "org/repo",
+    "path": "src/",
+    "language": "JavaScript"
+  },
+  "searchStrict": {
+    "command": "grep-app search \"<code pattern>\" case=true words=true",
+    "query": "<code pattern>",
+    "case": true,
+    "words": true
   }
 }

@@ -1,18 +1,36 @@
 {
   "search": {
+    "command": "exa-search search \"<topic>\" 5",
+    "query": "<topic>",
+    "numResults": 5
+  },
+  "searchWithType": {
+    "command": "exa-search search \"<topic>\" 5 deep",
     "query": "<topic>",
     "numResults": 5,
-    "type": "deep",
-    "contextMaxCharacters": 10000
+    "type": "deep"
   },
-  "searchWithContent": {
-    "query": "<topic>",
-    "numResults": 3,
-    "type": "deep",
-    "contextMaxCharacters": 20000
+  "contents": {
+    "command": "exa-search contents https://example.com/article",
+    "urls": [
+      "https://example.com/article"
+    ]
   },
-  "content": {
-    "url": "https://example.com/article",
-    "maxCharacters": 3000
+  "answer": {
+    "command": "exa-search answer \"<question>\"",
+    "query": "<question>"
+  },
+  "research": {
+    "command": "exa-search research \"<instructions>\" exa-research",
+    "instructions": "<instructions>",
+    "model": "exa-research"
+  },
+  "rawPost": {
+    "command": "exa-search post /search '{\"query\":\"<topic>\",\"numResults\":5}'",
+    "path": "/search",
+    "body": {
+      "query": "<topic>",
+      "numResults": 5
+    }
   }
 }
