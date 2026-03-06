@@ -1,10 +1,34 @@
 {
-  "resolveLibraryId": {
-    "query": "<user question>",
-    "libraryName": "<package name>"
+  "search": {
+    "command": "context7 search <library-name> <query>",
+    "libraryName": "<package name>",
+    "query": "<user question or topic>"
   },
-  "queryDocs": {
+  "id": {
+    "command": "context7 id <library-name> <query>",
+    "libraryName": "<package name>",
+    "query": "<user question or topic>"
+  },
+  "docs": {
+    "command": "context7 docs <library-id> <query>",
     "libraryId": "/org/project",
     "query": "<question>"
+  },
+  "json": {
+    "command": "context7 json <library-id> <query>",
+    "libraryId": "/org/project",
+    "query": "<question>"
+  },
+  "legacyAliases": {
+    "resolveLibraryId": {
+      "_aliasFor": "search",
+      "libraryName": "<package name>",
+      "query": "<user question or topic>"
+    },
+    "queryDocs": {
+      "_aliasFor": "docs",
+      "libraryId": "/org/project",
+      "query": "<question>"
+    }
   }
 }
