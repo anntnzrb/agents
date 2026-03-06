@@ -153,13 +153,13 @@ Launch subagents to query relevant library IDs simultaneously:
 task(
   subagent_type="general",
   description="Query nixpkgs docs",
-  prompt="Use query-docs with libraryId '/NixOS/nixpkgs' and query: '<USER_QUESTION>'. Return the key findings."
+  prompt="Use `context7 docs /NixOS/nixpkgs \"<USER_QUESTION>\"` and return the key findings."
 )
 
 task(
   subagent_type="general",
   description="Query nix.dev docs",
-  prompt="Use query-docs with libraryId '/NixOS/nix.dev' and query: '<USER_QUESTION>'. Return the key findings."
+  prompt="Use `context7 docs /NixOS/nix.dev \"<USER_QUESTION>\"` and return the key findings."
 )
 ```
 

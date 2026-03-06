@@ -17,16 +17,16 @@ description: "Develop Go (Golang) applications using modern patterns, popular li
 Before implementing, gather context from authoritative sources:
 
 ```
-# Context7 query-docs for repo-specific docs
-query-docs({ libraryId: "/gin-gonic/gin", query: "how to set up middleware" })
-query-docs({ libraryId: "/uber-go/zap", query: "structured logging setup" })
+# Context7 docs for repo-specific guidance
+context7 docs /gin-gonic/gin "how to set up middleware"
+context7 docs /uber-go/zap "structured logging setup"
 
 # gh search code for real-world implementation examples
 gh search code "ratelimit.New(" --language=go
 gh search code "errgroup.WithContext(" --language=go
 
 # For style/idiom questions
-query-docs({ libraryId: "/uber-go/guide", query: "style guide patterns and idioms" })
+context7 docs /uber-go/guide "style guide patterns and idioms"
 ```
 
 ## Notes

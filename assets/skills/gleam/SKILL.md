@@ -19,7 +19,7 @@ Idiomatic Gleam with **type-driven design** and **TDD**.
 
 ## Research
 
-Use Context7 `query-docs` first, then gh as fallback. Routing table and example queries live in `reference.md`.
+Use `context7 docs` first, then gh as fallback. Routing table and example queries live in `reference.md`.
 
 ## CLI
 

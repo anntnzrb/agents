@@ -5,7 +5,7 @@ description: "Develop with Nix including packages, flakes, NixOS, and derivation
 
 # Nix Development
 
-Research-first Nix development using **parallel Context7 `query-docs` calls** for accurate, up-to-date information.
+Research-first Nix development using **parallel Context7 `docs` queries** for accurate, up-to-date information.
 
 ## Workflow
 

@@ -2,7 +2,7 @@
 
 ## Research
 
-**Priority**: `query-docs` → fallback to `gh` CLI
+**Priority**: `context7 docs` → fallback to `gh` CLI
 
 ### 1. Context7 (Primary)
 
@@ -25,7 +25,7 @@ Query Context7 library IDs (GitHub project = libraryId) for accurate, up-to-date
 task(
   subagent_type="general",
   description="Query Gleam stdlib",
-  prompt="Use query-docs with libraryId '/gleam-lang/stdlib' and query: 'How does the list module handle sorting and filtering?'"
+  prompt="Use `context7 docs /gleam-lang/stdlib \"How does the list module handle sorting and filtering?\"` and summarize the result."
 )
 ```
 
