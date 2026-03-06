@@ -91,5 +91,5 @@ exa-search post /answer '{"query":"What is Bun?"}'
 ## Validation
 
 ```bash
-bash scripts/test-exa-http.sh
+./scripts/test-exa-http.sh
 ```

@@ -109,5 +109,5 @@ Use `brave-search raw </path> key=<key> ...` for these.
 ## Validation
 
 ```bash
-bash scripts/test-brave-http.sh
+./scripts/test-brave-http.sh
 ```

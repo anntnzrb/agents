@@ -66,3 +66,9 @@ Each hit includes fields like:
 
 - The response snippets are HTML, not plain text.
 - Facets are useful for narrowing a broad first pass before repeating the query with `f.repo`, `f.path`, or `f.lang`.
+
+## Validation
+
+```bash
+./scripts/test-grep-app-http.sh
+```

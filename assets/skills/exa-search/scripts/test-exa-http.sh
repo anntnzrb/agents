@@ -9,13 +9,12 @@ need() {
 }
 
 need bash
-need awk
 need curl
 need jq
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
 SKILL_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
-SKILL_MD="$SKILL_DIR/SKILL.md"
+HELPER="$SCRIPT_DIR/exa-search.sh"
 DEFAULT_ENV="$SKILL_DIR/.env"
 
 if [ -z "${EXA_SEARCH_ENV_FILE:-}" ] && [ -f "$DEFAULT_ENV" ]; then
@@ -27,12 +26,9 @@ if [ -z "${EXA_API_KEY:-${EXA_APIKEY:-}}" ] && [ ! -f "${EXA_SEARCH_ENV_FILE:-$D
   exit 0
 fi
 
-tmp="$(mktemp)"
-trap 'rm -f "$tmp"' EXIT
-awk '/^```bash$/{flag=1;next}/^```$/{if(flag){exit}}flag' "$SKILL_MD" > "$tmp"
-bash -n "$tmp"
+bash -n "$HELPER"
 # shellcheck source=/dev/null
-. "$tmp"
+. "$HELPER"
 
 echo "== search =="
 exa-search search "rust async" 1 | jq '{results: (.results | length), first_url: .results[0].url}'

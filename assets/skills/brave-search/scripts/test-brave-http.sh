@@ -9,13 +9,12 @@ need() {
 }
 
 need bash
-need awk
 need curl
 need jq
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
 SKILL_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
-SKILL_MD="$SKILL_DIR/SKILL.md"
+HELPER="$SCRIPT_DIR/brave-search.sh"
 DEFAULT_ENV="$SKILL_DIR/.env"
 
 if [ -z "${BRAVE_SEARCH_ENV_FILE:-}" ] && [ -f "$DEFAULT_ENV" ]; then
@@ -27,12 +26,9 @@ if [ -z "${BRAVE_API_KEY:-${BRAVE_SEARCH_API_KEY:-}}" ] && [ ! -f "${BRAVE_SEARC
   exit 0
 fi
 
-tmp="$(mktemp)"
-trap 'rm -f "$tmp"' EXIT
-awk '/^```bash$/{flag=1;next}/^```$/{if(flag){exit}}flag' "$SKILL_MD" > "$tmp"
-bash -n "$tmp"
+bash -n "$HELPER"
 # shellcheck source=/dev/null
-. "$tmp"
+. "$HELPER"
 
 echo "== web =="
 brave-search web "rust programming language" count=1 | jq '{web_results: (.web.results | length), first_url: .web.results[0].url}'

@@ -1,5 +1,5 @@
-#!/bin/sh
-set -eu
+#!/usr/bin/env bash
+set -euo pipefail
 
 UA="${REDDIT_USER_AGENT:-agents-reddit-test/1.0}"
 BASE="${REDDIT_BASE_URL:-https://www.reddit.com}"
@@ -11,28 +11,40 @@ need() {
   }
 }
 
+need bash
 need curl
 need jq
-need rg
 
-fetch() {
-  curl -fsSL -A "$UA" "$@"
-}
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+SKILL_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+HELPER="$SCRIPT_DIR/reddit.sh"
+DEFAULT_ENV="$SKILL_DIR/.env"
+
+if [ -z "${REDDIT_ENV_FILE:-}" ] && [ -f "$DEFAULT_ENV" ]; then
+  export REDDIT_ENV_FILE="$DEFAULT_ENV"
+fi
+
+export REDDIT_USER_AGENT="$UA"
+export REDDIT_BASE_URL="$BASE"
+
+bash -n "$HELPER"
+# shellcheck source=/dev/null
+. "$HELPER"
 
 echo "== browse =="
-fetch "$BASE/r/programming/hot.json?limit=2" | jq '{kind, count: (.data.children|length)}'
+reddit browse programming hot limit=2 | jq '{kind, count: (.data.children | length)}'
 
 echo "== search =="
-fetch "$BASE/search.json?q=rust&sort=relevance&t=month&limit=2" | jq '{kind, count: (.data.children|length)}'
+reddit search "rust" sort=relevance time=month limit=2 | jq '{kind, count: (.data.children | length)}'
 
 echo "== user =="
-fetch "$BASE/user/spez/about.json" | jq '{kind, name: .data.name}'
+reddit user spez | jq '{kind, name: .data.name}'
 
 echo "== comments =="
-post_url="$(fetch "$BASE/r/programming/hot.json?limit=1" | jq -r '.data.children[0].data.permalink')"
-fetch "${BASE}${post_url%.json}.json?limit=5" | jq '.[0].kind, .[1].kind'
+post_url="$(reddit browse programming hot limit=1 | jq -r '.data.children[0].data.permalink')"
+reddit post-url "${BASE}${post_url}" comment_limit=5 | jq '.[0].kind, .[1].kind'
 
-echo "== skill content =="
-rg -n 'Define `reddit` once per shell|reddit browse all hot limit=10|reddit user-analysis' assets/skills/reddit/SKILL.md >/dev/null
+echo "== glossary =="
+reddit explain karma | jq -e '.term == "karma"' >/dev/null
 
 echo "ok"

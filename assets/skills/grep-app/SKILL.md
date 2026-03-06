@@ -9,42 +9,13 @@ Use Grep.app directly over HTTP; no mcporter needed.
 
 ## Required shell helper
 
-Define `grep-app` once per shell:
+Source the bash helper from this skill once per shell:
 
 ```bash
-grep-app() {
-  local base_url="${GREP_APP_BASE_URL:-https://grep.app/api/search}"
-  local cmd="${1:-search}"
-  shift || true
-
-  local pair
-  local -a extra=()
-
-  case "$cmd" in
-    search)
-      local query="${1:?usage: grep-app search <pattern> [key=value ...]}"
-      shift
-      for pair in "$@"; do extra+=(--data-urlencode "$pair"); done
-      command curl -fsSLG "$base_url" \
-        --data-urlencode "q=${query}" \
-        "${extra[@]}"
-      ;;
-    regex)
-      local pattern="${1:?usage: grep-app regex <pattern> [key=value ...]}"
-      shift
-      for pair in "$@"; do extra+=(--data-urlencode "$pair"); done
-      command curl -fsSLG "$base_url" \
-        --data-urlencode "q=${pattern}" \
-        --data-urlencode "regexp=true" \
-        "${extra[@]}"
-      ;;
-    *)
-      echo "usage: grep-app <search|regex> ..." >&2
-      return 2
-      ;;
-  esac
-}
+source "${SKILLS_DIR:-skills}/grep-app/scripts/grep-app.sh"
 ```
+
+If `SKILLS_DIR` is unavailable, source the same file from your local `skills/` checkout.
 
 Then use `grep-app <subcommand>` everywhere below.
 
@@ -84,6 +55,12 @@ Pass Grep.app filters as query params:
 - `regex` sets `regexp=true` automatically.
 - Grep.app returns HTML snippets inside JSON; use `jq` to extract metadata like repo/path first.
 - Check licenses before reusing copied code.
+
+## Validation
+
+```bash
+./scripts/test-grep-app-http.sh
+```
 
 ## Query templates
 
