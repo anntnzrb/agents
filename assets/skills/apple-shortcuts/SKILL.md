@@ -1,6 +1,6 @@
 ---
 name: apple-shortcuts
-description: "Design, implement, debug, and optimize Apple Shortcuts automations across iPhone, iPad, Mac, Apple Watch, and Apple Vision Pro. Use when requests involve building shortcut logic, selecting actions/variables, creating personal or home automations, integrating App Intents/App Shortcuts, troubleshooting shortcut behavior, or mining the local shortcuts-docs-corpus for authoritative references."
+description: "Design, implement, debug, and optimize Apple Shortcuts automations across iPhone, iPad, Mac, Apple Watch, and Apple Vision Pro. Use when requests involve building shortcut logic, selecting actions/variables, creating personal or home automations, managing installed shortcuts from the Mac CLI, generating importable .shortcut/plist files, integrating App Intents/App Shortcuts, troubleshooting shortcut behavior, or mining the local shortcuts-docs-corpus for authoritative references."
 ---
 
 # Apple Shortcuts
@@ -8,6 +8,8 @@ description: "Design, implement, debug, and optimize Apple Shortcuts automations
 ## Activation Triggers
 - "create a shortcut", "build a shortcut", "shortcut automation", "Siri shortcut".
 - Device-specific shortcut requests for iPhone, iPad, Mac, Apple Watch, Apple Vision Pro.
+- Requests to list, open, inspect, or run installed shortcuts from the Mac CLI.
+- Requests for `.shortcut` files, shortcut plists, signing/import flow, or raw action serialization.
 - Requests mentioning Shortcuts actions, variables, dictionaries, menus, repeat/if flow, URL schemes, x-callback-url.
 - Requests mentioning App Intents, App Shortcuts, SiriKit donation, or WWDC shortcut integration guidance.
 - Requests to debug a failing shortcut or optimize shortcut reliability/performance.
@@ -18,12 +20,16 @@ description: "Design, implement, debug, and optimize Apple Shortcuts automations
    - User-level shortcut only: use support-guide patterns.
    - App integration: use App Intents/App Shortcuts docs.
    - CLI/local execution: include `shortcuts` command behavior and output handling.
+   - Raw `.shortcut` authoring: use only when the user explicitly wants plist/XML output, a signable artifact, or low-level action wiring.
 3. If user asks "what do my current shortcuts do?", run local introspection workflow before guessing.
-4. Build a shortcut blueprint before listing actions.
-5. Translate blueprint into an action graph with explicit variable names and control flow.
-6. Add a validation matrix (happy path, empty input, denied permissions, network/API failures, device-specific differences).
-7. Provide final deliverable:
+4. If user wants to open or run an installed shortcut on Mac, inventory first, then choose UI handoff or CLI execution.
+5. Build a shortcut blueprint before listing actions unless the request is explicitly for raw plist output.
+6. Translate blueprint into an action graph with explicit variable names and control flow.
+7. If using raw `.shortcut` authoring, keep the output minimal and use `references/plist-authoring.md` for wiring/signing details.
+8. Add a validation matrix (happy path, empty input, denied permissions, network/API failures, device-specific differences).
+9. Provide final deliverable:
    - Shortcut build plan (ordered actions + parameter values).
+   - Raw plist/signing steps when the request is explicitly for an importable file.
    - Trigger/automation setup instructions.
    - Test checklist and rollback/safety notes.
 
@@ -55,6 +61,16 @@ uv run scripts/make_blueprint.py \
 shortcuts list --show-identifiers
 shortcuts list --folders
 ```
+- Open a shortcut in Shortcuts.app for manual inspection/editing:
+```bash
+shortcuts view "My Shortcut"
+```
+- Run an installed shortcut:
+```bash
+shortcuts run "My Shortcut"
+shortcuts run "My Shortcut" --input-path ./input.txt
+printf '%s\n' "hello world" | shortcuts run "My Shortcut"
+```
 - Decode local action graphs (safe redaction on by default):
 ```bash
 uv run scripts/inspect_local_shortcuts.py --visible-only --include-folders
@@ -71,6 +87,10 @@ uv run scripts/inspect_local_shortcuts.py \
 uv run scripts/inspect_local_shortcuts.py --json --raw
 uv run scripts/inspect_local_shortcuts.py --json --raw --no-redact
 ```
+- Sign a generated `.shortcut` file for import:
+```bash
+shortcuts sign --mode anyone --input MyShortcut.shortcut --output MyShortcut_signed.shortcut
+```
 
 ## Local Introspection Protocol
 1. Inventory first: `shortcuts list --show-identifiers` and folder listing.
@@ -79,6 +99,12 @@ uv run scripts/inspect_local_shortcuts.py --json --raw --no-redact
 4. Include `--include-smart-prompts` to report permission grants from `ZSMARTPROMPTPERMISSION` (destination app + mode/status).
 5. Note hidden entries (e.g. placeholders/templates) and filter with `--visible-only` when user wants only normal library items.
 6. Keep redaction enabled by default; only use `--no-redact` when user explicitly asks for raw secrets.
+
+## Mac CLI Operations
+- Use `shortcuts view "<name>"` only when the user explicitly wants to open/edit the shortcut in Shortcuts.app.
+- Use `shortcuts run "<name>"` for direct execution, `--input-path` for file input, and stdin piping for text input.
+- If `shortcuts run/view` fails with `The shortcut "Name" could not be found.`, re-run inventory first, then retry with exact casing and spacing.
+- For machine-readable automation output, pair execution with explicit CLI output flags when available; see `references/debug-playbook.md`.
 
 ## Output Contract
 - Always produce named sections:
@@ -93,6 +119,7 @@ uv run scripts/inspect_local_shortcuts.py --json --raw --no-redact
 - In `Action Graph`, list ordered actions with exact action names when known.
 - Keep user-facing steps deterministic and executable.
 - Call out assumptions explicitly.
+- When the user explicitly requests a raw `.shortcut` artifact, replace `Action Graph` with `Shortcut File Structure` and include signing/import steps.
 
 ## Device-Specific Rules
 - iPhone/iPad:
@@ -100,6 +127,7 @@ uv run scripts/inspect_local_shortcuts.py --json --raw --no-redact
   - For automation triggers, separate personal vs home automation pathways.
 - Mac:
   - Include command-line compatibility if user asks about local workflows.
+  - Prefer `inspect_local_shortcuts.py` for analysis; reserve `shortcuts view` for UI handoff.
   - Note differences between widget/app trigger surfaces and iOS trigger surfaces.
 - Apple Watch:
   - Distinguish "run from watch" vs "create/edit from phone/mac".
@@ -122,6 +150,7 @@ uv run scripts/inspect_local_shortcuts.py --json --raw --no-redact
 - Use `references/pattern-cookbook.md` for action-level patterns.
 - Use `references/debug-playbook.md` for failure diagnosis.
 - Use `references/developer-integration.md` for App Intents and WWDC sources.
+- Use `references/plist-authoring.md` only for explicit raw `.shortcut`/plist authoring requests.
 
 ## Constraints
 - Use local corpus only. Do not fetch documentation from the web.
@@ -129,3 +158,4 @@ uv run scripts/inspect_local_shortcuts.py --json --raw --no-redact
 - Treat community sources as pattern inspiration; mark them non-authoritative.
 - Do not invent action names; if uncertain, say uncertain and provide nearest known action.
 - For local shortcut inventory/decoding tasks, prefer `scripts/inspect_local_shortcuts.py` over manual plist/sqlite shell pipelines.
+- Do not default to raw plist/XML output when a blueprint or action graph answers the request.
