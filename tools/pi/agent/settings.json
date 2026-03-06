@@ -1,9 +1,15 @@
 {
-  "lastChangelogVersion": "0.52.9",
-  "theme": "ef-elea-light",
+  "lastChangelogVersion": "0.56.3",
+  "theme": "dark",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.4",
   "defaultThinkingLevel": "medium",
+  "enabledModels": [
+    "kimi-coding/k2p5",
+    "github-copilot/claude-sonnet-4.6",
+    "openai-codex/gpt-5.4",
+    "openai-codex/gpt-5.3-codex"
+  ],
   "hideThinkingBlock": true,
   "followUpMode": "all",
   "showHardwareCursor": true,
