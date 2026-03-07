@@ -8,6 +8,9 @@ use std::time::Duration;
 
 use wait_timeout::ChildExt;
 use walkdir::WalkDir;
+
+mod packages;
+
 const DEFAULT_AGENT_FILE: &str = "AGENTS.md";
 const INSTALL_TIMEOUT_SECONDS: u64 = 120;
 
@@ -46,6 +49,7 @@ struct Job {
 }
 #[derive(Clone, Debug)]
 struct SyncEnv {
+    home: PathBuf,
     assets_home: PathBuf,
     tools_home: PathBuf,
     mcporter_home: PathBuf,
@@ -66,6 +70,7 @@ impl SyncEnv {
     fn from_home(home: PathBuf, install_timeout: Duration) -> Self {
         let agents_home = home.join(".config").join("agents");
         Self {
+            home: home.clone(),
             assets_home: agents_home.join("assets"),
             tools_home: agents_home.join("tools"),
             mcporter_home: home.join(".mcporter"),
@@ -304,6 +309,24 @@ fn iter_jobs(sync_env: &SyncEnv) -> Vec<Job> {
 fn run_jobs(jobs: &[Job]) -> bool {
     jobs.iter().all(run_job)
 }
+fn clean_pi_runtime(tool_root: &Path) -> bool {
+    let managed_entries = [
+        tool_root.join("extensions"),
+        tool_root.join("legacy"),
+        tool_root.join("themes"),
+        tool_root.join("AGENTS.md"),
+        tool_root.join("settings.json"),
+        tool_root.join("modes.json"),
+    ];
+
+    managed_entries.iter().all(|path| match rm_entry(path) {
+        Ok(()) => true,
+        Err(error) => {
+            err(&format!("cleanup failed: {} ({error})", path.display()));
+            false
+        }
+    })
+}
 fn iter_extension_packages(root: &Path) -> Vec<PathBuf> {
     if !root.is_dir() {
         return Vec::new();
@@ -460,10 +483,26 @@ fn install_extension_deps(root: &Path, timeout: Duration) -> bool {
 
         results.push(run_install(&command, &package_dir, timeout));
     }
+    results.push(packages::install_inferred_import_packages(root, timeout));
     results.into_iter().all(std::convert::identity)
 }
 fn run_sync(sync_env: &SyncEnv) -> bool {
-    let base_success = run_jobs(&iter_jobs(sync_env));
+    let cleanup_success = sync_env
+        .tools
+        .iter()
+        .find(|tool| tool.name == "pi")
+        .map(|tool| clean_pi_runtime(&tool.root()))
+        .unwrap_or(true);
+    let base_success = if cleanup_success {
+        run_jobs(&iter_jobs(sync_env))
+    } else {
+        false
+    };
+    let package_success = if base_success {
+        packages::bootstrap_packages(sync_env)
+    } else {
+        true
+    };
     let install_success = if base_success {
         sync_env
             .tools
@@ -477,7 +516,7 @@ fn run_sync(sync_env: &SyncEnv) -> bool {
         true
     };
 
-    base_success && install_success
+    base_success && package_success && install_success
 }
 pub(crate) fn main() -> std::process::ExitCode {
     let sync_env = match SyncEnv::from_system() {

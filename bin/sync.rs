@@ -4,6 +4,7 @@
 edition = "2024"
 
 [dependencies]
+serde_json = "1"
 wait-timeout = "0.2"
 walkdir = "2"
 
