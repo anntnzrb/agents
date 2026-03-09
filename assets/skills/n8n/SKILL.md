@@ -13,6 +13,8 @@ Use **REST API** to create/update/activate workflows. Use **MCP** to list and ru
 - Running/triggering workflows: MCP
 - Use `n8nctl` (uv script) for REST without curl/jq
 
+Auth/config check policy: do not stop at `echo $N8N_BASE_URL` or `echo $N8N_API_KEY` in the parent shell. If credentials may live in the skill-local `.env`, prefer `uv run scripts/n8nctl.py ...`; that entrypoint auto-loads the env file using the lookup order below. Only report missing credentials after the real command path fails.
+
 ## Preconditions
 
 - n8n instance URL (cloud, self-hosted, or local)
@@ -29,6 +31,8 @@ Use **REST API** to create/update/activate workflows. Use **MCP** to list and ru
 - Export workflows to confirm exact `type` strings in your instance
 
 ## Quick start (REST)
+
+If credentials live only in the skill-local `.env`, prefer `uv run scripts/n8nctl.py ...` from the Scripts section; the raw `curl` examples below assume the relevant env is already exported into the current process.
 
 ```bash
 # list workflows

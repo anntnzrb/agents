@@ -36,6 +36,8 @@ description: "Design, implement, debug, and optimize Apple Shortcuts automations
 ## Quick Commands
 Run these from the skill directory (`apple-shortcuts/`) so relative `scripts/...` paths resolve.
 
+Corpus check policy: do not infer a missing corpus from `APPLE_SHORTCUTS_CORPUS` being unset in the parent shell. The helpers can also use `--corpus-root` or auto-discover the nearest `shortcuts-docs-corpus/`.
+
 - Search corpus for authoritative snippets:
 ```bash
 uv run scripts/search_expert_chunks.py \

@@ -19,6 +19,8 @@ If `SKILLS_DIR` is unavailable, source the same file from your local `skills/` c
 
 Then use `context7 <subcommand>` everywhere below.
 
+Credential check policy: do not stop at `echo $CONTEXT7_API_KEY` in the parent shell. Always run the documented helper entrypoint first; it auto-loads a skill-local `.env` using the lookup order below. The API key is optional for basic usage, so only report a credential problem if the real command still fails or the user specifically needs higher-rate access.
+
 ## Workflow
 
 1. If you do not know the library ID, search first.

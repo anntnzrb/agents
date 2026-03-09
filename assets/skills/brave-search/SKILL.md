@@ -19,6 +19,8 @@ If `SKILLS_DIR` is unavailable, source the same file from your local `skills/` c
 
 Then use `brave-search <subcommand>` everywhere below.
 
+Credential check policy: do not stop at `echo $BRAVE_API_KEY` in the parent shell. Always run the documented helper entrypoint first; it auto-loads a skill-local `.env` using the lookup order below. Only report missing credentials if `brave-search ...` itself fails after that lookup.
+
 ## When to use
 
 - Fast scoping / quick lookups

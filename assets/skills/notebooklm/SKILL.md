@@ -13,8 +13,9 @@ Use `nlm` to list notebooks, select a target, and ask questions via `generate-ch
    - `command -v nlm` (if missing, ask how they want to install)
 
 2) Verify auth
-   - Check `~/.nlm/env` or env vars `NLM_AUTH_TOKEN`, `NLM_COOKIES`
+   - Do not rely on parent-shell env alone; auth may live in `~/.nlm/env`, CLI/browser state, or env vars `NLM_AUTH_TOKEN`, `NLM_COOKIES`
    - Tracked template: `.env.example` (usable as a local template or for `~/.nlm/env`)
+   - Prove auth with a real command such as `nlm list`, not just an env inspection
    - If missing, run:
      - `nlm auth --all --notebooks`
      - If profiles are locked: `NLM_USE_ORIGINAL_PROFILE=1 nlm auth --all --notebooks --debug`

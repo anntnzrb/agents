@@ -64,6 +64,7 @@ Use this to route to the correct reference file:
 
 - Tracked template: `.env.example`
 - Primary non-interactive auth var: `VERCEL_TOKEN`
+- Do not infer missing auth from `VERCEL_TOKEN` being unset in the parent shell; existing `vercel login` state may already be valid. Use `vercel whoami` to verify real auth state. `VERCEL_TOKEN` is mainly for unattended/CI flows.
 - The CLI does not auto-load `.env`; source it yourself or use direnv when you need unattended auth.
 
 ## Anti-Patterns

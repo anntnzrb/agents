@@ -19,6 +19,8 @@ If `SKILLS_DIR` is unavailable, source the same file from your local `skills/` c
 
 Then use `reddit <subcommand>` everywhere below.
 
+Environment check policy: do not stop at `echo $REDDIT_USER_AGENT` in the parent shell. Always run the documented helper entrypoint first; it auto-loads a skill-local `.env` using the lookup order below. Missing `REDDIT_USER_AGENT` is not a hard blocker because this skill has a built-in default.
+
 ## Quick start
 
 ```bash

@@ -19,6 +19,8 @@ If `SKILLS_DIR` is unavailable, source the same file from your local `skills/` c
 
 Then use `grep-app <subcommand>` everywhere below.
 
+Environment check policy: do not treat an unset `GREP_APP_BASE_URL` in the parent shell as a readiness failure. It is only an optional override; the skill works with its default base URL.
+
 ## When to use
 
 - Real usage patterns for APIs, config, and framework code

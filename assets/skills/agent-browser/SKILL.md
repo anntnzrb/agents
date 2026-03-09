@@ -20,6 +20,8 @@ Hard rules:
 2. End every task with `agent-browser close`, even when a command fails.
 3. If interrupted or unsure about state, run `agent-browser close` immediately, then restart from `open`.
 
+Auth check policy: do not infer missing auth from absent environment variables alone. agent-browser may authenticate via its auth vault, saved browser state, or an existing session. Verify with real commands like `agent-browser auth list`, `agent-browser state list`, or the actual login flow.
+
 ## Core Workflow
 
 Every browser automation follows this pattern:

@@ -12,6 +12,7 @@ Use this skill as an operator manual for the `@steipete/summarize` CLI.
 - Invoke summarize with `bun x @steipete/summarize ...`.
 - Prefer the local wrapper `./scripts/summarize.sh ...` in this skill for consistency.
 - Treat summarize as a black-box CLI. Do not inspect source code unless the user asks.
+- Do not claim credentials/config are missing from parent-shell env inspection alone; prove it with the real CLI path or `./scripts/summarize-doctor.sh`, since config may also live outside the current shell.
 
 ## Workflow
 
