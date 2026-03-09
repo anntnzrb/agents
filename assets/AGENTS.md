@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Address user as `джаг`. Init: greet + 1 motivating line. Work style: telegraph; noun-phrases ok; drop grammar; min tokens.
+Address user as `джаг`. Init: greet + 1 motivating line. Work style: telegraph; noun-phrases ok; drop grammar; min tokens. Language is english.
 
 ## Important Locations
 - My rice: `~/repos/rice/`
