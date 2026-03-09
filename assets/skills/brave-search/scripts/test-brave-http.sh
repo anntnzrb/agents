@@ -34,6 +34,19 @@ echo "== web =="
 brave-search web "rust programming language" count=1 | jq '{web_results: (.web.results | length), first_url: .web.results[0].url}'
 
 echo "== news =="
-brave-search news "typescript" count=1 freshness=pm | jq '{results: (.results | length), first_title: .results[0].title}'
+set +e
+news_out="$(brave-search news "typescript" count=1 freshness=pm 2>&1)"
+news_code=$?
+set -e
+if [ "$news_code" -eq 0 ]; then
+  printf '%s\n' "$news_out" | jq '{results: (.results | length), first_title: .results[0].title}'
+else
+  printf '%s\n' "$news_out" >&2
+  if printf '%s' "$news_out" | grep -q 'curl: (22).*429'; then
+    echo "warn: news endpoint rate-limited; web search auth path already verified" >&2
+  else
+    exit "$news_code"
+  fi
+fi
 
 echo "ok"
