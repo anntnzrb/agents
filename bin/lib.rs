@@ -28,6 +28,13 @@ impl ToolConfig {
             .map_or_else(|| self.home.clone(), |subdir| self.home.join(subdir))
     }
 
+    fn source_root(&self, tools_home: &Path) -> PathBuf {
+        self.tool_subdir.map_or_else(
+            || tools_home.join(self.name),
+            |subdir| tools_home.join(self.name).join(subdir),
+        )
+    }
+
     fn rename_asset(&self, asset_name: &str) -> String {
         self.asset_renames
             .iter()
@@ -100,6 +107,13 @@ impl SyncEnv {
                 ToolConfig {
                     name: "pi",
                     home: home.join(".pi"),
+                    agent_file: DEFAULT_AGENT_FILE,
+                    asset_renames: Vec::new(),
+                    tool_subdir: Some("agent"),
+                },
+                ToolConfig {
+                    name: "omp",
+                    home: home.join(".omp"),
                     agent_file: DEFAULT_AGENT_FILE,
                     asset_renames: Vec::new(),
                     tool_subdir: Some("agent"),
@@ -241,10 +255,7 @@ fn tool_dirs(sync_env: &SyncEnv) -> Vec<Job> {
         .tools
         .iter()
         .map(|tool| Job {
-            src: tool.tool_subdir.map_or_else(
-                || sync_env.tools_home.join(tool.name),
-                |subdir| sync_env.tools_home.join(tool.name).join(subdir),
-            ),
+            src: tool.source_root(&sync_env.tools_home),
             dst: tool.root(),
             kind: JobKind::Dir,
         })

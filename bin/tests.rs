@@ -156,6 +156,16 @@ fn run_sync_happy_path() {
             .join(".config")
             .join("agents")
             .join("tools")
+            .join("omp")
+            .join("agent")
+            .join("config.yml"),
+        "theme:\n  dark: graphite\n",
+    );
+    write_file(
+        &home
+            .join(".config")
+            .join("agents")
+            .join("tools")
             .join("pi")
             .join("agent")
             .join("extensions")
@@ -197,6 +207,15 @@ fn run_sync_happy_path() {
             .is_file()
     );
     assert!(home.join(".pi").join("agent").join("AGENTS.md").is_file());
+    assert!(home.join(".omp").join("agent").join("AGENTS.md").is_file());
+    assert!(home.join(".omp").join("agent").join("config.yml").is_file());
+    assert!(
+        home.join(".omp")
+            .join("agent")
+            .join("skills")
+            .join("skill.txt")
+            .is_file()
+    );
     assert!(home.join(".mcporter").join("mcporter.json").is_file());
     assert!(home.join(".pi").join("agent").join("auth.json").is_file());
     assert!(
@@ -214,6 +233,117 @@ fn run_sync_missing_sources_is_non_fatal() {
     let temp = TempDir::new().expect("tempdir");
     let sync_env = SyncEnv::from_home(temp.path().to_path_buf(), Duration::from_secs(1));
     assert!(run_sync(&sync_env));
+}
+
+#[test]
+fn run_sync_omp_copies_without_cleaning_destination() {
+    let temp = TempDir::new().expect("tempdir");
+    let home = temp.path().to_path_buf();
+    let sync_env = SyncEnv::from_home(home.clone(), Duration::from_secs(1));
+    let agents_root = home.join(".config").join("agents");
+
+    write_file(
+        &agents_root.join("assets").join("AGENTS.md"),
+        "agent-instructions",
+    );
+    write_file(
+        &agents_root.join("assets").join("skills").join("skill.txt"),
+        "fresh-skill",
+    );
+    write_file(
+        &agents_root
+            .join("tools")
+            .join("omp")
+            .join("agent")
+            .join("config.yml"),
+        "theme:\n  light: graphite\n",
+    );
+
+    write_file(
+        &home.join(".omp").join("agent").join("config.yml"),
+        "stale-config\n",
+    );
+    write_file(
+        &home
+            .join(".omp")
+            .join("agent")
+            .join("skills")
+            .join("stale.txt"),
+        "stale-skill",
+    );
+    write_file(
+        &home
+            .join(".omp")
+            .join("agent")
+            .join("logs")
+            .join("keep.txt"),
+        "keep-me",
+    );
+
+    assert!(run_sync(&sync_env));
+    assert_eq!(
+        fs::read_to_string(home.join(".omp").join("agent").join("config.yml"))
+            .expect("read omp config"),
+        "theme:\n  light: graphite\n"
+    );
+    assert!(
+        home.join(".omp")
+            .join("agent")
+            .join("skills")
+            .join("skill.txt")
+            .is_file()
+    );
+    assert!(
+        home.join(".omp")
+            .join("agent")
+            .join("skills")
+            .join("stale.txt")
+            .is_file()
+    );
+    assert!(
+        home.join(".omp")
+            .join("agent")
+            .join("logs")
+            .join("keep.txt")
+            .is_file()
+    );
+}
+
+#[test]
+fn run_sync_omp_does_not_bootstrap_packages() {
+    let temp = TempDir::new().expect("tempdir");
+    let home = temp.path().to_path_buf();
+    let sync_env = SyncEnv::from_home(home.clone(), Duration::from_secs(1));
+    let agents_root = home.join(".config").join("agents");
+
+    write_file(
+        &agents_root.join("assets").join("AGENTS.md"),
+        "agent-instructions",
+    );
+    write_file(
+        &agents_root
+            .join("tools")
+            .join("omp")
+            .join("agent")
+            .join("config.yml"),
+        "interruptMode: immediate\n",
+    );
+    write_file(
+        &agents_root
+            .join("tools")
+            .join("omp")
+            .join("agent")
+            .join("packages.json"),
+        "this is not valid json\n",
+    );
+
+    assert!(run_sync(&sync_env));
+    assert_eq!(
+        fs::read_to_string(home.join(".omp").join("agent").join("packages.json"))
+            .expect("read copied omp package file"),
+        "this is not valid json\n"
+    );
+    assert!(home.join(".omp").join("agent").join("config.yml").is_file());
 }
 
 #[test]
