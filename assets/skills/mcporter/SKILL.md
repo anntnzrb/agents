@@ -5,7 +5,13 @@ description: "MCP (Model Context Protocol) CLI workflows via MCPorter. Use for M
 
 # MCPorter
 
-Use MCPorter to list MCP servers, call tools, and manage MCP config. Prefer `bun x mcporter` (fallback: `npx --yes mcporter`).
+Use MCPorter to list MCP servers, call tools, and manage MCP config.
+
+Define `mcporter` once per shell:
+
+`mcporter() { nix run github:numtide/llm-agents.nix#mcporter -- "$@"; }`
+
+Then use `mcporter <command>` everywhere below.
 
 ## When to use
 
