@@ -1,4 +1,5 @@
 use std::process::Command;
+use std::time::Duration;
 
 use super::*;
 use tempfile::TempDir;
@@ -112,6 +113,33 @@ fn run_install_handles_success_failure_and_timeout() {
 }
 
 #[test]
+fn sync_env_harness_lookup_is_typed() {
+    let temp = TempDir::new().expect("tempdir");
+    let sync_env = SyncEnv::from_home(temp.path().to_path_buf(), Duration::from_secs(1));
+
+    let pi = sync_env.harness(HarnessId::Pi).expect("pi harness");
+    assert_eq!(
+        pi.source_root(&sync_env.tools_home),
+        temp.path()
+            .join(".config")
+            .join("agents")
+            .join("tools")
+            .join("pi")
+            .join("agent")
+    );
+    assert_eq!(
+        pi.instruction_target(),
+        temp.path().join(".pi").join("agent").join("AGENTS.md")
+    );
+
+    let claude = sync_env.harness(HarnessId::Claude).expect("claude harness");
+    assert_eq!(
+        claude.instruction_target(),
+        temp.path().join(".claude").join("CLAUDE.md")
+    );
+}
+
+#[test]
 fn run_sync_happy_path() {
     let temp = TempDir::new().expect("tempdir");
     let home = temp.path().to_path_buf();
@@ -196,10 +224,27 @@ fn run_sync_happy_path() {
             .join("stale.ts"),
         "stale",
     );
+    write_file(
+        &home
+            .join(".omp")
+            .join("agent")
+            .join("skills")
+            .join("stale.txt"),
+        "stale-skill",
+    );
+    write_file(
+        &home
+            .join(".omp")
+            .join("agent")
+            .join("logs")
+            .join("keep.txt"),
+        "keep-me",
+    );
 
     assert!(run_sync(&sync_env));
     assert!(home.join(".codex").join("AGENTS.md").is_file());
     assert!(home.join(".claude").join("CLAUDE.md").is_file());
+    assert!(!home.join(".claude").join("AGENTS.md").exists());
     assert!(
         home.join(".config")
             .join("opencode")
@@ -226,6 +271,21 @@ fn run_sync_happy_path() {
             .join("stale.ts")
             .exists()
     );
+    assert!(
+        !home
+            .join(".omp")
+            .join("agent")
+            .join("skills")
+            .join("stale.txt")
+            .exists()
+    );
+    assert!(
+        home.join(".omp")
+            .join("agent")
+            .join("logs")
+            .join("keep.txt")
+            .is_file()
+    );
 }
 
 #[test]
@@ -236,7 +296,139 @@ fn run_sync_missing_sources_is_non_fatal() {
 }
 
 #[test]
-fn run_sync_omp_copies_without_cleaning_destination() {
+fn run_sync_claude_uses_claude_md() {
+    let temp = TempDir::new().expect("tempdir");
+    let home = temp.path().to_path_buf();
+    let sync_env = SyncEnv::from_home(home.clone(), Duration::from_secs(1));
+
+    let source_agent_file = home
+        .join(".config")
+        .join("agents")
+        .join("assets")
+        .join("AGENTS.md");
+    write_file(&source_agent_file, "agent-instructions");
+
+    assert!(run_sync(&sync_env));
+    assert_eq!(
+        fs::read_to_string(home.join(".claude").join("CLAUDE.md")).expect("read claude file"),
+        "agent-instructions"
+    );
+    assert!(!home.join(".claude").join("AGENTS.md").exists());
+    assert_eq!(
+        fs::read_to_string(source_agent_file).expect("read source agent file"),
+        "agent-instructions"
+    );
+}
+
+#[test]
+fn run_sync_cleans_managed_entries_for_multiple_harnesses() {
+    let temp = TempDir::new().expect("tempdir");
+    let home = temp.path().to_path_buf();
+    let sync_env = SyncEnv::from_home(home.clone(), Duration::from_secs(1));
+    let agents_root = home.join(".config").join("agents");
+
+    write_file(
+        &agents_root.join("assets").join("AGENTS.md"),
+        "agent-instructions",
+    );
+    write_file(
+        &agents_root.join("assets").join("skills").join("skill.txt"),
+        "fresh-skill",
+    );
+    write_file(
+        &agents_root.join("tools").join("codex").join("config.toml"),
+        "fresh = true\n",
+    );
+    write_file(
+        &agents_root
+            .join("tools")
+            .join("omp")
+            .join("agent")
+            .join("config.yml"),
+        "theme:\n  light: graphite\n",
+    );
+
+    write_file(&home.join(".codex").join("config.toml"), "stale = true\n");
+    write_file(
+        &home.join(".codex").join("skills").join("stale.txt"),
+        "stale-skill",
+    );
+    write_file(
+        &home.join(".codex").join("logs").join("keep.txt"),
+        "keep-me",
+    );
+
+    write_file(
+        &home.join(".omp").join("agent").join("config.yml"),
+        "stale-config\n",
+    );
+    write_file(
+        &home
+            .join(".omp")
+            .join("agent")
+            .join("skills")
+            .join("stale.txt"),
+        "stale-skill",
+    );
+    write_file(
+        &home
+            .join(".omp")
+            .join("agent")
+            .join("logs")
+            .join("keep.txt"),
+        "keep-me",
+    );
+
+    assert!(run_sync(&sync_env));
+    assert_eq!(
+        fs::read_to_string(home.join(".codex").join("config.toml")).expect("read codex config"),
+        "fresh = true\n"
+    );
+    assert_eq!(
+        fs::read_to_string(home.join(".omp").join("agent").join("config.yml"))
+            .expect("read omp config"),
+        "theme:\n  light: graphite\n"
+    );
+    assert!(
+        home.join(".codex")
+            .join("skills")
+            .join("skill.txt")
+            .is_file()
+    );
+    assert!(
+        home.join(".omp")
+            .join("agent")
+            .join("skills")
+            .join("skill.txt")
+            .is_file()
+    );
+    assert!(
+        !home
+            .join(".codex")
+            .join("skills")
+            .join("stale.txt")
+            .exists()
+    );
+    assert!(
+        !home
+            .join(".omp")
+            .join("agent")
+            .join("skills")
+            .join("stale.txt")
+            .exists()
+    );
+    assert!(home.join(".codex").join("logs").join("keep.txt").is_file());
+    assert!(
+        home.join(".omp")
+            .join("agent")
+            .join("logs")
+            .join("keep.txt")
+            .is_file()
+    );
+}
+
+#[test]
+fn run_sync_omp_cleans_managed_entries_but_preserves_local_files() {
     let temp = TempDir::new().expect("tempdir");
     let home = temp.path().to_path_buf();
     let sync_env = SyncEnv::from_home(home.clone(), Duration::from_secs(1));
@@ -294,11 +486,12 @@ fn run_sync_omp_copies_without_cleaning_destination() {
             .is_file()
     );
     assert!(
-        home.join(".omp")
+        !home
+            .join(".omp")
             .join("agent")
             .join("skills")
             .join("stale.txt")
-            .is_file()
+            .exists()
     );
     assert!(
         home.join(".omp")
@@ -307,6 +500,74 @@ fn run_sync_omp_copies_without_cleaning_destination() {
             .join("keep.txt")
             .is_file()
     );
+}
+
+#[test]
+fn run_sync_cleans_legacy_pi_entries_without_prior_state() {
+    let temp = TempDir::new().expect("tempdir");
+    let home = temp.path().to_path_buf();
+    let sync_env = SyncEnv::from_home(home.clone(), Duration::from_secs(1));
+    let agents_root = home.join(".config").join("agents");
+
+    write_file(
+        &agents_root.join("assets").join("AGENTS.md"),
+        "agent-instructions",
+    );
+    write_file(
+        &home
+            .join(".pi")
+            .join("agent")
+            .join("legacy")
+            .join("old.txt"),
+        "stale",
+    );
+    write_file(
+        &home.join(".pi").join("agent").join("auth.json"),
+        "{\"token\":1}",
+    );
+
+    assert!(run_sync(&sync_env));
+    assert!(!home.join(".pi").join("agent").join("legacy").exists());
+    assert!(home.join(".pi").join("agent").join("auth.json").is_file());
+}
+
+#[test]
+fn run_sync_removes_entries_removed_from_ssot_after_prior_sync() {
+    let temp = TempDir::new().expect("tempdir");
+    let home = temp.path().to_path_buf();
+    let sync_env = SyncEnv::from_home(home.clone(), Duration::from_secs(1));
+    let agents_root = home.join(".config").join("agents");
+    let codex_config = agents_root.join("tools").join("codex").join("config.toml");
+    let skills_root = agents_root.join("assets").join("skills");
+
+    write_file(
+        &agents_root.join("assets").join("AGENTS.md"),
+        "agent-instructions",
+    );
+    write_file(&skills_root.join("skill.txt"), "fresh-skill");
+    write_file(&codex_config, "fresh = true\n");
+
+    assert!(run_sync(&sync_env));
+    assert!(home.join(".codex").join("config.toml").is_file());
+    assert!(
+        home.join(".codex")
+            .join("skills")
+            .join("skill.txt")
+            .is_file()
+    );
+    assert!(sync_env.managed_state_home.join("codex.json").is_file());
+
+    rm_entry(&codex_config).expect("remove codex config source");
+    rm_entry(&skills_root).expect("remove skills source");
+    write_file(
+        &home.join(".codex").join("logs").join("keep.txt"),
+        "keep-me",
+    );
+
+    assert!(run_sync(&sync_env));
+    assert!(!home.join(".codex").join("config.toml").exists());
+    assert!(!home.join(".codex").join("skills").exists());
+    assert!(home.join(".codex").join("logs").join("keep.txt").is_file());
 }
 
 #[test]

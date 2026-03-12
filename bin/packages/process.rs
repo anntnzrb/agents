@@ -1,0 +1,176 @@
+use std::fs;
+use std::io;
+use std::path::Path;
+use std::process::{Command, Stdio};
+use std::thread;
+use std::time::Duration;
+
+use wait_timeout::ChildExt;
+
+use super::super::{command_exists, err, read_pipe};
+use super::validate::missing_package_roots;
+
+pub(super) fn install_package_deps(dir: &Path, timeout: Duration) -> bool {
+    if !dir.join("package.json").is_file() {
+        return true;
+    }
+    let Some(tool) = js_runner() else {
+        err(&format!(
+            "no JS package manager available for {}",
+            dir.display()
+        ));
+        return false;
+    };
+    let install_command = vec![tool.to_string(), "install".to_string()];
+    if !run_command(&install_command, Some(dir), timeout, "install") {
+        return false;
+    }
+    install_inferred_import_packages(dir, timeout)
+}
+
+pub(super) fn install_inferred_import_packages(dir: &Path, timeout: Duration) -> bool {
+    let missing = match missing_package_roots(dir) {
+        Ok(missing) => missing,
+        Err(message) => {
+            err(&format!(
+                "dependency scan failed in {}: {message}",
+                dir.display()
+            ));
+            return false;
+        }
+    };
+    if missing.is_empty() {
+        return true;
+    }
+    if !ensure_install_project(dir) {
+        return false;
+    }
+
+    let Some(tool) = js_runner() else {
+        err(&format!(
+            "no JS package manager available for inferred imports in {}",
+            dir.display()
+        ));
+        return false;
+    };
+    let command = if tool == "bun" {
+        let mut command = vec![tool.to_string(), "add".to_string(), "--no-save".to_string()];
+        command.extend(missing);
+        command
+    } else {
+        let mut command = vec![
+            tool.to_string(),
+            "install".to_string(),
+            "--no-save".to_string(),
+        ];
+        command.extend(missing);
+        command
+    };
+    run_command(&command, Some(dir), timeout, "install inferred packages")
+}
+
+pub(super) fn run_package_build(dir: &Path, timeout: Duration) -> bool {
+    let Some(tool) = js_runner() else {
+        err(&format!(
+            "no JS runtime available for build in {}",
+            dir.display()
+        ));
+        return false;
+    };
+    let command = vec![tool.to_string(), "run".to_string(), "build".to_string()];
+    run_command(&command, Some(dir), timeout, "build")
+}
+
+pub(super) fn run_command(
+    command: &[String],
+    cwd: Option<&Path>,
+    timeout: Duration,
+    action: &str,
+) -> bool {
+    let mut child = match Command::new(&command[0])
+        .args(&command[1..])
+        .current_dir(cwd.unwrap_or_else(|| Path::new(".")))
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            err(&format!("missing command for {action}: {}", command[0]));
+            return false;
+        }
+        Err(error) => panic!("{error}"),
+    };
+
+    let stdout = child
+        .stdout
+        .take()
+        .unwrap_or_else(|| panic!("missing stdout pipe for {}", command[0]));
+    let stderr = child
+        .stderr
+        .take()
+        .unwrap_or_else(|| panic!("missing stderr pipe for {}", command[0]));
+    let stdout_handle = thread::spawn(move || read_pipe(stdout));
+    let stderr_handle = thread::spawn(move || read_pipe(stderr));
+
+    match child.wait_timeout(timeout) {
+        Ok(Some(status)) => {
+            let stdout_text =
+                String::from_utf8_lossy(&stdout_handle.join().unwrap_or_default()).into_owned();
+            let stderr_text =
+                String::from_utf8_lossy(&stderr_handle.join().unwrap_or_default()).into_owned();
+            if status.success() {
+                return true;
+            }
+            let detail = if !stderr_text.trim().is_empty() {
+                stderr_text.trim().to_string()
+            } else if !stdout_text.trim().is_empty() {
+                stdout_text.trim().to_string()
+            } else {
+                "unknown error".to_string()
+            };
+            err(&format!(
+                "{action} failed: {} ({detail})",
+                command.join(" ")
+            ));
+            false
+        }
+        Ok(None) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = stdout_handle.join();
+            let _ = stderr_handle.join();
+            err(&format!("{action} timed out: {}", command.join(" ")));
+            false
+        }
+        Err(error) => panic!("{error}"),
+    }
+}
+
+fn js_runner() -> Option<&'static str> {
+    if command_exists("bun") {
+        return Some("bun");
+    }
+    if command_exists("npm") {
+        return Some("npm");
+    }
+    None
+}
+
+fn ensure_install_project(dir: &Path) -> bool {
+    let package_json = dir.join("package.json");
+    if package_json.is_file() {
+        return true;
+    }
+    match fs::write(
+        &package_json,
+        "{\n  \"name\": \"pi-extension-deps\",\n  \"private\": true\n}\n",
+    ) {
+        Ok(()) => true,
+        Err(error) => {
+            err(&format!("write {} ({error})", package_json.display()));
+            false
+        }
+    }
+}
