@@ -53,20 +53,26 @@ pub(super) fn install_inferred_import_packages(dir: &Path, timeout: Duration) ->
         ));
         return false;
     };
-    let command = if tool == "bun" {
-        let mut command = vec![tool.to_string(), "add".to_string(), "--no-save".to_string()];
-        command.extend(missing);
-        command
-    } else {
-        let mut command = vec![
-            tool.to_string(),
-            "install".to_string(),
-            "--no-save".to_string(),
-        ];
-        command.extend(missing);
-        command
-    };
-    run_command(&command, Some(dir), timeout, "install inferred packages")
+    let command = inferred_install_command(tool, &missing);
+    if run_command(&command, Some(dir), timeout, "install inferred packages") {
+        return true;
+    }
+
+    if tool == "bun" && command_exists("npm") {
+        err(&format!(
+            "retrying inferred package install with npm in {} after bun resolution failed",
+            dir.display()
+        ));
+        let fallback = inferred_install_command("npm", &missing);
+        return run_command(
+            &fallback,
+            Some(dir),
+            timeout,
+            "install inferred packages via npm fallback",
+        );
+    }
+
+    false
 }
 
 pub(super) fn run_package_build(dir: &Path, timeout: Duration) -> bool {
@@ -156,6 +162,22 @@ fn js_runner() -> Option<&'static str> {
         return Some("npm");
     }
     None
+}
+
+fn inferred_install_command(tool: &str, missing: &[String]) -> Vec<String> {
+    if tool == "bun" {
+        let mut command = vec![tool.to_string(), "add".to_string(), "--no-save".to_string()];
+        command.extend(missing.iter().cloned());
+        return command;
+    }
+
+    let mut command = vec![
+        tool.to_string(),
+        "install".to_string(),
+        "--no-save".to_string(),
+    ];
+    command.extend(missing.iter().cloned());
+    command
 }
 
 fn ensure_install_project(dir: &Path) -> bool {
