@@ -54,16 +54,17 @@ context7 json /fastapi/fastapi "dependency injection"
   - `$SKILLS_DIR/context7/.env`
   - nearest ancestor `skills/context7/.env`
 - Tracked template: `.env.example`
-- Header used when present: `CONTEXT7_API_KEY: <key>`
+- Header used when present: `Authorization: Bearer <key>`
 
 ## Notes
 
 - If you already know the library ID (`/org/project`, `/org/project/version`, or `/websites/...`), skip search.
+- `docs` and `json` accept library IDs with or without a leading `/`; examples keep the canonical slash form.
 - Prefer exact title/source matches; use higher `totalSnippets` as a tiebreaker, not the only signal.
 - `docs` uses `type=txt` because it is easier to read in agent output.
 - Public endpoint works without an API key for basic usage; expect lower rate limits.
 - Override `CONTEXT7_BASE_URL` if you need to point at a different host.
-- The shell helper uses `--data-urlencode` to avoid broken queries from spaces or special characters.
+- When a key is present, the helper sends `Authorization: Bearer`, uses `--data-urlencode` for safe queries, and surfaces API error messages instead of raw curl HTTP failures.
 - `id` uses `jq`; if `jq` is unavailable, inspect `search` output manually.
 
 ## Common examples

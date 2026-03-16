@@ -23,7 +23,8 @@ if [ -z "${CONTEXT7_ENV_FILE:-}" ] && [ -f "$DEFAULT_ENV" ]; then
 fi
 
 docs_tmp="$(mktemp)"
-trap 'rm -f "$docs_tmp"' EXIT
+error_tmp="$(mktemp)"
+trap 'rm -f "$docs_tmp" "$error_tmp"' EXIT
 bash -n "$HELPER"
 # shellcheck source=/dev/null
 . "$HELPER"
@@ -34,5 +35,17 @@ context7 search react "hooks useState" | jq '{results: (.results | length), firs
 echo "== docs =="
 context7 docs /vercel/next.js "app router" > "$docs_tmp"
 awk 'NR <= 5 { print }' "$docs_tmp"
+
+echo "== not found =="
+if context7 docs /nope/not-real "app router" >/dev/null 2>"$error_tmp"; then
+  echo "expected docs lookup to fail" >&2
+  exit 1
+fi
+awk 'NR == 1 { print }' "$error_tmp"
+if ! awk 'index($0, "not found") { found=1 } END { exit found ? 0 : 1 }' "$error_tmp"; then
+  echo "expected helpful not-found error" >&2
+  awk '{ print }' "$error_tmp" >&2
+  exit 1
+fi
 
 echo "ok"
