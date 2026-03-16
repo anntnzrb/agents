@@ -1,28 +1,20 @@
 {
-  "lastChangelogVersion": "0.56.3",
-  "theme": "dark",
-  "defaultProvider": "openai-codex",
+  "collapseChangelog": true,
   "defaultModel": "gpt-5.4",
+  "defaultProvider": "openai-codex",
   "defaultThinkingLevel": "medium",
+  "editorPaddingX": 1,
   "enabledModels": [
     "kimi-coding/k2p5",
     "github-copilot/claude-sonnet-4.6",
     "openai-codex/gpt-5.4",
     "openai-codex/gpt-5.3-codex"
   ],
-  "hideThinkingBlock": true,
   "followUpMode": "all",
-  "showHardwareCursor": true,
-  "editorPaddingX": 1,
-  "steeringMode": "all",
-  "collapseChangelog": true,
+  "hideThinkingBlock": true,
+  "lastChangelogVersion": "0.58.3",
   "quietStartup": true,
-  "skills": {
-    "enabled": true,
-    "enableCodexUser": false,
-    "enableClaudeUser": false,
-    "enableClaudeProject": false,
-    "enablePiUser": true,
-    "enablePiProject": true
-  }
+  "showHardwareCursor": true,
+  "steeringMode": "all",
+  "theme": "ef-elea-light"
 }
