@@ -53,7 +53,7 @@ export interface HarnessSpec {
   readonly hooks?: readonly HarnessHookSpec[];
 }
 
-export class Harness {
+export interface Harness {
   readonly id: HarnessId;
   readonly sourceName: string;
   readonly home: string;
@@ -62,44 +62,6 @@ export class Harness {
   readonly runtimeSubdir: string | undefined;
   readonly compatManagedEntries: readonly string[];
   readonly hooks: readonly HarnessHook[];
-
-  constructor(spec: HarnessSpec) {
-    this.id = spec.id;
-    this.sourceName = spec.sourceName;
-    this.home = spec.home;
-    this.instructionFile = spec.instructionFile ?? SOURCE_AGENT_FILE;
-    this.assetRenames = spec.assetRenames ?? [];
-    this.runtimeSubdir = spec.runtimeSubdir;
-    this.compatManagedEntries = spec.compatManagedEntries ?? [];
-    this.hooks = normalizeHooks(spec.hooks ?? []);
-  }
-
-  root(): string {
-    return this.runtimeSubdir ? path.join(this.home, this.runtimeSubdir) : this.home;
-  }
-
-  sourceRoot(toolsHome: string): string {
-    return this.runtimeSubdir
-      ? path.join(toolsHome, this.sourceName, this.runtimeSubdir)
-      : path.join(toolsHome, this.sourceName);
-  }
-
-  instructionFileName(): string {
-    return this.instructionFile;
-  }
-
-  instructionTarget(): string {
-    return path.join(this.root(), this.instructionFile);
-  }
-
-  renameAsset(assetName: string): string {
-    const match = this.assetRenames.find(([src]) => src === assetName);
-    return match ? match[1] : assetName;
-  }
-
-  managedStatePath(managedStateHome: string): string {
-    return path.join(managedStateHome, `${this.sourceName}.json`);
-  }
 }
 
 export class SyncEnv {
@@ -139,49 +101,6 @@ export class SyncEnv {
 
   static fromHome(home: string, installTimeoutMs: number): SyncEnv {
     const agentsHome = path.join(home, ".config", "agents");
-    const harnessSpecs: HarnessSpec[] = [
-      {
-        id: HarnessId.Claude,
-        sourceName: "claude",
-        home: path.join(home, ".claude"),
-        instructionFile: CLAUDE_AGENT_FILE,
-      },
-      {
-        id: HarnessId.Codex,
-        sourceName: "codex",
-        home: path.join(home, ".codex"),
-      },
-      {
-        id: HarnessId.Opencode,
-        sourceName: "opencode",
-        home: path.join(home, ".config", "opencode"),
-      },
-      {
-        id: HarnessId.Pi,
-        sourceName: "pi",
-        home: path.join(home, ".pi"),
-        runtimeSubdir: "agent",
-        compatManagedEntries: PI_COMPAT_MANAGED_ENTRIES,
-        hooks: [
-          {
-            kind: "PackageBootstrap",
-            manifestFile: "packages.json",
-            settingsFile: "settings.json",
-            cacheSubdir: DEFAULT_PACKAGE_CACHE_SUBDIR,
-          },
-          {
-            kind: "ExtensionDeps",
-            rootDir: "extensions",
-          },
-        ],
-      },
-      {
-        id: HarnessId.Omp,
-        sourceName: "omp",
-        home: path.join(home, ".omp"),
-        runtimeSubdir: "agent",
-      },
-    ];
     return new SyncEnv(
       home,
       path.join(agentsHome, "assets"),
@@ -189,13 +108,100 @@ export class SyncEnv {
       path.join(home, ".mcporter"),
       path.join(home, MANAGED_STATE_SUBDIR),
       installTimeoutMs,
-      harnessSpecs.map((spec) => new Harness(spec))
+      defaultHarnesses(home)
     );
   }
 
   harness(id: HarnessId): Harness | undefined {
     return this.harnesses.find((harness) => harness.id === id);
   }
+}
+
+export function buildHarness(spec: HarnessSpec): Harness {
+  return {
+    id: spec.id,
+    sourceName: spec.sourceName,
+    home: spec.home,
+    instructionFile: spec.instructionFile ?? SOURCE_AGENT_FILE,
+    assetRenames: spec.assetRenames ?? [],
+    runtimeSubdir: spec.runtimeSubdir,
+    compatManagedEntries: spec.compatManagedEntries ?? [],
+    hooks: normalizeHooks(spec.hooks ?? []),
+  };
+}
+
+export function defaultHarnesses(home: string): readonly Harness[] {
+  const harnessSpecs: HarnessSpec[] = [
+    {
+      id: HarnessId.Claude,
+      sourceName: "claude",
+      home: path.join(home, ".claude"),
+      instructionFile: CLAUDE_AGENT_FILE,
+    },
+    {
+      id: HarnessId.Codex,
+      sourceName: "codex",
+      home: path.join(home, ".codex"),
+    },
+    {
+      id: HarnessId.Opencode,
+      sourceName: "opencode",
+      home: path.join(home, ".config", "opencode"),
+    },
+    {
+      id: HarnessId.Pi,
+      sourceName: "pi",
+      home: path.join(home, ".pi"),
+      runtimeSubdir: "agent",
+      compatManagedEntries: PI_COMPAT_MANAGED_ENTRIES,
+      hooks: [
+        {
+          kind: "PackageBootstrap",
+          manifestFile: "packages.json",
+          settingsFile: "settings.json",
+          cacheSubdir: DEFAULT_PACKAGE_CACHE_SUBDIR,
+        },
+        {
+          kind: "ExtensionDeps",
+          rootDir: "extensions",
+        },
+      ],
+    },
+    {
+      id: HarnessId.Omp,
+      sourceName: "omp",
+      home: path.join(home, ".omp"),
+      runtimeSubdir: "agent",
+    },
+  ];
+  return harnessSpecs.map(buildHarness);
+}
+
+export function harnessRoot(harness: Harness): string {
+  return harness.runtimeSubdir ? path.join(harness.home, harness.runtimeSubdir) : harness.home;
+}
+
+export function harnessSourceRoot(harness: Harness, toolsHome: string): string {
+  return harness.runtimeSubdir
+    ? path.join(toolsHome, harness.sourceName, harness.runtimeSubdir)
+    : path.join(toolsHome, harness.sourceName);
+}
+
+export function harnessInstructionTarget(harness: Harness): string {
+  return path.join(harnessRoot(harness), harness.instructionFile);
+}
+
+export function harnessInstructionFileName(harness: Harness): string {
+  return harness.instructionFile;
+}
+
+export function harnessRenameAsset(harness: Harness, assetName: string): string {
+  const match = harness.assetRenames.find(([src]) => src === assetName);
+  return match ? match[1] : assetName;
+}
+
+export function harnessManagedStatePath(harness: Harness, managedStateHome: string): string {
+  return path.join(managedStateHome, `${harness.sourceName}.json`);
 }
 
 function normalizeHooks(hooks: readonly HarnessHookSpec[]): HarnessHook[] {

@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { Effect } from "effect";
 
-import * as packages from "./packages.ts";
+import { installInferredImportPackages } from "./packages/process.ts";
 import {
   commandExists,
   type CommandOutcome,
@@ -105,7 +105,7 @@ export const installExtensionDeps = (root: string, timeoutMs: number) =>
 
       results.push((yield* runInstall(command, packageDir, timeoutMs)) as boolean);
     }
-    results.push(yield* Effect.promise(() => packages.installInferredImportPackages(root, timeoutMs)));
+    results.push(yield* installInferredImportPackages(root, timeoutMs));
     return results.every(Boolean);
   });
 

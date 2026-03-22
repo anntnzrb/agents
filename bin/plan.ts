@@ -1,7 +1,17 @@
 import fs from "node:fs";
 import { join, posix } from "node:path";
 
-import { SOURCE_AGENT_FILE, type Harness, type SyncEnv } from "./harness.ts";
+import {
+  harnessInstructionFileName,
+  harnessInstructionTarget,
+  harnessManagedStatePath,
+  harnessRenameAsset,
+  harnessRoot,
+  harnessSourceRoot,
+  SOURCE_AGENT_FILE,
+  type Harness,
+  type SyncEnv,
+} from "./harness.ts";
 
 export type JobKind = "File" | "Dir";
 
@@ -70,14 +80,14 @@ export function topLevelEntryNames(root: string): string[] {
 }
 
 function buildHarnessPlan(syncEnv: SyncEnv, harness: Harness, assetNames: readonly string[]): HarnessPlan {
-  const root = harness.root();
-  const sourceRoot = harness.sourceRoot(syncEnv.toolsHome);
-  const instructionTarget = harness.instructionTarget();
+  const root = harnessRoot(harness);
+  const sourceRoot = harnessSourceRoot(harness, syncEnv.toolsHome);
+  const instructionTarget = harnessInstructionTarget(harness);
   const currentEntryNames = currentManagedEntryNames(harness, sourceRoot, assetNames);
   const cleanupEntryNames = uniqueSorted([...currentEntryNames, ...harness.compatManagedEntries]);
   return {
     harness,
-    statePath: harness.managedStatePath(syncEnv.managedStateHome),
+    statePath: harnessManagedStatePath(harness, syncEnv.managedStateHome),
     root,
     sourceRoot,
     instructionTarget,
@@ -89,12 +99,12 @@ function buildHarnessPlan(syncEnv: SyncEnv, harness: Harness, assetNames: readon
 
 function currentManagedEntryNames(harness: Harness, sourceRoot: string, assetNames: readonly string[]): string[] {
   const names = new Set<string>();
-  names.add(harness.instructionFileName());
+  names.add(harnessInstructionFileName(harness));
   for (const entryName of topLevelEntryNames(sourceRoot)) {
     names.add(entryName);
   }
   for (const assetName of assetNames) {
-    names.add(harness.renameAsset(assetName));
+    names.add(harnessRenameAsset(harness, assetName));
   }
   return uniqueSorted([...names]);
 }
@@ -114,7 +124,7 @@ function assetJobs(syncEnv: SyncEnv, harnesses: readonly HarnessPlan[], assetNam
     for (const plan of harnesses) {
       jobs.push({
         src: assetPath,
-        dst: join(plan.root, plan.harness.renameAsset(assetName)),
+        dst: join(plan.root, harnessRenameAsset(plan.harness, assetName)),
         kind: "Dir",
       });
     }

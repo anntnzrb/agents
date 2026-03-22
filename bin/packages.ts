@@ -3,33 +3,11 @@ import path from "node:path";
 
 import { Effect } from "effect";
 
-import { SyncEnv } from "./harness.ts";
-import { buildSyncPlan } from "./plan.ts";
-
-import {
-  installInferredImportPackages as installInferredImportPackagesImpl,
-  installPackageDeps,
-  runPackageBuild,
-} from "./packages/process.ts";
-import {
-  cloneAttemptsForTests as cloneAttemptsForTestsImpl,
-  clonePackage,
-  commandForTests as commandForTestsImpl,
-  githubSlugForTests as githubSlugForTestsImpl,
-  packageCacheDir as packageCacheDirImpl,
-  replaceDirAtomically,
-  rmEntry,
-  stagingDirFor,
-} from "./packages/source.ts";
-import {
-  packageHasBuildScript,
-  packageIsHealthy,
-  validatePackageForTests as validatePackageForTestsImpl,
-} from "./packages/validate.ts";
-
-export const PACKAGE_SOURCE_FILE = "packages.json";
-export const PACKAGE_SETTINGS_FILE = "settings.json";
-export const PACKAGE_CACHE_SUBDIR = ".local/share/agents/pi-packages";
+import { installInferredImportPackages as installInferredImportPackagesImpl, installPackageDeps, runPackageBuild } from "./packages/process.ts";
+import { clonePackage, packageCacheDir, replaceDirAtomically, rmEntry, stagingDirFor } from "./packages/source.ts";
+import { packageHasBuildScript, packageIsHealthy } from "./packages/validate.ts";
+export { cloneAttemptsForTests, commandForTests, githubSlugForTests, packageCacheDir } from "./packages/source.ts";
+export { packageHasBuildScript, packageIsHealthy, validatePackageForTests } from "./packages/validate.ts";
 
 export interface PackageManifest {
   readonly packages: string[];
@@ -44,31 +22,6 @@ export interface PackageBootstrapTarget {
 
 function err(message: string): void {
   console.error(`sync: ${message}`);
-}
-
-export function packageCacheDir(cacheRoot: string, source: string): string {
-  return packageCacheDirImpl(cacheRoot, source);
-}
-
-export function githubSlugForTests(source: string): string | null {
-  return githubSlugForTestsImpl(source);
-}
-
-export function commandForTests(source: string, targetDir: string): string[] {
-  return commandForTestsImpl(source, targetDir);
-}
-
-export function cloneAttemptsForTests(
-  source: string,
-  targetDir: string,
-  ghAvailable: boolean,
-  outcomes: readonly boolean[],
-): Promise<[boolean, string[][]]> {
-  return cloneAttemptsForTestsImpl(source, targetDir, ghAvailable, outcomes);
-}
-
-export function validatePackageForTests(dir: string): boolean {
-  return validatePackageForTestsImpl(dir);
 }
 
 export function readPackageManifest(filePath: string): PackageManifest {
@@ -233,42 +186,6 @@ export async function bootstrapPackageTarget(target: PackageBootstrapTarget): Pr
 
   return success;
 }
-
-export async function bootstrapPackages(syncEnv: SyncEnv): Promise<boolean> {
-  const hooks = buildSyncPlan(syncEnv).hooks.filter((hook) => hook.kind === "PackageBootstrap");
-  if (hooks.length === 0) {
-    return true;
-  }
-
-  let success = true;
-  for (const hook of hooks) {
-    if (!(await bootstrapPackageTarget(hook))) {
-      success = false;
-    }
-  }
-  return success;
-}
-
-export async function installInferredImportPackages(
-  dir: string,
-  timeoutMs: number,
-): Promise<boolean> {
-  return Effect.runPromise(installInferredImportPackagesImpl(dir, timeoutMs));
-}
-
-export const bootstrapPackagesEffect = (syncEnv: SyncEnv) =>
-  Effect.tryPromise({
-    try: () => bootstrapPackages(syncEnv),
-    catch: (error) => error as Error,
-  });
-
-export const bootstrapPackageTargetEffect = (target: PackageBootstrapTarget) =>
-  Effect.tryPromise({
-    try: () => bootstrapPackageTarget(target),
-    catch: (error) => error as Error,
-  });
-
-export { packageHasBuildScript, packageIsHealthy };
 
 function isNotFound(error: unknown): boolean {
   return (

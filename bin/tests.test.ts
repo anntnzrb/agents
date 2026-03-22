@@ -39,6 +39,8 @@ let main: any;
 let tryAcquireSyncLock: any;
 let startSyncWatchdog: any;
 let buildSyncPlan: any;
+let harnessSourceRoot: any;
+let harnessInstructionTarget: any;
 
 const runtime = await loadRuntime();
 if (!runtime) {
@@ -69,6 +71,8 @@ if (!runtime) {
     tryAcquireSyncLock,
     startSyncWatchdog,
     buildSyncPlan,
+    harnessSourceRoot,
+    harnessInstructionTarget,
   } = runtime);
 }
 
@@ -126,6 +130,16 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
     HarnessId: (harnessModule as Record<string, unknown>).HarnessId ??
       (harnessModule as Record<string, unknown>).harnessId,
     SyncEnv: (harnessModule as Record<string, unknown>).SyncEnv,
+    harnessSourceRoot: pickFn(
+      harnessModule as Record<string, unknown>,
+      "harnessSourceRoot",
+      "harness_source_root",
+    ),
+    harnessInstructionTarget: pickFn(
+      harnessModule as Record<string, unknown>,
+      "harnessInstructionTarget",
+      "harness_instruction_target",
+    ),
     runSync: pickFn(libModule as Record<string, unknown>, "runSync", "run_sync"),
     copyItem: pickFn(jobsModule as Record<string, unknown>, "copyItem", "copy_item"),
     copyDirInto: pickFn(jobsModule as Record<string, unknown>, "copyDirInto", "copy_dir_into"),
@@ -458,14 +472,14 @@ test("sync_env_harness_lookup_is_typed", async () => {
     const pi = syncEnv.harness(enumMember(HarnessId, "Pi"));
     assert.ok(pi);
     assert.equal(
-      pi!.sourceRoot(syncEnv.toolsHome),
+      harnessSourceRoot(pi!, syncEnv.toolsHome),
       join(root, ".config", "agents", "tools", "pi", "agent"),
     );
-    assert.equal(pi!.instructionTarget(), join(root, ".pi", "agent", "AGENTS.md"));
+    assert.equal(harnessInstructionTarget(pi!), join(root, ".pi", "agent", "AGENTS.md"));
 
     const claude = syncEnv.harness(enumMember(HarnessId, "Claude"));
     assert.ok(claude);
-    assert.equal(claude!.instructionTarget(), join(root, ".claude", "CLAUDE.md"));
+    assert.equal(harnessInstructionTarget(claude!), join(root, ".claude", "CLAUDE.md"));
   });
 });
 
