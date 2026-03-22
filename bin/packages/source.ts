@@ -4,8 +4,11 @@ import path from "node:path";
 
 import { Effect } from "effect";
 
-import { commandExists } from "../install.ts";
+import { rmEntry } from "../runtime/fs.ts";
+import { commandExists } from "../runtime/process.ts";
 import { runCommand } from "./process.ts";
+
+export { rmEntry } from "../runtime/fs.ts";
 
 export function packageCacheDir(cacheRoot: string, source: string): string {
   const slug = sourceSlug(source);
@@ -15,26 +18,6 @@ export function packageCacheDir(cacheRoot: string, source: string): string {
 export function stagingDirFor(finalDir: string): string {
   const now = BigInt(Date.now()) * 1000000n;
   return withExtension(finalDir, `staging-${process.pid}-${now}`);
-}
-
-export function rmEntry(target: string): void {
-  try {
-    const stat = fs.lstatSync(target);
-    if (stat.isSymbolicLink() || stat.isFile()) {
-      fs.unlinkSync(target);
-      return;
-    }
-    if (stat.isDirectory()) {
-      fs.rmSync(target, { recursive: true, force: false });
-      return;
-    }
-    fs.unlinkSync(target);
-  } catch (error) {
-    if (isNotFound(error)) {
-      return;
-    }
-    throw error;
-  }
 }
 
 export async function replaceDirAtomically(src: string, dst: string): Promise<void> {
@@ -194,13 +177,4 @@ function exists(target: string): boolean {
   } catch {
     return false;
   }
-}
-
-function isNotFound(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === "ENOENT"
-  );
 }

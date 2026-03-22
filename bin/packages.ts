@@ -3,6 +3,9 @@ import path from "node:path";
 
 import { Effect } from "effect";
 
+import { SyncEnv } from "./harness.ts";
+import { buildSyncPlan } from "./plan.ts";
+
 import {
   installInferredImportPackages as installInferredImportPackagesImpl,
   installPackageDeps,
@@ -24,86 +27,23 @@ import {
   validatePackageForTests as validatePackageForTestsImpl,
 } from "./packages/validate.ts";
 
-const PACKAGE_SOURCE_FILE = "packages.json";
-const PACKAGE_CACHE_SUBDIR = ".local/share/agents/pi-packages";
+export const PACKAGE_SOURCE_FILE = "packages.json";
+export const PACKAGE_SETTINGS_FILE = "settings.json";
+export const PACKAGE_CACHE_SUBDIR = ".local/share/agents/pi-packages";
 
 export interface PackageManifest {
   readonly packages: string[];
 }
 
-export interface HarnessLike {
-  readonly id?: unknown;
-  readonly sourceName?: string;
-  readonly source_name?: string;
-  readonly home?: string;
-  readonly runtimeSubdir?: string | null;
-  readonly runtime_subdir?: string | null;
-  sourceRoot?(toolsHome: string): string;
-  root?(): string;
-}
-
-export interface SyncEnvLike {
-  readonly home: string;
-  readonly toolsHome?: string;
-  readonly tools_home?: string;
-  readonly installTimeout?: number;
-  readonly installTimeoutMs?: number;
-  readonly install_timeout?: number;
-  readonly harnesses?: readonly HarnessLike[];
-  harness?(id: unknown): HarnessLike | undefined;
+export interface PackageBootstrapTarget {
+  readonly manifestPath: string;
+  readonly runtimeSettingsPath: string;
+  readonly cacheRoot: string;
+  readonly timeoutMs: number;
 }
 
 function err(message: string): void {
   console.error(`sync: ${message}`);
-}
-
-function getToolsHome(syncEnv: SyncEnvLike): string {
-  return syncEnv.toolsHome ?? syncEnv.tools_home ?? path.join(syncEnv.home, ".config", "agents", "tools");
-}
-
-function getHarnessSourceName(harness: HarnessLike, fallback = "pi"): string {
-  return harness.sourceName ?? harness.source_name ?? fallback;
-}
-
-function getHarnessRoot(harness: HarnessLike, fallbackHome: string): string {
-  if (typeof harness.root === "function") {
-    return harness.root();
-  }
-
-  const home = harness.home ?? fallbackHome;
-  const runtimeSubdir = harness.runtimeSubdir ?? harness.runtime_subdir;
-  return runtimeSubdir ? path.join(home, runtimeSubdir) : home;
-}
-
-function getHarnessSourceRoot(harness: HarnessLike, toolsHome: string, sourceName: string): string {
-  if (typeof harness.sourceRoot === "function") {
-    return harness.sourceRoot(toolsHome);
-  }
-
-  const runtimeSubdir = harness.runtimeSubdir ?? harness.runtime_subdir;
-  const base = path.join(toolsHome, sourceName);
-  return runtimeSubdir ? path.join(base, runtimeSubdir) : base;
-}
-
-function getPiHarness(syncEnv: SyncEnvLike): HarnessLike | undefined {
-  if (typeof syncEnv.harness === "function") {
-    const candidates = [syncEnv.harness("Pi"), syncEnv.harness("pi"), syncEnv.harness("PI")];
-    for (const candidate of candidates) {
-      if (candidate) {
-        return candidate;
-      }
-    }
-  }
-
-  for (const harness of syncEnv.harnesses ?? []) {
-    if (getHarnessSourceName(harness, "") === "pi") {
-      return harness;
-    }
-    if (String(harness.id ?? "").toLowerCase() === "pi") {
-      return harness;
-    }
-  }
-  return undefined;
 }
 
 export function packageCacheDir(cacheRoot: string, source: string): string {
@@ -203,7 +143,7 @@ export function patchRuntimeSettings(filePath: string, packagePaths: readonly st
 
   (value as Record<string, unknown>).packages = packagePaths.map((packagePath) => packagePath.toString());
 
-  const parent = path.dirname(filePath);
+  const parent = filePath.split("/").slice(0, -1).join("/");
   if (parent.length > 0) {
     fs.mkdirSync(parent, { recursive: true });
   }
@@ -258,20 +198,10 @@ async function ensurePackage(source: string, cacheRoot: string, timeoutMs: numbe
   }
 }
 
-export async function bootstrapPackages(syncEnv: SyncEnvLike): Promise<boolean> {
-  const toolsHome = getToolsHome(syncEnv);
-  const piHarness = getPiHarness(syncEnv);
-  const manifestPath = piHarness
-    ? path.join(getHarnessSourceRoot(piHarness, toolsHome, "pi"), PACKAGE_SOURCE_FILE)
-    : path.join(toolsHome, "pi", "agent", PACKAGE_SOURCE_FILE);
-  const runtimeSettingsPath = piHarness
-    ? path.join(getHarnessRoot(piHarness, path.join(syncEnv.home, ".pi", "agent")), "settings.json")
-    : path.join(syncEnv.home, ".pi", "agent", "settings.json");
-  const cacheRoot = path.join(syncEnv.home, PACKAGE_CACHE_SUBDIR);
-
+export async function bootstrapPackageTarget(target: PackageBootstrapTarget): Promise<boolean> {
   let manifest: PackageManifest;
   try {
-    manifest = readPackageManifest(manifestPath);
+    manifest = readPackageManifest(target.manifestPath);
   } catch (error) {
     err(`package bootstrap failed: ${String(error instanceof Error ? error.message : error)}`);
     return false;
@@ -284,8 +214,8 @@ export async function bootstrapPackages(syncEnv: SyncEnvLike): Promise<boolean> 
       installedPaths.push(
         await ensurePackage(
           source,
-          cacheRoot,
-          syncEnv.installTimeoutMs ?? syncEnv.installTimeout ?? syncEnv.install_timeout ?? 120_000,
+          target.cacheRoot,
+          target.timeoutMs,
         ),
       );
     } catch (error) {
@@ -295,12 +225,27 @@ export async function bootstrapPackages(syncEnv: SyncEnvLike): Promise<boolean> 
   }
 
   try {
-    patchRuntimeSettings(runtimeSettingsPath, installedPaths);
+    patchRuntimeSettings(target.runtimeSettingsPath, installedPaths);
   } catch (error) {
     err(`package settings patch failed: ${String(error instanceof Error ? error.message : error)}`);
     success = false;
   }
 
+  return success;
+}
+
+export async function bootstrapPackages(syncEnv: SyncEnv): Promise<boolean> {
+  const hooks = buildSyncPlan(syncEnv).hooks.filter((hook) => hook.kind === "PackageBootstrap");
+  if (hooks.length === 0) {
+    return true;
+  }
+
+  let success = true;
+  for (const hook of hooks) {
+    if (!(await bootstrapPackageTarget(hook))) {
+      success = false;
+    }
+  }
   return success;
 }
 
@@ -311,9 +256,15 @@ export async function installInferredImportPackages(
   return Effect.runPromise(installInferredImportPackagesImpl(dir, timeoutMs));
 }
 
-export const bootstrapPackagesEffect = (syncEnv: SyncEnvLike) =>
+export const bootstrapPackagesEffect = (syncEnv: SyncEnv) =>
   Effect.tryPromise({
     try: () => bootstrapPackages(syncEnv),
+    catch: (error) => error as Error,
+  });
+
+export const bootstrapPackageTargetEffect = (target: PackageBootstrapTarget) =>
+  Effect.tryPromise({
+    try: () => bootstrapPackageTarget(target),
     catch: (error) => error as Error,
   });
 

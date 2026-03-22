@@ -4,10 +4,35 @@ export const SOURCE_AGENT_FILE = "AGENTS.md";
 const CLAUDE_AGENT_FILE = "CLAUDE.md";
 const INSTALL_TIMEOUT_SECONDS = 120;
 export const MANAGED_STATE_SUBDIR = ".local/share/agents/sync-managed";
+const DEFAULT_PACKAGE_CACHE_SUBDIR = ".local/share/agents/pi-packages";
 
 export type AssetRename = readonly [string, string];
 
 const PI_COMPAT_MANAGED_ENTRIES = ["legacy"] as const;
+
+export type HarnessHookSpec =
+  | {
+      readonly kind: "PackageBootstrap";
+      readonly manifestFile?: string;
+      readonly settingsFile?: string;
+      readonly cacheSubdir?: string;
+    }
+  | {
+      readonly kind: "ExtensionDeps";
+      readonly rootDir: string;
+    };
+
+export type HarnessHook =
+  | {
+      readonly kind: "PackageBootstrap";
+      readonly manifestFile: string;
+      readonly settingsFile: string;
+      readonly cacheSubdir: string;
+    }
+  | {
+      readonly kind: "ExtensionDeps";
+      readonly rootDir: string;
+    };
 
 export enum HarnessId {
   Claude = "Claude",
@@ -15,6 +40,17 @@ export enum HarnessId {
   Opencode = "Opencode",
   Pi = "Pi",
   Omp = "Omp",
+}
+
+export interface HarnessSpec {
+  readonly id: HarnessId;
+  readonly sourceName: string;
+  readonly home: string;
+  readonly instructionFile?: string;
+  readonly assetRenames?: readonly AssetRename[];
+  readonly runtimeSubdir?: string;
+  readonly compatManagedEntries?: readonly string[];
+  readonly hooks?: readonly HarnessHookSpec[];
 }
 
 export class Harness {
@@ -25,59 +61,17 @@ export class Harness {
   readonly assetRenames: readonly AssetRename[];
   readonly runtimeSubdir: string | undefined;
   readonly compatManagedEntries: readonly string[];
+  readonly hooks: readonly HarnessHook[];
 
-  constructor(
-    id: HarnessId,
-    sourceName: string,
-    home: string,
-    instructionFile = SOURCE_AGENT_FILE,
-    assetRenames: readonly AssetRename[] = [],
-    runtimeSubdir?: string,
-    compatManagedEntries: readonly string[] = []
-  ) {
-    this.id = id;
-    this.sourceName = sourceName;
-    this.home = home;
-    this.instructionFile = instructionFile;
-    this.assetRenames = assetRenames;
-    this.runtimeSubdir = runtimeSubdir;
-    this.compatManagedEntries = compatManagedEntries;
-  }
-
-  withInstructionFile(instructionFile: string): Harness {
-    return new Harness(
-      this.id,
-      this.sourceName,
-      this.home,
-      instructionFile,
-      this.assetRenames,
-      this.runtimeSubdir,
-      this.compatManagedEntries
-    );
-  }
-
-  withRuntimeSubdir(runtimeSubdir: string): Harness {
-    return new Harness(
-      this.id,
-      this.sourceName,
-      this.home,
-      this.instructionFile,
-      this.assetRenames,
-      runtimeSubdir,
-      this.compatManagedEntries
-    );
-  }
-
-  withCompatManagedEntries(compatManagedEntries: readonly string[]): Harness {
-    return new Harness(
-      this.id,
-      this.sourceName,
-      this.home,
-      this.instructionFile,
-      this.assetRenames,
-      this.runtimeSubdir,
-      compatManagedEntries
-    );
+  constructor(spec: HarnessSpec) {
+    this.id = spec.id;
+    this.sourceName = spec.sourceName;
+    this.home = spec.home;
+    this.instructionFile = spec.instructionFile ?? SOURCE_AGENT_FILE;
+    this.assetRenames = spec.assetRenames ?? [];
+    this.runtimeSubdir = spec.runtimeSubdir;
+    this.compatManagedEntries = spec.compatManagedEntries ?? [];
+    this.hooks = normalizeHooks(spec.hooks ?? []);
   }
 
   root(): string {
@@ -145,6 +139,49 @@ export class SyncEnv {
 
   static fromHome(home: string, installTimeoutMs: number): SyncEnv {
     const agentsHome = path.join(home, ".config", "agents");
+    const harnessSpecs: HarnessSpec[] = [
+      {
+        id: HarnessId.Claude,
+        sourceName: "claude",
+        home: path.join(home, ".claude"),
+        instructionFile: CLAUDE_AGENT_FILE,
+      },
+      {
+        id: HarnessId.Codex,
+        sourceName: "codex",
+        home: path.join(home, ".codex"),
+      },
+      {
+        id: HarnessId.Opencode,
+        sourceName: "opencode",
+        home: path.join(home, ".config", "opencode"),
+      },
+      {
+        id: HarnessId.Pi,
+        sourceName: "pi",
+        home: path.join(home, ".pi"),
+        runtimeSubdir: "agent",
+        compatManagedEntries: PI_COMPAT_MANAGED_ENTRIES,
+        hooks: [
+          {
+            kind: "PackageBootstrap",
+            manifestFile: "packages.json",
+            settingsFile: "settings.json",
+            cacheSubdir: DEFAULT_PACKAGE_CACHE_SUBDIR,
+          },
+          {
+            kind: "ExtensionDeps",
+            rootDir: "extensions",
+          },
+        ],
+      },
+      {
+        id: HarnessId.Omp,
+        sourceName: "omp",
+        home: path.join(home, ".omp"),
+        runtimeSubdir: "agent",
+      },
+    ];
     return new SyncEnv(
       home,
       path.join(agentsHome, "assets"),
@@ -152,21 +189,30 @@ export class SyncEnv {
       path.join(home, ".mcporter"),
       path.join(home, MANAGED_STATE_SUBDIR),
       installTimeoutMs,
-      [
-        new Harness(HarnessId.Claude, "claude", path.join(home, ".claude")).withInstructionFile(
-          CLAUDE_AGENT_FILE
-        ),
-        new Harness(HarnessId.Codex, "codex", path.join(home, ".codex")),
-        new Harness(HarnessId.Opencode, "opencode", path.join(home, ".config", "opencode")),
-        new Harness(HarnessId.Pi, "pi", path.join(home, ".pi"))
-          .withRuntimeSubdir("agent")
-          .withCompatManagedEntries(PI_COMPAT_MANAGED_ENTRIES),
-        new Harness(HarnessId.Omp, "omp", path.join(home, ".omp")).withRuntimeSubdir("agent"),
-      ]
+      harnessSpecs.map((spec) => new Harness(spec))
     );
   }
 
   harness(id: HarnessId): Harness | undefined {
     return this.harnesses.find((harness) => harness.id === id);
   }
+}
+
+function normalizeHooks(hooks: readonly HarnessHookSpec[]): HarnessHook[] {
+  return hooks.map((hook) => {
+    switch (hook.kind) {
+      case "PackageBootstrap":
+        return {
+          kind: hook.kind,
+          manifestFile: hook.manifestFile ?? "packages.json",
+          settingsFile: hook.settingsFile ?? "settings.json",
+          cacheSubdir: hook.cacheSubdir ?? DEFAULT_PACKAGE_CACHE_SUBDIR,
+        };
+      case "ExtensionDeps":
+        return {
+          kind: hook.kind,
+          rootDir: hook.rootDir,
+        };
+    }
+  });
 }

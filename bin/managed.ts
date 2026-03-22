@@ -1,7 +1,8 @@
 import fs from "node:fs";
-import { dirname, join, posix } from "node:path";
+import { dirname, join } from "node:path";
 
-import { Harness, SyncEnv } from "./harness.ts";
+import { SyncEnv } from "./harness.ts";
+import { buildSyncPlan, isSafeManagedEntryName, type SyncPlan } from "./plan.ts";
 import { err, panicMessage, rmEntry, warn } from "./lib.ts";
 
 export interface ManagedSyncPlan {
@@ -15,8 +16,24 @@ export interface ManagedHarnessPlan {
 }
 
 export function planManagedEntries(syncEnv: SyncEnv): ManagedSyncPlan {
+  return planManagedEntriesForSyncPlan(buildSyncPlan(syncEnv));
+}
+
+export function planManagedEntriesForSyncPlan(syncPlan: SyncPlan): ManagedSyncPlan {
   return {
-    harnesses: syncEnv.harnesses.map((harness) => planHarness(syncEnv, harness)),
+    harnesses: syncPlan.harnesses.map((harnessPlan) => {
+      const cleanupEntryNames = uniqueSorted([
+        ...harnessPlan.cleanupEntryNames,
+        ...loadRecordedEntryNames(harnessPlan.statePath),
+      ]);
+      return {
+        statePath: harnessPlan.statePath,
+        cleanupPaths: cleanupEntryNames
+          .map((entry) => cleanupPath(harnessPlan.root, entry))
+          .filter((entry): entry is string => entry !== null),
+        currentEntryNames: [...harnessPlan.currentEntryNames],
+      };
+    }),
   };
 }
 
@@ -48,13 +65,7 @@ export function recordManagedEntries(plan: ManagedSyncPlan): boolean {
   return success;
 }
 
-export function assetDirNames(path: string): string[] {
-  return dirEntryNames(path, true);
-}
-
-export function topLevelEntryNames(path: string): string[] {
-  return dirEntryNames(path, false);
-}
+export { assetDirNames, topLevelEntryNames } from "./plan.ts";
 
 export function loadRecordedEntryNames(path: string): string[] {
   let content: string;
@@ -86,9 +97,8 @@ export function loadRecordedEntryNames(path: string): string[] {
 
   const safeNames = new Set<string>();
   for (const entryName of parsed) {
-    const safeName = safeTopLevelEntryName(entryName);
-    if (safeName) {
-      safeNames.add(safeName);
+    if (isSafeManagedEntryName(entryName)) {
+      safeNames.add(entryName);
     } else {
       warn(`ignoring unsafe managed entry ${JSON.stringify(entryName)} in ${path}`);
     }
@@ -147,83 +157,9 @@ export function writeRecordedEntryNames(path: string, entryNames: string[]): voi
   }
 }
 
-function dirEntryNames(path: string, dirsOnly: boolean): string[] {
-  if (!isDirectory(path)) {
-    return [];
-  }
-
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(path, { withFileTypes: true });
-  } catch (error) {
-    throw new Error(`read ${path} (${panicMessage(error)})`);
-  }
-  const names: string[] = [];
-  for (const entry of entries) {
-    if (dirsOnly && !entry.isDirectory()) {
-      continue;
-    }
-    names.push(entry.name);
-  }
-  names.sort();
-  return names;
-}
-
-function planHarness(syncEnv: SyncEnv, harness: Harness): ManagedHarnessPlan {
-  const currentEntryNames = currentManagedEntryNames(syncEnv, harness);
-  const statePath = harness.managedStatePath(syncEnv.managedStateHome);
-  const cleanupEntryNames = new Set<string>();
-  for (const name of currentEntryNames) {
-    cleanupEntryNames.add(name);
-  }
-  for (const name of harness.compatManagedEntries) {
-    cleanupEntryNames.add(name);
-  }
-  for (const name of loadRecordedEntryNames(statePath)) {
-    cleanupEntryNames.add(name);
-  }
-
-  const harnessRoot = harness.root();
-  return {
-    statePath,
-    cleanupPaths: [...cleanupEntryNames]
-      .map((entry) => cleanupPath(harnessRoot, entry))
-      .filter((entry): entry is string => entry !== null),
-    currentEntryNames,
-  };
-}
-
-function currentManagedEntryNames(syncEnv: SyncEnv, harness: Harness): string[] {
-  const names = new Set<string>();
-  names.add(harness.instructionFileName());
-  for (const entryName of topLevelEntryNames(harness.sourceRoot(syncEnv.toolsHome))) {
-    names.add(entryName);
-  }
-  for (const assetName of assetDirNames(syncEnv.assetsHome)) {
-    names.add(harness.renameAsset(assetName));
-  }
-  return [...names].sort();
-}
-
 function cleanupPath(root: string, entryName: string): string | null {
-  const safeName = safeTopLevelEntryName(entryName);
+  const safeName = isSafeManagedEntryName(entryName) ? entryName : null;
   return safeName ? join(root, safeName) : null;
-}
-
-function safeTopLevelEntryName(entryName: string): string | null {
-  if (entryName.length === 0) {
-    return null;
-  }
-  if (posix.isAbsolute(entryName)) {
-    return null;
-  }
-  if (entryName.includes("/")) {
-    return null;
-  }
-  if (entryName === "." || entryName === "..") {
-    return null;
-  }
-  return entryName;
 }
 
 function createTempStateFile(path: string): { tempPath: string; fd: number } {
@@ -244,18 +180,14 @@ function createTempStateFile(path: string): { tempPath: string; fd: number } {
   throw new Error(`create temporary managed state near ${path} (name collision)`);
 }
 
-function isDirectory(path: string): boolean {
-  try {
-    return fs.statSync(path).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
 function isNotFound(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT";
 }
 
 function isAlreadyExists(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "EEXIST";
+}
+
+function uniqueSorted(names: readonly string[]): string[] {
+  return [...new Set(names)].sort();
 }

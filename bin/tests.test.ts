@@ -38,6 +38,7 @@ let inferredInstallStep: any;
 let main: any;
 let tryAcquireSyncLock: any;
 let startSyncWatchdog: any;
+let buildSyncPlan: any;
 
 const runtime = await loadRuntime();
 if (!runtime) {
@@ -67,6 +68,7 @@ if (!runtime) {
     main,
     tryAcquireSyncLock,
     startSyncWatchdog,
+    buildSyncPlan,
   } = runtime);
 }
 
@@ -106,6 +108,7 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
     installModule,
     jobsModule,
     managedModule,
+    planModule,
     packagesModule,
     packagesProcessModule,
   ] = await Promise.all([
@@ -114,6 +117,7 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
     import("./install.ts"),
     import("./jobs.ts"),
     import("./managed.ts"),
+    import("./plan.ts"),
     import("./packages.ts"),
     import("./packages/process.ts"),
   ]);
@@ -195,6 +199,11 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
       packagesProcessModule as Record<string, unknown>,
       "inferredInstallStep",
       "inferred_install_step",
+    ),
+    buildSyncPlan: pickFn(
+      planModule as Record<string, unknown>,
+      "buildSyncPlan",
+      "build_sync_plan",
     ),
     main: pickFn(libModule as Record<string, unknown>, "main"),
     tryAcquireSyncLock: pickFn(
@@ -457,6 +466,38 @@ test("sync_env_harness_lookup_is_typed", async () => {
     const claude = syncEnv.harness(enumMember(HarnessId, "Claude"));
     assert.ok(claude);
     assert.equal(claude!.instructionTarget(), join(root, ".claude", "CLAUDE.md"));
+  });
+});
+
+test("sync_plan_resolves_hook_targets_from_harness_specs", async () => {
+  await withTempDir(async (root) => {
+    const syncEnv = makeSyncEnv(root);
+    const syncPlan = await call<{
+      hooks: Array<Record<string, unknown>>;
+    }>(buildSyncPlan, syncEnv);
+
+    const packageHook = syncPlan.hooks.find((hook) => hook.kind === "PackageBootstrap");
+    const extensionHook = syncPlan.hooks.find((hook) => hook.kind === "ExtensionDeps");
+
+    assert.ok(packageHook);
+    assert.equal(
+      packageHook!.manifestPath,
+      join(root, ".config", "agents", "tools", "pi", "agent", "packages.json"),
+    );
+    assert.equal(
+      packageHook!.runtimeSettingsPath,
+      join(root, ".pi", "agent", "settings.json"),
+    );
+    assert.equal(
+      packageHook!.cacheRoot,
+      join(root, ".local", "share", "agents", "pi-packages"),
+    );
+
+    assert.ok(extensionHook);
+    assert.equal(
+      extensionHook!.root,
+      join(root, ".pi", "agent", "extensions"),
+    );
   });
 });
 

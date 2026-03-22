@@ -1,17 +1,13 @@
 import fs from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 
-import { SOURCE_AGENT_FILE, SyncEnv } from "./harness.ts";
-import { assetDirNames } from "./managed.ts";
-import { copyTree, err, isSymlink, panicMessage, rmEntry } from "./lib.ts";
+import { SyncEnv } from "./harness.ts";
+import { err, panicMessage } from "./lib.ts";
+import { buildSyncPlan, type Job } from "./plan.ts";
+import { copyTree, isSymlink, rmEntry } from "./runtime/fs.ts";
 
-export type JobKind = "File" | "Dir";
-
-export interface Job {
-  src: string;
-  dst: string;
-  kind: JobKind;
-}
+export type { JobKind } from "./plan.ts";
+export type { Job } from "./plan.ts";
 
 export function copyItem(src: string, dst: string): boolean {
   try {
@@ -53,12 +49,7 @@ export function copyDirInto(srcDir: string, dstDir: string): boolean {
 }
 
 export function iterJobs(syncEnv: SyncEnv): Job[] {
-  const jobs: Job[] = [];
-  jobs.push(...harnessDirs(syncEnv));
-  jobs.push(...assetCopies(syncEnv));
-  jobs.push(...agentFiles(syncEnv));
-  jobs.push(...configFiles(syncEnv));
-  return jobs;
+  return [...buildSyncPlan(syncEnv).jobs];
 }
 
 export function runJobs(jobs: readonly Job[]): boolean {
@@ -74,47 +65,6 @@ function runJob(job: Job): boolean {
     err(`unexpected error in ${job.kind === "Dir" ? "copy_dir_into" : "copy_item"}: ${panicMessage(error)}`);
     return false;
   }
-}
-
-function harnessDirs(syncEnv: SyncEnv): Job[] {
-  return syncEnv.harnesses.map((harness) => ({
-    src: harness.sourceRoot(syncEnv.toolsHome),
-    dst: harness.root(),
-    kind: "Dir",
-  }));
-}
-
-function assetCopies(syncEnv: SyncEnv): Job[] {
-  const jobs: Job[] = [];
-  for (const assetName of assetDirNames(syncEnv.assetsHome)) {
-    const assetPath = join(syncEnv.assetsHome, assetName);
-    for (const harness of syncEnv.harnesses) {
-      jobs.push({
-        src: assetPath,
-        dst: join(harness.root(), harness.renameAsset(assetName)),
-        kind: "Dir",
-      });
-    }
-  }
-  return jobs;
-}
-
-function agentFiles(syncEnv: SyncEnv): Job[] {
-  return syncEnv.harnesses.map((harness) => ({
-    src: join(syncEnv.assetsHome, SOURCE_AGENT_FILE),
-    dst: harness.instructionTarget(),
-    kind: "File",
-  }));
-}
-
-function configFiles(syncEnv: SyncEnv): Job[] {
-  return [
-    {
-      src: join(syncEnv.assetsHome, "mcporter.jsonc"),
-      dst: join(syncEnv.mcporterHome, "mcporter.json"),
-      kind: "File",
-    },
-  ];
 }
 
 function isDirectoryLike(path: string): boolean {
