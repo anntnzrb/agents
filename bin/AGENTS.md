@@ -4,6 +4,7 @@ This holds automation scripts used to manage and sync these AI Agent configs. Ke
 
 ## Full gate
 
+- `./bin/sync`
 - `bun run typecheck`
 - `bun test`
 - `bun run test:integration`
