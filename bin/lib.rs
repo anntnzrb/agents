@@ -46,8 +46,12 @@ redundant_explicit_links = "deny"
 
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::Duration;
 
+use fs2::FileExt;
 mod harness;
 mod install;
 mod jobs;
@@ -62,6 +66,10 @@ use install::{iter_extension_packages, run_install};
 use jobs::{copy_dir_into, copy_item};
 use jobs::{iter_jobs, run_jobs};
 use managed::{clean_managed_entries, plan_managed_entries, record_managed_entries};
+
+const SYNC_TIMEOUT_ENV: &str = "AGENTS_SYNC_TIMEOUT_SECONDS";
+const DEFAULT_SYNC_TIMEOUT_SECONDS: u64 = 15 * 60;
+const SYNC_LOCK_FILE: &str = "sync.lock";
 
 fn err(message: &str) {
     eprintln!("sync: {message}");
@@ -134,6 +142,68 @@ fn copy_tree(src: &Path, dst: &Path) -> io::Result<()> {
     Ok(())
 }
 
+#[derive(Debug)]
+struct SyncLock {
+    _file: fs::File,
+}
+
+fn parse_timeout_seconds(value: Option<&str>, default_seconds: u64) -> Duration {
+    value
+        .and_then(|raw| raw.parse::<u64>().ok())
+        .filter(|seconds| *seconds > 0)
+        .map(Duration::from_secs)
+        .unwrap_or_else(|| Duration::from_secs(default_seconds))
+}
+
+fn sync_timeout() -> Duration {
+    parse_timeout_seconds(
+        std::env::var(SYNC_TIMEOUT_ENV).ok().as_deref(),
+        DEFAULT_SYNC_TIMEOUT_SECONDS,
+    )
+}
+
+fn sync_lock_path(sync_env: &SyncEnv) -> PathBuf {
+    sync_env.managed_state_home.join(SYNC_LOCK_FILE)
+}
+
+fn try_acquire_sync_lock(sync_env: &SyncEnv) -> Result<Option<SyncLock>, String> {
+    fs::create_dir_all(&sync_env.managed_state_home).map_err(|error| {
+        format!(
+            "create sync state dir {} ({error})",
+            sync_env.managed_state_home.display()
+        )
+    })?;
+
+    let lock_path = sync_lock_path(sync_env);
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .truncate(false)
+        .open(&lock_path)
+        .map_err(|error| format!("open sync lock {} ({error})", lock_path.display()))?;
+
+    match file.try_lock_exclusive() {
+        Ok(()) => {
+            file.set_len(0)
+                .map_err(|error| format!("clear sync lock {} ({error})", lock_path.display()))?;
+            writeln!(file, "pid={}", std::process::id())
+                .map_err(|error| format!("write sync lock {} ({error})", lock_path.display()))?;
+            Ok(Some(SyncLock { _file: file }))
+        }
+        Err(error) if error.kind() == io::ErrorKind::WouldBlock => Ok(None),
+        Err(error) => Err(format!("lock sync {} ({error})", lock_path.display())),
+    }
+}
+
+fn start_sync_watchdog(timeout: Duration) {
+    let _ = thread::spawn(move || {
+        thread::sleep(timeout);
+        err(&format!("timed out after {}s", timeout.as_secs()));
+        std::process::exit(124);
+    });
+}
+
 fn run_sync(sync_env: &SyncEnv) -> bool {
     let managed_plan = match plan_managed_entries(sync_env) {
         Ok(plan) => plan,
@@ -189,6 +259,19 @@ pub(crate) fn main() -> std::process::ExitCode {
         }
     };
 
+    let _lock = match try_acquire_sync_lock(&sync_env) {
+        Ok(Some(lock)) => lock,
+        Ok(None) => {
+            err("another sync is already running; skipping");
+            return std::process::ExitCode::from(0);
+        }
+        Err(message) => {
+            err(&message);
+            return std::process::ExitCode::from(1);
+        }
+    };
+
+    start_sync_watchdog(sync_timeout());
     std::process::ExitCode::from(if run_sync(&sync_env) { 0 } else { 1 })
 }
 

@@ -113,6 +113,17 @@ fn run_install_handles_success_failure_and_timeout() {
 }
 
 #[test]
+fn parse_timeout_seconds_uses_default_for_invalid_values() {
+    assert_eq!(parse_timeout_seconds(None, 7), Duration::from_secs(7));
+    assert_eq!(parse_timeout_seconds(Some("0"), 7), Duration::from_secs(7));
+    assert_eq!(
+        parse_timeout_seconds(Some("nope"), 7),
+        Duration::from_secs(7)
+    );
+    assert_eq!(parse_timeout_seconds(Some("9"), 7), Duration::from_secs(9));
+}
+
+#[test]
 fn sync_env_harness_lookup_is_typed() {
     let temp = TempDir::new().expect("tempdir");
     let sync_env = SyncEnv::from_home(temp.path().to_path_buf(), Duration::from_secs(1));
