@@ -1,0 +1,60 @@
+{
+  "skill_name": "effect",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm migrating a small TypeScript service to Effect and need a compact example of how `Effect.gen` and `Effect.tryPromise` should work together for a fetch wrapper with typed errors. Keep it on core `effect` only.",
+      "expected_output": "Uses the effect skill, fetches core `effect` docs, and answers with guidance rooted in the core package only.",
+      "files": [],
+      "expectations": [
+        "The workflow selects only the `effect` library for documentation lookup",
+        "The answer keeps core `effect` guidance separate from ecosystem packages",
+        "The answer does not invent unsupported APIs or packages"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I have a repo using `@effect/platform` and `@effect/sql`. I need to know which package should own HTTP server/runtime wiring versus database layer abstractions. Point me at the right package docs first.",
+      "expected_output": "Uses the effect skill, selects the relevant ecosystem packages, and keeps package ownership explicit.",
+      "files": [],
+      "expectations": [
+        "The workflow includes `@effect/platform` and/or `@effect/sql` in the selected library list",
+        "The answer keeps package names explicit instead of merging responsibilities",
+        "The workflow does not fetch the entire supported catalog when two libraries are enough"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I'm using `@effect/opentelemetry` and want an API walkthrough. If the MCP doesn't cover it, don't bluff; tell me what fallback source to use.",
+      "expected_output": "Recognizes unsupported coverage and falls back cleanly instead of hallucinating docs.",
+      "files": [],
+      "expectations": [
+        "The answer states the package is outside the current supported library list or upstream coverage",
+        "The answer falls back to `context7`, `gh`, or `research`",
+        "The answer avoids hallucinated `@effect/opentelemetry` APIs"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "My app runs on Node and depends on `effect ^3.21.0` plus `@effect/platform-node ^0.106.0`. I need help wiring the runtime and filesystem layer. If MCP doesn't directly cover `@effect/platform-node`, handle that safely.",
+      "expected_output": "Recognizes `@effect/platform-node` as unsupported by the MCP, avoids passing it to MCP, and falls back without hallucinating direct package docs.",
+      "files": [],
+      "expectations": [
+        "The answer states that `@effect/platform-node` is not in the supported MCP library list",
+        "The workflow does not pass `@effect/platform-node` to `effect.effect-doc-links` or `effect.effect-documentation`",
+        "The answer uses fallback sources or clearly labeled adjacent context instead of claiming direct `@effect/platform-node` docs from MCP"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "This repo pins `effect 4.0.0-beta.35` and `@effect/platform-node 4.0.0-beta.35`. I want guidance for the current APIs, but I also need you to call out whether this is safe for production default use.",
+      "expected_output": "Recognizes an explicit v4 beta repo, allows beta-targeted guidance, and clearly labels the channel and production caveat.",
+      "files": [],
+      "expectations": [
+        "The answer identifies the repo as targeting Effect v4 beta rather than stable v3",
+        "The answer explicitly calls the v4 surface beta or opt-in",
+        "The answer does not silently rewrite the request into stable-channel v3 guidance"
+      ]
+    }
+  ]
+}
