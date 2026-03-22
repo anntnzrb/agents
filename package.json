@@ -3,10 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "sync": "bun run ./bin/sync.ts",
+    "sync": "bun run ./sync/src/cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "test:integration": "bun test ./bin/integration.test.ts"
+    "test:integration": "bun test ./sync/test/integration.test.ts"
   },
   "dependencies": {
     "effect": "^3.21.0"

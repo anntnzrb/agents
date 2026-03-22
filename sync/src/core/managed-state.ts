@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 
 import { SyncEnv } from "./harness.ts";
 import { buildSyncPlan, isSafeManagedEntryName, type SyncPlan } from "./plan.ts";
-import { err, panicMessage, rmEntry, warn } from "./lib.ts";
+import { err, panicMessage, rmEntry, warn } from "./index.ts";
 
 export interface ManagedSyncPlan {
   harnesses: ManagedHarnessPlan[];

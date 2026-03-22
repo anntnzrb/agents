@@ -9,28 +9,28 @@ import {
   recordExtensionHookState,
   type PreparedExtensionHookState,
 } from "./hook-state.ts";
-import { installExtensionDeps } from "./install.ts";
+import { installExtensionDeps } from "../extensions/install.ts";
 import { runJobsWithPreserve } from "./jobs.ts";
 import {
   cleanManagedEntries,
   planManagedEntriesForSyncPlan,
   recordManagedEntries,
-} from "./managed.ts";
-import { bootstrapPackageTarget } from "./packages.ts";
+} from "./managed-state.ts";
+import { bootstrapPackageTarget } from "../packages/index.ts";
 import { buildSyncPlan, type SyncHookPlan } from "./plan.ts";
-export { copyTree, isSymlink, rmEntry } from "./runtime/fs.ts";
-import { panicMessage } from "./runtime/errors.ts";
+export { copyTree, isSymlink, rmEntry } from "../runtime/fs.ts";
+import { panicMessage } from "../runtime/errors.ts";
 import {
   releaseSyncLock as releaseSyncLockImpl,
   type SyncLock,
   tryAcquireSyncLock as tryAcquireSyncLockImpl,
-} from "./runtime/lock.ts";
+} from "../runtime/lock.ts";
 
 const SYNC_TIMEOUT_ENV = "AGENTS_SYNC_TIMEOUT_SECONDS";
 const DEFAULT_SYNC_TIMEOUT_SECONDS = 15 * 60;
 const SYNC_LOCK_FILE = "sync.lock";
 
-export type { SyncLock } from "./runtime/lock.ts";
+export type { SyncLock } from "../runtime/lock.ts";
 
 export function err(message: string): void {
   console.error(`sync: ${message}`);
@@ -39,7 +39,7 @@ export function err(message: string): void {
 export function warn(message: string): void {
   console.error(`sync: warning: ${message}`);
 }
-export { panicMessage } from "./runtime/errors.ts";
+export { panicMessage } from "../runtime/errors.ts";
 
 export function parseTimeoutSeconds(value: string | undefined, defaultSeconds: number): number {
   const parsed = value ? Number.parseInt(value, 10) : Number.NaN;

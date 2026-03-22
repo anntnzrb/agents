@@ -2,9 +2,15 @@ import fs from "node:fs";
 import { dirname } from "node:path";
 
 import { SyncEnv } from "./harness.ts";
-import { err, panicMessage } from "./lib.ts";
+import { err, panicMessage } from "./index.ts";
 import { buildSyncPlan, type Job } from "./plan.ts";
-import { copyTree, isSymlink, rmEntry, syncManagedChildren, syncManagedTree } from "./runtime/fs.ts";
+import {
+  copyTree,
+  isSymlink,
+  rmEntry,
+  syncManagedChildren,
+  syncManagedTree,
+} from "../runtime/fs.ts";
 
 export type { JobKind } from "./plan.ts";
 export type { Job } from "./plan.ts";

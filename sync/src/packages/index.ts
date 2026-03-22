@@ -3,11 +3,21 @@ import path from "node:path";
 
 import { Effect } from "effect";
 
-import { installInferredImportPackages as installInferredImportPackagesImpl, installPackageDeps, runPackageBuild } from "./packages/process.ts";
-import { clonePackage, packageCacheDir, replaceDirAtomically, rmEntry, stagingDirFor } from "./packages/source.ts";
-import { packageHasBuildScript, packageIsHealthy } from "./packages/validate.ts";
-export { cloneAttemptsForTests, commandForTests, githubSlugForTests, packageCacheDir } from "./packages/source.ts";
-export { packageHasBuildScript, packageIsHealthy, validatePackageForTests } from "./packages/validate.ts";
+import {
+  installInferredImportPackages as installInferredImportPackagesImpl,
+  installPackageDeps,
+  runPackageBuild,
+} from "./process.ts";
+import {
+  clonePackage,
+  packageCacheDir,
+  replaceDirAtomically,
+  rmEntry,
+  stagingDirFor,
+} from "./source.ts";
+import { packageHasBuildScript, packageIsHealthy } from "./validate.ts";
+export { cloneAttemptsForTests, commandForTests, githubSlugForTests, packageCacheDir } from "./source.ts";
+export { packageHasBuildScript, packageIsHealthy, validatePackageForTests } from "./validate.ts";
 
 export interface PackageManifest {
   readonly packages: string[];

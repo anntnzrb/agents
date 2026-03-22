@@ -14,8 +14,8 @@ import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { setDefaultTimeout, test } from "bun:test";
 
-const TS_SYNC = resolve("/Users/annt/.config/agents/bin/sync.ts");
 const REPO_ROOT = resolve("/Users/annt/.config/agents");
+const TS_SYNC = resolve(REPO_ROOT, "sync/src/cli.ts");
 
 setDefaultTimeout(30_000);
 

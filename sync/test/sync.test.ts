@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { test } from "bun:test";
 import { Effect } from "effect";
-const BIN_ROOT = "/Users/annt/.config/agents/bin";
+const SRC_ROOT = "/Users/annt/.config/agents/sync/src";
 
 let HarnessId: any;
 let SyncEnv: any;
@@ -95,16 +95,16 @@ function pickFn(
 
 async function loadRuntime(): Promise<Record<string, unknown> | null> {
   const required = [
-    "lib.ts",
-    "harness.ts",
-    "install.ts",
-    "jobs.ts",
-    "managed.ts",
-    "packages.ts",
+    "core/index.ts",
+    "core/harness.ts",
+    "extensions/install.ts",
+    "core/jobs.ts",
+    "core/managed-state.ts",
+    "packages/index.ts",
     "packages/process.ts",
     "packages/validate.ts",
   ];
-  if (!required.every((file) => existsSync(join(BIN_ROOT, file)))) {
+  if (!required.every((file) => existsSync(join(SRC_ROOT, file)))) {
     return null;
   }
 
@@ -118,14 +118,14 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
     packagesModule,
     packagesProcessModule,
   ] = await Promise.all([
-    import("./lib.ts"),
-    import("./harness.ts"),
-    import("./install.ts"),
-    import("./jobs.ts"),
-    import("./managed.ts"),
-    import("./plan.ts"),
-    import("./packages.ts"),
-    import("./packages/process.ts"),
+    import("../src/core/index.ts"),
+    import("../src/core/harness.ts"),
+    import("../src/extensions/install.ts"),
+    import("../src/core/jobs.ts"),
+    import("../src/core/managed-state.ts"),
+    import("../src/core/plan.ts"),
+    import("../src/packages/index.ts"),
+    import("../src/packages/process.ts"),
   ]);
 
   return {
@@ -401,7 +401,7 @@ test("run_install_force_kills_term_trapping_process", async () => {
     writeFileSync(
       helper,
       `import { Effect } from "effect";
-import { runInstall } from ${JSON.stringify(join(BIN_ROOT, "install.ts"))};
+    import { runInstall } from ${JSON.stringify(join(SRC_ROOT, "extensions", "install.ts"))};
 const result = await Effect.runPromise(runInstall([${JSON.stringify(trapped)}], ${JSON.stringify(root)}, 100));
 console.log(String(result));
 `,
@@ -432,8 +432,8 @@ test("main_reports_lock_contention_and_skips", async () => {
     writeFileSync(
       helper,
       `import { Effect } from "effect";
-import { SyncEnv } from ${JSON.stringify(join(BIN_ROOT, "harness.ts"))};
-import { main, tryAcquireSyncLock } from ${JSON.stringify(join(BIN_ROOT, "lib.ts"))};
+        import { SyncEnv } from ${JSON.stringify(join(SRC_ROOT, "core", "harness.ts"))};
+        import { main, tryAcquireSyncLock } from ${JSON.stringify(join(SRC_ROOT, "core", "index.ts"))};
 
 const syncEnv = SyncEnv.fromHome(${JSON.stringify(root)}, 1_000);
 const lock = tryAcquireSyncLock(syncEnv);
@@ -467,7 +467,7 @@ test("watchdog_exits_124_on_global_timeout", async () => {
     const helper = join(root, "watchdog.ts");
     writeFileSync(
       helper,
-      `import { startSyncWatchdog } from ${JSON.stringify(join(BIN_ROOT, "lib.ts"))};
+      `import { startSyncWatchdog } from ${JSON.stringify(join(SRC_ROOT, "core", "index.ts"))};
 startSyncWatchdog(1);
 setInterval(() => {}, 1_000);
 `,
@@ -702,7 +702,7 @@ test("run_sync_removes_entries_removed_from_ssot_after_prior_sync", async () => 
 test("run_sync_preserves_generated_extension_runtime_when_hook_inputs_match", async () => {
   await withTempDir(async (root) => {
     const syncEnv = makeSyncEnv(root);
-    const { fingerprintTree } = await import("./hook-state.ts");
+    const { fingerprintTree } = await import("../src/core/hook-state.ts");
 
     writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
     writeFile(join(root, ".config", "agents", "tools", "pi", "agent", "extensions", "context", "index.ts"), "export const live = true;\n");

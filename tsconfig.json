@@ -16,5 +16,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["bin/**/*.ts"]
+  "include": ["sync/src/**/*.ts", "sync/test/**/*.ts"]
 }

@@ -6,4 +6,4 @@ script_dir=$(
   CDPATH= cd -- "$(dirname -- "$0")" && pwd
 )
 
-exec bun "$script_dir/sync.ts" "$@"
+exec bun "$script_dir/../sync/src/cli.ts" "$@"
