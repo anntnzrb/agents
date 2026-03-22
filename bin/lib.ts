@@ -3,8 +3,14 @@ import path from "node:path";
 import { Effect } from "effect";
 
 import { SyncEnv } from "./harness.ts";
+import {
+  clearExtensionHookState,
+  prepareExtensionHookState,
+  recordExtensionHookState,
+  type PreparedExtensionHookState,
+} from "./hook-state.ts";
 import { installExtensionDeps } from "./install.ts";
-import { runJobs } from "./jobs.ts";
+import { runJobsWithPreserve } from "./jobs.ts";
 import {
   cleanManagedEntries,
   planManagedEntriesForSyncPlan,
@@ -63,9 +69,11 @@ export function startSyncWatchdog(timeoutSeconds: number): void {
 export async function runSync(syncEnv: SyncEnv): Promise<boolean> {
   let syncPlan;
   let managedPlan;
+  let extensionHookStates;
   try {
     syncPlan = buildSyncPlan(syncEnv);
     managedPlan = planManagedEntriesForSyncPlan(syncPlan);
+    extensionHookStates = prepareExtensionHookStates(syncPlan.hooks);
   } catch (error) {
     err(panicMessage(error));
     return false;
@@ -75,7 +83,7 @@ export async function runSync(syncEnv: SyncEnv): Promise<boolean> {
   const baseSuccess = cleanupSuccess
     ? (() => {
         try {
-          return runJobs(syncPlan.jobs);
+          return runJobsWithPreserve(syncPlan.jobs, preservePathsByDst(extensionHookStates));
         } catch (error) {
           err(panicMessage(error));
           return false;
@@ -84,7 +92,10 @@ export async function runSync(syncEnv: SyncEnv): Promise<boolean> {
     : false;
 
   const managedStateSuccess = baseSuccess ? recordManagedEntries(managedPlan) : true;
-  const hookSuccess = baseSuccess && managedStateSuccess ? await runSyncHooks(syncPlan.hooks) : true;
+  const hookSuccess =
+    baseSuccess && managedStateSuccess
+      ? await runSyncHooks(syncPlan.hooks, extensionHookStates)
+      : true;
 
   return baseSuccess && managedStateSuccess && hookSuccess;
 }
@@ -136,25 +147,46 @@ export const main = (): Effect.Effect<number> =>
     );
   });
 
-async function runSyncHooks(hooks: readonly SyncHookPlan[]): Promise<boolean> {
+async function runSyncHooks(
+  hooks: readonly SyncHookPlan[],
+  extensionHookStates: ReadonlyMap<string, ExtensionHookRuntimeState>,
+): Promise<boolean> {
   let success = true;
   for (const hook of hooks) {
-    if (!(await runSyncHook(hook))) {
+    const hookState =
+      hook.kind === "ExtensionDeps" ? extensionHookStates.get(hook.statePath)?.state : undefined;
+    if (!(await runSyncHook(hook, hookState))) {
       success = false;
     }
   }
   return success;
 }
 
-async function runSyncHook(hook: SyncHookPlan): Promise<boolean> {
+async function runSyncHook(
+  hook: SyncHookPlan,
+  extensionHookState?: PreparedExtensionHookState,
+): Promise<boolean> {
   try {
     switch (hook.kind) {
       case "PackageBootstrap":
         return await bootstrapPackageTarget(hook);
-      case "ExtensionDeps":
-        return await Effect.runPromise(installExtensionDeps(hook.root, hook.timeoutMs));
+      case "ExtensionDeps": {
+        if (extensionHookState?.shouldSkip) {
+          return true;
+        }
+        const success = await Effect.runPromise(installExtensionDeps(hook.root, hook.timeoutMs));
+        if (success) {
+          recordExtensionHookState(hook, extensionHookState ?? prepareExtensionHookState(hook));
+        } else {
+          clearExtensionHookState(hook.statePath);
+        }
+        return success;
+      }
     }
   } catch (error) {
+    if (hook.kind === "ExtensionDeps") {
+      clearExtensionHookState(hook.statePath);
+    }
     err(panicMessage(error));
     return false;
   }
@@ -162,4 +194,40 @@ async function runSyncHook(hook: SyncHookPlan): Promise<boolean> {
 
 function logErr(message: string): Effect.Effect<void> {
   return Effect.sync(() => err(message));
+}
+
+function prepareExtensionHookStates(
+  hooks: readonly SyncHookPlan[],
+): ReadonlyMap<string, ExtensionHookRuntimeState> {
+  const states = new Map<string, ExtensionHookRuntimeState>();
+  for (const hook of hooks) {
+    if (hook.kind !== "ExtensionDeps") {
+      continue;
+    }
+    states.set(hook.statePath, {
+      hook,
+      state: prepareExtensionHookState(hook),
+    });
+  }
+  return states;
+}
+
+function preservePathsByDst(
+  states: ReadonlyMap<string, ExtensionHookRuntimeState>,
+): ReadonlyMap<string, readonly string[]> {
+  const preserveByDst = new Map<string, string[]>();
+  for (const { hook, state } of states.values()) {
+    if (!state.shouldSkip || state.preservePaths.length === 0) {
+      continue;
+    }
+    const paths = preserveByDst.get(hook.jobRoot) ?? [];
+    paths.push(...state.preservePaths);
+    preserveByDst.set(hook.jobRoot, [...new Set(paths)].sort());
+  }
+  return preserveByDst;
+}
+
+interface ExtensionHookRuntimeState {
+  readonly hook: Extract<SyncHookPlan, { readonly kind: "ExtensionDeps" }>;
+  readonly state: PreparedExtensionHookState;
 }

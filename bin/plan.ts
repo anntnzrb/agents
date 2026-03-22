@@ -20,6 +20,7 @@ export interface Job {
   readonly src: string;
   readonly dst: string;
   readonly kind: JobKind;
+  readonly scope?: "Tree" | "Children";
 }
 
 export interface HarnessPlan {
@@ -53,7 +54,11 @@ export interface PackageBootstrapHookPlan {
 export interface ExtensionDepsHookPlan {
   readonly kind: "ExtensionDeps";
   readonly harness: Harness;
+  readonly jobRoot: string;
   readonly root: string;
+  readonly sourceRoot: string;
+  readonly relativeRoot: string;
+  readonly statePath: string;
   readonly timeoutMs: number;
 }
 
@@ -115,6 +120,7 @@ function harnessDirJobs(harnesses: readonly HarnessPlan[]): Job[] {
     src: plan.sourceRoot,
     dst: plan.root,
     kind: "Dir",
+    scope: "Children",
   }));
 }
 
@@ -127,6 +133,7 @@ function assetJobs(syncEnv: SyncEnv, harnesses: readonly HarnessPlan[], assetNam
         src: assetPath,
         dst: join(plan.root, harnessRenameAsset(plan.harness, assetName)),
         kind: "Dir",
+        scope: "Tree",
       });
     }
   }
@@ -172,11 +179,19 @@ function buildHookPlans(
         return {
           kind: hook.kind,
           harness,
+          jobRoot: root,
           root: join(root, hook.rootDir),
+          sourceRoot: join(sourceRoot, hook.rootDir),
+          relativeRoot: hook.rootDir,
+          statePath: extensionHookStatePath(syncEnv.managedStateHome, harness),
           timeoutMs: syncEnv.installTimeoutMs,
         };
     }
   });
+}
+
+function extensionHookStatePath(managedStateHome: string, harness: Harness): string {
+  return join(managedStateHome, `${harness.sourceName}.extension-deps.json`);
 }
 
 function dirEntryNames(root: string, dirsOnly: boolean): string[] {

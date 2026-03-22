@@ -22,16 +22,11 @@ const detailFromOutput = (stdout: string, stderr: string): string => {
 };
 
 export const commandExists = async (command: string): Promise<boolean> => {
-  const pathVar = process.env.PATH;
-  if (!pathVar) {
-    return false;
+  if (!command.includes(path.sep)) {
+    return Boolean(Bun.which(command));
   }
 
-  const candidates = command.includes(path.sep)
-    ? [command]
-    : pathVar.split(path.delimiter).map((dir) => path.join(dir, command));
-
-  for (const candidate of candidates) {
+  for (const candidate of [command]) {
     try {
       const metadata = await fs.stat(candidate);
       if (!metadata.isFile()) {

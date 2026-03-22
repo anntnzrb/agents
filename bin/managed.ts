@@ -22,16 +22,18 @@ export function planManagedEntries(syncEnv: SyncEnv): ManagedSyncPlan {
 export function planManagedEntriesForSyncPlan(syncPlan: SyncPlan): ManagedSyncPlan {
   return {
     harnesses: syncPlan.harnesses.map((harnessPlan) => {
-      const cleanupEntryNames = uniqueSorted([
+      const currentEntryNames = [...harnessPlan.currentEntryNames];
+      const currentEntrySet = new Set(currentEntryNames);
+      const staleEntryNames = uniqueSorted([
         ...harnessPlan.cleanupEntryNames,
         ...loadRecordedEntryNames(harnessPlan.statePath),
-      ]);
+      ]).filter((entryName) => !currentEntrySet.has(entryName));
       return {
         statePath: harnessPlan.statePath,
-        cleanupPaths: cleanupEntryNames
+        cleanupPaths: staleEntryNames
           .map((entry) => cleanupPath(harnessPlan.root, entry))
           .filter((entry): entry is string => entry !== null),
-        currentEntryNames: [...harnessPlan.currentEntryNames],
+        currentEntryNames,
       };
     }),
   };

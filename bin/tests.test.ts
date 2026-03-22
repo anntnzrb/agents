@@ -41,6 +41,7 @@ let startSyncWatchdog: any;
 let buildSyncPlan: any;
 let harnessSourceRoot: any;
 let harnessInstructionTarget: any;
+let runJobsWithPreserve: any;
 
 const runtime = await loadRuntime();
 if (!runtime) {
@@ -73,6 +74,7 @@ if (!runtime) {
     buildSyncPlan,
     harnessSourceRoot,
     harnessInstructionTarget,
+    runJobsWithPreserve,
   } = runtime);
 }
 
@@ -143,6 +145,11 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
     runSync: pickFn(libModule as Record<string, unknown>, "runSync", "run_sync"),
     copyItem: pickFn(jobsModule as Record<string, unknown>, "copyItem", "copy_item"),
     copyDirInto: pickFn(jobsModule as Record<string, unknown>, "copyDirInto", "copy_dir_into"),
+    runJobsWithPreserve: pickFn(
+      jobsModule as Record<string, unknown>,
+      "runJobsWithPreserve",
+      "run_jobs_with_preserve",
+    ),
     iterExtensionPackages: pickFn(
       installModule as Record<string, unknown>,
       "iterExtensionPackages",
@@ -321,6 +328,30 @@ test("copy_dir_into_merges_existing_destination", async () => {
     assert.equal(await call<boolean>(copyDirInto, src, dst), true);
     assert.equal(exists(join(dst, "keep.txt")), true);
     assert.equal(exists(join(dst, "x.txt")), true);
+  });
+});
+
+test("run_jobs_with_preserve_keeps_generated_extension_entries", async () => {
+  await withTempDir(async (root) => {
+    const src = join(root, "src");
+    const dst = join(root, "dst");
+
+    writeFile(join(src, "extensions", "context", "index.ts"), "export const live = true;\n");
+    writeFile(join(dst, "extensions", "stale.ts"), "stale\n");
+    writeFile(join(dst, "extensions", "package.json"), '{"name":"generated"}\n');
+    writeFile(join(dst, "extensions", "node_modules", "dep", "index.js"), "module.exports = 1;\n");
+
+    const result = await call<boolean>(
+      runJobsWithPreserve,
+      [{ src, dst, kind: "Dir" }],
+      new Map([[dst, ["extensions/package.json", "extensions/node_modules"]]]),
+    );
+
+    assert.equal(result, true);
+    assert.equal(exists(join(dst, "extensions", "context", "index.ts")), true);
+    assert.equal(exists(join(dst, "extensions", "stale.ts")), false);
+    assert.equal(exists(join(dst, "extensions", "package.json")), true);
+    assert.equal(exists(join(dst, "extensions", "node_modules", "dep", "index.js")), true);
   });
 });
 
@@ -665,6 +696,63 @@ test("run_sync_removes_entries_removed_from_ssot_after_prior_sync", async () => 
     assert.equal(exists(join(root, ".codex", "config.toml")), false);
     assert.equal(exists(join(root, ".codex", "skills")), false);
     assert.equal(exists(join(root, ".codex", "logs", "keep.txt")), true);
+  });
+});
+
+test("run_sync_preserves_generated_extension_runtime_when_hook_inputs_match", async () => {
+  await withTempDir(async (root) => {
+    const syncEnv = makeSyncEnv(root);
+    const { fingerprintTree } = await import("./hook-state.ts");
+
+    writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
+    writeFile(join(root, ".config", "agents", "tools", "pi", "agent", "extensions", "context", "index.ts"), "export const live = true;\n");
+    writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
+    writeFile(join(root, ".pi", "agent", "extensions", "package.json"), '{"name":"generated"}\n');
+    writeFile(join(root, ".pi", "agent", "extensions", "node_modules", "dep", "index.js"), "module.exports = 1;\n");
+    writeFile(
+      join(root, ".local", "share", "agents", "sync-managed", "pi.extension-deps.json"),
+      `${JSON.stringify(
+        {
+          fingerprint: fingerprintTree(join(root, ".config", "agents", "tools", "pi", "agent", "extensions")),
+          generatedEntries: ["package.json", "node_modules"],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    const success = await call<boolean>(runSync, syncEnv);
+    assert.equal(success, true);
+    assert.equal(exists(join(root, ".pi", "agent", "extensions", "package.json")), true);
+    assert.equal(exists(join(root, ".pi", "agent", "extensions", "node_modules", "dep", "index.js")), true);
+  });
+});
+
+test("run_sync_removes_generated_extension_runtime_when_hook_inputs_change", async () => {
+  await withTempDir(async (root) => {
+    const syncEnv = makeSyncEnv(root);
+
+    writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
+    writeFile(join(root, ".config", "agents", "tools", "pi", "agent", "extensions", "context", "index.ts"), "export const live = true;\n");
+    writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
+    writeFile(join(root, ".pi", "agent", "extensions", "package.json"), '{"name":"generated"}\n');
+    writeFile(join(root, ".pi", "agent", "extensions", "node_modules", "dep", "index.js"), "module.exports = 1;\n");
+    writeFile(
+      join(root, ".local", "share", "agents", "sync-managed", "pi.extension-deps.json"),
+      `${JSON.stringify(
+        {
+          fingerprint: "stale",
+          generatedEntries: ["package.json", "node_modules"],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    const success = await call<boolean>(runSync, syncEnv);
+    assert.equal(success, true);
+    assert.equal(exists(join(root, ".pi", "agent", "extensions", "package.json")), false);
+    assert.equal(exists(join(root, ".pi", "agent", "extensions", "node_modules")), false);
   });
 });
 
