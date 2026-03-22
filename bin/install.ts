@@ -10,8 +10,6 @@ import {
   runCommandOutcome,
 } from "./runtime/process.ts";
 
-export { commandExists, readPipe } from "./runtime/process.ts";
-
 export const iterExtensionPackages = (root: string): Effect.Effect<string[]> =>
   Effect.promise(async () => {
     const stat = await fs.stat(root).catch(() => undefined);

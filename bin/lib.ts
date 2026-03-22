@@ -13,6 +13,7 @@ import {
 import { bootstrapPackageTarget } from "./packages.ts";
 import { buildSyncPlan, type SyncHookPlan } from "./plan.ts";
 export { copyTree, isSymlink, rmEntry } from "./runtime/fs.ts";
+import { panicMessage } from "./runtime/errors.ts";
 import {
   releaseSyncLock as releaseSyncLockImpl,
   type SyncLock,
@@ -32,16 +33,7 @@ export function err(message: string): void {
 export function warn(message: string): void {
   console.error(`sync: warning: ${message}`);
 }
-
-export function panicMessage(payload: unknown): string {
-  if (typeof payload === "string") {
-    return payload;
-  }
-  if (payload instanceof Error) {
-    return payload.message;
-  }
-  return "panic";
-}
+export { panicMessage } from "./runtime/errors.ts";
 
 export function parseTimeoutSeconds(value: string | undefined, defaultSeconds: number): number {
   const parsed = value ? Number.parseInt(value, 10) : Number.NaN;

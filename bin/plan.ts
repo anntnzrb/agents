@@ -12,6 +12,7 @@ import {
   type Harness,
   type SyncEnv,
 } from "./harness.ts";
+import { panicMessage } from "./runtime/errors.ts";
 
 export type JobKind = "File" | "Dir";
 
@@ -218,14 +219,4 @@ function isTopLevel(entryName: string): boolean {
 
 export function isSafeManagedEntryName(entryName: string): boolean {
   return isTopLevel(entryName);
-}
-
-function panicMessage(payload: unknown): string {
-  if (typeof payload === "string") {
-    return payload;
-  }
-  if (payload instanceof Error) {
-    return payload.message;
-  }
-  return "panic";
 }

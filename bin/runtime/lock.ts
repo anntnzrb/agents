@@ -2,6 +2,8 @@ import { dlopen, FFIType, toBuffer } from "bun:ffi";
 import fs from "node:fs";
 import os from "node:os";
 
+import { panicMessage } from "./errors.ts";
+
 const LOCK_EX = 2;
 const LOCK_NB = 4;
 const WOULD_BLOCK_ERRNOS = new Set([os.constants.errno.EAGAIN, os.constants.errno.EWOULDBLOCK]);
@@ -118,14 +120,4 @@ function currentErrno(): number {
 
 function systemErrorMessage(errno: number): string {
   return `${String(libcSymbols.strerror(errno))} (os error ${errno})`;
-}
-
-function panicMessage(payload: unknown): string {
-  if (typeof payload === "string") {
-    return payload;
-  }
-  if (payload instanceof Error) {
-    return payload.message;
-  }
-  return "panic";
 }
