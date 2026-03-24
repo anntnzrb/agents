@@ -182,7 +182,9 @@ const getActivityText = (result: ChildRunResult): string => {
 const buildProgressLines = (details: SpawnPiDetails): string[] =>
 	details.results.map((result) => {
 		const activity = shorten(getActivityText(result), 72);
-		return `${getResultStatusIcon(result)} ${result.index + 1}. ${formatTaskPreview(result.task)} — ${activity}`;
+		const usage = formatUsage(result);
+		const suffix = usage ? ` · ${usage}` : "";
+		return `${getResultStatusIcon(result)} ${result.index + 1}. ${formatTaskPreview(result.task)} — ${activity}${suffix}`;
 	});
 
 const buildOutputSection = (result: ChildRunResult): string => {
