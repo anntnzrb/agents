@@ -1,7 +1,7 @@
-import type { CommandGuardConfig, ExecutableMatch, Rule } from "./types";
+import type { ExecutableMatch, GuardrailsConfig, Rule } from "./types.js";
 
-import { executableBasename, splitShellSegments, tokenizeCommand, unique } from "./shell";
-import { firstExecutableIndex, unwrapCommand } from "./wrappers";
+import { executableBasename, splitShellSegments, tokenizeCommand, unique } from "./shell.js";
+import { firstExecutableIndex, unwrapCommand } from "./wrappers.js";
 
 const MAX_NESTING_DEPTH = 8;
 
@@ -121,15 +121,16 @@ function matchExecutable(actual: string, match: ExecutableMatch): boolean {
 }
 
 function matchRule(inspection: Inspection, rule: Rule): boolean {
-  if (rule.match.type === "regex") {
-    const regex = new RegExp(rule.match.pattern, rule.match.flags ?? "");
+  const match = rule.match;
+  if (match.type === "regex") {
+    const regex = new RegExp(match.pattern, match.flags ?? "");
     return inspection.commands.some((command) => regex.test(command));
   }
 
-  return inspection.executables.some((executable) => matchExecutable(executable, rule.match));
+  return inspection.executables.some((executable) => matchExecutable(executable, match));
 }
 
-export function reasonForCommand(command: string, config: CommandGuardConfig): string | null {
+export function reasonForCommand(command: string, config: GuardrailsConfig): string | null {
   const inspection = inspectCommand(command);
 
   for (const rule of config.agentBash.rules) {

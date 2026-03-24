@@ -1,20 +1,24 @@
 import { readFileSync } from "node:fs";
 
-import { parse, printParseErrorCode } from "jsonc-parser";
+import { parse, printParseErrorCode, type ParseError } from "jsonc-parser";
 
 import type {
   BlockAction,
-  CommandGuardConfig,
   ExecutableMatch,
+  GuardrailsConfig,
   LoadConfigResult,
   MatchConfig,
+  ProtectedPathRule,
   RegexMatch,
   Rule,
-} from "./types";
+} from "./types.js";
 
-const DEFAULT_CONFIG: CommandGuardConfig = {
+const DEFAULT_CONFIG: GuardrailsConfig = {
   version: 1,
   agentBash: {
+    rules: [],
+  },
+  protectedPaths: {
     rules: [],
   },
 };
@@ -45,7 +49,7 @@ function normalizeBlockAction(value: unknown, path: string): BlockAction | strin
   }
 
   if (value.type !== "block") {
-    return `${path}.type must be \"block\"`;
+    return `${path}.type must be "block"`;
   }
 
   if (typeof value.message !== "string" || value.message.trim().length === 0) {
@@ -59,15 +63,17 @@ function normalizeBlockAction(value: unknown, path: string): BlockAction | strin
 }
 
 function normalizeExecutableMatch(value: Record<string, unknown>, path: string): ExecutableMatch | string {
-  const names = value.names === undefined ? [] : asStringArray(value.names);
-  if (value.names !== undefined && names === null) {
+  const namesValue = value.names === undefined ? [] : asStringArray(value.names);
+  if (value.names !== undefined && namesValue === null) {
     return `${path}.names must be an array of strings`;
   }
+  const names = namesValue ?? [];
 
-  const patterns = value.patterns === undefined ? [] : asStringArray(value.patterns);
-  if (value.patterns !== undefined && patterns === null) {
+  const patternsValue = value.patterns === undefined ? [] : asStringArray(value.patterns);
+  if (value.patterns !== undefined && patternsValue === null) {
     return `${path}.patterns must be an array of strings`;
   }
+  const patterns = patternsValue ?? [];
 
   if (names.length === 0 && patterns.length === 0) {
     return `${path} must define at least one name or pattern`;
@@ -131,7 +137,7 @@ function normalizeMatch(value: unknown, path: string): MatchConfig | string {
     return normalizeRegexMatch(value, path);
   }
 
-  return `${path}.type must be \"executable\" or \"regex\"`;
+  return `${path}.type must be "executable" or "regex"`;
 }
 
 function normalizeRule(value: unknown, index: number): Rule | string {
@@ -161,7 +167,45 @@ function normalizeRule(value: unknown, index: number): Rule | string {
   };
 }
 
-function normalizeConfig(value: unknown): CommandGuardConfig | string {
+function normalizeProtectedPathRule(value: unknown, index: number): ProtectedPathRule | string {
+  const path = `protectedPaths.rules[${index}]`;
+  if (!isObject(value)) {
+    return `${path} must be an object`;
+  }
+
+  if (value.id !== undefined && typeof value.id !== "string") {
+    return `${path}.id must be a string`;
+  }
+
+  if (typeof value.pattern !== "string" || value.pattern.trim().length === 0) {
+    return `${path}.pattern must be a non-empty string`;
+  }
+
+  const tools = asStringArray(value.tools);
+  if (tools === null || tools.length === 0) {
+    return `${path}.tools must be a non-empty array of strings`;
+  }
+
+  for (const [toolIndex, tool] of tools.entries()) {
+    if (tool !== "read" && tool !== "write" && tool !== "edit") {
+      return `${path}.tools[${toolIndex}] must be read, write, or edit`;
+    }
+  }
+
+  const action = normalizeBlockAction(value.action, `${path}.action`);
+  if (typeof action === "string") {
+    return action;
+  }
+
+  return {
+    id: value.id as string | undefined,
+    pattern: value.pattern.trim(),
+    tools: tools as Array<"read" | "write" | "edit">,
+    action,
+  };
+}
+
+function normalizeConfig(value: unknown): GuardrailsConfig | string {
   if (!isObject(value)) {
     return "config root must be an object";
   }
@@ -175,29 +219,49 @@ function normalizeConfig(value: unknown): CommandGuardConfig | string {
     return "agentBash must be an object";
   }
 
-  const rulesValue = agentBash.rules === undefined ? [] : agentBash.rules;
-  if (!Array.isArray(rulesValue)) {
+  const bashRulesValue = agentBash.rules === undefined ? [] : agentBash.rules;
+  if (!Array.isArray(bashRulesValue)) {
     return "agentBash.rules must be an array";
   }
 
-  const rules: Rule[] = [];
-  for (const [index, entry] of rulesValue.entries()) {
+  const bashRules: Rule[] = [];
+  for (const [index, entry] of bashRulesValue.entries()) {
     const normalized = normalizeRule(entry, index);
     if (typeof normalized === "string") {
       return normalized;
     }
-    rules.push(normalized);
+    bashRules.push(normalized);
+  }
+
+  const protectedPaths = value.protectedPaths === undefined ? {} : value.protectedPaths;
+  if (!isObject(protectedPaths)) {
+    return "protectedPaths must be an object";
+  }
+
+  const protectedPathRulesValue = protectedPaths.rules === undefined ? [] : protectedPaths.rules;
+  if (!Array.isArray(protectedPathRulesValue)) {
+    return "protectedPaths.rules must be an array";
+  }
+
+  const protectedPathRules: ProtectedPathRule[] = [];
+  for (const [index, entry] of protectedPathRulesValue.entries()) {
+    const normalized = normalizeProtectedPathRule(entry, index);
+    if (typeof normalized === "string") {
+      return normalized;
+    }
+    protectedPathRules.push(normalized);
   }
 
   return {
     version: 1,
-    agentBash: { rules },
+    agentBash: { rules: bashRules },
+    protectedPaths: { rules: protectedPathRules },
   };
 }
 
 function formatJsoncError(path: string, offset: number, code: number): string {
   const label = printParseErrorCode(code);
-  return `command guard config invalid at ${path} (offset ${offset}, ${label})`;
+  return `guardrails config invalid at ${path} (offset ${offset}, ${label})`;
 }
 
 export function loadConfig(path: string): LoadConfigResult {
@@ -208,11 +272,11 @@ export function loadConfig(path: string): LoadConfigResult {
     const detail = error instanceof Error ? error.message : String(error);
     return {
       ok: false,
-      reason: `command guard configuration unavailable at ${path}: ${detail}`,
+      reason: `guardrails configuration unavailable at ${path}: ${detail}`,
     };
   }
 
-  const errors: { error: number; offset: number }[] = [];
+  const errors: ParseError[] = [];
   const parsed = parse(raw, errors, {
     allowTrailingComma: true,
     disallowComments: false,
@@ -230,7 +294,7 @@ export function loadConfig(path: string): LoadConfigResult {
   if (typeof normalized === "string") {
     return {
       ok: false,
-      reason: `command guard configuration invalid at ${path}: ${normalized}`,
+      reason: `guardrails configuration invalid at ${path}: ${normalized}`,
     };
   }
 

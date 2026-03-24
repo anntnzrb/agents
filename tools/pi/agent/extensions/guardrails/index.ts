@@ -3,30 +3,47 @@ import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadConfig } from "./config";
-import { reasonForCommand } from "./matcher";
+import { loadConfig } from "./config.js";
+import { reasonForCommand } from "./matcher.js";
+import { reasonForPath } from "./paths.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const configPath = join(__dirname, "guardrails.jsonc");
 
+const getConfigOrBlockReason = (path: string) => {
+  const result = loadConfig(path);
+  return result.ok ? result.config : result.reason;
+};
+
 export function createGuardrails(path: string) {
   return function guardrails(pi: ExtensionAPI): void {
     pi.on("tool_call", async (event) => {
-      if (!isToolCallEventType("bash", event)) {
-        return;
+      const configOrReason = getConfigOrBlockReason(path);
+      if (typeof configOrReason === "string") {
+        return { block: true, reason: configOrReason };
       }
 
-      const result = loadConfig(path);
-      if (!result.ok) {
-        return { block: true, reason: result.reason };
+      if (isToolCallEventType("bash", event)) {
+        const reason = reasonForCommand(event.input.command, configOrReason);
+        return reason ? { block: true, reason } : undefined;
       }
 
-      const reason = reasonForCommand(event.input.command, result.config);
-      if (!reason) {
-        return;
+      if (isToolCallEventType("read", event)) {
+        const reason = reasonForPath(event.input.path, "read", configOrReason);
+        return reason ? { block: true, reason } : undefined;
       }
 
-      return { block: true, reason };
+      if (isToolCallEventType("write", event)) {
+        const reason = reasonForPath(event.input.path, "write", configOrReason);
+        return reason ? { block: true, reason } : undefined;
+      }
+
+      if (isToolCallEventType("edit", event)) {
+        const reason = reasonForPath(event.input.path, "edit", configOrReason);
+        return reason ? { block: true, reason } : undefined;
+      }
+
+      return undefined;
     });
   };
 }

@@ -4,11 +4,12 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { loadConfig } from "./config";
-import { reasonForCommand } from "./matcher";
-import type { CommandGuardConfig } from "./types";
+import { loadConfig } from "./config.js";
+import { reasonForCommand } from "./matcher.js";
+import { reasonForPath } from "./paths.js";
+import type { GuardrailsConfig } from "./types.js";
 
-const pythonConfig: CommandGuardConfig = {
+const pythonConfig: GuardrailsConfig = {
   version: 1,
   agentBash: {
     rules: [
@@ -22,6 +23,19 @@ const pythonConfig: CommandGuardConfig = {
         action: {
           type: "block",
           message: "use uv",
+        },
+      },
+    ],
+  },
+  protectedPaths: {
+    rules: [
+      {
+        id: "no-read-env",
+        pattern: ".env",
+        tools: ["read"],
+        action: {
+          type: "block",
+          message: "no env reads",
         },
       },
     ],
@@ -52,6 +66,19 @@ test("loadConfig accepts JSONC comments and trailing commas", () => {
           },
         ],
       },
+      "protectedPaths": {
+        "rules": [
+          {
+            "id": "no-read-env",
+            "pattern": ".env",
+            "tools": ["read",],
+            "action": {
+              "type": "block",
+              "message": "no env reads",
+            },
+          },
+        ],
+      },
     }`,
   );
 
@@ -61,6 +88,7 @@ test("loadConfig accepts JSONC comments and trailing commas", () => {
     return;
   }
   assert.equal(result.config.agentBash.rules.length, 1);
+  assert.equal(result.config.protectedPaths.rules.length, 1);
 });
 
 test("loadConfig fails closed on invalid config", () => {
@@ -71,7 +99,8 @@ test("loadConfig fails closed on invalid config", () => {
     path,
     `{
       "version": 2,
-      "agentBash": { "rules": [] }
+      "agentBash": { "rules": [] },
+      "protectedPaths": { "rules": [] }
     }`,
   );
 
@@ -88,7 +117,7 @@ test("blocks direct python invocation", () => {
 });
 
 test("blocks versioned python executable", () => {
-  assert.equal(reasonForCommand(".venv/bin/python3.12 -c \"print(1)\"", pythonConfig), "use uv");
+  assert.equal(reasonForCommand('.venv/bin/python3.12 -c "print(1)"', pythonConfig), "use uv");
 });
 
 test("blocks env wrapped python invocation", () => {
@@ -114,7 +143,7 @@ test("allows uv-based python workflow", () => {
 });
 
 test("regex rules apply inside nested shell wrappers", () => {
-  const config: CommandGuardConfig = {
+  const config: GuardrailsConfig = {
     version: 1,
     agentBash: {
       rules: [
@@ -131,7 +160,50 @@ test("regex rules apply inside nested shell wrappers", () => {
         },
       ],
     },
+    protectedPaths: {
+      rules: [],
+    },
   };
 
   assert.equal(reasonForCommand("bash -lc 'python -m pip install rich'", config), "use uv add or uv run --with");
+});
+
+test("blocks protected reads", () => {
+  assert.equal(reasonForPath("/tmp/project/.env", "read", pythonConfig), "no env reads");
+});
+
+test("does not block unmatched tools for protected paths", () => {
+  assert.equal(reasonForPath("/tmp/project/.env", "write", pythonConfig), null);
+});
+
+test("does not overblock .env.example", () => {
+  assert.equal(reasonForPath("/tmp/project/.env.example", "read", pythonConfig), null);
+});
+
+test("blocks protected directory roots and children", () => {
+  const config: GuardrailsConfig = {
+    version: 1,
+    agentBash: { rules: [] },
+    protectedPaths: {
+      rules: [
+        {
+          id: "no-read-git",
+          pattern: ".git",
+          tools: ["read"],
+          action: { type: "block", message: "no git reads" },
+        },
+        {
+          id: "no-read-node-modules",
+          pattern: "node_modules",
+          tools: ["read"],
+          action: { type: "block", message: "no node_modules reads" },
+        },
+      ],
+    },
+  };
+
+  assert.equal(reasonForPath("/tmp/project/.git", "read", config), "no git reads");
+  assert.equal(reasonForPath("/tmp/project/.git/config", "read", config), "no git reads");
+  assert.equal(reasonForPath("/tmp/project/node_modules", "read", config), "no node_modules reads");
+  assert.equal(reasonForPath("/tmp/project/node_modules/react/index.js", "read", config), "no node_modules reads");
 });

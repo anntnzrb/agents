@@ -1,4 +1,4 @@
-import { executableBasename, isAssignmentToken } from "./shell";
+import { executableBasename, isAssignmentToken } from "./shell.js";
 
 const PASSTHROUGH_WRAPPERS = new Set(["builtin", "command", "exec", "nohup"]);
 const SHELL_EXECUTABLES = new Set(["bash", "dash", "fish", "ksh", "mksh", "sh", "zsh"]);

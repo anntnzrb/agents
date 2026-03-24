@@ -29,14 +29,26 @@ export interface AgentBashConfig {
   rules: Rule[];
 }
 
-export interface CommandGuardConfig {
+export interface ProtectedPathRule {
+  id?: string;
+  pattern: string;
+  tools: Array<"read" | "write" | "edit">;
+  action: BlockAction;
+}
+
+export interface ProtectedPathsConfig {
+  rules: ProtectedPathRule[];
+}
+
+export interface GuardrailsConfig {
   version: 1;
   agentBash: AgentBashConfig;
+  protectedPaths: ProtectedPathsConfig;
 }
 
 export interface LoadConfigSuccess {
   ok: true;
-  config: CommandGuardConfig;
+  config: GuardrailsConfig;
 }
 
 export interface LoadConfigFailure {
