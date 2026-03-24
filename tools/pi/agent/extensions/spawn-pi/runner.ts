@@ -6,22 +6,20 @@ import { type ChildRunResult, type TaskSpec, emptyUsage } from "./types.js";
 
 const inheritedCliArgs = getInheritedCliArgs();
 const DEPTH_ENV = "PI_SPAWN_DEPTH";
-const MAX_DEPTH_ENV = "PI_SPAWN_MAX_DEPTH";
-const DEFAULT_MAX_DEPTH = 1;
+const MAX_DEPTH = 1;
 
-const parseDepth = (raw: string | undefined, fallback: number): number => {
-	if (!raw || !/^\d+$/.test(raw)) return fallback;
+const parseDepth = (raw: string | undefined): number => {
+	if (!raw || !/^\d+$/.test(raw)) return 0;
 	const parsed = Number(raw);
-	return Number.isSafeInteger(parsed) ? parsed : fallback;
+	return Number.isSafeInteger(parsed) ? parsed : 0;
 };
 
 export const getDepthGuard = (): { currentDepth: number; maxDepth: number; canSpawn: boolean } => {
-	const currentDepth = parseDepth(process.env[DEPTH_ENV], 0);
-	const maxDepth = parseDepth(process.env[MAX_DEPTH_ENV], DEFAULT_MAX_DEPTH);
+	const currentDepth = parseDepth(process.env[DEPTH_ENV]);
 	return {
 		currentDepth,
-		maxDepth,
-		canSpawn: currentDepth < maxDepth,
+		maxDepth: MAX_DEPTH,
+		canSpawn: currentDepth < MAX_DEPTH,
 	};
 };
 
@@ -104,7 +102,7 @@ export const runChildTask = async (input: {
 	});
 	const invocation = getPiInvocation(args);
 	const startTime = Date.now();
-	const nextDepth = String(parseDepth(process.env[DEPTH_ENV], 0) + 1);
+	const nextDepth = String(parseDepth(process.env[DEPTH_ENV]) + 1);
 
 	await new Promise<void>((resolve) => {
 		let settled = false;
@@ -120,7 +118,6 @@ export const runChildTask = async (input: {
 			stdio: ["ignore", "pipe", "pipe"],
 			env: {
 				...process.env,
-				PI_OFFLINE: "1",
 				[DEPTH_ENV]: nextDepth,
 			},
 		});

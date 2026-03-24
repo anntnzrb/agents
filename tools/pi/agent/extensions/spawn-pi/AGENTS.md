@@ -18,9 +18,9 @@ Always start fresh.
 - Pi-only. No Codex/Claude/Gemini spawning.
 - Inherits current model + thinking.
 - Always runs child pi with `--no-session`.
-- Forces child env `PI_OFFLINE=1`.
+- Hard-disables `spawn_pi` inside child processes by refusing to register the tool whenever `PI_SPAWN_DEPTH > 0`.
 - Forwards built-in tools restriction and extension flags from parent CLI.
-- Default recursion guard: depth 1 (`PI_SPAWN_MAX_DEPTH` override if ever needed)
+- Hard-codes one spawn level only.
 - Keep child prompts plain: `Task: ...`
 
 ## Navigation

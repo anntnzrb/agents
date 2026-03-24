@@ -72,6 +72,8 @@ const buildTasks = (params: { task?: string; tasks?: string[]; cwd?: string }, c
 };
 
 export default function spawnPiExtension(pi: ExtensionAPI) {
+	if (getDepthGuard().currentDepth > 0) return;
+
 	pi.registerTool({
 		name: "spawn_pi",
 		label: "Spawn Pi",
