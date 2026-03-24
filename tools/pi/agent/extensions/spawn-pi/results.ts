@@ -1,5 +1,5 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	DEFAULT_MAX_BYTES,
@@ -21,11 +21,33 @@ import {
 	type SpawnPiDetails,
 } from "./types.js";
 
+const HOME_DIR = homedir();
+
 const shorten = (text: string, max: number): string =>
 	text.length > max ? `${text.slice(0, max)}...` : text;
 
+const toSingleLine = (text: string): string => text.replace(/\s+/g, " ").trim();
+
+const formatPreviewText = (text: string): string =>
+	text
+		.replace(/```([\w-]+)?\n?/g, "")
+		.replace(/```/g, "")
+		.replace(/`([^`]+)`/g, "$1")
+		.replace(/\*\*([^*]+)\*\*/g, "$1")
+		.replace(/__([^_]+)__/g, "$1")
+		.replace(/^\s*[-*>#]+\s*/gm, "")
+		.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
+		.replace(/\s+/g, " ")
+		.trim();
+
+const shortenPath = (value: string): string =>
+	value.startsWith(HOME_DIR) ? `~${value.slice(HOME_DIR.length)}` : value;
+
+const getPathArg = (args: Record<string, unknown>): string =>
+	String(args["path"] ?? args["file_path"] ?? ".");
+
 export const formatTaskPreview = (task: string): string =>
-	shorten(task.replace(/\s+/g, " ").trim(), 70);
+	shorten(toSingleLine(task), 70);
 
 export const formatTokens = (count: number): string => {
 	if (count < 1000) return count.toString();
@@ -55,21 +77,36 @@ export const summarizeToolCall = (
 ): string => {
 	switch (toolName) {
 		case "bash":
-			return shorten(String(args["command"] ?? "bash"), 60);
-		case "read":
-			return `read ${shorten(String(args["path"] ?? args["file_path"] ?? "?"), 48)}`;
-		case "write":
-			return `write ${shorten(String(args["path"] ?? args["file_path"] ?? "?"), 48)}`;
+			return `$ ${shorten(toSingleLine(String(args["command"] ?? "bash")), 72)}`;
+		case "read": {
+			const path = shortenPath(getPathArg(args));
+			const offset = Number(args["offset"] ?? 1);
+			const limit = Number(args["limit"]);
+			const hasOffset = Number.isFinite(offset);
+			const hasLimit = Number.isFinite(limit);
+			if (!hasOffset && !hasLimit) return `read ${shorten(path, 56)}`;
+			const start = hasOffset ? Math.max(1, Math.trunc(offset)) : 1;
+			const end = hasLimit ? start + Math.max(0, Math.trunc(limit)) - 1 : null;
+			const lines = end ? `:${start}-${end}` : `:${start}`;
+			return `read ${shorten(path, 52)}${lines}`;
+		}
+		case "write": {
+			const path = shortenPath(getPathArg(args));
+			const content = String(args["content"] ?? "");
+			const lineCount = content ? content.split("\n").length : 0;
+			const suffix = lineCount > 1 ? ` (${lineCount} lines)` : "";
+			return `write ${shorten(path, 52)}${suffix}`;
+		}
 		case "edit":
-			return `edit ${shorten(String(args["path"] ?? args["file_path"] ?? "?"), 48)}`;
+			return `edit ${shorten(shortenPath(getPathArg(args)), 56)}`;
 		case "grep":
-			return `grep ${shorten(String(args["pattern"] ?? "?"), 48)}`;
+			return `grep /${shorten(toSingleLine(String(args["pattern"] ?? "?")), 24)}/ in ${shorten(shortenPath(getPathArg(args)), 28)}`;
 		case "find":
-			return `find ${shorten(String(args["pattern"] ?? "*"), 48)}`;
+			return `find ${shorten(toSingleLine(String(args["pattern"] ?? "*")), 24)} in ${shorten(shortenPath(getPathArg(args)), 28)}`;
 		case "ls":
-			return `ls ${shorten(String(args["path"] ?? "."), 48)}`;
+			return `ls ${shorten(shortenPath(getPathArg(args)), 56)}`;
 		default:
-			return toolName;
+			return `${toolName} ${shorten(toSingleLine(JSON.stringify(args)), 48)}`;
 	}
 };
 
@@ -99,26 +136,53 @@ const buildHeader = (details: SpawnPiDetails): string =>
 		? "spawn_pi"
 		: `spawn_pi · ${details.results.length} tasks`;
 
+const getResultStatusIcon = (result: ChildRunResult): string => {
+	switch (getChildRunStatusLabel(result)) {
+		case "completed":
+			return "✓";
+		case "aborted":
+			return "⊘";
+		case "failed":
+			return "✗";
+	}
+};
+
+const getResultStatusColor = (result: ChildRunResult): "success" | "warning" | "error" => {
+	switch (getChildRunStatusLabel(result)) {
+		case "completed":
+			return "success";
+		case "aborted":
+			return "warning";
+		case "failed":
+			return "error";
+	}
+};
+
+const getRawPreviewText = (result: ChildRunResult): string => {
+	const errorPreview = toSingleLine(result.errorMessage || result.stderr);
+	if (errorPreview) return errorPreview;
+	return result.latestText || getFinalOutput(result.messages);
+};
+
+const getPreviewText = (result: ChildRunResult): string =>
+	formatPreviewText(getRawPreviewText(result));
+
 const getActivityText = (result: ChildRunResult): string => {
+	if (result.status === "queued") return "queued";
 	if (result.currentTool) return result.currentTool;
-	if (result.status === "queued") return "waiting";
-	const toolCalls = formatToolCalls(result.toolCalls);
-	if (toolCalls) return toolCalls;
+	const latestPreview = getPreviewText(result);
+	if (latestPreview && result.status === "running") return latestPreview;
+	if (result.status === "running") return "thinking";
+	if (result.status === "aborted" || result.stopReason === "aborted") return "aborted";
+	if (result.status === "completed") return "done";
+	if (result.status === "error") return "failed";
 	return "working";
 };
 
 const buildProgressLines = (details: SpawnPiDetails): string[] =>
 	details.results.map((result) => {
-		const icon =
-			result.status === "completed"
-				? "✓"
-				: result.status === "error"
-					? "✗"
-					: result.status === "running"
-						? "⏳"
-						: "•";
-		const activity = getActivityText(result);
-		return `${icon} ${result.index + 1}. ${formatTaskPreview(result.task)} — ${shorten(activity.replace(/\s+/g, " ").trim(), 60)}`;
+		const activity = shorten(getActivityText(result), 72);
+		return `${getResultStatusIcon(result)} ${result.index + 1}. ${formatTaskPreview(result.task)} — ${activity}`;
 	});
 
 const buildOutputSection = (result: ChildRunResult): string => {
@@ -191,20 +255,13 @@ export const buildToolContent = async (
 	};
 };
 
-export const buildProgressText = (details: SpawnPiDetails): string => {
-	const done = details.results.filter(
-		(result) => result.status === "completed" || result.status === "error",
-	).length;
-	const total = details.results.length;
-	return [`${buildHeader(details)} · ${done}/${total} done`, ...buildProgressLines(details)].join("\n");
-};
+export const buildProgressText = (details: SpawnPiDetails): string =>
+	buildProgressLines(details).join("\n");
 
 type RenderCallArgs = Partial<{ task: string; tasks: string[] }>;
 
 const getResultIcon = (result: ChildRunResult, theme: Theme): string =>
-	didChildRunFail(result)
-		? theme.fg("error", "✗")
-		: theme.fg("success", "✓");
+	theme.fg(getResultStatusColor(result), getResultStatusIcon(result));
 
 export const renderCall = (args: RenderCallArgs, theme: Theme) => {
 	const taskCount = args.tasks && args.tasks.length > 0 ? args.tasks.length : args.task ? 1 : 0;
@@ -229,7 +286,7 @@ export const renderResult = (
 	}
 
 	if (options.isPartial) {
-		return new Text(buildProgressLines(details).join("\n"), 0, 0);
+		return new Text(buildProgressText(details), 0, 0);
 	}
 
 	if (!options.expanded) {

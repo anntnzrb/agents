@@ -2,7 +2,7 @@ import type { TruncationResult } from "@mariozechner/pi-coding-agent";
 import type { Message } from "@mariozechner/pi-ai";
 
 export type SpawnMode = "single" | "parallel";
-export type ChildRunStatus = "queued" | "running" | "completed" | "error";
+export type ChildRunStatus = "queued" | "running" | "completed" | "aborted" | "error";
 
 export type TaskSpec = {
 	index: number;
@@ -79,4 +79,9 @@ export const didChildRunFail = (result: ChildRunResult): boolean =>
 
 export const getChildRunStatusLabel = (
 	result: ChildRunResult,
-): "completed" | "failed" => (didChildRunFail(result) ? "failed" : "completed");
+): "completed" | "aborted" | "failed" =>
+	result.status === "aborted" || result.stopReason === "aborted"
+		? "aborted"
+		: didChildRunFail(result)
+			? "failed"
+			: "completed";

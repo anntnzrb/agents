@@ -175,8 +175,9 @@ const finalizeChildRun = (
 	if (input.aborted) {
 		return {
 			...nextResult,
-			status: "error",
-			errorMessage: "spawn_pi aborted",
+			status: "aborted",
+			stopReason: "aborted",
+			errorMessage: "aborted",
 		};
 	}
 
