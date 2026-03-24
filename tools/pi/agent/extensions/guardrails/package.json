@@ -1,9 +1,9 @@
 {
-  "name": "pi-command-guard-support",
+  "name": "pi-guardrails-support",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "tsx --test command-guard.test.ts"
+    "test": "tsx --test guardrails.test.ts"
   },
   "dependencies": {
     "jsonc-parser": "^3.3.1"

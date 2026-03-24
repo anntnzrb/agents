@@ -1,17 +1,22 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { loadConfig } from "./config";
 import { reasonForCommand } from "./matcher";
 
-export function createCommandGuard(configPath: string) {
-  return function commandGuard(pi: ExtensionAPI): void {
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const configPath = join(__dirname, "guardrails.jsonc");
+
+export function createGuardrails(path: string) {
+  return function guardrails(pi: ExtensionAPI): void {
     pi.on("tool_call", async (event) => {
       if (!isToolCallEventType("bash", event)) {
         return;
       }
 
-      const result = loadConfig(configPath);
+      const result = loadConfig(path);
       if (!result.ok) {
         return { block: true, reason: result.reason };
       }
@@ -25,3 +30,5 @@ export function createCommandGuard(configPath: string) {
     });
   };
 }
+
+export default createGuardrails(configPath);

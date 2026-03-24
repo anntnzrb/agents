@@ -29,8 +29,8 @@ const pythonConfig: CommandGuardConfig = {
 };
 
 test("loadConfig accepts JSONC comments and trailing commas", () => {
-  const dir = mkdtempSync(join(tmpdir(), "command-guard-"));
-  const path = join(dir, "command-guard.jsonc");
+  const dir = mkdtempSync(join(tmpdir(), "guardrails-"));
+  const path = join(dir, "guardrails.jsonc");
 
   writeFileSync(
     path,
@@ -64,8 +64,8 @@ test("loadConfig accepts JSONC comments and trailing commas", () => {
 });
 
 test("loadConfig fails closed on invalid config", () => {
-  const dir = mkdtempSync(join(tmpdir(), "command-guard-"));
-  const path = join(dir, "command-guard.jsonc");
+  const dir = mkdtempSync(join(tmpdir(), "guardrails-"));
+  const path = join(dir, "guardrails.jsonc");
 
   writeFileSync(
     path,
