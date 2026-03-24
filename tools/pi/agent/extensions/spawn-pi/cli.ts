@@ -85,6 +85,13 @@ export const buildPiArgs = (input: {
 		args.push("--no-tools");
 	}
 
-	args.push(`Task: ${input.task}`);
+	args.push(
+		[
+			`Task: ${input.task}`,
+			"Return only the final answer needed by the parent.",
+			"Be concise.",
+			"Do not delegate further.",
+		].join("\n"),
+	);
 	return args;
 };

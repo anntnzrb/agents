@@ -21,7 +21,7 @@ Always start fresh.
 - Hard-disables `spawn_pi` inside child processes by refusing to register the tool whenever `PI_SPAWN_DEPTH > 0`.
 - Forwards built-in tools restriction and extension flags from parent CLI.
 - Hard-codes one spawn level only.
-- Keep child prompts plain: `Task: ...`
+- Child prompt contract stays minimal but explicit: task, concise final answer only, no further delegation.
 
 ## Navigation
 Start at `index.ts`, then `runner.ts`, then `results.ts`.
