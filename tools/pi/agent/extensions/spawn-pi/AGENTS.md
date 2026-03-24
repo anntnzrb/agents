@@ -18,10 +18,10 @@ Always start fresh.
 - Pi-only. No Codex/Claude/Gemini spawning.
 - Inherits current model + thinking.
 - Always runs child pi with `--no-session`.
-- Hard-disables `spawn_pi` inside child processes by refusing to register the tool whenever `PI_SPAWN_DEPTH > 0`.
-- Forwards built-in tools restriction and extension flags from parent CLI.
-- Hard-codes one spawn level only.
-- Child prompt contract stays minimal but explicit: task, concise final answer only, no further delegation.
+- Disables `spawn_pi` in child processes when `PI_SPAWN_DEPTH > 0`.
+- Forwards built-in tool restrictions and extension flags from parent CLI.
+- Hard-codes one spawn level.
+- Child prompt contract: task, concise final answer only, no further delegation.
 
 ## Navigation
 Start at `index.ts`, then `runner.ts`, then `results.ts`.
