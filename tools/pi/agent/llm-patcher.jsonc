@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "openai": {
+    "enabled": true,
+    "gpt5": {
+      // Provider payload field: text.verbosity
+      // Values: "low" | "medium" | "high"
+      "textVerbosity": "low"
+    }
+  }
+}
