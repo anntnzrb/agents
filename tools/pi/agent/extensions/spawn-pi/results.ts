@@ -24,14 +24,17 @@ export const formatTokens = (count: number): string => {
 	return `${(count / 1000000).toFixed(1)}M`;
 };
 
+const formatToolCalls = (count: number): string => {
+	if (count <= 0) return "";
+	return `${count} ${count === 1 ? "tool" : "tools"}`;
+};
+
 export const formatUsage = (result: ChildRunResult): string => {
 	const parts: string[] = [];
-	if (result.usage.turns > 0) parts.push(`${result.usage.turns}t`);
+	const toolCalls = formatToolCalls(result.toolCalls);
+	if (toolCalls) parts.push(toolCalls);
 	if (result.usage.input > 0) parts.push(`↑${formatTokens(result.usage.input)}`);
 	if (result.usage.output > 0) parts.push(`↓${formatTokens(result.usage.output)}`);
-	if (result.usage.contextTokens > 0) parts.push(`ctx:${formatTokens(result.usage.contextTokens)}`);
-	if (result.durationMs > 0) parts.push(`${(result.durationMs / 1000).toFixed(1)}s`);
-	if (result.model) parts.push(result.model);
 	return parts.join(" · ");
 };
 
@@ -76,6 +79,26 @@ export const getFinalOutput = (messages: readonly Message[]): string => {
 	}
 	return "";
 };
+
+const buildHeader = (details: SpawnPiDetails): string => {
+	if (details.results.length <= 1) return "spawn_pi";
+	return `spawn_pi · ${details.results.length} tasks`;
+};
+
+const getActivityText = (result: ChildRunResult): string => {
+	if (result.currentTool) return result.currentTool;
+	if (result.status === "queued") return "waiting";
+	const toolCalls = formatToolCalls(result.toolCalls);
+	if (toolCalls) return toolCalls;
+	return "working";
+};
+
+const buildProgressLines = (details: SpawnPiDetails): string[] =>
+	details.results.map((result) => {
+		const icon = result.status === "completed" ? "✓" : result.status === "error" ? "✗" : result.status === "running" ? "⏳" : "•";
+		const activity = getActivityText(result);
+		return `${icon} ${result.index + 1}. ${formatTaskPreview(result.task)} — ${shorten(activity.replace(/\s+/g, " ").trim(), 60)}`;
+	});
 
 export const buildToolContent = async (details: SpawnPiDetails): Promise<{ text: string; details: SpawnPiDetails }> => {
 	const sections = details.results.map((result) => {
@@ -132,30 +155,13 @@ export const buildToolContent = async (details: SpawnPiDetails): Promise<{ text:
 export const buildProgressText = (details: SpawnPiDetails): string => {
 	const done = details.results.filter((result) => result.status === "completed" || result.status === "error").length;
 	const total = details.results.length;
-	const header = `${details.mode} · ${done}/${total} done`;
-	const lines = details.results.map((result) => {
-		const icon = result.status === "completed" ? "✓" : result.status === "error" ? "✗" : result.status === "running" ? "⏳" : "•";
-		const activity = result.currentTool ?? result.latestText ?? "waiting";
-		return `${icon} ${result.index + 1}. ${formatTaskPreview(result.task)} — ${shorten(activity.replace(/\s+/g, " ").trim(), 60)}`;
-	});
-	return [header, ...lines].join("\n");
+	return [`${buildHeader(details)} · ${done}/${total} done`, ...buildProgressLines(details)].join("\n");
 };
 
 export const renderCall = (args: { task?: string; tasks?: string[] }, theme: any) => {
-	if (args.tasks && args.tasks.length > 0) {
-		let text = theme.fg("toolTitle", theme.bold("spawn_pi ")) + theme.fg("accent", `parallel (${args.tasks.length})`);
-		for (const task of args.tasks.slice(0, 3)) {
-			text += `\n  ${theme.fg("dim", formatTaskPreview(task))}`;
-		}
-		if (args.tasks.length > 3) text += `\n  ${theme.fg("muted", `... +${args.tasks.length - 3} more`)}`;
-		return new Text(text, 0, 0);
-	}
-
-	const preview = formatTaskPreview(args.task ?? "...");
-	const text =
-		theme.fg("toolTitle", theme.bold("spawn_pi ")) +
-		theme.fg("accent", "single") +
-		`\n  ${theme.fg("dim", preview)}`;
+	const taskCount = args.tasks && args.tasks.length > 0 ? args.tasks.length : args.task ? 1 : 0;
+	let text = theme.fg("toolTitle", theme.bold("spawn_pi"));
+	if (taskCount > 1) text += theme.fg("accent", ` · ${taskCount} tasks`);
 	return new Text(text, 0, 0);
 };
 
@@ -167,31 +173,29 @@ export const renderResult = (result: { content: Array<{ type: string; text?: str
 	}
 
 	if (options.isPartial) {
-		return new Text(buildProgressText(details), 0, 0);
+		return new Text(buildProgressLines(details).join("\n"), 0, 0);
 	}
 
 	if (!options.expanded) {
 		const lines = details.results.map((task) => {
 			const icon = task.exitCode === 0 && task.status !== "error" ? theme.fg("success", "✓") : theme.fg("error", "✗");
 			const usage = formatUsage(task);
-			const suffix = usage ? theme.fg("dim", ` ${usage}`) : "";
-			return `${icon} ${formatTaskPreview(task.task)}${suffix}`;
+			const suffix = usage ? theme.fg("dim", ` · ${usage}`) : "";
+			return `${icon} ${task.index + 1}. ${formatTaskPreview(task.task)}${suffix}`;
 		});
-		let header = theme.fg("toolTitle", theme.bold("spawn_pi ")) + theme.fg("accent", `${details.mode}`);
-		if (details.truncation?.truncated) header += theme.fg("warning", " (truncated)");
-		return new Text([header, ...lines].join("\n"), 0, 0);
+		return new Text(lines.join("\n"), 0, 0);
 	}
 
 	const container = new Container();
 	const mdTheme = getMarkdownTheme();
-	let header = theme.fg("toolTitle", theme.bold("spawn_pi ")) + theme.fg("accent", `${details.mode}`);
+	let header = theme.fg("toolTitle", theme.bold(buildHeader(details)));
 	if (details.truncation?.truncated) header += theme.fg("warning", " (truncated)");
 	container.addChild(new Text(header, 0, 0));
 
 	for (const task of details.results) {
 		container.addChild(new Spacer(1));
 		const icon = task.exitCode === 0 && task.status !== "error" ? theme.fg("success", "✓") : theme.fg("error", "✗");
-		container.addChild(new Text(`${icon} ${formatTaskPreview(task.task)}`, 0, 0));
+		container.addChild(new Text(`${icon} ${task.index + 1}. ${formatTaskPreview(task.task)}`, 0, 0));
 		const usage = formatUsage(task);
 		if (usage) container.addChild(new Text(theme.fg("dim", usage), 0, 0));
 		if (task.stderr.trim()) container.addChild(new Text(theme.fg("error", task.stderr.trim()), 0, 0));

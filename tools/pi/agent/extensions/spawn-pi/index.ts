@@ -133,6 +133,7 @@ export default function spawnPiExtension(pi: ExtensionAPI) {
 						contextTokens: 0,
 						turns: 0,
 					},
+					toolCalls: 0,
 				})),
 			};
 

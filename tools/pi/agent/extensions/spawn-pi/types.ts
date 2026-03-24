@@ -30,6 +30,7 @@ export type ChildRunResult = {
 	messages: Message[];
 	stderr: string;
 	usage: UsageStats;
+	toolCalls: number;
 	model?: string;
 	stopReason?: string;
 	errorMessage?: string;

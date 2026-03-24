@@ -91,6 +91,7 @@ export const runChildTask = async (input: {
 		messages: [],
 		stderr: "",
 		usage: emptyUsage(),
+		toolCalls: 0,
 	};
 
 	const modelArg = formatModelArg(input.model);
@@ -155,6 +156,7 @@ export const runChildTask = async (input: {
 					return;
 				case "tool_execution_start":
 					result.status = "running";
+					result.toolCalls += 1;
 					result.currentTool = summarizeToolCall(event.toolName, event.args ?? {});
 					notify();
 					return;
