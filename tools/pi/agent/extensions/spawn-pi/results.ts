@@ -1,21 +1,31 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import path from "node:path";
+import { join } from "node:path";
 import {
 	DEFAULT_MAX_BYTES,
 	DEFAULT_MAX_LINES,
 	formatSize,
 	getMarkdownTheme,
+	type Theme,
 	truncateHead,
+	type ToolRenderResultOptions,
 	withFileMutationQueue,
+	type AgentToolResult,
 } from "@mariozechner/pi-coding-agent";
 import type { Message } from "@mariozechner/pi-ai";
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
-import type { ChildRunResult, SpawnPiDetails } from "./types.js";
+import {
+	didChildRunFail,
+	getChildRunStatusLabel,
+	type ChildRunResult,
+	type SpawnPiDetails,
+} from "./types.js";
 
-const shorten = (text: string, max: number): string => (text.length > max ? `${text.slice(0, max)}...` : text);
+const shorten = (text: string, max: number): string =>
+	text.length > max ? `${text.slice(0, max)}...` : text;
 
-export const formatTaskPreview = (task: string): string => shorten(task.replace(/\s+/g, " ").trim(), 70);
+export const formatTaskPreview = (task: string): string =>
+	shorten(task.replace(/\s+/g, " ").trim(), 70);
 
 export const formatTokens = (count: number): string => {
 	if (count < 1000) return count.toString();
@@ -30,15 +40,19 @@ const formatToolCalls = (count: number): string => {
 };
 
 export const formatUsage = (result: ChildRunResult): string => {
-	const parts: string[] = [];
-	const toolCalls = formatToolCalls(result.toolCalls);
-	if (toolCalls) parts.push(toolCalls);
-	if (result.usage.input > 0) parts.push(`↑${formatTokens(result.usage.input)}`);
-	if (result.usage.output > 0) parts.push(`↓${formatTokens(result.usage.output)}`);
+	const parts = [
+		formatToolCalls(result.toolCalls),
+		result.usage.input > 0 ? `↑${formatTokens(result.usage.input)}` : "",
+		result.usage.output > 0 ? `↓${formatTokens(result.usage.output)}` : "",
+	].filter(Boolean);
+
 	return parts.join(" · ");
 };
 
-export const summarizeToolCall = (toolName: string, args: Record<string, unknown>): string => {
+export const summarizeToolCall = (
+	toolName: string,
+	args: Record<string, unknown>,
+): string => {
 	switch (toolName) {
 		case "bash":
 			return shorten(String(args["command"] ?? "bash"), 60);
@@ -71,8 +85,8 @@ export const getAssistantText = (message: Message): string => {
 };
 
 export const getFinalOutput = (messages: readonly Message[]): string => {
-	for (let i = messages.length - 1; i >= 0; i--) {
-		const message = messages[i];
+	for (let index = messages.length - 1; index >= 0; index -= 1) {
+		const message = messages[index];
 		if (!message) continue;
 		const text = getAssistantText(message);
 		if (text) return text;
@@ -80,10 +94,10 @@ export const getFinalOutput = (messages: readonly Message[]): string => {
 	return "";
 };
 
-const buildHeader = (details: SpawnPiDetails): string => {
-	if (details.results.length <= 1) return "spawn_pi";
-	return `spawn_pi · ${details.results.length} tasks`;
-};
+const buildHeader = (details: SpawnPiDetails): string =>
+	details.results.length <= 1
+		? "spawn_pi"
+		: `spawn_pi · ${details.results.length} tasks`;
 
 const getActivityText = (result: ChildRunResult): string => {
 	if (result.currentTool) return result.currentTool;
@@ -95,28 +109,68 @@ const getActivityText = (result: ChildRunResult): string => {
 
 const buildProgressLines = (details: SpawnPiDetails): string[] =>
 	details.results.map((result) => {
-		const icon = result.status === "completed" ? "✓" : result.status === "error" ? "✗" : result.status === "running" ? "⏳" : "•";
+		const icon =
+			result.status === "completed"
+				? "✓"
+				: result.status === "error"
+					? "✗"
+					: result.status === "running"
+						? "⏳"
+						: "•";
 		const activity = getActivityText(result);
 		return `${icon} ${result.index + 1}. ${formatTaskPreview(result.task)} — ${shorten(activity.replace(/\s+/g, " ").trim(), 60)}`;
 	});
 
-export const buildToolContent = async (details: SpawnPiDetails): Promise<{ text: string; details: SpawnPiDetails }> => {
-	const sections = details.results.map((result) => {
-		const status = result.exitCode === 0 && result.status !== "error" ? "completed" : "failed";
-		const output = getFinalOutput(result.messages) || result.stderr.trim() || result.errorMessage || "(no output)";
-		return [
-			`Task ${result.index + 1}: ${result.task}`,
-			`Status: ${status}`,
-			result.stopReason ? `Stop reason: ${result.stopReason}` : "",
-			result.errorMessage ? `Error: ${result.errorMessage}` : "",
-			result.stderr.trim() ? `Stderr:\n${result.stderr.trim()}` : "",
-			`Output:\n${output}`,
-		]
-			.filter(Boolean)
-			.join("\n\n");
-	});
+const buildOutputSection = (result: ChildRunResult): string => {
+	const output = getFinalOutput(result.messages);
+	if (output) return `Output:\n${output}`;
+	if (result.stderr.trim() || result.errorMessage) return "";
+	return "Output:\n(no output)";
+};
 
-	const combined = sections.join("\n\n---\n\n");
+const buildResultSection = (result: ChildRunResult): string =>
+	[
+		`Task ${result.index + 1}: ${result.task}`,
+		`Status: ${getChildRunStatusLabel(result)}`,
+		result.stopReason ? `Stop reason: ${result.stopReason}` : "",
+		result.errorMessage ? `Error: ${result.errorMessage}` : "",
+		result.stderr.trim() ? `Stderr:\n${result.stderr.trim()}` : "",
+		buildOutputSection(result),
+	]
+		.filter(Boolean)
+		.join("\n\n");
+
+const buildCombinedOutput = (details: SpawnPiDetails): string =>
+	details.results.map(buildResultSection).join("\n\n---\n\n");
+
+const persistFullOutput = async (content: string): Promise<string> => {
+	const dir = await mkdtemp(join(tmpdir(), "pi-spawn-output-"));
+	const filePath = join(dir, "output.txt");
+	await withFileMutationQueue(filePath, async () => {
+		await writeFile(filePath, content, { encoding: "utf-8", mode: 0o600 });
+	});
+	return filePath;
+};
+
+const buildTruncationNotice = (
+	filePath: string,
+	truncation: ReturnType<typeof truncateHead>,
+): string => {
+	const omittedLines = truncation.totalLines - truncation.outputLines;
+	const omittedBytes = truncation.totalBytes - truncation.outputBytes;
+	return [
+		"",
+		`[Output truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines`,
+		`(${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}).`,
+		`${omittedLines} lines (${formatSize(omittedBytes)}) omitted.`,
+		`Full output saved to: ${filePath}]`,
+	].join(" ");
+};
+
+export const buildToolContent = async (
+	details: SpawnPiDetails,
+): Promise<{ text: string; details: SpawnPiDetails }> => {
+	const combined = buildCombinedOutput(details);
 	const truncation = truncateHead(combined, {
 		maxLines: DEFAULT_MAX_LINES,
 		maxBytes: DEFAULT_MAX_BYTES,
@@ -124,52 +178,54 @@ export const buildToolContent = async (details: SpawnPiDetails): Promise<{ text:
 
 	if (!truncation.truncated) return { text: truncation.content, details };
 
-	const dir = await mkdtemp(path.join(tmpdir(), "pi-spawn-output-"));
-	const filePath = path.join(dir, "output.txt");
-	await withFileMutationQueue(filePath, async () => {
-		await writeFile(filePath, combined, { encoding: "utf-8", mode: 0o600 });
-	});
-
+	const fullOutputPath = await persistFullOutput(combined);
 	const nextDetails: SpawnPiDetails = {
 		...details,
 		truncation,
-		fullOutputPath: filePath,
+		fullOutputPath,
 	};
 
-	const omittedLines = truncation.totalLines - truncation.outputLines;
-	const omittedBytes = truncation.totalBytes - truncation.outputBytes;
-	const notice = [
-		"",
-		`[Output truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines`,
-		`(${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}).`,
-		`${omittedLines} lines (${formatSize(omittedBytes)}) omitted.`,
-		`Full output saved to: ${filePath}]`,
-	].join(" ");
-
 	return {
-		text: `${truncation.content}\n\n${notice.trim()}`,
+		text: `${truncation.content}\n\n${buildTruncationNotice(fullOutputPath, truncation).trim()}`,
 		details: nextDetails,
 	};
 };
 
 export const buildProgressText = (details: SpawnPiDetails): string => {
-	const done = details.results.filter((result) => result.status === "completed" || result.status === "error").length;
+	const done = details.results.filter(
+		(result) => result.status === "completed" || result.status === "error",
+	).length;
 	const total = details.results.length;
 	return [`${buildHeader(details)} · ${done}/${total} done`, ...buildProgressLines(details)].join("\n");
 };
 
-export const renderCall = (args: { task?: string; tasks?: string[] }, theme: any) => {
+type RenderCallArgs = Partial<{ task: string; tasks: string[] }>;
+
+const getResultIcon = (result: ChildRunResult, theme: Theme): string =>
+	didChildRunFail(result)
+		? theme.fg("error", "✗")
+		: theme.fg("success", "✓");
+
+export const renderCall = (args: RenderCallArgs, theme: Theme) => {
 	const taskCount = args.tasks && args.tasks.length > 0 ? args.tasks.length : args.task ? 1 : 0;
 	let text = theme.fg("toolTitle", theme.bold("spawn_pi"));
 	if (taskCount > 1) text += theme.fg("accent", ` · ${taskCount} tasks`);
 	return new Text(text, 0, 0);
 };
 
-export const renderResult = (result: { content: Array<{ type: string; text?: string }>; details?: SpawnPiDetails }, options: { expanded: boolean; isPartial?: boolean }, theme: any) => {
+export const renderResult = (
+	result: AgentToolResult<SpawnPiDetails>,
+	options: ToolRenderResultOptions,
+	theme: Theme,
+) => {
 	const details = result.details;
 	if (!details || details.results.length === 0) {
 		const text = result.content[0];
-		return new Text(text?.type === "text" ? (text.text ?? "(no output)") : "(no output)", 0, 0);
+		return new Text(
+			text?.type === "text" ? (text.text ?? "(no output)") : "(no output)",
+			0,
+			0,
+		);
 	}
 
 	if (options.isPartial) {
@@ -178,10 +234,9 @@ export const renderResult = (result: { content: Array<{ type: string; text?: str
 
 	if (!options.expanded) {
 		const lines = details.results.map((task) => {
-			const icon = task.exitCode === 0 && task.status !== "error" ? theme.fg("success", "✓") : theme.fg("error", "✗");
 			const usage = formatUsage(task);
 			const suffix = usage ? theme.fg("dim", ` · ${usage}`) : "";
-			return `${icon} ${task.index + 1}. ${formatTaskPreview(task.task)}${suffix}`;
+			return `${getResultIcon(task, theme)} ${task.index + 1}. ${formatTaskPreview(task.task)}${suffix}`;
 		});
 		return new Text(lines.join("\n"), 0, 0);
 	}
@@ -194,11 +249,21 @@ export const renderResult = (result: { content: Array<{ type: string; text?: str
 
 	for (const task of details.results) {
 		container.addChild(new Spacer(1));
-		const icon = task.exitCode === 0 && task.status !== "error" ? theme.fg("success", "✓") : theme.fg("error", "✗");
-		container.addChild(new Text(`${icon} ${task.index + 1}. ${formatTaskPreview(task.task)}`, 0, 0));
+		container.addChild(
+			new Text(
+				`${getResultIcon(task, theme)} ${task.index + 1}. ${formatTaskPreview(task.task)}`,
+				0,
+				0,
+			),
+		);
 		const usage = formatUsage(task);
 		if (usage) container.addChild(new Text(theme.fg("dim", usage), 0, 0));
-		if (task.stderr.trim()) container.addChild(new Text(theme.fg("error", task.stderr.trim()), 0, 0));
+		if (task.errorMessage) {
+			container.addChild(new Text(theme.fg("error", task.errorMessage), 0, 0));
+		}
+		if (task.stderr.trim()) {
+			container.addChild(new Text(theme.fg("error", task.stderr.trim()), 0, 0));
+		}
 		const output = getFinalOutput(task.messages);
 		if (output) {
 			container.addChild(new Spacer(1));
@@ -208,7 +273,9 @@ export const renderResult = (result: { content: Array<{ type: string; text?: str
 
 	if (details.fullOutputPath) {
 		container.addChild(new Spacer(1));
-		container.addChild(new Text(theme.fg("dim", `Full output: ${details.fullOutputPath}`), 0, 0));
+		container.addChild(
+			new Text(theme.fg("dim", `Full output: ${details.fullOutputPath}`), 0, 0),
+		);
 	}
 
 	return container;

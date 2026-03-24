@@ -1,72 +1,115 @@
-import fs from "node:fs";
-import path from "node:path";
+import { existsSync } from "node:fs";
+import { basename } from "node:path";
+
+export type InheritedTools =
+	| { mode: "default" }
+	| { mode: "disabled" }
+	| { mode: "explicit"; value: string };
 
 export type InheritedCliArgs = {
 	extensionArgs: string[];
-	toolsArg: string | undefined;
-	noTools: boolean;
+	tools: InheritedTools;
 };
 
-const isToolsFlag = (arg: string): boolean => arg === "--tools" || arg.startsWith("--tools=");
-const isExtensionFlag = (arg: string): boolean =>
-	arg === "-e" || arg === "--extension" || arg.startsWith("--extension=");
+type RuntimeInfo = {
+	argv: readonly string[];
+	execPath: string;
+	existsSync: (filePath: string) => boolean;
+};
 
-export const getInheritedCliArgs = (argv: readonly string[] = process.argv): InheritedCliArgs => {
-	const inherited: InheritedCliArgs = {
-		extensionArgs: [],
-		toolsArg: undefined,
-		noTools: false,
-	};
+const isToolsFlag = (arg: string): boolean =>
+	arg === "--tools" || arg.startsWith("--tools=");
 
-	for (let i = 2; i < argv.length; i++) {
-		const arg = argv[i];
+const getInlineFlagValue = (
+	arg: string,
+	flag: "--tools" | "--extension",
+): string | null => (arg.startsWith(`${flag}=`) ? arg.slice(flag.length + 1) : null);
+
+export const getInheritedCliArgs = (
+	argv: readonly string[] = process.argv,
+): InheritedCliArgs => {
+	const extensionArgs: string[] = [];
+	let tools: InheritedTools = { mode: "default" };
+
+	for (let index = 2; index < argv.length; index += 1) {
+		const arg = argv[index];
 		if (!arg) continue;
 
 		if (arg === "--no-extensions") {
-			inherited.extensionArgs.push(arg);
+			extensionArgs.push(arg);
 			continue;
 		}
 
-		if (isExtensionFlag(arg)) {
-			inherited.extensionArgs.push(arg);
-			if ((arg === "-e" || arg === "--extension") && argv[i + 1]) {
-				inherited.extensionArgs.push(argv[i + 1] ?? "");
-				i++;
-			}
+		if (arg === "-e" || arg === "--extension") {
+			const extension = argv[index + 1];
+			if (!extension) continue;
+			extensionArgs.push(arg, extension);
+			index += 1;
+			continue;
+		}
+
+		const inlineExtension = getInlineFlagValue(arg, "--extension");
+		if (inlineExtension) {
+			extensionArgs.push(arg);
 			continue;
 		}
 
 		if (arg === "--no-tools") {
-			inherited.noTools = true;
+			tools = { mode: "disabled" };
 			continue;
 		}
 
-		if (isToolsFlag(arg)) {
-			inherited.toolsArg = arg === "--tools" ? argv[i + 1] : arg.slice("--tools=".length);
-			if (arg === "--tools" && argv[i + 1]) i++;
+		if (!isToolsFlag(arg)) continue;
+
+		if (arg === "--tools") {
+			const value = argv[index + 1];
+			if (!value) continue;
+			tools = { mode: "explicit", value };
+			index += 1;
+			continue;
 		}
+
+		const value = getInlineFlagValue(arg, "--tools");
+		if (value) tools = { mode: "explicit", value };
 	}
 
-	return inherited;
+	return { extensionArgs, tools };
 };
 
-export const getPiInvocation = (args: readonly string[]): { command: string; args: string[] } => {
-	const currentScript = process.argv[1];
-	if (currentScript && fs.existsSync(currentScript)) {
-		return { command: process.execPath, args: [currentScript, ...args] };
+export const getPiInvocation = (
+	args: readonly string[],
+	runtime: RuntimeInfo = {
+		argv: process.argv,
+		execPath: process.execPath,
+		existsSync,
+	},
+): { command: string; args: string[] } => {
+	const currentScript = runtime.argv[1];
+	if (currentScript && runtime.existsSync(currentScript)) {
+		return { command: runtime.execPath, args: [currentScript, ...args] };
 	}
 
-	const execName = path.basename(process.execPath).toLowerCase();
+	const execName = basename(runtime.execPath).toLowerCase();
 	const isGenericRuntime = /^(node|bun)(\.exe)?$/.test(execName);
-	if (!isGenericRuntime) return { command: process.execPath, args: [...args] };
+	if (!isGenericRuntime) return { command: runtime.execPath, args: [...args] };
 
 	return { command: "pi", args: [...args] };
 };
 
-export const formatModelArg = (model?: { provider?: string; id?: string } | null): string | undefined => {
+export const formatModelArg = (
+	model?: { provider?: string; id?: string } | null,
+): string | undefined => {
 	if (!model?.id) return undefined;
 	return model.provider ? `${model.provider}/${model.id}` : model.id;
 };
+
+const buildChildPrompt = (task: string): string =>
+	[
+		`Task: ${task}`,
+		"Return only the final answer needed by the parent.",
+		"Be concise.",
+		"Do not delegate further.",
+	].join("\n");
 
 export const buildPiArgs = (input: {
 	task: string;
@@ -74,24 +117,28 @@ export const buildPiArgs = (input: {
 	thinkingLevel: string | undefined;
 	inheritedCliArgs: InheritedCliArgs;
 }): string[] => {
-	const args = ["--mode", "json", ...input.inheritedCliArgs.extensionArgs, "-p", "--no-session"];
+	const args = [
+		"--mode",
+		"json",
+		...input.inheritedCliArgs.extensionArgs,
+		"-p",
+		"--no-session",
+	];
 
 	if (input.modelArg) args.push("--model", input.modelArg);
 	if (input.thinkingLevel) args.push("--thinking", input.thinkingLevel);
 
-	if (input.inheritedCliArgs.toolsArg) {
-		args.push("--tools", input.inheritedCliArgs.toolsArg);
-	} else if (input.inheritedCliArgs.noTools) {
-		args.push("--no-tools");
+	switch (input.inheritedCliArgs.tools.mode) {
+		case "explicit":
+			args.push("--tools", input.inheritedCliArgs.tools.value);
+			break;
+		case "disabled":
+			args.push("--no-tools");
+			break;
+		case "default":
+			break;
 	}
 
-	args.push(
-		[
-			`Task: ${input.task}`,
-			"Return only the final answer needed by the parent.",
-			"Be concise.",
-			"Do not delegate further.",
-		].join("\n"),
-	);
+	args.push(buildChildPrompt(input.task));
 	return args;
 };

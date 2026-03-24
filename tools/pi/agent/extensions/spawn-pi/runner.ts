@@ -1,12 +1,37 @@
 import { spawn } from "node:child_process";
 import type { Message } from "@mariozechner/pi-ai";
-import { buildPiArgs, formatModelArg, getInheritedCliArgs, getPiInvocation } from "./cli.js";
+import type { InheritedCliArgs } from "./cli.js";
+import { buildPiArgs, formatModelArg, getPiInvocation } from "./cli.js";
 import { getAssistantText, summarizeToolCall } from "./results.js";
-import { type ChildRunResult, type TaskSpec, emptyUsage } from "./types.js";
+import {
+	cloneChildRunResult,
+	createChildRunResult,
+	type ChildRunResult,
+	type TaskSpec,
+} from "./types.js";
 
-const inheritedCliArgs = getInheritedCliArgs();
 const DEPTH_ENV = "PI_SPAWN_DEPTH";
 const MAX_DEPTH = 1;
+
+type AbortLike = {
+	aborted: boolean;
+	addEventListener: (
+		type: "abort",
+		listener: () => void,
+		options?: { once?: boolean },
+	) => void;
+	removeEventListener: (type: "abort", listener: () => void) => void;
+};
+
+type ChildEvent =
+	| { type: "agent_start" }
+	| { type: "agent_end" }
+	| { type: "tool_execution_start"; toolName: string; args: Record<string, unknown> }
+	| { type: "tool_execution_end" }
+	| { type: "message_end"; message: Message };
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null;
 
 const parseDepth = (raw: string | undefined): number => {
 	if (!raw || !/^\d+$/.test(raw)) return 0;
@@ -14,7 +39,11 @@ const parseDepth = (raw: string | undefined): number => {
 	return Number.isSafeInteger(parsed) ? parsed : 0;
 };
 
-export const getDepthGuard = (): { currentDepth: number; maxDepth: number; canSpawn: boolean } => {
+export const getDepthGuard = (): {
+	currentDepth: number;
+	maxDepth: number;
+	canSpawn: boolean;
+} => {
 	const currentDepth = parseDepth(process.env[DEPTH_ENV]);
 	return {
 		currentDepth,
@@ -25,29 +54,142 @@ export const getDepthGuard = (): { currentDepth: number; maxDepth: number; canSp
 
 const isAssistantMessage = (message: Message): boolean => message.role === "assistant";
 
+const getNumber = (value: unknown): number =>
+	typeof value === "number" && Number.isFinite(value) ? value : 0;
+
 const getCostTotal = (value: unknown): number => {
 	if (typeof value === "number" && Number.isFinite(value)) return value;
-	if (!value || typeof value !== "object") return 0;
-	const total = (value as { total?: unknown }).total;
-	return typeof total === "number" && Number.isFinite(total) ? total : 0;
+	if (!isRecord(value)) return 0;
+	return getNumber(value["total"]);
 };
 
-const collectAssistantUsage = (result: ChildRunResult, message: Message): void => {
-	if (!isAssistantMessage(message)) return;
-	const usage = message.usage;
-	if (!usage) return;
-	result.usage.turns += 1;
-	result.usage.input += usage.input || usage.inputTokens || 0;
-	result.usage.output += usage.output || usage.outputTokens || 0;
-	result.usage.cacheRead += usage.cacheRead || 0;
-	result.usage.cacheWrite += usage.cacheWrite || 0;
-	result.usage.cost += getCostTotal(usage.cost);
-	result.usage.contextTokens = usage.totalTokens || result.usage.contextTokens;
-	if (!result.model && message.model) result.model = message.model;
-	if (message.stopReason) result.stopReason = message.stopReason;
-	if (message.errorMessage) result.errorMessage = message.errorMessage;
+const clearCurrentTool = ({ currentTool: _currentTool, ...result }: ChildRunResult): ChildRunResult =>
+	result;
+
+const appendMessage = (
+	result: ChildRunResult,
+	message: Message,
+): ChildRunResult => {
+	const nextResult: ChildRunResult = {
+		...result,
+		messages: [...result.messages, message],
+	};
+
+	if (!isAssistantMessage(message) || !message.usage) return nextResult;
+
 	const latestText = getAssistantText(message);
-	if (latestText) result.latestText = latestText;
+	return {
+		...nextResult,
+		usage: {
+			...nextResult.usage,
+			turns: nextResult.usage.turns + 1,
+			input:
+				nextResult.usage.input +
+				(getNumber(message.usage.input) || getNumber(message.usage.inputTokens)),
+			output:
+				nextResult.usage.output +
+				(getNumber(message.usage.output) || getNumber(message.usage.outputTokens)),
+			cacheRead: nextResult.usage.cacheRead + getNumber(message.usage.cacheRead),
+			cacheWrite: nextResult.usage.cacheWrite + getNumber(message.usage.cacheWrite),
+			cost: nextResult.usage.cost + getCostTotal(message.usage.cost),
+			contextTokens:
+				getNumber(message.usage.totalTokens) || nextResult.usage.contextTokens,
+		},
+		...(message.model ? { model: message.model } : {}),
+		...(message.stopReason ? { stopReason: message.stopReason } : {}),
+		...(message.errorMessage ? { errorMessage: message.errorMessage } : {}),
+		...(latestText ? { latestText } : {}),
+	};
+};
+
+const parseChildEvent = (line: string): ChildEvent | null => {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(line);
+	} catch {
+		return null;
+	}
+
+	if (!isRecord(parsed)) return null;
+	const eventType = parsed["type"];
+	if (typeof eventType !== "string") return null;
+
+	switch (eventType) {
+		case "agent_start":
+			return { type: "agent_start" };
+		case "agent_end":
+			return { type: "agent_end" };
+		case "tool_execution_start":
+			return {
+				type: "tool_execution_start",
+				toolName:
+					typeof parsed["toolName"] === "string" ? parsed["toolName"] : "tool",
+				args: isRecord(parsed["args"])
+					? (parsed["args"] as Record<string, unknown>)
+					: {},
+			};
+		case "tool_execution_end":
+			return { type: "tool_execution_end" };
+		case "message_end":
+			return isRecord(parsed["message"])
+				? { type: "message_end", message: parsed["message"] as Message }
+				: null;
+		default:
+			return null;
+	}
+};
+
+const applyChildEvent = (
+	result: ChildRunResult,
+	event: ChildEvent,
+): ChildRunResult => {
+	switch (event.type) {
+		case "agent_start":
+			return clearCurrentTool({ ...result, status: "running" });
+		case "tool_execution_start":
+			return {
+				...result,
+				status: "running",
+				toolCalls: result.toolCalls + 1,
+				currentTool: summarizeToolCall(event.toolName, event.args),
+			};
+		case "tool_execution_end":
+			return clearCurrentTool(result);
+		case "message_end":
+			return appendMessage(result, event.message);
+		case "agent_end":
+			return clearCurrentTool({ ...result, status: "completed" });
+	}
+};
+
+const finalizeChildRun = (
+	result: ChildRunResult,
+	input: { exitCode: number; durationMs: number; aborted: boolean },
+): ChildRunResult => {
+	const nextResult = clearCurrentTool({
+		...result,
+		exitCode: input.exitCode,
+		durationMs: input.durationMs,
+	});
+
+	if (input.aborted) {
+		return {
+			...nextResult,
+			status: "error",
+			errorMessage: "spawn_pi aborted",
+		};
+	}
+
+	const failed =
+		nextResult.exitCode !== 0 ||
+		Boolean(nextResult.errorMessage) ||
+		nextResult.stopReason === "error" ||
+		nextResult.stopReason === "aborted";
+
+	return {
+		...nextResult,
+		status: failed ? "error" : "completed",
+	};
 };
 
 export const mapConcurrent = async <TIn, TOut>(
@@ -56,61 +198,66 @@ export const mapConcurrent = async <TIn, TOut>(
 	fn: (item: TIn, index: number) => Promise<TOut>,
 ): Promise<TOut[]> => {
 	if (items.length === 0) return [];
+
 	const limit = Math.max(1, Math.min(concurrency, items.length));
 	const results = new Array<TOut>(items.length);
 	let nextIndex = 0;
-	const workers = new Array(limit).fill(null).map(async () => {
+
+	const workers = Array.from({ length: limit }, async () => {
 		while (true) {
-			const currentIndex = nextIndex++;
+			const currentIndex = nextIndex;
+			nextIndex += 1;
 			if (currentIndex >= items.length) return;
-			results[currentIndex] = await fn(items[currentIndex] as TIn, currentIndex);
+			const item = items[currentIndex];
+			if (item === undefined) return;
+			results[currentIndex] = await fn(item, currentIndex);
 		}
 	});
+
 	await Promise.all(workers);
 	return results;
-};
-
-const clearCurrentTool = (result: ChildRunResult): void => {
-	delete result.currentTool;
 };
 
 export const runChildTask = async (input: {
 	taskSpec: TaskSpec;
 	model?: { provider?: string; id?: string } | null;
 	thinkingLevel?: string;
-	signal?: AbortSignal;
+	inheritedCliArgs: InheritedCliArgs;
+	signal?: AbortLike;
 	onChange?: (result: ChildRunResult) => void;
 }): Promise<ChildRunResult> => {
-	const result: ChildRunResult = {
-		index: input.taskSpec.index,
-		task: input.taskSpec.task,
-		cwd: input.taskSpec.cwd,
-		status: "queued",
-		exitCode: 0,
-		durationMs: 0,
-		messages: [],
-		stderr: "",
-		usage: emptyUsage(),
-		toolCalls: 0,
-	};
-
+	let result = createChildRunResult(input.taskSpec);
 	const modelArg = formatModelArg(input.model);
 	const args = buildPiArgs({
 		task: input.taskSpec.task,
 		modelArg,
 		thinkingLevel: input.thinkingLevel,
-		inheritedCliArgs,
+		inheritedCliArgs: input.inheritedCliArgs,
 	});
 	const invocation = getPiInvocation(args);
 	const startTime = Date.now();
-	const nextDepth = String(parseDepth(process.env[DEPTH_ENV]) + 1);
+	const nextDepth = String(getDepthGuard().currentDepth + 1);
 
 	await new Promise<void>((resolve) => {
 		let settled = false;
+		let stdoutBuffer = "";
+		let aborted = false;
+
 		const finish = () => {
 			if (settled) return;
 			settled = true;
+			if (input.signal) input.signal.removeEventListener("abort", abortChild);
 			resolve();
+		};
+
+		const notify = () => {
+			if (!input.onChange) return;
+			input.onChange(
+				cloneChildRunResult({
+					...result,
+					durationMs: Date.now() - startTime,
+				}),
+			);
 		};
 
 		const proc = spawn(invocation.command, invocation.args, {
@@ -123,15 +270,8 @@ export const runChildTask = async (input: {
 			},
 		});
 
-		let stdoutBuffer = "";
-		let aborted = false;
-
-		const notify = () => {
-			result.durationMs = Date.now() - startTime;
-			input.onChange?.({ ...result, messages: [...result.messages], usage: { ...result.usage } });
-		};
-
-		const killProc = () => {
+		const abortChild = () => {
+			if (aborted) return;
 			aborted = true;
 			proc.kill("SIGTERM");
 			setTimeout(() => {
@@ -141,92 +281,53 @@ export const runChildTask = async (input: {
 
 		const processLine = (line: string) => {
 			if (!line.trim()) return;
-			let event: any;
-			try {
-				event = JSON.parse(line);
-			} catch {
-				return;
-			}
-
-			switch (event.type) {
-				case "agent_start":
-					result.status = "running";
-					clearCurrentTool(result);
-					notify();
-					return;
-				case "tool_execution_start":
-					result.status = "running";
-					result.toolCalls += 1;
-					result.currentTool = summarizeToolCall(event.toolName, event.args ?? {});
-					notify();
-					return;
-				case "tool_execution_end":
-					clearCurrentTool(result);
-					notify();
-					return;
-				case "message_end": {
-					const message = event.message as Message | undefined;
-					if (!message) return;
-					result.messages.push(message);
-					collectAssistantUsage(result, message);
-					notify();
-					return;
-				}
-				case "agent_end":
-					clearCurrentTool(result);
-					result.status = result.exitCode === 0 ? "completed" : result.status;
-					notify();
-					return;
-				default:
-					return;
-			}
+			const event = parseChildEvent(line);
+			if (!event) return;
+			result = applyChildEvent(result, event);
+			notify();
 		};
 
-		proc.stdout.on("data", (data: Buffer | string) => {
+		proc.stdout.on("data", (data: Uint8Array | string) => {
 			stdoutBuffer += data.toString();
 			const lines = stdoutBuffer.split("\n");
 			stdoutBuffer = lines.pop() || "";
 			for (const line of lines) processLine(line);
 		});
 
-		proc.stderr.on("data", (data: Buffer | string) => {
-			result.stderr += data.toString();
+		proc.stderr.on("data", (data: Uint8Array | string) => {
+			result = { ...result, stderr: `${result.stderr}${data.toString()}` };
 			notify();
 		});
 
 		proc.on("error", (error: Error) => {
-			result.status = "error";
-			result.exitCode = 1;
-			result.errorMessage = error.message;
+			if (settled) return;
+			result = {
+				...result,
+				status: "error",
+				exitCode: 1,
+				errorMessage: error.message,
+			};
 			notify();
 			finish();
 		});
 
 		proc.on("close", (code: number | null) => {
+			if (settled) return;
 			if (stdoutBuffer.trim()) processLine(stdoutBuffer);
-			result.exitCode = code ?? result.exitCode;
-			result.durationMs = Date.now() - startTime;
-			if (aborted) {
-				result.status = "error";
-				result.errorMessage = "spawn_pi aborted";
-				notify();
-				finish();
-				return;
-			}
-			if (result.exitCode !== 0 || result.errorMessage || result.stopReason === "error" || result.stopReason === "aborted") {
-				result.status = "error";
-			} else {
-				result.status = "completed";
-			}
+			result = finalizeChildRun(result, {
+				exitCode: code ?? result.exitCode,
+				durationMs: Date.now() - startTime,
+				aborted,
+			});
 			notify();
 			finish();
 		});
 
 		if (input.signal) {
 			if (input.signal.aborted) {
-				killProc();
+				abortChild();
 			} else {
-				input.signal.addEventListener("abort", killProc, { once: true });
+				input.signal.addEventListener("abort", abortChild, { once: true });
 			}
 		}
 	});

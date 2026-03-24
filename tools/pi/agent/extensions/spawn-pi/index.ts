@@ -1,9 +1,17 @@
 import { stat } from "node:fs/promises";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { getInheritedCliArgs } from "./cli.js";
 import { buildProgressText, buildToolContent, renderCall, renderResult } from "./results.js";
 import { getDepthGuard, mapConcurrent, runChildTask } from "./runner.js";
-import type { SpawnMode, SpawnPiDetails, TaskSpec } from "./types.js";
+import {
+	createChildRunResult,
+	didChildRunFail,
+	type ChildRunResult,
+	type SpawnMode,
+	type SpawnPiDetails,
+	type TaskSpec,
+} from "./types.js";
 
 const MAX_PARALLEL_TASKS = 8;
 const DEFAULT_CONCURRENCY = 4;
@@ -34,6 +42,10 @@ const SpawnPiParams = Type.Object({
 	),
 });
 
+type SpawnPiParamsInput = Static<typeof SpawnPiParams>;
+type TaskPlan = { mode: SpawnMode; tasks: TaskSpec[] };
+type TaskPlanResult = { ok: true; value: TaskPlan } | { ok: false; error: string };
+
 const clampConcurrency = (value: unknown): number => {
 	if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_CONCURRENCY;
 	return Math.max(1, Math.min(MAX_PARALLEL_TASKS, Math.trunc(value)));
@@ -48,32 +60,63 @@ const validateCwd = async (cwd: string): Promise<string | null> => {
 	}
 };
 
-const buildTasks = (params: { task?: string; tasks?: string[]; cwd?: string }, cwd: string): { mode: SpawnMode; tasks: TaskSpec[]; error?: string } | null => {
-	const hasSingle = Boolean(params.task?.trim());
-	const taskList = (params.tasks ?? []).map((task) => task.trim()).filter(Boolean);
-	const hasParallel = taskList.length > 0;
-	if (Number(hasSingle) + Number(hasParallel) !== 1) {
-		return { mode: "single", tasks: [], error: "Provide exactly one of task or tasks." };
+const buildTaskPlan = (
+	params: SpawnPiParamsInput,
+	cwd: string,
+): TaskPlanResult => {
+	const task = params.task?.trim();
+	const tasks = (params.tasks ?? []).map((value) => value.trim()).filter(Boolean);
+	const modeCount = Number(Boolean(task)) + Number(tasks.length > 0);
+	if (modeCount !== 1) {
+		return { ok: false, error: "Provide exactly one of task or tasks." };
 	}
-	if (taskList.length > MAX_PARALLEL_TASKS) {
-		return { mode: "parallel", tasks: [], error: `Parallel mode accepts up to ${MAX_PARALLEL_TASKS} tasks.` };
-	}
-
-	if (hasSingle) {
+	if (tasks.length > MAX_PARALLEL_TASKS) {
 		return {
-			mode: "single",
-			tasks: [{ index: 0, task: params.task!.trim(), cwd: params.cwd ?? cwd }],
+			ok: false,
+			error: `Parallel mode accepts up to ${MAX_PARALLEL_TASKS} tasks.`,
 		};
 	}
 
-	return {
-		mode: "parallel",
-		tasks: taskList.map((task, index) => ({ index, task, cwd: params.cwd ?? cwd })),
-	};
+	const taskCwd = params.cwd ?? cwd;
+	return task
+		? {
+				ok: true,
+				value: {
+					mode: "single",
+					tasks: [{ index: 0, task, cwd: taskCwd }],
+				},
+			}
+		: {
+				ok: true,
+				value: {
+					mode: "parallel",
+					tasks: tasks.map((parallelTask, index) => ({
+						index,
+						task: parallelTask,
+						cwd: taskCwd,
+					})),
+				},
+			};
 };
+
+const createDetails = (taskPlan: TaskPlan): SpawnPiDetails => ({
+	mode: taskPlan.mode,
+	results: taskPlan.tasks.map(createChildRunResult),
+});
+
+const replaceResultAt = (
+	results: SpawnPiDetails["results"],
+	index: number,
+	nextResult: ChildRunResult,
+): SpawnPiDetails["results"] =>
+	results.map((result, resultIndex) =>
+		resultIndex === index ? nextResult : result,
+	);
 
 export default function spawnPiExtension(pi: ExtensionAPI) {
 	if (getDepthGuard().currentDepth > 0) return;
+
+	const inheritedCliArgs = getInheritedCliArgs();
 
 	pi.registerTool({
 		name: "spawn_pi",
@@ -94,54 +137,36 @@ export default function spawnPiExtension(pi: ExtensionAPI) {
 			const depth = getDepthGuard();
 			if (!depth.canSpawn) {
 				return {
-					content: [{ type: "text", text: `spawn_pi blocked: recursion depth ${depth.currentDepth} reached max ${depth.maxDepth}.` }],
+					content: [
+						{
+							type: "text",
+							text: `spawn_pi blocked: recursion depth ${depth.currentDepth} reached max ${depth.maxDepth}.`,
+						},
+					],
 					isError: true,
-					details: { mode: "single", results: [] } as SpawnPiDetails,
+					details: { mode: "single", results: [] } satisfies SpawnPiDetails,
 				};
 			}
 
-			const taskPlan = buildTasks(params as { task?: string; tasks?: string[]; cwd?: string }, ctx.cwd);
-			if (!taskPlan || taskPlan.error) {
+			const taskPlan = buildTaskPlan(params, ctx.cwd);
+			if (!taskPlan.ok) {
 				return {
-					content: [{ type: "text", text: taskPlan?.error ?? "Invalid spawn_pi task parameters." }],
+					content: [{ type: "text", text: taskPlan.error }],
 					isError: true,
-					details: { mode: taskPlan?.mode ?? "single", results: [] } as SpawnPiDetails,
+					details: { mode: "single", results: [] } satisfies SpawnPiDetails,
 				};
 			}
 
-			const cwdError = await validateCwd(taskPlan.tasks[0]?.cwd ?? ctx.cwd);
+			const cwdError = await validateCwd(taskPlan.value.tasks[0]?.cwd ?? ctx.cwd);
 			if (cwdError) {
 				return {
 					content: [{ type: "text", text: cwdError }],
 					isError: true,
-					details: { mode: taskPlan.mode, results: [] } as SpawnPiDetails,
+					details: { mode: taskPlan.value.mode, results: [] } satisfies SpawnPiDetails,
 				};
 			}
 
-			const details: SpawnPiDetails = {
-				mode: taskPlan.mode,
-				results: taskPlan.tasks.map((task) => ({
-					index: task.index,
-					task: task.task,
-					cwd: task.cwd,
-					status: "queued",
-					exitCode: 0,
-					durationMs: 0,
-					messages: [],
-					stderr: "",
-					usage: {
-						input: 0,
-						output: 0,
-						cacheRead: 0,
-						cacheWrite: 0,
-						cost: 0,
-						contextTokens: 0,
-						turns: 0,
-					},
-					toolCalls: 0,
-				})),
-			};
-
+			let details = createDetails(taskPlan.value);
 			let lastUpdateAt = 0;
 			const emitUpdate = (nextDetails: SpawnPiDetails) => {
 				if (!onUpdate) return;
@@ -154,26 +179,35 @@ export default function spawnPiExtension(pi: ExtensionAPI) {
 				});
 			};
 
+			const updateResult = (index: number, nextResult: ChildRunResult) => {
+				details = {
+					...details,
+					results: replaceResultAt(details.results, index, nextResult),
+				};
+				emitUpdate(details);
+			};
+
 			const maxConcurrency = clampConcurrency(params.maxConcurrency);
-			const results = await mapConcurrent(taskPlan.tasks, maxConcurrency, async (taskSpec, index) => {
-				const result = await runChildTask({
-					taskSpec,
-					model: ctx.model,
-					thinkingLevel: pi.getThinkingLevel(),
-					signal,
-					onChange: (partialResult) => {
-						details.results[index] = partialResult;
-						emitUpdate({ ...details, results: [...details.results] });
-					},
-				});
-				details.results[index] = result;
-				emitUpdate({ ...details, results: [...details.results] });
-				return result;
-			});
+			const results = await mapConcurrent(
+				taskPlan.value.tasks,
+				maxConcurrency,
+				async (taskSpec, index) => {
+					const result = await runChildTask({
+						taskSpec,
+						model: ctx.model,
+						thinkingLevel: pi.getThinkingLevel(),
+						inheritedCliArgs,
+						signal,
+						onChange: (partialResult) => updateResult(index, partialResult),
+					});
+					updateResult(index, result);
+					return result;
+				},
+			);
 
 			const finalDetails: SpawnPiDetails = { ...details, results };
 			const toolContent = await buildToolContent(finalDetails);
-			const failed = results.some((result) => result.exitCode !== 0 || result.status === "error");
+			const failed = results.some(didChildRunFail);
 			return {
 				content: [{ type: "text", text: toolContent.text }],
 				isError: failed,
@@ -186,7 +220,7 @@ export default function spawnPiExtension(pi: ExtensionAPI) {
 		},
 
 		renderResult(result, options, theme, _context) {
-			return renderResult(result as { content: Array<{ type: string; text?: string }>; details?: SpawnPiDetails }, options, theme);
+			return renderResult(result, options, theme);
 		},
 	});
 }
