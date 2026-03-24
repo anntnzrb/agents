@@ -5,20 +5,23 @@ import { buildSuccessText, normalizeQuestions, sortAnswers, validateQuestions } 
 import { createClarifyComponent, renderCallText, renderResultText } from "./ui.js";
 
 const DESCRIPTION = [
-	"Interactively ask the user for missing requirements, preferences, approvals, or constraints.",
-	"Use proactively when progress is blocked on something only the user can decide.",
-	"Ask 1 focused question by default; ask 2-3 only when all answers are required before continuing.",
-	"Prefer explicit options when you can suggest likely choices, and allow custom input unless you truly need a closed set.",
-	"Do not use for facts you can discover from the repo, logs, docs, or tools.",
-	"Interactive sessions only; non-interactive runs return a clean error instead of guessing.",
+	"Interactive user-decision collection: requirements, preferences, approvals, constraints.",
+	"Use proactively when progress blocks on something only user can decide, confirm, or prioritize.",
+	"Strong signals: ambiguous implementation direction, competing tradeoffs, missing requirement, approval gate, naming/style preference, fork needing user intent.",
+	"Prefer clarify over plain-prose questioning when direct user input needed before proceeding.",
+	"Default: 1 focused question. Use 2-3 only when all answers required before continuing.",
+	"Prefer explicit options when likely choices known; keep custom input unless choice truly closed.",
+	"Do not use for facts discoverable from repo, logs, docs, tools.",
+	"Interactive sessions only; non-interactive fails cleanly, no guessing.",
 ].join(" ");
 
 const PROMPT_GUIDELINES = [
-	"When blocked on user intent, preference, requirement, or approval, call clarify instead of guessing.",
-	"Keep clarify short: 1 question if possible, max 3.",
-	"Each question should target one decision and be immediately answerable.",
-	"If likely choices are known, provide options with short descriptions and leave allowOther enabled unless the choice must be closed.",
-	"After clarify returns, use details.answers as the structured source of truth.",
+	"Blocked on user intent, preference, requirement, approval, prioritization: call clarify; do not guess; avoid normal assistant-prose questioning.",
+	"Default user-decision path mid-task: clarify.",
+	"Keep short: 1 question if possible, max 3.",
+	"Each question: one decision, concrete, immediately answerable.",
+	"If likely choices known, provide 2-5 focused options, short descriptions; leave allowOther enabled unless choice truly closed.",
+	"After clarify returns, details.answers = source of truth. Continue from answers.",
 ];
 
 export default function clarifyExtension(pi: ExtensionAPI): void {
@@ -26,7 +29,8 @@ export default function clarifyExtension(pi: ExtensionAPI): void {
 		name: "clarify",
 		label: "Clarify",
 		description: DESCRIPTION,
-		promptSnippet: "clarify — interactively ask the user 1-3 focused requirement/preference questions when blocked on user input",
+		promptSnippet:
+			"clarify — proactive 1-3 question user-decision tool for blocked preference/requirement/approval/direction cases",
 		promptGuidelines: PROMPT_GUIDELINES,
 		parameters: ClarifyParamsSchema,
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
