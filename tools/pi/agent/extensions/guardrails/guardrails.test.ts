@@ -192,18 +192,32 @@ test("blocks protected directory roots and children", () => {
           tools: ["read"],
           action: { type: "block", message: "no git reads" },
         },
-        {
-          id: "no-read-node-modules",
-          pattern: "node_modules",
-          tools: ["read"],
-          action: { type: "block", message: "no node_modules reads" },
-        },
       ],
     },
   };
 
   assert.equal(reasonForPath("/tmp/project/.git", "read", config), "no git reads");
   assert.equal(reasonForPath("/tmp/project/.git/config", "read", config), "no git reads");
-  assert.equal(reasonForPath("/tmp/project/node_modules", "read", config), "no node_modules reads");
-  assert.equal(reasonForPath("/tmp/project/node_modules/react/index.js", "read", config), "no node_modules reads");
+});
+
+test("allows node_modules reads while still supporting node_modules write blocks", () => {
+  const config: GuardrailsConfig = {
+    version: 1,
+    agentBash: { rules: [] },
+    protectedPaths: {
+      rules: [
+        {
+          id: "no-write-node-modules",
+          pattern: "node_modules",
+          tools: ["write", "edit"],
+          action: { type: "block", message: "no node_modules writes" },
+        },
+      ],
+    },
+  };
+
+  assert.equal(reasonForPath("/tmp/project/node_modules", "read", config), null);
+  assert.equal(reasonForPath("/tmp/project/node_modules/react/index.js", "read", config), null);
+  assert.equal(reasonForPath("/tmp/project/node_modules", "write", config), "no node_modules writes");
+  assert.equal(reasonForPath("/tmp/project/node_modules/react/index.js", "edit", config), "no node_modules writes");
 });

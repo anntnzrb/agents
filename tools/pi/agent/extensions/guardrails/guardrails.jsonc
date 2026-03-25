@@ -107,15 +107,6 @@
         }
       },
       {
-        "id": "no-read-node-modules",
-        "pattern": "node_modules",
-        "tools": ["read"],
-        "action": {
-          "type": "block",
-          "message": "Reading node_modules is blocked by guardrails."
-        }
-      },
-      {
         "id": "no-write-env",
         "pattern": ".env",
         "tools": ["write", "edit"],
