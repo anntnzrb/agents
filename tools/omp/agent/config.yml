@@ -44,11 +44,36 @@ bashInterceptor.patterns:
   - pattern: "\\bpython(?:3(?:\\.\\d+)*)?\\b"
     tool: python
     message: "Anything invoking python is disabled. Load `/skill:python`."
+python.toolMode: bash-only
+python.kernelMode: session
+python.sharedGateway: true
+ttsr.enabled: true
+ttsr.contextMode: discard
+ttsr.interruptMode: tool-only
+ttsr.repeatMode: after-gap
+ttsr.repeatGap: 3
+task.isolation.mode: worktree
+task.isolation.merge: patch
+task.isolation.commits: ai
+task.eager: true
+task.maxConcurrency: 8
+task.maxRecursionDepth: 2
+disabledProviders:
+  - claude
+  - claude-plugins
+  - cline
+  - codex
+  - cursor
+  - gemini
+  - github
+  - mcp-json
+  - opencode
+  - ssh-json
+  - vscode
+  - windsurf
 commands: 
   enableClaudeProject: false
   enableClaudeUser: false
 secrets: 
   enabled: true
-python.toolMode: bash-only
-python.kernelMode: session
-python.sharedGateway: true
+lastChangelogVersion: 13.14.2
