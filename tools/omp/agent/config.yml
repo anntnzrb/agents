@@ -1,18 +1,27 @@
 modelRoles: 
   default: openai-codex/gpt-5.4:medium
-  smol: openai-codex/gpt-5.4:medium
+  smol: openai-codex/gpt-5.4-mini:low
   plan: openai-codex/gpt-5.4:xhigh
+  commit: openai-codex/gpt-5.4-mini:low
+  task: openai-codex/gpt-5.4-mini:xhigh
+  slow: openai-codex/gpt-5.4:xhigh
 theme: 
   dark: light-prism
   light: graphite
+
 hideThinkingBlock: true
+quietStartup: true
+collapseChangelog: true
+followUpMode: all
 steeringMode: all
-interruptMode: immediate
+interruptMode: wait
 compaction: 
   strategy: context-full
 branchSummary: 
   enabled: true
+doubleEscapeAction: tree
 treeFilterMode: no-tools
+startup.checkUpdate: false
 renderMermaid: 
   enabled: true
 checkpoint: 
