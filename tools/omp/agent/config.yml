@@ -22,24 +22,33 @@ branchSummary:
 doubleEscapeAction: tree
 treeFilterMode: no-tools
 startup.checkUpdate: false
-renderMermaid: 
-  enabled: true
-checkpoint: 
-  enabled: true
-calc: 
-  enabled: true
+mcp.enableProjectConfig: false
+mcp.discoveryMode: false
+mcp.notifications: false
+inspect_image.enabled: false
+calc.enabled: false
+checkpoint.enabled: false
+notebook.enabled: false
 async: 
   enabled: true
-mcp: 
-  enableProjectConfig: false
+renderMermaid.enabled: false
+fetch.enabled: false
+web_search.enabled: false
+browser.enabled: false
+lsp.enabled: false
+bashInterceptor.enabled: true
+bashInterceptor.patterns:
+  - pattern: "^\\s*(python|python3(?:\\.\\d+)*)\\b"
+    tool: python
+    message: "python/python3 is disabled. Load `/skill:python`."
+  - pattern: "\\bpython(?:3(?:\\.\\d+)*)?\\b"
+    tool: python
+    message: "Anything invoking python is disabled. Load `/skill:python`."
 commands: 
   enableClaudeProject: false
   enableClaudeUser: false
 secrets: 
   enabled: true
-python: 
-  toolMode: bash-only
-  kernelMode: session
-  sharedGateway: true
-bashInterceptor: 
-  enabled: true
+python.toolMode: bash-only
+python.kernelMode: session
+python.sharedGateway: true
