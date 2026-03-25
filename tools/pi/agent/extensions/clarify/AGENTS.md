@@ -2,6 +2,7 @@
 
 ## Purpose
 Interactive-only `clarify` tool for 1..3 focused user questions when the model is blocked on requirements, preferences, or approvals.
+Supports recommended/default options, optional timeout auto-select, waiting notification, and richer progress/navigation UI.
 
 ## Files
 - `index.ts` — thin tool registration + prompt metadata + execute wiring
