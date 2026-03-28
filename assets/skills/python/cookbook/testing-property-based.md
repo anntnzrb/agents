@@ -1,6 +1,6 @@
 # Property-Based Testing
 
-Use Hypothesis when the property is the point: parsers, transforms, serializers, and invariants. A few examples cannot cover the failure surface.
+Use Hypothesis when the property is the point: parsers, transforms, serializers, invariants. A few examples will not cover the failure surface.
 
 ## Install
 
@@ -11,13 +11,13 @@ uv add --dev hypothesis
 ## Strategy rules
 
 - Prefer narrow, domain-shaped strategies (`st.dates()`, `st.integers()`, bounded lists)
-- Keep generated values small enough to shrink quickly
-- Use `assume()` sparingly; if you need many `assume()` calls, narrow the strategy instead
+- Keep generated values small so shrink works fast
+- Use `assume()` sparingly; if you need many, narrow the strategy instead
 - Turn the smallest counterexample into a normal regression test
 
 ## Parser round-trip
 
-A parser should round-trip valid values cleanly.
+A parser should round-trip valid values.
 
 ```python
 from datetime import date
@@ -76,7 +76,7 @@ def test_point_json_round_trip(x: int, y: int) -> None:
 
 ## Invariant checks
 
-An invariant should hold for every valid input, and invalid inputs should fail fast.
+An invariant should hold for every valid input; invalid inputs should fail fast.
 
 ```python
 from dataclasses import dataclass
@@ -105,6 +105,6 @@ def test_interval_rejects_inverted_bounds(low: int, high: int) -> None:
 ## Don't use Hypothesis for
 
 - one-off branch coverage
-- trivial getters and setters
+- trivial getters/setters
 - filesystem or network glue
 - logic with one or two meaningful examples

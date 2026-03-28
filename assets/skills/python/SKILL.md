@@ -1,11 +1,11 @@
 ---
 name: python
-description: "Develop Python applications using modern patterns, uv, Pyright strict, typed JSON/data shapes, boundary validation, and practical testing. Use this whenever working with .py files, pyproject.toml, uv commands, pip/pip3, poetry, virtualenv/venv, inline script metadata, Python typing or static checking, JSON/API/RPC payloads, pydantic/msgspec boundaries, Hypothesis, pytest, asyncio, dataclasses, itertools, functools, or packaging. If the task involves running Python, managing dependencies, creating environments, or building Python packages, load this skill and prefer uv-oriented workflows."
+description: "Develop Python with uv, Pyright strict, typed JSON/data shapes, boundary validation, and practical testing. Use whenever work touches .py files, pyproject.toml, uv commands, Python typing/static checking, JSON/API/RPC payloads, pydantic/msgspec boundaries, Hypothesis, pytest, asyncio, dataclasses, or packaging. Prefer this skill for new Python projects and significant Python refactors."
 ---
 
 # Python Development
 
-Functional-first, production-first Python 3.14+ with uv, Pyright strict, typed JSON/data shapes, boundary validation, and small composable modules.
+Python 3.14+: uv-first, Pyright strict, typed JSON/data shapes, boundary validation, small composable modules.
 
 ## Activation Triggers
 - `.py`, `pyproject.toml`, uv commands, Python packaging
@@ -43,16 +43,16 @@ Functional-first, production-first Python 3.14+ with uv, Pyright strict, typed J
 - New or refactored Python modules
 - Async I/O, data pipelines, CLI tooling
 - Type-heavy APIs, validation, parsing, JSON-shaped data
-- Pyright strict setup/tuning; inherited mypy-based repos
-- Test strategy or flaky tests, especially parser/transform/invariant-heavy code
-- Any request that mentions Python setup, Python dependencies, virtual environments, or script execution
+- Pyright strict setup/tuning; inherited mypy repos
+- Test strategy, flaky tests, parser/transform/invariant-heavy code
+- Python setup, dependency, virtualenv, or packaging work
 
 ## When Not to Use
 - Non-Python runtimes
 - Browser E2E tests (use Playwright)
 
 ## uv-first workflow
-Use `uv` instead of raw `python`, `pip`, `poetry`, or `python -m venv`.
+Prefer `uv` over raw `python`, `pip`, `poetry`, and `python -m venv`.
 
 ### Quick reference
 ```bash
@@ -77,7 +77,7 @@ uv lock --script example.py
 - `python -m py_compile foo.py` -> `uv run python -m ast foo.py >/dev/null`
 
 ## Inline script metadata
-For standalone scripts, prefer uv inline metadata over ad-hoc setup.
+Prefer uv inline metadata for standalone scripts.
 
 ```python
 # /// script
@@ -89,13 +89,9 @@ For standalone scripts, prefer uv inline metadata over ad-hoc setup.
 # ///
 ```
 
-Then run:
+Run with `uv run script.py`.
 
-```bash
-uv run script.py
-```
-
-Helpful commands:
+Useful commands:
 
 ```bash
 uv init --script script.py --python 3.12
@@ -103,7 +99,7 @@ uv add --script script.py requests rich
 uv lock --script script.py
 ```
 
-For executable scripts:
+Executable script:
 
 ```python
 #!/usr/bin/env -S uv run --script
@@ -123,7 +119,7 @@ uv run pyright
 ```
 
 ## Quality gates
-New projects: make `pyright` strict the default static gate; keep `mypy` only for inherited repos.
+New projects: Pyright strict default static gate. Keep mypy only for inherited repos.
 
 ### Baseline
 ```bash
@@ -163,12 +159,11 @@ Prefer the standard `src/` layout unless the repo has a strong reason not to.
 
 ## Notes
 Core patterns, typed shapes, boundary validation, and testing notes live in `reference.md` and the cookbooks.
-Read the relevant cookbook when the task narrows:
-- async work -> `cookbook/async.md`
+Read only what the task needs:
+- async -> `cookbook/async.md`
 - functional structure -> `cookbook/patterns*.md`
-- tests or parser-heavy invariants -> `cookbook/testing*.md`
-- strict type gates / boundary validation -> `cookbook/correctness.md`
-- language features -> `cookbook/modern*.md`
+- tests / parser-heavy invariants -> `cookbook/testing*.md`
+- strict gates / boundary validation -> `cookbook/correctness.md`
 - typed shapes quick reference -> `reference.md`
 ## Research tools
 ```bash

@@ -246,8 +246,8 @@ class UserUpdated(TypedDict):
 Event = UserCreated | UserUpdated
 ```
 
-Parse untrusted JSON once at the boundary, then pass typed data or domain objects inward. Use `pydantic` or `msgspec` only for that edge conversion; do not carry runtime validators through the rest of the code.
-Promote to a real object after parsing if the data needs behavior or invariants; `TypedDict` is for shape, not methods.
+Parse untrusted JSON once at the boundary, then pass typed data or domain objects inward. Use `pydantic` or `msgspec` only for that edge conversion; do not carry runtime validators through core logic.
+Promote to a real object after parsing when the data needs behavior or invariants; `TypedDict` is for shape, not methods.
 
 ## Core Patterns
 
