@@ -56,7 +56,7 @@ def __repr__(self): ...
 - **Write pure functions**: Same input, same output, no side effects
 - **Use context managers**: `with` for resource cleanup
 - **Leverage comprehensions**: Readable, Pythonic transformations
-- **Validate at boundaries**: Check external input, trust internal data
+- **Validate at boundaries**: Parse untrusted input once, then trust typed internal data.
 - **Use Protocol for interfaces**: Structural typing, duck typing
 
 ### Don't
@@ -219,6 +219,35 @@ from typing import Protocol
 class Printable(Protocol):
     def __str__(self) -> str: ...
 ```
+
+## Typed JSON and Boundary Schemas
+
+For JSON-shaped data, keep the schema in the type system:
+
+| Shape | Prefer | Example |
+|-------|--------|---------|
+| fixed object keys | `TypedDict` | API request/response payloads |
+| fixed string values | `Literal` | `status: Literal["ok", "error"]` |
+| small variant set | discriminated union | `Foo | Bar` with a `kind` tag |
+
+```python
+from typing import Literal, NotRequired, TypedDict
+
+class UserCreated(TypedDict):
+    kind: Literal["user.created"]
+    user_id: str
+    email: str
+
+class UserUpdated(TypedDict):
+    kind: Literal["user.updated"]
+    user_id: str
+    email: NotRequired[str]
+
+Event = UserCreated | UserUpdated
+```
+
+Parse untrusted JSON once at the boundary, then pass typed data or domain objects inward. Use `pydantic` or `msgspec` only for that edge conversion; do not carry runtime validators through the rest of the code.
+Promote to a real object after parsing if the data needs behavior or invariants; `TypedDict` is for shape, not methods.
 
 ## Core Patterns
 
