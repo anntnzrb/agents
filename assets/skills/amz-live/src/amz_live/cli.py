@@ -126,7 +126,11 @@ def main(
         return run_rpc(stdin=input_stream, stdout=output_stream)
 
     if not args.query:
-        return _parser_error(parser, "the following arguments are required: query", stderr=error_stream)
+        return _parser_error(
+            parser,
+            "the following arguments are required: query",
+            stderr=error_stream,
+        )
 
     try:
         raw_results, filtered_results, details_by_asin, detail_attempted, scores_by_asin = (

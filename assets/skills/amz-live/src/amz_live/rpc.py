@@ -12,7 +12,6 @@ from .protocol import (
     search_and_filter,
 )
 
-
 RequestId = str | int | float | None
 
 
@@ -238,11 +237,7 @@ def _read_command(request: Mapping[str, object]) -> str:
 
 
 def _strip_jsonl_line(raw_line: str) -> str:
-    if raw_line.endswith("\n"):
-        raw_line = raw_line[:-1]
-    if raw_line.endswith("\r"):
-        raw_line = raw_line[:-1]
-    return raw_line
+    return raw_line.removesuffix("\n").removesuffix("\r")
 
 
 def _read_request_id(value: object | None) -> RequestId:

@@ -451,13 +451,13 @@ def get_schema_document() -> dict[str, object]:
                                 "oneOf": [
                                     {"type": "string"},
                                     {"type": "array", "items": {"type": "string"}},
-                                ]
+                                ],
                             },
                             "exclude": {
                                 "oneOf": [
                                     {"type": "string"},
                                     {"type": "array", "items": {"type": "string"}},
-                                ]
+                                ],
                             },
                             "limit": {"type": ["integer", "null"], "minimum": 0},
                             "htmlPath": {"type": ["string", "null"]},

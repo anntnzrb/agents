@@ -39,8 +39,32 @@ line-length = 100
 src = ["src"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP"]
+select = ["ALL"]
+ignore = [
+  "D",
+  "EM101",
+  "EM102",
+  "INP001",
+  "PLR2004",
+  "S101",
+  "TC001",
+  "TC003",
+  "TC006",
+  "TRY003",
+  "TRY004",
+]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+  "ANN",
+  "ARG001",
+  "ARG005",
+  "PLC0415",
+]
+"src/amz_live/filters.py" = ["PLR0911", "PLR0913"]
+"src/amz_live/protocol.py" = ["BLE001", "PLR0913", "S112"]
+"src/amz_live/rpc.py" = ["PLR0911"]
+"src/amz_live/score.py" = ["C901", "PLR0911"]
 [tool.pyright]
 typeCheckingMode = "strict"
 include = ["src"]

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from types import TracebackType
 from collections.abc import Mapping
+from types import TracebackType
+from typing import Self
 
 import httpx
 
@@ -60,7 +61,7 @@ class AmazonSearchClient:
             follow_redirects=True,
         )
 
-    def __enter__(self) -> AmazonSearchClient:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(
@@ -125,13 +126,13 @@ class AmazonSearchClient:
         if response.status_code == 503 or any(marker in body for marker in _ANTI_BOT_MARKERS):
             raise AmazonAntiBotError(
                 f"Amazon blocked the request with a captcha or 503: {url}. "
-                "Slow down, try later, or use --html for local debug."
+                "Slow down, try later, or use --html for local debug.",
             )
 
         if any(marker in lowered_url for marker in _ANTI_BOT_URL_MARKERS):
             raise AmazonAntiBotError(
                 f"Amazon redirected to a captcha or robot-check page: {url}. "
-                "Slow down, try later, or use --html for local debug."
+                "Slow down, try later, or use --html for local debug.",
             )
 
         if response.status_code >= 400:
@@ -146,11 +147,9 @@ def search(
     amazon_sort: str | None = None,
     base_url: str = AMAZON_BASE_URL,
 ) -> list[SearchResult]:
-    results: list[SearchResult] = []
     query = SearchQuery(keywords, page=page, amazon_sort=amazon_sort)
     with AmazonSearchClient(base_url=base_url) as client:
-        results = client.search_pages(query, pages=pages)
-    return results
+        return client.search_pages(query, pages=pages)
 
 
-__all__ = ["AmazonSearchClient", "DEFAULT_HEADERS", "search"]
+__all__ = ["DEFAULT_HEADERS", "AmazonSearchClient", "search"]

@@ -69,9 +69,7 @@ def _matches(
         return False
     if include and not all(term in searchable_text for term in include):
         return False
-    if exclude and any(term in searchable_text for term in exclude):
-        return False
-    return True
+    return not (exclude and any(term in searchable_text for term in exclude))
 
 
 def _coerce_decimal(value: float | Decimal | None) -> Decimal | None:

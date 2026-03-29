@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import re
-from decimal import Decimal
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Literal, TypedDict
 
 from .models import ProductDetail, SearchResult
@@ -76,7 +76,7 @@ def score_results(
             -(float(item[0].rating) if item[0].rating is not None else -1),
             -(item[0].review_count or -1),
             item[2],
-        )
+        ),
     )
     return [item[0] for item in scored], {item[0].asin: item[1] for item in scored}
 
@@ -179,7 +179,12 @@ def _score_review_count(result: SearchResult) -> float:
     return -8.0
 
 
-def _score_price(result: SearchResult, *, min_price: Decimal | None, max_price: Decimal | None) -> float:
+def _score_price(
+    result: SearchResult,
+    *,
+    min_price: Decimal | None,
+    max_price: Decimal | None,
+ ) -> float:
     if result.price is None:
         return -20.0
     if min_price is None or max_price is None or min_price == max_price:
@@ -191,9 +196,7 @@ def _score_badges(result: SearchResult) -> float:
     score = 0.0
     for badge in result.badges:
         lowered = badge.casefold()
-        if "best seller" in lowered:
-            score += 4.0
-        elif "amazon's choice" in lowered or "amazons choice" in lowered:
+        if "best seller" in lowered or "amazon's choice" in lowered or "amazons choice" in lowered:
             score += 4.0
         elif "top rated" in lowered:
             score += 2.0
@@ -233,7 +236,7 @@ def _score_spec_trust(result: SearchResult, *, detail: ProductDetail | None) -> 
         [
             result.title,
             *(detail.bullet_points if detail else ()),
-        ]
+        ],
     ).casefold()
     if "usb-if certified" in haystack:
         return 4.0
