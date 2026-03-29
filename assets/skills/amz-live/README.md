@@ -9,6 +9,8 @@ Fetch live search result cards or parse saved Amazon search HTML, then filter lo
 ```bash
 uv python install 3.14
 uv sync
+uv run pyright
+uv run pytest
 ```
 
 ## CLI

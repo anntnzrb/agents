@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import TracebackType
 from collections.abc import Mapping
 
 import httpx
@@ -62,7 +63,12 @@ class AmazonSearchClient:
     def __enter__(self) -> AmazonSearchClient:
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> bool:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> bool:
         self.close()
         return False
 
@@ -105,6 +111,7 @@ class AmazonSearchClient:
                 query.keywords,
                 page=page_number,
                 amazon_sort=query.amazon_sort,
+                zip_code=query.zip_code,
             )
             for result in self.search(page_query):
                 deduped.setdefault(result.asin, result)
@@ -139,9 +146,11 @@ def search(
     amazon_sort: str | None = None,
     base_url: str = AMAZON_BASE_URL,
 ) -> list[SearchResult]:
+    results: list[SearchResult] = []
     query = SearchQuery(keywords, page=page, amazon_sort=amazon_sort)
     with AmazonSearchClient(base_url=base_url) as client:
-        return client.search_pages(query, pages=pages)
+        results = client.search_pages(query, pages=pages)
+    return results
 
 
 __all__ = ["AmazonSearchClient", "DEFAULT_HEADERS", "search"]

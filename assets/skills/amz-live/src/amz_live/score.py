@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, TypedDict
 
 from .models import ProductDetail, SearchResult
 
@@ -22,6 +23,13 @@ _GENERIC_BRAND_TOKENS = {
 }
 
 
+class ResultScorePayload(TypedDict):
+    score: float
+    reasons: list[str]
+    signal_scores: dict[str, float]
+    brand_source: str | None
+
+
 @dataclass(frozen=True, slots=True)
 class ResultScore:
     score: float
@@ -29,7 +37,7 @@ class ResultScore:
     signal_scores: dict[str, float]
     brand_source: str | None
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> ResultScorePayload:
         return {
             "score": self.score,
             "reasons": list(self.reasons),
@@ -78,8 +86,8 @@ def _score_result(
     *,
     query: str | None,
     detail: ProductDetail | None,
-    min_price,
-    max_price,
+    min_price: Decimal | None,
+    max_price: Decimal | None,
 ) -> ResultScore:
     signals: dict[str, float] = {}
     reasons: list[str] = []
@@ -171,7 +179,7 @@ def _score_review_count(result: SearchResult) -> float:
     return -8.0
 
 
-def _score_price(result: SearchResult, *, min_price, max_price) -> float:
+def _score_price(result: SearchResult, *, min_price: Decimal | None, max_price: Decimal | None) -> float:
     if result.price is None:
         return -20.0
     if min_price is None or max_price is None or min_price == max_price:

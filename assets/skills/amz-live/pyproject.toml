@@ -20,6 +20,8 @@ amz-live = "amz_live.cli:main"
 
 [dependency-groups]
 dev = [
+  "hypothesis>=6.0",
+  "pyright>=1.1.0",
   "pytest>=8.0",
   "ruff>=0.11.0",
 ]
@@ -38,6 +40,12 @@ src = ["src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+[tool.pyright]
+typeCheckingMode = "strict"
+include = ["src"]
+exclude = [".venv", "build", "dist"]
+
 
 [tool.pytest.ini_options]
 addopts = "-ra"

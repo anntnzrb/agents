@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any
+from typing import TypedDict
 
 
 class AmazonLiveSearchError(RuntimeError):
@@ -15,6 +15,25 @@ class AmazonAntiBotError(AmazonLiveSearchError):
 
 class AmazonClientError(AmazonLiveSearchError):
     """Raised for network and non-bot HTTP failures."""
+
+
+class ProductDetailPayload(TypedDict):
+    brand: str | None
+    availability_text: str | None
+    delivery_text: str | None
+    ships_from: str | None
+    sold_by: str | None
+    bullet_points: list[str]
+
+
+class SearchResultPayload(TypedDict):
+    asin: str
+    title: str
+    url: str
+    price: float | None
+    rating: float | None
+    review_count: int | None
+    badges: list[str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,7 +79,7 @@ class ProductDetail:
     sold_by: str | None = None
     bullet_points: tuple[str, ...] = field(default_factory=tuple)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> ProductDetailPayload:
         return {
             "brand": self.brand,
             "availability_text": self.availability_text,
@@ -83,7 +102,7 @@ class SearchResult:
     review_count: int | None = None
     badges: tuple[str, ...] = field(default_factory=tuple)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> SearchResultPayload:
         return {
             "asin": self.asin,
             "title": self.title,

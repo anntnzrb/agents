@@ -3,14 +3,20 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Literal, NotRequired, TypedDict, cast
 
 from .client import AmazonSearchClient
 from .detail_parser import parse_product_detail
 from .filters import filter_results
-from .models import ProductDetail, SearchQuery, SearchResult
+from .models import (
+    ProductDetail,
+    ProductDetailPayload,
+    SearchQuery,
+    SearchResult,
+    SearchResultPayload,
+)
 from .parser import parse_search_results
-from .score import ResultScore, score_results
+from .score import ResultScore, ResultScorePayload, score_results
 
 PROTOCOL_VERSION = "1"
 LLM_JSON_TYPE = "amz-live.search_results"
@@ -27,6 +33,74 @@ _LLM_JSON_REQUIRED_FIELDS = [
     "results",
 ]
 _SEARCH_RESULTS_CACHE: dict[tuple[str, int, int, str | None, str | None], list[SearchResult]] = {}
+
+class SourcePayload(TypedDict):
+    mode: Literal["html", "live"]
+    html_path: NotRequired[str]
+
+
+class QueryPayload(TypedDict):
+    keywords: str
+    page: int
+    pages: int
+    amazon_sort: str | None
+    zip_code: str | None
+
+
+class FiltersPayload(TypedDict):
+    min_rating: float | None
+    max_price: float | None
+    badge: str | None
+    title_contains: str | None
+    include: list[str]
+    exclude: list[str]
+    limit: int | None
+
+
+class SummaryPayload(TypedDict):
+    raw_result_count: int
+    returned_result_count: int
+
+
+class EnrichmentPayload(TypedDict):
+    details: bool
+    detail_limit: int | None
+    attempted: int
+    succeeded: int
+
+
+class RankedResultScorePayload(ResultScorePayload):
+    rank: int
+
+
+class SerializedSearchResultPayload(SearchResultPayload, total=False):
+    details: ProductDetailPayload | None
+    score: float
+    reasons: list[str]
+    signal_scores: dict[str, float]
+    brand_source: str | None
+    ranking: RankedResultScorePayload
+
+
+class RankingPayload(TypedDict):
+    mode: Literal["agent_value"]
+    scored_count: int
+    details_used: int
+    limit_applied_after_ranking: bool
+
+
+class SearchResultsPayload(TypedDict):
+    type: str
+    version: str
+    ok: bool
+    source: SourcePayload
+    query: QueryPayload
+    filters: FiltersPayload
+    summary: SummaryPayload
+    enrichment: EnrichmentPayload
+    results: list[SerializedSearchResultPayload]
+    ranking: NotRequired[RankingPayload]
+
 
 
 def load_results(
@@ -47,6 +121,7 @@ def load_results(
     if cached is not None:
         return cached
 
+    results: list[SearchResult] = []
     search_query = SearchQuery(query, page=page, amazon_sort=amazon_sort, zip_code=zip_code)
     with AmazonSearchClient() as client:
         results = client.search_pages(search_query, pages=pages)
@@ -161,14 +236,15 @@ def build_llm_json(
     detail_attempted: int = 0,
     scoring: bool = False,
     scores_by_asin: dict[str, ResultScore] | None = None,
-) -> dict[str, Any]:
-    source: dict[str, Any] = {"mode": "html" if html_path else "live"}
+) -> SearchResultsPayload:
     if html_path is not None:
-        source["html_path"] = html_path
+        source: SourcePayload = {"mode": "html", "html_path": html_path}
+    else:
+        source = {"mode": "live"}
 
     details_by_asin = details_by_asin or {}
     scores_by_asin = scores_by_asin or {}
-    payload = {
+    payload: SearchResultsPayload = {
         "type": LLM_JSON_TYPE,
         "version": PROTOCOL_VERSION,
         "ok": True,
@@ -222,24 +298,34 @@ def serialize_results(
     details: bool = False,
     details_by_asin: dict[str, ProductDetail] | None = None,
     scores_by_asin: dict[str, ResultScore] | None = None,
-) -> list[dict[str, Any]]:
+) -> list[SerializedSearchResultPayload]:
     details_by_asin = details_by_asin or {}
     scores_by_asin = scores_by_asin or {}
-    serialized: list[dict[str, Any]] = []
+    serialized: list[SerializedSearchResultPayload] = []
     for index, result in enumerate(results, start=1):
-        item = result.to_dict()
+        item = cast(SerializedSearchResultPayload, result.to_dict())
         if details:
             detail = details_by_asin.get(result.asin)
             item["details"] = detail.to_dict() if detail is not None else None
         score = scores_by_asin.get(result.asin)
         if score is not None:
-            item.update(score.to_dict())
-            item["ranking"] = {"rank": index, **score.to_dict()}
+            score_payload = score.to_dict()
+            item["score"] = score_payload["score"]
+            item["reasons"] = score_payload["reasons"]
+            item["signal_scores"] = score_payload["signal_scores"]
+            item["brand_source"] = score_payload["brand_source"]
+            item["ranking"] = {
+                "rank": index,
+                "score": score_payload["score"],
+                "reasons": score_payload["reasons"],
+                "signal_scores": score_payload["signal_scores"],
+                "brand_source": score_payload["brand_source"],
+            }
         serialized.append(item)
     return serialized
 
 
-def get_schema_document() -> dict[str, Any]:
+def get_schema_document() -> dict[str, object]:
     return {
         "type": SCHEMA_TYPE,
         "version": PROTOCOL_VERSION,
@@ -394,10 +480,10 @@ def get_schema_document() -> dict[str, Any]:
 def _rpc_request_schema(
     *,
     command: str,
-    properties: dict[str, Any] | None = None,
+    properties: dict[str, object] | None = None,
     required: Sequence[str] | None = None,
-) -> dict[str, Any]:
-    request_properties: dict[str, Any] = {
+) -> dict[str, object]:
+    request_properties: dict[str, object] = {
         "id": {"type": ["string", "number", "null"]},
         "type": {
             "type": "string",

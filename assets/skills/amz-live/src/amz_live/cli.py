@@ -108,9 +108,9 @@ def main(
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    stdin = stdin or sys.stdin
-    stdout = stdout or sys.stdout
-    stderr = stderr or sys.stderr
+    input_stream: TextIO = sys.stdin if stdin is None else stdin
+    output_stream: TextIO = sys.stdout if stdout is None else stdout
+    error_stream: TextIO = sys.stderr if stderr is None else stderr
 
     parser = build_parser()
     try:
@@ -119,14 +119,14 @@ def main(
         return _exit_code(exc.code)
 
     if args.schema:
-        _print_json(get_schema_document(), stdout=stdout)
+        _print_json(get_schema_document(), stdout=output_stream)
         return 0
 
     if args.mode == "rpc":
-        return run_rpc(stdin=stdin, stdout=stdout)
+        return run_rpc(stdin=input_stream, stdout=output_stream)
 
     if not args.query:
-        return _parser_error(parser, "the following arguments are required: query", stderr=stderr)
+        return _parser_error(parser, "the following arguments are required: query", stderr=error_stream)
 
     try:
         raw_results, filtered_results, details_by_asin, detail_attempted, scores_by_asin = (
@@ -150,7 +150,7 @@ def main(
             )
         )
     except (AmazonLiveSearchError, OSError, ValueError) as exc:
-        print(f"error: {exc}", file=stderr)
+        print(f"error: {exc}", file=error_stream)
         return 1
 
     if args.json:
@@ -161,7 +161,7 @@ def main(
                 details_by_asin=details_by_asin,
                 scores_by_asin=scores_by_asin,
             ),
-            stdout=stdout,
+            stdout=output_stream,
         )
     elif args.llm_json:
         _print_json(
@@ -188,10 +188,10 @@ def main(
                 scoring=args.scoring,
                 scores_by_asin=scores_by_asin,
             ),
-            stdout=stdout,
+            stdout=output_stream,
         )
     else:
-        _print_human(filtered_results, stdout=stdout)
+        _print_human(filtered_results, stdout=output_stream)
     return 0
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from typing import Any, TextIO
+from typing import Literal, NotRequired, TextIO, TypedDict, cast, overload
 
 from .models import AmazonLiveSearchError
 from .protocol import (
@@ -11,6 +11,38 @@ from .protocol import (
     get_schema_document,
     search_and_filter,
 )
+
+
+RequestId = str | int | float | None
+
+
+class PingPayload(TypedDict):
+    ok: bool
+    version: str
+
+
+class RpcErrorPayload(TypedDict):
+    code: str
+    message: str
+
+
+class RpcSuccessResponse(TypedDict):
+    type: Literal["response"]
+    command: str
+    success: Literal[True]
+    data: object
+    id: NotRequired[RequestId]
+
+
+class RpcErrorResponse(TypedDict):
+    type: Literal["response"]
+    command: str
+    success: Literal[False]
+    error: RpcErrorPayload
+    id: NotRequired[RequestId]
+
+
+RpcResponse = RpcSuccessResponse | RpcErrorResponse
 
 
 def run_rpc(*, stdin: TextIO, stdout: TextIO) -> int:
@@ -24,9 +56,9 @@ def run_rpc(*, stdin: TextIO, stdout: TextIO) -> int:
     return 0
 
 
-def handle_rpc_line(line: str) -> dict[str, Any]:
+def handle_rpc_line(line: str) -> RpcResponse:
     try:
-        request = json.loads(line)
+        parsed = json.loads(line)
     except json.JSONDecodeError:
         return _error_response(
             command="unknown",
@@ -34,14 +66,15 @@ def handle_rpc_line(line: str) -> dict[str, Any]:
             message="Invalid JSON request.",
         )
 
-    if not isinstance(request, Mapping):
+    if not isinstance(parsed, Mapping):
         return _error_response(
             command="unknown",
             code="parse_error",
             message="JSON request must be an object.",
         )
 
-    request_id = request.get("id")
+    request = cast(Mapping[str, object], parsed)
+    request_id = _read_request_id(request.get("id"))
     try:
         command = _read_command(request)
     except ValueError as exc:
@@ -57,7 +90,7 @@ def handle_rpc_line(line: str) -> dict[str, Any]:
             case "ping":
                 return _success_response(
                     command=command,
-                    data={"ok": True, "version": PROTOCOL_VERSION},
+                    data=PingPayload(ok=True, version=PROTOCOL_VERSION),
                     request_id=request_id,
                 )
             case "get_schema":
@@ -91,8 +124,8 @@ def handle_rpc_line(line: str) -> dict[str, Any]:
         )
 
 
-def _handle_search(request: Mapping[str, Any]) -> dict[str, Any]:
-    request_id = request.get("id")
+def _handle_search(request: Mapping[str, object]) -> RpcSuccessResponse:
+    request_id = _read_request_id(request.get("id"))
     query = _require_string(request, "query")
     page = _read_int(request, "page", default=1, minimum=1)
     pages = _read_int(request, "pages", default=1, minimum=1)
@@ -159,10 +192,10 @@ def _handle_search(request: Mapping[str, Any]) -> dict[str, Any]:
 def _success_response(
     *,
     command: str,
-    data: Any,
-    request_id: Any = None,
-) -> dict[str, Any]:
-    response = {
+    data: object,
+    request_id: RequestId = None,
+) -> RpcSuccessResponse:
+    response: RpcSuccessResponse = {
         "type": "response",
         "command": command,
         "success": True,
@@ -178,9 +211,9 @@ def _error_response(
     command: str,
     code: str,
     message: str,
-    request_id: Any = None,
-) -> dict[str, Any]:
-    response = {
+    request_id: RequestId = None,
+) -> RpcErrorResponse:
+    response: RpcErrorResponse = {
         "type": "response",
         "command": command,
         "success": False,
@@ -191,7 +224,7 @@ def _error_response(
     return response
 
 
-def _read_command(request: Mapping[str, Any]) -> str:
+def _read_command(request: Mapping[str, object]) -> str:
     preferred_command = request.get("type")
     if preferred_command is not None:
         if not isinstance(preferred_command, str) or not preferred_command:
@@ -212,14 +245,20 @@ def _strip_jsonl_line(raw_line: str) -> str:
     return raw_line
 
 
-def _require_string(request: Mapping[str, Any], key: str) -> str:
+def _read_request_id(value: object | None) -> RequestId:
+    if value is None or isinstance(value, (str, int, float)):
+        return value
+    raise ValueError("id must be a string, number, or null")
+
+
+def _require_string(request: Mapping[str, object], key: str) -> str:
     value = request.get(key)
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{key} must be a non-empty string")
     return value.strip()
 
 
-def _read_optional_string(request: Mapping[str, Any], key: str) -> str | None:
+def _read_optional_string(request: Mapping[str, object], key: str) -> str | None:
     value = request.get(key)
     if value is None:
         return None
@@ -229,7 +268,7 @@ def _read_optional_string(request: Mapping[str, Any], key: str) -> str | None:
     return value or None
 
 
-def _read_optional_bool(request: Mapping[str, Any], key: str) -> bool | None:
+def _read_optional_bool(request: Mapping[str, object], key: str) -> bool | None:
     value = request.get(key)
     if value is None:
         return None
@@ -238,8 +277,28 @@ def _read_optional_bool(request: Mapping[str, Any], key: str) -> bool | None:
     return value
 
 
+@overload
 def _read_int(
-    request: Mapping[str, Any],
+    request: Mapping[str, object],
+    key: str,
+    *,
+    default: int,
+    minimum: int,
+ ) -> int: ...
+
+
+@overload
+def _read_int(
+    request: Mapping[str, object],
+    key: str,
+    *,
+    default: None,
+    minimum: int,
+ ) -> int | None: ...
+
+
+def _read_int(
+    request: Mapping[str, object],
     key: str,
     *,
     default: int | None,
@@ -256,7 +315,7 @@ def _read_int(
     return value
 
 
-def _read_optional_number(request: Mapping[str, Any], key: str) -> float | None:
+def _read_optional_number(request: Mapping[str, object], key: str) -> float | None:
     value = request.get(key)
     if value is None:
         return None
@@ -265,7 +324,7 @@ def _read_optional_number(request: Mapping[str, Any], key: str) -> float | None:
     return float(value)
 
 
-def _read_terms(request: Mapping[str, Any], key: str) -> list[str]:
+def _read_terms(request: Mapping[str, object], key: str) -> list[str]:
     value = request.get(key)
     if value is None:
         return []
@@ -274,6 +333,7 @@ def _read_terms(request: Mapping[str, Any], key: str) -> list[str]:
     if not isinstance(value, Sequence) or isinstance(value, bytes | bytearray):
         raise ValueError(f"{key} must be a string or array of strings")
 
+    value = cast(Sequence[object], value)
     terms: list[str] = []
     for item in value:
         if not isinstance(item, str):

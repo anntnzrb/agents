@@ -152,7 +152,9 @@ def _is_placeholder_href(value: str) -> bool:
     return lowered == "#" or lowered.startswith("javascript:")
 
 
-def _clean_text(value: str) -> str:
+def _clean_text(value: str | None) -> str:
+    if value is None:
+        return ""
     return " ".join(value.split())
 
 
