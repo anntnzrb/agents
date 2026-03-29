@@ -1,7 +1,8 @@
 import string
 from urllib.parse import parse_qs, urlparse
 
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from amz_live.query import SearchQuery, build_search_url
 

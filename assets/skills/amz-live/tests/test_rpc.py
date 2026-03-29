@@ -19,9 +19,9 @@ def test_rpc_search_type_emits_llm_payload() -> None:
                 "minRating": 4.5,
                 "maxPrice": 9.0,
                 "limit": 2,
-            }
+            },
         )
-        + "\n"
+        + "\n",
     )
     stdout = StringIO()
 
@@ -72,9 +72,9 @@ def test_rpc_search_accepts_zip_code() -> None:
                 "query": "usb c pd charger",
                 "htmlPath": str(FIXTURE_PATH),
                 "zipCode": "33101",
-            }
+            },
         )
-        + "\n"
+        + "\n",
     )
     stdout = StringIO()
 
@@ -92,7 +92,7 @@ def test_rpc_accepts_legacy_command_and_prefers_type() -> None:
         json.dumps({"id": "legacy-1", "command": "ping"})
         + "\n"
         + json.dumps({"id": "preferred-2", "type": "ping", "command": "wat"})
-        + "\n"
+        + "\n",
     )
     stdout = StringIO()
 
@@ -205,9 +205,9 @@ def test_rpc_search_scoring_mode_emits_scores_and_reasons(monkeypatch) -> None:
                 "query": "usb c to usb c braided cable",
                 "htmlPath": str(FIXTURE_PATH),
                 "scoring": True,
-            }
+            },
         )
-        + "\n"
+        + "\n",
     )
     stdout = StringIO()
 

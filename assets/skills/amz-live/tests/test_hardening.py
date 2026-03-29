@@ -131,7 +131,7 @@ def test_scoring_output_includes_merchant_trust_from_detail_page(monkeypatch) ->
             price=Decimal("7.99"),
             rating=Decimal("4.5"),
             review_count=22038,
-        )
+        ),
     ]
 
     monkeypatch.setattr("amz_live.protocol.load_results", lambda **kwargs: results)

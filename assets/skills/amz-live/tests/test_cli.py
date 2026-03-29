@@ -20,7 +20,7 @@ def test_cli_parses_fixture_filters_results_and_emits_json(capsys) -> None:
             "--limit",
             "2",
             "--json",
-        ]
+        ],
     )
 
     assert exit_code == 0
@@ -40,7 +40,7 @@ def test_cli_parses_fixture_include_filter_and_emits_json(capsys) -> None:
             "--max-price",
             "10",
             "--json",
-        ]
+        ],
     )
 
     assert exit_code == 0
@@ -62,7 +62,7 @@ def test_cli_emits_llm_json_envelope(capsys) -> None:
             "--limit",
             "2",
             "--llm-json",
-        ]
+        ],
     )
 
     assert exit_code == 0
@@ -179,7 +179,7 @@ def test_cli_llm_json_scoring_mode_emits_scores_and_reasons(monkeypatch, capsys)
             str(FIXTURE_PATH),
             "--llm-json",
             "--scoring",
-        ]
+        ],
     )
 
     assert exit_code == 0

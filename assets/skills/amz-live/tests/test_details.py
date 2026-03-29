@@ -29,7 +29,7 @@ def _patch_detail_fetch(monkeypatch, detail_html: str) -> list[str]:
 
     def fake_fetch_product_page(self, *args, **kwargs):  # pragma: no cover - future hook
         haystack = " ".join(
-            [*(str(arg) for arg in args), *(f"{key}={value}" for key, value in kwargs.items())]
+            [*(str(arg) for arg in args), *(f"{key}={value}" for key, value in kwargs.items())],
         )
         if "B07CWC39TL" in haystack:
             fetched.append("B07CWC39TL")
@@ -78,7 +78,7 @@ def test_cli_json_details_enriches_only_up_to_detail_limit(
             "--detail-limit",
             "1",
             "--json",
-        ]
+        ],
     )
 
     assert exit_code == 0
@@ -117,9 +117,9 @@ def test_rpc_search_details_enriches_only_up_to_detail_limit(
                 "limit": 2,
                 "details": True,
                 "detailLimit": 1,
-            }
+            },
         )
-        + "\n"
+        + "\n",
     )
     stdout = StringIO()
 
