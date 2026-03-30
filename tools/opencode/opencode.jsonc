@@ -98,9 +98,7 @@
   /* **************************************************************************
    * MISC
    * ************************************************************************ */
-  "instructions": [
-    "{env:HOME}/.config/agents/assets/agent-delegation.md",
-  ],
+  "instructions": [],
   "default_agent": "plan",
   "autoupdate": false,
   "share": "manual",
