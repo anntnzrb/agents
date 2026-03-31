@@ -66,6 +66,7 @@ Each hit includes fields like:
 
 - The response snippets are HTML, not plain text.
 - Facets are useful for narrowing a broad first pass before repeating the query with `f.repo`, `f.path`, or `f.lang`.
+- Public access can return HTTP `429` when rate limited; treat that as a service throttle, not a helper initialization problem.
 
 ## Validation
 

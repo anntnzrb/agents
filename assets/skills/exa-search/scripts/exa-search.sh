@@ -6,6 +6,12 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
 fi
 
 exa-search() {
+  _exa_search_skill_dir() {
+    local script_path="${BASH_SOURCE[0]:-}"
+    [ -n "$script_path" ] || return 1
+    cd -- "$(dirname -- "$script_path")/.." 2>/dev/null && pwd
+  }
+
   _exa_search_source_env() {
     local env_path="${1:-}" had_allexport=0
     [ -n "$env_path" ] || return 1
@@ -20,6 +26,9 @@ exa-search() {
     [ -n "${EXA_API_KEY:-${EXA_APIKEY:-}}" ] && return 0
 
     _exa_search_source_env "${EXA_SEARCH_ENV_FILE:-}" && return 0
+    local skill_dir=""
+    skill_dir="$(_exa_search_skill_dir)" || skill_dir=""
+    [ -n "$skill_dir" ] && _exa_search_source_env "$skill_dir/.env" && return 0
     [ -n "${SKILLS_DIR:-}" ] && _exa_search_source_env "$SKILLS_DIR/exa-search/.env" && return 0
 
     local dir="$PWD"

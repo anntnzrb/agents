@@ -16,6 +16,8 @@ source "${SKILLS_DIR:-skills}/reddit/scripts/reddit.sh"
 ```
 
 If `SKILLS_DIR` is unavailable, source the same file from your local `skills/` checkout.
+The helper also auto-loads `.env` from its own skill directory, so absolute-path
+`source` usage works from any current working directory.
 
 Then use `reddit <subcommand>` everywhere below.
 
@@ -38,12 +40,20 @@ reddit explain "cake day"
 - Keep `.env` beside this skill if you want a stable local User-Agent.
 - Helper lookup order:
   - `REDDIT_ENV_FILE`
+  - helper sibling `.env` resolved from `${BASH_SOURCE[0]}`
   - `$SKILLS_DIR/reddit/.env`
   - nearest ancestor `skills/reddit/.env`
 - Tracked template: `.env.example`
 - Common vars:
   - `REDDIT_USER_AGENT`
   - `REDDIT_BASE_URL`
+
+## Failure handling
+
+- Do not treat the parent shell as the source of truth for `REDDIT_USER_AGENT`; always run the helper first so it can load its own `.env`.
+- If you sourced the helper from an unusual location and env loading still fails, set `REDDIT_ENV_FILE` dynamically from the helper path rather than hard-coding a machine-specific directory.
+- Missing `REDDIT_USER_AGENT` after helper lookup is not a hard blocker because the helper has a built-in default.
+- Distinguish env lookup behavior from HTTP failures or Reddit-side blocking; report the actual request failure instead of claiming the skill lacks credentials.
 
 ## Notes
 

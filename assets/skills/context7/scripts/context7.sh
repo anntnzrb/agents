@@ -6,6 +6,12 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
 fi
 
 context7() {
+  _context7_skill_dir() {
+    local script_path="${BASH_SOURCE[0]:-}"
+    [ -n "$script_path" ] || return 1
+    cd -- "$(dirname -- "$script_path")/.." 2>/dev/null && pwd
+  }
+
   _context7_source_env() {
     local env_path="${1:-}" had_allexport=0
     [ -n "$env_path" ] || return 1
@@ -20,6 +26,9 @@ context7() {
     [ -n "${CONTEXT7_API_KEY:-}" ] && return 0
 
     _context7_source_env "${CONTEXT7_ENV_FILE:-}" && return 0
+    local skill_dir=""
+    skill_dir="$(_context7_skill_dir)" || skill_dir=""
+    [ -n "$skill_dir" ] && _context7_source_env "$skill_dir/.env" && return 0
     [ -n "${SKILLS_DIR:-}" ] && _context7_source_env "$SKILLS_DIR/context7/.env" && return 0
 
     local dir="$PWD"

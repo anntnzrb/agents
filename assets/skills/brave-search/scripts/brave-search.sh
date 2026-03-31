@@ -6,6 +6,12 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
 fi
 
 brave-search() {
+  _brave_search_skill_dir() {
+    local script_path="${BASH_SOURCE[0]:-}"
+    [ -n "$script_path" ] || return 1
+    cd -- "$(dirname -- "$script_path")/.." 2>/dev/null && pwd
+  }
+
   _brave_search_source_env() {
     local env_path="${1:-}" had_allexport=0
     [ -n "$env_path" ] || return 1
@@ -20,6 +26,9 @@ brave-search() {
     [ -n "${BRAVE_API_KEY:-${BRAVE_SEARCH_API_KEY:-}}" ] && return 0
 
     _brave_search_source_env "${BRAVE_SEARCH_ENV_FILE:-}" && return 0
+    local skill_dir=""
+    skill_dir="$(_brave_search_skill_dir)" || skill_dir=""
+    [ -n "$skill_dir" ] && _brave_search_source_env "$skill_dir/.env" && return 0
     [ -n "${SKILLS_DIR:-}" ] && _brave_search_source_env "$SKILLS_DIR/brave-search/.env" && return 0
 
     local dir="$PWD"

@@ -16,6 +16,8 @@ source "${SKILLS_DIR:-skills}/exa-search/scripts/exa-search.sh"
 ```
 
 If `SKILLS_DIR` is unavailable, source the same file from your local `skills/` checkout.
+The helper also auto-loads `.env` from its own skill directory, so absolute-path
+`source` usage works from any current working directory.
 
 Then use `exa-search <subcommand>` everywhere below.
 
@@ -42,9 +44,19 @@ exa-search research "Summarize the current state of OpenTelemetry in the Java ec
 - Keep `.env` beside this skill.
 - Helper lookup order:
   - `EXA_SEARCH_ENV_FILE`
+  - helper sibling `.env` resolved from `${BASH_SOURCE[0]}`
   - `$SKILLS_DIR/exa-search/.env`
   - nearest ancestor `skills/exa-search/.env`
 - Tracked template: `.env.example`
+
+## Failure handling
+
+- If a helper run says `EXA_API_KEY required`, retry once with the helper itself; do not assume the parent shell env is authoritative.
+- If you sourced the helper from an unusual location and env loading still fails, set `EXA_SEARCH_ENV_FILE` to the skill-local `.env` dynamically from the helper path rather than hard-coding a home directory.
+- Distinguish env lookup failures from provider failures:
+  - `EXA_API_KEY required` means local env discovery failed.
+  - `curl: (22)` with HTTP `401`, `402`, `403`, or similar means the API responded and the key/account/quota is the issue.
+- When the API responds with an auth/billing/quota error, report that explicitly instead of claiming the skill lacks credentials.
 
 ## Notes
 

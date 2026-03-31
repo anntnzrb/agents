@@ -6,6 +6,12 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
 fi
 
 reddit() {
+  _reddit_skill_dir() {
+    local script_path="${BASH_SOURCE[0]:-}"
+    [ -n "$script_path" ] || return 1
+    cd -- "$(dirname -- "$script_path")/.." 2>/dev/null && pwd
+  }
+
   _reddit_source_env() {
     local env_path="${1:-}" had_allexport=0
     [ -n "$env_path" ] || return 1
@@ -18,6 +24,9 @@ reddit() {
 
   _reddit_load_env() {
     _reddit_source_env "${REDDIT_ENV_FILE:-}" && return 0
+    local skill_dir=""
+    skill_dir="$(_reddit_skill_dir)" || skill_dir=""
+    [ -n "$skill_dir" ] && _reddit_source_env "$skill_dir/.env" && return 0
     [ -n "${SKILLS_DIR:-}" ] && _reddit_source_env "$SKILLS_DIR/reddit/.env" && return 0
 
     local dir="$PWD"

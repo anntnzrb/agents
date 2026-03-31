@@ -16,6 +16,8 @@ source "${SKILLS_DIR:-skills}/context7/scripts/context7.sh"
 ```
 
 If `SKILLS_DIR` is unavailable, source the same file from your local `skills/` checkout.
+The helper also auto-loads `.env` from its own skill directory, so absolute-path
+`source` usage works from any current working directory.
 
 Then use `context7 <subcommand>` everywhere below.
 
@@ -51,10 +53,20 @@ context7 json /fastapi/fastapi "dependency injection"
 - Keep `.env` beside this skill.
 - Helper lookup order:
   - `CONTEXT7_ENV_FILE`
+  - helper sibling `.env` resolved from `${BASH_SOURCE[0]}`
   - `$SKILLS_DIR/context7/.env`
   - nearest ancestor `skills/context7/.env`
 - Tracked template: `.env.example`
 - Header used when present: `Authorization: Bearer <key>`
+
+## Failure handling
+
+- Do not treat the parent shell as the source of truth for `CONTEXT7_API_KEY`; always run the helper first so it can load its own `.env`.
+- If you sourced the helper from an unusual location and env loading still fails, set `CONTEXT7_ENV_FILE` dynamically from the helper path rather than hard-coding a machine-specific directory.
+- Distinguish helper/env failures from API failures:
+  - missing key after helper lookup means env discovery failed
+  - HTTP `401`, `404`, `422`, `429`, or `503` means the request reached Context7 and failed for auth/library/rate/service reasons
+- Report the actual HTTP failure mode instead of collapsing everything into “missing credentials”.
 
 ## Notes
 

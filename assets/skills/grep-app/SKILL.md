@@ -50,6 +50,15 @@ Pass Grep.app filters as query params:
 - Tracked template: `.env.example`
 - Optional override: `GREP_APP_BASE_URL`
 
+## Failure handling
+
+- `grep-app` does not use a skill-local API key in this helper flow, so there is no `.env` credential-loading step to debug by default.
+- Distinguish helper issues from service issues:
+  - shell/source/usage errors mean local invocation is wrong
+  - `curl: (22)` with HTTP `429` means Grep.app rate-limited the request
+  - other HTTP failures mean the service or endpoint responded with an error, not that the helper failed to initialize
+- If `429` appears, report it as rate limiting and either retry later or fall back to another research route such as `context7`, `gh`, or `exa-search`.
+
 ## Notes
 
 - Public GitHub repos only.
