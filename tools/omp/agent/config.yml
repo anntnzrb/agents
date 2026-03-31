@@ -21,43 +21,59 @@ branchSummary:
   enabled: true
 doubleEscapeAction: tree
 treeFilterMode: no-tools
-startup.checkUpdate: false
-mcp.enableProjectConfig: false
-mcp.discoveryMode: false
-mcp.notifications: false
-inspect_image.enabled: false
-calc.enabled: false
-checkpoint.enabled: false
-notebook.enabled: false
-async: 
+startup:
+  checkUpdate: false
+mcp:
+  enableProjectConfig: false
+  discoveryMode: false
+  notifications: false
+inspect_image:
+  enabled: false
+calc:
+  enabled: false
+checkpoint:
+  enabled: false
+notebook:
+  enabled: false
+async:
   enabled: true
-renderMermaid.enabled: false
-fetch.enabled: false
-web_search.enabled: false
-browser.enabled: false
-lsp.enabled: false
-bashInterceptor.enabled: true
-bashInterceptor.patterns:
-  - pattern: "^\\s*(python|python3(?:\\.\\d+)*)\\b"
-    tool: python
-    message: "python/python3 is disabled. Load `/skill:python`."
-  - pattern: "\\bpython(?:3(?:\\.\\d+)*)?\\b"
-    tool: python
-    message: "Anything invoking python is disabled. Load `/skill:python`."
-python.toolMode: bash-only
-python.kernelMode: session
-python.sharedGateway: true
-ttsr.enabled: true
-ttsr.contextMode: discard
-ttsr.interruptMode: tool-only
-ttsr.repeatMode: after-gap
-ttsr.repeatGap: 3
-task.isolation.mode: worktree
-task.isolation.merge: patch
-task.isolation.commits: ai
-task.eager: true
-task.maxConcurrency: 8
-task.maxRecursionDepth: 2
+renderMermaid:
+  enabled: false
+fetch:
+  enabled: false
+web_search:
+  enabled: false
+browser:
+  enabled: false
+lsp:
+  enabled: false
+bashInterceptor:
+  enabled: true
+  patterns:
+    - pattern: "^\\s*(python|python3(?:\\.\\d+)*)\\b"
+      tool: python
+      message: "python/python3 is disabled. Load `/skill:python`."
+    - pattern: "\\bpython(?:3(?:\\.\\d+)*)?\\b"
+      tool: python
+      message: "Anything invoking python is disabled. Load `/skill:python`."
+python:
+  toolMode: bash-only
+  kernelMode: session
+  sharedGateway: true
+ttsr:
+  enabled: true
+  contextMode: discard
+  interruptMode: tool-only
+  repeatMode: after-gap
+  repeatGap: 3
+task:
+  isolation:
+    mode: worktree
+    merge: patch
+    commits: ai
+  eager: true
+  maxConcurrency: 8
+  maxRecursionDepth: 2
 disabledProviders:
   - claude
   - claude-plugins
