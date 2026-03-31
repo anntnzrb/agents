@@ -67,10 +67,6 @@ config_file = "agents/explorer.toml"
 description = "Use for execution and production work."
 config_file = "agents/worker.toml"
 
-[agents.refactorer]
-config_file = "agents/refactorer.toml"
-description = "Use for improving code quality without changing external behavior."
-
 # -----------------------------------------------------------------------------
 # MISC
 # -----------------------------------------------------------------------------
