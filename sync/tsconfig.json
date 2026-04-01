@@ -5,6 +5,14 @@
     "module": "Preserve",
     "moduleDetection": "force",
     "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@src/*": ["./src/*"],
+      "@core/*": ["./src/core/*"],
+      "@extensions/*": ["./src/extensions/*"],
+      "@packages/*": ["./src/packages/*"],
+      "@runtime/*": ["./src/runtime/*"]
+    },
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "types": ["bun-types"],
@@ -16,5 +24,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["sync/src/**/*.ts", "sync/test/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts"]
 }

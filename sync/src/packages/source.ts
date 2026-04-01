@@ -4,11 +4,11 @@ import path from "node:path";
 
 import { Effect } from "effect";
 
-import { rmEntry } from "../runtime/fs.ts";
-import { commandExists } from "../runtime/process.ts";
+import { rmEntry } from "@runtime/fs.ts";
+import { commandExists } from "@runtime/process.ts";
 import { runCommand } from "./process.ts";
 
-export { rmEntry } from "../runtime/fs.ts";
+export { rmEntry } from "@runtime/fs.ts";
 
 export function packageCacheDir(cacheRoot: string, source: string): string {
   const slug = sourceSlug(source);

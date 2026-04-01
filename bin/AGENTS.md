@@ -1,10 +1,13 @@
 # AGENTS.md
 
-This holds the stable sync wrapper used to manage and sync these AI Agent configs. Keep changes in the TypeScript sources under `sync/`, not in synced tool homes, because sync will overwrite tool-home copies.
+This holds the minimal public sync wrapper.
+Keep `bin/` tiny.
+Keep sync behavior and implementation in the repo-root `./sync/` app.
 
 ## Full gate
 
+Run from repo root:
 - `./bin/sync`
-- `bun run typecheck`
-- `bun test`
-- `bun run test:integration`
+- `cd ./sync && bun run typecheck`
+- `cd ./sync && bun test`
+- `cd ./sync && bun run test:integration`

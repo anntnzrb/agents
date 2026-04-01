@@ -12,7 +12,7 @@ import {
   type Harness,
   type SyncEnv,
 } from "./harness.ts";
-import { panicMessage } from "../runtime/errors.ts";
+import { panicMessage } from "@runtime/errors.ts";
 
 export type JobKind = "File" | "Dir";
 

@@ -15,7 +15,8 @@ import { tmpdir } from "node:os";
 import { setDefaultTimeout, test } from "bun:test";
 
 const REPO_ROOT = resolve("/Users/annt/.config/agents");
-const TS_SYNC = resolve(REPO_ROOT, "sync/src/cli.ts");
+const SYNC_ROOT = resolve(REPO_ROOT, "sync");
+const TS_SYNC = resolve(SYNC_ROOT, "src/cli.ts");
 
 setDefaultTimeout(30_000);
 
@@ -220,7 +221,7 @@ function initGitRepo(repoPath: string): void {
 
 function runSyncProcess(home: string): RunResult {
   const result = spawnSync("bun", [TS_SYNC], {
-    cwd: REPO_ROOT,
+    cwd: SYNC_ROOT,
     encoding: "utf8",
     env: {
       ...process.env,

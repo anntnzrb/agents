@@ -9,11 +9,11 @@ import {
   runCommand,
   runCommandOutcome,
   type CommandOutcome,
-} from "../runtime/process.ts";
+} from "@runtime/process.ts";
 import { missingPackageRoots } from "./validate.ts";
 
-export type { CommandOutcome } from "../runtime/process.ts";
-export { runCommand } from "../runtime/process.ts";
+export type { CommandOutcome } from "@runtime/process.ts";
+export { runCommand } from "@runtime/process.ts";
 
 export enum InferredInstallStep {
   Done = "Done",

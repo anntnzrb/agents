@@ -3,12 +3,12 @@ import path from "node:path";
 
 import { Effect } from "effect";
 
-import { installInferredImportPackages } from "../packages/process.ts";
+import { installInferredImportPackages } from "@packages/process.ts";
 import {
   commandExists,
   type CommandOutcome,
   runCommandOutcome,
-} from "../runtime/process.ts";
+} from "@runtime/process.ts";
 
 export const iterExtensionPackages = (root: string): Effect.Effect<string[]> =>
   Effect.promise(async () => {

@@ -9,11 +9,12 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { test } from "bun:test";
 import { Effect } from "effect";
-const SRC_ROOT = "/Users/annt/.config/agents/sync/src";
+const SYNC_ROOT = resolve("/Users/annt/.config/agents/sync");
+const SRC_ROOT = join(SYNC_ROOT, "src");
 
 let HarnessId: any;
 let SyncEnv: any;
@@ -118,14 +119,14 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
     packagesModule,
     packagesProcessModule,
   ] = await Promise.all([
-    import("../src/core/index.ts"),
-    import("../src/core/harness.ts"),
-    import("../src/extensions/install.ts"),
-    import("../src/core/jobs.ts"),
-    import("../src/core/managed-state.ts"),
-    import("../src/core/plan.ts"),
-    import("../src/packages/index.ts"),
-    import("../src/packages/process.ts"),
+    import("@core/index.ts"),
+    import("@core/harness.ts"),
+    import("@extensions/install.ts"),
+    import("@core/jobs.ts"),
+    import("@core/managed-state.ts"),
+    import("@core/plan.ts"),
+    import("@packages/index.ts"),
+    import("@packages/process.ts"),
   ]);
 
   return {
@@ -408,7 +409,7 @@ console.log(String(result));
     );
 
     const result = spawnSync("bun", [helper], {
-      cwd: root,
+      cwd: SYNC_ROOT,
       encoding: "utf8",
       stdio: "pipe",
       timeout: 5000,
@@ -446,7 +447,7 @@ console.log(String(exit));
     );
 
     const result = spawnSync("bun", [helper], {
-      cwd: root,
+      cwd: SYNC_ROOT,
       encoding: "utf8",
       stdio: "pipe",
       env: {
@@ -474,7 +475,7 @@ setInterval(() => {}, 1_000);
     );
 
     const result = spawnSync("bun", [helper], {
-      cwd: root,
+      cwd: SYNC_ROOT,
       encoding: "utf8",
       stdio: "pipe",
       timeout: 5_000,
@@ -702,7 +703,7 @@ test("run_sync_removes_entries_removed_from_ssot_after_prior_sync", async () => 
 test("run_sync_preserves_generated_extension_runtime_when_hook_inputs_match", async () => {
   await withTempDir(async (root) => {
     const syncEnv = makeSyncEnv(root);
-    const { fingerprintTree } = await import("../src/core/hook-state.ts");
+    const { fingerprintTree } = await import("@core/hook-state.ts");
 
     writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
     writeFile(join(root, ".config", "agents", "tools", "pi", "agent", "extensions", "context", "index.ts"), "export const live = true;\n");
@@ -975,7 +976,7 @@ test("managed_state_helpers_match_safe_entry_rules", async () => {
   "..",
   "/tmp/escape",
   "nested/path",
-  "../outside",
+  "${["..", "outside"].join("/")}",
   "good.txt"
 ]`,
     );

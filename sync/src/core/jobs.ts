@@ -10,7 +10,7 @@ import {
   rmEntry,
   syncManagedChildren,
   syncManagedTree,
-} from "../runtime/fs.ts";
+} from "@runtime/fs.ts";
 
 export type { JobKind } from "./plan.ts";
 export type { Job } from "./plan.ts";

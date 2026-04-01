@@ -4,8 +4,8 @@
 
 - `assets/`: SSOT for agent assets (skills, agents, shared config)
 - `tools/`: tool-specific configs staged for sync
-- `sync/`: isolated TypeScript sync application
-- `bin/sync`: stable sync wrapper for all tool homes
+- `sync/`: isolated TypeScript sync application; owns all JS/TS app config and dependencies
+- `bin/sync`: minimal public wrapper for the sync app
 - Do not directly edit synced tool homes (`~/.codex`, `~/.claude`, etc.); changes must land here for sync to overwriting
 
 ## Commit format
