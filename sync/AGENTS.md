@@ -9,3 +9,11 @@ This is the isolated sync application.
 - `./test/`: sync-specific tests
 - Keep behavior changes deliberate.
 - Public callable wrapper exists at repo root as `bin/sync`.
+
+## Validation
+
+Run from repo root:
+- `./bin/sync`
+- `cd ./sync && bun run typecheck`
+- `cd ./sync && bun test`
+- `cd ./sync && bun run test:integration`
