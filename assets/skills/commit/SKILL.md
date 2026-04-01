@@ -1,11 +1,11 @@
 ---
 name: commit
-description: "Create granular, logically grouped commits with precise staging or hunk selection. Use whenever the user asks to commit changes, split work into multiple commits, stage or unstage hunks, write or polish commit messages, clean up commit history before handoff, or says /commit. Prefer multiple small truthful commits over one catch-all commit. In GitButler-managed repos, prefer `but`; elsewhere use `git`."
+description: "Create granular, logically grouped commits with precise staging or hunk selection. Use whenever the user asks to commit changes, split or preview commits, stage or unstage hunks, write or polish commit messages, manage changelog fragments, clean up commit history before handoff, or says /commit. Prefer multiple small truthful commits over one catch-all commit. In GitButler-managed repos, prefer `but`; elsewhere use `git`."
 ---
 
 # Commit Skill
 
-Turn a dirty worktree into the smallest honest set of commits. Plan commit groups first. Then stage, verify, commit, refresh, and repeat until all intended changes are handled.
+Turn a dirty worktree into the smallest honest set of commits. Plan the whole set first. Then stage, verify, commit, refresh, and repeat until all intended changes are handled.
 
 WORKING DIRECTORY: optional argument, default current directory.
 
@@ -15,21 +15,43 @@ WORKING DIRECTORY: optional argument, default current directory.
 - Exact staging; hunk-level when needed
 - Message-file workflow every time
 - Repo conventions first; fallback to conventional commits
+- Changelog or fragment updates travel with the change they describe
+- End with a clean accounting of what was committed vs left behind
 
 ## Engine selection
-1. Read repo-local guidance first: `AGENTS.md`, `CONTRIBUTING.md`, commit docs, templates.
+1. Discover repo policy first. Read the smallest repo-local set that controls commits:
+   - nearest + root `AGENTS.md`
+   - `CONTRIBUTING.md`, `README.md`, release docs, issue-closing rules
+   - commit templates, `.gitmessage`, `commitlint*`, hook config (`.husky/`, `.lefthook/`, `.pre-commit-config.yaml`, `lint-staged`)
+   - changelog/release systems: `CHANGELOG.md`, `.changeset/`, `newsfragments/`, `changelog.d/`, release automation
+   - recent commit subjects if style is still unclear
+   Extract: message format, trailers/signoff/DCO, required validation, changelog expectations, issue refs, and whether push is allowed.
 2. Use **But mode** when the repo is GitButler-managed and `but status --json` is the natural write path.
 3. Otherwise use **Git mode**.
 4. Once in But mode, do not use raw `git add`, `git commit`, `git rebase`, or similar write commands. Read-only Git inspection is fine.
 
+## Planning rules
+Before the first write:
+- Inspect the full state.
+- Fast-path trivial diffs. If the whole change is whitespace-only, formatting-only, import-only, or comment-only, prefer one small `style` or `chore` commit and usually skip changelog work unless repo policy says otherwise.
+- Draft the full commit plan:
+  - every intended staged hunk belongs to exactly one commit
+  - if the same file spans multiple commits, name exact hunk or line ownership
+  - note dependencies when order matters; execute in dependency order
+  - decide validation and changelog work per commit, not as an afterthought
+- If the user asked for preview, dry-run, or message help only, stop after the plan.
+
 ## Commit loop
 1. Inspect the full state before the first commit.
-2. Draft all logical groups.
-3. Commit only the first group.
-4. Refresh remaining changes.
-5. Re-plan if IDs or hunks changed.
-6. Repeat until all intended changes are committed or the user says stop.
-7. End with a one-line list of the created commits.
+2. Preview the plan:
+   - single commit: message, files/hunks, validation plan, changelog intent
+   - split plan: numbered commits, files/hunks, dependencies, execution order
+3. If grouping, policy, or validation scope is ambiguous, call `clarify` before mutating.
+4. Commit only the next approved group.
+5. Refresh remaining changes after each commit.
+6. Re-plan if hunk IDs, file ownership, or changelog targets changed.
+7. Repeat until all intended changes are committed or the user says stop.
+8. End with a compact report: commits created, validation run/skipped, changelog updates, and remaining changes.
 
 ## Grouping heuristics
 - Separate unrelated concerns.
@@ -38,6 +60,7 @@ WORKING DIRECTORY: optional argument, default current directory.
 - Separate tests from implementation when independently meaningful.
 - Separate docs, config, and build changes unless tightly coupled.
 - Mixed file: split by hunk. Escalate from file-level to hunk-level rather than bundling.
+- Keep changelog fragments or manual changelog hunks with the commit they describe.
 - Prefer a few small truthful commits over one “final state” commit.
 
 ## Message policy
@@ -45,12 +68,20 @@ Use repo-specific convention if defined. Otherwise use conventional commits.
 
 ### Default format
 - Subject: `type(scope): description`
-- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`
-- Subject: imperative, specific, max 52 chars
+- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+- Subject: imperative, specific, max 52 chars unless repo history clearly uses a different limit
 - Blank line between subject and body
 - Body: wrap at 72 chars
 - Focus on intent and effect, not file-by-file narration
 - No bullets unless the repo style strongly prefers them
+
+### Message lint
+Before commit, check:
+- no trailing period in subject
+- no filler like `various`, `several`, `misc`, `improved`, `enhanced`, `better`
+- no meta phrases like `this commit`, `this change`, `updated code`, `modified files`, `address review comments`
+- scope and type fit the touched files
+- if repo history uses a different tense or trailer style, mirror the repo instead of the fallback
 
 ### Message-file rule
 Always draft the full message into a temp file first.
@@ -58,6 +89,32 @@ Always draft the full message into a temp file first.
 - But: `but commit --message-file "$msgfile"`
 
 This keeps formatting stable and avoids shell-quoting mistakes.
+
+## Validation gate
+- Discover repo-required validation first.
+- Prefer the narrowest meaningful gate for the affected package/app: focused tests, lint, typecheck, or build before whole-repo suites.
+- Do not invent expensive validation when the repo gives no signal. If only heavy or ambiguous validation exists, call `clarify`.
+- If validation fails, stop before the next commit. Report:
+  - failing command
+  - whether anything was already committed
+  - exact remaining staged/unstaged state
+- If the user explicitly wants unvalidated commits, say so in the final report.
+
+## Changelog behavior
+When the repo expects changelog or release fragments:
+- Detect whether the repo uses manual changelogs or fragment/generated systems.
+- Manual `CHANGELOG.md` / `NEWS.md` / `HISTORY.md`:
+  - read the current `[Unreleased]` section first
+  - add only user-visible entries
+  - skip trivial/style/test-only/internal refactor entries unless repo policy requires them
+  - deduplicate or update draft entries instead of appending duplicates
+  - never edit released sections
+- Fragment systems (`.changeset`, `newsfragments`, `changelog.d`, Towncrier, release-please, semantic-release):
+  - commit the fragment with the code change it describes
+  - do not hand-edit generated release output unless repo docs explicitly require it
+- If changelog policy is ambiguous, missing an `[Unreleased]` section, or release automation owns the file, stop and ask.
+
+Load `references/changelog.md` when changelog or release automation is relevant.
 
 ## Git mode
 Use this in normal Git repos.
@@ -77,8 +134,9 @@ git diff --cached
 ### Stage precisely
 Preferred order:
 1. Whole-file stage only when the file is one logical unit.
-2. `git add -p -- <path>` for mixed files.
+2. `git add -p -- <path>` for mixed files when patch UI is usable.
 3. `git add -e -- <path>` when patch mode still groups too much together.
+4. Patch-file or pathspec-file flows from `references/git.md` when you need exact noninteractive control, weird filenames, or partial new-file staging.
 
 ### Repair over-staging
 If the index got too much:
@@ -87,6 +145,8 @@ git reset -p
 # or
 git restore --staged -p -- <path>
 ```
+
+For noninteractive repair or exact reversals, use the reverse-apply patterns in `references/git.md`.
 
 ### Verify before every commit
 ```bash
@@ -100,10 +160,12 @@ git commit -F "$msgfile"
 
 ### Advanced Git flows
 Read `references/git.md` when you need:
+- noninteractive precise staging
 - split the previous mixed commit
-- `fixup!` / `amend!` / `reword!` flows
+- amend, fixup, autosquash, or reword flows
 - `--pathspec-from-file`
-- caveats around `git add -e`
+- recovery from hook failures, merge/rebase/cherry-pick states, or bad staging
+- caveats around `git add -e` and `git commit <pathspec>`
 
 ## But mode
 Use this in GitButler-managed repos.
@@ -119,6 +181,7 @@ but <mutation> --json --status-after
 ```
 - Use CLI IDs from `but status --json` or `but diff --json`.
 - Prefer `but` writes over raw Git writes.
+- Refresh IDs after every mutation. Do not assume old IDs still point at the same hunks or commits.
 
 ### Exact hunk commit
 1. Inspect:
@@ -153,32 +216,47 @@ Use:
 - `but undo`
 - `but oplog restore`
 
-Read `references/but.md` when you need exact command patterns or caveats.
+Read `references/but.md` when you need exact command patterns, message-file-safe reword flows, or recovery sequences.
 
 ## Split-a-mixed-commit rule
 If the task is “split the last mixed commit”:
 - Git mode: use the documented reset/patch loop from `references/git.md`
 - But mode: prefer native history surgery (`uncommit`, `move`, `squash`, `reword`, `commit empty`, `absorb`) instead of raw Git rewrites
 
+## Edge cases
+Stop and reassess before writing when you see:
+- merge, rebase, cherry-pick, or revert in progress
+- submodules, sparse checkouts, or binary files
+- rename-heavy diffs where rename-only and content changes should separate
+- generated files or lockfiles mixed with hand-written code
+- hooks that fail or mutate files unexpectedly
+- user requested only a subset and the rest of the worktree is dirty
+
 ## Safety checks
 - Never commit before seeing the whole change set.
-- Never stop after the first valid commit if more logical groups remain.
+- If nothing is staged: stage only the intended files/hunks unless the user explicitly said staged-only.
+- Never leave staged files/hunks unaccounted for. Every staged change must be committed now or intentionally left untouched because the user asked.
 - Never trust staging blindly; verify with cached diff or returned JSON state.
+- If split-plan dependencies become circular or unclear, stop and re-plan.
+- Never push unless the user explicitly asked for it.
 - If a repo has custom commit rules, follow them over the fallback format.
 - If the user asks for only part of the work to be committed, leave the rest untouched.
 
 ## Return format
-Return only a plain-text one-line list of the commits you created, newest first.
+Return a compact plain-text report:
+- `commits:` created commits with SHA + subject, oldest -> newest
+- `validation:` commands run, skipped, or failed
+- `changelog:` updated files or `none`
+- `remaining:` clean worktree or remaining paths intentionally left uncommitted
 
-Example:
-```text
-a1b2c3d feat(parser): split env parsing
-d4e5f6a test(parser): cover empty value case
-```
+For preview-only or dry-run:
+- say `no commits created`
+- print the proposed commit message(s) and split order instead
 
 ## References
 Load only what you need:
-- `references/git.md` - patch-mode Git flows, split-commit recipe, fixup/autosquash, pathspec tips
-- `references/but.md` - GitButler/`but` commit flows, hunk IDs, assignment-first workflows, repair tools
+- `references/git.md` - patch-mode Git flows, noninteractive precise staging, split/recovery, fixup/autosquash, pathspec tips
+- `references/but.md` - GitButler/`but` JSON workflows, hunk IDs, history surgery, repair tools, recovery
+- `references/changelog.md` - manual changelog vs fragment systems, verification, grouping rules
 
 Optional arguments: $ARGUMENTS

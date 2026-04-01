@@ -1,0 +1,65 @@
+{
+  "skill_name": "commit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have one dirty Git worktree with a bug fix, some import reordering, and a manual CHANGELOG.md edit. I want a preview first, then exact split commits without using interactive patch prompts.",
+      "expected_output": "Builds a preview split plan, distinguishes trivial import-only work, keeps the changelog hunk with the right logical commit, and uses noninteractive precise-staging guidance instead of assuming TTY patch mode.",
+      "files": [],
+      "expectations": [
+        "The plan previews numbered commits before mutation",
+        "The workflow assigns every intended hunk to exactly one commit",
+        "The answer uses patch-file or pathspec-file Git flows instead of only `git add -p`",
+        "The changelog edit stays with the commit it describes rather than becoming a catch-all docs commit"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Commit only these Git paths, including one filename with spaces, and leave the rest of the dirty repo untouched. Use a temp message file and tell me what validation you would run.",
+      "expected_output": "Uses pathspec-from-file style staging for awkward filenames, keeps unrelated work untouched, commits via a message file, and proposes a narrow validation gate.",
+      "files": [],
+      "expectations": [
+        "The workflow uses a NUL-safe path list or equivalent for weird filenames",
+        "The answer does not sweep unrelated dirty files into the commit",
+        "The commit command uses `git commit -F \"$msgfile\"`",
+        "The answer proposes focused validation instead of defaulting to a full-repo suite"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I already made one mixed Git commit by mistake. Split the last commit into honest commits, preserve new-file partial staging, and recover cleanly if I over-stage during the rewrite.",
+      "expected_output": "Uses the reset-and-restage split recipe, preserves partial new-file staging with `git add -N`, and includes an exact recovery path for over-staging.",
+      "files": [],
+      "expectations": [
+        "The workflow uses `git reset -N HEAD^` or an equivalent split-last-commit recipe",
+        "The answer keeps new files visible to partial staging",
+        "The answer includes reverse-apply or another exact over-staging recovery method",
+        "The final flow still commits from a message file"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "This repo is GitButler-managed. I need to commit only two exact hunks from one file, then reword the commit from a temp message file, and I want the plan to survive ID churn after each mutation.",
+      "expected_output": "Uses `but` JSON inspection, commits specific change IDs, treats post-mutation JSON as source of truth, and handles rewording without dropping the message-file workflow.",
+      "files": [],
+      "expectations": [
+        "The workflow starts from `but status --json` and `but diff --json`",
+        "The answer commits exact change IDs rather than falling back to raw Git writes",
+        "The answer refreshes IDs after each mutation",
+        "The reword flow preserves a temp-message-file workflow directly or via file-to-string handoff"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Figure out whether this repo wants manual changelog edits or release-note fragments before committing. If only heavy validation exists, do not guess—make me approve the tradeoff.",
+      "expected_output": "Detects changelog system type, applies the correct commit grouping rule, and escalates heavy or ambiguous validation with clarify instead of silently choosing.",
+      "files": [],
+      "expectations": [
+        "The workflow checks repo docs or release files to distinguish manual changelogs from fragment systems",
+        "The answer avoids hand-editing generated changelogs when automation owns them",
+        "The answer keeps release-note edits with the change they describe",
+        "The answer asks for approval when validation cost or scope is unclear"
+      ]
+    }
+  ]
+}
