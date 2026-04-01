@@ -77,15 +77,6 @@ export async function cloneAttemptsForTests(
   return [result, attempts];
 }
 
-export const clonePackageEffect = (
-  source: string,
-  targetDir: string,
-  timeoutMs: number,
-) =>
-  Effect.tryPromise({
-    try: () => clonePackage(source, targetDir, timeoutMs),
-    catch: (error) => error as Error,
-  });
 
 function sourceSlug(source: string): string {
   const trimmed = source.trim().replace(/\/+$/, "");

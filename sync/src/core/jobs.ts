@@ -1,9 +1,8 @@
 import fs from "node:fs";
 import { dirname } from "node:path";
 
-import { SyncEnv } from "./harness.ts";
 import { err, panicMessage } from "./index.ts";
-import { buildSyncPlan, type Job } from "./plan.ts";
+import { type Job } from "./plan.ts";
 import {
   copyTree,
   isSymlink,
@@ -54,13 +53,6 @@ export function copyDirInto(srcDir: string, dstDir: string): boolean {
   }
 }
 
-export function iterJobs(syncEnv: SyncEnv): Job[] {
-  return [...buildSyncPlan(syncEnv).jobs];
-}
-
-export function runJobs(jobs: readonly Job[]): boolean {
-  return runJobsWithPreserve(jobs);
-}
 
 export function runJobsWithPreserve(
   jobs: readonly Job[],
