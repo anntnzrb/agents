@@ -48,7 +48,9 @@ const runExtraction = async (
   assistantText: string,
   signal: AbortSignal
 ): Promise<ExtractionResult | null> => {
-  const apiKey = await ctx.modelRegistry.getApiKey(model);
+  const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+  if (!auth.ok || !auth.apiKey) return null;
+
   const userMessage: UserMessage = {
     role: "user",
     content: [{ type: "text", text: assistantText }],
@@ -58,7 +60,7 @@ const runExtraction = async (
   const response = await complete(
     model,
     { systemPrompt: SYSTEM_PROMPT, messages: [userMessage] },
-    { apiKey, signal }
+    { apiKey: auth.apiKey, headers: auth.headers, signal }
   );
 
   if (response.stopReason === "aborted") {
