@@ -38,10 +38,6 @@ export default function promptEditorExtension(pi: ExtensionAPI): void {
     await restore(ctx);
   });
 
-  pi.on("session_switch", async (_event, ctx) => {
-    await restore(ctx);
-  });
-
   pi.on("model_select", async (event: ModelSelectEvent, ctx) => {
     setLastObservedModel(event.model.provider, event.model.id);
     await handleModelSelect(pi, event, ctx);
