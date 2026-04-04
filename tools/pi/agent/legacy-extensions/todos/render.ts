@@ -104,7 +104,7 @@ export const renderTodoDetail = (theme: Theme, todo: TodoRecord, expanded: boole
 };
 
 export const appendExpandHint = (theme: Theme, text: string): string => {
-  return `${text}\n${theme.fg("dim", `(${keyHint("expandTools", "to expand")})`)}`;
+  return `${text}\n${theme.fg("dim", `(${keyHint("app.tools.expand", "to expand")})`)}`;
 };
 
 export const formatTodoList = (todos: TodoFrontMatter[]): string => {

@@ -201,7 +201,7 @@ export class TodoSelectorComponent extends Container implements Focusable {
       this.updateList();
       return;
     }
-    if (kb.matches(keyData, "selectConfirm")) {
+    if (kb.matches(keyData, "tui.select.confirm")) {
       const selected = this.filteredTodos[this.selectedIndex];
       if (selected) this.onSelectCallback(selected);
       return;
@@ -366,7 +366,7 @@ export class TodoDetailOverlayComponent {
       this.onAction("back");
       return;
     }
-    if (kb.matches(keyData, "selectConfirm")) {
+    if (kb.matches(keyData, "tui.select.confirm")) {
       this.onAction("work");
       return;
     }
