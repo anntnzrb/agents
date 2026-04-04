@@ -69,15 +69,21 @@ const generateHandoffPrompt = async (
 		loader.onAbort = () => done(null);
 
 		const run = async () => {
-			if (!ctx.model) return null;
-			const apiKey = await ctx.modelRegistry.getApiKey(ctx.model);
+			const model = ctx.model;
+			if (!model) return null;
+
+			const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+			if (!auth.ok || !auth.apiKey) {
+				throw new Error(auth.ok ? `No API key for ${model.provider}` : auth.error);
+			}
+
 			const response = await complete(
-				ctx.model,
+				model,
 				{
 					systemPrompt: SYSTEM_PROMPT,
 					messages: [buildPromptGenerationMessage(input)],
 				},
-				{ apiKey, signal: loader.signal },
+				{ apiKey: auth.apiKey, headers: auth.headers, signal: loader.signal },
 			);
 
 			if (response.stopReason === "aborted") return null;
