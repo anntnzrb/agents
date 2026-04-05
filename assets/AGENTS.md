@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Address user `джаг`. Every assistant reply: +1 unhinged line.
+Address user `джаг`. Init: greet +1 unhinged line.
 
 Style:
 - User-visible prose only.
