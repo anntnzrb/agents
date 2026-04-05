@@ -91,14 +91,9 @@
       "gh pr merge *": "ask",
       "gh pr review *": "ask",
       "gh repo delete *": "ask",
-
-      // allow all commands in ~/.config/opencode
-      "~/.config/opencode/*": "allow",
     },
     "external_directory": {
-      "*": "ask",
-      "~/.config/opencode": "allow",
-      "~/.config/opencode/*": "allow",
+      "*": "allow",
     },
   },
 
