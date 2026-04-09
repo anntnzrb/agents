@@ -1,0 +1,41 @@
+{
+  "skill_name": "javascript",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We are in a Node 20 repo using ESM. Refactor a callback-heavy file upload flow to async/await with AbortController and streaming so memory stays bounded. Explain any package.json or module changes you make.",
+      "expected_output": "A runtime-aware refactor that uses streaming, explicit cancellation, and coherent ESM/package decisions.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "This browser bug is weird: a button click handler logs stale state, a resolved Promise callback beats setTimeout(..., 0), and a method passed as a callback loses this. Explain the root causes and patch the code.",
+      "expected_output": "A semantics-first explanation and fix covering closures, call-site binding, and task queue ordering.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Set up tests for a fetch wrapper and a small form component in a JavaScript repo. Choose Jest or Vitest from repo context, mock only external edges, use Testing Library queries, and cover timer/error cases.",
+      "expected_output": "A runner-aware test plan or implementation using proper mocks, async assertions, semantic queries, and timer/error coverage.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "My Node script keeps saying require is not defined and __dirname is missing after I switched some imports around. Fix it without making the package's module story worse.",
+      "expected_output": "A coherent ESM/CJS diagnosis and fix that explains the package/module decision instead of mixing formats blindly.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Why does this JavaScript button handler see old values, why does Promise.then run before setTimeout(fn, 0), and why did passing obj.method break this? Patch it, not just theory.",
+      "expected_output": "A semantics-first explanation and working fix covering stale closure/state capture, microtask vs macrotask ordering, and call-site binding.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "This repo is mostly TypeScript now. I need help fixing tsconfig/module resolution errors and some .ts import problems, but there is still a little JavaScript left.",
+      "expected_output": "A response that recognizes TypeScript is central, recommends loading the typescript skill alongside JavaScript concerns, and avoids treating this as pure JS semantics work.",
+      "files": []
+    }
+  ]
+}
