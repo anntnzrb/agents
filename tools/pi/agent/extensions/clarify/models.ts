@@ -2,50 +2,46 @@ import { Type, type Static } from "@sinclair/typebox";
 
 export const ClarifyOptionSchema = Type.Object({
   label: Type.String({
-    description: "Short option label returned if selected.",
+    description: "Label.",
   }),
   description: Type.Optional(
     Type.String({
-      description: "Optional extra context shown under the option.",
+      description: "Details.",
     })
   ),
   recommended: Type.Optional(
     Type.Boolean({
-      description: "Marks this option as the recommended/default choice for the user.",
+      description: "Recommended.",
     })
   ),
   default: Type.Optional(
     Type.Boolean({
-      description: "Alias for recommended/default choice support.",
+      description: "Alias.",
     })
   ),
 });
 
 export const ClarifyQuestionSchema = Type.Object({
   id: Type.String({
-    description: "Stable machine-readable question id, e.g. scope, priority, runtime.",
+    description: "ID.",
   }),
   question: Type.String({
-    description:
-      "Focused user-facing question. Keep it specific, concrete, and immediately answerable.",
+    description: "Question text.",
   }),
   options: Type.Optional(
     Type.Array(ClarifyOptionSchema, {
-      description:
-        "Optional suggested answers. Prefer 2-5 focused options when likely choices are known.",
+      description: "Options.",
     })
   ),
   allowOther: Type.Optional(
     Type.Boolean({
-      description:
-        "Whether the user may type a different answer. Defaults to true; set false only for truly closed choices.",
+      description: "Allow custom answer.",
     })
   ),
   timeoutSeconds: Type.Optional(
     Type.Integer({
       minimum: 1,
-      description:
-        "Optional timeout in seconds. If it expires, clarify auto-selects the recommended/default option, or the first option when none is marked.",
+      description: "Auto-select timeout.",
     })
   ),
 });
@@ -54,8 +50,7 @@ export const ClarifyParamsSchema = Type.Object({
   questions: Type.Array(ClarifyQuestionSchema, {
     minItems: 1,
     maxItems: 3,
-    description:
-      "One to three focused clarification questions. Use one when a single blocker exists; use two or three only when all answers are necessary before proceeding.",
+    description: "1-3 questions.",
   }),
 });
 

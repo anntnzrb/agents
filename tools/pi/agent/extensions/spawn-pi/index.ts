@@ -17,26 +17,32 @@ const MAX_PARALLEL_TASKS = 8;
 const DEFAULT_CONCURRENCY = 4;
 const UPDATE_THROTTLE_MS = 250;
 
+const PROMPT_SNIPPET = "Run child pi workers for parallel subtasks";
+
+const PROMPT_GUIDELINES = [
+	"Use for independent subtasks.",
+	"Avoid same-file concurrent edits.",
+];
+
 const SpawnPiParams = Type.Object({
 	task: Type.Optional(
 		Type.String({
-			description:
-				"One self-contained task for one fresh child pi worker. Include all needed context; child runs do not inherit session history.",
+			description: "Single task.",
 		}),
 	),
 	tasks: Type.Optional(
 		Type.Array(Type.String(), {
-			description: `Independent self-contained subtasks for parallel child pi workers. Use when work splits into bounded, disjoint units. Include enough context in each task; children start fresh. Max ${MAX_PARALLEL_TASKS}.`,
+			description: `Task list (max ${MAX_PARALLEL_TASKS}).`,
 		}),
 	),
 	cwd: Type.Optional(
 		Type.String({
-			description: "Working directory for child pi workers. Defaults to current cwd.",
+			description: "Working directory.",
 		}),
 	),
 	maxConcurrency: Type.Optional(
 		Type.Number({
-			description: `Maximum parallel child pi workers for tasks. Default ${DEFAULT_CONCURRENCY}, max ${MAX_PARALLEL_TASKS}. Lower if subtasks may touch the same files, share git state, or conflict.`,
+			description: `Parallel workers (default ${DEFAULT_CONCURRENCY}, max ${MAX_PARALLEL_TASKS}).`,
 			default: DEFAULT_CONCURRENCY,
 		}),
 	),
@@ -121,16 +127,9 @@ export default function spawnPiExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "spawn_pi",
 		label: "Spawn Pi",
-		description: [
-			"Delegate work to fresh child pi workers.",
-			"Use proactively when a request splits into independent subtasks, distinct questions, parallel investigation, disjoint codebase slices, or parallel verification.",
-			"Maximize throughput: when bounded subtasks can advance in parallel, spawn child workers instead of doing everything serially.",
-			"Strong signals: parallel, simultaneously, at the same time, concurrently, split this up, fan out, delegate, separately.",
-			"Children inherit current model, thinking level, cwd, extension set, and built-in tool restrictions, but start fresh with no session carryover.",
-			"Use task for one child and tasks for parallel fanout. Each task should be concrete, well-scoped, self-contained, and explicit about the needed output.",
-			"Do not use for tightly coupled steps, urgent critical-path work, or concurrent edits to the same files.",
-			"Only one spawn level: child workers cannot spawn more child workers.",
-		].join(" "),
+		description: "Delegate independent subtasks to child pi workers.",
+		promptSnippet: PROMPT_SNIPPET,
+		promptGuidelines: PROMPT_GUIDELINES,
 		parameters: SpawnPiParams,
 
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
