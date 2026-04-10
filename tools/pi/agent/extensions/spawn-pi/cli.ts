@@ -43,7 +43,7 @@ export const getInheritedCliArgs = (
 		if (arg === "-e" || arg === "--extension") {
 			const extension = argv[index + 1];
 			if (!extension) continue;
-			extensionArgs.push(arg, extension);
+			extensionArgs.push("--extension", extension);
 			index += 1;
 			continue;
 		}
@@ -123,6 +123,8 @@ export const buildPiArgs = (input: {
 		...input.inheritedCliArgs.extensionArgs,
 		"-p",
 		"--no-session",
+		"--no-prompt-templates",
+		"--offline",
 	];
 
 	if (input.modelArg) args.push("--model", input.modelArg);
