@@ -1,0 +1,25 @@
+{
+  "providers": {
+    "fireworks": {
+      "baseUrl": "https://api.fireworks.ai/inference/v1",
+      "api": "openai-completions",
+      "apiKey": "!cat ~/.pi/agent/auth.json | jq -r '.fireworks.key'",
+      "models": [
+        {
+          "id": "accounts/fireworks/routers/kimi-k2p5-turbo",
+          "name": "Fireworks Kimi K2.5 Turbo",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 256000,
+          "maxTokens": 8192,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      ]
+    }
+  }
+}
