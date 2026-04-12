@@ -1,0 +1,8 @@
+Page: Kiwi
+URL: https://www.kiwi.com/us/search/results/guayaquil-ecuador/miami-florida-united-states/2026-05-15/2026-05-22
+
+- button "May 13 - May 20 $296" [ref=e85]
+- button "May 14 - May 21 $359" [ref=e86]
+- button "May 15 - May 22 $360" [ref=e87]
+- button "May 16 - May 23 $359" [ref=e88]
+- button "May 17 - May 24 $360" [ref=e89]
