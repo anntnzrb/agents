@@ -1,0 +1,23 @@
+{
+  "skill_name": "vox-interpres",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Talk to this song file and give me tempo and key with confidence: ~/repos/.tmp/rest-in-peace-1996.flac",
+      "expected_output": "Includes tempo BPM, key+mode, and explicit confidence value.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Analyze a 30-second segment starting at 60s from ~/repos/.tmp/rest-in-peace-1996.flac and summarize energy + sections.",
+      "expected_output": "Uses segment flags, reports energy metrics and section hints with timestamps.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Give me technical metadata (container/codec/sample rate/channels/bitrate) for ~/repos/.tmp/rest-in-peace-1996.flac.",
+      "expected_output": "Returns ffprobe-backed metadata fields in concise form.",
+      "files": []
+    }
+  ]
+}
