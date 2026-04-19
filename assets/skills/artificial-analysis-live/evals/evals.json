@@ -1,0 +1,23 @@
+{
+  "skill_name": "artificial-analysis-live",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Fetch fresh data and return the top 5 providers by endpoint count.",
+      "expected_output": "JSON result with providers ranked by endpoint count using fresh snapshot.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "For model claude-opus-4-7, compare providers by speed and latency and include price_blended.",
+      "expected_output": "JSON rows sorted by speed with provider/model/price/speed/ttfc/e2e fields.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Use a natural-language question to find cheapest deepinfra options and return top 3.",
+      "expected_output": "QA response with parsed_intent and query rows sorted by lowest price_blended.",
+      "files": []
+    }
+  ]
+}

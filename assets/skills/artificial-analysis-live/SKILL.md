@@ -1,0 +1,96 @@
+---
+name: artificial-analysis-live
+description: "Live Artificial Analysis provider+model benchmark extraction and querying. Use this whenever the user asks benchmark comparisons, model-vs-provider tradeoffs, fastest/cheapest provider for a model, latency/speed/cost rankings, provider deltas over time, or any question that needs fresh endpoint-level data (not just model-level API data). Trigger even if user only says 'compare models/providers' without naming Artificial Analysis explicitly."
+compatibility: Requires `uv` and network access.
+---
+
+# artificial-analysis-live
+
+AI-first skill for **fresh** Artificial Analysis endpoint data.
+
+## Core rule
+
+Do not answer benchmark/provider questions from stale memory. Run the tool first.
+
+## Entry points
+
+- Wrapper: `sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" ...`
+- Direct: `uv run --project <skill-dir> artificial-analysis ...`
+
+## Fast path
+
+```bash
+sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" fetch
+```
+
+## Commands
+
+### fetch
+Get live snapshot from RSC source and write outputs.
+
+```bash
+sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" fetch
+```
+
+### query
+Deterministic filter/sort over snapshot rows.
+
+```bash
+sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" query --model claude-opus-4-7 --sort-by speed --order desc --limit 5
+```
+
+### qa
+Minimal NL command that maps question -> query args.
+
+```bash
+sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" qa "best provider for claude opus 4.7 by speed top 3"
+```
+
+### stats
+Snapshot counts + top providers.
+
+```bash
+sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" stats
+```
+
+### diff
+Compare two snapshots.
+
+```bash
+sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" diff old.json new.json
+```
+
+### schema
+Machine-readable capability contract.
+
+```bash
+sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" schema
+```
+
+## RPC mode
+
+Use when another agent/process needs JSONL envelopes.
+
+```bash
+sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" --mode rpc
+```
+
+## Output policy
+
+- Tool output is JSON only.
+- Prefer `query` for deterministic ranking answers.
+- Prefer `qa` only when user asks in plain language and speed matters.
+- If data freshness is critical, run `fetch` immediately before `query`/`qa`.
+
+## Reliability defaults
+
+- ETag cache + 304 reuse
+- last-good fallback unless `--strict`
+- sanity thresholds (`--min-endpoints`, `--min-providers`)
+- extraction heuristics tolerate upstream schema key changes
+
+## Read only what you need
+
+- Command usage: `README.md`
+- JSON envelopes and fields: `references/output-contract.md`
+- Failure modes and recovery: `references/troubleshooting.md`
