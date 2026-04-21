@@ -6,7 +6,7 @@
   "compaction": {
     "enabled": true,
     "reserveTokens": 32000,
-    "keepRecentTokens": 40000,
+    "keepRecentTokens": 40000
   },
   "editorPaddingX": 1,
   "enabledModels": [
