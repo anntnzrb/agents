@@ -1,7 +1,5 @@
 import { readFileSync } from "node:fs";
 
-import { parse, printParseErrorCode, type ParseError } from "jsonc-parser";
-
 import type {
   BlockAction,
   ExecutableMatch,
@@ -259,9 +257,11 @@ function normalizeConfig(value: unknown): GuardrailsConfig | string {
   };
 }
 
-function formatJsoncError(path: string, offset: number, code: number): string {
-  const label = printParseErrorCode(code);
-  return `guardrails config invalid at ${path} (offset ${offset}, ${label})`;
+function stripJsonc(raw: string): string {
+  let cleaned = raw.replace(/\/\/.*$/gm, "");
+  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, "");
+  cleaned = cleaned.replace(/,\s*([\]\}])/g, "$1");
+  return cleaned;
 }
 
 export function loadConfig(path: string): LoadConfigResult {
@@ -276,17 +276,14 @@ export function loadConfig(path: string): LoadConfigResult {
     };
   }
 
-  const errors: ParseError[] = [];
-  const parsed = parse(raw, errors, {
-    allowTrailingComma: true,
-    disallowComments: false,
-  });
-
-  if (errors.length > 0) {
-    const first = errors[0];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stripJsonc(raw));
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
     return {
       ok: false,
-      reason: formatJsoncError(path, first.offset, first.error),
+      reason: `guardrails config invalid at ${path}: ${detail}`,
     };
   }
 
