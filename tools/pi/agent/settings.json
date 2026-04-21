@@ -3,6 +3,11 @@
   "defaultModel": "gpt-5.4",
   "defaultProvider": "openai-codex",
   "defaultThinkingLevel": "medium",
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 32000,
+    "keepRecentTokens": 40000,
+  },
   "editorPaddingX": 1,
   "enabledModels": [
     "kimi-coding/k2p5",
