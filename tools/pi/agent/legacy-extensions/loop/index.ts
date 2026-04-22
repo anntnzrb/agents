@@ -327,6 +327,8 @@ export default function loopExtension(pi: ExtensionAPI): void {
 		name: "signal_loop_success",
 		label: "Signal Loop Success",
 		description: "Stop the active loop when the breakout condition is satisfied. Only call this tool when explicitly instructed to do so by the user, tool or system prompt.",
+		promptSnippet: "Stop an active /loop cycle once the breakout condition is met.",
+		promptGuidelines: ["Only call signal_loop_success when the current loop breakout condition is explicitly satisfied."],
 		parameters: Type.Object({}),
 		async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
 			if (!loopState.active) {

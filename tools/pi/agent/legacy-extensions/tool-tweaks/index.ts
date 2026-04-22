@@ -144,6 +144,10 @@ const hideToolOutputExtension = (pi: ExtensionAPI): void => {
       name: tool.name,
       label: tool.label,
       description: tool.description,
+      promptSnippet: `${tool.name}: ${tool.description}`,
+      promptGuidelines: [
+        `Use ${tool.name} exactly like the built-in tool; this extension only changes rendering.`,
+      ],
       parameters: tool.parameters,
       execute: (toolCallId, params, onUpdate, _ctx, signal) =>
         tool.execute(toolCallId, params, signal, onUpdate),

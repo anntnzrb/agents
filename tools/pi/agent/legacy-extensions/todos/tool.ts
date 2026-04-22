@@ -34,6 +34,11 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
       "Title is the short summary; body is long-form markdown notes (update replaces, append adds). " +
       "Todo ids are shown as TODO-<hex>; id parameters accept TODO-<hex> or the raw hex filename. " +
       "Claim tasks before working on them to avoid conflicts, and close them when complete.",
+    promptSnippet: "Manage persisted todos (list/get/create/update/claim/release/delete).",
+    promptGuidelines: [
+      "Use todo when work needs persisted task tracking across turns or sessions.",
+      "Claim todo items before executing work and release or close them when done.",
+    ],
     parameters: TodoParams,
 
     async execute(_toolCallId, params, _onUpdate, ctx: ExtensionContext) {
