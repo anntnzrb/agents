@@ -14,6 +14,11 @@ Keep behavior aligned with Pi `bash` tool semantics (timeouts, truncation, temp-
 - Uses `-NoProfile -NoLogo -NonInteractive -Command`.
 - On Windows, prepends UTF-8 output encoding guard.
 - On Windows, enforces tool policy: remove `bash` from active tools and ensure `pwsh` is active.
+- Runtime caveat (current implementation): command execution uses `spawnSync` for Windows stability.
+  - Output is buffered then emitted, not truly streamed in real time.
+  - Mid-flight abort responsiveness is limited compared to async `spawn`.
+  - Large-output commands are bounded by process `maxBuffer` before tool-level truncation.
+- Future improvement path: restore hardened async `spawn` + stream draining + timeout/tree-kill for real-time updates.
 
 ## Navigation
 Start at `index.ts`.
