@@ -1,20 +1,14 @@
 {
   "collapseChangelog": true,
-  "defaultModel": "gpt-5.4",
   "defaultProvider": "openai-codex",
-  "defaultThinkingLevel": "medium",
+  "defaultModel": "gpt-5.3-codex",
+  "defaultThinkingLevel": "high",
   "compaction": {
     "enabled": true,
     "reserveTokens": 32000,
     "keepRecentTokens": 40000
   },
   "editorPaddingX": 1,
-  "enabledModels": [
-    "kimi-coding/k2p5",
-    "github-copilot/claude-sonnet-4.6",
-    "openai-codex/gpt-5.4",
-    "openai-codex/gpt-5.3-codex"
-  ],
   "followUpMode": "all",
   "hideThinkingBlock": true,
   "lastChangelogVersion": "0.58.3",
