@@ -78,6 +78,8 @@ export const summarizeToolCall = (
 	switch (toolName) {
 		case "bash":
 			return `$ ${shorten(toSingleLine(String(args["command"] ?? "bash")), 72)}`;
+		case "pwsh":
+			return `PS> ${shorten(toSingleLine(String(args["command"] ?? "pwsh")), 70)}`;
 		case "read": {
 			const path = shortenPath(getPathArg(args));
 			const offset = Number(args["offset"] ?? 1);

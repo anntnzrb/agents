@@ -132,6 +132,13 @@ test("blocks shell -c nested python invocation", () => {
   assert.equal(reasonForCommand("bash -lc 'python -m pytest'", pythonConfig), "use uv");
 });
 
+test("blocks pwsh -Command nested python invocation", () => {
+  assert.equal(reasonForCommand("pwsh -NoProfile -Command 'python -m pytest'", pythonConfig), "use uv");
+  assert.equal(reasonForCommand("pwsh.exe -Command \"python -m pytest\"", pythonConfig), "use uv");
+  assert.equal(reasonForCommand("powershell -Command \"python -m pytest\"", pythonConfig), "use uv");
+  assert.equal(reasonForCommand("powershell.exe -Command \"python -m pytest\"", pythonConfig), "use uv");
+});
+
 test("does not block harmless mentions", () => {
   assert.equal(reasonForCommand("echo python", pythonConfig), null);
   assert.equal(reasonForCommand("rg python README.md", pythonConfig), null);

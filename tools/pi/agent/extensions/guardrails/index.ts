@@ -28,6 +28,12 @@ export function createGuardrails(path: string) {
         return reason ? { block: true, reason } : undefined;
       }
 
+      if (isToolCallEventType<"pwsh", { command?: string }>("pwsh", event)) {
+        const command = typeof event.input.command === "string" ? event.input.command : "";
+        const reason = reasonForCommand(command, configOrReason);
+        return reason ? { block: true, reason } : undefined;
+      }
+
       if (isToolCallEventType("read", event)) {
         const reason = reasonForPath(event.input.path, "read", configOrReason);
         return reason ? { block: true, reason } : undefined;

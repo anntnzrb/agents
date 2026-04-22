@@ -4,9 +4,9 @@ Purpose: generic, policy-driven guardrails for agent tool calls.
 
 ## File map
 - `index.ts`: pi entrypoint; loads config and blocks matching tool calls
-- `guardrails.jsonc`: policy file for bash rules and protected paths
+- `guardrails.jsonc`: policy file for shell-command rules and protected paths
 - `config.ts`: JSONC parsing and config validation; fail-closed on invalid config
-- `matcher.ts`: bash rule evaluation against inspected commands/executables
+- `matcher.ts`: shell rule evaluation against inspected commands/executables
 - `paths.ts`: protected-path matching for read/write/edit
 - `shell.ts`: shell segmentation and tokenization helpers
 - `wrappers.ts`: wrapper unrolling for `env`, `sudo`, shells with `-c`, and similar commands
@@ -15,4 +15,4 @@ Purpose: generic, policy-driven guardrails for agent tool calls.
 
 ## Navigation
 Start at `index.ts`, then `config.ts`, `matcher.ts`, and `paths.ts`.
-If bash matching is wrong, inspect `shell.ts` and `wrappers.ts` next.
+If shell matching is wrong, inspect `shell.ts` and `wrappers.ts` next.

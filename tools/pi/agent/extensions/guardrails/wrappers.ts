@@ -1,7 +1,19 @@
 import { executableBasename, isAssignmentToken } from "./shell.js";
 
 const PASSTHROUGH_WRAPPERS = new Set(["builtin", "command", "exec", "nohup"]);
-const SHELL_EXECUTABLES = new Set(["bash", "dash", "fish", "ksh", "mksh", "sh", "zsh"]);
+const SHELL_EXECUTABLES = new Set([
+  "bash",
+  "dash",
+  "fish",
+  "ksh",
+  "mksh",
+  "pwsh",
+  "pwsh.exe",
+  "powershell",
+  "powershell.exe",
+  "sh",
+  "zsh",
+]);
 
 const SUDO_VALUE_OPTIONS = new Set([
   "-a",
@@ -43,7 +55,7 @@ export function firstExecutableIndex(tokens: string[]): number {
 }
 
 export function unwrapCommand(tokens: string[], index: number): UnwrappedCommand {
-  const executable = executableBasename(tokens[index]);
+  const executable = executableBasename(tokens[index]).toLowerCase();
 
   if (executable === "env") {
     return unwrapEnv(tokens, index);
@@ -289,12 +301,17 @@ function unwrapShell(tokens: string[], index: number): UnwrappedCommand {
 
   for (let i = 0; i < args.length; i += 1) {
     const token = args[i];
+    const normalized = token.toLowerCase();
 
     if (token === "--") {
       continue;
     }
 
-    if (token === "-c" || /^-[A-Za-z]*c[A-Za-z]*$/.test(token)) {
+    if (
+      normalized === "-c" ||
+      /^-[A-Za-z]*c[A-Za-z]*$/i.test(token) ||
+      normalized === "-command"
+    ) {
       return { nestedCommands: args[i + 1] ? [args[i + 1]] : [] };
     }
 
