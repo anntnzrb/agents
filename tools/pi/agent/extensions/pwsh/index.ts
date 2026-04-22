@@ -190,7 +190,10 @@ export default function pwshExtension(pi: ExtensionAPI): void {
 		parameters: pwshSchema,
 		description: `Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last ${DEFAULT_MAX_LINES} lines or ${Math.trunc(DEFAULT_MAX_BYTES / 1024)}KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.`,
 		promptSnippet: "Execute PowerShell commands (Get-ChildItem, Select-String, etc.)",
-		promptGuidelines: ["Use pwsh for Windows-native shell tasks and PowerShell-specific syntax."],
+		promptGuidelines: [
+			"Use pwsh for Windows-native shell tasks and PowerShell syntax (not bash syntax).",
+			"For quote-heavy commands, prefer here-strings or temp .ps1 scripts; use ${var} near punctuation and escaped backslash regex like '\\\\'.",
+		],
 		renderCall: (args, theme) => {
 			const command = typeof args.command === "string" && args.command.length > 0 ? args.command : "...";
 			const timeout = typeof args.timeout === "number" && Number.isFinite(args.timeout) ? args.timeout : undefined;
