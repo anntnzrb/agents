@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 import { SyncEnv } from "./harness.ts";
 import { buildSyncPlan, isSafeManagedEntryName, type SyncPlan } from "./plan.ts";
@@ -165,7 +165,7 @@ function cleanupPath(root: string, entryName: string): string | null {
 }
 
 function createTempStateFile(path: string): { tempPath: string; fd: number } {
-  const baseName = path.split("/").pop() ?? "managed-state.json";
+  const baseName = basename(path) || "managed-state.json";
   const nonce = Date.now().toString(16);
   for (let attempt = 0; attempt < 16; attempt += 1) {
     const tempPath = join(dirname(path), `.${baseName}.${process.pid}.${nonce}-${attempt}.tmp`);

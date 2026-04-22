@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 
 export const SOURCE_AGENT_FILE = "AGENTS.md";
@@ -92,9 +93,11 @@ export class SyncEnv {
   }
 
   static fromSystem(): SyncEnv {
-    const home = process.env.HOME;
+    const home = [process.env.HOME, process.env.USERPROFILE, os.homedir()].find(
+      (candidate): candidate is string => typeof candidate === "string" && candidate.trim().length > 0,
+    );
     if (!home) {
-      throw new Error("missing HOME");
+      throw new Error("missing HOME/USERPROFILE");
     }
     return SyncEnv.fromHome(home, INSTALL_TIMEOUT_SECONDS * 1000);
   }

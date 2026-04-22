@@ -106,8 +106,8 @@ export function patchRuntimeSettings(filePath: string, packagePaths: readonly st
 
   (value as Record<string, unknown>).packages = packagePaths.map((packagePath) => packagePath.toString());
 
-  const parent = filePath.split("/").slice(0, -1).join("/");
-  if (parent.length > 0) {
+  const parent = path.dirname(filePath);
+  if (parent && parent !== ".") {
     fs.mkdirSync(parent, { recursive: true });
   }
 
