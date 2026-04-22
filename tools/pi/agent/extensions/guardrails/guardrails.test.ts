@@ -235,33 +235,51 @@ test("allows uv-based python workflow", () => {
   assert.equal(reasonForCommand("uv run python script.py", pythonConfig), null);
 });
 
-test("warns for shell content search executables", () => {
-  assert.equal(reasonForCommand("rg TODO src", searchConfig), "prefer native grep tool");
-  assert.equal(reasonForCommand("ag TODO src", searchConfig), "prefer native grep tool");
-  assert.equal(reasonForCommand("ack-grep TODO src", searchConfig), "prefer native grep tool");
-  assert.equal(reasonForCommand("rg.exe TODO src", searchConfig), "prefer native grep tool");
+test("warns for shell content-search commands", () => {
+  assert.equal(reasonForCommand("rg TODO", searchConfig), "prefer native grep tool");
+  assert.equal(reasonForCommand("rg TODO src/main.ts", searchConfig), "prefer native grep tool");
+  assert.equal(reasonForCommand("rg TODO src --glob '*.ts'", searchConfig), "prefer native grep tool");
+  assert.equal(reasonForCommand("rg --hidden --no-ignore TODO src", searchConfig), "prefer native grep tool");
   assert.equal(reasonForCommand("git grep TODO", searchConfig), "prefer native grep tool");
-  assert.equal(reasonForCommand("grep -R TODO src", searchConfig), "prefer native grep tool");
+  assert.equal(reasonForCommand("git grep TODO src/", searchConfig), "prefer native grep tool");
+  assert.equal(reasonForCommand("grep -R TODO .", searchConfig), "prefer native grep tool");
   assert.equal(
     reasonForCommand("pwsh -NoProfile -Command 'Select-String -Pattern TODO -Path . -Recurse'", searchConfig),
     "prefer native grep tool",
   );
+  assert.equal(
+    reasonForCommand("git log --oneline -n 8 && rg -n \"foo\" tools/pi/agent/extensions/footer/index.ts && git status --short", searchConfig),
+    "prefer native grep tool",
+  );
 
-  assert.equal(actionForCommand("rg TODO src", searchConfig)?.type, "warn");
+  assert.equal(actionForCommand("rg TODO", searchConfig)?.type, "warn");
 });
 
-test("warns for shell file discovery executables", () => {
-  assert.equal(reasonForCommand("fd '*.ts' src", searchConfig), "prefer native find tool");
-  assert.equal(reasonForCommand("fd-find '*.ts' src", searchConfig), "prefer native find tool");
+test("does not warn for informational shell content-search commands", () => {
+  assert.equal(reasonForCommand("rg --help", searchConfig), null);
+  assert.equal(reasonForCommand("rg --version", searchConfig), null);
+  assert.equal(reasonForCommand("git grep --help", searchConfig), null);
+});
+
+test("warns for broad shell file-discovery commands", () => {
+  assert.equal(reasonForCommand("fd '*.ts'", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("fd-find '*.ts' .", searchConfig), "prefer native find tool");
   assert.equal(reasonForCommand("gfind . -name '*.ts'", searchConfig), "prefer native find tool");
-  assert.equal(reasonForCommand("locate package.json", searchConfig), "prefer native find tool");
-  assert.equal(reasonForCommand("find . -name '*.ts'", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("find / -name '*.ts'", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("locate js", searchConfig), "prefer native find tool");
   assert.equal(reasonForCommand("bash -lc 'find . -name \"*.ts\"'", searchConfig), "prefer native find tool");
 
-  assert.equal(actionForCommand("fd '*.ts' src", searchConfig)?.type, "warn");
+  assert.equal(actionForCommand("fd '*.ts'", searchConfig)?.type, "warn");
 });
 
-test("does not block harmless mentions of search tool names", () => {
+test("does not warn for narrow shell file-discovery commands", () => {
+  assert.equal(reasonForCommand("fd '*.ts' src", searchConfig), null);
+  assert.equal(reasonForCommand("find src -maxdepth 2 -name '*.ts'", searchConfig), null);
+  assert.equal(reasonForCommand("find --help", searchConfig), null);
+  assert.equal(reasonForCommand("locate package.json", searchConfig), null);
+});
+
+test("does not warn for harmless mentions of search tool names", () => {
   assert.equal(reasonForCommand("echo rg", searchConfig), null);
   assert.equal(reasonForCommand("printf 'use find and grep tools'", searchConfig), null);
   assert.equal(reasonForCommand("command -v rg", searchConfig), null);
