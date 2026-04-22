@@ -325,12 +325,16 @@ const renderFooterLine = (left: string, right: string, width: number): string =>
 	return truncateToWidth(left + padding + right, width);
 };
 
+const isStaleExtensionError = (error: unknown): boolean =>
+	error instanceof Error && error.message.includes("stale after session replacement or reload");
+
 export default function footerExtension(pi: ExtensionAPI) {
 	pi.on("session_start", (_event, ctx) => {
 		if (!ctx.hasUI) return;
 
 		const homeDir = getHomeDir();
-		const reserveTokens = readReserveTokens(ctx.cwd);
+		const sessionCwd = ctx.cwd;
+		const reserveTokens = readReserveTokens(sessionCwd);
 		let metricsCache: { key: string; value: SessionHealthMetrics } | undefined;
 
 		const getSessionHealthMetrics = (): SessionHealthMetrics => {
@@ -345,12 +349,13 @@ export default function footerExtension(pi: ExtensionAPI) {
 
 		ctx.ui.setFooter((tui, theme, footerData) => {
 			const gitStatusTracker = createGitStatusTracker(
-				ctx.cwd,
+				sessionCwd,
 				() => tui.requestRender(),
 				footerData.onBranchChange(() => {
 					gitStatusTracker.refresh();
 				}),
 			);
+			let lastGoodLine: string | undefined;
 
 			return {
 				dispose() {
@@ -360,24 +365,33 @@ export default function footerExtension(pi: ExtensionAPI) {
 					// No cached render state.
 				},
 				render(width: number): string[] {
-					const usage = getContextUsage(ctx.getContextUsage());
-					const model = getModel(ctx.model);
-					const metrics = getSessionHealthMetrics();
-					const left = buildLeft(
-						theme,
-						shortenCwd(ctx.cwd, homeDir),
-						footerData.getGitBranch(),
-						gitStatusTracker.getStatus(),
-					);
-					const right = buildRight(
-						theme,
-						usage,
-						model,
-						pi.getThinkingLevel(),
-						metrics,
-						reserveTokens,
-					);
-					return [renderFooterLine(left, right, width)];
+					try {
+						const usage = getContextUsage(ctx.getContextUsage());
+						const model = getModel(ctx.model);
+						const metrics = getSessionHealthMetrics();
+						const left = buildLeft(
+							theme,
+							shortenCwd(sessionCwd, homeDir),
+							footerData.getGitBranch(),
+							gitStatusTracker.getStatus(),
+						);
+						const right = buildRight(
+							theme,
+							usage,
+							model,
+							pi.getThinkingLevel(),
+							metrics,
+							reserveTokens,
+						);
+						const line = renderFooterLine(left, right, width);
+						lastGoodLine = line;
+						return [line];
+					} catch (error) {
+						if (!isStaleExtensionError(error)) throw error;
+						if (lastGoodLine) return [lastGoodLine];
+						const left = theme.fg("muted", shortenCwd(sessionCwd, homeDir));
+						return [renderFooterLine(left, "", width)];
+					}
 				},
 			};
 		});
