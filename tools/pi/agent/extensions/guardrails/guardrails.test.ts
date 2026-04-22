@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { loadConfig } from "./config.js";
-import { reasonForCommand } from "./matcher.js";
+import { actionForCommand, reasonForCommand } from "./matcher.js";
 import { reasonForPath } from "./paths.js";
 import type { GuardrailsConfig } from "./types.js";
 
@@ -39,6 +39,68 @@ const pythonConfig: GuardrailsConfig = {
         },
       },
     ],
+  },
+};
+
+const searchConfig: GuardrailsConfig = {
+  version: 1,
+  agentBash: {
+    rules: [
+      {
+        id: "prefer-native-content-search",
+        match: {
+          type: "executable",
+          caseSensitive: false,
+          names: [
+            "rg",
+            "ripgrep",
+            "ag",
+            "ack",
+            "ack-grep",
+            "pt",
+            "ugrep",
+            "sift",
+            "grep",
+            "ggrep",
+            "findstr",
+            "select-string",
+          ],
+          patterns: ["^(?:rg|ripgrep|ag|ack(?:-grep)?|pt|ugrep|sift|grep|ggrep|findstr|select-string)(?:\\.exe)?$"],
+        },
+        action: {
+          type: "warn",
+          message: "prefer native grep tool",
+        },
+      },
+      {
+        id: "prefer-native-content-search-git-grep",
+        match: {
+          type: "regex",
+          pattern: "\\bgit\\b[^\\n;|&]*\\bgrep\\b",
+          flags: "i",
+        },
+        action: {
+          type: "warn",
+          message: "prefer native grep tool",
+        },
+      },
+      {
+        id: "prefer-native-file-discovery",
+        match: {
+          type: "executable",
+          caseSensitive: false,
+          names: ["fd", "fdfind", "fd-find", "find", "gfind", "locate", "mlocate", "plocate"],
+          patterns: ["^(?:fd|fdfind|fd-find|find|gfind|locate|mlocate|plocate)(?:\\.exe)?$"],
+        },
+        action: {
+          type: "warn",
+          message: "prefer native find tool",
+        },
+      },
+    ],
+  },
+  protectedPaths: {
+    rules: [],
   },
 };
 
@@ -89,6 +151,30 @@ test("loadConfig accepts JSONC comments and trailing commas", () => {
   }
   assert.equal(result.config.agentBash.rules.length, 1);
   assert.equal(result.config.protectedPaths.rules.length, 1);
+});
+
+test("loadConfig accepts warn actions for agentBash rules", () => {
+  const dir = mkdtempSync(join(tmpdir(), "guardrails-"));
+  const path = join(dir, "guardrails.jsonc");
+
+  writeFileSync(
+    path,
+    `{
+      "version": 1,
+      "agentBash": {
+        "rules": [
+          {
+            "match": { "type": "executable", "names": ["rg"] },
+            "action": { "type": "warn", "message": "prefer native grep" }
+          }
+        ]
+      },
+      "protectedPaths": { "rules": [] }
+    }`,
+  );
+
+  const result = loadConfig(path);
+  assert.equal(result.ok, true);
 });
 
 test("loadConfig fails closed on invalid config", () => {
@@ -147,6 +233,40 @@ test("does not block harmless mentions", () => {
 
 test("allows uv-based python workflow", () => {
   assert.equal(reasonForCommand("uv run python script.py", pythonConfig), null);
+});
+
+test("warns for shell content search executables", () => {
+  assert.equal(reasonForCommand("rg TODO src", searchConfig), "prefer native grep tool");
+  assert.equal(reasonForCommand("ag TODO src", searchConfig), "prefer native grep tool");
+  assert.equal(reasonForCommand("ack-grep TODO src", searchConfig), "prefer native grep tool");
+  assert.equal(reasonForCommand("rg.exe TODO src", searchConfig), "prefer native grep tool");
+  assert.equal(reasonForCommand("git grep TODO", searchConfig), "prefer native grep tool");
+  assert.equal(reasonForCommand("grep -R TODO src", searchConfig), "prefer native grep tool");
+  assert.equal(
+    reasonForCommand("pwsh -NoProfile -Command 'Select-String -Pattern TODO -Path . -Recurse'", searchConfig),
+    "prefer native grep tool",
+  );
+
+  assert.equal(actionForCommand("rg TODO src", searchConfig)?.type, "warn");
+});
+
+test("warns for shell file discovery executables", () => {
+  assert.equal(reasonForCommand("fd '*.ts' src", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("fd-find '*.ts' src", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("gfind . -name '*.ts'", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("locate package.json", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("find . -name '*.ts'", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("bash -lc 'find . -name \"*.ts\"'", searchConfig), "prefer native find tool");
+
+  assert.equal(actionForCommand("fd '*.ts' src", searchConfig)?.type, "warn");
+});
+
+test("does not block harmless mentions of search tool names", () => {
+  assert.equal(reasonForCommand("echo rg", searchConfig), null);
+  assert.equal(reasonForCommand("printf 'use find and grep tools'", searchConfig), null);
+  assert.equal(reasonForCommand("command -v rg", searchConfig), null);
+  assert.equal(reasonForCommand("where git", searchConfig), null);
+  assert.equal(reasonForCommand("pwsh -NoProfile -Command 'gci -File'", searchConfig), null);
 });
 
 test("regex rules apply inside nested shell wrappers", () => {

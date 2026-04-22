@@ -83,6 +83,70 @@
           "type": "block",
           "message": "`python -m py_compile` is disabled. Load `/skill:python`."
         }
+      },
+      {
+        "id": "prefer-native-content-search",
+        "match": {
+          "type": "executable",
+          "caseSensitive": false,
+          "names": [
+            "rg",
+            "ripgrep",
+            "ag",
+            "ack",
+            "ack-grep",
+            "pt",
+            "ugrep",
+            "sift",
+            "grep",
+            "ggrep",
+            "findstr",
+            "select-string"
+          ],
+          "patterns": [
+            "^(?:rg|ripgrep|ag|ack(?:-grep)?|pt|ugrep|sift|grep|ggrep|findstr|select-string)(?:\\.exe)?$"
+          ]
+        },
+        "action": {
+          "type": "warn",
+          "message": "Prefer native `grep` tool over shell search commands when possible."
+        }
+      },
+      {
+        "id": "prefer-native-content-search-git-grep",
+        "match": {
+          "type": "regex",
+          "pattern": "\\bgit\\b[^\\n;|&]*\\bgrep\\b",
+          "flags": "i"
+        },
+        "action": {
+          "type": "warn",
+          "message": "Prefer native `grep` tool over shell search commands when possible."
+        }
+      },
+      {
+        "id": "prefer-native-file-discovery",
+        "match": {
+          "type": "executable",
+          "caseSensitive": false,
+          "names": [
+            "fd",
+            "fdfind",
+            "fd-find",
+            "find",
+            "gfind",
+            "locate",
+            "mlocate",
+            "plocate"
+          ],
+          "patterns": [
+            "^(?:fd|fdfind|fd-find|find|gfind|locate|mlocate|plocate)(?:\\.exe)?$"
+          ]
+        },
+        "action": {
+          "type": "warn",
+          "message": "Prefer native `find` tool over shell discovery commands when possible."
+        }
       }
     ]
   },

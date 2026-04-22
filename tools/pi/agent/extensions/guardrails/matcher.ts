@@ -1,4 +1,4 @@
-import type { ExecutableMatch, GuardrailsConfig, Rule } from "./types.js";
+import type { BashAction, ExecutableMatch, GuardrailsConfig, Rule } from "./types.js";
 
 import { executableBasename, splitShellSegments, tokenizeCommand, unique } from "./shell.js";
 import { firstExecutableIndex, unwrapCommand } from "./wrappers.js";
@@ -130,14 +130,19 @@ function matchRule(inspection: Inspection, rule: Rule): boolean {
   return inspection.executables.some((executable) => matchExecutable(executable, match));
 }
 
-export function reasonForCommand(command: string, config: GuardrailsConfig): string | null {
+export function actionForCommand(command: string, config: GuardrailsConfig): BashAction | null {
   const inspection = inspectCommand(command);
 
   for (const rule of config.agentBash.rules) {
     if (matchRule(inspection, rule)) {
-      return rule.action.message;
+      return rule.action;
     }
   }
 
   return null;
+}
+
+export function reasonForCommand(command: string, config: GuardrailsConfig): string | null {
+  const action = actionForCommand(command, config);
+  return action ? action.message : null;
 }

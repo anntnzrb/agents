@@ -3,6 +3,13 @@ export interface BlockAction {
   message: string;
 }
 
+export interface WarnAction {
+  type: "warn";
+  message: string;
+}
+
+export type BashAction = BlockAction | WarnAction;
+
 export interface ExecutableMatch {
   type: "executable";
   names?: string[];
@@ -22,7 +29,7 @@ export type MatchConfig = ExecutableMatch | RegexMatch;
 export interface Rule {
   id?: string;
   match: MatchConfig;
-  action: BlockAction;
+  action: BashAction;
 }
 
 export interface AgentBashConfig {

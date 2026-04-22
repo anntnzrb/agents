@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import type {
+  BashAction,
   BlockAction,
   ExecutableMatch,
   GuardrailsConfig,
@@ -56,6 +57,25 @@ function normalizeBlockAction(value: unknown, path: string): BlockAction | strin
 
   return {
     type: "block",
+    message: value.message,
+  };
+}
+
+function normalizeBashAction(value: unknown, path: string): BashAction | string {
+  if (!isObject(value)) {
+    return `${path} must be an object`;
+  }
+
+  if (value.type !== "block" && value.type !== "warn") {
+    return `${path}.type must be "block" or "warn"`;
+  }
+
+  if (typeof value.message !== "string" || value.message.trim().length === 0) {
+    return `${path}.message must be a non-empty string`;
+  }
+
+  return {
+    type: value.type,
     message: value.message,
   };
 }
@@ -153,7 +173,7 @@ function normalizeRule(value: unknown, index: number): Rule | string {
     return match;
   }
 
-  const action = normalizeBlockAction(value.action, `${path}.action`);
+  const action = normalizeBashAction(value.action, `${path}.action`);
   if (typeof action === "string") {
     return action;
   }

@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfig } from "./config.js";
-import { reasonForCommand } from "./matcher.js";
+import { actionForCommand } from "./matcher.js";
 import { reasonForPath } from "./paths.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -17,21 +17,35 @@ const getConfigOrBlockReason = (path: string) => {
 
 export function createGuardrails(path: string) {
   return function guardrails(pi: ExtensionAPI): void {
-    pi.on("tool_call", async (event) => {
+    pi.on("tool_call", async (event, ctx) => {
       const configOrReason = getConfigOrBlockReason(path);
       if (typeof configOrReason === "string") {
         return { block: true, reason: configOrReason };
       }
 
       if (isToolCallEventType("bash", event)) {
-        const reason = reasonForCommand(event.input.command, configOrReason);
-        return reason ? { block: true, reason } : undefined;
+        const action = actionForCommand(event.input.command, configOrReason);
+        if (!action) {
+          return undefined;
+        }
+        if (action.type === "warn") {
+          ctx.ui.notify(action.message, "warning");
+          return undefined;
+        }
+        return { block: true, reason: action.message };
       }
 
       if (isToolCallEventType<"pwsh", { command?: string }>("pwsh", event)) {
         const command = typeof event.input.command === "string" ? event.input.command : "";
-        const reason = reasonForCommand(command, configOrReason);
-        return reason ? { block: true, reason } : undefined;
+        const action = actionForCommand(command, configOrReason);
+        if (!action) {
+          return undefined;
+        }
+        if (action.type === "warn") {
+          ctx.ui.notify(action.message, "warning");
+          return undefined;
+        }
+        return { block: true, reason: action.message };
       }
 
       if (isToolCallEventType("read", event)) {
