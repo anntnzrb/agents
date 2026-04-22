@@ -43,25 +43,21 @@ const TYPE_GLOBS: Record<string, readonly string[]> = {
   yaml: ["*.yml", "*.yaml"],
 };
 
-const splitCommaPaths = (value: string): string[] =>
-  value
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-
 export const normalizeSearchRoots = (singlePath: string | undefined, multiPath: string[] | undefined): string[] => {
   if (singlePath && multiPath && multiPath.length > 0) {
     throw new Error("Use either path or paths, not both");
   }
 
   const rawEntries: string[] = [];
-  if (singlePath?.trim()) {
-    rawEntries.push(...splitCommaPaths(singlePath));
-  }
+  const trimmedSinglePath = singlePath?.trim();
+  if (trimmedSinglePath) rawEntries.push(trimmedSinglePath);
+
   if (multiPath) {
     for (const entry of multiPath) {
       if (typeof entry !== "string") continue;
-      rawEntries.push(...splitCommaPaths(entry));
+      const trimmedEntry = entry.trim();
+      if (trimmedEntry.length === 0) continue;
+      rawEntries.push(trimmedEntry);
     }
   }
 

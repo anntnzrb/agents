@@ -8,9 +8,14 @@ import {
 	resolveTypeFilter,
 } from "./logic.js";
 
-test("normalizeSearchRoots supports comma-separated path lists with dedupe", () => {
-	const roots = normalizeSearchRoots(undefined, ["apps,packages", "packages", "libs,apps"]);
+test("normalizeSearchRoots supports multipath trimming and dedupe", () => {
+	const roots = normalizeSearchRoots(undefined, ["apps", "packages", "packages", " libs "]);
 	assert.deepEqual(roots, ["apps", "packages", "libs"]);
+});
+
+test("normalizeSearchRoots keeps commas literal", () => {
+	const roots = normalizeSearchRoots("apps,packages", undefined);
+	assert.deepEqual(roots, ["apps,packages"]);
 });
 
 test("normalizeSearchRoots rejects path and paths together", () => {
