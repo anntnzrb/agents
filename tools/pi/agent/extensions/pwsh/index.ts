@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { delimiter } from "node:path";
-import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import {
 	DEFAULT_MAX_BYTES,
 	DEFAULT_MAX_LINES,
@@ -12,20 +12,14 @@ import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 
 const LOOKUP_TIMEOUT_MS = 5000;
-const EXIT_STDIO_GRACE_MS = 100;
 
 const pwshSchema = Type.Object({
 	command: Type.String({ description: "PowerShell command to execute" }),
 	timeout: Type.Optional(Type.Number({ description: "Timeout in seconds (optional, no default timeout)" })),
 });
 
-const WINDOWS_PWSH_FALLBACK_PATHS = [
-	"C:\\Program Files\\PowerShell\\7\\pwsh.exe",
-];
-
-const WINDOWS_POWERSHELL_FALLBACK_PATHS = [
-	"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-];
+const WINDOWS_PWSH_FALLBACK_PATHS = ["C:\\Program Files\\PowerShell\\7\\pwsh.exe"];
+const WINDOWS_POWERSHELL_FALLBACK_PATHS = ["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"];
 
 const UNIX_PWSH_FALLBACK_PATHS = ["/usr/local/bin/pwsh", "/opt/homebrew/bin/pwsh", "/usr/bin/pwsh"];
 
@@ -38,11 +32,8 @@ type PwshShellConfig = {
 const firstExistingPath = (paths: readonly string[]): string | undefined =>
 	paths.find((path) => existsSync(path));
 
-const getPathKey = (): string =>
-	Object.keys(process.env).find((key) => key.toLowerCase() === "path") ?? "PATH";
-
 const withPathPrepended = (baseEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv => {
-	const pathKey = getPathKey();
+	const pathKey = Object.keys(process.env).find((key) => key.toLowerCase() === "path") ?? "PATH";
 	const inheritedPath = baseEnv[pathKey] ?? process.env[pathKey] ?? "";
 	const ownPath = process.env[pathKey] ?? "";
 	const pathEntries = [...new Set([ownPath, inheritedPath].flatMap((value) => value.split(delimiter).filter(Boolean)))];
@@ -72,8 +63,7 @@ const lookupExecutableOnPath = (binary: string): string | undefined => {
 		timeout: LOOKUP_TIMEOUT_MS,
 	});
 	if (result.status !== 0 || !result.stdout) return undefined;
-	const candidate = result.stdout.split(/\r?\n/)[0]?.trim();
-	return candidate || undefined;
+	return result.stdout.split(/\r?\n/)[0]?.trim() || undefined;
 };
 
 const resolvePwshShellConfig = (): PwshShellConfig => {
@@ -125,105 +115,6 @@ const withUtf8Prefix = (command: string, shouldPrefix: boolean): string => {
 	return `${prefix}\n${command}`;
 };
 
-const killProcessTree = (pid: number): void => {
-	if (process.platform === "win32") {
-		try {
-			spawn("taskkill", ["/F", "/T", "/PID", String(pid)], {
-				stdio: "ignore",
-				detached: true,
-				windowsHide: true,
-			});
-		} catch {
-			// Ignore taskkill failures.
-		}
-		return;
-	}
-
-	try {
-		process.kill(-pid, "SIGKILL");
-	} catch {
-		try {
-			process.kill(pid, "SIGKILL");
-		} catch {
-			// Process already gone.
-		}
-	}
-};
-
-const waitForChildProcess = (child: ChildProcess): Promise<number | null> =>
-	new Promise((resolve, reject) => {
-		let settled = false;
-		let exited = false;
-		let exitCode: number | null = null;
-		let postExitTimer: NodeJS.Timeout | undefined;
-		let stdoutEnded = child.stdout === null;
-		let stderrEnded = child.stderr === null;
-
-		const cleanup = () => {
-			if (postExitTimer) {
-				clearTimeout(postExitTimer);
-				postExitTimer = undefined;
-			}
-			child.removeListener("error", onError);
-			child.removeListener("exit", onExit);
-			child.removeListener("close", onClose);
-			child.stdout?.removeListener("end", onStdoutEnd);
-			child.stderr?.removeListener("end", onStderrEnd);
-		};
-
-		const finalize = (code: number | null) => {
-			if (settled) return;
-			settled = true;
-			cleanup();
-			child.stdout?.destroy();
-			child.stderr?.destroy();
-			resolve(code);
-		};
-
-		const maybeFinalizeAfterExit = () => {
-			if (!exited || settled) return;
-			if (stdoutEnded && stderrEnded) {
-				finalize(exitCode);
-			}
-		};
-
-		const onStdoutEnd = () => {
-			stdoutEnded = true;
-			maybeFinalizeAfterExit();
-		};
-
-		const onStderrEnd = () => {
-			stderrEnded = true;
-			maybeFinalizeAfterExit();
-		};
-
-		const onError = (error: Error) => {
-			if (settled) return;
-			settled = true;
-			cleanup();
-			reject(error);
-		};
-
-		const onExit = (code: number | null) => {
-			exited = true;
-			exitCode = code;
-			maybeFinalizeAfterExit();
-			if (!settled) {
-				postExitTimer = setTimeout(() => finalize(code), EXIT_STDIO_GRACE_MS);
-			}
-		};
-
-		const onClose = (code: number | null) => {
-			finalize(code);
-		};
-
-		child.stdout?.once("end", onStdoutEnd);
-		child.stderr?.once("end", onStderrEnd);
-		child.once("error", onError);
-		child.once("exit", onExit);
-		child.once("close", onClose);
-	});
-
 const createLocalPwshOperations = (): BashOperations => {
 	let cachedShellConfig: PwshShellConfig | undefined;
 
@@ -234,61 +125,41 @@ const createLocalPwshOperations = (): BashOperations => {
 					reject(new Error(`Working directory does not exist: ${cwd}\nCannot execute PowerShell commands.`));
 					return;
 				}
+				if (signal?.aborted) {
+					reject(new Error("aborted"));
+					return;
+				}
 
-				cachedShellConfig ??= resolvePwshShellConfig();
-				const shellConfig = cachedShellConfig;
+				const shellConfig = cachedShellConfig ?? (cachedShellConfig = resolvePwshShellConfig());
 				const shellCommand = withUtf8Prefix(command, shellConfig.prependUtf8Prefix);
 
-				const child = spawn(shellConfig.shellPath, [...shellConfig.args, shellCommand], {
+				const result = spawnSync(shellConfig.shellPath, [...shellConfig.args, shellCommand], {
 					cwd,
-					detached: true,
 					env: withPathPrepended(env ?? process.env),
-					stdio: ["ignore", "pipe", "pipe"],
+					encoding: "utf-8",
+					timeout: timeout && timeout > 0 ? timeout * 1000 : undefined,
 					windowsHide: true,
+					maxBuffer: 50 * 1024 * 1024,
 				});
 
-				let timedOut = false;
-				let timeoutHandle: NodeJS.Timeout | undefined;
+				if (result.stdout) onData(Buffer.from(result.stdout, "utf8"));
+				if (result.stderr) onData(Buffer.from(result.stderr, "utf8"));
 
-				if (timeout !== undefined && timeout > 0) {
-					timeoutHandle = setTimeout(() => {
-						timedOut = true;
-						if (child.pid) killProcessTree(child.pid);
-					}, timeout * 1000);
+				if (result.error) {
+					const err = result.error as NodeJS.ErrnoException;
+					if (err.code === "ETIMEDOUT") {
+						reject(new Error(`timeout:${timeout}`));
+						return;
+					}
+					reject(result.error);
+					return;
+				}
+				if (signal?.aborted) {
+					reject(new Error("aborted"));
+					return;
 				}
 
-				child.stdout?.on("data", onData);
-				child.stderr?.on("data", onData);
-
-				const onAbort = () => {
-					if (child.pid) killProcessTree(child.pid);
-				};
-
-				if (signal) {
-					if (signal.aborted) onAbort();
-					else signal.addEventListener("abort", onAbort, { once: true });
-				}
-
-				waitForChildProcess(child)
-					.then((code) => {
-						if (timeoutHandle) clearTimeout(timeoutHandle);
-						if (signal) signal.removeEventListener("abort", onAbort);
-
-						if (signal?.aborted) {
-							reject(new Error("aborted"));
-							return;
-						}
-						if (timedOut) {
-							reject(new Error(`timeout:${timeout}`));
-							return;
-						}
-						resolve({ exitCode: code });
-					})
-					.catch((error) => {
-						if (timeoutHandle) clearTimeout(timeoutHandle);
-						if (signal) signal.removeEventListener("abort", onAbort);
-						reject(error);
-					});
+				resolve({ exitCode: result.status });
 			});
 		},
 	};
@@ -319,9 +190,7 @@ export default function pwshExtension(pi: ExtensionAPI): void {
 		parameters: pwshSchema,
 		description: `Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last ${DEFAULT_MAX_LINES} lines or ${Math.trunc(DEFAULT_MAX_BYTES / 1024)}KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.`,
 		promptSnippet: "Execute PowerShell commands (Get-ChildItem, Select-String, etc.)",
-		promptGuidelines: [
-			"Use pwsh for Windows-native shell tasks and PowerShell-specific syntax.",
-		],
+		promptGuidelines: ["Use pwsh for Windows-native shell tasks and PowerShell-specific syntax."],
 		renderCall: (args, theme) => {
 			const command = typeof args.command === "string" && args.command.length > 0 ? args.command : "...";
 			const timeout = typeof args.timeout === "number" && Number.isFinite(args.timeout) ? args.timeout : undefined;
@@ -329,8 +198,6 @@ export default function pwshExtension(pi: ExtensionAPI): void {
 			return new Text(theme.fg("toolTitle", theme.bold(`PS> ${command}`)) + timeoutSuffix, 0, 0);
 		},
 	});
-
-	enforceWindowsToolPolicy(pi);
 
 	pi.on("session_start", async () => {
 		enforceWindowsToolPolicy(pi);

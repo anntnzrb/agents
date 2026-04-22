@@ -245,14 +245,14 @@ line3
 
     if ($IsWindows) {
         Test-Case 'windows.stop-parsing-operator' {
-            $out = & cmd /c echo "a&b"
+            $out = & cmd /c 'echo a^&b'
             if (-not $out) { throw 'cmd output empty' }
             'cmd-ok'
         }
 
         Test-Case 'windows.native-path-backslashes' {
             $winPath = Join-Path $env:TEMP 'pwsh-win-test'
-            if ($winPath -notmatch '\\\\') { throw "expected backslashes in path: $winPath" }
+            if ($winPath -notmatch '\\') { throw "expected backslashes in path: $winPath" }
             $winPath
         }
 
