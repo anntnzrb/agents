@@ -111,11 +111,17 @@ const buildChildPrompt = (task: string): string =>
 		"Do not delegate further.",
 	].join("\n");
 
+const normalizeTools = (tools: readonly string[] | undefined): string[] | undefined => {
+	if (!tools) return undefined;
+	return [...new Set(tools.map((tool) => tool.trim()).filter(Boolean))];
+};
+
 export const buildPiArgs = (input: {
 	task: string;
 	modelArg: string | undefined;
 	thinkingLevel: string | undefined;
 	inheritedCliArgs: InheritedCliArgs;
+	runtimeTools?: readonly string[];
 }): string[] => {
 	const args = [
 		"--mode",
@@ -130,15 +136,21 @@ export const buildPiArgs = (input: {
 	if (input.modelArg) args.push("--model", input.modelArg);
 	if (input.thinkingLevel) args.push("--thinking", input.thinkingLevel);
 
-	switch (input.inheritedCliArgs.tools.mode) {
-		case "explicit":
-			args.push("--tools", input.inheritedCliArgs.tools.value);
-			break;
-		case "disabled":
-			args.push("--no-tools");
-			break;
-		case "default":
-			break;
+	const runtimeTools = normalizeTools(input.runtimeTools);
+	if (runtimeTools) {
+		if (runtimeTools.length === 0) args.push("--no-tools");
+		else args.push("--tools", runtimeTools.join(","));
+	} else {
+		switch (input.inheritedCliArgs.tools.mode) {
+			case "explicit":
+				args.push("--tools", input.inheritedCliArgs.tools.value);
+				break;
+			case "disabled":
+				args.push("--no-tools");
+				break;
+			case "default":
+				break;
+		}
 	}
 
 	args.push(buildChildPrompt(input.task));

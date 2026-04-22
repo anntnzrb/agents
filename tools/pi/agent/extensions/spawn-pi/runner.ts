@@ -224,6 +224,7 @@ export const runChildTask = async (input: {
 	model?: { provider?: string; id?: string } | null;
 	thinkingLevel?: string;
 	inheritedCliArgs: InheritedCliArgs;
+	runtimeTools?: readonly string[];
 	signal?: AbortLike;
 	onChange?: (result: ChildRunResult) => void;
 }): Promise<ChildRunResult> => {
@@ -234,6 +235,7 @@ export const runChildTask = async (input: {
 		modelArg,
 		thinkingLevel: input.thinkingLevel,
 		inheritedCliArgs: input.inheritedCliArgs,
+		runtimeTools: input.runtimeTools,
 	});
 	const invocation = getPiInvocation(args);
 	const startTime = Date.now();

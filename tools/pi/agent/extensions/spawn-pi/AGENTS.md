@@ -19,6 +19,7 @@ Always start fresh.
 - Inherits current model + thinking.
 - Always runs child pi with `--no-session`.
 - Disables `spawn_pi` in child processes when `PI_SPAWN_DEPTH > 0`.
+- Inherits active tool set from parent runtime (`pi.getActiveTools()`).
 - Forwards built-in tool restrictions and extension flags from parent CLI.
 - Hard-codes one spawn level.
 - Child prompt contract: task, concise final answer only, no further delegation.

@@ -186,6 +186,7 @@ export default function spawnPiExtension(pi: ExtensionAPI) {
 				emitUpdate(details);
 			};
 
+			const runtimeTools = pi.getActiveTools();
 			const maxConcurrency = clampConcurrency(params.maxConcurrency);
 			const results = await mapConcurrent(
 				taskPlan.value.tasks,
@@ -196,6 +197,7 @@ export default function spawnPiExtension(pi: ExtensionAPI) {
 						model: ctx.model,
 						thinkingLevel: pi.getThinkingLevel(),
 						inheritedCliArgs,
+						runtimeTools,
 						signal,
 						onChange: (partialResult) => updateResult(index, partialResult),
 					});
