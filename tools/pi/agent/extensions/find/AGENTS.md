@@ -1,13 +1,19 @@
-# Find Auto-Enable Extension
+# Find Extension (Native override + auto-enable)
 
 ## Purpose
-Ensure Pi's built-in `find` tool is active for every session without hardcoding the full tool list.
+Keep `find` always active and add low-maintenance ROI features:
+- `hidden` toggle
+- `path | paths` multipath discovery with dedupe
+- deterministic ordering
+- `limit+1` probe for accurate truncation notice
+- bounded timeout with explicit timeout error
 
 ## Files
-- `index.ts` — on `session_start` / `session_tree`, unions current active tools with `find`
+- `index.ts` — tool override + activation hooks
+- `index.test.ts` — pure helper behavior checks
 - `tsconfig.json` — strict TS config matching sibling extensions
 
 ## Notes
-- Dynamic: preserves whatever tools are already active
-- No override: relies on Pi built-in `find` implementation
-- No prompts or UI changes
+- Dynamic activation: preserves existing active tools while forcing `find` on
+- Overrides built-in `find` with fd-backed multipath/timeout behavior
+- Avoids mtime sort/cache complexity by design
