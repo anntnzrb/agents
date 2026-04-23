@@ -71,7 +71,7 @@ const buildTaskPlan = (
 	cwd: string,
 ): TaskPlanResult => {
 	const task = params.task?.trim();
-	const tasks = (params.tasks ?? []).map((value) => value.trim()).filter(Boolean);
+	const tasks = (params.tasks ?? []).map((value: string) => value.trim()).filter(Boolean);
 	const modeCount = Number(Boolean(task)) + Number(tasks.length > 0);
 	if (modeCount !== 1) {
 		return { ok: false, error: "Provide exactly one of task or tasks." };
@@ -96,7 +96,7 @@ const buildTaskPlan = (
 				ok: true,
 				value: {
 					mode: "parallel",
-					tasks: tasks.map((parallelTask, index) => ({
+					tasks: tasks.map((parallelTask: string, index: number) => ({
 						index,
 						task: parallelTask,
 						cwd: taskCwd,
@@ -192,9 +192,10 @@ export default function spawnPiExtension(pi: ExtensionAPI) {
 				taskPlan.value.tasks,
 				maxConcurrency,
 				async (taskSpec, index) => {
+					const model = ctx.model as { provider?: string; id?: string } | null | undefined;
 					const result = await runChildTask({
 						taskSpec,
-						model: ctx.model,
+						...(model !== undefined ? { model } : {}),
 						thinkingLevel: pi.getThinkingLevel(),
 						inheritedCliArgs,
 						runtimeTools,

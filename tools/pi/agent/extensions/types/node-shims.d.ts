@@ -17,6 +17,8 @@ declare const process: {
 	env: Record<string, string | undefined>;
 	cwd: () => string;
 	execPath: string;
+	argv: string[];
+	platform: string;
 };
 
 declare const console: {
@@ -27,16 +29,26 @@ declare const console: {
 
 declare const Buffer: {
 	byteLength: (value: string, encoding?: string) => number;
+	from: (value: string, encoding?: string) => Uint8Array;
 };
 
 declare namespace NodeJS {
 	interface ErrnoException extends Error {
 		code?: string;
 	}
+	interface ProcessEnv {
+		[key: string]: string | undefined;
+	}
 }
 
 declare module "node:child_process" {
 	export function spawn(command: string, args?: string[], options?: unknown): any;
+	export function spawnSync(command: string, args?: string[], options?: unknown): {
+		status: number | null;
+		stdout?: string;
+		stderr?: string;
+		error?: Error;
+	};
 	export function execFileSync(command: string, args?: string[], options?: unknown): any;
 }
 
@@ -63,11 +75,17 @@ declare module "node:fs" {
 }
 
 declare module "node:fs/promises" {
+	export function readFile(path: string): Promise<{ toString: (encoding?: string) => string; byteLength: number }>;
+	export function readFile(path: string, encoding: string): Promise<string>;
+	export function stat(path: string): Promise<{ isDirectory: () => boolean }>;
+	export function mkdtemp(prefix: string): Promise<string>;
+	export function writeFile(path: string, content: string, options?: unknown): Promise<void>;
+
 	const fsPromises: {
-		readFile: {
-			(path: string): Promise<{ toString: (encoding?: string) => string; byteLength: number }>;
-			(path: string, encoding: string): Promise<string>;
-		};
+		readFile: typeof readFile;
+		stat: typeof stat;
+		mkdtemp: typeof mkdtemp;
+		writeFile: typeof writeFile;
 	};
 	export default fsPromises;
 }
@@ -75,6 +93,7 @@ declare module "node:fs/promises" {
 declare module "node:path" {
 	const path: {
 		sep: string;
+		delimiter: string;
 		resolve: (...parts: string[]) => string;
 		relative: (from: string, to: string) => string;
 		basename: (value: string) => string;

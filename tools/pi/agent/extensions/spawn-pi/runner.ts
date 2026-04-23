@@ -14,7 +14,7 @@ const DEPTH_ENV = "PI_SPAWN_DEPTH";
 const MAX_DEPTH = 1;
 
 type AbortLike = {
-	aborted: boolean;
+	aborted?: boolean;
 	addEventListener: (
 		type: "abort",
 		listener: () => void,
@@ -235,7 +235,7 @@ export const runChildTask = async (input: {
 		modelArg,
 		thinkingLevel: input.thinkingLevel,
 		inheritedCliArgs: input.inheritedCliArgs,
-		runtimeTools: input.runtimeTools,
+		...(input.runtimeTools ? { runtimeTools: input.runtimeTools } : {}),
 	});
 	const invocation = getPiInvocation(args);
 	const startTime = Date.now();

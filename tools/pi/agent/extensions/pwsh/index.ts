@@ -159,7 +159,7 @@ const createLocalPwshOperations = (): BashOperations => {
 					return;
 				}
 
-				resolve({ exitCode: result.status });
+				resolve({ exitCode: result.status ?? 1 });
 			});
 		},
 	};

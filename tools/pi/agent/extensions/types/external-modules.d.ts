@@ -73,15 +73,35 @@ declare module "@mariozechner/pi-coding-agent" {
 
 	export type ExtensionCommandContext = ExtensionContext;
 
+	export type BashOperations = {
+		exec: (
+			command: string,
+			cwd: string,
+			input: {
+				onData: (data: Uint8Array | string) => void;
+				signal?: AbortSignal;
+				timeout?: number;
+				env?: NodeJS.ProcessEnv;
+			},
+		) => Promise<{ exitCode: number }>;
+	};
+
 	export type RegisteredTool = {
 		name: string;
 		label?: string;
 		description?: string;
 		promptSnippet?: string;
+		promptGuidelines?: string[];
 		parameters?: unknown;
 		renderCall?: (args: any, theme: Theme, context: ToolRenderCallContext) => any;
 		renderResult?: (result: any, options: ToolRenderResultOptions, theme: Theme, context: ToolRenderResultContext) => any;
-		execute?: (toolCallId: string, input: any, signal: AbortSignal, onUpdate: unknown, ctx: ExtensionContext) => Promise<any> | any;
+		execute?: (
+			toolCallId: string,
+			input: any,
+			signal: AbortSignal,
+			onUpdate?: (partial: AgentToolResult) => void,
+			ctx: ExtensionContext,
+		) => Promise<any> | any;
 	};
 
 	export type CommandSourceInfo = {
@@ -112,6 +132,17 @@ declare module "@mariozechner/pi-coding-agent" {
 		getThinkingLevel: () => string;
 	};
 
+	export type AgentToolContentPart = {
+		type: string;
+		text?: string;
+	};
+
+	export type AgentToolResult<TDetails = unknown> = {
+		content: AgentToolContentPart[];
+		details?: TDetails;
+		isError?: boolean;
+	};
+
 	export type TruncationResult = {
 		content: string;
 		truncated?: boolean;
@@ -137,7 +168,38 @@ declare module "@mariozechner/pi-coding-agent" {
 	): event is { type: "tool_call"; toolName: TName; input: TInput };
 	export function createReadToolDefinition(cwd: string): RegisteredTool;
 	export function createWriteToolDefinition(cwd: string): RegisteredTool;
+	export function createBashToolDefinition(cwd: string, options?: { operations?: BashOperations }): RegisteredTool;
+	export function withFileMutationQueue<T>(path: string, op: () => Promise<T>): Promise<T>;
+	export function getMarkdownTheme(): unknown;
 	export const DynamicBorder: any;
+}
+
+
+declare module "@mariozechner/pi-ai" {
+	export type MessageContentPart = {
+		type: string;
+		text?: string;
+	};
+
+	export type MessageUsage = {
+		input?: number;
+		output?: number;
+		inputTokens?: number;
+		outputTokens?: number;
+		cacheRead?: number;
+		cacheWrite?: number;
+		totalTokens?: number;
+		cost?: number | { total?: number | string } | string;
+	};
+
+	export type Message = {
+		role: string;
+		content: MessageContentPart[];
+		usage?: MessageUsage;
+		model?: string;
+		stopReason?: string;
+		errorMessage?: string;
+	};
 }
 
 declare module "@mariozechner/pi-tui" {

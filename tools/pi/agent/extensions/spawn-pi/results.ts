@@ -14,12 +14,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import type { Message } from "@mariozechner/pi-ai";
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
-import {
-	didChildRunFail,
-	getChildRunStatusLabel,
-	type ChildRunResult,
-	type SpawnPiDetails,
-} from "./types.js";
+import { getChildRunStatusLabel, type ChildRunResult, type SpawnPiDetails } from "./types.js";
 
 const HOME_DIR = homedir();
 
@@ -117,8 +112,8 @@ const isAssistant = (message: Message): boolean => message.role === "assistant";
 export const getAssistantText = (message: Message): string => {
 	if (!isAssistant(message)) return "";
 	return message.content
-		.filter((part: { type: string }) => part.type === "text")
-		.map((part: { text: string }) => part.text)
+		.filter((part) => part.type === "text")
+		.map((part) => part.text ?? "")
 		.join("\n")
 		.trim();
 };
@@ -224,12 +219,14 @@ const buildTruncationNotice = (
 	filePath: string,
 	truncation: ReturnType<typeof truncateHead>,
 ): string => {
-	const omittedLines = truncation.totalLines - truncation.outputLines;
-	const omittedBytes = truncation.totalBytes - truncation.outputBytes;
+	const outputLines = truncation.outputLines ?? 0;
+	const outputBytes = truncation.outputBytes ?? 0;
+	const omittedLines = truncation.totalLines - outputLines;
+	const omittedBytes = truncation.totalBytes - outputBytes;
 	return [
 		"",
-		`[Output truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines`,
-		`(${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}).`,
+		`[Output truncated: showing ${outputLines} of ${truncation.totalLines} lines`,
+		`(${formatSize(outputBytes)} of ${formatSize(truncation.totalBytes)}).`,
 		`${omittedLines} lines (${formatSize(omittedBytes)}) omitted.`,
 		`Full output saved to: ${filePath}]`,
 	].join(" ");
