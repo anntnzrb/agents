@@ -7,7 +7,7 @@ Keep `grep` always active and add high-signal ergonomics on top of native Pi beh
 - `path | paths` multipath search with dedupe
 - optional `literal`, `gitignore`, `noIgnore`
 - round-robin balancing across files
-- sparse-match auto-context
+- compact collapsed UI summary (expand for raw output)
 
 ## Files
 - `index.ts` — tool override + activation hooks

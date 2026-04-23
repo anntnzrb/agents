@@ -1,28 +1,9 @@
+export { normalizeSearchRoots } from "../_shared/search-input.js";
+
 export const DEFAULT_LIMIT = 1_000;
 export const MAX_LIMIT = 10_000;
 export const DEFAULT_TIMEOUT_MS = 5_000;
 
-export const normalizeSearchRoots = (singlePath: string | undefined, multiPath: string[] | undefined): string[] => {
-  if (singlePath && multiPath && multiPath.length > 0) {
-    throw new Error("Use either path or paths, not both");
-  }
-
-  const rawEntries: string[] = [];
-  const trimmedSinglePath = singlePath?.trim();
-  if (trimmedSinglePath) rawEntries.push(trimmedSinglePath);
-
-  if (multiPath) {
-    for (const entry of multiPath) {
-      if (typeof entry !== "string") continue;
-      const trimmedEntry = entry.trim();
-      if (trimmedEntry.length === 0) continue;
-      rawEntries.push(trimmedEntry);
-    }
-  }
-
-  if (rawEntries.length === 0) return ["."];
-  return [...new Set(rawEntries)];
-};
 export const normalizeLimit = (value: number | undefined): number => {
   const normalized = value === undefined ? DEFAULT_LIMIT : Math.floor(value);
   if (!Number.isFinite(normalized) || normalized <= 0) {

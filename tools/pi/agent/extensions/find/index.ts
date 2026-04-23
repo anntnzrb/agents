@@ -1,11 +1,11 @@
-import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { createInterface } from "node:readline";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { DEFAULT_MAX_BYTES, formatSize, keyHint, truncateHead } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
+import { runLineStreamingProcess } from "../_shared/line-process.js";
+import { ensureToolActive, getFirstTextContent, summarizeList } from "../_shared/tool-utils.js";
 import { buildFdArgs, normalizeLimit, normalizeSearchRoots, normalizeTimeout } from "./logic.js";
 
 const findSchema = Type.Object({
@@ -26,19 +26,7 @@ type FindInput = {
 	timeoutMs?: number;
 };
 
-const ensureToolActive = (pi: ExtensionAPI, toolName: string): void => {
-	const nextTools = new Set(pi.getActiveTools());
-	if (nextTools.has(toolName)) return;
-	nextTools.add(toolName);
-	pi.setActiveTools(Array.from(nextTools));
-};
-
 const toPosix = (value: string): string => value.replace(/\\/g, "/");
-
-const summarizeList = (items: string[], max = 2): string => {
-	if (items.length <= max) return items.join(", ");
-	return `${items.slice(0, max).join(", ")} +${items.length - max} more`;
-};
 
 const formatFindCall = (
 	input: FindInput,
@@ -67,13 +55,6 @@ const toolMissingMessage = (binary: string): string =>
 type FindRenderDetails = {
 	resultLimitReached?: number;
 	truncation?: { truncated?: boolean };
-};
-
-const getResultText = (content: readonly { type: string; text?: string }[]): string => {
-	for (const part of content) {
-		if (part.type === "text") return part.text ?? "";
-	}
-	return "";
 };
 
 const getCollapsedSummary = (
@@ -109,78 +90,19 @@ const runFd = async (params: {
 	const { pattern, rootAbsolute, includeHidden, limit, timeoutMs, signal } = params;
 	const args = buildFdArgs(pattern, rootAbsolute, includeHidden, limit);
 
-	return await new Promise<string[]>((resolve, reject) => {
-		const child = spawn("fd", args, { stdio: ["ignore", "pipe", "pipe"] });
-		const lines = createInterface({ input: child.stdout });
-		const matches: string[] = [];
-		let stderr = "";
-		let killedForLimit = false;
-		let aborted = false;
-		let timedOut = false;
-
-		const timer = setTimeout(() => {
-			timedOut = true;
-			child.kill();
-		}, timeoutMs);
-
-		const stopChild = () => {
-			if (!child.killed) {
-				killedForLimit = true;
-				child.kill();
-			}
-		};
-
-		const cleanup = () => {
-			clearTimeout(timer);
-			lines.close();
-			signal?.removeEventListener("abort", onAbort);
-		};
-
-		const onAbort = () => {
-			aborted = true;
-			child.kill();
-		};
-		signal?.addEventListener("abort", onAbort, { once: true });
-
-		child.stderr.on("data", (chunk) => {
-			stderr += chunk.toString();
-		});
-
-		lines.on("line", (line) => {
-			const normalizedLine = line.replace(/\r$/, "");
-			if (normalizedLine.length === 0) return;
-			matches.push(normalizedLine);
-			if (matches.length >= limit) {
-				stopChild();
-			}
-		});
-
-		child.on("error", (error) => {
-			cleanup();
-			if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-				reject(new Error(toolMissingMessage("fd")));
-				return;
-			}
-			reject(new Error(`Failed to run fd: ${error.message}`));
-		});
-
-		child.on("close", (code) => {
-			cleanup();
-			if (aborted) {
-				reject(new Error("Operation aborted"));
-				return;
-			}
-			if (timedOut) {
-				reject(new Error(`find timed out after ${Math.max(1, Math.round(timeoutMs / 1000))}s`));
-				return;
-			}
-			if (!killedForLimit && code !== 0 && code !== 1) {
-				const detail = stderr.trim() || `fd exited with code ${code}`;
-				reject(new Error(detail));
-				return;
-			}
-			resolve(matches);
-		});
+	return await runLineStreamingProcess<string>({
+		command: "fd",
+		args,
+		maxResults: limit,
+		timeoutMs,
+		...(signal ? { signal } : {}),
+		normalizeLine: (line) => line.replace(/\r$/, ""),
+		skipEmptyLines: true,
+		missingBinaryMessage: toolMissingMessage("fd"),
+		runErrorLabel: "fd",
+		exitErrorLabel: "fd",
+		timeoutErrorMessage: (ms) => `find timed out after ${Math.max(1, Math.round(ms / 1000))}s`,
+		parseLine: (line) => line,
 	});
 };
 
@@ -203,7 +125,7 @@ export default function findExtension(pi: ExtensionAPI) {
 		},
 		renderResult(result, options, theme, context) {
 			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
-			const rawText = getResultText(result.content as Array<{ type: string; text?: string }>) || "(no output)";
+			const rawText = getFirstTextContent(result.content as Array<{ type: string; text?: string }>) || "(no output)";
 			if (context.isError || options.expanded || options.isPartial) {
 				text.setText(rawText);
 				return text;

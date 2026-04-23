@@ -1,12 +1,12 @@
-import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { createInterface } from "node:readline";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { DEFAULT_MAX_BYTES, formatSize, keyHint, truncateHead } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
+import { runLineStreamingProcess } from "../_shared/line-process.js";
+import { ensureToolActive, getFirstTextContent, summarizeList } from "../_shared/tool-utils.js";
 import {
 	balanceMatchesByFile,
 	normalizeLimit,
@@ -59,13 +59,6 @@ type GrepInput = {
 	limit?: number;
 };
 
-const ensureToolActive = (pi: ExtensionAPI, toolName: string): void => {
-	const nextTools = new Set(pi.getActiveTools());
-	if (nextTools.has(toolName)) return;
-	nextTools.add(toolName);
-	pi.setActiveTools(Array.from(nextTools));
-};
-
 const normalizeContext = (value: number | undefined): number | undefined => {
 	if (value === undefined) return undefined;
 	const normalized = Math.floor(value);
@@ -83,11 +76,6 @@ const truncateLineForOutput = (line: string): { text: string; truncated: boolean
 		text: `${line.slice(0, GREP_MAX_LINE_LENGTH)}... [truncated]`,
 		truncated: true,
 	};
-};
-
-const summarizeList = (items: string[], max = 2): string => {
-	if (items.length <= max) return items.join(", ");
-	return `${items.slice(0, max).join(", ")} +${items.length - max} more`;
 };
 
 const formatGrepCall = (input: GrepInput, theme: { fg: (token: string, text: string) => string; bold: (text: string) => string }): string => {
@@ -169,83 +157,31 @@ const runRipgrep = async (params: {
 	}
 	args.push(pattern, rootAbsolute);
 
-	return await new Promise<RawMatch[]>((resolve, reject) => {
-		const child = spawn("rg", args, { stdio: ["ignore", "pipe", "pipe"] });
-		const lines = createInterface({ input: child.stdout });
-		const matches: RawMatch[] = [];
-		let stderr = "";
-		let aborted = false;
-		let killedForCap = false;
-
-		const stopChild = (forCap = false) => {
-			if (!child.killed) {
-				killedForCap = forCap;
-				child.kill();
-			}
-		};
-
-		const cleanup = () => {
-			lines.close();
-			signal?.removeEventListener("abort", onAbort);
-		};
-
-		const onAbort = () => {
-			aborted = true;
-			stopChild();
-		};
-		signal?.addEventListener("abort", onAbort, { once: true });
-
-		child.stderr.on("data", (chunk) => {
-			stderr += chunk.toString();
-		});
-
-		lines.on("line", (line) => {
-			if (matches.length >= maxMatches) {
-				stopChild(true);
-				return;
-			}
+	return await runLineStreamingProcess<RawMatch>({
+		command: "rg",
+		args,
+		maxResults: maxMatches,
+		...(signal ? { signal } : {}),
+		missingBinaryMessage: toolMissingMessage("rg", "ripgrep (e.g. `brew install ripgrep`)"),
+		runErrorLabel: "ripgrep",
+		exitErrorLabel: "ripgrep",
+		parseLine: (line) => {
 			const event = parseMatchEvent(line);
-			if (!event || event.type !== "match") return;
+			if (!event || event.type !== "match") return undefined;
 			const filePath = event.data?.path?.text;
 			const lineNumber = event.data?.line_number;
 			const lineText = event.data?.lines?.text;
-			if (!filePath || typeof lineNumber !== "number") return;
+			if (!filePath || typeof lineNumber !== "number") return undefined;
 			const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(rootAbsolute, filePath);
 			const cleanedLine = (lineText ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "").replace(/\n$/, "");
 			const displayPath = toPosixRelative(cwd, absolutePath);
-			matches.push({
+			return {
 				absolutePath,
 				displayPath,
 				lineNumber,
 				lineText: cleanedLine,
-			});
-			if (matches.length >= maxMatches) {
-				stopChild(true);
-			}
-		});
-
-		child.on("error", (error) => {
-			cleanup();
-			if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-				reject(new Error(toolMissingMessage("rg", "ripgrep (e.g. `brew install ripgrep`)")));
-				return;
-			}
-			reject(new Error(`Failed to run ripgrep: ${error.message}`));
-		});
-
-		child.on("close", (code) => {
-			cleanup();
-			if (aborted) {
-				reject(new Error("Operation aborted"));
-				return;
-			}
-			if (!killedForCap && code !== 0 && code !== 1) {
-				const detail = stderr.trim() || `ripgrep exited with code ${code}`;
-				reject(new Error(detail));
-				return;
-			}
-			resolve(matches);
-		});
+			};
+		},
 	});
 };
 
@@ -302,6 +238,9 @@ const formatMatches = async (matches: RawMatch[], contextLines: number): Promise
 };
 
 type GrepRenderDetails = {
+	matchCount?: number;
+	fileCount?: number;
+	outputLineCount?: number;
 	matchLimitReached?: number;
 	truncation?: ReturnType<typeof truncateHead>;
 	linesTruncated?: boolean;
@@ -335,9 +274,10 @@ const buildCollapsedResultText = (
 	if (body.length === 0) return theme.fg("dim", "(no output)");
 	if (body === "No matches found") return theme.fg("dim", body);
 
-	const { matchCount, fileCount, lineCount } = summarizeOutput(body);
 	const lines: string[] = [];
-	if (matchCount > 0) {
+	const matchCount = details?.matchCount;
+	const fileCount = details?.fileCount;
+	if (typeof matchCount === "number" && typeof fileCount === "number") {
 		lines.push(
 			theme.fg(
 				"toolOutput",
@@ -345,7 +285,18 @@ const buildCollapsedResultText = (
 			),
 		);
 	} else {
-		lines.push(theme.fg("toolOutput", `${lineCount} ${pluralize(lineCount, "line", "lines")} of output`));
+		const fallback = summarizeOutput(body);
+		if (fallback.matchCount > 0) {
+			lines.push(
+				theme.fg(
+					"toolOutput",
+					`${fallback.matchCount} ${pluralize(fallback.matchCount, "match", "matches")} · ${fallback.fileCount} ${pluralize(fallback.fileCount, "file", "files")}`,
+				),
+			);
+		} else {
+			const lineCount = details?.outputLineCount ?? fallback.lineCount;
+			lines.push(theme.fg("toolOutput", `${lineCount} ${pluralize(lineCount, "line", "lines")} of output`));
+		}
 	}
 
 	const notices: string[] = [];
@@ -360,6 +311,10 @@ const buildCollapsedResultText = (
 	}
 	lines.push(theme.fg("dim", `(${keyHint("app.tools.expand", "to expand")})`));
 	return lines.join("\n");
+};
+
+export const __test = {
+	buildCollapsedResultText,
 };
 
 export default function grepExtension(pi: ExtensionAPI) {
@@ -381,8 +336,7 @@ export default function grepExtension(pi: ExtensionAPI) {
 		},
 		renderResult(result, options, theme, context) {
 			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
-			const firstTextBlock = result.content.find((block) => block.type === "text");
-			const rawText = firstTextBlock?.type === "text" ? (firstTextBlock.text ?? "") : "";
+			const rawText = getFirstTextContent(result.content as Array<{ type: string; text?: string }>);
 
 			if (context.isError) {
 				text.setText(theme.fg("error", rawText.length > 0 ? rawText : "grep failed"));
@@ -467,11 +421,13 @@ export default function grepExtension(pi: ExtensionAPI) {
 			});
 			let output = truncation.content;
 			const notices: string[] = [];
-			const details: {
-				matchLimitReached?: number;
-				truncation?: ReturnType<typeof truncateHead>;
-				linesTruncated?: boolean;
-			} = {};
+			const fileCount = new Set(selected.map((match) => match.displayPath)).size;
+			const outputLineCount = rawOutput.length === 0 ? 0 : rawOutput.split("\n").filter((line) => line.trim().length > 0).length;
+			const details: GrepRenderDetails = {
+				matchCount: selected.length,
+				fileCount,
+				outputLineCount,
+			};
 
 			if (hasMore) {
 				notices.push(`${effectiveLimit} matches limit reached. Use offset=${effectiveOffset + effectiveLimit} for next page`);
@@ -491,7 +447,7 @@ export default function grepExtension(pi: ExtensionAPI) {
 
 			return {
 				content: [{ type: "text", text: output }],
-				details: Object.keys(details).length > 0 ? details : undefined,
+				details,
 			};
 		},
 	});

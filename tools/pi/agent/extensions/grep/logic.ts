@@ -1,5 +1,7 @@
 import path from "node:path";
 
+export { normalizeSearchRoots } from "../_shared/search-input.js";
+
 export const DEFAULT_LIMIT = 100;
 export const MAX_LIMIT = 2_000;
 
@@ -41,28 +43,6 @@ const TYPE_GLOBS: Record<string, readonly string[]> = {
   md: ["*.md", "*.markdown"],
   json: ["*.json", "*.jsonc", "*.json5"],
   yaml: ["*.yml", "*.yaml"],
-};
-
-export const normalizeSearchRoots = (singlePath: string | undefined, multiPath: string[] | undefined): string[] => {
-  if (singlePath && multiPath && multiPath.length > 0) {
-    throw new Error("Use either path or paths, not both");
-  }
-
-  const rawEntries: string[] = [];
-  const trimmedSinglePath = singlePath?.trim();
-  if (trimmedSinglePath) rawEntries.push(trimmedSinglePath);
-
-  if (multiPath) {
-    for (const entry of multiPath) {
-      if (typeof entry !== "string") continue;
-      const trimmedEntry = entry.trim();
-      if (trimmedEntry.length === 0) continue;
-      rawEntries.push(trimmedEntry);
-    }
-  }
-
-  if (rawEntries.length === 0) return ["."];
-  return [...new Set(rawEntries)];
 };
 
 export const normalizeLimit = (value: number | undefined): number => {
@@ -129,7 +109,9 @@ export const balanceMatchesByFile = (matches: RawMatch[]): RawMatch[] => {
       if (!fileMatches) continue;
       const index = indexes.get(file) ?? 0;
       if (index >= fileMatches.length) continue;
-      ordered.push(fileMatches[index]);
+      const nextMatch = fileMatches[index];
+      if (!nextMatch) continue;
+      ordered.push(nextMatch);
       indexes.set(file, index + 1);
       added = true;
     }
