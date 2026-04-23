@@ -1,8 +1,8 @@
 {
   "collapseChangelog": true,
   "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.3-codex",
-  "defaultThinkingLevel": "high",
+  "defaultModel": "gpt-5.5",
+  "defaultThinkingLevel": "medium",
   "compaction": {
     "enabled": true,
     "reserveTokens": 32000,
@@ -11,7 +11,7 @@
   "editorPaddingX": 1,
   "followUpMode": "all",
   "hideThinkingBlock": true,
-  "lastChangelogVersion": "0.58.3",
+  "lastChangelogVersion": "0.70.0",
   "quietStartup": true,
   "showHardwareCursor": true,
   "steeringMode": "all",
