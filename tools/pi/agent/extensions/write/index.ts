@@ -65,6 +65,10 @@ const buildCollapsedWriteCallText = (
 	].join("\n");
 };
 
+export const __test = {
+	getContentStats,
+};
+
 export default function writeExtension(pi: ExtensionAPI): void {
 	const baseWrite = createWriteToolDefinition(process.cwd());
 

@@ -46,7 +46,7 @@ const formatNumber = (value: number): string => {
 const formatSignedNumber = (value: number): string =>
 	value < 0 ? `-${formatNumber(Math.abs(value))}` : formatNumber(value);
 
-const getHomeDir = (): string | undefined => process.env.HOME ?? process.env.USERPROFILE;
+const getHomeDir = (): string | undefined => process.env["HOME"] ?? process.env["USERPROFILE"];
 
 const shortenCwd = (cwd: string, home: string | undefined): string =>
 	home && cwd.startsWith(home) ? `~${cwd.slice(home.length)}` : cwd;
@@ -85,37 +85,44 @@ const getOptionalBoolean = (value: unknown): boolean | undefined =>
 	typeof value === "boolean" ? value : undefined;
 
 const getModel = (value: unknown): ModelLike | undefined => {
-	if (!isRecord(value) || typeof value.id !== "string") return undefined;
-	return {
-		id: value.id,
-		contextWindow: getOptionalNumber(value.contextWindow),
-		reasoning: getOptionalBoolean(value.reasoning),
+	if (!isRecord(value) || typeof value["id"] !== "string") return undefined;
+	const model: ModelLike = {
+		id: value["id"],
 	};
+	const contextWindow = getOptionalNumber(value["contextWindow"]);
+	if (contextWindow !== undefined) {
+		model.contextWindow = contextWindow;
+	}
+	const reasoning = getOptionalBoolean(value["reasoning"]);
+	if (reasoning !== undefined) {
+		model.reasoning = reasoning;
+	}
+	return model;
 };
 
 const getContextUsage = (value: unknown): ContextUsageLike | undefined => {
 	if (!isRecord(value)) return undefined;
-	const tokens = getOptionalNumber(value.tokens);
-	const contextWindow = getOptionalNumber(value.contextWindow);
+	const tokens = getOptionalNumber(value["tokens"]);
+	const contextWindow = getOptionalNumber(value["contextWindow"]);
 	if (tokens === undefined || contextWindow === undefined) return undefined;
 	return {
 		tokens,
 		contextWindow,
-		percent: getOptionalNumber(value.percent) ?? null,
+		percent: getOptionalNumber(value["percent"]) ?? null,
 	};
 };
 
 const getEntryType = (entry: unknown): string | undefined =>
-	isRecord(entry) && typeof entry.type === "string" ? entry.type : undefined;
+	isRecord(entry) && typeof entry["type"] === "string" ? entry["type"] : undefined;
 
 const getCompactionSummary = (entry: unknown): string | undefined =>
-	isRecord(entry) && typeof entry.summary === "string" ? entry.summary : undefined;
+	isRecord(entry) && typeof entry["summary"] === "string" ? entry["summary"] : undefined;
 
 const getCompactionDetailsReserve = (settings: unknown): number | undefined => {
 	if (!isRecord(settings)) return undefined;
-	const compaction = settings.compaction;
+	const compaction = settings["compaction"];
 	if (!isRecord(compaction)) return undefined;
-	const reserveTokens = getOptionalNumber(compaction.reserveTokens);
+	const reserveTokens = getOptionalNumber(compaction["reserveTokens"]);
 	return reserveTokens !== undefined && reserveTokens >= 0 ? reserveTokens : undefined;
 };
 
@@ -141,7 +148,7 @@ const readReserveTokens = (cwd: string): number | undefined => {
 
 const getMessageFromEntry = (entry: unknown): Record<string, unknown> | undefined => {
 	if (!isRecord(entry)) return undefined;
-	const message = entry.message;
+	const message = entry["message"];
 	return isRecord(message) ? message : undefined;
 };
 
@@ -179,9 +186,9 @@ const computeSessionHealthMetrics = (entries: readonly unknown[]): SessionHealth
 		}
 		if (entryType !== "message") continue;
 		const message = getMessageFromEntry(entry);
-		if (!message || message.role !== "assistant") continue;
-		if (typeof message.errorMessage !== "string") continue;
-		if (message.errorMessage.includes("context_length_exceeded")) {
+		if (!message || message["role"] !== "assistant") continue;
+		if (typeof message["errorMessage"] !== "string") continue;
+		if (message["errorMessage"].includes("context_length_exceeded")) {
 			overflowCount += 1;
 		}
 	}
@@ -327,6 +334,11 @@ const renderFooterLine = (left: string, right: string, width: number): string =>
 
 const isStaleExtensionError = (error: unknown): boolean =>
 	error instanceof Error && error.message.includes("stale after session replacement or reload");
+
+export const __test = {
+	calculatePollutionPercent,
+	isStaleExtensionError,
+};
 
 export default function footerExtension(pi: ExtensionAPI) {
 	pi.on("session_start", (_event, ctx) => {

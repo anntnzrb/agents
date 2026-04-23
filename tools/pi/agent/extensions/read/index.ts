@@ -1,5 +1,6 @@
 import { createReadToolDefinition, DEFAULT_MAX_BYTES, formatSize, keyHint, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
+import { getFirstTextContent } from "../_shared/tool-utils.js";
 
 type ReadResultPart = {
 	type: string;
@@ -14,13 +15,6 @@ type ReadDetails = {
 		maxLines?: number;
 		firstLineExceedsLimit?: boolean;
 	};
-};
-
-const getResultText = (content: readonly ReadResultPart[]): string => {
-	for (const part of content) {
-		if (part.type === "text") return part.text ?? "";
-	}
-	return "";
 };
 
 const buildCollapsedReadText = (
@@ -44,6 +38,10 @@ const buildCollapsedReadText = (
 	return lines.join("\n");
 };
 
+export const __test = {
+	buildCollapsedReadText,
+};
+
 export default function readExtension(pi: ExtensionAPI): void {
 	const baseRead = createReadToolDefinition(process.cwd());
 
@@ -51,7 +49,7 @@ export default function readExtension(pi: ExtensionAPI): void {
 		...baseRead,
 		renderResult(result, options, theme, context) {
 			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
-			const rawText = getResultText(result.content as ReadResultPart[]);
+			const rawText = getFirstTextContent(result.content as ReadResultPart[]);
 
 			if (context.isError || options.expanded || options.isPartial) {
 				text.setText(rawText || "(no output)");
