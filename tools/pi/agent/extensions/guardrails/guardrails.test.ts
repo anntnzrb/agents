@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { loadConfig } from "./config.js";
-import { actionForCommand, reasonForCommand } from "./matcher.js";
+import { __test, actionForCommand, reasonForCommand } from "./matcher.js";
 import { reasonForPath } from "./paths.js";
 import type { GuardrailsConfig } from "./types.js";
 
@@ -277,6 +277,14 @@ test("does not warn for narrow shell file-discovery commands", () => {
   assert.equal(reasonForCommand("find src -maxdepth 2 -name '*.ts'", searchConfig), null);
   assert.equal(reasonForCommand("find --help", searchConfig), null);
   assert.equal(reasonForCommand("locate package.json", searchConfig), null);
+});
+
+test("optionHasValue token rules remain stable", () => {
+  assert.equal(__test.optionHasValue("--glob", "rg"), true);
+  assert.equal(__test.optionHasValue("--threads", "ripgrep"), true);
+  assert.equal(__test.optionHasValue("--glob", "fd"), true);
+  assert.equal(__test.optionHasValue("-maxdepth", "find"), true);
+  assert.equal(__test.optionHasValue("--version", "rg"), false);
 });
 
 test("does not warn for harmless mentions of search tool names", () => {

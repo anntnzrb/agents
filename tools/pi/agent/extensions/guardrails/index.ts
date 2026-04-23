@@ -1,18 +1,52 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
+import { statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfig } from "./config.js";
 import { actionForCommand } from "./matcher.js";
 import { reasonForPath } from "./paths.js";
+import type { GuardrailsConfig } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const configPath = join(__dirname, "guardrails.jsonc");
 
+let cachedSignature: string | null = null;
+let cachedConfigOrReason: GuardrailsConfig | string | undefined;
+
+const getConfigSignature = (path: string): string => {
+  try {
+    const stats = statSync(path);
+    return `${path}:${stats.mtimeMs}:${stats.size}`;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return `${path}:missing:${message}`;
+  }
+};
+
 const getConfigOrBlockReason = (path: string) => {
+  const signature = getConfigSignature(path);
+  if (cachedSignature === signature && cachedConfigOrReason !== undefined) {
+    return cachedConfigOrReason;
+  }
+
   const result = loadConfig(path);
-  return result.ok ? result.config : result.reason;
+  const configOrReason = result.ok ? result.config : result.reason;
+  cachedSignature = signature;
+  cachedConfigOrReason = configOrReason;
+  return configOrReason;
+};
+
+const resetConfigCache = () => {
+  cachedSignature = null;
+  cachedConfigOrReason = undefined;
+};
+
+export const __test = {
+  getConfigSignature,
+  getConfigOrBlockReason,
+  resetConfigCache,
 };
 
 export function createGuardrails(path: string) {

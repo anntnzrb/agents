@@ -31,6 +31,55 @@ const FILE_DISCOVERY_EXECUTABLES = new Set([
   "plocate",
 ]);
 
+const RG_OPTIONS_WITH_VALUE = new Set([
+  "-e",
+  "-f",
+  "-g",
+  "-m",
+  "-A",
+  "-B",
+  "-C",
+  "-j",
+  "-t",
+  "-T",
+  "--glob",
+  "--max-count",
+  "--threads",
+  "--type",
+  "--type-not",
+]);
+
+const GREP_OPTIONS_WITH_VALUE = new Set(["-e", "-f", "-m", "-A", "-B", "-C", "--max-count"]);
+
+const FD_OPTIONS_WITH_VALUE = new Set([
+  "-g",
+  "-d",
+  "-t",
+  "-E",
+  "--glob",
+  "--max-depth",
+  "--type",
+  "--exclude",
+  "--search-path",
+]);
+
+const FIND_OPTIONS_WITH_VALUE = new Set([
+  "-maxdepth",
+  "-mindepth",
+  "-name",
+  "-path",
+  "-type",
+  "-mtime",
+  "-mmin",
+  "-size",
+  "-user",
+  "-group",
+  "-perm",
+]);
+
+const EXECUTABLE_PATTERN_REGEX_CACHE = new WeakMap<ExecutableMatch, RegExp[]>();
+const RULE_REGEX_CACHE = new WeakMap<Rule, RegExp>();
+
 type ParsedCommand = {
   command: string;
   executable: string;
@@ -155,10 +204,31 @@ function buildFlags(flags: string | undefined, caseSensitive: boolean | undefine
   return flags?.includes("i") ? flags : `${flags ?? ""}i`;
 }
 
+function getExecutablePatternRegexes(match: ExecutableMatch): RegExp[] {
+  const cached = EXECUTABLE_PATTERN_REGEX_CACHE.get(match);
+  if (cached) return cached;
+
+  const flags = buildFlags(match.flags, match.caseSensitive);
+  const compiled = (match.patterns ?? []).map((pattern) => new RegExp(pattern, flags));
+  EXECUTABLE_PATTERN_REGEX_CACHE.set(match, compiled);
+  return compiled;
+}
+
+function getRuleRegex(rule: Rule): RegExp {
+  const cached = RULE_REGEX_CACHE.get(rule);
+  if (cached) return cached;
+
+  if (rule.match.type !== "regex") {
+    throw new Error("getRuleRegex called for non-regex rule");
+  }
+
+  const regex = new RegExp(rule.match.pattern, rule.match.flags ?? "");
+  RULE_REGEX_CACHE.set(rule, regex);
+  return regex;
+}
+
 function matchExecutable(actual: string, match: ExecutableMatch): boolean {
   const names = match.names ?? [];
-  const patterns = match.patterns ?? [];
-  const flags = buildFlags(match.flags, match.caseSensitive);
   const basename = executableBasename(actual);
   const values = [actual, basename, normalizeExecutable(actual)];
 
@@ -176,8 +246,8 @@ function matchExecutable(actual: string, match: ExecutableMatch): boolean {
     }
   }
 
-  for (const pattern of patterns) {
-    const regex = new RegExp(pattern, flags);
+  const regexes = getExecutablePatternRegexes(match);
+  for (const regex of regexes) {
     if (values.some((value) => regex.test(value))) {
       return true;
     }
@@ -189,7 +259,7 @@ function matchExecutable(actual: string, match: ExecutableMatch): boolean {
 function getRuleMatches(inspection: Inspection, rule: Rule): RuleMatchContext[] {
   const match = rule.match;
   if (match.type === "regex") {
-    const regex = new RegExp(match.pattern, match.flags ?? "");
+    const regex = getRuleRegex(rule);
     return inspection.commands.filter((command) => regex.test(command)).map((command) => ({ command }));
   }
 
@@ -219,54 +289,16 @@ function isRootLikePath(token: string): boolean {
 function optionHasValue(token: string, executable: string): boolean {
   const normalized = normalizeExecutable(executable);
   if (normalized === "rg" || normalized === "ripgrep") {
-    return new Set([
-      "-e",
-      "-f",
-      "-g",
-      "-m",
-      "-A",
-      "-B",
-      "-C",
-      "-j",
-      "-t",
-      "-T",
-      "--glob",
-      "--max-count",
-      "--threads",
-      "--type",
-      "--type-not",
-    ]).has(token);
+    return RG_OPTIONS_WITH_VALUE.has(token);
   }
   if (normalized === "grep" || normalized === "ggrep") {
-    return new Set(["-e", "-f", "-m", "-A", "-B", "-C", "--max-count"]).has(token);
+    return GREP_OPTIONS_WITH_VALUE.has(token);
   }
   if (normalized === "fd" || normalized === "fdfind" || normalized === "fd-find") {
-    return new Set([
-      "-g",
-      "-d",
-      "-t",
-      "-E",
-      "--glob",
-      "--max-depth",
-      "--type",
-      "--exclude",
-      "--search-path",
-    ]).has(token);
+    return FD_OPTIONS_WITH_VALUE.has(token);
   }
   if (normalized === "find" || normalized === "gfind") {
-    return new Set([
-      "-maxdepth",
-      "-mindepth",
-      "-name",
-      "-path",
-      "-type",
-      "-mtime",
-      "-mmin",
-      "-size",
-      "-user",
-      "-group",
-      "-perm",
-    ]).has(token);
+    return FIND_OPTIONS_WITH_VALUE.has(token);
   }
   return false;
 }
@@ -415,5 +447,6 @@ export const __test = {
   shouldWarnFileDiscovery,
   inspectCommand,
   normalizeExecutable,
+  optionHasValue,
   unique,
 };
