@@ -170,6 +170,10 @@ function inspectTokens(tokens: string[], command: string, depth: number): Inspec
   }
 
   const executable = tokens[index];
+  if (!executable) {
+    return emptyInspection();
+  }
+
   const normalizedExecutable = normalizeExecutable(executable);
   const current: Inspection = {
     commands: [command],
@@ -309,10 +313,19 @@ function extractPositionals(parsed: ParsedCommand): string[] {
 
   for (let i = 0; i < args.length; i += 1) {
     const token = args[i];
+    if (!token) {
+      continue;
+    }
+
     if (token === "--") {
-      positionals.push(...args.slice(i + 1));
+      for (const trailing of args.slice(i + 1)) {
+        if (trailing) {
+          positionals.push(trailing);
+        }
+      }
       break;
     }
+
     if (token.startsWith("-")) {
       if (token.includes("=") || !optionHasValue(token, parsed.executable)) {
         continue;
@@ -320,6 +333,7 @@ function extractPositionals(parsed: ParsedCommand): string[] {
       i += 1;
       continue;
     }
+
     positionals.push(token);
   }
 
@@ -330,10 +344,19 @@ function parseMaxDepth(parsed: ParsedCommand): number | undefined {
   const args = parsed.tokens.slice(1);
   for (let i = 0; i < args.length; i += 1) {
     const token = args[i];
+    if (!token) {
+      continue;
+    }
+
     if (token === "-maxdepth" && i + 1 < args.length) {
-      const value = Number.parseInt(args[i + 1], 10);
+      const rawValue = args[i + 1];
+      if (!rawValue) {
+        continue;
+      }
+      const value = Number.parseInt(rawValue, 10);
       return Number.isFinite(value) ? value : undefined;
     }
+
     if (token.startsWith("-maxdepth=") || token.startsWith("--maxdepth=")) {
       const value = Number.parseInt(token.split("=")[1] ?? "", 10);
       return Number.isFinite(value) ? value : undefined;
@@ -392,28 +415,25 @@ function shouldWarnFileDiscovery(parsed: ParsedCommand): boolean {
   return FILE_DISCOVERY_EXECUTABLES.has(executable);
 }
 
+function parsedFromCommand(command: string): ParsedCommand {
+  const tokens = tokenizeCommand(command);
+  return {
+    command,
+    executable: tokens[0] ?? "",
+    tokens,
+  };
+}
+
 function shouldEmitWarn(rule: Rule, context: RuleMatchContext): boolean {
   if (rule.action.type !== "warn") return true;
   const ruleId = rule.id ?? "";
 
   if (ruleId === "prefer-native-content-search" || ruleId === "prefer-native-content-search-git-grep") {
-    return context.parsed ? shouldWarnContentSearch(context.parsed) : shouldWarnContentSearch({
-      command: context.command,
-      executable: tokenizeCommand(context.command)[0] ?? "",
-      tokens: tokenizeCommand(context.command),
-    });
+    return shouldWarnContentSearch(context.parsed ?? parsedFromCommand(context.command));
   }
 
   if (ruleId === "prefer-native-file-discovery") {
-    if (!context.parsed) {
-      const tokens = tokenizeCommand(context.command);
-      return shouldWarnFileDiscovery({
-        command: context.command,
-        executable: tokens[0] ?? "",
-        tokens,
-      });
-    }
-    return shouldWarnFileDiscovery(context.parsed);
+    return shouldWarnFileDiscovery(context.parsed ?? parsedFromCommand(context.command));
   }
 
   return true;

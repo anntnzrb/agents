@@ -47,17 +47,19 @@ function normalizeBlockAction(value: unknown, path: string): BlockAction | strin
     return `${path} must be an object`;
   }
 
-  if (value.type !== "block") {
+  const type = value["type"];
+  if (type !== "block") {
     return `${path}.type must be "block"`;
   }
 
-  if (typeof value.message !== "string" || value.message.trim().length === 0) {
+  const message = value["message"];
+  if (typeof message !== "string" || message.trim().length === 0) {
     return `${path}.message must be a non-empty string`;
   }
 
   return {
     type: "block",
-    message: value.message,
+    message,
   };
 }
 
@@ -66,29 +68,33 @@ function normalizeBashAction(value: unknown, path: string): BashAction | string 
     return `${path} must be an object`;
   }
 
-  if (value.type !== "block" && value.type !== "warn") {
+  const type = value["type"];
+  if (type !== "block" && type !== "warn") {
     return `${path}.type must be "block" or "warn"`;
   }
 
-  if (typeof value.message !== "string" || value.message.trim().length === 0) {
+  const message = value["message"];
+  if (typeof message !== "string" || message.trim().length === 0) {
     return `${path}.message must be a non-empty string`;
   }
 
   return {
-    type: value.type,
-    message: value.message,
+    type,
+    message,
   };
 }
 
 function normalizeExecutableMatch(value: Record<string, unknown>, path: string): ExecutableMatch | string {
-  const namesValue = value.names === undefined ? [] : asStringArray(value.names);
-  if (value.names !== undefined && namesValue === null) {
+  const rawNames = value["names"];
+  const namesValue = rawNames === undefined ? [] : asStringArray(rawNames);
+  if (rawNames !== undefined && namesValue === null) {
     return `${path}.names must be an array of strings`;
   }
   const names = namesValue ?? [];
 
-  const patternsValue = value.patterns === undefined ? [] : asStringArray(value.patterns);
-  if (value.patterns !== undefined && patternsValue === null) {
+  const rawPatterns = value["patterns"];
+  const patternsValue = rawPatterns === undefined ? [] : asStringArray(rawPatterns);
+  if (rawPatterns !== undefined && patternsValue === null) {
     return `${path}.patterns must be an array of strings`;
   }
   const patterns = patternsValue ?? [];
@@ -97,49 +103,64 @@ function normalizeExecutableMatch(value: Record<string, unknown>, path: string):
     return `${path} must define at least one name or pattern`;
   }
 
-  if (value.flags !== undefined && typeof value.flags !== "string") {
+  const rawFlags = value["flags"];
+  if (rawFlags !== undefined && typeof rawFlags !== "string") {
     return `${path}.flags must be a string`;
   }
+  const flags = typeof rawFlags === "string" ? rawFlags : undefined;
 
-  if (value.caseSensitive !== undefined && typeof value.caseSensitive !== "boolean") {
+  const rawCaseSensitive = value["caseSensitive"];
+  if (rawCaseSensitive !== undefined && typeof rawCaseSensitive !== "boolean") {
     return `${path}.caseSensitive must be a boolean`;
   }
+  const caseSensitive = typeof rawCaseSensitive === "boolean" ? rawCaseSensitive : undefined;
 
   for (const [index, pattern] of patterns.entries()) {
-    const error = validateRegex(pattern, value.flags as string | undefined);
+    const error = validateRegex(pattern, flags);
     if (error) {
       return `${path}.patterns[${index}] is invalid: ${error}`;
     }
   }
 
-  return {
+  const out: ExecutableMatch = {
     type: "executable",
     names,
     patterns,
-    flags: value.flags as string | undefined,
-    caseSensitive: value.caseSensitive as boolean | undefined,
   };
+  if (flags !== undefined) {
+    out.flags = flags;
+  }
+  if (caseSensitive !== undefined) {
+    out.caseSensitive = caseSensitive;
+  }
+  return out;
 }
 
 function normalizeRegexMatch(value: Record<string, unknown>, path: string): RegexMatch | string {
-  if (typeof value.pattern !== "string" || value.pattern.length === 0) {
+  const rawPattern = value["pattern"];
+  if (typeof rawPattern !== "string" || rawPattern.length === 0) {
     return `${path}.pattern must be a non-empty string`;
   }
 
-  if (value.flags !== undefined && typeof value.flags !== "string") {
+  const rawFlags = value["flags"];
+  if (rawFlags !== undefined && typeof rawFlags !== "string") {
     return `${path}.flags must be a string`;
   }
+  const flags = typeof rawFlags === "string" ? rawFlags : undefined;
 
-  const error = validateRegex(value.pattern, value.flags as string | undefined);
+  const error = validateRegex(rawPattern, flags);
   if (error) {
     return `${path}.pattern is invalid: ${error}`;
   }
 
-  return {
+  const out: RegexMatch = {
     type: "regex",
-    pattern: value.pattern,
-    flags: value.flags as string | undefined,
+    pattern: rawPattern,
   };
+  if (flags !== undefined) {
+    out.flags = flags;
+  }
+  return out;
 }
 
 function normalizeMatch(value: unknown, path: string): MatchConfig | string {
@@ -147,11 +168,12 @@ function normalizeMatch(value: unknown, path: string): MatchConfig | string {
     return `${path} must be an object`;
   }
 
-  if (value.type === "executable") {
+  const type = value["type"];
+  if (type === "executable") {
     return normalizeExecutableMatch(value, path);
   }
 
-  if (value.type === "regex") {
+  if (type === "regex") {
     return normalizeRegexMatch(value, path);
   }
 
@@ -164,25 +186,29 @@ function normalizeRule(value: unknown, index: number): Rule | string {
     return `${path} must be an object`;
   }
 
-  if (value.id !== undefined && typeof value.id !== "string") {
+  const rawId = value["id"];
+  if (rawId !== undefined && typeof rawId !== "string") {
     return `${path}.id must be a string`;
   }
 
-  const match = normalizeMatch(value.match, `${path}.match`);
+  const match = normalizeMatch(value["match"], `${path}.match`);
   if (typeof match === "string") {
     return match;
   }
 
-  const action = normalizeBashAction(value.action, `${path}.action`);
+  const action = normalizeBashAction(value["action"], `${path}.action`);
   if (typeof action === "string") {
     return action;
   }
 
-  return {
-    id: value.id as string | undefined,
+  const out: Rule = {
     match,
     action,
   };
+  if (typeof rawId === "string") {
+    out.id = rawId;
+  }
+  return out;
 }
 
 function normalizeProtectedPathRule(value: unknown, index: number): ProtectedPathRule | string {
@@ -191,15 +217,17 @@ function normalizeProtectedPathRule(value: unknown, index: number): ProtectedPat
     return `${path} must be an object`;
   }
 
-  if (value.id !== undefined && typeof value.id !== "string") {
+  const rawId = value["id"];
+  if (rawId !== undefined && typeof rawId !== "string") {
     return `${path}.id must be a string`;
   }
 
-  if (typeof value.pattern !== "string" || value.pattern.trim().length === 0) {
+  const rawPattern = value["pattern"];
+  if (typeof rawPattern !== "string" || rawPattern.trim().length === 0) {
     return `${path}.pattern must be a non-empty string`;
   }
 
-  const tools = asStringArray(value.tools);
+  const tools = asStringArray(value["tools"]);
   if (tools === null || tools.length === 0) {
     return `${path}.tools must be a non-empty array of strings`;
   }
@@ -210,17 +238,20 @@ function normalizeProtectedPathRule(value: unknown, index: number): ProtectedPat
     }
   }
 
-  const action = normalizeBlockAction(value.action, `${path}.action`);
+  const action = normalizeBlockAction(value["action"], `${path}.action`);
   if (typeof action === "string") {
     return action;
   }
 
-  return {
-    id: value.id as string | undefined,
-    pattern: value.pattern.trim(),
+  const out: ProtectedPathRule = {
+    pattern: rawPattern.trim(),
     tools: tools as Array<"read" | "write" | "edit">,
     action,
   };
+  if (typeof rawId === "string") {
+    out.id = rawId;
+  }
+  return out;
 }
 
 function normalizeConfig(value: unknown): GuardrailsConfig | string {
@@ -228,16 +259,17 @@ function normalizeConfig(value: unknown): GuardrailsConfig | string {
     return "config root must be an object";
   }
 
-  if (value.version !== undefined && value.version !== 1) {
+  const version = value["version"];
+  if (version !== undefined && version !== 1) {
     return "version must be 1";
   }
 
-  const agentBash = value.agentBash === undefined ? {} : value.agentBash;
-  if (!isObject(agentBash)) {
+  const agentBashRaw = value["agentBash"] === undefined ? {} : value["agentBash"];
+  if (!isObject(agentBashRaw)) {
     return "agentBash must be an object";
   }
 
-  const bashRulesValue = agentBash.rules === undefined ? [] : agentBash.rules;
+  const bashRulesValue = agentBashRaw["rules"] === undefined ? [] : agentBashRaw["rules"];
   if (!Array.isArray(bashRulesValue)) {
     return "agentBash.rules must be an array";
   }
@@ -251,12 +283,12 @@ function normalizeConfig(value: unknown): GuardrailsConfig | string {
     bashRules.push(normalized);
   }
 
-  const protectedPaths = value.protectedPaths === undefined ? {} : value.protectedPaths;
-  if (!isObject(protectedPaths)) {
+  const protectedPathsRaw = value["protectedPaths"] === undefined ? {} : value["protectedPaths"];
+  if (!isObject(protectedPathsRaw)) {
     return "protectedPaths must be an object";
   }
 
-  const protectedPathRulesValue = protectedPaths.rules === undefined ? [] : protectedPaths.rules;
+  const protectedPathRulesValue = protectedPathsRaw["rules"] === undefined ? [] : protectedPathsRaw["rules"];
   if (!Array.isArray(protectedPathRulesValue)) {
     return "protectedPaths.rules must be an array";
   }

@@ -29,6 +29,10 @@ export function splitShellSegments(command: string): string[] {
 
   for (let i = 0; i < command.length; i += 1) {
     const ch = command[i];
+    if (ch === undefined) {
+      continue;
+    }
+
     const next = command[i + 1];
 
     if (escaped) {
@@ -102,6 +106,9 @@ export function tokenizeCommand(segment: string): string[] {
 
   for (let i = 0; i < segment.length; i += 1) {
     const ch = segment[i];
+    if (ch === undefined) {
+      continue;
+    }
 
     if (escaped) {
       current += ch;

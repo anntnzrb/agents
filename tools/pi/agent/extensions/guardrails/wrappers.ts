@@ -46,16 +46,32 @@ export interface UnwrappedCommand {
   nestedCommands?: string[];
 }
 
+function tokenAt(tokens: string[], index: number): string | null {
+  if (index < 0 || index >= tokens.length) {
+    return null;
+  }
+  return tokens[index] ?? null;
+}
+
 export function firstExecutableIndex(tokens: string[]): number {
   let index = 0;
-  while (index < tokens.length && isAssignmentToken(tokens[index])) {
+  while (index < tokens.length) {
+    const token = tokenAt(tokens, index);
+    if (!token || !isAssignmentToken(token)) {
+      break;
+    }
     index += 1;
   }
   return index;
 }
 
 export function unwrapCommand(tokens: string[], index: number): UnwrappedCommand {
-  const executable = executableBasename(tokens[index]).toLowerCase();
+  const executableToken = tokenAt(tokens, index);
+  if (!executableToken) {
+    return {};
+  }
+
+  const executable = executableBasename(executableToken).toLowerCase();
 
   if (executable === "env") {
     return unwrapEnv(tokens, index);
@@ -93,12 +109,20 @@ export function unwrapCommand(tokens: string[], index: number): UnwrappedCommand
 }
 
 function unwrapPassthrough(tokens: string[], index: number): UnwrappedCommand {
-  const executable = executableBasename(tokens[index]);
+  const executableToken = tokenAt(tokens, index);
+  if (!executableToken) {
+    return {};
+  }
+
+  const executable = executableBasename(executableToken);
   let i = index + 1;
 
   if (executable === "exec") {
     while (i < tokens.length) {
-      const token = tokens[i];
+      const token = tokenAt(tokens, i);
+      if (!token) {
+        break;
+      }
       if (token === "--") {
         i += 1;
         break;
@@ -117,7 +141,10 @@ function unwrapPassthrough(tokens: string[], index: number): UnwrappedCommand {
 
   if (executable === "command") {
     while (i < tokens.length) {
-      const token = tokens[i];
+      const token = tokenAt(tokens, i);
+      if (!token) {
+        break;
+      }
       if (token === "--") {
         i += 1;
         break;
@@ -134,7 +161,10 @@ function unwrapPassthrough(tokens: string[], index: number): UnwrappedCommand {
   }
 
   while (i < tokens.length) {
-    const token = tokens[i];
+    const token = tokenAt(tokens, i);
+    if (!token) {
+      break;
+    }
     if (token === "--") {
       i += 1;
       break;
@@ -152,14 +182,19 @@ function unwrapEnv(tokens: string[], index: number): UnwrappedCommand {
   let i = index + 1;
 
   while (i < tokens.length) {
-    const token = tokens[i];
+    const token = tokenAt(tokens, i);
+    if (!token) {
+      break;
+    }
+
     if (token === "--") {
       i += 1;
       break;
     }
 
     if (token === "-S" || token === "--split-string") {
-      return { nestedCommands: tokens[i + 1] ? [tokens[i + 1]] : [] };
+      const split = tokenAt(tokens, i + 1);
+      return { nestedCommands: split ? [split] : [] };
     }
 
     if (token === "-u" || token === "-C" || token === "--unset" || token === "--chdir" || token === "--argv0") {
@@ -191,13 +226,14 @@ function unwrapEnv(tokens: string[], index: number): UnwrappedCommand {
 function unwrapNice(tokens: string[], index: number): UnwrappedCommand {
   let i = index + 1;
 
-  if (tokens[i] === "--") {
+  if (tokenAt(tokens, i) === "--") {
     return { remainderTokens: tokens.slice(i + 1) };
   }
 
-  if (tokens[i] === "-n" || tokens[i] === "--adjustment") {
+  const firstArg = tokenAt(tokens, i);
+  if (firstArg === "-n" || firstArg === "--adjustment") {
     i += 2;
-  } else if (tokens[i] && /^[+-]?\d+$/.test(tokens[i])) {
+  } else if (firstArg && /^[+-]?\d+$/.test(firstArg)) {
     i += 1;
   }
 
@@ -208,7 +244,10 @@ function unwrapStdbuf(tokens: string[], index: number): UnwrappedCommand {
   let i = index + 1;
 
   while (i < tokens.length) {
-    const token = tokens[i];
+    const token = tokenAt(tokens, i);
+    if (!token) {
+      break;
+    }
     if (token === "--") {
       i += 1;
       break;
@@ -226,7 +265,10 @@ function unwrapSudo(tokens: string[], index: number): UnwrappedCommand {
   let i = index + 1;
 
   while (i < tokens.length) {
-    const token = tokens[i];
+    const token = tokenAt(tokens, i);
+    if (!token) {
+      break;
+    }
     if (token === "--") {
       i += 1;
       break;
@@ -252,7 +294,10 @@ function unwrapTime(tokens: string[], index: number): UnwrappedCommand {
   let i = index + 1;
 
   while (i < tokens.length) {
-    const token = tokens[i];
+    const token = tokenAt(tokens, i);
+    if (!token) {
+      break;
+    }
     if (token === "--") {
       i += 1;
       break;
@@ -270,7 +315,10 @@ function unwrapTimeout(tokens: string[], index: number): UnwrappedCommand {
   let i = index + 1;
 
   while (i < tokens.length) {
-    const token = tokens[i];
+    const token = tokenAt(tokens, i);
+    if (!token) {
+      break;
+    }
     if (token === "--") {
       i += 1;
       break;
@@ -300,7 +348,11 @@ function unwrapShell(tokens: string[], index: number): UnwrappedCommand {
   const args = tokens.slice(index + 1);
 
   for (let i = 0; i < args.length; i += 1) {
-    const token = args[i];
+    const token = tokenAt(args, i);
+    if (!token) {
+      break;
+    }
+
     const normalized = token.toLowerCase();
 
     if (token === "--") {
@@ -312,7 +364,8 @@ function unwrapShell(tokens: string[], index: number): UnwrappedCommand {
       /^-[A-Za-z]*c[A-Za-z]*$/i.test(token) ||
       normalized === "-command"
     ) {
-      return { nestedCommands: args[i + 1] ? [args[i + 1]] : [] };
+      const nested = tokenAt(args, i + 1);
+      return { nestedCommands: nested ? [nested] : [] };
     }
 
     if (!token.startsWith("-")) {

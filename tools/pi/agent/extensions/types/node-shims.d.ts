@@ -1,3 +1,7 @@
+declare interface ImportMeta {
+	url: string;
+}
+
 declare type AbortSignal = {
 	aborted?: boolean;
 	addEventListener: (event: "abort", handler: () => void, options?: { once?: boolean }) => void;
@@ -13,6 +17,12 @@ declare const process: {
 	env: Record<string, string | undefined>;
 	cwd: () => string;
 	execPath: string;
+};
+
+declare const console: {
+	log: (...args: unknown[]) => void;
+	error: (...args: unknown[]) => void;
+	warn: (...args: unknown[]) => void;
 };
 
 declare const Buffer: {
@@ -39,7 +49,10 @@ declare module "node:crypto" {
 
 declare module "node:fs" {
 	export const promises: {
-		readFile: (path: string, encoding: string) => Promise<string>;
+		readFile: {
+			(path: string): Promise<{ toString: (encoding?: string) => string; byteLength: number }>;
+			(path: string, encoding: string): Promise<string>;
+		};
 		stat: (path: string) => Promise<{ isDirectory: () => boolean }>;
 	};
 	export function statSync(path: string): { mtimeMs: number; size: number };
@@ -49,8 +62,19 @@ declare module "node:fs" {
 	export function mkdtempSync(prefix: string): string;
 }
 
+declare module "node:fs/promises" {
+	const fsPromises: {
+		readFile: {
+			(path: string): Promise<{ toString: (encoding?: string) => string; byteLength: number }>;
+			(path: string, encoding: string): Promise<string>;
+		};
+	};
+	export default fsPromises;
+}
+
 declare module "node:path" {
 	const path: {
+		sep: string;
 		resolve: (...parts: string[]) => string;
 		relative: (from: string, to: string) => string;
 		basename: (value: string) => string;
@@ -74,6 +98,7 @@ declare module "node:url" {
 
 declare module "node:os" {
 	export function tmpdir(): string;
+	export function homedir(): string;
 }
 
 declare module "node:perf_hooks" {

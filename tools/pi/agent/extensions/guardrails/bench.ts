@@ -82,7 +82,7 @@ const corpus = [
 const start = performance.now();
 let warned = 0;
 for (let i = 0; i < ITERATIONS; i += 1) {
-	const command = corpus[i % corpus.length];
+	const command = corpus[i % corpus.length] ?? corpus[0] ?? "";
 	const action = actionForCommand(command, config);
 	if (action?.type === "warn") warned += 1;
 }

@@ -24,23 +24,51 @@ declare module "@mariozechner/pi-coding-agent" {
 		isPartial?: boolean;
 	};
 
+	export type SessionEntry = {
+		type?: string;
+		customType?: string;
+		data?: unknown;
+		message?: {
+			role?: string;
+			usage?: {
+				inputTokens?: number;
+				outputTokens?: number;
+				cacheRead?: number;
+				cacheWrite?: number;
+				cost?: number | { total?: number | string } | string;
+			};
+		};
+	};
+
+	export type SessionManagerLike = {
+		getEntries: () => SessionEntry[];
+		getLeafId: () => string | null;
+		getSessionId: () => string | null;
+	};
+
+	export type ContextUsage = {
+		tokens: number;
+		contextWindow: number;
+	};
+
 	export type ExtensionContext = {
 		cwd: string;
 		hasUI: boolean;
 		model?: unknown;
-		sessionManager: {
-			getEntries: () => unknown[];
-			getLeafId: () => string | null;
-		};
+		sessionManager: SessionManagerLike;
 		ui: {
 			notify: (message: string, level?: string) => void;
 			setFooter: (factory: (...args: any[]) => any) => void;
+			custom: <T>(factory: (...args: any[]) => T | Promise<T>) => Promise<T>;
 		};
-		getContextUsage: () => unknown;
+		getContextUsage: () => ContextUsage | null;
+		getSystemPrompt: () => string | null;
 	};
 
 	export type ToolResultEvent = {
-		input: any;
+		toolName?: string;
+		isError?: boolean;
+		input?: unknown;
 	};
 
 	export type ExtensionCommandContext = ExtensionContext;
@@ -56,12 +84,31 @@ declare module "@mariozechner/pi-coding-agent" {
 		execute?: (toolCallId: string, input: any, signal: AbortSignal, onUpdate: unknown, ctx: ExtensionContext) => Promise<any> | any;
 	};
 
+	export type CommandSourceInfo = {
+		source?: string;
+		path?: string;
+	};
+
+	export type RegisteredCommand = {
+		name: string;
+		sourceInfo?: CommandSourceInfo;
+	};
+
+	export type ToolInfo = {
+		name: string;
+		description?: string;
+	};
+
 	export type ExtensionAPI = {
 		on: (event: string, handler: (event: any, ctx: ExtensionContext) => any) => void;
 		registerTool: (tool: RegisteredTool) => void;
-		registerCommand?: (name: string, command: any) => void;
+		registerCommand: (name: string, command: any) => void;
 		getActiveTools: () => string[];
 		setActiveTools: (tools: string[]) => void;
+		getAllTools: () => ToolInfo[];
+		getCommands: () => RegisteredCommand[];
+		appendEntry: <T>(customType: string, data: T) => void;
+		sendMessage: (message: { customType: string; content: string; display?: boolean }, options?: { triggerTurn?: boolean }) => void;
 		getThinkingLevel: () => string;
 	};
 
@@ -101,6 +148,9 @@ declare module "@mariozechner/pi-tui" {
 
 	export class Container {
 		constructor(...args: any[]);
+		addChild(child: any): void;
+		invalidate(): void;
+		render(width: number): string[];
 	}
 
 	export class Markdown {
