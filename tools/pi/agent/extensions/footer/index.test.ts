@@ -1,6 +1,12 @@
 import { describe, expect, mock, test } from "bun:test";
 
 mock.module("@mariozechner/pi-tui", () => ({
+	Text: class {
+		text = "";
+		setText(value: string) {
+			this.text = value;
+		}
+	},
 	truncateToWidth: (value: string, width: number) => value.slice(0, width),
 	visibleWidth: (value: string) => value.length,
 }));

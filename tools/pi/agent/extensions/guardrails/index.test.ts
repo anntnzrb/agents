@@ -4,7 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 mock.module("@mariozechner/pi-coding-agent", () => ({
+	DEFAULT_MAX_BYTES: 50 * 1024,
+	DEFAULT_MAX_LINES: 2000,
+	formatSize: (bytes: number) => `${bytes}B`,
+	keyHint: (_action: string, hint: string) => hint,
+	truncateHead: (content: string) => ({ content, truncated: false }),
 	isToolCallEventType: () => false,
+	createReadToolDefinition: () => ({ name: "read" }),
+	createWriteToolDefinition: () => ({ name: "write" }),
 }));
 
 const { __test } = await import("./index.js");

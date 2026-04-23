@@ -4,8 +4,13 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 mock.module("@mariozechner/pi-coding-agent", () => ({
+	DEFAULT_MAX_BYTES: 50 * 1024,
+	DEFAULT_MAX_LINES: 2000,
 	formatSize: (bytes: number) => `${bytes}B`,
 	keyHint: (_action: string, hint: string) => hint,
+	truncateHead: (content: string) => ({ content, truncated: false }),
+	isToolCallEventType: () => false,
+	createReadToolDefinition: () => ({ name: "read" }),
 	createWriteToolDefinition: () => ({
 		name: "write",
 		renderCall: () => new MockText(),
@@ -21,6 +26,8 @@ class MockText {
 
 mock.module("@mariozechner/pi-tui", () => ({
 	Text: MockText,
+	truncateToWidth: (value: string, width: number) => value.slice(0, width),
+	visibleWidth: (value: string) => value.length,
 }));
 
 const { __test, default: writeExtension } = await import("./index.js");

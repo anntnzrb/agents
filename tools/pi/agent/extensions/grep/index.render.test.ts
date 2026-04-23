@@ -2,15 +2,21 @@ import { describe, expect, mock, test } from "bun:test";
 
 mock.module("@mariozechner/pi-coding-agent", () => ({
 	DEFAULT_MAX_BYTES: 50 * 1024,
+	DEFAULT_MAX_LINES: 2000,
 	formatSize: (bytes: number) => `${Math.round(bytes / 1024)}KB`,
 	keyHint: (_action: string, hint: string) => hint,
 	truncateHead: (content: string) => ({ content, truncated: false }),
+	isToolCallEventType: () => false,
+	createReadToolDefinition: () => ({ name: "read" }),
+	createWriteToolDefinition: () => ({ name: "write" }),
 }));
 
 mock.module("@mariozechner/pi-tui", () => ({
 	Text: class {
 		setText() {}
 	},
+	truncateToWidth: (value: string, width: number) => value.slice(0, width),
+	visibleWidth: (value: string) => value.length,
 }));
 
 mock.module("@sinclair/typebox", () => ({
