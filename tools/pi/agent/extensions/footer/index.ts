@@ -262,6 +262,19 @@ const buildHealthBadges = (
 	return badges;
 };
 
+const isInsideGitWorkTree = (cwd: string): boolean => {
+	try {
+		const output = execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
+			cwd,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "ignore"],
+		});
+		return output.trim() === "true";
+	} catch {
+		return false;
+	}
+};
+
 const readGitStatus = (cwd: string): GitStatus => {
 	try {
 		const output = execFileSync("git", ["status", "--porcelain"], {
@@ -280,22 +293,27 @@ const createGitStatusTracker = (
 	onChange: () => void,
 	unsubscribeBranch: () => void,
 ): GitStatusTracker => {
-	let status = readGitStatus(cwd);
+	const isGitRepo = isInsideGitWorkTree(cwd);
+	let status = isGitRepo ? readGitStatus(cwd) : { isDirty: false };
 	const refresh = () => {
+		if (!isGitRepo) return;
 		const nextStatus = readGitStatus(cwd);
 		if (nextStatus.isDirty === status.isDirty) return;
 		status = nextStatus;
 		onChange();
 	};
-	const interval = setInterval(refresh, DIRTY_POLL_MS);
+	const interval = isGitRepo ? setInterval(refresh, DIRTY_POLL_MS) : undefined;
 	return {
 		getStatus: () => status,
 		refresh() {
+			if (!isGitRepo) return;
 			status = readGitStatus(cwd);
 			onChange();
 		},
 		dispose() {
-			clearInterval(interval);
+			if (interval !== undefined) {
+				clearInterval(interval);
+			}
 			unsubscribeBranch();
 		},
 	};
