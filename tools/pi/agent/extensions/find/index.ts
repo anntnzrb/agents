@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { DEFAULT_MAX_BYTES, formatSize, truncateHead } from "@mariozechner/pi-coding-agent";
+import { DEFAULT_MAX_BYTES, formatSize, keyHint, truncateHead } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { buildFdArgs, normalizeLimit, normalizeSearchRoots, normalizeTimeout } from "./logic.js";
@@ -63,6 +63,41 @@ const formatFindCall = (
 
 const toolMissingMessage = (binary: string): string =>
 	`'${binary}' is not available in PATH. Install ${binary} and ensure it is available in PATH.`;
+
+type FindRenderDetails = {
+	resultLimitReached?: number;
+	truncation?: { truncated?: boolean };
+};
+
+const getResultText = (content: readonly { type: string; text?: string }[]): string => {
+	for (const part of content) {
+		if (part.type === "text") return part.text ?? "";
+	}
+	return "";
+};
+
+const getCollapsedSummary = (
+	rawText: string,
+	details: FindRenderDetails,
+	theme: { fg: (token: string, text: string) => string },
+): string => {
+	if (rawText === "No files found matching pattern") return rawText;
+	const noticeIndex = rawText.indexOf("\n\n[");
+	const filesBlock = noticeIndex >= 0 ? rawText.slice(0, noticeIndex) : rawText;
+	const files = filesBlock
+		.split("\n")
+		.map((line) => line.trim())
+		.filter(Boolean);
+	if (files.length === 0) return rawText || "(no output)";
+
+	const lines: string[] = [theme.fg("toolOutput", `${files.length} ${files.length === 1 ? "file" : "files"}`)];
+	const notices: string[] = [];
+	if (details.truncation?.truncated) notices.push(`${formatSize(DEFAULT_MAX_BYTES)} output limit`);
+	if (notices.length > 0) lines.push(theme.fg("warning", notices.join(" · ")));
+	lines.push(theme.fg("dim", `(${keyHint("app.tools.expand", "to expand")})`));
+	return lines.join("\n");
+};
+
 const runFd = async (params: {
 	pattern: string;
 	rootAbsolute: string;
@@ -164,6 +199,17 @@ export default function findExtension(pi: ExtensionAPI) {
 		renderCall(args, theme, context) {
 			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
 			text.setText(formatFindCall(args as FindInput, theme));
+			return text;
+		},
+		renderResult(result, options, theme, context) {
+			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
+			const rawText = getResultText(result.content as Array<{ type: string; text?: string }>) || "(no output)";
+			if (context.isError || options.expanded || options.isPartial) {
+				text.setText(rawText);
+				return text;
+			}
+			const summary = getCollapsedSummary(rawText, (result.details ?? {}) as FindRenderDetails, theme);
+			text.setText(summary);
 			return text;
 		},
 		async execute(_toolCallId, input: FindInput, signal, _onUpdate, ctx) {

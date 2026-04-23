@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { DEFAULT_MAX_BYTES, formatSize, truncateHead } from "@mariozechner/pi-coding-agent";
+import { DEFAULT_MAX_BYTES, formatSize, keyHint, truncateHead } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import {
@@ -301,6 +301,67 @@ const formatMatches = async (matches: RawMatch[], contextLines: number): Promise
 	return { output: outputLines.join("\n"), linesTruncated };
 };
 
+type GrepRenderDetails = {
+	matchLimitReached?: number;
+	truncation?: ReturnType<typeof truncateHead>;
+	linesTruncated?: boolean;
+};
+
+const stripNoticeSuffix = (text: string): string => text.replace(/\n\n\[[^\n]+\]$/, "");
+
+const pluralize = (count: number, singular: string, plural: string): string =>
+	count === 1 ? singular : plural;
+
+const summarizeOutput = (output: string): { matchCount: number; fileCount: number; lineCount: number } => {
+	let matchCount = 0;
+	const files = new Set<string>();
+	const lines = output.split("\n").filter((line) => line.trim().length > 0);
+	for (const line of lines) {
+		const match = /^(.*):(\d+): /.exec(line);
+		if (!match) continue;
+		matchCount += 1;
+		const filePath = match[1];
+		if (filePath) files.add(filePath);
+	}
+	return { matchCount, fileCount: files.size, lineCount: lines.length };
+};
+
+const buildCollapsedResultText = (
+	rawText: string,
+	details: GrepRenderDetails | undefined,
+	theme: { fg: (token: string, text: string) => string },
+): string => {
+	const body = stripNoticeSuffix(rawText).trim();
+	if (body.length === 0) return theme.fg("dim", "(no output)");
+	if (body === "No matches found") return theme.fg("dim", body);
+
+	const { matchCount, fileCount, lineCount } = summarizeOutput(body);
+	const lines: string[] = [];
+	if (matchCount > 0) {
+		lines.push(
+			theme.fg(
+				"toolOutput",
+				`${matchCount} ${pluralize(matchCount, "match", "matches")} · ${fileCount} ${pluralize(fileCount, "file", "files")}`,
+			),
+		);
+	} else {
+		lines.push(theme.fg("toolOutput", `${lineCount} ${pluralize(lineCount, "line", "lines")} of output`));
+	}
+
+	const notices: string[] = [];
+	if (details?.truncation?.truncated) {
+		notices.push(`${formatSize(DEFAULT_MAX_BYTES)} output limit`);
+	}
+	if (details?.linesTruncated) {
+		notices.push(`line max ${GREP_MAX_LINE_LENGTH}`);
+	}
+	if (notices.length > 0) {
+		lines.push(theme.fg("warning", notices.join(" · ")));
+	}
+	lines.push(theme.fg("dim", `(${keyHint("app.tools.expand", "to expand")})`));
+	return lines.join("\n");
+};
+
 export default function grepExtension(pi: ExtensionAPI) {
 	const activate = () => ensureToolActive(pi, "grep");
 	pi.on("session_start", activate);
@@ -316,6 +377,23 @@ export default function grepExtension(pi: ExtensionAPI) {
 		renderCall(args, theme, context) {
 			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
 			text.setText(formatGrepCall(args, theme));
+			return text;
+		},
+		renderResult(result, options, theme, context) {
+			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
+			const firstTextBlock = result.content.find((block) => block.type === "text");
+			const rawText = firstTextBlock?.type === "text" ? (firstTextBlock.text ?? "") : "";
+
+			if (context.isError) {
+				text.setText(theme.fg("error", rawText.length > 0 ? rawText : "grep failed"));
+				return text;
+			}
+			if (options.isPartial || options.expanded) {
+				text.setText(rawText.length > 0 ? rawText : "(no output)");
+				return text;
+			}
+
+			text.setText(buildCollapsedResultText(rawText, result.details as GrepRenderDetails | undefined, theme));
 			return text;
 		},
 		async execute(_toolCallId, input: GrepInput, signal, _onUpdate, ctx) {
