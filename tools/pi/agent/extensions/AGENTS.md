@@ -6,6 +6,12 @@ Prefer functional over imperative, and stateless over stateful where practical.
 - Minimize mutable module state; isolate unavoidable state in small scopes (UI components, caches)
 - Keep side effects at the edges (I/O, UI, model calls)
 
+## Skills for extension work
+
+- Load `/skill:typescript` for TypeScript extension changes and validation.
+- Load `/skill:effect` when touching Effect-based code or when validating Effect patterns.
+- If neither applies, skip them.
+
 ## QA
 
 Full gate for extensions (run from the specific extension dir):
@@ -16,3 +22,11 @@ Full gate for extensions (run from the specific extension dir):
 - All extensions must include AGENTS.md with description + navigation
 
 NOTE: Fallback to npm (`npx`) if `bun` is unavailable.
+
+## Native Pi tool override philosophy
+
+When modifying or overriding built-in Pi tools (`read`, `write`, `edit`, `grep`, `find`, etc.), use a conservative approach:
+- Prefer thin wrappers and UI-only overrides over reimplementing tool execution.
+- Minimize behavioral drift from native defaults unless explicitly required.
+- Keep change-surface small, reversible, and easy to diff.
+- Treat this as guidance, not a hard cap; break it only with clear justification.
