@@ -1,0 +1,5 @@
+{
+  "name": "@agents/pi-extensions",
+  "private": true,
+  "type": "module"
+}

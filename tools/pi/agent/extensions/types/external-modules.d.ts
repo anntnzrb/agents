@@ -1,0 +1,132 @@
+declare module "@mariozechner/pi-coding-agent" {
+	export type ThemeColor = string;
+	export type Theme = {
+		fg: (token: string, text: string) => string;
+		bold: (text: string) => string;
+	};
+
+	export type ToolRenderCallContext = {
+		lastComponent?: unknown;
+		expanded?: boolean;
+		executionStarted?: boolean;
+		cwd: string;
+		state: Record<string, unknown>;
+	};
+
+	export type ToolRenderResultContext = {
+		lastComponent?: unknown;
+		showImages?: boolean;
+		isError?: boolean;
+	};
+
+	export type ToolRenderResultOptions = {
+		expanded?: boolean;
+		isPartial?: boolean;
+	};
+
+	export type ExtensionContext = {
+		cwd: string;
+		hasUI: boolean;
+		model?: unknown;
+		sessionManager: {
+			getEntries: () => unknown[];
+			getLeafId: () => string | null;
+		};
+		ui: {
+			notify: (message: string, level?: string) => void;
+			setFooter: (factory: (...args: any[]) => any) => void;
+		};
+		getContextUsage: () => unknown;
+	};
+
+	export type ToolResultEvent = {
+		input: any;
+	};
+
+	export type ExtensionCommandContext = ExtensionContext;
+
+	export type RegisteredTool = {
+		name: string;
+		label?: string;
+		description?: string;
+		promptSnippet?: string;
+		parameters?: unknown;
+		renderCall?: (args: any, theme: Theme, context: ToolRenderCallContext) => any;
+		renderResult?: (result: any, options: ToolRenderResultOptions, theme: Theme, context: ToolRenderResultContext) => any;
+		execute?: (toolCallId: string, input: any, signal: AbortSignal, onUpdate: unknown, ctx: ExtensionContext) => Promise<any> | any;
+	};
+
+	export type ExtensionAPI = {
+		on: (event: string, handler: (event: any, ctx: ExtensionContext) => any) => void;
+		registerTool: (tool: RegisteredTool) => void;
+		registerCommand?: (name: string, command: any) => void;
+		getActiveTools: () => string[];
+		setActiveTools: (tools: string[]) => void;
+		getThinkingLevel: () => string;
+	};
+
+	export type TruncationResult = {
+		content: string;
+		truncated?: boolean;
+		truncatedBy?: "lines" | "bytes" | null;
+		totalLines: number;
+		totalBytes: number;
+		outputLines?: number;
+		outputBytes?: number;
+		lastLinePartial?: boolean;
+		firstLineExceedsLimit?: boolean;
+		maxLines?: number;
+		maxBytes?: number;
+	};
+
+	export const DEFAULT_MAX_BYTES: number;
+	export const DEFAULT_MAX_LINES: number;
+	export function formatSize(bytes: number): string;
+	export function keyHint(action: string, fallbackText: string): string;
+	export function truncateHead(content: string, options?: { maxLines?: number; maxBytes?: number }): TruncationResult;
+	export function isToolCallEventType<TName extends string = string, TInput = any>(
+		name: TName,
+		event: any,
+	): event is { type: "tool_call"; toolName: TName; input: TInput };
+	export function createReadToolDefinition(cwd: string): RegisteredTool;
+	export function createWriteToolDefinition(cwd: string): RegisteredTool;
+	export const DynamicBorder: any;
+}
+
+declare module "@mariozechner/pi-tui" {
+	export class Text {
+		constructor(text: string, width?: number, height?: number);
+		setText(text: string): void;
+	}
+
+	export class Container {
+		constructor(...args: any[]);
+	}
+
+	export class Markdown {
+		constructor(...args: any[]);
+	}
+
+	export class Spacer {
+		constructor(...args: any[]);
+	}
+
+	export const Key: any;
+	export type Component = any;
+	export type TUI = any;
+	export function matchesKey(...args: any[]): boolean;
+	export function truncateToWidth(text: string, width: number, ellipsis?: any, pad?: boolean): string;
+	export function visibleWidth(text: string): number;
+}
+
+declare module "@sinclair/typebox" {
+	export type Static<T> = any;
+	export const Type: {
+		String: (options?: unknown) => unknown;
+		Number: (options?: unknown) => unknown;
+		Boolean: (options?: unknown) => unknown;
+		Array: (item: unknown, options?: unknown) => unknown;
+		Object: (properties: Record<string, unknown>, options?: unknown) => unknown;
+		Optional: (schema: unknown) => unknown;
+	};
+}
