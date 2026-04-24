@@ -14,6 +14,11 @@ type HintDefinition = {
 	fallbackSignature: string;
 };
 
+type BlockHintDefinition = {
+	messagePattern: RegExp;
+	hint: string;
+};
+
 const HINT_DEFINITIONS = {
 	grep: {
 		nativeTool: "grep",
@@ -36,6 +41,14 @@ const HINT_DEFINITIONS = {
 
 const HINT_DEFINITION_LIST = Object.values(HINT_DEFINITIONS);
 
+const BLOCK_HINT_DEFINITIONS: readonly BlockHintDefinition[] = [
+	{
+		messagePattern: /python|pip|poetry|package tooling|py_compile|venv/i,
+		hint:
+			"Guardrail: direct Python tooling disabled. Load `/skill:python`; use repo Python workflow/uv (`uv run`, `uv add`, `uv run --with`) instead of raw python/pip/env commands.",
+	},
+];
+
 const extractObjectPropertyNames = (schema: unknown): string[] => {
 	if (!schema || typeof schema !== "object") return [];
 	const properties = (schema as { properties?: unknown }).properties;
@@ -44,6 +57,9 @@ const extractObjectPropertyNames = (schema: unknown): string[] => {
 };
 
 const definitionForMessage = (message: string): HintDefinition | undefined => HINT_DEFINITION_LIST.find((definition) => definition.messagePattern.test(message));
+
+const blockDefinitionForMessage = (message: string): BlockHintDefinition | undefined =>
+	BLOCK_HINT_DEFINITIONS.find((definition) => definition.messagePattern.test(message));
 
 export const formatToolSignature = (toolName: GuardedNativeTool, tools: readonly ToolLike[] = []): string => {
 	const definition = HINT_DEFINITIONS[toolName];
@@ -62,3 +78,5 @@ export const agentHintForWarning = (message: string, tools: readonly ToolLike[] 
 	const definition = definitionForMessage(message);
 	return definition ? formatWarningHint(definition, tools) : message;
 };
+
+export const agentHintForBlock = (message: string): string => blockDefinitionForMessage(message)?.hint ?? message;

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { loadConfig } from "./config.js";
-import { agentHintForWarning, formatToolSignature } from "./hints.js";
+import { agentHintForBlock, agentHintForWarning, formatToolSignature } from "./hints.js";
 import { __test, actionForCommand, reasonForCommand } from "./matcher.js";
 import { reasonForPath } from "./paths.js";
 import type { GuardrailsConfig } from "./types.js";
@@ -18,8 +18,35 @@ const pythonConfig: GuardrailsConfig = {
         id: "no-python",
         match: {
           type: "executable",
-          names: ["python", "python3"],
-          patterns: ["^python3(?:\\.\\d+)+$"],
+          caseSensitive: false,
+          names: ["python", "python2", "python3", "pythonw", "pythonw2", "pythonw3", "py", "pypy", "pypy3"],
+          patterns: ["^pythonw?(?:[23])?(?:\\.\\d+)*(?:\\.exe)?$", "^py(?:\\.exe)?$", "^pypy(?:3)?(?:\\.exe)?$"],
+        },
+        action: {
+          type: "block",
+          message: "use uv",
+        },
+      },
+      {
+        id: "no-pip",
+        match: {
+          type: "executable",
+          caseSensitive: false,
+          names: ["pip", "pip2", "pip3", "pipx"],
+          patterns: ["^pip(?:[23])?(?:\\.\\d+)*(?:\\.exe)?$", "^pipx(?:\\.exe)?$"],
+        },
+        action: {
+          type: "block",
+          message: "use uv",
+        },
+      },
+      {
+        id: "no-python-env-tools",
+        match: {
+          type: "executable",
+          caseSensitive: false,
+          names: ["conda", "hatch", "mamba", "pdm", "pipenv", "poetry", "rye", "virtualenv"],
+          patterns: ["^(?:conda|hatch|mamba|pdm|pipenv|poetry|rye|virtualenv)(?:\\.exe)?$"],
         },
         action: {
           type: "block",
@@ -227,12 +254,28 @@ test("blocks direct python invocation", () => {
   assert.equal(reasonForCommand("python script.py", pythonConfig), "use uv");
 });
 
-test("blocks versioned python executable", () => {
+test("blocks versioned and alternate python executables", () => {
   assert.equal(reasonForCommand('.venv/bin/python3.12 -c "print(1)"', pythonConfig), "use uv");
+  assert.equal(reasonForCommand('python3.12.exe -c "print(1)"', pythonConfig), "use uv");
+  assert.equal(reasonForCommand('pythonw.exe script.py', pythonConfig), "use uv");
+  assert.equal(reasonForCommand('py -3 script.py', pythonConfig), "use uv");
+  assert.equal(reasonForCommand('py.exe -3.12 script.py', pythonConfig), "use uv");
+  assert.equal(reasonForCommand('pypy3 -c "print(1)"', pythonConfig), "use uv");
+});
+
+ test("blocks python packaging and environment tools", () => {
+  assert.equal(reasonForCommand("pip3.12 install rich", pythonConfig), "use uv");
+  assert.equal(reasonForCommand("pip.exe install rich", pythonConfig), "use uv");
+  assert.equal(reasonForCommand("pipx run black .", pythonConfig), "use uv");
+  assert.equal(reasonForCommand("poetry install", pythonConfig), "use uv");
+  assert.equal(reasonForCommand("pipenv run pytest", pythonConfig), "use uv");
+  assert.equal(reasonForCommand("virtualenv .venv", pythonConfig), "use uv");
+  assert.equal(reasonForCommand("conda env list", pythonConfig), "use uv");
 });
 
 test("blocks env wrapped python invocation", () => {
   assert.equal(reasonForCommand("/usr/bin/env PYTHONPATH=. python script.py", pythonConfig), "use uv");
+  assert.equal(reasonForCommand("/usr/bin/env -S py -3 script.py", pythonConfig), "use uv");
 });
 
 test("blocks sudo wrapped python invocation", () => {
@@ -307,6 +350,14 @@ test("agent warning hints name native replacements and shell executables", () =>
 test("tool signatures fall back when live schema is unavailable", () => {
   assert.match(formatToolSignature("grep", []), /outputMode/);
   assert.match(formatToolSignature("find", []), /kind/);
+});
+
+test("python block hints point to python skill and uv", () => {
+  const hint = agentHintForBlock("Python env/package tooling is disabled. Load `/skill:python`.");
+  assert.match(hint, /direct Python tooling disabled/);
+  assert.match(hint, /\/skill:python/);
+  assert.match(hint, /uv run/);
+  assert.equal(agentHintForBlock("Reading .env files is blocked by guardrails."), "Reading .env files is blocked by guardrails.");
 });
 
 test("warns for broad shell file-discovery commands", () => {

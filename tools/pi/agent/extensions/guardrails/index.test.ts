@@ -59,6 +59,7 @@ describe("guardrails config cache", () => {
 		const notifications: string[] = [];
 		const messages: Array<{ customType: string; content: string; display?: boolean }> = [];
 		const pi = {
+			getAllTools: () => [],
 			sendMessage: (message: { customType: string; content: string; display?: boolean }) => messages.push(message),
 		} as any;
 		const ctx = {
@@ -79,11 +80,7 @@ describe("guardrails config cache", () => {
 	});
 
 	test("keeps UI warnings terse while sending fuller agent hints", () => {
-		expect(__test.agentHintForWarning("Use native `grep` tool for repo search.")).toContain(
-			"grep({ pattern, path, glob, type, ignoreCase, literal, context, limit })",
-		);
-		expect(__test.agentHintForWarning("Use native `find` tool for file lookup.")).toContain(
-			"find({ pattern, path, paths, hidden, limit, timeoutMs })",
-		);
+		expect(__test.agentHintForWarning("Use native `grep` tool for repo search.")).toContain("grep({ pattern, path, paths");
+		expect(__test.agentHintForWarning("Use native `find` tool for file lookup.")).toContain("find({ pattern, path, paths");
 	});
 });

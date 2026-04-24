@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfig } from "./config.js";
-import { agentHintForWarning } from "./hints.js";
+import { agentHintForBlock, agentHintForWarning } from "./hints.js";
 import { actionForCommand } from "./matcher.js";
 import { reasonForPath } from "./paths.js";
 import type { GuardrailsConfig } from "./types.js";
@@ -65,6 +65,7 @@ export const __test = {
   getConfigSignature,
   getConfigOrBlockReason,
   resetConfigCache,
+  agentHintForBlock,
   agentHintForWarning,
   emitGuardrailWarning,
 };
@@ -86,7 +87,7 @@ export function createGuardrails(path: string) {
           emitGuardrailWarning(pi, ctx, event.toolName, action.message);
           return undefined;
         }
-        return { block: true, reason: action.message };
+        return { block: true, reason: agentHintForBlock(action.message) };
       }
 
       if (isToolCallEventType<"pwsh", { command?: string }>("pwsh", event)) {
@@ -99,7 +100,7 @@ export function createGuardrails(path: string) {
           emitGuardrailWarning(pi, ctx, event.toolName, action.message);
           return undefined;
         }
-        return { block: true, reason: action.message };
+        return { block: true, reason: agentHintForBlock(action.message) };
       }
 
       if (isToolCallEventType("read", event)) {
