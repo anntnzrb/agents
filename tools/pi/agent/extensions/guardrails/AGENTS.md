@@ -6,6 +6,7 @@ Purpose: generic, policy-driven guardrails for agent tool calls.
 - `index.ts`: pi entrypoint; loads config and blocks matching tool calls
 - `guardrails.jsonc`: policy file for shell-command rules and protected paths
 - `config.ts`: JSONC parsing and config validation; fail-closed on invalid config
+- `hints.ts`: agent-facing replacement hints for warnings; derives live tool signatures from `pi.getAllTools()` with static fallback
 - `matcher.ts`: shell rule evaluation against inspected commands/executables
 - `paths.ts`: protected-path matching for read/write/edit
 - `shell.ts`: shell segmentation and tokenization helpers

@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadConfig } from "./config.js";
+import { agentHintForWarning } from "./hints.js";
 import { actionForCommand } from "./matcher.js";
 import { reasonForPath } from "./paths.js";
 import type { GuardrailsConfig } from "./types.js";
@@ -45,16 +46,6 @@ const resetConfigCache = () => {
   emittedWarnings.clear();
 };
 
-const agentHintForWarning = (message: string): string => {
-  if (message.includes("`grep`")) {
-    return "Guardrail: use native `grep` tool instead of shell search for repository search. Tool shape: grep({ pattern, path, glob, type, ignoreCase, literal, context, limit }).";
-  }
-  if (message.includes("`find`")) {
-    return "Guardrail: use native `find` tool instead of shell discovery for repository file lookup. Tool shape: find({ pattern, path, paths, hidden, limit, timeoutMs }).";
-  }
-  return message;
-};
-
 const emitGuardrailWarning = (pi: ExtensionAPI, ctx: ExtensionContext, toolName: string, message: string) => {
   ctx.ui.notify(message, "warning");
   const key = `${toolName}:${message}`;
@@ -63,7 +54,7 @@ const emitGuardrailWarning = (pi: ExtensionAPI, ctx: ExtensionContext, toolName:
   pi.sendMessage(
     {
       customType: "guardrails-warning",
-      content: agentHintForWarning(message),
+      content: agentHintForWarning(message, pi.getAllTools()),
       display: false,
     },
     { triggerTurn: false },

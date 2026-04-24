@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { loadConfig } from "./config.js";
+import { agentHintForWarning, formatToolSignature } from "./hints.js";
 import { __test, actionForCommand, reasonForCommand } from "./matcher.js";
 import { reasonForPath } from "./paths.js";
 import type { GuardrailsConfig } from "./types.js";
@@ -259,6 +260,28 @@ test("does not warn for informational shell content-search commands", () => {
   assert.equal(reasonForCommand("rg --help", searchConfig), null);
   assert.equal(reasonForCommand("rg --version", searchConfig), null);
   assert.equal(reasonForCommand("git grep --help", searchConfig), null);
+});
+
+test("agent warning hints name native replacements and shell executables", () => {
+  const tools = [
+    { name: "grep", parameters: { properties: { pattern: {}, path: {}, outputMode: {}, timeoutMs: {} } } },
+    { name: "find", parameters: { properties: { pattern: {}, paths: {}, kind: {}, noIgnore: {} } } },
+  ];
+
+  const grepHint = agentHintForWarning("Use native `grep` tool for repo search.", tools);
+  assert.match(grepHint, /don't use shell search executables/);
+  assert.match(grepHint, /`rg`/);
+  assert.match(grepHint, /grep\(\{ pattern, path, outputMode, timeoutMs \}\)/);
+
+  const findHint = agentHintForWarning("Use native `find` tool for file lookup.", tools);
+  assert.match(findHint, /don't use shell discovery executables/);
+  assert.match(findHint, /`fd`/);
+  assert.match(findHint, /find\(\{ pattern, paths, kind, noIgnore \}\)/);
+});
+
+test("tool signatures fall back when live schema is unavailable", () => {
+  assert.match(formatToolSignature("grep", []), /outputMode/);
+  assert.match(formatToolSignature("find", []), /kind/);
 });
 
 test("warns for broad shell file-discovery commands", () => {
