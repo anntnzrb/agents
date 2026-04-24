@@ -14,8 +14,8 @@ import { Type } from "@sinclair/typebox";
 const LOOKUP_TIMEOUT_MS = 5000;
 
 const pwshSchema = Type.Object({
-	command: Type.String({ description: "PowerShell command to execute" }),
-	timeout: Type.Optional(Type.Number({ description: "Timeout in seconds (optional, no default timeout)" })),
+	command: Type.String({ description: "PowerShell command" }),
+	timeout: Type.Optional(Type.Number({ description: "Timeout seconds (optional; no default)" })),
 });
 
 const WINDOWS_PWSH_FALLBACK_PATHS = ["C:\\Program Files\\PowerShell\\7\\pwsh.exe"];
@@ -188,11 +188,11 @@ export default function pwshExtension(pi: ExtensionAPI): void {
 		name: "pwsh",
 		label: "pwsh",
 		parameters: pwshSchema,
-		description: `Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last ${DEFAULT_MAX_LINES} lines or ${Math.trunc(DEFAULT_MAX_BYTES / 1024)}KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.`,
+		description: `Execute PowerShell in current working directory. Returns stdout/stderr. Output truncated to last ${DEFAULT_MAX_LINES} lines or ${Math.trunc(DEFAULT_MAX_BYTES / 1024)}KB, whichever hits first; full truncated output saved to temp file. Optional timeout seconds.`,
 		promptSnippet: "Execute PowerShell commands (Get-ChildItem, Select-String, etc.)",
 		promptGuidelines: [
-			"Use pwsh for Windows-native shell tasks and PowerShell syntax (not bash syntax).",
-			"For quote-heavy commands, prefer here-strings or temp .ps1 scripts; use ${var} near punctuation and escaped backslash regex like '\\\\'.",
+			"Use pwsh for Windows-native shell tasks and PowerShell syntax; not bash syntax.",
+			"Quote-heavy commands: prefer here-strings or temp .ps1 scripts; use ${var} near punctuation; regex backslashes as '\\\\'.",
 		],
 		renderCall: (args, theme) => {
 			const command = typeof args.command === "string" && args.command.length > 0 ? args.command : "...";

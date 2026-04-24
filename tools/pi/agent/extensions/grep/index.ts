@@ -27,24 +27,24 @@ import { buildCollapsedResultText, formatGrepCall, type GrepRenderDetails } from
 const MAX_INTERNAL_PROBE = 5_000;
 const OUTPUT_LIMIT_LABEL = formatSize(DEFAULT_MAX_BYTES);
 const OUTPUT_MODE_VALUES_LABEL = "content, files_with_matches, count";
-const GREP_TOOL_DESCRIPTION = `Search file contents for a pattern with optional multipath, type filtering, output modes (${OUTPUT_MODE_VALUES_LABEL}), pagination, timeout, and gitignore/literal controls. Output is truncated to ${OUTPUT_LIMIT_LABEL}.`;
-const GREP_PROMPT_SNIPPET = "Search file contents with output modes, pagination, type filtering, and ignore controls";
+const GREP_TOOL_DESCRIPTION = `Search file contents by pattern. Supports multipath roots, type filters, output modes (${OUTPUT_MODE_VALUES_LABEL}), pagination, timeout, gitignore, literal mode. Output truncated to ${OUTPUT_LIMIT_LABEL}.`;
+const GREP_PROMPT_SNIPPET = "Search file contents: output modes, pagination, type filters, ignore controls";
 
 const PARAM_DESCRIPTIONS = {
-	pattern: "Search pattern (regex or literal string)",
-	path: "Directory or file to search (default: current directory)",
-	paths: "Search roots. Mutually exclusive with path.",
-	glob: "Filter files by glob pattern, e.g. '*.ts' or '**/*.spec.ts'",
+	pattern: "Pattern: regex or literal string",
+	path: "Directory/file root (default: current directory)",
+	paths: "Search roots; mutually exclusive with path",
+	glob: "File glob filter, e.g. '*.ts' or '**/*.spec.ts'",
 	type: "Language/file type filter, e.g. ts, js, py, rs",
 	ignoreCase: "Case-insensitive search (default: false)",
-	literal: "Treat pattern as literal string instead of regex (default: false)",
-	context: "Number of context lines around matches",
+	literal: "Treat pattern as literal, not regex (default: false)",
+	context: "Context lines around matches",
 	outputMode: `Output mode: ${OUTPUT_MODE_VALUES_LABEL} (default: content)`,
 	gitignore: "Respect .gitignore (default: true)",
-	noIgnore: "Include ignored files (overrides gitignore)",
+	noIgnore: "Include ignored files; overrides gitignore",
 	offset: "Skip first N matches/results after ordering (default: 0)",
-	limit: `Maximum number of matches/results to return (default: ${DEFAULT_LIMIT})`,
-	timeoutMs: `Timeout in milliseconds (default: ${DEFAULT_TIMEOUT_MS})`,
+	limit: `Max matches/results returned (default: ${DEFAULT_LIMIT})`,
+	timeoutMs: `Timeout ms (default: ${DEFAULT_TIMEOUT_MS})`,
 } as const;
 
 const grepSchema = Type.Object({

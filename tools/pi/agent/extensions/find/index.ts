@@ -12,19 +12,19 @@ import { buildFdArgs, DEFAULT_LIMIT, DEFAULT_TIMEOUT_MS, type FindKind, normaliz
 
 const OUTPUT_LIMIT_LABEL = formatSize(DEFAULT_MAX_BYTES);
 const KIND_VALUES_LABEL = "file, directory, any";
-const FIND_TOOL_DESCRIPTION = `Search files by glob pattern with optional multipath roots, kind filtering (${KIND_VALUES_LABEL}), hidden and gitignore controls, timeout, and deterministic dedupe. Output is truncated to ${OUTPUT_LIMIT_LABEL}.`;
-const FIND_PROMPT_SNIPPET = "Find files or directories by glob pattern with multipath, kind, hidden, and ignore controls";
+const FIND_TOOL_DESCRIPTION = `Find files/directories by glob. Supports multipath roots, kind (${KIND_VALUES_LABEL}), hidden/gitignore controls, timeout, deterministic dedupe. Output truncated to ${OUTPUT_LIMIT_LABEL}.`;
+const FIND_PROMPT_SNIPPET = "Find files/directories by glob: multipath, kind, hidden, ignore controls";
 
 const PARAM_DESCRIPTIONS = {
-	pattern: "Glob pattern to match files, e.g. '*.ts', '**/*.json', or 'src/**/*.spec.ts'",
-	path: "Directory to search in (default: current directory)",
-	paths: "Search roots. Mutually exclusive with path.",
-	hidden: "Include hidden files and directories (default: true)",
+	pattern: "Glob pattern, e.g. '*.ts', '**/*.json', 'src/**/*.spec.ts'",
+	path: "Search directory (default: current directory)",
+	paths: "Search roots; mutually exclusive with path",
+	hidden: "Include hidden files/directories (default: true)",
 	kind: `Result kind: ${KIND_VALUES_LABEL} (default: file)`,
 	gitignore: "Respect .gitignore (default: true)",
-	noIgnore: "Include ignored files (overrides gitignore)",
-	limit: `Maximum number of results (default: ${DEFAULT_LIMIT})`,
-	timeoutMs: `Timeout in milliseconds (default: ${DEFAULT_TIMEOUT_MS})`,
+	noIgnore: "Include ignored files; overrides gitignore",
+	limit: `Max results (default: ${DEFAULT_LIMIT})`,
+	timeoutMs: `Timeout ms (default: ${DEFAULT_TIMEOUT_MS})`,
 } as const;
 
 const findSchema = Type.Object({

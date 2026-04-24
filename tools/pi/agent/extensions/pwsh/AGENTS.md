@@ -1,24 +1,24 @@
 # Pwsh extension
 
 ## Purpose
-Add a built-in style `pwsh` tool for PowerShell command execution.
-Keep behavior aligned with Pi `bash` tool semantics (timeouts, truncation, temp-file spill, streaming updates).
+Add built-in-style `pwsh` tool for PowerShell execution.
+Align with Pi `bash` semantics: timeouts, truncation, temp-file spill, streaming updates where supported.
 
 ## Files
-- `index.ts` — tool registration + local PowerShell execution backend
-- `tsconfig.json` — strict TS config matching sibling extensions
+- `index.ts` — tool registration + local PowerShell backend
+- `tsconfig.json` — strict TS config
 
 ## Notes
-- Windows first tries `pwsh.exe`, then falls back to `powershell.exe`.
-- Non-Windows requires `pwsh` on PATH.
+- Windows: try `pwsh.exe`, fallback `powershell.exe`.
+- Non-Windows: require `pwsh` on PATH.
 - Uses `-NoProfile -NoLogo -NonInteractive -Command`.
-- On Windows, prepends UTF-8 output encoding guard.
-- On Windows, enforces tool policy: remove `bash` from active tools and ensure `pwsh` is active.
-- Runtime caveat (current implementation): command execution uses `spawnSync` for Windows stability.
-  - Output is buffered then emitted, not truly streamed in real time.
-  - Mid-flight abort responsiveness is limited compared to async `spawn`.
-  - Large-output commands are bounded by process `maxBuffer` before tool-level truncation.
-- Future improvement path: restore hardened async `spawn` + stream draining + timeout/tree-kill for real-time updates.
+- Windows: prepends UTF-8 output encoding guard.
+- Windows policy: remove `bash` from active tools; ensure `pwsh` active.
+- Runtime caveat: current command execution uses `spawnSync` for Windows stability.
+  - Output buffered then emitted; not true realtime streaming.
+  - Mid-flight abort less responsive than async `spawn`.
+  - Large output bounded by process `maxBuffer` before tool truncation.
+- Future: hardened async `spawn` + stream draining + timeout/tree-kill for realtime updates.
 
 ## Navigation
 Start at `index.ts`.

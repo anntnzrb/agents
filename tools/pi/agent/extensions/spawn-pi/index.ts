@@ -19,30 +19,27 @@ const UPDATE_THROTTLE_MS = 250;
 
 const PROMPT_SNIPPET = "Run child pi workers for parallel subtasks";
 
-const PROMPT_GUIDELINES = [
-	"Use for independent subtasks.",
-	"Avoid same-file concurrent edits.",
-];
+const PROMPT_GUIDELINES = ["Use for independent subtasks.", "Avoid same-file concurrent edits."];
 
 const SpawnPiParams = Type.Object({
 	task: Type.Optional(
 		Type.String({
-			description: "Single task.",
+			description: "Single task",
 		}),
 	),
 	tasks: Type.Optional(
 		Type.Array(Type.String(), {
-			description: `Task list (max ${MAX_PARALLEL_TASKS}).`,
+			description: `Task list; max ${MAX_PARALLEL_TASKS}`,
 		}),
 	),
 	cwd: Type.Optional(
 		Type.String({
-			description: "Working directory.",
+			description: "Working directory",
 		}),
 	),
 	maxConcurrency: Type.Optional(
 		Type.Number({
-			description: `Parallel workers (default ${DEFAULT_CONCURRENCY}, max ${MAX_PARALLEL_TASKS}).`,
+			description: `Parallel workers; default ${DEFAULT_CONCURRENCY}, max ${MAX_PARALLEL_TASKS}`,
 			default: DEFAULT_CONCURRENCY,
 		}),
 	),
