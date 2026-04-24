@@ -365,10 +365,16 @@ function parseMaxDepth(parsed: ParsedCommand): number | undefined {
   return undefined;
 }
 
+function commandHasToken(parsed: ParsedCommand, token: string): boolean {
+  return parsed.tokens.slice(1).some((value) => value.toLowerCase() === token);
+}
+
 function shouldWarnContentSearch(parsed: ParsedCommand): boolean {
   const executable = normalizeExecutable(parsed.executable);
   const args = parsed.tokens.slice(1);
   if (args.some(isInfoFlag)) return false;
+
+  if ((executable === "rg" || executable === "ripgrep") && commandHasToken(parsed, "--files")) return false;
 
   if (executable === "git") {
     const tokens = tokenizeCommand(parsed.command);
@@ -387,6 +393,14 @@ function shouldWarnFileDiscovery(parsed: ParsedCommand): boolean {
   const executable = normalizeExecutable(parsed.executable);
   const args = parsed.tokens.slice(1);
   if (args.some(isInfoFlag)) return false;
+
+  if (executable === "rg" || executable === "ripgrep") {
+    return commandHasToken(parsed, "--files");
+  }
+
+  if (executable === "git") {
+    return commandHasToken(parsed, "ls-files");
+  }
 
   if (executable === "fd" || executable === "fdfind" || executable === "fd-find") {
     const positionals = extractPositionals(parsed);
@@ -432,7 +446,7 @@ function shouldEmitWarn(rule: Rule, context: RuleMatchContext): boolean {
     return shouldWarnContentSearch(context.parsed ?? parsedFromCommand(context.command));
   }
 
-  if (ruleId === "prefer-native-file-discovery") {
+  if (ruleId === "prefer-native-file-discovery" || ruleId === "prefer-native-file-discovery-rg-files" || ruleId === "prefer-native-file-discovery-git-ls-files") {
     return shouldWarnFileDiscovery(context.parsed ?? parsedFromCommand(context.command));
   }
 
@@ -463,6 +477,7 @@ export function reasonForCommand(command: string, config: GuardrailsConfig): str
 export const __test = {
   extractPositionals,
   parseMaxDepth,
+  commandHasToken,
   shouldWarnContentSearch,
   shouldWarnFileDiscovery,
   inspectCommand,

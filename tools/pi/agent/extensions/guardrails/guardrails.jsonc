@@ -85,6 +85,30 @@
         }
       },
       {
+        "id": "prefer-native-file-discovery-rg-files",
+        "match": {
+          "type": "regex",
+          "pattern": "\\b(?:rg|ripgrep)\\b[^\\n;|&]*\\s--files\\b",
+          "flags": "i"
+        },
+        "action": {
+          "type": "warn",
+          "message": "Use native `find` tool for file lookup."
+        }
+      },
+      {
+        "id": "prefer-native-file-discovery-git-ls-files",
+        "match": {
+          "type": "regex",
+          "pattern": "\\bgit\\b[^\\n;|&]*\\bls-files\\b",
+          "flags": "i"
+        },
+        "action": {
+          "type": "warn",
+          "message": "Use native `find` tool for file lookup."
+        }
+      },
+      {
         "id": "prefer-native-content-search",
         "match": {
           "type": "executable",

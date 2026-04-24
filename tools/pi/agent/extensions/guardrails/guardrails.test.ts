@@ -48,6 +48,30 @@ const searchConfig: GuardrailsConfig = {
   agentBash: {
     rules: [
       {
+        id: "prefer-native-file-discovery-rg-files",
+        match: {
+          type: "regex",
+          pattern: "\\b(?:rg|ripgrep)\\b[^\\n;|&]*\\s--files\\b",
+          flags: "i",
+        },
+        action: {
+          type: "warn",
+          message: "prefer native find tool",
+        },
+      },
+      {
+        id: "prefer-native-file-discovery-git-ls-files",
+        match: {
+          type: "regex",
+          pattern: "\\bgit\\b[^\\n;|&]*\\bls-files\\b",
+          flags: "i",
+        },
+        action: {
+          type: "warn",
+          message: "prefer native find tool",
+        },
+      },
+      {
         id: "prefer-native-content-search",
         match: {
           type: "executable",
@@ -260,6 +284,7 @@ test("does not warn for informational shell content-search commands", () => {
   assert.equal(reasonForCommand("rg --help", searchConfig), null);
   assert.equal(reasonForCommand("rg --version", searchConfig), null);
   assert.equal(reasonForCommand("git grep --help", searchConfig), null);
+  assert.equal(reasonForCommand("git ls-files --help", searchConfig), null);
 });
 
 test("agent warning hints name native replacements and shell executables", () => {
@@ -285,6 +310,11 @@ test("tool signatures fall back when live schema is unavailable", () => {
 });
 
 test("warns for broad shell file-discovery commands", () => {
+  assert.equal(reasonForCommand("rg --files", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("ripgrep --files src", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("rg --files | nl -ba", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("git ls-files", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("git ls-files '*.ts'", searchConfig), "prefer native find tool");
   assert.equal(reasonForCommand("fd '*.ts'", searchConfig), "prefer native find tool");
   assert.equal(reasonForCommand("fd-find '*.ts' .", searchConfig), "prefer native find tool");
   assert.equal(reasonForCommand("gfind . -name '*.ts'", searchConfig), "prefer native find tool");
