@@ -9,11 +9,11 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { test } from "bun:test";
-import { Effect } from "effect";
-const SYNC_ROOT = resolve("/Users/annt/.config/agents/sync");
+
+const SYNC_ROOT = resolve(import.meta.dir, "..");
 const SRC_ROOT = join(SYNC_ROOT, "src");
 
 let HarnessId: any;
@@ -23,6 +23,7 @@ let copyItem: any;
 let copyDirInto: any;
 let iterExtensionPackages: any;
 let runInstall: any;
+let runCommandOutcome: any;
 let parseTimeoutSeconds: any;
 let planManagedEntries: any;
 let loadRecordedEntryNames: any;
@@ -56,6 +57,7 @@ if (!runtime) {
     copyDirInto,
     iterExtensionPackages,
     runInstall,
+    runCommandOutcome,
     parseTimeoutSeconds,
     planManagedEntries,
     loadRecordedEntryNames,
@@ -104,6 +106,7 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
     "packages/index.ts",
     "packages/process.ts",
     "packages/validate.ts",
+    "runtime/process.ts",
   ];
   if (!required.every((file) => existsSync(join(SRC_ROOT, file)))) {
     return null;
@@ -118,6 +121,7 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
     planModule,
     packagesModule,
     packagesProcessModule,
+    runtimeProcessModule,
   ] = await Promise.all([
     import("@core/index.ts"),
     import("@core/harness.ts"),
@@ -127,6 +131,7 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
     import("@core/plan.ts"),
     import("@packages/index.ts"),
     import("@packages/process.ts"),
+    import("@runtime/process.ts"),
   ]);
 
   return {
@@ -157,6 +162,11 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
       "iter_extension_packages",
     ),
     runInstall: pickFn(installModule as Record<string, unknown>, "runInstall", "run_install"),
+    runCommandOutcome: pickFn(
+      runtimeProcessModule as Record<string, unknown>,
+      "runCommandOutcome",
+      "run_command_outcome",
+    ),
     parseTimeoutSeconds: pickFn(
       libModule as Record<string, unknown>,
       "parseTimeoutSeconds",
@@ -298,13 +308,13 @@ async function call<T>(fn: (...args: unknown[]) => unknown, ...args: unknown[]):
 }
 
 async function resolveValue<T>(value: unknown): Promise<T> {
-  if (value && typeof value === "object") {
-    if ("then" in value && typeof (value as { then?: unknown }).then === "function") {
-      return await (value as Promise<T>);
-    }
-    if ("pipe" in value && "_op" in value) {
-      return await Effect.runPromise(value as unknown as Effect.Effect<T>);
-    }
+  if (
+    value &&
+    typeof value === "object" &&
+    "then" in value &&
+    typeof (value as { then?: unknown }).then === "function"
+  ) {
+    return await (value as Promise<T>);
   }
   return value as T;
 }
@@ -388,6 +398,33 @@ test("run_install_handles_success_failure_and_timeout", async () => {
   });
 });
 
+test("run_command_outcome_resolves_relative_executable_from_command_cwd", async () => {
+  await withTempDir(async (root) => {
+    const scriptDir = join(root, "scripts");
+    mkdirSync(scriptDir, { recursive: true });
+
+    const command = process.platform === "win32" ? ".\\scripts\\ok" : "./scripts/ok";
+    if (process.platform === "win32") {
+      writeFile(join(scriptDir, "ok.cmd"), "@echo off\r\nexit /b 0\r\n");
+    } else {
+      writeExecutable(join(scriptDir, "ok"), "#!/bin/sh\nexit 0\n");
+    }
+
+    assert.deepEqual(await call(runCommandOutcome, [command], root, 1000), { _tag: "Success" });
+  });
+});
+
+test("run_command_outcome_times_out_cross_platform", async () => {
+  await withTempDir(async (root) => {
+    const startedAt = performance.now();
+    const outcome = await call(runCommandOutcome, ["bun", "-e", "setInterval(() => {}, 1000)"], root, 100);
+    const elapsed = performance.now() - startedAt;
+
+    assert.deepEqual(outcome, { _tag: "TimedOut" });
+    assert.equal(elapsed < 1000, true);
+  });
+});
+
 test("run_install_force_kills_term_trapping_process", async () => {
   if (!isPosix()) return;
 
@@ -401,9 +438,8 @@ test("run_install_force_kills_term_trapping_process", async () => {
     const helper = join(root, "helper.ts");
     writeFileSync(
       helper,
-      `import { Effect } from "effect";
-    import { runInstall } from ${JSON.stringify(join(SRC_ROOT, "extensions", "install.ts"))};
-const result = await Effect.runPromise(runInstall([${JSON.stringify(trapped)}], ${JSON.stringify(root)}, 100));
+      `import { runInstall } from ${JSON.stringify(join(SRC_ROOT, "extensions", "install.ts"))};
+const result = await runInstall([${JSON.stringify(trapped)}], ${JSON.stringify(root)}, 100);
 console.log(String(result));
 `,
     );
@@ -432,8 +468,7 @@ test("main_reports_lock_contention_and_skips", async () => {
     const helper = join(root, "helper.ts");
     writeFileSync(
       helper,
-      `import { Effect } from "effect";
-        import { SyncEnv } from ${JSON.stringify(join(SRC_ROOT, "core", "harness.ts"))};
+      `import { SyncEnv } from ${JSON.stringify(join(SRC_ROOT, "core", "harness.ts"))};
         import { main, tryAcquireSyncLock } from ${JSON.stringify(join(SRC_ROOT, "core", "index.ts"))};
 
 const syncEnv = SyncEnv.fromHome(${JSON.stringify(root)}, 1_000);
@@ -441,7 +476,7 @@ const lock = tryAcquireSyncLock(syncEnv);
 if (!lock) {
   process.exit(2);
 }
-const exit = await Effect.runPromise(main());
+const exit = await main();
 console.log(String(exit));
 `,
     );
@@ -804,10 +839,9 @@ test("patch_runtime_settings_preserves_other_keys", async () => {
     );
 
     await call<void>(patchRuntimeSettings, path, [join(root, "pkg")]);
-    const settings = readText(path);
-    assert.equal(settings.includes('"theme": "dark"'), true);
-    assert.equal(settings.includes('"packages"'), true);
-    assert.equal(settings.includes(join(root, "pkg")), true);
+    const settings = JSON.parse(readText(path)) as { theme?: string; packages?: string[] };
+    assert.equal(settings.theme, "dark");
+    assert.deepEqual(settings.packages, [join(root, "pkg")]);
   });
 });
 
@@ -816,6 +850,21 @@ test("package_cache_dir_is_stable", async () => {
   const left = await call<string>(packageCacheDir, root, "https://github.com/tintinweb/pi-supervisor");
   const right = await call<string>(packageCacheDir, root, "https://github.com/tintinweb/pi-supervisor");
   assert.equal(left, right);
+});
+
+test("package_cache_dir_uses_basename_for_local_paths", async () => {
+  const root = "/tmp/cache-root";
+  const sources = [
+    "packages\\foo",
+    ".\\packages\\foo",
+    "C:\\x\\foo",
+    "\\\\server\\share\\foo",
+  ];
+
+  for (const source of sources) {
+    const cacheDir = await call<string>(packageCacheDir, root, source);
+    assert.equal(basename(cacheDir).startsWith("foo-"), true, source);
+  }
 });
 
 test("github_clone_command_prefers_gh_when_available", async () => {

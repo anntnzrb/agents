@@ -1,8 +1,6 @@
 import * as fs from "node:fs";
 import path from "node:path";
 
-import { Effect } from "effect";
-
 import {
   installInferredImportPackages as installInferredImportPackagesImpl,
   installPackageDeps,
@@ -134,16 +132,16 @@ async function ensurePackage(source: string, cacheRoot: string, timeoutMs: numbe
     if (!(await clonePackage(source, stagingDir, timeoutMs))) {
       throw new Error("clone failed");
     }
-    if (!(await Effect.runPromise(installPackageDeps(stagingDir, timeoutMs)))) {
+    if (!(await installPackageDeps(stagingDir, timeoutMs))) {
       throw new Error("dependency install failed");
     }
 
     let healthy = packageIsHealthy(stagingDir);
     if (!healthy && packageHasBuildScript(stagingDir)) {
-      if (!(await Effect.runPromise(runPackageBuild(stagingDir, timeoutMs)))) {
+      if (!(await runPackageBuild(stagingDir, timeoutMs))) {
         throw new Error("build failed");
       }
-      if (!(await Effect.runPromise(installInferredImportPackagesImpl(stagingDir, timeoutMs)))) {
+      if (!(await installInferredImportPackagesImpl(stagingDir, timeoutMs))) {
         throw new Error("install inferred packages after build failed");
       }
       healthy = packageIsHealthy(stagingDir);

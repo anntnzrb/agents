@@ -14,8 +14,8 @@ import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { setDefaultTimeout, test } from "bun:test";
 
-const REPO_ROOT = resolve("/Users/annt/.config/agents");
-const SYNC_ROOT = resolve(REPO_ROOT, "sync");
+const SYNC_ROOT = resolve(import.meta.dir, "..");
+const REPO_ROOT = resolve(SYNC_ROOT, "..");
 const TS_SYNC = resolve(SYNC_ROOT, "src/cli.ts");
 
 setDefaultTimeout(30_000);
@@ -69,13 +69,7 @@ test("integration_package_bootstrap_patches_settings_and_cache_paths", () => {
     setupPackageRepos(sourceRepo, buildRepo);
     writeFileSync(
       join(home, ".config", "agents", "tools", "pi", "agent", "packages.json"),
-      `{
-  "packages": [
-    "${sourceRepo}",
-    "${buildRepo}"
-  ]
-}
-`,
+      `${JSON.stringify({ packages: [sourceRepo, buildRepo] }, null, 2)}\n`,
     );
 
     const result = runSyncProcess(home);
@@ -100,12 +94,7 @@ test("integration_invalid_package_json_fails_package_bootstrap", () => {
 
     writeFileSync(
       join(home, ".config", "agents", "tools", "pi", "agent", "packages.json"),
-      `{
-  "packages": [
-    "${badRepo}"
-  ]
-}
-`,
+      `${JSON.stringify({ packages: [badRepo] }, null, 2)}\n`,
     );
 
     const result = runSyncProcess(home);
@@ -188,12 +177,19 @@ function setupPackageRepos(sourceRepo: string, buildRepo: string): void {
     join(buildRepo, "package.json"),
     `{
   "scripts": {
-    "build": "mkdir -p dist && printf 'export default {}\\n' > dist/index.js"
+    "build": "bun run build.ts"
   },
   "pi": {
     "extensions": ["./dist/index.js"]
   }
 }
+`,
+  );
+  writeFileSync(
+    join(buildRepo, "build.ts"),
+    `import { mkdirSync, writeFileSync } from "node:fs";
+mkdirSync("dist", { recursive: true });
+writeFileSync("dist/index.js", "export default {}\\n");
 `,
   );
   initGitRepo(sourceRepo);

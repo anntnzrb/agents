@@ -1,9 +1,6 @@
-import { spawn } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-
-import { Effect } from "effect";
 
 export type CommandOutcome =
   | { readonly _tag: "Success" }
@@ -21,108 +18,125 @@ const detailFromOutput = (stdout: string, stderr: string): string => {
   return "unknown error";
 };
 
-export const commandExists = async (command: string): Promise<boolean> => {
-  if (!command.includes(path.sep)) {
-    return Boolean(Bun.which(command));
-  }
+const hasPathSeparator = (command: string): boolean =>
+  command.includes(path.sep) || command.includes("/") || command.includes("\\");
 
-  for (const candidate of [command]) {
+const resolveCommandPath = (command: string, cwd?: string): string =>
+  hasPathSeparator(command) && cwd && !path.isAbsolute(command)
+    ? path.resolve(cwd, command)
+    : command;
+
+const pathCommandCandidates = (command: string): string[] => {
+  if (process.platform !== "win32" || path.extname(command)) {
+    return [command];
+  }
+  const extensions = (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD")
+    .split(";")
+    .map((extension) => extension.trim())
+    .filter((extension) => extension.length > 0);
+  return [
+    command,
+    ...extensions.flatMap((extension) => [
+      `${command}${extension.toLowerCase()}`,
+      `${command}${extension.toUpperCase()}`,
+    ]),
+  ];
+};
+
+const executableForCommand = (command: string, cwd?: string): string => {
+  const resolved = resolveCommandPath(command, cwd);
+  return hasPathSeparator(resolved) ? resolved : (Bun.which(resolved) ?? resolved);
+};
+
+const existingPathCommand = async (command: string): Promise<string | undefined> => {
+  for (const candidate of pathCommandCandidates(command)) {
     try {
       const metadata = await fs.stat(candidate);
       if (!metadata.isFile()) {
         continue;
       }
       await fs.access(candidate, fsConstants.X_OK);
-      return true;
+      return candidate;
     } catch {
       continue;
     }
   }
-  return false;
+  return undefined;
 };
 
-export const readPipe = async (stream: NodeJS.ReadableStream | null): Promise<Buffer> => {
-  if (!stream) {
-    return Buffer.alloc(0);
+const resolveExecutable = async (command: string, cwd?: string): Promise<string | undefined> => {
+  const executable = executableForCommand(command, cwd);
+  if (!hasPathSeparator(executable)) {
+    return Bun.which(executable) ?? undefined;
   }
-
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks);
+  return await existingPathCommand(executable);
 };
 
-export const runCommandOutcome = (
+export const commandExists = async (command: string, cwd?: string): Promise<boolean> =>
+  (await resolveExecutable(command, cwd)) !== undefined;
+
+export const runCommandOutcome = async (
   command: readonly string[],
   cwd: string | undefined,
   timeoutMs: number,
-): Effect.Effect<CommandOutcome> =>
-  Effect.promise(async () => {
-    try {
-      const child = spawn(command[0]!, command.slice(1), {
-        cwd: cwd ?? ".",
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+): Promise<CommandOutcome> => {
+  if (!command[0]) {
+    return { _tag: "MissingCommand" };
+  }
 
-      const stdoutPromise = readPipe(child.stdout);
-      const stderrPromise = readPipe(child.stderr);
+  const executable = await resolveExecutable(command[0], cwd);
+  if (!executable) {
+    return { _tag: "MissingCommand" };
+  }
 
-      return await new Promise<CommandOutcome>((resolve, reject) => {
-        let timedOut = false;
-        const timer = setTimeout(() => {
-          timedOut = true;
-          child.kill("SIGKILL");
-        }, timeoutMs);
-
-        child.once("error", (error) => {
-          clearTimeout(timer);
-          const io = error as NodeJS.ErrnoException;
-          if (io.code === "ENOENT") {
-            resolve({ _tag: "MissingCommand" });
-            return;
-          }
-          reject(error);
-        });
-
-        child.once("close", async (code) => {
-          clearTimeout(timer);
-          const stdout = (await stdoutPromise).toString("utf8");
-          const stderr = (await stderrPromise).toString("utf8");
-
-          if (timedOut) {
-            resolve({ _tag: "TimedOut" });
-            return;
-          }
-          if (code === 0) {
-            resolve({ _tag: "Success" });
-            return;
-          }
-          resolve({
-            _tag: "Failure",
-            detail: detailFromOutput(stdout, stderr),
-          });
-        });
-      });
-    } catch (error) {
-      throw error as Error;
-    }
+  const subprocess = Bun.spawn([executable, ...command.slice(1)], {
+    cwd: cwd ?? ".",
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
   });
 
-export const runCommand = (
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    subprocess.kill("SIGKILL");
+  }, timeoutMs);
+
+  try {
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(subprocess.stdout).text().catch(() => ""),
+      new Response(subprocess.stderr).text().catch(() => ""),
+      subprocess.exited,
+    ]);
+
+    if (timedOut) {
+      return { _tag: "TimedOut" };
+    }
+    if (exitCode === 0) {
+      return { _tag: "Success" };
+    }
+    return {
+      _tag: "Failure",
+      detail: detailFromOutput(stdout, stderr),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+export const runCommand = async (
   command: readonly string[],
   cwd: string | undefined,
   timeoutMs: number,
   action: string,
-): Effect.Effect<boolean> =>
-  Effect.gen(function* () {
-    const outcome = yield* runCommandOutcome(command, cwd, timeoutMs);
-    if (outcome._tag === "Success") {
-      return true;
-    }
-    logCommandFailure(command, action, outcome);
-    return false;
-  });
+): Promise<boolean> => {
+  const outcome = await runCommandOutcome(command, cwd, timeoutMs);
+  if (outcome._tag === "Success") {
+    return true;
+  }
+  logCommandFailure(command, action, outcome);
+  return false;
+};
 
 export const logCommandFailure = (
   command: readonly string[],
@@ -143,13 +157,12 @@ export const logCommandFailure = (
   }
 };
 
-export const pickJsRunner = (): Effect.Effect<string | undefined> =>
-  Effect.promise(async () => {
-    if (await commandExists("bun")) {
-      return "bun";
-    }
-    if (await commandExists("npm")) {
-      return "npm";
-    }
-    return undefined;
-  });
+export const pickJsRunner = async (): Promise<string | undefined> => {
+  if (await commandExists("bun")) {
+    return "bun";
+  }
+  if (await commandExists("npm")) {
+    return "npm";
+  }
+  return undefined;
+};

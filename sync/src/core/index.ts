@@ -1,7 +1,5 @@
 import path from "node:path";
 
-import { Effect } from "effect";
-
 import { SyncEnv } from "./harness.ts";
 import {
   clearExtensionHookState,
@@ -100,52 +98,36 @@ export async function runSync(syncEnv: SyncEnv): Promise<boolean> {
   return baseSuccess && managedStateSuccess && hookSuccess;
 }
 
-export const main = (): Effect.Effect<number> =>
-  Effect.gen(function* () {
-    const syncEnvResult = yield* Effect.either(
-      Effect.try({
-        try: () => SyncEnv.fromSystem(),
-        catch: (error) => panicMessage(error),
-      }),
-    );
-    if (syncEnvResult._tag === "Left") {
-      yield* logErr(syncEnvResult.left);
-      return 1;
-    }
-    const syncEnv = syncEnvResult.right;
+export const main = async (): Promise<number> => {
+  let syncEnv: SyncEnv;
+  try {
+    syncEnv = SyncEnv.fromSystem();
+  } catch (error) {
+    err(panicMessage(error));
+    return 1;
+  }
 
-    return yield* Effect.scoped(
-      Effect.gen(function* () {
-        const lockResult = yield* Effect.either(
-          Effect.acquireRelease(
-            Effect.try({
-              try: () => tryAcquireSyncLock(syncEnv),
-              catch: (error) => panicMessage(error),
-            }),
-            (lock) =>
-              Effect.sync(() => {
-                if (lock) {
-                  releaseSyncLockImpl(lock);
-                }
-              }),
-          ),
-        );
+  let lock: SyncLock | undefined;
+  try {
+    lock = tryAcquireSyncLock(syncEnv);
+  } catch (error) {
+    err(panicMessage(error));
+    return 1;
+  }
 
-        if (lockResult._tag === "Left") {
-          yield* logErr(lockResult.left);
-          return 1;
-        }
-        if (!lockResult.right) {
-          yield* logErr("another sync is already running; skipping");
-          return 0;
-        }
+  if (!lock) {
+    err("another sync is already running; skipping");
+    return 0;
+  }
 
-        startSyncWatchdog(syncTimeout());
-        const success = yield* Effect.promise(() => runSync(syncEnv));
-        return success ? 0 : 1;
-      }),
-    );
-  });
+  try {
+    startSyncWatchdog(syncTimeout());
+    const success = await runSync(syncEnv);
+    return success ? 0 : 1;
+  } finally {
+    releaseSyncLockImpl(lock);
+  }
+};
 
 async function runSyncHooks(
   hooks: readonly SyncHookPlan[],
@@ -174,7 +156,7 @@ async function runSyncHook(
         if (extensionHookState?.shouldSkip) {
           return true;
         }
-        const success = await Effect.runPromise(installExtensionDeps(hook.root, hook.timeoutMs));
+        const success = await installExtensionDeps(hook.root, hook.timeoutMs);
         if (success) {
           recordExtensionHookState(hook, extensionHookState ?? prepareExtensionHookState(hook));
         } else {
@@ -190,10 +172,6 @@ async function runSyncHook(
     err(panicMessage(error));
     return false;
   }
-}
-
-function logErr(message: string): Effect.Effect<void> {
-  return Effect.sync(() => err(message));
 }
 
 function prepareExtensionHookStates(

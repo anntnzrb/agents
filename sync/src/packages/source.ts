@@ -2,8 +2,6 @@ import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 
-import { Effect } from "effect";
-
 import { rmEntry } from "@runtime/fs.ts";
 import { commandExists } from "@runtime/process.ts";
 import { runCommand } from "./process.ts";
@@ -44,7 +42,7 @@ export async function replaceDirAtomically(src: string, dst: string): Promise<vo
 
 export async function clonePackage(source: string, targetDir: string, timeoutMs: number): Promise<boolean> {
   return clonePackageWithRunner(source, targetDir, await commandExists("gh"), (command) =>
-    Effect.runPromise(runCommand(command, undefined, timeoutMs, "clone")),
+    runCommand(command, undefined, timeoutMs, "clone"),
   );
 }
 
@@ -79,13 +77,15 @@ export async function cloneAttemptsForTests(
 
 
 function sourceSlug(source: string): string {
-  const trimmed = source.trim().replace(/\/+$/, "");
+  const trimmed = source.trim().replace(/[\\/]+$/, "");
   const normalized = trimmed.endsWith(".git") ? trimmed.slice(0, -4) : trimmed;
-  const tail = normalized
-    .split(/[/:]/)
-    .filter((part) => part.length > 0)
-    .slice(-2);
-  const joined = tail.length === 0 ? "package" : tail.join("-");
+  const sourceParts = isLocalPathSource(normalized)
+    ? [localPathBasename(normalized)]
+    : normalized
+        .split(/[/:]/)
+        .filter((part) => part.length > 0)
+        .slice(-2);
+  const joined = sourceParts.length === 0 ? "package" : sourceParts.join("-");
   const sanitized = joined
     .split("")
     .map((ch) => (/[A-Za-z0-9]/.test(ch) ? ch.toLowerCase() : "-"))
@@ -95,6 +95,21 @@ function sourceSlug(source: string): string {
     .filter((part) => part.length > 0)
     .join("-");
   return compact.length > 0 ? compact : "package";
+}
+
+function localPathBasename(source: string): string {
+  return source.includes("\\") ? path.win32.basename(source) : path.basename(source);
+}
+
+function isLocalPathSource(source: string): boolean {
+  return (
+    path.isAbsolute(source) ||
+    /^[A-Za-z]:[\\/]/.test(source) ||
+    source.startsWith("\\\\") ||
+    source.startsWith(".\\") ||
+    source.startsWith("..\\") ||
+    source.includes("\\")
+  );
 }
 
 function fnv1a64(input: string): string {

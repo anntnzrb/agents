@@ -1,23 +1,16 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { Effect } from "effect";
-
 import { installInferredImportPackages } from "@packages/process.ts";
-import {
-  commandExists,
-  type CommandOutcome,
-  runCommandOutcome,
-} from "@runtime/process.ts";
+import { commandExists, type CommandOutcome, runCommandOutcome } from "@runtime/process.ts";
 
-export const iterExtensionPackages = (root: string): Effect.Effect<string[]> =>
-  Effect.promise(async () => {
-    const stat = await fs.stat(root).catch(() => undefined);
-    if (!stat?.isDirectory()) {
-      return [];
-    }
-    return walkExtensionPackages(root);
-  });
+export const iterExtensionPackages = async (root: string): Promise<string[]> => {
+  const stat = await fs.stat(root).catch(() => undefined);
+  if (!stat?.isDirectory()) {
+    return [];
+  }
+  return walkExtensionPackages(root);
+};
 
 const walkExtensionPackages = async (root: string): Promise<string[]> => {
   const packagesFound: string[] = [];
@@ -46,19 +39,18 @@ const walkExtensionPackages = async (root: string): Promise<string[]> => {
   return packagesFound;
 };
 
-export const runInstall = (
+export const runInstall = async (
   command: readonly string[],
   packageDir: string,
   timeoutMs: number,
-): Effect.Effect<boolean> =>
-  Effect.gen(function* () {
-    const outcome = yield* runCommandOutcome(command, packageDir, timeoutMs);
-    if (outcome._tag === "Success") {
-      return true;
-    }
-    logInstallFailure(command, packageDir, outcome);
-    return false;
-  });
+): Promise<boolean> => {
+  const outcome = await runCommandOutcome(command, packageDir, timeoutMs);
+  if (outcome._tag === "Success") {
+    return true;
+  }
+  logInstallFailure(command, packageDir, outcome);
+  return false;
+};
 
 const needsNodeInstall = async (packageDir: string): Promise<boolean> => {
   const packageJson = await fs
@@ -85,27 +77,26 @@ const chooseInstaller = async (packageDir: string): Promise<string[] | undefined
   return undefined;
 };
 
-export const installExtensionDeps = (root: string, timeoutMs: number) =>
-  Effect.gen(function* () {
-    const results: boolean[] = [];
-    for (const packageDir of yield* iterExtensionPackages(root)) {
-      if (!(yield* Effect.promise(() => needsNodeInstall(packageDir)))) {
-        results.push(true);
-        continue;
-      }
-
-      const command = yield* Effect.promise(() => chooseInstaller(packageDir));
-      if (!command) {
-        console.error(`sync: no package manager available for ${packageDir}`);
-        results.push(false);
-        continue;
-      }
-
-      results.push((yield* runInstall(command, packageDir, timeoutMs)) as boolean);
+export const installExtensionDeps = async (root: string, timeoutMs: number): Promise<boolean> => {
+  const results: boolean[] = [];
+  for (const packageDir of await iterExtensionPackages(root)) {
+    if (!(await needsNodeInstall(packageDir))) {
+      results.push(true);
+      continue;
     }
-    results.push(yield* installInferredImportPackages(root, timeoutMs));
-    return results.every(Boolean);
-  });
+
+    const command = await chooseInstaller(packageDir);
+    if (!command) {
+      console.error(`sync: no package manager available for ${packageDir}`);
+      results.push(false);
+      continue;
+    }
+
+    results.push(await runInstall(command, packageDir, timeoutMs));
+  }
+  results.push(await installInferredImportPackages(root, timeoutMs));
+  return results.every(Boolean);
+};
 
 function logInstallFailure(
   command: readonly string[],
