@@ -2,13 +2,10 @@ import { describe, expect, mock, test } from "bun:test";
 
 mock.module("@mariozechner/pi-coding-agent", () => ({
 	DEFAULT_MAX_BYTES: 50 * 1024,
-	DEFAULT_MAX_LINES: 2000,
 	formatSize: (bytes: number) => `${bytes}B`,
-	keyHint: (_action: string, hint: string) => hint,
-	truncateHead: (content: string) => ({ content, truncated: false }),
-	isToolCallEventType: () => false,
 	createReadToolDefinition: () => ({ name: "read" }),
 	createWriteToolDefinition: () => ({ name: "write" }),
+	createEditToolDefinition: () => ({ name: "edit", renderShell: "self" }),
 }));
 
 class MockText {
@@ -20,66 +17,73 @@ class MockText {
 
 mock.module("@mariozechner/pi-tui", () => ({
 	Text: MockText,
-	truncateToWidth: (value: string, width: number) => value.slice(0, width),
-	visibleWidth: (value: string) => value.length,
 }));
 
 const { __test, default: readExtension } = await import("./index.js");
 
 const passthroughTheme = {
 	fg: (_token: string, text: string) => text,
+	bold: (text: string) => text,
 };
 
-describe("read collapsed summary", () => {
-	test("always includes expand hint", () => {
-		const text = __test.buildCollapsedReadText({}, passthroughTheme);
-		expect(text).toContain("to expand");
+const tokenTheme = {
+	fg: (token: string, text: string) => `<${token}>${text}</${token}>`,
+	bold: (text: string) => `**${text}**`,
+};
+
+describe("read compact rendering", () => {
+	test("call is naked single-line telemetry", () => {
+		const text = __test.buildReadCallText({ path: "src/foo.ts" }, passthroughTheme);
+		expect(text).toBe("☰ read src/foo.ts");
+		expect(text.split("\n")).toHaveLength(1);
 	});
 
-	test("shows line-window hint when truncated by lines", () => {
-		const text = __test.buildCollapsedReadText(
-			{
-				truncation: {
-					truncated: true,
-					truncatedBy: "lines",
-					maxLines: 120,
-				},
-			},
-			passthroughTheme,
-		);
-		expect(text).toContain("120 line window");
+	test("call shows requested line windows", () => {
+		expect(__test.getReadRange({ offset: 4, limit: 3 })).toBe("L[4-6]");
+		expect(__test.getReadRange({ limit: 5 })).toBe("L[1-5]");
+		expect(__test.getReadRange({ offset: 8 })).toBe("L[8-]");
+		expect(__test.buildReadCallText({ path: "src/foo.ts", offset: 4, limit: 3 }, passthroughTheme)).toBe("☰ read src/foo.ts · L[4-6]");
 	});
 
-	test("shows byte limit hint when first line exceeds limit", () => {
-		const text = __test.buildCollapsedReadText(
-			{
-				truncation: {
-					truncated: true,
-					firstLineExceedsLimit: true,
-					maxBytes: 64,
-				},
-			},
-			passthroughTheme,
-		);
-		expect(text).toContain("64B limit");
+	test("colors cue/title/path separately", () => {
+		const text = __test.buildReadCallText({ path: "src/foo.ts" }, tokenTheme);
+		expect(text).toContain("<muted>☰</muted>");
+		expect(text).toContain("<toolTitle>**read**</toolTitle>");
+		expect(text).toContain("<muted>src/foo.ts</muted>");
 	});
-});
 
-describe("read renderResult", () => {
-	test("shows raw output in expanded mode", () => {
+	test("leaves line window unstyled", () => {
+		const text = __test.buildReadCallText({ path: "src/foo.ts", offset: 4, limit: 3 }, tokenTheme);
+		expect(text).toContain("L[4-6]");
+		expect(text).not.toContain("<text>L[4-6]</text>");
+	});
+
+	test("result is empty unless truncated", () => {
+		expect(__test.buildReadResultText({}, passthroughTheme)).toBe("");
+	});
+
+	test("shows compact truncation hints", () => {
+		expect(
+			__test.buildReadResultText(
+				{ truncation: { truncated: true, truncatedBy: "lines", maxLines: 120 } },
+				passthroughTheme,
+			),
+		).toBe("120 lines");
+		expect(
+			__test.buildReadResultText(
+				{ truncation: { truncated: true, firstLineExceedsLimit: true, maxBytes: 64 } },
+				passthroughTheme,
+			),
+		).toBe("64B limit");
+	});
+
+	test("registered tool uses naked self shell", () => {
 		let registered: any;
 		readExtension({ registerTool: (tool: unknown) => (registered = tool) } as any);
-		const text = new MockText();
-		registered.renderResult(
-			{ content: [{ type: "text", text: "RAW" }], details: {} },
-			{ expanded: true, isPartial: false },
-			passthroughTheme,
-			{ lastComponent: text, isError: false },
-		);
-		expect(text.text).toBe("RAW");
+		expect(registered.renderShell).toBe("self");
 	});
 
-	test("shows raw output in error mode", () => {
+	test("error mode shows raw output", () => {
 		let registered: any;
 		readExtension({ registerTool: (tool: unknown) => (registered = tool) } as any);
 		const text = new MockText();

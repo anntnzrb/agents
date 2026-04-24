@@ -1,10 +1,12 @@
 import { describe, expect, mock, test } from "bun:test";
 
 mock.module("@mariozechner/pi-coding-agent", () => ({
+	formatSize: (bytes: number) => `${bytes}B`,
 	createEditToolDefinition: () => ({
 		name: "edit",
 		renderShell: "self",
 	}),
+	createWriteToolDefinition: () => ({ name: "write" }),
 }));
 
 class MockText {

@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { createWriteToolDefinition, formatSize, keyHint, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { createWriteToolDefinition, formatSize, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 
 type WriteArgs = {
@@ -49,6 +49,12 @@ const getWriteMarker = (rawPath: string, cwd: string): "+" | "~" | "?" => {
 	}
 };
 
+const formatWriteMarker = (marker: "+" | "~" | "?", theme: { fg: (token: string, text: string) => string }): string => {
+	if (marker === "+") return theme.fg("toolDiffAdded", marker);
+	if (marker === "~") return theme.fg("warning", marker);
+	return theme.fg("muted", marker);
+};
+
 const buildCollapsedWriteCallText = (
 	args: WriteArgs,
 	marker: "+" | "~" | "?",
@@ -57,15 +63,18 @@ const buildCollapsedWriteCallText = (
 	const rawPath = asString(args.file_path) ?? asString(args.path) ?? "...";
 	const content = asString(args.content) ?? "";
 	const stats = getContentStats(content);
-	const summary = `${formatSize(stats.bytes)} · ${stats.lines} ${stats.lines === 1 ? "line" : "lines"}`;
+	const lines = `${stats.lines} ${stats.lines === 1 ? "line" : "lines"}`;
 
 	return [
-		`${theme.fg("toolTitle", theme.bold("write"))} ${theme.fg("accent", rawPath)}`,
-		theme.fg("dim", `${marker} ${summary} (${keyHint("app.tools.expand", "to expand")})`),
-	].join("\n");
+		`${theme.fg("muted", "▣")} ${theme.fg("toolTitle", theme.bold("write"))} ${formatWriteMarker(marker, theme)} ${theme.fg("muted", rawPath)}`,
+		formatSize(stats.bytes),
+		lines,
+	].join(theme.fg("dim", " · "));
 };
 
 export const __test = {
+	buildCollapsedWriteCallText,
+	formatWriteMarker,
 	getContentStats,
 };
 
@@ -74,13 +83,8 @@ export default function writeExtension(pi: ExtensionAPI): void {
 
 	pi.registerTool({
 		...baseWrite,
+		renderShell: "self",
 		renderCall(args, theme, context) {
-			if (context.expanded) {
-				return baseWrite.renderCall
-					? baseWrite.renderCall(args, theme, { ...context, lastComponent: undefined })
-					: new Text("", 0, 0);
-			}
-
 			const state = context.state as WriteRenderState;
 			const typedArgs = (args ?? {}) as WriteArgs;
 			const rawPath = asString(typedArgs.file_path) ?? asString(typedArgs.path) ?? "...";
