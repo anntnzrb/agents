@@ -24,7 +24,6 @@ import {
   tryAcquireSyncLock as tryAcquireSyncLockImpl,
 } from "@runtime/lock.ts";
 
-const SYNC_TIMEOUT_ENV = "AGENTS_SYNC_TIMEOUT_SECONDS";
 const DEFAULT_SYNC_TIMEOUT_SECONDS = 15 * 60;
 const SYNC_LOCK_FILE = "sync.lock";
 
@@ -45,7 +44,7 @@ export function parseTimeoutSeconds(value: string | undefined, defaultSeconds: n
 }
 
 export function syncTimeout(): number {
-  return parseTimeoutSeconds(process.env[SYNC_TIMEOUT_ENV], DEFAULT_SYNC_TIMEOUT_SECONDS);
+  return DEFAULT_SYNC_TIMEOUT_SECONDS;
 }
 
 export function syncLockPath(syncEnv: SyncEnv): string {
