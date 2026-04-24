@@ -93,6 +93,7 @@ declare module "@mariozechner/pi-coding-agent" {
 		promptSnippet?: string;
 		promptGuidelines?: string[];
 		parameters?: unknown;
+		renderShell?: "default" | "self";
 		renderCall?: (args: any, theme: Theme, context: ToolRenderCallContext) => any;
 		renderResult?: (result: any, options: ToolRenderResultOptions, theme: Theme, context: ToolRenderResultContext) => any;
 		execute?: (
@@ -143,6 +144,11 @@ declare module "@mariozechner/pi-coding-agent" {
 		isError?: boolean;
 	};
 
+	export type EditToolDetails = {
+		diff: string;
+		firstChangedLine?: number;
+	};
+
 	export type TruncationResult = {
 		content: string;
 		truncated?: boolean;
@@ -168,6 +174,7 @@ declare module "@mariozechner/pi-coding-agent" {
 	): event is { type: "tool_call"; toolName: TName; input: TInput };
 	export function createReadToolDefinition(cwd: string): RegisteredTool;
 	export function createWriteToolDefinition(cwd: string): RegisteredTool;
+	export function createEditToolDefinition(cwd: string): RegisteredTool;
 	export function createBashToolDefinition(cwd: string, options?: { operations?: BashOperations }): RegisteredTool;
 	export function createFindToolDefinition(cwd: string): RegisteredTool;
 	export function createGrepToolDefinition(cwd: string): RegisteredTool;
