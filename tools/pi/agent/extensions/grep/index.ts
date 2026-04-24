@@ -157,6 +157,7 @@ const runRipgrep = async (params: {
 
 export const __test = {
 	buildCollapsedResultText,
+	formatGrepCall,
 };
 
 const ensureRgViaNativeGrep = async (
@@ -193,12 +194,13 @@ export default function grepExtension(pi: ExtensionAPI) {
 			"Search file contents for a pattern with optional multipath, type filtering, pagination, and gitignore/literal controls. Output is truncated to 50KB.",
 		promptSnippet: "Search file contents for patterns with pagination and type filtering",
 		parameters: grepSchema,
+		renderShell: "self",
 		renderCall(args, theme, context) {
 			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
 			text.setText(formatGrepCall(args, theme));
 			return text;
 		},
-		renderResult(result, options, theme, context) {
+		renderResult(result, _options, theme, context) {
 			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
 			const rawText = getFirstTextContent(result.content as Array<{ type: string; text?: string }>);
 
@@ -206,11 +208,6 @@ export default function grepExtension(pi: ExtensionAPI) {
 				text.setText(theme.fg("error", rawText.length > 0 ? rawText : "grep failed"));
 				return text;
 			}
-			if (options.isPartial || options.expanded) {
-				text.setText(rawText.length > 0 ? rawText : "(no output)");
-				return text;
-			}
-
 			text.setText(buildCollapsedResultText(rawText, result.details as GrepRenderDetails | undefined, theme));
 			return text;
 		},

@@ -7,11 +7,12 @@ Keep `grep` always active and add high-signal ergonomics on top of native Pi beh
 - `path | paths` multipath search with dedupe
 - optional `literal`, `gitignore`, `noIgnore`
 - round-robin balancing across files
-- compact collapsed UI summary (expand for raw output)
+- naked compact UI rendering with max-two-line telemetry
 
 ## Files
 - `index.ts` — tool override + activation hooks
 - `index.test.ts` — pure helper behavior checks
+- `index.render.test.ts` — compact rendering checks
 - `tsconfig.json` — strict TS config matching sibling extensions
 
 ## Notes

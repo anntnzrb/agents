@@ -1,14 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { AgentToolResult, ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import {
-	createFindToolDefinition,
-	DEFAULT_MAX_BYTES,
-	formatSize,
-	getAgentDir,
-	keyHint,
-	truncateHead,
-} from "@mariozechner/pi-coding-agent";
+import { createFindToolDefinition, DEFAULT_MAX_BYTES, formatSize, getAgentDir, truncateHead } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { runLineStreamingProcess } from "../_shared/line-process.js";
@@ -42,19 +35,15 @@ const formatFindCall = (
 ): string => {
 	const pattern = typeof input.pattern === "string" ? input.pattern : "";
 	const pathRoots = input.paths?.filter((entry) => typeof entry === "string" && entry.trim().length > 0) ?? [];
-	const scope = pathRoots.length > 0 ? `paths:${summarizeList(pathRoots)}` : `path:${input.path ?? "."}`;
-	const flags: string[] = [];
+	const scope = pathRoots.length > 0 ? `paths:${summarizeList(pathRoots)}` : (input.path ?? ".");
+	const flags: string[] = [pattern];
 	if (input.hidden === false) flags.push("hidden:false");
 	if (input.limit !== undefined) flags.push(`limit:${input.limit}`);
 	if (input.timeoutMs !== undefined) flags.push(`timeoutMs:${input.timeoutMs}`);
 
-	let line =
-		theme.fg("toolTitle", theme.bold("find")) +
-		" " +
-		theme.fg("accent", pattern) +
-		theme.fg("toolOutput", ` in ${scope}`);
-	if (flags.length > 0) line += theme.fg("muted", ` [${flags.join(", ")}]`);
-	return line;
+	return [`${theme.fg("muted", "◇")} ${theme.fg("toolTitle", theme.bold("find"))} ${theme.fg("muted", scope)}`, ...flags].join(
+		theme.fg("dim", " · "),
+	);
 };
 
 const toolMissingMessage = (binary: string): string =>
@@ -70,7 +59,7 @@ const getCollapsedSummary = (
 	details: FindRenderDetails,
 	theme: { fg: (token: string, text: string) => string },
 ): string => {
-	if (rawText === "No files found matching pattern") return rawText;
+	if (rawText === "No files found matching pattern") return `  ${rawText}`;
 	const noticeIndex = rawText.indexOf("\n\n[");
 	const filesBlock = noticeIndex >= 0 ? rawText.slice(0, noticeIndex) : rawText;
 	const files = filesBlock
@@ -79,12 +68,10 @@ const getCollapsedSummary = (
 		.filter(Boolean);
 	if (files.length === 0) return rawText || "(no output)";
 
-	const lines: string[] = [theme.fg("toolOutput", `${files.length} ${files.length === 1 ? "file" : "files"}`)];
-	const notices: string[] = [];
-	if (details.truncation?.truncated) notices.push(`${formatSize(DEFAULT_MAX_BYTES)} output limit`);
-	if (notices.length > 0) lines.push(theme.fg("warning", notices.join(" · ")));
-	lines.push(theme.fg("dim", `(${keyHint("app.tools.expand", "to expand")})`));
-	return lines.join("\n");
+	const segments = [`${files.length} ${files.length === 1 ? "file" : "files"}`];
+	if (details.resultLimitReached !== undefined) segments.push("limit");
+	if (details.truncation?.truncated) segments.push(theme.fg("warning", `${formatSize(DEFAULT_MAX_BYTES)} output limit`));
+	return `  ${segments.join(theme.fg("dim", " · "))}`;
 };
 
 const runFd = async (params: {
@@ -136,6 +123,11 @@ const ensureFdViaNativeFind = async (
 	);
 };
 
+export const __test = {
+	formatFindCall,
+	getCollapsedSummary,
+};
+
 export default function findExtension(pi: ExtensionAPI) {
 	const activate = () => ensureToolActive(pi, "find");
 	pi.on("session_start", activate);
@@ -148,16 +140,17 @@ export default function findExtension(pi: ExtensionAPI) {
 			"Search files by glob pattern with optional multipath roots, hidden toggle, timeout, and deterministic dedupe. Output is truncated to 50KB.",
 		promptSnippet: "Find files by glob pattern with optional hidden toggle and multipath",
 		parameters: findSchema,
+		renderShell: "self",
 		renderCall(args, theme, context) {
 			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
 			text.setText(formatFindCall(args as FindInput, theme));
 			return text;
 		},
-		renderResult(result, options, theme, context) {
+		renderResult(result, _options, theme, context) {
 			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
 			const rawText = getFirstTextContent(result.content as Array<{ type: string; text?: string }>) || "(no output)";
-			if (context.isError || options.expanded || options.isPartial) {
-				text.setText(rawText);
+			if (context.isError) {
+				text.setText(theme.fg("error", rawText));
 				return text;
 			}
 			const summary = getCollapsedSummary(rawText, (result.details ?? {}) as FindRenderDetails, theme);

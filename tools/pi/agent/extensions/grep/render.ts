@@ -1,4 +1,4 @@
-import { DEFAULT_MAX_BYTES, formatSize, keyHint, type TruncationResult } from "@mariozechner/pi-coding-agent";
+import { DEFAULT_MAX_BYTES, formatSize, type TruncationResult } from "@mariozechner/pi-coding-agent";
 import { summarizeList } from "../_shared/tool-utils.js";
 import { GREP_MAX_LINE_LENGTH } from "./output.js";
 
@@ -53,8 +53,8 @@ const summarizeOutput = (output: string): { matchCount: number; fileCount: numbe
 export const formatGrepCall = (input: CallInput, theme: Theme): string => {
 	const pattern = typeof input.pattern === "string" ? input.pattern : "";
 	const pathRoots = input.paths?.filter((entry) => typeof entry === "string" && entry.trim().length > 0) ?? [];
-	const scope = pathRoots.length > 0 ? `paths:${summarizeList(pathRoots)}` : `path:${input.path ?? "."}`;
-	const flags: string[] = [];
+	const scope = pathRoots.length > 0 ? `paths:${summarizeList(pathRoots)}` : (input.path ?? ".");
+	const flags: string[] = [`/${pattern}/`];
 	if (input.type) flags.push(`type:${input.type}`);
 	if (input.glob) flags.push(`glob:${input.glob}`);
 	if (input.literal) flags.push("literal");
@@ -65,15 +65,9 @@ export const formatGrepCall = (input: CallInput, theme: Theme): string => {
 	if ((input.offset ?? 0) > 0) flags.push(`offset:${input.offset}`);
 	if (input.limit !== undefined) flags.push(`limit:${input.limit}`);
 
-	let line =
-		theme.fg("toolTitle", theme.bold("grep")) +
-		" " +
-		theme.fg("accent", `/${pattern}/`) +
-		theme.fg("toolOutput", ` in ${scope}`);
-	if (flags.length > 0) {
-		line += theme.fg("muted", ` [${flags.join(", ")}]`);
-	}
-	return line;
+	return [`${theme.fg("muted", "⌕")} ${theme.fg("toolTitle", theme.bold("grep"))} ${theme.fg("muted", scope)}`, ...flags].join(
+		theme.fg("dim", " · "),
+	);
 };
 
 export const buildCollapsedResultText = (
@@ -82,44 +76,28 @@ export const buildCollapsedResultText = (
 	theme: { fg: (token: string, text: string) => string },
 ): string => {
 	const body = stripNoticeSuffix(rawText).trim();
-	if (body.length === 0) return theme.fg("dim", "(no output)");
-	if (body === "No matches found") return theme.fg("dim", body);
+	if (body.length === 0) return "  0 matches";
+	if (body === "No matches found") return "  0 matches";
 
 	const lines: string[] = [];
 	const matchCount = details?.matchCount;
 	const fileCount = details?.fileCount;
 	if (typeof matchCount === "number" && typeof fileCount === "number") {
-		lines.push(
-			theme.fg(
-				"toolOutput",
-				`${matchCount} ${pluralize(matchCount, "match", "matches")} · ${fileCount} ${pluralize(fileCount, "file", "files")}`,
-			),
-		);
+		lines.push(`${matchCount} ${pluralize(matchCount, "match", "matches")} · ${fileCount} ${pluralize(fileCount, "file", "files")}`);
 	} else {
 		const fallback = summarizeOutput(body);
 		if (fallback.matchCount > 0) {
-			lines.push(
-				theme.fg(
-					"toolOutput",
-					`${fallback.matchCount} ${pluralize(fallback.matchCount, "match", "matches")} · ${fallback.fileCount} ${pluralize(fallback.fileCount, "file", "files")}`,
-				),
-			);
+			lines.push(`${fallback.matchCount} ${pluralize(fallback.matchCount, "match", "matches")} · ${fallback.fileCount} ${pluralize(fallback.fileCount, "file", "files")}`);
 		} else {
 			const lineCount = details?.outputLineCount ?? fallback.lineCount;
-			lines.push(theme.fg("toolOutput", `${lineCount} ${pluralize(lineCount, "line", "lines")} of output`));
+			lines.push(`${lineCount} ${pluralize(lineCount, "line", "lines")} of output`);
 		}
 	}
 
 	const notices: string[] = [];
-	if (details?.truncation?.truncated) {
-		notices.push(`${formatSize(DEFAULT_MAX_BYTES)} output limit`);
-	}
-	if (details?.linesTruncated) {
-		notices.push(`line max ${GREP_MAX_LINE_LENGTH}`);
-	}
-	if (notices.length > 0) {
-		lines.push(theme.fg("warning", notices.join(" · ")));
-	}
-	lines.push(theme.fg("dim", `(${keyHint("app.tools.expand", "to expand")})`));
-	return lines.join("\n");
+	if (details?.matchLimitReached !== undefined) notices.push("limit");
+	if (details?.truncation?.truncated) notices.push(`${formatSize(DEFAULT_MAX_BYTES)} output limit`);
+	if (details?.linesTruncated) notices.push(`line max ${GREP_MAX_LINE_LENGTH}`);
+	if (notices.length > 0) lines.push(theme.fg("warning", notices.join(" · ")));
+	return `  ${lines.join(theme.fg("dim", " · "))}`;
 };

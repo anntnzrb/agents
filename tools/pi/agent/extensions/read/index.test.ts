@@ -3,9 +3,13 @@ import { describe, expect, mock, test } from "bun:test";
 mock.module("@mariozechner/pi-coding-agent", () => ({
 	DEFAULT_MAX_BYTES: 50 * 1024,
 	formatSize: (bytes: number) => `${bytes}B`,
+	getAgentDir: () => "/tmp/pi-agent",
+	truncateHead: (content: string) => ({ content, truncated: false }),
 	createReadToolDefinition: () => ({ name: "read" }),
 	createWriteToolDefinition: () => ({ name: "write" }),
 	createEditToolDefinition: () => ({ name: "edit", renderShell: "self" }),
+	createFindToolDefinition: () => ({ name: "find" }),
+	createGrepToolDefinition: () => ({ name: "grep" }),
 }));
 
 class MockText {
@@ -68,13 +72,13 @@ describe("read compact rendering", () => {
 				{ truncation: { truncated: true, truncatedBy: "lines", maxLines: 120 } },
 				passthroughTheme,
 			),
-		).toBe("120 lines");
+		).toBe("  120 lines");
 		expect(
 			__test.buildReadResultText(
 				{ truncation: { truncated: true, firstLineExceedsLimit: true, maxBytes: 64 } },
 				passthroughTheme,
 			),
-		).toBe("64B limit");
+		).toBe("  64B limit");
 	});
 
 	test("registered tool uses naked self shell", () => {

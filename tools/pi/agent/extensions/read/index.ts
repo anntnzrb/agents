@@ -54,12 +54,12 @@ const buildReadResultText = (details: ReadDetails, theme: { fg: (token: string, 
 	if (!truncation?.truncated) return "";
 
 	if (truncation.firstLineExceedsLimit) {
-		return theme.fg("warning", `${formatSize(truncation.maxBytes ?? DEFAULT_MAX_BYTES)} limit`);
+		return `  ${theme.fg("warning", `${formatSize(truncation.maxBytes ?? DEFAULT_MAX_BYTES)} limit`)}`;
 	}
 	if (truncation.truncatedBy === "lines") {
-		return theme.fg("warning", `${truncation.maxLines ?? "?"} lines`);
+		return `  ${theme.fg("warning", `${truncation.maxLines ?? "?"} lines`)}`;
 	}
-	return theme.fg("warning", `${formatSize(truncation.maxBytes ?? DEFAULT_MAX_BYTES)} limit`);
+	return `  ${theme.fg("warning", `${formatSize(truncation.maxBytes ?? DEFAULT_MAX_BYTES)} limit`)}`;
 };
 
 export const __test = {

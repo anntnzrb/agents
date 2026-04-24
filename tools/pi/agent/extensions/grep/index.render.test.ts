@@ -9,6 +9,8 @@ mock.module("@mariozechner/pi-coding-agent", () => ({
 	isToolCallEventType: () => false,
 	createReadToolDefinition: () => ({ name: "read" }),
 	createWriteToolDefinition: () => ({ name: "write" }),
+	createFindToolDefinition: () => ({ name: "find" }),
+	createGrepToolDefinition: () => ({ name: "grep" }),
 }));
 
 mock.module("@mariozechner/pi-tui", () => ({
@@ -34,9 +36,28 @@ const { __test } = await import("./index.js");
 
 const passthroughTheme = {
 	fg: (_token: string, text: string) => text,
+	bold: (text: string) => text,
 };
 
-describe("grep collapsed summary", () => {
+const tokenTheme = {
+	fg: (token: string, text: string) => `<${token}>${text}</${token}>`,
+	bold: (text: string) => `**${text}**`,
+};
+
+describe("grep compact rendering", () => {
+	test("call is naked single-line telemetry", () => {
+		const text = __test.formatGrepCall({ pattern: "TODO", path: "src", type: "ts", literal: true }, passthroughTheme);
+		expect(text).toBe("⌕ grep src · /TODO/ · type:ts · literal");
+		expect(text.split("\n")).toHaveLength(1);
+	});
+
+	test("colors cue/title/pattern separately", () => {
+		const text = __test.formatGrepCall({ pattern: "TODO", path: "src" }, tokenTheme);
+		expect(text).toContain("<muted>⌕</muted>");
+		expect(text).toContain("<toolTitle>**grep**</toolTitle>");
+		expect(text).toContain("<muted>src</muted>");
+		expect(text).toContain("/TODO/");
+	});
 	test("prefers structured details counters", () => {
 		const text = __test.buildCollapsedResultText("a.ts:1: todo", { matchCount: 3, fileCount: 2 }, passthroughTheme);
 		expect(text).toContain("3 matches · 2 files");
@@ -53,11 +74,13 @@ describe("grep collapsed summary", () => {
 			{
 				matchCount: 1,
 				fileCount: 1,
+				matchLimitReached: 1,
 				truncation: { truncated: true },
 				linesTruncated: true,
 			},
 			passthroughTheme,
 		);
+		expect(text).toContain("limit");
 		expect(text).toContain("50KB output limit");
 		expect(text).toContain("line max 500");
 	});

@@ -7,10 +7,12 @@ Keep `find` always active and add low-maintenance ROI features:
 - deterministic ordering
 - `limit+1` probe for accurate truncation notice
 - bounded timeout with explicit timeout error
+- naked compact UI rendering with max-two-line telemetry
 
 ## Files
 - `index.ts` — tool override + activation hooks
 - `index.test.ts` — pure helper behavior checks
+- `index.render.test.ts` — compact rendering checks
 - `tsconfig.json` — strict TS config matching sibling extensions
 
 ## Notes
