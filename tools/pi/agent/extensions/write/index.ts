@@ -1,7 +1,9 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { createWriteToolDefinition, formatSize, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+import { getReusableText, joinRenderSegments, pluralize, type ColorTheme, type RenderTheme } from "../_shared/render-utils.js";
+import { getUtf8ContentStats } from "../_shared/text-stats.js";
+import { asString } from "../_shared/value-utils.js";
 
 type WriteArgs = {
 	path?: unknown;
@@ -11,32 +13,6 @@ type WriteArgs = {
 
 type WriteRenderState = {
 	marker?: "+" | "~" | "?";
-};
-
-type ContentStats = {
-	bytes: number;
-	lines: number;
-};
-
-const asString = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
-
-const getContentStats = (content: string): ContentStats => {
-	const bytes = Buffer.byteLength(content, "utf-8");
-	if (content.length === 0) return { bytes, lines: 0 };
-
-	let end = content.length;
-	if (content.endsWith("\r\n")) {
-		end -= 2;
-	} else if (content.endsWith("\n")) {
-		end -= 1;
-	}
-	if (end <= 0) return { bytes, lines: 0 };
-
-	let lines = 1;
-	for (let index = 0; index < end; index++) {
-		if (content.charCodeAt(index) === 10) lines++;
-	}
-	return { bytes, lines };
 };
 
 const getWriteMarker = (rawPath: string, cwd: string): "+" | "~" | "?" => {
@@ -49,33 +25,32 @@ const getWriteMarker = (rawPath: string, cwd: string): "+" | "~" | "?" => {
 	}
 };
 
-const formatWriteMarker = (marker: "+" | "~" | "?", theme: { fg: (token: string, text: string) => string }): string => {
+const formatWriteMarker = (marker: "+" | "~" | "?", theme: ColorTheme): string => {
 	if (marker === "+") return theme.fg("toolDiffAdded", marker);
 	if (marker === "~") return theme.fg("warning", marker);
 	return theme.fg("muted", marker);
 };
 
-const buildCollapsedWriteCallText = (
-	args: WriteArgs,
-	marker: "+" | "~" | "?",
-	theme: { fg: (token: string, text: string) => string; bold: (text: string) => string },
-): string => {
+const buildCollapsedWriteCallText = (args: WriteArgs, marker: "+" | "~" | "?", theme: RenderTheme): string => {
 	const rawPath = asString(args.file_path) ?? asString(args.path) ?? "...";
 	const content = asString(args.content) ?? "";
-	const stats = getContentStats(content);
-	const lines = `${stats.lines} ${stats.lines === 1 ? "line" : "lines"}`;
+	const stats = getUtf8ContentStats(content);
+	const lines = `${stats.lines} ${pluralize(stats.lines, "line")}`;
 
-	return [
-		`${theme.fg("muted", "▣")} ${theme.fg("toolTitle", theme.bold("write"))} ${formatWriteMarker(marker, theme)} ${theme.fg("muted", rawPath)}`,
-		formatSize(stats.bytes),
-		lines,
-	].join(theme.fg("dim", " · "));
+	return joinRenderSegments(
+		[
+			`${theme.fg("muted", "▣")} ${theme.fg("toolTitle", theme.bold("write"))} ${formatWriteMarker(marker, theme)} ${theme.fg("muted", rawPath)}`,
+			formatSize(stats.bytes),
+			lines,
+		],
+		theme,
+	);
 };
 
 export const __test = {
 	buildCollapsedWriteCallText,
 	formatWriteMarker,
-	getContentStats,
+	getContentStats: getUtf8ContentStats,
 };
 
 export default function writeExtension(pi: ExtensionAPI): void {
@@ -94,7 +69,7 @@ export default function writeExtension(pi: ExtensionAPI): void {
 				state.marker = "?";
 			}
 
-			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
+			const text = getReusableText(context.lastComponent);
 			text.setText(buildCollapsedWriteCallText(typedArgs, state.marker ?? "?", theme));
 			return text;
 		},

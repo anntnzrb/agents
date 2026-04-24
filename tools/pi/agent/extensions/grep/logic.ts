@@ -1,4 +1,4 @@
-import path from "node:path";
+import { relativePosixPath } from "../_shared/path-utils.js";
 
 export { normalizeSearchRoots } from "../_shared/search-input.js";
 
@@ -137,7 +137,4 @@ export const balanceMatchesByFile = (matches: RawMatch[]): RawMatch[] => {
   return ordered;
 };
 
-export const toPosixRelative = (cwd: string, absolutePath: string): string => {
-  const relativeToCwd = path.relative(cwd, absolutePath);
-  return relativeToCwd.length === 0 ? path.basename(absolutePath) : relativeToCwd.replace(/\\/g, "/");
-};
+export const toPosixRelative = relativePosixPath;

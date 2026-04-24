@@ -2,9 +2,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { AgentToolResult, ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { createFindToolDefinition, DEFAULT_MAX_BYTES, formatSize, getAgentDir, truncateHead } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { runLineStreamingProcess } from "../_shared/line-process.js";
+import { compactDisplayPath, toPosixPath } from "../_shared/path-utils.js";
+import { getReusableText, joinRenderSegments, pluralize, type ColorTheme, type RenderTheme } from "../_shared/render-utils.js";
 import { resolveSearchBinary } from "../_shared/search-binaries.js";
 import { ensureToolActive, getFirstTextContent, summarizeList } from "../_shared/tool-utils.js";
 import { buildFdArgs, DEFAULT_LIMIT, DEFAULT_TIMEOUT_MS, type FindKind, normalizeKind, normalizeLimit, normalizeSearchRoots, normalizeTimeout } from "./logic.js";
@@ -57,23 +58,10 @@ const RENDER_LABELS = {
 	limit: "limit",
 } as const;
 
-const toPosix = (value: string): string => value.replace(/\\/g, "/");
-
-const compactPath = (value: string): string => {
-	if (value === "." || value.startsWith("paths:")) return value;
-	const normalized = toPosix(value);
-	const parts = normalized.split("/").filter(Boolean);
-	if (parts.length <= 4) return value;
-	return `…/${parts.slice(-4).join("/")}`;
-};
-
-const formatFindCall = (
-	input: FindInput,
-	theme: { fg: (token: string, text: string) => string; bold: (text: string) => string },
-): string => {
+const formatFindCall = (input: FindInput, theme: RenderTheme): string => {
 	const pattern = typeof input.pattern === "string" ? input.pattern : "";
 	const pathRoots = input.paths?.filter((entry) => typeof entry === "string" && entry.trim().length > 0) ?? [];
-	const scope = compactPath(pathRoots.length > 0 ? `paths:${summarizeList(pathRoots)}` : (input.path ?? "."));
+	const scope = compactDisplayPath(pathRoots.length > 0 ? `paths:${summarizeList(pathRoots)}` : (input.path ?? "."));
 	const flags: string[] = [theme.fg("accent", pattern)];
 	if (input.kind && input.kind !== "file") flags.push(theme.fg("accent", input.kind));
 	if (input.hidden === false) flags.push(theme.fg("muted", RENDER_LABELS.visible));
@@ -82,9 +70,7 @@ const formatFindCall = (
 	if (input.limit !== undefined) flags.push(theme.fg("muted", `${RENDER_LABELS.limit}:${input.limit}`));
 	if (input.timeoutMs !== undefined) flags.push(theme.fg("muted", `${input.timeoutMs}ms`));
 
-	return [`${theme.fg("muted", "◇")} ${theme.fg("toolTitle", theme.bold("find"))} ${theme.fg("muted", scope)}`, ...flags].join(
-		theme.fg("dim", " · "),
-	);
+	return joinRenderSegments([`${theme.fg("muted", "◇")} ${theme.fg("toolTitle", theme.bold("find"))} ${theme.fg("muted", scope)}`, ...flags], theme);
 };
 
 const toolMissingMessage = (binary: string): string =>
@@ -95,11 +81,7 @@ type FindRenderDetails = {
 	truncation?: { truncated?: boolean };
 };
 
-const getCollapsedSummary = (
-	rawText: string,
-	details: FindRenderDetails,
-	theme: { fg: (token: string, text: string) => string },
-): string => {
+const getCollapsedSummary = (rawText: string, details: FindRenderDetails, theme: ColorTheme): string => {
 	if (rawText === "No files found matching pattern") return `  ${rawText}`;
 	const noticeIndex = rawText.indexOf("\n\n[");
 	const filesBlock = noticeIndex >= 0 ? rawText.slice(0, noticeIndex) : rawText;
@@ -109,9 +91,9 @@ const getCollapsedSummary = (
 		.filter(Boolean);
 	if (files.length === 0) return rawText || "(no output)";
 
-	const segments = [`↳ ${files.length} ${files.length === 1 ? "file" : "files"}`];
+	const segments = [`↳ ${files.length} ${pluralize(files.length, "file")}`];
 	if (details.truncation?.truncated) segments.push(theme.fg("warning", `${formatSize(DEFAULT_MAX_BYTES)} output limit`));
-	return `  ${segments.join(theme.fg("dim", " · "))}`;
+	return `  ${joinRenderSegments(segments, theme)}`;
 };
 
 const runFd = async (params: {
@@ -183,12 +165,12 @@ export default function findExtension(pi: ExtensionAPI) {
 		parameters: findSchema,
 		renderShell: "self",
 		renderCall(args, theme, context) {
-			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
+			const text = getReusableText(context.lastComponent);
 			text.setText(formatFindCall(args as FindInput, theme));
 			return text;
 		},
 		renderResult(result, _options, theme, context) {
-			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
+			const text = getReusableText(context.lastComponent);
 			const rawText = getFirstTextContent(result.content as Array<{ type: string; text?: string }>) || "(no output)";
 			if (context.isError) {
 				text.setText(theme.fg("error", rawText));
@@ -253,7 +235,7 @@ export default function findExtension(pi: ExtensionAPI) {
 				for (const matchPath of matches) {
 					const resolved = path.isAbsolute(matchPath) ? matchPath : path.resolve(absoluteRoot, matchPath);
 					const relativeToCwd = path.relative(cwd, resolved);
-					const normalized = toPosix(relativeToCwd.length === 0 ? path.basename(resolved) : relativeToCwd);
+					const normalized = toPosixPath(relativeToCwd.length === 0 ? path.basename(resolved) : relativeToCwd);
 					if (dedupe.has(normalized)) continue;
 					dedupe.add(normalized);
 					collected.push(normalized);

@@ -11,11 +11,23 @@ Before adding helper logic, check and reuse `extensions/_shared/`:
 - `tool-utils.ts`: `ensureToolActive`, `summarizeList`, `getFirstTextContent`
 - `search-input.ts`: `normalizeSearchRoots`
 - `line-process.ts`: shared line-stream subprocess runner (spawn/abort/timeout/limit/error path)
+- `render-utils.ts`: compact-render theme types, separators, `Text` reuse, pluralization
+- `value-utils.ts`: small unknown-value coercion helpers
+- `text-stats.ts`: logical line counting and UTF-8 content stats
+- `path-utils.ts`: POSIX path normalization and compact display paths
+- `types/`: ambient TypeScript declarations used by extension `tsconfig.json` files
 
 Rules:
 - Do not duplicate helpers already present in `_shared`.
 - If two extensions need the same helper, extract to `_shared` immediately.
 - Keep `_shared` generic and dependency-light.
+- Keep ambient declaration files under `_shared/types/`; they are support plumbing, not extensions.
+
+## Directory conventions
+
+- Extension directories are plain names (`grep/`, `find/`, `guardrails/`).
+- Shared implementation/type support lives under `_shared/`.
+- Tooling config lives under `.config/` and should stay config-only; do not put importable runtime helpers there.
 
 ## Modularization policy (extension-local first)
 
@@ -41,7 +53,7 @@ Gate for extension changes (run from the specific extension dir):
 Also:
 - Verify guideline criteria are met.
 - Keep files between 500-1000 SLOC (excluding comments). Beyond 500L, modularize.
-- If an extension lacks `tsconfig.json`, add one extending `../tsconfig.base.json` with `../types/**/*.d.ts` included before running strict typecheck.
+- If an extension lacks `tsconfig.json`, add one extending `../tsconfig.base.json` with `../_shared/types/**/*.d.ts` included before running strict typecheck.
 - All extensions must include AGENTS.md with description + navigation.
 
 NOTE: Fallback to npm (`npx`) if `bun` is unavailable.

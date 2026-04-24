@@ -1,6 +1,7 @@
 import { createReadToolDefinition, DEFAULT_MAX_BYTES, formatSize, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+import { getReusableText, joinRenderSegments, type ColorTheme, type RenderTheme } from "../_shared/render-utils.js";
 import { getFirstTextContent } from "../_shared/tool-utils.js";
+import { asPositiveInteger, asString } from "../_shared/value-utils.js";
 
 type ReadArgs = {
 	path?: unknown;
@@ -24,11 +25,6 @@ type ReadDetails = {
 	};
 };
 
-const asString = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
-
-const asPositiveInteger = (value: unknown): number | undefined =>
-	typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
-
 const getReadRange = (args: ReadArgs): string | undefined => {
 	const offset = asPositiveInteger(args.offset);
 	const limit = asPositiveInteger(args.limit);
@@ -38,18 +34,15 @@ const getReadRange = (args: ReadArgs): string | undefined => {
 	return `L[${start}-${start + limit - 1}]`;
 };
 
-const buildReadCallText = (
-	args: ReadArgs,
-	theme: { fg: (token: string, text: string) => string; bold: (text: string) => string },
-): string => {
+const buildReadCallText = (args: ReadArgs, theme: RenderTheme): string => {
 	const rawPath = asString(args.path) ?? asString(args.file_path) ?? "...";
 	const segments = [`${theme.fg("muted", "☰")} ${theme.fg("toolTitle", theme.bold("read"))} ${theme.fg("muted", rawPath)}`];
 	const range = getReadRange(args);
 	if (range) segments.push(range);
-	return segments.join(theme.fg("dim", " · "));
+	return joinRenderSegments(segments, theme);
 };
 
-const buildReadResultText = (details: ReadDetails, theme: { fg: (token: string, text: string) => string }): string => {
+const buildReadResultText = (details: ReadDetails, theme: ColorTheme): string => {
 	const truncation = details.truncation;
 	if (!truncation?.truncated) return "";
 
@@ -75,12 +68,12 @@ export default function readExtension(pi: ExtensionAPI): void {
 		...baseRead,
 		renderShell: "self",
 		renderCall(args, theme, context) {
-			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
+			const text = getReusableText(context.lastComponent);
 			text.setText(buildReadCallText((args ?? {}) as ReadArgs, theme));
 			return text;
 		},
 		renderResult(result, _options, theme, context) {
-			const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
+			const text = getReusableText(context.lastComponent);
 			const rawText = getFirstTextContent(result.content as ReadResultPart[]);
 
 			if (context.isError) {
