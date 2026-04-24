@@ -25,9 +25,10 @@ Rules:
 
 ## Skills for extension work
 
-- Load `/skill:typescript` for TypeScript extension changes and validation.
-- Load `/skill:effect` when touching Effect-based code or when validating Effect patterns.
-- If neither applies, skip them.
+Load relevant skills early, before planning or editing:
+- Load `/skill:typescript` eagerly for any TypeScript extension work (`*.ts`, tests, schemas, tool registration, renderers, config-adjacent TS validation).
+- Load `/skill:effect` eagerly when code imports/uses Effect, when reviewing nearby Effect patterns, or when an extension change could affect Effect-style APIs/runtimes.
+- If work is docs-only and does not require TS/Effect reasoning, skip them.
 
 ## QA
 
