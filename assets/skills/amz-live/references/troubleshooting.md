@@ -64,7 +64,7 @@ Check:
 
 Good smoke test:
 ```bash
-printf '%s\n' '{"id":"1","type":"ping"}' | uv run amz-live --mode rpc
+printf '%s\n' '{"id":"1","type":"ping"}' | uv run --script <skill-dir>/scripts/cli.py --mode rpc
 ```
 
 ## Local deterministic debug
@@ -72,7 +72,7 @@ printf '%s\n' '{"id":"1","type":"ping"}' | uv run amz-live --mode rpc
 Use fixture mode when debugging output contract or ranking logic:
 
 ```bash
-uv run amz-live "$QUERY" \
+uv run --script <skill-dir>/scripts/cli.py "$QUERY" \
   --html tests/fixtures/search_results_fragment.html \
   --llm-json
 ```

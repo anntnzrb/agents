@@ -4,12 +4,19 @@ Read-only agent-first flight search CLI.
 
 Provider: Kiwi web search scrape via `agent-browser` (nix wrapper) + public `api.skypicker.com/locations` resolver.
 
+## Entry point
+
+Cross-platform:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
+```
+
 ## Quickstart
 
 ```bash
-uv python install 3.14
-uv sync
-uv run pytest
+uv run --script <skill-dir>/scripts/cli.py --help
+uv run --with pytest pytest
 ```
 
 ## Credentials
@@ -20,23 +27,23 @@ No API keys. No env vars required.
 
 ## Wrapper
 
-Run from anywhere:
+Run from the skill root:
 
 ```bash
-bash scripts/flight-live.sh --schema
+uv run --script scripts/cli.py --schema
 ```
 
 Wrapper behavior:
 - resolves skill root
 - auto-loads `./.env` from skill directory when present
-- executes: `uv run --project "$SKILL_DIR" flight-live "$@"`
+- executes: `uv run --script "$SKILL_DIR/scripts/cli.py" "$@"`
 
 ## CLI
 
 Minimal search:
 
 ```bash
-uv run flight-live \
+uv run --script <skill-dir>/scripts/cli.py \
   --origin NYC \
   --destination LON \
   --depart-start 2026-07-01 \
@@ -82,7 +89,7 @@ Example:
 printf '%s\n' \
   '{"id":"1","type":"ping"}' \
   '{"id":"2","type":"search","origin":"NYC","destination":"MAD","departStart":"2026-06-01","departEnd":"2026-06-30"}' \
-  | uv run flight-live --mode rpc
+  | uv run --script <skill-dir>/scripts/cli.py --mode rpc
 ```
 
 ## References

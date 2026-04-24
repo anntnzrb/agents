@@ -14,13 +14,13 @@ End-to-end flow: natural language → workflow JSON → apply → enable MCP →
 # Save as <WORKFLOW.json>
 
 # 2) Create or update
-uv run scripts/n8nctl.py create <WORKFLOW.json>
+uv run --script <skill-dir>/scripts/cli.py create <WORKFLOW.json>
 # or
-uv run scripts/n8nctl.py update <WORKFLOW_ID> <WORKFLOW.json>
+uv run --script <skill-dir>/scripts/cli.py update <WORKFLOW_ID> <WORKFLOW.json>
 
 # 3) Enable MCP + activate
-uv run scripts/n8nctl.py mcp-enable <WORKFLOW_ID>
-uv run scripts/n8nctl.py activate <WORKFLOW_ID>
+uv run --script <skill-dir>/scripts/cli.py mcp-enable <WORKFLOW_ID>
+uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
 
 # 4) Run via MCP client (example: chat trigger)
 # Call n8n.execute_workflow with inputs {"type":"chat","chatInput":"hello"}
@@ -36,11 +36,11 @@ uv run scripts/n8nctl.py activate <WORKFLOW_ID>
 
 **Solution**:
 ```bash
-uv run scripts/n8nctl.py export <WORKFLOW_ID> <WORKFLOW.json>
+uv run --script <skill-dir>/scripts/cli.py export <WORKFLOW_ID> <WORKFLOW.json>
 # edit <WORKFLOW.json>
-uv run scripts/n8nctl.py update <WORKFLOW_ID> <WORKFLOW.json>
-uv run scripts/n8nctl.py mcp-enable <WORKFLOW_ID>
-uv run scripts/n8nctl.py activate <WORKFLOW_ID>
+uv run --script <skill-dir>/scripts/cli.py update <WORKFLOW_ID> <WORKFLOW.json>
+uv run --script <skill-dir>/scripts/cli.py mcp-enable <WORKFLOW_ID>
+uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
 ```
 
 **Tip**: Always re-apply `mcp-enable` after major edits to ensure `availableInMCP` stays true.

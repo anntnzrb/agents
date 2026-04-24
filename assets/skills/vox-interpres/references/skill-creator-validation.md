@@ -36,9 +36,9 @@ Goal coverage:
 Executed:
 
 ```bash
-uv run --project assets/skills/vox-interpres --group dev pytest -q tests/test_query.py tests/test_cli_smoke.py
-uv run --project assets/skills/vox-interpres --group dev pyright src tests
-uv run --project assets/skills/vox-interpres --group dev ruff check src tests
+uv run --with pytest --with audioread --with librosa --with numpy --with soundfile --with matplotlib pytest -q tests/test_query.py tests/test_cli_smoke.py
+uv run --with pyright --with audioread --with librosa --with numpy --with soundfile --with matplotlib pyright
+uv run --with ruff ruff check lib tests
 ```
 
 Results:
@@ -51,7 +51,7 @@ Results:
 ### Eval 1 (tempo + key)
 Command:
 ```bash
-uv run --project assets/skills/vox-interpres vox-interpres ask ~/repos/.tmp/rest-in-peace-1996.flac "tempo and key?" --refresh
+uv run --script assets/skills/vox-interpres/scripts/cli.py ask ~/repos/.tmp/rest-in-peace-1996.flac "tempo and key?" --refresh
 ```
 Observed:
 - returns tempo + key + confidence ✅
@@ -59,7 +59,7 @@ Observed:
 ### Eval 2 (segment energy + sections)
 Command:
 ```bash
-uv run --project assets/skills/vox-interpres vox-interpres analyze ~/repos/.tmp/rest-in-peace-1996.flac --segment-start 60 --segment-duration 30 --json
+uv run --script assets/skills/vox-interpres/scripts/cli.py analyze ~/repos/.tmp/rest-in-peace-1996.flac --segment-start 60 --segment-duration 30 --json
 ```
 Observed:
 - segment-scoped tempo/key/energy/sections present ✅
@@ -67,7 +67,7 @@ Observed:
 ### Eval 3 (metadata)
 Command:
 ```bash
-uv run --project assets/skills/vox-interpres vox-interpres ask ~/repos/.tmp/rest-in-peace-1996.flac "show metadata codec bitrate sample rate channels" --refresh
+uv run --script assets/skills/vox-interpres/scripts/cli.py ask ~/repos/.tmp/rest-in-peace-1996.flac "show metadata codec bitrate sample rate channels" --refresh
 ```
 Observed:
 - container/codec/sample_rate/channels/bitrate returned ✅

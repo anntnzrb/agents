@@ -14,13 +14,13 @@ Do not answer benchmark/provider questions from stale memory. Run the tool first
 
 ## Entry points
 
-- Wrapper: `sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" ...`
-- Direct: `uv run --project <skill-dir> artificial-analysis ...`
+- With `SKILLS_DIR`: `uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" ...`
+- Direct: `uv run --script <skill-dir>/scripts/cli.py ...`
 
 ## Fast path
 
 ```bash
-sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" fetch
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 ```
 
 ## Commands
@@ -29,42 +29,42 @@ sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" fe
 Get live snapshot from RSC source and write outputs.
 
 ```bash
-sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" fetch
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 ```
 
 ### query
 Deterministic filter/sort over snapshot rows.
 
 ```bash
-sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" query --model claude-opus-4-7 --sort-by speed --order desc --limit 5
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" query --model claude-opus-4-7 --sort-by speed --order desc --limit 5
 ```
 
 ### qa
 Minimal NL command that maps question -> query args.
 
 ```bash
-sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" qa "best provider for claude opus 4.7 by speed top 3"
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" qa "best provider for claude opus 4.7 by speed top 3"
 ```
 
 ### stats
 Snapshot counts + top providers.
 
 ```bash
-sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" stats
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" stats
 ```
 
 ### diff
 Compare two snapshots.
 
 ```bash
-sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" diff old.json new.json
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" diff old.json new.json
 ```
 
 ### schema
 Machine-readable capability contract.
 
 ```bash
-sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" schema
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" schema
 ```
 
 ## RPC mode
@@ -72,7 +72,7 @@ sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" sc
 Use when another agent/process needs JSONL envelopes.
 
 ```bash
-sh "$SKILLS_DIR/artificial-analysis-live/scripts/artificial-analysis-live.sh" --mode rpc
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" --mode rpc
 ```
 
 ## Output policy

@@ -1,11 +1,11 @@
 # Cheatsheet
 
-Run from skill root with `uv run flight-live ...`; elsewhere use `scripts/flight-live.sh ...`.
+Run with `uv run --script <skill-dir>/scripts/cli.py ...`, replacing `<skill-dir>` with this skill directory.
 
 ## Baseline search
 
 ```bash
-uv run flight-live \
+uv run --script <skill-dir>/scripts/cli.py \
   --origin NYC \
   --destination MAD \
   --depart-start 2026-06-01 \
@@ -16,7 +16,7 @@ uv run flight-live \
 ## Budget + nonstop
 
 ```bash
-uv run flight-live \
+uv run --script <skill-dir>/scripts/cli.py \
   --origin SFO \
   --destination HND \
   --depart-start 2026-09-01 \

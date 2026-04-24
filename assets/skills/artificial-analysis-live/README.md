@@ -12,14 +12,21 @@ Compatibility hardening:
 
 Source: `https://artificialanalysis.ai/leaderboards/providers` with header `RSC: 1`.
 
+## Entry point
+
+Cross-platform:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
+```
+
 ## CLI mode (default)
 
 Default command is `fetch` when omitted.
 
 ```bash
-cd artificial-analysis
-uv run artificial-analysis
-uv run artificial-analysis fetch
+uv run --script <skill-dir>/scripts/cli.py
+uv run --script <skill-dir>/scripts/cli.py fetch
 ```
 
 Returns one JSON envelope on stdout and writes:
@@ -31,11 +38,11 @@ Returns one JSON envelope on stdout and writes:
 ### Fetch flags
 
 ```bash
-uv run artificial-analysis fetch \
-  --output-json /tmp/full-data.json \
-  --output-endpoints /tmp/endpoints.txt \
-  --output-url /tmp/full-url.txt \
-  --cache-dir /tmp/aa-cache \
+uv run --script <skill-dir>/scripts/cli.py fetch \
+  --output-json <temp-dir>/full-data.json \
+  --output-endpoints <temp-dir>/endpoints.txt \
+  --output-url <temp-dir>/full-url.txt \
+  --cache-dir <temp-dir>/aa-cache \
   --timeout-seconds 60 \
   --min-endpoints 700 \
   --min-providers 40 \
@@ -52,8 +59,8 @@ Cache/ETag behavior:
 ## Stats
 
 ```bash
-uv run artificial-analysis stats
-uv run artificial-analysis stats artifacts/artificial-analysis/full-data.json --top 20
+uv run --script <skill-dir>/scripts/cli.py stats
+uv run --script <skill-dir>/scripts/cli.py stats artifacts/artificial-analysis/full-data.json --top 20
 ```
 
 Returns counts + top providers by endpoint count.
@@ -61,7 +68,7 @@ Returns counts + top providers by endpoint count.
 ## Diff
 
 ```bash
-uv run artificial-analysis diff old.json new.json
+uv run --script <skill-dir>/scripts/cli.py diff old.json new.json
 ```
 
 Returns:
@@ -74,10 +81,10 @@ Returns:
 
 ```bash
 # model across providers
-uv run artificial-analysis query --model claude-opus-4-7 --sort-by price_blended --order asc --limit 10
+uv run --script <skill-dir>/scripts/cli.py query --model claude-opus-4-7 --sort-by price_blended --order asc --limit 10
 
 # provider view
-uv run artificial-analysis query --provider deepinfra --sort-by intelligence --order desc --limit 20
+uv run --script <skill-dir>/scripts/cli.py query --provider deepinfra --sort-by intelligence --order desc --limit 20
 ```
 
 Returns endpoint rows with pricing, speed/latency, and benchmark metrics.
@@ -86,10 +93,10 @@ Returns endpoint rows with pricing, speed/latency, and benchmark metrics.
 
 ```bash
 # model + metric inferred from question
-uv run artificial-analysis qa "best provider for claude opus 4.7 by speed top 3"
+uv run --script <skill-dir>/scripts/cli.py qa "best provider for claude opus 4.7 by speed top 3"
 
 # provider + cheapest inferred
-uv run artificial-analysis qa "cheapest deepinfra top 5"
+uv run --script <skill-dir>/scripts/cli.py qa "cheapest deepinfra top 5"
 ```
 
 It returns parsed intent + delegated `query` result in one JSON object.
@@ -97,7 +104,7 @@ It returns parsed intent + delegated `query` result in one JSON object.
 ## Schema
 
 ```bash
-uv run artificial-analysis schema
+uv run --script <skill-dir>/scripts/cli.py schema
 ```
 
 Returns machine-readable capability schema JSON.
@@ -107,7 +114,7 @@ Returns machine-readable capability schema JSON.
 Start loop:
 
 ```bash
-uv run artificial-analysis --mode rpc
+uv run --script <skill-dir>/scripts/cli.py --mode rpc
 ```
 
 ### Request format
@@ -149,7 +156,7 @@ printf '%s\n' \
   '{"id":"3","type":"stats","args":{"top":5}}' \
   '{"id":"4","type":"query","args":{"model":"claude-opus-4-7","sort_by":"price_blended","order":"asc","limit":5}}' \
   '{"id":"5","type":"qa","args":{"question":"best provider for claude opus 4.7 by speed top 3"}}' \
-  | uv run artificial-analysis --mode rpc
+  | uv run --script <skill-dir>/scripts/cli.py --mode rpc
 ```
 
 ## Contracts and recovery
@@ -160,5 +167,5 @@ printf '%s\n' \
 ## Lightweight tests
 
 ```bash
-uv run python -m unittest discover -s tests -q
+uv run --with pytest pytest -q tests
 ```

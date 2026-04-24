@@ -11,9 +11,19 @@ Use **REST API** to create/update/activate workflows. Use **MCP** to list and ru
 
 - Authoring (no UI): REST API
 - Running/triggering workflows: MCP
-- Use `n8nctl` (uv script) for REST without curl/jq
+- Use `scripts/cli.py` for REST without curl/jq
 
-Auth/config check policy: do not stop at `echo $N8N_BASE_URL` or `echo $N8N_API_KEY` in the parent shell. If credentials may live in the skill-local `.env`, prefer `uv run scripts/n8nctl.py ...`; that entrypoint auto-loads the env file using the lookup order below. Only report missing credentials after the real command path fails.
+Auth/config check policy: do not stop at `echo $N8N_BASE_URL` or `echo $N8N_API_KEY` in the parent shell. If credentials may live in the skill-local `.env`, prefer `uv run --script <skill-dir>/scripts/cli.py ...`; that entrypoint auto-loads the env file using the lookup order below. Only report missing credentials after the real command path fails.
+
+## Entry point
+
+Cross-platform:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
+```
+
+Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
 
 ## Preconditions
 
@@ -32,7 +42,7 @@ Auth/config check policy: do not stop at `echo $N8N_BASE_URL` or `echo $N8N_API_
 
 ## Quick start (REST)
 
-If credentials live only in the skill-local `.env`, prefer `uv run scripts/n8nctl.py ...` from the Scripts section; the raw `curl` examples below assume the relevant env is already exported into the current process.
+If credentials live only in the skill-local `.env`, prefer `uv run --script <skill-dir>/scripts/cli.py ...` from the Scripts section; the raw `curl` examples below assume the relevant env is already exported into the current process.
 
 ```bash
 # list workflows
@@ -64,7 +74,7 @@ bun x supergateway --streamableHttp "<N8N_MCP_URL>" \
   - `N8N_API_KEY`
   - `N8N_MCP_URL`
   - `N8N_MCP_TOKEN`
-- `n8nctl.py` auto-loads from:
+- `scripts/cli.py` dispatches to `n8nctl.py`, which auto-loads from:
   - `N8N_ENV_FILE`
   - `$SKILLS_DIR/n8n/.env`
   - nearest ancestor `skills/n8n/.env`
@@ -91,13 +101,13 @@ docker exec -it "<N8N_CONTAINER>" n8n import:workflow --input=/path/to/workflow.
 Minimal REST CLI (no curl):
 
 ```bash
-uv run scripts/n8nctl.py list --limit 5
-uv run scripts/n8nctl.py get <WORKFLOW_ID>
-uv run scripts/n8nctl.py create <WORKFLOW.json>
-uv run scripts/n8nctl.py update <WORKFLOW_ID> <WORKFLOW.json>
-uv run scripts/n8nctl.py activate <WORKFLOW_ID>
-uv run scripts/n8nctl.py mcp-enable <WORKFLOW_ID>
-uv run scripts/n8nctl.py validate <WORKFLOW.json>
+uv run --script <skill-dir>/scripts/cli.py list --limit 5
+uv run --script <skill-dir>/scripts/cli.py get <WORKFLOW_ID>
+uv run --script <skill-dir>/scripts/cli.py create <WORKFLOW.json>
+uv run --script <skill-dir>/scripts/cli.py update <WORKFLOW_ID> <WORKFLOW.json>
+uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
+uv run --script <skill-dir>/scripts/cli.py mcp-enable <WORKFLOW_ID>
+uv run --script <skill-dir>/scripts/cli.py validate <WORKFLOW.json>
 ```
 
 ## Query templates

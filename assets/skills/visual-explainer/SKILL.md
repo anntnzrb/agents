@@ -12,6 +12,16 @@ metadata:
 
 Generate self-contained HTML files for technical diagrams, visualizations, and data tables. Always open the result in the browser. Never fall back to ASCII art when this skill is loaded.
 
+## Entry point
+
+Cross-platform helper command:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
+```
+
+Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch. Use this for bundled helper actions such as `share <html-file>`.
+
 **Proactive table rendering.** When you're about to present tabular data as an ASCII box-drawing table in the terminal (comparisons, audits, feature matrices, status reports, any structured rows/columns), generate an HTML page instead. The threshold: if the table has 4+ rows or 3+ columns, it belongs in the browser. Don't wait for the user to ask — render it as HTML automatically and tell them the file path. You can still include a brief text summary in the chat, but the table itself should be the HTML page.
 
 ## Available Commands
@@ -111,17 +121,10 @@ Vary the choice each time. If the last diagram was dark and technical, make the 
 
 **AI-generated illustrations (optional).** If [surf-cli](https://github.com/nicobailon/surf-cli) is available, you can generate images via Gemini and embed them in the page for creative, illustrative, explanatory, educational, or decorative purposes. Check availability with `which surf`. If available:
 
-```bash
-# Generate to a temp file (use --aspect-ratio for control)
-surf gemini "descriptive prompt" --generate-image /tmp/ve-img.png --aspect-ratio 16:9
-
-# Base64 encode for self-containment (macOS)
-IMG=$(base64 -i /tmp/ve-img.png)
-# Linux: IMG=$(base64 -w 0 /tmp/ve-img.png)
-
-# Embed in HTML and clean up
-# <img src="data:image/png;base64,${IMG}" alt="descriptive alt text">
-rm /tmp/ve-img.png
+```text
+# Generate to a temp file, then base64-embed it with the platform-native tool available in your environment.
+surf gemini "descriptive prompt" --generate-image <temp-image-path> --aspect-ratio 16:9
+# <img src="data:image/png;base64,..." alt="descriptive alt text">
 ```
 
 See `./references/css-patterns.md` for image container styles (hero banners, inline illustrations, captions).
@@ -364,16 +367,16 @@ Every diagram is a single self-contained `.html` file. No external assets except
 Share visual explainer pages instantly via Vercel. No account or authentication required.
 
 **Usage:**
-```bash
-bash {{skill_dir}}/scripts/share.sh <html-file>
+```text
+uv run --script {{skill_dir}}/scripts/cli.py share <html-file>
 ```
 
 **Example:**
-```bash
-bash {{skill_dir}}/scripts/share.sh ~/.agent/diagrams/my-diagram.html
+```text
+uv run --script {{skill_dir}}/scripts/cli.py share ~/.agent/diagrams/my-diagram.html
 
 # Output:
-# ✓ Shared successfully!
+# Shared successfully!
 # Live URL:  https://skill-deploy-abc123.vercel.app
 # Claim URL: https://vercel.com/claim-deployment?code=...
 ```

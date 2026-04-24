@@ -19,6 +19,16 @@ Run `/readiness-report` to evaluate the current repository. The analysis:
 3. Determines maturity level (L1-L5) based on 80% threshold per level
 4. Provides prioritized recommendations
 
+## Entry point
+
+Cross-platform:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
+```
+
+Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
+
 ## Workflow
 
 ### Step 1: Run Repository Analysis
@@ -26,7 +36,13 @@ Run `/readiness-report` to evaluate the current repository. The analysis:
 Execute the analysis script to gather signals from the repository:
 
 ```bash
-python scripts/analyze_repo.py --repo-path .
+uv run --script <skill-dir>/scripts/cli.py analyze --repo-path .
+```
+
+Or analyze and print a report in one pass:
+
+```bash
+uv run --script <skill-dir>/scripts/cli.py run --repo-path . --format markdown
 ```
 
 This script checks for:
@@ -41,7 +57,7 @@ This script checks for:
 After analysis, generate the formatted report:
 
 ```bash
-python scripts/generate_report.py --analysis-file /tmp/readiness_analysis.json
+uv run --script <skill-dir>/scripts/cli.py report --analysis-file <temp-dir>/readiness_analysis.json
 ```
 
 ### Step 3: Present Results
@@ -109,8 +125,9 @@ Fix gaps in this order:
 
 ## Resources
 
-- `scripts/analyze_repo.py` - Repository analysis script
-- `scripts/generate_report.py` - Report generation and formatting
+- `scripts/cli.py` - Public dispatcher (`analyze`, `report`, `run`)
+- `scripts/analyze_repo.py` - Internal repository analysis script
+- `scripts/generate_report.py` - Internal report generation and formatting
 - `references/criteria.md` - Complete criteria definitions by pillar
 - `references/maturity-levels.md` - Detailed level requirements
 

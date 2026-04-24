@@ -10,7 +10,7 @@ The helper scripts resolve corpus root in this order:
 
 Check detection quickly:
 ```bash
-uv run scripts/search_expert_chunks.py --query "sanity check" --top 1 --show-corpus-root
+uv run --script <skill-dir>/scripts/cli.py search --query "sanity check" --top 1 --show-corpus-root
 ```
 
 ## Key Artifacts
@@ -23,7 +23,7 @@ uv run scripts/search_expert_chunks.py --query "sanity check" --top 1 --show-cor
 ## Fast Search Patterns
 - Search chunk JSONL with helper script:
 ```bash
-uv run scripts/search_expert_chunks.py \
+uv run --script <skill-dir>/scripts/cli.py search \
   --query "run shortcuts from command line" --group support --top 10
 ```
 

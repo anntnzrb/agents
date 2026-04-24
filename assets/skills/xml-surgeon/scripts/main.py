@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv --script
+#!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = ["lxml>=5.3.0"]
 # ///

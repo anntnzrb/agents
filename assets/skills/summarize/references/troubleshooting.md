@@ -9,8 +9,8 @@ Use this runbook when summarize commands fail.
 3. If structured output helps, run with `--json`.
 4. Run local doctor checks:
 
-```bash
-./scripts/summarize-doctor.sh
+```text
+uv run --script <skill-dir>/scripts/cli.py doctor
 ```
 
 ## Common failures
@@ -25,8 +25,8 @@ Actions:
 - Verify env vars: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, etc.
 - Force a known-working model:
 
-```bash
-bun x @steipete/summarize "https://example.com" --model openai/gpt-5-mini
+```text
+uv run --script <skill-dir>/scripts/cli.py "https://example.com" --model openai/gpt-5-mini
 ```
 
 - If using OpenRouter, verify `OPENROUTER_API_KEY` and optional provider allowlist.
@@ -39,8 +39,8 @@ Symptoms:
 Actions:
 - Try explicit mode:
 
-```bash
-bun x @steipete/summarize "<youtube-url>" --youtube yt-dlp --verbose
+```text
+uv run --script <skill-dir>/scripts/cli.py "<youtube-url>" --youtube yt-dlp --verbose
 ```
 
 - Ensure `yt-dlp` is installed or set `YT_DLP_PATH`.
@@ -56,14 +56,14 @@ Actions:
 - Validate dependencies (`yt-dlp`, `ffmpeg`, optional `tesseract`).
 - Tune thresholds:
 
-```bash
-bun x @steipete/summarize slides "<url>" --slides-scene-threshold 0.2 --slides-max 12 --verbose
+```text
+uv run --script <skill-dir>/scripts/cli.py slides "<url>" --slides-scene-threshold 0.2 --slides-max 12 --verbose
 ```
 
 - Enable OCR only when needed:
 
-```bash
-bun x @steipete/summarize "<url>" --slides --slides-ocr
+```text
+uv run --script <skill-dir>/scripts/cli.py "<url>" --slides --slides-ocr
 ```
 
 ### 4) Extraction quality is weak
@@ -74,14 +74,14 @@ Symptoms:
 Actions:
 - Test markdown extraction path:
 
-```bash
-bun x @steipete/summarize "https://example.com" --extract --format md --markdown-mode readability --verbose
+```text
+uv run --script <skill-dir>/scripts/cli.py "https://example.com" --extract --format md --markdown-mode readability --verbose
 ```
 
-- Try Firecrawl fallback:
+- Try Firecrawl fallback after setting `FIRECRAWL_API_KEY` in the environment:
 
-```bash
-FIRECRAWL_API_KEY=... bun x @steipete/summarize "https://example.com" --firecrawl always --extract --format md --verbose
+```text
+uv run --script <skill-dir>/scripts/cli.py "https://example.com" --firecrawl always --extract --format md --verbose
 ```
 
 ### 5) Cache-related confusion
@@ -91,10 +91,10 @@ Symptoms:
 
 Actions:
 
-```bash
-bun x @steipete/summarize --cache-stats
-bun x @steipete/summarize "https://example.com" --no-cache
-bun x @steipete/summarize "https://example.com/video.mp4" --no-media-cache
+```text
+uv run --script <skill-dir>/scripts/cli.py --cache-stats
+uv run --script <skill-dir>/scripts/cli.py "https://example.com" --no-cache
+uv run --script <skill-dir>/scripts/cli.py "https://example.com/video.mp4" --no-media-cache
 ```
 
 ## Escalation pattern

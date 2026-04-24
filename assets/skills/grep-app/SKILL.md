@@ -5,19 +5,17 @@ description: "Search public GitHub code via Grep.app's HTTP API. Use for real-wo
 
 # Grep.app
 
-Use Grep.app directly over HTTP; no mcporter needed.
+Use Grep.app directly over HTTP through the bundled cross-platform Python CLI.
 
-## Required shell helper
+## Entry point
 
-Source the bash helper from this skill once per shell:
+Cross-platform:
 
-```bash
-source "${SKILLS_DIR:-skills}/grep-app/scripts/grep-app.sh"
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
 ```
 
-If `SKILLS_DIR` is unavailable, source the same file from your local `skills/` checkout.
-
-Then use `grep-app <subcommand>` everywhere below.
+Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
 
 Environment check policy: do not treat an unset `GREP_APP_BASE_URL` in the parent shell as a readiness failure. It is only an optional override; the skill works with its default base URL.
 
@@ -29,10 +27,10 @@ Environment check policy: do not treat an unset `GREP_APP_BASE_URL` in the paren
 
 ## Quick start
 
-```bash
-grep-app search "useState(" f.lang=TypeScript
-grep-app search "errgroup.WithContext(" f.repo=golang/sync
-grep-app regex "useState\\(" f.lang=TypeScript
+```text
+uv run --script <skill-dir>/scripts/cli.py search "useState(" f.lang=TypeScript
+uv run --script <skill-dir>/scripts/cli.py search "errgroup.WithContext(" f.repo=golang/sync
+uv run --script <skill-dir>/scripts/cli.py regex "useState\\(" f.lang=TypeScript
 ```
 
 ## Useful filters
@@ -53,9 +51,9 @@ Pass Grep.app filters as query params:
 ## Failure handling
 
 - `grep-app` does not use a skill-local API key in this helper flow, so there is no `.env` credential-loading step to debug by default.
-- Distinguish helper issues from service issues:
-  - shell/source/usage errors mean local invocation is wrong
-  - `curl: (22)` with HTTP `429` means Grep.app rate-limited the request
+- Distinguish invocation issues from service issues:
+  - usage errors mean local invocation is wrong
+  - HTTP `429` means Grep.app rate-limited the request
   - other HTTP failures mean the service or endpoint responded with an error, not that the helper failed to initialize
 - If `429` appears, report it as rate limiting and either retry later or fall back to another research route such as `context7`, `gh`, or `exa-search`.
 
@@ -64,13 +62,13 @@ Pass Grep.app filters as query params:
 - Public GitHub repos only.
 - `search` is literal by default.
 - `regex` sets `regexp=true` automatically.
-- Grep.app returns HTML snippets inside JSON; use `jq` to extract metadata like repo/path first.
+- Grep.app returns HTML snippets inside JSON; extract metadata like repo/path first.
 - Check licenses before reusing copied code.
 
 ## Validation
 
-```bash
-./scripts/test-grep-app-http.sh
+```text
+uv run --script <skill-dir>/scripts/cli.py --help
 ```
 
 ## Query templates

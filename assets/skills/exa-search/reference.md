@@ -9,7 +9,7 @@
 
 Keep `.env` beside this skill and populate it from `.env.example`.
 
-Supported lookup order in the shell helper:
+Supported lookup order in `scripts/cli.py`:
 - `EXA_SEARCH_ENV_FILE`
 - `$SKILLS_DIR/exa-search/.env`
 - nearest ancestor `skills/exa-search/.env`
@@ -90,6 +90,6 @@ exa-search post /answer '{"query":"What is Bun?"}'
 
 ## Validation
 
-```bash
-./scripts/test-exa-http.sh
+```text
+uv run --script <skill-dir>/scripts/cli.py --help
 ```

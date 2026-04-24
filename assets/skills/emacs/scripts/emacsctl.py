@@ -5,16 +5,16 @@
 """Reliable emacsclient wrapper for live Emacs introspection and reloads.
 
 Examples:
-  uv run scripts/emacsctl.py ping
-  uv run scripts/emacsctl.py face default
-  uv run scripts/emacsctl.py buffer
-  uv run scripts/emacsctl.py key 'C-x C-f'
-  uv run scripts/emacsctl.py library package
-  uv run scripts/emacsctl.py feature use-package
-  cat query.el | uv run scripts/emacsctl.py eval - --json
-  uv run scripts/emacsctl.py eval-file /tmp/query.el --json
-  uv run scripts/emacsctl.py reload-init
-  uv run scripts/emacsctl.py load path/to/init.el
+  uv run --script <skill-dir>/scripts/cli.py ping
+  uv run --script <skill-dir>/scripts/cli.py face default
+  uv run --script <skill-dir>/scripts/cli.py buffer
+  uv run --script <skill-dir>/scripts/cli.py key 'C-x C-f'
+  uv run --script <skill-dir>/scripts/cli.py library package
+  uv run --script <skill-dir>/scripts/cli.py feature use-package
+  cat query.el | uv run --script <skill-dir>/scripts/cli.py eval - --json
+  uv run --script <skill-dir>/scripts/cli.py eval-file <temp-dir>/query.el --json
+  uv run --script <skill-dir>/scripts/cli.py reload-init
+  uv run --script <skill-dir>/scripts/cli.py load path/to/init.el
 """
 
 from __future__ import annotations

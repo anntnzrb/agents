@@ -12,7 +12,7 @@ Checks:
 - Ensure input is numeric id or URL with `/deportes/partido/<id>`.
 - Run direct:
 ```bash
-uv run scripts/ecuabet.py <match_id_or_url> --no-raw --compact
+uv run --script <skill-dir>/scripts/cli.py feed ecuabet <match_id_or_url> --no-raw --compact
 ```
 
 ## 2) Feed network/API failure

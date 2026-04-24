@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+import _path  # noqa: F401
 from artificial_analysis.rsc import extract_lists, snapshot_slugs
 
 

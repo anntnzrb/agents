@@ -50,7 +50,7 @@ Tell the user: "This will take some time — I'll run the optimization loop in t
 Save the eval set to the workspace, then run in the background:
 
 ```bash
-uv run scripts/run_loop.py \
+uv run --script <skill-dir>/scripts/cli.py run-loop \
   --eval-set <path-to-trigger-eval.json> \
   --skill-path <path-to-skill> \
   --model <model-id-powering-this-session> \

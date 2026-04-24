@@ -78,8 +78,8 @@ Required env vars:
 Examples:
 
 ```bash
-uv run scripts/n8nctl.py list --limit 5
-uv run scripts/n8nctl.py export <WORKFLOW_ID> <OUT.json>
-uv run scripts/n8nctl.py mcp-enable <WORKFLOW_ID>
-uv run scripts/n8nctl.py validate <WORKFLOW.json>
+uv run --script <skill-dir>/scripts/cli.py list --limit 5
+uv run --script <skill-dir>/scripts/cli.py export <WORKFLOW_ID> <OUT.json>
+uv run --script <skill-dir>/scripts/cli.py mcp-enable <WORKFLOW_ID>
+uv run --script <skill-dir>/scripts/cli.py validate <WORKFLOW.json>
 ```

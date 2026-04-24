@@ -5,23 +5,19 @@ description: "Fallback search via the Brave Search HTTP API. Use for quick looku
 
 # Brave Search
 
-Use Brave Search directly over HTTP with `curl`; no mcporter needed.
+Use Brave Search directly over HTTP through the bundled cross-platform Python CLI.
 
-## Required shell helper
+## Entry point
 
-Source the bash helper from this skill once per shell:
+Cross-platform:
 
-```bash
-source "${SKILLS_DIR:-skills}/brave-search/scripts/brave-search.sh"
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
 ```
 
-If `SKILLS_DIR` is unavailable, source the same file from your local `skills/` checkout.
-The helper also auto-loads `.env` from its own skill directory, so absolute-path
-`source` usage works from any current working directory.
+Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
 
-Then use `brave-search <subcommand>` everywhere below.
-
-Credential check policy: do not stop at `echo $BRAVE_API_KEY` in the parent shell. Always run the documented helper entrypoint first; it auto-loads a skill-local `.env` using the lookup order below. Only report missing credentials if `brave-search ...` itself fails after that lookup.
+Credential check policy: run the documented CLI entrypoint first; it auto-loads a skill-local `.env` using the lookup order below. Only report missing credentials if the CLI itself fails after that lookup.
 
 ## When to use
 
@@ -32,42 +28,42 @@ Credential check policy: do not stop at `echo $BRAVE_API_KEY` in the parent shel
 
 ## Quick start
 
-```bash
-brave-search web "rust async tutorial" count=5 summary=1
-brave-search news "typescript 5.9" count=5 freshness=pd
-brave-search local "coffee near times square" count=5
-brave-search image "saturn v launch" count=10
-brave-search video "bun runtime benchmark" count=10
+```text
+uv run --script <skill-dir>/scripts/cli.py web "rust async tutorial" count=5 summary=1
+uv run --script <skill-dir>/scripts/cli.py news "typescript 5.9" count=5 freshness=pd
+uv run --script <skill-dir>/scripts/cli.py local "coffee near times square" count=5
+uv run --script <skill-dir>/scripts/cli.py image "saturn v launch" count=10
+uv run --script <skill-dir>/scripts/cli.py video "bun runtime benchmark" count=10
 ```
 
 ## Summaries
 
 Brave's older summarizer flow is still reachable directly:
 
-```bash
-key="$(brave-search summarizer-key "what is the second highest mountain" count=5)"
-brave-search summarize "$key" inline_references=true entity_info=1
+```text
+uv run --script <skill-dir>/scripts/cli.py summarizer-key "what is the second highest mountain" count=5
+uv run --script <skill-dir>/scripts/cli.py summarize <summary-key> inline_references=true entity_info=1
 ```
 
-Use `brave-search raw /summarizer/title key="$key"` or other `/summarizer/*` paths for specialized endpoints.
+Use `raw /summarizer/title key=<summary-key>` or other `/summarizer/*` paths for specialized endpoints.
 
 ## Credentials
 
 - Keep `.env` beside this skill.
-- Helper lookup order:
+- CLI lookup order:
   - `BRAVE_SEARCH_ENV_FILE`
-  - helper sibling `.env` resolved from `${BASH_SOURCE[0]}`
+  - skill `.env`
   - `$SKILLS_DIR/brave-search/.env`
   - nearest ancestor `skills/brave-search/.env`
 - Tracked template: `.env.example`
 
 ## Failure handling
 
-- If a helper run says `BRAVE_API_KEY required`, retry once with the helper itself; do not assume the parent shell env is authoritative.
-- If you sourced the helper from an unusual location and env loading still fails, set `BRAVE_SEARCH_ENV_FILE` dynamically from the helper path rather than hard-coding a machine-specific directory.
+- If a CLI run says `BRAVE_API_KEY required`, retry once with the documented `uv run --script` command; do not assume the parent shell env is authoritative.
+- If env loading still fails, set `BRAVE_SEARCH_ENV_FILE` dynamically from the skill path rather than hard-coding a machine-specific directory.
 - Distinguish env lookup failures from provider failures:
   - `BRAVE_API_KEY required` means local env discovery failed.
-  - `curl: (22)` with HTTP `401`, `402`, `403`, `429`, or similar means the API responded and the key/account/quota/rate limit is the issue.
+  - HTTP `401`, `402`, `403`, `429`, or similar means the API responded and the key/account/quota/rate limit is the issue.
 - Report the actual HTTP failure mode instead of collapsing everything into “missing credentials”.
 
 ## Notes
@@ -80,8 +76,8 @@ Use `brave-search raw /summarizer/title key="$key"` or other `/summarizer/*` pat
 
 ## Validation
 
-```bash
-./scripts/test-brave-http.sh
+```text
+uv run --script <skill-dir>/scripts/cli.py --help
 ```
 
 ## Query templates

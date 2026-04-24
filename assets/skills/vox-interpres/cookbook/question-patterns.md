@@ -76,7 +76,7 @@ These return concatenated deterministic answers.
 - "Muéstrame la estructura por secciones"
 - "Dame metadata: codec, bitrate y sample rate"
 
-Note: intent matching is keyword-based in English tokens right now. For Spanish-first behavior, add Spanish tokens in `src/vox_interpres/query.py`.
+Note: intent matching is keyword-based in English tokens right now. For Spanish-first behavior, add Spanish tokens in `lib/vox_interpres/query.py`.
 
 ---
 

@@ -7,7 +7,7 @@ Use these patterns when the user asks for deeper or repeated analysis.
 Goal: baseline probabilities and safe shortlist before kickoff.
 
 ```bash
-uv run scripts/main.py <match_id_or_url> \
+uv run --script <skill-dir>/scripts/cli.py run <match_id_or_url> \
   --ecuabet <match_id_or_url> \
   --require-ecuabet \
   --recommend-top 10 \
@@ -27,7 +27,7 @@ Report:
 Goal: adapt picks to live momentum and market state.
 
 ```bash
-uv run scripts/main.py <match_id_or_url> \
+uv run --script <skill-dir>/scripts/cli.py run <match_id_or_url> \
   --ecuabet <match_id_or_url> \
   --require-ecuabet \
   --watch 20 \

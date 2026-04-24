@@ -70,6 +70,6 @@ Each hit includes fields like:
 
 ## Validation
 
-```bash
-./scripts/test-grep-app-http.sh
+```text
+uv run --script <skill-dir>/scripts/cli.py --help
 ```

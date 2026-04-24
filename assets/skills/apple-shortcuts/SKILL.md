@@ -33,24 +33,33 @@ description: "Design, implement, debug, and optimize Apple Shortcuts automations
    - Trigger/automation setup instructions.
    - Test checklist and rollback/safety notes.
 
+## Entry point
+
+Cross-platform:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
+```
+
+Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
+
 ## Quick Commands
-Run these from the skill directory (`apple-shortcuts/`) so relative `scripts/...` paths resolve.
 
 Corpus check policy: do not infer a missing corpus from `APPLE_SHORTCUTS_CORPUS` being unset in the parent shell. The helpers can also use `--corpus-root` or auto-discover the nearest `shortcuts-docs-corpus/`.
 
 - Search corpus for authoritative snippets:
 ```bash
-uv run scripts/search_expert_chunks.py \
+uv run --script <skill-dir>/scripts/cli.py search \
   --query "run shortcut from command line output type" --top 8
 ```
 - Filter search to official support docs:
 ```bash
-uv run scripts/search_expert_chunks.py \
+uv run --script <skill-dir>/scripts/cli.py search \
   --query "ask for input action" --group support --top 10
 ```
 - Generate a structured shortcut blueprint:
 ```bash
-uv run scripts/make_blueprint.py \
+uv run --script <skill-dir>/scripts/cli.py blueprint \
   --goal "capture meeting notes and send summary" \
   --devices "iPhone,Mac" \
   --trigger "Share Sheet" \
@@ -75,19 +84,19 @@ printf '%s\n' "hello world" | shortcuts run "My Shortcut"
 ```
 - Decode local action graphs (safe redaction on by default):
 ```bash
-uv run scripts/inspect_local_shortcuts.py --visible-only --include-folders
+uv run --script <skill-dir>/scripts/cli.py inspect --visible-only --include-folders
 ```
 - Deep inspect one shortcut with run history + smart prompt permissions:
 ```bash
-uv run scripts/inspect_local_shortcuts.py \
+uv run --script <skill-dir>/scripts/cli.py inspect \
   --name "LLM" \
   --include-run-stats \
   --include-smart-prompts
 ```
 - Raw export (use only when explicitly needed; includes sensitive data unless redaction remains enabled):
 ```bash
-uv run scripts/inspect_local_shortcuts.py --json --raw
-uv run scripts/inspect_local_shortcuts.py --json --raw --no-redact
+uv run --script <skill-dir>/scripts/cli.py inspect --json --raw
+uv run --script <skill-dir>/scripts/cli.py inspect --json --raw --no-redact
 ```
 - Sign a generated `.shortcut` file for import:
 ```bash
@@ -96,7 +105,7 @@ shortcuts sign --mode anyone --input MyShortcut.shortcut --output MyShortcut_sig
 
 ## Local Introspection Protocol
 1. Inventory first: `shortcuts list --show-identifiers` and folder listing.
-2. Decode shortcut internals from `~/Library/Shortcuts/Shortcuts.sqlite` using `inspect_local_shortcuts.py` (not `shortcuts view`, which only opens UI).
+2. Decode shortcut internals from `~/Library/Shortcuts/Shortcuts.sqlite` using `uv run --script <skill-dir>/scripts/cli.py inspect` (not `shortcuts view`, which only opens UI).
 3. Include `--include-run-stats` to report usage/outcome telemetry from `ZSHORTCUTRUNEVENT`.
 4. Include `--include-smart-prompts` to report permission grants from `ZSMARTPROMPTPERMISSION` (destination app + mode/status).
 5. Note hidden entries (e.g. placeholders/templates) and filter with `--visible-only` when user wants only normal library items.

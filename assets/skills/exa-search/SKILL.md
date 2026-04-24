@@ -5,23 +5,19 @@ description: "Primary search via Exa's HTTP API. Use for deeper web research, fu
 
 # Exa Search
 
-Use Exa directly over HTTP with `curl`; no mcporter needed.
+Use Exa directly over HTTP through the bundled cross-platform Python CLI.
 
-## Required shell helper
+## Entry point
 
-Source the bash helper from this skill once per shell:
+Cross-platform:
 
-```bash
-source "${SKILLS_DIR:-skills}/exa-search/scripts/exa-search.sh"
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
 ```
 
-If `SKILLS_DIR` is unavailable, source the same file from your local `skills/` checkout.
-The helper also auto-loads `.env` from its own skill directory, so absolute-path
-`source` usage works from any current working directory.
+Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
 
-Then use `exa-search <subcommand>` everywhere below.
-
-Credential check policy: do not stop at `echo $EXA_API_KEY` in the parent shell. Always run the documented helper entrypoint first; it auto-loads a skill-local `.env` using the lookup order below. Only report missing credentials if `exa-search ...` itself fails after that lookup.
+Credential check policy: run the documented CLI entrypoint first; it auto-loads a skill-local `.env` using the lookup order below. Only report missing credentials if the CLI itself fails after that lookup.
 
 ## When to use
 
@@ -32,30 +28,30 @@ Credential check policy: do not stop at `echo $EXA_API_KEY` in the parent shell.
 
 ## Quick start
 
-```bash
-exa-search search "best sqlite backup strategy" 5
-exa-search contents https://sqlite.org/backup.html
-exa-search answer "What is the capital of France?"
-exa-search research "Summarize the current state of OpenTelemetry in the Java ecosystem" exa-research
+```text
+uv run --script <skill-dir>/scripts/cli.py search "best sqlite backup strategy" 5
+uv run --script <skill-dir>/scripts/cli.py contents https://sqlite.org/backup.html
+uv run --script <skill-dir>/scripts/cli.py answer "What is the capital of France?"
+uv run --script <skill-dir>/scripts/cli.py research "Summarize the current state of OpenTelemetry in the Java ecosystem" exa-research
 ```
 
 ## Credentials
 
 - Keep `.env` beside this skill.
-- Helper lookup order:
+- CLI lookup order:
   - `EXA_SEARCH_ENV_FILE`
-  - helper sibling `.env` resolved from `${BASH_SOURCE[0]}`
+  - skill `.env`
   - `$SKILLS_DIR/exa-search/.env`
   - nearest ancestor `skills/exa-search/.env`
 - Tracked template: `.env.example`
 
 ## Failure handling
 
-- If a helper run says `EXA_API_KEY required`, retry once with the helper itself; do not assume the parent shell env is authoritative.
-- If you sourced the helper from an unusual location and env loading still fails, set `EXA_SEARCH_ENV_FILE` to the skill-local `.env` dynamically from the helper path rather than hard-coding a home directory.
+- If a CLI run says `EXA_API_KEY required`, retry once with the documented `uv run --script` command; do not assume the parent shell env is authoritative.
+- If env loading still fails, set `EXA_SEARCH_ENV_FILE` to the skill-local `.env` dynamically from the skill path rather than hard-coding a home directory.
 - Distinguish env lookup failures from provider failures:
   - `EXA_API_KEY required` means local env discovery failed.
-  - `curl: (22)` with HTTP `401`, `402`, `403`, or similar means the API responded and the key/account/quota is the issue.
+  - HTTP `401`, `402`, `403`, or similar means the API responded and the key/account/quota is the issue.
 - When the API responds with an auth/billing/quota error, report that explicitly instead of claiming the skill lacks credentials.
 
 ## Notes
@@ -68,16 +64,16 @@ exa-search research "Summarize the current state of OpenTelemetry in the Java ec
 
 ## Raw examples
 
-```bash
-exa-search post /search '{"query":"rust async channels","numResults":5}'
-exa-search post /contents '{"urls":["https://example.com/article"]}'
-exa-search post /answer '{"query":"What is Bun?"}'
+```text
+uv run --script <skill-dir>/scripts/cli.py post /search '{"query":"rust async channels","numResults":5}'
+uv run --script <skill-dir>/scripts/cli.py post /contents '{"urls":["https://example.com/article"]}'
+uv run --script <skill-dir>/scripts/cli.py post /answer '{"query":"What is Bun?"}'
 ```
 
 ## Validation
 
-```bash
-./scripts/test-exa-http.sh
+```text
+uv run --script <skill-dir>/scripts/cli.py --help
 ```
 
 ## Query templates

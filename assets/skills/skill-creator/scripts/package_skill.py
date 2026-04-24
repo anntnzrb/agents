@@ -1,20 +1,32 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["PyYAML>=6.0"]
+# ///
 """
 Skill Packager - Creates a distributable .skill file of a skill folder
 
 Usage:
-    uv run scripts/package_skill.py <path/to/skill-folder> [output-directory]
+    uv run --script <skill-dir>/scripts/cli.py package <path/to/skill-folder> [output-directory]
 
 Example:
-    uv run scripts/package_skill.py skills/public/my-skill
-    uv run scripts/package_skill.py skills/public/my-skill ./dist
+    uv run --script <skill-dir>/scripts/cli.py package skills/public/my-skill
+    uv run --script <skill-dir>/scripts/cli.py package skills/public/my-skill ./dist
 """
 
 import fnmatch
 import sys
 import zipfile
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from scripts.quick_validate import validate_skill
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # Patterns to exclude when packaging skills.
 EXCLUDE_DIRS = {"__pycache__", "node_modules"}
@@ -110,10 +122,10 @@ def package_skill(skill_path, output_dir=None):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: uv run scripts/package_skill.py <path/to/skill-folder> [output-directory]")
+        print("Usage: uv run --script <skill-dir>/scripts/cli.py package <path/to/skill-folder> [output-directory]")
         print("\nExample:")
-        print("  uv run scripts/package_skill.py skills/public/my-skill")
-        print("  uv run scripts/package_skill.py skills/public/my-skill ./dist")
+        print("  uv run --script <skill-dir>/scripts/cli.py package skills/public/my-skill")
+        print("  uv run --script <skill-dir>/scripts/cli.py package skills/public/my-skill ./dist")
         sys.exit(1)
 
     skill_path = sys.argv[1]

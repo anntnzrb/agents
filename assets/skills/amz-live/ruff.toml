@@ -1,0 +1,32 @@
+target-version = "py314"
+line-length = 100
+src = ["lib"]
+
+[lint]
+select = ["ALL"]
+ignore = [
+  "D",
+  "EM101",
+  "EM102",
+  "INP001",
+  "PLR2004",
+  "S101",
+  "TC001",
+  "TC003",
+  "TC006",
+  "TRY003",
+  "TRY004",
+]
+
+[lint.per-file-ignores]
+"scripts/cli.py" = ["E402", "I001"]
+"tests/**/*.py" = [
+  "ANN",
+  "ARG001",
+  "ARG005",
+  "PLC0415",
+]
+"lib/amz_live/filters.py" = ["PLR0911", "PLR0913"]
+"lib/amz_live/protocol.py" = ["BLE001", "PLR0913", "S112"]
+"lib/amz_live/rpc.py" = ["PLR0911"]
+"lib/amz_live/score.py" = ["C901", "PLR0911"]

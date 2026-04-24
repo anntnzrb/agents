@@ -1,24 +1,29 @@
 ---
 name: agent-browser
 description: Browser automation CLI for AI agents. Use when the user needs to interact with websites, including navigating pages, filling forms, clicking buttons, taking screenshots, extracting data, testing web apps, or automating any browser task. Triggers include requests to "open a website", "fill out a form", "click a button", "take a screenshot", "scrape data from a page", "test this web app", "login to a site", "automate browser actions", or any task requiring programmatic web interaction.
-allowed-tools: Bash(npx agent-browser:*), Bash(agent-browser:*)
 ---
 
 # Browser Automation with agent-browser
 
+## Entry point
+
+Cross-platform:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
+```
+
+Set `<skill-dir>` to this skill directory. Do not rely on shell functions, shell sourcing, executable bits, or shebang dispatch. The wrapper delegates to `nix run github:numtide/llm-agents.nix#agent-browser -- ...` and preserves exit codes.
+
+Examples below use `agent-browser ...` as readable shorthand for `uv run --script <skill-dir>/scripts/cli.py ...`; invoke the canonical command in actual tool calls unless your environment already provides an equivalent `agent-browser` executable.
+
 ## Required lifecycle (must follow)
-
-Define `agent-browser` once per shell:
-
-`agent-browser(){ nix run github:numtide/llm-agents.nix#agent-browser -- "$@"; }`
-
-Then use `agent-browser <command>` everywhere below.
 
 Hard rules:
 
-1. Before each new task, run `agent-browser close` once to clear stale sessions.
-2. End every task with `agent-browser close`, even when a command fails.
-3. If interrupted or unsure about state, run `agent-browser close` immediately, then restart from `open`.
+1. Before each new task, run `uv run --script <skill-dir>/scripts/cli.py close` once to clear stale sessions.
+2. End every task with `uv run --script <skill-dir>/scripts/cli.py close`, even when a command fails.
+3. If interrupted or unsure about state, run `uv run --script <skill-dir>/scripts/cli.py close` immediately, then restart from `open`.
 
 Auth check policy: do not infer missing auth from absent environment variables alone. agent-browser may authenticate via its auth vault, saved browser state, or an existing session. Verify with real commands like `agent-browser auth list`, `agent-browser state list`, or the actual login flow.
 
@@ -31,7 +36,7 @@ Every browser automation follows this pattern:
 3. **Interact**: Use refs to click, fill, select
 4. **Re-snapshot**: After navigation or DOM changes, get fresh refs
 
-```bash
+```text
 agent-browser open https://example.com/form
 agent-browser snapshot -i
 # Output: @e1 [input type="email"], @e2 [input type="password"], @e3 [button] "Submit"
@@ -47,7 +52,7 @@ agent-browser snapshot -i  # Check result
 
 Commands can be chained with `&&` in a single shell invocation. The browser persists between commands via a background daemon, so chaining is safe and more efficient than separate calls.
 
-```bash
+```text
 # Chain open + wait + snapshot in one call
 agent-browser open https://example.com && agent-browser wait --load networkidle && agent-browser snapshot -i
 
@@ -62,7 +67,7 @@ agent-browser open https://example.com && agent-browser wait --load networkidle 
 
 ## Essential Commands
 
-```bash
+```text
 # Navigation
 agent-browser open <url>              # Navigate (aliases: goto, navigate)
 agent-browser close                   # Close browser
@@ -120,7 +125,7 @@ agent-browser diff url <url1> <url2> --selector "#main"  # Scope to element
 
 ### Form Submission
 
-```bash
+```text
 agent-browser open https://example.com/signup
 agent-browser snapshot -i
 agent-browser fill @e1 "Jane Doe"
@@ -133,7 +138,7 @@ agent-browser wait --load networkidle
 
 ### Authentication with Auth Vault (Recommended)
 
-```bash
+```text
 # Save credentials once (encrypted with AGENT_BROWSER_ENCRYPTION_KEY)
 # Recommended: pipe password via stdin to avoid shell history exposure
 echo "pass" | agent-browser auth save github --url https://github.com/login --username user --password-stdin
@@ -149,7 +154,7 @@ agent-browser auth delete github
 
 ### Authentication with State Persistence
 
-```bash
+```text
 # Login once and save state
 agent-browser open https://app.example.com/login
 agent-browser snapshot -i
@@ -166,7 +171,7 @@ agent-browser open https://app.example.com/dashboard
 
 ### Session Persistence
 
-```bash
+```text
 # Auto-save/restore cookies and localStorage across browser restarts
 agent-browser --session-name myapp open https://app.example.com/login
 # ... login flow ...
@@ -188,7 +193,7 @@ agent-browser state clean --older-than 7
 
 ### Data Extraction
 
-```bash
+```text
 agent-browser open https://example.com/products
 agent-browser snapshot -i
 agent-browser get text @e5           # Get specific element text
@@ -201,7 +206,7 @@ agent-browser get text @e1 --json
 
 ### Parallel Sessions
 
-```bash
+```text
 agent-browser --session site1 open https://site-a.com
 agent-browser --session site2 open https://site-b.com
 
@@ -213,7 +218,7 @@ agent-browser session list
 
 ### Connect to Existing Chrome
 
-```bash
+```text
 # Auto-discover running Chrome with remote debugging enabled
 agent-browser --auto-connect open https://example.com
 agent-browser --auto-connect snapshot
@@ -224,7 +229,7 @@ agent-browser --cdp 9222 snapshot
 
 ### Color Scheme (Dark Mode)
 
-```bash
+```text
 # Persistent dark mode via flag (applies to all pages and new tabs)
 agent-browser --color-scheme dark open https://example.com
 
@@ -237,7 +242,7 @@ agent-browser set media dark
 
 ### Visual Browser (Debugging)
 
-```bash
+```text
 agent-browser --headed open https://example.com
 agent-browser highlight @e1          # Highlight element
 agent-browser record start demo.webm # Record session
@@ -249,7 +254,7 @@ Use `AGENT_BROWSER_HEADED=1` to enable headed mode via environment variable. Bro
 
 ### Local Files (PDFs, HTML)
 
-```bash
+```text
 # Open local files with file:// URLs
 agent-browser --allow-file-access open file:///path/to/document.pdf
 agent-browser --allow-file-access open file:///path/to/page.html
@@ -258,7 +263,7 @@ agent-browser screenshot output.png
 
 ### iOS Simulator (Mobile Safari)
 
-```bash
+```text
 # List available iOS simulators
 agent-browser device list
 
@@ -311,7 +316,7 @@ See [references/advanced.md](references/advanced.md).
 
 agent-browser has an experimental native Rust daemon that communicates with Chrome directly via CDP, bypassing Node.js and Playwright entirely. It is opt-in and not recommended for production use yet.
 
-```bash
+```text
 # Enable via flag
 agent-browser --native open example.com
 
@@ -321,17 +326,3 @@ agent-browser open example.com
 ```
 
 The native daemon supports Chromium and Safari (via WebDriver). Firefox and WebKit are not yet supported. All core commands (navigate, snapshot, click, fill, screenshot, cookies, storage, tabs, eval, etc.) work identically in native mode. Use `agent-browser close` before switching between native and default mode within the same session.
-
-## Ready-to-Use Templates
-
-| Template | Description |
-|----------|-------------|
-| [templates/form-automation.sh](templates/form-automation.sh) | Form filling with validation |
-| [templates/authenticated-session.sh](templates/authenticated-session.sh) | Login once, reuse state |
-| [templates/capture-workflow.sh](templates/capture-workflow.sh) | Content extraction with screenshots |
-
-```bash
-./templates/form-automation.sh https://example.com/form
-./templates/authenticated-session.sh https://app.example.com/login
-./templates/capture-workflow.sh https://example.com ./output
-```

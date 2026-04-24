@@ -5,7 +5,7 @@
 Goal: map fare surface and shortlist best dates.
 
 ```bash
-uv run flight-live \
+uv run --script <skill-dir>/scripts/cli.py \
   --origin NYC \
   --destination MAD \
   --depart-start 2026-06-01 \

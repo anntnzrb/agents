@@ -59,14 +59,15 @@ def test_build_search_url_round_trips_query_params(
     page: int,
     zip_code: str | None,
 ) -> None:
-    url = build_search_url(SearchQuery(keywords, page=page, zip_code=zip_code))
+    query = SearchQuery(keywords, page=page, zip_code=zip_code)
+    url = build_search_url(query)
     parsed = urlparse(url)
     params = parse_qs(parsed.query)
 
     assert parsed.scheme == "https"
     assert parsed.netloc == "www.amazon.com"
     assert parsed.path == "/s"
-    assert params["k"] == [keywords]
+    assert params["k"] == [query.keywords]
     assert params["page"] == [str(page)]
 
     if zip_code is None:

@@ -5,55 +5,43 @@ description: "Retrieve up-to-date library/API docs and code examples via the Con
 
 # Context7
 
-Use Context7 for version-specific docs and code examples. Prefer direct HTTP via `curl`
+Use Context7 for version-specific docs and code examples through the bundled cross-platform Python CLI.
 
-## Required shell helper
+## Entry point
 
-Source the bash helper from this skill once per shell:
+Cross-platform:
 
-```bash
-source "${SKILLS_DIR:-skills}/context7/scripts/context7.sh"
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
 ```
 
-If `SKILLS_DIR` is unavailable, source the same file from your local `skills/` checkout.
-The helper also auto-loads `.env` from its own skill directory, so absolute-path
-`source` usage works from any current working directory.
+Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
 
-Then use `context7 <subcommand>` everywhere below.
-
-Credential check policy: do not stop at `echo $CONTEXT7_API_KEY` in the parent shell. Always run the documented helper entrypoint first; it auto-loads a skill-local `.env` using the lookup order below. The API key is optional for basic usage, so only report a credential problem if the real command still fails or the user specifically needs higher-rate access.
+Credential check policy: run the documented CLI entrypoint first; it auto-loads a skill-local `.env` using the lookup order below. The API key is optional for basic usage, so only report a credential problem if the real command still fails or the user specifically needs higher-rate access.
 
 ## Workflow
 
 1. If you do not know the library ID, search first.
 2. Inspect the top matches by `title`, `description`, and `totalSnippets`.
-3. Fetch docs with `context7 docs <library-id> <query>`.
-4. Use `context7 json ...` only when structured parsing is needed.
+3. Fetch docs with `docs <library-id> <query>`.
+4. Use `json ...` only when structured parsing is needed.
 
 ## Quick start
 
-```bash
-# Find likely matches
-context7 search react "hooks useState" \
-  | jq '.results[:5] | map({id, title, description, totalSnippets})'
-
-# Grab the top library ID directly
-context7 id react "hooks useState"
-
-# Fetch readable docs
-context7 docs /vercel/next.js "app router server actions"
-
-# Fetch structured JSON when you need metadata/snippets
-context7 json /fastapi/fastapi "dependency injection"
+```text
+uv run --script <skill-dir>/scripts/cli.py search react "hooks useState"
+uv run --script <skill-dir>/scripts/cli.py id react "hooks useState"
+uv run --script <skill-dir>/scripts/cli.py docs /vercel/next.js "app router server actions"
+uv run --script <skill-dir>/scripts/cli.py json /fastapi/fastapi "dependency injection"
 ```
 
 ## Credentials
 
 - API key is optional but recommended for higher rate limits.
 - Keep `.env` beside this skill.
-- Helper lookup order:
+- CLI lookup order:
   - `CONTEXT7_ENV_FILE`
-  - helper sibling `.env` resolved from `${BASH_SOURCE[0]}`
+  - skill `.env`
   - `$SKILLS_DIR/context7/.env`
   - nearest ancestor `skills/context7/.env`
 - Tracked template: `.env.example`
@@ -61,10 +49,10 @@ context7 json /fastapi/fastapi "dependency injection"
 
 ## Failure handling
 
-- Do not treat the parent shell as the source of truth for `CONTEXT7_API_KEY`; always run the helper first so it can load its own `.env`.
-- If you sourced the helper from an unusual location and env loading still fails, set `CONTEXT7_ENV_FILE` dynamically from the helper path rather than hard-coding a machine-specific directory.
-- Distinguish helper/env failures from API failures:
-  - missing key after helper lookup means env discovery failed
+- Do not treat the parent shell as the source of truth for `CONTEXT7_API_KEY`; always run the CLI so it can load its own `.env`.
+- If env loading still fails, set `CONTEXT7_ENV_FILE` dynamically from the skill path rather than hard-coding a machine-specific directory.
+- Distinguish env behavior from API failures:
+  - missing key after CLI lookup usually means env discovery failed, but a key is optional for public low-rate usage
   - HTTP `401`, `404`, `422`, `429`, or `503` means the request reached Context7 and failed for auth/library/rate/service reasons
 - Report the actual HTTP failure mode instead of collapsing everything into “missing credentials”.
 
@@ -76,29 +64,22 @@ context7 json /fastapi/fastapi "dependency injection"
 - `docs` uses `type=txt` because it is easier to read in agent output.
 - Public endpoint works without an API key for basic usage; expect lower rate limits.
 - Override `CONTEXT7_BASE_URL` if you need to point at a different host.
-- When a key is present, the helper sends `Authorization: Bearer`, uses `--data-urlencode` for safe queries, and surfaces API error messages instead of raw curl HTTP failures.
-- `id` uses `jq`; if `jq` is unavailable, inspect `search` output manually.
 
 ## Common examples
 
-```bash
-# React hooks
-context7 id react "hooks useState"
-context7 docs /websites/react_dev "useState"
-
-# Next.js routing
-context7 id nextjs "routing app router"
-context7 docs /vercel/next.js "app router"
-
-# FastAPI dependencies
-context7 id fastapi "dependencies dependency injection"
-context7 docs /fastapi/fastapi "dependency injection"
+```text
+uv run --script <skill-dir>/scripts/cli.py id react "hooks useState"
+uv run --script <skill-dir>/scripts/cli.py docs /websites/react_dev "useState"
+uv run --script <skill-dir>/scripts/cli.py id nextjs "routing app router"
+uv run --script <skill-dir>/scripts/cli.py docs /vercel/next.js "app router"
+uv run --script <skill-dir>/scripts/cli.py id fastapi "dependencies dependency injection"
+uv run --script <skill-dir>/scripts/cli.py docs /fastapi/fastapi "dependency injection"
 ```
 
 ## Validation
 
-```bash
-./scripts/test-context7-http.sh
+```text
+uv run --script <skill-dir>/scripts/cli.py --help
 ```
 
 ## Query templates

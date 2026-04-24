@@ -2,9 +2,9 @@
 Inspect local Apple Shortcuts definitions from Shortcuts.sqlite.
 
 Usage:
-  uv run scripts/inspect_local_shortcuts.py
-  uv run scripts/inspect_local_shortcuts.py --name "Action Button"
-  uv run scripts/inspect_local_shortcuts.py --include-run-stats --include-smart-prompts
+  uv run --script <skill-dir>/scripts/cli.py inspect
+  uv run --script <skill-dir>/scripts/cli.py inspect --name "Action Button"
+  uv run --script <skill-dir>/scripts/cli.py inspect --include-run-stats --include-smart-prompts
 """
 
 from __future__ import annotations

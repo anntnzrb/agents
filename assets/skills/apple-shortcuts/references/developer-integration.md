@@ -13,11 +13,11 @@ Use this reference for App Intents and App Shortcuts guidance without web fetche
 
 ## Useful Search Queries
 ```bash
-uv run scripts/search_expert_chunks.py --group developer --query "AppShortcutsProvider appShortcuts"
-uv run scripts/search_expert_chunks.py --group developer --query "creating your first app intent"
-uv run scripts/search_expert_chunks.py --group developer --query "ShortcutsLink ShortcutsUIButton"
-uv run scripts/search_expert_chunks.py --group wwdc --query "Develop for Shortcuts and Spotlight with App Intents"
-uv run scripts/search_expert_chunks.py --group wwdc --query "Implement App Shortcuts with App Intents"
+uv run --script <skill-dir>/scripts/cli.py search --group developer --query "AppShortcutsProvider appShortcuts"
+uv run --script <skill-dir>/scripts/cli.py search --group developer --query "creating your first app intent"
+uv run --script <skill-dir>/scripts/cli.py search --group developer --query "ShortcutsLink ShortcutsUIButton"
+uv run --script <skill-dir>/scripts/cli.py search --group wwdc --query "Develop for Shortcuts and Spotlight with App Intents"
+uv run --script <skill-dir>/scripts/cli.py search --group wwdc --query "Implement App Shortcuts with App Intents"
 ```
 
 ## Integration Checklist

@@ -10,65 +10,75 @@ Execute, inspect, and manage Jupyter notebooks directly from Claude Code. Elimin
 ## Workflow
 
 ```
-1. INSPECT  → Understand notebook structure (nb.py inspect)
+1. INSPECT  → Understand notebook structure (`uv run --script <skill-dir>/scripts/cli.py inspect`)
 2. EDIT     → Modify cells with NotebookEdit tool
-3. EXECUTE  → Run cells and capture outputs (nb.py execute -i)
-4. VERIFY   → Read outputs, check for errors (nb.py show --output-only)
+3. EXECUTE  → Run cells and capture outputs (`uv run --script <skill-dir>/scripts/cli.py execute -i`)
+4. VERIFY   → Read outputs, check for errors (`uv run --script <skill-dir>/scripts/cli.py show --output-only`)
 5. ITERATE  → Repeat until complete
 ```
+
+## Entry point
+
+Cross-platform:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
+```
+
+Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
 
 ## Setup (One-Time)
 
 ```bash
 # Install a Jupyter kernel (needed for execution)
-uv run --with ipykernel python -m ipykernel install --user --name python3
+uv run --with ipykernel python -m ipykernel install --user --name uv-py
 ```
 
 ## Scripts
 
-Located in this skill's `scripts/` directory:
+Public dispatcher: `scripts/cli.py`.
 
-| Script | Purpose | Dependencies |
-|--------|---------|--------------|
-| `nb.py` | Full notebook CLI | nbformat, nbclient, nbconvert |
-| `validate.py` | Quick syntax check | nbformat only |
+| Command | Purpose | Internal |
+|--------|---------|----------|
+| `inspect`, `show`, `execute`, `convert`, `clear`, `grep` | Full notebook CLI | `nb.py` |
+| `validate` | Quick syntax check | `validate.py` |
 
-Both scripts are executable with inline dependencies (PEP 723) - uv handles everything automatically.
+`cli.py` carries inline dependencies (PEP 723); uv handles everything automatically.
 
 ## CLI Reference
 
 ```bash
 # Inspect structure
-nb.py inspect notebook.ipynb
+uv run --script <skill-dir>/scripts/cli.py inspect notebook.ipynb
 
 # Show cell contents
-nb.py show notebook.ipynb
-nb.py show notebook.ipynb -c 0,2-4      # specific cells
-nb.py show notebook.ipynb -o            # include outputs
-nb.py show notebook.ipynb --output-only # outputs only
-nb.py show notebook.ipynb -o --save-images ./images/  # save images to dir
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 0,2-4      # specific cells
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -o            # include outputs
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb --output-only # outputs only
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -o --save-images ./images/  # save images to dir
 
 # Execute cells
-nb.py execute notebook.ipynb            # all cells, show output
-nb.py execute notebook.ipynb -i         # save outputs back to file
-nb.py execute notebook.ipynb -c 0,2-4   # specific cells
-nb.py execute notebook.ipynb --save-images ./outputs/  # save images
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb            # all cells, show output
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -i         # save outputs back to file
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 0,2-4   # specific cells
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb --save-images ./outputs/  # save images
 
 # Search cells
-nb.py grep "import pandas" notebook.ipynb      # find cells with pattern
-nb.py grep -i "def.*function" notebook.ipynb   # case-insensitive regex
-nb.py grep -C "pattern" notebook.ipynb         # show full cell context
-nb.py grep --cells-only "pattern" notebook.ipynb  # just cell indices
+uv run --script <skill-dir>/scripts/cli.py grep "import pandas" notebook.ipynb      # find cells with pattern
+uv run --script <skill-dir>/scripts/cli.py grep -i "def.*function" notebook.ipynb   # case-insensitive regex
+uv run --script <skill-dir>/scripts/cli.py grep -C "pattern" notebook.ipynb         # show full cell context
+uv run --script <skill-dir>/scripts/cli.py grep --cells-only "pattern" notebook.ipynb  # just cell indices
 
-# Validate (lightweight - only needs nbformat)
-validate.py notebook.ipynb
+# Validate (lightweight)
+uv run --script <skill-dir>/scripts/cli.py validate notebook.ipynb
 
 # Convert
-nb.py convert notebook.ipynb --to py
-nb.py convert notebook.ipynb --to html -o output.html
+uv run --script <skill-dir>/scripts/cli.py convert notebook.ipynb --to py
+uv run --script <skill-dir>/scripts/cli.py convert notebook.ipynb --to html -o output.html
 
 # Clear outputs
-nb.py clear notebook.ipynb
+uv run --script <skill-dir>/scripts/cli.py clear notebook.ipynb
 ```
 
 ## Quick Patterns
@@ -77,20 +87,20 @@ nb.py clear notebook.ipynb
 
 ```bash
 # Execute all cells, save outputs back to file
-nb.py execute notebook.ipynb -i
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -i
 
 # Then show just the outputs
-nb.py show notebook.ipynb --output-only
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb --output-only
 ```
 
 ### Debug a Failing Cell
 
 ```bash
 # Execute up to the failing cell
-nb.py execute notebook.ipynb -c 0-5 --allow-errors
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 0-5 --allow-errors
 
 # Inspect the error output
-nb.py show notebook.ipynb -c 5 -o
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o
 ```
 
 ### Edit Cell (Built-in Tool)
@@ -104,26 +114,26 @@ Use Claude's `NotebookEdit` tool to modify cells:
 ### Validate Before Commit
 
 ```bash
-# Quick syntax check (lightweight deps)
-validate.py notebook.ipynb
+# Quick syntax check
+uv run --script <skill-dir>/scripts/cli.py validate notebook.ipynb
 
 # Clear outputs for clean commits
-nb.py clear notebook.ipynb
+uv run --script <skill-dir>/scripts/cli.py clear notebook.ipynb
 ```
 
 ## Tool Integration
 
 | Task | Tool |
 |------|------|
-| Read notebook structure | `nb.py inspect` |
-| Read cell contents | `nb.py show` or `read` tool |
+| Read notebook structure | `uv run --script <skill-dir>/scripts/cli.py inspect` |
+| Read cell contents | `uv run --script <skill-dir>/scripts/cli.py show` or `read` tool |
 | Edit cells | `NotebookEdit` tool |
-| Execute cells | `nb.py execute` |
-| View outputs | `nb.py show -o` or `--output-only` |
-| Search cells | `nb.py grep` |
-| Extract images | `nb.py show -o --save-images DIR` |
-| Validate syntax | `validate.py` (fast) or `nb.py validate` |
-| Convert formats | `nb.py convert` |
+| Execute cells | `uv run --script <skill-dir>/scripts/cli.py execute` |
+| View outputs | `uv run --script <skill-dir>/scripts/cli.py show -o` or `--output-only` |
+| Search cells | `uv run --script <skill-dir>/scripts/cli.py grep` |
+| Extract images | `uv run --script <skill-dir>/scripts/cli.py show -o --save-images DIR` |
+| Validate syntax | `uv run --script <skill-dir>/scripts/cli.py validate` |
+| Convert formats | `uv run --script <skill-dir>/scripts/cli.py convert` |
 
 ## References
 

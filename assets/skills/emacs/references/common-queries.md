@@ -7,21 +7,21 @@ Commands below are shown relative to the skill directory. When the working direc
 ## Runtime basics
 
 ```bash
-uv run scripts/emacsctl.py ping
+uv run --script <skill-dir>/scripts/cli.py ping
 ```
 
 ## Active fonts and faces
 
 ```bash
-uv run scripts/emacsctl.py face default
-uv run scripts/emacsctl.py face fixed-pitch
-uv run scripts/emacsctl.py face variable-pitch
+uv run --script <skill-dir>/scripts/cli.py face default
+uv run --script <skill-dir>/scripts/cli.py face fixed-pitch
+uv run --script <skill-dir>/scripts/cli.py face variable-pitch
 ```
 
 For a combined query:
 
 ```bash
-cat <<'ELISP' | uv run scripts/emacsctl.py eval - --json
+cat <<'ELISP' | uv run --script <skill-dir>/scripts/cli.py eval - --json
 (list
   (cons "default_family" (face-attribute 'default :family nil 'default))
   (cons "default_height" (face-attribute 'default :height nil 'default))
@@ -36,21 +36,21 @@ ELISP
 ## Current buffer context
 
 ```bash
-uv run scripts/emacsctl.py buffer
+uv run --script <skill-dir>/scripts/cli.py buffer
 ```
 
 ## Keybinding lookup
 
 ```bash
-uv run scripts/emacsctl.py key 'C-x C-f'
+uv run --script <skill-dir>/scripts/cli.py key 'C-x C-f'
 ```
 
 ## Feature and library lookup
 
 ```bash
-uv run scripts/emacsctl.py feature server
-uv run scripts/emacsctl.py library package
-uv run scripts/emacsctl.py library use-package
+uv run --script <skill-dir>/scripts/cli.py feature server
+uv run --script <skill-dir>/scripts/cli.py library package
+uv run --script <skill-dir>/scripts/cli.py library use-package
 ```
 
 ## Variable values
@@ -58,7 +58,7 @@ uv run scripts/emacsctl.py library use-package
 Use a custom eval when there is no dedicated helper subcommand yet:
 
 ```bash
-cat <<'ELISP' | uv run scripts/emacsctl.py eval - --json
+cat <<'ELISP' | uv run --script <skill-dir>/scripts/cli.py eval - --json
 (list
   (cons "inhibit_startup_message" inhibit-startup-message)
   (cons "use_dialog_box" use-dialog-box)
@@ -69,7 +69,7 @@ ELISP
 ## Mode state
 
 ```bash
-cat <<'ELISP' | uv run scripts/emacsctl.py eval - --json
+cat <<'ELISP' | uv run --script <skill-dir>/scripts/cli.py eval - --json
 (list
   (cons "menu_bar_mode" (bound-and-true-p menu-bar-mode))
   (cons "tool_bar_mode" (bound-and-true-p tool-bar-mode))
@@ -81,7 +81,7 @@ ELISP
 ## Locate docs/source roots
 
 ```bash
-cat <<'ELISP' | uv run scripts/emacsctl.py eval - --json
+cat <<'ELISP' | uv run --script <skill-dir>/scripts/cli.py eval - --json
 (list
   (cons "data_directory" data-directory)
   (cons "invocation_directory" invocation-directory)
@@ -97,25 +97,25 @@ Then search locally with `rg`.
 For larger forms, prefer a temp file:
 
 ```bash
-cat > /tmp/emacs-query.el <<'ELISP'
+cat > <temp-dir>/emacs-query.el <<'ELISP'
 (list
   (cons "default_family" (face-attribute 'default :family nil 'default))
   (cons "default_height" (face-attribute 'default :height nil 'default)))
 ELISP
 
-uv run scripts/emacsctl.py eval-file /tmp/emacs-query.el --json
+uv run --script <skill-dir>/scripts/cli.py eval-file <temp-dir>/emacs-query.el --json
 ```
 
 ## Reload the current init file
 
 ```bash
-uv run scripts/emacsctl.py reload-init
+uv run --script <skill-dir>/scripts/cli.py reload-init
 ```
 
 Or load a specific file:
 
 ```bash
-uv run scripts/emacsctl.py load path/to/init.el
+uv run --script <skill-dir>/scripts/cli.py load path/to/init.el
 ```
 
 Remember: loading a file live does not mean every startup-time behavior is now active. Verify and call out restart requirements.

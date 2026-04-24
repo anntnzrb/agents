@@ -10,7 +10,7 @@ Practical recipes for authoring workflows via REST and running them via MCP.
 
 **Solution**:
 ```bash
-uv run scripts/n8nctl.py list --limit 10
+uv run --script <skill-dir>/scripts/cli.py list --limit 10
 ```
 
 **Tip**: Add `--active true` to see only active workflows.
@@ -23,8 +23,8 @@ uv run scripts/n8nctl.py list --limit 10
 
 **Solution**:
 ```bash
-uv run scripts/n8nctl.py mcp-enable <WORKFLOW_ID>
-uv run scripts/n8nctl.py activate <WORKFLOW_ID>
+uv run --script <skill-dir>/scripts/cli.py mcp-enable <WORKFLOW_ID>
+uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
 ```
 
 **Tip**: MCP lists workflows that are active and marked `availableInMCP`.
@@ -51,7 +51,7 @@ uv run scripts/n8nctl.py activate <WORKFLOW_ID>
 
 **Solution**:
 ```bash
-uv run scripts/n8nctl.py export <WORKFLOW_ID> <OUT.json>
+uv run --script <skill-dir>/scripts/cli.py export <WORKFLOW_ID> <OUT.json>
 ```
 
 **Tip**: Edit JSON, then apply with `n8nctl.py update`.
@@ -91,7 +91,7 @@ Use DeepWiki on `n8n-io/n8n-docs` to list OpenAI‑compatible LLM nodes and loca
 
 **Solution**:
 ```bash
-uv run scripts/n8nctl.py validate <WORKFLOW.json>
+uv run --script <skill-dir>/scripts/cli.py validate <WORKFLOW.json>
 ```
 
 **Tip**: Validate, then apply `create` or `update`.

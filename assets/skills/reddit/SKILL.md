@@ -5,42 +5,38 @@ description: "Read Reddit directly via Reddit's public JSON endpoints. Use for s
 
 # Reddit
 
-Use Reddit directly over HTTP via `reddit.com/*.json`; no mcporter needed.
+Use Reddit directly over HTTP via `reddit.com/*.json` through the bundled cross-platform Python CLI.
 
-## Required shell helper
+## Entry point
 
-Source the bash helper from this skill once per shell:
+Cross-platform:
 
-```bash
-source "${SKILLS_DIR:-skills}/reddit/scripts/reddit.sh"
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
 ```
 
-If `SKILLS_DIR` is unavailable, source the same file from your local `skills/` checkout.
-The helper also auto-loads `.env` from its own skill directory, so absolute-path
-`source` usage works from any current working directory.
+Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
 
-Then use `reddit <subcommand>` everywhere below.
-
-Environment check policy: do not stop at `echo $REDDIT_USER_AGENT` in the parent shell. Always run the documented helper entrypoint first; it auto-loads a skill-local `.env` using the lookup order below. Missing `REDDIT_USER_AGENT` is not a hard blocker because this skill has a built-in default.
+Environment check policy: run the documented CLI entrypoint first; it auto-loads a skill-local `.env` using the lookup order below. Missing `REDDIT_USER_AGENT` is not a hard blocker because this skill has a built-in default.
 
 ## Quick start
 
-```bash
-reddit browse all hot limit=10
-reddit browse technology top time=week limit=10
-reddit search "h1b" subreddits='["cscareerquestions","immigration"]' sort=new time=month limit=10
-reddit post programming 1abcde comment_limit=20 comment_sort=top
-reddit post-url "https://reddit.com/r/programming/comments/1abcde/example/" comment_limit=20
-reddit user-analysis spez posts_limit=5 comments_limit=5 time_range=month
-reddit explain "cake day"
+```text
+uv run --script <skill-dir>/scripts/cli.py browse all hot limit=10
+uv run --script <skill-dir>/scripts/cli.py browse technology top time=week limit=10
+uv run --script <skill-dir>/scripts/cli.py search "h1b" subreddits='["cscareerquestions","immigration"]' sort=new time=month limit=10
+uv run --script <skill-dir>/scripts/cli.py post programming 1abcde comment_limit=20 comment_sort=top
+uv run --script <skill-dir>/scripts/cli.py post-url "https://reddit.com/r/programming/comments/1abcde/example/" comment_limit=20
+uv run --script <skill-dir>/scripts/cli.py user-analysis spez posts_limit=5 comments_limit=5 time_range=month
+uv run --script <skill-dir>/scripts/cli.py explain "cake day"
 ```
 
 ## Environment
 
 - Keep `.env` beside this skill if you want a stable local User-Agent.
-- Helper lookup order:
+- CLI lookup order:
   - `REDDIT_ENV_FILE`
-  - helper sibling `.env` resolved from `${BASH_SOURCE[0]}`
+  - skill `.env`
   - `$SKILLS_DIR/reddit/.env`
   - nearest ancestor `skills/reddit/.env`
 - Tracked template: `.env.example`
@@ -50,9 +46,9 @@ reddit explain "cake day"
 
 ## Failure handling
 
-- Do not treat the parent shell as the source of truth for `REDDIT_USER_AGENT`; always run the helper first so it can load its own `.env`.
-- If you sourced the helper from an unusual location and env loading still fails, set `REDDIT_ENV_FILE` dynamically from the helper path rather than hard-coding a machine-specific directory.
-- Missing `REDDIT_USER_AGENT` after helper lookup is not a hard blocker because the helper has a built-in default.
+- Do not treat the parent shell as the source of truth for `REDDIT_USER_AGENT`; always run the CLI so it can load its own `.env`.
+- If env loading still fails, set `REDDIT_ENV_FILE` dynamically from the skill path rather than hard-coding a machine-specific directory.
+- Missing `REDDIT_USER_AGENT` after CLI lookup is not a hard blocker because the CLI has a built-in default.
 - Distinguish env lookup behavior from HTTP failures or Reddit-side blocking; report the actual request failure instead of claiming the skill lacks credentials.
 
 ## Notes
@@ -76,8 +72,8 @@ See `assets/query-templates.json`.
 
 ## Validation
 
-```bash
-./scripts/test-reddit-http.sh
+```text
+uv run --script <skill-dir>/scripts/cli.py --help
 ```
 
 ## Reference

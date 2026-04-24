@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
 """
 Generate a structured Apple Shortcuts blueprint.
 
 Usage:
-  uv run scripts/make_blueprint.py --goal "..." --devices "iPhone,Mac"
+  uv run --script <skill-dir>/scripts/cli.py blueprint --goal "..." --devices "iPhone,Mac"
 """
 
 from __future__ import annotations

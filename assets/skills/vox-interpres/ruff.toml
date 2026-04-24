@@ -1,0 +1,5 @@
+target-version = "py311"
+src = ["lib", "tests"]
+
+[lint.per-file-ignores]
+"scripts/cli.py" = ["E402"]

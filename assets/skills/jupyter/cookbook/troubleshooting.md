@@ -17,7 +17,7 @@ jupyter kernelspec list
 python -m ipykernel install --user
 
 # Or specify a different kernel
-nb.py execute notebook.ipynb -k python
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -k python
 ```
 
 **Tip**: Kernel names are in the notebook's `metadata.kernelspec.name`. Use `inspect` to check.
@@ -31,10 +31,10 @@ nb.py execute notebook.ipynb -k python
 **Solution**:
 ```bash
 # Increase timeout (default: 600 seconds)
-nb.py execute notebook.ipynb -t 3600  # 1 hour
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -t 3600  # 1 hour
 
 # Or execute long cell separately
-nb.py execute notebook.ipynb -c 5 -t 7200  # 2 hours for cell 5
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 5 -t 7200  # 2 hours for cell 5
 ```
 
 **Tip**: Consider breaking long-running cells into smaller chunks.
@@ -48,10 +48,10 @@ nb.py execute notebook.ipynb -c 5 -t 7200  # 2 hours for cell 5
 **Solution**:
 ```bash
 # Continue past errors
-nb.py execute notebook.ipynb --allow-errors -i
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb --allow-errors -i
 
 # Then inspect failures
-nb.py show notebook.ipynb -o | grep -A 20 "Error:"
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -o | grep -A 20 "Error:"
 ```
 
 **Tip**: The error output includes the full traceback.
@@ -65,10 +65,10 @@ nb.py show notebook.ipynb -o | grep -A 20 "Error:"
 **Solution**:
 ```bash
 # Clear all outputs (resets execution order)
-nb.py clear notebook.ipynb
+uv run --script <skill-dir>/scripts/cli.py clear notebook.ipynb
 
 # Execute from fresh state
-nb.py execute notebook.ipynb -i
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -i
 ```
 
 **Tip**: Always "Run All" to verify notebook works in order.
@@ -84,12 +84,9 @@ nb.py execute notebook.ipynb -i
 # Check which Python the kernel uses
 jupyter kernelspec list --json
 
-# Ensure package is installed in that environment
-# For the python3 kernel:
-python3 -m pip install missing_package
-
-# Or use a uv-managed environment
-uv pip install missing_package
+# Ensure the package is available to the selected kernel.
+# Prefer a uv-managed kernel/environment, then add dependencies through that environment.
+uv add missing_package
 ```
 
 **Tip**: The kernel's Python may differ from your shell's Python.
@@ -121,7 +118,7 @@ grep -n "<<<<<<" notebook.ipynb
 **Solution**:
 ```bash
 # Clear outputs
-nb.py clear notebook.ipynb
+uv run --script <skill-dir>/scripts/cli.py clear notebook.ipynb
 
 # Then re-execute with limited output
 # In your code, use:
@@ -138,14 +135,14 @@ nb.py clear notebook.ipynb
 **Problem**: Tracebacks have unreadable escape sequences.
 
 **Solution**:
-The `nb.py show` command automatically strips ANSI codes. If you're still seeing them:
+The `uv run --script <skill-dir>/scripts/cli.py show` command automatically strips ANSI codes. If you're still seeing them:
 
 ```bash
 # The default output is already cleaned
-nb.py show notebook.ipynb -c 5 -o
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o
 
 # For raw inspection with codes:
-nb.py show notebook.ipynb -c 5 -o --raw
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o --raw
 ```
 
 **Tip**: ANSI codes are for terminal colors; they're stripped for readability.
@@ -165,7 +162,7 @@ jupyter notebook stop 8888
 ps aux | grep python | grep jupyter
 
 # Execute with shorter timeout
-nb.py execute notebook.ipynb -t 60 -c 5
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -t 60 -c 5
 ```
 
 **Tip**: Common causes: infinite loops, waiting for user input, network I/O.
@@ -204,7 +201,7 @@ The scripts use inline dependencies with `uv run`. If uv isn't handling deps:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # The shebang handles the rest automatically
-nb.py execute notebook.ipynb
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb
 ```
 
 **Tip**: For the lightweight `validate.py`, only `nbformat` is needed.

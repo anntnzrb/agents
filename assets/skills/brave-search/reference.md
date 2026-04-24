@@ -9,7 +9,7 @@
 
 Keep `.env` beside this skill and populate it from `.env.example`.
 
-Supported lookup order in the shell helper:
+Supported lookup order in `scripts/cli.py`:
 - `BRAVE_SEARCH_ENV_FILE`
 - `$SKILLS_DIR/brave-search/.env`
 - nearest ancestor `skills/brave-search/.env`
@@ -104,10 +104,10 @@ Use `brave-search raw </path> key=<key> ...` for these.
 - Web search is the best default path.
 - `summary=1` on web search returns a `summarizer.key` when Brave can generate a summary.
 - Summarizer is deprecated in Brave's docs in favor of newer answer-oriented flows, but the HTTP endpoints still exist.
-- Keep queries URL-safe by always using the shell helper, which uses `--data-urlencode`.
+- Keep queries URL-safe by using `scripts/cli.py`, which encodes query parameters.
 
 ## Validation
 
-```bash
-./scripts/test-brave-http.sh
+```text
+uv run --script <skill-dir>/scripts/cli.py --help
 ```

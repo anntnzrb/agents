@@ -19,7 +19,7 @@ The full `yt-dlp` documentation is extensive. When you need to look up specific 
 
 1. Fetch the docs:
    ```bash
-   curl -s https://raw.githubusercontent.com/yt-dlp/yt-dlp/refs/heads/master/README.md -o /tmp/yt-dlp-docs.md
+   curl -s https://raw.githubusercontent.com/yt-dlp/yt-dlp/refs/heads/master/README.md -o <temp-dir>/yt-dlp-docs.md
    ```
 
 2. Use a **subagent** to search the docs (preserves context window):
@@ -29,7 +29,7 @@ The full `yt-dlp` documentation is extensive. When you need to look up specific 
      description="Search yt-dlp docs",
      prompt="Thoroughness: quick
    
-   Read /tmp/yt-dlp-docs.md and find information about [SPECIFIC TOPIC].
+   Read <temp-dir>/yt-dlp-docs.md and find information about [SPECIFIC TOPIC].
    Return only the relevant options and examples."
    )
    ```

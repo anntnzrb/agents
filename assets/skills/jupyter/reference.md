@@ -155,13 +155,13 @@ df.describe()
 
 ```bash
 # Show cell 0
-uv run nb.py show notebook.ipynb -c 0
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 0
 
 # Show cells 2, 3, 4
-uv run nb.py show notebook.ipynb -c 2-4
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 2-4
 
 # Show cells 0, 5, 10
-uv run nb.py show notebook.ipynb -c 0,5,10
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 0,5,10
 ```
 
 ### By Cell ID
@@ -181,10 +181,10 @@ Long-running cells may timeout. Adjust with `-t`:
 
 ```bash
 # 10-minute timeout (default: 600s)
-uv run nb.py execute notebook.ipynb -t 600
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -t 600
 
 # 1-hour timeout for ML training
-uv run nb.py execute notebook.ipynb -t 3600
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -t 3600
 ```
 
 ### Kernel Selection
@@ -192,8 +192,8 @@ uv run nb.py execute notebook.ipynb -t 3600
 Force a specific kernel:
 
 ```bash
-uv run nb.py execute notebook.ipynb -k python3
-uv run nb.py execute notebook.ipynb -k ir  # R kernel
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -k uv-py
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -k ir  # R kernel
 ```
 
 ### Error Handling
@@ -201,7 +201,7 @@ uv run nb.py execute notebook.ipynb -k ir  # R kernel
 Continue past failing cells:
 
 ```bash
-uv run nb.py execute notebook.ipynb --allow-errors
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb --allow-errors
 ```
 
 ## Output Interpretation

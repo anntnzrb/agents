@@ -1,11 +1,11 @@
 # Cheatsheet
 
-Run from the skill root with `uv run amz-live ...`; if you're elsewhere, use `scripts/amz-live.sh ...`.
+Run with `uv run --script <skill-dir>/scripts/cli.py ...`, replacing `<skill-dir>` with this skill directory.
 
 ## Best default
 
 ```bash
-uv run amz-live "$QUERY" \
+uv run --script <skill-dir>/scripts/cli.py "$QUERY" \
   --llm-json \
   --details \
   --detail-limit 2 \
@@ -16,7 +16,7 @@ uv run amz-live "$QUERY" \
 ## Cheap decent cables
 
 ```bash
-uv run amz-live "usb c to usb c braided cable" \
+uv run --script <skill-dir>/scripts/cli.py "usb c to usb c braided cable" \
   --llm-json \
   --max-price 10 \
   --min-rating 4.5 \

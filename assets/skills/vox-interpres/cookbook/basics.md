@@ -15,7 +15,7 @@ If one is missing, fix that first.
 ## 2) Analyze full song
 
 ```bash
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" analyze ./song.flac --json
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze ./song.flac --json
 ```
 
 Outputs:
@@ -25,15 +25,15 @@ Outputs:
 ## 3) Ask quick questions (single shot)
 
 ```bash
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" ask ./song.flac "tempo and key?"
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" ask ./song.flac "how energetic is this?"
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" ask ./song.flac "show metadata"
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" ask ./song.flac "tempo and key?"
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" ask ./song.flac "how energetic is this?"
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" ask ./song.flac "show metadata"
 ```
 
 ## 4) Chat mode (interactive)
 
 ```bash
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" chat ./song.flac
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" chat ./song.flac
 ```
 
 Inside REPL:
@@ -43,7 +43,7 @@ Inside REPL:
 ## 5) Analyze only a segment
 
 ```bash
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" analyze ./song.flac \
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze ./song.flac \
   --segment-start 60 \
   --segment-duration 30 \
   --json
@@ -55,16 +55,16 @@ Use this for “what happens at minute 1?” style analysis.
 
 ```bash
 # force recompute
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" analyze ./song.flac --refresh
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze ./song.flac --refresh
 
 # do not read/write cache
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" analyze ./song.flac --no-cache
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze ./song.flac --no-cache
 ```
 
 ## 7) Generate plots (waveform/spectrogram/chroma)
 
 ```bash
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" analyze ./song.flac \
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze ./song.flac \
   --plots \
   --out-dir ~/.cache/vox-interpres \
   --json
@@ -78,11 +78,11 @@ Plot file paths appear in `plot_files`.
 A=./song-a.flac
 B=./song-b.flac
 
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" analyze "$A" --json > /tmp/a.json
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" analyze "$B" --json > /tmp/b.json
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze "$A" --json > <temp-dir>/a.json
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze "$B" --json > <temp-dir>/b.json
 
-jq '{tempo:.beats.tempo_bpm,key:(.key.key+" "+.key.mode),energy:.energy.dynamic_range}' /tmp/a.json
-jq '{tempo:.beats.tempo_bpm,key:(.key.key+" "+.key.mode),energy:.energy.dynamic_range}' /tmp/b.json
+jq '{tempo:.beats.tempo_bpm,key:(.key.key+" "+.key.mode),energy:.energy.dynamic_range}' <temp-dir>/a.json
+jq '{tempo:.beats.tempo_bpm,key:(.key.key+" "+.key.mode),energy:.energy.dynamic_range}' <temp-dir>/b.json
 ```
 
 ## 9) Agent pattern (human asks, agent executes)

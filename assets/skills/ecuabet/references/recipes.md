@@ -6,22 +6,22 @@ Shortcut prompts are documented in `references/shortcuts.md`.
 
 ## Integrated one-shot
 ```bash
-uv run scripts/main.py 13821298 --ecuabet 13821298 --require-ecuabet --no-raw --compact
+uv run --script <skill-dir>/scripts/cli.py run 13821298 --ecuabet 13821298 --require-ecuabet --no-raw --compact
 ```
 
 ## Integrated watch
 ```bash
-uv run scripts/main.py 13821298 --ecuabet 13821298 --require-ecuabet --watch 20 --max-iterations 0 --no-raw --compact
+uv run --script <skill-dir>/scripts/cli.py run 13821298 --ecuabet 13821298 --require-ecuabet --watch 20 --max-iterations 0 --no-raw --compact
 ```
 
 ## Write snapshot file
 ```bash
-uv run scripts/main.py 13821298 --ecuabet 13821298 --require-ecuabet --no-raw --output snapshots/latest.json
+uv run --script <skill-dir>/scripts/cli.py run 13821298 --ecuabet 13821298 --require-ecuabet --no-raw --output snapshots/latest.json
 ```
 
 ## Strict low-variance shortlist
 ```bash
-uv run scripts/main.py 13821298 \
+uv run --script <skill-dir>/scripts/cli.py run 13821298 \
   --ecuabet 13821298 \
   --require-ecuabet \
   --recommend-top 8 \
@@ -34,7 +34,7 @@ uv run scripts/main.py 13821298 \
 
 ## Wider upside shortlist
 ```bash
-uv run scripts/main.py 13821298 \
+uv run --script <skill-dir>/scripts/cli.py run 13821298 \
   --ecuabet 13821298 \
   --require-ecuabet \
   --recommend-top 12 \
@@ -48,7 +48,7 @@ uv run scripts/main.py 13821298 \
 
 ## Tune recommendation bounds
 ```bash
-uv run scripts/main.py 13821298 \
+uv run --script <skill-dir>/scripts/cli.py run 13821298 \
   --ecuabet 13821298 \
   --require-ecuabet \
   --recommend-top 12 \
@@ -63,11 +63,11 @@ uv run scripts/main.py 13821298 \
 
 ## Per-feed debugging
 ```bash
-uv run scripts/ecuabet.py 13821298 --no-raw --compact
-uv run scripts/sofascore.py "RB Leipzig Wolfsburg" --no-raw --compact
-uv run scripts/espn.py "RB Leipzig Wolfsburg" --league ger.1 --no-raw --compact
-uv run scripts/open_meteo.py "51.3397,12.3731" --hourly-limit 12 --compact
-uv run scripts/understat.py --league Bundesliga --season 2025 --home-team "RB Leipzig" --away-team "Wolfsburg" --compact
+uv run --script <skill-dir>/scripts/cli.py feed ecuabet 13821298 --no-raw --compact
+uv run --script <skill-dir>/scripts/cli.py feed sofascore "RB Leipzig Wolfsburg" --no-raw --compact
+uv run --script <skill-dir>/scripts/cli.py feed espn "RB Leipzig Wolfsburg" --league ger.1 --no-raw --compact
+uv run --script <skill-dir>/scripts/cli.py feed open-meteo "51.3397,12.3731" --hourly-limit 12 --compact
+uv run --script <skill-dir>/scripts/cli.py feed understat --league Bundesliga --season 2025 --home-team "RB Leipzig" --away-team "Wolfsburg" --compact
 ```
 
 ## Run tests

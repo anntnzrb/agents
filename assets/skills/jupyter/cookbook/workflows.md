@@ -16,13 +16,13 @@ nb.py inspect notebook.ipynb
 # 2. Edit cell (use NotebookEdit tool in Claude)
 
 # 3. Execute and save outputs
-nb.py execute notebook.ipynb -i
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -i
 
 # 4. View outputs
-nb.py show notebook.ipynb --output-only
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb --output-only
 
 # 5. If errors, check specific cell
-nb.py show notebook.ipynb -c 5 -o
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o
 ```
 
 **Tip**: Use `-i` (in-place) to save outputs back to the file for persistence.
@@ -36,10 +36,10 @@ nb.py show notebook.ipynb -c 5 -o
 **Solution**:
 ```bash
 # Execute cells 3 through 7
-nb.py execute notebook.ipynb -c 3-7 -i
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 3-7 -i
 
 # View just those outputs
-nb.py show notebook.ipynb -c 3-7 --output-only
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 3-7 --output-only
 ```
 
 **Tip**: Cell indices are 0-based. Use `inspect` to see the cell list first.
@@ -56,7 +56,7 @@ nb.py show notebook.ipynb -c 3-7 --output-only
 validate.py notebook.ipynb
 
 # Clear all outputs
-nb.py clear notebook.ipynb
+uv run --script <skill-dir>/scripts/cli.py clear notebook.ipynb
 
 # Now safe to commit
 git add notebook.ipynb
@@ -87,7 +87,7 @@ nb.py convert notebook.ipynb --to py -o script.py
 **Solution**:
 ```bash
 # First ensure outputs are current
-nb.py execute notebook.ipynb -i
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -i
 
 # Then convert to HTML
 nb.py convert notebook.ipynb --to html -o report.html
@@ -104,10 +104,10 @@ nb.py convert notebook.ipynb --to html -o report.html
 **Solution**:
 ```bash
 # Execute just the import cells
-nb.py execute notebook.ipynb -c 0-2 --allow-errors
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 0-2 --allow-errors
 
 # Check the error
-nb.py show notebook.ipynb -c 0-2 -o
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 0-2 -o
 ```
 
 **Tip**: The error output will show `ModuleNotFoundError` with the missing package name.
@@ -121,12 +121,12 @@ nb.py show notebook.ipynb -c 0-2 -o
 **Solution**:
 ```bash
 # Execute in batches
-nb.py execute notebook.ipynb -c 0-5 -i
-nb.py show notebook.ipynb -c 5 -o
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 0-5 -i
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o
 
 # If good, continue
-nb.py execute notebook.ipynb -c 6-10 -i
-nb.py show notebook.ipynb -c 10 -o
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 6-10 -i
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 10 -o
 ```
 
 **Tip**: Use `--allow-errors` if you want to continue past failures.
@@ -140,7 +140,7 @@ nb.py show notebook.ipynb -c 10 -o
 **Solution**:
 ```bash
 # Show only code cells
-nb.py show notebook.ipynb -t code
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -t code
 ```
 
 **Tip**: Use `-t markdown` to show only markdown cells.
@@ -171,7 +171,7 @@ validate.py notebook.ipynb --require-outputs
 **Solution**:
 ```bash
 # Show raw output data
-nb.py show notebook.ipynb -c 5 -o --raw
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o --raw
 ```
 
 **Tip**: Raw mode shows the full MIME type data including base64-encoded images.
@@ -197,7 +197,7 @@ nb.py grep -C "class.*Model" notebook.ipynb
 nb.py grep --cells-only "TODO" notebook.ipynb
 ```
 
-**Tip**: Use `--cells-only` output with `-c` flag: `nb.py execute notebook.ipynb -c $(nb.py grep --cells-only "import" notebook.ipynb)`
+**Tip**: Use `--cells-only` output with `-c` flag: `uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c $(nb.py grep --cells-only "import" notebook.ipynb)`
 
 ---
 
@@ -208,13 +208,13 @@ nb.py grep --cells-only "TODO" notebook.ipynb
 **Solution**:
 ```bash
 # Save all images from outputs to a directory
-nb.py show notebook.ipynb -o --save-images ./images/
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -o --save-images ./images/
 
 # Save images after executing
-nb.py execute notebook.ipynb --save-images ./outputs/
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb --save-images ./outputs/
 
 # Extract images from specific cells only
-nb.py show notebook.ipynb -c 5,10-12 -o --save-images ./figures/
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5,10-12 -o --save-images ./figures/
 ```
 
 **Tip**: Images are saved as `cell_N_output_M.png` (or `.jpg`, `.svg`). Supports PNG, JPEG, and SVG formats.

@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["anthropic>=0.40", "PyYAML>=6.0"]
+# ///
 """Improve a skill description based on eval results.
 
 Takes eval results (from run_eval.py) and generates an improved description
@@ -10,6 +14,8 @@ import json
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import anthropic
 

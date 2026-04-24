@@ -14,7 +14,7 @@ Share a visual explainer HTML file instantly via Vercel. Returns a live URL with
 **Examples:**
 ```
 /share ~/.agent/diagrams/my-diagram.html
-/share /tmp/visual-explainer-output.html
+/share <temp-dir>/visual-explainer-output.html
 ```
 
 ## How It Works
@@ -31,8 +31,10 @@ No Vercel account, Cloudflare account, or API keys needed. The deployment is "cl
 
 ## Script Location
 
-```bash
-bash {{skill_dir}}/scripts/share.sh <file>
+Canonical cross-platform command:
+
+```text
+uv run --script {{skill_dir}}/scripts/cli.py share <file>
 ```
 
 ## Output
@@ -40,7 +42,7 @@ bash {{skill_dir}}/scripts/share.sh <file>
 ```
 Sharing my-diagram.html...
 
-✓ Shared successfully!
+Shared successfully!
 
 Live URL:  https://skill-deploy-abc123.vercel.app
 Claim URL: https://vercel.com/claim-deployment?code=...

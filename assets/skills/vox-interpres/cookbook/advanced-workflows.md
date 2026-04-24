@@ -9,12 +9,12 @@ Detect how key/energy/tempo shift over time.
 ```bash
 FILE=./song.flac
 for START in 0 30 60 90 120; do
-  sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" analyze "$FILE" \
+  uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze "$FILE" \
     --segment-start "$START" \
     --segment-duration 30 \
-    --json > "/tmp/seg-$START.json"
+    --json > "<temp-dir>/seg-$START.json"
   printf 'segment=%ss\n' "$START"
-  jq '{tempo:.beats.tempo_bpm,key:(.key.key+" "+.key.mode),kconf:.key.confidence,energy:.energy.dynamic_range}' "/tmp/seg-$START.json"
+  jq '{tempo:.beats.tempo_bpm,key:(.key.key+" "+.key.mode),kconf:.key.confidence,energy:.energy.dynamic_range}' "<temp-dir>/seg-$START.json"
 done
 ```
 
@@ -24,7 +24,7 @@ Use this to find drops, breakdowns, and modulation-like behavior.
 
 ```bash
 find ./music -type f \( -name '*.mp3' -o -name '*.flac' -o -name '*.wav' -o -name '*.ogg' -o -name '*.m4a' \) | while IFS= read -r f; do
-  sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" analyze "$f" --json > "/tmp/$(basename "$f").json" || true
+  uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze "$f" --json > "<temp-dir>/$(basename "$f").json" || true
 done
 ```
 
@@ -36,7 +36,7 @@ Objective: keep tracks close in tempo and compatible key region.
 
 ```bash
 # pseudo: run analyze on all tracks, then filter
-jq -s '[.[] | {file:.file_path,bpm:.beats.tempo_bpm,key:(.key.key+" "+.key.mode),kconf:.key.confidence}]' /tmp/*.json
+jq -s '[.[] | {file:.file_path,bpm:.beats.tempo_bpm,key:(.key.key+" "+.key.mode),kconf:.key.confidence}]' <temp-dir>/*.json
 ```
 
 Use ±3 BPM windows, and prefer key confidence > 0.25 when matching.
@@ -53,8 +53,8 @@ For each user question:
 ## 5) Plot-driven review
 
 ```bash
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" analyze ./song.flac --plots --json > /tmp/song.json
-jq '.plot_files' /tmp/song.json
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze ./song.flac --plots --json > <temp-dir>/song.json
+jq '.plot_files' <temp-dir>/song.json
 ```
 
 Use plots for:
@@ -72,7 +72,7 @@ Inspect `notes` in JSON to verify fallback path happened.
 ```bash
 OUT=./report
 mkdir -p "$OUT"
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" analyze ./song.flac --plots --json > "$OUT/analysis.json"
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze ./song.flac --plots --json > "$OUT/analysis.json"
 ```
 
 Now you have a portable packet:

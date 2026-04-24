@@ -14,7 +14,7 @@ At a high level, the process of creating a skill goes like this:
 - Create a few test prompts and run them with the skill enabled
 - Help the user evaluate the results both qualitatively and quantitatively
   - While the runs happen in the background, draft some quantitative evals if there aren't any (if there are some, you can either use as is or modify if you feel something needs to change about them). Then explain them to the user (or if they already existed, explain the ones that already exist)
-  - Use the `eval-viewer/generate_review.py` script to show the user the results for them to look at, and also let them look at the quantitative metrics
+  - Use `uv run --script <skill-dir>/scripts/cli.py generate-review` to show the user the results and quantitative metrics
 - Rewrite the skill based on feedback from the user's evaluation of the results (and also if there are any glaring flaws that become apparent from the quantitative benchmarks)
 - Repeat until you're satisfied
 - Expand the test set and try again at larger scale
@@ -26,6 +26,25 @@ On the other hand, maybe they already have a draft of the skill. In this case yo
 Of course, you should always be flexible and if the user is like "I don't need to run a bunch of evaluations, just vibe with me", you can do that instead.
 
 Then after the skill is done (but again, the order is flexible), you can run the description-optimization workflow to improve triggering quality.
+
+## Entry point
+
+Cross-platform:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
+```
+
+Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
+
+Useful commands:
+
+```bash
+uv run --script <skill-dir>/scripts/cli.py aggregate-benchmark <workspace>/iteration-N --skill-name <name>
+uv run --script <skill-dir>/scripts/cli.py generate-review <workspace>/iteration-N --skill-name <name>
+uv run --script <skill-dir>/scripts/cli.py package <path-to-skill-folder>
+uv run --script <skill-dir>/scripts/cli.py quick-validate <path-to-skill-folder>
+```
 
 ## Communicating with the user
 
@@ -225,7 +244,7 @@ Once all runs are done:
 
 2. **Aggregate into benchmark** — run the aggregation script from the skill-creator directory:
    ```bash
-   uv run scripts/aggregate_benchmark.py <workspace>/iteration-N --skill-name <name>
+   uv run --script <skill-creator-path>/scripts/cli.py aggregate-benchmark <workspace>/iteration-N --skill-name <name>
    ```
    This produces `benchmark.json` and `benchmark.md` with pass_rate, time, and tokens for each configuration, with mean ± stddev and the delta. If generating benchmark.json manually, see `references/schemas.md` for the exact schema the viewer expects.
 Put each with_skill version before its baseline counterpart.
@@ -234,7 +253,7 @@ Put each with_skill version before its baseline counterpart.
 
 4. **Launch the viewer** with both qualitative outputs and quantitative data:
    ```bash
-   nohup uv run <skill-creator-path>/eval-viewer/generate_review.py \
+   nohup uv run --script <skill-creator-path>/scripts/cli.py generate-review \
      <workspace>/iteration-N \
      --skill-name "my-skill" \
      --benchmark <workspace>/iteration-N/benchmark.json \
@@ -245,7 +264,7 @@ Put each with_skill version before its baseline counterpart.
 
    **Cowork / headless environments:** If `webbrowser.open()` is not available or the environment has no display, use `--static <output_path>` to write a standalone HTML file instead of starting a server. Feedback will be downloaded as a `feedback.json` file when the user clicks "Submit All Reviews". After download, copy `feedback.json` into the workspace directory for the next iteration to pick up.
 
-Note: please use generate_review.py to create the viewer; there's no need to write custom HTML.
+Note: please use `uv run --script <skill-creator-path>/scripts/cli.py generate-review` to create the viewer; there's no need to write custom HTML.
 
 5. **Tell the user** something like: "I've opened the results in your browser. There are two tabs — 'Outputs' lets you click through each test case and leave feedback, 'Benchmark' shows the quantitative comparison. When you're done, come back here and let me know."
 
@@ -344,7 +363,7 @@ Use [references/description-optimization.md](references/description-optimization
 Check whether you have access to the `present_files` tool. If you don't, skip this step. If you do, package the skill and present the .skill file to the user:
 
 ```bash
-uv run scripts/package_skill.py <path/to/skill-folder>
+uv run --script <skill-creator-path>/scripts/cli.py package <path/to/skill-folder>
 ```
 
 After packaging, direct the user to the resulting `.skill` file path so they can install it.
@@ -379,11 +398,11 @@ Repeating one more time the core loop here for emphasis:
 - Draft or edit the skill
 - Run the test prompts with the skill enabled
 - With the user, evaluate the outputs:
-  - Create benchmark.json and run `eval-viewer/generate_review.py` to help the user review them
+  - Create benchmark.json and run `uv run --script <skill-creator-path>/scripts/cli.py generate-review` to help the user review them
   - Run quantitative evals
 - Repeat until you and the user are satisfied
 - Package the final skill and return it to the user.
 
-Please add steps to your TodoList, if you have such a thing, to make sure you don't forget. If you're in Cowork, please specifically put "Create evals JSON and run `eval-viewer/generate_review.py` so human can review test cases" in your TodoList to make sure it happens.
+Please add steps to your TodoList, if you have such a thing, to make sure you don't forget. If you're in Cowork, please specifically put "Create evals JSON and run the skill-creator `generate-review` command so human can review test cases" in your TodoList to make sure it happens.
 
 Good luck!

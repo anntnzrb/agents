@@ -1,7 +1,7 @@
 ---
 name: flight-live
 description: Read-only flight search via Kiwi web scraping through agent-browser (nix wrapper) plus public skypicker location resolution. Use for date-window fare discovery, shortlist ranking, and weekday/weekend tradeoff checks with machine-readable output.
-compatibility: Requires `uv` and `nix`. Uses bundled `flight-live` project plus `scripts/flight-live.sh`. Network access required.
+compatibility: Requires `uv` and `nix`. Uses bundled skill-local `scripts/cli.py`. Network access required.
 ---
 
 # flight-live
@@ -12,17 +12,17 @@ Operator manual for the bundled read-only flight CLI.
 No credentials. No API keys. No commercial APIs.
 
 ## Entry points
-- From skill root: `uv run flight-live ...`
-- From anywhere: `bash "$SKILLS_DIR/flight-live/scripts/flight-live.sh" ...`
-- If `SKILLS_DIR` is not set: `bash <skill-dir>/scripts/flight-live.sh ...`
-- For process integration: `uv run flight-live --mode rpc`
+- From skill root: `uv run --script <skill-dir>/scripts/cli.py ...`
+- From anywhere: `uv run --script "$SKILLS_DIR/flight-live/scripts/cli.py" ...`
+- If `SKILLS_DIR` is not set: `uv run --script <skill-dir>/scripts/cli.py ...`
+- For process integration: `uv run --script <skill-dir>/scripts/cli.py --mode rpc`
 
 ## Core rule
 Prefer `--llm-json` unless user asks for human text.
 
 ## Fast pattern
 ```bash
-uv run flight-live \
+uv run --script <skill-dir>/scripts/cli.py \
   --origin GYE \
   --destination MIA \
   --depart-start 2026-08-01 \

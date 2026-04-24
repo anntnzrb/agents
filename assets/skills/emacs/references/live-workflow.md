@@ -15,13 +15,13 @@ The goal is usually not a one-off tweak. The goal is a persistent change that is
 Use this order unless there is a strong reason not to:
 
 1. Runtime introspection
-   - `uv run scripts/emacsctl.py ping`
-   - `uv run scripts/emacsctl.py face default`
-   - `uv run scripts/emacsctl.py buffer`
-   - `uv run scripts/emacsctl.py key 'C-x C-f'`
-   - `uv run scripts/emacsctl.py library package`
-   - `uv run scripts/emacsctl.py feature server`
-   - `uv run scripts/emacsctl.py eval ...`
+   - `uv run --script <skill-dir>/scripts/cli.py ping`
+   - `uv run --script <skill-dir>/scripts/cli.py face default`
+   - `uv run --script <skill-dir>/scripts/cli.py buffer`
+   - `uv run --script <skill-dir>/scripts/cli.py key 'C-x C-f'`
+   - `uv run --script <skill-dir>/scripts/cli.py library package`
+   - `uv run --script <skill-dir>/scripts/cli.py feature server`
+   - `uv run --script <skill-dir>/scripts/cli.py eval ...`
 2. Official manuals
    - `info '(emacs)...'`
    - `info '(elisp)...'`

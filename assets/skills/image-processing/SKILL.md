@@ -28,9 +28,11 @@ img-process batch ./images --action convert --format webp -o ./optimised
 
 Pillow is required for both `img-process` and custom scripts:
 
-```bash
-pip install Pillow
+```text
+uv run --with Pillow <script.py>
 ```
+
+For a project-local dependency, use `uv add Pillow`.
 
 If Pillow is unavailable, use alternatives:
 

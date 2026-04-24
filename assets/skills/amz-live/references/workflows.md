@@ -5,7 +5,7 @@
 Goal: broad candidate set, low request cost.
 
 ```bash
-uv run amz-live "$QUERY" --llm-json --limit 10
+uv run --script <skill-dir>/scripts/cli.py "$QUERY" --llm-json --limit 10
 ```
 
 Then inspect:
@@ -25,7 +25,7 @@ If noisy, tighten with:
 Goal: final candidates with richer evidence.
 
 ```bash
-uv run amz-live "$QUERY" \
+uv run --script <skill-dir>/scripts/cli.py "$QUERY" \
   --llm-json \
   --details \
   --detail-limit 2 \
@@ -75,7 +75,7 @@ Template:
 Best default:
 
 ```bash
-uv run amz-live "usb c to usb c braided cable" \
+uv run --script <skill-dir>/scripts/cli.py "usb c to usb c braided cable" \
   --llm-json \
   --max-price 10 \
   --min-rating 4.5 \
@@ -99,7 +99,7 @@ If still noisy:
 Use when debugging parser/scoring without live requests.
 
 ```bash
-uv run amz-live "$QUERY" \
+uv run --script <skill-dir>/scripts/cli.py "$QUERY" \
   --html tests/fixtures/search_results_fragment.html \
   --llm-json
 ```

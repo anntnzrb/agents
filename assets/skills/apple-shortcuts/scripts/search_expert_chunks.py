@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
 """
 Search the local Shortcuts expert chunk index.
 
 Usage:
-  uv run scripts/search_expert_chunks.py --query "ask for input action"
+  uv run --script <skill-dir>/scripts/cli.py search --query "ask for input action"
 """
 
 from __future__ import annotations

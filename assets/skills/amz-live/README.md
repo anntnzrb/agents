@@ -4,19 +4,26 @@ Tiny read-only Amazon search CLI.
 
 Fetch live search result cards or parse saved Amazon search HTML, then filter locally.
 
+## Entry point
+
+Cross-platform:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
+```
+
 ## Quickstart
 
 ```bash
-uv python install 3.14
-uv sync
-uv run pyright
-uv run pytest
+uv run --script <skill-dir>/scripts/cli.py --help
+uv run --with pytest --with hypothesis --with httpx --with selectolax pytest
+uv run --with pyright --with httpx --with selectolax pyright
 ```
 
 ## CLI
 
 ```bash
-uv run amz-live "wireless mouse"
+uv run --script <skill-dir>/scripts/cli.py "wireless mouse"
 ```
 
 ## Machine-readable outputs
@@ -28,7 +35,7 @@ uv run amz-live "wireless mouse"
 Rich single-object envelope for agents and LLM flows.
 
 ```bash
-uv run amz-live "usb c to usb c braided cable" \
+uv run --script <skill-dir>/scripts/cli.py "usb c to usb c braided cable" \
   --html tests/fixtures/search_results_fragment.html \
   --llm-json \
   --min-rating 4.5 \
@@ -39,7 +46,7 @@ uv run amz-live "usb c to usb c braided cable" \
 Add detail-page enrichment for shortlisted candidates:
 
 ```bash
-uv run amz-live "usb c to usb c braided cable" \
+uv run --script <skill-dir>/scripts/cli.py "usb c to usb c braided cable" \
   --llm-json \
   --max-price 10 \
   --min-rating 4.5 \
@@ -68,7 +75,7 @@ Top-level shape:
 Machine-readable schema/capabilities document for agents.
 
 ```bash
-uv run amz-live --schema
+uv run --script <skill-dir>/scripts/cli.py --schema
 ```
 
 ### `--mode rpc`
@@ -89,7 +96,7 @@ printf '%s\n' \
   '{"id":"1","type":"ping"}' \
   '{"id":"2","type":"get_schema"}' \
   '{"id":"3","type":"search","query":"usb c to usb c braided cable","htmlPath":"tests/fixtures/search_results_fragment.html","minRating":4.5,"maxPrice":9,"limit":2}' \
-  | uv run amz-live --mode rpc
+  | uv run --script <skill-dir>/scripts/cli.py --mode rpc
 ```
 
 ## Useful filters

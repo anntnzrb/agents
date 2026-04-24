@@ -87,12 +87,12 @@ Error response example:
 }
 ```
 
-## Shell smoke test
+## RPC smoke test
 
-```bash
+```text
 printf '%s\n' \
   '{"id":"1","type":"ping"}' \
   '{"id":"2","type":"get_schema"}' \
   '{"id":"3","type":"search","origin":"NYC","destination":"MAD","departStart":"2026-06-01","departEnd":"2026-06-30"}' \
-  | uv run flight-live --mode rpc
+  | uv run --script <skill-dir>/scripts/cli.py --mode rpc
 ```

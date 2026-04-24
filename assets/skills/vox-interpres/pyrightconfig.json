@@ -1,0 +1,6 @@
+{
+  "include": ["lib", "tests"],
+  "extraPaths": ["lib"],
+  "typeCheckingMode": "basic",
+  "exclude": [".venv", "build", "dist"]
+}

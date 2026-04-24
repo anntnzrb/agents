@@ -1,16 +1,17 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
 """
 Report Generator for Agent Readiness
 
 Generates formatted markdown reports from analysis JSON.
 
 Usage:
-    python generate_report.py --analysis-file /tmp/readiness_analysis.json
-    python generate_report.py --analysis-file /tmp/readiness_analysis.json --format markdown
+    uv run --script scripts/cli.py report --analysis-file <temp-dir>/readiness_analysis.json
+    uv run --script scripts/cli.py report --analysis-file <temp-dir>/readiness_analysis.json --format markdown
 """
 
 import argparse
 import json
+import tempfile
 from pathlib import Path
 
 
@@ -250,7 +251,7 @@ def main():
     )
     parser.add_argument(
         "--analysis-file", "-a",
-        default="/tmp/readiness_analysis.json",
+        default=str(Path(tempfile.gettempdir()) / "readiness_analysis.json"),
         help="Path to analysis JSON file"
     )
     parser.add_argument(
@@ -270,7 +271,7 @@ def main():
     analysis_path = Path(args.analysis_file)
     if not analysis_path.exists():
         print(f"❌ Analysis file not found: {args.analysis_file}")
-        print("Run analyze_repo.py first to generate the analysis.")
+        print("Run `uv run --script scripts/cli.py analyze` first to generate the analysis.")
         return 1
     
     data = json.loads(analysis_path.read_text())

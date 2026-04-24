@@ -61,7 +61,7 @@ Common issues:
 Smoke test:
 
 ```bash
-printf '%s\n' '{"id":"1","type":"ping"}' | uv run flight-live --mode rpc
+printf '%s\n' '{"id":"1","type":"ping"}' | uv run --script <skill-dir>/scripts/cli.py --mode rpc
 ```
 
 ## Evidence priority when conflicted

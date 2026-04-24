@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
 """Run trigger evaluation for a skill description.
 
 Tests whether a skill's description causes Claude to trigger (read the skill)
@@ -15,6 +15,8 @@ import time
 import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.utils import parse_skill_md
 

@@ -23,30 +23,30 @@ Do not improvise music claims without evidence. Run the CLI first, then answer.
 
 ## Entry points
 
-- Wrapper: `sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" ...`
-- Direct: `uv run --project <skill-dir> vox-interpres ...`
+- Wrapper: `uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" ...`
+- Direct: `uv run --script <skill-dir>/scripts/cli.py ...`
 
 ## Fast path
 
 ```bash
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" ask ./song.flac "tempo and key?" --refresh
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" ask ./song.flac "tempo and key?" --refresh
 ```
 
 ## Commands
 
 ### Analyze
 ```bash
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" analyze ./song.mp3 --json
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze ./song.mp3 --json
 ```
 
 ### Ask one question
 ```bash
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" ask ./song.wav "where are the sections?"
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" ask ./song.wav "where are the sections?"
 ```
 
 ### Chat loop
 ```bash
-sh "$SKILLS_DIR/vox-interpres/scripts/vox-interpres.sh" chat ./song.ogg
+uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" chat ./song.ogg
 ```
 
 ## Read only what you need

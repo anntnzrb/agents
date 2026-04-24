@@ -103,7 +103,7 @@ Only increase `detailLimit` when the shortlist is genuinely small.
 printf '%s\n' \
   '{"id":"1","type":"ping"}' \
   '{"id":"2","type":"search","query":"usb c to usb c braided cable","zipCode":"33101","maxPrice":10,"minRating":4.5,"include":["braided"],"exclude":["usb a","lightning"],"details":true,"detailLimit":2,"scoring":true,"limit":5}' \
-  | uv run amz-live --mode rpc
+  | uv run --script <skill-dir>/scripts/cli.py --mode rpc
 ```
 
 ## Integration guidance

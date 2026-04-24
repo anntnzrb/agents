@@ -7,7 +7,7 @@ description: "Advanced multi-feed Ecuabet match intelligence using skill-local s
 
 ## Overview
 
-This skill uses the local scripts in `scripts/` as the operational core and local docs in `references/` for advanced execution patterns.
+This skill uses `scripts/cli.py` as the public cross-platform entrypoint and local docs in `references/` for advanced execution patterns.
 
 ## Activation Triggers
 - User mentions `$ecuabet`.
@@ -15,8 +15,19 @@ This skill uses the local scripts in `scripts/` as the operational core and loca
 - User asks for live refresh with cards/fouls/offsides/corners/weather/form context.
 - User asks for lower-risk vs higher-return tradeoff using current market state.
 
+## Entry point
+
+Cross-platform:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
+```
+
+Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
+
 ## Layout
-- `scripts/main.py`: integrated entrypoint (all feeds + recommendations).
+- `scripts/cli.py`: public dispatcher (`run` and `feed`).
+- `scripts/main.py`: integrated internal entrypoint (all feeds + recommendations).
 - `scripts/ecuabet.py`: Ecuabet markets/tracker.
 - `scripts/sofascore.py`: live match incidents/stats.
 - `scripts/espn.py`: ESPN summary/team stats/key events.
@@ -36,7 +47,7 @@ Assumption: current directory is this skill folder (the one containing `SKILL.md
 
 ### One-shot integrated output
 ```bash
-uv run scripts/main.py <match_id_or_url> \
+uv run --script <skill-dir>/scripts/cli.py run <match_id_or_url> \
   --ecuabet <match_id_or_url> \
   --require-ecuabet \
   --no-raw \
@@ -45,7 +56,7 @@ uv run scripts/main.py <match_id_or_url> \
 
 ### Live watch mode
 ```bash
-uv run scripts/main.py <match_id_or_url> \
+uv run --script <skill-dir>/scripts/cli.py run <match_id_or_url> \
   --ecuabet <match_id_or_url> \
   --require-ecuabet \
   --watch 15 \
@@ -56,7 +67,7 @@ uv run scripts/main.py <match_id_or_url> \
 
 ### Recommendation tuning
 ```bash
-uv run scripts/main.py <match_id_or_url> \
+uv run --script <skill-dir>/scripts/cli.py run <match_id_or_url> \
   --ecuabet <match_id_or_url> \
   --require-ecuabet \
   --recommend-top 10 \
@@ -71,22 +82,22 @@ uv run scripts/main.py <match_id_or_url> \
 
 ### Per-feed debug
 ```bash
-uv run scripts/ecuabet.py <match_id_or_url> --no-raw --compact
-uv run scripts/sofascore.py "<team_a> <team_b>" --no-raw --compact
-uv run scripts/espn.py "<team_a> <team_b>" --league esp.1 --no-raw --compact
-uv run scripts/open_meteo.py "<lat,lon>" --hourly-limit 12 --compact
-uv run scripts/understat.py --league La_Liga --season 2025 --home-team "<team_a>" --away-team "<team_b>" --compact
+uv run --script <skill-dir>/scripts/cli.py feed ecuabet <match_id_or_url> --no-raw --compact
+uv run --script <skill-dir>/scripts/cli.py feed sofascore "<team_a> <team_b>" --no-raw --compact
+uv run --script <skill-dir>/scripts/cli.py feed espn "<team_a> <team_b>" --league esp.1 --no-raw --compact
+uv run --script <skill-dir>/scripts/cli.py feed open-meteo "<lat,lon>" --hourly-limit 12 --compact
+uv run --script <skill-dir>/scripts/cli.py feed understat --league La_Liga --season 2025 --home-team "<team_a>" --away-team "<team_b>" --compact
 ```
 
 ### Quality gate
 ```bash
-cd scripts
-uv run pytest tests -q
+cd <skill-dir>/scripts
+uv run --with pytest pytest tests -q
 ```
 
 ## Output Focus
 
-Primary fields to report from `scripts/main.py` output:
+Primary fields to report from `uv run --script <skill-dir>/scripts/cli.py run` output:
 - `oneShot.topRecommendation`
 - `oneShot.shortlist`
 - `oneShot.globalConfidence`
@@ -106,6 +117,6 @@ Primary fields to report from `scripts/main.py` output:
 
 ## Resource Policy
 
-- Use `scripts/` for execution.
+- Use `scripts/cli.py` for public execution; other `scripts/` files are internals.
 - Use `references/` for advanced guidance and structured interpretation.
 - No `assets/` are required for this skill at this time.

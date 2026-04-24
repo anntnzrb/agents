@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
 """
 Repository Readiness Analyzer
 
@@ -6,8 +6,8 @@ Analyzes a repository across eight technical pillars to determine
 agent readiness. Outputs a JSON file with detailed criteria evaluation.
 
 Usage:
-    python analyze_repo.py --repo-path /path/to/repo
-    python analyze_repo.py --repo-path . --output /tmp/analysis.json
+    uv run --script scripts/cli.py analyze --repo-path /path/to/repo
+    uv run --script scripts/cli.py analyze --repo-path . --output <temp-dir>/analysis.json
 """
 
 import argparse
@@ -15,6 +15,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Optional
@@ -1341,7 +1342,7 @@ def main():
     )
     parser.add_argument(
         "--output", "-o",
-        default="/tmp/readiness_analysis.json",
+        default=str(Path(tempfile.gettempdir()) / "readiness_analysis.json"),
         help="Output file for analysis results"
     )
     parser.add_argument(

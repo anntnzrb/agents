@@ -12,8 +12,18 @@ Treat Emacs work as two connected systems:
 
 Prefer truth from the running instance first, then official manuals, then local installed docs/source, then ecosystem corroboration.
 
+## Entry point
+
+Cross-platform:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py ...
+```
+
+Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
+
 ## Evidence order
-1. Runtime introspection via `scripts/emacsctl.py`
+1. Runtime introspection via `uv run --script <skill-dir>/scripts/cli.py`
 2. Official manuals via `info`
 3. Local installed docs/source via `rg`
 4. Corroboration via Grep.app, then `gh`
@@ -51,7 +61,7 @@ Default pattern: inspect -> preview -> apply -> verify.
   - if the repo already splits config, edit the relevant module instead of bloating `init.el`
 
 ## Runtime introspection
-Default to `scripts/emacsctl.py` for Emacs communication. It exists to avoid fragile shell quoting and to make common checks easy.
+Default to `uv run --script <skill-dir>/scripts/cli.py` for Emacs communication. It dispatches to `scripts/emacsctl.py`, avoids fragile shell quoting, and makes common checks easy.
 
 Use raw `emacsclient` only when:
 - debugging the helper itself
@@ -68,16 +78,14 @@ Prefer helper subcommands before custom Elisp when they fit the task:
 - `reload-init`
 - `load`
 
-Commands below are shown relative to the skill directory. If your current working directory is elsewhere, resolve the absolute script path from this skill location and use that path.
-
 Quick checks:
 
 ```bash
-uv run scripts/emacsctl.py ping
-uv run scripts/emacsctl.py face default
-uv run scripts/emacsctl.py buffer
-uv run scripts/emacsctl.py library use-package
-uv run scripts/emacsctl.py feature server
+uv run --script <skill-dir>/scripts/cli.py ping
+uv run --script <skill-dir>/scripts/cli.py face default
+uv run --script <skill-dir>/scripts/cli.py buffer
+uv run --script <skill-dir>/scripts/cli.py library use-package
+uv run --script <skill-dir>/scripts/cli.py feature server
 ```
 
 For reusable or multiline queries, prefer a temp `.el` file plus `eval-file`.
@@ -118,8 +126,8 @@ Use corroboration to understand how people do things in practice, not as the pri
 - Prefer precise reloads:
   - the edited module file
   - `user-init-file`
-  - `scripts/emacsctl.py reload-init`
-  - `scripts/emacsctl.py load path/to/file.el`
+  - `uv run --script <skill-dir>/scripts/cli.py reload-init`
+  - `uv run --script <skill-dir>/scripts/cli.py load path/to/file.el`
 - If the change lives in `early-init.el`, explain which parts are startup-only and whether a restart is required
 - If you test an ephemeral tweak before writing it, label it clearly as a preview and persist it before finishing
 
@@ -138,11 +146,12 @@ Use corroboration to understand how people do things in practice, not as the pri
 - Keep diffs small and modular; avoid turning `init.el` into a dump file
 - Verify final state with runtime queries after reloading
 - Prefer querying variables, faces, frame params, keymaps, loaded features, and buffer state over guessing
-- Prefer `scripts/emacsctl.py` over raw `emacsclient` when the helper can express the same operation reliably
+- Prefer `uv run --script <skill-dir>/scripts/cli.py` over raw `emacsclient` when the helper can express the same operation reliably
 - Be explicit about risk when live-evaluating changes in an already-running Emacs
 
 ## Resources
-- `scripts/emacsctl.py`: reliable `emacsclient` wrapper
+- `scripts/cli.py`: public dispatcher for the reliable `emacsclient` wrapper
+- `scripts/emacsctl.py`: internal wrapper
 - `references/live-workflow.md`: inspect/apply/verify guidance and restart matrix
 - `references/common-queries.md`: reusable runtime query examples
 - create task-specific evals only when intentionally benchmarking this skill with `skill-creator`

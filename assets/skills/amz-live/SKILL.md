@@ -1,7 +1,7 @@
 ---
 name: amz-live
 description: Read-only Amazon catalog search through the bundled `amz-live` CLI in this skill. Use whenever the user wants Amazon product discovery, price comparison, shortlist generation, cheap-but-decent recommendations, connector/type-specific cable hunting, structured Amazon search output, or agent-usable machine-readable results. Prefer this skill over manual browsing for Amazon shopping/search/filter/rank tasks, especially when you need repeatable filters, detail enrichment, scoring, delivery-location control, or Pi-style RPC integration.
-compatibility: Requires `uv`. Uses the bundled skill-local `amz-live` project plus `scripts/amz-live.sh`. Network access required for live mode.
+compatibility: Requires `uv`. Uses bundled skill-local `scripts/cli.py`. Network access required for live mode.
 ---
 
 # amz-live
@@ -9,10 +9,10 @@ compatibility: Requires `uv`. Uses the bundled skill-local `amz-live` project pl
 Treat this skill as the operator manual for the bundled Amazon read-only CLI.
 
 ## Entry points
-- From the skill root: `uv run amz-live ...`
-- If `SKILLS_DIR` is set: `bash "$SKILLS_DIR/amz-live/scripts/amz-live.sh" ...`
-- Otherwise resolve the skill directory, then run `bash <skill-dir>/scripts/amz-live.sh ...`
-- For process integration: `uv run amz-live --mode rpc`
+- From the skill root: `uv run --script <skill-dir>/scripts/cli.py ...`
+- If `SKILLS_DIR` is set: `uv run --script "$SKILLS_DIR/amz-live/scripts/cli.py" ...`
+- Otherwise resolve the skill directory, then run `uv run --script <skill-dir>/scripts/cli.py ...`
+- For process integration: `uv run --script <skill-dir>/scripts/cli.py --mode rpc`
 
 ## Core rule
 Prefer `--llm-json` unless the user explicitly wants human text. It gives the cleanest envelope for filters, enrichment, ranking, and location context.
@@ -54,22 +54,22 @@ Why:
 6. Answer from envelope fields, not vibes.
 
 ## Output modes
-- Human: `uv run amz-live "wireless mouse"`
-- Raw JSON: `uv run amz-live "wireless mouse" --json`
-- LLM JSON: `uv run amz-live "wireless mouse" --llm-json`
-- Schema: `uv run amz-live --schema`
-- RPC: `printf '%s\n' ... | uv run amz-live --mode rpc`
+- Human: `uv run --script <skill-dir>/scripts/cli.py "wireless mouse"`
+- Raw JSON: `uv run --script <skill-dir>/scripts/cli.py "wireless mouse" --json`
+- LLM JSON: `uv run --script <skill-dir>/scripts/cli.py "wireless mouse" --llm-json`
+- Schema: `uv run --script <skill-dir>/scripts/cli.py --schema`
+- RPC: `printf '%s\n' ... | uv run --script <skill-dir>/scripts/cli.py --mode rpc`
 
 ## Fast patterns
 ### Broad discovery
-`uv run amz-live "$QUERY" --llm-json --limit 10`
+`uv run --script <skill-dir>/scripts/cli.py "$QUERY" --llm-json --limit 10`
 
 ### Broad discovery with US/Miami delivery context
-`uv run amz-live "$QUERY" --zip 33101 --llm-json --limit 10`
+`uv run --script <skill-dir>/scripts/cli.py "$QUERY" --zip 33101 --llm-json --limit 10`
 
 ### Final shortlist
 ```bash
-uv run amz-live "$QUERY" \
+uv run --script <skill-dir>/scripts/cli.py "$QUERY" \
   --llm-json \
   --details \
   --detail-limit 2 \
@@ -79,7 +79,7 @@ uv run amz-live "$QUERY" \
 
 ### Location-sensitive shortlist
 ```bash
-uv run amz-live "$QUERY" \
+uv run --script <skill-dir>/scripts/cli.py "$QUERY" \
   --zip 33101 \
   --llm-json \
   --details \
@@ -90,7 +90,7 @@ uv run amz-live "$QUERY" \
 
 ### Local deterministic debug
 ```bash
-uv run amz-live "$QUERY" \
+uv run --script <skill-dir>/scripts/cli.py "$QUERY" \
   --html tests/fixtures/search_results_fragment.html \
   --llm-json
 ```
@@ -116,7 +116,7 @@ Use `--zip` when the user cares about shipping locality, delivery dates, stock d
 
 Example:
 ```bash
-uv run amz-live "usb c pd charger 65w" --zip 33101 --llm-json
+uv run --script <skill-dir>/scripts/cli.py "usb c pd charger 65w" --zip 33101 --llm-json
 ```
 
 Behavior:
@@ -203,7 +203,7 @@ Examples:
 
 Good cable hunt template:
 ```bash
-uv run amz-live "usb c to usb c braided cable" \
+uv run --script <skill-dir>/scripts/cli.py "usb c to usb c braided cable" \
   --zip 33101 \
   --llm-json \
   --max-price 10 \
