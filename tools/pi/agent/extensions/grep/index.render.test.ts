@@ -5,6 +5,7 @@ mock.module("@mariozechner/pi-coding-agent", () => ({
 	DEFAULT_MAX_LINES: 2000,
 	formatSize: (bytes: number) => `${Math.round(bytes / 1024)}KB`,
 	keyHint: (_action: string, hint: string) => hint,
+	getAgentDir: () => "/tmp/pi-agent",
 	truncateHead: (content: string) => ({ content, truncated: false }),
 	isToolCallEventType: () => false,
 	createReadToolDefinition: () => ({ name: "read" }),
@@ -47,8 +48,24 @@ const tokenTheme = {
 describe("grep compact rendering", () => {
 	test("call is naked single-line telemetry", () => {
 		const text = __test.formatGrepCall({ pattern: "TODO", path: "src", type: "ts", literal: true }, passthroughTheme);
-		expect(text).toBe("⌕ grep src · /TODO/ · type:ts · literal");
+		expect(text).toBe("⌕ grep src · /TODO/ · ts · literal");
 		expect(text.split("\n")).toHaveLength(1);
+	});
+
+	test("call includes non-default output mode and timeout", () => {
+		const text = __test.formatGrepCall({ pattern: "TODO", path: "src", outputMode: "files_with_matches", timeoutMs: 2500 }, passthroughTheme);
+		expect(text).toBe("⌕ grep src · /TODO/ · files · 2500ms");
+	});
+
+	test("call spells out offset and limit", () => {
+		const text = __test.formatGrepCall({ pattern: "TODO", path: "src", offset: 3, limit: 3 }, passthroughTheme);
+		expect(text).toContain("offset:3");
+		expect(text).toContain("limit:3");
+	});
+
+	test("call compacts long paths", () => {
+		const text = __test.formatGrepCall({ pattern: "TODO", path: "/tmp/llm-agents-scan/opencode/packages/opencode/src/tool" }, passthroughTheme);
+		expect(text).toContain("…/packages/opencode/src/tool");
 	});
 
 	test("colors cue/title/pattern separately", () => {
@@ -60,12 +77,18 @@ describe("grep compact rendering", () => {
 	});
 	test("prefers structured details counters", () => {
 		const text = __test.buildCollapsedResultText("a.ts:1: todo", { matchCount: 3, fileCount: 2 }, passthroughTheme);
-		expect(text).toContain("3 matches · 2 files");
+		expect(text).toContain("↳ 3 matches in 2 files");
+	});
+
+	test("summarizes files output mode as files", () => {
+		const text = __test.buildCollapsedResultText("a.ts\nb.ts", { outputMode: "files_with_matches", fileCount: 2 }, passthroughTheme);
+		expect(text).toContain("2 files");
+		expect(text).not.toContain("matches");
 	});
 
 	test("falls back to parsed output summary when counters missing", () => {
 		const text = __test.buildCollapsedResultText("a.ts:1: x\nb.ts:2: y", undefined, passthroughTheme);
-		expect(text).toContain("2 matches · 2 files");
+		expect(text).toContain("↳ 2 matches in 2 files");
 	});
 
 	test("shows warning badges from details", () => {
@@ -80,7 +103,7 @@ describe("grep compact rendering", () => {
 			},
 			passthroughTheme,
 		);
-		expect(text).toContain("limit");
+		expect(text).not.toContain("more");
 		expect(text).toContain("50KB output limit");
 		expect(text).toContain("line max 500");
 	});

@@ -7,15 +7,35 @@ import { Type } from "@sinclair/typebox";
 import { runLineStreamingProcess } from "../_shared/line-process.js";
 import { resolveSearchBinary } from "../_shared/search-binaries.js";
 import { ensureToolActive, getFirstTextContent, summarizeList } from "../_shared/tool-utils.js";
-import { buildFdArgs, normalizeLimit, normalizeSearchRoots, normalizeTimeout } from "./logic.js";
+import { buildFdArgs, DEFAULT_LIMIT, DEFAULT_TIMEOUT_MS, type FindKind, normalizeKind, normalizeLimit, normalizeSearchRoots, normalizeTimeout } from "./logic.js";
+
+const OUTPUT_LIMIT_LABEL = formatSize(DEFAULT_MAX_BYTES);
+const KIND_VALUES_LABEL = "file, directory, any";
+const FIND_TOOL_DESCRIPTION = `Search files by glob pattern with optional multipath roots, kind filtering (${KIND_VALUES_LABEL}), hidden and gitignore controls, timeout, and deterministic dedupe. Output is truncated to ${OUTPUT_LIMIT_LABEL}.`;
+const FIND_PROMPT_SNIPPET = "Find files or directories by glob pattern with multipath, kind, hidden, and ignore controls";
+
+const PARAM_DESCRIPTIONS = {
+	pattern: "Glob pattern to match files, e.g. '*.ts', '**/*.json', or 'src/**/*.spec.ts'",
+	path: "Directory to search in (default: current directory)",
+	paths: "Search roots. Mutually exclusive with path.",
+	hidden: "Include hidden files and directories (default: true)",
+	kind: `Result kind: ${KIND_VALUES_LABEL} (default: file)`,
+	gitignore: "Respect .gitignore (default: true)",
+	noIgnore: "Include ignored files (overrides gitignore)",
+	limit: `Maximum number of results (default: ${DEFAULT_LIMIT})`,
+	timeoutMs: `Timeout in milliseconds (default: ${DEFAULT_TIMEOUT_MS})`,
+} as const;
 
 const findSchema = Type.Object({
-	pattern: Type.String({ description: "Glob pattern to match files, e.g. '*.ts', '**/*.json', or 'src/**/*.spec.ts'" }),
-	path: Type.Optional(Type.String({ description: "Directory to search in (default: current directory)" })),
-	paths: Type.Optional(Type.Array(Type.String({ description: "Search roots. Mutually exclusive with path." }))),
-	hidden: Type.Optional(Type.Boolean({ description: "Include hidden files and directories (default: true)" })),
-	limit: Type.Optional(Type.Number({ description: "Maximum number of results (default: 1000)" })),
-	timeoutMs: Type.Optional(Type.Number({ description: "Timeout in milliseconds (default: 5000)" })),
+	pattern: Type.String({ description: PARAM_DESCRIPTIONS.pattern }),
+	path: Type.Optional(Type.String({ description: PARAM_DESCRIPTIONS.path })),
+	paths: Type.Optional(Type.Array(Type.String({ description: PARAM_DESCRIPTIONS.paths }))),
+	hidden: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.hidden })),
+	kind: Type.Optional(Type.String({ description: PARAM_DESCRIPTIONS.kind })),
+	gitignore: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.gitignore })),
+	noIgnore: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.noIgnore })),
+	limit: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.limit })),
+	timeoutMs: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.timeoutMs })),
 });
 
 type FindInput = {
@@ -23,11 +43,29 @@ type FindInput = {
 	path?: string;
 	paths?: string[];
 	hidden?: boolean;
+	kind?: string;
+	gitignore?: boolean;
+	noIgnore?: boolean;
 	limit?: number;
 	timeoutMs?: number;
 };
 
+const RENDER_LABELS = {
+	visible: "visible",
+	gitignoreOff: "gitignore off",
+	ignoredOn: "ignored on",
+	limit: "limit",
+} as const;
+
 const toPosix = (value: string): string => value.replace(/\\/g, "/");
+
+const compactPath = (value: string): string => {
+	if (value === "." || value.startsWith("paths:")) return value;
+	const normalized = toPosix(value);
+	const parts = normalized.split("/").filter(Boolean);
+	if (parts.length <= 4) return value;
+	return `…/${parts.slice(-4).join("/")}`;
+};
 
 const formatFindCall = (
 	input: FindInput,
@@ -35,11 +73,14 @@ const formatFindCall = (
 ): string => {
 	const pattern = typeof input.pattern === "string" ? input.pattern : "";
 	const pathRoots = input.paths?.filter((entry) => typeof entry === "string" && entry.trim().length > 0) ?? [];
-	const scope = pathRoots.length > 0 ? `paths:${summarizeList(pathRoots)}` : (input.path ?? ".");
-	const flags: string[] = [pattern];
-	if (input.hidden === false) flags.push("hidden:false");
-	if (input.limit !== undefined) flags.push(`limit:${input.limit}`);
-	if (input.timeoutMs !== undefined) flags.push(`timeoutMs:${input.timeoutMs}`);
+	const scope = compactPath(pathRoots.length > 0 ? `paths:${summarizeList(pathRoots)}` : (input.path ?? "."));
+	const flags: string[] = [theme.fg("accent", pattern)];
+	if (input.kind && input.kind !== "file") flags.push(theme.fg("accent", input.kind));
+	if (input.hidden === false) flags.push(theme.fg("muted", RENDER_LABELS.visible));
+	if (input.gitignore === false) flags.push(theme.fg("warning", RENDER_LABELS.gitignoreOff));
+	if (input.noIgnore === true) flags.push(theme.fg("warning", RENDER_LABELS.ignoredOn));
+	if (input.limit !== undefined) flags.push(theme.fg("muted", `${RENDER_LABELS.limit}:${input.limit}`));
+	if (input.timeoutMs !== undefined) flags.push(theme.fg("muted", `${input.timeoutMs}ms`));
 
 	return [`${theme.fg("muted", "◇")} ${theme.fg("toolTitle", theme.bold("find"))} ${theme.fg("muted", scope)}`, ...flags].join(
 		theme.fg("dim", " · "),
@@ -68,8 +109,7 @@ const getCollapsedSummary = (
 		.filter(Boolean);
 	if (files.length === 0) return rawText || "(no output)";
 
-	const segments = [`${files.length} ${files.length === 1 ? "file" : "files"}`];
-	if (details.resultLimitReached !== undefined) segments.push("limit");
+	const segments = [`↳ ${files.length} ${files.length === 1 ? "file" : "files"}`];
 	if (details.truncation?.truncated) segments.push(theme.fg("warning", `${formatSize(DEFAULT_MAX_BYTES)} output limit`));
 	return `  ${segments.join(theme.fg("dim", " · "))}`;
 };
@@ -79,12 +119,14 @@ const runFd = async (params: {
 	pattern: string;
 	rootAbsolute: string;
 	includeHidden: boolean;
+	kind: FindKind;
+	useGitignore: boolean;
 	limit: number;
 	timeoutMs: number;
 	signal?: AbortSignal;
 }): Promise<string[]> => {
-	const { command, pattern, rootAbsolute, includeHidden, limit, timeoutMs, signal } = params;
-	const args = buildFdArgs(pattern, rootAbsolute, includeHidden, limit);
+	const { command, pattern, rootAbsolute, includeHidden, kind, useGitignore, limit, timeoutMs, signal } = params;
+	const args = buildFdArgs(pattern, rootAbsolute, includeHidden, limit, kind, useGitignore);
 
 	return await runLineStreamingProcess<string>({
 		command,
@@ -136,9 +178,8 @@ export default function findExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "find",
 		label: "find",
-		description:
-			"Search files by glob pattern with optional multipath roots, hidden toggle, timeout, and deterministic dedupe. Output is truncated to 50KB.",
-		promptSnippet: "Find files by glob pattern with optional hidden toggle and multipath",
+		description: FIND_TOOL_DESCRIPTION,
+		promptSnippet: FIND_PROMPT_SNIPPET,
 		parameters: findSchema,
 		renderShell: "self",
 		renderCall(args, theme, context) {
@@ -164,6 +205,8 @@ export default function findExtension(pi: ExtensionAPI) {
 
 			const effectiveLimit = normalizeLimit(input.limit);
 			const includeHidden = input.hidden ?? true;
+			const kind = normalizeKind(input.kind);
+			const useGitignore = input.noIgnore === true ? false : input.gitignore !== false;
 			const timeoutMs = normalizeTimeout(input.timeoutMs);
 			const roots = normalizeSearchRoots(input.path, input.paths);
 			const deadline = Date.now() + timeoutMs;
@@ -201,6 +244,8 @@ export default function findExtension(pi: ExtensionAPI) {
 					pattern: input.pattern,
 					rootAbsolute: absoluteRoot,
 					includeHidden,
+					kind,
+					useGitignore,
 					limit: remaining,
 					timeoutMs: remainingTimeoutMs,
 					signal,

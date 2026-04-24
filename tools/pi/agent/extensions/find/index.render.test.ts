@@ -41,8 +41,18 @@ const tokenTheme = {
 describe("find compact rendering", () => {
 	test("call is naked single-line telemetry", () => {
 		const text = __test.formatFindCall({ pattern: "**/*.ts", path: "src", hidden: false, limit: 20 }, passthroughTheme);
-		expect(text).toBe("◇ find src · **/*.ts · hidden:false · limit:20");
+		expect(text).toBe("◇ find src · **/*.ts · visible · limit:20");
 		expect(text.split("\n")).toHaveLength(1);
+	});
+
+	test("call includes non-default kind and ignore controls", () => {
+		const text = __test.formatFindCall({ pattern: "src*", path: ".", kind: "directory", gitignore: false, noIgnore: true }, passthroughTheme);
+		expect(text).toBe("◇ find . · src* · directory · gitignore off · ignored on");
+	});
+
+	test("call compacts long paths", () => {
+		const text = __test.formatFindCall({ pattern: "*.ts", path: "/tmp/llm-agents-scan/opencode/packages/opencode/src/tool" }, passthroughTheme);
+		expect(text).toContain("…/packages/opencode/src/tool");
 	});
 
 	test("colors cue/title/pattern separately", () => {
@@ -55,7 +65,7 @@ describe("find compact rendering", () => {
 
 	test("summarizes file count", () => {
 		const text = __test.getCollapsedSummary("a.ts\nb.ts", {}, passthroughTheme);
-		expect(text).toBe("  2 files");
+		expect(text).toBe("  ↳ 2 files");
 	});
 
 	test("summarizes no matches", () => {
@@ -70,7 +80,7 @@ describe("find compact rendering", () => {
 			passthroughTheme,
 		);
 		expect(text).toContain("1 file");
-		expect(text).toContain("limit");
+		expect(text).not.toContain("more");
 		expect(text).toContain("50KB output limit");
 	});
 });

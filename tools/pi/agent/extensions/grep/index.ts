@@ -5,45 +5,63 @@ import type { AgentToolResult, ExtensionAPI } from "@mariozechner/pi-coding-agen
 import { createGrepToolDefinition, DEFAULT_MAX_BYTES, formatSize, getAgentDir, truncateHead } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { runLineStreamingProcess } from "../_shared/line-process.js";
 import { resolveSearchBinary } from "../_shared/search-binaries.js";
 import { ensureToolActive, getFirstTextContent } from "../_shared/tool-utils.js";
 import {
 	balanceMatchesByFile,
+	DEFAULT_LIMIT,
+	DEFAULT_TIMEOUT_MS,
+	type GrepOutputMode,
 	normalizeLimit,
 	normalizeOffset,
+	normalizeOutputMode,
 	normalizeSearchRoots,
+	normalizeTimeout,
 	resolveTypeFilter,
-	toPosixRelative,
 	type RawMatch,
-	type TypeFilter,
 } from "./logic.js";
 import { formatMatches, GREP_MAX_LINE_LENGTH } from "./output.js";
+import { type CountHit, type FileHit, runRipgrep, runRipgrepCounts, runRipgrepFiles } from "./ripgrep.js";
 import { buildCollapsedResultText, formatGrepCall, type GrepRenderDetails } from "./render.js";
 
 const MAX_INTERNAL_PROBE = 5_000;
+const OUTPUT_LIMIT_LABEL = formatSize(DEFAULT_MAX_BYTES);
+const OUTPUT_MODE_VALUES_LABEL = "content, files_with_matches, count";
+const GREP_TOOL_DESCRIPTION = `Search file contents for a pattern with optional multipath, type filtering, output modes (${OUTPUT_MODE_VALUES_LABEL}), pagination, timeout, and gitignore/literal controls. Output is truncated to ${OUTPUT_LIMIT_LABEL}.`;
+const GREP_PROMPT_SNIPPET = "Search file contents with output modes, pagination, type filtering, and ignore controls";
 
-type MatchEvent = {
-	type?: string;
-	data?: {
-		path?: { text?: string };
-		line_number?: number;
-		lines?: { text?: string };
-	};
-};
+const PARAM_DESCRIPTIONS = {
+	pattern: "Search pattern (regex or literal string)",
+	path: "Directory or file to search (default: current directory)",
+	paths: "Search roots. Mutually exclusive with path.",
+	glob: "Filter files by glob pattern, e.g. '*.ts' or '**/*.spec.ts'",
+	type: "Language/file type filter, e.g. ts, js, py, rs",
+	ignoreCase: "Case-insensitive search (default: false)",
+	literal: "Treat pattern as literal string instead of regex (default: false)",
+	context: "Number of context lines around matches",
+	outputMode: `Output mode: ${OUTPUT_MODE_VALUES_LABEL} (default: content)`,
+	gitignore: "Respect .gitignore (default: true)",
+	noIgnore: "Include ignored files (overrides gitignore)",
+	offset: "Skip first N matches/results after ordering (default: 0)",
+	limit: `Maximum number of matches/results to return (default: ${DEFAULT_LIMIT})`,
+	timeoutMs: `Timeout in milliseconds (default: ${DEFAULT_TIMEOUT_MS})`,
+} as const;
+
 const grepSchema = Type.Object({
-	pattern: Type.String({ description: "Search pattern (regex or literal string)" }),
-	path: Type.Optional(Type.String({ description: "Directory or file to search (default: current directory)" })),
-	paths: Type.Optional(Type.Array(Type.String({ description: "Search roots. Mutually exclusive with path." }))),
-	glob: Type.Optional(Type.String({ description: "Filter files by glob pattern, e.g. '*.ts' or '**/*.spec.ts'" })),
-	type: Type.Optional(Type.String({ description: "Language/file type filter, e.g. ts, js, py, rs" })),
-	ignoreCase: Type.Optional(Type.Boolean({ description: "Case-insensitive search (default: false)" })),
-	literal: Type.Optional(Type.Boolean({ description: "Treat pattern as literal string instead of regex (default: false)" })),
-	context: Type.Optional(Type.Number({ description: "Number of context lines around matches" })),
-	gitignore: Type.Optional(Type.Boolean({ description: "Respect .gitignore (default: true)" })),
-	noIgnore: Type.Optional(Type.Boolean({ description: "Include ignored files (overrides gitignore)" })),
-	offset: Type.Optional(Type.Number({ description: "Skip first N matches after ordering (default: 0)" })),
-	limit: Type.Optional(Type.Number({ description: "Maximum number of matches to return (default: 100)" })),
+	pattern: Type.String({ description: PARAM_DESCRIPTIONS.pattern }),
+	path: Type.Optional(Type.String({ description: PARAM_DESCRIPTIONS.path })),
+	paths: Type.Optional(Type.Array(Type.String({ description: PARAM_DESCRIPTIONS.paths }))),
+	glob: Type.Optional(Type.String({ description: PARAM_DESCRIPTIONS.glob })),
+	type: Type.Optional(Type.String({ description: PARAM_DESCRIPTIONS.type })),
+	ignoreCase: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.ignoreCase })),
+	literal: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.literal })),
+	context: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.context })),
+	outputMode: Type.Optional(Type.String({ description: PARAM_DESCRIPTIONS.outputMode })),
+	gitignore: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.gitignore })),
+	noIgnore: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.noIgnore })),
+	offset: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.offset })),
+	limit: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.limit })),
+	timeoutMs: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.timeoutMs })),
 });
 
 type GrepInput = {
@@ -55,10 +73,12 @@ type GrepInput = {
 	ignoreCase?: boolean;
 	literal?: boolean;
 	context?: number;
+	outputMode?: string;
 	gitignore?: boolean;
 	noIgnore?: boolean;
 	offset?: number;
 	limit?: number;
+	timeoutMs?: number;
 };
 
 const normalizeContext = (value: number | undefined): number | undefined => {
@@ -72,92 +92,31 @@ const normalizeContext = (value: number | undefined): number | undefined => {
 
 const hashLine = (line: string): string => createHash("sha1").update(line).digest("hex");
 
-const parseMatchEvent = (line: string): MatchEvent | null => {
-	if (line.trim().length === 0) return null;
-	try {
-		return JSON.parse(line) as MatchEvent;
-	} catch {
-		return null;
-	}
-};
-
-const toolMissingMessage = (binary: string, installHint: string): string =>
-	`'${binary}' is not available in PATH. Install ${installHint} and retry.`;
-
 const isDirectoryPath = async (absolutePath: string): Promise<boolean> => {
 	const stat = await fs.stat(absolutePath);
 	return stat.isDirectory();
 };
 
-const runRipgrep = async (params: {
-	command: string;
-	rootAbsolute: string;
-	cwd: string;
-	pattern: string;
-	glob: string | undefined;
-	typeFilter: TypeFilter | null;
-	ignoreCase: boolean;
-	literal: boolean;
-	useGitignore: boolean;
-	maxMatches: number;
-	signal?: AbortSignal;
-}): Promise<RawMatch[]> => {
-	const {
-		command,
-		rootAbsolute,
-		cwd,
-		pattern,
-		glob,
-		typeFilter,
-		ignoreCase,
-		literal,
-		useGitignore,
-		maxMatches,
-		signal,
-	} = params;
-	const args = ["--json", "--line-number", "--color=never", "--hidden"];
-	if (ignoreCase) args.push("--ignore-case");
-	if (literal) args.push("--fixed-strings");
-	if (!useGitignore) args.push("--no-ignore");
-	if (glob) args.push("--glob", glob);
-	if (typeFilter) {
-		for (const typeGlob of typeFilter.rgGlobs) {
-			args.push("--glob", typeGlob);
-		}
-	}
-	args.push(pattern, rootAbsolute);
-
-	return await runLineStreamingProcess<RawMatch>({
-		command,
-		args,
-		maxResults: maxMatches,
-		...(signal ? { signal } : {}),
-		missingBinaryMessage: toolMissingMessage("rg", "ripgrep (e.g. `brew install ripgrep`)"),
-		runErrorLabel: "ripgrep",
-		exitErrorLabel: "ripgrep",
-		parseLine: (line) => {
-			const event = parseMatchEvent(line);
-			if (!event || event.type !== "match") return undefined;
-			const filePath = event.data?.path?.text;
-			const lineNumber = event.data?.line_number;
-			const lineText = event.data?.lines?.text;
-			if (!filePath || typeof lineNumber !== "number") return undefined;
-			const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(rootAbsolute, filePath);
-			const cleanedLine = (lineText ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "").replace(/\n$/, "");
-			const displayPath = toPosixRelative(cwd, absolutePath);
-			return {
-				absolutePath,
-				displayPath,
-				lineNumber,
-				lineText: cleanedLine,
-			};
-		},
-	});
-};
-
 export const __test = {
 	buildCollapsedResultText,
 	formatGrepCall,
+};
+
+const formatOutputModeResult = async (
+	matches: RawMatch[],
+	outputMode: GrepOutputMode,
+	contextLines: number,
+): Promise<{ rawOutput: string; outputLineCount: number; linesTruncated: boolean }> => {
+	if (outputMode === "files_with_matches") {
+		const files = [...new Set(matches.map((match) => match.displayPath))];
+		return { rawOutput: files.join("\n"), outputLineCount: files.length, linesTruncated: false };
+	}
+	if (outputMode === "count") {
+		return { rawOutput: String(matches.length), outputLineCount: 1, linesTruncated: false };
+	}
+	const { output, linesTruncated } = await formatMatches(matches, contextLines);
+	const outputLineCount = output.length === 0 ? 0 : output.split("\n").filter((line) => line.trim().length > 0).length;
+	return { rawOutput: output, outputLineCount, linesTruncated };
 };
 
 const ensureRgViaNativeGrep = async (
@@ -190,9 +149,8 @@ export default function grepExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "grep",
 		label: "grep",
-		description:
-			"Search file contents for a pattern with optional multipath, type filtering, pagination, and gitignore/literal controls. Output is truncated to 50KB.",
-		promptSnippet: "Search file contents for patterns with pagination and type filtering",
+		description: GREP_TOOL_DESCRIPTION,
+		promptSnippet: GREP_PROMPT_SNIPPET,
 		parameters: grepSchema,
 		renderShell: "self",
 		renderCall(args, theme, context) {
@@ -219,24 +177,154 @@ export default function grepExtension(pi: ExtensionAPI) {
 			const effectiveLimit = normalizeLimit(input.limit);
 			const effectiveOffset = normalizeOffset(input.offset);
 			const requestedContext = normalizeContext(input.context);
+			const outputMode = normalizeOutputMode(input.outputMode);
+			const timeoutMs = normalizeTimeout(input.timeoutMs);
 			const typeFilter = resolveTypeFilter(input.type);
 			const useGitignore = input.noIgnore === true ? false : input.gitignore !== false;
 			const roots = normalizeSearchRoots(input.path, input.paths);
 			const requestedWindow = effectiveOffset + effectiveLimit + 1;
 			const internalProbeLimit = Math.min(Math.max(requestedWindow * 5, requestedWindow), MAX_INTERNAL_PROBE);
 			const cwd = ctx.cwd;
+			const deadline = Date.now() + timeoutMs;
 			let rgCommand = resolveSearchBinary("rg");
 			if (!rgCommand) {
 				await ensureRgViaNativeGrep(toolCallId, signal, onUpdate, cwd);
 				rgCommand = resolveSearchBinary("rg");
 				if (!rgCommand) throw new Error("rg is unavailable after native Pi ensureTool fallback");
 			}
+			if (outputMode === "files_with_matches") {
+				const outputProbeLimit = MAX_INTERNAL_PROBE;
+				const dedupeFiles = new Set<string>();
+				const collectedFiles: FileHit[] = [];
+				for (const root of roots) {
+					if (collectedFiles.length >= outputProbeLimit) break;
+					const remainingTimeoutMs = deadline - Date.now();
+					if (remainingTimeoutMs <= 0) {
+						throw new Error(`grep timed out after ${Math.max(1, Math.round(timeoutMs / 1000))}s`);
+					}
+					const absoluteRoot = path.resolve(cwd, root);
+					try {
+						await fs.stat(absoluteRoot);
+					} catch {
+						throw new Error(`Path not found: ${root}`);
+					}
+					const hits = await runRipgrepFiles({
+						command: rgCommand,
+						rootAbsolute: absoluteRoot,
+						cwd,
+						pattern: input.pattern,
+						glob: input.glob,
+						typeFilter,
+						ignoreCase: input.ignoreCase === true,
+						literal: input.literal === true,
+						useGitignore,
+						maxResults: outputProbeLimit - collectedFiles.length,
+						timeoutMs: remainingTimeoutMs,
+						signal,
+					});
+					for (const hit of hits) {
+						if (dedupeFiles.has(hit.displayPath)) continue;
+						dedupeFiles.add(hit.displayPath);
+						collectedFiles.push(hit);
+						if (collectedFiles.length >= outputProbeLimit) break;
+					}
+				}
+				const orderedFiles = [...collectedFiles].sort((a, b) => a.displayPath.localeCompare(b.displayPath));
+				const pagedFiles = orderedFiles.slice(effectiveOffset, effectiveOffset + effectiveLimit + 1);
+				const hasMoreFiles = pagedFiles.length > effectiveLimit;
+				const selectedFiles = hasMoreFiles ? pagedFiles.slice(0, effectiveLimit) : pagedFiles;
+				if (selectedFiles.length === 0) {
+					return { content: [{ type: "text", text: "No matches found" }], details: undefined };
+				}
+				const rawOutput = selectedFiles.map((hit) => hit.displayPath).join("\n");
+				const truncation = truncateHead(rawOutput, { maxLines: Number.MAX_SAFE_INTEGER, maxBytes: DEFAULT_MAX_BYTES });
+				let output = truncation.content;
+				const notices: string[] = [];
+				const details: GrepRenderDetails = { outputMode, fileCount: selectedFiles.length, outputLineCount: selectedFiles.length };
+				if (hasMoreFiles) {
+					notices.push(`${effectiveLimit} results limit reached. Use offset=${effectiveOffset + effectiveLimit} for next page`);
+					details.matchLimitReached = effectiveLimit;
+				}
+				if (truncation.truncated) {
+					notices.push(`${formatSize(DEFAULT_MAX_BYTES)} output limit reached`);
+					details.truncation = truncation;
+				}
+				if (notices.length > 0) output += `\n\n[${notices.join(". ")}]`;
+				return { content: [{ type: "text", text: output }], details };
+			}
+
+			if (outputMode === "count") {
+				const outputProbeLimit = MAX_INTERNAL_PROBE;
+				const dedupeCounts = new Set<string>();
+				const collectedCounts: CountHit[] = [];
+				for (const root of roots) {
+					if (collectedCounts.length >= outputProbeLimit) break;
+					const remainingTimeoutMs = deadline - Date.now();
+					if (remainingTimeoutMs <= 0) {
+						throw new Error(`grep timed out after ${Math.max(1, Math.round(timeoutMs / 1000))}s`);
+					}
+					const absoluteRoot = path.resolve(cwd, root);
+					try {
+						await fs.stat(absoluteRoot);
+					} catch {
+						throw new Error(`Path not found: ${root}`);
+					}
+					const hits = await runRipgrepCounts({
+						command: rgCommand,
+						rootAbsolute: absoluteRoot,
+						cwd,
+						pattern: input.pattern,
+						glob: input.glob,
+						typeFilter,
+						ignoreCase: input.ignoreCase === true,
+						literal: input.literal === true,
+						useGitignore,
+						maxResults: outputProbeLimit - collectedCounts.length,
+						timeoutMs: remainingTimeoutMs,
+						signal,
+					});
+					for (const hit of hits) {
+						if (dedupeCounts.has(hit.displayPath)) continue;
+						dedupeCounts.add(hit.displayPath);
+						collectedCounts.push(hit);
+						if (collectedCounts.length >= outputProbeLimit) break;
+					}
+				}
+				const orderedCounts = [...collectedCounts].sort((a, b) => a.displayPath.localeCompare(b.displayPath));
+				const pagedCounts = orderedCounts.slice(effectiveOffset, effectiveOffset + effectiveLimit + 1);
+				const hasMoreCounts = pagedCounts.length > effectiveLimit;
+				const selectedCounts = hasMoreCounts ? pagedCounts.slice(0, effectiveLimit) : pagedCounts;
+				if (selectedCounts.length === 0) {
+					return { content: [{ type: "text", text: "No matches found" }], details: undefined };
+				}
+				const totalCount = selectedCounts.reduce((sum, hit) => sum + hit.count, 0);
+				const rawOutput = `${selectedCounts.map((hit) => `${hit.displayPath}:${hit.count}`).join("\n")}\n\nFound ${totalCount} total occurrence${totalCount === 1 ? "" : "s"} across ${selectedCounts.length} file${selectedCounts.length === 1 ? "" : "s"}.`;
+				const truncation = truncateHead(rawOutput, { maxLines: Number.MAX_SAFE_INTEGER, maxBytes: DEFAULT_MAX_BYTES });
+				let output = truncation.content;
+				const notices: string[] = [];
+				const details: GrepRenderDetails = { outputMode, matchCount: totalCount, fileCount: selectedCounts.length, outputLineCount: selectedCounts.length + 2 };
+				if (hasMoreCounts) {
+					notices.push(`${effectiveLimit} results limit reached. Use offset=${effectiveOffset + effectiveLimit} for next page`);
+					details.matchLimitReached = effectiveLimit;
+				}
+				if (truncation.truncated) {
+					notices.push(`${formatSize(DEFAULT_MAX_BYTES)} output limit reached`);
+					details.truncation = truncation;
+				}
+				if (notices.length > 0) output += `\n\n[${notices.join(". ")}]`;
+				return { content: [{ type: "text", text: output }], details };
+			}
+
 			const dedupe = new Set<string>();
 			const collectedMatches: RawMatch[] = [];
 			let hasDirectorySearch = false;
 
 			for (const root of roots) {
 				if (collectedMatches.length >= internalProbeLimit) break;
+				const remainingTimeoutMs = deadline - Date.now();
+				if (remainingTimeoutMs <= 0) {
+					throw new Error(`grep timed out after ${Math.max(1, Math.round(timeoutMs / 1000))}s`);
+				}
 				const absoluteRoot = path.resolve(cwd, root);
 				let directory = false;
 				try {
@@ -258,6 +346,7 @@ export default function grepExtension(pi: ExtensionAPI) {
 					literal: input.literal === true,
 					useGitignore,
 					maxMatches: remaining,
+					timeoutMs: remainingTimeoutMs,
 					signal,
 				});
 				for (const match of matches) {
@@ -269,10 +358,10 @@ export default function grepExtension(pi: ExtensionAPI) {
 				}
 			}
 
-			const orderedMatches = hasDirectorySearch ? balanceMatchesByFile(collectedMatches) : collectedMatches;
-			const paged = orderedMatches.slice(effectiveOffset, effectiveOffset + effectiveLimit + 1);
+			const paged = collectedMatches.slice(effectiveOffset, effectiveOffset + effectiveLimit + 1);
 			const hasMore = paged.length > effectiveLimit;
-			const selected = hasMore ? paged.slice(0, effectiveLimit) : paged;
+			const selectedWindow = hasMore ? paged.slice(0, effectiveLimit) : paged;
+			const selected = hasDirectorySearch ? balanceMatchesByFile(selectedWindow) : selectedWindow;
 
 			if (selected.length === 0) {
 				return {
@@ -281,8 +370,8 @@ export default function grepExtension(pi: ExtensionAPI) {
 				};
 			}
 
-			const contextLines = requestedContext ?? 0;
-			const { output: rawOutput, linesTruncated } = await formatMatches(selected, contextLines);
+			const contextLines = outputMode === "content" ? (requestedContext ?? 0) : 0;
+			const { rawOutput, outputLineCount, linesTruncated } = await formatOutputModeResult(selected, outputMode, contextLines);
 			const truncation = truncateHead(rawOutput, {
 				maxLines: Number.MAX_SAFE_INTEGER,
 				maxBytes: DEFAULT_MAX_BYTES,
@@ -290,8 +379,8 @@ export default function grepExtension(pi: ExtensionAPI) {
 			let output = truncation.content;
 			const notices: string[] = [];
 			const fileCount = new Set(selected.map((match) => match.displayPath)).size;
-			const outputLineCount = rawOutput.length === 0 ? 0 : rawOutput.split("\n").filter((line) => line.trim().length > 0).length;
 			const details: GrepRenderDetails = {
+				outputMode,
 				matchCount: selected.length,
 				fileCount,
 				outputLineCount,

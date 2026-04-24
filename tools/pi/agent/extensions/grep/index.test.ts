@@ -4,9 +4,12 @@ import test from "node:test";
 import {
 	balanceMatchesByFile,
 	normalizeOffset,
+	normalizeOutputMode,
 	normalizeSearchRoots,
+	normalizeTimeout,
 	resolveTypeFilter,
 } from "./logic.js";
+import { __test as ripgrepTest } from "./ripgrep.js";
 
 test("normalizeSearchRoots supports multipath trimming and dedupe", () => {
 	const roots = normalizeSearchRoots(undefined, ["apps", "packages", "packages", " libs "]);
@@ -28,6 +31,21 @@ test("normalizeOffset validates non-negative integers", () => {
 	assert.throws(() => normalizeOffset(-1), /non-negative/);
 });
 
+test("normalizeTimeout validates positive values with default", () => {
+	assert.equal(normalizeTimeout(undefined), 5000);
+	assert.equal(normalizeTimeout(99.9), 99);
+	assert.throws(() => normalizeTimeout(0), /positive number/);
+	assert.throws(() => normalizeTimeout(Number.NaN), /positive number/);
+});
+
+test("normalizeOutputMode validates supported modes", () => {
+	assert.equal(normalizeOutputMode(undefined), "content");
+	assert.equal(normalizeOutputMode(""), "content");
+	assert.equal(normalizeOutputMode("files_with_matches"), "files_with_matches");
+	assert.equal(normalizeOutputMode("count"), "count");
+	assert.throws(() => normalizeOutputMode("files"), /outputMode/);
+});
+
 test("resolveTypeFilter validates supported types", () => {
 	const tsFilter = resolveTypeFilter("typescript");
 	assert.ok(tsFilter);
@@ -35,6 +53,21 @@ test("resolveTypeFilter validates supported types", () => {
 	assert.equal(tsFilter?.predicate("/tmp/a.ts"), true);
 	assert.equal(tsFilter?.predicate("/tmp/a.py"), false);
 	assert.throws(() => resolveTypeFilter("unknown-type"), /Unknown grep type/);
+});
+
+test("normalizeRipgrepGlob preserves basename globs and scopes slash globs to any depth", () => {
+	assert.equal(ripgrepTest.normalizeRipgrepGlob("*.ts"), "*.ts");
+	assert.equal(ripgrepTest.normalizeRipgrepGlob("src/*.ts"), "**/src/*.ts");
+	assert.equal(ripgrepTest.normalizeRipgrepGlob("**/src/*.ts"), "**/src/*.ts");
+	assert.equal(ripgrepTest.normalizeRipgrepGlob("/tmp/*.ts"), "/tmp/*.ts");
+});
+
+test("buildRipgrepCommonArgs excludes git internals unless explicit glob owns filtering", () => {
+	assert.ok(ripgrepTest.buildRipgrepCommonArgs({ glob: undefined, typeFilter: null, ignoreCase: false, literal: false, useGitignore: true }).includes("!**/.git/**"));
+	assert.equal(
+		ripgrepTest.buildRipgrepCommonArgs({ glob: "*.ts", typeFilter: null, ignoreCase: false, literal: false, useGitignore: true }).includes("!**/.git/**"),
+		false,
+	);
 });
 
 test("balanceMatchesByFile interleaves files round-robin", () => {

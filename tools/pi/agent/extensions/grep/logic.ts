@@ -4,6 +4,9 @@ export { normalizeSearchRoots } from "../_shared/search-input.js";
 
 export const DEFAULT_LIMIT = 100;
 export const MAX_LIMIT = 2_000;
+export const DEFAULT_TIMEOUT_MS = 5_000;
+
+export type GrepOutputMode = "content" | "files_with_matches" | "count";
 
 export type RawMatch = {
   absolutePath: string;
@@ -59,6 +62,20 @@ export const normalizeOffset = (value: number | undefined): number => {
     throw new Error("offset must be a non-negative number");
   }
   return normalized;
+};
+
+export const normalizeTimeout = (value: number | undefined): number => {
+  const normalized = value === undefined ? DEFAULT_TIMEOUT_MS : Math.floor(value);
+  if (!Number.isFinite(normalized) || normalized <= 0) {
+    throw new Error("timeoutMs must be a positive number");
+  }
+  return normalized;
+};
+
+export const normalizeOutputMode = (value: string | undefined): GrepOutputMode => {
+  if (value === undefined || value.trim().length === 0) return "content";
+  if (value === "content" || value === "files_with_matches" || value === "count") return value;
+  throw new Error("outputMode must be one of: content, files_with_matches, count");
 };
 
 export const resolveTypeFilter = (input: string | undefined): TypeFilter | null => {
