@@ -1,10 +1,18 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { DEFAULT_MAX_BYTES, formatSize, keyHint, truncateHead } from "@mariozechner/pi-coding-agent";
+import type { AgentToolResult, ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import {
+	createFindToolDefinition,
+	DEFAULT_MAX_BYTES,
+	formatSize,
+	getAgentDir,
+	keyHint,
+	truncateHead,
+} from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { runLineStreamingProcess } from "../_shared/line-process.js";
+import { resolveSearchBinary } from "../_shared/search-binaries.js";
 import { ensureToolActive, getFirstTextContent, summarizeList } from "../_shared/tool-utils.js";
 import { buildFdArgs, normalizeLimit, normalizeSearchRoots, normalizeTimeout } from "./logic.js";
 
@@ -80,6 +88,7 @@ const getCollapsedSummary = (
 };
 
 const runFd = async (params: {
+	command: string;
 	pattern: string;
 	rootAbsolute: string;
 	includeHidden: boolean;
@@ -87,11 +96,11 @@ const runFd = async (params: {
 	timeoutMs: number;
 	signal?: AbortSignal;
 }): Promise<string[]> => {
-	const { pattern, rootAbsolute, includeHidden, limit, timeoutMs, signal } = params;
+	const { command, pattern, rootAbsolute, includeHidden, limit, timeoutMs, signal } = params;
 	const args = buildFdArgs(pattern, rootAbsolute, includeHidden, limit);
 
 	return await runLineStreamingProcess<string>({
-		command: "fd",
+		command,
 		args,
 		maxResults: limit,
 		timeoutMs,
@@ -104,6 +113,27 @@ const runFd = async (params: {
 		timeoutErrorMessage: (ms) => `find timed out after ${Math.max(1, Math.round(ms / 1000))}s`,
 		parseLine: (line) => line,
 	});
+};
+
+const ensureFdViaNativeFind = async (
+	toolCallId: string,
+	signal: AbortSignal,
+	onUpdate: ((partial: AgentToolResult) => void) | undefined,
+	cwd: string,
+): Promise<void> => {
+	const nativeFind = createFindToolDefinition(cwd);
+	if (!nativeFind.execute) throw new Error("native find tool is unavailable");
+	await nativeFind.execute(
+		toolCallId,
+		{
+			pattern: "__pi_search_binary_bootstrap_never_match__",
+			path: path.join(getAgentDir(), "bin"),
+			limit: 1,
+		},
+		signal,
+		onUpdate,
+		{ cwd } as never,
+	);
 };
 
 export default function findExtension(pi: ExtensionAPI) {
@@ -134,7 +164,7 @@ export default function findExtension(pi: ExtensionAPI) {
 			text.setText(summary);
 			return text;
 		},
-		async execute(_toolCallId, input: FindInput, signal, _onUpdate, ctx) {
+		async execute(toolCallId, input: FindInput, signal, onUpdate, ctx) {
 			if (!input.pattern || input.pattern.trim().length === 0) {
 				throw new Error("pattern must be a non-empty string");
 			}
@@ -146,6 +176,12 @@ export default function findExtension(pi: ExtensionAPI) {
 			const deadline = Date.now() + timeoutMs;
 			const cwd = ctx.cwd;
 			const requestedCount = effectiveLimit + 1;
+			let fdCommand = resolveSearchBinary("fd");
+			if (!fdCommand) {
+				await ensureFdViaNativeFind(toolCallId, signal, onUpdate, cwd);
+				fdCommand = resolveSearchBinary("fd");
+				if (!fdCommand) throw new Error("fd is unavailable after native Pi ensureTool fallback");
+			}
 			const dedupe = new Set<string>();
 			const collected: string[] = [];
 
@@ -168,6 +204,7 @@ export default function findExtension(pi: ExtensionAPI) {
 
 				const remaining = requestedCount - collected.length;
 				const matches = await runFd({
+					command: fdCommand,
 					pattern: input.pattern,
 					rootAbsolute: absoluteRoot,
 					includeHidden,

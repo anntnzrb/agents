@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { DEFAULT_MAX_BYTES, formatSize, truncateHead } from "@mariozechner/pi-coding-agent";
+import type { AgentToolResult, ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { createGrepToolDefinition, DEFAULT_MAX_BYTES, formatSize, getAgentDir, truncateHead } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { runLineStreamingProcess } from "../_shared/line-process.js";
+import { resolveSearchBinary } from "../_shared/search-binaries.js";
 import { ensureToolActive, getFirstTextContent } from "../_shared/tool-utils.js";
 import {
 	balanceMatchesByFile,
@@ -89,6 +90,7 @@ const isDirectoryPath = async (absolutePath: string): Promise<boolean> => {
 };
 
 const runRipgrep = async (params: {
+	command: string;
 	rootAbsolute: string;
 	cwd: string;
 	pattern: string;
@@ -101,6 +103,7 @@ const runRipgrep = async (params: {
 	signal?: AbortSignal;
 }): Promise<RawMatch[]> => {
 	const {
+		command,
 		rootAbsolute,
 		cwd,
 		pattern,
@@ -125,7 +128,7 @@ const runRipgrep = async (params: {
 	args.push(pattern, rootAbsolute);
 
 	return await runLineStreamingProcess<RawMatch>({
-		command: "rg",
+		command,
 		args,
 		maxResults: maxMatches,
 		...(signal ? { signal } : {}),
@@ -154,6 +157,28 @@ const runRipgrep = async (params: {
 
 export const __test = {
 	buildCollapsedResultText,
+};
+
+const ensureRgViaNativeGrep = async (
+	toolCallId: string,
+	signal: AbortSignal,
+	onUpdate: ((partial: AgentToolResult) => void) | undefined,
+	cwd: string,
+): Promise<void> => {
+	const nativeGrep = createGrepToolDefinition(cwd);
+	if (!nativeGrep.execute) throw new Error("native grep tool is unavailable");
+	await nativeGrep.execute(
+		toolCallId,
+		{
+			pattern: "__pi_search_binary_bootstrap_never_match__",
+			path: path.join(getAgentDir(), "bin"),
+			literal: true,
+			limit: 1,
+		},
+		signal,
+		onUpdate,
+		{ cwd } as never,
+	);
 };
 
 export default function grepExtension(pi: ExtensionAPI) {
@@ -189,7 +214,7 @@ export default function grepExtension(pi: ExtensionAPI) {
 			text.setText(buildCollapsedResultText(rawText, result.details as GrepRenderDetails | undefined, theme));
 			return text;
 		},
-		async execute(_toolCallId, input: GrepInput, signal, _onUpdate, ctx) {
+		async execute(toolCallId, input: GrepInput, signal, onUpdate, ctx) {
 			if (!input.pattern || input.pattern.trim().length === 0) {
 				throw new Error("pattern must be a non-empty string");
 			}
@@ -203,6 +228,12 @@ export default function grepExtension(pi: ExtensionAPI) {
 			const requestedWindow = effectiveOffset + effectiveLimit + 1;
 			const internalProbeLimit = Math.min(Math.max(requestedWindow * 5, requestedWindow), MAX_INTERNAL_PROBE);
 			const cwd = ctx.cwd;
+			let rgCommand = resolveSearchBinary("rg");
+			if (!rgCommand) {
+				await ensureRgViaNativeGrep(toolCallId, signal, onUpdate, cwd);
+				rgCommand = resolveSearchBinary("rg");
+				if (!rgCommand) throw new Error("rg is unavailable after native Pi ensureTool fallback");
+			}
 			const dedupe = new Set<string>();
 			const collectedMatches: RawMatch[] = [];
 			let hasDirectorySearch = false;
@@ -220,6 +251,7 @@ export default function grepExtension(pi: ExtensionAPI) {
 				const remaining = internalProbeLimit - collectedMatches.length;
 				if (remaining <= 0) break;
 				const matches = await runRipgrep({
+					command: rgCommand,
 					rootAbsolute: absoluteRoot,
 					cwd,
 					pattern: input.pattern,

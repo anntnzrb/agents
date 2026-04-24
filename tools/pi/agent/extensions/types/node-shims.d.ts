@@ -60,6 +60,8 @@ declare module "node:crypto" {
 }
 
 declare module "node:fs" {
+	export const constants: { X_OK: number };
+	export function accessSync(path: string, mode?: number): void;
 	export const promises: {
 		readFile: {
 			(path: string): Promise<{ toString: (encoding?: string) => string; byteLength: number }>;

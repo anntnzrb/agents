@@ -169,7 +169,10 @@ declare module "@mariozechner/pi-coding-agent" {
 	export function createReadToolDefinition(cwd: string): RegisteredTool;
 	export function createWriteToolDefinition(cwd: string): RegisteredTool;
 	export function createBashToolDefinition(cwd: string, options?: { operations?: BashOperations }): RegisteredTool;
+	export function createFindToolDefinition(cwd: string): RegisteredTool;
+	export function createGrepToolDefinition(cwd: string): RegisteredTool;
 	export function withFileMutationQueue<T>(path: string, op: () => Promise<T>): Promise<T>;
+	export function getAgentDir(): string;
 	export function getMarkdownTheme(): unknown;
 	export const DynamicBorder: any;
 }
