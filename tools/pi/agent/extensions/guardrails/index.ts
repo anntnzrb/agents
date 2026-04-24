@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import { statSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -14,6 +14,7 @@ const configPath = join(__dirname, "guardrails.jsonc");
 
 let cachedSignature: string | null = null;
 let cachedConfigOrReason: GuardrailsConfig | string | undefined;
+const emittedWarnings = new Set<string>();
 
 const getConfigSignature = (path: string): string => {
   try {
@@ -41,12 +42,40 @@ const getConfigOrBlockReason = (path: string) => {
 const resetConfigCache = () => {
   cachedSignature = null;
   cachedConfigOrReason = undefined;
+  emittedWarnings.clear();
+};
+
+const agentHintForWarning = (message: string): string => {
+  if (message.includes("`grep`")) {
+    return "Guardrail: use native `grep` tool instead of shell search for repository search. Tool shape: grep({ pattern, path, glob, type, ignoreCase, literal, context, limit }).";
+  }
+  if (message.includes("`find`")) {
+    return "Guardrail: use native `find` tool instead of shell discovery for repository file lookup. Tool shape: find({ pattern, path, paths, hidden, limit, timeoutMs }).";
+  }
+  return message;
+};
+
+const emitGuardrailWarning = (pi: ExtensionAPI, ctx: ExtensionContext, toolName: string, message: string) => {
+  ctx.ui.notify(message, "warning");
+  const key = `${toolName}:${message}`;
+  if (emittedWarnings.has(key)) return;
+  emittedWarnings.add(key);
+  pi.sendMessage(
+    {
+      customType: "guardrails-warning",
+      content: agentHintForWarning(message),
+      display: false,
+    },
+    { triggerTurn: false },
+  );
 };
 
 export const __test = {
   getConfigSignature,
   getConfigOrBlockReason,
   resetConfigCache,
+  agentHintForWarning,
+  emitGuardrailWarning,
 };
 
 export function createGuardrails(path: string) {
@@ -63,7 +92,7 @@ export function createGuardrails(path: string) {
           return undefined;
         }
         if (action.type === "warn") {
-          ctx.ui.notify(action.message, "warning");
+          emitGuardrailWarning(pi, ctx, event.toolName, action.message);
           return undefined;
         }
         return { block: true, reason: action.message };
@@ -76,7 +105,7 @@ export function createGuardrails(path: string) {
           return undefined;
         }
         if (action.type === "warn") {
-          ctx.ui.notify(action.message, "warning");
+          emitGuardrailWarning(pi, ctx, event.toolName, action.message);
           return undefined;
         }
         return { block: true, reason: action.message };

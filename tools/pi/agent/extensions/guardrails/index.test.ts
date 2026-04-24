@@ -53,4 +53,37 @@ describe("guardrails config cache", () => {
 			expect(third.agentBash.rules[0]?.action.message).toBe("two");
 		}
 	});
+
+	test("emits agent-visible guardrail warnings once per tool and message", () => {
+		__test.resetConfigCache();
+		const notifications: string[] = [];
+		const messages: Array<{ customType: string; content: string; display?: boolean }> = [];
+		const pi = {
+			sendMessage: (message: { customType: string; content: string; display?: boolean }) => messages.push(message),
+		} as any;
+		const ctx = {
+			ui: {
+				notify: (message: string) => notifications.push(message),
+			},
+		} as any;
+
+		__test.emitGuardrailWarning(pi, ctx, "pwsh", "use native grep");
+		__test.emitGuardrailWarning(pi, ctx, "pwsh", "use native grep");
+		__test.emitGuardrailWarning(pi, ctx, "bash", "use native grep");
+
+		expect(notifications).toEqual(["use native grep", "use native grep", "use native grep"]);
+		expect(messages).toEqual([
+			{ customType: "guardrails-warning", content: "use native grep", display: false },
+			{ customType: "guardrails-warning", content: "use native grep", display: false },
+		]);
+	});
+
+	test("keeps UI warnings terse while sending fuller agent hints", () => {
+		expect(__test.agentHintForWarning("Use native `grep` tool for repo search.")).toContain(
+			"grep({ pattern, path, glob, type, ignoreCase, literal, context, limit })",
+		);
+		expect(__test.agentHintForWarning("Use native `find` tool for file lookup.")).toContain(
+			"find({ pattern, path, paths, hidden, limit, timeoutMs })",
+		);
+	});
 });

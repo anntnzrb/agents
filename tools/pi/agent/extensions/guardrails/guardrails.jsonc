@@ -109,7 +109,7 @@
         },
         "action": {
           "type": "warn",
-          "message": "Prefer native `grep` tool over shell search commands when possible."
+          "message": "Use native `grep` tool for repo search."
         }
       },
       {
@@ -121,7 +121,7 @@
         },
         "action": {
           "type": "warn",
-          "message": "Prefer native `grep` tool over shell search commands when possible."
+          "message": "Use native `grep` tool for repo search."
         }
       },
       {
@@ -145,7 +145,7 @@
         },
         "action": {
           "type": "warn",
-          "message": "Prefer native `find` tool over shell discovery commands when possible."
+          "message": "Use native `find` tool for file lookup."
         }
       }
     ]
