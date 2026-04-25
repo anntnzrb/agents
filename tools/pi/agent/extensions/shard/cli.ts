@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { basename } from "node:path";
+import type { ChildMode } from "./types.js";
 
 export type InheritedTools =
 	| { mode: "default" }
@@ -103,13 +104,24 @@ export const formatModelArg = (
 	return model.provider ? `${model.provider}/${model.id}` : model.id;
 };
 
-const buildChildPrompt = (task: string): string =>
-	[
+const buildChildPrompt = (task: string, childMode: ChildMode): string => {
+	const shared = ["Return only the final report needed by the parent.", "Be concise.", "Do not delegate further."];
+	if (childMode === "explorer") {
+		return [
+			`Task: ${task}`,
+			"Mode: explorer. You are a read-only child Pi explorer.",
+			"Use only inspection tools. Do not modify files. Do not run shell commands.",
+			"Report concise findings with relevant file paths and evidence.",
+			...shared,
+		].join("\n");
+	}
+	return [
 		`Task: ${task}`,
-		"Return only the final answer needed by the parent.",
-		"Be concise.",
-		"Do not delegate further.",
+		"Mode: worker. You are a delegated child Pi worker. Use the available tools as needed.",
+		"If modifying files, avoid touching files that may be handled by other workers unless the task explicitly assigns them to you.",
+		...shared,
 	].join("\n");
+};
 
 const normalizeTools = (tools: readonly string[] | undefined): string[] | undefined => {
 	if (!tools) return undefined;
@@ -118,6 +130,7 @@ const normalizeTools = (tools: readonly string[] | undefined): string[] | undefi
 
 export const buildPiArgs = (input: {
 	task: string;
+	childMode: ChildMode;
 	modelArg: string | undefined;
 	thinkingLevel: string | undefined;
 	inheritedCliArgs: InheritedCliArgs;
@@ -153,6 +166,6 @@ export const buildPiArgs = (input: {
 		}
 	}
 
-	args.push(buildChildPrompt(input.task));
+	args.push(buildChildPrompt(input.task, input.childMode));
 	return args;
 };

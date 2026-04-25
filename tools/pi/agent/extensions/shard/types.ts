@@ -1,13 +1,16 @@
 import type { TruncationResult } from "@mariozechner/pi-coding-agent";
 import type { Message } from "@mariozechner/pi-ai";
 
-export type SpawnMode = "single" | "parallel";
+export type RunMode = "single" | "parallel";
+export type ChildMode = "worker" | "explorer";
 export type ChildRunStatus = "queued" | "running" | "completed" | "aborted" | "error";
 
 export type TaskSpec = {
 	index: number;
 	task: string;
 	cwd: string;
+	childMode: ChildMode;
+	timeoutSec?: number;
 };
 
 export type UsageStats = {
@@ -24,6 +27,8 @@ export type ChildRunResult = {
 	index: number;
 	task: string;
 	cwd: string;
+	childMode: ChildMode;
+	timeoutSec?: number;
 	status: ChildRunStatus;
 	exitCode: number;
 	durationMs: number;
@@ -38,8 +43,9 @@ export type ChildRunResult = {
 	latestText?: string;
 };
 
-export type SpawnPiDetails = {
-	mode: SpawnMode;
+export type ToolDetails = {
+	mode: RunMode;
+	childMode: ChildMode;
 	results: ChildRunResult[];
 	truncation?: TruncationResult;
 	fullOutputPath?: string;
@@ -59,6 +65,8 @@ export const createChildRunResult = (taskSpec: TaskSpec): ChildRunResult => ({
 	index: taskSpec.index,
 	task: taskSpec.task,
 	cwd: taskSpec.cwd,
+	childMode: taskSpec.childMode,
+	...(taskSpec.timeoutSec !== undefined ? { timeoutSec: taskSpec.timeoutSec } : {}),
 	status: "queued",
 	exitCode: 0,
 	durationMs: 0,

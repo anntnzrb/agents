@@ -10,8 +10,9 @@ import {
 	type TaskSpec,
 } from "./types.js";
 
-const DEPTH_ENV = "PI_SPAWN_DEPTH";
+const DEPTH_ENV = "PI_SHARD_DEPTH";
 const MAX_DEPTH = 1;
+const FORCE_KILL_DELAY_MS = 5000;
 
 type AbortLike = {
 	aborted?: boolean;
@@ -22,6 +23,8 @@ type AbortLike = {
 	) => void;
 	removeEventListener: (type: "abort", listener: () => void) => void;
 };
+
+type TerminationReason = "aborted" | "timeout";
 
 type ChildEvent =
 	| { type: "agent_start" }
@@ -42,13 +45,13 @@ const parseDepth = (raw: string | undefined): number => {
 export const getDepthGuard = (): {
 	currentDepth: number;
 	maxDepth: number;
-	canSpawn: boolean;
+	canRun: boolean;
 } => {
 	const currentDepth = parseDepth(process.env[DEPTH_ENV]);
 	return {
 		currentDepth,
 		maxDepth: MAX_DEPTH,
-		canSpawn: currentDepth < MAX_DEPTH,
+		canRun: currentDepth < MAX_DEPTH,
 	};
 };
 
@@ -162,9 +165,14 @@ const applyChildEvent = (
 	}
 };
 
-const finalizeChildRun = (
+export const finalizeChildRun = (
 	result: ChildRunResult,
-	input: { exitCode: number; durationMs: number; aborted: boolean },
+	input: {
+		exitCode: number;
+		durationMs: number;
+		terminationReason?: TerminationReason;
+		timeoutSec?: number;
+	},
 ): ChildRunResult => {
 	const nextResult = clearCurrentTool({
 		...result,
@@ -172,12 +180,21 @@ const finalizeChildRun = (
 		durationMs: input.durationMs,
 	});
 
-	if (input.aborted) {
+	if (input.terminationReason === "aborted") {
 		return {
 			...nextResult,
 			status: "aborted",
 			stopReason: "aborted",
 			errorMessage: "aborted",
+		};
+	}
+
+	if (input.terminationReason === "timeout") {
+		return {
+			...nextResult,
+			status: "error",
+			stopReason: "timeout",
+			errorMessage: `timed out after ${input.timeoutSec ?? "?"}s`,
 		};
 	}
 
@@ -232,6 +249,7 @@ export const runChildTask = async (input: {
 	const modelArg = formatModelArg(input.model);
 	const args = buildPiArgs({
 		task: input.taskSpec.task,
+		childMode: input.taskSpec.childMode,
 		modelArg,
 		thinkingLevel: input.thinkingLevel,
 		inheritedCliArgs: input.inheritedCliArgs,
@@ -244,11 +262,15 @@ export const runChildTask = async (input: {
 	await new Promise<void>((resolve) => {
 		let settled = false;
 		let stdoutBuffer = "";
-		let aborted = false;
+		let terminationReason: TerminationReason | undefined;
+		let timeoutTimer: unknown;
+		let killTimer: unknown;
 
 		const finish = () => {
 			if (settled) return;
 			settled = true;
+			if (timeoutTimer) clearTimeout(timeoutTimer);
+			if (killTimer) clearTimeout(killTimer);
 			if (input.signal) input.signal.removeEventListener("abort", abortChild);
 			resolve();
 		};
@@ -263,24 +285,43 @@ export const runChildTask = async (input: {
 			);
 		};
 
+		const detached = process.platform !== "win32";
 		const proc = spawn(invocation.command, invocation.args, {
 			cwd: input.taskSpec.cwd,
 			shell: false,
 			stdio: ["ignore", "pipe", "pipe"],
+			detached,
 			env: {
 				...process.env,
 				[DEPTH_ENV]: nextDepth,
 			},
 		});
 
-		const abortChild = () => {
-			if (aborted) return;
-			aborted = true;
-			proc.kill("SIGTERM");
-			setTimeout(() => {
-				if (!proc.killed) proc.kill("SIGKILL");
-			}, 5000);
+		const killChild = (signalName: "SIGTERM" | "SIGKILL") => {
+			const pid = typeof proc.pid === "number" ? proc.pid : undefined;
+			if (process.platform !== "win32" && pid) {
+				try {
+					process.kill(-pid, signalName);
+					return;
+				} catch {
+					// Fall back to direct child kill below.
+				}
+			}
+			proc.kill(signalName);
 		};
+
+		const terminateChild = (reason: TerminationReason) => {
+			if (terminationReason) return;
+			terminationReason = reason;
+			killChild("SIGTERM");
+			killTimer = setTimeout(() => {
+				if (!settled) killChild("SIGKILL");
+			}, FORCE_KILL_DELAY_MS);
+		};
+
+		function abortChild() {
+			terminateChild("aborted");
+		}
 
 		const processLine = (line: string) => {
 			if (!line.trim()) return;
@@ -320,11 +361,20 @@ export const runChildTask = async (input: {
 			result = finalizeChildRun(result, {
 				exitCode: code ?? result.exitCode,
 				durationMs: Date.now() - startTime,
-				aborted,
+				...(terminationReason ? { terminationReason } : {}),
+				...(input.taskSpec.timeoutSec !== undefined
+					? { timeoutSec: input.taskSpec.timeoutSec }
+					: {}),
 			});
 			notify();
 			finish();
 		});
+
+		if (input.taskSpec.timeoutSec !== undefined) {
+			timeoutTimer = setTimeout(() => {
+				terminateChild("timeout");
+			}, input.taskSpec.timeoutSec * 1000);
+		}
 
 		if (input.signal) {
 			if (input.signal.aborted) {

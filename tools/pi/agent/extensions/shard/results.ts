@@ -14,7 +14,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import type { Message } from "@mariozechner/pi-ai";
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
-import { getChildRunStatusLabel, type ChildRunResult, type SpawnPiDetails } from "./types.js";
+import { getChildRunStatusLabel, type ChildRunResult, type ToolDetails } from "./types.js";
 
 const HOME_DIR = homedir();
 
@@ -128,10 +128,11 @@ export const getFinalOutput = (messages: readonly Message[]): string => {
 	return "";
 };
 
-const buildHeader = (details: SpawnPiDetails): string =>
-	details.results.length <= 1
-		? "spawn_pi"
-		: `spawn_pi · ${details.results.length} tasks`;
+const buildHeader = (details: ToolDetails): string => {
+	const segments = ["shard", details.childMode];
+	if (details.results.length > 1) segments.push(`${details.results.length} tasks`);
+	return segments.join(" · ");
+};
 
 const getResultStatusIcon = (result: ChildRunResult): string => {
 	switch (getChildRunStatusLabel(result)) {
@@ -176,7 +177,7 @@ const getActivityText = (result: ChildRunResult): string => {
 	return "working";
 };
 
-const buildProgressLines = (details: SpawnPiDetails): string[] =>
+const buildProgressLines = (details: ToolDetails): string[] =>
 	details.results.map((result) => {
 		const activity = shorten(getActivityText(result), 72);
 		const usage = formatUsage(result);
@@ -203,11 +204,11 @@ const buildResultSection = (result: ChildRunResult): string =>
 		.filter(Boolean)
 		.join("\n\n");
 
-const buildCombinedOutput = (details: SpawnPiDetails): string =>
+const buildCombinedOutput = (details: ToolDetails): string =>
 	details.results.map(buildResultSection).join("\n\n---\n\n");
 
 const persistFullOutput = async (content: string): Promise<string> => {
-	const dir = await mkdtemp(join(tmpdir(), "pi-spawn-output-"));
+	const dir = await mkdtemp(join(tmpdir(), "pi-shard-output-"));
 	const filePath = join(dir, "output.txt");
 	await withFileMutationQueue(filePath, async () => {
 		await writeFile(filePath, content, { encoding: "utf-8", mode: 0o600 });
@@ -233,8 +234,8 @@ const buildTruncationNotice = (
 };
 
 export const buildToolContent = async (
-	details: SpawnPiDetails,
-): Promise<{ text: string; details: SpawnPiDetails }> => {
+	details: ToolDetails,
+): Promise<{ text: string; details: ToolDetails }> => {
 	const combined = buildCombinedOutput(details);
 	const truncation = truncateHead(combined, {
 		maxLines: DEFAULT_MAX_LINES,
@@ -244,7 +245,7 @@ export const buildToolContent = async (
 	if (!truncation.truncated) return { text: truncation.content, details };
 
 	const fullOutputPath = await persistFullOutput(combined);
-	const nextDetails: SpawnPiDetails = {
+	const nextDetails: ToolDetails = {
 		...details,
 		truncation,
 		fullOutputPath,
@@ -256,23 +257,28 @@ export const buildToolContent = async (
 	};
 };
 
-export const buildProgressText = (details: SpawnPiDetails): string =>
+export const buildProgressText = (details: ToolDetails): string =>
 	buildProgressLines(details).join("\n");
 
-type RenderCallArgs = Partial<{ task: string; tasks: string[] }>;
+type RenderCallArgs = Partial<{ tasks: string[]; mode: "worker" | "explorer" }>;
+
+const deriveRenderMode = (args: RenderCallArgs, taskCount: number): "worker" | "explorer" | undefined =>
+	args.mode ?? (taskCount === 1 ? "worker" : taskCount > 1 ? "explorer" : undefined);
 
 const getResultIcon = (result: ChildRunResult, theme: Theme): string =>
 	theme.fg(getResultStatusColor(result), getResultStatusIcon(result));
 
 export const renderCall = (args: RenderCallArgs, theme: Theme) => {
-	const taskCount = args.tasks && args.tasks.length > 0 ? args.tasks.length : args.task ? 1 : 0;
-	let text = theme.fg("toolTitle", theme.bold("spawn_pi"));
+	const taskCount = args.tasks?.length ?? 0;
+	const childMode = deriveRenderMode(args, taskCount);
+	let text = theme.fg("toolTitle", theme.bold("shard"));
+	if (childMode) text += theme.fg("accent", ` · ${childMode}`);
 	if (taskCount > 1) text += theme.fg("accent", ` · ${taskCount} tasks`);
 	return new Text(text, 0, 0);
 };
 
 export const renderResult = (
-	result: AgentToolResult<SpawnPiDetails>,
+	result: AgentToolResult<ToolDetails>,
 	options: ToolRenderResultOptions,
 	theme: Theme,
 ) => {

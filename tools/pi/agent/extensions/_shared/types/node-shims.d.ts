@@ -19,6 +19,7 @@ declare const process: {
 	execPath: string;
 	argv: string[];
 	platform: string;
+	kill: (pid: number, signal?: string) => void;
 };
 
 declare const console: {

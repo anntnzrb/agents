@@ -1,146 +1,120 @@
-import { stat } from "node:fs/promises";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type, type Static } from "@sinclair/typebox";
 import { getInheritedCliArgs } from "./cli.js";
+import {
+	buildTaskPlan,
+	clampConcurrency,
+	DEFAULT_CONCURRENCY,
+	MAX_TASKS,
+	selectRuntimeTools,
+	validateCwd,
+} from "./planning.js";
 import { buildProgressText, buildToolContent, renderCall, renderResult } from "./results.js";
 import { getDepthGuard, mapConcurrent, runChildTask } from "./runner.js";
 import {
 	createChildRunResult,
 	didChildRunFail,
 	type ChildRunResult,
-	type SpawnMode,
-	type SpawnPiDetails,
+	type ToolDetails,
 	type TaskSpec,
 } from "./types.js";
 
-const MAX_PARALLEL_TASKS = 8;
-const DEFAULT_CONCURRENCY = 4;
 const UPDATE_THROTTLE_MS = 250;
 
-const PROMPT_SNIPPET = "Run child pi workers for parallel subtasks";
+const PROMPT_SNIPPET = "Delegate bounded independent subtasks to child Pi workers";
 
-const PROMPT_GUIDELINES = ["Use for independent subtasks.", "Avoid same-file concurrent edits."];
+const PROMPT_GUIDELINES = [
+	"Use shard to offload bounded subtasks while the parent remains orchestrator.",
+	"Pass all work through tasks, even for one child task.",
+	"Only put mutually independent tasks in one shard call; all tasks in the array may run concurrently.",
+	"For dependent work, call shard in phases and include prior results in later task prompts.",
+	"Omit mode for the default behavior: one task becomes worker, multiple tasks become explorer.",
+	"Use mode:'explorer' for parallel read-only codebase inspection.",
+	"Use mode:'worker' for a single delegated implementation, validation, or repair task.",
+	"Do not use worker mode with multiple tasks; parallel worker isolation is not implemented.",
+	"Use timeoutSec only when the child run should be bounded.",
+];
 
-const SpawnPiParams = Type.Object({
-	task: Type.Optional(
+const ToolParams = Type.Object({
+	tasks: Type.Array(Type.String(), {
+		description: `Independent child task batch; max ${MAX_TASKS}. All tasks in one call may run concurrently.`,
+		minItems: 1,
+		maxItems: MAX_TASKS,
+	}),
+	mode: Type.Optional(
 		Type.String({
-			description: "Single task",
-		}),
-	),
-	tasks: Type.Optional(
-		Type.Array(Type.String(), {
-			description: `Task list; max ${MAX_PARALLEL_TASKS}`,
+			description:
+				"Child capability mode: worker or explorer. Omit to derive: one task => worker, multiple tasks => explorer.",
 		}),
 	),
 	cwd: Type.Optional(
 		Type.String({
-			description: "Working directory",
+			description: "Working directory for all tasks",
 		}),
 	),
 	maxConcurrency: Type.Optional(
 		Type.Number({
-			description: `Parallel workers; default ${DEFAULT_CONCURRENCY}, max ${MAX_PARALLEL_TASKS}`,
+			description: `Parallel explorer workers; default ${DEFAULT_CONCURRENCY}, max ${MAX_TASKS}`,
 			default: DEFAULT_CONCURRENCY,
+		}),
+	),
+	timeoutSec: Type.Optional(
+		Type.Number({
+			description: "Optional per-child timeout in seconds; no default",
 		}),
 	),
 });
 
-type SpawnPiParamsInput = Static<typeof SpawnPiParams>;
-type TaskPlan = { mode: SpawnMode; tasks: TaskSpec[] };
-type TaskPlanResult = { ok: true; value: TaskPlan } | { ok: false; error: string };
+type ToolParamsInput = Static<typeof ToolParams>;
+type TaskPlan = { mode: "single" | "parallel"; childMode: "worker" | "explorer"; tasks: TaskSpec[] };
 
-const clampConcurrency = (value: unknown): number => {
-	if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_CONCURRENCY;
-	return Math.max(1, Math.min(MAX_PARALLEL_TASKS, Math.trunc(value)));
-};
+const createEmptyDetails = (childMode: "worker" | "explorer" = "worker"): ToolDetails => ({
+	mode: "single",
+	childMode,
+	results: [],
+});
 
-const validateCwd = async (cwd: string): Promise<string | null> => {
-	try {
-		const info = await stat(cwd);
-		return info.isDirectory() ? null : `Invalid cwd "${cwd}": not a directory.`;
-	} catch {
-		return `Invalid cwd "${cwd}": path does not exist or is not accessible.`;
-	}
-};
-
-const buildTaskPlan = (
-	params: SpawnPiParamsInput,
-	cwd: string,
-): TaskPlanResult => {
-	const task = params.task?.trim();
-	const tasks = (params.tasks ?? []).map((value: string) => value.trim()).filter(Boolean);
-	const modeCount = Number(Boolean(task)) + Number(tasks.length > 0);
-	if (modeCount !== 1) {
-		return { ok: false, error: "Provide exactly one of task or tasks." };
-	}
-	if (tasks.length > MAX_PARALLEL_TASKS) {
-		return {
-			ok: false,
-			error: `Parallel mode accepts up to ${MAX_PARALLEL_TASKS} tasks.`,
-		};
-	}
-
-	const taskCwd = params.cwd ?? cwd;
-	return task
-		? {
-				ok: true,
-				value: {
-					mode: "single",
-					tasks: [{ index: 0, task, cwd: taskCwd }],
-				},
-			}
-		: {
-				ok: true,
-				value: {
-					mode: "parallel",
-					tasks: tasks.map((parallelTask: string, index: number) => ({
-						index,
-						task: parallelTask,
-						cwd: taskCwd,
-					})),
-				},
-			};
-};
-
-const createDetails = (taskPlan: TaskPlan): SpawnPiDetails => ({
+const createDetails = (taskPlan: TaskPlan): ToolDetails => ({
 	mode: taskPlan.mode,
+	childMode: taskPlan.childMode,
 	results: taskPlan.tasks.map(createChildRunResult),
 });
 
 const replaceResultAt = (
-	results: SpawnPiDetails["results"],
+	results: ToolDetails["results"],
 	index: number,
 	nextResult: ChildRunResult,
-): SpawnPiDetails["results"] =>
+): ToolDetails["results"] =>
 	results.map((result, resultIndex) =>
 		resultIndex === index ? nextResult : result,
 	);
 
-export default function spawnPiExtension(pi: ExtensionAPI) {
+export default function shardExtension(pi: ExtensionAPI) {
 	if (getDepthGuard().currentDepth > 0) return;
 
 	const inheritedCliArgs = getInheritedCliArgs();
 
 	pi.registerTool({
-		name: "spawn_pi",
-		label: "Spawn Pi",
-		description: "Delegate independent subtasks to child pi workers.",
+		name: "shard",
+		label: "shard",
+		description:
+			"Delegate bounded work to child Pi processes. The parent remains orchestrator. `tasks` is an independent batch: all tasks in one call may run concurrently. Use multiple shard calls for dependent phases.",
 		promptSnippet: PROMPT_SNIPPET,
 		promptGuidelines: PROMPT_GUIDELINES,
-		parameters: SpawnPiParams,
+		parameters: ToolParams,
 
-		async execute(_toolCallId, params, signal, onUpdate, ctx) {
+		async execute(_toolCallId, params: ToolParamsInput, signal, onUpdate, ctx) {
 			const depth = getDepthGuard();
-			if (!depth.canSpawn) {
+			if (!depth.canRun) {
 				return {
 					content: [
 						{
 							type: "text",
-							text: `spawn_pi blocked: recursion depth ${depth.currentDepth} reached max ${depth.maxDepth}.`,
+							text: `shard blocked: recursion depth ${depth.currentDepth} reached max ${depth.maxDepth}.`,
 						},
 					],
 					isError: true,
-					details: { mode: "single", results: [] } satisfies SpawnPiDetails,
+					details: createEmptyDetails(),
 				};
 			}
 
@@ -149,7 +123,7 @@ export default function spawnPiExtension(pi: ExtensionAPI) {
 				return {
 					content: [{ type: "text", text: taskPlan.error }],
 					isError: true,
-					details: { mode: "single", results: [] } satisfies SpawnPiDetails,
+					details: createEmptyDetails(),
 				};
 			}
 
@@ -158,13 +132,17 @@ export default function spawnPiExtension(pi: ExtensionAPI) {
 				return {
 					content: [{ type: "text", text: cwdError }],
 					isError: true,
-					details: { mode: taskPlan.value.mode, results: [] } satisfies SpawnPiDetails,
+					details: {
+						mode: taskPlan.value.mode,
+						childMode: taskPlan.value.childMode,
+						results: [],
+					} satisfies ToolDetails,
 				};
 			}
 
 			let details = createDetails(taskPlan.value);
 			let lastUpdateAt = 0;
-			const emitUpdate = (nextDetails: SpawnPiDetails) => {
+			const emitUpdate = (nextDetails: ToolDetails) => {
 				if (!onUpdate) return;
 				const now = Date.now();
 				if (now - lastUpdateAt < UPDATE_THROTTLE_MS) return;
@@ -183,7 +161,7 @@ export default function spawnPiExtension(pi: ExtensionAPI) {
 				emitUpdate(details);
 			};
 
-			const runtimeTools = pi.getActiveTools();
+			const runtimeTools = selectRuntimeTools(taskPlan.value.childMode, pi.getActiveTools());
 			const maxConcurrency = clampConcurrency(params.maxConcurrency);
 			const results = await mapConcurrent(
 				taskPlan.value.tasks,
@@ -204,7 +182,7 @@ export default function spawnPiExtension(pi: ExtensionAPI) {
 				},
 			);
 
-			const finalDetails: SpawnPiDetails = { ...details, results };
+			const finalDetails: ToolDetails = { ...details, results };
 			const toolContent = await buildToolContent(finalDetails);
 			const failed = results.some(didChildRunFail);
 			return {
