@@ -204,8 +204,33 @@ const buildResultSection = (result: ChildRunResult): string =>
 		.filter(Boolean)
 		.join("\n\n");
 
+const formatDuration = (durationMs: number): string => {
+	if (durationMs < 1000) return `${durationMs}ms`;
+	if (durationMs < 60000) return `${(durationMs / 1000).toFixed(1)}s`;
+	return `${Math.round(durationMs / 60000)}m`;
+};
+
+const buildAggregateHeader = (details: ToolDetails): string => {
+	const completed = details.results.filter((result) => getChildRunStatusLabel(result) === "completed").length;
+	const aborted = details.results.filter((result) => getChildRunStatusLabel(result) === "aborted").length;
+	const failed = details.results.filter((result) => getChildRunStatusLabel(result) === "failed").length;
+	const durationMs = Math.max(0, ...details.results.map((result) => result.durationMs));
+	const toolCalls = details.results.reduce((total, result) => total + result.toolCalls, 0);
+	return [
+		`shard: ${details.childMode}`,
+		`${details.results.length} ${details.results.length === 1 ? "task" : "tasks"}`,
+		`${completed} completed`,
+		failed > 0 ? `${failed} failed` : "",
+		aborted > 0 ? `${aborted} aborted` : "",
+		durationMs > 0 ? formatDuration(durationMs) : "",
+		toolCalls > 0 ? `${toolCalls} ${toolCalls === 1 ? "tool" : "tools"}` : "",
+	]
+		.filter(Boolean)
+		.join(" · ");
+};
+
 const buildCombinedOutput = (details: ToolDetails): string =>
-	details.results.map(buildResultSection).join("\n\n---\n\n");
+	[buildAggregateHeader(details), details.results.map(buildResultSection).join("\n\n---\n\n")].join("\n\n");
 
 const persistFullOutput = async (content: string): Promise<string> => {
 	const dir = await mkdtemp(join(tmpdir(), "pi-shard-output-"));

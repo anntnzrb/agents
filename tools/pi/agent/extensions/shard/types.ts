@@ -11,6 +11,8 @@ export type TaskSpec = {
 	cwd: string;
 	childMode: ChildMode;
 	timeoutSec?: number;
+	maxTurns?: number;
+	maxToolCalls?: number;
 };
 
 export type UsageStats = {
@@ -29,6 +31,8 @@ export type ChildRunResult = {
 	cwd: string;
 	childMode: ChildMode;
 	timeoutSec?: number;
+	maxTurns?: number;
+	maxToolCalls?: number;
 	status: ChildRunStatus;
 	exitCode: number;
 	durationMs: number;
@@ -67,6 +71,8 @@ export const createChildRunResult = (taskSpec: TaskSpec): ChildRunResult => ({
 	cwd: taskSpec.cwd,
 	childMode: taskSpec.childMode,
 	...(taskSpec.timeoutSec !== undefined ? { timeoutSec: taskSpec.timeoutSec } : {}),
+	...(taskSpec.maxTurns !== undefined ? { maxTurns: taskSpec.maxTurns } : {}),
+	...(taskSpec.maxToolCalls !== undefined ? { maxToolCalls: taskSpec.maxToolCalls } : {}),
 	status: "queued",
 	exitCode: 0,
 	durationMs: 0,

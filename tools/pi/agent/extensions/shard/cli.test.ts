@@ -88,6 +88,9 @@ describe("buildPiArgs prompts", () => {
 		expect(prompt).toContain("Mode: worker");
 		expect(prompt).toContain("delegated child Pi worker");
 		expect(prompt).toContain("Do not delegate further.");
+		expect(prompt).toContain("SUMMARY: one concise paragraph.");
+		expect(prompt).toContain("CHANGES:");
+		expect(prompt).toContain("VALIDATION:");
 	});
 
 	test("explorer prompt includes read-only and no-shell language", () => {
@@ -102,5 +105,8 @@ describe("buildPiArgs prompts", () => {
 		expect(prompt).toContain("read-only child Pi explorer");
 		expect(prompt).toContain("Do not run shell commands.");
 		expect(prompt).toContain("Do not modify files.");
+		expect(prompt).toContain("SUMMARY: one concise paragraph.");
+		expect(prompt).toContain("EVIDENCE:");
+		expect(prompt).toContain("NEXT:");
 	});
 });

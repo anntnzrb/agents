@@ -4,6 +4,8 @@ import {
 	normalizeChildMode,
 	normalizeTasks,
 	selectRuntimeTools,
+	validateMaxToolCalls,
+	validateMaxTurns,
 	validateTimeoutSec,
 } from "./planning.js";
 
@@ -112,5 +114,36 @@ describe("shard timeout validation", () => {
 		const result = validateTimeoutSec(86401);
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.error).toBe("timeoutSec must be <= 86400 seconds.");
+	});
+});
+
+describe("shard budget validation", () => {
+	test("budgets omitted return undefined", () => {
+		expect(unwrap(validateMaxTurns(undefined))).toBeUndefined();
+		expect(unwrap(validateMaxToolCalls(undefined))).toBeUndefined();
+	});
+
+	test("valid budgets are accepted and copied into task plan", () => {
+		const plan = unwrap(buildTaskPlan({ tasks: ["tiny"], maxTurns: 2, maxToolCalls: 5 }, "/repo"));
+		expect(plan.tasks[0]?.maxTurns).toBe(2);
+		expect(plan.tasks[0]?.maxToolCalls).toBe(5);
+	});
+
+	test("invalid budgets are rejected", () => {
+		const turns = validateMaxTurns(1.5);
+		const calls = validateMaxToolCalls(0);
+		expect(turns.ok).toBe(false);
+		expect(calls.ok).toBe(false);
+		if (!turns.ok) expect(turns.error).toBe("maxTurns must be a positive integer.");
+		if (!calls.ok) expect(calls.error).toBe("maxToolCalls must be a positive integer.");
+	});
+
+	test("excessive budgets are rejected", () => {
+		const turns = validateMaxTurns(101);
+		const calls = validateMaxToolCalls(1001);
+		expect(turns.ok).toBe(false);
+		expect(calls.ok).toBe(false);
+		if (!turns.ok) expect(turns.error).toBe("maxTurns must be <= 100.");
+		if (!calls.ok) expect(calls.error).toBe("maxToolCalls must be <= 1000.");
 	});
 });

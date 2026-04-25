@@ -24,7 +24,7 @@ type AbortLike = {
 	removeEventListener: (type: "abort", listener: () => void) => void;
 };
 
-type TerminationReason = "aborted" | "timeout";
+type TerminationReason = "aborted" | "timeout" | "maxTurns" | "maxToolCalls";
 
 type ChildEvent =
 	| { type: "agent_start" }
@@ -172,6 +172,8 @@ export const finalizeChildRun = (
 		durationMs: number;
 		terminationReason?: TerminationReason;
 		timeoutSec?: number;
+		maxTurns?: number;
+		maxToolCalls?: number;
 	},
 ): ChildRunResult => {
 	const nextResult = clearCurrentTool({
@@ -195,6 +197,24 @@ export const finalizeChildRun = (
 			status: "error",
 			stopReason: "timeout",
 			errorMessage: `timed out after ${input.timeoutSec ?? "?"}s`,
+		};
+	}
+
+	if (input.terminationReason === "maxTurns") {
+		return {
+			...nextResult,
+			status: "error",
+			stopReason: "maxTurns",
+			errorMessage: `exceeded maxTurns ${input.maxTurns ?? "?"}`,
+		};
+	}
+
+	if (input.terminationReason === "maxToolCalls") {
+		return {
+			...nextResult,
+			status: "error",
+			stopReason: "maxToolCalls",
+			errorMessage: `exceeded maxToolCalls ${input.maxToolCalls ?? "?"}`,
 		};
 	}
 
@@ -323,11 +343,22 @@ export const runChildTask = async (input: {
 			terminateChild("aborted");
 		}
 
+		const enforceBudgets = () => {
+			if (input.taskSpec.maxTurns !== undefined && result.usage.turns > input.taskSpec.maxTurns) {
+				terminateChild("maxTurns");
+				return;
+			}
+			if (input.taskSpec.maxToolCalls !== undefined && result.toolCalls > input.taskSpec.maxToolCalls) {
+				terminateChild("maxToolCalls");
+			}
+		};
+
 		const processLine = (line: string) => {
 			if (!line.trim()) return;
 			const event = parseChildEvent(line);
 			if (!event) return;
 			result = applyChildEvent(result, event);
+			enforceBudgets();
 			notify();
 		};
 
@@ -364,6 +395,12 @@ export const runChildTask = async (input: {
 				...(terminationReason ? { terminationReason } : {}),
 				...(input.taskSpec.timeoutSec !== undefined
 					? { timeoutSec: input.taskSpec.timeoutSec }
+					: {}),
+				...(input.taskSpec.maxTurns !== undefined
+					? { maxTurns: input.taskSpec.maxTurns }
+					: {}),
+				...(input.taskSpec.maxToolCalls !== undefined
+					? { maxToolCalls: input.taskSpec.maxToolCalls }
 					: {}),
 			});
 			notify();

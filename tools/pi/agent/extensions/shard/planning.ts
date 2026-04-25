@@ -4,6 +4,8 @@ import type { ChildMode, TaskSpec } from "./types.js";
 export const MAX_TASKS = 8;
 export const DEFAULT_CONCURRENCY = 4;
 export const MAX_TIMEOUT_SEC = 86400;
+export const MAX_TURNS = 100;
+export const MAX_TOOL_CALLS = 1000;
 
 const EXPLORER_TOOLS = new Set(["read", "grep", "find"]);
 
@@ -21,6 +23,8 @@ export type PlanInput = {
 	cwd?: unknown;
 	maxConcurrency?: unknown;
 	timeoutSec?: unknown;
+	maxTurns?: unknown;
+	maxToolCalls?: unknown;
 };
 
 export const clampConcurrency = (value: unknown): number => {
@@ -76,6 +80,27 @@ export const validateTimeoutSec = (value: unknown): PlanResult<number | undefine
 	return { ok: true, value };
 };
 
+const validatePositiveIntegerBudget = (
+	value: unknown,
+	fieldName: "maxTurns" | "maxToolCalls",
+	maximum: number,
+): PlanResult<number | undefined> => {
+	if (value === undefined) return { ok: true, value: undefined };
+	if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+		return { ok: false, error: `${fieldName} must be a positive integer.` };
+	}
+	if (value > maximum) {
+		return { ok: false, error: `${fieldName} must be <= ${maximum}.` };
+	}
+	return { ok: true, value };
+};
+
+export const validateMaxTurns = (value: unknown): PlanResult<number | undefined> =>
+	validatePositiveIntegerBudget(value, "maxTurns", MAX_TURNS);
+
+export const validateMaxToolCalls = (value: unknown): PlanResult<number | undefined> =>
+	validatePositiveIntegerBudget(value, "maxToolCalls", MAX_TOOL_CALLS);
+
 export const buildTaskPlan = (
 	params: PlanInput,
 	defaultCwd: string,
@@ -96,6 +121,10 @@ export const buildTaskPlan = (
 
 	const timeoutSec = validateTimeoutSec(params.timeoutSec);
 	if (!timeoutSec.ok) return timeoutSec;
+	const maxTurns = validateMaxTurns(params.maxTurns);
+	if (!maxTurns.ok) return maxTurns;
+	const maxToolCalls = validateMaxToolCalls(params.maxToolCalls);
+	if (!maxToolCalls.ok) return maxToolCalls;
 
 	const cwd = typeof params.cwd === "string" && params.cwd.trim() ? params.cwd : defaultCwd;
 
@@ -110,6 +139,8 @@ export const buildTaskPlan = (
 				cwd,
 				childMode: childMode.value,
 				...(timeoutSec.value !== undefined ? { timeoutSec: timeoutSec.value } : {}),
+				...(maxTurns.value !== undefined ? { maxTurns: maxTurns.value } : {}),
+				...(maxToolCalls.value !== undefined ? { maxToolCalls: maxToolCalls.value } : {}),
 			})),
 		},
 	};

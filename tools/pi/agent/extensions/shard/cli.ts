@@ -113,6 +113,14 @@ const buildChildPrompt = (task: string, childMode: ChildMode): string => {
 			"Use only inspection tools. Do not modify files. Do not run shell commands.",
 			"Report concise findings with relevant file paths and evidence.",
 			...shared,
+			"Use this report format:",
+			"SUMMARY: one concise paragraph.",
+			"EVIDENCE:",
+			"- path[:line] — finding or fact.",
+			"RISKS:",
+			"- uncertainty, missing evidence, or none.",
+			"NEXT:",
+			"- recommended parent action.",
 		].join("\n");
 	}
 	return [
@@ -120,6 +128,14 @@ const buildChildPrompt = (task: string, childMode: ChildMode): string => {
 		"Mode: worker. You are a delegated child Pi worker. Use the available tools as needed.",
 		"If modifying files, avoid touching files that may be handled by other workers unless the task explicitly assigns them to you.",
 		...shared,
+		"Use this report format:",
+		"SUMMARY: one concise paragraph.",
+		"CHANGES:",
+		"- path — what changed, or none.",
+		"VALIDATION:",
+		"- command/result, or not run with reason.",
+		"RISKS:",
+		"- anything the parent should know, or none.",
 	].join("\n");
 };
 

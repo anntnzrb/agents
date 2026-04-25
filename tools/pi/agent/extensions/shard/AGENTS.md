@@ -14,7 +14,9 @@ The parent session remains the orchestrator.
   - multiple tasks -> `explorer`
 - `worker` is parent-like and accepts exactly one task.
 - `explorer` is strict read-only fanout: active tools are filtered to `read`, `grep`, `find`; no shell or mutation tools.
-- `timeoutSec` is optional and has no default.
+- `timeoutSec`, `maxTurns`, and `maxToolCalls` are optional and have no defaults.
+- `maxTurns` and `maxToolCalls` are strict budget kill switches; use only for explicit bounded runs.
+- Child prompts require structured reports so parent output is predictable and compact.
 
 ## Files
 - `index.ts` — tool registration, param validation, orchestration

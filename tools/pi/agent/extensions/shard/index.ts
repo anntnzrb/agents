@@ -32,7 +32,8 @@ const PROMPT_GUIDELINES = [
 	"Use mode:'explorer' for parallel read-only codebase inspection.",
 	"Use mode:'worker' for a single delegated implementation, validation, or repair task.",
 	"Do not use worker mode with multiple tasks; parallel worker isolation is not implemented.",
-	"Use timeoutSec only when the child run should be bounded.",
+	"Use timeoutSec only when the child run should be time-bounded.",
+	"Use maxTurns or maxToolCalls only for explicit budget limits; omit them for normal exploration or implementation.",
 ];
 
 const ToolParams = Type.Object({
@@ -61,6 +62,16 @@ const ToolParams = Type.Object({
 	timeoutSec: Type.Optional(
 		Type.Number({
 			description: "Optional per-child timeout in seconds; no default",
+		}),
+	),
+	maxTurns: Type.Optional(
+		Type.Number({
+			description: "Optional per-child maximum assistant turns; no default. Use only for explicit budget limits.",
+		}),
+	),
+	maxToolCalls: Type.Optional(
+		Type.Number({
+			description: "Optional per-child maximum tool calls; no default. Use only for explicit budget limits.",
 		}),
 	),
 });
