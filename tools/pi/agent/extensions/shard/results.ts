@@ -135,23 +135,31 @@ const buildHeader = (details: ToolDetails): string => {
 };
 
 const getResultStatusIcon = (result: ChildRunResult): string => {
-	switch (getChildRunStatusLabel(result)) {
+	switch (result.status) {
+		case "queued":
+			return "◦";
+		case "running":
+			return "…";
 		case "completed":
 			return "✓";
 		case "aborted":
 			return "⊘";
-		case "failed":
+		case "error":
 			return "✗";
 	}
 };
 
-const getResultStatusColor = (result: ChildRunResult): "success" | "warning" | "error" => {
-	switch (getChildRunStatusLabel(result)) {
+const getResultStatusColor = (result: ChildRunResult): "dim" | "success" | "warning" | "error" => {
+	switch (result.status) {
+		case "queued":
+			return "dim";
+		case "running":
+			return "warning";
 		case "completed":
 			return "success";
 		case "aborted":
 			return "warning";
-		case "failed":
+		case "error":
 			return "error";
 	}
 };
@@ -167,13 +175,12 @@ const getPreviewText = (result: ChildRunResult): string =>
 
 const getActivityText = (result: ChildRunResult): string => {
 	if (result.status === "queued") return "queued";
-	if (result.currentTool) return result.currentTool;
 	const latestPreview = getPreviewText(result);
 	if (latestPreview && result.status === "running") return latestPreview;
 	if (result.status === "running") return "thinking";
-	if (result.status === "aborted" || result.stopReason === "aborted") return "aborted";
+	if (result.status === "aborted" || result.stopReason === "aborted") return latestPreview || "aborted";
 	if (result.status === "completed") return "done";
-	if (result.status === "error") return "failed";
+	if (result.status === "error") return latestPreview || "failed";
 	return "working";
 };
 
@@ -293,6 +300,11 @@ const deriveRenderMode = (args: RenderCallArgs, taskCount: number): "worker" | "
 const getResultIcon = (result: ChildRunResult, theme: Theme): string =>
 	theme.fg(getResultStatusColor(result), getResultStatusIcon(result));
 
+const getCompactStatusDetail = (result: ChildRunResult): string => {
+	if (result.status === "completed") return "";
+	return shorten(getActivityText(result), 72);
+};
+
 export const renderCall = (args: RenderCallArgs, theme: Theme) => {
 	const taskCount = args.tasks?.length ?? 0;
 	const childMode = deriveRenderMode(args, taskCount);
@@ -324,8 +336,10 @@ export const renderResult = (
 	if (!options.expanded) {
 		const lines = details.results.map((task) => {
 			const usage = formatUsage(task);
+			const statusDetail = getCompactStatusDetail(task);
+			const detail = statusDetail ? theme.fg(getResultStatusColor(task), ` — ${statusDetail}`) : "";
 			const suffix = usage ? theme.fg("dim", ` · ${usage}`) : "";
-			return `${getResultIcon(task, theme)} ${task.index + 1}. ${formatTaskPreview(task.task)}${suffix}`;
+			return `${getResultIcon(task, theme)} ${task.index + 1}. ${formatTaskPreview(task.task)}${detail}${suffix}`;
 		});
 		return new Text(lines.join("\n"), 0, 0);
 	}
