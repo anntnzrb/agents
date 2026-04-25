@@ -35,28 +35,59 @@ Rules:
 - Promote to `_shared` only with 2+ extension reuse.
 - Keep `index.ts` orchestration-focused; move pure formatting/parsing/helpers out when file size drifts up.
 
-## Skills for extension work
+## Extension change loop
 
-Load relevant skills early, before planning/editing:
-- `/skill:typescript` eagerly for TypeScript extension work: `*.ts`, tests, schemas, tool registration, renderers, config-adjacent TS validation.
-- `/skill:effect` eagerly when code imports/uses Effect, reviewing nearby Effect patterns, or change may affect Effect-style APIs/runtimes.
-- Docs-only with no TS/Effect reasoning: skip.
+1. Load skills first:
+   - `/skill:typescript` for TS/tests/schemas/tool registration/renderers/config TS.
+   - `/skill:effect` for Effect imports/APIs/runtimes.
+2. Read touched extension `AGENTS.md` files.
+3. Map public surface: schema, promptSnippet, description, render labels, commands, events, guardrail hints, docs/tests.
+4. Red when practical: add/update failing test for intended behavior/API.
+5. Patch smallest coherent unit. Personal-agent policy: rewrite/renew freely; no legacy args, shims, deprecations, fallback compatibility unless user explicitly asks.
+6. Green loop: format/lint/test/typecheck. Any red gate => diagnose, patch, rerun same gate class until green or hard blocker.
+7. Runtime/model-facing change => scenario-specific ephemeral Pi validation before user reload.
+8. Sync after green when SSOT changes must reach runtime homes.
+9. Report: changed surface, gates, ephemeral Pi result, reload need.
 
-## QA
+## Ephemeral Pi validation
 
-Gate for extension changes (run from specific extension dir):
+Goal: validate fresh extension runtime via child Pi; minimize user reloads.
+
+Use when parent may be stale or change touches model/runtime surface: tools, schemas, prompt snippets, commands, events, guardrails, context, provider behavior, file effects.
+
+- One-shot/default: `pi --no-extensions -e <extension.ts> --no-session --mode json -p --tools <tools> "<natural-language scenario>"`
+- Multi-extension: repeat `-e <extension.ts>` for collision/interaction tests.
+- JSON mode: preferred for automation; parse JSONL events, not pretty text.
+- RPC mode: use only for multi-turn/client/UI protocol tests needing stdin commands or extension UI protocol.
+- Parse with small Bun/TS scripts for assertions. `jq` ok for ad hoc inspection; avoid brittle grep over mixed stdout/stderr.
+- Inspect relevant events:
+  - tools: `tool_execution_start`, `tool_execution_end`, `message_end`
+  - prompts/context: `message_*`, final assistant text, provider-facing behavior when observable
+  - commands/events: messages, tool calls/results, stderr/stdout, exit code, file effects
+- Write natural-language scenarios that force changed behavior through Pi. Assert exact relevant facts: tool names, args, forbidden args absent, results, errors, emitted messages, command effects, filesystem state.
+- `pi ... --help` only proves startup/load. Never count it as behavior validation.
+- Direct Bun import harnesses validate deterministic internals; they do not replace child Pi for model-facing behavior.
+- Child Pi does not update parent session. Ask user reload/restart only for parent-runtime adoption or visual/TUI inspection.
+
+## QA gates
+
+Run from each touched extension dir:
 - `bun x biome format --write . --config-path ../.config/biome.json`
 - `bun x biome lint . --config-path ../.config/biome.json --error-on-warnings`
 - `bun test <targeted tests>`
-- `bun x tsc -p tsconfig.json --noEmit` for touched extensions using local TS baseline
+- `bun x tsc -p tsconfig.json --noEmit` when `tsconfig.json` exists or TS touched.
 
-Also:
+Cross-extension changes:
+- Run targeted gates for every touched extension.
+- Run combined tests for coupled surfaces (`find+grep+guardrails`, render+logic, etc.).
+- Run scenario-specific child Pi validation when public/runtime behavior changes.
+- Run direct Bun harness or child Pi with all changed extensions loaded together when schemas/tools/events can collide.
+
+Other requirements:
 - Verify guideline criteria.
 - Keep files 500-1000 SLOC excluding comments; beyond 500L, modularize.
 - If extension lacks `tsconfig.json`, add one extending `../tsconfig.base.json` with `../_shared/types/**/*.d.ts` included before strict typecheck.
-- All extensions need AGENTS.md: description + navigation.
-
-NOTE: fallback to npm (`npx`) if `bun` unavailable.
+- All extensions need `AGENTS.md`: description + navigation.
 
 ## Native Pi tool override philosophy
 
