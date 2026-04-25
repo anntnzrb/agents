@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import type { Message } from "@mariozechner/pi-ai";
 import type { InheritedCliArgs } from "./cli.js";
 import { buildPiArgs, formatModelArg, getPiInvocation } from "./cli.js";
@@ -11,8 +11,90 @@ import {
 } from "./types.js";
 
 const DEPTH_ENV = "PI_SHARD_DEPTH";
+const WATCHDOG_PAYLOAD_ENV = "PI_SHARD_WATCHDOG_PAYLOAD";
 const MAX_DEPTH = 1;
 const FORCE_KILL_DELAY_MS = 5000;
+const FINAL_DRAIN_DELAY_MS = 5000;
+const POST_EXIT_STDIO_IDLE_MS = 2000;
+const POST_EXIT_STDIO_HARD_MS = 8000;
+const WATCHDOG_SCRIPT = String.raw`
+const { spawn, spawnSync } = require("node:child_process");
+const FORCE_KILL_DELAY_MS = 5000;
+const PARENT_CHECK_INTERVAL_MS = 1000;
+const payloadRaw = process.env.PI_SHARD_WATCHDOG_PAYLOAD;
+if (!payloadRaw) {
+	console.error("PI_SHARD_WATCHDOG_PAYLOAD is required");
+	process.exit(1);
+}
+let payload;
+try {
+	payload = JSON.parse(payloadRaw);
+} catch (error) {
+	console.error("invalid PI_SHARD_WATCHDOG_PAYLOAD: " + (error && error.message ? error.message : String(error)));
+	process.exit(1);
+}
+const parentPid = Number(payload.parentPid);
+const command = typeof payload.command === "string" ? payload.command : "";
+const args = Array.isArray(payload.args) ? payload.args.filter((arg) => typeof arg === "string") : [];
+const cwd = typeof payload.cwd === "string" ? payload.cwd : process.cwd();
+const env = payload.env && typeof payload.env === "object" ? { ...process.env, ...payload.env } : process.env;
+if (!Number.isSafeInteger(parentPid) || parentPid <= 0 || !command) {
+	console.error("invalid watchdog payload");
+	process.exit(1);
+}
+const detached = process.platform !== "win32";
+const child = spawn(command, args, { cwd, detached, env, stdio: ["ignore", "pipe", "pipe"] });
+let childExited = false;
+let terminating = false;
+let forceKillTimer;
+const killChild = (signalName) => {
+	if (childExited || !child.pid) return;
+	if (process.platform === "win32") {
+		spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+		return;
+	}
+	try {
+		process.kill(-child.pid, signalName);
+	} catch {
+		try { child.kill(signalName); } catch {}
+	}
+};
+const terminate = (signalName = "SIGTERM") => {
+	if (terminating) return;
+	terminating = true;
+	killChild(signalName);
+	forceKillTimer = setTimeout(() => killChild("SIGKILL"), FORCE_KILL_DELAY_MS);
+};
+const parentAlive = () => {
+	try {
+		process.kill(parentPid, 0);
+		return true;
+	} catch {
+		return false;
+	}
+};
+const parentCheckTimer = setInterval(() => {
+	if (!parentAlive()) terminate("SIGTERM");
+}, PARENT_CHECK_INTERVAL_MS);
+child.stdout && child.stdout.pipe(process.stdout);
+child.stderr && child.stderr.pipe(process.stderr);
+child.on("error", (error) => {
+	console.error(error.message);
+	process.exitCode = 1;
+	terminate("SIGTERM");
+});
+child.on("close", (code, signal) => {
+	childExited = true;
+	clearInterval(parentCheckTimer);
+	if (forceKillTimer) clearTimeout(forceKillTimer);
+	if (typeof code === "number") process.exit(code);
+	if (signal) process.exit(1);
+	process.exit(0);
+});
+process.on("SIGTERM", () => terminate("SIGTERM"));
+process.on("SIGINT", () => terminate("SIGTERM"));
+if (process.platform !== "win32") process.on("SIGHUP", () => terminate("SIGTERM"));
+`;
 
 type AbortLike = {
 	aborted?: boolean;
@@ -24,7 +106,38 @@ type AbortLike = {
 	removeEventListener: (type: "abort", listener: () => void) => void;
 };
 
-type TerminationReason = "aborted" | "timeout" | "maxTurns" | "maxToolCalls";
+type TerminationReason =
+	| "aborted"
+	| "timeout"
+	| "maxTurns"
+	| "maxToolCalls"
+	| "finalDrain";
+
+type SignalName = "SIGTERM" | "SIGKILL";
+
+const activeChildPids = new Set<number>();
+
+const killProcessGroupOrChild = (pid: number, signalName: SignalName): void => {
+	if (process.platform === "win32") {
+		spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+		return;
+	}
+	try {
+		process.kill(-pid, signalName);
+		return;
+	} catch {
+		// Fall back to direct child kill below.
+	}
+	try {
+		process.kill(pid, signalName);
+	} catch {
+		// Process already exited or cannot be signaled.
+	}
+};
+
+export const killActiveChildProcesses = (signalName: SignalName = "SIGTERM"): void => {
+	for (const pid of activeChildPids) killProcessGroupOrChild(pid, signalName);
+};
 
 type ChildEvent =
 	| { type: "agent_start" }
@@ -56,6 +169,17 @@ export const getDepthGuard = (): {
 };
 
 const isAssistantMessage = (message: Message): boolean => message.role === "assistant";
+
+const messageHasToolCall = (message: Message): boolean =>
+	Array.isArray(message.content) &&
+	message.content.some(
+		(part) => isRecord(part) && part["type"] === "toolCall",
+	);
+
+const isFinalAssistantStop = (message: Message): boolean =>
+	isAssistantMessage(message) &&
+	(message as { stopReason?: string }).stopReason === "stop" &&
+	!messageHasToolCall(message);
 
 const getNumber = (value: unknown): number =>
 	typeof value === "number" && Number.isFinite(value) ? value : 0;
@@ -218,6 +342,15 @@ export const finalizeChildRun = (
 		};
 	}
 
+	if (input.terminationReason === "finalDrain") {
+		return {
+			...nextResult,
+			status: "error",
+			stopReason: "error",
+			errorMessage: `child did not exit within ${FINAL_DRAIN_DELAY_MS}ms after final response`,
+		};
+	}
+
 	const failed =
 		nextResult.exitCode !== 0 ||
 		Boolean(nextResult.errorMessage) ||
@@ -285,12 +418,31 @@ export const runChildTask = async (input: {
 		let terminationReason: TerminationReason | undefined;
 		let timeoutTimer: unknown;
 		let killTimer: unknown;
+		let finalDrainTimer: unknown;
+		let postExitIdleTimer: unknown;
+		let postExitHardTimer: unknown;
+		let processExited = false;
+		let stdoutEnded = false;
+		let stderrEnded = false;
+
+		const clearPostExitStdioTimers = () => {
+			if (postExitIdleTimer) {
+				clearTimeout(postExitIdleTimer);
+				postExitIdleTimer = undefined;
+			}
+			if (postExitHardTimer) {
+				clearTimeout(postExitHardTimer);
+				postExitHardTimer = undefined;
+			}
+		};
 
 		const finish = () => {
 			if (settled) return;
 			settled = true;
 			if (timeoutTimer) clearTimeout(timeoutTimer);
 			if (killTimer) clearTimeout(killTimer);
+			if (finalDrainTimer) clearTimeout(finalDrainTimer);
+			clearPostExitStdioTimers();
 			if (input.signal) input.signal.removeEventListener("abort", abortChild);
 			resolve();
 		};
@@ -305,27 +457,35 @@ export const runChildTask = async (input: {
 			);
 		};
 
+		const childEnv = {
+			...process.env,
+			[DEPTH_ENV]: nextDepth,
+		};
+		const watchdogPayload = JSON.stringify({
+			parentPid: process.pid,
+			command: invocation.command,
+			args: invocation.args,
+			cwd: input.taskSpec.cwd,
+			env: childEnv,
+		});
 		const detached = process.platform !== "win32";
-		const proc = spawn(invocation.command, invocation.args, {
+		const proc = spawn(process.execPath, ["-e", WATCHDOG_SCRIPT], {
 			cwd: input.taskSpec.cwd,
 			shell: false,
 			stdio: ["ignore", "pipe", "pipe"],
 			detached,
 			env: {
 				...process.env,
-				[DEPTH_ENV]: nextDepth,
+				[WATCHDOG_PAYLOAD_ENV]: watchdogPayload,
 			},
 		});
+		const childPid = typeof proc.pid === "number" ? proc.pid : undefined;
+		if (childPid !== undefined) activeChildPids.add(childPid);
 
-		const killChild = (signalName: "SIGTERM" | "SIGKILL") => {
-			const pid = typeof proc.pid === "number" ? proc.pid : undefined;
-			if (process.platform !== "win32" && pid) {
-				try {
-					process.kill(-pid, signalName);
-					return;
-				} catch {
-					// Fall back to direct child kill below.
-				}
+		const killChild = (signalName: SignalName) => {
+			if (childPid !== undefined) {
+				killProcessGroupOrChild(childPid, signalName);
+				return;
 			}
 			proc.kill(signalName);
 		};
@@ -333,10 +493,44 @@ export const runChildTask = async (input: {
 		const terminateChild = (reason: TerminationReason) => {
 			if (terminationReason) return;
 			terminationReason = reason;
+			if (finalDrainTimer) {
+				clearTimeout(finalDrainTimer);
+				finalDrainTimer = undefined;
+			}
 			killChild("SIGTERM");
 			killTimer = setTimeout(() => {
 				if (!settled) killChild("SIGKILL");
 			}, FORCE_KILL_DELAY_MS);
+		};
+
+		const startFinalDrain = () => {
+			if (settled || processExited || finalDrainTimer || terminationReason) return;
+			finalDrainTimer = setTimeout(() => {
+				if (!settled && !processExited) terminateChild("finalDrain");
+			}, FINAL_DRAIN_DELAY_MS);
+		};
+
+		const destroyUnendedStdio = () => {
+			if (!stdoutEnded) {
+				try {
+					proc.stdout?.destroy();
+				} catch {
+					// Ignore cleanup errors.
+				}
+			}
+			if (!stderrEnded) {
+				try {
+					proc.stderr?.destroy();
+				} catch {
+					// Ignore cleanup errors.
+				}
+			}
+		};
+
+		const armPostExitStdioGuard = () => {
+			if (!processExited || settled) return;
+			if (postExitIdleTimer) clearTimeout(postExitIdleTimer);
+			postExitIdleTimer = setTimeout(destroyUnendedStdio, POST_EXIT_STDIO_IDLE_MS);
 		};
 
 		function abortChild() {
@@ -358,23 +552,47 @@ export const runChildTask = async (input: {
 			const event = parseChildEvent(line);
 			if (!event) return;
 			result = applyChildEvent(result, event);
+			if (event.type === "message_end" && isFinalAssistantStop(event.message)) {
+				startFinalDrain();
+			}
 			enforceBudgets();
 			notify();
 		};
 
 		proc.stdout.on("data", (data: Uint8Array | string) => {
+			armPostExitStdioGuard();
 			stdoutBuffer += data.toString();
 			const lines = stdoutBuffer.split("\n");
 			stdoutBuffer = lines.pop() || "";
 			for (const line of lines) processLine(line);
 		});
+		proc.stdout.on("end", () => {
+			stdoutEnded = true;
+			if (stdoutEnded && stderrEnded) clearPostExitStdioTimers();
+		});
 
 		proc.stderr.on("data", (data: Uint8Array | string) => {
+			armPostExitStdioGuard();
 			result = { ...result, stderr: `${result.stderr}${data.toString()}` };
 			notify();
 		});
+		proc.stderr.on("end", () => {
+			stderrEnded = true;
+			if (stdoutEnded && stderrEnded) clearPostExitStdioTimers();
+		});
+
+		proc.on("exit", () => {
+			processExited = true;
+			if (finalDrainTimer) {
+				clearTimeout(finalDrainTimer);
+				finalDrainTimer = undefined;
+			}
+			armPostExitStdioGuard();
+			postExitHardTimer = setTimeout(destroyUnendedStdio, POST_EXIT_STDIO_HARD_MS);
+		});
 
 		proc.on("error", (error: Error) => {
+			if (childPid !== undefined) activeChildPids.delete(childPid);
 			if (settled) return;
 			result = {
 				...result,
@@ -387,6 +605,7 @@ export const runChildTask = async (input: {
 		});
 
 		proc.on("close", (code: number | null) => {
+			if (childPid !== undefined) activeChildPids.delete(childPid);
 			if (settled) return;
 			if (stdoutBuffer.trim()) processLine(stdoutBuffer);
 			result = finalizeChildRun(result, {

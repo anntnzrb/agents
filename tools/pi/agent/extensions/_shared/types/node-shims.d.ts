@@ -15,6 +15,7 @@ declare function clearInterval(handle: unknown): void;
 
 declare const process: {
 	env: Record<string, string | undefined>;
+	pid: number;
 	cwd: () => string;
 	execPath: string;
 	argv: string[];

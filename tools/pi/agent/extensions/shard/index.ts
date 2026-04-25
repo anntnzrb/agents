@@ -10,7 +10,7 @@ import {
 	validateCwd,
 } from "./planning.js";
 import { buildProgressText, buildToolContent, renderCall, renderResult } from "./results.js";
-import { getDepthGuard, mapConcurrent, runChildTask } from "./runner.js";
+import { getDepthGuard, killActiveChildProcesses, mapConcurrent, runChildTask } from "./runner.js";
 import {
 	createChildRunResult,
 	didChildRunFail,
@@ -102,6 +102,10 @@ const replaceResultAt = (
 
 export default function shardExtension(pi: ExtensionAPI) {
 	if (getDepthGuard().currentDepth > 0) return;
+
+	pi.on("session_shutdown", () => {
+		killActiveChildProcesses("SIGTERM");
+	});
 
 	const inheritedCliArgs = getInheritedCliArgs();
 

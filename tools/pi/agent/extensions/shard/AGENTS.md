@@ -17,6 +17,9 @@ The parent session remains the orchestrator.
 - `timeoutSec`, `maxTurns`, and `maxToolCalls` are optional and have no defaults.
 - `maxTurns` and `maxToolCalls` are strict budget kill switches; use only for explicit bounded runs.
 - Child prompts require structured reports so parent output is predictable and compact.
+- Active child process groups are killed on abort/timeout/budget termination and on `session_shutdown`.
+- Children run through an inline watchdog process; if the invoking parent Pi process dies, the watchdog kills the child process group/process tree.
+- Child stdout/stderr have post-exit guards, and a child that emits a final response but fails to exit is terminated.
 
 ## Files
 - `index.ts` — tool registration, param validation, orchestration
