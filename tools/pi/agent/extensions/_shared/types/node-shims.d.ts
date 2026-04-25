@@ -54,9 +54,10 @@ declare module "node:child_process" {
 
 declare module "node:crypto" {
 	export function createHash(algorithm: string): {
-		update: (value: string) => { digest: (encoding: string) => string };
+		update: (value: string | Uint8Array) => { digest: (encoding: string) => string };
 		digest: (encoding: string) => string;
 	};
+	export function randomBytes(size: number): { toString: (encoding?: string) => string };
 }
 
 declare module "node:fs" {
@@ -77,16 +78,38 @@ declare module "node:fs" {
 }
 
 declare module "node:fs/promises" {
+	type FileHandle = {
+		writeFile: (content: string, encoding?: string) => Promise<void>;
+		sync: () => Promise<void>;
+		close: () => Promise<void>;
+	};
+
+	export function chmod(path: string, mode: number): Promise<void>;
+	export function lstat(path: string): Promise<{ isSymbolicLink: () => boolean }>;
+	export function mkdir(path: string, options?: unknown): Promise<void>;
+	export function open(path: string, flags: string, mode?: number): Promise<FileHandle>;
 	export function readFile(path: string): Promise<{ toString: (encoding?: string) => string; byteLength: number }>;
 	export function readFile(path: string, encoding: string): Promise<string>;
-	export function stat(path: string): Promise<{ isDirectory: () => boolean }>;
+	export function readlink(path: string): Promise<string>;
+	export function realpath(path: string): Promise<string>;
+	export function rename(oldPath: string, newPath: string): Promise<void>;
+	export function stat(path: string): Promise<{ isDirectory: () => boolean; mode: number; nlink: number }>;
 	export function mkdtemp(prefix: string): Promise<string>;
+	export function unlink(path: string): Promise<void>;
 	export function writeFile(path: string, content: string, options?: unknown): Promise<void>;
 
 	const fsPromises: {
+		chmod: typeof chmod;
+		lstat: typeof lstat;
+		mkdir: typeof mkdir;
+		open: typeof open;
 		readFile: typeof readFile;
+		readlink: typeof readlink;
+		realpath: typeof realpath;
+		rename: typeof rename;
 		stat: typeof stat;
 		mkdtemp: typeof mkdtemp;
+		unlink: typeof unlink;
 		writeFile: typeof writeFile;
 	};
 	export default fsPromises;
