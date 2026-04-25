@@ -6,7 +6,6 @@ import { GREP_MAX_LINE_LENGTH } from "./output.js";
 
 type CallInput = {
 	pattern: string;
-	path?: string;
 	paths?: string[];
 	glob?: string;
 	type?: string;
@@ -14,8 +13,7 @@ type CallInput = {
 	literal?: boolean;
 	context?: number;
 	outputMode?: string;
-	gitignore?: boolean;
-	noIgnore?: boolean;
+	ignored?: boolean;
 	offset?: number;
 	limit?: number;
 	timeoutMs?: number;
@@ -36,8 +34,7 @@ const stripNoticeSuffix = (text: string): string => text.replace(/\n\n\[[^\n]+\]
 const RENDER_LABELS = {
 	filesOutputMode: "files",
 	ignoreCase: "i",
-	gitignoreOff: "gitignore off",
-	ignoredOn: "ignored on",
+	ignoredOn: "ignored",
 	offset: "offset",
 	limit: "limit",
 } as const;
@@ -64,7 +61,8 @@ const summarizeOutput = (output: string): { matchCount: number; fileCount: numbe
 export const formatGrepCall = (input: CallInput, theme: RenderTheme): string => {
 	const pattern = typeof input.pattern === "string" ? input.pattern : "";
 	const pathRoots = input.paths?.filter((entry) => typeof entry === "string" && entry.trim().length > 0) ?? [];
-	const scope = compactDisplayPath(pathRoots.length > 0 ? `paths:${summarizeList(pathRoots)}` : (input.path ?? "."));
+	const displayRoots = pathRoots.map((entry) => compactDisplayPath(entry));
+	const scope = pathRoots.length > 0 ? `paths:${summarizeList(displayRoots)}` : ".";
 	const flags: string[] = [theme.fg("accent", `/${pattern}/`)];
 	if (input.glob) flags.push(theme.fg("muted", input.glob));
 	if (input.type) flags.push(theme.fg("muted", input.type));
@@ -72,8 +70,7 @@ export const formatGrepCall = (input: CallInput, theme: RenderTheme): string => 
 	if (input.literal) flags.push(theme.fg("muted", "literal"));
 	if (input.ignoreCase) flags.push(theme.fg("muted", RENDER_LABELS.ignoreCase));
 	if (input.context !== undefined) flags.push(theme.fg("muted", `ctx ${input.context}`));
-	if (input.gitignore === false) flags.push(theme.fg("warning", RENDER_LABELS.gitignoreOff));
-	if (input.noIgnore) flags.push(theme.fg("warning", RENDER_LABELS.ignoredOn));
+	if (input.ignored) flags.push(theme.fg("warning", RENDER_LABELS.ignoredOn));
 	if ((input.offset ?? 0) > 0) flags.push(theme.fg("muted", `${RENDER_LABELS.offset}:${input.offset}`));
 	if (input.limit !== undefined) flags.push(theme.fg("muted", `${RENDER_LABELS.limit}:${input.limit}`));
 	if (input.timeoutMs !== undefined) flags.push(theme.fg("muted", `${input.timeoutMs}ms`));

@@ -27,21 +27,19 @@ import { buildCollapsedResultText, formatGrepCall, type GrepRenderDetails } from
 const MAX_INTERNAL_PROBE = 5_000;
 const OUTPUT_LIMIT_LABEL = formatSize(DEFAULT_MAX_BYTES);
 const OUTPUT_MODE_VALUES_LABEL = "content, files_with_matches, count";
-const GREP_TOOL_DESCRIPTION = `Search file contents by pattern. Supports multipath roots, type filters, output modes (${OUTPUT_MODE_VALUES_LABEL}), pagination, timeout, gitignore, literal mode. Output truncated to ${OUTPUT_LIMIT_LABEL}.`;
-const GREP_PROMPT_SNIPPET = "Search file contents: output modes, pagination, type filters, ignore controls";
+const GREP_TOOL_DESCRIPTION = `Search file contents by pattern. Supports multipath roots, type filters, output modes (${OUTPUT_MODE_VALUES_LABEL}), pagination, timeout, ignored controls, literal mode. Output truncated to ${OUTPUT_LIMIT_LABEL}.`;
+const GREP_PROMPT_SNIPPET = "Search file contents: output modes, pagination, type filters, ignored controls";
 
 const PARAM_DESCRIPTIONS = {
 	pattern: "Pattern: regex or literal string",
-	path: "Directory/file root (default: current directory)",
-	paths: "Search roots; mutually exclusive with path",
+	paths: 'Search roots (default: ["."])',
 	glob: "File glob filter, e.g. '*.ts' or '**/*.spec.ts'",
 	type: "Language/file type filter, e.g. ts, js, py, rs",
 	ignoreCase: "Case-insensitive search (default: false)",
 	literal: "Treat pattern as literal, not regex (default: false)",
-	context: "Context lines around matches",
+	context: "Context lines around matches (default: 0)",
 	outputMode: `Output mode: ${OUTPUT_MODE_VALUES_LABEL} (default: content)`,
-	gitignore: "Respect .gitignore (default: true)",
-	noIgnore: "Include ignored files; overrides gitignore",
+	ignored: "Include ignored files (default: false)",
 	offset: "Skip first N matches/results after ordering (default: 0)",
 	limit: `Max matches/results returned (default: ${DEFAULT_LIMIT})`,
 	timeoutMs: `Timeout ms (default: ${DEFAULT_TIMEOUT_MS})`,
@@ -49,24 +47,21 @@ const PARAM_DESCRIPTIONS = {
 
 const grepSchema = Type.Object({
 	pattern: Type.String({ description: PARAM_DESCRIPTIONS.pattern }),
-	path: Type.Optional(Type.String({ description: PARAM_DESCRIPTIONS.path })),
-	paths: Type.Optional(Type.Array(Type.String({ description: PARAM_DESCRIPTIONS.paths }))),
+	paths: Type.Optional(Type.Array(Type.String(), { description: PARAM_DESCRIPTIONS.paths, default: ["."] })),
 	glob: Type.Optional(Type.String({ description: PARAM_DESCRIPTIONS.glob })),
 	type: Type.Optional(Type.String({ description: PARAM_DESCRIPTIONS.type })),
-	ignoreCase: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.ignoreCase })),
-	literal: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.literal })),
-	context: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.context })),
-	outputMode: Type.Optional(Type.String({ description: PARAM_DESCRIPTIONS.outputMode })),
-	gitignore: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.gitignore })),
-	noIgnore: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.noIgnore })),
-	offset: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.offset })),
-	limit: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.limit })),
-	timeoutMs: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.timeoutMs })),
+	ignoreCase: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.ignoreCase, default: false })),
+	literal: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.literal, default: false })),
+	context: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.context, default: 0 })),
+	outputMode: Type.Optional(Type.String({ description: PARAM_DESCRIPTIONS.outputMode, default: "content" })),
+	ignored: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.ignored, default: false })),
+	offset: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.offset, default: 0 })),
+	limit: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.limit, default: DEFAULT_LIMIT })),
+	timeoutMs: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.timeoutMs, default: DEFAULT_TIMEOUT_MS })),
 });
 
 type GrepInput = {
 	pattern: string;
-	path?: string;
 	paths?: string[];
 	glob?: string;
 	type?: string;
@@ -74,8 +69,7 @@ type GrepInput = {
 	literal?: boolean;
 	context?: number;
 	outputMode?: string;
-	gitignore?: boolean;
-	noIgnore?: boolean;
+	ignored?: boolean;
 	offset?: number;
 	limit?: number;
 	timeoutMs?: number;
@@ -180,8 +174,8 @@ export default function grepExtension(pi: ExtensionAPI) {
 			const outputMode = normalizeOutputMode(input.outputMode);
 			const timeoutMs = normalizeTimeout(input.timeoutMs);
 			const typeFilter = resolveTypeFilter(input.type);
-			const useGitignore = input.noIgnore === true ? false : input.gitignore !== false;
-			const roots = normalizeSearchRoots(input.path, input.paths);
+			const useGitignore = input.ignored === true ? false : true;
+			const roots = normalizeSearchRoots(input.paths);
 			const requestedWindow = effectiveOffset + effectiveLimit + 1;
 			const internalProbeLimit = Math.min(Math.max(requestedWindow * 5, requestedWindow), MAX_INTERNAL_PROBE);
 			const cwd = ctx.cwd;

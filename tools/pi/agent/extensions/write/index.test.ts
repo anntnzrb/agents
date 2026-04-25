@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 
 mock.module("@mariozechner/pi-coding-agent", () => ({
 	formatSize: (bytes: number) => `${bytes}B`,
+	isToolCallEventType: () => false,
 	createReadToolDefinition: () => ({ name: "read" }),
 	createWriteToolDefinition: (cwd: string, options?: { operations?: { mkdir: (dir: string) => Promise<void>; writeFile: (filePath: string, content: string) => Promise<void> } }) => ({
 		name: "write",

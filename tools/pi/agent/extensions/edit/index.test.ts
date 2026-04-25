@@ -2,6 +2,7 @@ import { describe, expect, mock, test } from "bun:test";
 
 mock.module("@mariozechner/pi-coding-agent", () => ({
 	formatSize: (bytes: number) => `${bytes}B`,
+	isToolCallEventType: () => false,
 	createEditToolDefinition: () => ({
 		name: "edit",
 		renderShell: "self",
@@ -47,10 +48,10 @@ describe("edit compact helpers", () => {
 		expect(__test.getLogicalLineCount("a\nb\n")).toBe(2);
 	});
 
-	test("extracts array, json-string, and legacy edits", () => {
+	test("extracts only structured edit arrays", () => {
 		expect(__test.getRenderableEdits({ edits: [{ oldText: "a", newText: "b" }] })).toEqual([{ oldText: "a", newText: "b" }]);
-		expect(__test.getRenderableEdits({ edits: '[{"oldText":"a","newText":"b"}]' })).toEqual([{ oldText: "a", newText: "b" }]);
-		expect(__test.getRenderableEdits({ oldText: "a", newText: "b" })).toEqual([{ oldText: "a", newText: "b" }]);
+		expect(__test.getRenderableEdits({ edits: '[{"oldText":"a","newText":"b"}]' })).toBeUndefined();
+		expect(__test.getRenderableEdits({ oldText: "a", newText: "b" } as never)).toBeUndefined();
 		expect(__test.getRenderableEdits({ edits: [{ oldText: "a" }] })).toBeUndefined();
 	});
 

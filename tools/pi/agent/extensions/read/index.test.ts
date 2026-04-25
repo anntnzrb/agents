@@ -5,6 +5,7 @@ mock.module("@mariozechner/pi-coding-agent", () => ({
 	formatSize: (bytes: number) => `${bytes}B`,
 	getAgentDir: () => "/tmp/pi-agent",
 	truncateHead: (content: string) => ({ content, truncated: false }),
+	isToolCallEventType: () => false,
 	createReadToolDefinition: () => ({ name: "read" }),
 	createWriteToolDefinition: () => ({ name: "write" }),
 	createEditToolDefinition: () => ({ name: "edit", renderShell: "self" }),

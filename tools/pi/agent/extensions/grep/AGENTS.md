@@ -3,7 +3,7 @@
 ## Purpose
 Keep `grep` active; add repo-search ergonomics:
 - `type` filter (`ts`, `js`, `py`, `rs`, ...)
-- `path | paths` multipath + dedupe
+- `paths` multipath + dedupe
 - `offset` pagination + bounded probing
 - `outputMode`:
   - `content` — default line matches via `rg --json`
@@ -11,7 +11,7 @@ Keep `grep` active; add repo-search ergonomics:
   - `count` — per-file counts via `rg --count-matches --with-filename`
 - stable sorted pagination for file/count modes
 - bounded `timeoutMs`
-- optional `literal`, `gitignore`, `noIgnore`
+- optional `literal`, `ignored`
 - slash-glob normalization: `src/*.ts` -> `**/src/*.ts`
 - `.gitignore` outside git repos via `--no-require-git`
 - default `**/.git/**` exclusion unless explicit `glob`

@@ -9,7 +9,6 @@ import { asString } from "../_shared/value-utils.js";
 
 type WriteArgs = {
 	path?: unknown;
-	file_path?: unknown;
 	content?: unknown;
 	expectedHash?: unknown;
 };
@@ -155,7 +154,7 @@ const executeWrite = (toolCallId: string, cwd: string, input: WriteArgs, signal:
 };
 
 const buildCollapsedWriteCallText = (args: WriteArgs, marker: "+" | "~" | "?", theme: RenderTheme): string => {
-	const rawPath = asString(args.path) ?? asString(args.file_path) ?? "...";
+	const rawPath = asString(args.path) ?? "...";
 	const content = asString(args.content) ?? "";
 	const stats = getUtf8ContentStats(content);
 	const lines = `${stats.lines} ${pluralize(stats.lines, "line")}`;
@@ -193,7 +192,7 @@ export default function writeExtension(pi: ExtensionAPI): void {
 		renderCall(args, theme, context) {
 			const state = context.state as WriteRenderState;
 			const typedArgs = (args ?? {}) as WriteArgs;
-			const rawPath = asString(typedArgs.path) ?? asString(typedArgs.file_path) ?? "...";
+			const rawPath = asString(typedArgs.path) ?? "...";
 			if (!context.executionStarted) {
 				state.marker = getWriteMarker(rawPath, context.cwd);
 			} else if (state.marker === undefined) {

@@ -12,17 +12,19 @@ import {
 import { __test as ripgrepTest } from "./ripgrep.js";
 
 test("normalizeSearchRoots supports multipath trimming and dedupe", () => {
-	const roots = normalizeSearchRoots(undefined, ["apps", "packages", "packages", " libs "]);
+	const roots = normalizeSearchRoots(["apps", "packages", "packages", " libs "]);
 	assert.deepEqual(roots, ["apps", "packages", "libs"]);
 });
 
-test("normalizeSearchRoots keeps commas literal", () => {
-	const roots = normalizeSearchRoots("apps,packages", undefined);
-	assert.deepEqual(roots, ["apps,packages"]);
+test("normalizeSearchRoots defaults omitted, empty, and blank roots to current directory", () => {
+	assert.deepEqual(normalizeSearchRoots(undefined), ["."]);
+	assert.deepEqual(normalizeSearchRoots([]), ["."]);
+	assert.deepEqual(normalizeSearchRoots([" ", "\t"]), ["."]);
 });
 
-test("normalizeSearchRoots rejects path and paths together", () => {
-	assert.throws(() => normalizeSearchRoots("src", ["apps"]), /either path or paths/);
+test("normalizeSearchRoots keeps commas literal", () => {
+	const roots = normalizeSearchRoots(["apps,packages"]);
+	assert.deepEqual(roots, ["apps,packages"]);
 });
 
 test("normalizeOffset validates non-negative integers", () => {

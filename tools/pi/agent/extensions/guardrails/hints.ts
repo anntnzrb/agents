@@ -27,7 +27,7 @@ const HINT_DEFINITIONS = {
 		shellToolKind: "search executables",
 		taskLabel: "repository search",
 		fallbackSignature:
-			"grep({ pattern, path, paths, glob, type, ignoreCase, literal, context, outputMode, gitignore, noIgnore, offset, limit, timeoutMs })",
+			"grep({ pattern, paths, glob, type, ignoreCase, literal, context, outputMode, ignored, offset, limit, timeoutMs })",
 	},
 	find: {
 		nativeTool: "find",
@@ -35,7 +35,7 @@ const HINT_DEFINITIONS = {
 		shellExecutableLabel: "`fd`, `find`, `locate`",
 		shellToolKind: "discovery executables",
 		taskLabel: "repository file lookup",
-		fallbackSignature: "find({ pattern, path, paths, hidden, kind, gitignore, noIgnore, limit, timeoutMs })",
+		fallbackSignature: "find({ pattern, paths, hidden, kind, ignored, limit, timeoutMs })",
 	},
 } as const satisfies Record<GuardedNativeTool, HintDefinition>;
 

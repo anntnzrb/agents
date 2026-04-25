@@ -7,8 +7,8 @@ Keep `find` active; add file-discovery ergonomics:
   - `file` — default, `fd --type file`
   - `directory` — `fd --type directory`
   - `any` — no fd type filter
-- `gitignore` / `noIgnore` controls (`noIgnore` overrides `gitignore`)
-- `path | paths` multipath + dedupe
+- `ignored` control (`ignored: true` includes ignored files)
+- `paths` multipath + dedupe
 - slash-pattern scoped globs: `src/*.ts` -> `**/src/*.ts` with full-path matching
 - deterministic returned output via local sort/dedupe
 - `limit+1` probe for truncation notice
@@ -26,5 +26,5 @@ Keep `find` active; add file-discovery ergonomics:
 - Dynamic activation preserves active tools while forcing `find` on.
 - Overrides built-in `find` with fd-backed multipath, kind, ignore, timeout behavior.
 - Default `kind=file` matches tool contract; avoids surprise directories.
-- `hidden` independent from ignore handling; `noIgnore` does not imply hidden files.
+- `hidden` independent from ignore handling; `ignored` does not imply hidden files.
 - No mtime sort/cache/index complexity; tactical filesystem discovery only.

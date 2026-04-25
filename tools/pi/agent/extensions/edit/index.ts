@@ -11,10 +11,7 @@ type Edit = {
 
 type EditArgs = {
 	path?: unknown;
-	file_path?: unknown;
 	edits?: unknown;
-	oldText?: unknown;
-	newText?: unknown;
 };
 
 type LineStats = {
@@ -37,35 +34,17 @@ type RenderResult = {
 	details?: EditToolDetails;
 };
 
-const parseEditsString = (value: string): Edit[] | undefined => {
-	try {
-		const parsed = JSON.parse(value) as unknown;
-		return getRenderableEdits({ edits: parsed });
-	} catch {
-		return undefined;
-	}
-};
-
 const getRenderableEdits = (args: EditArgs): Edit[] | undefined => {
-	if (Array.isArray(args.edits)) {
-		const edits = args.edits.filter(
-			(edit): edit is Edit =>
-				typeof edit === "object" &&
-				edit !== null &&
-				typeof (edit as { oldText?: unknown }).oldText === "string" &&
-				typeof (edit as { newText?: unknown }).newText === "string",
-		);
-		if (edits.length === args.edits.length && edits.length > 0) return edits;
-	}
+	if (!Array.isArray(args.edits)) return undefined;
 
-	if (typeof args.edits === "string") {
-		const edits = parseEditsString(args.edits);
-		if (edits) return edits;
-	}
-
-	if (typeof args.oldText === "string" && typeof args.newText === "string") {
-		return [{ oldText: args.oldText, newText: args.newText }];
-	}
+	const edits = args.edits.filter(
+		(edit): edit is Edit =>
+			typeof edit === "object" &&
+			edit !== null &&
+			typeof (edit as { oldText?: unknown }).oldText === "string" &&
+			typeof (edit as { newText?: unknown }).newText === "string",
+	);
+	if (edits.length === args.edits.length && edits.length > 0) return edits;
 
 	return undefined;
 };
@@ -87,7 +66,7 @@ const formatColoredLineStats = (stats: LineStats, theme: ColorTheme): string =>
 const formatEditCount = (count: number): string => `${count} ${pluralize(count, "edit")}`;
 
 const getEditSummary = (args: EditArgs, previous?: EditSummary): EditSummary => {
-	const path = asString(args.path) ?? asString(args.file_path) ?? previous?.path ?? "...";
+	const path = asString(args.path) ?? previous?.path ?? "...";
 	const edits = getRenderableEdits(args);
 	if (!edits) return { path, count: previous?.count, stats: previous?.stats };
 	return { path, count: edits.length, stats: getLineStats(edits) };

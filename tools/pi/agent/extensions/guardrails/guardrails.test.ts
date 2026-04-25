@@ -332,19 +332,19 @@ test("does not warn for informational shell content-search commands", () => {
 
 test("agent warning hints name native replacements and shell executables", () => {
   const tools = [
-    { name: "grep", parameters: { properties: { pattern: {}, path: {}, outputMode: {}, timeoutMs: {} } } },
-    { name: "find", parameters: { properties: { pattern: {}, paths: {}, kind: {}, noIgnore: {} } } },
+    { name: "grep", parameters: { properties: { pattern: {}, paths: {}, outputMode: {}, ignored: {}, timeoutMs: {} } } },
+    { name: "find", parameters: { properties: { pattern: {}, paths: {}, kind: {}, ignored: {} } } },
   ];
 
   const grepHint = agentHintForWarning("Use native `grep` tool for repo search.", tools);
   assert.match(grepHint, /don't use shell search executables/);
   assert.match(grepHint, /`rg`/);
-  assert.match(grepHint, /grep\(\{ pattern, path, outputMode, timeoutMs \}\)/);
+  assert.match(grepHint, /grep\(\{ pattern, paths, outputMode, ignored, timeoutMs \}\)/);
 
   const findHint = agentHintForWarning("Use native `find` tool for file lookup.", tools);
   assert.match(findHint, /don't use shell discovery executables/);
   assert.match(findHint, /`fd`/);
-  assert.match(findHint, /find\(\{ pattern, paths, kind, noIgnore \}\)/);
+  assert.match(findHint, /find\(\{ pattern, paths, kind, ignored \}\)/);
 });
 
 test("tool signatures fall back when live schema is unavailable", () => {

@@ -80,7 +80,7 @@ describe("guardrails config cache", () => {
 	});
 
 	test("keeps UI warnings terse while sending fuller agent hints", () => {
-		expect(__test.agentHintForWarning("Use native `grep` tool for repo search.")).toContain("grep({ pattern, path, paths");
-		expect(__test.agentHintForWarning("Use native `find` tool for file lookup.")).toContain("find({ pattern, path, paths");
+		expect(__test.agentHintForWarning("Use native `grep` tool for repo search.")).toContain("grep({ pattern, paths");
+		expect(__test.agentHintForWarning("Use native `find` tool for file lookup.")).toContain("find({ pattern, paths");
 	});
 });

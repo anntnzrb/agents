@@ -47,32 +47,32 @@ const tokenTheme = {
 
 describe("grep compact rendering", () => {
 	test("call is naked single-line telemetry", () => {
-		const text = __test.formatGrepCall({ pattern: "TODO", path: "src", type: "ts", literal: true }, passthroughTheme);
-		expect(text).toBe("⌕ grep src · /TODO/ · ts · literal");
+		const text = __test.formatGrepCall({ pattern: "TODO", paths: ["src"], type: "ts", literal: true }, passthroughTheme);
+		expect(text).toBe("⌕ grep paths:src · /TODO/ · ts · literal");
 		expect(text.split("\n")).toHaveLength(1);
 	});
 
 	test("call includes non-default output mode and timeout", () => {
-		const text = __test.formatGrepCall({ pattern: "TODO", path: "src", outputMode: "files_with_matches", timeoutMs: 2500 }, passthroughTheme);
-		expect(text).toBe("⌕ grep src · /TODO/ · files · 2500ms");
+		const text = __test.formatGrepCall({ pattern: "TODO", paths: ["src"], outputMode: "files_with_matches", timeoutMs: 2500 }, passthroughTheme);
+		expect(text).toBe("⌕ grep paths:src · /TODO/ · files · 2500ms");
 	});
 
 	test("call spells out offset and limit", () => {
-		const text = __test.formatGrepCall({ pattern: "TODO", path: "src", offset: 3, limit: 3 }, passthroughTheme);
+		const text = __test.formatGrepCall({ pattern: "TODO", paths: ["src"], offset: 3, limit: 3 }, passthroughTheme);
 		expect(text).toContain("offset:3");
 		expect(text).toContain("limit:3");
 	});
 
 	test("call compacts long paths", () => {
-		const text = __test.formatGrepCall({ pattern: "TODO", path: "/tmp/llm-agents-scan/opencode/packages/opencode/src/tool" }, passthroughTheme);
+		const text = __test.formatGrepCall({ pattern: "TODO", paths: ["/tmp/llm-agents-scan/opencode/packages/opencode/src/tool"] }, passthroughTheme);
 		expect(text).toContain("…/packages/opencode/src/tool");
 	});
 
 	test("colors cue/title/pattern separately", () => {
-		const text = __test.formatGrepCall({ pattern: "TODO", path: "src" }, tokenTheme);
+		const text = __test.formatGrepCall({ pattern: "TODO", paths: ["src"] }, tokenTheme);
 		expect(text).toContain("<muted>⌕</muted>");
 		expect(text).toContain("<toolTitle>**grep**</toolTitle>");
-		expect(text).toContain("<muted>src</muted>");
+		expect(text).toContain("<muted>paths:src</muted>");
 		expect(text).toContain("/TODO/");
 	});
 	test("prefers structured details counters", () => {

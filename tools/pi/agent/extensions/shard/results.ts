@@ -38,8 +38,14 @@ const formatPreviewText = (text: string): string =>
 const shortenPath = (value: string): string =>
 	value.startsWith(HOME_DIR) ? `~${value.slice(HOME_DIR.length)}` : value;
 
-const getPathArg = (args: Record<string, unknown>): string =>
-	String(args["path"] ?? args["file_path"] ?? ".");
+const getPathArg = (args: Record<string, unknown>): string => String(args["path"] ?? ".");
+
+const getSearchRootsArg = (args: Record<string, unknown>): string => {
+	const paths = args["paths"];
+	if (!Array.isArray(paths)) return ".";
+	const roots = paths.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+	return roots.length > 0 ? roots.join(",") : ".";
+};
 
 export const formatTaskPreview = (task: string): string =>
 	shorten(toSingleLine(task), 70);
@@ -97,9 +103,9 @@ export const summarizeToolCall = (
 		case "edit":
 			return `edit ${shorten(shortenPath(getPathArg(args)), 56)}`;
 		case "grep":
-			return `grep /${shorten(toSingleLine(String(args["pattern"] ?? "?")), 24)}/ in ${shorten(shortenPath(getPathArg(args)), 28)}`;
+			return `grep /${shorten(toSingleLine(String(args["pattern"] ?? "?")), 24)}/ in ${shorten(shortenPath(getSearchRootsArg(args)), 28)}`;
 		case "find":
-			return `find ${shorten(toSingleLine(String(args["pattern"] ?? "*")), 24)} in ${shorten(shortenPath(getPathArg(args)), 28)}`;
+			return `find ${shorten(toSingleLine(String(args["pattern"] ?? "*")), 24)} in ${shorten(shortenPath(getSearchRootsArg(args)), 28)}`;
 		case "ls":
 			return `ls ${shorten(shortenPath(getPathArg(args)), 56)}`;
 		default:

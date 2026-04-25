@@ -5,6 +5,7 @@ mock.module("@mariozechner/pi-coding-agent", () => ({
 	formatSize: (bytes: number) => `${Math.round(bytes / 1024)}KB`,
 	getAgentDir: () => "/tmp/pi-agent",
 	truncateHead: (content: string) => ({ content, truncated: false }),
+	isToolCallEventType: () => false,
 	createFindToolDefinition: () => ({ name: "find" }),
 	createGrepToolDefinition: () => ({ name: "grep" }),
 }));
@@ -40,26 +41,26 @@ const tokenTheme = {
 
 describe("find compact rendering", () => {
 	test("call is naked single-line telemetry", () => {
-		const text = __test.formatFindCall({ pattern: "**/*.ts", path: "src", hidden: false, limit: 20 }, passthroughTheme);
-		expect(text).toBe("◇ find src · **/*.ts · visible · limit:20");
+		const text = __test.formatFindCall({ pattern: "**/*.ts", paths: ["src"], hidden: false, limit: 20 }, passthroughTheme);
+		expect(text).toBe("◇ find paths:src · **/*.ts · visible · limit:20");
 		expect(text.split("\n")).toHaveLength(1);
 	});
 
 	test("call includes non-default kind and ignore controls", () => {
-		const text = __test.formatFindCall({ pattern: "src*", path: ".", kind: "directory", gitignore: false, noIgnore: true }, passthroughTheme);
-		expect(text).toBe("◇ find . · src* · directory · gitignore off · ignored on");
+		const text = __test.formatFindCall({ pattern: "src*", kind: "directory", ignored: true }, passthroughTheme);
+		expect(text).toBe("◇ find . · src* · directory · ignored");
 	});
 
 	test("call compacts long paths", () => {
-		const text = __test.formatFindCall({ pattern: "*.ts", path: "/tmp/llm-agents-scan/opencode/packages/opencode/src/tool" }, passthroughTheme);
+		const text = __test.formatFindCall({ pattern: "*.ts", paths: ["/tmp/llm-agents-scan/opencode/packages/opencode/src/tool"] }, passthroughTheme);
 		expect(text).toContain("…/packages/opencode/src/tool");
 	});
 
 	test("colors cue/title/pattern separately", () => {
-		const text = __test.formatFindCall({ pattern: "**/*.ts", path: "src" }, tokenTheme);
+		const text = __test.formatFindCall({ pattern: "**/*.ts", paths: ["src"] }, tokenTheme);
 		expect(text).toContain("<muted>◇</muted>");
 		expect(text).toContain("<toolTitle>**find**</toolTitle>");
-		expect(text).toContain("<muted>src</muted>");
+		expect(text).toContain("<muted>paths:src</muted>");
 		expect(text).toContain("**/*.ts");
 	});
 

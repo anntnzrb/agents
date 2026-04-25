@@ -5,7 +5,6 @@ import { asPositiveInteger, asString } from "../_shared/value-utils.js";
 
 type ReadArgs = {
 	path?: unknown;
-	file_path?: unknown;
 	offset?: unknown;
 	limit?: unknown;
 };
@@ -35,7 +34,7 @@ const getReadRange = (args: ReadArgs): string | undefined => {
 };
 
 const buildReadCallText = (args: ReadArgs, theme: RenderTheme): string => {
-	const rawPath = asString(args.path) ?? asString(args.file_path) ?? "...";
+	const rawPath = asString(args.path) ?? "...";
 	const segments = [`${theme.fg("muted", "☰")} ${theme.fg("toolTitle", theme.bold("read"))} ${theme.fg("muted", rawPath)}`];
 	const range = getReadRange(args);
 	if (range) segments.push(range);
