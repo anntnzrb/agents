@@ -28,6 +28,18 @@ const pythonConfig: GuardrailsConfig = {
         },
       },
       {
+        id: "no-python-m-pip",
+        match: {
+          type: "regex",
+          pattern: "\\b(?:pythonw?(?:[23])?(?:\\.\\d+)*|py|pypy3?)\\b[^\\n;|&]*(?:\\s-m\\s*pip\\b|\\s-mpip\\b)",
+          flags: "i",
+        },
+        action: {
+          type: "block",
+          message: "use uv",
+        },
+      },
+      {
         id: "no-pip",
         match: {
           type: "executable",
@@ -278,6 +290,10 @@ test("blocks env wrapped python invocation", () => {
   assert.equal(reasonForCommand("/usr/bin/env -S py -3 script.py", pythonConfig), "use uv");
 });
 
+test("blocks python module package tooling", () => {
+  assert.equal(reasonForCommand("uv run python -m pip install rich", pythonConfig), "use uv");
+});
+
 test("blocks sudo wrapped python invocation", () => {
   assert.equal(reasonForCommand("sudo -u annt python script.py", pythonConfig), "use uv");
 });
@@ -301,6 +317,23 @@ test("does not block harmless mentions", () => {
 
 test("allows uv-based python workflow", () => {
   assert.equal(reasonForCommand("uv run python script.py", pythonConfig), null);
+});
+
+test("ignores commands inside heredoc bodies", () => {
+  assert.equal(reasonForCommand("cat <<'EOF'\nrg TODO\nEOF", searchConfig), null);
+  assert.equal(reasonForCommand("uv run python - <<'PY'\nprint('python -m pip is text')\nPY", pythonConfig), null);
+});
+
+test("allows uv-based python workflow with heredoc stdin", () => {
+  assert.equal(
+    reasonForCommand("uv run python - <<'PY'\nimport importlib.util\nprint('ok')\nPY", pythonConfig),
+    null,
+  );
+  assert.equal(reasonForCommand('uv run python - <<"PY-EOF"\nprint("ok")\nPY-EOF', pythonConfig), null);
+});
+
+test("does not treat quoted heredoc markers as heredocs", () => {
+  assert.equal(reasonForCommand('echo "<<PY"\npython script.py', pythonConfig), "use uv");
 });
 
 test("warns for shell content-search commands", () => {

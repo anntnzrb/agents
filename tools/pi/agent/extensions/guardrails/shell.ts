@@ -11,7 +11,61 @@ export function unique(values: string[]): string[] {
   return [...new Set(values.filter((value) => value.length > 0))];
 }
 
+const HEREDOC_PATTERN = /<<-?\s*(?!<)(["']?)([A-Za-z_][A-Za-z0-9_-]*)\1/g;
+
+function isOutsideQuotes(value: string): boolean {
+  let inSingle = false;
+  let inDouble = false;
+  let escaped = false;
+
+  for (const ch of value) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\" && !inSingle) {
+      escaped = true;
+      continue;
+    }
+    if (ch === "'" && !inDouble) {
+      inSingle = !inSingle;
+      continue;
+    }
+    if (ch === '"' && !inSingle) {
+      inDouble = !inDouble;
+    }
+  }
+
+  return !inSingle && !inDouble;
+}
+
+export function stripHeredocBodies(command: string): string {
+  const lines = command.split(/\r?\n/);
+  const kept: string[] = [];
+  const pendingDelimiters: string[] = [];
+
+  for (const line of lines) {
+    if (pendingDelimiters.length > 0) {
+      if (line.trim() === pendingDelimiters[0]) {
+        pendingDelimiters.shift();
+      }
+      continue;
+    }
+
+    kept.push(line);
+    HEREDOC_PATTERN.lastIndex = 0;
+    for (const match of line.matchAll(HEREDOC_PATTERN)) {
+      if (match.index !== undefined && isOutsideQuotes(line.slice(0, match.index))) {
+        pendingDelimiters.push(match[2] ?? "");
+      }
+    }
+  }
+
+  return kept.join("\n");
+}
+
 export function splitShellSegments(command: string): string[] {
+  const normalizedCommand = stripHeredocBodies(command);
   const segments: string[] = [];
   let current = "";
   let inSingle = false;
@@ -27,13 +81,13 @@ export function splitShellSegments(command: string): string[] {
     current = "";
   };
 
-  for (let i = 0; i < command.length; i += 1) {
-    const ch = command[i];
+  for (let i = 0; i < normalizedCommand.length; i += 1) {
+    const ch = normalizedCommand[i];
     if (ch === undefined) {
       continue;
     }
 
-    const next = command[i + 1];
+    const next = normalizedCommand[i + 1];
 
     if (escaped) {
       current += ch;

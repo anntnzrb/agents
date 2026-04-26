@@ -1,6 +1,6 @@
 import type { BashAction, ExecutableMatch, GuardrailsConfig, Rule } from "./types.js";
 
-import { executableBasename, splitShellSegments, tokenizeCommand, unique } from "./shell.js";
+import { executableBasename, splitShellSegments, stripHeredocBodies, tokenizeCommand, unique } from "./shell.js";
 import { firstExecutableIndex, unwrapCommand } from "./wrappers.js";
 
 const MAX_NESTING_DEPTH = 8;
@@ -137,13 +137,14 @@ function inspectCommand(command: string, depth = 0): Inspection {
     return emptyInspection();
   }
 
+  const inspectedCommand = stripHeredocBodies(command);
   const parts: Inspection[] = [];
-  const trimmed = command.trim();
+  const trimmed = inspectedCommand.trim();
   if (trimmed.length > 0) {
     parts.push({ commands: [trimmed], executables: [], parsedCommands: [] });
   }
 
-  for (const segment of splitShellSegments(command)) {
+  for (const segment of splitShellSegments(inspectedCommand)) {
     parts.push(inspectSegment(segment, depth));
   }
 
