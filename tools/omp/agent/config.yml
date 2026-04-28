@@ -1,10 +1,10 @@
 modelRoles: 
-  default: openai-codex/gpt-5.4:medium
-  smol: openai-codex/gpt-5.4-mini:low
-  plan: openai-codex/gpt-5.4:xhigh
-  commit: openai-codex/gpt-5.4-mini:low
-  task: openai-codex/gpt-5.4-mini:xhigh
-  slow: openai-codex/gpt-5.4:xhigh
+  default: openai-codex/gpt-5.5:medium
+  smol: openai-codex/gpt-5.5:medium
+  plan: openai-codex/gpt-5.5:medium
+  commit: openai-codex/gpt-5.5:medium
+  task: openai-codex/gpt-5.5:medium
+  slow: openai-codex/gpt-5.5:medium
 theme: 
   dark: light-prism
   light: graphite
