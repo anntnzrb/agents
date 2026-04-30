@@ -44,8 +44,11 @@ const withPathPrepended = (baseEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv => {
 	};
 };
 
+// Cold-path: spawnSync for binary lookup is cached after first call.
+// Per AGENTS.md event-loop hygiene: acceptable because it runs once and is memoized.
 const lookupExecutableOnPath = (binary: string): string | undefined => {
 	if (process.platform === "win32") {
+		// Cold-path: see above.
 		const result = spawnSync("where", [binary], {
 			encoding: "utf-8",
 			timeout: LOOKUP_TIMEOUT_MS,
@@ -58,6 +61,7 @@ const lookupExecutableOnPath = (binary: string): string | undefined => {
 		return candidates.find((candidate) => existsSync(candidate));
 	}
 
+	// Cold-path: see above.
 	const result = spawnSync("which", [binary], {
 		encoding: "utf-8",
 		timeout: LOOKUP_TIMEOUT_MS,
@@ -139,8 +143,7 @@ const createLocalPwshOperations = (): BashOperations => {
 					windowsHide: true,
 				});
 
-				let stdout = "";
-				let stderr = "";
+				let settled = false;
 				let timedOut = false;
 				let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -157,15 +160,14 @@ const createLocalPwshOperations = (): BashOperations => {
 				signal?.addEventListener("abort", onAbort, { once: true });
 
 				child.stdout?.on("data", (chunk: Buffer) => {
-					stdout += chunk.toString("utf8");
 					onData(chunk);
 				});
 				child.stderr?.on("data", (chunk: Buffer) => {
-					stderr += chunk.toString("utf8");
 					onData(chunk);
 				});
 
 				child.on("error", (error: Error) => {
+					settled = true;
 					signal?.removeEventListener("abort", onAbort);
 					if (timeoutTimer) clearTimeout(timeoutTimer);
 					reject(error);
@@ -174,6 +176,7 @@ const createLocalPwshOperations = (): BashOperations => {
 				child.on("close", (code: number | null) => {
 					signal?.removeEventListener("abort", onAbort);
 					if (timeoutTimer) clearTimeout(timeoutTimer);
+					if (settled) return;
 					if (timedOut) {
 						reject(new Error(`timeout:${timeout}`));
 						return;
