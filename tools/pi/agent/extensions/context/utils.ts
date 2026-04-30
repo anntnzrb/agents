@@ -2,7 +2,6 @@ import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@m
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 
 export function formatUsd(cost: number): string {
 	if (!Number.isFinite(cost) || cost <= 0) return "$0.00";
@@ -51,11 +50,11 @@ function getAgentDir(): string {
 }
 
 async function readFileIfExists(filePath: string): Promise<{ path: string; content: string; bytes: number } | null> {
-	if (!existsSync(filePath)) return null;
 	try {
 		const buf = await fs.readFile(filePath);
 		return { path: filePath, content: buf.toString("utf8"), bytes: buf.byteLength };
-	} catch {
+	} catch (error) {
+		if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return null;
 		return null;
 	}
 }

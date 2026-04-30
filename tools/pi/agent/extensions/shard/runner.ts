@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import type { Message } from "@mariozechner/pi-ai";
 import type { InheritedCliArgs } from "./cli.js";
 import { buildPiArgs, formatModelArg, getPiInvocation } from "./cli.js";
@@ -119,7 +119,11 @@ const activeChildPids = new Set<number>();
 
 const killProcessGroupOrChild = (pid: number, signalName: SignalName): void => {
 	if (process.platform === "win32") {
-		spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+		const killer = spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
+			stdio: "ignore",
+			detached: true,
+		});
+		killer.unref();
 		return;
 	}
 	try {
