@@ -36,10 +36,10 @@ describe("footer helpers", () => {
 });
 
 describe("footer stale fallback", () => {
-	const createHarness = (initiallyStale = false) => {
-		let sessionStartHandler: ((event: unknown, ctx: any) => void) | undefined;
+	const createHarness = async (initiallyStale = false) => {
+		let sessionStartHandler: ((event: unknown, ctx: any) => void | Promise<void>) | undefined;
 		const pi = {
-			on: (event: string, handler: (event: unknown, ctx: any) => void) => {
+			on: (event: string, handler: (event: unknown, ctx: any) => void | Promise<void>) => {
 				if (event === "session_start") sessionStartHandler = handler;
 			},
 			getThinkingLevel: () => "off",
@@ -69,7 +69,7 @@ describe("footer stale fallback", () => {
 			model: { id: "m", reasoning: false, contextWindow: 100 },
 		};
 
-		sessionStartHandler?.({}, ctx);
+		await sessionStartHandler?.({}, ctx);
 		expect(footerFactory).toBeDefined();
 		const footer = footerFactory?.(
 			{ requestRender: () => {} },
@@ -85,8 +85,8 @@ describe("footer stale fallback", () => {
 		};
 	};
 
-	test("reuses last good line on stale-extension error", () => {
-		const { footer, setStale } = createHarness(false);
+	test("reuses last good line on stale-extension error", async () => {
+		const { footer, setStale } = await createHarness(false);
 		const first = footer.render(80)[0];
 		setStale(true);
 		const second = footer.render(80)[0];
@@ -94,8 +94,8 @@ describe("footer stale fallback", () => {
 		footer.dispose();
 	});
 
-	test("renders cwd-only line when stale before first successful render", () => {
-		const { footer } = createHarness(true);
+	test("renders cwd-only line when stale before first successful render", async () => {
+		const { footer } = await createHarness(true);
 		const line = footer.render(80)[0] ?? "";
 		expect(line).toContain("/tmp");
 		expect(line.toLowerCase()).not.toContain("reloading");

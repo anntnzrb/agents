@@ -1,5 +1,5 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ExtensionAPI, Theme, ThemeColor } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
@@ -34,7 +34,6 @@ type SessionHealthMetrics = {
 };
 
 const separator = (theme: Theme): string => theme.fg("dim", " · ");
-const DIRTY_POLL_MS = 15_000;
 
 const formatNumber = (value: number): string => {
 	if (value < 1_000) return value.toString();
@@ -126,23 +125,23 @@ const getCompactionDetailsReserve = (settings: unknown): number | undefined => {
 	return reserveTokens !== undefined && reserveTokens >= 0 ? reserveTokens : undefined;
 };
 
-const readJsonFile = (path: string): unknown | undefined => {
+const readJsonFileAsync = async (path: string): Promise<unknown | undefined> => {
 	try {
-		if (!existsSync(path)) return undefined;
-		return JSON.parse(readFileSync(path, "utf8"));
+		const text = await readFile(path, "utf8");
+		return JSON.parse(text);
 	} catch {
 		return undefined;
 	}
 };
 
-const readReserveTokens = (cwd: string): number | undefined => {
+const readReserveTokensAsync = async (cwd: string): Promise<number | undefined> => {
 	const homeDir = getHomeDir();
 	const globalSettingsPath = homeDir ? join(homeDir, ".pi", "agent", "settings.json") : undefined;
 	const projectSettingsPath = join(cwd, ".pi", "settings.json");
 	const globalReserve = globalSettingsPath
-		? getCompactionDetailsReserve(readJsonFile(globalSettingsPath))
+		? getCompactionDetailsReserve(await readJsonFileAsync(globalSettingsPath))
 		: undefined;
-	const projectReserve = getCompactionDetailsReserve(readJsonFile(projectSettingsPath));
+	const projectReserve = getCompactionDetailsReserve(await readJsonFileAsync(projectSettingsPath));
 	return projectReserve ?? globalReserve;
 };
 
@@ -262,26 +261,21 @@ const buildHealthBadges = (
 	return badges;
 };
 
-const isInsideGitWorkTree = (cwd: string): boolean => {
-	try {
-		const output = execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
-			cwd,
-			encoding: "utf8",
-			stdio: ["ignore", "pipe", "ignore"],
+const execFileAsync = (
+	file: string,
+	args: string[],
+	options: { cwd?: string },
+): Promise<string> =>
+	new Promise((resolve, reject) => {
+		execFile(file, args, { ...options, encoding: "utf8" }, (error, stdout) => {
+			if (error) reject(error);
+			else resolve(stdout);
 		});
-		return output.trim() === "true";
-	} catch {
-		return false;
-	}
-};
+	});
 
-const readGitStatus = (cwd: string): GitStatus => {
+const readGitStatusAsync = async (cwd: string): Promise<GitStatus> => {
 	try {
-		const output = execFileSync("git", ["status", "--porcelain"], {
-			cwd,
-			encoding: "utf8",
-			stdio: ["ignore", "pipe", "ignore"],
-		});
+		const output = await execFileAsync("git", ["status", "--porcelain"], { cwd });
 		return { isDirty: output.trim().length > 0 };
 	} catch {
 		return { isDirty: false };
@@ -293,27 +287,24 @@ const createGitStatusTracker = (
 	onChange: () => void,
 	unsubscribeBranch: () => void,
 ): GitStatusTracker => {
-	const isGitRepo = isInsideGitWorkTree(cwd);
-	let status = isGitRepo ? readGitStatus(cwd) : { isDirty: false };
-	const refresh = () => {
-		if (!isGitRepo) return;
-		const nextStatus = readGitStatus(cwd);
+	let status: GitStatus = { isDirty: false };
+	let disposed = false;
+
+	const refresh = async () => {
+		if (disposed) return;
+		const nextStatus = await readGitStatusAsync(cwd);
 		if (nextStatus.isDirty === status.isDirty) return;
 		status = nextStatus;
 		onChange();
 	};
-	const interval = isGitRepo ? setInterval(refresh, DIRTY_POLL_MS) : undefined;
+
+	refresh();
+
 	return {
 		getStatus: () => status,
-		refresh() {
-			if (!isGitRepo) return;
-			status = readGitStatus(cwd);
-			onChange();
-		},
+		refresh,
 		dispose() {
-			if (interval !== undefined) {
-				clearInterval(interval);
-			}
+			disposed = true;
 			unsubscribeBranch();
 		},
 	};
@@ -359,12 +350,12 @@ export const __test = {
 };
 
 export default function footerExtension(pi: ExtensionAPI) {
-	pi.on("session_start", (_event, ctx) => {
+	pi.on("session_start", async (_event, ctx) => {
 		if (!ctx.hasUI) return;
 
 		const homeDir = getHomeDir();
 		const sessionCwd = ctx.cwd;
-		const reserveTokens = readReserveTokens(sessionCwd);
+		const reserveTokens = await readReserveTokensAsync(sessionCwd);
 		let metricsCache: { key: string; value: SessionHealthMetrics } | undefined;
 
 		const getSessionHealthMetrics = (): SessionHealthMetrics => {
