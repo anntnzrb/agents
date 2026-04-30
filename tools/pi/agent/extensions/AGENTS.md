@@ -6,6 +6,13 @@ Prefer functional/stateless where practical.
 - Minimize mutable module state; isolate unavoidable state in UI components/caches.
 - Keep side effects at edges: I/O, UI, model calls.
 
+## Event-loop hygiene
+
+- **Never** use synchronous child-process APIs (`execFileSync`, `spawnSync`, `execSync`) inside async tool handlers, UI render callbacks, event listeners, or Promise constructors. They freeze the entire TUI/agent event loop.
+- Use `child_process.spawn` / `execFile` with Promise wrappers or stream handlers for all subprocess work in hot paths.
+- Use `node:fs/promises` in async functions; avoid `existsSync` + `readFileSync` pairs. Prefer `try { await readFile(...) } catch (ENOENT) { ... }`.
+- Cold-path binary resolution (`search-binaries.ts`) may remain sync if it is cached and not invoked per tool call, but document the exception explicitly.
+
 ## Shared utilities (reuse first)
 Before helper logic, check `extensions/_shared/`:
 - `tool-utils.ts`: `ensureToolActive`, `summarizeList`, `getFirstTextContent`
