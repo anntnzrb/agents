@@ -29,10 +29,19 @@ declare const console: {
 	warn: (...args: unknown[]) => void;
 };
 
-declare const Buffer: {
-	byteLength: (value: string, encoding?: string) => number;
-	from: (value: string, encoding?: string) => Uint8Array;
-};
+declare interface Buffer extends Uint8Array {
+	toString(encoding?: string): string;
+	byteLength: number;
+}
+
+interface BufferConstructor {
+	readonly prototype: Buffer;
+	from(value: string | ArrayLike<number> | Uint8Array, encoding?: string): Buffer;
+	byteLength(value: string, encoding?: string): number;
+	alloc(size: number): Buffer;
+}
+
+declare var Buffer: BufferConstructor;
 
 declare namespace NodeJS {
 	interface ErrnoException extends Error {
@@ -52,6 +61,7 @@ declare module "node:child_process" {
 		error?: Error;
 	};
 	export function execFileSync(command: string, args?: string[], options?: unknown): any;
+	export function execFile(command: string, args?: string[], options?: unknown, callback?: (error: Error | null, stdout: string, stderr: string) => void): any;
 }
 
 declare module "node:crypto" {
