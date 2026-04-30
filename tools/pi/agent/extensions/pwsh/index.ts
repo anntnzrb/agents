@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { delimiter } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
 	DEFAULT_MAX_BYTES,
 	DEFAULT_MAX_LINES,
@@ -133,33 +133,57 @@ const createLocalPwshOperations = (): BashOperations => {
 				const shellConfig = cachedShellConfig ?? (cachedShellConfig = resolvePwshShellConfig());
 				const shellCommand = withUtf8Prefix(command, shellConfig.prependUtf8Prefix);
 
-				const result = spawnSync(shellConfig.shellPath, [...shellConfig.args, shellCommand], {
+				const child = spawn(shellConfig.shellPath, [...shellConfig.args, shellCommand], {
 					cwd,
 					env: withPathPrepended(env ?? process.env),
-					encoding: "utf-8",
-					timeout: timeout && timeout > 0 ? timeout * 1000 : undefined,
 					windowsHide: true,
-					maxBuffer: 50 * 1024 * 1024,
 				});
 
-				if (result.stdout) onData(Buffer.from(result.stdout, "utf8"));
-				if (result.stderr) onData(Buffer.from(result.stderr, "utf8"));
+				let stdout = "";
+				let stderr = "";
+				let timedOut = false;
+				let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
 
-				if (result.error) {
-					const err = result.error as NodeJS.ErrnoException;
-					if (err.code === "ETIMEDOUT") {
+				if (timeout && timeout > 0) {
+					timeoutTimer = setTimeout(() => {
+						timedOut = true;
+						child.kill("SIGTERM");
+					}, timeout * 1000);
+				}
+
+				const onAbort = () => {
+					child.kill("SIGTERM");
+				};
+				signal?.addEventListener("abort", onAbort, { once: true });
+
+				child.stdout?.on("data", (chunk: Buffer) => {
+					stdout += chunk.toString("utf8");
+					onData(chunk);
+				});
+				child.stderr?.on("data", (chunk: Buffer) => {
+					stderr += chunk.toString("utf8");
+					onData(chunk);
+				});
+
+				child.on("error", (error: Error) => {
+					signal?.removeEventListener("abort", onAbort);
+					if (timeoutTimer) clearTimeout(timeoutTimer);
+					reject(error);
+				});
+
+				child.on("close", (code: number | null) => {
+					signal?.removeEventListener("abort", onAbort);
+					if (timeoutTimer) clearTimeout(timeoutTimer);
+					if (timedOut) {
 						reject(new Error(`timeout:${timeout}`));
 						return;
 					}
-					reject(result.error);
-					return;
-				}
-				if (signal?.aborted) {
-					reject(new Error("aborted"));
-					return;
-				}
-
-				resolve({ exitCode: result.status ?? 1 });
+					if (signal?.aborted) {
+						reject(new Error("aborted"));
+						return;
+					}
+					resolve({ exitCode: code ?? 1 });
+				});
 			});
 		},
 	};
