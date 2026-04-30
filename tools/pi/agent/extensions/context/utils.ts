@@ -53,8 +53,7 @@ async function readFileIfExists(filePath: string): Promise<{ path: string; conte
 	try {
 		const buf = await fs.readFile(filePath);
 		return { path: filePath, content: buf.toString("utf8"), bytes: buf.byteLength };
-	} catch (error) {
-		if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return null;
+	} catch {
 		return null;
 	}
 }
