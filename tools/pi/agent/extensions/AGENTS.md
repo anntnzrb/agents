@@ -12,6 +12,7 @@ Prefer functional/stateless where practical.
 - Use `child_process.spawn` / `execFile` with Promise wrappers or stream handlers for all subprocess work in hot paths.
 - Use `node:fs/promises` in async functions; avoid `existsSync` + `readFileSync` pairs. Prefer `try { await readFile(...) } catch (ENOENT) { ... }`.
 - Cold-path binary resolution (`search-binaries.ts`) may remain sync if it is cached and not invoked per tool call, but document the exception explicitly.
+- When a sync interface wraps an async implementation (e.g. `refresh: () => void` calling `async` code), either: (a) swallow rejections with try/catch inside, or (b) change the interface to return `Promise<void>` and await call sites. Never discard returned Promises silently.
 
 ## Shared utilities (reuse first)
 Before helper logic, check `extensions/_shared/`:

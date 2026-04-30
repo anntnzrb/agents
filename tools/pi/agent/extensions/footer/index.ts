@@ -33,6 +33,8 @@ type SessionHealthMetrics = {
 	pollutionWarnThreshold: number | null;
 };
 
+const DIRTY_CHECK_MS = 15_000;
+
 const separator = (theme: Theme): string => theme.fg("dim", " · ");
 
 const formatNumber = (value: number): string => {
@@ -292,19 +294,27 @@ const createGitStatusTracker = (
 
 	const refresh = async () => {
 		if (disposed) return;
-		const nextStatus = await readGitStatusAsync(cwd);
-		if (nextStatus.isDirty === status.isDirty) return;
-		status = nextStatus;
-		onChange();
+		try {
+			const nextStatus = await readGitStatusAsync(cwd);
+			if (nextStatus.isDirty === status.isDirty) return;
+			status = nextStatus;
+			onChange();
+		} catch {
+			// Git unavailable or not a repo — leave status unchanged.
+		}
 	};
 
-	refresh();
+	void refresh();
+	const dirtyCheckInterval = setInterval(() => {
+		void refresh();
+	}, DIRTY_CHECK_MS);
 
 	return {
 		getStatus: () => status,
 		refresh,
 		dispose() {
 			disposed = true;
+			clearInterval(dirtyCheckInterval);
 			unsubscribeBranch();
 		},
 	};
