@@ -94,8 +94,17 @@ declare module "@mariozechner/pi-coding-agent" {
 		promptGuidelines?: string[];
 		parameters?: unknown;
 		renderShell?: "default" | "self";
-		renderCall?: (args: any, theme: Theme, context: ToolRenderCallContext) => any;
-		renderResult?: (result: any, options: ToolRenderResultOptions, theme: Theme, context: ToolRenderResultContext) => any;
+		renderCall?: (
+			args: any,
+			theme: Theme,
+			context: ToolRenderCallContext,
+		) => any;
+		renderResult?: (
+			result: any,
+			options: ToolRenderResultOptions,
+			theme: Theme,
+			context: ToolRenderResultContext,
+		) => any;
 		execute?: (
 			toolCallId: string,
 			input: any,
@@ -121,7 +130,10 @@ declare module "@mariozechner/pi-coding-agent" {
 	};
 
 	export type ExtensionAPI = {
-		on: (event: string, handler: (event: any, ctx: ExtensionContext) => any) => void;
+		on: (
+			event: string,
+			handler: (event: any, ctx: ExtensionContext) => any,
+		) => void;
 		registerTool: (tool: RegisteredTool) => void;
 		registerCommand: (name: string, command: any) => void;
 		getActiveTools: () => string[];
@@ -129,7 +141,18 @@ declare module "@mariozechner/pi-coding-agent" {
 		getAllTools: () => ToolInfo[];
 		getCommands: () => RegisteredCommand[];
 		appendEntry: <T>(customType: string, data: T) => void;
-		sendMessage: (message: { customType: string; content: string; display?: boolean }, options?: { triggerTurn?: boolean }) => void;
+		sendMessage: (
+			message: {
+				customType: string;
+				content: string;
+				display?: boolean;
+				details?: unknown;
+			},
+			options?: {
+				triggerTurn?: boolean;
+				deliverAs?: "steer" | "followUp" | "nextTurn";
+			},
+		) => void;
 		getThinkingLevel: () => string;
 	};
 
@@ -167,23 +190,34 @@ declare module "@mariozechner/pi-coding-agent" {
 	export const DEFAULT_MAX_LINES: number;
 	export function formatSize(bytes: number): string;
 	export function keyHint(action: string, fallbackText: string): string;
-	export function truncateHead(content: string, options?: { maxLines?: number; maxBytes?: number }): TruncationResult;
-	export function isToolCallEventType<TName extends string = string, TInput = any>(
+	export function truncateHead(
+		content: string,
+		options?: { maxLines?: number; maxBytes?: number },
+	): TruncationResult;
+	export function isToolCallEventType<
+		TName extends string = string,
+		TInput = any,
+	>(
 		name: TName,
 		event: any,
 	): event is { type: "tool_call"; toolName: TName; input: TInput };
 	export function createReadToolDefinition(cwd: string): RegisteredTool;
 	export function createWriteToolDefinition(cwd: string): RegisteredTool;
 	export function createEditToolDefinition(cwd: string): RegisteredTool;
-	export function createBashToolDefinition(cwd: string, options?: { operations?: BashOperations }): RegisteredTool;
+	export function createBashToolDefinition(
+		cwd: string,
+		options?: { operations?: BashOperations },
+	): RegisteredTool;
 	export function createFindToolDefinition(cwd: string): RegisteredTool;
 	export function createGrepToolDefinition(cwd: string): RegisteredTool;
-	export function withFileMutationQueue<T>(path: string, op: () => Promise<T>): Promise<T>;
+	export function withFileMutationQueue<T>(
+		path: string,
+		op: () => Promise<T>,
+	): Promise<T>;
 	export function getAgentDir(): string;
 	export function getMarkdownTheme(): unknown;
 	export const DynamicBorder: any;
 }
-
 
 declare module "@mariozechner/pi-ai" {
 	export type MessageContentPart = {
@@ -237,7 +271,12 @@ declare module "@mariozechner/pi-tui" {
 	export type Component = any;
 	export type TUI = any;
 	export function matchesKey(...args: any[]): boolean;
-	export function truncateToWidth(text: string, width: number, ellipsis?: any, pad?: boolean): string;
+	export function truncateToWidth(
+		text: string,
+		width: number,
+		ellipsis?: any,
+		pad?: boolean,
+	): string;
 	export function visibleWidth(text: string): number;
 }
 

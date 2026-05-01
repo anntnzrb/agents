@@ -52,12 +52,19 @@ interface ContentBlock {
 
 interface MessageLike {
 	role?: string;
+	customType?: string;
 	content?: unknown;
+	details?: unknown;
 	toolCallId?: string;
 	isError?: boolean;
 }
 
-const asContentBlocks = (content: unknown): ContentBlock[] => (Array.isArray(content) ? (content as ContentBlock[]) : []);
+interface SummaryMessageDetails extends SummaryDetails {
+	summaryText?: unknown;
+}
+
+const asContentBlocks = (content: unknown): ContentBlock[] =>
+	Array.isArray(content) ? (content as ContentBlock[]) : [];
 
 const textFromContent = (content: unknown): string =>
 	asContentBlocks(content)
@@ -79,13 +86,28 @@ const toolArguments = (block: ContentBlock): unknown => {
 	return {};
 };
 
-export function captureBatch(message: unknown, toolResults: unknown[], turnIndex: number, timestamp: number): CapturedBatch {
-	const content = asContentBlocks((message as MessageLike | undefined)?.content);
+export function captureBatch(
+	message: unknown,
+	toolResults: unknown[],
+	turnIndex: number,
+	timestamp: number,
+): CapturedBatch {
+	const content = asContentBlocks(
+		(message as MessageLike | undefined)?.content,
+	);
 	const results = toolResults as MessageLike[];
 
-	const assistantText = textFromContent((message as MessageLike | undefined)?.content);
+	const assistantText = textFromContent(
+		(message as MessageLike | undefined)?.content,
+	);
 	const toolCalls = content
-		.filter((block) => block.type === "toolCall" && typeof block.id === "string" && typeof block.name === "string" && !NON_COLLECTIBLE_TOOL_NAMES.has(block.name))
+		.filter(
+			(block) =>
+				block.type === "toolCall" &&
+				typeof block.id === "string" &&
+				typeof block.name === "string" &&
+				!NON_COLLECTIBLE_TOOL_NAMES.has(block.name),
+		)
 		.map((block): CapturedToolCall => {
 			const match = results.find((result) => result.toolCallId === block.id);
 			return {
@@ -101,18 +123,36 @@ export function captureBatch(message: unknown, toolResults: unknown[], turnIndex
 }
 
 export function totalResultChars(batches: readonly CapturedBatch[]): number {
-	return batches.reduce((total, batch) => total + batch.toolCalls.reduce((inner, call) => inner + call.resultText.length, 0), 0);
+	return batches.reduce(
+		(total, batch) =>
+			total +
+			batch.toolCalls.reduce(
+				(inner, call) => inner + call.resultText.length,
+				0,
+			),
+		0,
+	);
 }
 
 export function shouldCollect(batches: readonly CapturedBatch[]): boolean {
 	if (batches.length === 0) return false;
 	if (totalResultChars(batches) >= MIN_PENDING_RESULT_CHARS) return true;
-	return batches.some((batch) => batch.toolCalls.some((call) => call.resultText.length >= LARGE_SINGLE_RESULT_CHARS));
+	return batches.some((batch) =>
+		batch.toolCalls.some(
+			(call) => call.resultText.length >= LARGE_SINGLE_RESULT_CHARS,
+		),
+	);
 }
 
-export function collectSummaryDetails(batches: readonly CapturedBatch[]): SummaryDetails {
-	const toolCallIds = batches.flatMap((batch) => batch.toolCalls.map((call) => call.toolCallId));
-	const toolNames = batches.flatMap((batch) => batch.toolCalls.map((call) => call.toolName));
+export function collectSummaryDetails(
+	batches: readonly CapturedBatch[],
+): SummaryDetails {
+	const toolCallIds = batches.flatMap((batch) =>
+		batch.toolCalls.map((call) => call.toolCallId),
+	);
+	const toolNames = batches.flatMap((batch) =>
+		batch.toolCalls.map((call) => call.toolName),
+	);
 	const turns = batches.map((batch) => batch.turnIndex);
 	return {
 		toolCallIds,
@@ -128,15 +168,26 @@ const truncateForSummary = (text: string): string => {
 	return `${text.slice(0, MAX_RESULT_CHARS_FOR_SUMMARY)}…`;
 };
 
-export function serializeBatchesForSummary(batches: readonly CapturedBatch[]): string {
+export function serializeBatchesForSummary(
+	batches: readonly CapturedBatch[],
+): string {
 	return batches
 		.map((batch) => {
-			const assistant = batch.assistantText.length > 0 ? `Assistant text:\n${batch.assistantText}\n\n` : "";
+			const assistant =
+				batch.assistantText.length > 0
+					? `Assistant text:\n${batch.assistantText}\n\n`
+					: "";
 			const calls = batch.toolCalls
 				.map((call) => {
 					const status = call.isError ? "ERROR" : "OK";
 					const args = JSON.stringify(call.arguments, null, 2);
-					return [`ToolCallId: ${call.toolCallId}`, `Tool: ${call.toolName}`, `Arguments: ${args}`, `Result (${status}):`, truncateForSummary(call.resultText)].join("\n");
+					return [
+						`ToolCallId: ${call.toolCallId}`,
+						`Tool: ${call.toolName}`,
+						`Arguments: ${args}`,
+						`Result (${status}):`,
+						truncateForSummary(call.resultText),
+					].join("\n");
 				})
 				.join("\n---\n");
 			return `=== Turn ${batch.turnIndex} ===\n${assistant}${calls}`;
@@ -144,9 +195,35 @@ export function serializeBatchesForSummary(batches: readonly CapturedBatch[]): s
 		.join("\n\n");
 }
 
-export function compactMessages(messages: unknown[], collectedToolCallIds: ReadonlySet<string>): unknown[] {
+export function compactMessages(
+	messages: unknown[],
+	collectedToolCallIds: ReadonlySet<string>,
+): unknown[] {
 	return messages.filter((message) => {
 		const msg = message as MessageLike;
-		return !(msg.role === "toolResult" && typeof msg.toolCallId === "string" && collectedToolCallIds.has(msg.toolCallId));
+		return !(
+			msg.role === "toolResult" &&
+			typeof msg.toolCallId === "string" &&
+			collectedToolCallIds.has(msg.toolCallId)
+		);
+	});
+}
+
+export function restoreSummaryContentForContext(
+	messages: unknown[],
+): unknown[] {
+	return messages.map((message) => {
+		const msg = message as MessageLike;
+		if (msg.role !== "custom" || msg.customType !== CUSTOM_TYPE_SUMMARY)
+			return message;
+		const summaryText = (msg.details as SummaryMessageDetails | undefined)
+			?.summaryText;
+		if (
+			typeof summaryText !== "string" ||
+			summaryText.length === 0 ||
+			msg.content === summaryText
+		)
+			return message;
+		return { ...msg, content: summaryText };
 	});
 }

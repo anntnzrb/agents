@@ -7,16 +7,29 @@ import {
 	CUSTOM_TYPE_SUMMARY,
 	captureBatch,
 	compactMessages,
+	restoreSummaryContentForContext,
 	shouldCollect,
 	type CapturedBatch,
 } from "./logic.js";
 import { summarizeBatches } from "./summarizer.js";
 
 interface SendMessageCapable {
-	sendMessage: (message: { customType: string; content: string; display?: boolean; details?: unknown }, options?: { deliverAs?: "steer" | "followUp" | "nextTurn"; triggerTurn?: boolean }) => void;
+	sendMessage: (
+		message: {
+			customType: string;
+			content: string;
+			display?: boolean;
+			details?: unknown;
+		},
+		options?: {
+			deliverAs?: "steer" | "followUp" | "nextTurn";
+			triggerTurn?: boolean;
+		},
+	) => void;
 }
 
-const toolResultCount = (event: { toolResults?: unknown[] }): number => (Array.isArray(event.toolResults) ? event.toolResults.length : 0);
+const toolResultCount = (event: { toolResults?: unknown[] }): number =>
+	Array.isArray(event.toolResults) ? event.toolResults.length : 0;
 const formatCompactNumber = (value: number): string => {
 	if (value >= 1_000_000) return `${Math.round(value / 100_000) / 10}m`;
 	if (value >= 1_000) return `${Math.round(value / 100) / 10}k`;
@@ -26,7 +39,10 @@ const formatCompactNumber = (value: number): string => {
 const notifyLoaded = (ctx: unknown, count: number, chars: number): void => {
 	const candidate = ctx as { ui?: { notify?: unknown } };
 	if (typeof candidate.ui?.notify !== "function") return;
-	candidate.ui.notify(`context-gc loaded · ${count} indexed · ${formatCompactNumber(chars)} compacted`, "info");
+	candidate.ui.notify(
+		`context-gc loaded · ${count} indexed · ${formatCompactNumber(chars)} compacted`,
+		"info",
+	);
 };
 
 export default function contextGc(pi: ExtensionAPI) {
@@ -56,9 +72,9 @@ export default function contextGc(pi: ExtensionAPI) {
 			(pi as SendMessageCapable).sendMessage(
 				{
 					customType: CUSTOM_TYPE_SUMMARY,
-					content: summary.text,
+					content: `Context GC: compacted ${details.toolCallIds.length} tool output(s) · ${formatCompactNumber(details.totalResultChars)} chars · ${details.turnStart === details.turnEnd ? `turn ${details.turnStart}` : `turns ${details.turnStart}-${details.turnEnd}`}`,
 					display: false,
-					details,
+					details: { ...details, summaryText: summary.text },
 				},
 				{ deliverAs: "nextTurn" },
 			);
@@ -71,7 +87,8 @@ export default function contextGc(pi: ExtensionAPI) {
 		index.reconstructFromSession(ctx);
 		compactedChars = index.totalResultChars();
 		pendingBatches.length = 0;
-		if (event.reason === "startup" || event.reason === "reload") notifyLoaded(ctx, index.records.size, compactedChars);
+		if (event.reason === "startup" || event.reason === "reload")
+			notifyLoaded(ctx, index.records.size, compactedChars);
 	});
 
 	pi.on("session_tree", async (_event, ctx) => {
@@ -86,7 +103,12 @@ export default function contextGc(pi: ExtensionAPI) {
 			return;
 		}
 
-		const batch = captureBatch(event.message, event.toolResults, event.turnIndex ?? 0, Date.now());
+		const batch = captureBatch(
+			event.message,
+			event.toolResults,
+			event.turnIndex ?? 0,
+			Date.now(),
+		);
 		if (batch.toolCalls.length === 0) return;
 		pendingBatches.push(batch);
 	});
@@ -96,26 +118,45 @@ export default function contextGc(pi: ExtensionAPI) {
 	});
 
 	pi.on("context", async (event) => {
-		if (index.records.size === 0 || !Array.isArray(event.messages)) return undefined;
+		if (index.records.size === 0 || !Array.isArray(event.messages))
+			return undefined;
 		const compacted = compactMessages(event.messages, index.ids());
-		if (compacted.length === event.messages.length) return undefined;
-		return { messages: compacted };
+		const restored = restoreSummaryContentForContext(compacted);
+		if (
+			compacted.length === event.messages.length &&
+			restored.every((message, index_) => message === compacted[index_])
+		)
+			return undefined;
+		return { messages: restored };
 	});
 
 	pi.registerTool({
 		name: CONTEXT_TREE_QUERY_TOOL,
 		label: "Context Tree Query",
-		description: "Retrieve exact original outputs for toolCallIds collected by context-gc.",
+		description:
+			"Retrieve exact original outputs for toolCallIds collected by context-gc.",
 		promptSnippet: "Retrieve exact original outputs for collected toolCallIds",
-		promptGuidelines: ["Use context_tree_query when a context-gc summary says exact original tool output is needed for specific toolCallIds."],
+		promptGuidelines: [
+			"Use context_tree_query when a context-gc summary says exact original tool output is needed for specific toolCallIds.",
+		],
 		parameters: Type.Object({
-			toolCallIds: Type.Array(Type.String({ description: "Collected toolCallIds to retrieve" }), { description: "Tool call IDs listed in a context-gc summary" }),
+			toolCallIds: Type.Array(
+				Type.String({ description: "Collected toolCallIds to retrieve" }),
+				{ description: "Tool call IDs listed in a context-gc summary" },
+			),
 		}),
 		execute(_toolCallId: string, input: { toolCallIds?: unknown }) {
-			const ids = Array.isArray(input.toolCallIds) ? input.toolCallIds.filter((id): id is string => typeof id === "string") : [];
+			const ids = Array.isArray(input.toolCallIds)
+				? input.toolCallIds.filter((id): id is string => typeof id === "string")
+				: [];
 			return {
-				content: [{ type: "text", text: formatRecordsForQuery(index.lookup(ids)) }],
-				details: { requested: ids, found: index.lookup(ids).map((record) => record.toolCallId) },
+				content: [
+					{ type: "text", text: formatRecordsForQuery(index.lookup(ids)) },
+				],
+				details: {
+					requested: ids,
+					found: index.lookup(ids).map((record) => record.toolCallId),
+				},
 			};
 		},
 	});
