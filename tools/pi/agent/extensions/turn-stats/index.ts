@@ -86,7 +86,7 @@ const formatGcStats = (stats: GcStats): string => (stats.events > 0 ? ` · 🧹 
 const formatTurnStats = (usage: TurnUsage, elapsedMs: number, gcStats: GcStats): string => {
 	const elapsedSeconds = elapsedMs / 1000;
 	const tokensPerSecond = usage.output / elapsedSeconds;
-	return `⚡ ${tokensPerSecond.toFixed(1)} tok/s · ↑ ${usage.input.toLocaleString()}t · ↓ ${usage.output.toLocaleString()}t · ⏱ ${elapsedSeconds.toFixed(1)}s${formatGcStats(gcStats)}`;
+	return `⚡ ${tokensPerSecond.toFixed(1)} tok/s · ↑ ${usage.input.toLocaleString()}t · ↓ ${usage.output.toLocaleString()}t${formatGcStats(gcStats)} · ⏱ ${elapsedSeconds.toFixed(1)}s`;
 };
 
 export const __test = {
