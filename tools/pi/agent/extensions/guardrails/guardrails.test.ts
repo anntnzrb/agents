@@ -266,6 +266,11 @@ test("blocks direct python invocation", () => {
   assert.equal(reasonForCommand("python script.py", pythonConfig), "use uv");
 });
 
+test("blocks direct python heredoc stdin invocation", () => {
+  assert.equal(reasonForCommand("python3 - <<'PY'\nprint(1)\nPY", pythonConfig), "use uv");
+  assert.equal(reasonForCommand("python - <<PY\nprint(1)\nPY", pythonConfig), "use uv");
+});
+
 test("blocks versioned and alternate python executables", () => {
   assert.equal(reasonForCommand('.venv/bin/python3.12 -c "print(1)"', pythonConfig), "use uv");
   assert.equal(reasonForCommand('python3.12.exe -c "print(1)"', pythonConfig), "use uv");
@@ -402,17 +407,27 @@ test("warns for broad shell file-discovery commands", () => {
   assert.equal(reasonForCommand("fd '*.ts'", searchConfig), "prefer native find tool");
   assert.equal(reasonForCommand("fd-find '*.ts' .", searchConfig), "prefer native find tool");
   assert.equal(reasonForCommand("gfind . -name '*.ts'", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("find . -name '*.ts'", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("find src -name '*.ts'", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("find src -maxdepth 2 -name '*.ts'", searchConfig), "prefer native find tool");
   assert.equal(reasonForCommand("find / -name '*.ts'", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("find . -name '*.ts' | head", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("echo x | find . -name '*.ts'", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("find . -name '*.ts' -print0 | xargs -0 grep TODO", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("env FOO=1 find . -name '*.ts'", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("command find . -name '*.ts'", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("sudo find . -name '*.ts'", searchConfig), "prefer native find tool");
   assert.equal(reasonForCommand("locate js", searchConfig), "prefer native find tool");
   assert.equal(reasonForCommand("bash -lc 'find . -name \"*.ts\"'", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("sh -c 'find src -name \"*.ts\"'", searchConfig), "prefer native find tool");
 
   assert.equal(actionForCommand("fd '*.ts'", searchConfig)?.type, "warn");
 });
 
-test("does not warn for narrow shell file-discovery commands", () => {
+test("does not warn for informational or narrow non-find shell file-discovery commands", () => {
   assert.equal(reasonForCommand("fd '*.ts' src", searchConfig), null);
-  assert.equal(reasonForCommand("find src -maxdepth 2 -name '*.ts'", searchConfig), null);
   assert.equal(reasonForCommand("find --help", searchConfig), null);
+  assert.equal(reasonForCommand("find --version", searchConfig), null);
   assert.equal(reasonForCommand("locate package.json", searchConfig), null);
 });
 

@@ -411,13 +411,6 @@ function shouldWarnFileDiscovery(parsed: ParsedCommand): boolean {
   }
 
   if (executable === "find" || executable === "gfind") {
-    const positionals = extractPositionals(parsed);
-    const startPaths = positionals.filter((token) => !token.startsWith("-")).slice(0, 1);
-    const roots = startPaths.length === 0 ? ["."] : startPaths;
-    const rootLike = roots.some((token) => isRootLikePath(token));
-    if (!rootLike) return false;
-    const maxDepth = parseMaxDepth(parsed);
-    if (maxDepth !== undefined && maxDepth <= 2) return false;
     return true;
   }
 

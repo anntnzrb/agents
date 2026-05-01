@@ -61,6 +61,27 @@ const emitGuardrailWarning = (pi: ExtensionAPI, ctx: ExtensionContext, toolName:
   );
 };
 
+type ToolEventLike = {
+  toolName?: string;
+  input?: Record<string, unknown>;
+};
+
+const toolNameOf = (event: unknown): string => {
+  const toolName = (event as ToolEventLike).toolName;
+  return typeof toolName === "string" ? toolName : "";
+};
+
+const isNamedTool = (event: unknown, name: string): event is ToolEventLike => {
+  const toolName = toolNameOf(event);
+  return toolName === name || toolName === `functions.${name}` || toolName.endsWith(`.${name}`);
+};
+
+const inputString = (event: unknown, key: string): string | null => {
+  const input = (event as ToolEventLike).input;
+  const value = input?.[key];
+  return typeof value === "string" ? value : null;
+};
+
 export const __test = {
   getConfigSignature,
   getConfigOrBlockReason,
@@ -78,43 +99,47 @@ export function createGuardrails(path: string) {
         return { block: true, reason: configOrReason };
       }
 
-      if (isToolCallEventType("bash", event)) {
-        const action = actionForCommand(event.input.command, configOrReason);
-        if (!action) {
-          return undefined;
-        }
-        if (action.type === "warn") {
-          emitGuardrailWarning(pi, ctx, event.toolName, action.message);
-          return undefined;
-        }
-        return { block: true, reason: agentHintForBlock(action.message) };
-      }
-
-      if (isToolCallEventType<"pwsh", { command?: string }>("pwsh", event)) {
-        const command = typeof event.input.command === "string" ? event.input.command : "";
+      if (isToolCallEventType("bash", event) || isNamedTool(event, "bash")) {
+        const command = inputString(event, "command") ?? "";
         const action = actionForCommand(command, configOrReason);
         if (!action) {
           return undefined;
         }
         if (action.type === "warn") {
-          emitGuardrailWarning(pi, ctx, event.toolName, action.message);
+          emitGuardrailWarning(pi, ctx, toolNameOf(event), action.message);
           return undefined;
         }
         return { block: true, reason: agentHintForBlock(action.message) };
       }
 
-      if (isToolCallEventType("read", event)) {
-        const reason = reasonForPath(event.input.path, "read", configOrReason);
+      if (isToolCallEventType<"pwsh", { command?: string }>("pwsh", event) || isNamedTool(event, "pwsh")) {
+        const command = inputString(event, "command") ?? "";
+        const action = actionForCommand(command, configOrReason);
+        if (!action) {
+          return undefined;
+        }
+        if (action.type === "warn") {
+          emitGuardrailWarning(pi, ctx, toolNameOf(event), action.message);
+          return undefined;
+        }
+        return { block: true, reason: agentHintForBlock(action.message) };
+      }
+
+      if (isToolCallEventType("read", event) || isNamedTool(event, "read")) {
+        const path = inputString(event, "path") ?? "";
+        const reason = reasonForPath(path, "read", configOrReason);
         return reason ? { block: true, reason } : undefined;
       }
 
-      if (isToolCallEventType("write", event)) {
-        const reason = reasonForPath(event.input.path, "write", configOrReason);
+      if (isToolCallEventType("write", event) || isNamedTool(event, "write")) {
+        const path = inputString(event, "path") ?? "";
+        const reason = reasonForPath(path, "write", configOrReason);
         return reason ? { block: true, reason } : undefined;
       }
 
-      if (isToolCallEventType("edit", event)) {
-        const reason = reasonForPath(event.input.path, "edit", configOrReason);
+      if (isToolCallEventType("edit", event) || isNamedTool(event, "edit")) {
+        const path = inputString(event, "path") ?? "";
+        const reason = reasonForPath(path, "edit", configOrReason);
         return reason ? { block: true, reason } : undefined;
       }
 

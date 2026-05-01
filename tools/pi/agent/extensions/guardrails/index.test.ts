@@ -14,9 +14,112 @@ mock.module("@mariozechner/pi-coding-agent", () => ({
 	createWriteToolDefinition: () => ({ name: "write" }),
 }));
 
-const { __test } = await import("./index.js");
+const { __test, createGuardrails } = await import("./index.js");
+
+const setupGuardrailsHandler = (config: unknown) => {
+	const dir = mkdtempSync(join(tmpdir(), "guardrails-index-"));
+	const configPath = join(dir, "guardrails.jsonc");
+	writeFileSync(configPath, JSON.stringify(config));
+
+	let handler: ((event: unknown, ctx: unknown) => unknown) | undefined;
+	const notifications: string[] = [];
+	const messages: Array<{ customType: string; content: string; display?: boolean }> = [];
+	const pi = {
+		on: (_event: string, registered: (event: unknown, ctx: unknown) => unknown) => {
+			handler = registered;
+		},
+		getAllTools: () => [],
+		sendMessage: (message: { customType: string; content: string; display?: boolean }) => messages.push(message),
+	} as any;
+	const ctx = { ui: { notify: (message: string) => notifications.push(message) } } as any;
+
+	createGuardrails(configPath)(pi);
+	return { handler, ctx, notifications, messages };
+};
 
 describe("guardrails config cache", () => {
+	test("adapts canonical and namespaced shell block events", async () => {
+		const { handler, ctx } = setupGuardrailsHandler({
+			version: 1,
+			agentBash: {
+				rules: [
+					{ match: { type: "executable", names: ["python3"] }, action: { type: "block", message: "no python" } },
+					{ match: { type: "executable", names: ["pip"] }, action: { type: "block", message: "no pip" } },
+					{ match: { type: "executable", names: ["poetry"] }, action: { type: "block", message: "no poetry" } },
+				],
+			},
+			protectedPaths: { rules: [] },
+		});
+
+		for (const [toolName, command, expected] of [
+			["bash", "python3 - <<'PY'\nprint(1)\nPY", "direct Python tooling disabled"],
+			["functions.bash", "pip install rich", "direct Python tooling disabled"],
+			["custom.namespace.bash", "poetry install", "direct Python tooling disabled"],
+			["pwsh", "python3 -c \"print(1)\"", "direct Python tooling disabled"],
+			["functions.pwsh", "pip install rich", "direct Python tooling disabled"],
+			["custom.namespace.pwsh", "poetry install", "direct Python tooling disabled"],
+		] as const) {
+			const result = await handler?.({ toolName, input: { command } }, ctx);
+			expect(result).toEqual({ block: true, reason: expect.stringContaining(expected) });
+		}
+	});
+
+	test("adapts canonical and namespaced shell warn events", async () => {
+		const { handler, ctx, notifications, messages } = setupGuardrailsHandler({
+			version: 1,
+			agentBash: {
+				rules: [
+					{ match: { type: "executable", names: ["rg"] }, action: { type: "warn", message: "use grep tool" } },
+					{ match: { type: "executable", names: ["fd", "find"] }, action: { type: "warn", message: "use find tool" } },
+				],
+			},
+			protectedPaths: { rules: [] },
+		});
+
+		for (const [toolName, command] of [
+			["bash", "rg TODO"],
+			["functions.bash", "fd '*.ts'"],
+			["custom.namespace.bash", "find src -name '*.ts'"],
+			["pwsh", "rg TODO"],
+			["functions.pwsh", "fd '*.ts'"],
+			["custom.namespace.pwsh", "find src -name '*.ts'"],
+		] as const) {
+			const result = await handler?.({ toolName, input: { command } }, ctx);
+			expect(result).toBeUndefined();
+		}
+
+		expect(notifications).toHaveLength(6);
+		expect(messages).toHaveLength(6);
+	});
+
+	test("adapts canonical and namespaced protected path events", async () => {
+		const { handler, ctx } = setupGuardrailsHandler({
+			version: 1,
+			agentBash: { rules: [] },
+			protectedPaths: {
+				rules: [
+					{ pattern: ".env", tools: ["read"], action: { type: "block", message: "no env reads" } },
+					{ pattern: ".env", tools: ["write", "edit"], action: { type: "block", message: "no env writes" } },
+				],
+			},
+		});
+
+		for (const [toolName, path, reason] of [
+			["read", "/tmp/project/.env", "no env reads"],
+			["functions.read", "/tmp/project/.env", "no env reads"],
+			["custom.namespace.read", "/tmp/project/.env", "no env reads"],
+			["write", "/tmp/project/.env", "no env writes"],
+			["functions.write", "/tmp/project/.env", "no env writes"],
+			["custom.namespace.write", "/tmp/project/.env", "no env writes"],
+			["edit", "/tmp/project/.env", "no env writes"],
+			["functions.edit", "/tmp/project/.env", "no env writes"],
+			["custom.namespace.edit", "/tmp/project/.env", "no env writes"],
+		] as const) {
+			const result = await handler?.({ toolName, input: { path } }, ctx);
+			expect(result).toEqual({ block: true, reason });
+		}
+	});
+
 	test("reuses cache for unchanged file and invalidates on change", async () => {
 		const dir = mkdtempSync(join(tmpdir(), "guardrails-index-"));
 		const configPath = join(dir, "guardrails.jsonc");
