@@ -28,6 +28,8 @@ class MockText {
 
 mock.module("@mariozechner/pi-tui", () => ({
 	Text: MockText,
+	truncateToWidth: (value: string, _width: number) => value,
+	visibleWidth: (value: string) => value.length,
 }));
 
 const { __test, default: writeExtension } = await import("./index.js");

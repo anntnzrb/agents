@@ -14,6 +14,8 @@ mock.module("@mariozechner/pi-tui", () => ({
 	Text: class {
 		setText() {}
 	},
+	truncateToWidth: (value: string, _width: number) => value,
+	visibleWidth: (value: string) => value.length,
 }));
 
 mock.module("@sinclair/typebox", () => ({
