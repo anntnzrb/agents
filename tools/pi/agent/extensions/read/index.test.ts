@@ -41,28 +41,28 @@ const tokenTheme = {
 describe("read compact rendering", () => {
 	test("call is naked single-line telemetry", () => {
 		const text = __test.buildReadCallText({ path: "src/foo.ts" }, passthroughTheme);
-		expect(text).toBe("☰ read src/foo.ts");
+		expect(text).toBe("◎ read src/foo.ts");
 		expect(text.split("\n")).toHaveLength(1);
 	});
 
 	test("call shows requested line windows", () => {
-		expect(__test.getReadRange({ offset: 4, limit: 3 })).toBe("L[4-6]");
-		expect(__test.getReadRange({ limit: 5 })).toBe("L[1-5]");
-		expect(__test.getReadRange({ offset: 8 })).toBe("L[8-]");
-		expect(__test.buildReadCallText({ path: "src/foo.ts", offset: 4, limit: 3 }, passthroughTheme)).toBe("☰ read src/foo.ts · L[4-6]");
+		expect(__test.getReadRange({ offset: 4, limit: 3 })).toBe("L4:L6");
+		expect(__test.getReadRange({ limit: 5 })).toBe("L1:L5");
+		expect(__test.getReadRange({ offset: 8 })).toBe("L8:-");
+		expect(__test.buildReadCallText({ path: "src/foo.ts", offset: 4, limit: 3 }, passthroughTheme)).toBe("◎ read src/foo.ts · L4:L6");
 	});
 
 	test("colors cue/title/path separately", () => {
 		const text = __test.buildReadCallText({ path: "src/foo.ts" }, tokenTheme);
-		expect(text).toContain("<muted>☰</muted>");
+		expect(text).toContain("<muted>◎</muted>");
 		expect(text).toContain("<toolTitle>**read**</toolTitle>");
 		expect(text).toContain("<muted>src/foo.ts</muted>");
 	});
 
 	test("leaves line window unstyled", () => {
 		const text = __test.buildReadCallText({ path: "src/foo.ts", offset: 4, limit: 3 }, tokenTheme);
-		expect(text).toContain("L[4-6]");
-		expect(text).not.toContain("<text>L[4-6]</text>");
+		expect(text).toContain("L4:L6");
+		expect(text).not.toContain("<text>L4:L6</text>");
 	});
 
 	test("result is empty unless truncated", () => {

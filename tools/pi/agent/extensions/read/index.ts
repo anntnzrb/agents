@@ -29,13 +29,13 @@ const getReadRange = (args: ReadArgs): string | undefined => {
 	const limit = asPositiveInteger(args.limit);
 	if (offset === undefined && limit === undefined) return undefined;
 	const start = offset ?? 1;
-	if (limit === undefined) return `L[${start}-]`;
-	return `L[${start}-${start + limit - 1}]`;
+	if (limit === undefined) return `L${start}:-`;
+	return `L${start}:L${start + limit - 1}`;
 };
 
 const buildReadCallText = (args: ReadArgs, theme: RenderTheme): string => {
 	const rawPath = asString(args.path) ?? "...";
-	const segments = [`${theme.fg("muted", "☰")} ${theme.fg("toolTitle", theme.bold("read"))} ${theme.fg("muted", rawPath)}`];
+	const segments = [`${theme.fg("muted", "◎")} ${theme.fg("toolTitle", theme.bold("read"))} ${theme.fg("muted", rawPath)}`];
 	const range = getReadRange(args);
 	if (range) segments.push(range);
 	return joinRenderSegments(segments, theme);
