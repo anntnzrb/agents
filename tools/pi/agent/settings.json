@@ -1,8 +1,5 @@
 {
   "collapseChangelog": true,
-  "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.5",
-  "defaultThinkingLevel": "medium",
   "compaction": {
     "enabled": true,
     "reserveTokens": 32000,
@@ -11,7 +8,12 @@
   "editorPaddingX": 1,
   "followUpMode": "all",
   "hideThinkingBlock": true,
-  "lastChangelogVersion": "0.70.0",
+  "lastChangelogVersion": "0.71.1",
+  "enabledModels": [
+    "opencode-go/mimo-v2.5-pro:high",
+    "opencode-go/minimax-m2.7:high",
+    "openai-codex/gpt-5.5:medium"
+  ],
   "quietStartup": true,
   "showHardwareCursor": true,
   "steeringMode": "all",
