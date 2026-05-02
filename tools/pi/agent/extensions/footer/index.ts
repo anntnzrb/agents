@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { VERSION } from "@mariozechner/pi-coding-agent";
 import type { ExtensionAPI, Theme, ThemeColor } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 
@@ -324,9 +325,10 @@ const getDirtyMarker = (theme: Theme, gitStatus: GitStatus): string =>
 	gitStatus.isDirty ? theme.fg("warning", "*") : "";
 
 const buildLeft = (theme: Theme, cwd: string, branch: string | null, gitStatus: GitStatus): string => {
+	const versionPrefix = theme.fg("dim", `[v${VERSION}]`) + separator(theme);
 	const shortCwd = theme.fg("muted", cwd);
-	if (!branch) return shortCwd;
-	return shortCwd + separator(theme) + theme.fg("accent", branch) + getDirtyMarker(theme, gitStatus);
+	if (!branch) return versionPrefix + shortCwd;
+	return versionPrefix + shortCwd + separator(theme) + theme.fg("accent", branch) + getDirtyMarker(theme, gitStatus);
 };
 
 const buildRight = (

@@ -1,5 +1,8 @@
 import { describe, expect, mock, test } from "bun:test";
 
+mock.module("@mariozechner/pi-coding-agent", () => ({
+	VERSION: "0.0.0",
+}));
 mock.module("@mariozechner/pi-tui", () => ({
 	Text: class {
 		text = "";

@@ -8,7 +8,7 @@ Replace Pi's built-in footer with a minimal one-line footer.
 - `tsconfig.json` — strict TS config matching sibling extensions
 
 ## Layout
-- left: shortened cwd + git branch
+- left: pi version prefix + shortened cwd + git branch
 - right: context usage + model/thinking
 
 ## Notes
