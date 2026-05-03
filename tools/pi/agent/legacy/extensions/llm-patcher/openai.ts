@@ -6,6 +6,7 @@ import {
 	unchanged,
 	type PatchFieldChange,
 	type PatchResult,
+	type PatchTrace,
 	type PlainObject,
 	type ProviderPayloadPatcher,
 	type ProviderVerbosity,
@@ -55,10 +56,10 @@ const createTrace = (
 	changed: boolean,
 	reason: string,
 	changes: readonly PatchFieldChange[] = [],
-) => ({
+): PatchTrace => ({
 	provider: OPENAI_PROVIDER,
 	rule: GPT5_VERBOSITY_RULE,
-	model,
+	...(model === undefined ? {} : { model }),
 	changed,
 	reason,
 	changes,

@@ -9,9 +9,10 @@ Mandatory patch trace logging included.
 ## Files
 - `index.ts` — loads config, registers `before_provider_request`, runs payload patchers, appends trace logs
 - `config.ts` — loads minimal JSONC config with defaults and trace log path
-- `../../llm-patcher.jsonc` — synced user-level settings file (`~/.pi/agent/llm-patcher.jsonc`)
+- `llm-patcher.jsonc` — extension-local JSONC settings file, synced with this legacy extension
 - `openai.ts` — OpenAI Responses payload detection + GPT-5 verbosity patch + trace reasons
 - `types.ts` — shared narrow helpers + patch/trace types
+- `package.json` — marks this legacy extension package as ESM for local typechecking
 - `tsconfig.json` — strict TS config matching sibling extensions
 
 ## Notes

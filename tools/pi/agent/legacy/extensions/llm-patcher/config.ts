@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	isPlainObject,
 	type PlainObject,
@@ -31,7 +32,9 @@ const DEFAULT_CONFIG: LlmPatcherConfig = {
 	},
 };
 
-export const configPath = join(homedir(), ".pi", "agent", "llm-patcher.jsonc");
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+export const configPath = join(__dirname, "llm-patcher.jsonc");
 export const traceLogPath = join(homedir(), ".pi", "agent", "llm-patcher.trace.jsonl");
 
 const parseJsonc = (source: string): unknown => {
