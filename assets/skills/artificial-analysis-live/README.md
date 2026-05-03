@@ -77,6 +77,24 @@ Returns:
 - removed endpoint slugs
 - provider endpoint deltas
 
+## Harness
+
+Rank unique models by Harness, a coding-agent score that avoids Intelligence Index benchmark soup:
+
+```text
+Harness = 0.5 * Agentic Index + 0.5 * Coding Index
+Execution Gap = Agentic Index - Coding Index
+```
+
+```bash
+uv run --script <skill-dir>/scripts/cli.py harness --limit 25
+uv run --script <skill-dir>/scripts/cli.py harness --creator anthropic --limit 10
+uv run --script <skill-dir>/scripts/cli.py harness --open-weights-only --limit 25
+uv run --script <skill-dir>/scripts/cli.py query --sort-by harness --order desc --limit 20
+```
+
+Use `Harness` for model picking. Use `Execution Gap` as a risk flag: large positive gaps mean the model may pursue tasks well but have weaker executable/code precision.
+
 ## Query (model/provider benchmark questions)
 
 ```bash
@@ -130,6 +148,7 @@ uv run --script <skill-dir>/scripts/cli.py --mode rpc
 - `fetch`
 - `stats`
 - `diff`
+- `harness`
 - `query`
 - `qa`
 

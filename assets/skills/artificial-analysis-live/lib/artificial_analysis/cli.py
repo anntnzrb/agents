@@ -81,6 +81,17 @@ def build_parser() -> argparse.ArgumentParser:
     diff_parser.add_argument("new_snapshot", type=Path)
     diff_parser.set_defaults(handler=_handle_diff)
 
+    harness_parser = subparsers.add_parser(
+        "harness",
+        help="Rank unique models by Harness = 50% Agentic Index + 50% Coding Index.",
+    )
+    harness_parser.add_argument("snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON)
+    harness_parser.add_argument("--model", type=str, default=None, help="Model slug/name contains filter.")
+    harness_parser.add_argument("--creator", type=str, default=None, help="Creator/lab name contains filter.")
+    harness_parser.add_argument("--open-weights-only", action="store_true", help="Return only open-weights models.")
+    harness_parser.add_argument("--limit", type=int, default=50)
+    harness_parser.set_defaults(handler=_handle_harness)
+
     query_parser = subparsers.add_parser("query", help="Query model/provider benchmark rows from a snapshot.")
     query_parser.add_argument("snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON)
     query_parser.add_argument("--model", type=str, default=None, help="Model slug/name contains filter.")
@@ -90,7 +101,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--sort-by",
         type=str,
         default="intelligence",
-        choices=("intelligence", "coding", "math", "price_blended", "speed", "ttfc", "e2e"),
+        choices=("harness", "intelligence", "agentic", "coding", "math", "price_blended", "speed", "ttfc", "e2e"),
     )
     query_parser.add_argument("--order", type=str, default="auto", choices=("auto", "asc", "desc"))
     query_parser.add_argument("--limit", type=int, default=20)
@@ -108,7 +119,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--sort-by",
         type=str,
         default=None,
-        choices=("intelligence", "coding", "math", "price_blended", "speed", "ttfc", "e2e"),
+        choices=("harness", "intelligence", "agentic", "coding", "math", "price_blended", "speed", "ttfc", "e2e"),
         help="Override inferred sort metric.",
     )
     qa_parser.add_argument(
@@ -132,7 +143,7 @@ def _normalize_argv(argv: Sequence[str] | None) -> list[str]:
     if not values:
         return ["fetch"]
 
-    known_subcommands = {"fetch", "stats", "diff", "query", "qa", "schema"}
+    known_subcommands = {"fetch", "stats", "diff", "harness", "query", "qa", "schema"}
     if any(token in known_subcommands for token in values):
         return values
     if any(token in {"-h", "--help"} for token in values):
@@ -334,6 +345,93 @@ def _diff_payload(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
+    snapshot = load_snapshot(args.snapshot)
+    hosts_models = snapshot.get("hosts_models")
+    if not isinstance(hosts_models, list):
+        raise ExtractionError("Snapshot missing hosts_models list")
+
+    model_filter = args.model.lower() if isinstance(args.model, str) and args.model else None
+    creator_filter = args.creator.lower() if isinstance(args.creator, str) and args.creator else None
+
+    seen: set[str] = set()
+    rows: list[dict[str, Any]] = []
+    skipped_missing = 0
+
+    for item in hosts_models:
+        if not isinstance(item, dict):
+            continue
+        model = item.get("model") if isinstance(item.get("model"), dict) else {}
+        model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
+        if not model_slug or model_slug in seen:
+            continue
+        seen.add(model_slug)
+        if model.get("deleted") or model.get("deprecated"):
+            continue
+
+        model_name = model.get("name") if isinstance(model.get("name"), str) else None
+        creator = model.get("model_creators") if isinstance(model.get("model_creators"), dict) else {}
+        creator_name = creator.get("name") if isinstance(creator.get("name"), str) else None
+
+        if model_filter and not _matches_any(model_filter, [model_slug, model_name]):
+            continue
+        if creator_filter and not _matches_any(creator_filter, [creator_name, creator.get("slug")]):
+            continue
+        if args.open_weights_only and model.get("is_open_weights") is not True:
+            continue
+
+        agentic = model.get("agentic_index")
+        coding = model.get("coding_index")
+        if not isinstance(agentic, int | float) or not isinstance(coding, int | float):
+            skipped_missing += 1
+            continue
+
+        harness = (float(agentic) + float(coding)) / 2.0
+        rows.append(
+            {
+                "rank": 0,
+                "model_slug": model_slug,
+                "model_name": model_name,
+                "creator": creator_name,
+                "harness": round(harness, 4),
+                "agentic": agentic,
+                "coding": coding,
+                "execution_gap": round(float(agentic) - float(coding), 4),
+                "intelligence": model.get("intelligence_index"),
+                "release_date": model.get("release_date"),
+                "reasoning_model": model.get("reasoning_model"),
+                "is_open_weights": model.get("is_open_weights"),
+                "context_window_tokens": model.get("context_window_tokens"),
+            }
+        )
+
+    rows.sort(key=lambda row: (-float(row["harness"]), str(row.get("model_slug") or "")))
+    for index, row in enumerate(rows, start=1):
+        row["rank"] = index
+
+    limited = rows[: max(args.limit, 0)]
+    return {
+        "snapshot": str(args.snapshot),
+        "definition": {
+            "name": "Harness",
+            "formula": "0.5 * Agentic Index + 0.5 * Coding Index",
+            "execution_gap": "Agentic Index - Coding Index; high positive values indicate executable-precision risk.",
+        },
+        "applied_filters": {
+            "model": args.model,
+            "creator": args.creator,
+            "open_weights_only": args.open_weights_only,
+            "limit": args.limit,
+        },
+        "counts": {
+            "ranked_models": len(rows),
+            "returned_models": len(limited),
+            "skipped_missing_agentic_or_coding": skipped_missing,
+        },
+        "rows": limited,
+    }
+
+
 def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
     snapshot = load_snapshot(args.snapshot)
     hosts_models = snapshot.get("hosts_models")
@@ -382,7 +480,9 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "model_name": model_name,
                 "provider_slug": provider_slug,
                 "provider_name": provider_name,
+                "harness": _harness_score(model),
                 "intelligence": model.get("intelligence_index"),
+                "agentic": model.get("agentic_index"),
                 "coding": model.get("coding_index"),
                 "math": model.get("math_index"),
                 "gpqa": model.get("gpqa"),
@@ -448,6 +548,14 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
         "top_models": top_models,
         "rows": limited,
     }
+
+
+def _harness_score(model: dict[str, Any]) -> float | None:
+    agentic = model.get("agentic_index")
+    coding = model.get("coding_index")
+    if isinstance(agentic, int | float) and isinstance(coding, int | float):
+        return round((float(agentic) + float(coding)) / 2.0, 4)
+    return None
 
 
 def _matches_any(needle: str, values: list[str | None]) -> bool:
@@ -609,6 +717,10 @@ def _infer_sort(question: str) -> tuple[str, str]:
         return ("ttfc", "asc")
     if any(word in q for word in ("speed", "throughput", "tokens per second", "fastest", "rápido", "velocidad")):
         return ("speed", "desc")
+    if any(word in q for word in ("harness", "agent harness", "coding agent", "agentic coding")):
+        return ("harness", "desc")
+    if any(word in q for word in ("agentic", "agent", "autonomous")):
+        return ("agentic", "desc")
     if any(word in q for word in ("coding", "code", "programming", "codificación")):
         return ("coding", "desc")
     if any(word in q for word in ("math", "matemática", "matematica")):
@@ -637,6 +749,11 @@ def _handle_stats(args: argparse.Namespace) -> int:
 
 def _handle_diff(args: argparse.Namespace) -> int:
     _emit_json(_envelope("diff", _diff_payload(args)), stdout=sys.stdout)
+    return 0
+
+
+def _handle_harness(args: argparse.Namespace) -> int:
+    _emit_json(_envelope("harness", _harness_payload(args)), stdout=sys.stdout)
     return 0
 
 
@@ -691,6 +808,16 @@ def _capability_schema() -> dict[str, Any]:
                 "args": ["old_snapshot", "new_snapshot"],
                 "flags": {},
             },
+            "harness": {
+                "description": "Rank unique models by Harness = 50% Agentic Index + 50% Coding Index.",
+                "args": ["snapshot(optional)"],
+                "flags": {
+                    "model": "str contains filter on model slug/name",
+                    "creator": "str contains filter on creator/lab slug/name",
+                    "open_weights_only": "bool only include open-weights models",
+                    "limit": "int max rows (default 50)",
+                },
+            },
             "query": {
                 "description": "Filter/sort endpoint benchmark rows by model/provider/endpoint.",
                 "args": ["snapshot(optional)"],
@@ -698,7 +825,7 @@ def _capability_schema() -> dict[str, Any]:
                     "model": "str contains filter on model slug/name",
                     "provider": "str contains filter on provider slug/name",
                     "endpoint": "str contains filter on endpoint slug",
-                    "sort_by": "intelligence|coding|math|price_blended|speed|ttfc|e2e",
+                    "sort_by": "harness|intelligence|agentic|coding|math|price_blended|speed|ttfc|e2e",
                     "order": "auto|asc|desc",
                     "limit": "int max rows (default 20)",
                 },
@@ -784,6 +911,16 @@ def _stats_namespace(args: dict[str, Any]) -> argparse.Namespace:
     return argparse.Namespace(
         snapshot=Path(_arg_value(args, "snapshot", str(DEFAULT_OUTPUT_JSON))),
         top=int(_arg_value(args, "top", 10)),
+    )
+
+
+def _harness_namespace(args: dict[str, Any]) -> argparse.Namespace:
+    return argparse.Namespace(
+        snapshot=Path(_arg_value(args, "snapshot", str(DEFAULT_OUTPUT_JSON))),
+        model=_arg_value(args, "model", None),
+        creator=_arg_value(args, "creator", None),
+        open_weights_only=bool(_arg_value(args, "open_weights_only", False)),
+        limit=int(_arg_value(args, "limit", 50)),
     )
 
 
@@ -876,6 +1013,8 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                 response = _success_response(request_id, command, _stats_payload(_stats_namespace(args_payload)))
             elif command == "diff":
                 response = _success_response(request_id, command, _diff_payload(_diff_namespace(args_payload)))
+            elif command == "harness":
+                response = _success_response(request_id, command, _harness_payload(_harness_namespace(args_payload)))
             elif command == "query":
                 response = _success_response(request_id, command, _query_payload(_query_namespace(args_payload)))
             elif command == "qa":
