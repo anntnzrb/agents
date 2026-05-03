@@ -1,5 +1,6 @@
 {
   "collapseChangelog": true,
+  "doubleEscapeAction": "none",
   "compaction": {
     "enabled": true,
     "reserveTokens": 32000,
