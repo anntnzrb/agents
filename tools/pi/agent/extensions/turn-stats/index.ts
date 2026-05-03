@@ -35,6 +35,8 @@ type ContextGcEntry = {
 	};
 };
 
+// Optional telemetry emitted by the legacy context-gc extension.
+// Session-entry based by design: no runtime dependency; absent entries render nothing.
 const CONTEXT_GC_INDEX_TYPE = "context-gc-index";
 const APPROX_CHARS_PER_TOKEN = 4;
 const emptyTurnUsage: TurnUsage = { input: 0, output: 0 };
