@@ -6,3 +6,4 @@ bun.lock
 package-lock.json
 assets/skills/*/.env
 assets/skills/*/.env.local
+artifacts/
