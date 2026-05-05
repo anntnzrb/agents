@@ -11,14 +11,14 @@
 - Put reusable code in `lib/<module>/`; make `scripts/cli.py` add `lib/` to `sys.path`.
 - Keep `SKILL.md` focused on when/how to use the skill; move bulk docs to `references/`.
 
-## Hard bans
+## Portability Constraints
 
-- No Bash/sh/PowerShell wrappers as bundled skill entrypoints.
-- No `*.sh` files in skills.
-- No `source`, `./script`, shebang, or executable-bit assumptions in public docs.
-- No raw `python`, `python3`, `pip`, or `pip install` in public run paths.
-- No `pyproject.toml` or `uv.lock` per skill unless the user explicitly asks for package semantics.
-- No POSIX-only paths like `/tmp`; use `<temp-dir>` in docs and `tempfile` in code.
+- Bundled skill entrypoints use `scripts/cli.py`, not Bash/sh/PowerShell wrappers.
+- Skills do not include `*.sh` files.
+- Public docs avoid `source`, `./script`, shebang, or executable-bit assumptions.
+- Public run paths use `uv run --script`, not raw `python`, `python3`, `pip`, or `pip install`.
+- Per-skill `pyproject.toml` or `uv.lock` belongs only in package-style skills when the user explicitly asks for package semantics.
+- Docs use `<temp-dir>` and code uses `tempfile`; avoid POSIX-only paths like `/tmp`.
 
 ## Cross-platform code rules
 
@@ -31,7 +31,7 @@
 
 ## Validation
 
-Run against the skill-screator skill.
+Use the `skill-creator` skill for skill creation, audits, packaging, or trigger/structure work.
 
 Before handoff after skill executable changes:
 
@@ -41,3 +41,8 @@ git diff --check
 ```
 
 For migrated library code, run the smallest relevant pytest/ruff/pyright gate with explicit `uv run --with ...` deps.
+
+## Stop Rules
+
+- Skip executable validation for docs-only edits unless the docs change public invocation behavior.
+- Do not add package metadata, shell wrappers, or platform assumptions unless the user explicitly requests that scope.

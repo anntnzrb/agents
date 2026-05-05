@@ -12,3 +12,7 @@ Purpose: /answer extracts questions from last assistant message, shows Q&A TUI, 
 
 ## Navigation
 Start at index.ts. For extraction flow see extraction.ts; for UI behavior see qna-component.ts.
+
+## Stop Rules
+- Keep this extension focused on extracting questions, collecting answers, and sending the resulting user turn.
+- Do not change answer content policy or general assistant behavior from this extension.

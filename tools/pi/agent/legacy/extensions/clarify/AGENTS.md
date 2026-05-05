@@ -11,8 +11,12 @@ Supports recommended/default options, optional timeout auto-select, waiting noti
 - `ui.ts` — custom TUI flow for single-question and multi-question review flow
 - `tsconfig.json` — strict TS config matching sibling minimal extensions
 
-## Notes
+## Invariants
 - No slash commands
 - Non-interactive mode fails cleanly
 - Single question: simple flow
 - Multi-question: tabbed flow + review/submit
+
+## Stop Rules
+- Ask only focused questions that unblock requirements, preferences, or approvals.
+- Keep this extension interactive-only; do not add non-interactive fallback behavior unless explicitly requested.

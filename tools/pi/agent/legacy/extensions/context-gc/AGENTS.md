@@ -17,6 +17,10 @@ Silent always-on context garbage-collector for Pi sessions:
 ## Navigation
 Start with `index.ts`, then `logic.ts` for behavior invariants.
 
-## Policy
-No modes. No enable/disable flag. No settings file. No UI cockpit.
-If this extension is loaded, it applies its fixed policy.
+## Invariants
+- If this extension is loaded, it applies its fixed policy.
+- No modes, enable/disable flag, settings file, or UI cockpit.
+
+## Stop Rules
+- Preserve silent always-on behavior unless the user explicitly requests a policy change.
+- Keep original tool results recoverable from non-context session custom entries.

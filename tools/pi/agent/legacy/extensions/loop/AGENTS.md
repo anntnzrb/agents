@@ -7,3 +7,7 @@ Purpose: `/loop` runs follow-up iterations until a breakout condition is satisfi
 
 ## Navigation
 Start at `index.ts`.
+
+## Stop Rules
+- Preserve existing breakout and user-interrupt behavior.
+- Do not add autonomous side effects outside the follow-up iteration loop.

@@ -7,3 +7,7 @@ Purpose: render minimal tool call/output in the UI.
 
 ## Navigation
 Start at index.disabled.ts (renderHiddenCall).
+
+## Stop Rules
+- Keep this extension UI-rendering scoped.
+- Do not change tool execution semantics from this extension.

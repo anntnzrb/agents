@@ -12,7 +12,11 @@ Keep native `read` execution behavior untouched while reducing UI noise:
 - `index.ts` — wraps built-in `read` tool and overrides UI rendering only
 - `tsconfig.json` — strict TS config matching sibling extensions
 
-## Notes
+## Invariants
 - Uses native Pi execute path unchanged (`...createReadToolDefinition(process.cwd())`)
 - Preserves model context: full tool output still returned in `content`
 - Only UI rendering is overridden
+
+## Stop Rules
+- Do not change read execution semantics from this extension.
+- Keep changes scoped to UI compaction unless explicitly requested.

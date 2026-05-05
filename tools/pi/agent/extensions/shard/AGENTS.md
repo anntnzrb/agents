@@ -31,15 +31,20 @@ The parent session remains the orchestrator.
 - `*.test.ts` — targeted unit tests
 - `tsconfig.json` — strict TS config
 
-## Notes
+## Invariants
 - Pi-only. No Codex/Claude/Gemini child launching.
 - Child Pi runs with `--no-session`.
 - Disable `shard` in child when `PI_SHARD_DEPTH > 0`.
 - Worker mode inherits parent runtime active tools via `pi.getActiveTools()`.
 - Explorer mode keeps parent extension flags but filters callable tools.
 - Forward built-in tool restrictions + extension flags from parent CLI.
-- Hard-code one child-delegation level.
+- Keep one child-delegation level to prevent recursive fanout.
 - JSON mode is machine truth; no tmux/PTY/job runtime here.
+
+## Stop Rules
+- Do not use shard from child processes.
+- Do not put dependent phases in one shard call; return control to the parent between phases.
+- Keep parent orchestration responsibility explicit in prompts and reports.
 
 ## Navigation
 Start `index.ts` -> `planning.ts` -> `runner.ts` -> `results.ts`.

@@ -16,3 +16,7 @@ Purpose: file-backed todo manager with a tool and /todos TUI.
 
 ## Navigation
 Start at index.ts, then tool.ts or command.ts.
+
+## Stop Rules
+- Keep scope file-backed and local to this todo manager.
+- Do not integrate external task systems or alter unrelated session state unless explicitly requested.

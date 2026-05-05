@@ -4,7 +4,7 @@
 Minimal provider-payload patcher.
 Adjust model behavior at the provider request boundary.
 OpenAI GPT-5 Responses payloads only for now.
-Mandatory patch trace logging included.
+Patch trace logging is an invariant.
 
 ## Files
 - `index.ts` — loads config, registers `before_provider_request`, runs payload patchers, appends trace logs
@@ -15,8 +15,14 @@ Mandatory patch trace logging included.
 - `package.json` — marks this legacy extension package as ESM for local typechecking
 - `tsconfig.json` — strict TS config matching sibling extensions
 
-## Notes
-- Pure patchers preferred.
+## Invariants
+- Prefer pure patchers.
 - Return fresh payloads; no in-place mutation.
-- Current behavior: set `text.verbosity` from config for GPT-5 OpenAI-style Responses payloads.
 - Every provider request appends a JSONL trace entry with rule, model, changed flag, reason, and field changes.
+
+## Current Scope
+- Set `text.verbosity` from config for GPT-5 OpenAI-style Responses payloads.
+
+## Stop Rules
+- Do not broaden provider/model coverage unless explicitly requested.
+- Keep trace logging intact while refactoring patch rules.
