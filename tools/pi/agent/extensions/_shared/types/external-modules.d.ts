@@ -9,6 +9,7 @@ declare module "@mariozechner/pi-coding-agent" {
 		lastComponent?: unknown;
 		expanded?: boolean;
 		executionStarted?: boolean;
+		argsComplete?: boolean;
 		cwd: string;
 		state: Record<string, unknown>;
 	};

@@ -212,6 +212,7 @@ describe("write compact rendering", () => {
 		const context = {
 			expanded: false,
 			executionStarted: false,
+			argsComplete: false,
 			state: {},
 			cwd: dir,
 			lastComponent: new MockText(),
@@ -226,5 +227,31 @@ describe("write compact rendering", () => {
 		expect(second.text).toContain("~");
 
 		rmSync(dir, { recursive: true, force: true });
+	});
+
+	test("classifies late streamed args after execution starts", () => {
+		let registered: any;
+		writeExtension({ registerTool: (tool: unknown) => (registered = tool) } as any);
+
+		const dir = join(tmpdir(), `write-late-marker-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+		mkdirSync(dir, { recursive: true });
+		const filePath = join(dir, "file.txt");
+		writeFileSync(filePath, "existing");
+
+		try {
+			const context = {
+				expanded: false,
+				executionStarted: true,
+				argsComplete: false,
+				state: {},
+				cwd: dir,
+				lastComponent: new MockText(),
+			};
+
+			const rendered = registered.renderCall({ path: filePath, content: "payload" }, passthroughTheme, context) as MockText;
+			expect(rendered.text).toContain("~");
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
 	});
 });

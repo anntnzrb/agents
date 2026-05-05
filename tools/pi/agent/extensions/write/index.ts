@@ -193,7 +193,8 @@ export default function writeExtension(pi: ExtensionAPI): void {
 			const state = context.state as WriteRenderState;
 			const typedArgs = (args ?? {}) as WriteArgs;
 			const rawPath = asString(typedArgs.path) ?? "...";
-			if (!context.executionStarted) {
+			const canClassifyMarker = rawPath.length > 0 && rawPath !== "..." && (!context.executionStarted || !context.argsComplete);
+			if ((state.marker === undefined || state.marker === "?") && canClassifyMarker) {
 				state.marker = getWriteMarker(rawPath, context.cwd);
 			} else if (state.marker === undefined) {
 				state.marker = "?";
