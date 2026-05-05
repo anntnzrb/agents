@@ -11,6 +11,7 @@ from typing import Any, TextIO
 
 from .rsc import (
     BASE_URL,
+    CODING_CAPABILITY_URL,
     ExtractionError,
     build_full_url,
     build_snapshot_payload,
@@ -34,6 +35,7 @@ PROTOCOL_VERSION = "1"
 DEFAULT_OUTPUT_JSON = Path("artifacts/artificial-analysis/full-data.json")
 DEFAULT_OUTPUT_ENDPOINTS = Path("artifacts/artificial-analysis/endpoints.txt")
 DEFAULT_OUTPUT_URL = Path("artifacts/artificial-analysis/full-url.txt")
+DEFAULT_CODING_OUTPUT_JSON = Path("artifacts/artificial-analysis/coding-data.json")
 
 
 class CliUsageError(RuntimeError):
@@ -92,6 +94,30 @@ def build_parser() -> argparse.ArgumentParser:
     harness_parser.add_argument("--limit", type=int, default=50)
     harness_parser.set_defaults(handler=_handle_harness)
 
+    coding_parser = subparsers.add_parser(
+        "coding",
+        help="Fetch/query Coding Index capability rows, including coding-only output token composition.",
+    )
+    coding_parser.add_argument("--output-json", type=Path, default=DEFAULT_CODING_OUTPUT_JSON)
+    coding_parser.add_argument("--timeout-seconds", type=float, default=60.0)
+    coding_parser.add_argument("--model", type=str, default=None, help="Model slug/name contains filter.")
+    coding_parser.add_argument("--creator", type=str, default=None, help="Creator/lab name contains filter.")
+    coding_parser.add_argument("--open-weights-only", action="store_true", help="Return only open-weights models.")
+    coding_parser.add_argument(
+        "--sort-by",
+        type=str,
+        default="coding",
+        choices=("coding", "output_tokens", "answer_tokens", "reasoning_tokens", "input_tokens", "cost"),
+    )
+    coding_parser.add_argument("--order", type=str, default="auto", choices=("auto", "asc", "desc"))
+    coding_parser.add_argument("--limit", type=int, default=50)
+    coding_parser.add_argument(
+        "--include-benchmark-counts",
+        action="store_true",
+        help="Include per-benchmark token counts for Coding Index components.",
+    )
+    coding_parser.set_defaults(handler=_handle_coding)
+
     query_parser = subparsers.add_parser("query", help="Query model/provider benchmark rows from a snapshot.")
     query_parser.add_argument("snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON)
     query_parser.add_argument("--model", type=str, default=None, help="Model slug/name contains filter.")
@@ -143,7 +169,7 @@ def _normalize_argv(argv: Sequence[str] | None) -> list[str]:
     if not values:
         return ["fetch"]
 
-    known_subcommands = {"fetch", "stats", "diff", "harness", "query", "qa", "schema"}
+    known_subcommands = {"fetch", "stats", "diff", "harness", "coding", "query", "qa", "schema"}
     if any(token in known_subcommands for token in values):
         return values
     if any(token in {"-h", "--help"} for token in values):
@@ -343,6 +369,192 @@ def _diff_payload(args: argparse.Namespace) -> dict[str, Any]:
         "removed_endpoint_slugs": removed,
         "provider_deltas": provider_deltas,
     }
+
+
+def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
+    result = fetch_rsc(url=CODING_CAPABILITY_URL, timeout_seconds=args.timeout_seconds)
+    frames = parse_json_frames(result.body)
+    models = _extract_default_data_models(frames)
+
+    model_filter = args.model.lower() if isinstance(args.model, str) and args.model else None
+    creator_filter = args.creator.lower() if isinstance(args.creator, str) and args.creator else None
+
+    rows: list[dict[str, Any]] = []
+    skipped_missing_token_counts = 0
+    for model in models:
+        if not isinstance(model, dict) or model.get("deleted"):
+            continue
+
+        model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
+        model_name = model.get("name") if isinstance(model.get("name"), str) else None
+        short_name = model.get("short_name") if isinstance(model.get("short_name"), str) else model_name
+        creator = model.get("model_creators") if isinstance(model.get("model_creators"), dict) else {}
+        creator_name = creator.get("name") if isinstance(creator.get("name"), str) else None
+
+        if model_filter and not _matches_any(model_filter, [model_slug, model_name, short_name]):
+            continue
+        if creator_filter and not _matches_any(creator_filter, [creator_name, creator.get("slug")]):
+            continue
+        if args.open_weights_only and model.get("is_open_weights") is not True:
+            continue
+
+        token_counts = model.get("tokenCounts") if isinstance(model.get("tokenCounts"), dict) else None
+        if token_counts is None:
+            skipped_missing_token_counts += 1
+            continue
+
+        answer_tokens = _number_or_none(token_counts.get("answerTokens"))
+        reasoning_tokens = _number_or_none(token_counts.get("reasoningTokens"))
+        output_tokens = _number_or_none(token_counts.get("outputTokens"))
+        input_tokens = _number_or_none(token_counts.get("inputTokens"))
+        eval_cost = model.get("evalCost") if isinstance(model.get("evalCost"), dict) else {}
+
+        row: dict[str, Any] = {
+            "model_slug": model_slug,
+            "model_name": model_name,
+            "short_name": short_name,
+            "creator": creator_name,
+            "coding": model.get("coding_index"),
+            "terminalbench_hard": model.get("terminalbench_hard"),
+            "scicode": model.get("scicode"),
+            "reasoning_model": model.get("reasoning_model"),
+            "deprecated": model.get("deprecated"),
+            "is_open_weights": model.get("is_open_weights"),
+            "release_date": model.get("release_date"),
+            "context_window_tokens": model.get("context_window_tokens"),
+            "coding_token_counts": {
+                "scope": "coding_index_only",
+                "definition": "Tokens used to run the Coding Index evaluation. output_tokens = answer_tokens + reasoning_tokens.",
+                "input_tokens": input_tokens,
+                "answer_tokens": answer_tokens,
+                "reasoning_tokens": reasoning_tokens,
+                "output_tokens": output_tokens,
+                "answer_share_of_output": _share(answer_tokens, output_tokens),
+                "reasoning_share_of_output": _share(reasoning_tokens, output_tokens),
+            },
+            "coding_eval_cost": {
+                "total_cost": _number_or_none(eval_cost.get("totalCost")),
+                "input_cost": _number_or_none(eval_cost.get("inputCost")),
+                "answer_cost": _number_or_none(eval_cost.get("answerCost")),
+                "reasoning_cost": _number_or_none(eval_cost.get("reasoningCost")),
+            },
+        }
+        if args.include_benchmark_counts:
+            row["coding_component_token_counts"] = _coding_component_token_counts(model)
+        rows.append(row)
+
+    sort_key_map = {
+        "coding": "coding",
+        "input_tokens": "coding_token_counts.input_tokens",
+        "answer_tokens": "coding_token_counts.answer_tokens",
+        "reasoning_tokens": "coding_token_counts.reasoning_tokens",
+        "output_tokens": "coding_token_counts.output_tokens",
+        "cost": "coding_eval_cost.total_cost",
+    }
+    reverse = _resolve_reverse(sort_key=args.sort_by, order=args.order)
+    rows.sort(key=lambda row: _nested_sort_metric(row, sort_key_map[args.sort_by], reverse=reverse))
+    limited = rows[: max(args.limit, 0)]
+
+    args.output_json.parent.mkdir(parents=True, exist_ok=True)
+    args.output_json.write_text(json.dumps({"meta": {"source_url": CODING_CAPABILITY_URL, "fetched_at": result.fetched_at}, "rows": rows}, ensure_ascii=False))
+
+    return {
+        "source": {
+            "url": CODING_CAPABILITY_URL,
+            "status_code": result.status_code,
+            "fetched_at": result.fetched_at,
+        },
+        "output_json": str(args.output_json),
+        "definition": {
+            "scope": "coding_index_only",
+            "warning": "These token counts are tied to the Coding Index capability page, not the global Intelligence Index token counts.",
+            "components": ["terminalbench_hard", "scicode"],
+            "output_tokens": "answer_tokens + reasoning_tokens",
+        },
+        "applied_filters": {
+            "model": args.model,
+            "creator": args.creator,
+            "open_weights_only": args.open_weights_only,
+            "sort_by": args.sort_by,
+            "order": args.order,
+            "limit": args.limit,
+            "include_benchmark_counts": args.include_benchmark_counts,
+        },
+        "counts": {
+            "matched_models": len(rows),
+            "returned_models": len(limited),
+            "skipped_missing_token_counts": skipped_missing_token_counts,
+            "frames": len(frames),
+        },
+        "rows": limited,
+    }
+
+
+def _extract_default_data_models(frames: list[tuple[str, Any]]) -> list[Any]:
+    candidates: list[list[Any]] = []
+
+    def scan(node: Any) -> None:
+        if isinstance(node, dict):
+            default_data = node.get("defaultData")
+            if _looks_like_coding_capability_rows(default_data):
+                candidates.append(default_data)
+            for value in node.values():
+                scan(value)
+        elif isinstance(node, list):
+            for item in node:
+                scan(item)
+
+    for _, frame in frames:
+        scan(frame)
+
+    if not candidates:
+        raise ExtractionError("Coding capability payload missing defaultData rows with tokenCounts.")
+    return max(candidates, key=len)
+
+
+def _looks_like_coding_capability_rows(value: Any) -> bool:
+    if not isinstance(value, list):
+        return False
+    sample = [item for item in value[:25] if isinstance(item, dict)]
+    if len(sample) < 2:
+        return False
+    hits = 0
+    for item in sample:
+        if isinstance(item.get("slug"), str) and "coding_index" in item and isinstance(item.get("tokenCounts"), dict):
+            hits += 1
+    return hits >= max(2, len(sample) // 2)
+
+
+def _number_or_none(value: Any) -> int | float | None:
+    return value if isinstance(value, int | float) else None
+
+
+def _share(part: int | float | None, total: int | float | None) -> float | None:
+    if not isinstance(part, int | float) or not isinstance(total, int | float) or total == 0:
+        return None
+    return round(float(part) / float(total), 6)
+
+
+def _coding_component_token_counts(model: dict[str, Any]) -> dict[str, Any]:
+    eval_counts = model.get("eval_token_counts") if isinstance(model.get("eval_token_counts"), dict) else {}
+    return {
+        key: eval_counts.get(key)
+        for key in ("terminalbench_hard", "scicode")
+        if isinstance(eval_counts.get(key), dict)
+    }
+
+
+def _nested_sort_metric(row: dict[str, Any], path: str, *, reverse: bool) -> tuple[int, float]:
+    current: Any = row
+    for part in path.split("."):
+        if not isinstance(current, dict):
+            current = None
+            break
+        current = current.get(part)
+    if isinstance(current, int | float):
+        normalized = -float(current) if reverse else float(current)
+        return (0, normalized)
+    return (1, 0.0)
 
 
 def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
@@ -757,6 +969,11 @@ def _handle_harness(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_coding(args: argparse.Namespace) -> int:
+    _emit_json(_envelope("coding", _coding_payload(args)), stdout=sys.stdout)
+    return 0
+
+
 def _handle_query(args: argparse.Namespace) -> int:
     _emit_json(_envelope("query", _query_payload(args)), stdout=sys.stdout)
     return 0
@@ -817,6 +1034,20 @@ def _capability_schema() -> dict[str, Any]:
                     "open_weights_only": "bool only include open-weights models",
                     "limit": "int max rows (default 50)",
                 },
+            },
+            "coding": {
+                "description": "Fetch/query Coding Index capability rows with coding-only output token composition.",
+                "source_url": CODING_CAPABILITY_URL,
+                "flags": {
+                    "model": "str contains filter on model slug/name",
+                    "creator": "str contains filter on creator/lab name",
+                    "open_weights_only": "bool only include open-weights models",
+                    "sort_by": "coding|output_tokens|answer_tokens|reasoning_tokens|input_tokens|cost",
+                    "order": "auto|asc|desc",
+                    "limit": "int max rows (default 50)",
+                    "include_benchmark_counts": "bool include Terminal-Bench Hard and SciCode token counts",
+                },
+                "token_scope": "coding_index_only; not global Intelligence Index token counts",
             },
             "query": {
                 "description": "Filter/sort endpoint benchmark rows by model/provider/endpoint.",
@@ -924,6 +1155,20 @@ def _harness_namespace(args: dict[str, Any]) -> argparse.Namespace:
     )
 
 
+def _coding_namespace(args: dict[str, Any]) -> argparse.Namespace:
+    return argparse.Namespace(
+        output_json=Path(_arg_value(args, "output_json", str(DEFAULT_CODING_OUTPUT_JSON))),
+        timeout_seconds=float(_arg_value(args, "timeout_seconds", 60.0)),
+        model=_arg_value(args, "model", None),
+        creator=_arg_value(args, "creator", None),
+        open_weights_only=bool(_arg_value(args, "open_weights_only", False)),
+        sort_by=str(_arg_value(args, "sort_by", "coding")),
+        order=str(_arg_value(args, "order", "auto")),
+        limit=int(_arg_value(args, "limit", 50)),
+        include_benchmark_counts=bool(_arg_value(args, "include_benchmark_counts", False)),
+    )
+
+
 def _diff_namespace(args: dict[str, Any]) -> argparse.Namespace:
     old_snapshot = _arg_value(args, "old_snapshot", None)
     new_snapshot = _arg_value(args, "new_snapshot", None)
@@ -1015,6 +1260,8 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                 response = _success_response(request_id, command, _diff_payload(_diff_namespace(args_payload)))
             elif command == "harness":
                 response = _success_response(request_id, command, _harness_payload(_harness_namespace(args_payload)))
+            elif command == "coding":
+                response = _success_response(request_id, command, _coding_payload(_coding_namespace(args_payload)))
             elif command == "query":
                 response = _success_response(request_id, command, _query_payload(_query_namespace(args_payload)))
             elif command == "qa":

@@ -46,6 +46,16 @@ Minimal NL command that maps question -> query args.
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" qa "best provider for claude opus 4.7 by speed top 3"
 ```
 
+### coding
+Fetch/query the Coding Index capability page and return **coding-index-only** token composition.
+
+```bash
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" coding --sort-by coding --limit 10
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" coding --model gpt-5-5 --include-benchmark-counts
+```
+
+Use this for Coding Index output token composition. These counts are scoped to the Coding Index evaluation only, not global Intelligence Index token counts. Output tokens are `answer_tokens + reasoning_tokens`; components are Terminal-Bench Hard + SciCode.
+
 ### stats
 Snapshot counts + top providers.
 
@@ -78,7 +88,8 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" --mode rpc
 ## Output policy
 
 - Tool output is JSON only.
-- Prefer `query` for deterministic ranking answers.
+- Prefer `coding` for Coding Index token composition/cost breakdown questions.
+- Prefer `query` for provider endpoint ranking answers.
 - Prefer `qa` only when user asks in plain language and speed matters.
 - If data freshness is critical, run `fetch` immediately before `query`/`qa`.
 

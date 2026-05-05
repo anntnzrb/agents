@@ -95,6 +95,27 @@ uv run --script <skill-dir>/scripts/cli.py query --sort-by harness --order desc 
 
 Use `Harness` for model picking. Use `Execution Gap` as a risk flag: large positive gaps mean the model may pursue tasks well but have weaker executable/code precision.
 
+## Coding Index token composition
+
+Fetches `https://artificialanalysis.ai/models/capabilities/coding` directly. No long `models=` URL required.
+
+```bash
+uv run --script <skill-dir>/scripts/cli.py coding --limit 25
+uv run --script <skill-dir>/scripts/cli.py coding --model gpt-5-5 --include-benchmark-counts
+uv run --script <skill-dir>/scripts/cli.py coding --sort-by output_tokens --order desc --limit 10
+```
+
+Returns unique model rows with `coding_token_counts`:
+
+- scope: `coding_index_only`
+- `input_tokens`
+- `answer_tokens`
+- `reasoning_tokens`
+- `output_tokens = answer_tokens + reasoning_tokens`
+- answer/reasoning output shares
+
+Important: these counts are tied to the Coding Index capability evaluation, not global `intelligence_index_token_counts`. The current Coding Index components are Terminal-Bench Hard and SciCode; pass `--include-benchmark-counts` to include each component's token counts.
+
 ## Query (model/provider benchmark questions)
 
 ```bash
@@ -149,6 +170,7 @@ uv run --script <skill-dir>/scripts/cli.py --mode rpc
 - `stats`
 - `diff`
 - `harness`
+- `coding`
 - `query`
 - `qa`
 

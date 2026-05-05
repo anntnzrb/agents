@@ -10,6 +10,7 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 BASE_URL = "https://artificialanalysis.ai/leaderboards/providers"
+CODING_CAPABILITY_URL = "https://artificialanalysis.ai/models/capabilities/coding"
 CACHE_META_FILE = "providers-cache.json"
 CACHE_BODY_FILE = "providers.rsc"
 CACHE_LAST_GOOD_FILE = "last-good.json"
