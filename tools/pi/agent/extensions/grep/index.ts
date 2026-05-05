@@ -40,6 +40,7 @@ const PARAM_DESCRIPTIONS = {
 	context: "Context lines around matches (default: 0)",
 	outputMode: `Output mode: ${OUTPUT_MODE_VALUES_LABEL} (default: content)`,
 	ignored: "Include ignored files (default: false)",
+	pcre2: "Enable ripgrep PCRE2 regex engine for look-around/backreferences (default: false)",
 	offset: "Skip first N matches/results after ordering (default: 0)",
 	limit: `Max matches/results returned (default: ${DEFAULT_LIMIT})`,
 	timeoutMs: `Timeout ms (default: ${DEFAULT_TIMEOUT_MS})`,
@@ -55,6 +56,7 @@ const grepSchema = Type.Object({
 	context: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.context, default: 0 })),
 	outputMode: Type.Optional(Type.String({ description: PARAM_DESCRIPTIONS.outputMode, default: "content" })),
 	ignored: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.ignored, default: false })),
+	pcre2: Type.Optional(Type.Boolean({ description: PARAM_DESCRIPTIONS.pcre2, default: false })),
 	offset: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.offset, default: 0 })),
 	limit: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.limit, default: DEFAULT_LIMIT })),
 	timeoutMs: Type.Optional(Type.Number({ description: PARAM_DESCRIPTIONS.timeoutMs, default: DEFAULT_TIMEOUT_MS })),
@@ -70,6 +72,7 @@ type GrepInput = {
 	context?: number;
 	outputMode?: string;
 	ignored?: boolean;
+	pcre2?: boolean;
 	offset?: number;
 	limit?: number;
 	timeoutMs?: number;
@@ -211,6 +214,7 @@ export default function grepExtension(pi: ExtensionAPI) {
 						typeFilter,
 						ignoreCase: input.ignoreCase === true,
 						literal: input.literal === true,
+						pcre2: input.pcre2 === true,
 						useGitignore,
 						maxResults: outputProbeLimit - collectedFiles.length,
 						timeoutMs: remainingTimeoutMs,
@@ -272,6 +276,7 @@ export default function grepExtension(pi: ExtensionAPI) {
 						typeFilter,
 						ignoreCase: input.ignoreCase === true,
 						literal: input.literal === true,
+						pcre2: input.pcre2 === true,
 						useGitignore,
 						maxResults: outputProbeLimit - collectedCounts.length,
 						timeoutMs: remainingTimeoutMs,
@@ -338,6 +343,7 @@ export default function grepExtension(pi: ExtensionAPI) {
 					typeFilter,
 					ignoreCase: input.ignoreCase === true,
 					literal: input.literal === true,
+					pcre2: input.pcre2 === true,
 					useGitignore,
 					maxMatches: remaining,
 					timeoutMs: remainingTimeoutMs,

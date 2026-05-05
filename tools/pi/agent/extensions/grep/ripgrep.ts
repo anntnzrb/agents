@@ -29,6 +29,7 @@ type RipgrepBaseParams = {
 	typeFilter: TypeFilter | null;
 	ignoreCase: boolean;
 	literal: boolean;
+	pcre2: boolean;
 	useGitignore: boolean;
 	timeoutMs: number;
 	signal?: AbortSignal;
@@ -72,12 +73,14 @@ const buildRipgrepCommonArgs = (params: {
 	typeFilter: TypeFilter | null;
 	ignoreCase: boolean;
 	literal: boolean;
+	pcre2: boolean;
 	useGitignore: boolean;
 }): string[] => {
-	const { glob, typeFilter, ignoreCase, literal, useGitignore } = params;
+	const { glob, typeFilter, ignoreCase, literal, pcre2, useGitignore } = params;
 	const args: string[] = [];
 	if (ignoreCase) args.push("--ignore-case");
 	if (literal) args.push("--fixed-strings");
+	else if (pcre2) args.push("--pcre2");
 	if (!useGitignore) args.push("--no-ignore");
 	if (glob) {
 		args.push("--glob", normalizeRipgrepGlob(glob));
@@ -110,9 +113,9 @@ const resolveRipgrepPath = (cwd: string, rootAbsolute: string, filePath: string)
 };
 
 const runRipgrepLineMode = async <T>(params: RipgrepLineParams<T>): Promise<T[]> => {
-	const { command, rootAbsolute, cwd, pattern, glob, typeFilter, ignoreCase, literal, useGitignore, maxResults, timeoutMs, signal, modeArgs, parseLine } = params;
+	const { command, rootAbsolute, cwd, pattern, glob, typeFilter, ignoreCase, literal, pcre2, useGitignore, maxResults, timeoutMs, signal, modeArgs, parseLine } = params;
 	const args = [...modeArgs, "--color=never", "--hidden", "--no-require-git"];
-	appendCommonRipgrepArgs({ args, glob, typeFilter, ignoreCase, literal, useGitignore });
+	appendCommonRipgrepArgs({ args, glob, typeFilter, ignoreCase, literal, pcre2, useGitignore });
 	args.push(pattern, rootAbsolute);
 
 	return await runLineStreamingProcess<T>({
@@ -152,9 +155,9 @@ export const runRipgrepCounts = async (params: RipgrepResultParams): Promise<Cou
 	});
 
 export const runRipgrep = async (params: RipgrepMatchParams): Promise<RawMatch[]> => {
-	const { command, rootAbsolute, cwd, pattern, glob, typeFilter, ignoreCase, literal, useGitignore, maxMatches, timeoutMs, signal } = params;
+	const { command, rootAbsolute, cwd, pattern, glob, typeFilter, ignoreCase, literal, pcre2, useGitignore, maxMatches, timeoutMs, signal } = params;
 	const args = ["--json", "--line-number", "--color=never", "--hidden", "--no-require-git"];
-	appendCommonRipgrepArgs({ args, glob, typeFilter, ignoreCase, literal, useGitignore });
+	appendCommonRipgrepArgs({ args, glob, typeFilter, ignoreCase, literal, pcre2, useGitignore });
 	args.push(pattern, rootAbsolute);
 
 	return await runLineStreamingProcess<RawMatch>({

@@ -65,9 +65,17 @@ test("normalizeRipgrepGlob preserves basename globs and scopes slash globs to an
 });
 
 test("buildRipgrepCommonArgs excludes git internals unless explicit glob owns filtering", () => {
-	assert.ok(ripgrepTest.buildRipgrepCommonArgs({ glob: undefined, typeFilter: null, ignoreCase: false, literal: false, useGitignore: true }).includes("!**/.git/**"));
+	assert.ok(ripgrepTest.buildRipgrepCommonArgs({ glob: undefined, typeFilter: null, ignoreCase: false, literal: false, pcre2: false, useGitignore: true }).includes("!**/.git/**"));
 	assert.equal(
-		ripgrepTest.buildRipgrepCommonArgs({ glob: "*.ts", typeFilter: null, ignoreCase: false, literal: false, useGitignore: true }).includes("!**/.git/**"),
+		ripgrepTest.buildRipgrepCommonArgs({ glob: "*.ts", typeFilter: null, ignoreCase: false, literal: false, pcre2: false, useGitignore: true }).includes("!**/.git/**"),
+		false,
+	);
+});
+
+test("buildRipgrepCommonArgs enables PCRE2 unless literal mode owns matching", () => {
+	assert.ok(ripgrepTest.buildRipgrepCommonArgs({ glob: undefined, typeFilter: null, ignoreCase: false, literal: false, pcre2: true, useGitignore: true }).includes("--pcre2"));
+	assert.equal(
+		ripgrepTest.buildRipgrepCommonArgs({ glob: undefined, typeFilter: null, ignoreCase: false, literal: true, pcre2: true, useGitignore: true }).includes("--pcre2"),
 		false,
 	);
 });
