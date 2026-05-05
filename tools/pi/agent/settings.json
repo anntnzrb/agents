@@ -14,7 +14,7 @@
     "opencode-go/kimi-k2.6:high",
     "opencode-go/minimax-m2.7:high",
     "opencode-go/mimo-v2.5-pro:high",
-    "openai-codex/gpt-5.5:medium"
+    "openai-codex/gpt-5.5:low"
   ],
   "quietStartup": true,
   "showHardwareCursor": true,
