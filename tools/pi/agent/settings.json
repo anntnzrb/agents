@@ -16,6 +16,12 @@
     "opencode-go/mimo-v2.5-pro:high",
     "openai-codex/gpt-5.5:low"
   ],
+  "providerPatcher": {
+    "_comment": "serviceTier.openai options: off, priority",
+    "serviceTier": {
+      "openai": "off"
+    }
+  },
   "quietStartup": true,
   "showHardwareCursor": true,
   "steeringMode": "all",
