@@ -3,7 +3,7 @@
   "doubleEscapeAction": "none",
   "compaction": {
     "enabled": true,
-    "reserveTokens": 32000,
+    "reserveTokens": 28672,
     "keepRecentTokens": 40000
   },
   "editorPaddingX": 1,
