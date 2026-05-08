@@ -14,6 +14,7 @@ mock.module("@mariozechner/pi-tui", () => ({
 	visibleWidth: (value: string) => value.length,
 }));
 
+const { clearFooterContributionsForTests, registerFooterContribution } = await import("../_shared/footer-contributions.js");
 const { __test, default: footerExtension } = await import("./index.js");
 
 describe("footer helpers", () => {
@@ -36,10 +37,16 @@ describe("footer helpers", () => {
 		const expected = Math.round((100 * block.length) / summary.length);
 		expect(__test.calculatePollutionPercent(summary)).toBe(expected);
 	});
+
+	test("does not expose pi-goal-specific helpers", () => {
+		expect("getLatestGoal" in __test).toBe(false);
+		expect("buildGoalBadge" in __test).toBe(false);
+	});
 });
 
 describe("footer stale fallback", () => {
-	const createHarness = async (initiallyStale = false) => {
+	const createHarness = async (initiallyStale = false, entries: unknown[] = []) => {
+		clearFooterContributionsForTests();
 		let sessionStartHandler: ((event: unknown, ctx: any) => void | Promise<void>) | undefined;
 		const pi = {
 			on: (event: string, handler: (event: unknown, ctx: any) => void | Promise<void>) => {
@@ -55,7 +62,7 @@ describe("footer stale fallback", () => {
 			hasUI: true,
 			cwd: "/tmp",
 			sessionManager: {
-				getEntries: () => [],
+				getEntries: () => entries,
 				getLeafId: () => null,
 			},
 			ui: {
@@ -87,6 +94,19 @@ describe("footer stale fallback", () => {
 			},
 		};
 	};
+
+	test("renders generic registered footer contributions", async () => {
+		const entries = [{ type: "custom", customType: "x" }];
+		const { footer } = await createHarness(false, entries);
+		registerFooterContribution({
+			id: "test-badge",
+			render: ({ entries: contributionEntries }, theme) =>
+				contributionEntries === entries ? theme.fg("success", "badge") : undefined,
+		});
+		expect(footer.render(80)[0]).toContain("badge");
+		footer.dispose();
+		clearFooterContributionsForTests();
+	});
 
 	test("reuses last good line on stale-extension error", async () => {
 		const { footer, setStale } = await createHarness(false);

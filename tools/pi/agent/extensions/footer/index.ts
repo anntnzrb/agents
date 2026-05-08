@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { VERSION } from "@mariozechner/pi-coding-agent";
 import type { ExtensionAPI, Theme, ThemeColor } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import { getFooterContributions } from "../_shared/footer-contributions.js";
 
 type ModelLike = {
 	id: string;
@@ -241,8 +242,9 @@ const buildHealthBadges = (
 	model: ModelLike | undefined,
 	metrics: SessionHealthMetrics,
 	reserveTokens: number | undefined,
+	footerBadges: readonly string[],
 ): string[] => {
-	const badges: string[] = [];
+	const badges: string[] = [...footerBadges];
 	const headroom = getCompactionHeadroom(usage, model, reserveTokens);
 	if (headroom !== null && shouldShowHeadroomBadge(headroom, reserveTokens)) {
 		badges.push(theme.fg(getHeadroomColor(headroom), `🪫${formatSignedNumber(headroom)}`));
@@ -338,12 +340,13 @@ const buildRight = (
 	thinkingLevel: string,
 	metrics: SessionHealthMetrics,
 	reserveTokens: number | undefined,
+	footerBadges: readonly string[],
 ): string => {
 	const base =
 		getContextLabel(theme, usage, model) +
 		separator(theme) +
 		theme.fg("toolTitle", getThinkingLabel(model, thinkingLevel));
-	const badges = buildHealthBadges(theme, usage, model, metrics, reserveTokens);
+	const badges = buildHealthBadges(theme, usage, model, metrics, reserveTokens, footerBadges);
 	if (badges.length === 0) return base;
 	return `${base}${separator(theme)}${badges.join(separator(theme))}`;
 };
@@ -368,16 +371,16 @@ export default function footerExtension(pi: ExtensionAPI) {
 		const homeDir = getHomeDir();
 		const sessionCwd = ctx.cwd;
 		const reserveTokens = await readReserveTokensAsync(sessionCwd);
-		let metricsCache: { key: string; value: SessionHealthMetrics } | undefined;
+		let sessionCache: { key: string; entries: readonly unknown[]; metrics: SessionHealthMetrics } | undefined;
 
-		const getSessionHealthMetrics = (): SessionHealthMetrics => {
+		const getSessionSnapshot = (): { entries: readonly unknown[]; metrics: SessionHealthMetrics } => {
 			const entries = ctx.sessionManager.getEntries();
 			const leafId = ctx.sessionManager.getLeafId() ?? "root";
 			const cacheKey = `${entries.length}:${leafId}`;
-			if (metricsCache?.key === cacheKey) return metricsCache.value;
-			const value = computeSessionHealthMetrics(entries);
-			metricsCache = { key: cacheKey, value };
-			return value;
+			if (sessionCache?.key === cacheKey) return sessionCache;
+			const metrics = computeSessionHealthMetrics(entries);
+			sessionCache = { key: cacheKey, entries, metrics };
+			return { entries, metrics };
 		};
 
 		ctx.ui.setFooter((tui, theme, footerData) => {
@@ -401,7 +404,8 @@ export default function footerExtension(pi: ExtensionAPI) {
 					try {
 						const usage = getContextUsage(ctx.getContextUsage());
 						const model = getModel(ctx.model);
-						const metrics = getSessionHealthMetrics();
+						const { entries, metrics } = getSessionSnapshot();
+						const footerBadges = getFooterContributions().flatMap((contribution) => contribution.render({ entries }, theme) ?? []);
 						const left = buildLeft(
 							theme,
 							shortenCwd(sessionCwd, homeDir),
@@ -415,6 +419,7 @@ export default function footerExtension(pi: ExtensionAPI) {
 							pi.getThinkingLevel(),
 							metrics,
 							reserveTokens,
+							footerBadges,
 						);
 						const line = renderFooterLine(left, right, width);
 						lastGoodLine = line;
