@@ -1,6 +1,6 @@
 import type { BashAction, ExecutableMatch, GuardrailsConfig, Rule } from "./types.js";
 
-import { executableBasename, splitShellSegments, stripHeredocBodies, tokenizeCommand, unique } from "./shell.js";
+import { executableBasename, splitShellSegmentsDetailed, stripHeredocBodies, tokenizeCommand, unique } from "./shell.js";
 import { firstExecutableIndex, unwrapCommand } from "./wrappers.js";
 
 const MAX_NESTING_DEPTH = 8;
@@ -84,6 +84,8 @@ type ParsedCommand = {
   command: string;
   executable: string;
   tokens: string[];
+  stdinFromPipe: boolean;
+  stdoutToPipe: boolean;
 };
 
 interface Inspection {
@@ -144,23 +146,23 @@ function inspectCommand(command: string, depth = 0): Inspection {
     parts.push({ commands: [trimmed], executables: [], parsedCommands: [] });
   }
 
-  for (const segment of splitShellSegments(inspectedCommand)) {
-    parts.push(inspectSegment(segment, depth));
+  for (const segment of splitShellSegmentsDetailed(inspectedCommand)) {
+    parts.push(inspectSegment(segment.text, depth, segment.stdinFromPipe, segment.stdoutToPipe));
   }
 
   return mergeInspection(...parts);
 }
 
-function inspectSegment(segment: string, depth: number): Inspection {
+function inspectSegment(segment: string, depth: number, stdinFromPipe = false, stdoutToPipe = false): Inspection {
   const tokens = tokenizeCommand(segment);
   if (tokens.length === 0) {
     return emptyInspection();
   }
 
-  return inspectTokens(tokens, segment, depth);
+  return inspectTokens(tokens, segment, depth, stdinFromPipe, stdoutToPipe);
 }
 
-function inspectTokens(tokens: string[], command: string, depth: number): Inspection {
+function inspectTokens(tokens: string[], command: string, depth: number, stdinFromPipe = false, stdoutToPipe = false): Inspection {
   if (depth > MAX_NESTING_DEPTH || tokens.length === 0) {
     return emptyInspection();
   }
@@ -184,6 +186,8 @@ function inspectTokens(tokens: string[], command: string, depth: number): Inspec
         command,
         executable,
         tokens: tokens.slice(index),
+        stdinFromPipe,
+        stdoutToPipe,
       },
     ],
   };
@@ -370,10 +374,34 @@ function commandHasToken(parsed: ParsedCommand, token: string): boolean {
   return parsed.tokens.slice(1).some((value) => value.toLowerCase() === token);
 }
 
+function isStdinFilterGrep(parsed: ParsedCommand): boolean {
+  const executable = normalizeExecutable(parsed.executable);
+  if (executable !== "grep" && executable !== "ggrep" && executable !== "findstr" && executable !== "select-string") {
+    return false;
+  }
+  if (!parsed.stdinFromPipe) return false;
+
+  const args = parsed.tokens.slice(1);
+  if (args.some((token) => token === "-r" || token === "-R" || token === "--recursive" || token === "--dereference-recursive")) {
+    return false;
+  }
+
+  const positionals = extractPositionals(parsed);
+  if (executable === "findstr" || executable === "select-string") {
+    return positionals.length <= 1;
+  }
+
+  // Plain grep consumes stdin when it only has a pattern operand. File operands after
+  // the pattern are repository/file search and should still nudge toward native grep.
+  return positionals.length <= 1;
+}
+
 function shouldWarnContentSearch(parsed: ParsedCommand): boolean {
   const executable = normalizeExecutable(parsed.executable);
   const args = parsed.tokens.slice(1);
   if (args.some(isInfoFlag)) return false;
+
+  if (isStdinFilterGrep(parsed)) return false;
 
   if ((executable === "rg" || executable === "ripgrep") && commandHasToken(parsed, "--files")) return false;
 
@@ -429,6 +457,8 @@ function parsedFromCommand(command: string): ParsedCommand {
     command,
     executable: tokens[0] ?? "",
     tokens,
+    stdinFromPipe: false,
+    stdoutToPipe: false,
   };
 }
 

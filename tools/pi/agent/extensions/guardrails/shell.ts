@@ -64,21 +64,29 @@ export function stripHeredocBodies(command: string): string {
   return kept.join("\n");
 }
 
-export function splitShellSegments(command: string): string[] {
+export type ShellSegment = {
+  text: string;
+  stdinFromPipe: boolean;
+  stdoutToPipe: boolean;
+};
+
+export function splitShellSegmentsDetailed(command: string): ShellSegment[] {
   const normalizedCommand = stripHeredocBodies(command);
-  const segments: string[] = [];
+  const segments: ShellSegment[] = [];
   let current = "";
   let inSingle = false;
   let inDouble = false;
   let inTemplate = false;
   let escaped = false;
+  let nextStdinFromPipe = false;
 
-  const push = () => {
+  const push = (separator?: "pipe" | "other") => {
     const trimmed = current.trim();
     if (trimmed.length > 0) {
-      segments.push(trimmed);
+      segments.push({ text: trimmed, stdinFromPipe: nextStdinFromPipe, stdoutToPipe: separator === "pipe" });
     }
     current = "";
+    nextStdinFromPipe = separator === "pipe";
   };
 
   for (let i = 0; i < normalizedCommand.length; i += 1) {
@@ -121,18 +129,18 @@ export function splitShellSegments(command: string): string[] {
 
     if (!inSingle && !inDouble && !inTemplate) {
       if (ch === "\n" || ch === ";") {
-        push();
+        push("other");
         continue;
       }
 
       if ((ch === "&" && next === "&") || (ch === "|" && next === "|")) {
-        push();
+        push("other");
         i += 1;
         continue;
       }
 
       if (ch === "|") {
-        push();
+        push("pipe");
         continue;
       }
     }
@@ -140,8 +148,12 @@ export function splitShellSegments(command: string): string[] {
     current += ch;
   }
 
-  push();
+  push("other");
   return segments;
+}
+
+export function splitShellSegments(command: string): string[] {
+  return splitShellSegmentsDetailed(command).map((segment) => segment.text);
 }
 
 export function tokenizeCommand(segment: string): string[] {

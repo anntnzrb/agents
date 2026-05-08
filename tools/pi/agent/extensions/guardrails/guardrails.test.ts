@@ -361,6 +361,22 @@ test("warns for shell content-search commands", () => {
   assert.equal(actionForCommand("rg TODO", searchConfig)?.type, "warn");
 });
 
+test("does not warn when grep filters piped command output", () => {
+  assert.equal(reasonForCommand("ps -axo pid,command | grep -E 'pi-coding-agent|bun' | grep -v grep", searchConfig), null);
+  assert.equal(reasonForCommand("curl -sS https://example.com | grep -o 'content:\"[^\"]*' | head -1", searchConfig), null);
+  assert.equal(reasonForCommand("jq -r '.models[] | .name' data.json | grep -Ei 'glm|kimi|qwen'", searchConfig), null);
+  assert.equal(reasonForCommand("ioreg -r -e AppleSmartBattery | grep -E '(CurrentCapacity|MaxCapacity)'", searchConfig), null);
+  assert.equal(reasonForCommand("vercel projects ls | grep -i 'odoo-meta-connector' || true", searchConfig), null);
+});
+
+test("still warns when piped grep is file or repository search", () => {
+  assert.equal(reasonForCommand("cat src/main.ts | grep TODO", searchConfig), null);
+  assert.equal(reasonForCommand("find . -type f | xargs grep TODO", searchConfig), "prefer native find tool");
+  assert.equal(reasonForCommand("printf '%s\\n' src/main.ts | xargs grep TODO", searchConfig), null);
+  assert.equal(reasonForCommand("grep TODO src/main.ts | head -1", searchConfig), "prefer native grep tool");
+  assert.equal(reasonForCommand("rg TODO src | head -1", searchConfig), "prefer native grep tool");
+});
+
 test("does not warn for informational shell content-search commands", () => {
   assert.equal(reasonForCommand("rg --help", searchConfig), null);
   assert.equal(reasonForCommand("rg --version", searchConfig), null);
