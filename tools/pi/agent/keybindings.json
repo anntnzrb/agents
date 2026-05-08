@@ -1,6 +1,4 @@
 {
-  "tui.input.submit": ["ctrl+enter"],
-  "tui.input.newLine": ["enter", "ctrl+j"],
-  "app.interrupt": ["ctrl+g"],
+  "tui.input.newLine": ["ctrl+j"],
   "app.exit": []
 }
