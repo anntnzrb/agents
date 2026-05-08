@@ -187,6 +187,7 @@ declare module "@mariozechner/pi-coding-agent" {
 		maxBytes?: number;
 	};
 
+	export const VERSION: string;
 	export const DEFAULT_MAX_BYTES: number;
 	export const DEFAULT_MAX_LINES: number;
 	export function formatSize(bytes: number): string;
