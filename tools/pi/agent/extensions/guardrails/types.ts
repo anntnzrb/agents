@@ -1,6 +1,9 @@
 export interface BlockAction {
   type: "block";
   message: string;
+  requiresSkill?: string;
+  requiredWorkflow?: string;
+  requiresBinding?: string;
 }
 
 export interface WarnAction {
@@ -47,8 +50,14 @@ export interface ProtectedPathsConfig {
   rules: ProtectedPathRule[];
 }
 
+export interface SkillBinding {
+  requiresSkill: string;
+  requiredWorkflow?: string;
+}
+
 export interface GuardrailsConfig {
   version: 1;
+  skillBindings: Record<string, SkillBinding>;
   agentBash: AgentBashConfig;
   protectedPaths: ProtectedPathsConfig;
 }

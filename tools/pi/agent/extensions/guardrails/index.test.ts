@@ -3,6 +3,10 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+const skillDir = mkdtempSync(join(tmpdir(), "guardrails-skill-"));
+const skillPath = join(skillDir, "SKILL.md");
+writeFileSync(skillPath, "---\nname: python\ndescription: Python test skill\n---\n# Python Skill\n");
+
 mock.module("@earendil-works/pi-coding-agent", () => ({
 	VERSION: "0.0.0",
 	DEFAULT_MAX_BYTES: 50 * 1024,
@@ -10,6 +14,10 @@ mock.module("@earendil-works/pi-coding-agent", () => ({
 	formatSize: (bytes: number) => `${bytes}B`,
 	keyHint: (_action: string, hint: string) => hint,
 	getAgentDir: () => "/tmp/pi-agent",
+	loadSkills: () => ({
+		skills: [{ name: "python", description: "Python test skill", filePath: skillPath, baseDir: skillDir, sourceInfo: {}, disableModelInvocation: true }],
+		diagnostics: [],
+	}),
 	truncateHead: (content: string) => ({ content, truncated: false }),
 	isToolCallEventType: () => false,
 	createReadToolDefinition: () => ({ name: "read", renderShell: "self" }),
@@ -44,29 +52,35 @@ const setupGuardrailsHandler = (config: unknown) => {
 
 describe("guardrails config cache", () => {
 	test("adapts canonical and namespaced shell block events", async () => {
-		const { handler, ctx } = setupGuardrailsHandler({
+		const { handler, ctx, messages } = setupGuardrailsHandler({
 			version: 1,
+			skillBindings: {
+				"python-tooling": { requiresSkill: "python" },
+			},
 			agentBash: {
 				rules: [
-					{ match: { type: "executable", names: ["python3"] }, action: { type: "block", message: "no python" } },
-					{ match: { type: "executable", names: ["pip"] }, action: { type: "block", message: "no pip" } },
-					{ match: { type: "executable", names: ["poetry"] }, action: { type: "block", message: "no poetry" } },
+					{ match: { type: "executable", names: ["python3"] }, action: { type: "block", message: "no python", requiresBinding: "python-tooling" } },
+					{ match: { type: "executable", names: ["pip"] }, action: { type: "block", message: "no pip", requiresBinding: "python-tooling" } },
+					{ match: { type: "executable", names: ["poetry"] }, action: { type: "block", message: "no poetry", requiresBinding: "python-tooling" } },
 				],
 			},
 			protectedPaths: { rules: [] },
 		});
 
 		for (const [toolName, command, expected] of [
-			["bash", "python3 - <<'PY'\nprint(1)\nPY", "direct Python tooling disabled"],
-			["functions.bash", "pip install rich", "direct Python tooling disabled"],
-			["custom.namespace.bash", "poetry install", "direct Python tooling disabled"],
-			["pwsh", "python3 -c \"print(1)\"", "direct Python tooling disabled"],
-			["functions.pwsh", "pip install rich", "direct Python tooling disabled"],
-			["custom.namespace.pwsh", "poetry install", "direct Python tooling disabled"],
+			["bash", "python3 - <<'PY'\nprint(1)\nPY", "Required skill `python` has been loaded into context"],
+			["functions.bash", "pip install rich", "Required skill `python` has been loaded into context"],
+			["custom.namespace.bash", "poetry install", "Required skill `python` has been loaded into context"],
+			["pwsh", "python3 -c \"print(1)\"", "Required skill `python` has been loaded into context"],
+			["functions.pwsh", "pip install rich", "Required skill `python` has been loaded into context"],
+			["custom.namespace.pwsh", "poetry install", "Required skill `python` has been loaded into context"],
 		] as const) {
 			const result = await handler?.({ toolName, input: { command } }, ctx);
 			expect(result).toEqual({ block: true, reason: expect.stringContaining(expected) });
 		}
+		expect(messages).toHaveLength(1);
+		expect(messages[0]?.customType).toBe("guardrails-skill-load");
+		expect(messages[0]?.content).toContain("<required_skill_load name=\"python\"");
 	});
 
 	test("adapts canonical and namespaced shell warn events", async () => {

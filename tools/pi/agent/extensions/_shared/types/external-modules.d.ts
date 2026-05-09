@@ -130,6 +130,15 @@ declare module "@earendil-works/pi-coding-agent" {
 		description?: string;
 	};
 
+	export type Skill = {
+		name: string;
+		description: string;
+		filePath: string;
+		baseDir: string;
+		sourceInfo: unknown;
+		disableModelInvocation: boolean;
+	};
+
 	export type ExtensionAPI = {
 		on: (
 			event: string,
@@ -217,6 +226,12 @@ declare module "@earendil-works/pi-coding-agent" {
 		op: () => Promise<T>,
 	): Promise<T>;
 	export function getAgentDir(): string;
+	export function loadSkills(options: {
+		cwd: string;
+		agentDir: string;
+		skillPaths: string[];
+		includeDefaults: boolean;
+	}): { skills: Skill[]; diagnostics: unknown[] };
 	export function getMarkdownTheme(): unknown;
 	export const DynamicBorder: any;
 }

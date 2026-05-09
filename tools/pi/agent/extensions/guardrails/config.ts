@@ -10,10 +10,12 @@ import type {
   ProtectedPathRule,
   RegexMatch,
   Rule,
+  SkillBinding,
 } from "./types.js";
 
 const DEFAULT_CONFIG: GuardrailsConfig = {
   version: 1,
+  skillBindings: {},
   agentBash: {
     rules: [],
   },
@@ -57,10 +59,39 @@ function normalizeBlockAction(value: unknown, path: string): BlockAction | strin
     return `${path}.message must be a non-empty string`;
   }
 
-  return {
+  const rawRequiresSkill = value["requiresSkill"];
+  if (rawRequiresSkill !== undefined && (typeof rawRequiresSkill !== "string" || rawRequiresSkill.trim().length === 0)) {
+    return `${path}.requiresSkill must be a non-empty string`;
+  }
+
+  const rawRequiredWorkflow = value["requiredWorkflow"];
+  if (rawRequiredWorkflow !== undefined && (typeof rawRequiredWorkflow !== "string" || rawRequiredWorkflow.trim().length === 0)) {
+    return `${path}.requiredWorkflow must be a non-empty string`;
+  }
+
+  const rawRequiresBinding = value["requiresBinding"];
+  if (rawRequiresBinding !== undefined && (typeof rawRequiresBinding !== "string" || rawRequiresBinding.trim().length === 0)) {
+    return `${path}.requiresBinding must be a non-empty string`;
+  }
+
+  if (rawRequiresBinding !== undefined && (rawRequiresSkill !== undefined || rawRequiredWorkflow !== undefined)) {
+    return `${path} cannot combine requiresBinding with requiresSkill/requiredWorkflow`;
+  }
+
+  const out: BlockAction = {
     type: "block",
     message,
   };
+  if (typeof rawRequiresSkill === "string") {
+    out.requiresSkill = rawRequiresSkill;
+  }
+  if (typeof rawRequiredWorkflow === "string") {
+    out.requiredWorkflow = rawRequiredWorkflow;
+  }
+  if (typeof rawRequiresBinding === "string") {
+    out.requiresBinding = rawRequiresBinding;
+  }
+  return out;
 }
 
 function normalizeBashAction(value: unknown, path: string): BashAction | string {
@@ -76,6 +107,52 @@ function normalizeBashAction(value: unknown, path: string): BashAction | string 
   const message = value["message"];
   if (typeof message !== "string" || message.trim().length === 0) {
     return `${path}.message must be a non-empty string`;
+  }
+
+  const rawRequiresSkill = value["requiresSkill"];
+  if (rawRequiresSkill !== undefined && (typeof rawRequiresSkill !== "string" || rawRequiresSkill.trim().length === 0)) {
+    return `${path}.requiresSkill must be a non-empty string`;
+  }
+
+  const rawRequiredWorkflow = value["requiredWorkflow"];
+  if (rawRequiredWorkflow !== undefined && (typeof rawRequiredWorkflow !== "string" || rawRequiredWorkflow.trim().length === 0)) {
+    return `${path}.requiredWorkflow must be a non-empty string`;
+  }
+
+  const rawRequiresBinding = value["requiresBinding"];
+  if (rawRequiresBinding !== undefined && (typeof rawRequiresBinding !== "string" || rawRequiresBinding.trim().length === 0)) {
+    return `${path}.requiresBinding must be a non-empty string`;
+  }
+
+  if (type === "warn" && rawRequiresSkill !== undefined) {
+    return `${path}.requiresSkill is only valid for block actions`;
+  }
+  if (type === "warn" && rawRequiredWorkflow !== undefined) {
+    return `${path}.requiredWorkflow is only valid for block actions`;
+  }
+  if (type === "warn" && rawRequiresBinding !== undefined) {
+    return `${path}.requiresBinding is only valid for block actions`;
+  }
+
+  if (rawRequiresBinding !== undefined && (rawRequiresSkill !== undefined || rawRequiredWorkflow !== undefined)) {
+    return `${path} cannot combine requiresBinding with requiresSkill/requiredWorkflow`;
+  }
+
+  if (type === "block") {
+    const out: BlockAction = {
+      type,
+      message,
+    };
+    if (typeof rawRequiresSkill === "string") {
+      out.requiresSkill = rawRequiresSkill;
+    }
+    if (typeof rawRequiredWorkflow === "string") {
+      out.requiredWorkflow = rawRequiredWorkflow;
+    }
+    if (typeof rawRequiresBinding === "string") {
+      out.requiresBinding = rawRequiresBinding;
+    }
+    return out;
   }
 
   return {
@@ -254,6 +331,35 @@ function normalizeProtectedPathRule(value: unknown, index: number): ProtectedPat
   return out;
 }
 
+function normalizeSkillBindings(value: unknown): Record<string, SkillBinding> | string {
+  if (value === undefined) return {};
+  if (!isObject(value)) return "skillBindings must be an object";
+
+  const out: Record<string, SkillBinding> = {};
+  for (const [name, entry] of Object.entries(value)) {
+    if (!isObject(entry)) return `skillBindings.${name} must be an object`;
+
+    const rawRequiresSkill = entry["requiresSkill"];
+    if (typeof rawRequiresSkill !== "string" || rawRequiresSkill.trim().length === 0) {
+      return `skillBindings.${name}.requiresSkill must be a non-empty string`;
+    }
+
+    const rawRequiredWorkflow = entry["requiredWorkflow"];
+    if (rawRequiredWorkflow !== undefined && (typeof rawRequiredWorkflow !== "string" || rawRequiredWorkflow.trim().length === 0)) {
+      return `skillBindings.${name}.requiredWorkflow must be a non-empty string`;
+    }
+
+    const binding: SkillBinding = {
+      requiresSkill: rawRequiresSkill,
+    };
+    if (typeof rawRequiredWorkflow === "string") {
+      binding.requiredWorkflow = rawRequiredWorkflow;
+    }
+    out[name] = binding;
+  }
+  return out;
+}
+
 function normalizeConfig(value: unknown): GuardrailsConfig | string {
   if (!isObject(value)) {
     return "config root must be an object";
@@ -262,6 +368,11 @@ function normalizeConfig(value: unknown): GuardrailsConfig | string {
   const version = value["version"];
   if (version !== undefined && version !== 1) {
     return "version must be 1";
+  }
+
+  const skillBindings = normalizeSkillBindings(value["skillBindings"]);
+  if (typeof skillBindings === "string") {
+    return skillBindings;
   }
 
   const agentBashRaw = value["agentBash"] === undefined ? {} : value["agentBash"];
@@ -281,6 +392,13 @@ function normalizeConfig(value: unknown): GuardrailsConfig | string {
       return normalized;
     }
     bashRules.push(normalized);
+  }
+
+  for (const [index, rule] of bashRules.entries()) {
+    if (rule.action.type !== "block" || !rule.action.requiresBinding) continue;
+    if (!skillBindings[rule.action.requiresBinding]) {
+      return `agentBash.rules[${index}].action.requiresBinding references unknown skillBindings key: ${rule.action.requiresBinding}`;
+    }
   }
 
   const protectedPathsRaw = value["protectedPaths"] === undefined ? {} : value["protectedPaths"];
@@ -304,6 +422,7 @@ function normalizeConfig(value: unknown): GuardrailsConfig | string {
 
   return {
     version: 1,
+    skillBindings,
     agentBash: { rules: bashRules },
     protectedPaths: { rules: protectedPathRules },
   };

@@ -1,6 +1,7 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, Skill } from "@earendil-works/pi-coding-agent";
+import { getAgentDir, isToolCallEventType, loadSkills } from "@earendil-works/pi-coding-agent";
 import { statSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,7 +9,7 @@ import { loadConfig } from "./config.js";
 import { agentHintForBlock, agentHintForWarning } from "./hints.js";
 import { actionForCommand } from "./matcher.js";
 import { reasonForPath } from "./paths.js";
-import type { GuardrailsConfig } from "./types.js";
+import type { BlockAction, GuardrailsConfig, SkillBinding } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const configPath = join(__dirname, "guardrails.jsonc");
@@ -16,6 +17,7 @@ const configPath = join(__dirname, "guardrails.jsonc");
 let cachedSignature: string | null = null;
 let cachedConfigOrReason: GuardrailsConfig | string | undefined;
 const emittedWarnings = new Set<string>();
+const loadedSkills = new Set<string>();
 
 const getConfigSignature = (path: string): string => {
   try {
@@ -44,6 +46,7 @@ const resetConfigCache = () => {
   cachedSignature = null;
   cachedConfigOrReason = undefined;
   emittedWarnings.clear();
+  loadedSkills.clear();
 };
 
 const emitGuardrailWarning = (pi: ExtensionAPI, ctx: ExtensionContext, toolName: string, message: string) => {
@@ -59,6 +62,51 @@ const emitGuardrailWarning = (pi: ExtensionAPI, ctx: ExtensionContext, toolName:
     },
     { triggerTurn: false },
   );
+};
+
+const findSkill = (ctx: ExtensionContext, skillName: string): Skill | undefined =>
+  loadSkills({ cwd: ctx.cwd, agentDir: getAgentDir(), skillPaths: [], includeDefaults: true }).skills.find((skill) => skill.name === skillName);
+
+const skillInjectionContent = (skill: Skill, content: string): string => `<required_skill_load name="${skill.name}" source="${skill.filePath}">
+${content}
+</required_skill_load>`;
+
+type SkillLoadState =
+  | { status: "not-required" }
+  | { status: "already-loaded"; skillName: string }
+  | { status: "loaded"; skillName: string }
+  | { status: "missing"; skillName: string }
+  | { status: "error"; skillName: string; detail: string };
+
+const loadRequiredSkill = async (pi: ExtensionAPI, ctx: ExtensionContext, skillName: string | undefined): Promise<SkillLoadState> => {
+  if (!skillName) return { status: "not-required" };
+  if (loadedSkills.has(skillName)) return { status: "already-loaded", skillName };
+
+  const skill = findSkill(ctx, skillName);
+  if (!skill) {
+    ctx.ui.notify(`Guardrails could not find required skill: ${skillName}`, "warning");
+    return { status: "missing", skillName };
+  }
+
+  try {
+    const content = await readFile(skill.filePath, "utf8");
+    loadedSkills.add(skillName);
+    pi.sendMessage(
+      {
+        customType: "guardrails-skill-load",
+        content: skillInjectionContent(skill, content),
+        display: false,
+        details: { skill: skill.name, path: skill.filePath },
+      },
+      { deliverAs: "steer", triggerTurn: false },
+    );
+    ctx.ui.notify(`Guardrails loaded skill: ${skill.name}`, "info");
+    return { status: "loaded", skillName };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    ctx.ui.notify(`Guardrails could not load required skill ${skillName}: ${detail}`, "warning");
+    return { status: "error", skillName, detail };
+  }
 };
 
 type ToolEventLike = {
@@ -82,6 +130,26 @@ const inputString = (event: unknown, key: string): string | null => {
   return typeof value === "string" ? value : null;
 };
 
+const bindingForAction = (action: BlockAction, config: GuardrailsConfig): SkillBinding | null => {
+  if (!action.requiresBinding) return null;
+  return config.skillBindings[action.requiresBinding] ?? null;
+};
+
+const resolvedSkillName = (action: BlockAction, config: GuardrailsConfig): string | undefined =>
+  bindingForAction(action, config)?.requiresSkill ?? action.requiresSkill;
+
+const resolvedWorkflow = (action: BlockAction, config: GuardrailsConfig): string | undefined =>
+  bindingForAction(action, config)?.requiredWorkflow ?? action.requiredWorkflow;
+
+const hintInputForBlockAction = (action: BlockAction, config: GuardrailsConfig): { message: string; requiresSkill?: string; requiredWorkflow?: string } => {
+  const out: { message: string; requiresSkill?: string; requiredWorkflow?: string } = { message: action.message };
+  const skillName = resolvedSkillName(action, config);
+  const workflow = resolvedWorkflow(action, config);
+  if (skillName) out.requiresSkill = skillName;
+  if (workflow) out.requiredWorkflow = workflow;
+  return out;
+};
+
 export const __test = {
   getConfigSignature,
   getConfigOrBlockReason,
@@ -93,6 +161,10 @@ export const __test = {
 
 export function createGuardrails(path: string) {
   return function guardrails(pi: ExtensionAPI): void {
+    pi.on("session_start", () => {
+      loadedSkills.clear();
+    });
+
     pi.on("tool_call", async (event, ctx) => {
       const configOrReason = getConfigOrBlockReason(path);
       if (typeof configOrReason === "string") {
@@ -109,7 +181,25 @@ export function createGuardrails(path: string) {
           emitGuardrailWarning(pi, ctx, toolNameOf(event), action.message);
           return undefined;
         }
-        return { block: true, reason: agentHintForBlock(action.message) };
+
+        const skillLoadState = await loadRequiredSkill(pi, ctx, resolvedSkillName(action, configOrReason));
+        if (skillLoadState.status === "missing") {
+          return {
+            block: true,
+            reason: `Guardrail blocked this command and could not load required skill \`${skillLoadState.skillName}\`. Ensure the skill exists and try again.`,
+          };
+        }
+        if (skillLoadState.status === "error") {
+          return {
+            block: true,
+            reason: `Guardrail blocked this command and failed to load required skill \`${skillLoadState.skillName}\`: ${skillLoadState.detail}`,
+          };
+        }
+
+        return {
+          block: true,
+          reason: agentHintForBlock(hintInputForBlockAction(action, configOrReason)),
+        };
       }
 
       if (isToolCallEventType<"pwsh", { command?: string }>("pwsh", event) || isNamedTool(event, "pwsh")) {
@@ -122,7 +212,25 @@ export function createGuardrails(path: string) {
           emitGuardrailWarning(pi, ctx, toolNameOf(event), action.message);
           return undefined;
         }
-        return { block: true, reason: agentHintForBlock(action.message) };
+
+        const skillLoadState = await loadRequiredSkill(pi, ctx, resolvedSkillName(action, configOrReason));
+        if (skillLoadState.status === "missing") {
+          return {
+            block: true,
+            reason: `Guardrail blocked this command and could not load required skill \`${skillLoadState.skillName}\`. Ensure the skill exists and try again.`,
+          };
+        }
+        if (skillLoadState.status === "error") {
+          return {
+            block: true,
+            reason: `Guardrail blocked this command and failed to load required skill \`${skillLoadState.skillName}\`: ${skillLoadState.detail}`,
+          };
+        }
+
+        return {
+          block: true,
+          reason: agentHintForBlock(hintInputForBlockAction(action, configOrReason)),
+        };
       }
 
       if (isToolCallEventType("read", event) || isNamedTool(event, "read")) {

@@ -2,6 +2,12 @@
   // Generic agent guardrails policy.
   // Add more rules here without touching extension code.
   "version": 1,
+  "skillBindings": {
+    "python-tooling": {
+      "requiresSkill": "python",
+      "requiredWorkflow": "Use uv workflow (`uv run`, `uv add`, `uv run --with`) and avoid raw python/pip/env tooling."
+    }
+  },
   "agentBash": {
     "rules": [
       {
@@ -28,7 +34,8 @@
         },
         "action": {
           "type": "block",
-          "message": "python/python3 is disabled. Load `/skill:python`."
+          "message": "python/python3 is disabled. Use uv-based Python workflow.",
+          "requiresBinding": "python-tooling"
         }
       },
       {
@@ -49,7 +56,8 @@
         },
         "action": {
           "type": "block",
-          "message": "pip/pip3 is disabled. Load `/skill:python`."
+          "message": "pip/pip3 is disabled. Use uv-based Python workflow.",
+          "requiresBinding": "python-tooling"
         }
       },
       {
@@ -73,7 +81,8 @@
         },
         "action": {
           "type": "block",
-          "message": "Python env/package tooling is disabled. Load `/skill:python`."
+          "message": "Python env/package tooling is disabled. Use uv-based Python workflow.",
+          "requiresBinding": "python-tooling"
         }
       },
       {
@@ -85,7 +94,8 @@
         },
         "action": {
           "type": "block",
-          "message": "`python -m pip` is disabled. Load `/skill:python`."
+          "message": "`python -m pip` is disabled. Use uv-based Python workflow.",
+          "requiresBinding": "python-tooling"
         }
       },
       {
@@ -97,7 +107,8 @@
         },
         "action": {
           "type": "block",
-          "message": "`python -m venv` is disabled. Load `/skill:python`."
+          "message": "`python -m venv` is disabled. Use uv-based Python workflow.",
+          "requiresBinding": "python-tooling"
         }
       },
       {
@@ -109,7 +120,8 @@
         },
         "action": {
           "type": "block",
-          "message": "`python -m py_compile` is disabled. Load `/skill:python`."
+          "message": "`python -m py_compile` is disabled. Use uv-based Python workflow.",
+          "requiresBinding": "python-tooling"
         }
       },
       {

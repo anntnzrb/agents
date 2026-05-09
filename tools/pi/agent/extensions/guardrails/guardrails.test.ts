@@ -12,6 +12,7 @@ import type { GuardrailsConfig } from "./types.js";
 
 const pythonConfig: GuardrailsConfig = {
   version: 1,
+  skillBindings: {},
   agentBash: {
     rules: [
       {
@@ -84,6 +85,7 @@ const pythonConfig: GuardrailsConfig = {
 
 const searchConfig: GuardrailsConfig = {
   version: 1,
+  skillBindings: {},
   agentBash: {
     rules: [
       {
@@ -239,6 +241,82 @@ test("loadConfig accepts warn actions for agentBash rules", () => {
 
   const result = loadConfig(path);
   assert.equal(result.ok, true);
+});
+
+test("loadConfig accepts reusable skillBindings for block actions", () => {
+  const dir = mkdtempSync(join(tmpdir(), "guardrails-"));
+  const path = join(dir, "guardrails.jsonc");
+
+  writeFileSync(
+    path,
+    `{
+      "version": 1,
+      "skillBindings": {
+        "python-tooling": {
+          "requiresSkill": "python",
+          "requiredWorkflow": "Use uv"
+        }
+      },
+      "agentBash": {
+        "rules": [
+          {
+            "match": { "type": "executable", "names": ["python3"] },
+            "action": {
+              "type": "block",
+              "message": "no python",
+              "requiresBinding": "python-tooling"
+            }
+          }
+        ]
+      },
+      "protectedPaths": { "rules": [] }
+    }`,
+  );
+
+  const result = loadConfig(path);
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+  const action = result.config.agentBash.rules[0]?.action;
+  assert.equal(action?.type, "block");
+  if (action?.type !== "block") return;
+  assert.equal(action.requiresBinding, "python-tooling");
+});
+
+test("loadConfig fails when requiresBinding references unknown skill binding", () => {
+  const dir = mkdtempSync(join(tmpdir(), "guardrails-"));
+  const path = join(dir, "guardrails.jsonc");
+
+  writeFileSync(
+    path,
+    `{
+      "version": 1,
+      "skillBindings": {
+        "python-tooling": { "requiresSkill": "python" }
+      },
+      "agentBash": {
+        "rules": [
+          {
+            "match": { "type": "executable", "names": ["python3"] },
+            "action": {
+              "type": "block",
+              "message": "no python",
+              "requiresBinding": "missing"
+            }
+          }
+        ]
+      },
+      "protectedPaths": { "rules": [] }
+    }`,
+  );
+
+  const result = loadConfig(path);
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    return;
+  }
+  assert.match(result.reason, /requiresBinding references unknown skillBindings key/);
 });
 
 test("loadConfig fails closed on invalid config", () => {
@@ -406,10 +484,13 @@ test("tool signatures fall back when live schema is unavailable", () => {
   assert.match(formatToolSignature("find", []), /kind/);
 });
 
-test("python block hints point to python skill and uv", () => {
-  const hint = agentHintForBlock("Python env/package tooling is disabled. Load `/skill:python`.");
-  assert.match(hint, /direct Python tooling disabled/);
-  assert.match(hint, /\/skill:python/);
+test("block hints are generic and skill-driven", () => {
+  const hint = agentHintForBlock({
+    message: "Python env/package tooling is disabled. Use uv-based Python workflow.",
+    requiresSkill: "python",
+    requiredWorkflow: "Use uv workflow (`uv run`, `uv add`, `uv run --with`) and avoid raw python/pip/env tooling.",
+  });
+  assert.match(hint, /Required skill `python` has been loaded into context/);
   assert.match(hint, /uv run/);
   assert.equal(agentHintForBlock("Reading .env files is blocked by guardrails."), "Reading .env files is blocked by guardrails.");
 });
@@ -466,6 +547,7 @@ test("does not warn for harmless mentions of search tool names", () => {
 test("regex rules apply inside nested shell wrappers", () => {
   const config: GuardrailsConfig = {
     version: 1,
+    skillBindings: {},
     agentBash: {
       rules: [
         {
@@ -504,6 +586,7 @@ test("does not overblock .env.example", () => {
 test("blocks protected directory roots and children", () => {
   const config: GuardrailsConfig = {
     version: 1,
+    skillBindings: {},
     agentBash: { rules: [] },
     protectedPaths: {
       rules: [
@@ -524,6 +607,7 @@ test("blocks protected directory roots and children", () => {
 test("allows node_modules reads while still supporting node_modules write blocks", () => {
   const config: GuardrailsConfig = {
     version: 1,
+    skillBindings: {},
     agentBash: { rules: [] },
     protectedPaths: {
       rules: [

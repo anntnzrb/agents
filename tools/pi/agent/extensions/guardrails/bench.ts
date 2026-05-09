@@ -7,6 +7,7 @@ const ITERATIONS = Number.parseInt(process.env["GUARDRAILS_BENCH_ITERS"] ?? "100
 
 const config: GuardrailsConfig = {
 	version: 1,
+	skillBindings: {},
 	agentBash: {
 		rules: [
 			{
