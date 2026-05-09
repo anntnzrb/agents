@@ -13,7 +13,7 @@ web_search = "disabled"
 
 model = "gpt-5.5"
 review_model = "gpt-5.5"
-model_reasoning_effort = "medium"
+model_reasoning_effort = "low"
 model_verbosity = "low"
 model_reasoning_summary = "detailed"
 model_personality = "pragmatic"
