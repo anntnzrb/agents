@@ -2,6 +2,7 @@
 name: artificial-analysis-live
 description: "Live Artificial Analysis provider+model benchmark extraction and querying. Use this whenever the user asks benchmark comparisons, model-vs-provider tradeoffs, fastest/cheapest provider for a model, latency/speed/cost rankings, provider deltas over time, or any question that needs fresh endpoint-level data (not just model-level API data). Trigger even if user only says 'compare models/providers' without naming Artificial Analysis explicitly."
 compatibility: Requires `uv` and network access.
+disable-model-invocation: true
 ---
 
 # artificial-analysis-live

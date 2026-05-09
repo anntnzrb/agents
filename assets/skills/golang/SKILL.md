@@ -1,6 +1,7 @@
 ---
 name: golang
 description: "Develop Go (Golang) applications using modern patterns, popular libraries, and idiomatic design. Activate when working with .go files, go.mod, go.sum, or user mentions Go, Golang, goroutines, channels, or Go libraries like gin, cobra, gorm."
+disable-model-invocation: true
 ---
 
 # Golang Development Skill

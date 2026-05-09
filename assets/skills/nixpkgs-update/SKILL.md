@@ -1,6 +1,7 @@
 ---
 name: nixpkgs-update
 description: "Update nixpkgs packages with nix-update and nixpkgs-review. Activate when user wants to bump a package version, contribute to nixpkgs, update Nix packages, or mentions nix-update, nixpkgs-review, or nixpkgs contribution."
+disable-model-invocation: true
 ---
 
 # Nixpkgs Package Update

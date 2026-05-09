@@ -1,6 +1,7 @@
 ---
 name: javascript
 description: "Primary skill for implementing and debugging modern JavaScript across Node.js and browser runtimes with runtime-aware module choices, semantics-first debugging, async/concurrency patterns, performance tuning, and test strategy. Use whenever work touches .js/.mjs/.cjs, package.json module fields, ESM/CJS interop, Promises, event loop behavior, fetch/streams/workers, browser APIs, Node.js APIs, Jest/Vitest/Testing Library, legacy JS refactors, or weird JavaScript behavior. Also use for plain-language requests like 'convert require to import', 'why is this undefined', 'why did Promise run before setTimeout', 'fix flaky JS tests', 'stream this instead of buffering', or 'debug this Node/browser JavaScript bug'. Pair with typescript when .ts/.tsx type-system work is central."
+disable-model-invocation: true
 ---
 
 # JavaScript Development

@@ -2,6 +2,7 @@
 name: amz-live
 description: Read-only Amazon catalog search through the bundled `amz-live` CLI in this skill. Use whenever the user wants Amazon product discovery, price comparison, shortlist generation, cheap-but-decent recommendations, connector/type-specific cable hunting, structured Amazon search output, or agent-usable machine-readable results. Prefer this skill over manual browsing for Amazon shopping/search/filter/rank tasks, especially when you need repeatable filters, detail enrichment, scoring, delivery-location control, or Pi-style RPC integration.
 compatibility: Requires `uv`. Uses bundled skill-local `scripts/cli.py`. Network access required for live mode.
+disable-model-invocation: true
 ---
 
 # amz-live

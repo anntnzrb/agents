@@ -4,6 +4,7 @@ description: 'Review UI code for Web Interface Guidelines compliance. Use when a
 metadata:
   author: vercel
   version: "1.0.0"
+disable-model-invocation: true
 ---
 
 # Web Interface Guidelines

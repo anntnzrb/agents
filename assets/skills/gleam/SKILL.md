@@ -1,6 +1,7 @@
 ---
 name: gleam
 description: "Develop with Gleam using idiomatic patterns, TDD, and type-driven design. Activate when working with .gleam files, gleam.toml, or user mentions Gleam, BEAM, or Erlang."
+disable-model-invocation: true
 ---
 
 # Gleam Development

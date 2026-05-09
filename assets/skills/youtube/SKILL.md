@@ -1,6 +1,7 @@
 ---
 name: youtube
 description: "Work with video and audio links. Activate when user shares a YouTube link, video URL, or any media link - regardless of the task (download, info, convert, extract, list, or explore). Uses yt-dlp for all operations."
+disable-model-invocation: true
 ---
 
 # yt-dlp Video Downloader Skill

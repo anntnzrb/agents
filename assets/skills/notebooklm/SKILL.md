@@ -1,6 +1,7 @@
 ---
 name: notebooklm
 description: "Use the nlm CLI to talk to NotebookLM notebooks. Activate when the user mentions NotebookLM, notebook, knowledge base, or asks to chat with their notebooks."
+disable-model-invocation: true
 ---
 
 # NotebookLM CLI

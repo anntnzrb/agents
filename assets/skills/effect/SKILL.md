@@ -1,6 +1,7 @@
 ---
 name: effect
 description: "Effect TypeScript docs via Effect MCP through MCPorter. Use whenever the user mentions effect, effect-ts, @effect/* packages, fibers, layers, runtime, schema, platform, sql, cli, ai, rpc, typeclass, or asks how to use Effect APIs or ecosystem modules. Load the mcporter skill to execute this skill's MCP calls."
+disable-model-invocation: true
 ---
 
 # Effect MCP

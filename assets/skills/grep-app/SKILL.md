@@ -1,6 +1,7 @@
 ---
 name: grep-app
 description: "Search public GitHub code via Grep.app's HTTP API. Use for real-world usage examples, config snippets, and API syntax patterns."
+disable-model-invocation: true
 ---
 
 # Grep.app

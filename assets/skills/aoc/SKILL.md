@@ -1,6 +1,7 @@
 ---
 name: aoc
 description: "Solve Advent of Code puzzles, algorithm challenges, and competitive programming problems. Activate when user provides AoC problem context/input, mentions solving puzzles/challenges, asks about algorithm selection (BFS, DFS, DP, etc.), or needs help with parsing structured input."
+disable-model-invocation: true
 ---
 
 # Advent of Code Solver

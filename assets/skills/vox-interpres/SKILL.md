@@ -2,6 +2,7 @@
 name: vox-interpres
 description: "Human-to-song interface using deterministic audio analysis + Q&A. Trigger this whenever the user wants to talk to a song/audio file, ask what is happening in a track, detect tempo/key/sections/energy, inspect metadata/codec, compare segments, or run conversational analysis on MP3/FLAC/WAV/OGG/M4A."
 compatibility: Requires `uv`, `ffmpeg`/`ffprobe`, and local audio files.
+disable-model-invocation: true
 ---
 
 # vox-interpres

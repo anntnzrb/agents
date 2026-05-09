@@ -1,6 +1,7 @@
 ---
 name: java-oop-assignment
 description: "Completes Java OOP university assignments from PDF specifications with minimal implementation. Use when user provides a PDF assignment file or mentions completing a Java/FOP/OOP homework exercise. Focuses on writing the least code necessary to satisfy requirements."
+disable-model-invocation: true
 ---
 
 # Java OOP Assignment Solver

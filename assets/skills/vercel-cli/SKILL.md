@@ -1,6 +1,7 @@
 ---
 name: vercel-cli
 description: "Deploy, manage, and debug Vercel projects from the command line. Use whenever the user mentions Vercel deployments, preview or production environments, project linking, domains, env vars, logs, integrations, or Vercel CI/CD workflows, even if they do not explicitly ask for the CLI."
+disable-model-invocation: true
 ---
 
 # Vercel CLI Skill

@@ -2,6 +2,7 @@
 name: emacs
 description: "Operate Emacs as both a running editor/runtime and a configurable system. Use this whenever the user mentions Emacs, Emacs Lisp, init.el, early-init.el, packages, use-package, package.el, hooks, advice, keybindings, themes, faces, fonts, buffers, windows, frames, server/emacsclient, or wants to inspect, configure, debug, or live-patch a running Emacs instance. Prefer runtime introspection and persistent config edits over guesswork or session-only tweaks."
 compatibility: "Requires `emacsclient` and `uv`. Best with a running Emacs server. `info` preferred for manuals; `rg` recommended for installed docs/source lookup."
+disable-model-invocation: true
 ---
 
 # Emacs

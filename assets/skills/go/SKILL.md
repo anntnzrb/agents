@@ -1,6 +1,7 @@
 ---
 name: go
 description: "Execute a plan with parallel agent orchestration. Activate when user says /go, asks to execute a plan, or requests multi-agent parallelism."
+disable-model-invocation: true
 ---
 
 # Go Orchestration Skill

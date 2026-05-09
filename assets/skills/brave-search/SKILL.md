@@ -1,6 +1,7 @@
 ---
 name: brave-search
 description: "Fallback search via the Brave Search HTTP API. Use for quick lookups, recency checks, images/videos/local results, and lightweight web research when Exa isn't ideal."
+disable-model-invocation: true
 ---
 
 # Brave Search

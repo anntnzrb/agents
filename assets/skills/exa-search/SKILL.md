@@ -1,6 +1,7 @@
 ---
 name: exa-search
 description: "Primary search via Exa's HTTP API. Use for deeper web research, full-page content retrieval, answer generation, and richer synthesis when lightweight search is not enough."
+disable-model-invocation: true
 ---
 
 # Exa Search

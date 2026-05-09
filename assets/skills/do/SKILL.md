@@ -1,6 +1,7 @@
 ---
 name: do
 description: "Delegate a task to a subagent and return only the result. Activate when user says /do or asks to delegate work."
+disable-model-invocation: true
 ---
 
 # Do Skill

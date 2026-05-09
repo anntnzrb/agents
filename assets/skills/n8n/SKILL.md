@@ -1,6 +1,7 @@
 ---
 name: n8n
 description: "n8n automation via REST API (authoring) and MCP (runtime). Use REST for workflow CRUD; use MCP for listing/triggering enabled workflows."
+disable-model-invocation: true
 ---
 
 # n8n
