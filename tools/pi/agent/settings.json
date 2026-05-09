@@ -11,10 +11,9 @@
   "hideThinkingBlock": true,
   "lastChangelogVersion": "0.74.0",
   "enabledModels": [
-    "openai-codex/gpt-5.5:low",
-    "opencode-go/kimi-k2.6:high",
-    "opencode-go/minimax-m2.7:high",
-    "opencode-go/mimo-v2.5-pro:high"
+    "openai-codex/gpt-5.3-codex:xhigh",
+    "openai-codex/gpt-5.5:medium",
+    "opencode-go/deepseek-v4-pro:xhigh"
   ],
   "providerPatcher": {
     "_comment": "serviceTier.openai options: off, priority",
