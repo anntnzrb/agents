@@ -9,7 +9,7 @@
   "editorPaddingX": 1,
   "followUpMode": "all",
   "hideThinkingBlock": true,
-  "lastChangelogVersion": "0.71.1",
+  "lastChangelogVersion": "0.74.0",
   "enabledModels": [
     "openai-codex/gpt-5.5:low",
     "opencode-go/kimi-k2.6:high",
