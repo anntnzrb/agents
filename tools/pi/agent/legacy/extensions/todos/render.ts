@@ -2,8 +2,8 @@
  * Rendering helpers for todos.
  */
 
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import { keyHint } from "@mariozechner/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { keyHint } from "@earendil-works/pi-coding-agent";
 import type { TodoFrontMatter, TodoRecord } from "./types.ts";
 import {
   formatTodoHeading,

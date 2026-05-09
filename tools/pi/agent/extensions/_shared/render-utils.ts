@@ -1,4 +1,4 @@
-import { Text } from "@mariozechner/pi-tui";
+import { Text } from "@earendil-works/pi-tui";
 
 export type ColorTheme = {
 	fg: (token: string, text: string) => string;

@@ -1,5 +1,5 @@
-import type { TruncationResult } from "@mariozechner/pi-coding-agent";
-import type { Message } from "@mariozechner/pi-ai";
+import type { TruncationResult } from "@earendil-works/pi-coding-agent";
+import type { Message } from "@earendil-works/pi-ai";
 
 export type RunMode = "single" | "parallel";
 export type ChildMode = "worker" | "explorer";

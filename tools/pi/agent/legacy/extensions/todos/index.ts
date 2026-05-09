@@ -2,7 +2,7 @@
  * Todo extension - file-backed todo manager with tool + TUI.
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createTodoTool } from "./tool.ts";
 import {
   ensureTodosDir,

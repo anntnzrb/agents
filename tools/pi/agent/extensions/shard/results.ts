@@ -11,9 +11,9 @@ import {
 	type ToolRenderResultOptions,
 	withFileMutationQueue,
 	type AgentToolResult,
-} from "@mariozechner/pi-coding-agent";
-import type { Message } from "@mariozechner/pi-ai";
-import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-coding-agent";
+import type { Message } from "@earendil-works/pi-ai";
+import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { getChildRunStatusLabel, type ChildRunResult, type ToolDetails } from "./types.js";
 
 const HOME_DIR = homedir();

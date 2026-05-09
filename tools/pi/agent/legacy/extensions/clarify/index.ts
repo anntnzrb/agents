@@ -1,5 +1,5 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { ClarifyParamsSchema, type ClarifyResult } from "./models.js";
 import { buildSuccessText, normalizeQuestions, sortAnswers, validateQuestions } from "./results.js";
 import { createClarifyComponent, renderCallText, renderResultText } from "./ui.js";

@@ -1,4 +1,4 @@
-import type { Theme, ThemeColor } from "@mariozechner/pi-coding-agent";
+import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 import { registerFooterContribution } from "../_shared/footer-contributions.js";
 import { formatElapsed } from "./format.js";
 import { CUSTOM_TYPE } from "./state.js";

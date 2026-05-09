@@ -1,4 +1,4 @@
-import { DEFAULT_MAX_BYTES, formatSize, type TruncationResult } from "@mariozechner/pi-coding-agent";
+import { DEFAULT_MAX_BYTES, formatSize, type TruncationResult } from "@earendil-works/pi-coding-agent";
 import { compactDisplayPath } from "../_shared/path-utils.js";
 import { joinRenderSegments, pluralize, type ColorTheme, type RenderTheme } from "../_shared/render-utils.js";
 import { summarizeList } from "../_shared/tool-utils.js";

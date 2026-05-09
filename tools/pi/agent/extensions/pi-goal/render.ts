@@ -1,5 +1,5 @@
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { getReusableText, joinRenderSegments } from "../_shared/render-utils.js";
 import type { GoalEventKind, GoalState } from "./format.js";
 import { goalEventStatus, goalUsage } from "./format.js";

@@ -1,9 +1,9 @@
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { VERSION } from "@mariozechner/pi-coding-agent";
-import type { ExtensionAPI, Theme, ThemeColor } from "@mariozechner/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import { VERSION } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { getFooterContributions } from "../_shared/footer-contributions.js";
 
 type ModelLike = {

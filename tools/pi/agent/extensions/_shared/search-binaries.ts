@@ -1,6 +1,6 @@
 import { accessSync, constants, existsSync } from "node:fs";
 import path from "node:path";
-import { getAgentDir } from "@mariozechner/pi-coding-agent";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 
 const pathKey = (): string => Object.keys(process.env).find((key) => key.toLowerCase() === "path") ?? "PATH";
 

@@ -1,4 +1,4 @@
-import { type ExtensionAPI, type ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import { type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { type ServiceTier, tierLabel } from "./logic.js";
 import { getApplicableTierChoices, getEffectiveServiceTier, patchProviderOptionsRequest, type TierChoice } from "./patchers.js";
 import { loadSettings, saveSettings, type ProviderOptionsSettings } from "./settings.js";

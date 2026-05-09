@@ -1,5 +1,5 @@
-import { ModelSelectorComponent, SettingsManager } from "@mariozechner/pi-coding-agent";
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { ModelSelectorComponent, SettingsManager } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import {
   ALL_THINKING_LEVELS,

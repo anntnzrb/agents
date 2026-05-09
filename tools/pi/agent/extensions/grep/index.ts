@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { AgentToolResult, ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { createGrepToolDefinition, DEFAULT_MAX_BYTES, formatSize, getAgentDir, truncateHead } from "@mariozechner/pi-coding-agent";
+import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createGrepToolDefinition, DEFAULT_MAX_BYTES, formatSize, getAgentDir, truncateHead } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { getReusableText } from "../_shared/render-utils.js";
 import { resolveSearchBinary } from "../_shared/search-binaries.js";

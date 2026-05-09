@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { AgentToolResult, ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { createFindToolDefinition, DEFAULT_MAX_BYTES, formatSize, getAgentDir, truncateHead } from "@mariozechner/pi-coding-agent";
+import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createFindToolDefinition, DEFAULT_MAX_BYTES, formatSize, getAgentDir, truncateHead } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { runLineStreamingProcess } from "../_shared/line-process.js";
 import { compactDisplayPath, toPosixPath } from "../_shared/path-utils.js";

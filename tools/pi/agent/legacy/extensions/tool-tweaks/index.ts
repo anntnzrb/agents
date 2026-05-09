@@ -2,9 +2,9 @@
  * Tool Output Suppressor - hides tool parameters and results in the UI.
  */
 
-import { createCodingTools, createReadOnlyTools } from "@mariozechner/pi-coding-agent";
-import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+import { createCodingTools, createReadOnlyTools } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 
 type Tool = ReturnType<typeof createCodingTools>[number];
 type ToolArgs = Record<string, unknown>;

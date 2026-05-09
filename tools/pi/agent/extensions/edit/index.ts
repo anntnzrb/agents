@@ -1,4 +1,4 @@
-import { createEditToolDefinition, type EditToolDetails, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { createEditToolDefinition, type EditToolDetails, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getReusableText, joinRenderSegments, pluralize, type ColorTheme, type RenderTheme } from "../_shared/render-utils.js";
 import { countLogicalLines } from "../_shared/text-stats.js";
 import { getFirstTextContent } from "../_shared/tool-utils.js";

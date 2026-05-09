@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import { applyEditor } from "./editor.ts";
 import { handleModelSelect, restoreModeFromSelection } from "./modes-core.ts";

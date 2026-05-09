@@ -2,7 +2,7 @@
  * Helpers for extracting the last assistant message from the session.
  */
 
-import type { SessionEntry } from "@mariozechner/pi-coding-agent";
+import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 
 /**
  * Result of searching for the last assistant message.

@@ -1,4 +1,4 @@
-declare module "@mariozechner/pi-coding-agent" {
+declare module "@earendil-works/pi-coding-agent" {
 	export type ThemeColor = string;
 	export type Theme = {
 		fg: (token: string, text: string) => string;
@@ -221,7 +221,7 @@ declare module "@mariozechner/pi-coding-agent" {
 	export const DynamicBorder: any;
 }
 
-declare module "@mariozechner/pi-ai" {
+declare module "@earendil-works/pi-ai" {
 	export type MessageContentPart = {
 		type: string;
 		text?: string;
@@ -248,7 +248,7 @@ declare module "@mariozechner/pi-ai" {
 	};
 }
 
-declare module "@mariozechner/pi-tui" {
+declare module "@earendil-works/pi-tui" {
 	export class Text {
 		constructor(text: string, width?: number, height?: number);
 		setText(text: string): void;

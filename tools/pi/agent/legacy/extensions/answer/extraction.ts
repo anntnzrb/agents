@@ -2,9 +2,9 @@
  * Question extraction helpers.
  */
 
-import { complete, type UserMessage } from "@mariozechner/pi-ai";
-import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { BorderedLoader } from "@mariozechner/pi-coding-agent";
+import { complete, type UserMessage } from "@earendil-works/pi-ai";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { BorderedLoader } from "@earendil-works/pi-coding-agent";
 import { JSON_BLOCK_RE, SYSTEM_PROMPT } from "./constants.ts";
 import type { ActiveModel, ExtractionResult } from "./types.ts";
 

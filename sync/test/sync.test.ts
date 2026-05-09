@@ -931,11 +931,11 @@ test("validate_package_dir_detects_missing_import_packages", async () => {
     );
     writeFile(
       join(pkg, "index.ts"),
-      'import { Text } from "@mariozechner/pi-tui";\nexport default Text;\n',
+      'import { Text } from "@earendil-works/pi-tui";\nexport default Text;\n',
     );
     assert.equal(await call<boolean>(validatePackageForTests, pkg), false);
 
-    writeFile(join(pkg, "node_modules", "@mariozechner", "pi-tui", "package.json"), "{}\n");
+    writeFile(join(pkg, "node_modules", "@earendil-works", "pi-tui", "package.json"), "{}\n");
     assert.equal(await call<boolean>(validatePackageForTests, pkg), true);
   });
 });

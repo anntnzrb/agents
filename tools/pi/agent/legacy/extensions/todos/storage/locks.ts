@@ -4,7 +4,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { LOCK_TTL_MS } from "../constants.ts";
 import type { LockInfo } from "../types.ts";
 import { displayTodoId } from "../utils.ts";

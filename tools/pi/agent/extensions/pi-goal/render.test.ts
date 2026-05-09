@@ -1,7 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
 import type { GoalState } from "./format.js";
 
-mock.module("@mariozechner/pi-tui", () => ({
+mock.module("@earendil-works/pi-tui", () => ({
   Text: class {
     text = "";
     constructor(text = "") {

@@ -13,7 +13,7 @@ import {
   type TUI,
   visibleWidth,
   wrapTextWithAnsi,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { EMPTY_ANSWER_DEFAULT, SKIP_ANSWER_DEFAULT } from "./constants.ts";
 import type { ExtractedQuestion } from "./types.ts";
 

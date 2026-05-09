@@ -1,13 +1,22 @@
 import { describe, expect, mock, test } from "bun:test";
 
-mock.module("@mariozechner/pi-coding-agent", () => ({
+mock.module("@earendil-works/pi-coding-agent", () => ({
+	VERSION: "0.0.0",
+	DEFAULT_MAX_BYTES: 50 * 1024,
+	DEFAULT_MAX_LINES: 2000,
 	formatSize: (bytes: number) => `${bytes}B`,
+	keyHint: (_action: string, hint: string) => hint,
+	getAgentDir: () => "/tmp/pi-agent",
+	truncateHead: (content: string) => ({ content, truncated: false }),
 	isToolCallEventType: () => false,
+	createReadToolDefinition: () => ({ name: "read", renderShell: "self" }),
 	createEditToolDefinition: () => ({
 		name: "edit",
 		renderShell: "self",
 	}),
-	createWriteToolDefinition: () => ({ name: "write" }),
+	createWriteToolDefinition: () => ({ name: "write", renderShell: "self" }),
+	createFindToolDefinition: () => ({ name: "find", renderShell: "self" }),
+	createGrepToolDefinition: () => ({ name: "grep", renderShell: "self" }),
 }));
 
 class MockText {
@@ -20,7 +29,7 @@ class MockText {
 	}
 }
 
-mock.module("@mariozechner/pi-tui", () => ({
+mock.module("@earendil-works/pi-tui", () => ({
 	Text: MockText,
 	truncateToWidth: (value: string, _width: number) => value,
 	visibleWidth: (value: string) => value.length,

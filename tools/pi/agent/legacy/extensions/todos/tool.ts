@@ -2,8 +2,8 @@
  * Tool registration for todo operations.
  */
 
-import type { ExtensionContext, ToolDefinition } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+import type { ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { TodoParams, type TodoAction, type TodoRecord, type TodoToolDetails } from "./types.ts";
 import {
   appendTodo,

@@ -2,7 +2,7 @@
  * Answer Extension - extracts questions from the last assistant response and collects answers.
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { ANSWER_MESSAGE_PREFIX } from "./constants.ts";
 import { findLastAssistantText } from "./assistant-text.ts";
 import { extractQuestions } from "./extraction.ts";

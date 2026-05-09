@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { handleGoalCommand, makeGoalArgumentCompletions } from "./command.js";
 import { registerGoalFooterContribution } from "./footer.js";
 import { truncateObjective } from "./format.js";

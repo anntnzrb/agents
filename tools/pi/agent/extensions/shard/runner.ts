@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import type { Message } from "@mariozechner/pi-ai";
+import type { Message } from "@earendil-works/pi-ai";
 import type { InheritedCliArgs } from "./cli.js";
 import { buildPiArgs, formatModelArg, getPiInvocation } from "./cli.js";
 import { getAssistantText, summarizeToolCall } from "./results.js";

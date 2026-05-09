@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { chmod, lstat, mkdir, open, readFile, readlink, realpath, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { createWriteToolDefinition, formatSize, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { createWriteToolDefinition, formatSize, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getReusableText, joinRenderSegments, pluralize, type ColorTheme, type RenderTheme } from "../_shared/render-utils.js";
 import { getUtf8ContentStats } from "../_shared/text-stats.js";
 import { asString } from "../_shared/value-utils.js";

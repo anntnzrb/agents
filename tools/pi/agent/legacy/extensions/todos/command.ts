@@ -2,8 +2,8 @@
  * /todos command UI.
  */
 
-import { copyToClipboard, type ExtensionContext } from "@mariozechner/pi-coding-agent";
-import type { TUI } from "@mariozechner/pi-tui";
+import { copyToClipboard, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { TUI } from "@earendil-works/pi-tui";
 import path from "node:path";
 import {
   TodoActionMenuComponent,

@@ -1,4 +1,4 @@
-import { createReadToolDefinition, DEFAULT_MAX_BYTES, formatSize, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { createReadToolDefinition, DEFAULT_MAX_BYTES, formatSize, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getReusableText, joinRenderSegments, type ColorTheme, type RenderTheme } from "../_shared/render-utils.js";
 import { getFirstTextContent } from "../_shared/tool-utils.js";
 import { asPositiveInteger, asString } from "../_shared/value-utils.js";

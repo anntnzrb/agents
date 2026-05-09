@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { GoalState } from "./format.js";
 import { emitGoalEvent, persistGoal, type GoalRuntime } from "./state.js";
 import { buildUpdateGoalCallText, buildUpdateGoalResultText, renderReusableText } from "./render.js";

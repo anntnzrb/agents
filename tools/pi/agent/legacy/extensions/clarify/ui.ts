@@ -1,4 +1,4 @@
-import type { Theme } from "@mariozechner/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 
 declare const setInterval: (handler: () => void, timeout: number) => number;
 declare const clearInterval: (timer: number) => void;
@@ -13,7 +13,7 @@ import {
   type TUI,
   visibleWidth,
   wrapTextWithAnsi,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import type { ClarifyAnswer, ClarifyQuestion, ClarifyResult } from "./models.js";
 import { getAutoSelectOption, getRecommendedOption } from "./results.js";
 

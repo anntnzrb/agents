@@ -2,7 +2,7 @@
  * Utility helpers for todos.
  */
 
-import { fuzzyMatch } from "@mariozechner/pi-tui";
+import { fuzzyMatch } from "@earendil-works/pi-tui";
 import { TODO_ID_PATTERN, TODO_ID_PREFIX } from "./constants.ts";
 import type { TodoFrontMatter } from "./types.ts";
 

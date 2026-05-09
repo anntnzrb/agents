@@ -2,7 +2,7 @@
  * Shared types for the answer extension.
  */
 
-import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 /** Structured output format for question extraction. */
 export interface ExtractedQuestion {

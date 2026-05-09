@@ -5,7 +5,7 @@
 import crypto from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import fs from "node:fs/promises";
-import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { TodoFrontMatter, TodoRecord } from "../types.ts";
 import {
   clearAssignmentIfClosed,
