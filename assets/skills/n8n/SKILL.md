@@ -1,6 +1,10 @@
 ---
 name: n8n
-description: "n8n automation via REST API (authoring) and MCP (runtime). Use REST for workflow CRUD; use MCP for listing/triggering enabled workflows."
+description: n8n automation via REST API (authoring) and MCP (runtime). Use REST for workflow CRUD; use MCP for listing/triggering enabled workflows.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

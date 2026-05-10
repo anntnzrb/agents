@@ -1,6 +1,10 @@
 ---
 name: context7
-description: "Retrieve up-to-date library/API docs and code examples via the Context7 HTTP API. Use for library-specific questions, setup/config steps, code generation, and verifying current APIs."
+description: Retrieve up-to-date library/API docs and code examples via the Context7 HTTP API. Use for library-specific questions, setup/config steps, code generation, and verifying current APIs.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

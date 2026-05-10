@@ -1,6 +1,10 @@
 ---
 name: mcporter
-description: "MCP (Model Context Protocol) CLI workflows via MCPorter. Use for MCP servers, tool listing/calls, ad-hoc MCP endpoints, auth/OAuth flows, and config management."
+description: MCP (Model Context Protocol) CLI workflows via MCPorter. Use for MCP servers, tool listing/calls, ad-hoc MCP endpoints, auth/OAuth flows, and config management.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

@@ -1,6 +1,10 @@
 ---
 name: readiness-report
-description: "Evaluate how well a codebase supports autonomous AI development. Analyzes repositories across eight technical pillars (Style & Validation, Build System, Testing, Documentation, Dev Environment, Debugging & Observability, Security, Task Discovery) and five maturity levels. Use when users request `/readiness-report` or want to assess agent readiness, codebase maturity, or identify gaps preventing effective AI-assisted development."
+description: Evaluate how well a codebase supports autonomous AI development. Analyzes repositories across eight technical pillars (Style & Validation, Build System, Testing, Documentation, Dev Environment, Debugging & Observability, Security, Task Discovery) and five maturity levels. Use when users request `/readiness-report` or want to assess agent readiness, codebase maturity, or identify gaps preventing effective AI-assisted development.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

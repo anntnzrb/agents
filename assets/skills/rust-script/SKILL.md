@@ -1,6 +1,10 @@
 ---
 name: rust-script
-description: "Expert guide for Cargo single-file Rust scripts (`-Zscript`) and fallback `rust-script` usage. Use when users ask about Rust scripting, shebang scripts, embedded Cargo manifests/frontmatter, `--manifest-path` for script files, command support/limits, migration from Python/TypeScript scripts, or debugging Cargo script errors and stabilization status."
+description: Expert guide for Cargo single-file Rust scripts (`-Zscript`) and fallback `rust-script` usage. Use when users ask about Rust scripting, shebang scripts, embedded Cargo manifests/frontmatter, `--manifest-path` for script files, command support/limits, migration from Python/TypeScript scripts, or debugging Cargo script errors and stabilization status.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

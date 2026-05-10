@@ -1,6 +1,10 @@
 ---
 name: youtube
-description: "Work with video and audio links. Activate when user shares a YouTube link, video URL, or any media link - regardless of the task (download, info, convert, extract, list, or explore). Uses yt-dlp for all operations."
+description: Work with video and audio links. Activate when user shares a YouTube link, video URL, or any media link - regardless of the task (download, info, convert, extract, list, or explore). Uses yt-dlp for all operations.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

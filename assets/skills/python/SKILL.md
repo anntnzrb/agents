@@ -1,6 +1,10 @@
 ---
 name: python
-description: "Develop Python with uv, Pyright strict, typed JSON/data shapes, boundary validation, and practical testing. Use whenever work touches .py files, pyproject.toml, uv commands, Python typing/static checking, JSON/API/RPC payloads, pydantic/msgspec boundaries, Hypothesis, pytest, asyncio, dataclasses, or packaging. Prefer this skill for new Python projects and significant Python refactors."
+description: Develop Python with uv, Pyright strict, typed JSON/data shapes, boundary validation, and practical testing. Use whenever work touches .py files, pyproject.toml, uv commands, Python typing/static checking, JSON/API/RPC payloads, pydantic/msgspec boundaries, Hypothesis, pytest, asyncio, dataclasses, or packaging. Prefer this skill for new Python projects and significant Python refactors.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

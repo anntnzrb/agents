@@ -1,6 +1,10 @@
 ---
 name: notebooklm
-description: "Use the nlm CLI to talk to NotebookLM notebooks. Activate when the user mentions NotebookLM, notebook, knowledge base, or asks to chat with their notebooks."
+description: Use the nlm CLI to talk to NotebookLM notebooks. Activate when the user mentions NotebookLM, notebook, knowledge base, or asks to chat with their notebooks.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

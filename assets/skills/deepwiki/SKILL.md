@@ -1,6 +1,10 @@
 ---
 name: deepwiki
-description: "DeepWiki MCP for GitHub repo docs and Q&A. Use for deepwiki, repo docs, GitHub repository questions, or codebase queries. Load the mcporter skill to execute this skill’s MCP calls."
+description: DeepWiki MCP for GitHub repo docs and Q&A. Use for deepwiki, repo docs, GitHub repository questions, or codebase queries. Load the mcporter skill to execute this skill’s MCP calls.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

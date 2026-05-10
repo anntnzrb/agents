@@ -1,6 +1,10 @@
 ---
 name: ast-grep
-description: "Read-only structural code search with ast-grep/sg. Grep/rg/sed alternative for AST-aware CLI exploration, pattern search, and fast code discovery. Activates on ast-grep/sg, structural search, AST search, find usages, tree-sitter."
+description: Read-only structural code search with ast-grep/sg. Grep/rg/sed alternative for AST-aware CLI exploration, pattern search, and fast code discovery. Activates on ast-grep/sg, structural search, AST search, find usages, tree-sitter.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

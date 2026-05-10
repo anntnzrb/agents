@@ -1,6 +1,10 @@
 ---
 name: grep-app
-description: "Search public GitHub code via Grep.app's HTTP API. Use for real-world usage examples, config snippets, and API syntax patterns."
+description: Search public GitHub code via Grep.app's HTTP API. Use for real-world usage examples, config snippets, and API syntax patterns.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

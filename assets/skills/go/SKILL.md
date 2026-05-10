@@ -1,6 +1,10 @@
 ---
 name: go
-description: "Execute a plan with parallel agent orchestration. Activate when user says /go, asks to execute a plan, or requests multi-agent parallelism."
+description: Execute a plan with parallel agent orchestration. Activate when user says /go, asks to execute a plan, or requests multi-agent parallelism.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

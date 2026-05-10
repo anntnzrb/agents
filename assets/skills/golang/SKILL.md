@@ -1,6 +1,10 @@
 ---
 name: golang
-description: "Develop Go (Golang) applications using modern patterns, popular libraries, and idiomatic design. Activate when working with .go files, go.mod, go.sum, or user mentions Go, Golang, goroutines, channels, or Go libraries like gin, cobra, gorm."
+description: Develop Go (Golang) applications using modern patterns, popular libraries, and idiomatic design. Activate when working with .go files, go.mod, go.sum, or user mentions Go, Golang, goroutines, channels, or Go libraries like gin, cobra, gorm.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

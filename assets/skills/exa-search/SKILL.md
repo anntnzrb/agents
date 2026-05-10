@@ -1,6 +1,10 @@
 ---
 name: exa-search
-description: "Primary search via Exa's HTTP API. Use for deeper web research, full-page content retrieval, answer generation, and richer synthesis when lightweight search is not enough."
+description: Primary search via Exa's HTTP API. Use for deeper web research, full-page content retrieval, answer generation, and richer synthesis when lightweight search is not enough.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

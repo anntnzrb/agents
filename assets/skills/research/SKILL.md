@@ -1,6 +1,10 @@
 ---
 name: research
-description: "Research router for selecting the best source path across GitHub/repo docs, API/library docs, OSS code patterns, live web search, Reddit sentiment, and NotebookLM knowledge bases. Use when tasks involve research, fact-checking, source-backed comparisons, evidence gathering, trend checks, or confidence validation. Route code/docs work to gh+deepwiki+context7+grep-app, route web/live work to brave-search+exa-search, route sentiment/discussion to reddit, and route notebook sources to notebooklm. Exclude summarize from this router."
+description: Research router for selecting the best source path across GitHub/repo docs, API/library docs, OSS code patterns, live web search, Reddit sentiment, and NotebookLM knowledge bases. Use when tasks involve research, fact-checking, source-backed comparisons, evidence gathering, trend checks, or confidence validation. Route code/docs work to gh+deepwiki+context7+grep-app, route web/live work to brave-search+exa-search, route sentiment/discussion to reddit, and route notebook sources to notebooklm. Exclude summarize from this router.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

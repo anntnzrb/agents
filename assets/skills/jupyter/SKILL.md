@@ -1,6 +1,10 @@
 ---
 name: jupyter
-description: "Work with Jupyter notebooks without leaving Claude Code. Execute cells, inspect outputs, validate structure, and convert formats. Activate when working with .ipynb files, user mentions notebooks, Jupyter, or needs to run/debug notebook code."
+description: Work with Jupyter notebooks without leaving Claude Code. Execute cells, inspect outputs, validate structure, and convert formats. Activate when working with .ipynb files, user mentions notebooks, Jupyter, or needs to run/debug notebook code.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

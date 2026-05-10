@@ -1,6 +1,10 @@
 ---
 name: reddit
-description: "Read Reddit directly via Reddit's public JSON endpoints. Use for subreddit browsing, search, post/comment retrieval, user activity analysis, and common Reddit glossary lookups."
+description: Read Reddit directly via Reddit's public JSON endpoints. Use for subreddit browsing, search, post/comment retrieval, user activity analysis, and common Reddit glossary lookups.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

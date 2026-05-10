@@ -1,7 +1,11 @@
 ---
 name: flight-live
 description: Read-only flight search via Kiwi web scraping through agent-browser (nix wrapper) plus public skypicker location resolution. Use for date-window fare discovery, shortlist ranking, and weekday/weekend tradeoff checks with machine-readable output.
+license: GPL-3.0-or-later
 compatibility: Requires `uv` and `nix`. Uses bundled skill-local `scripts/cli.py`. Network access required.
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

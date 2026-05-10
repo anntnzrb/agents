@@ -1,6 +1,10 @@
 ---
 name: skill-creator
-description: "Create, audit, refactor, benchmark, and optimize skills. Use whenever the user wants a new skill, a second pass on an existing skill, help validating SKILL.md structure, evals, benchmarks, packaging, or trigger descriptions — even if they only ask for cleanup, iteration, or skill polish."
+description: Create, audit, refactor, benchmark, and optimize skills. Use whenever the user wants a new skill, a second pass on an existing skill, help validating SKILL.md structure, evals, benchmarks, packaging, or trigger descriptions — even if they only ask for cleanup, iteration, or skill polish.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

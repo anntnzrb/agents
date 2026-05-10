@@ -1,6 +1,10 @@
 ---
 name: gleam
-description: "Develop with Gleam using idiomatic patterns, TDD, and type-driven design. Activate when working with .gleam files, gleam.toml, or user mentions Gleam, BEAM, or Erlang."
+description: Develop with Gleam using idiomatic patterns, TDD, and type-driven design. Activate when working with .gleam files, gleam.toml, or user mentions Gleam, BEAM, or Erlang.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

@@ -1,6 +1,10 @@
 ---
 name: apple-shortcuts
-description: "Design, implement, debug, and optimize Apple Shortcuts automations across iPhone, iPad, Mac, Apple Watch, and Apple Vision Pro. Use when requests involve building shortcut logic, selecting actions/variables, creating personal or home automations, managing installed shortcuts from the Mac CLI, generating importable .shortcut/plist files, integrating App Intents/App Shortcuts, troubleshooting shortcut behavior, or mining the local shortcuts-docs-corpus for authoritative references."
+description: Design, implement, debug, and optimize Apple Shortcuts automations across iPhone, iPad, Mac, Apple Watch, and Apple Vision Pro. Use when requests involve building shortcut logic, selecting actions/variables, creating personal or home automations, managing installed shortcuts from the Mac CLI, generating importable .shortcut/plist files, integrating App Intents/App Shortcuts, troubleshooting shortcut behavior, or mining the local shortcuts-docs-corpus for authoritative references.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 

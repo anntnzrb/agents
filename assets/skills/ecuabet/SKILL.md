@@ -1,6 +1,10 @@
 ---
 name: ecuabet
-description: "Advanced multi-feed Ecuabet match intelligence using skill-local scripts and references. Use when given an Ecuabet match id/url and you need one-shot or live decision output with confidence, EV, market context, incidents, and feed-health diagnostics."
+description: Advanced multi-feed Ecuabet match intelligence using skill-local scripts and references. Use when given an Ecuabet match id/url and you need one-shot or live decision output with confidence, EV, market context, incidents, and feed-health diagnostics.
+license: GPL-3.0-or-later
+metadata:
+  author: anntnzrb
+allowed-tools: ""
 disable-model-invocation: true
 ---
 
