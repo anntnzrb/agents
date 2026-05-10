@@ -61,6 +61,7 @@ declare module "@earendil-works/pi-coding-agent" {
 			notify: (message: string, level?: string) => void;
 			setFooter: (factory: (...args: any[]) => any) => void;
 			custom: <T>(factory: (...args: any[]) => T | Promise<T>) => Promise<T>;
+			select?: (title: string, options: string[]) => Promise<string | undefined>;
 		};
 		getContextUsage: () => ContextUsage | null;
 		getSystemPrompt: () => string | null;
@@ -150,6 +151,7 @@ declare module "@earendil-works/pi-coding-agent" {
 		setActiveTools: (tools: string[]) => void;
 		getAllTools: () => ToolInfo[];
 		getCommands: () => RegisteredCommand[];
+		setLabel?: (entryId: string, label?: string) => void;
 		appendEntry: <T>(customType: string, data: T) => void;
 		sendMessage: (
 			message: {
@@ -234,9 +236,13 @@ declare module "@earendil-works/pi-coding-agent" {
 	}): { skills: Skill[]; diagnostics: unknown[] };
 	export function getMarkdownTheme(): unknown;
 	export const DynamicBorder: any;
+	export const BorderedLoader: any;
+	export const TreeSelectorComponent: any;
 }
 
 declare module "@earendil-works/pi-ai" {
+	export function complete(...args: any[]): Promise<any>;
+	export type UserMessage = any;
 	export type MessageContentPart = {
 		type: string;
 		text?: string;
@@ -285,6 +291,7 @@ declare module "@earendil-works/pi-tui" {
 	}
 
 	export const Key: any;
+	export function getKeybindings(): any;
 	export type Component = any;
 	export type TUI = any;
 	export function matchesKey(...args: any[]): boolean;
