@@ -10,36 +10,35 @@ disable-model-invocation: true
 
 # Browser Automation with agent-browser
 
-## Entry point
+Use `agent-browser` for browser tasks: navigate sites, fill forms, click controls, authenticate, capture screenshots/PDFs, extract page data, test web apps, compare page states, or automate repeatable browser interactions.
 
-Cross-platform:
+## Entry Point
+
+Canonical entry:
 
 ```text
 uv run --script <skill-dir>/scripts/cli.py ...
 ```
 
-Set `<skill-dir>` to this skill directory. Do not rely on shell functions, shell sourcing, executable bits, or shebang dispatch. The wrapper delegates to `nix run github:numtide/llm-agents.nix#agent-browser -- ...` and preserves exit codes.
+Set `<skill-dir>` to this skill directory. NEVER rely on shell functions, shell sourcing, executable bits, or shebang dispatch. The wrapper delegates to `nix run github:numtide/llm-agents.nix#agent-browser -- ...` and preserves exit codes.
 
-Examples below use `agent-browser ...` as readable shorthand for `uv run --script <skill-dir>/scripts/cli.py ...`; invoke the canonical command in actual tool calls unless your environment already provides an equivalent `agent-browser` executable.
+Examples use `agent-browser ...` as readable shorthand for `uv run --script <skill-dir>/scripts/cli.py ...`; invoke the canonical command in actual tool calls unless the environment already provides an equivalent `agent-browser` executable.
 
-## Required lifecycle (must follow)
+<critical>
+- Before each new browser task, you MUST run `uv run --script <skill-dir>/scripts/cli.py close` once to clear stale sessions.
+- After every browser task, you MUST run `uv run --script <skill-dir>/scripts/cli.py close`, even when a command fails.
+- On interruption, uncertainty, stale daemon state, or unknown browser state, you MUST run `uv run --script <skill-dir>/scripts/cli.py close` immediately, then restart from `open`.
+- NEVER infer missing authentication from absent environment variables alone. agent-browser MAY authenticate via its auth vault, saved browser state, or an existing session. Verify auth with real commands: `agent-browser auth list`, `agent-browser state list`, or the actual login flow.
+- Element refs such as `@e1` are snapshot-local. After navigation, reload, DOM mutation, modal open/close, filtering, pagination, or any interaction that may change the tree, you MUST run `agent-browser snapshot -i` again before using refs.
+</critical>
 
-Hard rules:
+<workflow>
+Every browser automation MUST follow this loop:
 
-1. Before each new task, run `uv run --script <skill-dir>/scripts/cli.py close` once to clear stale sessions.
-2. End every task with `uv run --script <skill-dir>/scripts/cli.py close`, even when a command fails.
-3. If interrupted or unsure about state, run `uv run --script <skill-dir>/scripts/cli.py close` immediately, then restart from `open`.
-
-Auth check policy: do not infer missing auth from absent environment variables alone. agent-browser may authenticate via its auth vault, saved browser state, or an existing session. Verify with real commands like `agent-browser auth list`, `agent-browser state list`, or the actual login flow.
-
-## Core Workflow
-
-Every browser automation follows this pattern:
-
-1. **Navigate**: `agent-browser open <url>`
-2. **Snapshot**: `agent-browser snapshot -i` (get element refs like `@e1`, `@e2`)
-3. **Interact**: Use refs to click, fill, select
-4. **Re-snapshot**: After navigation or DOM changes, get fresh refs
+1. Navigate: `agent-browser open <url>`
+2. Snapshot: `agent-browser snapshot -i` to obtain current element refs.
+3. Interact: click, fill, select, check, type, scroll, or wait using current refs.
+4. Re-snapshot: after navigation or DOM changes, refresh refs and inspect the result.
 
 ```text
 agent-browser open https://example.com/form
@@ -50,12 +49,13 @@ agent-browser fill @e1 "user@example.com"
 agent-browser fill @e2 "password123"
 agent-browser click @e3
 agent-browser wait --load networkidle
-agent-browser snapshot -i  # Check result
+agent-browser snapshot -i
 ```
+</workflow>
 
 ## Command Chaining
 
-Commands can be chained with `&&` in a single shell invocation. The browser persists between commands via a background daemon, so chaining is safe and more efficient than separate calls.
+You MAY chain commands with `&&` in one shell invocation. The browser persists between commands via a background daemon, so chaining is safe only when later commands need no unobserved intermediate output.
 
 ```text
 # Chain open + wait + snapshot in one call
@@ -68,7 +68,7 @@ agent-browser fill @e1 "user@example.com" && agent-browser fill @e2 "password123
 agent-browser open https://example.com && agent-browser wait --load networkidle && agent-browser screenshot page.png
 ```
 
-**When to chain:** Use `&&` when you don't need to read the output of an intermediate command before proceeding (e.g., open + wait + screenshot). Run commands separately when you need to parse the output first (e.g., snapshot to discover refs, then interact using those refs).
+Use `&&` only when intermediate output is irrelevant, such as open + wait + screenshot. Run commands separately when output determines the next action, especially `snapshot -i` before ref-based interaction.
 
 ## Essential Commands
 
@@ -139,13 +139,15 @@ agent-browser select @e3 "California"
 agent-browser check @e4
 agent-browser click @e5
 agent-browser wait --load networkidle
+agent-browser snapshot -i
 ```
 
-### Authentication with Auth Vault (Recommended)
+### Authentication with Auth Vault
+
+Prefer the auth vault when credentials must be reused. Pipe passwords via stdin to avoid shell history exposure.
 
 ```text
 # Save credentials once (encrypted with AGENT_BROWSER_ENCRYPTION_KEY)
-# Recommended: pipe password via stdin to avoid shell history exposure
 echo "pass" | agent-browser auth save github --url https://github.com/login --username user --password-stdin
 
 # Login using saved profile (LLM never sees password)
@@ -158,6 +160,8 @@ agent-browser auth delete github
 ```
 
 ### Authentication with State Persistence
+
+Use saved browser state when the login flow establishes cookies, localStorage, OAuth state, or 2FA-bound sessions.
 
 ```text
 # Login once and save state
@@ -175,6 +179,8 @@ agent-browser open https://app.example.com/dashboard
 ```
 
 ### Session Persistence
+
+Use named sessions for automatic cookie/localStorage restore across restarts. Set `AGENT_BROWSER_ENCRYPTION_KEY` when state requires encryption at rest.
 
 ```text
 # Auto-save/restore cookies and localStorage across browser restarts
@@ -198,6 +204,8 @@ agent-browser state clean --older-than 7
 
 ### Data Extraction
 
+Extract only what the task requires. Prefer scoped selectors or refs over whole-page dumps when precision matters.
+
 ```text
 agent-browser open https://example.com/products
 agent-browser snapshot -i
@@ -211,6 +219,8 @@ agent-browser get text @e1 --json
 
 ### Parallel Sessions
 
+Use separate sessions for concurrent sites, isolated identities, or comparison workflows.
+
 ```text
 agent-browser --session site1 open https://site-a.com
 agent-browser --session site2 open https://site-b.com
@@ -223,6 +233,8 @@ agent-browser session list
 
 ### Connect to Existing Chrome
 
+Use an existing Chrome only when remote debugging is intentionally enabled or CDP attachment is required.
+
 ```text
 # Auto-discover running Chrome with remote debugging enabled
 agent-browser --auto-connect open https://example.com
@@ -232,7 +244,7 @@ agent-browser --auto-connect snapshot
 agent-browser --cdp 9222 snapshot
 ```
 
-### Color Scheme (Dark Mode)
+### Color Scheme
 
 ```text
 # Persistent dark mode via flag (applies to all pages and new tabs)
@@ -245,7 +257,9 @@ AGENT_BROWSER_COLOR_SCHEME=dark agent-browser open https://example.com
 agent-browser set media dark
 ```
 
-### Visual Browser (Debugging)
+### Visual Browser
+
+Use headed mode for debugging, visual QA, highlighting, recording, or profiling.
 
 ```text
 agent-browser --headed open https://example.com
@@ -255,9 +269,9 @@ agent-browser profiler start         # Start Chrome DevTools profiling
 agent-browser profiler stop trace.json # Stop and save profile (path optional)
 ```
 
-Use `AGENT_BROWSER_HEADED=1` to enable headed mode via environment variable. Browser extensions work in both headed and headless mode.
+`AGENT_BROWSER_HEADED=1` enables headed mode via environment variable. Browser extensions work in both headed and headless mode.
 
-### Local Files (PDFs, HTML)
+### Local Files
 
 ```text
 # Open local files with file:// URLs
@@ -267,6 +281,8 @@ agent-browser screenshot output.png
 ```
 
 ### iOS Simulator (Mobile Safari)
+
+Use iOS mode for Mobile Safari workflows. Requirements: macOS with Xcode, Appium (`npm install -g appium && appium driver install xcuitest`). Physical iOS devices work when pre-configured; use `--device "<UDID>"` where UDID is from `xcrun xctrace list devices`.
 
 ```text
 # List available iOS simulators
@@ -288,19 +304,9 @@ agent-browser -p ios screenshot mobile.png
 agent-browser -p ios close
 ```
 
-**Requirements:** macOS with Xcode, Appium (`npm install -g appium && appium driver install xcuitest`)
-
-**Real devices:** Works with physical iOS devices if pre-configured. Use `--device "<UDID>"` where UDID is from `xcrun xctrace list devices`.
-
 ## Advanced Workflows
 
-Use the advanced reference when you need:
-- content boundaries, allowlists, action policy, or output limits
-- snapshot/screenshot diffing and regression checks
-- timeout strategy for slow pages
-- ref invalidation / re-snapshot rules
-- semantic locators or `eval` usage
-- persistent config file behavior
+Read the advanced reference only when you need content boundaries, allowlists, action policy, output limits, snapshot/screenshot diffing, timeout strategy, ref lifecycle troubleshooting, semantic locators, `eval`, or persistent config behavior.
 
 See [references/advanced.md](references/advanced.md).
 
@@ -319,7 +325,7 @@ See [references/advanced.md](references/advanced.md).
 
 ## Experimental: Native Mode
 
-agent-browser has an experimental native Rust daemon that communicates with Chrome directly via CDP, bypassing Node.js and Playwright entirely. It is opt-in and not recommended for production use yet.
+Native mode is experimental. It uses a Rust daemon that communicates with Chrome directly via CDP, bypassing Node.js and Playwright. Use it only when explicitly needed; it is not RECOMMENDED for production.
 
 ```text
 # Enable via flag
@@ -330,4 +336,8 @@ export AGENT_BROWSER_NATIVE=1
 agent-browser open example.com
 ```
 
-The native daemon supports Chromium and Safari (via WebDriver). Firefox and WebKit are not yet supported. All core commands (navigate, snapshot, click, fill, screenshot, cookies, storage, tabs, eval, etc.) work identically in native mode. Use `agent-browser close` before switching between native and default mode within the same session.
+The native daemon supports Chromium and Safari via WebDriver. Firefox and WebKit are not yet supported. Core commands such as navigate, snapshot, click, fill, screenshot, cookies, storage, tabs, and eval should behave the same as default mode. You MUST run `agent-browser close` before switching between native and default mode within the same session.
+
+<critical>
+At task end, close the browser with `uv run --script <skill-dir>/scripts/cli.py close`. If any browser command output changes the page, invalidates refs, or raises state uncertainty, re-enter the workflow from snapshot or open rather than guessing.
+</critical>

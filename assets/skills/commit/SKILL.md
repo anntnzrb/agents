@@ -10,18 +10,18 @@ disable-model-invocation: true
 
 # Commit Skill
 
-Turn a dirty worktree into the smallest honest set of commits. Plan the whole set first. Then stage, verify, commit, refresh, and repeat until all intended changes are handled.
+Turn a dirty worktree into the smallest honest set of commits. Plan the full set first. Stage exactly, validate intentionally, commit from a message file, refresh state, and repeat until every intended change is committed or explicitly left behind.
 
 WORKING DIRECTORY: optional argument, default current directory.
 
 ## Goals
-- One logical unit per commit
-- No early work hidden inside a later-message catch-all commit
-- Exact staging; hunk-level when needed
-- Message-file workflow every time
-- Repo conventions first; fallback to conventional commits
-- Changelog or fragment updates travel with the change they describe
-- End with a clean accounting of what was committed vs left behind
+- Create one logical unit per commit.
+- Keep early work out of later catch-all commits.
+- Stage exact files or hunks; use hunk-level staging for mixed files.
+- Use message-file commits every time.
+- Follow repo conventions before fallback conventions.
+- Commit changelog or release fragments with the code they describe.
+- End with a complete accounting of committed and remaining work.
 
 ## Engine selection
 1. Discover repo policy first. Read the smallest repo-local set that controls commits:
@@ -29,21 +29,21 @@ WORKING DIRECTORY: optional argument, default current directory.
    - `CONTRIBUTING.md`, `README.md`, release docs, issue-closing rules
    - commit templates, `.gitmessage`, `commitlint*`, hook config (`.husky/`, `.lefthook/`, `.pre-commit-config.yaml`, `lint-staged`)
    - changelog/release systems: `CHANGELOG.md`, `.changeset/`, `newsfragments/`, `changelog.d/`, release automation
-   - recent commit subjects if style is still unclear
-   Extract: message format, trailers/signoff/DCO, required validation, changelog expectations, issue refs, and whether push is allowed.
+   - recent commit subjects when style is still unclear
+   Extract message format, trailers/signoff/DCO, required validation, changelog expectations, issue refs, and push policy.
 2. Use **But mode** when the repo is GitButler-managed and `but status --json` is the natural write path.
 3. Otherwise use **Git mode**.
-4. Once in But mode, do not use raw `git add`, `git commit`, `git rebase`, or similar write commands. Read-only Git inspection is fine.
+4. In But mode, NEVER use raw `git add`, `git commit`, `git rebase`, or equivalent write commands. Read-only Git inspection MAY be used.
 
 ## Planning rules
 Before the first write:
-- Inspect the full state.
-- Fast-path trivial diffs. If the whole change is whitespace-only, formatting-only, import-only, or comment-only, prefer one small `style` or `chore` commit and usually skip changelog work unless repo policy says otherwise.
+- Inspect the full state. NEVER commit from a partial view.
+- Fast-path trivial diffs. If the full change is whitespace-only, formatting-only, import-only, or comment-only, SHOULD use one small `style` or `chore` commit and usually skip changelog work unless repo policy requires it.
 - Draft the full commit plan:
   - every intended staged hunk belongs to exactly one commit
-  - if the same file spans multiple commits, name exact hunk or line ownership
-  - note dependencies when order matters; execute in dependency order
-  - decide validation and changelog work per commit, not as an afterthought
+  - mixed files name exact hunk or line ownership per commit
+  - dependency order is explicit when order matters
+  - validation and changelog handling are decided per commit
 - If the user asked for preview, dry-run, or message help only, stop after the plan.
 
 ## Commit loop
@@ -54,7 +54,7 @@ Before the first write:
 3. If grouping, policy, or validation scope is ambiguous, call `clarify` before mutating.
 4. Commit only the next approved group.
 5. Refresh remaining changes after each commit.
-6. Re-plan if hunk IDs, file ownership, or changelog targets changed.
+6. Re-plan if hunk IDs, file ownership, changelog targets, or validation scope changed.
 7. Repeat until all intended changes are committed or the user says stop.
 8. End with a compact report: commits created, validation run/skipped, changelog updates, and remaining changes.
 
@@ -64,7 +64,7 @@ Before the first write:
 - Separate formatting-only work from semantic changes.
 - Separate tests from implementation when independently meaningful.
 - Separate docs, config, and build changes unless tightly coupled.
-- Mixed file: split by hunk. Escalate from file-level to hunk-level rather than bundling.
+- Split mixed files by hunk. Escalate from file-level to hunk-level rather than bundling.
 - Keep changelog fragments or manual changelog hunks with the commit they describe.
 - Prefer a few small truthful commits over one “final state” commit.
 
@@ -74,31 +74,43 @@ Use repo-specific convention if defined. Otherwise use conventional commits.
 ### Default format
 - Subject: `type(scope): description`
 - Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
-- Subject: imperative, specific, max 52 chars unless repo history clearly uses a different limit
-- Blank line between subject and body
-- Body: wrap at 72 chars
-- Focus on intent and effect, not file-by-file narration
-- No bullets unless the repo style strongly prefers them
+- Subject MUST be imperative, specific, and max 52 chars unless repo history clearly uses a different limit.
+- Leave one blank line between subject and body.
+- Wrap body at 72 chars.
+- Focus on intent and effect, not file-by-file narration.
+- Avoid bullets unless repo style strongly prefers them.
 
 ### Message lint
-Before commit, check:
-- no trailing period in subject
-- no filler like `various`, `several`, `misc`, `improved`, `enhanced`, `better`
-- no meta phrases like `this commit`, `this change`, `updated code`, `modified files`, `address review comments`
+Before commit, verify:
+- subject has no trailing period
+- subject is imperative
+- subject is max 52 chars unless repo history clearly uses a different limit
+- subject has no filler words: `various`, `several`, `misc`, `improved`, `enhanced`, `better`
+- message has no meta phrases: `this commit`, `this change`, `updated code`, `modified files`, `address review comments`
 - scope and type fit the touched files
-- if repo history uses a different tense or trailer style, mirror the repo instead of the fallback
+- repo-specific tense, trailer, signoff, and issue-reference style override fallback style
+
+WRONG:
+```text
+chore: various updates.
+```
+
+RIGHT:
+```text
+chore(config): tighten commit lint
+```
 
 ### Message-file rule
 Always draft the full message into a temp file first.
 - Git: `git commit -F "$msgfile"`
 - But: `but commit --message-file "$msgfile"`
 
-This keeps formatting stable and avoids shell-quoting mistakes.
+This preserves formatting and avoids shell-quoting mistakes. NEVER pass multiline messages directly on the command line.
 
 ## Validation gate
-- Discover repo-required validation first.
+- Discover repo-required validation before committing.
 - Prefer the narrowest meaningful gate for the affected package/app: focused tests, lint, typecheck, or build before whole-repo suites.
-- Do not invent expensive validation when the repo gives no signal. If only heavy or ambiguous validation exists, call `clarify`.
+- NEVER invent expensive validation when the repo gives no signal. If only heavy or ambiguous validation exists, call `clarify`.
 - If validation fails, stop before the next commit. Report:
   - failing command
   - whether anything was already committed
@@ -113,13 +125,23 @@ When the repo expects changelog or release fragments:
   - add only user-visible entries
   - skip trivial/style/test-only/internal refactor entries unless repo policy requires them
   - deduplicate or update draft entries instead of appending duplicates
-  - never edit released sections
+  - NEVER edit released sections
 - Fragment systems (`.changeset`, `newsfragments`, `changelog.d`, Towncrier, release-please, semantic-release):
   - commit the fragment with the code change it describes
-  - do not hand-edit generated release output unless repo docs explicitly require it
+  - NEVER hand-edit generated release output unless repo docs explicitly require it
 - If changelog policy is ambiguous, missing an `[Unreleased]` section, or release automation owns the file, stop and ask.
 
 Load `references/changelog.md` when changelog or release automation is relevant.
+
+WRONG:
+```text
+Commit code now and add the changelog later.
+```
+
+RIGHT:
+```text
+Commit the changelog fragment with the code change it describes.
+```
 
 ## Git mode
 Use this in normal Git repos.
@@ -141,7 +163,7 @@ Preferred order:
 1. Whole-file stage only when the file is one logical unit.
 2. `git add -p -- <path>` for mixed files when patch UI is usable.
 3. `git add -e -- <path>` when patch mode still groups too much together.
-4. Patch-file or pathspec-file flows from `references/git.md` when you need exact noninteractive control, weird filenames, or partial new-file staging.
+4. Patch-file or pathspec-file flows from `references/git.md` when exact noninteractive control, weird filenames, or partial new-file staging are required.
 
 ### Repair over-staging
 If the index got too much:
@@ -157,6 +179,8 @@ For noninteractive repair or exact reversals, use the reverse-apply patterns in 
 ```bash
 git diff --cached
 ```
+
+NEVER trust staging blindly. The cached diff MUST match the intended commit.
 
 ### Commit
 ```bash
@@ -180,13 +204,13 @@ Use this in GitButler-managed repos.
 ```bash
 but status --json
 ```
-- For mutations, prefer:
+- For mutations, SHOULD use:
 ```bash
 but <mutation> --json --status-after
 ```
 - Use CLI IDs from `but status --json` or `but diff --json`.
-- Prefer `but` writes over raw Git writes.
-- Refresh IDs after every mutation. Do not assume old IDs still point at the same hunks or commits.
+- SHOULD use `but` writes over raw Git writes.
+- Refresh IDs after every mutation. NEVER assume old IDs still point at the same hunks or commits.
 
 ### Exact hunk commit
 1. Inspect:
@@ -226,7 +250,7 @@ Read `references/but.md` when you need exact command patterns, message-file-safe
 ## Split-a-mixed-commit rule
 If the task is “split the last mixed commit”:
 - Git mode: use the documented reset/patch loop from `references/git.md`
-- But mode: prefer native history surgery (`uncommit`, `move`, `squash`, `reword`, `commit empty`, `absorb`) instead of raw Git rewrites
+- But mode: SHOULD use native history surgery (`uncommit`, `move`, `squash`, `reword`, `commit empty`, `absorb`) instead of raw Git rewrites
 
 ## Edge cases
 Stop and reassess before writing when you see:
@@ -238,14 +262,24 @@ Stop and reassess before writing when you see:
 - user requested only a subset and the rest of the worktree is dirty
 
 ## Safety checks
-- Never commit before seeing the whole change set.
-- If nothing is staged: stage only the intended files/hunks unless the user explicitly said staged-only.
-- Never leave staged files/hunks unaccounted for. Every staged change must be committed now or intentionally left untouched because the user asked.
-- Never trust staging blindly; verify with cached diff or returned JSON state.
+- NEVER commit before seeing the whole change set.
+- If nothing is staged, stage only the intended files/hunks unless the user explicitly said staged-only.
+- NEVER leave staged files/hunks unaccounted for. Every staged change MUST be committed now or intentionally left untouched because the user asked.
+- NEVER trust staging blindly; verify with cached diff or returned JSON state.
 - If split-plan dependencies become circular or unclear, stop and re-plan.
-- Never push unless the user explicitly asked for it.
+- NEVER push unless the user explicitly asked for it.
 - If a repo has custom commit rules, follow them over the fallback format.
 - If the user asks for only part of the work to be committed, leave the rest untouched.
+
+WRONG:
+```text
+Commit whatever is already staged without inspection.
+```
+
+RIGHT:
+```text
+Inspect the cached diff or returned JSON state, then commit only accounted-for changes.
+```
 
 ## Return format
 Return a compact plain-text report:
