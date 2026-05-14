@@ -1,0 +1,5 @@
+{
+  "name": "@agents/omp-extensions",
+  "private": true,
+  "type": "module"
+}
