@@ -22,6 +22,8 @@ mcp:
   enableProjectConfig: false
   discoveryMode: false
   notifications: false
+tools:
+  discoveryMode: all
 lsp:
   enabled: false
 bashInterceptor:
@@ -43,7 +45,6 @@ disabledProviders:
   - github
   - mcp-json
   - opencode
-  - ssh-json
   - vscode
   - windsurf
 commands: 
