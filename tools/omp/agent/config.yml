@@ -68,6 +68,8 @@ bashInterceptor:
       flags: i
       tool: python
       message: "Python CLI tools must run through uv. Load `/skill:python`, then use `uv run <tool>`, `uvx <tool>`, or `uv tool run <tool>`."
+github:
+  enabled: true
 disabledProviders:
   - claude
   - claude-plugins
@@ -75,10 +77,10 @@ disabledProviders:
   - codex
   - cursor
   - gemini
-  - github
   - mcp-json
   - opencode
   - vscode
+  - github
   - windsurf
 commands: 
   enableClaudeProject: false
