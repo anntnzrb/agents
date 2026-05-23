@@ -36,12 +36,38 @@ lsp:
 bashInterceptor:
   enabled: true
   patterns:
-    - pattern: "^\\s*(python|python3(?:\\.\\d+)*)\\b"
+    - pattern: "^(?!.*\\buv\\s+run\\b).*\\b(?:pythonw?(?:[23])?(?:\\.\\d+)*(?:\\.exe)?|py(?:\\.exe)?|pypy(?:3)?(?:\\.exe)?)\\b"
+      flags: i
       tool: python
-      message: "python/python3 is disabled. Load `/skill:python`."
-    - pattern: "\\bpython(?:3(?:\\.\\d+)*)?\\b"
+      message: "Direct Python execution is disabled. Load `/skill:python`, then use uv workflow (`uv run`, `uv run --with`, `uv add`)."
+    - pattern: "^(?!.*\\buv\\s+pip\\b).*\\b(?:pip(?:[23])?(?:\\.\\d+)*(?:\\.exe)?|pipx(?:\\.exe)?)\\b"
+      flags: i
       tool: python
-      message: "Anything invoking python is disabled. Load `/skill:python`."
+      message: "pip/pipx is disabled. Load `/skill:python`, then use uv workflow (`uv add`, `uv pip`, `uv run --with`, `uv tool`)."
+    - pattern: "\\b(?:pip-compile|pip-sync|pipdeptree)(?:\\.exe)?\\b"
+      flags: i
+      tool: python
+      message: "pip-tools style commands are disabled. Load `/skill:python`, then use `uv pip compile`, `uv pip sync`, or uv-native project commands."
+    - pattern: "\\b(?:conda|hatch|mamba|micromamba|pdm|pipenv|poetry|rye|virtualenv|pyenv)(?:\\.exe)?\\b"
+      flags: i
+      tool: python
+      message: "Python env/package/version tooling is disabled. Load `/skill:python`, then use uv workflow (`uv python`, `uv sync`, `uv add`, `uv run`)."
+    - pattern: "\\b(?:twine|flit)(?:\\.exe)?\\b"
+      flags: i
+      tool: python
+      message: "Python publish/build tooling is disabled. Load `/skill:python`, then use uv workflow (`uv build`, `uv publish`)."
+    - pattern: "\\b(?:pythonw?(?:[23])?(?:\\.\\d+)*|py|pypy3?)\\b[^\\n;|&]*(?:\\s-m\\s*(?:pip|venv|virtualenv|ensurepip|py_compile|compileall|build|twine)\\b|\\s-m(?:pip|venv|virtualenv|ensurepip|py_compile|compileall|build|twine)\\b)"
+      flags: i
+      tool: python
+      message: "`python -m ...` Python tooling is disabled. Load `/skill:python`, then use uv workflow (`uv run`, `uv pip`, `uv build`, `uv publish`)."
+    - pattern: "\\b(?:pythonw?(?:[23])?(?:\\.\\d+)*|py|pypy3?)\\b[^\\n;|&]*\\bsetup\\.py\\b"
+      flags: i
+      tool: python
+      message: "`python setup.py ...` is disabled. Load `/skill:python`, then use PEP 517/uv workflow (`uv build`, `uv publish`, `uv sync`)."
+    - pattern: "^(?!.*\\b(?:uv\\s+run|uvx|uv\\s+tool\\s+run)\\b).*\\b(?:pytest|py\\.test|tox|nox|coverage|mypy|pyright|ruff|black|isort|flake8|pylint|ipython|jupyter|jupyter-lab|jupyter-notebook|notebook)(?:\\.exe)?\\b"
+      flags: i
+      tool: python
+      message: "Python CLI tools must run through uv. Load `/skill:python`, then use `uv run <tool>`, `uvx <tool>`, or `uv tool run <tool>`."
 disabledProviders:
   - claude
   - claude-plugins
