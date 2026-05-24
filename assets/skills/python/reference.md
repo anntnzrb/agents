@@ -1,234 +1,17 @@
-# Reference Guide
+# Python Quick Reference
 
-## Data Structure Selection
-
-| Need | Data Structure |
-|------|----------------|
-| Ordered, mutable sequence | `list` |
-| Immutable sequence | `tuple` |
-| Fast lookup by key | `dict` |
-| Membership testing | `set` / `frozenset` |
-| FIFO queue | `collections.deque` |
-| Priority queue | `heapq` |
-| Counting | `collections.Counter` |
-| Ordered dict | `dict` (insertion order since 3.7) |
-| Default values | `collections.defaultdict` |
-
-### When to Use What
-
-- **list**: Default mutable sequence. O(1) append, O(n) insert/delete
-- **tuple**: Immutable, hashable. Use for fixed data, dict keys, return values
-- **dict**: Key-value lookup. O(1) average access
-- **set**: Membership testing O(1), deduplication, set operations
-- **deque**: Fast append/pop from both ends. Use for queues
-- **namedtuple/dataclass**: Structured data with named fields
-
-## Naming Conventions (PEP 8)
-
-```python
-# snake_case for functions and variables
-def calculate_total_price(items: list) -> float: ...
-user_count = 42
-
-# SCREAMING_SNAKE_CASE for constants
-MAX_RETRY_ATTEMPTS = 3
-DEFAULT_TIMEOUT = 30
-
-# PascalCase for classes
-class UserRepository: ...
-class HTTPClient: ...  # Acronyms capitalized
-
-# _leading underscore for private
-def _internal_helper(): ...
-_cache = {}
-
-# __dunder__ for magic methods
-def __init__(self): ...
-def __repr__(self): ...
-```
-
-## Best Practices
-
-### Do
-
-- **Use type hints**: Document intent, enable static analysis
-- **Prefer immutability**: `frozen=True` dataclasses, tuples over lists
-- **Write pure functions**: Same input, same output, no side effects
-- **Use context managers**: `with` for resource cleanup
-- **Leverage comprehensions**: Readable, Pythonic transformations
-- **Validate at boundaries**: Parse untrusted input once, then trust typed internal data.
-- **Use Protocol for interfaces**: Structural typing, duck typing
-
-### Don't
-
-- **Avoid mutable default args**: `def f(lst=None)` not `def f(lst=[])`
-- **Don't catch bare Exception**: Be specific about error types
-- **Avoid global state**: Pass dependencies explicitly
-- **Don't mutate function args**: Return new values instead
-- **Avoid deep inheritance**: Composition over inheritance
-- **Don't ignore type errors**: Fix them, they catch bugs
-
-## Code Organization
-
-```
-my-project/
-├── src/my_project/
-│   ├── __init__.py
-│   ├── main.py          # Entry point
-│   ├── config.py        # Configuration
-│   ├── domain/          # Business entities
-│   │   ├── __init__.py
-│   │   ├── user.py
-│   │   └── order.py
-│   ├── services/        # Business logic
-│   │   └── user_service.py
-│   ├── adapters/        # External interfaces
-│   │   ├── db.py
-│   │   └── api.py
-│   └── utils/           # Shared utilities
-├── tests/
-│   ├── unit/
-│   └── integration/
-├── pyproject.toml
-└── uv.lock
-```
-
-## Error Handling
-
-```python
-# Custom exceptions with context
-class UserNotFoundError(Exception):
-    def __init__(self, user_id: int):
-        self.user_id = user_id
-        super().__init__(f"User {user_id} not found")
-
-# Catch specific exceptions
-try:
-    user = find_user(user_id)
-except UserNotFoundError as e:
-    logger.warning(f"User {e.user_id} not found")
-    return None
-except DatabaseError:
-    logger.exception("Database error")
-    raise
-
-# Result types instead of exceptions
-from dataclasses import dataclass
-from typing import TypeVar, Generic
-
-T = TypeVar("T")
-
-@dataclass(frozen=True)
-class Ok(Generic[T]):
-    value: T
-
-@dataclass(frozen=True)
-class Err:
-    error: str
-
-Result = Ok[T] | Err
-```
-
-## Performance Tips
-
-### Prefer
-
-- **Generator expressions**: `(x for x in items)` for large data
-- **`dict.get()`**: Avoid KeyError, provide defaults
-- **`set` for membership**: O(1) vs O(n) for lists
-- **Local variables**: Faster than globals in tight loops
-- **`itertools`**: Memory-efficient iteration
-- **`__slots__`**: Reduce memory for many instances
-
-### Avoid
-
-- **Repeated attribute lookup**: Cache `obj.attr` in loops
-- **String concatenation in loops**: Use `"".join(parts)`
-- **Creating lists for iteration**: Use generators
-- **`import` inside functions**: Move to module level
-
-## Common Idioms
-
-```python
-# Unpacking
-first, *rest = items
-a, b = b, a  # Swap
-
-# Dict comprehension with condition
-{k: v for k, v in data.items() if v is not None}
-
-# Defaultdict for grouping
-from collections import defaultdict
-groups = defaultdict(list)
-for item in items:
-    groups[item.category].append(item)
-
-# Counter for frequencies
-from collections import Counter
-counts = Counter(["a", "b", "a", "c", "a"])
-# Counter({'a': 3, 'b': 1, 'c': 1})
-
-# Enumerate with start
-for i, item in enumerate(items, start=1):
-    print(f"{i}. {item}")
-
-# Zip for parallel iteration
-for name, age in zip(names, ages):
-    print(f"{name} is {age}")
-
-# any/all for conditions
-if any(item.is_valid for item in items): ...
-if all(x > 0 for x in numbers): ...
-
-# Walrus operator
-if (match := pattern.search(text)):
-    print(match.group(0))
-```
-
-## Type Hints Quick Reference
-
-```python
-# Basic types
-x: int = 1
-s: str = "hello"
-flag: bool = True
-
-# Collections
-items: list[str] = []
-counts: dict[str, int] = {}
-ids: set[int] = set()
-
-# Optional (None possible)
-name: str | None = None
-
-# Union
-value: int | str = 42
-
-# Callable
-from typing import Callable
-fn: Callable[[int, str], bool]
-
-# TypeVar for generics
-from typing import TypeVar
-T = TypeVar("T")
-def first(items: list[T]) -> T: ...
-
-# Protocol for structural typing
-from typing import Protocol
-
-class Printable(Protocol):
-    def __str__(self) -> str: ...
-```
+Keep this file for fast decisions while coding. Load cookbooks for tutorials and deep patterns.
 
 ## Typed JSON and Boundary Schemas
 
-For JSON-shaped data, keep the schema in the type system:
+For JSON/API/RPC/CLI/env payloads, keep known shapes in the type system while they are still dict-shaped.
 
 | Shape | Prefer | Example |
 |-------|--------|---------|
 | fixed object keys | `TypedDict` | API request/response payloads |
+| optional keys | `NotRequired` / `Required` | sparse updates |
 | fixed string values | `Literal` | `status: Literal["ok", "error"]` |
-| small variant set | discriminated union | `Foo | Bar` with a `kind` tag |
+| small variant set | discriminated union | `Created | Updated` with a `kind` tag |
 
 ```python
 from typing import Literal, NotRequired, TypedDict
@@ -246,168 +29,92 @@ class UserUpdated(TypedDict):
 Event = UserCreated | UserUpdated
 ```
 
-Parse untrusted JSON once at the boundary, then pass typed data or domain objects inward. Use `pydantic` or `msgspec` only for that edge conversion; do not carry runtime validators through core logic.
-Promote to a real object after parsing when the data needs behavior or invariants; `TypedDict` is for shape, not methods.
+Boundary rule:
+1. Decode or receive untrusted data at the edge.
+2. Validate/narrow once with typed code, Pydantic `TypeAdapter`, or msgspec.
+3. Convert inward to `TypedDict`s or domain objects.
+4. Keep `dict[str, Any]` and validator objects out of core logic unless the project intentionally uses them as domain models.
 
-## Core Patterns
+### Pydantic standalone validation
 
-### Pure Functions + Immutability
+```python
+from typing import Literal, TypedDict
+from pydantic import ConfigDict, TypeAdapter
+
+class CreateUser(TypedDict):
+    action: Literal["create_user"]
+    email: str
+
+adapter = TypeAdapter(CreateUser, config=ConfigDict(strict=True))
+payload = adapter.validate_python(raw_payload)
+```
+
+### msgspec closed payload
+
+```python
+from typing import Literal
+import msgspec
+
+class CreateUser(msgspec.Struct, forbid_unknown_fields=True):
+    action: Literal["create_user"]
+    email: str
+
+payload = msgspec.json.decode(raw_bytes, type=CreateUser)
+```
+
+## Type System Defaults
+
+- Public functions and methods should have explicit parameter and return types.
+- For inputs, prefer abstract/read-only protocols when mutation is not required: `Iterable[T]`, `Sequence[T]`, `Mapping[K, V]`.
+- For concrete implementation returns, prefer concrete types: `list[T]`, `dict[K, V]`, domain objects.
+- Use `object` instead of `Any` when accepting any value but treating it generically.
+- Prefer `T | None`, `A | B`, `Protocol`, `typing.Self`, and `@override` when supported by the project target.
+- Avoid `cast(...)`, `# type: ignore`, and `pyright: ignore`; improve the model first.
+
+## Error Handling and Result Types
+
+Catch specific exceptions at the layer that can act. At process/task/API boundaries, log and deliberately map or re-raise. Preserve exception context; do not hide bad input with broad fallbacks.
 
 ```python
 from dataclasses import dataclass
+from typing import Generic, TypeVar
 
-@dataclass(frozen=True)  # Immutable
-class Point:
-    x: float
-    y: float
+T = TypeVar("T")
 
-    def translate(self, dx: float, dy: float) -> "Point":
-        return Point(self.x + dx, self.y + dy)  # New instance
-```
+@dataclass(frozen=True, slots=True)
+class Ok(Generic[T]):
+    value: T
 
-### Composition with Pipe
+@dataclass(frozen=True, slots=True)
+class Err:
+    code: str
+    message: str
 
-```python
-from functools import reduce
-from typing import Callable, Any
+Result = Ok[T] | Err
 
-def pipe(*fns: Callable[[Any], Any]) -> Callable[[Any], Any]:
-    return reduce(lambda f, g: lambda x: g(f(x)), fns)
-
-# Usage: read left-to-right
-process = pipe(parse, validate, transform, save)
-result = process(data)
-```
-
-### Structural Typing with Protocol
-
-```python
-from typing import Protocol
-
-class Persistable(Protocol):
-    def save(self) -> None: ...
-    def load(self) -> None: ...
-
-def backup(store: Persistable) -> None:  # Duck typing!
-    store.save()
-```
-
-## Itertools Patterns
-
-```python
-from itertools import chain, batched, pairwise, groupby, accumulate, takewhile
-
-# chain: Flatten iterables
-list(chain([1, 2], [3, 4]))  # [1, 2, 3, 4]
-
-# batched: Chunk into groups (3.12+)
-list(batched("ABCDEFG", 3))  # [('A','B','C'), ('D','E','F'), ('G',)]
-
-# pairwise: Consecutive pairs
-list(pairwise("ABCD"))  # [('A','B'), ('B','C'), ('C','D')]
-
-# groupby: Group consecutive (requires sorted input!)
-data = [("a", 1), ("a", 2), ("b", 3)]
-{k: list(g) for k, g in groupby(data, key=lambda x: x[0])}
-# {'a': [('a', 1), ('a', 2)], 'b': [('b', 3)]}
-
-# accumulate: Running totals
-list(accumulate([1, 2, 3, 4]))  # [1, 3, 6, 10]
-
-# takewhile/dropwhile: Conditional slicing
-list(takewhile(lambda x: x < 5, [1, 3, 6, 2]))  # [1, 3]
-
-# combinations/permutations/product
-from itertools import combinations, permutations, product
-list(combinations("ABC", 2))  # [('A','B'), ('A','C'), ('B','C')]
-list(product([0, 1], repeat=2))  # [(0,0), (0,1), (1,0), (1,1)]
-```
-
-## Functools Patterns
-
-```python
-from functools import reduce, partial, lru_cache
-
-# reduce: Fold to single value
-reduce(lambda acc, x: acc + x, [1, 2, 3, 4], 0)  # 10
-
-# partial: Fix arguments
-from operator import mul
-double = partial(mul, 2)
-double(5)  # 10
-
-# lru_cache: Memoization
-@lru_cache(maxsize=128)
-def fib(n: int) -> int:
-    return n if n < 2 else fib(n-1) + fib(n-2)
-```
-
-## Async Patterns
-
-```python
-import asyncio
-import httpx
-
-# TaskGroup: Structured concurrency (3.11+)
-async def fetch_all(urls: list[str]) -> list[str]:
-    async with httpx.AsyncClient() as client:
-        async with asyncio.TaskGroup() as tg:
-            tasks = [tg.create_task(client.get(url)) for url in urls]
-    return [t.result().text for t in tasks]
-
-# Async generator
-async def async_range(n: int):
-    for i in range(n):
-        await asyncio.sleep(0.01)
-        yield i
-
-async def consume():
-    async for value in async_range(5):
-        print(value)
-
-# Gather with error handling
-async def fetch_safe(urls: list[str]):
-    results = await asyncio.gather(
-        *[fetch(url) for url in urls],
-        return_exceptions=True
-    )
-    successes = [r for r in results if not isinstance(r, Exception)]
-    errors = [r for r in results if isinstance(r, Exception)]
-    return successes, errors
-```
-
-## Project Structure
-
-```
-my-project/
-├── src/my_project/
-│   ├── __init__.py
-│   ├── main.py
-│   ├── domain/        # Types, entities
-│   └── services/      # Business logic
-├── tests/
-├── pyproject.toml
-└── uv.lock            # Always commit!
+def parse_count(value: object) -> Result[int]:
+    if isinstance(value, int):
+        return Ok(value)
+    return Err("invalid_count", "count must be an integer")
 ```
 
 ## Anti-Patterns
 
 | Avoid | Do Instead |
 |-------|------------|
-| Mutable default args `def f(lst=[])` | `def f(lst=None)` or `field(default_factory=list)` |
+| Mutable default args `def f(items=[])` | `def f(items: Sequence[T] | None = None)` or `field(default_factory=list)` |
 | `dict[str, Any]` for known payloads | `TypedDict` / `Literal` / discriminated unions |
 | `Any` for "accepts anything" | `object` plus narrowing |
 | Concrete mutable input types (`list[T]`) when only reading | `Sequence[T]`, `Iterable[T]`, `Mapping[K, V]` |
 | Abstract return types from concrete implementations | Concrete `list[T]`, `dict[K, V]`, domain objects |
-| `Optional[T]` / `Union[A, B]` on modern targets | `T | None` / `A | B` |
-| `requests.get` in async | `httpx.AsyncClient` |
+| `Optional[T]` / `Union[A, B]` on modern targets | `T | None` / `A | B` when runtime target allows |
+| `requests.get` in async code | `httpx.AsyncClient` or `await asyncio.to_thread(...)` for unavoidable blocking work |
 | Bare `asyncio.create_task()` | `TaskGroup` or tracked/cancelled task lifecycle |
 | Classes for data bags | `@dataclass(frozen=True, slots=True)` or `TypedDict` |
-| Inheritance hierarchies | Protocols + composition |
-| Mutating function args | Return new values / copy-on-write |
-| `try/except Exception` | Specific exception types; boundary-level catch/log/map only |
-| Blocking in async | async equivalent or `await asyncio.to_thread(fn)` |
-| Blind `dataclasses.asdict()` in hot paths | Shallow projection or explicit serializer |
+| Inheritance hierarchies for behavior seams | Protocols + composition |
+| Mutating function arguments | Return new values / copy-on-write |
+| `try/except Exception` around core logic | Specific exceptions; boundary-level catch/log/map only |
+| Blind `dataclasses.asdict()` in hot paths | Explicit shallow projection or serializer |
 | `os.path` string manipulation | `pathlib.Path` |
 | Naive UTC `utcnow()` | timezone-aware `datetime.now(UTC)` |
 
@@ -415,11 +122,47 @@ my-project/
 
 | Pitfall | Fix |
 |---------|-----|
-| Async client leaks | Use `async with httpx.AsyncClient()` or explicit lifecycle |
-| Ruff vs formatter churn | Use `ruff format` as the only formatter |
-| mypy narrowing pain | Use `isinstance`, `match`, Protocols, or typed boundary schemas |
-| Slow tests from real I/O | Use fixtures, `tmp_path`, local fakes, and boundary seams |
+| Raw `response.json()` moves inward | Validate/narrow at the API adapter immediately |
+| Pydantic/msgspec everywhere | Validate once at the edge; convert inward |
+| Pydantic coercion hides bad input | Use strict mode where coercion is unsafe |
+| msgspec accepts unexpected keys | Use `forbid_unknown_fields=True` for closed payloads |
+| mypy/Pyright narrowing pain | Use `isinstance`, `match`, Protocols, or discriminated unions |
 | Shared mutable state | Prefer immutable data or copy-on-write |
 | Over-clever comprehensions | Extract a named pure function |
-| Hypothesis noise | Use narrow domain strategies; reserve for invariants/round-trips |
-| Pydantic/msgspec everywhere | Validate once at the edge; convert inward |
+| Async client leaks | Use `async with` or explicit application lifecycle |
+| Slow tests from real I/O | Use fixtures, `tmp_path`, local fakes, and boundary seams |
+| Hypothesis noise | Reserve for invariants/round-trips; keep strategies domain-shaped |
+| Ruff/formatter churn | Use `ruff format` as the only formatter |
+
+## Project Structure
+
+Prefer `src/` layout unless the repository has an established convention.
+
+```text
+my-project/
+├── src/my_project/
+│   ├── __init__.py
+│   ├── main.py          # Entry point / CLI shell
+│   ├── config.py        # Env/config parsing boundary
+│   ├── domain/          # Typed values, entities, invariants
+│   ├── services/        # Pure business logic / use cases
+│   └── adapters/        # DB/API/filesystem/process boundaries
+├── tests/
+│   ├── unit/
+│   └── integration/
+├── pyproject.toml
+└── uv.lock
+```
+
+## Quick Data Structure Reminders
+
+| Need | Use |
+|------|-----|
+| Ordered mutable sequence | `list` |
+| Fixed immutable record/sequence | `tuple` / `NamedTuple` / frozen dataclass |
+| Fast lookup by key | `dict` |
+| Membership/deduplication | `set` / `frozenset` |
+| FIFO queue | `collections.deque` |
+| Priority queue | `heapq` |
+| Counting | `collections.Counter` |
+| Grouping defaults | `collections.defaultdict` |

@@ -28,6 +28,20 @@ Common patterns:
 - One logical user-visible change usually means one fragment.
 - Internal-only refactors, formatting-only changes, and test-only changes usually do not get fragments unless repo policy says otherwise.
 
+## Examples
+
+Wrong:
+
+```text
+Commit code now and add the changelog later.
+```
+
+Right:
+
+```text
+Commit the changelog fragment with the code change it describes.
+```
+
 ## Split-commit rule
 When several logical commits touch the same package:
 - default: split manual changelog hunks or fragments per commit

@@ -158,6 +158,33 @@ Policy still belongs in the skill:
 - body wrapped at 72
 
 Git recommends short subjects, but does not enforce the limit.
+## Message examples
+
+Wrong:
+
+```text
+chore: various updates.
+```
+
+Right:
+
+```text
+chore(config): tighten commit lint
+```
+
+## Safety example
+
+Wrong:
+
+```text
+Commit whatever is already staged without inspection.
+```
+
+Right:
+
+```text
+Inspect the cached diff or returned JSON state, then commit only accounted-for changes.
+```
 
 ## Pathspec-from-file
 Useful for many paths or tricky filenames.

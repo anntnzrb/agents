@@ -10,6 +10,13 @@
 - Put runtime deps in PEP 723 metadata inside `scripts/cli.py`.
 - Put reusable code in `lib/<module>/`; make `scripts/cli.py` add `lib/` to `sys.path`.
 - Keep `SKILL.md` focused on when/how to use the skill; move bulk docs to `references/`.
+- Progressive disclosure standard:
+  - `SKILL.md` is the entrypoint/router only: triggers, activation criteria, minimal workflow, tool/script routing, and follow-up reads.
+  - Target `SKILL.md` at ≤150 lines; hard cap 250 lines unless the skill has no bundled references.
+  - Move stable explanation/API notes to `references/`; move worked examples to `cookbook/`; move deterministic fetching/parsing/scoring/generation into `scripts/`.
+  - When bundled docs exist, `SKILL.md` MUST include a required follow-up reads table with columns: `Need`, `Read`, `When`.
+  - Reference files over 300 lines MUST start with a table of contents or equivalent section index.
+  - Do not place large always-loaded docs in skill-package `AGENTS.md`; use `references/` and route to them from `SKILL.md`.
 
 ## Portability Constraints
 

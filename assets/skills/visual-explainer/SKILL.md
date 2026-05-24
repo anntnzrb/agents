@@ -47,17 +47,26 @@ Detailed prompt templates live in `./commands/`. In Pi, use slash commands (`/di
 1. Choose a direction before writing HTML. NEVER default to generic dark-blue technical styling.
 2. Determine audience and density: developer system model, PM overview, team proposal review, data audit, prose explanation, or slide presentation.
 3. Treat visual structure as default. Essays, READMEs, articles, and docs become cards, diagrams, grids, timelines, callouts, or tables; prose blocks are accents, not the page mode.
-4. Read the relevant template/reference before generating:
-   - Text-heavy architecture overviews: `./templates/architecture.html`
-   - Flowcharts, sequence diagrams, ER, state machines, mind maps, class diagrams, C4: `./templates/mermaid-flowchart.html`
-   - Data tables, comparisons, audits, feature matrices: `./templates/data-table.html`
-   - Slide decks: `./templates/slide-deck.html` and `./references/slide-patterns.md`
-   - Prose-heavy publishable pages: "Prose Page Elements" in `./references/css-patterns.md` and "Typography by Content Voice" in `./references/libraries.md`
-   - CSS/layout patterns, SVG connectors, depth tiers, collapsibles, overflow protection, code blocks, and image containers: `./references/css-patterns.md`
-   - Pages with 4+ sections: `./references/responsive-nav.md`
+4. Read the template/reference routed by content type before generating. Load only what applies.
 5. Write one self-contained `.html` file. External assets are limited to CDN links for fonts and optional libraries.
 6. Open the file in a browser and inspect it from the user's perspective before responding.
 </workflow>
+
+## Routing Table
+
+| Need | Load | Use |
+|---|---|---|
+| Text-heavy architecture overviews | `./templates/architecture.html` | CSS Grid cards + flow arrows when descriptions, code refs, tool lists, or rich card content matter more than topology |
+| Flowcharts, sequence diagrams, ER, state machines, mind maps, class diagrams, C4 | `./templates/mermaid-flowchart.html`, `./references/mermaid-rules.md` | Mermaid when automatic edge routing or specialized syntax materially improves comprehension |
+| Complex architecture with 15+ elements | `./templates/mermaid-flowchart.html`, `./references/mermaid-rules.md`, `./references/css-patterns.md` | Hybrid: simple Mermaid overview plus detailed CSS Grid cards; NEVER cram into one Mermaid diagram |
+| Data tables, comparisons, audits, feature matrices | `./templates/data-table.html`, `./references/data-tables.md` | Real semantic HTML `<table>`; REQUIRED for ASCII-table threshold |
+| Slide decks | `./templates/slide-deck.html`, `./references/slide-patterns.md`, `./references/slide-deck-mode.md`, `./references/css-patterns.md`, `./references/libraries.md` | Opt-in only; one viewport per slide; complete source coverage |
+| Prose-heavy publishable pages | `./references/css-patterns.md`, `./references/libraries.md` | Prose Page Elements and Typography by Content Voice; transform prose into visual structure |
+| CSS/layout, SVG connectors, depth, collapsibles, overflow, code blocks, image containers | `./references/css-patterns.md` | Reuse established patterns; protect against overflow and unreadable code |
+| Visual direction, palettes, forbidden aesthetics | `./references/visual-style.md`, `./references/libraries.md` | Pick one distinctive aesthetic; typography carries the design; avoid AI-slop signals |
+| Pages with 4+ sections | `./references/responsive-nav.md` | Add responsive navigation |
+| AI-generated illustrations | `./references/ai-illustrations.md` | Optional; use only when imagery explains what CSS/Mermaid cannot |
+| Sharing pages | `./commands/share.md` | `uv run --script {{skill_dir}}/scripts/cli.py share <html-file>` |
 
 ## Rendering Dispatch
 
@@ -79,111 +88,9 @@ Detailed prompt templates live in `./commands/`. In Pi, use slash commands (`/di
 | Dashboard / metrics | CSS Grid + Chart.js | Use KPI cards, inline SVG sparklines, CSS progress bars, Chart.js via CDN for real charts |
 | Documentation / README / API reference | Cards, numbered flows, tables, side-by-side panels, callouts | Transform prose structure; NEVER merely restyle paragraphs |
 
-## Mermaid Rules
+## Output Contract
 
-Use Mermaid when automatic edge routing or specialized syntax materially improves comprehension. Apply these constraints together:
-
-| Area | Rule |
-|---|---|
-| Template | NEVER use bare `<pre class="mermaid">`. Always copy the full `diagram-shell` pattern from `templates/mermaid-flowchart.html`: `.diagram-shell` > `.mermaid-wrap` > `.zoom-controls` + `.mermaid-viewport` > `.mermaid-canvas`, CSS, and the JS module for zoom/pan/fit. |
-| Controls | Every `.mermaid-wrap` MUST include +/−/reset/expand controls, Ctrl/Cmd+scroll zoom, click-and-drag pan, and click-to-expand/open full-size. Preserve `openMermaidInNewTab()` behavior from `./references/css-patterns.md`. |
-| Theme | Use `theme: 'base'` with custom `themeVariables` so Mermaid matches page palette. Use `layout: 'elk'` for complex graphs only with the `@mermaid-js/layout-elk` CDN import from `./references/libraries.md`. |
-| Scaling | 10-12 nodes require `fontSize` 18-20px and `INITIAL_ZOOM` 1.5-1.6. 15+ elements require the hybrid pattern: simple Mermaid overview plus detailed CSS Grid cards. |
-| Direction | Prefer `flowchart TD`/`graph TD`. Use LR only for simple 3-4 node linear flows. |
-| Labels | Use `<br/>` inside quoted flowchart labels. NEVER use escaped newlines like `\n`; Mermaid renders them as literal text in HTML. Example: `A["Copilot Backend<br/>/api + /api/voicebot"]`. |
-| CSS collision | NEVER define `.node` as page-level CSS. Mermaid uses `.node` internally for positioned SVG groups. Use `.ve-card` for page cards. Mermaid node styling MUST be scoped under `.mermaid` such as `.mermaid .node rect`. |
-| C4 | Use flowchart syntax with `subgraph` boundaries. Persons: `(("Name"))`; systems: `["Name"]`; databases: `[("Name")]`; relationships: `-->|"protocol"|`; external systems MAY use dashed `classDef`. Native `C4Context` ignores custom themes and is forbidden. |
-| State labels | If labels include colons, parentheses, `<br/>`, HTML entities, function names, or multi-line text, use `flowchart TD` with quoted edge labels instead of `stateDiagram-v2`. |
-
-## Visual Style
-
-Pick one aesthetic and commit. Vary recent choices; if replacing styling with a generic dark theme would not change the page's identity, redesign it.
-
-| Aesthetic | Use when | Requirements |
-|---|---|---|
-| Blueprint | Technical systems, plans, architecture | Subtle grid, deep slate/blue, monospace labels, precise borders |
-| Editorial | Reviews, narratives, proposals | Serif headlines such as Instrument Serif or Crimson Pro, generous whitespace, muted earth tones or deep navy + gold |
-| Paper/ink | Explainers, docs, approachable plans | Warm cream `#faf7f5`, terracotta/sage, tactile informal feel |
-| Monochrome terminal | CLI/tooling/system internals | Green/amber on near-black, monospace-forward, restrained CRT effect |
-| IDE-inspired | Code-centric topics | Borrow a real named palette exactly: Dracula, Nord, Catppuccin Mocha/Latte, Solarized Dark/Light, Gruvbox, One Dark, Rosé Pine |
-| Data-dense | Audits, matrices, dashboards | Small type, tight spacing, high information density, muted colors |
-
-Typography MUST carry the design. Pick a distinctive pairing from `./references/libraries.md`; rotate pairings across generations. Good defaults include DM Sans + Fira Code, Instrument Serif + JetBrains Mono, IBM Plex Sans + IBM Plex Mono, Bricolage Grotesque + Fragment Mono, and Plus Jakarta Sans + Azeret Mono. Load fonts with `<link>` in `<head>` and include system fallbacks.
-
-Color MUST use CSS custom properties. Define at minimum `--bg`, `--surface`, `--border`, `--text`, `--text-dim`, and 3-5 accents with dim variants. Prefer semantic names such as `--pipeline-step`. Use intentional palettes such as terracotta/sage (`#c2410c`, `#65a30d`), teal/slate (`#0891b2`, `#0369a1`), rose/cranberry (`#be123c`, `#881337`), amber/emerald (`#d97706`, `#059669`), or deep blue/gold (`#1e3a5f`, `#d4a73a`).
-
-```css
-/* Light-first: editorial, paper/ink, blueprint */
-:root { /* light values */ }
-@media (prefers-color-scheme: dark) { :root { /* dark values */ } }
-
-/* Dark-first: IDE-inspired, terminal */
-:root { /* dark values */ }
-@media (prefers-color-scheme: light) { :root { /* light values */ } }
-```
-
-Build depth through 2-4% lightness shifts, low-opacity borders, restrained shadows, subtle grids, and gentle radial atmosphere. Hero sections SHOULD dominate the first viewport. Reference sections SHOULD be compact and MAY use `<details>/<summary>`. Use depth tiers from `./references/css-patterns.md`: hero, elevated, default, recessed.
-
-Animation MUST earn its place: entrance reveals, hover feedback, SVG connector draw-ins, count-up hero values, and user-initiated interactions are acceptable. Continuous post-load motion is forbidden except progress indicators. Always implement `prefers-reduced-motion`.
-
-<critical>
-## Forbidden Aesthetics
-
-These are AI-slop signals. If two or more appear, regenerate with Editorial, Blueprint, Paper/ink, or a real IDE palette.
-
-| Category | NEVER use |
-|---|---|
-| Themes | Neon dashboard; gradient mesh; generic dark theme with cyan-magenta-pink accents |
-| Font body | Inter, Roboto, Arial, Helvetica, or `system-ui` alone as primary `--font-body` |
-| Accent colors | `#8b5cf6`, `#7c3aed`, `#a78bfa`, `#d946ef`, Tailwind purple/pink/cyan defaults, cyan-magenta-pink combos |
-| Text effects | Gradient heading text using `background-clip: text`; identical gradient KPI treatment |
-| Shadows/motion | Glowing box-shadows, animated glow keyframes, pulsing/breathing static content, continuous decorative animation after load |
-| Headers | Emoji header icons; every section using the same icon-in-rounded-box pattern |
-| Layout | Perfectly centered everything, identical cards everywhere, symmetric mirrored halves, every section with equal visual weight |
-| Templates | Three-dot window chrome on code blocks; "neon dashboard"; pink/purple/cyan background blobs |
-
-Required replacements: styled monospace labels, colored dot indicators, numbered badges, asymmetric dividers, inline SVG icons only when meaningful, simple code headers with filename/language labels, and varied KPI hierarchy.
-</critical>
-
-## Data Tables
-
-Use real `<table>` markup, not CSS Grid pretending to be a table. Implement sticky `<thead>`, subtle alternating rows, optional sticky first column, responsive wrapper with `overflow-x: auto`, width hints via `<colgroup>` or `th`, hover highlighting, natural text wrapping, `<code>` for technical references, dimmed `<small>` secondary detail, and `tabular-nums` for numeric columns.
-
-Status indicators MUST be styled elements, not emoji: green match/pass/yes, red gap/fail/no, amber partial/warning, muted neutral/info.
-
-## Implementation Plans and Code Views
-
-The goal is understanding, not source dumping. NEVER inline full files unless the user explicitly asks for complete source. Show file structure with one-line descriptions, 5-10 line key snippets, collapsible full code only when truly needed, API/interface summary, and usage examples.
-
-Code blocks MUST use explicit formatting from `./references/css-patterns.md`, including `white-space: pre-wrap`, otherwise code collapses into unreadable walls.
-
-## AI-Generated Illustrations
-
-AI imagery is OPTIONAL. Check availability with `which surf`. If unavailable, skip images without error; the page MUST stand on CSS, typography, and structure alone.
-
-```text
-# Generate to a temp file, then base64-embed it with the platform-native tool available in your environment.
-surf gemini "descriptive prompt" --generate-image <temp-image-path> --aspect-ratio 16:9
-# <img src="data:image/png;base64,..." alt="descriptive alt text">
-```
-
-Use images for hero tone, conceptual illustrations, user journeys, mental models, or educational visuals Mermaid/CSS cannot express. NEVER use generic decoration, data-distracting imagery, or images for content Mermaid/CSS handles well. Match prompt style, palette, and aspect ratio to the page (`16:9` hero, `1:1` inline).
-
-## Slide Deck Mode
-
-Slide decks are opt-in only. Generate slides only when the user invokes `/generate-slides`, passes `--slides` to a prompt such as `/diff-review --slides`, or explicitly asks for a slide deck. NEVER auto-select slide format.
-
-Before generating slides, read `./references/slide-patterns.md`, `./templates/slide-deck.html`, `./references/css-patterns.md`, and `./references/libraries.md`. Slides are not scrollable pages reformatted: each slide is exactly one viewport (`100dvh`), typography is 2-3× larger, compositions are bolder, and the deck needs a narrative arc such as impact → context → deep dive → resolution.
-
-Content completeness is REQUIRED. Inventory the source, map every item to slides, and verify coverage before writing HTML. Every section, decision, data point, specification, and collapsible detail from the source MUST appear. Add slides rather than cutting content. Consecutive slides MUST vary spatial approach: centered, left-heavy, right-heavy, split, edge-aligned, full-bleed. Three centered slides in a row is a failure.
-
-Use the 10 slide types from `slide-patterns.md`: Title, Section Divider, Content, Split, Diagram, Dashboard, Table, Code, Quote, Full-Bleed. Content that exceeds density limits splits across slides; it NEVER scrolls within a slide. If surf-cli is available, generate 2-4 images for title/background/optional illustrations before writing HTML.
-
-When `--slides` is passed to `/diff-review`, `/plan-review`, `/project-recap`, or another prompt, gather data using that prompt's normal instructions, then present the same breadth of content as a slide deck. The slide format is NEVER an excuse to summarize away sections.
-
-## File Structure
-
-Every diagram is a single self-contained `.html` file:
+Every diagram is a single self-contained `.html` file written to `~/.agent/diagrams/` with a descriptive filename such as `modem-architecture.html`, `pipeline-flow.html`, or `schema-overview.html`.
 
 ```html
 <!DOCTYPE html>
@@ -205,10 +112,6 @@ Every diagram is a single self-contained `.html` file:
 </html>
 ```
 
-## Deliver
-
-Write to `~/.agent/diagrams/` with a descriptive filename such as `modem-architecture.html`, `pipeline-flow.html`, or `schema-overview.html`.
-
 Open in browser:
 
 ```text
@@ -216,44 +119,25 @@ open ~/.agent/diagrams/filename.html
 xdg-open ~/.agent/diagrams/filename.html
 ```
 
-Tell the user the file path so they can re-open or share it.
+Tell the user the exact file path so they can re-open or share it.
 
-## Sharing Pages
+## Hard Aesthetic Rules
 
-Share pages via Vercel. No account or authentication is required.
+- Pick one aesthetic and commit. Vary recent choices; if replacing styling with a generic dark theme would not change the page's identity, redesign it.
+- Typography MUST carry the design. Pick a distinctive pairing from `./references/libraries.md`; rotate pairings across generations. Load fonts with `<link>` in `<head>` and include system fallbacks.
+- Color MUST use CSS custom properties. Define at minimum `--bg`, `--surface`, `--border`, `--text`, `--text-dim`, and 3-5 accents with dim variants.
+- Build depth through 2-4% lightness shifts, low-opacity borders, restrained shadows, subtle grids, and gentle radial atmosphere. Hero sections SHOULD dominate the first viewport.
+- Animation MUST earn its place. Continuous post-load motion is forbidden except progress indicators. Always implement `prefers-reduced-motion`.
+- NEVER use generic AI-slop aesthetics: neon dashboard, gradient mesh, cyan-magenta-pink accents, gradient heading text, glowing box-shadows, pulsing static content, emoji header icons, identical icon-card sections, centered-everything layouts, three-dot code chrome, or purple/pink/cyan background blobs. See `./references/visual-style.md`.
 
-```text
-uv run --script {{skill_dir}}/scripts/cli.py share <html-file>
-```
+## Implementation Plans and Code Views
 
-Example:
+The goal is understanding, not source dumping. NEVER inline full files unless the user explicitly asks for complete source. Show file structure with one-line descriptions, 5-10 line key snippets, collapsible full code only when truly needed, API/interface summary, and usage examples.
 
-```text
-uv run --script {{skill_dir}}/scripts/cli.py share ~/.agent/diagrams/my-diagram.html
-
-# Output:
-# Shared successfully!
-# Live URL:  https://skill-deploy-abc123.vercel.app
-# Claim URL: https://vercel.com/claim-deployment?code=...
-```
-
-How it works:
-1. Copies HTML file to temp directory as `index.html`
-2. Deploys via the vercel-deploy skill (zero-auth claimable deployment)
-3. URL is live immediately — works in any browser
-
-Requirements:
-- vercel-deploy skill (should be pre-installed; if not: `pi install npm:vercel-deploy`)
-
-Notes:
-- Deployments are public — anyone with the URL can view
-- Preview deployments have configurable retention (default: 30 days)
-- Claim URL lets you transfer the deployment to your Vercel account
-
-See `./commands/share.md` for the `/share` command template.
+Code blocks MUST use explicit formatting from `./references/css-patterns.md`, including `white-space: pre-wrap`, otherwise code collapses into unreadable walls.
 
 <yielding>
-## Quality Checks
+## Validation Checklist
 
 Before delivering, verify:
 - Squint test: hierarchy remains visible when blurred.

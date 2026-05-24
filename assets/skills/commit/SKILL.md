@@ -23,6 +23,15 @@ WORKING DIRECTORY: optional argument, default current directory.
 - Commit changelog or release fragments with the code they describe.
 - End with a complete accounting of committed and remaining work.
 
+
+## Required follow-up reads
+
+| Reference | Read when |
+|-----------|-----------|
+| `references/git.md` | Git mode needs patch-mode details, noninteractive precise staging, partial new-file staging, pathspec files, amend/fixup/autosquash/reword, split-last-commit, or recovery from bad staging/hook/merge states. |
+| `references/but.md` | But mode needs exact JSON command patterns, hunk IDs, assignment-first flows, message-file-safe rewording, history surgery, branch/stack movement, or `but` recovery sequences. |
+| `references/changelog.md` | Any touched repo uses or may require `CHANGELOG.md`, `NEWS.md`, `.changeset/`, `newsfragments/`, `changelog.d/`, release-please, semantic-release, Towncrier, issue-closing release notes, or generated release output. |
+
 ## Engine selection
 1. Discover repo policy first. Read the smallest repo-local set that controls commits:
    - nearest + root `AGENTS.md`
@@ -90,15 +99,7 @@ Before commit, verify:
 - scope and type fit the touched files
 - repo-specific tense, trailer, signoff, and issue-reference style override fallback style
 
-WRONG:
-```text
-chore: various updates.
-```
-
-RIGHT:
-```text
-chore(config): tighten commit lint
-```
+Detailed message examples live in `references/git.md` and repo history; keep SKILL decisions here.
 
 ### Message-file rule
 Always draft the full message into a temp file first.
@@ -133,119 +134,38 @@ When the repo expects changelog or release fragments:
 
 Load `references/changelog.md` when changelog or release automation is relevant.
 
-WRONG:
-```text
-Commit code now and add the changelog later.
-```
-
-RIGHT:
-```text
-Commit the changelog fragment with the code change it describes.
-```
+Detailed changelog examples live in `references/changelog.md`; keep fragments/manual entries with the code commit they describe.
 
 ## Git mode
+
 Use this in normal Git repos.
 
-### Inspect
-```bash
-git status --short
-git diff --stat
-```
+- Inspect with `git status --short` and `git diff --stat`; use `git diff` / `git diff --cached` when grouping is unclear.
+- Stage whole files only when each file is one logical unit.
+- Use `git add -p -- <path>` for mixed files when patch UI is usable.
+- Escalate to `git add -e -- <path>` only when patch mode groups too much together.
+- Use patch-file or pathspec-file flows from `references/git.md` when exact noninteractive control, weird filenames, or partial new-file staging are required.
+- Repair over-staging with `git reset -p`, `git restore --staged -p -- <path>`, or reverse-apply patterns from `references/git.md`.
+- Before every commit, verify `git diff --cached`; the cached diff MUST match the intended commit.
+- Commit with `git commit -F "$msgfile"`.
 
-If grouping is unclear, inspect more:
-```bash
-git diff
-git diff --cached
-```
-
-### Stage precisely
-Preferred order:
-1. Whole-file stage only when the file is one logical unit.
-2. `git add -p -- <path>` for mixed files when patch UI is usable.
-3. `git add -e -- <path>` when patch mode still groups too much together.
-4. Patch-file or pathspec-file flows from `references/git.md` when exact noninteractive control, weird filenames, or partial new-file staging are required.
-
-### Repair over-staging
-If the index got too much:
-```bash
-git reset -p
-# or
-git restore --staged -p -- <path>
-```
-
-For noninteractive repair or exact reversals, use the reverse-apply patterns in `references/git.md`.
-
-### Verify before every commit
-```bash
-git diff --cached
-```
-
-NEVER trust staging blindly. The cached diff MUST match the intended commit.
-
-### Commit
-```bash
-git commit -F "$msgfile"
-```
-
-### Advanced Git flows
-Read `references/git.md` when you need:
-- noninteractive precise staging
-- split the previous mixed commit
-- amend, fixup, autosquash, or reword flows
-- `--pathspec-from-file`
-- recovery from hook failures, merge/rebase/cherry-pick states, or bad staging
-- caveats around `git add -e` and `git commit <pathspec>`
+Read `references/git.md` for noninteractive precise staging, split-last-commit, amend/fixup/autosquash/reword, `--pathspec-from-file`, recovery from hook/merge/rebase/cherry-pick states, and caveats around `git add -e` or `git commit <pathspec>`.
 
 ## But mode
+
 Use this in GitButler-managed repos.
 
-### Core rules
-- Start write or history work with:
-```bash
-but status --json
-```
-- For mutations, SHOULD use:
-```bash
-but <mutation> --json --status-after
-```
+- Start write or history work with `but status --json`.
+- Inspect exact file/hunk IDs with `but diff --json`.
+- For mutations, SHOULD use `but <mutation> --json --status-after`.
 - Use CLI IDs from `but status --json` or `but diff --json`.
 - SHOULD use `but` writes over raw Git writes.
 - Refresh IDs after every mutation. NEVER assume old IDs still point at the same hunks or commits.
+- Commit exact files/hunks with `but commit <branch> --message-file "$msgfile" --changes <id1>,<id2> --json --status-after`.
+- For assignment-first flows, use `but stage <file-or-hunk> <branch> --json --status-after` before `but commit <branch> --message-file "$msgfile" --only --json --status-after`.
+- Repair and cleanup commands include `but unstage`, `but rub`, `but amend`, `but uncommit`, `but move`, `but squash`, `but reword`, `but absorb`, `but mark`, `but undo`, and `but oplog restore`.
 
-### Exact hunk commit
-1. Inspect:
-```bash
-but status --json
-but diff --json
-```
-2. Pick exact file or hunk IDs.
-3. Commit only those changes:
-```bash
-but commit <branch> --message-file "$msgfile" --changes <id1>,<id2> --json --status-after
-```
-
-### Assignment-first flow
-Useful when work spans multiple stacks or branches:
-```bash
-but stage <file-or-hunk> <branch> --json --status-after
-but commit <branch> --message-file "$msgfile" --only --json --status-after
-```
-
-### Repair and cleanup
-Use:
-- `but unstage`
-- `but rub <file-or-hunk> zz`
-- `but amend`
-- `but uncommit`
-- `but move`
-- `but squash`
-- `but reword`
-- `but absorb`
-- `but mark`
-- `but undo`
-- `but oplog restore`
-
-Read `references/but.md` when you need exact command patterns, message-file-safe reword flows, or recovery sequences.
+Read `references/but.md` for exact JSON command patterns, assignment-first flows, message-file-safe rewording, history surgery, branch/stack movement, and recovery sequences.
 
 ## Split-a-mixed-commit rule
 If the task is “split the last mixed commit”:
@@ -271,15 +191,7 @@ Stop and reassess before writing when you see:
 - If a repo has custom commit rules, follow them over the fallback format.
 - If the user asks for only part of the work to be committed, leave the rest untouched.
 
-WRONG:
-```text
-Commit whatever is already staged without inspection.
-```
-
-RIGHT:
-```text
-Inspect the cached diff or returned JSON state, then commit only accounted-for changes.
-```
+Reference examples live in `references/git.md` and `references/but.md`; safety checks above are binding.
 
 ## Return format
 Return a compact plain-text report:
@@ -292,10 +204,8 @@ For preview-only or dry-run:
 - say `no commits created`
 - print the proposed commit message(s) and split order instead
 
-## References
-Load only what you need:
-- `references/git.md` - patch-mode Git flows, noninteractive precise staging, split/recovery, fixup/autosquash, pathspec tips
-- `references/but.md` - GitButler/`but` JSON workflows, hunk IDs, history surgery, repair tools, recovery
-- `references/changelog.md` - manual changelog vs fragment systems, verification, grouping rules
+## Reference routing
+
+Use the Required follow-up reads table near the top of this file; do not preload commit references before engine selection makes them relevant.
 
 Optional arguments: $ARGUMENTS
