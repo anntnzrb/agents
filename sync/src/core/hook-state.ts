@@ -8,10 +8,8 @@ import type { ExtensionDepsHookPlan } from "./plan.ts";
 const GENERATED_EXTENSION_ENTRY_NAMES = [
   "package.json",
   "node_modules",
-  "package-lock.json",
   "bun.lock",
   "bun.lockb",
-  "npm-shrinkwrap.json",
 ] as const;
 
 interface ExtensionHookStateFile {

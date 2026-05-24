@@ -150,12 +150,5 @@ export const logCommandFailure = (
   }
 };
 
-export const pickJsRunner = async (): Promise<string | undefined> => {
-  if (await commandExists("bun")) {
-    return "bun";
-  }
-  if (await commandExists("npm")) {
-    return "npm";
-  }
-  return undefined;
-};
+export const pickBunRunner = async (): Promise<"bun" | undefined> =>
+  (await commandExists("bun")) ? "bun" : undefined;

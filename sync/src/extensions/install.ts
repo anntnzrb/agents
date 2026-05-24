@@ -61,21 +61,8 @@ const needsNodeInstall = async (packageDir: string): Promise<boolean> => {
   return packageJson && !nodeModules;
 };
 
-const chooseInstaller = async (packageDir: string): Promise<string[] | undefined> => {
-  if (
-    (await fs.stat(path.join(packageDir, "bun.lockb")).catch(() => undefined)) &&
-    (await commandExists("bun"))
-  ) {
-    return ["bun", "install"];
-  }
-  if (await commandExists("npm")) {
-    return ["npm", "install"];
-  }
-  if (await commandExists("bun")) {
-    return ["bun", "install"];
-  }
-  return undefined;
-};
+const chooseInstaller = async (): Promise<string[] | undefined> =>
+  (await commandExists("bun")) ? ["bun", "install"] : undefined;
 
 export const installExtensionDeps = async (root: string, timeoutMs: number): Promise<boolean> => {
   const results: boolean[] = [];
@@ -85,9 +72,9 @@ export const installExtensionDeps = async (root: string, timeoutMs: number): Pro
       continue;
     }
 
-    const command = await chooseInstaller(packageDir);
+    const command = await chooseInstaller();
     if (!command) {
-      console.error(`sync: no package manager available for ${packageDir}`);
+      console.error(`sync: bun is required for ${packageDir}`);
       results.push(false);
       continue;
     }

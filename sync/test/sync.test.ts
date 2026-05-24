@@ -36,7 +36,6 @@ let commandForTests: any;
 let cloneAttemptsForTests: any;
 let validatePackageForTests: any;
 let packageHasBuildScript: any;
-let inferredInstallStep: any;
 let main: any;
 let tryAcquireSyncLock: any;
 let startSyncWatchdog: any;
@@ -70,7 +69,6 @@ if (!runtime) {
     cloneAttemptsForTests,
     validatePackageForTests,
     packageHasBuildScript,
-    inferredInstallStep,
     main,
     tryAcquireSyncLock,
     startSyncWatchdog,
@@ -226,11 +224,6 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
       packagesModule as Record<string, unknown>,
       "packageHasBuildScript",
       "package_has_build_script",
-    ),
-    inferredInstallStep: pickFn(
-      packagesProcessModule as Record<string, unknown>,
-      "inferredInstallStep",
-      "inferred_install_step",
     ),
     buildSyncPlan: pickFn(
       planModule as Record<string, unknown>,
@@ -1057,24 +1050,6 @@ test("managed_state_malformed_json_is_recoverable", async () => {
   });
 });
 
-test("inferred_install_step_matches_legacy_fallback_rules", async () => {
-  assert.equal(
-    await call(inferredInstallStep, "bun", true, { _tag: "Success" }),
-    "Done",
-  );
-  assert.equal(
-    await call(inferredInstallStep, "bun", true, { _tag: "Failure", detail: "bun add failed" }),
-    "RetryWithNpm",
-  );
-  assert.equal(
-    await call(inferredInstallStep, "bun", false, { _tag: "Failure", detail: "bun add failed" }),
-    "ReportPrimaryFailure",
-  );
-  assert.equal(
-    await call(inferredInstallStep, "npm", true, { _tag: "Failure", detail: "npm install failed" }),
-    "ReportPrimaryFailure",
-  );
-});
 }
 
 function makeSyncEnv(root: string): any {
