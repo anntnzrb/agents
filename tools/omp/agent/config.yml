@@ -30,7 +30,7 @@ memories:
   minRolloutIdleHours: 12
   summaryInjectionTokenLimit: 5000
 tools:
-  discoveryMode: all
+  discoveryMode: off
 lsp:
   enabled: false
 bashInterceptor:
