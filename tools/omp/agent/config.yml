@@ -31,6 +31,12 @@ memories:
   summaryInjectionTokenLimit: 5000
 tools:
   discoveryMode: off
+readHashLines: true
+edit:
+  mode: hashline
+  modelVariants:
+    openai-codex/: apply_patch
+    openai/: apply_patch
 task:
   eager: true
   maxConcurrency: 16
