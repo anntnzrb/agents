@@ -76,11 +76,32 @@ lsp:
 bashInterceptor:
   enabled: true
   patterns:
-    - pattern: "^(?!.*\\buv\\s+run\\b)(?:\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*|.*[;&|]\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*)(?:pythonw?(?:[23])?(?:\\.\\d+)*(?:\\.exe)?|py(?:\\.exe)?|pypy(?:3)?(?:\\.exe)?)\\b"
+    - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:echo|printf)\\s+.*(?:>|>>)\\s*(?:\"[^\"]+\"|'[^']+'|[^\\s\"']+)(?:\\s*(?:&&|\\|\\||;).*)?$|(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*cat\\s*<<[^\\n]*>\\s*(?:\"[^\"]+\"|'[^']+'|[^\\s\"']+)"
+      tool: write
+      message: "Use the `write` tool instead of echo/cat redirection. It handles encoding and provides confirmation."
+    - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(cat|head|tail|less|more)\\s+"
+      tool: read
+      message: "Use the `read` tool instead of cat/head/tail. It provides better context and handles binary files."
+    - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(grep|rg|ripgrep|ag|ack)\\s+"
+      tool: search
+      message: "Use the `search` tool instead of grep/rg. It respects .gitignore and provides structured output."
+    - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:fd\\b|(?:(?:find|locate)\\s+.*(?:-name|-iname|-type|--type|-glob)))"
+      tool: find
+      message: "Use the `find` tool instead of find/fd. It respects .gitignore and is faster for glob patterns."
+    - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*sed\\s+(-i|--in-place)"
+      tool: edit
+      message: "Use the `edit` tool instead of sed -i. It provides diff preview and fuzzy matching."
+    - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*perl\\s+.*-[pn]?i"
+      tool: edit
+      message: "Use the `edit` tool instead of perl -i. It provides diff preview and fuzzy matching."
+    - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*awk\\s+.*-i\\s+inplace"
+      tool: edit
+      message: "Use the `edit` tool instead of awk -i inplace. It provides diff preview and fuzzy matching."
+    - pattern: "(?:^|[;&|]\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:pythonw?(?:[23])?(?:\\.\\d+)*(?:\\.exe)?|py(?:\\.exe)?|pypy(?:3)?(?:\\.exe)?)\\b"
       flags: i
       tool: bash
       message: "Direct Python execution is disabled. Load `/skill:python`, then use uv workflow (`uv run`, `uv run --with`, `uv add`)."
-    - pattern: "^(?!.*\\buv\\s+pip\\b)(?:\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*|.*[;&|]\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*)(?:pip(?:[23])?(?:\\.\\d+)*(?:\\.exe)?|pipx(?:\\.exe)?)\\b"
+    - pattern: "(?:^|[;&|]\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:pip(?:[23])?(?:\\.\\d+)*(?:\\.exe)?|pipx(?:\\.exe)?)\\b"
       flags: i
       tool: bash
       message: "pip/pipx is disabled. Load `/skill:python`, then use uv workflow (`uv add`, `uv pip`, `uv run --with`, `uv tool`)."
@@ -104,10 +125,42 @@ bashInterceptor:
       flags: i
       tool: bash
       message: "`python setup.py ...` is disabled. Load `/skill:python`, then use PEP 517/uv workflow (`uv build`, `uv publish`, `uv sync`)."
-    - pattern: "^(?!.*\\b(?:uv\\s+run|uvx|uv\\s+tool\\s+run)\\b)(?:\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*|.*[;&|]\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*)(?:pytest|py\\.test|tox|nox|coverage|mypy|pyright|ruff|black|isort|flake8|pylint|ipython|jupyter|jupyter-lab|jupyter-notebook|notebook)(?:\\.exe)?\\b"
+    - pattern: "(?:^|[;&|]\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:pytest|py\\.test|tox|nox|coverage|mypy|pyright|ruff|black|isort|flake8|pylint|ipython|jupyter|jupyter-lab|jupyter-notebook|notebook)(?:\\.exe)?\\b"
       flags: i
       tool: bash
       message: "Python CLI tools must run through uv. Load `/skill:python`, then use `uv run <tool>`, `uvx <tool>`, or `uv tool run <tool>`."
+    - pattern: "(?:^|[;&|]\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:pwsh|pwsh\\.exe|powershell|powershell\\.exe)\\b[^\\n]*\\s-(?:e|en|enc|encodedcommand)\\b"
+      flags: i
+      tool: bash
+      message: "Opaque PowerShell payloads are blocked. Use an explicit script with `-Command` or write a `.ps1` and run it with `-File`."
+    - pattern: "(?:^|[;&|]\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:pwsh|pwsh\\.exe|powershell|powershell\\.exe)\\b(?![^\\n]*\\s-NoProfile\\b[^\\n]*\\s-(?:Command|c)\\b)[^\\n]*\\s-(?:Command|c)\\b"
+      flags: i
+      tool: bash
+      message: "PowerShell from OMP bash must include `-NoProfile`. Use `pwsh.exe -NoProfile -NoLogo -NonInteractive -Command '...'`, or `-File` for multiline scripts."
+    - pattern: "(?:^|[;&|]\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:pwsh|pwsh\\.exe|powershell|powershell\\.exe)\\b(?![^\\n]*\\s-NonInteractive\\b[^\\n]*\\s-(?:Command|c)\\b)[^\\n]*\\s-(?:Command|c)\\b"
+      flags: i
+      tool: bash
+      message: "PowerShell from OMP bash must include `-NonInteractive`. Use `pwsh.exe -NoProfile -NoLogo -NonInteractive -Command '...'`, or `-File` for multiline scripts."
+    - pattern: "(?:^|[;&|]\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:pwsh|pwsh\\.exe|powershell|powershell\\.exe)\\b[^\\n]*\\s-(?:Command|c)\\s+\""
+      flags: i
+      tool: bash
+      message: "Do not wrap PowerShell `-Command` in Bash double quotes. Bash will eat `$`, backticks, and backslashes. Use single quotes around the script, or write a `.ps1` and run it with `-File`."
+    - pattern: "(?:^|[;&|]\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:cp|mv|rm|touch|mkdir)\\b[^\\n]*(?:[A-Za-z]:\\\\|\\\\\\\\)"
+      flags: i
+      tool: bash
+      message: "Do not aim POSIX shell commands at Windows `C:\\...` or UNC paths. Use OMP `read`/`search`/`find`/`edit`/`write`, or run PowerShell with `-LiteralPath`."
+    - pattern: "(?:^|[;&|]\\s*)\\s*(?:Start-Process|Invoke-Item|explorer(?:\\.exe)?|mshta(?:\\.exe)?|rundll32(?:\\.exe)?)\\b|(?:^|[;&|]\\s*)\\s*(?:pwsh|pwsh\\.exe|powershell|powershell\\.exe)\\b[^\\n]*\\s-(?:Command|c)\\s+[^\\n]*(?:Start-Process|Invoke-Item|explorer(?:\\.exe)?|mshta(?:\\.exe)?|rundll32(?:\\.exe)?)\\b|(?:^|[;&|]\\s*)\\s*cmd(?:\\.exe)?\\s+/c\\s+start\\b"
+      flags: i
+      tool: bash
+      message: "GUI and URL launches from shell are blocked here. If you really need that, make the intent explicit and use the right tool or user-approved flow."
+    - pattern: "\\b(?:Remove-Item\\b[^\\n]*\\s-Force\\b|Remove-Item\\b[^\\n]*\\s-Recurse\\b|cmd(?:\\.exe)?\\b[^\\n]*\\b(?:del|erase)\\b[^\\n]*\\s/[Ff]\\b|cmd(?:\\.exe)?\\b[^\\n]*\\b(?:rd|rmdir)\\b[^\\n]*\\s/[Ss]\\b[^\\n]*\\s/[Qq]\\b)"
+      flags: i
+      tool: bash
+      message: "Forceful Windows delete patterns are blocked. Use OMP file tools for precise changes, or restate the destructive intent explicitly first."
+    - pattern: "(?:^|[;&|]\\s*)\\s*(?:Get-ChildItem|Get-Content|Set-Location|Copy-Item|Move-Item|Remove-Item|Rename-Item|New-Item|Set-Content|Add-Content|Out-File|Select-String|Where-Object|ForEach-Object|Test-Path|Resolve-Path|Get-Item|Select-Object|Measure-Object)\\b"
+      flags: i
+      tool: bash
+      message: "This is PowerShell syntax, not Bash. In OMP bash on Windows, invoke `pwsh.exe -NoProfile -NoLogo -NonInteractive -Command '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; <script>'`, or use `-File` for quote-heavy commands."
 
 # =============================================================================
 # Integrations / Providers
