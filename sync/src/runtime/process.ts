@@ -89,39 +89,32 @@ export const runCommandOutcome = async (
     return { _tag: "MissingCommand" };
   }
 
+  const signal = AbortSignal.timeout(timeoutMs);
   const subprocess = Bun.spawn([executable, ...command.slice(1)], {
     cwd: cwd ?? ".",
+    killSignal: "SIGKILL",
+    signal,
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
   });
 
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    subprocess.kill("SIGKILL");
-  }, timeoutMs);
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(subprocess.stdout).text().catch(() => ""),
+    new Response(subprocess.stderr).text().catch(() => ""),
+    subprocess.exited,
+  ]);
 
-  try {
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(subprocess.stdout).text().catch(() => ""),
-      new Response(subprocess.stderr).text().catch(() => ""),
-      subprocess.exited,
-    ]);
-
-    if (timedOut) {
-      return { _tag: "TimedOut" };
-    }
-    if (exitCode === 0) {
-      return { _tag: "Success" };
-    }
-    return {
-      _tag: "Failure",
-      detail: detailFromOutput(stdout, stderr),
-    };
-  } finally {
-    clearTimeout(timer);
+  if (signal.aborted) {
+    return { _tag: "TimedOut" };
   }
+  if (exitCode === 0) {
+    return { _tag: "Success" };
+  }
+  return {
+    _tag: "Failure",
+    detail: detailFromOutput(stdout, stderr),
+  };
 };
 
 export const runCommand = async (
