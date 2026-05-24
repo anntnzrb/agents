@@ -106,9 +106,7 @@ export function missingPackageRoots(dir: string): string[] {
   return [...missing].sort();
 }
 
-export function validatePackageForTests(dir: string): boolean {
-  return packageIsHealthy(dir);
-}
+export const validatePackageForTests = (dir: string): boolean => packageIsHealthy(dir);
 
 function validatePiManifest(dir: string, pi: Record<string, unknown>): boolean | null {
   let hasEntries = false;
@@ -134,15 +132,12 @@ function validatePiManifest(dir: string, pi: Record<string, unknown>): boolean |
   return hasEntries ? true : null;
 }
 
-function isPatternEntry(value: string): boolean {
-  return (
-    value.startsWith("!") ||
-    value.startsWith("+") ||
-    value.startsWith("-") ||
-    value.includes("*") ||
-    value.includes("?")
-  );
-}
+const isPatternEntry = (value: string): boolean =>
+  value.startsWith("!") ||
+  value.startsWith("+") ||
+  value.startsWith("-") ||
+  value.includes("*") ||
+  value.includes("?");
 
 function readJsonFile(path: string): unknown | null {
   const content = readFile(path);
@@ -275,9 +270,7 @@ function packageRootFromSpecifier(specifier: string): string | null {
   return trimmed.split("/")[0] ?? null;
 }
 
-function packageRootIsBuiltin(packageRoot: string): boolean {
-  return BUILTIN_PACKAGE_ROOTS.has(packageRoot);
-}
+const packageRootIsBuiltin = (packageRoot: string): boolean => BUILTIN_PACKAGE_ROOTS.has(packageRoot);
 
 function isDirectory(path: string): boolean {
   try {

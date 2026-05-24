@@ -284,6 +284,4 @@ function walk(absolute: string, relative: string, out: SnapshotEntry[]): void {
   });
 }
 
-function normalizePath(path: string): string {
-  return path.split(sep).join("/");
-}
+const normalizePath = (path: string): string => path.split(sep).join("/");

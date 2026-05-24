@@ -46,9 +46,7 @@ export async function clonePackage(source: string, targetDir: string, timeoutMs:
   );
 }
 
-export function githubSlugForTests(source: string): string | null {
-  return githubRepoSlug(source);
-}
+export const githubSlugForTests = (source: string): string | null => githubRepoSlug(source);
 
 export function commandForTests(source: string, targetDir: string): string[] {
   const command = cloneCommands(source, targetDir, true)[0];
@@ -97,20 +95,16 @@ function sourceSlug(source: string): string {
   return compact.length > 0 ? compact : "package";
 }
 
-function localPathBasename(source: string): string {
-  return source.includes("\\") ? path.win32.basename(source) : path.basename(source);
-}
+const localPathBasename = (source: string): string =>
+  source.includes("\\") ? path.win32.basename(source) : path.basename(source);
 
-function isLocalPathSource(source: string): boolean {
-  return (
-    path.isAbsolute(source) ||
-    /^[A-Za-z]:[\\/]/.test(source) ||
-    source.startsWith("\\\\") ||
-    source.startsWith(".\\") ||
-    source.startsWith("..\\") ||
-    source.includes("\\")
-  );
-}
+const isLocalPathSource = (source: string): boolean =>
+  path.isAbsolute(source) ||
+  /^[A-Za-z]:[\\/]/.test(source) ||
+  source.startsWith("\\\\") ||
+  source.startsWith(".\\") ||
+  source.startsWith("..\\") ||
+  source.includes("\\");
 
 function fnv1a64(input: string): string {
   let hash = 0xcbf29ce484222325n;

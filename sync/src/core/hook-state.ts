@@ -179,17 +179,11 @@ function exists(targetPath: string): boolean {
   }
 }
 
-function shouldSkipEntry(entryName: string): boolean {
-  return entryName === "node_modules" || entryName === ".git" || entryName.startsWith(".");
-}
+const shouldSkipEntry = (entryName: string): boolean => entryName === "node_modules" || entryName === ".git" || entryName.startsWith(".");
 
-function normalizeRelativePath(pathValue: string): string {
-  return pathValue.split(sep).join("/");
-}
+const normalizeRelativePath = (pathValue: string): string => pathValue.split(sep).join("/");
 
-function joinRelative(left: string, right: string): string {
-  return left.length === 0 ? right : `${left}/${right}`;
-}
+const joinRelative = (left: string, right: string): string => left.length === 0 ? right : `${left}/${right}`;
 
 function isNotFound(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT";

@@ -43,13 +43,9 @@ export function parseTimeoutSeconds(value: string | undefined, defaultSeconds: n
   return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultSeconds;
 }
 
-export function syncTimeout(): number {
-  return DEFAULT_SYNC_TIMEOUT_SECONDS;
-}
+export const syncTimeout = (): number => DEFAULT_SYNC_TIMEOUT_SECONDS;
 
-export function syncLockPath(syncEnv: SyncEnv): string {
-  return path.join(syncEnv.managedStateHome, SYNC_LOCK_FILE);
-}
+export const syncLockPath = (syncEnv: SyncEnv): string => path.join(syncEnv.managedStateHome, SYNC_LOCK_FILE);
 
 export function tryAcquireSyncLock(syncEnv: SyncEnv): SyncLock | undefined {
   return tryAcquireSyncLockImpl(syncEnv.managedStateHome, syncLockPath(syncEnv));

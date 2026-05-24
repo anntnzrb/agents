@@ -148,9 +148,8 @@ function currentErrno(): number {
   return toBuffer(errnoPtr as never, 0, 4).readInt32LE(0);
 }
 
-function systemErrorMessage(errno: number): string {
-  return `${String(requirePosixLibc().strerror(errno))} (os error ${errno})`;
-}
+const systemErrorMessage = (errno: number): string =>
+  `${String(requirePosixLibc().strerror(errno))} (os error ${errno})`;
 
 function tryAcquireWindowsSyncLock(lockPath: string): SyncLock | undefined {
   const openExclusive = (): number | undefined => {
@@ -239,11 +238,8 @@ function isProcessRunning(pid: number): boolean {
   }
 }
 
-function isErrno(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === code
-  );
-}
+const isErrno = (error: unknown, code: string): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  (error as { code?: string }).code === code;

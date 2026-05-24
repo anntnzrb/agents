@@ -186,10 +186,6 @@ function isNotFound(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT";
 }
 
-function isAlreadyExists(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "EEXIST";
-}
+const isAlreadyExists = (error: unknown): boolean => typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "EEXIST";
 
-function uniqueSorted(names: readonly string[]): string[] {
-  return [...new Set(names)].sort();
-}
+const uniqueSorted = (names: readonly string[]): string[] => [...new Set(names)].sort();

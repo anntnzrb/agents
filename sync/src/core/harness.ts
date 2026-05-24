@@ -180,9 +180,8 @@ export function defaultHarnesses(home: string): readonly Harness[] {
   return harnessSpecs.map(buildHarness);
 }
 
-export function harnessRoot(harness: Harness): string {
-  return harness.runtimeSubdir ? path.join(harness.home, harness.runtimeSubdir) : harness.home;
-}
+export const harnessRoot = (harness: Harness): string =>
+  harness.runtimeSubdir ? path.join(harness.home, harness.runtimeSubdir) : harness.home;
 
 export function harnessSourceRoot(harness: Harness, toolsHome: string): string {
   return harness.runtimeSubdir
@@ -190,22 +189,17 @@ export function harnessSourceRoot(harness: Harness, toolsHome: string): string {
     : path.join(toolsHome, harness.sourceName);
 }
 
-export function harnessInstructionTarget(harness: Harness): string {
-  return path.join(harnessRoot(harness), harness.instructionFile);
-}
+export const harnessInstructionTarget = (harness: Harness): string => path.join(harnessRoot(harness), harness.instructionFile);
 
-export function harnessInstructionFileName(harness: Harness): string {
-  return harness.instructionFile;
-}
+export const harnessInstructionFileName = (harness: Harness): string => harness.instructionFile;
 
 export function harnessRenameAsset(harness: Harness, assetName: string): string {
   const match = harness.assetRenames.find(([src]) => src === assetName);
   return match ? match[1] : assetName;
 }
 
-export function harnessManagedStatePath(harness: Harness, managedStateHome: string): string {
-  return path.join(managedStateHome, `${harness.sourceName}.json`);
-}
+export const harnessManagedStatePath = (harness: Harness, managedStateHome: string): string =>
+  path.join(managedStateHome, `${harness.sourceName}.json`);
 
 function normalizeHooks(hooks: readonly HarnessHookSpec[]): HarnessHook[] {
   return hooks.map((hook) => {

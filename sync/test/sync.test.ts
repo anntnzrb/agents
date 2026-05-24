@@ -291,17 +291,11 @@ function runGit(cwd: string, args: string[]): void {
   assert.equal(result.status, 0, result.stderr || result.stdout);
 }
 
-function readText(path: string): string {
-  return readFileSync(path, "utf8");
-}
+const readText = (path: string): string => readFileSync(path, "utf8");
 
-function exists(path: string): boolean {
-  return existsSync(path);
-}
+const exists = (path: string): boolean => existsSync(path);
 
-function isPosix(): boolean {
-  return process.platform === "darwin" || process.platform === "linux";
-}
+const isPosix = (): boolean => process.platform === "darwin" || process.platform === "linux";
 
 async function call<T>(fn: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<T> {
   return await resolveValue(fn(...args));

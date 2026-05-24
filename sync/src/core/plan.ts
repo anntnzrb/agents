@@ -77,13 +77,9 @@ export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
   };
 }
 
-export function assetDirNames(root: string): string[] {
-  return dirEntryNames(root, true);
-}
+export const assetDirNames = (root: string): string[] => dirEntryNames(root, true);
 
-export function topLevelEntryNames(root: string): string[] {
-  return dirEntryNames(root, false);
-}
+export const topLevelEntryNames = (root: string): string[] => dirEntryNames(root, false);
 
 function buildHarnessPlan(syncEnv: SyncEnv, harness: Harness, assetNames: readonly string[]): HarnessPlan {
   const root = harnessRoot(harness);
@@ -190,9 +186,8 @@ function buildHookPlans(
   });
 }
 
-function extensionHookStatePath(managedStateHome: string, harness: Harness): string {
-  return join(managedStateHome, `${harness.sourceName}.extension-deps.json`);
-}
+const extensionHookStatePath = (managedStateHome: string, harness: Harness): string =>
+  join(managedStateHome, `${harness.sourceName}.extension-deps.json`);
 
 function dirEntryNames(root: string, dirsOnly: boolean): string[] {
   if (!isDirectory(root)) {
@@ -216,9 +211,7 @@ function dirEntryNames(root: string, dirsOnly: boolean): string[] {
   return uniqueSorted(names);
 }
 
-function uniqueSorted(names: readonly string[]): string[] {
-  return [...new Set(names)].sort();
-}
+const uniqueSorted = (names: readonly string[]): string[] => [...new Set(names)].sort();
 
 function isDirectory(root: string): boolean {
   try {
@@ -228,10 +221,11 @@ function isDirectory(root: string): boolean {
   }
 }
 
-function isTopLevel(entryName: string): boolean {
-  return entryName.length > 0 && !posix.isAbsolute(entryName) && !entryName.includes("/") && entryName !== "." && entryName !== "..";
-}
+const isTopLevel = (entryName: string): boolean =>
+  entryName.length > 0 &&
+  !posix.isAbsolute(entryName) &&
+  !entryName.includes("/") &&
+  entryName !== "." &&
+  entryName !== "..";
 
-export function isSafeManagedEntryName(entryName: string): boolean {
-  return isTopLevel(entryName);
-}
+export const isSafeManagedEntryName = (entryName: string): boolean => isTopLevel(entryName);
