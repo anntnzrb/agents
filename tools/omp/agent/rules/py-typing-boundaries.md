@@ -6,8 +6,10 @@ condition:
   - "\\bBaseModel\\b|\\bTypeAdapter\\b|\\bmsgspec\\.Struct\\b|\\bTypedDict\\b|\\bLiteral\\b|\\bProtocol\\b"
   - "\\bexcept\\s+Exception\\b|\\bexcept\\s*:|\\b(?:List|Dict|Tuple|Set|Optional|Union)\\b"
 scope:
-  - text
-  - tool
+  - tool:edit(*.py)
+  - tool:edit(**/*.py)
+  - tool:write(*.py)
+  - tool:write(**/*.py)
 interruptMode: never
 ---
 

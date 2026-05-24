@@ -6,8 +6,10 @@ condition:
   - "\\basyncio\\.gather\\s*\\(|\\bhttpx\\.AsyncClient\\s*\\("
   - "\\basync\\s+def\\b|\\bawait\\b|\\basyncio\\."
 scope:
-  - text
-  - tool
+  - tool:edit(*.py)
+  - tool:edit(**/*.py)
+  - tool:write(*.py)
+  - tool:write(**/*.py)
 interruptMode: never
 ---
 

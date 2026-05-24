@@ -6,8 +6,10 @@ condition:
   - "\\{\\s*\\*\\*[^}]+,\\s*\\*\\*[^}]+\\}|\\b[a-zA-Z_][a-zA-Z0-9_]*\\s*=\\s*(?:len\\(|re\\.search\\(|[^\\n]+\\.search\\()"
   - "\\b(?:datetime\\.datetime\\.utcnow|datetime\\.datetime\\.utcfromtimestamp|os\\.path\\.|open\\([^\\n]*(?:\"r\"|'r')|\\.append\\s*\\(|dataclasses\\.(?:asdict|astuple)\\s*\\(|field\\s*\\([^\\n]*default\\s*=\\s*(?:\\[\\]|\\{\\}|set\\(\\)))"
 scope:
-  - text
-  - tool
+  - tool:edit(*.py)
+  - tool:edit(**/*.py)
+  - tool:write(*.py)
+  - tool:write(**/*.py)
 interruptMode: never
 ---
 

@@ -6,8 +6,10 @@ condition:
   - "\\bmock\\.|\\bMock\\b|\\bMagicMock\\b|\\bpatch\\s*\\(|@pytest\\.mark\\.parametrize|pytest\\.raises"
   - "@pytest\\.mark\\.parametrize|pytest\\.raises|\\bpytest\\.approx\\b|\\bassert\\s+[^\\n]+==\\s+(?:True|False|None|\\[\\]|\\{\\}|\\(\\))\\b"
 scope:
-  - text
-  - tool
+  - tool:edit(*.py)
+  - tool:edit(**/*.py)
+  - tool:write(*.py)
+  - tool:write(**/*.py)
 interruptMode: never
 ---
 
