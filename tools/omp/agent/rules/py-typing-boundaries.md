@@ -3,7 +3,7 @@ description: Prefer strict typing, typed JSON shapes, and single boundary valida
 condition:
   - "\\bAny\\b|\\bdict\\s*\\[\\s*str\\s*,\\s*(?:Any|object)\\s*\\]|\\bMapping\\s*\\[\\s*str\\s*,\\s*(?:Any|object)\\s*\\]"
   - "\\bjson\\.loads\\s*\\(|\\.json\\s*\\(\\)|\\bcast\\s*\\(|#\\s*type:\\s*ignore|pyright:\\s*ignore"
-  - "\\bBaseModel\\b|\\bTypeAdapter\\b|\\bmsgspec\\.Struct\\b|\\bTypedDict\\b|\\bLiteral\\b|\\bProtocol\\b|\\bdataclass\\s*\\("
+  - "\\bBaseModel\\b|\\bTypeAdapter\\b|\\bmsgspec\\.Struct\\b|\\bTypedDict\\b|\\bLiteral\\b|\\bProtocol\\b"
   - "\\bexcept\\s+Exception\\b|\\bexcept\\s*:|\\b(?:List|Dict|Tuple|Set|Optional|Union)\\b"
 scope:
   - text
@@ -18,6 +18,7 @@ Type-system defaults:
 - Public functions and methods should have explicit parameter and return types.
 - Avoid `Any`. If an external library forces `Any`, contain it at the boundary, narrow immediately, and document the narrowing.
 - Avoid `cast(...)` and `# type: ignore` unless the checker cannot express a real invariant. Prefer better modeling first.
+- Use `@dataclass(frozen=True, slots=True)` for immutable domain value objects when appropriate.
 - For arguments, prefer protocols and abstract collection types (`Iterable[T]`, `Sequence[T]`, `Mapping[K, V]`) when mutation is not required.
 - For returns from concrete implementations, prefer concrete types (`list[T]`, `dict[K, V]`, domain objects).
 - Use `object` instead of `Any` when a value may be anything but is only treated generically.

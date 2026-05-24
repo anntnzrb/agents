@@ -1,9 +1,9 @@
 ---
 description: Use the Python skill and uv workflow for all Python work
 condition:
-  - \"\\b(?:pythonw?(?:[23])?(?:\\.\\d+)*(?:\\.exe)?|py(?:\\.exe)?|pypy(?:3)?(?:\\.exe)?|pip(?:[23])?(?:\\.\\d+)*(?:\\.exe)?|pipx(?:\\.exe)?|pip-compile|pip-sync|pipdeptree|conda|hatch|mamba|micromamba|pdm|pipenv|poetry|rye|virtualenv|pyenv|twine|flit|pytest|py\\.test|tox|nox|coverage|mypy|pyright|ruff|black|isort|flake8|pylint|ipython|jupyter|jupyter-lab|jupyter-notebook|notebook)\\b\"
-  - \"\\bpython(?:w?(?:[23])?(?:\\.\\d+)*)?\\b[^\\n;|&]*\\s-m\\s*(?:pip|venv|virtualenv|ensurepip|py_compile|compileall|build|twine)\\b\"
-  - \"\\bpython(?:w?(?:[23])?(?:\\.\\d+)*)?\\b[^\\n;|&]*\\bsetup\\.py\\b\"
+  - "\\b(?:pythonw?(?:[23])?(?:\\.\\d+)*(?:\\.exe)?|py(?:\\.exe)?|pypy(?:3)?(?:\\.exe)?|pip(?:[23])?(?:\\.\\d+)*(?:\\.exe)?|pipx(?:\\.exe)?|pip-compile|pip-sync|pipdeptree|conda|hatch|mamba|micromamba|pdm|pipenv|poetry|rye|virtualenv|pyenv|twine|flit|pytest|py\\.test|tox|nox|coverage|mypy|pyright|ruff|black|isort|flake8|pylint|ipython|jupyter|jupyter-lab|jupyter-notebook|notebook)\\b"
+  - "\\bpython(?:w?(?:[23])?(?:\\.\\d+)*)?\\b[^\\n;|&]*\\s-m\\s*(?:pip|venv|virtualenv|ensurepip|py_compile|compileall|build|twine)\\b"
+  - "\\bpython(?:w?(?:[23])?(?:\\.\\d+)*)?\\b[^\\n;|&]*\\bsetup\\.py\\b"
 scope:
   - text
   - tool

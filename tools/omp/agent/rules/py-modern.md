@@ -4,7 +4,7 @@ condition:
   - "\\b(?:typing\\.)?(?:List|Dict|Tuple|Set|FrozenSet|Deque|DefaultDict|Counter|Optional|Union)\\b"
   - "\\bTypeAlias\\b|\\bTypeVar\\s*\\("
   - "\\{\\s*\\*\\*[^}]+,\\s*\\*\\*[^}]+\\}|\\b[a-zA-Z_][a-zA-Z0-9_]*\\s*=\\s*(?:len\\(|re\\.search\\(|[^\\n]+\\.search\\()"
-  - "\\b(?:datetime\\.datetime\\.utcnow|datetime\\.datetime\\.utcfromtimestamp|os\\.path\\.|open\\([^\\n]*(?:\"r\"|'r')|\\.append\\s*\\(|for\\s+\\w+\\s+in\\s+)"
+  - "\\b(?:datetime\\.datetime\\.utcnow|datetime\\.datetime\\.utcfromtimestamp|os\\.path\\.|open\\([^\\n]*(?:\"r\"|'r')|\\.append\\s*\\(|dataclasses\\.(?:asdict|astuple)\\s*\\(|field\\s*\\([^\\n]*default\\s*=\\s*(?:\\[\\]|\\{\\}|set\\(\\)))"
 scope:
   - text
   - tool

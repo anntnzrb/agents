@@ -4,7 +4,7 @@ condition:
   - "\\b(?:pyright|mypy|ruff|pytest|hypothesis|coverage|pytest-cov)\\b"
   - "\\[tool\\.(?:pyright|ruff|pytest|coverage)\\]|pyrightconfig\\.json|pyproject\\.toml"
   - "\\bmock\\.|\\bMock\\b|\\bMagicMock\\b|\\bpatch\\s*\\(|@pytest\\.mark\\.parametrize|pytest\\.raises"
-  - "\\bassert\\s+[^\\n]+==\\s*[^\\n]+|\\bpytest\\.approx\\b"
+  - "@pytest\\.mark\\.parametrize|pytest\\.raises|\\bpytest\\.approx\\b|\\bassert\\s+[^\\n]+==\\s+(?:True|False|None|\\[\\]|\\{\\}|\\(\\))\\b"
 scope:
   - text
   - tool
