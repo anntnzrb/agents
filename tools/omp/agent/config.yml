@@ -132,19 +132,19 @@ bashInterceptor:
     - pattern: "(?:^|[;&|]\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:pwsh|pwsh\\.exe|powershell|powershell\\.exe)\\b[^\\n]*\\s-(?:e|en|enc|encodedcommand)\\b"
       flags: i
       tool: bash
-      message: "Opaque PowerShell payloads are blocked. Use an explicit script with `-Command` or write a `.ps1` and run it with `-File`."
+      message: "Opaque PowerShell payloads are blocked. Use an explicit script with `-Command`, or write a temporary `.ps1` under PowerShell temp and run it with `-File`."
     - pattern: "(?:^|[;&|]\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:pwsh|pwsh\\.exe|powershell|powershell\\.exe)\\b(?![^\\n]*\\s-NoProfile\\b[^\\n]*\\s-(?:Command|c)\\b)[^\\n]*\\s-(?:Command|c)\\b"
       flags: i
       tool: bash
-      message: "PowerShell from OMP bash must include `-NoProfile`. Use `pwsh.exe -NoProfile -NoLogo -NonInteractive -Command '...'`, or `-File` for multiline scripts."
+      message: "PowerShell from OMP bash must include `-NoProfile`. Use `pwsh.exe -NoProfile -NoLogo -NonInteractive -Command '...'`, or a temporary `.ps1` under PowerShell temp with `-File` for multiline scripts."
     - pattern: "(?:^|[;&|]\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:pwsh|pwsh\\.exe|powershell|powershell\\.exe)\\b(?![^\\n]*\\s-NonInteractive\\b[^\\n]*\\s-(?:Command|c)\\b)[^\\n]*\\s-(?:Command|c)\\b"
       flags: i
       tool: bash
-      message: "PowerShell from OMP bash must include `-NonInteractive`. Use `pwsh.exe -NoProfile -NoLogo -NonInteractive -Command '...'`, or `-File` for multiline scripts."
+      message: "PowerShell from OMP bash must include `-NonInteractive`. Use `pwsh.exe -NoProfile -NoLogo -NonInteractive -Command '...'`, or a temporary `.ps1` under PowerShell temp with `-File` for multiline scripts."
     - pattern: "(?:^|[;&|]\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:pwsh|pwsh\\.exe|powershell|powershell\\.exe)\\b[^\\n]*\\s-(?:Command|c)\\s+\""
       flags: i
       tool: bash
-      message: "Do not wrap PowerShell `-Command` in Bash double quotes. Bash will eat `$`, backticks, and backslashes. Use single quotes around the script, or write a `.ps1` and run it with `-File`."
+      message: "Do not wrap PowerShell `-Command` in Bash double quotes. Bash will eat `$`, backticks, and backslashes. Use single quotes around the script, or write a temporary `.ps1` under PowerShell temp and run it with `-File`."
     - pattern: "(?:^|[;&|]\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:cp|mv|rm|touch|mkdir)\\b[^\\n]*(?:[A-Za-z]:\\\\|\\\\\\\\)"
       flags: i
       tool: bash
@@ -160,7 +160,7 @@ bashInterceptor:
     - pattern: "(?:^|[;&|]\\s*)\\s*(?:Get-ChildItem|Get-Content|Set-Location|Copy-Item|Move-Item|Remove-Item|Rename-Item|New-Item|Set-Content|Add-Content|Out-File|Select-String|Where-Object|ForEach-Object|Test-Path|Resolve-Path|Get-Item|Select-Object|Measure-Object)\\b"
       flags: i
       tool: bash
-      message: "This is PowerShell syntax, not Bash. In OMP bash on Windows, invoke `pwsh.exe -NoProfile -NoLogo -NonInteractive -Command '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; <script>'`, or use `-File` for quote-heavy commands."
+      message: "This is PowerShell syntax, not Bash. In OMP bash on Windows, invoke `pwsh.exe -NoProfile -NoLogo -NonInteractive -Command '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; <script>'`, or use a temporary `.ps1` under PowerShell temp with `-File` for quote-heavy commands."
 
 # =============================================================================
 # Integrations / Providers
