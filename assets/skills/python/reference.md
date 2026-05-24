@@ -394,20 +394,32 @@ my-project/
 
 | Avoid | Do Instead |
 |-------|------------|
-| Mutable default args `def f(lst=[])` | `def f(lst=None)` |
+| Mutable default args `def f(lst=[])` | `def f(lst=None)` or `field(default_factory=list)` |
+| `dict[str, Any]` for known payloads | `TypedDict` / `Literal` / discriminated unions |
+| `Any` for "accepts anything" | `object` plus narrowing |
+| Concrete mutable input types (`list[T]`) when only reading | `Sequence[T]`, `Iterable[T]`, `Mapping[K, V]` |
+| Abstract return types from concrete implementations | Concrete `list[T]`, `dict[K, V]`, domain objects |
+| `Optional[T]` / `Union[A, B]` on modern targets | `T | None` / `A | B` |
 | `requests.get` in async | `httpx.AsyncClient` |
-| Classes for data bags | `@dataclass(frozen=True)` |
+| Bare `asyncio.create_task()` | `TaskGroup` or tracked/cancelled task lifecycle |
+| Classes for data bags | `@dataclass(frozen=True, slots=True)` or `TypedDict` |
 | Inheritance hierarchies | Protocols + composition |
-| Mutating function args | Return new values |
-| `try/except Exception` | Specific exception types |
-| Blocking in async | `await asyncio.to_thread(fn)` |
+| Mutating function args | Return new values / copy-on-write |
+| `try/except Exception` | Specific exception types; boundary-level catch/log/map only |
+| Blocking in async | async equivalent or `await asyncio.to_thread(fn)` |
+| Blind `dataclasses.asdict()` in hot paths | Shallow projection or explicit serializer |
+| `os.path` string manipulation | `pathlib.Path` |
+| Naive UTC `utcnow()` | timezone-aware `datetime.now(UTC)` |
 
 ## Pitfalls and Fixes
 
 | Pitfall | Fix |
 |---------|-----|
-| Async client leaks | Use `async with httpx.AsyncClient()` |
+| Async client leaks | Use `async with httpx.AsyncClient()` or explicit lifecycle |
 | Ruff vs formatter churn | Use `ruff format` as the only formatter |
-| mypy narrowing pain | Use `isinstance`, `match`, or Protocols |
-| Slow tests from real I/O | Use fixtures, `tmp_path`, and mocks |
+| mypy narrowing pain | Use `isinstance`, `match`, Protocols, or typed boundary schemas |
+| Slow tests from real I/O | Use fixtures, `tmp_path`, local fakes, and boundary seams |
 | Shared mutable state | Prefer immutable data or copy-on-write |
+| Over-clever comprehensions | Extract a named pure function |
+| Hypothesis noise | Use narrow domain strategies; reserve for invariants/round-trips |
+| Pydantic/msgspec everywhere | Validate once at the edge; convert inward |
