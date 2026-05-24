@@ -1,5 +1,4 @@
-import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
-import * as fs from "node:fs";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
 import type {
@@ -47,28 +46,61 @@ type PwshDetails = {
 
 type PiExports = ExtensionAPI["pi"];
 
-const firstExistingPath = (paths: readonly string[]): string | undefined =>
-	paths.find(candidate => fs.existsSync(candidate));
-
-const lookupExecutableOnPath = (binary: string): string | undefined => {
-	const lookupBinary = process.platform === "win32" ? "where" : "which";
-	const result = spawnSync(lookupBinary, [binary], {
-		encoding: "utf-8",
-		timeout: LOOKUP_TIMEOUT_MS,
-	});
-	if (result.status !== 0 || !result.stdout) return undefined;
-	return result.stdout
-		.split(/\r?\n/)
-		.map(line => line.trim())
-		.find(candidate => candidate.length > 0 && fs.existsSync(candidate));
+const pathExists = async (candidate: string): Promise<boolean> => {
+	try {
+		await fsp.access(candidate);
+		return true;
+	} catch {
+		return false;
+	}
 };
 
-const resolvePwshShellConfig = (): PwshShellConfig => {
+const firstExistingPath = async (paths: readonly string[]): Promise<string | undefined> => {
+	for (const candidate of paths) {
+		if (await pathExists(candidate)) return candidate;
+	}
+	return undefined;
+};
+
+const lookupExecutableOnPath = async (binary: string): Promise<string | undefined> => {
+	const lookupBinary = process.platform === "win32" ? "where" : "which";
+	const result = await new Promise<{ status: number | null; stdout: string }>(resolve => {
+		const child = spawn(lookupBinary, [binary], {
+			stdio: ["ignore", "pipe", "ignore"],
+			windowsHide: true,
+		});
+		let stdout = "";
+		const decoder = new TextDecoder("utf-8", { ignoreBOM: true });
+		const timer = setTimeout(() => {
+			child.kill("SIGTERM");
+		}, LOOKUP_TIMEOUT_MS);
+		child.stdout.on("data", (chunk: Buffer) => {
+			stdout += decoder.decode(chunk, { stream: true });
+		});
+		child.on("error", () => {
+			clearTimeout(timer);
+			resolve({ status: 1, stdout: "" });
+		});
+		child.on("close", status => {
+			clearTimeout(timer);
+			stdout += decoder.decode();
+			resolve({ status, stdout });
+		});
+	});
+	if (result.status !== 0 || !result.stdout) return undefined;
+	for (const candidate of result.stdout.split(/\r?\n/)) {
+		const trimmed = candidate.trim();
+		if (trimmed.length > 0 && (await pathExists(trimmed))) return trimmed;
+	}
+	return undefined;
+};
+
+const resolvePwshShellConfig = async (): Promise<PwshShellConfig> => {
 	if (process.platform === "win32") {
 		const pwshPath =
-			firstExistingPath(WINDOWS_PWSH_FALLBACK_PATHS) ??
-			lookupExecutableOnPath("pwsh.exe") ??
-			lookupExecutableOnPath("pwsh");
+			(await firstExistingPath(WINDOWS_PWSH_FALLBACK_PATHS)) ??
+			(await lookupExecutableOnPath("pwsh.exe")) ??
+			(await lookupExecutableOnPath("pwsh"));
 		if (pwshPath) {
 			return {
 				shellPath: pwshPath,
@@ -78,9 +110,9 @@ const resolvePwshShellConfig = (): PwshShellConfig => {
 		}
 
 		const powershellPath =
-			firstExistingPath(WINDOWS_POWERSHELL_FALLBACK_PATHS) ??
-			lookupExecutableOnPath("powershell.exe") ??
-			lookupExecutableOnPath("powershell");
+			(await firstExistingPath(WINDOWS_POWERSHELL_FALLBACK_PATHS)) ??
+			(await lookupExecutableOnPath("powershell.exe")) ??
+			(await lookupExecutableOnPath("powershell"));
 		if (powershellPath) {
 			return {
 				shellPath: powershellPath,
@@ -92,7 +124,7 @@ const resolvePwshShellConfig = (): PwshShellConfig => {
 		throw new Error("PowerShell not found. Install pwsh or ensure powershell.exe is available on PATH.");
 	}
 
-	const pwshPath = firstExistingPath(UNIX_PWSH_FALLBACK_PATHS) ?? lookupExecutableOnPath("pwsh");
+	const pwshPath = (await firstExistingPath(UNIX_PWSH_FALLBACK_PATHS)) ?? (await lookupExecutableOnPath("pwsh"));
 	if (pwshPath) {
 		return {
 			shellPath: pwshPath,
@@ -106,7 +138,7 @@ const resolvePwshShellConfig = (): PwshShellConfig => {
 
 const resolveCwd = async (baseCwd: string, cwd: string | undefined): Promise<string> => {
 	const resolved = cwd ? path.resolve(baseCwd, cwd) : baseCwd;
-	let stat: fs.Stats;
+	let stat: Awaited<ReturnType<typeof fsp.stat>>;
 	try {
 		stat = await fsp.stat(resolved);
 	} catch {
@@ -142,7 +174,7 @@ const enforceWindowsToolPolicy = async (pi: ExtensionAPI): Promise<void> => {
 	if (!unchanged) await pi.setActiveTools(nextTools);
 };
 
-let cachedShellConfig: PwshShellConfig | undefined;
+let cachedShellConfig: Promise<PwshShellConfig> | undefined;
 
 const escapePwshSingleQuotedForDisplay = (value: string): string => value.replaceAll("'", "''");
 
@@ -223,7 +255,10 @@ const executePwsh = async (
 		params.timeout && Number.isFinite(params.timeout) && params.timeout > 0 ? params.timeout : DEFAULT_TIMEOUT_SECONDS;
 	const timeoutMs = resolveTimeoutMs(timeoutSeconds);
 	const cwd = await resolveCwd(ctx.cwd, params.cwd);
-	const shellConfig = cachedShellConfig ?? (cachedShellConfig = resolvePwshShellConfig());
+	const shellConfig = await (cachedShellConfig ??= resolvePwshShellConfig().catch(error => {
+		cachedShellConfig = undefined;
+		throw error;
+	}));
 	const shellCommand = withUtf8Prefix(params.command, shellConfig.prependUtf8Prefix);
 	const { id: artifactId, path: artifactPath } = await ctx.sessionManager.allocateArtifactPath("pwsh");
 	if (signal?.aborted) return abortResult(cwd);
