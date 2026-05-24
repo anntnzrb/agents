@@ -751,6 +751,44 @@ test("run_sync_preserves_generated_extension_runtime_when_hook_inputs_match", as
   });
 });
 
+test("run_sync_drops_legacy_npm_extension_state_entries_without_reinstall", async () => {
+  await withTempDir(async (root) => {
+    const syncEnv = makeSyncEnv(root);
+    const { fingerprintTree } = await import("@core/hook-state.ts");
+    const sourceRoot = join(root, ".config", "agents", "tools", "pi", "agent", "extensions");
+    const statePath = join(root, ".local", "share", "agents", "sync-managed", "pi.extension-deps.json");
+
+    writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
+    writeFile(join(sourceRoot, "context", "index.ts"), "export const live = true;\n");
+    writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
+    writeFile(join(root, ".pi", "agent", "extensions", "package.json"), '{"name":"generated"}\n');
+    writeFile(join(root, ".pi", "agent", "extensions", "node_modules", "dep", "index.js"), "module.exports = 1;\n");
+    writeFile(join(root, ".pi", "agent", "extensions", "package-lock.json"), '{"lockfileVersion":3}\n');
+    writeFile(join(root, ".pi", "agent", "extensions", "npm-shrinkwrap.json"), '{"lockfileVersion":3}\n');
+    writeFile(
+      statePath,
+      `${JSON.stringify(
+        {
+          fingerprint: fingerprintTree(sourceRoot),
+          generatedEntries: ["package.json", "node_modules", "package-lock.json", "npm-shrinkwrap.json"],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    const success = await call<boolean>(runSync, syncEnv);
+    assert.equal(success, true);
+    assert.equal(exists(join(root, ".pi", "agent", "extensions", "package.json")), true);
+    assert.equal(exists(join(root, ".pi", "agent", "extensions", "node_modules", "dep", "index.js")), true);
+    assert.equal(exists(join(root, ".pi", "agent", "extensions", "package-lock.json")), false);
+    assert.equal(exists(join(root, ".pi", "agent", "extensions", "npm-shrinkwrap.json")), false);
+
+    const state = JSON.parse(readText(statePath)) as { generatedEntries?: unknown };
+    assert.deepEqual(state.generatedEntries, ["package.json", "node_modules"]);
+  });
+});
+
 test("run_sync_removes_generated_extension_runtime_when_hook_inputs_change", async () => {
   await withTempDir(async (root) => {
     const syncEnv = makeSyncEnv(root);

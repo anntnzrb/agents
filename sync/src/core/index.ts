@@ -149,6 +149,9 @@ async function runSyncHook(
         return await bootstrapPackageTarget(hook);
       case "ExtensionDeps": {
         if (extensionHookState?.shouldSkip) {
+          if (extensionHookState.shouldRefreshState) {
+            recordExtensionHookState(hook, extensionHookState);
+          }
           return true;
         }
         const success = await installExtensionDeps(hook.root, hook.timeoutMs);

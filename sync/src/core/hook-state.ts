@@ -12,9 +12,15 @@ const GENERATED_EXTENSION_ENTRY_NAMES = [
   "bun.lockb",
 ] as const;
 
+const GENERATED_EXTENSION_ENTRY_NAME_SET = new Set<string>(GENERATED_EXTENSION_ENTRY_NAMES);
+
 interface ExtensionHookStateFile {
   readonly fingerprint: string;
   readonly generatedEntries: readonly string[];
+}
+
+interface LoadedExtensionHookState extends ExtensionHookStateFile {
+  readonly shouldRefreshState: boolean;
 }
 
 export interface PreparedExtensionHookState {
@@ -22,6 +28,7 @@ export interface PreparedExtensionHookState {
   readonly generatedEntries: readonly string[];
   readonly preservePaths: readonly string[];
   readonly shouldSkip: boolean;
+  readonly shouldRefreshState: boolean;
 }
 
 export function prepareExtensionHookState(hook: ExtensionDepsHookPlan): PreparedExtensionHookState {
@@ -33,6 +40,7 @@ export function prepareExtensionHookState(hook: ExtensionDepsHookPlan): Prepared
       generatedEntries: [],
       preservePaths: [],
       shouldSkip: false,
+      shouldRefreshState: false,
     };
   }
 
@@ -40,6 +48,7 @@ export function prepareExtensionHookState(hook: ExtensionDepsHookPlan): Prepared
     exists(join(hook.root, entryName)),
   );
   const shouldSkip = generatedEntries.length === previousState.generatedEntries.length;
+  const shouldRefreshState = previousState.shouldRefreshState;
   return {
     fingerprint,
     generatedEntries,
@@ -47,6 +56,7 @@ export function prepareExtensionHookState(hook: ExtensionDepsHookPlan): Prepared
       ? generatedEntries.map((entryName) => joinRelative(hook.relativeRoot, entryName))
       : [],
     shouldSkip,
+    shouldRefreshState,
   };
 }
 
@@ -120,7 +130,7 @@ function walkTree(root: string, current: string, hash: ReturnType<typeof createH
   }
 }
 
-function loadExtensionHookState(path: string): ExtensionHookStateFile | undefined {
+function loadExtensionHookState(path: string): LoadedExtensionHookState | undefined {
   let content: string;
   try {
     content = fs.readFileSync(path, "utf8");
@@ -156,9 +166,13 @@ function loadExtensionHookState(path: string): ExtensionHookStateFile | undefine
     return undefined;
   }
 
+  const normalizedGeneratedEntries = [...new Set(generatedEntries)].sort();
+  const filteredGeneratedEntries = normalizedGeneratedEntries.filter(isGeneratedExtensionEntryName);
+
   return {
     fingerprint,
-    generatedEntries: [...new Set(generatedEntries)].sort(),
+    generatedEntries: filteredGeneratedEntries,
+    shouldRefreshState: filteredGeneratedEntries.length !== normalizedGeneratedEntries.length,
   };
 }
 
@@ -183,6 +197,9 @@ const shouldSkipEntry = (entryName: string): boolean => entryName === "node_modu
 const normalizeRelativePath = (pathValue: string): string => pathValue.split(sep).join("/");
 
 const joinRelative = (left: string, right: string): string => left.length === 0 ? right : `${left}/${right}`;
+
+const isGeneratedExtensionEntryName = (entryName: string): boolean =>
+  GENERATED_EXTENSION_ENTRY_NAME_SET.has(entryName);
 
 
 function warn(message: string): void {
