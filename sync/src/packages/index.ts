@@ -1,5 +1,6 @@
-import * as fs from "node:fs";
+import fs from "node:fs";
 import path from "node:path";
+import { isErrno } from "@runtime/errors.ts";
 
 import {
   installInferredImportPackages as installInferredImportPackagesImpl,
@@ -32,12 +33,15 @@ function err(message: string): void {
   console.error(`sync: ${message}`);
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
 export function readPackageManifest(filePath: string): PackageManifest {
   let content: string;
   try {
     content = fs.readFileSync(filePath, "utf8");
   } catch (error) {
-    if (isNotFound(error)) {
+    if (isErrno(error, "ENOENT")) {
       return { packages: [] };
     }
     throw new Error(`${filePath} (${String(error)})`);
@@ -50,11 +54,10 @@ export function readPackageManifest(filePath: string): PackageManifest {
     throw new Error(`invalid JSON in ${filePath}: ${String(error)}`);
   }
 
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw new Error(`${filePath} must contain a JSON object`);
   }
-  const object = value as Record<string, unknown>;
-  const packagesValue = object.packages;
+  const packagesValue = value.packages;
   if (packagesValue === undefined) {
     throw new Error(`${filePath} missing "packages" array`);
   }
@@ -86,7 +89,7 @@ export function patchRuntimeSettings(filePath: string, packagePaths: readonly st
   try {
     current = fs.readFileSync(filePath, "utf8");
   } catch (error) {
-    if (!isNotFound(error)) {
+    if (!isErrno(error, "ENOENT")) {
       throw new Error(`read ${filePath} (${String(error)})`);
     }
   }
@@ -98,11 +101,8 @@ export function patchRuntimeSettings(filePath: string, packagePaths: readonly st
     throw new Error(`parse ${filePath} (${String(error)})`);
   }
 
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    value = {};
-  }
-
-  (value as Record<string, unknown>).packages = packagePaths.map((packagePath) => packagePath.toString());
+  const settings = isRecord(value) ? value : {};
+  settings.packages = packagePaths.map((packagePath) => packagePath.toString());
 
   const parent = path.dirname(filePath);
   if (parent && parent !== ".") {
@@ -110,7 +110,7 @@ export function patchRuntimeSettings(filePath: string, packagePaths: readonly st
   }
 
   try {
-    fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+    fs.writeFileSync(filePath, `${JSON.stringify(settings, null, 2)}\n`);
   } catch (error) {
     throw new Error(`write ${filePath} (${String(error)})`);
   }
@@ -195,11 +195,3 @@ export async function bootstrapPackageTarget(target: PackageBootstrapTarget): Pr
   return success;
 }
 
-function isNotFound(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === "ENOENT"
-  );
-}

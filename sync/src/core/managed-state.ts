@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { basename, dirname, join } from "node:path";
+import { isErrno } from "@runtime/errors.ts";
 
 import { SyncEnv } from "./harness.ts";
 import { buildSyncPlan, isSafeManagedEntryName, type SyncPlan } from "./plan.ts";
@@ -74,7 +75,7 @@ export function loadRecordedEntryNames(path: string): string[] {
   try {
     content = fs.readFileSync(path, "utf8");
   } catch (error) {
-    if (isNotFound(error)) {
+    if (isErrno(error, "ENOENT")) {
       return [];
     }
     throw new Error(`read ${path} (${panicMessage(error)})`);
@@ -173,7 +174,7 @@ function createTempStateFile(path: string): { tempPath: string; fd: number } {
       const fd = fs.openSync(tempPath, "wx");
       return { tempPath, fd };
     } catch (error) {
-      if (!isAlreadyExists(error)) {
+      if (!isErrno(error, "EEXIST")) {
         throw new Error(`create ${tempPath} (${panicMessage(error)})`);
       }
     }
@@ -182,10 +183,5 @@ function createTempStateFile(path: string): { tempPath: string; fd: number } {
   throw new Error(`create temporary managed state near ${path} (name collision)`);
 }
 
-function isNotFound(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT";
-}
-
-const isAlreadyExists = (error: unknown): boolean => typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "EEXIST";
 
 const uniqueSorted = (names: readonly string[]): string[] => [...new Set(names)].sort();

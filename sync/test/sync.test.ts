@@ -548,7 +548,7 @@ test("sync_plan_resolves_hook_targets_from_harness_specs", async () => {
   await withTempDir(async (root) => {
     const syncEnv = makeSyncEnv(root);
     const syncPlan = await call<{
-      hooks: Array<Record<string, unknown>>;
+      hooks: Record<string, unknown>[];
     }>(buildSyncPlan, syncEnv);
 
     const packageHook = syncPlan.hooks.find((hook) => hook.kind === "PackageBootstrap");
@@ -1030,7 +1030,7 @@ test("managed_state_helpers_match_safe_entry_rules", async () => {
     );
     assert.deepEqual(names, ["good.txt"]);
 
-    const plan = await call<{ harnesses: Array<{ cleanupPaths: string[] }> }>(planManagedEntries, syncEnv);
+    const plan = await call<{ harnesses: { cleanupPaths: string[] }[] }>(planManagedEntries, syncEnv);
     assert.ok(plan.harnesses.length > 0);
   });
 });
@@ -1052,7 +1052,7 @@ test("managed_state_malformed_json_is_recoverable", async () => {
     const recovered = await call<string[]>(loadRecordedEntryNames, statePath);
     assert.deepEqual(recovered, []);
 
-    const plan = await call<{ harnesses: Array<{ cleanupPaths: string[] }> }>(planManagedEntries, syncEnv);
+    const plan = await call<{ harnesses: { cleanupPaths: string[] }[] }>(planManagedEntries, syncEnv);
     assert.ok(plan.harnesses.length > 0);
   });
 });

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
+import { isErrno } from "@runtime/errors.ts";
 import type { ExtensionDepsHookPlan } from "./plan.ts";
 
 const GENERATED_EXTENSION_ENTRY_NAMES = [
@@ -126,7 +127,7 @@ function loadExtensionHookState(path: string): ExtensionHookStateFile | undefine
   try {
     content = fs.readFileSync(path, "utf8");
   } catch (error) {
-    if (isNotFound(error)) {
+    if (isErrno(error, "ENOENT")) {
       return undefined;
     }
     warn(`hook state read failed, ignoring ${path} (${String(error)})`);
@@ -185,9 +186,6 @@ const normalizeRelativePath = (pathValue: string): string => pathValue.split(sep
 
 const joinRelative = (left: string, right: string): string => left.length === 0 ? right : `${left}/${right}`;
 
-function isNotFound(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT";
-}
 
 function warn(message: string): void {
   console.error(`sync: warning: ${message}`);

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { isErrno } from "./errors.ts";
 
 export function isSymlink(targetPath: string): boolean {
   try {
@@ -22,7 +23,7 @@ export function rmEntry(targetPath: string): void {
     }
     fs.unlinkSync(targetPath);
   } catch (error) {
-    if (!isNotFound(error)) {
+    if (!isErrno(error, "ENOENT")) {
       throw error;
     }
   }
@@ -187,7 +188,7 @@ function ensureDirectory(dst: string): void {
     }
     rmEntry(dst);
   } catch (error) {
-    if (!isNotFound(error)) {
+    if (!isErrno(error, "ENOENT")) {
       throw error;
     }
   }
@@ -208,18 +209,10 @@ function safeReadDir(targetPath: string): fs.Dirent[] {
   try {
     return fs.readdirSync(targetPath, { withFileTypes: true });
   } catch (error) {
-    if (isNotFound(error)) {
+    if (isErrno(error, "ENOENT")) {
       return [];
     }
     throw error;
   }
 }
 
-function isNotFound(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === "ENOENT"
-  );
-}

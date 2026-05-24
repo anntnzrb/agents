@@ -44,6 +44,9 @@ const BUILTIN_PACKAGE_ROOTS = new Set([
   "zlib",
 ]);
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
 export function packageIsHealthy(dir: string): boolean {
   if (!isDirectory(dir)) {
     return false;
@@ -55,10 +58,10 @@ export function packageIsHealthy(dir: string): boolean {
   const packageJsonPath = join(dir, "package.json");
   if (isFile(packageJsonPath)) {
     const packageJson = readJsonFile(packageJsonPath);
-    if (packageJson && typeof packageJson === "object" && !Array.isArray(packageJson)) {
-      const pi = (packageJson as Record<string, unknown>).pi;
-      if (pi && typeof pi === "object") {
-        const validated = validatePiManifest(dir, pi as Record<string, unknown>);
+    if (isRecord(packageJson)) {
+      const pi = packageJson.pi;
+      if (isRecord(pi)) {
+        const validated = validatePiManifest(dir, pi);
         if (validated !== null) {
           return validated;
         }
@@ -76,17 +79,12 @@ export function packageHasBuildScript(dir: string): boolean {
   }
 
   const packageJson = readJsonFile(packageJsonPath);
-  if (!packageJson || typeof packageJson !== "object" || Array.isArray(packageJson)) {
+  if (!isRecord(packageJson)) {
     return false;
   }
 
-  const scripts = (packageJson as Record<string, unknown>).scripts;
-  return (
-    !!scripts &&
-    typeof scripts === "object" &&
-    !Array.isArray(scripts) &&
-    Object.prototype.hasOwnProperty.call(scripts, "build")
-  );
+  const scripts = packageJson.scripts;
+  return isRecord(scripts) && Object.hasOwn(scripts, "build");
 }
 
 export function missingPackageRoots(dir: string): string[] {

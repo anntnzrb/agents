@@ -2,7 +2,7 @@ import { dlopen, FFIType, toBuffer } from "bun:ffi";
 import fs from "node:fs";
 import os from "node:os";
 
-import { panicMessage } from "./errors.ts";
+import { isErrno, panicMessage } from "./errors.ts";
 
 const IS_WINDOWS = process.platform === "win32";
 const LOCK_EX = 2;
@@ -238,8 +238,3 @@ function isProcessRunning(pid: number): boolean {
   }
 }
 
-const isErrno = (error: unknown, code: string): boolean =>
-  typeof error === "object" &&
-  error !== null &&
-  "code" in error &&
-  (error as { code?: string }).code === code;
