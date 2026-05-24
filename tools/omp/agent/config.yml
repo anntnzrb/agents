@@ -1,3 +1,6 @@
+# =============================================================================
+# Models
+# =============================================================================
 modelRoles: 
   default: openai-codex/gpt-5.5:low
   smol: opencode-go/mimo-v2.5-pro:high
@@ -5,6 +8,10 @@ modelRoles:
   commit: opencode-go/mimo-v2.5-pro:high
   task: openai-codex/gpt-5.5:low
   slow: openai-codex/gpt-5.5:medium
+
+# =============================================================================
+# UI / Interaction
+# =============================================================================
 theme: 
   dark: light-prism
   light: light-gruvbox
@@ -16,8 +23,10 @@ steeringMode: all
 interruptMode: wait
 doubleEscapeAction: tree
 treeFilterMode: no-tools
-startup:
-  checkUpdate: false
+
+# =============================================================================
+# MCP / Memory
+# =============================================================================
 mcp:
   enableProjectConfig: false
   discoveryMode: false
@@ -29,6 +38,10 @@ memories:
   maxRolloutAgeDays: 30
   minRolloutIdleHours: 12
   summaryInjectionTokenLimit: 5000
+
+# =============================================================================
+# Tools
+# =============================================================================
 tools:
   discoveryMode: off
 readHashLines: true
@@ -37,6 +50,10 @@ edit:
   modelVariants:
     openai-codex/: apply_patch
     openai/: apply_patch
+
+# =============================================================================
+# Task (Subagents)
+# =============================================================================
 task:
   eager: true
   maxConcurrency: 16
@@ -46,8 +63,16 @@ async:
   enabled: true
 irc:
   enabled: true
+
+# =============================================================================
+# Code Intelligence
+# =============================================================================
 lsp:
   enabled: false
+
+# =============================================================================
+# Bash Guardrails
+# =============================================================================
 bashInterceptor:
   enabled: true
   patterns:
@@ -83,6 +108,10 @@ bashInterceptor:
       flags: i
       tool: bash
       message: "Python CLI tools must run through uv. Load `/skill:python`, then use `uv run <tool>`, `uvx <tool>`, or `uv tool run <tool>`."
+
+# =============================================================================
+# Integrations / Providers
+# =============================================================================
 github:
   enabled: true
 disabledProviders:
@@ -97,9 +126,15 @@ disabledProviders:
   - vscode
   - github
   - windsurf
+
+# =============================================================================
+# Misc
+# =============================================================================
 commands: 
   enableClaudeProject: false
   enableClaudeUser: false
 secrets: 
   enabled: true
+startup:
+  checkUpdate: false
 lastChangelogVersion: 13.14.2
