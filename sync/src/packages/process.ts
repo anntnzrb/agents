@@ -13,11 +13,13 @@ import { missingPackageRoots } from "./validate.ts";
 export type { CommandOutcome } from "@runtime/process.ts";
 export { runCommand } from "@runtime/process.ts";
 
-export enum InferredInstallStep {
-  Done = "Done",
-  RetryWithNpm = "RetryWithNpm",
-  ReportPrimaryFailure = "ReportPrimaryFailure",
-}
+export const InferredInstallStep = {
+  Done: "Done",
+  RetryWithNpm: "RetryWithNpm",
+  ReportPrimaryFailure: "ReportPrimaryFailure",
+} as const;
+
+export type InferredInstallStep = (typeof InferredInstallStep)[keyof typeof InferredInstallStep];
 
 export const installPackageDeps = async (dir: string, timeoutMs: number): Promise<boolean> => {
   const hasPackageJson = await fs

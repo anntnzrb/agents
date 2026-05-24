@@ -5,7 +5,6 @@
     "module": "Preserve",
     "moduleDetection": "force",
     "moduleResolution": "bundler",
-    "baseUrl": ".",
     "paths": {
       "@core/*": ["./src/core/*"],
       "@extensions/*": ["./src/extensions/*"],
@@ -14,11 +13,13 @@
     },
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
-    "types": ["bun-types"],
+    "types": ["bun"],
     "strict": true,
     "noImplicitReturns": true,
     "noUncheckedIndexedAccess": true,
     "useUnknownInCatchVariables": true,
+    "noImplicitOverride": true,
+    "erasableSyntaxOnly": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "skipLibCheck": true

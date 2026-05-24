@@ -35,13 +35,15 @@ export type HarnessHook =
       readonly rootDir: string;
     };
 
-export enum HarnessId {
-  Claude = "Claude",
-  Codex = "Codex",
-  Opencode = "Opencode",
-  Pi = "Pi",
-  Omp = "Omp",
-}
+export const HarnessId = {
+  Claude: "Claude",
+  Codex: "Codex",
+  Opencode: "Opencode",
+  Pi: "Pi",
+  Omp: "Omp",
+} as const;
+
+export type HarnessId = (typeof HarnessId)[keyof typeof HarnessId];
 
 export interface HarnessSpec {
   readonly id: HarnessId;
