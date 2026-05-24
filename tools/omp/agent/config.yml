@@ -31,6 +31,15 @@ memories:
   summaryInjectionTokenLimit: 5000
 tools:
   discoveryMode: off
+task:
+  eager: true
+  maxConcurrency: 16
+  maxRecursionDepth: 1
+  maxRuntimeMs: 3600000
+async:
+  enabled: true
+irc:
+  enabled: true
 lsp:
   enabled: false
 bashInterceptor:
