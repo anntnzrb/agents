@@ -1,6 +1,6 @@
 ---
 name: context7
-description: Retrieve up-to-date library/API docs and code examples via the Context7 HTTP API. Use for library-specific questions, setup/config steps, code generation, and verifying current APIs.
+description: Retrieve current library, framework, SDK, API, CLI, and cloud-service documentation with the official ctx7 CLI. Use for Context7/ctx7 requests, API syntax, setup/configuration, version-specific changes, library-specific debugging, code examples, and any question where current docs matter. Uses `bun x ctx7@latest` only; no MCP, no installs, no persistent setup.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
@@ -10,83 +10,50 @@ disable-model-invocation: true
 
 # Context7
 
-Use Context7 for version-specific docs and code examples through the bundled cross-platform Python CLI.
+Use the official `ctx7` CLI for current documentation and code examples. This skill is CLI-only and read-only: no MCP, no setup, no installs, no generated skills, no persistent login flows.
 
 ## Entry point
 
-Cross-platform:
-
 ```text
-uv run --script <skill-dir>/scripts/cli.py ...
+bun x ctx7@latest library <name> "<user question>"
+bun x ctx7@latest docs <libraryId> "<user question>"
 ```
 
-Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
-
-Credential check policy: run the documented CLI entrypoint first; it auto-loads a skill-local `.env` using the lookup order below. The API key is optional for basic usage, so only report a credential problem if the real command still fails or the user specifically needs higher-rate access.
+There is no installation step. Do not run `npm install -g`, `ctx7 setup`, `ctx7 skills install`, `ctx7 skills generate`, `ctx7 skills remove`, or `ctx7 login` from this skill.
 
 ## Workflow
 
-1. If you do not know the library ID, search first.
-2. Inspect the top matches by `title`, `description`, and `totalSnippets`.
-3. Fetch docs with `docs <library-id> <query>`.
-4. Use `json ...` only when structured parsing is needed.
+1. If the user provides a Context7 library ID (`/org/project`, `/org/project/version`, or `/websites/...`), skip lookup.
+2. Otherwise resolve the library with `bun x ctx7@latest library <name> "<full user question>"`.
+3. Pick the best ID by exact name, description relevance, snippet count, source reputation, benchmark score, and requested version.
+4. Fetch docs with `bun x ctx7@latest docs <libraryId> "<full user question>"`.
+5. Answer from the fetched docs. If Context7 fails, state the failure and do not silently pretend the answer is current.
 
-## Quick start
+Do not run more than three Context7 commands for one user question unless the user explicitly asks for broader exploration.
 
-```text
-uv run --script <skill-dir>/scripts/cli.py search react "hooks useState"
-uv run --script <skill-dir>/scripts/cli.py id react "hooks useState"
-uv run --script <skill-dir>/scripts/cli.py docs /vercel/next.js "app router server actions"
-uv run --script <skill-dir>/scripts/cli.py json /fastapi/fastapi "dependency injection"
-```
+## Query discipline
 
-## Credentials
+- Use the user's full intent as the query; specific questions rank better than keywords.
+- Do not send API keys, passwords, personal data, proprietary code, or secrets to Context7.
+- Use `--json` only when structured parsing is materially useful.
+- Missing `CONTEXT7_API_KEY` is not a problem by itself. Public docs queries work without auth at lower rate limits.
 
-- API key is optional but recommended for higher rate limits.
-- Keep `.env` beside this skill.
-- CLI lookup order:
-  - `CONTEXT7_ENV_FILE`
-  - skill `.env`
-  - `$SKILLS_DIR/context7/.env`
-  - nearest ancestor `skills/context7/.env`
-- Tracked template: `.env.example`
-- Header used when present: `Authorization: Bearer <key>`
+## Optional read-only skill registry lookup
 
-## Failure handling
+Only if the user explicitly asks about Context7 skills/registry, you MAY use read-only text/JSON commands such as skill search/info/list-style lookups. Do not install, generate, remove, configure, authenticate persistently, or modify agent state.
 
-- Do not treat the parent shell as the source of truth for `CONTEXT7_API_KEY`; always run the CLI so it can load its own `.env`.
-- If env loading still fails, set `CONTEXT7_ENV_FILE` dynamically from the skill path rather than hard-coding a machine-specific directory.
-- Distinguish env behavior from API failures:
-  - missing key after CLI lookup usually means env discovery failed, but a key is optional for public low-rate usage
-  - HTTP `401`, `404`, `422`, `429`, or `503` means the request reached Context7 and failed for auth/library/rate/service reasons
-- Report the actual HTTP failure mode instead of collapsing everything into “missing credentials”.
+## Required follow-up reads
 
-## Notes
+| Need | Read | When |
+| --- | --- | --- |
+| CLI command details, auth, errors, telemetry | `references/cli.md` | Before debugging command failures or using JSON/auth-related behavior |
+| Worked docs lookup examples | `cookbook/docs-lookup.md` | When choosing IDs, versions, or query wording |
 
-- If you already know the library ID (`/org/project`, `/org/project/version`, or `/websites/...`), skip search.
-- `docs` and `json` accept library IDs with or without a leading `/`; examples keep the canonical slash form.
-- Prefer exact title/source matches; use higher `totalSnippets` as a tiebreaker, not the only signal.
-- `docs` uses `type=txt` because it is easier to read in agent output.
-- Public endpoint works without an API key for basic usage; expect lower rate limits.
-- Override `CONTEXT7_BASE_URL` if you need to point at a different host.
-
-## Common examples
+## Quick examples
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py id react "hooks useState"
-uv run --script <skill-dir>/scripts/cli.py docs /websites/react_dev "useState"
-uv run --script <skill-dir>/scripts/cli.py id nextjs "routing app router"
-uv run --script <skill-dir>/scripts/cli.py docs /vercel/next.js "app router"
-uv run --script <skill-dir>/scripts/cli.py id fastapi "dependencies dependency injection"
-uv run --script <skill-dir>/scripts/cli.py docs /fastapi/fastapi "dependency injection"
+bun x ctx7@latest library react "hooks useState"
+bun x ctx7@latest docs /reactjs/react.dev "useState hook behavior"
+bun x ctx7@latest library nextjs "app router server actions" --json
+bun x ctx7@latest docs /vercel/next.js "app router server actions" --json
 ```
-
-## Validation
-
-```text
-uv run --script <skill-dir>/scripts/cli.py --help
-```
-
-## Query templates
-
-See `assets/query-templates.json`.

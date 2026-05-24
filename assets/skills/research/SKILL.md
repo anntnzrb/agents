@@ -28,7 +28,7 @@ Route research requests to the right source class, then return source-backed ans
 - Use `context7` for up-to-date library/API docs and examples.
 - Use `grep-app` for public OSS code usage patterns.
 
-`context7` and `grep-app` are direct HTTP skills. `deepwiki` may still be MCP-backed until its direct equivalent reaches Q&A parity.
+`context7` uses the official read-only `ctx7` CLI for library docs. `grep-app` is direct HTTP. `deepwiki` may still be MCP-backed until its direct equivalent reaches Q&A parity.
 
 ### Web/live research
 
