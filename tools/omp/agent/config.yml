@@ -47,9 +47,9 @@ tools:
 readHashLines: true
 edit:
   mode: hashline
-  modelVariants:
-    openai-codex/: apply_patch
-    openai/: apply_patch
+  # modelVariants:
+  #   openai-codex/: apply_patch
+  #   openai/: apply_patch
 
 # =============================================================================
 # Task (Subagents)
