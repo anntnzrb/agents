@@ -1,0 +1,26 @@
+{
+  "cases": [
+    {
+      "id": 1,
+      "prompt": "I'm in my local Odoo runtime and the app is connecting to the wrong database. Use the bundled odoo-local-ops skill to inspect the environment and tell me which database is effectively in use.",
+      "expected_output": "Uses the bundled CLI to inspect runtime, reports the effective database source, and does not fall back to raw shell or psql commands.",
+      "files": [],
+      "expectations": [
+        "Uses the bundled `odooctl.py` CLI via `uv run` rather than raw shell or psql commands.",
+        "Reports the effective local database and runtime backend.",
+        "Keeps output free of secrets."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "List the routes in my local Odoo checkout and highlight the ones that are likely to write state.",
+      "expected_output": "Uses `route list` and/or `route scan-writes`, explains that the write classification is heuristic, and does not invoke routes.",
+      "files": [],
+      "expectations": [
+        "Uses the bundled CLI instead of ad-hoc grep or shell parsing when presenting route inventory.",
+        "Keeps route inspection clearly separate from route invocation.",
+        "Describes write signals as heuristic risk indicators rather than proof."
+      ]
+    }
+  ]
+}
