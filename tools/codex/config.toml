@@ -5,7 +5,7 @@
 # do not emit thinking blocks (visually)
 hide_agent_reasoning = true
 
-web_search = "disabled"
+web_search = "live"
 
 # -----------------------------------------------------------------------------
 # MODEL
@@ -16,7 +16,7 @@ review_model = "gpt-5.5"
 model_reasoning_effort = "low"
 model_verbosity = "low"
 model_reasoning_summary = "detailed"
-model_personality = "pragmatic"
+personality = "pragmatic"
 
 # -----------------------------------------------------------------------------
 # PERMISSIONS
@@ -38,18 +38,20 @@ inherit = "core"
 # -----------------------------------------------------------------------------
 
 [features]
-apply_patch_freeform = true # EXP
 child_agents_md = true # EXP
 multi_agent = true
-personality = true # EXP
+memories = true # EXP
+personality = true
+prevent_idle_sleep = true # EXP
 shell_snapshot = true
-sqlite = true # EXP
-undo = true # EXP
 unified_exec = true
 default_mode_request_user_input = true
 
-# steer = ENTER ; queue = TAB
-steer = true
+[tools.web_search]
+context_size = "medium"
+
+[tui]
+alternate_screen = "never"
 
 # -----------------------------------------------------------------------------
 # AGENTS
