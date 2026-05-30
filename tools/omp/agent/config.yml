@@ -3,9 +3,9 @@
 # =============================================================================
 modelRoles: 
   default: openai-codex/gpt-5.5:low
-  smol: opencode-go/mimo-v2.5-pro:high
+  smol: deepseek/deepseek-v4-flash:xhigh
   plan: openai-codex/gpt-5.5:high
-  commit: opencode-go/mimo-v2.5-pro:high
+  commit: deepseek/deepseek-v4-flash:xhigh
   task: openai-codex/gpt-5.5:low
   slow: openai-codex/gpt-5.5:medium
 
