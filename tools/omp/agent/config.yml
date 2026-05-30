@@ -31,13 +31,14 @@ mcp:
   enableProjectConfig: false
   discoveryMode: false
   notifications: false
-memory:
-  backend: local
-memories:
-  maxRolloutsPerStartup: 64
-  maxRolloutAgeDays: 30
-  minRolloutIdleHours: 12
-  summaryInjectionTokenLimit: 5000
+# memory:
+#   backend: local
+# memories:
+#   enabled: true
+#   maxRolloutsPerStartup: 64
+#   maxRolloutAgeDays: 30
+#   minRolloutIdleHours: 12
+#   summaryInjectionTokenLimit: 5000
 
 # =============================================================================
 # Context / Branching
