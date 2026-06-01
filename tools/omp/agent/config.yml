@@ -13,9 +13,8 @@ modelRoles:
 # UI / Interaction
 # =============================================================================
 theme: 
-  dark: light-prism
-  light: light-gruvbox
-
+  dark: titanium
+  light: light
 hideThinkingBlock: true
 collapseChangelog: true
 followUpMode: all
@@ -27,7 +26,7 @@ treeFilterMode: no-tools
 # =============================================================================
 # MCP / Memory
 # =============================================================================
-mcp:
+mcp: 
   enableProjectConfig: false
   discoveryMode: false
   notifications: false
@@ -43,17 +42,17 @@ mcp:
 # =============================================================================
 # Context / Branching
 # =============================================================================
-branchSummary:
+branchSummary: 
   enabled: true
   reserveTokens: 16384
 
 # =============================================================================
 # Tools
 # =============================================================================
-tools:
-  discoveryMode: off
+tools: 
+  discoveryMode: "off"
 readHashLines: true
-edit:
+edit: 
   mode: hashline
   # modelVariants:
   #   openai-codex/: apply_patch
@@ -62,28 +61,28 @@ edit:
 # =============================================================================
 # Task (Subagents)
 # =============================================================================
-task:
+task: 
   eager: true
   maxConcurrency: 16
   maxRecursionDepth: 1
   maxRuntimeMs: 3600000
-async:
+async: 
   enabled: true
-irc:
+irc: 
   enabled: true
 
 # =============================================================================
 # Code Intelligence
 # =============================================================================
-lsp:
+lsp: 
   enabled: false
 
 # =============================================================================
 # Bash Guardrails
 # =============================================================================
-bashInterceptor:
+bashInterceptor: 
   enabled: true
-  patterns:
+  patterns: 
     - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:echo|printf)\\s+.*(?:>|>>)\\s*(?:\"[^\"]+\"|'[^']+'|[^\\s\"']+)(?:\\s*(?:&&|\\|\\||;).*)?$|(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*cat\\s*<<[^\\n]*>\\s*(?:\"[^\"]+\"|'[^']+'|[^\\s\"']+)"
       tool: write
       message: "Use the `write` tool instead of echo/cat redirection. It handles encoding and provides confirmation."
@@ -173,9 +172,9 @@ bashInterceptor:
 # =============================================================================
 # Integrations / Providers
 # =============================================================================
-github:
+github: 
   enabled: true
-disabledProviders:
+disabledProviders: 
   - claude
   - claude-plugins
   - cline
@@ -196,6 +195,10 @@ commands:
   enableClaudeUser: false
 secrets: 
   enabled: true
-startup:
+startup: 
   checkUpdate: false
-lastChangelogVersion: 13.14.2
+lastChangelogVersion: 15.7.5
+providers: 
+  webSearch: auto
+symbolPreset: unicode
+setupVersion: 1
