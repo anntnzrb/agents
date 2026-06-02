@@ -2,12 +2,14 @@
 # Models
 # =============================================================================
 modelRoles: 
-  default: openai-codex/gpt-5.5:low
-  smol: deepseek/deepseek-v4-flash:xhigh
+  default: opencode-go/mimo-v2.5-pro:high
+  task: opencode-go/mimo-v2.5-pro:high
+
+  commit: opencode-go/deepseek-v4-flash:xhigh
+  smol: opencode-go/deepseek-v4-flash:xhigh
+
   plan: openai-codex/gpt-5.5:high
-  commit: deepseek/deepseek-v4-flash:xhigh
-  task: openai-codex/gpt-5.5:low
-  slow: openai-codex/gpt-5.5:medium
+  slow: openai-codex/gpt-5.5:high
 
 # =============================================================================
 # UI / Interaction
