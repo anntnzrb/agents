@@ -2,7 +2,10 @@
  * Tool Output Suppressor - hides tool parameters and results in the UI.
  */
 
-import { createCodingTools, createReadOnlyTools } from "@earendil-works/pi-coding-agent";
+import {
+  createCodingTools,
+  createReadOnlyTools,
+} from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 
@@ -28,13 +31,14 @@ const countUnescapedQuotes = (text: string): number =>
         ? [count, false]
         : char === "\\"
           ? [count, true]
-          : char === "\""
+          : char === '"'
             ? [count + 1, false]
             : [count, false],
     [0, false],
   )[0];
 
-const trimTrailingBackslashes = (text: string): string => text.replace(/\\+$/, "");
+const trimTrailingBackslashes = (text: string): string =>
+  text.replace(/\\+$/, "");
 
 const endsWithUnescapedQuote = (text: string): boolean => {
   const match = text.match(/(\\*)"$/);
@@ -68,7 +72,8 @@ const truncateValue = (text: string): string =>
 /** Format a value for display in the call line. */
 const formatValue = (value: unknown): string => {
   if (typeof value === "string") return JSON.stringify(truncateValue(value));
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
   if (Array.isArray(value)) {
     const preview = value.slice(0, 3).map(formatValue).join(", ");
     return `[${preview}${value.length > 3 ? ", …" : ""}]`;
@@ -106,11 +111,17 @@ const colorizeArgs = (argsText: string, theme: Theme): string => {
     }
     const key = part.slice(0, sepIndex);
     const value = part.slice(sepIndex + 2);
-    return theme.fg("accent", key) + theme.fg("muted", ": ") +
-      theme.fg("toolOutput", theme.italic(value));
+    return (
+      theme.fg("accent", key) +
+      theme.fg("muted", ": ") +
+      theme.fg("toolOutput", theme.italic(value))
+    );
   });
-  return theme.fg("muted", "{ ") + colored.join(theme.fg("muted", ", ")) +
-    theme.fg("muted", " }");
+  return (
+    theme.fg("muted", "{ ") +
+    colored.join(theme.fg("muted", ", ")) +
+    theme.fg("muted", " }")
+  );
 };
 
 /** Render the minimal tool call header. */
@@ -135,7 +146,7 @@ const renderHiddenCall = (toolName: string, args: ToolArgs, theme: Theme) => {
 
 /** Render a minimal pending indicator while the tool is running. */
 const renderHiddenResult = (isPartial: boolean, theme: Theme) =>
-  (isPartial ? new Text(theme.fg("muted", "…"), 0, 0) : undefined);
+  isPartial ? new Text(theme.fg("muted", "…"), 0, 0) : undefined;
 
 /** Register the tool output suppression renderers. */
 const hideToolOutputExtension = (pi: ExtensionAPI): void => {
@@ -151,12 +162,12 @@ const hideToolOutputExtension = (pi: ExtensionAPI): void => {
       parameters: tool.parameters,
       execute: (toolCallId, params, onUpdate, _ctx, signal) =>
         tool.execute(toolCallId, params, signal, onUpdate),
-      renderCall: (args, theme) => renderHiddenCall(tool.name, args as ToolArgs, theme),
-      renderResult: (_result, options, theme) => renderHiddenResult(options.isPartial, theme),
+      renderCall: (args, theme) =>
+        renderHiddenCall(tool.name, args as ToolArgs, theme),
+      renderResult: (_result, options, theme) =>
+        renderHiddenResult(options.isPartial, theme),
     });
   }
 };
 
 export default hideToolOutputExtension;
-  });
-}
