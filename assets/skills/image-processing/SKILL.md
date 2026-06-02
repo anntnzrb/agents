@@ -41,21 +41,21 @@ For a project-local dependency, use `uv add Pillow`.
 
 If Pillow is unavailable, use alternatives:
 
-| Alternative | Platform | Install | Best for |
-|-------------|----------|---------|----------|
-| `sips` | macOS (built-in) | None | Resize, convert (no trim/OG) |
-| `sharp` | Node.js | `npm install sharp` | Full feature set, high performance |
-| `ffmpeg` | Cross-platform | `brew install ffmpeg` | Resize, convert |
+| Alternative | Platform         | Install               | Best for                           |
+| ----------- | ---------------- | --------------------- | ---------------------------------- |
+| `sips`      | macOS (built-in) | None                  | Resize, convert (no trim/OG)       |
+| `sharp`     | Node.js          | `npm install sharp`   | Full feature set, high performance |
+| `ffmpeg`    | Cross-platform   | `brew install ffmpeg` | Resize, convert                    |
 
 ## Output Format Guide
 
-| Use case | Format | Why |
-|----------|--------|-----|
-| Photos, hero images | WebP | Best compression, wide browser support |
-| Logos, icons (need transparency) | PNG | Lossless, supports alpha |
-| Fallback for older browsers | JPG | Universal support |
-| Thumbnails | WebP or JPG | Small file size priority |
-| OG cards | PNG | Social platforms handle PNG best |
+| Use case                         | Format      | Why                                    |
+| -------------------------------- | ----------- | -------------------------------------- |
+| Photos, hero images              | WebP        | Best compression, wide browser support |
+| Logos, icons (need transparency) | PNG         | Lossless, supports alpha               |
+| Fallback for older browsers      | JPG         | Universal support                      |
+| Thumbnails                       | WebP or JPG | Small file size priority               |
+| OG cards                         | PNG         | Social platforms handle PNG best       |
 
 ## Core Patterns
 

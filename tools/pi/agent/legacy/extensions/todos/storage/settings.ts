@@ -15,14 +15,18 @@ const getTodoSettingsPath = (todosDir: string): string => {
 
 const normalizeTodoSettings = (raw: Partial<TodoSettings>): TodoSettings => {
   const gc = raw.gc ?? DEFAULT_TODO_SETTINGS.gc;
-  const gcDays = Number.isFinite(raw.gcDays) ? raw.gcDays : DEFAULT_TODO_SETTINGS.gcDays;
+  const gcDays = Number.isFinite(raw.gcDays)
+    ? raw.gcDays
+    : DEFAULT_TODO_SETTINGS.gcDays;
   return {
     gc: Boolean(gc),
     gcDays: Math.max(0, Math.floor(gcDays)),
   };
 };
 
-export const readTodoSettings = async (todosDir: string): Promise<TodoSettings> => {
+export const readTodoSettings = async (
+  todosDir: string,
+): Promise<TodoSettings> => {
   const settingsPath = getTodoSettingsPath(todosDir);
   let data: Partial<TodoSettings> = {};
 
@@ -38,7 +42,7 @@ export const readTodoSettings = async (todosDir: string): Promise<TodoSettings> 
 
 export const garbageCollectTodos = async (
   todosDir: string,
-  settings: TodoSettings
+  settings: TodoSettings,
 ): Promise<void> => {
   if (!settings.gc) return;
 
@@ -69,6 +73,6 @@ export const garbageCollectTodos = async (
         } catch {
           // ignore unreadable todo
         }
-      })
+      }),
   );
 };

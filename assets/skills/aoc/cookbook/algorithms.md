@@ -9,6 +9,7 @@ Recipes for common AoC algorithm patterns.
 **Problem**: Find shortest path in unweighted graph or grid.
 
 **Solution**:
+
 ```text
 queue = [start]
 visited = {start}
@@ -32,6 +33,7 @@ while queue:
 **Problem**: Find all paths, detect cycles, check reachability.
 
 **Solution**:
+
 ```text
 def dfs(node, visited):
     if node in visited:
@@ -50,6 +52,7 @@ def dfs(node, visited):
 **Problem**: Shortest path with non-negative edge weights.
 
 **Solution**:
+
 ```text
 pq = [(0, start)]  # (distance, node)
 dist = {start: 0}
@@ -69,11 +72,12 @@ while pq:
 
 ---
 
-## A*: Heuristic Search
+## A\*: Heuristic Search
 
 **Problem**: Shortest path when you have a good distance estimate.
 
 **Solution**:
+
 ```text
 pq = [(heuristic(start, goal), 0, start)]  # (f, g, node)
 g_scores = {start: 0}
@@ -99,6 +103,7 @@ while pq:
 **Problem**: "Count ways...", "Find min/max...", overlapping subproblems.
 
 **Solution** (top-down):
+
 ```text
 memo = {}
 
@@ -114,6 +119,7 @@ def solve(state):
 ```
 
 **Solution** (bottom-up):
+
 ```text
 dp = initialize_base_cases()
 
@@ -132,6 +138,7 @@ return dp[final_state]
 **Problem**: "After N iterations..." where N is astronomically large.
 
 **Solution**:
+
 ```text
 state = initial
 seen = {state: 0}
@@ -156,6 +163,7 @@ for step in range(1, max_steps + 1):
 **Problem**: "Find minimum X such that..." with monotonic property.
 
 **Solution**:
+
 ```text
 def binary_search(lo, hi, predicate):
     while lo < hi:
@@ -176,6 +184,7 @@ def binary_search(lo, hi, predicate):
 **Problem**: Find/count connected regions, calculate areas.
 
 **Solution**:
+
 ```text
 def flood_fill(grid, start, target):
     if grid[start] != target:
@@ -202,6 +211,7 @@ def flood_fill(grid, start, target):
 **Problem**: Multiple cycles that need to align.
 
 **Solution**:
+
 ```text
 gcd(a, b) = gcd(b, a % b)  # Euclidean
 lcm(a, b) = a * b // gcd(a, b)
@@ -219,6 +229,7 @@ lcm(a, b, c) = lcm(lcm(a, b), c)
 **Problem**: Numbers grow too large, need to keep bounded.
 
 **Solution**:
+
 ```text
 result = (result + value) % MOD
 result = (result * factor) % MOD

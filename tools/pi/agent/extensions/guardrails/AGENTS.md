@@ -3,6 +3,7 @@
 Purpose: generic, policy-driven guardrails for agent tool calls.
 
 ## File map
+
 - `index.ts`: pi entrypoint; loads config and blocks matching tool calls
 - `guardrails.jsonc`: policy file for shell-command rules and protected paths
 - `config.ts`: JSONC parsing and config validation; invalid config fails closed with diagnosable errors
@@ -15,13 +16,16 @@ Purpose: generic, policy-driven guardrails for agent tool calls.
 - `guardrails.test.ts`: regression tests for config loading and matching behavior
 
 ## Navigation
+
 Start at `index.ts`, then `config.ts`, `matcher.ts`, and `paths.ts`.
 If shell matching is wrong, inspect `shell.ts` and `wrappers.ts` next.
 
 ## Invariants
+
 - Invalid guardrail config blocks risky execution rather than silently allowing it.
 - Warning hints must match live tool signatures when available.
 
 ## Stop Rules
+
 - Do not relax policy matching while modernizing prompts or docs.
 - Keep config changes separate from matcher behavior unless the task explicitly couples them.

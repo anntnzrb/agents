@@ -57,7 +57,9 @@ def load_env() -> None:
         candidates.append(Path(os.environ["EXA_SEARCH_ENV_FILE"]).expanduser())
     candidates.append(skill_dir / ".env")
     if os.environ.get("SKILLS_DIR"):
-        candidates.append(Path(os.environ["SKILLS_DIR"]).expanduser() / "exa-search" / ".env")
+        candidates.append(
+            Path(os.environ["SKILLS_DIR"]).expanduser() / "exa-search" / ".env"
+        )
     candidates.append(ancestor_env("exa-search"))
     for candidate in candidates:
         if candidate is not None and parse_env_file(candidate):
@@ -106,7 +108,10 @@ def main(argv: list[str]) -> int:
     load_env()
     api_key = os.environ.get("EXA_API_KEY") or os.environ.get("EXA_APIKEY")
     if not api_key:
-        print("EXA_API_KEY required (export it, use this skill's .env, or set EXA_SEARCH_ENV_FILE)", file=sys.stderr)
+        print(
+            "EXA_API_KEY required (export it, use this skill's .env, or set EXA_SEARCH_ENV_FILE)",
+            file=sys.stderr,
+        )
         return 2
 
     base_url = os.environ.get("EXA_BASE_URL", "https://api.exa.ai").rstrip("/")
@@ -121,7 +126,9 @@ def main(argv: list[str]) -> int:
 
     if cmd == "search":
         if not args:
-            print("usage: exa-search search <query> [numResults] [type]", file=sys.stderr)
+            print(
+                "usage: exa-search search <query> [numResults] [type]", file=sys.stderr
+            )
             return 2
         try:
             num_results = parse_num(args[1]) if len(args) > 1 else 5
@@ -155,7 +162,17 @@ def main(argv: list[str]) -> int:
         if not args:
             print("usage: exa-search research <instructions> [model]", file=sys.stderr)
             return 2
-        return post_json(base_url, "/research/v1", api_key, dump_body({"instructions": args[0], "model": args[1] if len(args) > 1 else "exa-research"}))
+        return post_json(
+            base_url,
+            "/research/v1",
+            api_key,
+            dump_body(
+                {
+                    "instructions": args[0],
+                    "model": args[1] if len(args) > 1 else "exa-research",
+                }
+            ),
+        )
 
     print(USAGE, file=sys.stderr)
     return 2

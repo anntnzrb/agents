@@ -3,11 +3,13 @@
 Coverage reports, exclusions, test layout, markers, and commands.
 
 ---
+
 ## Generate Coverage Reports
 
 **Problem**: Need to know which lines of code are tested and identify gaps.
 
 **Solution**:
+
 ```bash
 # Basic coverage
 uv run pytest --cov=src
@@ -32,6 +34,7 @@ uv run pytest --cov=src --cov-fail-under=80
 **Problem**: Some lines like debug code or type checking shouldn't count against coverage.
 
 **Solution**:
+
 ```toml
 # pyproject.toml
 [tool.coverage.run]
@@ -58,6 +61,7 @@ fail_under = 80
 **Problem**: Large projects need structure to separate unit, integration, and end-to-end tests.
 
 **Solution**:
+
 ```text
 tests/
 |-- conftest.py           # Shared fixtures
@@ -79,6 +83,7 @@ tests/
 **Problem**: Need to selectively run slow tests, integration tests, or exclude certain categories.
 
 **Solution**:
+
 ```python
 import pytest
 
@@ -106,6 +111,7 @@ def test_database_integration():
 **Problem**: Need quick reference for running tests in different ways during development.
 
 **Solution**:
+
 ```bash
 # Run all tests
 uv run pytest

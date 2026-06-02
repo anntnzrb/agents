@@ -121,7 +121,10 @@ def resolve_deployer() -> tuple[Deployer | None, str | None]:
 
     if errors:
         return None, "; ".join(errors)
-    return None, "vercel-deploy skill not found; install it with: pi install npm:vercel-deploy"
+    return (
+        None,
+        "vercel-deploy skill not found; install it with: pi install npm:vercel-deploy",
+    )
 
 
 def extract_json_line(output: str) -> str | None:
@@ -170,7 +173,10 @@ def share(html_file: Path) -> int:
 
         preview_match = PREVIEW_RE.search(result)
         if preview_match is None:
-            print("error: deployment completed but no Vercel preview URL was found", file=sys.stderr)
+            print(
+                "error: deployment completed but no Vercel preview URL was found",
+                file=sys.stderr,
+            )
             if result:
                 print(result.rstrip(), file=sys.stderr)
             return 2

@@ -20,6 +20,7 @@ Object.is(-0, 0); // false
 ### Truthy / falsy traps
 
 Falsy values:
+
 - `false`
 - `0`
 - `-0`
@@ -159,6 +160,7 @@ class Dog extends Animal {
 ```
 
 When debugging, separate:
+
 - own properties vs inherited properties
 - instance fields vs prototype methods
 - data mutation vs lookup behavior

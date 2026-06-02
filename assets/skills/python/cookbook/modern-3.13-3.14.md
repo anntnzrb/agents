@@ -3,11 +3,13 @@
 Free-threaded mode, new stdlib features, and newer syntax.
 
 ---
+
 ## Free-Threaded Python (3.13+)
 
 **Problem**: You need true parallel execution for CPU-bound tasks without multiprocessing overhead.
 
 **Solution**:
+
 ```python
 # Build/install with: --disable-gil
 # True parallelism for CPU-bound threads
@@ -34,6 +36,7 @@ for t in threads:
 **Problem**: You want to create a copy of an object with some fields changed, especially for dataclasses.
 
 **Solution**:
+
 ```python
 from copy import replace
 from dataclasses import dataclass
@@ -57,6 +60,7 @@ bob = replace(alice, name="Bob")
 **Problem**: You need to mark functions as deprecated with proper warnings.
 
 **Solution**:
+
 ```python
 from warnings import deprecated
 
@@ -76,6 +80,7 @@ old_function()  # Emits DeprecationWarning
 **Problem**: You want safe, inspectable string templates that aren't immediately evaluated like f-strings.
 
 **Solution**:
+
 ```python
 name = "Alice"
 age = 30
@@ -98,6 +103,7 @@ print(template.interpolations) # (Interpolation(name, ...), ...)
 **Problem**: You need forward references in type hints without quote strings.
 
 **Solution**:
+
 ```python
 # Forward references work without quotes!
 class Node:
@@ -119,6 +125,7 @@ class Node:
 **Problem**: You need UUIDs that maintain chronological order for database efficiency.
 
 **Solution**:
+
 ```python
 from uuid import uuid7
 
@@ -138,6 +145,7 @@ assert id1 < id2  # Chronologically sortable!
 **Problem**: You want to copy or move files using pathlib instead of shutil.
 
 **Solution**:
+
 ```python
 from pathlib import Path
 
@@ -158,6 +166,7 @@ Path("src/").copy(Path("backup/"), recursive=True)
 **Problem**: You want to catch multiple exception types without tuple syntax.
 
 **Solution**:
+
 ```python
 # Multiple exception types without parentheses
 try:
@@ -167,4 +176,3 @@ except ValueError, TypeError, KeyError:  # No tuple needed!
 ```
 
 **Tip**: The comma-separated syntax matches the consistency of other Python syntax and reduces visual clutter.
-

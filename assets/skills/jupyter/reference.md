@@ -21,6 +21,7 @@ A `.ipynb` file is JSON with this structure:
 ### Cell Types
 
 **Code cells:**
+
 ```json
 {
   "cell_type": "code",
@@ -33,6 +34,7 @@ A `.ipynb` file is JSON with this structure:
 ```
 
 **Markdown cells:**
+
 ```json
 {
   "cell_type": "markdown",
@@ -44,16 +46,17 @@ A `.ipynb` file is JSON with this structure:
 
 ### Output Types
 
-| Type | Field | Description |
-|------|-------|-------------|
-| `stream` | `text` | stdout/stderr output |
-| `execute_result` | `data` | Return value of last expression |
-| `display_data` | `data` | Explicit display (plots, HTML) |
-| `error` | `ename`, `evalue`, `traceback` | Exception info |
+| Type             | Field                          | Description                     |
+| ---------------- | ------------------------------ | ------------------------------- |
+| `stream`         | `text`                         | stdout/stderr output            |
+| `execute_result` | `data`                         | Return value of last expression |
+| `display_data`   | `data`                         | Explicit display (plots, HTML)  |
+| `error`          | `ename`, `evalue`, `traceback` | Exception info                  |
 
 ### Data MIME Types
 
 Common output data formats:
+
 - `text/plain` - Text representation
 - `text/html` - HTML (tables, rich output)
 - `image/png` - PNG image (base64 encoded)
@@ -77,12 +80,12 @@ Common output data formats:
 
 ### Common Kernel Names
 
-| Name | Description |
-|------|-------------|
-| `python3` | Default Python 3 kernel |
-| `python` | May be Python 2 or 3 |
-| `ir` | R kernel |
-| `julia-1.9` | Julia kernel |
+| Name        | Description             |
+| ----------- | ----------------------- |
+| `python3`   | Default Python 3 kernel |
+| `python`    | May be Python 2 or 3    |
+| `ir`        | R kernel                |
+| `julia-1.9` | Julia kernel            |
 
 ## Best Practices
 
@@ -102,12 +105,12 @@ Common output data formats:
 
 ### Cell Granularity
 
-| Good | Bad |
-|------|-----|
-| One concept per cell | Giant cells with many operations |
-| Imports in first cell | Imports scattered throughout |
-| Markdown before code | Code without explanation |
-| Small, testable units | Monolithic scripts |
+| Good                  | Bad                              |
+| --------------------- | -------------------------------- |
+| One concept per cell  | Giant cells with many operations |
+| Imports in first cell | Imports scattered throughout     |
+| Markdown before code  | Code without explanation         |
+| Small, testable units | Monolithic scripts               |
 
 ## Anti-Patterns
 
@@ -209,8 +212,9 @@ uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb --allow-errors
 ### Stream Output
 
 ```json
-{"output_type": "stream", "name": "stdout", "text": "Hello\n"}
+{ "output_type": "stream", "name": "stdout", "text": "Hello\n" }
 ```
+
 Displayed as plain text.
 
 ### Execute Result
@@ -224,6 +228,7 @@ Displayed as plain text.
   }
 }
 ```
+
 `text/plain` shown by default. Use `--raw` for full data.
 
 ### Error Output
@@ -236,4 +241,5 @@ Displayed as plain text.
   "traceback": ["..."]
 }
 ```
+
 Traceback is displayed with ANSI codes stripped.

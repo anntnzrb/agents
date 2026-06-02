@@ -1,6 +1,12 @@
 export type GoalStatus = "active" | "paused" | "complete";
 
-export type GoalEventKind = "active" | "continuation" | "paused" | "resumed" | "cleared" | "complete";
+export type GoalEventKind =
+  | "active"
+  | "continuation"
+  | "paused"
+  | "resumed"
+  | "cleared"
+  | "complete";
 
 export type GoalState = {
   version: 1;
@@ -58,11 +64,13 @@ export const goalEventStatus = (kind: GoalEventKind): string => {
   }
 };
 
-export const goalUsage = (state: GoalState): string => formatElapsed(state.timeUsedSeconds);
+export const goalUsage = (state: GoalState): string =>
+  formatElapsed(state.timeUsedSeconds);
 
 export const goalUsageSummary = (state: GoalState): string => {
   const parts = [`Objective: ${state.objective}`];
-  if (state.timeUsedSeconds > 0) parts.push(`Time: ${formatElapsed(state.timeUsedSeconds)}.`);
+  if (state.timeUsedSeconds > 0)
+    parts.push(`Time: ${formatElapsed(state.timeUsedSeconds)}.`);
   return parts.join(" ");
 };
 
@@ -76,5 +84,7 @@ export const statusLine = (state: GoalState | null): string | undefined => {
 
 export const truncateObjective = (objective: string, max = 96): string => {
   const singleLine = objective.replace(/\s+/g, " ").trim();
-  return singleLine.length > max ? `${singleLine.slice(0, max - 1)}…` : singleLine;
+  return singleLine.length > max
+    ? `${singleLine.slice(0, max - 1)}…`
+    : singleLine;
 };

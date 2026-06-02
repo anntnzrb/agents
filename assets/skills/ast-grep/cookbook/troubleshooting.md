@@ -7,6 +7,7 @@
 **Problem**: `sg` command missing.
 
 **Solution**:
+
 ```bash
 ast-grep run -p 'pattern' -l ts src
 ```
@@ -20,6 +21,7 @@ ast-grep run -p 'pattern' -l ts src
 **Problem**: Expected matches, got none.
 
 **Solution**:
+
 ```bash
 sg -p 'pattern' -l ts --debug-query=ast
 ```
@@ -33,6 +35,7 @@ sg -p 'pattern' -l ts --debug-query=ast
 **Problem**: Files parsed as wrong language.
 
 **Solution**:
+
 ```bash
 sg -p 'pattern' -l ts path/to/file
 ```
@@ -46,6 +49,7 @@ sg -p 'pattern' -l ts path/to/file
 **Problem**: Pattern too broad.
 
 **Solution**:
+
 ```bash
 sg -p 'pattern' -l ts --selector identifier src
 ```
@@ -59,6 +63,7 @@ sg -p 'pattern' -l ts --selector identifier src
 **Problem**: Search takes too long.
 
 **Solution**:
+
 ```bash
 sg -p 'pattern' -l ts --globs 'src/**/*.ts' --threads 4 .
 ```
@@ -72,6 +77,7 @@ sg -p 'pattern' -l ts --globs 'src/**/*.ts' --threads 4 .
 **Problem**: Stdin search fails.
 
 **Solution**:
+
 ```bash
 cat file.ts | sg -p 'pattern' -l ts --stdin
 ```

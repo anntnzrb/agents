@@ -4,12 +4,12 @@ A guide to Clojure's concurrency primitives and state management patterns.
 
 ## Reference Types Overview
 
-| Type | Use Case | Coordination | Sync/Async |
-|------|----------|--------------|------------|
-| Atom | Independent state | None | Sync |
-| Ref | Coordinated state | STM | Sync |
-| Agent | Async updates | None | Async |
-| Var | Thread-local | None | Sync |
+| Type  | Use Case          | Coordination | Sync/Async |
+| ----- | ----------------- | ------------ | ---------- |
+| Atom  | Independent state | None         | Sync       |
+| Ref   | Coordinated state | STM          | Sync       |
+| Agent | Async updates     | None         | Async      |
+| Var   | Thread-local      | None         | Sync       |
 
 ---
 
@@ -18,6 +18,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need thread-safe synchronous updates to independent state without coordination.
 
 **Solution**:
+
 ```clojure
 ;; Create
 (def counter (atom 0))
@@ -48,6 +49,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need to update an atom only when certain conditions are met.
 
 **Solution**:
+
 ```clojure
 ;; Conditional update
 (swap! state
@@ -71,6 +73,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need to enforce constraints on atom values or react to changes.
 
 **Solution**:
+
 ```clojure
 ;; With validators
 (def positive (atom 0 :validator pos?))
@@ -93,6 +96,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need a simple thread-safe cache that computes values on-demand.
 
 **Solution**:
+
 ```clojure
 (def cache (atom {}))
 
@@ -123,6 +127,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need to update multiple pieces of state atomically (all-or-nothing).
 
 **Solution**:
+
 ```clojure
 ;; Create refs
 (def account-a (ref {:balance 1000}))
@@ -149,6 +154,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need to choose the right ref operation for your use case.
 
 **Solution**:
+
 ```clojure
 ;; alter: apply fn (retries on conflict)
 (dosync (alter counter inc))
@@ -175,6 +181,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need to perform side effects based on transactional state changes.
 
 **Solution**:
+
 ```clojure
 ;; DON'T: Side effects in transactions (may retry!)
 (dosync
@@ -200,6 +207,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need to update state asynchronously without blocking the caller.
 
 **Solution**:
+
 ```clojure
 ;; Create
 (def log-agent (agent []))
@@ -230,6 +238,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need to detect and recover from errors in agent actions.
 
 **Solution**:
+
 ```clojure
 ;; Check for errors
 (agent-error log-agent)
@@ -256,6 +265,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need to serialize writes to a file or resource without explicit locking.
 
 **Solution**:
+
 ```clojure
 (def file-writer (agent nil))
 
@@ -278,6 +288,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need context-specific state that's isolated per thread (like database connections or request data).
 
 **Solution**:
+
 ```clojure
 ;; Define with earmuffs
 (def ^:dynamic *db-conn* nil)
@@ -308,6 +319,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need thread-local bindings to be available in newly spawned threads.
 
 **Solution**:
+
 ```clojure
 ;; bound-fn preserves bindings for new threads
 (binding [*x* 10]
@@ -327,6 +339,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need to communicate between concurrent processes using CSP-style channels.
 
 **Solution**:
+
 ```clojure
 (require '[clojure.core.async :as a
            :refer [go go-loop chan <! >! <!! >!!
@@ -354,6 +367,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need lightweight threads for concurrent operations without blocking OS threads.
 
 **Solution**:
+
 ```clojure
 ;; Produce
 (go
@@ -381,6 +395,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need to wait on multiple channels simultaneously with timeout support.
 
 **Solution**:
+
 ```clojure
 (go
   (let [[v port] (alts! [ch1 ch2 (timeout 1000)])]
@@ -405,6 +420,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need to process channel data in parallel with a specified level of concurrency.
 
 **Solution**:
+
 ```clojure
 ;; Parallel processing
 (a/pipeline 4       ; parallelism
@@ -437,6 +453,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need multiple workers consuming from a single channel.
 
 **Solution**:
+
 ```clojure
 ;; Fan-out: one producer, multiple consumers
 (let [ch (chan)]
@@ -456,6 +473,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need to merge multiple producer channels into a single consumer channel.
 
 **Solution**:
+
 ```clojure
 ;; Fan-in: multiple producers, one consumer
 (defn fan-in [chs]
@@ -477,6 +495,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need to route messages to multiple subscribers based on topics.
 
 **Solution**:
+
 ```clojure
 ;; Pub/sub
 (def publisher (chan))
@@ -501,6 +520,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need to run a computation asynchronously on a thread pool and retrieve the result later.
 
 **Solution**:
+
 ```clojure
 ;; Start async computation
 (def result (future
@@ -524,6 +544,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need a container for a value that will be delivered exactly once, possibly from another thread.
 
 **Solution**:
+
 ```clojure
 ;; Create empty promise
 (def p (promise))
@@ -547,6 +568,7 @@ A guide to Clojure's concurrency primitives and state management patterns.
 **Problem**: You need to defer an expensive computation until it's actually needed, and cache the result.
 
 **Solution**:
+
 ```clojure
 ;; Deferred computation (runs once when dereferenced)
 (def expensive (delay

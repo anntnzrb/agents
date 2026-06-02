@@ -21,6 +21,7 @@ Use Cargo script mode:
 ```
 
 Use this for:
+
 - single-file scripts with compile-time guarantees
 - shebang executables
 - dependency management in embedded manifest frontmatter
@@ -38,20 +39,24 @@ Set command prefix by toolchain model:
   - `CARGO_SCRIPT_CMD='cargo -Zscript'`
 
 Detection hint:
+
 - if `cargo -Zscript ...` works, prefer it
 - if `cargo +nightly` errors with `no such command: +nightly`, do not use `+nightly`
 
 ## Fast Decision Tree
 
 1. User asks for Rust scripting + accepts nightly:
+
 - choose `<CARGO_SCRIPT_CMD>`
 - prefer frontmatter manifest (`---cargo ... ---`)
 
 2. User wants stable-only and no nightly:
+
 - use `rust-script` fallback
 - explain tradeoff vs Cargo-native scripts
 
 3. User asks about publishing/installing script file directly:
+
 - explain current limitation (`package`/`publish` unsupported; `install --path file.rs` unsupported)
 - suggest converting to normal package (`cargo new --bin`)
 
@@ -100,6 +105,7 @@ fn main() {
 ## Frontmatter Contract
 
 Accepted shape:
+
 - optional shebang on first line
 - optional blank lines
 - opening fence: `---` (or more dashes)
@@ -108,6 +114,7 @@ Accepted shape:
 - closing fence with matching dash count
 
 Rejected:
+
 - mismatched fence dash count
 - unsupported infostring attributes
 - multiple frontmatter blocks
@@ -128,18 +135,23 @@ Read references only as needed:
 ## Agent Operating Procedure
 
 1. Detect user intent:
+
 - Cargo-native script mode or `rust-script` fallback.
 
 2. Validate command shape:
+
 - `-Zscript` position, path form, `--manifest-path` usage.
 
 3. Apply known limits:
+
 - block unsupported flows early (`package`, `publish`, `install --path file.rs`, path dependency on script).
 
 4. Provide fix-ready command:
+
 - return exact corrected command, no vague advice.
 
 5. If behavior seems new/regressed:
+
 - check `references/upstream-status.md`
 - then confirm live state with `gh issue view`.
 

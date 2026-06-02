@@ -9,6 +9,7 @@ Functional and OOP patterns in Python using Protocols.
 **Problem**: You need to construct complex objects step-by-step with a clean, readable API that allows method chaining.
 
 **Solution**:
+
 ```python
 from typing import Optional
 
@@ -54,6 +55,7 @@ assert query == "SELECT * FROM users WHERE age > 18 AND status = 'active' LIMIT 
 **Problem**: You want to decouple your code from specific implementations and make it easy to swap dependencies for testing or runtime configuration.
 
 **Solution**:
+
 ```python
 from typing import Protocol
 
@@ -98,6 +100,7 @@ service.process()
 **Problem**: You need to create different types of objects based on runtime conditions without exposing the creation logic to the client.
 
 **Solution**:
+
 ```python
 from typing import Protocol, Literal
 
@@ -151,6 +154,7 @@ db.connect()
 **Problem**: You need to switch between different algorithms or behaviors at runtime without modifying the client code.
 
 **Solution**:
+
 ```python
 from typing import Protocol
 
@@ -214,6 +218,7 @@ assert sorter.sort([3, 1, 4, 1, 5]) == [1, 1, 3, 4, 5]
 **Problem**: You want to abstract data access logic and provide a collection-like interface for domain objects, making it easy to switch storage backends.
 
 **Solution**:
+
 ```python
 from typing import Protocol, TypeVar, Generic
 from dataclasses import dataclass
@@ -263,6 +268,7 @@ user = repo.get(1)
 **Problem**: You need to notify multiple objects about state changes or events without creating tight coupling between components.
 
 **Solution**:
+
 ```python
 from typing import Callable
 from dataclasses import dataclass, field

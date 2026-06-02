@@ -5,7 +5,10 @@ Read this file for `fetch`, workers, storage, observers, and browser performance
 ## Fetch with timeouts and cancellation
 
 ```js
-export async function fetchJSON(url, { signal, timeoutMs = 5000, ...init } = {}) {
+export async function fetchJSON(
+  url,
+  { signal, timeoutMs = 5000, ...init } = {},
+) {
   const timeout = AbortSignal.timeout(timeoutMs);
   const composite = signal ? AbortSignal.any([signal, timeout]) : timeout;
 
@@ -60,11 +63,11 @@ Reach for service workers only when offline, cache control, or background sync i
 
 ## Storage choice
 
-| Need | Use |
-| --- | --- |
-| tiny sync key/value settings | `localStorage` |
-| async structured data, larger datasets | `IndexedDB` |
-| transient per-tab state | in-memory state / `sessionStorage` |
+| Need                                   | Use                                |
+| -------------------------------------- | ---------------------------------- |
+| tiny sync key/value settings           | `localStorage`                     |
+| async structured data, larger datasets | `IndexedDB`                        |
+| transient per-tab state                | in-memory state / `sessionStorage` |
 
 `localStorage` is synchronous. Do not use it in hot paths or as a fake database.
 

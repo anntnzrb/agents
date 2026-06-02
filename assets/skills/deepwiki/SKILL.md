@@ -19,10 +19,10 @@ Use DeepWiki MCP for public GitHub repo documentation and Q&A.
 
 ## Suggested flow
 
-1) `read_wiki_structure` for topic map  
-2) `read_wiki_contents` for scoped docs  
-3) `ask_question` for targeted Q&A  
-If empty/insufficient: fall back to Exa/Brave.
+1. `read_wiki_structure` for topic map
+2. `read_wiki_contents` for scoped docs
+3. `ask_question` for targeted Q&A  
+   If empty/insufficient: fall back to Exa/Brave.
 
 ## Notes
 

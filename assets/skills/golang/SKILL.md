@@ -41,6 +41,7 @@ Repository routing table lives in `reference.md`.
 ## CLI Quick Reference
 
 ### Module Management
+
 ```bash
 go mod init <module>       # Initialize module
 go mod tidy                # Sync dependencies
@@ -52,6 +53,7 @@ go mod graph               # Dependency graph
 ```
 
 ### Build & Run
+
 ```bash
 go build ./...             # Build all packages
 go run .                   # Run current package
@@ -60,6 +62,7 @@ go generate ./...          # Run go:generate directives
 ```
 
 ### Testing
+
 ```bash
 go test ./...              # Run all tests
 go test -v ./...           # Verbose output
@@ -73,6 +76,7 @@ go test -count=1           # Disable test caching
 ```
 
 ### Linting (golangci-lint)
+
 ```bash
 golangci-lint run          # Run all linters
 golangci-lint run --fix    # Auto-fix issues
@@ -80,6 +84,7 @@ golangci-lint linters      # List available linters
 ```
 
 ### Workspaces (multi-module)
+
 ```bash
 go work init ./mod1 ./mod2 # Initialize workspace
 go work use ./mod3         # Add module to workspace
@@ -87,6 +92,7 @@ go work sync               # Sync workspace
 ```
 
 ### Other Tools
+
 ```bash
 go fmt ./...               # Format code
 go vet ./...               # Static analysis

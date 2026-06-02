@@ -9,6 +9,7 @@ Deep dive into async programming in Python 3.14+.
 **Problem**: You need to run multiple async operations concurrently with proper error handling and automatic cleanup.
 
 **Solution**:
+
 ```python
 import asyncio
 
@@ -39,6 +40,7 @@ asyncio.run(main())
 **Problem**: You need to collect results from multiple async operations running in parallel.
 
 **Solution**:
+
 ```python
 async def fetch_all(urls: list[str]) -> list[str]:
     tasks = [fetch_data(url) for url in urls]
@@ -65,6 +67,7 @@ async def fetch_all_safe(urls: list[str]):
 **Problem**: You need to ensure async operations don't run indefinitely.
 
 **Solution**:
+
 ```python
 async def with_timeout():
     try:
@@ -91,6 +94,7 @@ except asyncio.TimeoutError:
 **Problem**: You need to yield values asynchronously, processing data as it becomes available.
 
 **Solution**:
+
 ```python
 from typing import AsyncGenerator
 
@@ -113,6 +117,7 @@ async def consume():
 **Problem**: You want to build collections from async generators concisely.
 
 **Solution**:
+
 ```python
 async def get_items() -> list[int]:
     return [i async for i in async_range(10)]
@@ -130,6 +135,7 @@ async def filter_items() -> list[int]:
 **Problem**: You need to ensure cleanup happens when an async generator is done or interrupted.
 
 **Solution**:
+
 ```python
 async def stream_data():
     try:
@@ -148,6 +154,7 @@ async def stream_data():
 **Problem**: You need to manage async resources with setup and teardown logic.
 
 **Solution**:
+
 ```python
 class AsyncDatabaseConnection:
     async def __aenter__(self):
@@ -174,6 +181,7 @@ async def use_db():
 **Problem**: You want to create simple async context managers without defining a full class.
 
 **Solution**:
+
 ```python
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -202,6 +210,7 @@ async def timed_operation():
 **Problem**: You need to make async HTTP requests efficiently.
 
 **Solution**:
+
 ```python
 import httpx
 
@@ -227,6 +236,7 @@ async def post_data(url: str, data: dict) -> dict:
 **Problem**: You need to make multiple HTTP requests and want to reuse connections for better performance.
 
 **Solution**:
+
 ```python
 async def fetch_multiple(urls: list[str]) -> list[dict]:
     async with httpx.AsyncClient() as client:
@@ -247,6 +257,7 @@ async def fetch_multiple(urls: list[str]) -> list[dict]:
 **Problem**: You need to automatically retry failed HTTP requests with backoff.
 
 **Solution**:
+
 ```python
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -268,6 +279,7 @@ async def fetch_with_retry(url: str) -> dict:
 **Problem**: You need to handle different types of exceptions from multiple concurrent tasks.
 
 **Solution**:
+
 ```python
 async def run_tasks():
     try:
@@ -290,6 +302,7 @@ async def run_tasks():
 **Problem**: You want your async code to continue working even if some operations fail.
 
 **Solution**:
+
 ```python
 async def fetch_with_fallback(primary: str, fallback: str) -> str:
     try:
@@ -314,6 +327,7 @@ async def fetch_best_effort(urls: list[str]) -> list[str]:
 **Problem**: You need to run blocking I/O or CPU-intensive code without blocking the event loop.
 
 **Solution**:
+
 ```python
 import asyncio
 
@@ -337,6 +351,7 @@ async def main():
 **Problem**: You need to limit the number of concurrent async operations.
 
 **Solution**:
+
 ```python
 async def fetch_with_limit(urls: list[str], max_concurrent: int = 10):
     semaphore = asyncio.Semaphore(max_concurrent)
@@ -357,6 +372,7 @@ async def fetch_with_limit(urls: list[str], max_concurrent: int = 10):
 **Problem**: You need to signal between async tasks or wait for a specific condition.
 
 **Solution**:
+
 ```python
 async def waiter(event: asyncio.Event):
     print("Waiting...")
@@ -381,6 +397,7 @@ async def main():
 **Problem**: You need to process items asynchronously with separate producer and consumer tasks.
 
 **Solution**:
+
 ```python
 async def producer(queue: asyncio.Queue):
     for i in range(10):
@@ -410,6 +427,7 @@ async def main():
 **Problem**: You need to safely access and modify shared state from multiple async tasks.
 
 **Solution**:
+
 ```python
 class AsyncCounter:
     def __init__(self):
@@ -432,13 +450,13 @@ class AsyncCounter:
 
 **Solution**:
 
-| Avoid | Do Instead |
-|-------|------------|
-| `requests.get(url)` | `await client.get(url)` with httpx |
-| `time.sleep(n)` | `await asyncio.sleep(n)` |
-| Bare `asyncio.create_task()` | Use TaskGroup or gather |
-| Global event loop | `asyncio.run(main())` |
-| `loop.run_until_complete()` | `asyncio.run()` |
+| Avoid                        | Do Instead                         |
+| ---------------------------- | ---------------------------------- |
+| `requests.get(url)`          | `await client.get(url)` with httpx |
+| `time.sleep(n)`              | `await asyncio.sleep(n)`           |
+| Bare `asyncio.create_task()` | Use TaskGroup or gather            |
+| Global event loop            | `asyncio.run(main())`              |
+| `loop.run_until_complete()`  | `asyncio.run()`                    |
 
 **Tip**: Blocking calls in async code will freeze the entire event loop. Always use async equivalents and prefer modern APIs like TaskGroup and `asyncio.run()`.
 
@@ -449,6 +467,7 @@ class AsyncCounter:
 **Problem**: You need a quick lookup of common async patterns.
 
 **Solution**:
+
 ```python
 # Run async code
 asyncio.run(main())

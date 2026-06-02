@@ -12,7 +12,9 @@ const GENERATED_EXTENSION_ENTRY_NAMES = [
   "bun.lockb",
 ] as const;
 
-const GENERATED_EXTENSION_ENTRY_NAME_SET = new Set<string>(GENERATED_EXTENSION_ENTRY_NAMES);
+const GENERATED_EXTENSION_ENTRY_NAME_SET = new Set<string>(
+  GENERATED_EXTENSION_ENTRY_NAMES,
+);
 
 interface ExtensionHookStateFile {
   readonly fingerprint: string;
@@ -31,7 +33,9 @@ export interface PreparedExtensionHookState {
   readonly shouldRefreshState: boolean;
 }
 
-export function prepareExtensionHookState(hook: ExtensionDepsHookPlan): PreparedExtensionHookState {
+export function prepareExtensionHookState(
+  hook: ExtensionDepsHookPlan,
+): PreparedExtensionHookState {
   const fingerprint = fingerprintTree(hook.sourceRoot);
   const previousState = loadExtensionHookState(hook.statePath);
   if (!previousState || previousState.fingerprint !== fingerprint) {
@@ -47,13 +51,16 @@ export function prepareExtensionHookState(hook: ExtensionDepsHookPlan): Prepared
   const generatedEntries = previousState.generatedEntries.filter((entryName) =>
     exists(join(hook.root, entryName)),
   );
-  const shouldSkip = generatedEntries.length === previousState.generatedEntries.length;
+  const shouldSkip =
+    generatedEntries.length === previousState.generatedEntries.length;
   const shouldRefreshState = previousState.shouldRefreshState;
   return {
     fingerprint,
     generatedEntries,
     preservePaths: shouldSkip
-      ? generatedEntries.map((entryName) => joinRelative(hook.relativeRoot, entryName))
+      ? generatedEntries.map((entryName) =>
+          joinRelative(hook.relativeRoot, entryName),
+        )
       : [],
     shouldSkip,
     shouldRefreshState,
@@ -91,10 +98,14 @@ export function fingerprintTree(root: string): string {
   return hash.digest("hex");
 }
 
-function walkTree(root: string, current: string, hash: ReturnType<typeof createHash>): void {
-  const entries = fs.readdirSync(current, { withFileTypes: true }).sort((left, right) =>
-    left.name.localeCompare(right.name),
-  );
+function walkTree(
+  root: string,
+  current: string,
+  hash: ReturnType<typeof createHash>,
+): void {
+  const entries = fs
+    .readdirSync(current, { withFileTypes: true })
+    .sort((left, right) => left.name.localeCompare(right.name));
 
   for (const entry of entries) {
     if (shouldSkipEntry(entry.name)) {
@@ -130,7 +141,9 @@ function walkTree(root: string, current: string, hash: ReturnType<typeof createH
   }
 }
 
-function loadExtensionHookState(path: string): LoadedExtensionHookState | undefined {
+function loadExtensionHookState(
+  path: string,
+): LoadedExtensionHookState | undefined {
   let content: string;
   try {
     content = fs.readFileSync(path, "utf8");
@@ -156,23 +169,29 @@ function loadExtensionHookState(path: string): LoadedExtensionHookState | undefi
   }
 
   const fingerprint = (parsed as { fingerprint?: unknown }).fingerprint;
-  const generatedEntries = (parsed as { generatedEntries?: unknown }).generatedEntries;
+  const generatedEntries = (parsed as { generatedEntries?: unknown })
+    .generatedEntries;
   if (typeof fingerprint !== "string" || !Array.isArray(generatedEntries)) {
     warn(`hook state parse failed, ignoring ${path} (invalid shape)`);
     return undefined;
   }
   if (!generatedEntries.every((entry) => typeof entry === "string")) {
-    warn(`hook state parse failed, ignoring ${path} (generated entries must be strings)`);
+    warn(
+      `hook state parse failed, ignoring ${path} (generated entries must be strings)`,
+    );
     return undefined;
   }
 
   const normalizedGeneratedEntries = [...new Set(generatedEntries)].sort();
-  const filteredGeneratedEntries = normalizedGeneratedEntries.filter(isGeneratedExtensionEntryName);
+  const filteredGeneratedEntries = normalizedGeneratedEntries.filter(
+    isGeneratedExtensionEntryName,
+  );
 
   return {
     fingerprint,
     generatedEntries: filteredGeneratedEntries,
-    shouldRefreshState: filteredGeneratedEntries.length !== normalizedGeneratedEntries.length,
+    shouldRefreshState:
+      filteredGeneratedEntries.length !== normalizedGeneratedEntries.length,
   };
 }
 
@@ -192,15 +211,19 @@ function exists(targetPath: string): boolean {
   }
 }
 
-const shouldSkipEntry = (entryName: string): boolean => entryName === "node_modules" || entryName === ".git" || entryName.startsWith(".");
+const shouldSkipEntry = (entryName: string): boolean =>
+  entryName === "node_modules" ||
+  entryName === ".git" ||
+  entryName.startsWith(".");
 
-const normalizeRelativePath = (pathValue: string): string => pathValue.split(sep).join("/");
+const normalizeRelativePath = (pathValue: string): string =>
+  pathValue.split(sep).join("/");
 
-const joinRelative = (left: string, right: string): string => left.length === 0 ? right : `${left}/${right}`;
+const joinRelative = (left: string, right: string): string =>
+  left.length === 0 ? right : `${left}/${right}`;
 
 const isGeneratedExtensionEntryName = (entryName: string): boolean =>
   GENERATED_EXTENSION_ENTRY_NAME_SET.has(entryName);
-
 
 function warn(message: string): void {
   console.error(`sync: warning: ${message}`);

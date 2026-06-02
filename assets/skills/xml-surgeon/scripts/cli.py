@@ -42,9 +42,15 @@ def main(argv: list[str] | None = None) -> int:
     if not argv or argv[0] in {"-h", "--help"}:
         print("usage: cli.py [xml-surgeon-args...]\n")
         print("Cross-platform:")
-        print("  uv run --script <skill-dir>/scripts/cli.py select --xpath \"//field[@name='arch']\" path/to/file.xml")
-        print("  uv run --script <skill-dir>/scripts/cli.py set-attr --xpath \"//field\" --name string --value label --diff path/to/file.xml")
-        print("\nDelegates to scripts/main.py. Use a subcommand with --help for XML CLI flags.")
+        print(
+            "  uv run --script <skill-dir>/scripts/cli.py select --xpath \"//field[@name='arch']\" path/to/file.xml"
+        )
+        print(
+            '  uv run --script <skill-dir>/scripts/cli.py set-attr --xpath "//field" --name string --value label --diff path/to/file.xml'
+        )
+        print(
+            "\nDelegates to scripts/main.py. Use a subcommand with --help for XML CLI flags."
+        )
         return 0
     return _run_script(argv)
 

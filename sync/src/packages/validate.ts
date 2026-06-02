@@ -1,7 +1,12 @@
 import fs from "node:fs";
 import { extname, join } from "node:path";
 
-export const RESOURCE_KEYS = ["extensions", "skills", "prompts", "themes"] as const;
+export const RESOURCE_KEYS = [
+  "extensions",
+  "skills",
+  "prompts",
+  "themes",
+] as const;
 
 const BUILTIN_PACKAGE_ROOTS = new Set([
   "assert",
@@ -104,9 +109,13 @@ export function missingPackageRoots(dir: string): string[] {
   return [...missing].sort();
 }
 
-export const validatePackageForTests = (dir: string): boolean => packageIsHealthy(dir);
+export const validatePackageForTests = (dir: string): boolean =>
+  packageIsHealthy(dir);
 
-function validatePiManifest(dir: string, pi: Record<string, unknown>): boolean | null {
+function validatePiManifest(
+  dir: string,
+  pi: Record<string, unknown>,
+): boolean | null {
   let hasEntries = false;
   for (const key of RESOURCE_KEYS) {
     const entries = pi[key];
@@ -168,7 +177,11 @@ function walk(root: string, files: string[]): void {
     const entryPath = join(root, entry.name);
 
     if (entry.isDirectory()) {
-      if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === ".git") {
+      if (
+        entry.name.startsWith(".") ||
+        entry.name === "node_modules" ||
+        entry.name === ".git"
+      ) {
         continue;
       }
       walk(entryPath, files);
@@ -179,7 +192,11 @@ function walk(root: string, files: string[]): void {
       try {
         const metadata = fs.statSync(entryPath);
         if (metadata.isDirectory()) {
-          if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === ".git") {
+          if (
+            entry.name.startsWith(".") ||
+            entry.name === "node_modules" ||
+            entry.name === ".git"
+          ) {
             continue;
           }
           walk(entryPath, files);
@@ -268,7 +285,8 @@ function packageRootFromSpecifier(specifier: string): string | null {
   return trimmed.split("/")[0] ?? null;
 }
 
-const packageRootIsBuiltin = (packageRoot: string): boolean => BUILTIN_PACKAGE_ROOTS.has(packageRoot);
+const packageRootIsBuiltin = (packageRoot: string): boolean =>
+  BUILTIN_PACKAGE_ROOTS.has(packageRoot);
 
 function isDirectory(path: string): boolean {
   try {

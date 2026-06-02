@@ -4,14 +4,14 @@ Pick one aesthetic and commit. Vary recent choices; if replacing styling with a 
 
 ## Aesthetics
 
-| Aesthetic | Use when | Requirements |
-|---|---|---|
-| Blueprint | Technical systems, plans, architecture | Subtle grid, deep slate/blue, monospace labels, precise borders |
-| Editorial | Reviews, narratives, proposals | Serif headlines such as Instrument Serif or Crimson Pro, generous whitespace, muted earth tones or deep navy + gold |
-| Paper/ink | Explainers, docs, approachable plans | Warm cream `#faf7f5`, terracotta/sage, tactile informal feel |
-| Monochrome terminal | CLI/tooling/system internals | Green/amber on near-black, monospace-forward, restrained CRT effect |
-| IDE-inspired | Code-centric topics | Borrow a real named palette exactly: Dracula, Nord, Catppuccin Mocha/Latte, Solarized Dark/Light, Gruvbox, One Dark, Rosé Pine |
-| Data-dense | Audits, matrices, dashboards | Small type, tight spacing, high information density, muted colors |
+| Aesthetic           | Use when                               | Requirements                                                                                                                   |
+| ------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Blueprint           | Technical systems, plans, architecture | Subtle grid, deep slate/blue, monospace labels, precise borders                                                                |
+| Editorial           | Reviews, narratives, proposals         | Serif headlines such as Instrument Serif or Crimson Pro, generous whitespace, muted earth tones or deep navy + gold            |
+| Paper/ink           | Explainers, docs, approachable plans   | Warm cream `#faf7f5`, terracotta/sage, tactile informal feel                                                                   |
+| Monochrome terminal | CLI/tooling/system internals           | Green/amber on near-black, monospace-forward, restrained CRT effect                                                            |
+| IDE-inspired        | Code-centric topics                    | Borrow a real named palette exactly: Dracula, Nord, Catppuccin Mocha/Latte, Solarized Dark/Light, Gruvbox, One Dark, Rosé Pine |
+| Data-dense          | Audits, matrices, dashboards           | Small type, tight spacing, high information density, muted colors                                                              |
 
 Typography MUST carry the design. Pick a distinctive pairing from `./libraries.md`; rotate pairings across generations. Good defaults include DM Sans + Fira Code, Instrument Serif + JetBrains Mono, IBM Plex Sans + IBM Plex Mono, Bricolage Grotesque + Fragment Mono, and Plus Jakarta Sans + Azeret Mono. Load fonts with `<link>` in `<head>` and include system fallbacks.
 
@@ -19,12 +19,24 @@ Color MUST use CSS custom properties. Define at minimum `--bg`, `--surface`, `--
 
 ```css
 /* Light-first: editorial, paper/ink, blueprint */
-:root { /* light values */ }
-@media (prefers-color-scheme: dark) { :root { /* dark values */ } }
+:root {
+  /* light values */
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* dark values */
+  }
+}
 
 /* Dark-first: IDE-inspired, terminal */
-:root { /* dark values */ }
-@media (prefers-color-scheme: light) { :root { /* light values */ } }
+:root {
+  /* dark values */
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    /* light values */
+  }
+}
 ```
 
 Build depth through 2-4% lightness shifts, low-opacity borders, restrained shadows, subtle grids, and gentle radial atmosphere. Hero sections SHOULD dominate the first viewport. Reference sections SHOULD be compact and MAY use `<details>/<summary>`. Use depth tiers from `./css-patterns.md`: hero, elevated, default, recessed.
@@ -35,15 +47,15 @@ Animation MUST earn its place: entrance reveals, hover feedback, SVG connector d
 
 These are AI-slop signals. If two or more appear, regenerate with Editorial, Blueprint, Paper/ink, or a real IDE palette.
 
-| Category | NEVER use |
-|---|---|
-| Themes | Neon dashboard; gradient mesh; generic dark theme with cyan-magenta-pink accents |
-| Font body | Inter, Roboto, Arial, Helvetica, or `system-ui` alone as primary `--font-body` |
-| Accent colors | `#8b5cf6`, `#7c3aed`, `#a78bfa`, `#d946ef`, Tailwind purple/pink/cyan defaults, cyan-magenta-pink combos |
-| Text effects | Gradient heading text using `background-clip: text`; identical gradient KPI treatment |
-| Shadows/motion | Glowing box-shadows, animated glow keyframes, pulsing/breathing static content, continuous decorative animation after load |
-| Headers | Emoji header icons; every section using the same icon-in-rounded-box pattern |
-| Layout | Perfectly centered everything, identical cards everywhere, symmetric mirrored halves, every section with equal visual weight |
-| Templates | Three-dot window chrome on code blocks; "neon dashboard"; pink/purple/cyan background blobs |
+| Category       | NEVER use                                                                                                                    |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Themes         | Neon dashboard; gradient mesh; generic dark theme with cyan-magenta-pink accents                                             |
+| Font body      | Inter, Roboto, Arial, Helvetica, or `system-ui` alone as primary `--font-body`                                               |
+| Accent colors  | `#8b5cf6`, `#7c3aed`, `#a78bfa`, `#d946ef`, Tailwind purple/pink/cyan defaults, cyan-magenta-pink combos                     |
+| Text effects   | Gradient heading text using `background-clip: text`; identical gradient KPI treatment                                        |
+| Shadows/motion | Glowing box-shadows, animated glow keyframes, pulsing/breathing static content, continuous decorative animation after load   |
+| Headers        | Emoji header icons; every section using the same icon-in-rounded-box pattern                                                 |
+| Layout         | Perfectly centered everything, identical cards everywhere, symmetric mirrored halves, every section with equal visual weight |
+| Templates      | Three-dot window chrome on code blocks; "neon dashboard"; pink/purple/cyan background blobs                                  |
 
 Required replacements: styled monospace labels, colored dot indicators, numbered badges, asymmetric dividers, inline SVG icons only when meaningful, simple code headers with filename/language labels, and varied KPI hierarchy.

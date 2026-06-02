@@ -41,11 +41,17 @@ test("integration_happy_path_matches_expected_outputs", () => {
     assert.equal(existsSync(join(home, ".codex", "AGENTS.md")), true);
     assert.equal(existsSync(join(home, ".claude", "CLAUDE.md")), true);
     assert.equal(existsSync(join(home, ".claude", "AGENTS.md")), false);
-    assert.equal(existsSync(join(home, ".config", "opencode", "AGENTS.md")), true);
+    assert.equal(
+      existsSync(join(home, ".config", "opencode", "AGENTS.md")),
+      true,
+    );
     assert.equal(existsSync(join(home, ".pi", "agent", "AGENTS.md")), true);
     assert.equal(existsSync(join(home, ".omp", "agent", "AGENTS.md")), true);
     assert.equal(existsSync(join(home, ".omp", "agent", "config.yml")), true);
-    assert.equal(existsSync(join(home, ".omp", "agent", "skills", "skill.txt")), true);
+    assert.equal(
+      existsSync(join(home, ".omp", "agent", "skills", "skill.txt")),
+      true,
+    );
     assert.equal(existsSync(join(home, ".mcporter", "mcporter.json")), true);
     assert.equal(existsSync(join(home, ".pi", "agent", "auth.json")), true);
   });
@@ -75,12 +81,23 @@ test("integration_package_bootstrap_patches_settings_and_cache_paths", () => {
     const result = runSyncProcess(home);
 
     assert.equal(result.exitCode, 0, result.stderr || result.stdout);
-    const settings = readFileSync(join(home, ".pi", "agent", "settings.json"), "utf8");
+    const settings = readFileSync(
+      join(home, ".pi", "agent", "settings.json"),
+      "utf8",
+    );
     assert.equal(settings.includes("source-pkg"), true);
     assert.equal(settings.includes("build-pkg"), true);
-    const cacheSnapshot = snapshotSelected(join(home, ".local", "share", "agents", "pi-packages"));
-    assert.equal(cacheSnapshot.some((entry) => entry.path.includes("source-pkg")), true);
-    assert.equal(cacheSnapshot.some((entry) => entry.path.includes("build-pkg")), true);
+    const cacheSnapshot = snapshotSelected(
+      join(home, ".local", "share", "agents", "pi-packages"),
+    );
+    assert.equal(
+      cacheSnapshot.some((entry) => entry.path.includes("source-pkg")),
+      true,
+    );
+    assert.equal(
+      cacheSnapshot.some((entry) => entry.path.includes("build-pkg")),
+      true,
+    );
   });
 });
 
@@ -130,9 +147,15 @@ function withTempDir<T>(fn: (root: string) => T): T {
 function makeFixture(root: string): string {
   const home = join(root, "ts-home");
   mkdirSync(join(home, ".config", "agents", "assets"), { recursive: true });
-  mkdirSync(join(home, ".config", "agents", "tools", "codex"), { recursive: true });
-  mkdirSync(join(home, ".config", "agents", "tools", "omp", "agent"), { recursive: true });
-  mkdirSync(join(home, ".config", "agents", "tools", "pi", "agent"), { recursive: true });
+  mkdirSync(join(home, ".config", "agents", "tools", "codex"), {
+    recursive: true,
+  });
+  mkdirSync(join(home, ".config", "agents", "tools", "omp", "agent"), {
+    recursive: true,
+  });
+  mkdirSync(join(home, ".config", "agents", "tools", "pi", "agent"), {
+    recursive: true,
+  });
   mkdirSync(join(home, ".pi", "agent"), { recursive: true });
   mkdirSync(join(home, ".omp", "agent"), { recursive: true });
   mkdirSync(join(home, ".omp", "agent", "logs"), { recursive: true });
@@ -146,11 +169,25 @@ function makeFixture(root: string): string {
 }
 
 function writeFixtureFiles(home: string): void {
-  writeFileSync(join(home, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
-  writeFileSync(join(home, ".config", "agents", "assets", "mcporter.jsonc"), '{"x":1}');
-  mkdirSync(join(home, ".config", "agents", "assets", "skills"), { recursive: true });
-  writeFileSync(join(home, ".config", "agents", "assets", "skills", "skill.txt"), "skill-content");
-  writeFileSync(join(home, ".config", "agents", "tools", "codex", "config.toml"), "codex = true");
+  writeFileSync(
+    join(home, ".config", "agents", "assets", "AGENTS.md"),
+    "agent-instructions",
+  );
+  writeFileSync(
+    join(home, ".config", "agents", "assets", "mcporter.jsonc"),
+    '{"x":1}',
+  );
+  mkdirSync(join(home, ".config", "agents", "assets", "skills"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(home, ".config", "agents", "assets", "skills", "skill.txt"),
+    "skill-content",
+  );
+  writeFileSync(
+    join(home, ".config", "agents", "tools", "codex", "config.toml"),
+    "codex = true",
+  );
   writeFileSync(
     join(home, ".config", "agents", "tools", "omp", "agent", "config.yml"),
     "theme:\n  dark: graphite\n",
@@ -260,7 +297,10 @@ function snapshotSelected(root: string): SnapshotEntry[] {
   if (existsSync(root)) {
     walk(root, "", entries);
   }
-  return entries.filter((entry) => !entry.path.includes("/.git") && !entry.path.includes("/node_modules"));
+  return entries.filter(
+    (entry) =>
+      !entry.path.includes("/.git") && !entry.path.includes("/node_modules"),
+  );
 }
 
 function walk(absolute: string, relative: string, out: SnapshotEntry[]): void {
@@ -273,7 +313,11 @@ function walk(absolute: string, relative: string, out: SnapshotEntry[]): void {
     out.push({ path: normalizePath(relative), kind: "dir" });
     const children = readdirSync(absolute).sort();
     for (const child of children) {
-      walk(join(absolute, child), relative ? `${relative}/${child}` : child, out);
+      walk(
+        join(absolute, child),
+        relative ? `${relative}/${child}` : child,
+        out,
+      );
     }
     return;
   }

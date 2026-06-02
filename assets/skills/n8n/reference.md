@@ -7,6 +7,7 @@
 - Docs: `<N8N_BASE_URL>/api/v1/docs`
 
 Common endpoints:
+
 - `GET /api/v1/workflows`
 - `POST /api/v1/workflows`
 - `PUT /api/v1/workflows/{id}`
@@ -19,7 +20,8 @@ Common endpoints:
 - Instance-level MCP for listing and running enabled workflows
 
 Notes:
- - Use `supergateway` for streamable HTTP endpoints
+
+- Use `supergateway` for streamable HTTP endpoints
 
 ## Node lookup
 
@@ -57,12 +59,14 @@ Add after you have the MCP URL and token:
 Tracked template: `.env.example`
 
 Common vars:
+
 - `N8N_BASE_URL`
 - `N8N_API_KEY`
 - `N8N_MCP_URL`
 - `N8N_MCP_TOKEN`
 
 `n8nctl.py` lookup order:
+
 - `N8N_ENV_FILE`
 - `$SKILLS_DIR/n8n/.env`
 - nearest ancestor `skills/n8n/.env`
@@ -72,6 +76,7 @@ Common vars:
 The `scripts/n8nctl.py` helper wraps REST calls and avoids curl/jq.
 
 Required env vars:
+
 - `N8N_BASE_URL`
 - `N8N_API_KEY`
 

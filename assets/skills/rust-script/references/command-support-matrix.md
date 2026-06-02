@@ -5,6 +5,7 @@ Scope: single-file packages with embedded manifest (`-Zscript`).
 ## Supported
 
 Via `--manifest-path <script.rs>`:
+
 - `check`
 - `build`
 - `test`
@@ -22,6 +23,7 @@ Via `--manifest-path <script.rs>`:
 - `remove`
 
 Direct manifest-command form:
+
 - `<CARGO_SCRIPT_CMD> ./script.rs`
 
 ## Unsupported / Rejected
@@ -34,6 +36,7 @@ Direct manifest-command form:
 ## Manifest Field Restrictions
 
 Disallowed in embedded manifests:
+
 - `[workspace]`
 - `[lib]`
 - `[[bin]]`

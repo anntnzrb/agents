@@ -53,9 +53,7 @@ type RoutePath = (typeof routes)[RouteName];
 **Solution**:
 
 ```ts
-type Result<T, E> =
-  | { ok: true; value: T }
-  | { ok: false; error: E };
+type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 
 function parsePort(raw: string): Result<number, "invalid-port"> {
   const port = Number(raw);
@@ -122,12 +120,11 @@ interface Admin extends User {
 **Solution**:
 
 ```ts
-type DeepReadonly<T> =
-  T extends (...args: never[]) => unknown
-    ? T
-    : T extends object
-      ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
-      : T;
+type DeepReadonly<T> = T extends (...args: never[]) => unknown
+  ? T
+  : T extends object
+    ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+    : T;
 ```
 
 **Tip**: Recursive helpers can tank compiler performance. Reach for them only when a shallow helper is not enough.

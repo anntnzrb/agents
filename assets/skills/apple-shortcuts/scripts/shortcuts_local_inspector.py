@@ -46,7 +46,9 @@ def clean_text(text: str) -> str:
 
 
 def redact_text(text: str) -> str:
-    redacted = re.sub(r"(Bearer\s+)([^\s\"']+)", r"\1<REDACTED>", text, flags=re.IGNORECASE)
+    redacted = re.sub(
+        r"(Bearer\s+)([^\s\"']+)", r"\1<REDACTED>", text, flags=re.IGNORECASE
+    )
     redacted = re.sub(r"\b(cpk_[A-Za-z0-9._-]{12,})\b", "<REDACTED>", redacted)
     redacted = re.sub(r"\b(sk-[A-Za-z0-9._-]{12,})\b", "<REDACTED>", redacted)
     redacted = re.sub(r"\b(sk-proj-[A-Za-z0-9._-]{12,})\b", "<REDACTED>", redacted)
@@ -180,7 +182,11 @@ def summarize_action(action: dict[str, Any]) -> str:
         if origin or destination:
             return f"{identifier} | from={origin} to={destination}"
     if identifier == "is.workflow.actions.lowpowermode.set":
-        return f"{identifier} | state=off" if params.get("OnValue") == 0 else f"{identifier} | state=on"
+        return (
+            f"{identifier} | state=off"
+            if params.get("OnValue") == 0
+            else f"{identifier} | state=on"
+        )
     if identifier == "is.workflow.actions.setbrightness":
         level = params.get("WFBrightness")
         if isinstance(level, (int, float)):
@@ -257,7 +263,11 @@ def _decode_smart_prompt(blob: bytes) -> dict[str, str]:
     if not isinstance(decoded, dict):
         return {}
     content_destination = decoded.get("ContentDestination", {})
-    app_descriptor = content_destination.get("appDescriptor", {}) if isinstance(content_destination, dict) else {}
+    app_descriptor = (
+        content_destination.get("appDescriptor", {})
+        if isinstance(content_destination, dict)
+        else {}
+    )
     source_attr = decoded.get("SourceContentAttribution", {})
     origin = source_attr.get("origin", {}) if isinstance(source_attr, dict) else {}
     destination_bundle = ""
@@ -340,24 +350,35 @@ def load_run_stats(db_path: Path) -> dict[int, dict[str, Any]]:
     stats: dict[int, dict[str, Any]] = {}
     for row in outcome_rows:
         shortcut_pk = int(row["ZSHORTCUT"])
-        entry = stats.setdefault(shortcut_pk, {"total_runs": 0, "outcomes": {}, "sources": {}, "last_run_local": ""})
+        entry = stats.setdefault(
+            shortcut_pk,
+            {"total_runs": 0, "outcomes": {}, "sources": {}, "last_run_local": ""},
+        )
         outcome_key = str(row["ZOUTCOME"])
         count = int(row["C"])
         entry["outcomes"][outcome_key] = count
         entry["total_runs"] += count
     for row in source_rows:
         shortcut_pk = int(row["ZSHORTCUT"])
-        entry = stats.setdefault(shortcut_pk, {"total_runs": 0, "outcomes": {}, "sources": {}, "last_run_local": ""})
+        entry = stats.setdefault(
+            shortcut_pk,
+            {"total_runs": 0, "outcomes": {}, "sources": {}, "last_run_local": ""},
+        )
         entry["sources"][str(row["SRC"])] = int(row["C"])
     for row in last_rows:
         shortcut_pk = int(row["ZSHORTCUT"])
-        entry = stats.setdefault(shortcut_pk, {"total_runs": 0, "outcomes": {}, "sources": {}, "last_run_local": ""})
+        entry = stats.setdefault(
+            shortcut_pk,
+            {"total_runs": 0, "outcomes": {}, "sources": {}, "last_run_local": ""},
+        )
         entry["last_run_local"] = _apple_timestamp_to_local_str(row["LAST_DATE"])
     return stats
 
 
 def _run_shortcuts_cli(args: list[str]) -> str:
-    proc = subprocess.run(["shortcuts", *args], check=True, capture_output=True, text=True)
+    proc = subprocess.run(
+        ["shortcuts", *args], check=True, capture_output=True, text=True
+    )
     return proc.stdout
 
 
@@ -380,7 +401,9 @@ def load_folder_map() -> dict[str, str]:
     folders = [line.strip() for line in folder_output.splitlines() if line.strip()]
     for folder in folders:
         try:
-            out = _run_shortcuts_cli(["list", "--folder-name", folder, "--show-identifiers"])
+            out = _run_shortcuts_cli(
+                ["list", "--folder-name", folder, "--show-identifiers"]
+            )
         except subprocess.CalledProcessError:
             continue
         for line in out.splitlines():
@@ -388,7 +411,9 @@ def load_folder_map() -> dict[str, str]:
             if parsed:
                 mapping[parsed[1]] = folder
     try:
-        out_none = _run_shortcuts_cli(["list", "--folder-name", "none", "--show-identifiers"])
+        out_none = _run_shortcuts_cli(
+            ["list", "--folder-name", "none", "--show-identifiers"]
+        )
     except subprocess.CalledProcessError:
         out_none = ""
     for line in out_none.splitlines():
@@ -398,7 +423,9 @@ def load_folder_map() -> dict[str, str]:
     return mapping
 
 
-def matches(row: ShortcutRow, exact: set[str], contains: str | None, visible_only: bool) -> bool:
+def matches(
+    row: ShortcutRow, exact: set[str], contains: str | None, visible_only: bool
+) -> bool:
     if visible_only and row.hidden_from_library:
         return False
     if exact and row.name not in exact:

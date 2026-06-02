@@ -39,10 +39,12 @@ const { add } = require("./math.cjs");
 ```
 
 In that package:
+
 - `.js` -> ESM
 - `.cjs` -> CJS escape hatch
 
 Without `type: module`:
+
 - `.js` -> CJS by default in Node
 - `.mjs` -> ESM escape hatch
 
@@ -136,11 +138,13 @@ const __dirname = dirname(__filename);
 Circular imports usually fail at **execution time**.
 
 Symptoms:
+
 - imported binding is `undefined`
 - module partially initializes
 - class extends `undefined`
 
 Fixes:
+
 - move shared primitives to a third module
 - invert the dependency with callbacks / interfaces
 - delay one edge with dynamic import only if the dependency is truly optional
@@ -148,12 +152,14 @@ Fixes:
 ## Shipping packages
 
 Start simple:
+
 - one entry point
 - one module mode
 - explicit exports
 - minimal public surface
 
 Reach for dual ESM+CJS only when:
+
 - consumers actually need both
 - tooling cannot tolerate one mode
 - you are willing to test both paths continuously

@@ -53,7 +53,11 @@ export class QnAComponent implements Component, Focusable {
   private yellow = (text: string) => `\x1b[33m${text}\x1b[0m`;
   private gray = (text: string) => `\x1b[90m${text}\x1b[0m`;
 
-  constructor(questions: ExtractedQuestion[], tui: TUI, onDone: (result: string | null) => void) {
+  constructor(
+    questions: ExtractedQuestion[],
+    tui: TUI,
+    onDone: (result: string | null) => void,
+  ) {
     this.questions = questions;
     this.answers = questions.map(() => "");
     this.tui = tui;
@@ -148,8 +152,17 @@ export class QnAComponent implements Component, Focusable {
     lines.push(this.padToWidth(line, width));
   }
 
-  private pushBoxLine(lines: string[], content: string, layout: RenderLayout, leftPad = 2): void {
-    this.pushLine(lines, this.boxLine(content, layout.boxWidth, leftPad), layout.width);
+  private pushBoxLine(
+    lines: string[],
+    content: string,
+    layout: RenderLayout,
+    leftPad = 2,
+  ): void {
+    this.pushLine(
+      lines,
+      this.boxLine(content, layout.boxWidth, leftPad),
+      layout.width,
+    );
   }
 
   private pushEmptyBoxLine(lines: string[], layout: RenderLayout): void {
@@ -276,7 +289,7 @@ export class QnAComponent implements Component, Focusable {
     const topBorder = this.dim(`╭${this.horizontalLine(layout.boxWidth - 2)}╮`);
     this.pushLine(lines, topBorder, layout.width);
     const title = `${this.bold(this.cyan("Questions"))} ${this.dim(
-      `(${this.currentIndex + 1}/${this.questions.length})`
+      `(${this.currentIndex + 1}/${this.questions.length})`,
     )}`;
     this.pushBoxLine(lines, title, layout);
     const divider = this.dim(`├${this.horizontalLine(layout.boxWidth - 2)}┤`);
@@ -311,7 +324,10 @@ export class QnAComponent implements Component, Focusable {
     if (question.context) {
       this.pushEmptyBoxLine(lines, layout);
       const contextText = this.gray(`> ${question.context}`);
-      const wrappedContext = wrapTextWithAnsi(contextText, layout.contentWidth - 2);
+      const wrappedContext = wrapTextWithAnsi(
+        contextText,
+        layout.contentWidth - 2,
+      );
       for (const line of wrappedContext) {
         this.pushBoxLine(lines, line, layout);
       }
@@ -340,17 +356,27 @@ export class QnAComponent implements Component, Focusable {
 
     if (this.showingConfirmation) {
       const confirmMsg = `${this.yellow("Submit all answers?")} ${this.dim(
-        "(Enter/y to confirm, Esc/n to cancel)"
+        "(Enter/y to confirm, Esc/n to cancel)",
       )}`;
-      this.pushBoxLine(lines, truncateToWidth(confirmMsg, layout.contentWidth), layout);
+      this.pushBoxLine(
+        lines,
+        truncateToWidth(confirmMsg, layout.contentWidth),
+        layout,
+      );
     } else {
       const controls = `${this.dim("Tab/Enter")} next · ${this.dim(
-        "Shift+Tab"
+        "Shift+Tab",
       )} prev · ${this.dim("Shift+Enter")} newline · ${this.dim("Esc")} cancel`;
-      this.pushBoxLine(lines, truncateToWidth(controls, layout.contentWidth), layout);
+      this.pushBoxLine(
+        lines,
+        truncateToWidth(controls, layout.contentWidth),
+        layout,
+      );
     }
 
-    const bottomBorder = this.dim(`╰${this.horizontalLine(layout.boxWidth - 2)}╯`);
+    const bottomBorder = this.dim(
+      `╰${this.horizontalLine(layout.boxWidth - 2)}╯`,
+    );
     this.pushLine(lines, bottomBorder, layout.width);
   }
 

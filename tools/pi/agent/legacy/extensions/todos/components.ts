@@ -2,7 +2,11 @@
  * TUI components for the todo extension.
  */
 
-import { DynamicBorder, getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
+import {
+  DynamicBorder,
+  getMarkdownTheme,
+  type Theme,
+} from "@earendil-works/pi-coding-agent";
 import {
   Container,
   type Focusable,
@@ -19,7 +23,12 @@ import {
   truncateToWidth,
   visibleWidth,
 } from "@earendil-works/pi-tui";
-import type { TodoFrontMatter, TodoMenuAction, TodoOverlayAction, TodoRecord } from "./types.ts";
+import type {
+  TodoFrontMatter,
+  TodoMenuAction,
+  TodoOverlayAction,
+  TodoRecord,
+} from "./types.ts";
 import {
   filterTodos,
   formatTodoId,
@@ -60,7 +69,10 @@ export class TodoSelectorComponent extends Container implements Focusable {
     onCancel: () => void,
     initialSearchInput?: string,
     currentSessionId?: string,
-    private onQuickAction?: (todo: TodoFrontMatter, action: "work" | "refine") => void
+    private onQuickAction?: (
+      todo: TodoFrontMatter,
+      action: "work" | "refine",
+    ) => void,
   ) {
     super();
     this.tui = tui;
@@ -71,7 +83,9 @@ export class TodoSelectorComponent extends Container implements Focusable {
     this.onSelectCallback = onSelect;
     this.onCancelCallback = onCancel;
 
-    this.addChild(new DynamicBorder((text: string) => theme.fg("accent", text)));
+    this.addChild(
+      new DynamicBorder((text: string) => theme.fg("accent", text)),
+    );
     this.addChild(new Spacer(1));
 
     this.headerText = new Text("", 1, 0);
@@ -96,7 +110,9 @@ export class TodoSelectorComponent extends Container implements Focusable {
     this.hintText = new Text("", 1, 0);
     this.addChild(this.hintText);
     this.addChild(new Spacer(1));
-    this.addChild(new DynamicBorder((text: string) => theme.fg("accent", text)));
+    this.addChild(
+      new DynamicBorder((text: string) => theme.fg("accent", text)),
+    );
 
     this.updateHeader();
     this.updateHints();
@@ -115,7 +131,9 @@ export class TodoSelectorComponent extends Container implements Focusable {
   }
 
   private updateHeader(): void {
-    const openCount = this.allTodos.filter((todo) => !isTodoClosed(todo.status)).length;
+    const openCount = this.allTodos.filter(
+      (todo) => !isTodoClosed(todo.status),
+    ).length;
     const closedCount = this.allTodos.length - openCount;
     const title = `Todos (${openCount} open, ${closedCount} closed)`;
     this.headerText.setText(this.theme.fg("accent", this.theme.bold(title)));
@@ -125,8 +143,8 @@ export class TodoSelectorComponent extends Container implements Focusable {
     this.hintText.setText(
       this.theme.fg(
         "dim",
-        "Type to search • ↑↓ select • Enter actions • Ctrl+Shift+W work • Ctrl+Shift+R refine • Esc close"
-      )
+        "Type to search • ↑↓ select • Enter actions • Ctrl+Shift+W work • Ctrl+Shift+R refine • Esc close",
+      ),
     );
   }
 
@@ -134,7 +152,7 @@ export class TodoSelectorComponent extends Container implements Focusable {
     this.filteredTodos = filterTodos(this.allTodos, query);
     this.selectedIndex = Math.min(
       this.selectedIndex,
-      Math.max(0, this.filteredTodos.length - 1)
+      Math.max(0, this.filteredTodos.length - 1),
     );
     this.updateList();
   }
@@ -143,16 +161,24 @@ export class TodoSelectorComponent extends Container implements Focusable {
     this.listContainer.clear();
 
     if (this.filteredTodos.length === 0) {
-      this.listContainer.addChild(new Text(this.theme.fg("muted", "  No matching todos"), 0, 0));
+      this.listContainer.addChild(
+        new Text(this.theme.fg("muted", "  No matching todos"), 0, 0),
+      );
       return;
     }
 
     const maxVisible = 10;
     const startIndex = Math.max(
       0,
-      Math.min(this.selectedIndex - Math.floor(maxVisible / 2), this.filteredTodos.length - maxVisible)
+      Math.min(
+        this.selectedIndex - Math.floor(maxVisible / 2),
+        this.filteredTodos.length - maxVisible,
+      ),
     );
-    const endIndex = Math.min(startIndex + maxVisible, this.filteredTodos.length);
+    const endIndex = Math.min(
+      startIndex + maxVisible,
+      this.filteredTodos.length,
+    );
 
     for (let i = startIndex; i < endIndex; i += 1) {
       const todo = this.filteredTodos[i];
@@ -163,7 +189,11 @@ export class TodoSelectorComponent extends Container implements Focusable {
       const titleColor = isSelected ? "accent" : closed ? "dim" : "text";
       const statusColor = closed ? "dim" : "success";
       const tagText = todo.tags.length ? ` [${todo.tags.join(", ")}]` : "";
-      const assignmentText = renderAssignmentSuffix(this.theme, todo, this.currentSessionId);
+      const assignmentText = renderAssignmentSuffix(
+        this.theme,
+        todo,
+        this.currentSessionId,
+      );
       const line =
         prefix +
         this.theme.fg("accent", formatTodoId(todo.id)) +
@@ -179,7 +209,7 @@ export class TodoSelectorComponent extends Container implements Focusable {
     if (startIndex > 0 || endIndex < this.filteredTodos.length) {
       const scrollInfo = this.theme.fg(
         "dim",
-        `  (${this.selectedIndex + 1}/${this.filteredTodos.length})`
+        `  (${this.selectedIndex + 1}/${this.filteredTodos.length})`,
       );
       this.listContainer.addChild(new Text(scrollInfo, 0, 0));
     }
@@ -190,14 +220,18 @@ export class TodoSelectorComponent extends Container implements Focusable {
     if (kb.matches(keyData, "selectUp")) {
       if (this.filteredTodos.length === 0) return;
       this.selectedIndex =
-        this.selectedIndex === 0 ? this.filteredTodos.length - 1 : this.selectedIndex - 1;
+        this.selectedIndex === 0
+          ? this.filteredTodos.length - 1
+          : this.selectedIndex - 1;
       this.updateList();
       return;
     }
     if (kb.matches(keyData, "selectDown")) {
       if (this.filteredTodos.length === 0) return;
       this.selectedIndex =
-        this.selectedIndex === this.filteredTodos.length - 1 ? 0 : this.selectedIndex + 1;
+        this.selectedIndex === this.filteredTodos.length - 1
+          ? 0
+          : this.selectedIndex + 1;
       this.updateList();
       return;
     }
@@ -212,7 +246,8 @@ export class TodoSelectorComponent extends Container implements Focusable {
     }
     if (matchesKey(keyData, Key.ctrlShift("r"))) {
       const selected = this.filteredTodos[this.selectedIndex];
-      if (selected && this.onQuickAction) this.onQuickAction(selected, "refine");
+      if (selected && this.onQuickAction)
+        this.onQuickAction(selected, "refine");
       return;
     }
     if (matchesKey(keyData, Key.ctrlShift("w"))) {
@@ -241,7 +276,7 @@ export class TodoActionMenuComponent extends Container {
     theme: Theme,
     todo: TodoRecord,
     onSelect: (action: TodoMenuAction) => void,
-    onCancel: () => void
+    onCancel: () => void,
   ) {
     super();
     this.onSelectCallback = onSelect;
@@ -257,18 +292,37 @@ export class TodoActionMenuComponent extends Container {
         ? [{ value: "reopen", label: "reopen", description: "Reopen todo" }]
         : [{ value: "close", label: "close", description: "Close todo" }]),
       ...(todo.assigned_to_session
-        ? [{ value: "release", label: "release", description: "Release assignment" }]
+        ? [
+            {
+              value: "release",
+              label: "release",
+              description: "Release assignment",
+            },
+          ]
         : []),
-      { value: "copyPath", label: "copy path", description: "Copy absolute path to clipboard" },
-      { value: "copyText", label: "copy text", description: "Copy title and body to clipboard" },
+      {
+        value: "copyPath",
+        label: "copy path",
+        description: "Copy absolute path to clipboard",
+      },
+      {
+        value: "copyText",
+        label: "copy text",
+        description: "Copy title and body to clipboard",
+      },
       { value: "delete", label: "delete", description: "Delete todo" },
     ];
 
-    this.addChild(new DynamicBorder((text: string) => theme.fg("accent", text)));
+    this.addChild(
+      new DynamicBorder((text: string) => theme.fg("accent", text)),
+    );
     this.addChild(
       new Text(
-        theme.fg("accent", theme.bold(`Actions for ${formatTodoId(todo.id)} \"${title}\"`))
-      )
+        theme.fg(
+          "accent",
+          theme.bold(`Actions for ${formatTodoId(todo.id)} \"${title}\"`),
+        ),
+      ),
     );
 
     this.selectList = new SelectList(options, options.length, {
@@ -279,12 +333,15 @@ export class TodoActionMenuComponent extends Container {
       noMatch: (text) => theme.fg("warning", text),
     });
 
-    this.selectList.onSelect = (item) => this.onSelectCallback(item.value as TodoMenuAction);
+    this.selectList.onSelect = (item) =>
+      this.onSelectCallback(item.value as TodoMenuAction);
     this.selectList.onCancel = () => this.onCancelCallback();
 
     this.addChild(this.selectList);
     this.addChild(new Text(theme.fg("dim", "Enter to confirm • Esc back")));
-    this.addChild(new DynamicBorder((text: string) => theme.fg("accent", text)));
+    this.addChild(
+      new DynamicBorder((text: string) => theme.fg("accent", text)),
+    );
   }
 
   handleInput(keyData: string): void {
@@ -300,7 +357,11 @@ export class TodoDeleteConfirmComponent extends Container {
   private selectList: SelectList;
   private onConfirm: (confirmed: boolean) => void;
 
-  constructor(theme: Theme, message: string, onConfirm: (confirmed: boolean) => void) {
+  constructor(
+    theme: Theme,
+    message: string,
+    onConfirm: (confirmed: boolean) => void,
+  ) {
     super();
     this.onConfirm = onConfirm;
 
@@ -309,7 +370,9 @@ export class TodoDeleteConfirmComponent extends Container {
       { value: "no", label: "No" },
     ];
 
-    this.addChild(new DynamicBorder((text: string) => theme.fg("accent", text)));
+    this.addChild(
+      new DynamicBorder((text: string) => theme.fg("accent", text)),
+    );
     this.addChild(new Text(theme.fg("accent", message)));
 
     this.selectList = new SelectList(options, options.length, {
@@ -325,7 +388,9 @@ export class TodoDeleteConfirmComponent extends Container {
 
     this.addChild(this.selectList);
     this.addChild(new Text(theme.fg("dim", "Enter to confirm • Esc back")));
-    this.addChild(new DynamicBorder((text: string) => theme.fg("accent", text)));
+    this.addChild(
+      new DynamicBorder((text: string) => theme.fg("accent", text)),
+    );
   }
 
   handleInput(keyData: string): void {
@@ -347,12 +412,22 @@ export class TodoDetailOverlayComponent {
   private totalLines = 0;
   private onAction: (action: TodoOverlayAction) => void;
 
-  constructor(tui: TUI, theme: Theme, todo: TodoRecord, onAction: (action: TodoOverlayAction) => void) {
+  constructor(
+    tui: TUI,
+    theme: Theme,
+    todo: TodoRecord,
+    onAction: (action: TodoOverlayAction) => void,
+  ) {
     this.tui = tui;
     this.theme = theme;
     this.todo = todo;
     this.onAction = onAction;
-    this.markdown = new Markdown(this.getMarkdownText(), 1, 0, getMarkdownTheme());
+    this.markdown = new Markdown(
+      this.getMarkdownText(),
+      1,
+      0,
+      getMarkdownTheme(),
+    );
   }
 
   private getMarkdownText(): string {
@@ -394,7 +469,10 @@ export class TodoDetailOverlayComponent {
     const footerLines = 3;
     const borderLines = 2;
     const innerWidth = Math.max(10, width - 2);
-    const contentHeight = Math.max(1, maxHeight - headerLines - footerLines - borderLines);
+    const contentHeight = Math.max(
+      1,
+      maxHeight - headerLines - footerLines - borderLines,
+    );
 
     const markdownLines = this.markdown.render(innerWidth);
     this.totalLines = markdownLines.length;
@@ -402,7 +480,10 @@ export class TodoDetailOverlayComponent {
     const maxScroll = Math.max(0, this.totalLines - contentHeight);
     this.scrollOffset = Math.max(0, Math.min(this.scrollOffset, maxScroll));
 
-    const visibleLines = markdownLines.slice(this.scrollOffset, this.scrollOffset + contentHeight);
+    const visibleLines = markdownLines.slice(
+      this.scrollOffset,
+      this.scrollOffset + contentHeight,
+    );
     const lines: string[] = [];
 
     lines.push(this.buildTitleLine(innerWidth));
@@ -425,14 +506,23 @@ export class TodoDetailOverlayComponent {
     const framedLines = lines.map((line) => {
       const truncated = truncateToWidth(line, innerWidth);
       const padding = Math.max(0, innerWidth - visibleWidth(truncated));
-      return borderColor("│") + truncated + " ".repeat(padding) + borderColor("│");
+      return (
+        borderColor("│") + truncated + " ".repeat(padding) + borderColor("│")
+      );
     });
 
-    return [top, ...framedLines, bottom].map((line) => truncateToWidth(line, width));
+    return [top, ...framedLines, bottom].map((line) =>
+      truncateToWidth(line, width),
+    );
   }
 
   invalidate(): void {
-    this.markdown = new Markdown(this.getMarkdownText(), 1, 0, getMarkdownTheme());
+    this.markdown = new Markdown(
+      this.getMarkdownText(),
+      1,
+      0,
+      getMarkdownTheme(),
+    );
   }
 
   private getMaxHeight(): number {
@@ -441,7 +531,9 @@ export class TodoDetailOverlayComponent {
   }
 
   private buildTitleLine(width: number): string {
-    const titleText = this.todo.title ? ` ${this.todo.title} ` : ` Todo ${formatTodoId(this.todo.id)} `;
+    const titleText = this.todo.title
+      ? ` ${this.todo.title} `
+      : ` Todo ${formatTodoId(this.todo.id)} `;
     const titleWidth = visibleWidth(titleText);
     if (titleWidth >= width) {
       return truncateToWidth(this.theme.fg("accent", titleText.trim()), width);
@@ -458,7 +550,9 @@ export class TodoDetailOverlayComponent {
   private buildMetaLine(width: number): string {
     const status = getTodoStatus(this.todo) || "open";
     const statusColor = isTodoClosed(status) ? "dim" : "success";
-    const tagText = this.todo.tags.length ? this.todo.tags.join(", ") : "no tags";
+    const tagText = this.todo.tags.length
+      ? this.todo.tags.join(", ")
+      : "no tags";
     const line =
       this.theme.fg("accent", formatTodoId(this.todo.id)) +
       this.theme.fg("muted", " • ") +
@@ -469,15 +563,23 @@ export class TodoDetailOverlayComponent {
   }
 
   private buildActionLine(width: number): string {
-    const work = this.theme.fg("accent", "enter") + this.theme.fg("muted", " work on todo");
+    const work =
+      this.theme.fg("accent", "enter") +
+      this.theme.fg("muted", " work on todo");
     const back = this.theme.fg("dim", "esc back");
     const pieces = [work, back];
 
     let line = pieces.join(this.theme.fg("muted", " • "));
     if (this.totalLines > this.viewHeight) {
       const start = Math.min(this.totalLines, this.scrollOffset + 1);
-      const end = Math.min(this.totalLines, this.scrollOffset + this.viewHeight);
-      const scrollInfo = this.theme.fg("dim", ` ${start}-${end}/${this.totalLines}`);
+      const end = Math.min(
+        this.totalLines,
+        this.scrollOffset + this.viewHeight,
+      );
+      const scrollInfo = this.theme.fg(
+        "dim",
+        ` ${start}-${end}/${this.totalLines}`,
+      );
       line += scrollInfo;
     }
 
@@ -486,6 +588,9 @@ export class TodoDetailOverlayComponent {
 
   private scrollBy(delta: number): void {
     const maxScroll = Math.max(0, this.totalLines - this.viewHeight);
-    this.scrollOffset = Math.max(0, Math.min(this.scrollOffset + delta, maxScroll));
+    this.scrollOffset = Math.max(
+      0,
+      Math.min(this.scrollOffset + delta, maxScroll),
+    );
   }
 }

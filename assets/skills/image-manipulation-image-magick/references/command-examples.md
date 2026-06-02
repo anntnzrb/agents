@@ -42,9 +42,9 @@ fi
 & $magick identify -format "%wx%h" path/to/image.jpg
 
 # For multiple images
-Get-ChildItem "path/to/images/*" | ForEach-Object { 
+Get-ChildItem "path/to/images/*" | ForEach-Object {
     $dimensions = & $magick identify -format "%f: %wx%h`n" $_.FullName
-    Write-Host $dimensions 
+    Write-Host $dimensions
 }
 ```
 
@@ -69,7 +69,7 @@ done
 & $magick input.jpg -resize 427x240 output.jpg
 
 # Batch resize images
-Get-ChildItem "path/to/images/*" | ForEach-Object { 
+Get-ChildItem "path/to/images/*" | ForEach-Object {
     & $magick $_.FullName -resize 427x240 "path/to/output/thumb_$($_.Name)"
 }
 ```
@@ -108,7 +108,7 @@ magick identify -verbose path/to/image.jpg
 ### PowerShell (Windows)
 
 ```powershell
-Get-ChildItem "path/to/images/*" | ForEach-Object { 
+Get-ChildItem "path/to/images/*" | ForEach-Object {
     $dimensions = & $magick identify -format "%w,%h" $_.FullName
     if ($dimensions) {
         $width,$height = $dimensions -split ','

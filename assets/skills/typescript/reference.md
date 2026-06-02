@@ -4,11 +4,11 @@
 
 Pick module mode from runtime, not fashion:
 
-| Target | `module` | `moduleResolution` | Notes |
-|---|---|---|---|
-| Vite / Next / frontend bundlers | `ESNext` | `bundler` | Bundler resolves aliases and extensionless imports |
-| Node / Bun apps | `NodeNext` | `NodeNext` | Match runtime semantics and package exports |
-| Published libraries | `NodeNext` | `NodeNext` | Keep build config separate from editor config |
+| Target                          | `module`   | `moduleResolution` | Notes                                              |
+| ------------------------------- | ---------- | ------------------ | -------------------------------------------------- |
+| Vite / Next / frontend bundlers | `ESNext`   | `bundler`          | Bundler resolves aliases and extensionless imports |
+| Node / Bun apps                 | `NodeNext` | `NodeNext`         | Match runtime semantics and package exports        |
+| Published libraries             | `NodeNext` | `NodeNext`         | Keep build config separate from editor config      |
 
 Use `assets/tsconfig-bundler.json` for bundler-first apps.
 Use `assets/tsconfig-nodenext.json` for Node/Bun projects.

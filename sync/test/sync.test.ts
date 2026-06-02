@@ -133,7 +133,8 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
   ]);
 
   return {
-    HarnessId: (harnessModule as Record<string, unknown>).HarnessId ??
+    HarnessId:
+      (harnessModule as Record<string, unknown>).HarnessId ??
       (harnessModule as Record<string, unknown>).harnessId,
     SyncEnv: (harnessModule as Record<string, unknown>).SyncEnv,
     harnessSourceRoot: pickFn(
@@ -146,9 +147,21 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
       "harnessInstructionTarget",
       "harness_instruction_target",
     ),
-    runSync: pickFn(libModule as Record<string, unknown>, "runSync", "run_sync"),
-    copyItem: pickFn(jobsModule as Record<string, unknown>, "copyItem", "copy_item"),
-    copyDirInto: pickFn(jobsModule as Record<string, unknown>, "copyDirInto", "copy_dir_into"),
+    runSync: pickFn(
+      libModule as Record<string, unknown>,
+      "runSync",
+      "run_sync",
+    ),
+    copyItem: pickFn(
+      jobsModule as Record<string, unknown>,
+      "copyItem",
+      "copy_item",
+    ),
+    copyDirInto: pickFn(
+      jobsModule as Record<string, unknown>,
+      "copyDirInto",
+      "copy_dir_into",
+    ),
     runJobsWithPreserve: pickFn(
       jobsModule as Record<string, unknown>,
       "runJobsWithPreserve",
@@ -159,7 +172,11 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
       "iterExtensionPackages",
       "iter_extension_packages",
     ),
-    runInstall: pickFn(installModule as Record<string, unknown>, "runInstall", "run_install"),
+    runInstall: pickFn(
+      installModule as Record<string, unknown>,
+      "runInstall",
+      "run_install",
+    ),
     runCommandOutcome: pickFn(
       runtimeProcessModule as Record<string, unknown>,
       "runCommandOutcome",
@@ -244,7 +261,9 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
   };
 }
 
-async function withTempDir<T>(fn: (root: string) => T | Promise<T>): Promise<T> {
+async function withTempDir<T>(
+  fn: (root: string) => T | Promise<T>,
+): Promise<T> {
   const root = mkdtempSync(join(tmpdir(), "agents-tests-"));
   try {
     return await fn(root);
@@ -288,9 +307,13 @@ const readText = (path: string): string => readFileSync(path, "utf8");
 
 const exists = (path: string): boolean => existsSync(path);
 
-const isPosix = (): boolean => process.platform === "darwin" || process.platform === "linux";
+const isPosix = (): boolean =>
+  process.platform === "darwin" || process.platform === "linux";
 
-async function call<T>(fn: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<T> {
+async function call<T>(
+  fn: (...args: unknown[]) => unknown,
+  ...args: unknown[]
+): Promise<T> {
   return await resolveValue(fn(...args));
 }
 
@@ -307,155 +330,185 @@ async function resolveValue<T>(value: unknown): Promise<T> {
 }
 
 if (runtime) {
-test("copy_item_missing_source_returns_true", async () => {
-  await withTempDir(async (root) => {
-    const src = join(root, "missing.txt");
-    const dst = join(root, "out.txt");
-    assert.equal(await call<boolean>(copyItem, src, dst), true);
-    assert.equal(exists(dst), false);
+  test("copy_item_missing_source_returns_true", async () => {
+    await withTempDir(async (root) => {
+      const src = join(root, "missing.txt");
+      const dst = join(root, "out.txt");
+      assert.equal(await call<boolean>(copyItem, src, dst), true);
+      assert.equal(exists(dst), false);
+    });
   });
-});
 
-test("copy_dir_into_merges_existing_destination", async () => {
-  await withTempDir(async (root) => {
-    const src = join(root, "src");
-    const dst = join(root, "dst");
-    writeFile(join(src, "x.txt"), "x");
-    writeFile(join(dst, "keep.txt"), "k");
+  test("copy_dir_into_merges_existing_destination", async () => {
+    await withTempDir(async (root) => {
+      const src = join(root, "src");
+      const dst = join(root, "dst");
+      writeFile(join(src, "x.txt"), "x");
+      writeFile(join(dst, "keep.txt"), "k");
 
-    assert.equal(await call<boolean>(copyDirInto, src, dst), true);
-    assert.equal(exists(join(dst, "keep.txt")), true);
-    assert.equal(exists(join(dst, "x.txt")), true);
+      assert.equal(await call<boolean>(copyDirInto, src, dst), true);
+      assert.equal(exists(join(dst, "keep.txt")), true);
+      assert.equal(exists(join(dst, "x.txt")), true);
+    });
   });
-});
 
-test("run_jobs_with_preserve_keeps_generated_extension_entries", async () => {
-  await withTempDir(async (root) => {
-    const src = join(root, "src");
-    const dst = join(root, "dst");
+  test("run_jobs_with_preserve_keeps_generated_extension_entries", async () => {
+    await withTempDir(async (root) => {
+      const src = join(root, "src");
+      const dst = join(root, "dst");
 
-    writeFile(join(src, "extensions", "context", "index.ts"), "export const live = true;\n");
-    writeFile(join(dst, "extensions", "stale.ts"), "stale\n");
-    writeFile(join(dst, "extensions", "package.json"), '{"name":"generated"}\n');
-    writeFile(join(dst, "extensions", "node_modules", "dep", "index.js"), "module.exports = 1;\n");
+      writeFile(
+        join(src, "extensions", "context", "index.ts"),
+        "export const live = true;\n",
+      );
+      writeFile(join(dst, "extensions", "stale.ts"), "stale\n");
+      writeFile(
+        join(dst, "extensions", "package.json"),
+        '{"name":"generated"}\n',
+      );
+      writeFile(
+        join(dst, "extensions", "node_modules", "dep", "index.js"),
+        "module.exports = 1;\n",
+      );
 
-    const result = await call<boolean>(
-      runJobsWithPreserve,
-      [{ src, dst, kind: "Dir" }],
-      new Map([[dst, ["extensions/package.json", "extensions/node_modules"]]]),
-    );
+      const result = await call<boolean>(
+        runJobsWithPreserve,
+        [{ src, dst, kind: "Dir" }],
+        new Map([
+          [dst, ["extensions/package.json", "extensions/node_modules"]],
+        ]),
+      );
 
-    assert.equal(result, true);
-    assert.equal(exists(join(dst, "extensions", "context", "index.ts")), true);
-    assert.equal(exists(join(dst, "extensions", "stale.ts")), false);
-    assert.equal(exists(join(dst, "extensions", "package.json")), true);
-    assert.equal(exists(join(dst, "extensions", "node_modules", "dep", "index.js")), true);
+      assert.equal(result, true);
+      assert.equal(
+        exists(join(dst, "extensions", "context", "index.ts")),
+        true,
+      );
+      assert.equal(exists(join(dst, "extensions", "stale.ts")), false);
+      assert.equal(exists(join(dst, "extensions", "package.json")), true);
+      assert.equal(
+        exists(join(dst, "extensions", "node_modules", "dep", "index.js")),
+        true,
+      );
+    });
   });
-});
 
-test("iter_extension_packages_skips_node_modules", async () => {
-  await withTempDir(async (root) => {
-    writeFile(join(root, "a", "package.json"), "{}");
-    writeFile(join(root, "a", "nested", "package.json"), "{}");
-    writeFile(join(root, "a", "node_modules", "skip", "package.json"), "{}");
+  test("iter_extension_packages_skips_node_modules", async () => {
+    await withTempDir(async (root) => {
+      writeFile(join(root, "a", "package.json"), "{}");
+      writeFile(join(root, "a", "nested", "package.json"), "{}");
+      writeFile(join(root, "a", "node_modules", "skip", "package.json"), "{}");
 
-    const packages = [...(await call<string[]>(iterExtensionPackages, root))].sort();
-    assert.equal(packages.length, 2);
+      const packages = [
+        ...(await call<string[]>(iterExtensionPackages, root)),
+      ].sort();
+      assert.equal(packages.length, 2);
+    });
   });
-});
 
-test("run_install_handles_success_failure_and_timeout", async () => {
-  if (!isPosix()) return;
+  test("run_install_handles_success_failure_and_timeout", async () => {
+    if (!isPosix()) return;
 
-  await withTempDir(async (root) => {
-    const bin = join(root, "bin");
-    mkdirSync(bin, { recursive: true });
+    await withTempDir(async (root) => {
+      const bin = join(root, "bin");
+      mkdirSync(bin, { recursive: true });
 
-    const ok = join(bin, "ok");
-    writeExecutable(ok, "#!/bin/sh\nexit 0\n");
-    assert.equal(await call<boolean>(runInstall, [ok], root, 1000), true);
+      const ok = join(bin, "ok");
+      writeExecutable(ok, "#!/bin/sh\nexit 0\n");
+      assert.equal(await call<boolean>(runInstall, [ok], root, 1000), true);
 
-    const fail = join(bin, "fail");
-    writeExecutable(fail, "#!/bin/sh\necho bad >&2\nexit 3\n");
-    assert.equal(await call<boolean>(runInstall, [fail], root, 1000), false);
+      const fail = join(bin, "fail");
+      writeExecutable(fail, "#!/bin/sh\necho bad >&2\nexit 3\n");
+      assert.equal(await call<boolean>(runInstall, [fail], root, 1000), false);
 
-    const sleepy = join(bin, "sleepy");
-    writeExecutable(sleepy, "#!/bin/sh\nsleep 2\n");
-    assert.equal(await call<boolean>(runInstall, [sleepy], root, 100), false);
+      const sleepy = join(bin, "sleepy");
+      writeExecutable(sleepy, "#!/bin/sh\nsleep 2\n");
+      assert.equal(await call<boolean>(runInstall, [sleepy], root, 100), false);
+    });
   });
-});
 
-test("run_command_outcome_resolves_relative_executable_from_command_cwd", async () => {
-  await withTempDir(async (root) => {
-    const scriptDir = join(root, "scripts");
-    mkdirSync(scriptDir, { recursive: true });
+  test("run_command_outcome_resolves_relative_executable_from_command_cwd", async () => {
+    await withTempDir(async (root) => {
+      const scriptDir = join(root, "scripts");
+      mkdirSync(scriptDir, { recursive: true });
 
-    const command = process.platform === "win32" ? ".\\scripts\\ok" : "./scripts/ok";
-    if (process.platform === "win32") {
-      writeFile(join(scriptDir, "ok.cmd"), "@echo off\r\nexit /b 0\r\n");
-    } else {
-      writeExecutable(join(scriptDir, "ok"), "#!/bin/sh\nexit 0\n");
-    }
+      const command =
+        process.platform === "win32" ? ".\\scripts\\ok" : "./scripts/ok";
+      if (process.platform === "win32") {
+        writeFile(join(scriptDir, "ok.cmd"), "@echo off\r\nexit /b 0\r\n");
+      } else {
+        writeExecutable(join(scriptDir, "ok"), "#!/bin/sh\nexit 0\n");
+      }
 
-    assert.deepEqual(await call(runCommandOutcome, [command], root, 1000), { _tag: "Success" });
+      assert.deepEqual(await call(runCommandOutcome, [command], root, 1000), {
+        _tag: "Success",
+      });
+    });
   });
-});
 
-test("run_command_outcome_times_out_cross_platform", async () => {
-  await withTempDir(async (root) => {
-    const startedAt = performance.now();
-    const outcome = await call(runCommandOutcome, ["bun", "-e", "setInterval(() => {}, 1000)"], root, 100);
-    const elapsed = performance.now() - startedAt;
+  test("run_command_outcome_times_out_cross_platform", async () => {
+    await withTempDir(async (root) => {
+      const startedAt = performance.now();
+      const outcome = await call(
+        runCommandOutcome,
+        ["bun", "-e", "setInterval(() => {}, 1000)"],
+        root,
+        100,
+      );
+      const elapsed = performance.now() - startedAt;
 
-    assert.deepEqual(outcome, { _tag: "TimedOut" });
-    assert.equal(elapsed < 1000, true);
+      assert.deepEqual(outcome, { _tag: "TimedOut" });
+      assert.equal(elapsed < 1000, true);
+    });
   });
-});
 
-test("run_install_force_kills_term_trapping_process", async () => {
-  if (!isPosix()) return;
+  test("run_install_force_kills_term_trapping_process", async () => {
+    if (!isPosix()) return;
 
-  await withTempDir(async (root) => {
-    const bin = join(root, "bin");
-    mkdirSync(bin, { recursive: true });
+    await withTempDir(async (root) => {
+      const bin = join(root, "bin");
+      mkdirSync(bin, { recursive: true });
 
-    const trapped = join(bin, "trapped");
-    writeExecutable(trapped, "#!/bin/sh\ntrap '' TERM\nwhile :; do sleep 1; done\n");
+      const trapped = join(bin, "trapped");
+      writeExecutable(
+        trapped,
+        "#!/bin/sh\ntrap '' TERM\nwhile :; do sleep 1; done\n",
+      );
 
-    const helper = join(root, "helper.ts");
-    writeFileSync(
-      helper,
-      `import { runInstall } from ${JSON.stringify(join(SRC_ROOT, "extensions", "install.ts"))};
+      const helper = join(root, "helper.ts");
+      writeFileSync(
+        helper,
+        `import { runInstall } from ${JSON.stringify(join(SRC_ROOT, "extensions", "install.ts"))};
 const result = await runInstall([${JSON.stringify(trapped)}], ${JSON.stringify(root)}, 100);
 console.log(String(result));
 `,
-    );
+      );
 
-    const result = spawnSync("bun", [helper], {
-      cwd: SYNC_ROOT,
-      encoding: "utf8",
-      stdio: "pipe",
-      timeout: 5000,
-      env: {
-        ...process.env,
-        PATH: process.env.PATH ?? "",
-      },
+      const result = spawnSync("bun", [helper], {
+        cwd: SYNC_ROOT,
+        encoding: "utf8",
+        stdio: "pipe",
+        timeout: 5000,
+        env: {
+          ...process.env,
+          PATH: process.env.PATH ?? "",
+        },
+      });
+
+      assert.equal(result.error, undefined, result.stderr || result.stdout);
+      assert.equal(result.status, 0, result.stderr || result.stdout);
+      assert.equal(result.stdout.trim(), "false");
     });
-
-    assert.equal(result.error, undefined, result.stderr || result.stdout);
-    assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.equal(result.stdout.trim(), "false");
   });
-});
 
-test("main_reports_lock_contention_and_skips", async () => {
-  if (!isPosix()) return;
+  test("main_reports_lock_contention_and_skips", async () => {
+    if (!isPosix()) return;
 
-  await withTempDir(async (root) => {
-    const helper = join(root, "helper.ts");
-    writeFileSync(
-      helper,
-      `import { SyncEnv } from ${JSON.stringify(join(SRC_ROOT, "core", "harness.ts"))};
+    await withTempDir(async (root) => {
+      const helper = join(root, "helper.ts");
+      writeFileSync(
+        helper,
+        `import { SyncEnv } from ${JSON.stringify(join(SRC_ROOT, "core", "harness.ts"))};
         import { main, tryAcquireSyncLock } from ${JSON.stringify(join(SRC_ROOT, "core", "index.ts"))};
 
 const syncEnv = SyncEnv.fromHome(${JSON.stringify(root)}, 1_000);
@@ -466,543 +519,906 @@ if (!lock) {
 const exit = await main();
 console.log(String(exit));
 `,
-    );
+      );
 
-    const result = spawnSync("bun", [helper], {
-      cwd: SYNC_ROOT,
-      encoding: "utf8",
-      stdio: "pipe",
-      env: {
-        ...process.env,
-        HOME: root,
-        PATH: process.env.PATH ?? "",
-      },
+      const result = spawnSync("bun", [helper], {
+        cwd: SYNC_ROOT,
+        encoding: "utf8",
+        stdio: "pipe",
+        env: {
+          ...process.env,
+          HOME: root,
+          PATH: process.env.PATH ?? "",
+        },
+      });
+
+      assert.equal(result.status, 0, result.stderr || result.stdout);
+      assert.equal(result.stdout.trim(), "0");
+      assert.equal(
+        result.stderr.includes("another sync is already running; skipping"),
+        true,
+      );
     });
-
-    assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.equal(result.stdout.trim(), "0");
-    assert.equal(result.stderr.includes("another sync is already running; skipping"), true);
   });
-});
 
-test("watchdog_exits_124_on_global_timeout", async () => {
-  await withTempDir(async (root) => {
-    const helper = join(root, "watchdog.ts");
-    writeFileSync(
-      helper,
-      `import { startSyncWatchdog } from ${JSON.stringify(join(SRC_ROOT, "core", "index.ts"))};
+  test("watchdog_exits_124_on_global_timeout", async () => {
+    await withTempDir(async (root) => {
+      const helper = join(root, "watchdog.ts");
+      writeFileSync(
+        helper,
+        `import { startSyncWatchdog } from ${JSON.stringify(join(SRC_ROOT, "core", "index.ts"))};
 startSyncWatchdog(1);
 setInterval(() => {}, 1_000);
 `,
-    );
+      );
 
-    const result = spawnSync("bun", [helper], {
-      cwd: SYNC_ROOT,
-      encoding: "utf8",
-      stdio: "pipe",
-      timeout: 5_000,
-      env: {
-        ...process.env,
-        PATH: process.env.PATH ?? "",
-      },
+      const result = spawnSync("bun", [helper], {
+        cwd: SYNC_ROOT,
+        encoding: "utf8",
+        stdio: "pipe",
+        timeout: 5_000,
+        env: {
+          ...process.env,
+          PATH: process.env.PATH ?? "",
+        },
+      });
+
+      assert.equal(result.status, 124, result.stderr || result.stdout);
+      assert.equal(result.stderr.includes("timed out after 1s"), true);
     });
-
-    assert.equal(result.status, 124, result.stderr || result.stdout);
-    assert.equal(result.stderr.includes("timed out after 1s"), true);
   });
-});
 
-test("parse_timeout_seconds_uses_default_for_invalid_values", async () => {
-  assert.equal(await call<number>(parseTimeoutSeconds, undefined, 7), 7);
-  assert.equal(await call<number>(parseTimeoutSeconds, "0", 7), 7);
-  assert.equal(await call<number>(parseTimeoutSeconds, "nope", 7), 7);
-  assert.equal(await call<number>(parseTimeoutSeconds, "9", 7), 9);
-});
-
-test("sync_env_harness_lookup_is_typed", async () => {
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
-
-    const pi = syncEnv.harness(enumMember(HarnessId, "Pi"));
-    assert.ok(pi);
-    assert.equal(
-      harnessSourceRoot(pi!, syncEnv.toolsHome),
-      join(root, ".config", "agents", "tools", "pi", "agent"),
-    );
-    assert.equal(harnessInstructionTarget(pi!), join(root, ".pi", "agent", "AGENTS.md"));
-
-    const claude = syncEnv.harness(enumMember(HarnessId, "Claude"));
-    assert.ok(claude);
-    assert.equal(harnessInstructionTarget(claude!), join(root, ".claude", "CLAUDE.md"));
+  test("parse_timeout_seconds_uses_default_for_invalid_values", async () => {
+    assert.equal(await call<number>(parseTimeoutSeconds, undefined, 7), 7);
+    assert.equal(await call<number>(parseTimeoutSeconds, "0", 7), 7);
+    assert.equal(await call<number>(parseTimeoutSeconds, "nope", 7), 7);
+    assert.equal(await call<number>(parseTimeoutSeconds, "9", 7), 9);
   });
-});
 
-test("sync_plan_resolves_hook_targets_from_harness_specs", async () => {
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
-    const syncPlan = await call<{
-      hooks: Record<string, unknown>[];
-    }>(buildSyncPlan, syncEnv);
+  test("sync_env_harness_lookup_is_typed", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
 
-    const packageHook = syncPlan.hooks.find((hook) => hook.kind === "PackageBootstrap");
-    const extensionHook = syncPlan.hooks.find((hook) => hook.kind === "ExtensionDeps");
+      const pi = syncEnv.harness(enumMember(HarnessId, "Pi"));
+      assert.ok(pi);
+      assert.equal(
+        harnessSourceRoot(pi!, syncEnv.toolsHome),
+        join(root, ".config", "agents", "tools", "pi", "agent"),
+      );
+      assert.equal(
+        harnessInstructionTarget(pi!),
+        join(root, ".pi", "agent", "AGENTS.md"),
+      );
 
-    assert.ok(packageHook);
-    assert.equal(
-      packageHook!.manifestPath,
-      join(root, ".config", "agents", "tools", "pi", "agent", "packages.json"),
-    );
-    assert.equal(
-      packageHook!.runtimeSettingsPath,
-      join(root, ".pi", "agent", "settings.json"),
-    );
-    assert.equal(
-      packageHook!.cacheRoot,
-      join(root, ".local", "share", "agents", "pi-packages"),
-    );
-
-    assert.ok(extensionHook);
-    assert.equal(
-      extensionHook!.root,
-      join(root, ".pi", "agent", "extensions"),
-    );
-  });
-});
-
-test("run_sync_happy_path", async () => {
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
-
-    writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
-    writeFile(join(root, ".config", "agents", "assets", "mcporter.jsonc"), '{"x":1}');
-    writeFile(join(root, ".config", "agents", "assets", "skills", "skill.txt"), "skill-content");
-    writeFile(join(root, ".config", "agents", "tools", "codex", "config.toml"), "codex = true");
-    writeFile(
-      join(root, ".config", "agents", "tools", "omp", "agent", "config.yml"),
-      "theme:\n  dark: graphite\n",
-    );
-    writeFile(
-      join(root, ".config", "agents", "tools", "pi", "agent", "extensions", "answer", "package.json"),
-      "{}",
-    );
-    mkdirSync(join(root, ".config", "agents", "tools", "pi", "agent", "extensions", "answer", "node_modules"), {
-      recursive: true,
+      const claude = syncEnv.harness(enumMember(HarnessId, "Claude"));
+      assert.ok(claude);
+      assert.equal(
+        harnessInstructionTarget(claude!),
+        join(root, ".claude", "CLAUDE.md"),
+      );
     });
-    writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
-    writeFile(join(root, ".pi", "agent", "extensions", "stale.ts"), "stale");
-    writeFile(join(root, ".omp", "agent", "skills", "stale.txt"), "stale-skill");
-    writeFile(join(root, ".omp", "agent", "logs", "keep.txt"), "keep-me");
-
-    assert.equal(await call<boolean>(runSync, syncEnv), true);
-    assert.equal(exists(join(root, ".codex", "AGENTS.md")), true);
-    assert.equal(exists(join(root, ".claude", "CLAUDE.md")), true);
-    assert.equal(exists(join(root, ".claude", "AGENTS.md")), false);
-    assert.equal(exists(join(root, ".config", "opencode", "AGENTS.md")), true);
-    assert.equal(exists(join(root, ".pi", "agent", "AGENTS.md")), true);
-    assert.equal(exists(join(root, ".omp", "agent", "AGENTS.md")), true);
-    assert.equal(exists(join(root, ".omp", "agent", "config.yml")), true);
-    assert.equal(exists(join(root, ".omp", "agent", "skills", "skill.txt")), true);
-    assert.equal(exists(join(root, ".mcporter", "mcporter.json")), true);
-    assert.equal(exists(join(root, ".pi", "agent", "auth.json")), true);
-    assert.equal(exists(join(root, ".pi", "agent", "extensions", "stale.ts")), false);
-    assert.equal(exists(join(root, ".omp", "agent", "skills", "stale.txt")), false);
-    assert.equal(exists(join(root, ".omp", "agent", "logs", "keep.txt")), true);
   });
-});
 
-test("run_sync_missing_sources_is_non_fatal", async () => {
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
-    assert.equal(await call<boolean>(runSync, syncEnv), true);
+  test("sync_plan_resolves_hook_targets_from_harness_specs", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const syncPlan = await call<{
+        hooks: Record<string, unknown>[];
+      }>(buildSyncPlan, syncEnv);
+
+      const packageHook = syncPlan.hooks.find(
+        (hook) => hook.kind === "PackageBootstrap",
+      );
+      const extensionHook = syncPlan.hooks.find(
+        (hook) => hook.kind === "ExtensionDeps",
+      );
+
+      assert.ok(packageHook);
+      assert.equal(
+        packageHook!.manifestPath,
+        join(
+          root,
+          ".config",
+          "agents",
+          "tools",
+          "pi",
+          "agent",
+          "packages.json",
+        ),
+      );
+      assert.equal(
+        packageHook!.runtimeSettingsPath,
+        join(root, ".pi", "agent", "settings.json"),
+      );
+      assert.equal(
+        packageHook!.cacheRoot,
+        join(root, ".local", "share", "agents", "pi-packages"),
+      );
+
+      assert.ok(extensionHook);
+      assert.equal(
+        extensionHook!.root,
+        join(root, ".pi", "agent", "extensions"),
+      );
+    });
   });
-});
 
-test("run_sync_claude_uses_claude_md", async () => {
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
-    const sourceAgentFile = join(root, ".config", "agents", "assets", "AGENTS.md");
-    writeFile(sourceAgentFile, "agent-instructions");
+  test("run_sync_happy_path", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
 
-    assert.equal(await call<boolean>(runSync, syncEnv), true);
-    assert.equal(readText(join(root, ".claude", "CLAUDE.md")), "agent-instructions");
-    assert.equal(exists(join(root, ".claude", "AGENTS.md")), false);
-    assert.equal(readText(sourceAgentFile), "agent-instructions");
-  });
-});
-
-test("run_sync_cleans_managed_entries_for_multiple_harnesses", async () => {
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
-    const agentsRoot = join(root, ".config", "agents");
-
-    writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
-    writeFile(join(agentsRoot, "assets", "skills", "skill.txt"), "fresh-skill");
-    writeFile(join(agentsRoot, "tools", "codex", "config.toml"), "fresh = true\n");
-    writeFile(join(agentsRoot, "tools", "omp", "agent", "config.yml"), "theme:\n  light: graphite\n");
-
-    writeFile(join(root, ".codex", "config.toml"), "stale = true\n");
-    writeFile(join(root, ".codex", "skills", "stale.txt"), "stale-skill");
-    writeFile(join(root, ".codex", "logs", "keep.txt"), "keep-me");
-    writeFile(join(root, ".omp", "agent", "config.yml"), "stale-config\n");
-    writeFile(join(root, ".omp", "agent", "skills", "stale.txt"), "stale-skill");
-    writeFile(join(root, ".omp", "agent", "logs", "keep.txt"), "keep-me");
-
-    assert.equal(await call<boolean>(runSync, syncEnv), true);
-    assert.equal(readText(join(root, ".codex", "config.toml")), "fresh = true\n");
-    assert.equal(readText(join(root, ".omp", "agent", "config.yml")), "theme:\n  light: graphite\n");
-    assert.equal(exists(join(root, ".codex", "skills", "skill.txt")), true);
-    assert.equal(exists(join(root, ".omp", "agent", "skills", "skill.txt")), true);
-    assert.equal(exists(join(root, ".codex", "skills", "stale.txt")), false);
-    assert.equal(exists(join(root, ".omp", "agent", "skills", "stale.txt")), false);
-    assert.equal(exists(join(root, ".codex", "logs", "keep.txt")), true);
-    assert.equal(exists(join(root, ".omp", "agent", "logs", "keep.txt")), true);
-  });
-});
-
-test("run_sync_omp_cleans_managed_entries_but_preserves_local_files", async () => {
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
-    const agentsRoot = join(root, ".config", "agents");
-
-    writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
-    writeFile(join(agentsRoot, "assets", "skills", "skill.txt"), "fresh-skill");
-    writeFile(join(agentsRoot, "tools", "omp", "agent", "config.yml"), "theme:\n  light: graphite\n");
-
-    writeFile(join(root, ".omp", "agent", "config.yml"), "stale-config\n");
-    writeFile(join(root, ".omp", "agent", "skills", "stale.txt"), "stale-skill");
-    writeFile(join(root, ".omp", "agent", "logs", "keep.txt"), "keep-me");
-
-    assert.equal(await call<boolean>(runSync, syncEnv), true);
-    assert.equal(readText(join(root, ".omp", "agent", "config.yml")), "theme:\n  light: graphite\n");
-    assert.equal(exists(join(root, ".omp", "agent", "skills", "skill.txt")), true);
-    assert.equal(exists(join(root, ".omp", "agent", "skills", "stale.txt")), false);
-    assert.equal(exists(join(root, ".omp", "agent", "logs", "keep.txt")), true);
-  });
-});
-
-test("run_sync_cleans_legacy_pi_entries_without_prior_state", async () => {
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
-    const agentsRoot = join(root, ".config", "agents");
-
-    writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
-    writeFile(join(root, ".pi", "agent", "legacy", "old.txt"), "stale");
-    writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
-
-    assert.equal(await call<boolean>(runSync, syncEnv), true);
-    assert.equal(exists(join(root, ".pi", "agent", "legacy")), false);
-    assert.equal(exists(join(root, ".pi", "agent", "auth.json")), true);
-  });
-});
-
-test("run_sync_removes_entries_removed_from_ssot_after_prior_sync", async () => {
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
-    const agentsRoot = join(root, ".config", "agents");
-    const codexConfig = join(agentsRoot, "tools", "codex", "config.toml");
-    const skillsRoot = join(agentsRoot, "assets", "skills");
-
-    writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
-    writeFile(join(skillsRoot, "skill.txt"), "fresh-skill");
-    writeFile(codexConfig, "fresh = true\n");
-
-    assert.equal(await call<boolean>(runSync, syncEnv), true);
-    assert.equal(exists(join(root, ".codex", "config.toml")), true);
-    assert.equal(exists(join(root, ".codex", "skills", "skill.txt")), true);
-    assert.equal(exists(join(root, ".local", "share", "agents", "sync-managed", "codex.json")), true);
-
-    rmSync(codexConfig, { force: true });
-    rmSync(skillsRoot, { recursive: true, force: true });
-    writeFile(join(root, ".codex", "logs", "keep.txt"), "keep-me");
-
-    assert.equal(await call<boolean>(runSync, syncEnv), true);
-    assert.equal(exists(join(root, ".codex", "config.toml")), false);
-    assert.equal(exists(join(root, ".codex", "skills")), false);
-    assert.equal(exists(join(root, ".codex", "logs", "keep.txt")), true);
-  });
-});
-
-test("run_sync_preserves_generated_extension_runtime_when_hook_inputs_match", async () => {
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
-    const { fingerprintTree } = await import("@core/hook-state.ts");
-
-    writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
-    writeFile(join(root, ".config", "agents", "tools", "pi", "agent", "extensions", "context", "index.ts"), "export const live = true;\n");
-    writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
-    writeFile(join(root, ".pi", "agent", "extensions", "package.json"), '{"name":"generated"}\n');
-    writeFile(join(root, ".pi", "agent", "extensions", "node_modules", "dep", "index.js"), "module.exports = 1;\n");
-    writeFile(
-      join(root, ".local", "share", "agents", "sync-managed", "pi.extension-deps.json"),
-      `${JSON.stringify(
+      writeFile(
+        join(root, ".config", "agents", "assets", "AGENTS.md"),
+        "agent-instructions",
+      );
+      writeFile(
+        join(root, ".config", "agents", "assets", "mcporter.jsonc"),
+        '{"x":1}',
+      );
+      writeFile(
+        join(root, ".config", "agents", "assets", "skills", "skill.txt"),
+        "skill-content",
+      );
+      writeFile(
+        join(root, ".config", "agents", "tools", "codex", "config.toml"),
+        "codex = true",
+      );
+      writeFile(
+        join(root, ".config", "agents", "tools", "omp", "agent", "config.yml"),
+        "theme:\n  dark: graphite\n",
+      );
+      writeFile(
+        join(
+          root,
+          ".config",
+          "agents",
+          "tools",
+          "pi",
+          "agent",
+          "extensions",
+          "answer",
+          "package.json",
+        ),
+        "{}",
+      );
+      mkdirSync(
+        join(
+          root,
+          ".config",
+          "agents",
+          "tools",
+          "pi",
+          "agent",
+          "extensions",
+          "answer",
+          "node_modules",
+        ),
         {
-          fingerprint: fingerprintTree(join(root, ".config", "agents", "tools", "pi", "agent", "extensions")),
-          generatedEntries: ["package.json", "node_modules"],
+          recursive: true,
         },
-        null,
-        2,
-      )}\n`,
-    );
+      );
+      writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
+      writeFile(join(root, ".pi", "agent", "extensions", "stale.ts"), "stale");
+      writeFile(
+        join(root, ".omp", "agent", "skills", "stale.txt"),
+        "stale-skill",
+      );
+      writeFile(join(root, ".omp", "agent", "logs", "keep.txt"), "keep-me");
 
-    const success = await call<boolean>(runSync, syncEnv);
-    assert.equal(success, true);
-    assert.equal(exists(join(root, ".pi", "agent", "extensions", "package.json")), true);
-    assert.equal(exists(join(root, ".pi", "agent", "extensions", "node_modules", "dep", "index.js")), true);
+      assert.equal(await call<boolean>(runSync, syncEnv), true);
+      assert.equal(exists(join(root, ".codex", "AGENTS.md")), true);
+      assert.equal(exists(join(root, ".claude", "CLAUDE.md")), true);
+      assert.equal(exists(join(root, ".claude", "AGENTS.md")), false);
+      assert.equal(
+        exists(join(root, ".config", "opencode", "AGENTS.md")),
+        true,
+      );
+      assert.equal(exists(join(root, ".pi", "agent", "AGENTS.md")), true);
+      assert.equal(exists(join(root, ".omp", "agent", "AGENTS.md")), true);
+      assert.equal(exists(join(root, ".omp", "agent", "config.yml")), true);
+      assert.equal(
+        exists(join(root, ".omp", "agent", "skills", "skill.txt")),
+        true,
+      );
+      assert.equal(exists(join(root, ".mcporter", "mcporter.json")), true);
+      assert.equal(exists(join(root, ".pi", "agent", "auth.json")), true);
+      assert.equal(
+        exists(join(root, ".pi", "agent", "extensions", "stale.ts")),
+        false,
+      );
+      assert.equal(
+        exists(join(root, ".omp", "agent", "skills", "stale.txt")),
+        false,
+      );
+      assert.equal(
+        exists(join(root, ".omp", "agent", "logs", "keep.txt")),
+        true,
+      );
+    });
   });
-});
 
-test("run_sync_drops_legacy_npm_extension_state_entries_without_reinstall", async () => {
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
-    const { fingerprintTree } = await import("@core/hook-state.ts");
-    const sourceRoot = join(root, ".config", "agents", "tools", "pi", "agent", "extensions");
-    const statePath = join(root, ".local", "share", "agents", "sync-managed", "pi.extension-deps.json");
-
-    writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
-    writeFile(join(sourceRoot, "context", "index.ts"), "export const live = true;\n");
-    writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
-    writeFile(join(root, ".pi", "agent", "extensions", "package.json"), '{"name":"generated"}\n');
-    writeFile(join(root, ".pi", "agent", "extensions", "node_modules", "dep", "index.js"), "module.exports = 1;\n");
-    writeFile(join(root, ".pi", "agent", "extensions", "package-lock.json"), '{"lockfileVersion":3}\n');
-    writeFile(join(root, ".pi", "agent", "extensions", "npm-shrinkwrap.json"), '{"lockfileVersion":3}\n');
-    writeFile(
-      statePath,
-      `${JSON.stringify(
-        {
-          fingerprint: fingerprintTree(sourceRoot),
-          generatedEntries: ["package.json", "node_modules", "package-lock.json", "npm-shrinkwrap.json"],
-        },
-        null,
-        2,
-      )}\n`,
-    );
-
-    const success = await call<boolean>(runSync, syncEnv);
-    assert.equal(success, true);
-    assert.equal(exists(join(root, ".pi", "agent", "extensions", "package.json")), true);
-    assert.equal(exists(join(root, ".pi", "agent", "extensions", "node_modules", "dep", "index.js")), true);
-    assert.equal(exists(join(root, ".pi", "agent", "extensions", "package-lock.json")), false);
-    assert.equal(exists(join(root, ".pi", "agent", "extensions", "npm-shrinkwrap.json")), false);
-
-    const state = JSON.parse(readText(statePath)) as { generatedEntries?: unknown };
-    assert.deepEqual(state.generatedEntries, ["package.json", "node_modules"]);
+  test("run_sync_missing_sources_is_non_fatal", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      assert.equal(await call<boolean>(runSync, syncEnv), true);
+    });
   });
-});
 
-test("run_sync_removes_generated_extension_runtime_when_hook_inputs_change", async () => {
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
+  test("run_sync_claude_uses_claude_md", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const sourceAgentFile = join(
+        root,
+        ".config",
+        "agents",
+        "assets",
+        "AGENTS.md",
+      );
+      writeFile(sourceAgentFile, "agent-instructions");
 
-    writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
-    writeFile(join(root, ".config", "agents", "tools", "pi", "agent", "extensions", "context", "index.ts"), "export const live = true;\n");
-    writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
-    writeFile(join(root, ".pi", "agent", "extensions", "package.json"), '{"name":"generated"}\n');
-    writeFile(join(root, ".pi", "agent", "extensions", "node_modules", "dep", "index.js"), "module.exports = 1;\n");
-    writeFile(
-      join(root, ".local", "share", "agents", "sync-managed", "pi.extension-deps.json"),
-      `${JSON.stringify(
-        {
-          fingerprint: "stale",
-          generatedEntries: ["package.json", "node_modules"],
-        },
-        null,
-        2,
-      )}\n`,
-    );
-
-    const success = await call<boolean>(runSync, syncEnv);
-    assert.equal(success, true);
-    assert.equal(exists(join(root, ".pi", "agent", "extensions", "package.json")), false);
-    assert.equal(exists(join(root, ".pi", "agent", "extensions", "node_modules")), false);
+      assert.equal(await call<boolean>(runSync, syncEnv), true);
+      assert.equal(
+        readText(join(root, ".claude", "CLAUDE.md")),
+        "agent-instructions",
+      );
+      assert.equal(exists(join(root, ".claude", "AGENTS.md")), false);
+      assert.equal(readText(sourceAgentFile), "agent-instructions");
+    });
   });
-});
 
-test("run_sync_omp_does_not_bootstrap_packages", async () => {
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
-    const agentsRoot = join(root, ".config", "agents");
+  test("run_sync_cleans_managed_entries_for_multiple_harnesses", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const agentsRoot = join(root, ".config", "agents");
 
-    writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
-    writeFile(join(agentsRoot, "tools", "omp", "agent", "config.yml"), "interruptMode: immediate\n");
-    writeFile(join(agentsRoot, "tools", "omp", "agent", "packages.json"), "this is not valid json\n");
+      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(
+        join(agentsRoot, "assets", "skills", "skill.txt"),
+        "fresh-skill",
+      );
+      writeFile(
+        join(agentsRoot, "tools", "codex", "config.toml"),
+        "fresh = true\n",
+      );
+      writeFile(
+        join(agentsRoot, "tools", "omp", "agent", "config.yml"),
+        "theme:\n  light: graphite\n",
+      );
 
-    assert.equal(await call<boolean>(runSync, syncEnv), true);
-    assert.equal(readText(join(root, ".omp", "agent", "packages.json")), "this is not valid json\n");
-    assert.equal(exists(join(root, ".omp", "agent", "config.yml")), true);
+      writeFile(join(root, ".codex", "config.toml"), "stale = true\n");
+      writeFile(join(root, ".codex", "skills", "stale.txt"), "stale-skill");
+      writeFile(join(root, ".codex", "logs", "keep.txt"), "keep-me");
+      writeFile(join(root, ".omp", "agent", "config.yml"), "stale-config\n");
+      writeFile(
+        join(root, ".omp", "agent", "skills", "stale.txt"),
+        "stale-skill",
+      );
+      writeFile(join(root, ".omp", "agent", "logs", "keep.txt"), "keep-me");
+
+      assert.equal(await call<boolean>(runSync, syncEnv), true);
+      assert.equal(
+        readText(join(root, ".codex", "config.toml")),
+        "fresh = true\n",
+      );
+      assert.equal(
+        readText(join(root, ".omp", "agent", "config.yml")),
+        "theme:\n  light: graphite\n",
+      );
+      assert.equal(exists(join(root, ".codex", "skills", "skill.txt")), true);
+      assert.equal(
+        exists(join(root, ".omp", "agent", "skills", "skill.txt")),
+        true,
+      );
+      assert.equal(exists(join(root, ".codex", "skills", "stale.txt")), false);
+      assert.equal(
+        exists(join(root, ".omp", "agent", "skills", "stale.txt")),
+        false,
+      );
+      assert.equal(exists(join(root, ".codex", "logs", "keep.txt")), true);
+      assert.equal(
+        exists(join(root, ".omp", "agent", "logs", "keep.txt")),
+        true,
+      );
+    });
   });
-});
 
-test("read_package_manifest_dedupes_sources", async () => {
-  await withTempDir(async (root) => {
-    const path = join(root, "packages.json");
-    writeFile(
-      path,
-      `{
+  test("run_sync_omp_cleans_managed_entries_but_preserves_local_files", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const agentsRoot = join(root, ".config", "agents");
+
+      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(
+        join(agentsRoot, "assets", "skills", "skill.txt"),
+        "fresh-skill",
+      );
+      writeFile(
+        join(agentsRoot, "tools", "omp", "agent", "config.yml"),
+        "theme:\n  light: graphite\n",
+      );
+
+      writeFile(join(root, ".omp", "agent", "config.yml"), "stale-config\n");
+      writeFile(
+        join(root, ".omp", "agent", "skills", "stale.txt"),
+        "stale-skill",
+      );
+      writeFile(join(root, ".omp", "agent", "logs", "keep.txt"), "keep-me");
+
+      assert.equal(await call<boolean>(runSync, syncEnv), true);
+      assert.equal(
+        readText(join(root, ".omp", "agent", "config.yml")),
+        "theme:\n  light: graphite\n",
+      );
+      assert.equal(
+        exists(join(root, ".omp", "agent", "skills", "skill.txt")),
+        true,
+      );
+      assert.equal(
+        exists(join(root, ".omp", "agent", "skills", "stale.txt")),
+        false,
+      );
+      assert.equal(
+        exists(join(root, ".omp", "agent", "logs", "keep.txt")),
+        true,
+      );
+    });
+  });
+
+  test("run_sync_cleans_legacy_pi_entries_without_prior_state", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const agentsRoot = join(root, ".config", "agents");
+
+      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(root, ".pi", "agent", "legacy", "old.txt"), "stale");
+      writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
+
+      assert.equal(await call<boolean>(runSync, syncEnv), true);
+      assert.equal(exists(join(root, ".pi", "agent", "legacy")), false);
+      assert.equal(exists(join(root, ".pi", "agent", "auth.json")), true);
+    });
+  });
+
+  test("run_sync_removes_entries_removed_from_ssot_after_prior_sync", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const agentsRoot = join(root, ".config", "agents");
+      const codexConfig = join(agentsRoot, "tools", "codex", "config.toml");
+      const skillsRoot = join(agentsRoot, "assets", "skills");
+
+      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(skillsRoot, "skill.txt"), "fresh-skill");
+      writeFile(codexConfig, "fresh = true\n");
+
+      assert.equal(await call<boolean>(runSync, syncEnv), true);
+      assert.equal(exists(join(root, ".codex", "config.toml")), true);
+      assert.equal(exists(join(root, ".codex", "skills", "skill.txt")), true);
+      assert.equal(
+        exists(
+          join(root, ".local", "share", "agents", "sync-managed", "codex.json"),
+        ),
+        true,
+      );
+
+      rmSync(codexConfig, { force: true });
+      rmSync(skillsRoot, { recursive: true, force: true });
+      writeFile(join(root, ".codex", "logs", "keep.txt"), "keep-me");
+
+      assert.equal(await call<boolean>(runSync, syncEnv), true);
+      assert.equal(exists(join(root, ".codex", "config.toml")), false);
+      assert.equal(exists(join(root, ".codex", "skills")), false);
+      assert.equal(exists(join(root, ".codex", "logs", "keep.txt")), true);
+    });
+  });
+
+  test("run_sync_preserves_generated_extension_runtime_when_hook_inputs_match", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const { fingerprintTree } = await import("@core/hook-state.ts");
+
+      writeFile(
+        join(root, ".config", "agents", "assets", "AGENTS.md"),
+        "agent-instructions",
+      );
+      writeFile(
+        join(
+          root,
+          ".config",
+          "agents",
+          "tools",
+          "pi",
+          "agent",
+          "extensions",
+          "context",
+          "index.ts",
+        ),
+        "export const live = true;\n",
+      );
+      writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
+      writeFile(
+        join(root, ".pi", "agent", "extensions", "package.json"),
+        '{"name":"generated"}\n',
+      );
+      writeFile(
+        join(
+          root,
+          ".pi",
+          "agent",
+          "extensions",
+          "node_modules",
+          "dep",
+          "index.js",
+        ),
+        "module.exports = 1;\n",
+      );
+      writeFile(
+        join(
+          root,
+          ".local",
+          "share",
+          "agents",
+          "sync-managed",
+          "pi.extension-deps.json",
+        ),
+        `${JSON.stringify(
+          {
+            fingerprint: fingerprintTree(
+              join(
+                root,
+                ".config",
+                "agents",
+                "tools",
+                "pi",
+                "agent",
+                "extensions",
+              ),
+            ),
+            generatedEntries: ["package.json", "node_modules"],
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const success = await call<boolean>(runSync, syncEnv);
+      assert.equal(success, true);
+      assert.equal(
+        exists(join(root, ".pi", "agent", "extensions", "package.json")),
+        true,
+      );
+      assert.equal(
+        exists(
+          join(
+            root,
+            ".pi",
+            "agent",
+            "extensions",
+            "node_modules",
+            "dep",
+            "index.js",
+          ),
+        ),
+        true,
+      );
+    });
+  });
+
+  test("run_sync_drops_legacy_npm_extension_state_entries_without_reinstall", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const { fingerprintTree } = await import("@core/hook-state.ts");
+      const sourceRoot = join(
+        root,
+        ".config",
+        "agents",
+        "tools",
+        "pi",
+        "agent",
+        "extensions",
+      );
+      const statePath = join(
+        root,
+        ".local",
+        "share",
+        "agents",
+        "sync-managed",
+        "pi.extension-deps.json",
+      );
+
+      writeFile(
+        join(root, ".config", "agents", "assets", "AGENTS.md"),
+        "agent-instructions",
+      );
+      writeFile(
+        join(sourceRoot, "context", "index.ts"),
+        "export const live = true;\n",
+      );
+      writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
+      writeFile(
+        join(root, ".pi", "agent", "extensions", "package.json"),
+        '{"name":"generated"}\n',
+      );
+      writeFile(
+        join(
+          root,
+          ".pi",
+          "agent",
+          "extensions",
+          "node_modules",
+          "dep",
+          "index.js",
+        ),
+        "module.exports = 1;\n",
+      );
+      writeFile(
+        join(root, ".pi", "agent", "extensions", "package-lock.json"),
+        '{"lockfileVersion":3}\n',
+      );
+      writeFile(
+        join(root, ".pi", "agent", "extensions", "npm-shrinkwrap.json"),
+        '{"lockfileVersion":3}\n',
+      );
+      writeFile(
+        statePath,
+        `${JSON.stringify(
+          {
+            fingerprint: fingerprintTree(sourceRoot),
+            generatedEntries: [
+              "package.json",
+              "node_modules",
+              "package-lock.json",
+              "npm-shrinkwrap.json",
+            ],
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const success = await call<boolean>(runSync, syncEnv);
+      assert.equal(success, true);
+      assert.equal(
+        exists(join(root, ".pi", "agent", "extensions", "package.json")),
+        true,
+      );
+      assert.equal(
+        exists(
+          join(
+            root,
+            ".pi",
+            "agent",
+            "extensions",
+            "node_modules",
+            "dep",
+            "index.js",
+          ),
+        ),
+        true,
+      );
+      assert.equal(
+        exists(join(root, ".pi", "agent", "extensions", "package-lock.json")),
+        false,
+      );
+      assert.equal(
+        exists(join(root, ".pi", "agent", "extensions", "npm-shrinkwrap.json")),
+        false,
+      );
+
+      const state = JSON.parse(readText(statePath)) as {
+        generatedEntries?: unknown;
+      };
+      assert.deepEqual(state.generatedEntries, [
+        "package.json",
+        "node_modules",
+      ]);
+    });
+  });
+
+  test("run_sync_removes_generated_extension_runtime_when_hook_inputs_change", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+
+      writeFile(
+        join(root, ".config", "agents", "assets", "AGENTS.md"),
+        "agent-instructions",
+      );
+      writeFile(
+        join(
+          root,
+          ".config",
+          "agents",
+          "tools",
+          "pi",
+          "agent",
+          "extensions",
+          "context",
+          "index.ts",
+        ),
+        "export const live = true;\n",
+      );
+      writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
+      writeFile(
+        join(root, ".pi", "agent", "extensions", "package.json"),
+        '{"name":"generated"}\n',
+      );
+      writeFile(
+        join(
+          root,
+          ".pi",
+          "agent",
+          "extensions",
+          "node_modules",
+          "dep",
+          "index.js",
+        ),
+        "module.exports = 1;\n",
+      );
+      writeFile(
+        join(
+          root,
+          ".local",
+          "share",
+          "agents",
+          "sync-managed",
+          "pi.extension-deps.json",
+        ),
+        `${JSON.stringify(
+          {
+            fingerprint: "stale",
+            generatedEntries: ["package.json", "node_modules"],
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const success = await call<boolean>(runSync, syncEnv);
+      assert.equal(success, true);
+      assert.equal(
+        exists(join(root, ".pi", "agent", "extensions", "package.json")),
+        false,
+      );
+      assert.equal(
+        exists(join(root, ".pi", "agent", "extensions", "node_modules")),
+        false,
+      );
+    });
+  });
+
+  test("run_sync_omp_does_not_bootstrap_packages", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const agentsRoot = join(root, ".config", "agents");
+
+      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(
+        join(agentsRoot, "tools", "omp", "agent", "config.yml"),
+        "interruptMode: immediate\n",
+      );
+      writeFile(
+        join(agentsRoot, "tools", "omp", "agent", "packages.json"),
+        "this is not valid json\n",
+      );
+
+      assert.equal(await call<boolean>(runSync, syncEnv), true);
+      assert.equal(
+        readText(join(root, ".omp", "agent", "packages.json")),
+        "this is not valid json\n",
+      );
+      assert.equal(exists(join(root, ".omp", "agent", "config.yml")), true);
+    });
+  });
+
+  test("read_package_manifest_dedupes_sources", async () => {
+    await withTempDir(async (root) => {
+      const path = join(root, "packages.json");
+      writeFile(
+        path,
+        `{
   "packages": [
     "https://github.com/tintinweb/pi-supervisor",
     "https://github.com/tintinweb/pi-supervisor",
     "https://github.com/joelhooks/pi-tools"
   ]
 }`,
-    );
+      );
 
-    const manifest = await call<{ packages: string[] }>(readPackageManifest, path);
-    assert.equal(manifest.packages.length, 2);
+      const manifest = await call<{ packages: string[] }>(
+        readPackageManifest,
+        path,
+      );
+      assert.equal(manifest.packages.length, 2);
+    });
   });
-});
 
-test("patch_runtime_settings_preserves_other_keys", async () => {
-  await withTempDir(async (root) => {
-    const path = join(root, "settings.json");
-    writeFile(
-      path,
-      `{
+  test("patch_runtime_settings_preserves_other_keys", async () => {
+    await withTempDir(async (root) => {
+      const path = join(root, "settings.json");
+      writeFile(
+        path,
+        `{
   "theme": "dark",
   "defaultModel": "gpt-5.4"
 }
 `,
-    );
+      );
 
-    await call<void>(patchRuntimeSettings, path, [join(root, "pkg")]);
-    const settings = JSON.parse(readText(path)) as { theme?: string; packages?: string[] };
-    assert.equal(settings.theme, "dark");
-    assert.deepEqual(settings.packages, [join(root, "pkg")]);
+      await call<void>(patchRuntimeSettings, path, [join(root, "pkg")]);
+      const settings = JSON.parse(readText(path)) as {
+        theme?: string;
+        packages?: string[];
+      };
+      assert.equal(settings.theme, "dark");
+      assert.deepEqual(settings.packages, [join(root, "pkg")]);
+    });
   });
-});
 
-test("package_cache_dir_is_stable", async () => {
-  const root = "/tmp/cache-root";
-  const left = await call<string>(packageCacheDir, root, "https://github.com/tintinweb/pi-supervisor");
-  const right = await call<string>(packageCacheDir, root, "https://github.com/tintinweb/pi-supervisor");
-  assert.equal(left, right);
-});
-
-test("package_cache_dir_uses_basename_for_local_paths", async () => {
-  const root = "/tmp/cache-root";
-  const sources = [
-    "packages\\foo",
-    ".\\packages\\foo",
-    "C:\\x\\foo",
-    "\\\\server\\share\\foo",
-  ];
-
-  for (const source of sources) {
-    const cacheDir = await call<string>(packageCacheDir, root, source);
-    assert.equal(basename(cacheDir).startsWith("foo-"), true, source);
-  }
-});
-
-test("github_clone_command_prefers_gh_when_available", async () => {
-  await withTempDir(async (root) => {
-    const target = join(root, "out");
-    const command = await call<string[]>(commandForTests, "https://github.com/tintinweb/pi-supervisor", target);
-    assert.equal(command[0], "gh");
-    assert.equal(
-      await call<string | null>(githubSlugForTests, "https://github.com/tintinweb/pi-supervisor"),
-      "tintinweb/pi-supervisor",
-    );
-  });
-});
-
-test("github_clone_falls_back_to_git_after_gh_failure", async () => {
-  await withTempDir(async (root) => {
-    const target = join(root, "out");
-    const [success, attempts] = await call<[boolean, string[][]]>(
-      cloneAttemptsForTests,
+  test("package_cache_dir_is_stable", async () => {
+    const root = "/tmp/cache-root";
+    const left = await call<string>(
+      packageCacheDir,
+      root,
       "https://github.com/tintinweb/pi-supervisor",
-      target,
-      true,
-      [false, true],
     );
-
-    assert.equal(success, true);
-    assert.equal(attempts.length, 2);
-    assert.equal(attempts[0]![0], "gh");
-    assert.equal(attempts[1]![0], "git");
-    assert.equal(attempts[1]![3], "https://github.com/tintinweb/pi-supervisor");
+    const right = await call<string>(
+      packageCacheDir,
+      root,
+      "https://github.com/tintinweb/pi-supervisor",
+    );
+    assert.equal(left, right);
   });
-});
 
-test("validate_package_dir_accepts_manifest_and_conventional_dirs", async () => {
-  await withTempDir(async (root) => {
-    const manifestPkg = join(root, "manifest-pkg");
-    writeFile(
-      join(manifestPkg, "package.json"),
-      `{
+  test("package_cache_dir_uses_basename_for_local_paths", async () => {
+    const root = "/tmp/cache-root";
+    const sources = [
+      "packages\\foo",
+      ".\\packages\\foo",
+      "C:\\x\\foo",
+      "\\\\server\\share\\foo",
+    ];
+
+    for (const source of sources) {
+      const cacheDir = await call<string>(packageCacheDir, root, source);
+      assert.equal(basename(cacheDir).startsWith("foo-"), true, source);
+    }
+  });
+
+  test("github_clone_command_prefers_gh_when_available", async () => {
+    await withTempDir(async (root) => {
+      const target = join(root, "out");
+      const command = await call<string[]>(
+        commandForTests,
+        "https://github.com/tintinweb/pi-supervisor",
+        target,
+      );
+      assert.equal(command[0], "gh");
+      assert.equal(
+        await call<string | null>(
+          githubSlugForTests,
+          "https://github.com/tintinweb/pi-supervisor",
+        ),
+        "tintinweb/pi-supervisor",
+      );
+    });
+  });
+
+  test("github_clone_falls_back_to_git_after_gh_failure", async () => {
+    await withTempDir(async (root) => {
+      const target = join(root, "out");
+      const [success, attempts] = await call<[boolean, string[][]]>(
+        cloneAttemptsForTests,
+        "https://github.com/tintinweb/pi-supervisor",
+        target,
+        true,
+        [false, true],
+      );
+
+      assert.equal(success, true);
+      assert.equal(attempts.length, 2);
+      assert.equal(attempts[0]![0], "gh");
+      assert.equal(attempts[1]![0], "git");
+      assert.equal(
+        attempts[1]![3],
+        "https://github.com/tintinweb/pi-supervisor",
+      );
+    });
+  });
+
+  test("validate_package_dir_accepts_manifest_and_conventional_dirs", async () => {
+    await withTempDir(async (root) => {
+      const manifestPkg = join(root, "manifest-pkg");
+      writeFile(
+        join(manifestPkg, "package.json"),
+        `{
   "pi": {
     "extensions": ["./src/index.ts"]
   }
 }`,
-    );
-    writeFile(join(manifestPkg, "src", "index.ts"), "export default {}\n");
-    assert.equal(await call<boolean>(validatePackageForTests, manifestPkg), true);
+      );
+      writeFile(join(manifestPkg, "src", "index.ts"), "export default {}\n");
+      assert.equal(
+        await call<boolean>(validatePackageForTests, manifestPkg),
+        true,
+      );
 
-    const conventionalPkg = join(root, "conventional-pkg");
-    writeFile(join(conventionalPkg, "extensions", "index.ts"), "export default {}\n");
-    assert.equal(await call<boolean>(validatePackageForTests, conventionalPkg), true);
+      const conventionalPkg = join(root, "conventional-pkg");
+      writeFile(
+        join(conventionalPkg, "extensions", "index.ts"),
+        "export default {}\n",
+      );
+      assert.equal(
+        await call<boolean>(validatePackageForTests, conventionalPkg),
+        true,
+      );
+    });
   });
-});
 
-test("validate_package_dir_detects_missing_import_packages", async () => {
-  await withTempDir(async (root) => {
-    const pkg = join(root, "import-pkg");
-    writeFile(
-      join(pkg, "package.json"),
-      `{
+  test("validate_package_dir_detects_missing_import_packages", async () => {
+    await withTempDir(async (root) => {
+      const pkg = join(root, "import-pkg");
+      writeFile(
+        join(pkg, "package.json"),
+        `{
   "pi": {
     "extensions": ["./index.ts"]
   }
 }`,
-    );
-    writeFile(
-      join(pkg, "index.ts"),
-      'import { Text } from "@earendil-works/pi-tui";\nexport default Text;\n',
-    );
-    assert.equal(await call<boolean>(validatePackageForTests, pkg), false);
+      );
+      writeFile(
+        join(pkg, "index.ts"),
+        'import { Text } from "@earendil-works/pi-tui";\nexport default Text;\n',
+      );
+      assert.equal(await call<boolean>(validatePackageForTests, pkg), false);
 
-    writeFile(join(pkg, "node_modules", "@earendil-works", "pi-tui", "package.json"), "{}\n");
-    assert.equal(await call<boolean>(validatePackageForTests, pkg), true);
+      writeFile(
+        join(pkg, "node_modules", "@earendil-works", "pi-tui", "package.json"),
+        "{}\n",
+      );
+      assert.equal(await call<boolean>(validatePackageForTests, pkg), true);
+    });
   });
-});
 
-test("validate_package_dir_rejects_malformed_package_json", async () => {
-  await withTempDir(async (root) => {
-    const pkg = join(root, "bad-pkg");
-    writeFile(join(pkg, "package.json"), "{not valid json");
+  test("validate_package_dir_rejects_malformed_package_json", async () => {
+    await withTempDir(async (root) => {
+      const pkg = join(root, "bad-pkg");
+      writeFile(join(pkg, "package.json"), "{not valid json");
 
-    await assert.rejects(call<boolean>(validatePackageForTests, pkg));
-    await assert.rejects(call<boolean>(packageHasBuildScript, pkg));
+      await assert.rejects(call<boolean>(validatePackageForTests, pkg));
+      await assert.rejects(call<boolean>(packageHasBuildScript, pkg));
+    });
   });
-});
 
-test("run_sync_bootstraps_packages_and_patches_runtime_settings", async () => {
-  if (!isPosix()) return;
+  test("run_sync_bootstraps_packages_and_patches_runtime_settings", async () => {
+    if (!isPosix()) return;
 
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
-    writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
-    writeFile(join(root, ".pi", "agent", "settings.json"), "{}\n");
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      writeFile(
+        join(root, ".config", "agents", "assets", "AGENTS.md"),
+        "agent-instructions",
+      );
+      writeFile(join(root, ".pi", "agent", "settings.json"), "{}\n");
 
-    const repos = join(root, "repos");
-    mkdirSync(repos, { recursive: true });
+      const repos = join(root, "repos");
+      mkdirSync(repos, { recursive: true });
 
-    const sourceRepo = join(repos, "source-pkg");
-    writeFile(
-      join(sourceRepo, "package.json"),
-      `{
+      const sourceRepo = join(repos, "source-pkg");
+      writeFile(
+        join(sourceRepo, "package.json"),
+        `{
   "pi": {
     "extensions": ["./src/index.ts"]
   }
 }
 `,
-    );
-    writeFile(join(sourceRepo, "src", "index.ts"), "export default {}\n");
-    initGitRepo(sourceRepo);
+      );
+      writeFile(join(sourceRepo, "src", "index.ts"), "export default {}\n");
+      initGitRepo(sourceRepo);
 
-    const buildRepo = join(repos, "build-pkg");
-    writeFile(
-      join(buildRepo, "package.json"),
-      `{
+      const buildRepo = join(repos, "build-pkg");
+      writeFile(
+        join(buildRepo, "package.json"),
+        `{
   "scripts": {
     "build": "mkdir -p dist && printf 'export default {}\\n' > dist/index.js"
   },
@@ -1011,41 +1427,49 @@ test("run_sync_bootstraps_packages_and_patches_runtime_settings", async () => {
   }
 }
 `,
-    );
-    initGitRepo(buildRepo);
+      );
+      initGitRepo(buildRepo);
 
-    writeFile(
-      join(root, ".config", "agents", "tools", "pi", "agent", "packages.json"),
-      `{
+      writeFile(
+        join(
+          root,
+          ".config",
+          "agents",
+          "tools",
+          "pi",
+          "agent",
+          "packages.json",
+        ),
+        `{
   "packages": [
     "${sourceRepo}",
     "${buildRepo}"
   ]
 }
 `,
-    );
+      );
 
-    const success = await call<boolean>(runSync, syncEnv);
-    assert.equal(success, true);
-    const settings = readText(join(root, ".pi", "agent", "settings.json"));
-    assert.equal(settings.includes("source-pkg"), true);
-    assert.equal(settings.includes("build-pkg"), true);
-    assert.equal(
-      exists(join(root, ".local", "share", "agents", "pi-packages")),
-      true,
-    );
+      const success = await call<boolean>(runSync, syncEnv);
+      assert.equal(success, true);
+      const settings = readText(join(root, ".pi", "agent", "settings.json"));
+      assert.equal(settings.includes("source-pkg"), true);
+      assert.equal(settings.includes("build-pkg"), true);
+      assert.equal(
+        exists(join(root, ".local", "share", "agents", "pi-packages")),
+        true,
+      );
+    });
   });
-});
 
-test("managed_state_helpers_match_safe_entry_rules", async () => {
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
-    const harness = syncEnv.harness(enumMember(HarnessId, "Codex"));
-    assert.ok(harness);
+  test("managed_state_helpers_match_safe_entry_rules", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const harness = syncEnv.harness(enumMember(HarnessId, "Codex"));
+      assert.ok(harness);
 
-    writeFile(
-      join(root, ".local", "share", "agents", "sync-managed", "codex.json"),
-      `[
+      writeFile(
+        join(root, ".local", "share", "agents", "sync-managed", "codex.json"),
+        `[
   "good.txt",
   "..",
   "/tmp/escape",
@@ -1053,41 +1477,53 @@ test("managed_state_helpers_match_safe_entry_rules", async () => {
   "${["..", "outside"].join("/")}",
   "good.txt"
 ]`,
-    );
+      );
 
-    const names = await call<string[]>(
-      loadRecordedEntryNames,
-      join(root, ".local", "share", "agents", "sync-managed", "codex.json"),
-    );
-    assert.deepEqual(names, ["good.txt"]);
+      const names = await call<string[]>(
+        loadRecordedEntryNames,
+        join(root, ".local", "share", "agents", "sync-managed", "codex.json"),
+      );
+      assert.deepEqual(names, ["good.txt"]);
 
-    const plan = await call<{ harnesses: { cleanupPaths: string[] }[] }>(planManagedEntries, syncEnv);
-    assert.ok(plan.harnesses.length > 0);
+      const plan = await call<{ harnesses: { cleanupPaths: string[] }[] }>(
+        planManagedEntries,
+        syncEnv,
+      );
+      assert.ok(plan.harnesses.length > 0);
+    });
   });
-});
 
-test("managed_state_write_persists_expected_json", async () => {
-  await withTempDir(async (root) => {
-    const path = join(root, "state", "codex.json");
-    await call<void>(writeRecordedEntryNames, path, ["alpha", "beta"]);
-    assert.equal(readText(path), '[\n  "alpha",\n  "beta"\n]\n');
+  test("managed_state_write_persists_expected_json", async () => {
+    await withTempDir(async (root) => {
+      const path = join(root, "state", "codex.json");
+      await call<void>(writeRecordedEntryNames, path, ["alpha", "beta"]);
+      assert.equal(readText(path), '[\n  "alpha",\n  "beta"\n]\n');
+    });
   });
-});
 
-test("managed_state_malformed_json_is_recoverable", async () => {
-  await withTempDir(async (root) => {
-    const syncEnv = makeSyncEnv(root);
-    const statePath = join(root, ".local", "share", "agents", "sync-managed", "codex.json");
-    writeFile(statePath, "{not valid json");
+  test("managed_state_malformed_json_is_recoverable", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const statePath = join(
+        root,
+        ".local",
+        "share",
+        "agents",
+        "sync-managed",
+        "codex.json",
+      );
+      writeFile(statePath, "{not valid json");
 
-    const recovered = await call<string[]>(loadRecordedEntryNames, statePath);
-    assert.deepEqual(recovered, []);
+      const recovered = await call<string[]>(loadRecordedEntryNames, statePath);
+      assert.deepEqual(recovered, []);
 
-    const plan = await call<{ harnesses: { cleanupPaths: string[] }[] }>(planManagedEntries, syncEnv);
-    assert.ok(plan.harnesses.length > 0);
+      const plan = await call<{ harnesses: { cleanupPaths: string[] }[] }>(
+        planManagedEntries,
+        syncEnv,
+      );
+      assert.ok(plan.harnesses.length > 0);
+    });
   });
-});
-
 }
 
 function makeSyncEnv(root: string): any {

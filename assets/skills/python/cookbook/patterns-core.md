@@ -3,11 +3,13 @@
 Functional-first building blocks: higher-order functions, purity, comprehensions, generators.
 
 ---
+
 ## Higher-Order Functions
 
 **Problem**: You need to pass functions as arguments to other functions or return them as values.
 
 **Solution**:
+
 ```python
 from typing import Callable
 
@@ -30,6 +32,7 @@ assert result == 7  # 5 -> 6 -> 7
 **Problem**: You want functions that are predictable, testable, and free from side effects.
 
 **Solution**:
+
 ```python
 # OK Pure: Same input -> Same output, no side effects
 def calculate_discount(price: float, rate: float) -> float:
@@ -51,6 +54,7 @@ def add_to_total(amount: float) -> None:
 **Problem**: You need to transform, filter, or aggregate collections of data.
 
 **Solution**:
+
 ```python
 from functools import reduce
 from operator import add, mul
@@ -83,6 +87,7 @@ evens_comp = [x for x in numbers if x % 2 == 0]
 **Problem**: You need to transform or filter lists concisely.
 
 **Solution**:
+
 ```python
 # Basic
 squares = [x ** 2 for x in range(10)]
@@ -111,6 +116,7 @@ unique_lengths = {len(word) for word in ["apple", "pie", "cat"]}
 **Problem**: You need to process large datasets without loading everything into memory.
 
 **Solution**:
+
 ```python
 # Generator: Lazy, memory-efficient
 squares_gen = (x ** 2 for x in range(10))
@@ -133,6 +139,7 @@ result = sum(large_data)  # Process lazily
 **Problem**: Your comprehensions are becoming too complex and hard to understand.
 
 **Solution**:
+
 ```python
 # OK Keep simple and readable
 good = [x * 2 for x in numbers if x > 5]

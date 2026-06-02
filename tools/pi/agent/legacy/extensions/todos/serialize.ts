@@ -11,8 +11,12 @@ export const serializeTodoForAgent = (todo: TodoRecord): string => {
 };
 
 export const serializeTodoListForAgent = (todos: TodoFrontMatter[]): string => {
-  const { assignedTodos, openTodos, closedTodos } = splitTodosByAssignment(todos);
-  const mapTodo = (todo: TodoFrontMatter) => ({ ...todo, id: formatTodoId(todo.id) });
+  const { assignedTodos, openTodos, closedTodos } =
+    splitTodosByAssignment(todos);
+  const mapTodo = (todo: TodoFrontMatter) => ({
+    ...todo,
+    id: formatTodoId(todo.id),
+  });
   return JSON.stringify(
     {
       assigned: assignedTodos.map(mapTodo),
@@ -20,6 +24,6 @@ export const serializeTodoListForAgent = (todos: TodoFrontMatter[]): string => {
       closed: closedTodos.map(mapTodo),
     },
     null,
-    2
+    2,
   );
 };

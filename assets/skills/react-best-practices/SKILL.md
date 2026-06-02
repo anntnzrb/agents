@@ -15,6 +15,7 @@ React and Next.js performance optimization guidance from Vercel Engineering. Use
 ## When to Apply
 
 Reference these guidelines when:
+
 - Writing new React components or Next.js pages
 - Implementing data fetching (client or server-side)
 - Reviewing code for performance issues
@@ -23,25 +24,25 @@ Reference these guidelines when:
 
 ## Routing
 
-| Need | Load |
-| --- | --- |
-| Pick a rule category by impact | `rules/_sections.md` |
-| Apply a specific optimization | Matching `rules/<rule-id>.md` |
-| Review all expanded Vercel guidance | `references/vercel-guide.md` |
-| Package overview for humans | `README.md` |
+| Need                                | Load                          |
+| ----------------------------------- | ----------------------------- |
+| Pick a rule category by impact      | `rules/_sections.md`          |
+| Apply a specific optimization       | Matching `rules/<rule-id>.md` |
+| Review all expanded Vercel guidance | `references/vercel-guide.md`  |
+| Package overview for humans         | `README.md`                   |
 
 ## Category Prefixes
 
-| Priority | Category | Prefix |
-| --- | --- | --- |
-| 1 | Eliminating Waterfalls | `async-` |
-| 2 | Bundle Size Optimization | `bundle-` |
-| 3 | Server-Side Performance | `server-` |
-| 4 | Client-Side Data Fetching | `client-` |
-| 5 | Re-render Optimization | `rerender-` |
-| 6 | Rendering Performance | `rendering-` |
-| 7 | JavaScript Performance | `js-` |
-| 8 | Advanced Patterns | `advanced-` |
+| Priority | Category                  | Prefix       |
+| -------- | ------------------------- | ------------ |
+| 1        | Eliminating Waterfalls    | `async-`     |
+| 2        | Bundle Size Optimization  | `bundle-`    |
+| 3        | Server-Side Performance   | `server-`    |
+| 4        | Client-Side Data Fetching | `client-`    |
+| 5        | Re-render Optimization    | `rerender-`  |
+| 6        | Rendering Performance     | `rendering-` |
+| 7        | JavaScript Performance    | `js-`        |
+| 8        | Advanced Patterns         | `advanced-`  |
 
 ## Use
 

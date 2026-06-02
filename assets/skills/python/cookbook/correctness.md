@@ -41,17 +41,17 @@ For inherited loose codebases, `strict = ["src"]` is a migration step only. New 
 
 Use static types for known JSON shape:
 
-| Shape | Prefer |
-|-------|--------|
-| object with fixed keys | `TypedDict` |
-| fixed field value | `Literal` |
-| small variant set | discriminated union (`kind` / `type` tag) |
+| Shape                  | Prefer                                    |
+| ---------------------- | ----------------------------------------- |
+| object with fixed keys | `TypedDict`                               |
+| fixed field value      | `Literal`                                 |
+| small variant set      | discriminated union (`kind` / `type` tag) |
 
 Use runtime validators only when bytes or JSON cross a boundary:
 
-| Need | Tool |
-|------|------|
-| fast typed decode/encode and lightweight structs | `msgspec` |
+| Need                                                    | Tool       |
+| ------------------------------------------------------- | ---------- |
+| fast typed decode/encode and lightweight structs        | `msgspec`  |
 | richer validation, aliases, or an existing Pydantic API | `pydantic` |
 
 Choose one boundary tool per edge. Parse once, normalize once, then hand the app plain typed objects.
@@ -68,11 +68,11 @@ Choose one boundary tool per edge. Parse once, normalize once, then hand the app
 
 Pick the smallest gate that matches project shape:
 
-| Project shape | Baseline gate | Add when needed |
-|---------------|---------------|-----------------|
-| small library / CLI | `pyright` strict + `ruff` check/format + `pytest` | — |
-| API or service with external input | baseline + boundary tests | schema fixtures for request/response shapes |
-| parser / transformer / serializer | baseline + boundary tests | targeted Hypothesis properties |
-| legacy codebase | strict on new code first | expand repo-wide once the debt is paid |
+| Project shape                      | Baseline gate                                     | Add when needed                             |
+| ---------------------------------- | ------------------------------------------------- | ------------------------------------------- |
+| small library / CLI                | `pyright` strict + `ruff` check/format + `pytest` | —                                           |
+| API or service with external input | baseline + boundary tests                         | schema fixtures for request/response shapes |
+| parser / transformer / serializer  | baseline + boundary tests                         | targeted Hypothesis properties              |
+| legacy codebase                    | strict on new code first                          | expand repo-wide once the debt is paid      |
 
 Gate order: `pyright` strict, then lint/format, then tests.

@@ -81,22 +81,22 @@ timeout 600 nix run nixpkgs#nixpkgs-review -- wip --print-result
 
 ## Candidate Criteria Summary
 
-| Criteria | Required Value |
-|----------|----------------|
-| Location | `pkgs/by-name/` |
-| Type | Rust OR Go |
-| has_patches | `false` |
-| complexity | `simple` |
-| Version bump | patch/minor only |
+| Criteria     | Required Value                  |
+| ------------ | ------------------------------- |
+| Location     | `pkgs/by-name/`                 |
+| Type         | Rust OR Go                      |
+| has_patches  | `false`                         |
+| complexity   | `simple`                        |
+| Version bump | patch/minor only                |
 | **Platform** | **Must support current system** |
 
 **If ANY criterion fails, discard the candidate. Never present options that can't be tested locally.**
 
 ## Failure Handling
 
-| Failure | Action |
-|---------|--------|
-| Build timeout (>10m) | Discard, cleanup, report |
-| Build error | Discard, cleanup, report |
+| Failure               | Action                   |
+| --------------------- | ------------------------ |
+| Build timeout (>10m)  | Discard, cleanup, report |
+| Build error           | Discard, cleanup, report |
 | Review timeout (>10m) | Discard, cleanup, report |
-| Platform mismatch | Never present to user |
+| Platform mismatch     | Never present to user    |

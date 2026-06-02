@@ -25,6 +25,7 @@
 `metadata` comes from `ffprobe` when available.
 
 Fields:
+
 - `container`
 - `codec`
 - `sample_rate_hz`
@@ -38,6 +39,7 @@ If ffprobe fails/missing, these may be null/empty.
 ## Key estimate
 
 `key` fields:
+
 - `key` (pitch class)
 - `mode` (`major`/`minor`)
 - `confidence` (0..1, relative confidence)
@@ -48,6 +50,7 @@ Important: this is heuristic global-key estimation, not frame-level harmonic tru
 ## Beats
 
 `beats` fields:
+
 - `tempo_bpm`
 - `beat_count`
 - `first_beat_s`
@@ -56,6 +59,7 @@ Important: this is heuristic global-key estimation, not frame-level harmonic tru
 ## Spectral stats
 
 Each block (`centroid`, `bandwidth`, `rolloff`, `flatness`) includes:
+
 - `mean`, `std`, `minimum`, `maximum`, `p10`, `p90`
 
 ## Energy dynamics
@@ -68,6 +72,7 @@ Each block (`centroid`, `bandwidth`, `rolloff`, `flatness`) includes:
 ## Section hints
 
 `section_hints` entries:
+
 - `start_s`
 - `end_s`
 - `label`
@@ -78,6 +83,7 @@ Labels are heuristic (`intro/verse/chorus/...`) and should be treated as hints, 
 ## Notes
 
 `notes` may include:
+
 - ffmpeg/ffprobe version lines
 - fallback decode information (if ffmpeg transcode was used)
 - plot generation notes
@@ -85,6 +91,7 @@ Labels are heuristic (`intro/verse/chorus/...`) and should be treated as hints, 
 ## Cache behavior
 
 Cache key uses:
+
 - resolved file path
 - file size + mtime
 - segment start + duration

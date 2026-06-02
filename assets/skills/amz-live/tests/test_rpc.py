@@ -87,6 +87,7 @@ def test_rpc_search_accepts_zip_code() -> None:
     assert response["success"] is True
     assert response["data"]["query"]["zip_code"] == "33101"
 
+
 def test_rpc_accepts_legacy_command_and_prefers_type() -> None:
     stdin = StringIO(
         json.dumps({"id": "legacy-1", "command": "ping"})

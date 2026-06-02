@@ -126,7 +126,9 @@ def _request(
         headers["Content-Type"] = "application/json"
     with httpx.Client(timeout=30.0) as client:
         try:
-            resp = client.request(method, url, params=params, json=body, headers=headers)
+            resp = client.request(
+                method, url, params=params, json=body, headers=headers
+            )
         except httpx.HTTPError as exc:
             _fail(f"request failed: {exc}")
     if resp.is_error:
@@ -147,7 +149,9 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 
 def _require_workflow_fields(data: dict[str, Any], path: Path) -> dict[str, Any]:
-    missing = [key for key in ("name", "nodes", "connections", "settings") if key not in data]
+    missing = [
+        key for key in ("name", "nodes", "connections", "settings") if key not in data
+    ]
     if missing:
         _fail(f"workflow JSON missing keys {missing} in {path}")
     return data
@@ -220,13 +224,22 @@ def _validate_workflow_data(data: dict[str, Any], path: Path) -> dict[str, Any]:
                         continue
                     target = edge.get("node")
                     if isinstance(target, str) and target not in name_set:
-                        errors.append(f"connection from {src_name} to missing node: {target}")
+                        errors.append(
+                            f"connection from {src_name} to missing node: {target}"
+                        )
 
     if isinstance(settings, dict):
-        if "availableInMCP" in settings and not isinstance(settings["availableInMCP"], bool):
+        if "availableInMCP" in settings and not isinstance(
+            settings["availableInMCP"], bool
+        ):
             warnings.append("settings.availableInMCP should be boolean")
 
-    return {"valid": len(errors) == 0, "errors": errors, "warnings": warnings, "path": str(path)}
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors,
+        "warnings": warnings,
+        "path": str(path),
+    }
 
 
 def cmd_list(cfg: Config, args: argparse.Namespace) -> dict[str, Any]:
@@ -243,12 +256,16 @@ def cmd_get(cfg: Config, args: argparse.Namespace) -> dict[str, Any]:
 
 
 def cmd_create(cfg: Config, args: argparse.Namespace) -> dict[str, Any]:
-    payload = _workflow_payload(_require_workflow_fields(_load_json(args.path), args.path))
+    payload = _workflow_payload(
+        _require_workflow_fields(_load_json(args.path), args.path)
+    )
     return _request(cfg, "POST", "/api/v1/workflows", body=payload)
 
 
 def cmd_update(cfg: Config, args: argparse.Namespace) -> dict[str, Any]:
-    payload = _workflow_payload(_require_workflow_fields(_load_json(args.path), args.path))
+    payload = _workflow_payload(
+        _require_workflow_fields(_load_json(args.path), args.path)
+    )
     return _request(cfg, "PUT", f"/api/v1/workflows/{args.workflow_id}", body=payload)
 
 

@@ -65,20 +65,32 @@ export const normalizeOffset = (value: number | undefined): number => {
 };
 
 export const normalizeTimeout = (value: number | undefined): number => {
-  const normalized = value === undefined ? DEFAULT_TIMEOUT_MS : Math.floor(value);
+  const normalized =
+    value === undefined ? DEFAULT_TIMEOUT_MS : Math.floor(value);
   if (!Number.isFinite(normalized) || normalized <= 0) {
     throw new Error("timeoutMs must be a positive number");
   }
   return normalized;
 };
 
-export const normalizeOutputMode = (value: string | undefined): GrepOutputMode => {
+export const normalizeOutputMode = (
+  value: string | undefined,
+): GrepOutputMode => {
   if (value === undefined || value.trim().length === 0) return "content";
-  if (value === "content" || value === "files_with_matches" || value === "count") return value;
-  throw new Error("outputMode must be one of: content, files_with_matches, count");
+  if (
+    value === "content" ||
+    value === "files_with_matches" ||
+    value === "count"
+  )
+    return value;
+  throw new Error(
+    "outputMode must be one of: content, files_with_matches, count",
+  );
 };
 
-export const resolveTypeFilter = (input: string | undefined): TypeFilter | null => {
+export const resolveTypeFilter = (
+  input: string | undefined,
+): TypeFilter | null => {
   if (!input || input.trim().length === 0) return null;
   const rawKey = input.trim().toLowerCase();
   const key = TYPE_ALIASES[rawKey] ?? rawKey;

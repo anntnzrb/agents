@@ -41,7 +41,9 @@ def _default_action_graph(trigger: str, automation_type: str) -> list[str]:
     return steps
 
 
-def _validation_matrix(devices: list[str], automation_type: str) -> list[dict[str, str]]:
+def _validation_matrix(
+    devices: list[str], automation_type: str
+) -> list[dict[str, str]]:
     matrix = [
         {"case": "Happy path", "expectation": "Correct output and completion status."},
         {"case": "Empty input", "expectation": "Graceful message and safe exit."},
@@ -84,7 +86,11 @@ def build_blueprint(args: argparse.Namespace) -> dict[str, Any]:
         "action_graph": _default_action_graph(args.trigger, args.automation_type),
         "variables": [
             {"name": "input_payload", "type": "Any", "source": "trigger/input action"},
-            {"name": "normalized_input", "type": "Dictionary|Text|List", "source": "normalize block"},
+            {
+                "name": "normalized_input",
+                "type": "Dictionary|Text|List",
+                "source": "normalize block",
+            },
             {"name": "result", "type": "Any", "source": "core task block"},
         ],
         "failure_handling": [
@@ -150,7 +156,9 @@ def render_markdown(bp: dict[str, Any]) -> str:
         lines.append(f"- {row['case']}: {row['expectation']}")
     lines.append("")
     lines.append("## Notes")
-    lines.append("- Replace generic action labels with exact Shortcuts action names before implementation.")
+    lines.append(
+        "- Replace generic action labels with exact Shortcuts action names before implementation."
+    )
     return "\n".join(lines)
 
 
@@ -158,9 +166,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate a Shortcuts blueprint.")
     parser.add_argument("--goal", required=True, help="Primary automation objective.")
     parser.add_argument("--devices", default="iPhone", help="Comma-separated devices.")
-    parser.add_argument("--trigger", default="Manual run from Shortcuts app", help="Trigger source.")
+    parser.add_argument(
+        "--trigger", default="Manual run from Shortcuts app", help="Trigger source."
+    )
     parser.add_argument("--inputs", default="", help="Comma-separated input contract.")
-    parser.add_argument("--outputs", default="", help="Comma-separated output contract.")
+    parser.add_argument(
+        "--outputs", default="", help="Comma-separated output contract."
+    )
     parser.add_argument(
         "--automation-type",
         choices=["manual", "personal", "home", "app-intents"],

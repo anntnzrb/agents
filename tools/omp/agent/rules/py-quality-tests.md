@@ -16,6 +16,7 @@ interruptMode: never
 Use modern Python quality gates and tests that defend behavior.
 
 Quality gate defaults:
+
 - New Python projects should use Pyright strict as the primary static gate.
 - Legacy repos may keep mypy if already established; do not churn checker stacks without a reason.
 - Use Ruff for linting and formatting. Prefer `ruff format` as the formatter to avoid formatter churn.
@@ -34,12 +35,14 @@ Quality gate defaults:
 - Respect configured `target-version`; do not modernize syntax beyond the project's runtime.
 
 Recommended gate order:
+
 1. `uv run pyright`
 2. `uv run ruff check .`
 3. `uv run ruff format --check .`
 4. `uv run pytest`
 
 Testing defaults:
+
 - Use pytest.
 - Test behavior and contracts, not internal wiring.
 - Prefer parametrized tests with descriptive IDs for input matrices.
@@ -50,15 +53,18 @@ Testing defaults:
 - Avoid tautological tests and placeholder assertions.
 
 Property-based testing:
+
 - Use Hypothesis only when the property is the point: parsers, normalizers, serializers, idempotence, round-trips, and invariants.
 - Keep strategies narrow and domain-shaped; turn useful counterexamples into normal regression tests.
 - Do not use Hypothesis for one-off branch coverage, trivial getters/setters, or filesystem/network glue.
 
 Mocking:
+
 - Prefer dependency injection and boundary seams over patching global/module state.
 - Patch where the dependency is used; use `AsyncMock` for async dependencies.
 - Do not mock the unit under test or over-assert incidental call order.
 
 Coverage:
+
 - Coverage thresholds are only useful with meaningful behavior tests.
 - Prefer edge-case and failure-path tests for parser/transform/API-boundary-heavy code.

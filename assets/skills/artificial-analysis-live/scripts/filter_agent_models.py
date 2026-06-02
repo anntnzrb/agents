@@ -72,11 +72,15 @@ def model_row(model: Json) -> Row:
     return {
         "slug": str(model.get("slug") or ""),
         "name": str(model.get("name") or ""),
-        "open_weights": model.get("is_open_weights") if isinstance(model.get("is_open_weights"), bool) else None,
+        "open_weights": model.get("is_open_weights")
+        if isinstance(model.get("is_open_weights"), bool)
+        else None,
         "omni": model_omni(model),
         "tbench": number(model.get("terminalbench_hard")),
         "ifbench": number(model.get("ifbench")),
-        "license": model.get("license_name") if isinstance(model.get("license_name"), str) else None,
+        "license": model.get("license_name")
+        if isinstance(model.get("license_name"), str)
+        else None,
     }
 
 
@@ -105,7 +109,11 @@ def load_rows(snapshot: Path) -> list[Row]:
         old["omni"] = max(old["omni"], row["omni"])
         old["tbench"] = max_nullable(old["tbench"], row["tbench"])
         old["ifbench"] = max_nullable(old["ifbench"], row["ifbench"])
-        old["open_weights"] = old["open_weights"] if old["open_weights"] is not None else row["open_weights"]
+        old["open_weights"] = (
+            old["open_weights"]
+            if old["open_weights"] is not None
+            else row["open_weights"]
+        )
         old["license"] = old["license"] or row["license"]
     return list(by_slug.values())
 
@@ -208,18 +216,28 @@ def fetch_snapshot(skill_cli: Path) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Filter Artificial Analysis models for coding-agent use.")
+    parser = argparse.ArgumentParser(
+        description="Filter Artificial Analysis models for coding-agent use."
+    )
     parser.add_argument("--snapshot", type=Path, default=DEFAULT_SNAPSHOT)
-    parser.add_argument("--fetch", action="store_true", help="refresh AA snapshot before filtering")
+    parser.add_argument(
+        "--fetch", action="store_true", help="refresh AA snapshot before filtering"
+    )
     parser.add_argument("--skill-cli", type=Path, default=DEFAULT_SKILL_CLI)
-    parser.add_argument("--open-weight", choices=["all", "true", "false"], default="all")
+    parser.add_argument(
+        "--open-weight", choices=["all", "true", "false"], default="all"
+    )
     parser.add_argument("--min-omni", type=float, default=-20.0)
     parser.add_argument("--min-tbench", type=float, default=0.30)
     parser.add_argument("--min-ifbench", type=float, default=0.55)
-    parser.add_argument("--sort-by", choices=["tbench", "omni", "ifbench", "name"], default="tbench")
+    parser.add_argument(
+        "--sort-by", choices=["tbench", "omni", "ifbench", "name"], default="tbench"
+    )
     parser.add_argument("--asc", action="store_true", help="sort ascending")
     parser.add_argument("--limit", type=int, default=0, help="0 means no limit")
-    parser.add_argument("--format", choices=["markdown", "tsv", "json"], default="markdown")
+    parser.add_argument(
+        "--format", choices=["markdown", "tsv", "json"], default="markdown"
+    )
     return parser.parse_args()
 
 
@@ -228,7 +246,10 @@ def main() -> int:
     if args.fetch:
         fetch_snapshot(args.skill_cli)
     if not args.snapshot.exists():
-        print(f"snapshot not found: {args.snapshot}. Run with --fetch first.", file=sys.stderr)
+        print(
+            f"snapshot not found: {args.snapshot}. Run with --fetch first.",
+            file=sys.stderr,
+        )
         return 2
 
     rows = load_rows(args.snapshot)

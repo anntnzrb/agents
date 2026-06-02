@@ -123,11 +123,17 @@ def fetch_kiwi_web_calendar(
 
     deduped: dict[tuple[date, date | None, float, str], PlannerOffer] = {}
     for offer in all_offers:
-        deduped[(offer.depart_date, offer.return_date, offer.price, offer.currency)] = offer
+        deduped[(offer.depart_date, offer.return_date, offer.price, offer.currency)] = (
+            offer
+        )
 
     return sorted(
         deduped.values(),
-        key=lambda item: (item.depart_date, item.price, item.return_date or item.depart_date),
+        key=lambda item: (
+            item.depart_date,
+            item.price,
+            item.return_date or item.depart_date,
+        ),
     )
 
 
@@ -346,7 +352,9 @@ def _ensure_agent_browser_available() -> None:
             timeout=90,
         )
     except FileNotFoundError as exc:
-        raise FlightLiveError("`nix` executable is missing. Install Nix and retry.") from exc
+        raise FlightLiveError(
+            "`nix` executable is missing. Install Nix and retry."
+        ) from exc
     except subprocess.TimeoutExpired as exc:
         raise FlightLiveError(
             "Timed out while validating agent-browser via nix. Check network/Nix setup, then retry."
@@ -383,7 +391,9 @@ def _run_agent_browser(args: list[str], *, timeout: int) -> str:
             )
             return completed.stdout
         except FileNotFoundError as exc:
-            raise FlightLiveError("`nix` executable is missing. Install Nix and retry.") from exc
+            raise FlightLiveError(
+                "`nix` executable is missing. Install Nix and retry."
+            ) from exc
         except subprocess.TimeoutExpired:
             last_error = FlightLiveError(
                 "agent-browser command timed out. Retry with a narrower date window or better connectivity."
@@ -432,7 +442,9 @@ def _http_get_json(url: str, *, params: Mapping[str, object]) -> object:
         raise FlightLiveError(f"Network error calling provider {url}: {exc}") from exc
 
     if status >= 400:
-        raise FlightLiveError(f"HTTP {status} from provider {url}: {body[:200].strip()}")
+        raise FlightLiveError(
+            f"HTTP {status} from provider {url}: {body[:200].strip()}"
+        )
 
     try:
         return json.loads(body)

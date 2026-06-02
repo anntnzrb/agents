@@ -62,7 +62,7 @@ Default loop for behavior or runtime-facing changes:
 7. Runtime/model-facing change => scenario-specific ephemeral Pi validation before user reload.
 8. Sync after green when SSOT changes must reach runtime homes.
 9. Report changed surface, gates, ephemeral Pi result, and reload need.
-</workflow>
+   </workflow>
 
 Stop/skip rules:
 

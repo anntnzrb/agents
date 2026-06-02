@@ -1,6 +1,7 @@
 # Cargo Script Workflow
 
 Set `<CARGO_SCRIPT_CMD>` by environment:
+
 - rustup toolchain selector style: `cargo +nightly -Zscript`
 - nightly cargo already on PATH (common in Nix): `cargo -Zscript`
 
@@ -64,11 +65,13 @@ fn main() {
 ## Build/Lock Location Behavior
 
 For embedded manifests:
+
 - default build dir is under Cargo cache (`{cargo-cache-home}/build/{workspace-path-hash}`)
 - target dir defaults to `<build-dir>/target`
 - lockfile root is tied to build-dir hash; no local `./Cargo.lock` next to script by default
 
 Implications:
+
 - script repositories stay clean
 - build products are shared by Cargo cache policy
 - if users expect local lockfile in script dir, explain this is current design
@@ -78,12 +81,14 @@ Implications:
 `cargo <script.rs>` reloads config rooted at script parent path (install-like behavior), not caller cwd behavior from regular project commands.
 
 If config surprises appear:
+
 - inspect nearest `.cargo/config.toml` from script location
 - do not assume workspace-root config from current shell cwd
 
 ## `arg0` vs executable path
 
 For embedded manifests:
+
 - `arg0` is script path
 - executable path should be obtained via `std::env::current_exe()`
 

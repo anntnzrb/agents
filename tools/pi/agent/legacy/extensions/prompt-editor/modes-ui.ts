@@ -1,5 +1,11 @@
-import { ModelSelectorComponent, SettingsManager } from "@earendil-works/pi-coding-agent";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import {
+  ModelSelectorComponent,
+  SettingsManager,
+} from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 
 import {
   ALL_THINKING_LEVELS,
@@ -42,19 +48,20 @@ function normalizeModeNameInput(name: string | undefined): string {
 function validateModeNameOrError(
   name: string,
   existing: Record<string, ModeSpec>,
-  opts?: { allowExisting?: boolean }
+  opts?: { allowExisting?: boolean },
 ): string | null {
   if (!name) return "Mode name cannot be empty";
   if (/\s/.test(name)) return "Mode name cannot contain whitespace";
   if (isReservedModeName(name)) return `Mode name \"${name}\" is reserved`;
-  if (!opts?.allowExisting && existing[name]) return `Mode \"${name}\" already exists`;
+  if (!opts?.allowExisting && existing[name])
+    return `Mode \"${name}\" already exists`;
   return null;
 }
 
 async function handleModeChoiceUI(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
-  choice: string
+  choice: string,
 ): Promise<void> {
   if (runtime.currentMode === CUSTOM_MODE_NAME && choice !== CUSTOM_MODE_NAME) {
     const action = await ctx.ui.select(`Mode \"${choice}\"`, ["use", "store"]);
@@ -75,7 +82,10 @@ async function handleModeChoiceUI(
   await applyMode(pi, ctx, choice);
 }
 
-export async function selectModeUI(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
+export async function selectModeUI(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+): Promise<void> {
   if (!ctx.hasUI) return;
 
   while (true) {
@@ -83,7 +93,7 @@ export async function selectModeUI(pi: ExtensionAPI, ctx: ExtensionContext): Pro
     const names = orderedModeNames(runtime.data.modes);
     const choice = await ctx.ui.select(
       `Mode (current: ${runtime.currentMode})`,
-      [...names, MODE_UI_CONFIGURE]
+      [...names, MODE_UI_CONFIGURE],
     );
     if (!choice) return;
 
@@ -97,13 +107,20 @@ export async function selectModeUI(pi: ExtensionAPI, ctx: ExtensionContext): Pro
   }
 }
 
-async function configureModesUI(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
+async function configureModesUI(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+): Promise<void> {
   if (!ctx.hasUI) return;
 
   while (true) {
     await ensureRuntime(pi, ctx);
     const names = orderedModeNames(runtime.data.modes);
-    const choice = await ctx.ui.select("Configure modes", [...names, MODE_UI_ADD, MODE_UI_BACK]);
+    const choice = await ctx.ui.select("Configure modes", [
+      ...names,
+      MODE_UI_ADD,
+      MODE_UI_BACK,
+    ]);
     if (!choice || choice === MODE_UI_BACK) return;
 
     if (choice === MODE_UI_ADD) {
@@ -118,12 +135,18 @@ async function configureModesUI(pi: ExtensionAPI, ctx: ExtensionContext): Promis
   }
 }
 
-async function addModeUI(pi: ExtensionAPI, ctx: ExtensionContext): Promise<string | undefined> {
+async function addModeUI(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+): Promise<string | undefined> {
   if (!ctx.hasUI) return undefined;
   await ensureRuntime(pi, ctx);
 
   while (true) {
-    const raw = await ctx.ui.input("New mode name", "e.g. docs, review, planning");
+    const raw = await ctx.ui.input(
+      "New mode name",
+      "e.g. docs, review, planning",
+    );
     if (raw === undefined) return undefined;
 
     const name = normalizeModeNameInput(raw);
@@ -145,7 +168,11 @@ async function addModeUI(pi: ExtensionAPI, ctx: ExtensionContext): Promise<strin
   }
 }
 
-async function editModeUI(pi: ExtensionAPI, ctx: ExtensionContext, mode: string): Promise<void> {
+async function editModeUI(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  mode: string,
+): Promise<void> {
   if (!ctx.hasUI) return;
 
   let modeName = mode;
@@ -155,7 +182,10 @@ async function editModeUI(pi: ExtensionAPI, ctx: ExtensionContext, mode: string)
     const spec = runtime.data.modes[modeName];
     if (!spec) return;
 
-    const modelLabel = spec.provider && spec.modelId ? `${spec.provider}/${spec.modelId}` : "(no model)";
+    const modelLabel =
+      spec.provider && spec.modelId
+        ? `${spec.provider}/${spec.modelId}`
+        : "(no model)";
     const thinkingLabel = spec.thinkingLevel ?? THINKING_UNSET_LABEL;
 
     const actions = ["Change name", "Change model", "Change thinking level"];
@@ -164,7 +194,7 @@ async function editModeUI(pi: ExtensionAPI, ctx: ExtensionContext, mode: string)
 
     const action = await ctx.ui.select(
       `Edit mode \"${modeName}\"  model: ${modelLabel}  thinking: ${thinkingLabel}`,
-      actions
+      actions,
     );
     if (!action || action === MODE_UI_BACK) return;
 
@@ -207,7 +237,10 @@ async function editModeUI(pi: ExtensionAPI, ctx: ExtensionContext, mode: string)
     }
 
     if (action === "Delete mode") {
-      const ok = await ctx.ui.confirm("Delete mode", `Delete mode \"${modeName}\"?`);
+      const ok = await ctx.ui.confirm(
+        "Delete mode",
+        `Delete mode \"${modeName}\"?`,
+      );
       if (!ok) continue;
 
       delete runtime.data.modes[modeName];
@@ -230,7 +263,7 @@ async function editModeUI(pi: ExtensionAPI, ctx: ExtensionContext, mode: string)
 function renameModesRecord(
   modes: Record<string, ModeSpec>,
   oldName: string,
-  newName: string
+  newName: string,
 ): Record<string, ModeSpec> {
   const next: Record<string, ModeSpec> = {};
   for (const [key, value] of Object.entries(modes)) {
@@ -242,7 +275,7 @@ function renameModesRecord(
 async function renameModeUI(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
-  oldName: string
+  oldName: string,
 ): Promise<string | undefined> {
   if (!ctx.hasUI) return undefined;
 
@@ -266,7 +299,11 @@ async function renameModeUI(
       continue;
     }
 
-    runtime.data.modes = renameModesRecord(runtime.data.modes, oldName, newName);
+    runtime.data.modes = renameModesRecord(
+      runtime.data.modes,
+      oldName,
+      newName,
+    );
     await persistRuntime(pi, ctx);
 
     if (runtime.currentMode === oldName) runtime.currentMode = newName;
@@ -280,13 +317,15 @@ async function renameModeUI(
 
 async function pickModelForModeUI(
   ctx: ExtensionContext,
-  spec: ModeSpec
+  spec: ModeSpec,
 ): Promise<{ provider: string; modelId: string } | undefined> {
   if (!ctx.hasUI) return undefined;
 
   const settingsManager = SettingsManager.inMemory();
   const currentModel =
-    spec.provider && spec.modelId ? ctx.modelRegistry.find(spec.provider, spec.modelId) : ctx.model;
+    spec.provider && spec.modelId
+      ? ctx.modelRegistry.find(spec.provider, spec.modelId)
+      : ctx.model;
   const scopedModels: Array<{ model: unknown; thinkingLevel: string }> = [];
 
   return ctx.ui.custom<{ provider: string; modelId: string } | undefined>(
@@ -298,37 +337,47 @@ async function pickModelForModeUI(
         ctx.modelRegistry as never,
         scopedModels as never,
         (model) => done({ provider: model.provider, modelId: model.id }),
-        () => done(undefined)
+        () => done(undefined),
       );
       return selector;
-    }
+    },
   );
 }
 
 async function pickThinkingLevelForModeUI(
   ctx: ExtensionContext,
-  current: ThinkingLevel | undefined
+  current: ThinkingLevel | undefined,
 ): Promise<ThinkingLevel | null | undefined> {
   if (!ctx.hasUI) return undefined;
 
   const defaultValue = current ?? "off";
   const options = [...ALL_THINKING_LEVELS, THINKING_UNSET_LABEL];
-  const ordered = [defaultValue, ...options.filter((value) => value !== defaultValue)];
+  const ordered = [
+    defaultValue,
+    ...options.filter((value) => value !== defaultValue),
+  ];
 
   const choice = await ctx.ui.select("Thinking level", ordered);
   if (!choice) return undefined;
   if (choice === THINKING_UNSET_LABEL) return null;
-  if (ALL_THINKING_LEVELS.includes(choice as ThinkingLevel)) return choice as ThinkingLevel;
+  if (ALL_THINKING_LEVELS.includes(choice as ThinkingLevel))
+    return choice as ThinkingLevel;
   return undefined;
 }
 
-export async function cycleMode(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
+export async function cycleMode(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+): Promise<void> {
   if (!ctx.hasUI) return;
   await ensureRuntime(pi, ctx);
   const names = orderedModeNames(runtime.data.modes);
   if (names.length === 0) return;
 
-  const baseMode = runtime.currentMode === CUSTOM_MODE_NAME ? runtime.lastRealMode : runtime.currentMode;
+  const baseMode =
+    runtime.currentMode === CUSTOM_MODE_NAME
+      ? runtime.lastRealMode
+      : runtime.currentMode;
   const idx = Math.max(0, names.indexOf(baseMode));
   const next = names[(idx + 1 + names.length) % names.length] ?? names[0];
   if (!next) return;
@@ -338,7 +387,7 @@ export async function cycleMode(pi: ExtensionAPI, ctx: ExtensionContext): Promis
 export async function handleModeCommand(
   pi: ExtensionAPI,
   args: string,
-  ctx: ExtensionContext
+  ctx: ExtensionContext,
 ): Promise<void> {
   const tokens = args
     .split(/\s+/)
@@ -362,13 +411,15 @@ export async function handleModeCommand(
     }
 
     if (target === CUSTOM_MODE_NAME) {
-      if (ctx.hasUI) ctx.ui.notify(`Cannot store into \"${CUSTOM_MODE_NAME}\"`, "warning");
+      if (ctx.hasUI)
+        ctx.ui.notify(`Cannot store into \"${CUSTOM_MODE_NAME}\"`, "warning");
       return;
     }
 
     const selection = getCurrentOverlaySelection(pi);
     await storeSelectionIntoMode(pi, ctx, target, selection);
-    if (ctx.hasUI) ctx.ui.notify(`Stored current selection into \"${target}\"`, "info");
+    if (ctx.hasUI)
+      ctx.ui.notify(`Stored current selection into \"${target}\"`, "info");
     return;
   }
 

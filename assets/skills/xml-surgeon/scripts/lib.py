@@ -23,11 +23,11 @@ def read_bytes(path: str) -> bytes:
 
 
 def detect_decl_and_encoding(data: bytes) -> Tuple[bool, str | None]:
-    m = re.match(br"\s*<\?xml\s+[^>]*\?>", data)
+    m = re.match(rb"\s*<\?xml\s+[^>]*\?>", data)
     has_decl = bool(m)
     enc = None
     if has_decl:
-        m2 = re.search(br"encoding=[\"']([^\"']+)[\"']", data[:200])
+        m2 = re.search(rb"encoding=[\"']([^\"']+)[\"']", data[:200])
         if m2:
             enc = m2.group(1).decode("ascii", "ignore")
     return has_decl, enc
@@ -42,7 +42,9 @@ def parser(huge: bool, recover: bool) -> etree.XMLParser:
     )
 
 
-def parse_doc(path: str, huge: bool, recover: bool) -> Tuple[etree._ElementTree, bytes, bool, str | None]:
+def parse_doc(
+    path: str, huge: bool, recover: bool
+) -> Tuple[etree._ElementTree, bytes, bool, str | None]:
     data = read_bytes(path)
     has_decl, enc = detect_decl_and_encoding(data)
     try:
@@ -463,8 +465,8 @@ def find_start_tag_span(text: str, line_start: int, tag: str) -> tuple[int, int]
 
 
 def escape_attr(value: str, quote: str) -> str:
-    if quote == "\"":
-        return xml_escape(value, {"\"": "&quot;"})
+    if quote == '"':
+        return xml_escape(value, {'"': "&quot;"})
     return xml_escape(value, {"'": "&apos;"})
 
 
@@ -476,7 +478,7 @@ def set_attr_in_tag(tag_text: str, name: str, value: str) -> tuple[str, bool]:
         escaped = escape_attr(value, quote)
         replacement = f"{match.group(1)}{quote}{escaped}{quote}"
         return pattern.sub(replacement, tag_text, count=1), True
-    insert = f" {name}=\"{escape_attr(value, chr(34))}\""
+    insert = f' {name}="{escape_attr(value, chr(34))}"'
     if tag_text.rstrip().endswith("/>"):
         idx = tag_text.rfind("/>")
         return tag_text[:idx] + insert + tag_text[idx:], True
@@ -540,7 +542,9 @@ def apply_text_surgical(
 
     for el in elements:
         if len(el):
-            fail("set-text only supports elements without child elements in surgical mode")
+            fail(
+                "set-text only supports elements without child elements in surgical mode"
+            )
         line = el.sourceline or 0
         if line <= 0 or line > len(starts):
             continue

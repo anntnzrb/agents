@@ -14,9 +14,9 @@ const WOULD_BLOCK_ERRNOS = new Set(
 );
 
 const posixLibc = IS_WINDOWS ? undefined : createPosixLibc();
-const errnoAccessor = (process.platform === "darwin" ? "__error" : "__errno_location") as
-  | "__error"
-  | "__errno_location";
+const errnoAccessor = (
+  process.platform === "darwin" ? "__error" : "__errno_location"
+) as "__error" | "__errno_location";
 
 interface PosixLibcSymbols {
   readonly flock: (fd: number, operation: number) => number;
@@ -30,11 +30,16 @@ export interface SyncLock {
   readonly lockPath?: string;
 }
 
-export function tryAcquireSyncLock(stateDir: string, lockPath: string): SyncLock | undefined {
+export function tryAcquireSyncLock(
+  stateDir: string,
+  lockPath: string,
+): SyncLock | undefined {
   try {
     fs.mkdirSync(stateDir, { recursive: true });
   } catch (error) {
-    throw new Error(`create sync state dir ${stateDir} (${panicMessage(error)})`);
+    throw new Error(
+      `create sync state dir ${stateDir} (${panicMessage(error)})`,
+    );
   }
 
   if (IS_WINDOWS) {
@@ -104,7 +109,8 @@ export function releaseSyncLock(lock: SyncLock): void {
 }
 
 function createPosixLibc(): PosixLibcSymbols {
-  const libcPath = process.platform === "darwin" ? "libSystem.B.dylib" : "libc.so.6";
+  const libcPath =
+    process.platform === "darwin" ? "libSystem.B.dylib" : "libc.so.6";
   const libc = dlopen(libcPath, {
     flock: {
       args: [FFIType.i32, FFIType.i32],
@@ -237,4 +243,3 @@ function isProcessRunning(pid: number): boolean {
     return false;
   }
 }
-

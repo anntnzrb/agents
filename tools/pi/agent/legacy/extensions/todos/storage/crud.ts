@@ -14,7 +14,12 @@ import {
   sortTodos,
   validateTodoId,
 } from "../utils.ts";
-import { parseFrontMatter, parseTodoContent, serializeTodo, splitFrontMatter } from "./front-matter.ts";
+import {
+  parseFrontMatter,
+  parseTodoContent,
+  serializeTodo,
+  splitFrontMatter,
+} from "./front-matter.ts";
 import { withTodoLock } from "./locks.ts";
 import { getTodoPath } from "./paths.ts";
 
@@ -22,12 +27,18 @@ export const ensureTodosDir = async (todosDir: string): Promise<void> => {
   await fs.mkdir(todosDir, { recursive: true });
 };
 
-const readTodoFile = async (filePath: string, idFallback: string): Promise<TodoRecord> => {
+const readTodoFile = async (
+  filePath: string,
+  idFallback: string,
+): Promise<TodoRecord> => {
   const content = await fs.readFile(filePath, "utf8");
   return parseTodoContent(content, idFallback);
 };
 
-const writeTodoFile = async (filePath: string, todo: TodoRecord): Promise<void> => {
+const writeTodoFile = async (
+  filePath: string,
+  todo: TodoRecord,
+): Promise<void> => {
   await fs.writeFile(filePath, serializeTodo(todo), "utf8");
 };
 
@@ -40,7 +51,9 @@ export const generateTodoId = async (todosDir: string): Promise<string> => {
   throw new Error("Failed to generate unique todo id");
 };
 
-export const listTodos = async (todosDir: string): Promise<TodoFrontMatter[]> => {
+export const listTodos = async (
+  todosDir: string,
+): Promise<TodoFrontMatter[]> => {
   let entries: string[] = [];
   try {
     entries = await fs.readdir(todosDir);
@@ -108,7 +121,7 @@ export const listTodosSync = (todosDir: string): TodoFrontMatter[] => {
 
 export const ensureTodoExists = async (
   filePath: string,
-  id: string
+  id: string,
 ): Promise<TodoRecord | null> => {
   if (!existsSync(filePath)) return null;
   return readTodoFile(filePath, id);
@@ -117,7 +130,7 @@ export const ensureTodoExists = async (
 export const appendTodoBody = async (
   filePath: string,
   todo: TodoRecord,
-  text: string
+  text: string,
 ): Promise<TodoRecord> => {
   const spacer = todo.body.trim().length ? "\n\n" : "";
   todo.body = `${todo.body.replace(/\s+$/, "")}${spacer}${text.trim()}\n`;
@@ -128,7 +141,7 @@ export const appendTodoBody = async (
 export const createTodo = async (
   todosDir: string,
   todo: TodoRecord,
-  ctx: ExtensionContext
+  ctx: ExtensionContext,
 ): Promise<TodoRecord | { error: string }> => {
   await ensureTodosDir(todosDir);
   if (!todo.created_at) {
@@ -151,7 +164,7 @@ export const updateTodo = async (
   todosDir: string,
   id: string,
   updates: Partial<Pick<TodoRecord, "title" | "status" | "tags" | "body">>,
-  ctx: ExtensionContext
+  ctx: ExtensionContext,
 ): Promise<TodoRecord | { error: string }> => {
   const validated = validateTodoId(id);
   if ("error" in validated) {
@@ -165,7 +178,8 @@ export const updateTodo = async (
 
   const result = await withTodoLock(todosDir, normalizedId, ctx, async () => {
     const existing = await ensureTodoExists(filePath, normalizedId);
-    if (!existing) return { error: `Todo ${displayTodoId(id)} not found` } as const;
+    if (!existing)
+      return { error: `Todo ${displayTodoId(id)} not found` } as const;
 
     existing.id = normalizedId;
     if (updates.title !== undefined) existing.title = updates.title;
@@ -190,7 +204,7 @@ export const appendTodo = async (
   todosDir: string,
   id: string,
   text: string,
-  ctx: ExtensionContext
+  ctx: ExtensionContext,
 ): Promise<TodoRecord | { error: string }> => {
   const validated = validateTodoId(id);
   if ("error" in validated) {
@@ -204,7 +218,8 @@ export const appendTodo = async (
 
   const result = await withTodoLock(todosDir, normalizedId, ctx, async () => {
     const existing = await ensureTodoExists(filePath, normalizedId);
-    if (!existing) return { error: `Todo ${displayTodoId(id)} not found` } as const;
+    if (!existing)
+      return { error: `Todo ${displayTodoId(id)} not found` } as const;
     if (!text.trim()) return existing;
     return appendTodoBody(filePath, existing, text);
   });
@@ -220,7 +235,7 @@ export const updateTodoStatus = async (
   todosDir: string,
   id: string,
   status: string,
-  ctx: ExtensionContext
+  ctx: ExtensionContext,
 ): Promise<TodoRecord | { error: string }> => {
   const validated = validateTodoId(id);
   if ("error" in validated) {
@@ -234,7 +249,8 @@ export const updateTodoStatus = async (
 
   const result = await withTodoLock(todosDir, normalizedId, ctx, async () => {
     const existing = await ensureTodoExists(filePath, normalizedId);
-    if (!existing) return { error: `Todo ${displayTodoId(id)} not found` } as const;
+    if (!existing)
+      return { error: `Todo ${displayTodoId(id)} not found` } as const;
     existing.status = status;
     clearAssignmentIfClosed(existing);
     await writeTodoFile(filePath, existing);
@@ -252,7 +268,7 @@ export const claimTodoAssignment = async (
   todosDir: string,
   id: string,
   ctx: ExtensionContext,
-  force = false
+  force = false,
 ): Promise<TodoRecord | { error: string }> => {
   const validated = validateTodoId(id);
   if ("error" in validated) {
@@ -266,7 +282,8 @@ export const claimTodoAssignment = async (
   const sessionId = ctx.sessionManager.getSessionId();
   const result = await withTodoLock(todosDir, normalizedId, ctx, async () => {
     const existing = await ensureTodoExists(filePath, normalizedId);
-    if (!existing) return { error: `Todo ${displayTodoId(id)} not found` } as const;
+    if (!existing)
+      return { error: `Todo ${displayTodoId(id)} not found` } as const;
     if (isTodoClosed(existing.status)) {
       return { error: `Todo ${displayTodoId(id)} is closed` } as const;
     }
@@ -294,7 +311,7 @@ export const releaseTodoAssignment = async (
   todosDir: string,
   id: string,
   ctx: ExtensionContext,
-  force = false
+  force = false,
 ): Promise<TodoRecord | { error: string }> => {
   const validated = validateTodoId(id);
   if ("error" in validated) {
@@ -308,7 +325,8 @@ export const releaseTodoAssignment = async (
   const sessionId = ctx.sessionManager.getSessionId();
   const result = await withTodoLock(todosDir, normalizedId, ctx, async () => {
     const existing = await ensureTodoExists(filePath, normalizedId);
-    if (!existing) return { error: `Todo ${displayTodoId(id)} not found` } as const;
+    if (!existing)
+      return { error: `Todo ${displayTodoId(id)} not found` } as const;
     const assigned = existing.assigned_to_session;
     if (!assigned) {
       return existing;
@@ -333,7 +351,7 @@ export const releaseTodoAssignment = async (
 export const deleteTodo = async (
   todosDir: string,
   id: string,
-  ctx: ExtensionContext
+  ctx: ExtensionContext,
 ): Promise<TodoRecord | { error: string }> => {
   const validated = validateTodoId(id);
   if ("error" in validated) {
@@ -347,7 +365,8 @@ export const deleteTodo = async (
 
   const result = await withTodoLock(todosDir, normalizedId, ctx, async () => {
     const existing = await ensureTodoExists(filePath, normalizedId);
-    if (!existing) return { error: `Todo ${displayTodoId(id)} not found` } as const;
+    if (!existing)
+      return { error: `Todo ${displayTodoId(id)} not found` } as const;
     await fs.unlink(filePath);
     return existing;
   });

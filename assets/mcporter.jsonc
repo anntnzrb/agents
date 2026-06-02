@@ -2,15 +2,12 @@
   "mcpServers": {
     "deepwiki": {
       "description": "DeepWiki MCP",
-      "serverUrl": "https://mcp.deepwiki.com/mcp"
+      "serverUrl": "https://mcp.deepwiki.com/mcp",
     },
     "effect": {
       "description": "Effect MCP",
       "command": "bun",
-      "args": [
-        "x",
-        "@niklaserik/effect-mcp"
-      ]
+      "args": ["x", "@niklaserik/effect-mcp"],
     },
     "n8n": {
       "description": "n8n MCP",
@@ -21,8 +18,8 @@
         "--streamableHttp",
         "${N8N_MCP_URL}",
         "--header",
-        "Authorization: Bearer ${N8N_MCP_TOKEN}"
-      ]
-    }
-  }
+        "Authorization: Bearer ${N8N_MCP_TOKEN}",
+      ],
+    },
+  },
 }

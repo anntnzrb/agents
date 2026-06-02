@@ -51,10 +51,7 @@ Use streams when payload size is unknown or large.
 import { pipeline } from "node:stream/promises";
 import { createReadStream, createWriteStream } from "node:fs";
 
-await pipeline(
-  createReadStream("input.log"),
-  createWriteStream("copy.log"),
-);
+await pipeline(createReadStream("input.log"), createWriteStream("copy.log"));
 ```
 
 Use `pipeline()` for composed streams so backpressure and errors behave sanely.
@@ -75,10 +72,10 @@ Remember to remove listeners on long-lived objects when lifetimes end.
 
 ## Worker threads vs child processes
 
-| Tool | Use when | Notes |
-| --- | --- | --- |
-| `worker_threads` | CPU-bound JS work needs parallelism | Shares process memory, lower overhead |
-| `child_process` | Need a separate process, shell command, or isolation | Higher overhead, separate runtime |
+| Tool             | Use when                                             | Notes                                 |
+| ---------------- | ---------------------------------------------------- | ------------------------------------- |
+| `worker_threads` | CPU-bound JS work needs parallelism                  | Shares process memory, lower overhead |
+| `child_process`  | Need a separate process, shell command, or isolation | Higher overhead, separate runtime     |
 
 ### Worker thread example
 
@@ -112,6 +109,7 @@ process.on("SIGINT", async () => {
 ```
 
 Good defaults:
+
 - validate required env vars at startup
 - set timeouts on outbound I/O
 - close servers, queues, and DB pools on shutdown

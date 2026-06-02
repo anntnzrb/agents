@@ -16,6 +16,7 @@ Use this skill as the **conversation layer** between a human and an audio file.
 ## Trigger aggressively
 
 Use when user says things like:
+
 - “talk to this song”
 - “what is this track doing?”
 - “tempo/key/energy/structure?”
@@ -40,16 +41,19 @@ uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" ask ./song.flac "temp
 ## Commands
 
 ### Analyze
+
 ```bash
 uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze ./song.mp3 --json
 ```
 
 ### Ask one question
+
 ```bash
 uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" ask ./song.wav "where are the sections?"
 ```
 
 ### Chat loop
+
 ```bash
 uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" chat ./song.ogg
 ```

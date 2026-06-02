@@ -1,6 +1,7 @@
 # Workflows
 
 ## Workflow A: New Shortcut (User-Level)
+
 1. Capture intent:
    - Goal
    - Trigger surface (app, widget, Siri, watch, automation)
@@ -18,6 +19,7 @@
 5. Validate against test matrix.
 
 ## Workflow B: Personal/Home Automation
+
 1. Classify automation type:
    - Personal automation trigger
    - Home automation trigger
@@ -27,12 +29,14 @@
 5. Include disable/rollback procedure.
 
 ## Workflow C: Cross-Device Shortcut
+
 1. Identify creation surface vs execution surfaces.
 2. Split device-specific actions into branches.
 3. Keep shared logic in common pre/post sections.
 4. Test each target device explicitly.
 
 ## Workflow D: App Integration (Developer)
+
 1. Choose App Intents entity and intent boundaries.
 2. Define App Shortcut phrases and discoverability.
 3. Validate behavior in Shortcuts + Spotlight entry points.
@@ -40,7 +44,9 @@
 5. Add migration notes if converting SiriKit custom intents.
 
 ## Standard Output Shape
+
 Always produce:
+
 1. Goal
 2. Trigger
 3. Inputs

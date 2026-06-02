@@ -9,6 +9,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: You need to decide whether to write a macro or a function for code transformation.
 
 **Solution**:
+
 ```clojure
 ;; BAD: macro for simple transformation
 (defmacro add-one [x] `(+ ~x 1))
@@ -26,6 +27,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: You need to understand the difference between quote and syntax quote for writing macros.
 
 **Solution**:
+
 ```clojure
 ;; Quote: literal list
 '(a b c)         ; => (a b c)
@@ -51,6 +53,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: You want to create a custom control flow that executes code when a condition is false.
 
 **Solution**:
+
 ```clojure
 (defmacro unless [pred & body]
   `(if (not ~pred)
@@ -76,6 +79,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: Your macro introduces a local binding that could shadow a variable from the calling code.
 
 **Solution**:
+
 ```clojure
 ;; BAD: name collision
 (defmacro with-value [v & body]
@@ -103,6 +107,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: You want to measure how long a block of code takes to execute.
 
 **Solution**:
+
 ```clojure
 (defmacro with-timing [& body]
   `(let [start# (System/currentTimeMillis)]
@@ -129,6 +134,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: You need to see what code your macro generates to debug or understand its behavior.
 
 **Solution**:
+
 ```clojure
 ;; Expand one level
 (macroexpand '(unless true (println "hi")))
@@ -151,6 +157,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: Your macro evaluates an expression multiple times, causing side effects or expensive computations to run repeatedly.
 
 **Solution**:
+
 ```clojure
 ;; MISTAKE: Double evaluation
 (defmacro square [x]
@@ -173,6 +180,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: You want code to compile only when certain conditions are met (e.g., development mode).
 
 **Solution**:
+
 ```clojure
 (defmacro when-dev [& body]
   (when (= "dev" (System/getenv "ENV"))
@@ -192,6 +200,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: You need to ensure a resource is properly closed after use, similar to try-with-resources.
 
 **Solution**:
+
 ```clojure
 (defmacro with-resource [binding & body]
   `(let [~(first binding) ~(second binding)]
@@ -214,6 +223,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: You want to thread values through functions but stop if any intermediate result is nil.
 
 **Solution**:
+
 ```clojure
 (defmacro ->? [expr & forms]
   "Thread if not nil"
@@ -233,6 +243,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: You want assertions that provide meaningful error messages with relevant context when they fail.
 
 **Solution**:
+
 ```clojure
 (defmacro assert-with [test msg & ctx]
   `(when-not ~test
@@ -253,6 +264,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: You need to know about local bindings or the form being expanded at the macro call site.
 
 **Solution**:
+
 ```clojure
 ;; &form: the actual form being expanded
 ;; &env: local bindings at expansion site
@@ -283,6 +295,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: You want to include file and line number information in logged messages or errors.
 
 **Solution**:
+
 ```clojure
 (defmacro log-location [msg]
   (let [{:keys [line column]} (meta &form)]
@@ -298,6 +311,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: You want to reuse the result of a test expression in the then clause without re-evaluating it.
 
 **Solution**:
+
 ```clojure
 ;; 'it' bound to test result
 (defmacro if-it [test then else]
@@ -323,6 +337,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: You want to create a readable domain-specific language for database queries.
 
 **Solution**:
+
 ```clojure
 (defmacro query [table & clauses]
   (let [parsed (parse-clauses clauses)]
@@ -355,6 +370,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: You want to define tests with a clean syntax and automatic pass/fail reporting.
 
 **Solution**:
+
 ```clojure
 (defmacro deftest+ [name & body]
   `(defn ~name []
@@ -384,6 +400,7 @@ Transform code at compile time with macros, create DSLs, and master Clojure's me
 **Problem**: You need to verify that your macros both expand correctly and behave as expected.
 
 **Solution**:
+
 ```clojure
 (deftest test-my-macro
   ;; Test expansion

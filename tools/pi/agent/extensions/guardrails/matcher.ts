@@ -1,6 +1,17 @@
-import type { BashAction, ExecutableMatch, GuardrailsConfig, Rule } from "./types.js";
+import type {
+  BashAction,
+  ExecutableMatch,
+  GuardrailsConfig,
+  Rule,
+} from "./types.js";
 
-import { executableBasename, splitShellSegmentsDetailed, stripHeredocBodies, tokenizeCommand, unique } from "./shell.js";
+import {
+  executableBasename,
+  splitShellSegmentsDetailed,
+  stripHeredocBodies,
+  tokenizeCommand,
+  unique,
+} from "./shell.js";
 import { firstExecutableIndex, unwrapCommand } from "./wrappers.js";
 
 const MAX_NESTING_DEPTH = 8;
@@ -49,7 +60,15 @@ const RG_OPTIONS_WITH_VALUE = new Set([
   "--type-not",
 ]);
 
-const GREP_OPTIONS_WITH_VALUE = new Set(["-e", "-f", "-m", "-A", "-B", "-C", "--max-count"]);
+const GREP_OPTIONS_WITH_VALUE = new Set([
+  "-e",
+  "-f",
+  "-m",
+  "-A",
+  "-B",
+  "-C",
+  "--max-count",
+]);
 
 const FD_OPTIONS_WITH_VALUE = new Set([
   "-g",
@@ -147,13 +166,25 @@ function inspectCommand(command: string, depth = 0): Inspection {
   }
 
   for (const segment of splitShellSegmentsDetailed(inspectedCommand)) {
-    parts.push(inspectSegment(segment.text, depth, segment.stdinFromPipe, segment.stdoutToPipe));
+    parts.push(
+      inspectSegment(
+        segment.text,
+        depth,
+        segment.stdinFromPipe,
+        segment.stdoutToPipe,
+      ),
+    );
   }
 
   return mergeInspection(...parts);
 }
 
-function inspectSegment(segment: string, depth: number, stdinFromPipe = false, stdoutToPipe = false): Inspection {
+function inspectSegment(
+  segment: string,
+  depth: number,
+  stdinFromPipe = false,
+  stdoutToPipe = false,
+): Inspection {
   const tokens = tokenizeCommand(segment);
   if (tokens.length === 0) {
     return emptyInspection();
@@ -162,7 +193,13 @@ function inspectSegment(segment: string, depth: number, stdinFromPipe = false, s
   return inspectTokens(tokens, segment, depth, stdinFromPipe, stdoutToPipe);
 }
 
-function inspectTokens(tokens: string[], command: string, depth: number, stdinFromPipe = false, stdoutToPipe = false): Inspection {
+function inspectTokens(
+  tokens: string[],
+  command: string,
+  depth: number,
+  stdinFromPipe = false,
+  stdoutToPipe = false,
+): Inspection {
   if (depth > MAX_NESTING_DEPTH || tokens.length === 0) {
     return emptyInspection();
   }
@@ -200,13 +237,22 @@ function inspectTokens(tokens: string[], command: string, depth: number, stdinFr
   }
 
   if (unwrapped.remainderTokens && unwrapped.remainderTokens.length > 0) {
-    children.push(inspectTokens(unwrapped.remainderTokens, unwrapped.remainderTokens.join(" "), depth + 1));
+    children.push(
+      inspectTokens(
+        unwrapped.remainderTokens,
+        unwrapped.remainderTokens.join(" "),
+        depth + 1,
+      ),
+    );
   }
 
   return mergeInspection(...children);
 }
 
-function buildFlags(flags: string | undefined, caseSensitive: boolean | undefined): string {
+function buildFlags(
+  flags: string | undefined,
+  caseSensitive: boolean | undefined,
+): string {
   if (caseSensitive !== false) {
     return flags ?? "";
   }
@@ -218,7 +264,9 @@ function getExecutablePatternRegexes(match: ExecutableMatch): RegExp[] {
   if (cached) return cached;
 
   const flags = buildFlags(match.flags, match.caseSensitive);
-  const compiled = (match.patterns ?? []).map((pattern) => new RegExp(pattern, flags));
+  const compiled = (match.patterns ?? []).map(
+    (pattern) => new RegExp(pattern, flags),
+  );
   EXECUTABLE_PATTERN_REGEX_CACHE.set(match, compiled);
   return compiled;
 }
@@ -242,14 +290,19 @@ function matchExecutable(actual: string, match: ExecutableMatch): boolean {
   const values = [actual, basename, normalizeExecutable(actual)];
 
   for (const name of names) {
-    const normalizedName = match.caseSensitive === false ? name.toLowerCase() : name;
+    const normalizedName =
+      match.caseSensitive === false ? name.toLowerCase() : name;
     for (const value of values) {
-      const subject = match.caseSensitive === false ? value.toLowerCase() : value;
+      const subject =
+        match.caseSensitive === false ? value.toLowerCase() : value;
       if (name.includes("/") || name.includes("\\")) {
         if (subject === normalizedName) {
           return true;
         }
-      } else if (subject === normalizedName || executableBasename(subject) === normalizedName) {
+      } else if (
+        subject === normalizedName ||
+        executableBasename(subject) === normalizedName
+      ) {
         return true;
       }
     }
@@ -265,11 +318,16 @@ function matchExecutable(actual: string, match: ExecutableMatch): boolean {
   return false;
 }
 
-function getRuleMatches(inspection: Inspection, rule: Rule): RuleMatchContext[] {
+function getRuleMatches(
+  inspection: Inspection,
+  rule: Rule,
+): RuleMatchContext[] {
   const match = rule.match;
   if (match.type === "regex") {
     const regex = getRuleRegex(rule);
-    return inspection.commands.filter((command) => regex.test(command)).map((command) => ({ command }));
+    return inspection.commands
+      .filter((command) => regex.test(command))
+      .map((command) => ({ command }));
   }
 
   const matches: RuleMatchContext[] = [];
@@ -282,13 +340,24 @@ function getRuleMatches(inspection: Inspection, rule: Rule): RuleMatchContext[] 
 }
 
 function isInfoFlag(token: string): boolean {
-  return token === "-h" || token === "--help" || token === "-V" || token === "--version";
+  return (
+    token === "-h" ||
+    token === "--help" ||
+    token === "-V" ||
+    token === "--version"
+  );
 }
 
 function isRootLikePath(token: string): boolean {
   const normalized = token.trim();
   if (normalized.length === 0) return false;
-  if (normalized === "." || normalized === "./" || normalized === "/" || normalized === "~" || normalized === "~/") {
+  if (
+    normalized === "." ||
+    normalized === "./" ||
+    normalized === "/" ||
+    normalized === "~" ||
+    normalized === "~/"
+  ) {
     return true;
   }
   if (/^[A-Za-z]:[\\/]?$/.test(normalized)) return true;
@@ -303,7 +372,11 @@ function optionHasValue(token: string, executable: string): boolean {
   if (normalized === "grep" || normalized === "ggrep") {
     return GREP_OPTIONS_WITH_VALUE.has(token);
   }
-  if (normalized === "fd" || normalized === "fdfind" || normalized === "fd-find") {
+  if (
+    normalized === "fd" ||
+    normalized === "fdfind" ||
+    normalized === "fd-find"
+  ) {
     return FD_OPTIONS_WITH_VALUE.has(token);
   }
   if (normalized === "find" || normalized === "gfind") {
@@ -376,13 +449,26 @@ function commandHasToken(parsed: ParsedCommand, token: string): boolean {
 
 function isStdinFilterGrep(parsed: ParsedCommand): boolean {
   const executable = normalizeExecutable(parsed.executable);
-  if (executable !== "grep" && executable !== "ggrep" && executable !== "findstr" && executable !== "select-string") {
+  if (
+    executable !== "grep" &&
+    executable !== "ggrep" &&
+    executable !== "findstr" &&
+    executable !== "select-string"
+  ) {
     return false;
   }
   if (!parsed.stdinFromPipe) return false;
 
   const args = parsed.tokens.slice(1);
-  if (args.some((token) => token === "-r" || token === "-R" || token === "--recursive" || token === "--dereference-recursive")) {
+  if (
+    args.some(
+      (token) =>
+        token === "-r" ||
+        token === "-R" ||
+        token === "--recursive" ||
+        token === "--dereference-recursive",
+    )
+  ) {
     return false;
   }
 
@@ -403,11 +489,17 @@ function shouldWarnContentSearch(parsed: ParsedCommand): boolean {
 
   if (isStdinFilterGrep(parsed)) return false;
 
-  if ((executable === "rg" || executable === "ripgrep") && commandHasToken(parsed, "--files")) return false;
+  if (
+    (executable === "rg" || executable === "ripgrep") &&
+    commandHasToken(parsed, "--files")
+  )
+    return false;
 
   if (executable === "git") {
     const tokens = tokenizeCommand(parsed.command);
-    const grepIndex = tokens.findIndex((token) => token.toLowerCase() === "grep");
+    const grepIndex = tokens.findIndex(
+      (token) => token.toLowerCase() === "grep",
+    );
     if (grepIndex === -1) return false;
 
     const grepArgs = tokens.slice(grepIndex + 1);
@@ -431,18 +523,28 @@ function shouldWarnFileDiscovery(parsed: ParsedCommand): boolean {
     return commandHasToken(parsed, "ls-files");
   }
 
-  if (executable === "fd" || executable === "fdfind" || executable === "fd-find") {
+  if (
+    executable === "fd" ||
+    executable === "fdfind" ||
+    executable === "fd-find"
+  ) {
     const positionals = extractPositionals(parsed);
     const paths = positionals.slice(1);
     if (paths.length === 0) return true;
-    return paths.some((token) => isRootLikePath(token) || token === "**" || token === "*");
+    return paths.some(
+      (token) => isRootLikePath(token) || token === "**" || token === "*",
+    );
   }
 
   if (executable === "find" || executable === "gfind") {
     return true;
   }
 
-  if (executable === "locate" || executable === "mlocate" || executable === "plocate") {
+  if (
+    executable === "locate" ||
+    executable === "mlocate" ||
+    executable === "plocate"
+  ) {
     const positionals = extractPositionals(parsed);
     const query = positionals[0] ?? "";
     return query.length < 3 || query === "*";
@@ -466,18 +568,32 @@ function shouldEmitWarn(rule: Rule, context: RuleMatchContext): boolean {
   if (rule.action.type !== "warn") return true;
   const ruleId = rule.id ?? "";
 
-  if (ruleId === "prefer-native-content-search" || ruleId === "prefer-native-content-search-git-grep") {
-    return shouldWarnContentSearch(context.parsed ?? parsedFromCommand(context.command));
+  if (
+    ruleId === "prefer-native-content-search" ||
+    ruleId === "prefer-native-content-search-git-grep"
+  ) {
+    return shouldWarnContentSearch(
+      context.parsed ?? parsedFromCommand(context.command),
+    );
   }
 
-  if (ruleId === "prefer-native-file-discovery" || ruleId === "prefer-native-file-discovery-rg-files" || ruleId === "prefer-native-file-discovery-git-ls-files") {
-    return shouldWarnFileDiscovery(context.parsed ?? parsedFromCommand(context.command));
+  if (
+    ruleId === "prefer-native-file-discovery" ||
+    ruleId === "prefer-native-file-discovery-rg-files" ||
+    ruleId === "prefer-native-file-discovery-git-ls-files"
+  ) {
+    return shouldWarnFileDiscovery(
+      context.parsed ?? parsedFromCommand(context.command),
+    );
   }
 
   return true;
 }
 
-export function actionForCommand(command: string, config: GuardrailsConfig): BashAction | null {
+export function actionForCommand(
+  command: string,
+  config: GuardrailsConfig,
+): BashAction | null {
   const inspection = inspectCommand(command);
 
   for (const rule of config.agentBash.rules) {
@@ -493,7 +609,10 @@ export function actionForCommand(command: string, config: GuardrailsConfig): Bas
   return null;
 }
 
-export function reasonForCommand(command: string, config: GuardrailsConfig): string | null {
+export function reasonForCommand(
+  command: string,
+  config: GuardrailsConfig,
+): string | null {
   const action = actionForCommand(command, config);
   return action ? action.message : null;
 }

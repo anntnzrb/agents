@@ -9,6 +9,7 @@ Essential patterns for working with Clojure's data structures, sequences, and fu
 **Problem**: You need to select the appropriate data structure for your use case.
 
 **Solution**:
+
 ```clojure
 ;; Vectors: indexed access, append at end
 (def users ["Alice" "Bob" "Charlie"])
@@ -41,6 +42,7 @@ Essential patterns for working with Clojure's data structures, sequences, and fu
 **Problem**: You need to add, remove, or combine collection elements.
 
 **Solution**:
+
 ```clojure
 ;; Adding
 (conj [1 2] 3)           ; => [1 2 3]
@@ -72,6 +74,7 @@ Essential patterns for working with Clojure's data structures, sequences, and fu
 **Problem**: You need to extract values from maps or use sets as filters.
 
 **Solution**:
+
 ```clojure
 ;; Keywords extract from maps
 (:name {:name "Alice" :age 30}) ; => "Alice"
@@ -92,6 +95,7 @@ Essential patterns for working with Clojure's data structures, sequences, and fu
 **Problem**: You need to transform, filter, or reduce sequences.
 
 **Solution**:
+
 ```clojure
 ;; map: transform each element
 (map inc [1 2 3])          ; => (2 3 4)
@@ -123,6 +127,7 @@ Essential patterns for working with Clojure's data structures, sequences, and fu
 **Problem**: You need to organize sequences into groups or chunks.
 
 **Solution**:
+
 ```clojure
 ;; group-by: map of key -> items
 (group-by :type [{:type :a :n 1} {:type :b :n 2} {:type :a :n 3}])
@@ -148,6 +153,7 @@ Essential patterns for working with Clojure's data structures, sequences, and fu
 **Problem**: You need to check if elements exist or meet certain conditions.
 
 **Solution**:
+
 ```clojure
 ;; some: find first truthy
 (some even? [1 3 5 6])       ; => true
@@ -171,6 +177,7 @@ Essential patterns for working with Clojure's data structures, sequences, and fu
 **Problem**: You need to work with infinite or large sequences without realizing them all at once.
 
 **Solution**:
+
 ```clojure
 ;; range: lazy infinite or bounded
 (range)           ; infinite: 0, 1, 2, ...
@@ -201,6 +208,7 @@ Essential patterns for working with Clojure's data structures, sequences, and fu
 **Problem**: You need to force evaluation of a lazy sequence for side effects or to cache results.
 
 **Solution**:
+
 ```clojure
 ;; Force evaluation
 (doall (map println [1 2 3])) ; Realizes, returns seq
@@ -221,6 +229,7 @@ Essential patterns for working with Clojure's data structures, sequences, and fu
 **Problem**: You want to compose transformations that work across different contexts without intermediate collections.
 
 **Solution**:
+
 ```clojure
 ;; Transducers separate transformation from data source
 (def xf
@@ -248,6 +257,7 @@ Essential patterns for working with Clojure's data structures, sequences, and fu
 **Problem**: You need to know which sequence operations are available as transducers.
 
 **Solution**:
+
 ```clojure
 (map f)           ; Transform
 (filter pred)     ; Keep matching
@@ -272,6 +282,7 @@ Essential patterns for working with Clojure's data structures, sequences, and fu
 **Problem**: You need to process large collections in parallel.
 
 **Solution**:
+
 ```clojure
 (require '[clojure.core.reducers :as r])
 
@@ -296,6 +307,7 @@ Essential patterns for working with Clojure's data structures, sequences, and fu
 **Problem**: You need to generate sequences with nested iteration, filtering, and bindings.
 
 **Solution**:
+
 ```clojure
 ;; List comprehension
 (for [x [1 2 3]
@@ -332,6 +344,7 @@ Essential patterns for working with Clojure's data structures, sequences, and fu
 **Problem**: You need to update keys or values across an entire map.
 
 **Solution**:
+
 ```clojure
 ;; Update values
 (update-vals {:a 1 :b 2} inc)     ; => {:a 2 :b 3}
@@ -357,6 +370,7 @@ Essential patterns for working with Clojure's data structures, sequences, and fu
 **Problem**: You need to iterate over map entries efficiently.
 
 **Solution**:
+
 ```clojure
 ;; Iterate entries
 (for [[k v] {:a 1 :b 2}]
@@ -380,6 +394,7 @@ Essential patterns for working with Clojure's data structures, sequences, and fu
 **Problem**: You need to navigate and edit nested tree structures functionally.
 
 **Solution**:
+
 ```clojure
 (require '[clojure.zip :as z])
 

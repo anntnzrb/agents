@@ -17,13 +17,19 @@ Minimal Pi-inspired JSONL RPC for the bundled skill-local CLI. Not full Pi RPC.
 Request:
 
 ```json
-{"id":"1","type":"ping"}
+{ "id": "1", "type": "ping" }
 ```
 
 Response:
 
 ```json
-{"id":"1","type":"response","command":"ping","success":true,"data":{"ok":true,"version":"1"}}
+{
+  "id": "1",
+  "type": "response",
+  "command": "ping",
+  "success": true,
+  "data": { "ok": true, "version": "1" }
+}
 ```
 
 ### get_schema
@@ -31,7 +37,7 @@ Response:
 Request:
 
 ```json
-{"id":"2","type":"get_schema"}
+{ "id": "2", "type": "get_schema" }
 ```
 
 Use before building integrations.
@@ -71,7 +77,7 @@ Response success:
   "type": "response",
   "command": "search",
   "success": true,
-  "data": {"type": "amz-live.search_results", "results": []}
+  "data": { "type": "amz-live.search_results", "results": [] }
 }
 ```
 
@@ -83,13 +89,14 @@ Response error:
   "type": "response",
   "command": "search",
   "success": false,
-  "error": {"code": "search_error", "message": "..."}
+  "error": { "code": "search_error", "message": "..." }
 }
 ```
 
 ## Good defaults
 
 For agents, prefer:
+
 - `details: true`
 - `detailLimit: 2`
 - `scoring: true`
@@ -109,11 +116,13 @@ printf '%s\n' \
 ## Integration guidance
 
 Use RPC when:
+
 - another agent or process needs strict envelopes
 - you want schema-first integration
 - shell stdout parsing is simpler than direct CLI flag parsing
 
 Use plain CLI when:
+
 - working manually in the skill root
 - one-shot commands are enough
 - you are debugging by hand

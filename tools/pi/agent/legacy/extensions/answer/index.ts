@@ -2,7 +2,10 @@
  * Answer Extension - extracts questions from the last assistant response and collects answers.
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import { ANSWER_MESSAGE_PREFIX } from "./constants.ts";
 import { findLastAssistantText } from "./assistant-text.ts";
 import { extractQuestions } from "./extraction.ts";
@@ -13,7 +16,7 @@ import type { ActiveModel, ExtractedQuestion } from "./types.ts";
  * Ensure UI and model are available for the /answer command.
  */
 const ensureInteractiveModel = (
-  ctx: ExtensionContext
+  ctx: ExtensionContext,
 ): ctx is ExtensionContext & { model: ActiveModel } => {
   if (!ctx.hasUI) {
     ctx.ui.notify("answer requires interactive mode", "error");
@@ -35,7 +38,10 @@ const resolveAssistantText = (ctx: ExtensionContext): string | null => {
     return result.text;
   }
   if (result.status === "incomplete") {
-    ctx.ui.notify(`Last assistant message incomplete (${result.reason})`, "error");
+    ctx.ui.notify(
+      `Last assistant message incomplete (${result.reason})`,
+      "error",
+    );
     return null;
   }
   ctx.ui.notify("No assistant messages found", "error");
@@ -47,10 +53,10 @@ const resolveAssistantText = (ctx: ExtensionContext): string | null => {
  */
 const collectAnswers = (
   ctx: ExtensionContext,
-  questions: ExtractedQuestion[]
+  questions: ExtractedQuestion[],
 ): Promise<string | null> => {
   return ctx.ui.custom<string | null>(
-    (tui, _theme, _kb, done) => new QnAComponent(questions, tui, done)
+    (tui, _theme, _kb, done) => new QnAComponent(questions, tui, done),
   );
 };
 
@@ -64,20 +70,27 @@ const sendAnswers = (pi: ExtensionAPI, answers: string): void => {
       content: `${ANSWER_MESSAGE_PREFIX}${answers}`,
       display: true,
     },
-    { triggerTurn: true }
+    { triggerTurn: true },
   );
 };
 
 /**
  * Handle /answer interactions.
  */
-const answerHandler = async (pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> => {
+const answerHandler = async (
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+): Promise<void> => {
   if (!ensureInteractiveModel(ctx)) return;
 
   const assistantText = resolveAssistantText(ctx);
   if (!assistantText) return;
 
-  const extractionResult = await extractQuestions(ctx, ctx.model, assistantText);
+  const extractionResult = await extractQuestions(
+    ctx,
+    ctx.model,
+    assistantText,
+  );
   if (extractionResult === null) {
     ctx.ui.notify("Cancelled", "info");
     return;
@@ -102,7 +115,8 @@ const answerHandler = async (pi: ExtensionAPI, ctx: ExtensionContext): Promise<v
  */
 const answerExtension = (pi: ExtensionAPI): void => {
   pi.registerCommand("answer", {
-    description: "Extract questions from last assistant message into interactive Q&A",
+    description:
+      "Extract questions from last assistant message into interactive Q&A",
     handler: (_args, ctx) => answerHandler(pi, ctx),
   });
 };

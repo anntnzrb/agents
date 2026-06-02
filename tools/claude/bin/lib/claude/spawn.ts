@@ -28,7 +28,10 @@ export const setupEnv = (modes: ProviderModes = {}): EnvironmentConfig => {
           : provider === "openrouter"
             ? { ANTHROPIC_API_KEY: "" }
             : {};
-      Object.assign(env, createProviderEnvWithModel(provider, model, extraConfig));
+      Object.assign(
+        env,
+        createProviderEnvWithModel(provider, model, extraConfig),
+      );
     } else {
       Object.assign(env, providers[provider].env);
     }
@@ -36,7 +39,10 @@ export const setupEnv = (modes: ProviderModes = {}): EnvironmentConfig => {
 
   // Map provider-specific API keys to ANTHROPIC_AUTH_TOKEN
   for (const [key, provider] of Object.entries(providers)) {
-    if (modes[key as ProviderKey] !== undefined && process.env[provider.apiKeyEnvVar]) {
+    if (
+      modes[key as ProviderKey] !== undefined &&
+      process.env[provider.apiKeyEnvVar]
+    ) {
       env.ANTHROPIC_AUTH_TOKEN = process.env[provider.apiKeyEnvVar]!;
       break;
     }

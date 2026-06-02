@@ -15,7 +15,8 @@ export const normalizeLimit = (value: number | undefined): number => {
 };
 
 export const normalizeTimeout = (value: number | undefined): number => {
-  const normalized = value === undefined ? DEFAULT_TIMEOUT_MS : Math.floor(value);
+  const normalized =
+    value === undefined ? DEFAULT_TIMEOUT_MS : Math.floor(value);
   if (!Number.isFinite(normalized) || normalized <= 0) {
     throw new Error("timeoutMs must be a positive number");
   }
@@ -24,7 +25,8 @@ export const normalizeTimeout = (value: number | undefined): number => {
 
 export const normalizeKind = (value: string | undefined): FindKind => {
   if (value === undefined || value.trim().length === 0) return "file";
-  if (value === "file" || value === "directory" || value === "any") return value;
+  if (value === "file" || value === "directory" || value === "any")
+    return value;
   throw new Error("kind must be one of: file, directory, any");
 };
 
@@ -36,7 +38,13 @@ export const buildFdArgs = (
   kind: FindKind,
   useGitignore: boolean,
 ): string[] => {
-  const args = ["--glob", "--color=never", "--no-require-git", "--max-results", String(limit)];
+  const args = [
+    "--glob",
+    "--color=never",
+    "--no-require-git",
+    "--max-results",
+    String(limit),
+  ];
   if (includeHidden) args.push("--hidden");
   if (!useGitignore) args.push("--no-ignore");
   if (kind === "file") args.push("--type", "file");
@@ -45,7 +53,11 @@ export const buildFdArgs = (
   let effectivePattern = pattern;
   if (pattern.includes("/")) {
     args.push("--full-path");
-    if (!pattern.startsWith("/") && !pattern.startsWith("**/") && pattern !== "**") {
+    if (
+      !pattern.startsWith("/") &&
+      !pattern.startsWith("**/") &&
+      pattern !== "**"
+    ) {
       effectivePattern = `**/${pattern}`;
     }
   }

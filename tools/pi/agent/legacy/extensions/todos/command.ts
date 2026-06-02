@@ -2,7 +2,10 @@
  * /todos command UI.
  */
 
-import { copyToClipboard, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import {
+  copyToClipboard,
+  type ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import path from "node:path";
 import {
@@ -30,7 +33,7 @@ import { formatTodoList } from "./render.ts";
  */
 export const getTodoArgumentCompletions = (
   argumentPrefix: string,
-  cwd: string
+  cwd: string,
 ): Array<{ value: string; label: string; description?: string }> | null => {
   const todos = listTodosSync(getTodosDir(cwd));
   if (!todos.length) return null;
@@ -52,7 +55,7 @@ export const getTodoArgumentCompletions = (
  */
 export const runTodosCommand = async (
   ctx: ExtensionContext,
-  args?: string | null
+  args?: string | null,
 ): Promise<void> => {
   const todosDir = getTodosDir(ctx.cwd);
   const todos = await listTodos(todosDir);
@@ -72,25 +75,21 @@ export const runTodosCommand = async (
     let selector: TodoSelectorComponent | null = null;
     let actionMenu: TodoActionMenuComponent | null = null;
     let deleteConfirm: TodoDeleteConfirmComponent | null = null;
-    let activeComponent:
-      | {
-          render: (width: number) => string[];
-          invalidate: () => void;
-          handleInput?: (data: string) => void;
-          focused?: boolean;
-        }
-      | null = null;
+    let activeComponent: {
+      render: (width: number) => string[];
+      invalidate: () => void;
+      handleInput?: (data: string) => void;
+      focused?: boolean;
+    } | null = null;
     let wrapperFocused = false;
 
     const setActiveComponent = (
-      component:
-        | {
-            render: (width: number) => string[];
-            invalidate: () => void;
-            handleInput?: (data: string) => void;
-            focused?: boolean;
-          }
-        | null
+      component: {
+        render: (width: number) => string[];
+        invalidate: () => void;
+        handleInput?: (data: string) => void;
+        focused?: boolean;
+      } | null,
     ) => {
       if (activeComponent && "focused" in activeComponent) {
         activeComponent.focused = false;
@@ -127,7 +126,9 @@ export const runTodosCommand = async (
       }
     };
 
-    const resolveTodoRecord = async (todo: TodoFrontMatter): Promise<TodoRecord | null> => {
+    const resolveTodoRecord = async (
+      todo: TodoFrontMatter,
+    ): Promise<TodoRecord | null> => {
       const filePath = getTodoPath(todosDir, todo.id);
       const record = await ensureTodoExists(filePath, todo.id);
       if (!record) {
@@ -137,14 +138,21 @@ export const runTodosCommand = async (
       return record;
     };
 
-    const openTodoOverlay = async (record: TodoRecord): Promise<"back" | "work"> => {
+    const openTodoOverlay = async (
+      record: TodoRecord,
+    ): Promise<"back" | "work"> => {
       const action = await ctx.ui.custom<"back" | "work">(
         (overlayTui, overlayTheme, _overlayKb, overlayDone) =>
-          new TodoDetailOverlayComponent(overlayTui, overlayTheme, record, overlayDone),
+          new TodoDetailOverlayComponent(
+            overlayTui,
+            overlayTheme,
+            record,
+            overlayDone,
+          ),
         {
           overlay: true,
           overlayOptions: { width: "80%", maxHeight: "80%", anchor: "center" },
-        }
+        },
       );
 
       return action ?? "back";
@@ -152,7 +160,7 @@ export const runTodosCommand = async (
 
     const applyTodoAction = async (
       record: TodoRecord,
-      action: TodoMenuAction
+      action: TodoMenuAction,
     ): Promise<"stay" | "exit"> => {
       if (action === "refine") {
         const title = record.title || "(untitled)";
@@ -179,7 +187,12 @@ export const runTodosCommand = async (
       }
 
       if (action === "release") {
-        const result = await releaseTodoAssignment(todosDir, record.id, ctx, true);
+        const result = await releaseTodoAssignment(
+          todosDir,
+          record.id,
+          ctx,
+          true,
+        );
         if ("error" in result) {
           ctx.ui.notify(result.error, "error");
           return "stay";
@@ -203,7 +216,12 @@ export const runTodosCommand = async (
       }
 
       const nextStatus = action === "close" ? "closed" : "open";
-      const result = await updateTodoStatus(todosDir, record.id, nextStatus, ctx);
+      const result = await updateTodoStatus(
+        todosDir,
+        record.id,
+        nextStatus,
+        ctx,
+      );
       if ("error" in result) {
         ctx.ui.notify(result.error, "error");
         return "stay";
@@ -211,11 +229,17 @@ export const runTodosCommand = async (
 
       const updatedTodos = await listTodos(todosDir);
       selector?.setTodos(updatedTodos);
-      ctx.ui.notify(`${action === "close" ? "Closed" : "Reopened"} todo ${formatTodoId(record.id)}`, "info");
+      ctx.ui.notify(
+        `${action === "close" ? "Closed" : "Reopened"} todo ${formatTodoId(record.id)}`,
+        "info",
+      );
       return "stay";
     };
 
-    const handleActionSelection = async (record: TodoRecord, action: TodoMenuAction) => {
+    const handleActionSelection = async (
+      record: TodoRecord,
+      action: TodoMenuAction,
+    ) => {
       if (action === "view") {
         const overlayAction = await openTodoOverlay(record);
         if (overlayAction === "work") {
@@ -230,16 +254,20 @@ export const runTodosCommand = async (
 
       if (action === "delete") {
         const message = `Delete todo ${formatTodoId(record.id)}? This cannot be undone.`;
-        deleteConfirm = new TodoDeleteConfirmComponent(theme, message, (confirmed) => {
-          if (!confirmed) {
-            setActiveComponent(actionMenu);
-            return;
-          }
-          void (async () => {
-            await applyTodoAction(record, "delete");
-            setActiveComponent(selector);
-          })();
-        });
+        deleteConfirm = new TodoDeleteConfirmComponent(
+          theme,
+          message,
+          (confirmed) => {
+            if (!confirmed) {
+              setActiveComponent(actionMenu);
+              return;
+            }
+            void (async () => {
+              await applyTodoAction(record, "delete");
+              setActiveComponent(selector);
+            })();
+          },
+        );
         setActiveComponent(deleteConfirm);
         return;
       }
@@ -261,7 +289,7 @@ export const runTodosCommand = async (
         },
         () => {
           setActiveComponent(selector);
-        }
+        },
       );
       setActiveComponent(actionMenu);
     };
@@ -287,7 +315,7 @@ export const runTodosCommand = async (
             ? buildRefinePrompt(todo.id, title)
             : `work on todo ${formatTodoId(todo.id)} "${title}"`;
         done();
-      }
+      },
     );
 
     setActiveComponent(selector);

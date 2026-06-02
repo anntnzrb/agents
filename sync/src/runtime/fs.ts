@@ -39,7 +39,11 @@ export function copyTree(src: string, dst: string): void {
   copyTreeRecursive(src, dst);
 }
 
-export function syncManagedTree(src: string, dst: string, preservePaths: readonly string[] = []): void {
+export function syncManagedTree(
+  src: string,
+  dst: string,
+  preservePaths: readonly string[] = [],
+): void {
   const metadata = fs.statSync(src);
   if (!metadata.isDirectory()) {
     syncManagedFile(src, dst);
@@ -48,7 +52,11 @@ export function syncManagedTree(src: string, dst: string, preservePaths: readonl
   syncManagedTreeRecursive(src, dst, normalizePreservePaths(preservePaths));
 }
 
-export function syncManagedChildren(src: string, dst: string, preservePaths: readonly string[] = []): void {
+export function syncManagedChildren(
+  src: string,
+  dst: string,
+  preservePaths: readonly string[] = [],
+): void {
   const metadata = fs.statSync(src);
   if (!metadata.isDirectory()) {
     syncManagedFile(src, dst);
@@ -79,7 +87,11 @@ function copyTreeRecursive(src: string, dst: string): void {
   }
 }
 
-function syncManagedTreeRecursive(src: string, dst: string, preservePaths: readonly string[]): void {
+function syncManagedTreeRecursive(
+  src: string,
+  dst: string,
+  preservePaths: readonly string[],
+): void {
   const metadata = fs.statSync(src);
   if (!metadata.isDirectory()) {
     syncManagedFile(src, dst);
@@ -114,7 +126,11 @@ function syncManagedTreeRecursive(src: string, dst: string, preservePaths: reado
   }
 }
 
-function syncManagedChildrenRecursive(src: string, dst: string, preservePaths: readonly string[]): void {
+function syncManagedChildrenRecursive(
+  src: string,
+  dst: string,
+  preservePaths: readonly string[],
+): void {
   const metadata = fs.statSync(src);
   if (!metadata.isDirectory()) {
     syncManagedFile(src, dst);
@@ -147,7 +163,11 @@ function syncManagedFile(src: string, dst: string): void {
   fs.copyFileSync(src, dst);
 }
 
-function isIdenticalFile(src: string, srcMetadata: fs.Stats, dst: string): boolean {
+function isIdenticalFile(
+  src: string,
+  srcMetadata: fs.Stats,
+  dst: string,
+): boolean {
   if (srcMetadata.isDirectory()) {
     return false;
   }
@@ -195,7 +215,10 @@ function ensureDirectory(dst: string): void {
   fs.mkdirSync(dst, { recursive: true });
 }
 
-function childPreserve(preservePaths: readonly string[], childName: string): string[] {
+function childPreserve(
+  preservePaths: readonly string[],
+  childName: string,
+): string[] {
   const prefix = `${childName}/`;
   return preservePaths
     .filter((candidate) => candidate.startsWith(prefix))
@@ -203,7 +226,9 @@ function childPreserve(preservePaths: readonly string[], childName: string): str
 }
 
 const normalizePreservePaths = (preservePaths: readonly string[]): string[] =>
-  [...new Set(preservePaths.filter((candidate) => candidate.length > 0))].sort();
+  [
+    ...new Set(preservePaths.filter((candidate) => candidate.length > 0)),
+  ].sort();
 
 function safeReadDir(targetPath: string): fs.Dirent[] {
   try {
@@ -215,4 +240,3 @@ function safeReadDir(targetPath: string): fs.Dirent[] {
     throw error;
   }
 }
-

@@ -3,11 +3,13 @@
 Iterator algebra, batching, filtering, grouping, and itertools recipes.
 
 ---
+
 ## Infinite Iterators
 
 **Problem**: You need to generate infinite sequences or cycle through values repeatedly.
 
 **Solution**:
+
 ```python
 from itertools import count, cycle, repeat
 
@@ -34,6 +36,7 @@ assert repeated == ['x', 'x', 'x']
 **Problem**: You need to concatenate iterables or compute running aggregations.
 
 **Solution**:
+
 ```python
 from itertools import chain, accumulate
 from operator import add, mul
@@ -59,6 +62,7 @@ assert cumprod == [1, 2, 6, 24]
 **Problem**: You need to group elements into chunks or create consecutive pairs.
 
 **Solution**:
+
 ```python
 from itertools import batched, pairwise
 
@@ -80,6 +84,7 @@ assert pairs == [('A', 'B'), ('B', 'C'), ('C', 'D')]
 **Problem**: You need to filter or slice iterators based on conditions.
 
 **Solution**:
+
 ```python
 from itertools import filterfalse, takewhile, dropwhile, islice
 
@@ -111,6 +116,7 @@ assert sliced == [2, 4, 6]
 **Problem**: You need to generate combinations, permutations, or cartesian products.
 
 **Solution**:
+
 ```python
 from itertools import combinations, permutations, product
 
@@ -140,6 +146,7 @@ assert len(all_binary) == 8  # 2^3
 **Problem**: You need to group consecutive equal elements or group by a key.
 
 **Solution**:
+
 ```python
 from itertools import groupby
 
@@ -170,6 +177,7 @@ for dept, group in groupby(sorted_people, key=lambda x: x["dept"]):
 **Problem**: You need common iterator patterns like flattening, taking n items, or finding unique elements.
 
 **Solution**:
+
 ```python
 from itertools import islice, chain
 

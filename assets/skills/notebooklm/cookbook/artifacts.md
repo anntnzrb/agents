@@ -7,6 +7,7 @@
 **Problem**: See artifacts for a notebook.
 
 **Solution**:
+
 ```bash
 nlm artifacts <notebook-id>
 ```
@@ -20,6 +21,7 @@ nlm artifacts <notebook-id>
 **Problem**: Create a note, audio, report, or app artifact.
 
 **Solution**:
+
 ```bash
 nlm create-artifact <notebook-id> note
 ```
@@ -33,6 +35,7 @@ nlm create-artifact <notebook-id> note
 **Problem**: Remove an artifact.
 
 **Solution**:
+
 ```bash
 nlm delete-artifact <artifact-id>
 ```

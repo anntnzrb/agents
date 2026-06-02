@@ -9,6 +9,7 @@ Recipes for common Go design patterns: functional options, dependency injection,
 **Problem**: How to create flexible constructors with optional configuration?
 
 **Solution**:
+
 ```go
 type Server struct {
     host    string
@@ -58,6 +59,7 @@ server := NewServer(
 **Problem**: How to validate option values and return configuration errors?
 
 **Solution**:
+
 ```go
 type Option func(*Config) error
 
@@ -91,6 +93,7 @@ func NewConfig(opts ...Option) (*Config, error) {
 **Problem**: How to make code testable by injecting dependencies?
 
 **Solution**:
+
 ```go
 type UserService struct {
     repo   UserRepository
@@ -117,6 +120,7 @@ type UserRepository interface {
 **Problem**: How to wire up complex dependency graphs automatically?
 
 **Solution**:
+
 ```go
 import "go.uber.org/fx"
 
@@ -151,6 +155,7 @@ func NewUserService(repo *UserRepository, log *zap.Logger) *UserService {
 **Problem**: How to manage startup and shutdown of resources in fx?
 
 **Solution**:
+
 ```go
 func NewDatabase(lc fx.Lifecycle) *sql.DB {
     db := connectDB()
@@ -177,6 +182,7 @@ func NewDatabase(lc fx.Lifecycle) *sql.DB {
 **Problem**: How to add context to errors while preserving the original error?
 
 **Solution**:
+
 ```go
 func LoadConfig(path string) (*Config, error) {
     data, err := os.ReadFile(path)
@@ -202,6 +208,7 @@ func LoadConfig(path string) (*Config, error) {
 **Problem**: How to define and check for specific error conditions?
 
 **Solution**:
+
 ```go
 var (
     ErrNotFound     = errors.New("not found")
@@ -232,6 +239,7 @@ if errors.Is(err, ErrNotFound) {
 **Problem**: How to include structured data in errors for programmatic handling?
 
 **Solution**:
+
 ```go
 type ValidationError struct {
     Field   string
@@ -265,6 +273,7 @@ if errors.As(err, &valErr) {
 **Problem**: How to collect and return multiple errors from a batch operation?
 
 **Solution**:
+
 ```go
 import "go.uber.org/multierr"
 
@@ -295,6 +304,7 @@ if errs := validateAll(items); errs != nil {
 **Problem**: How to design interfaces that are easy to implement and mock?
 
 **Solution**:
+
 ```go
 // Good: small, focused interfaces
 type Reader interface {
@@ -321,6 +331,7 @@ type ReadWriter interface {
 **Problem**: How to avoid forcing implementations to provide unused methods?
 
 **Solution**:
+
 ```go
 // Instead of one large interface
 type UserService interface {
@@ -354,6 +365,7 @@ func NewHandler(getter UserGetter) *Handler {
 **Problem**: How to construct complex objects step-by-step with a fluent API?
 
 **Solution**:
+
 ```go
 type RequestBuilder struct {
     method  string
@@ -412,6 +424,7 @@ req, _ := NewRequest().
 **Problem**: How to abstract data access behind a clean interface?
 
 **Solution**:
+
 ```go
 type UserRepository interface {
     Get(ctx context.Context, id string) (*User, error)
@@ -450,6 +463,7 @@ func (r *postgresUserRepo) Get(ctx context.Context, id string) (*User, error) {
 **Problem**: How to add cross-cutting concerns (logging, auth, recovery) to HTTP handlers?
 
 **Solution**:
+
 ```go
 type Middleware func(http.Handler) http.Handler
 
@@ -501,6 +515,7 @@ handler := Chain(myHandler, Logging(logger), Recovery())
 **Problem**: How to stop a server cleanly, finishing in-flight requests?
 
 **Solution**:
+
 ```go
 func main() {
     server := &http.Server{Addr: ":8080", Handler: router}

@@ -14,18 +14,22 @@ disable-model-invocation: true
 Operator manual for the bundled read-only flight CLI.
 
 ## Credentials
+
 No credentials. No API keys. No commercial APIs.
 
 ## Entry points
+
 - From skill root: `uv run --script <skill-dir>/scripts/cli.py ...`
 - From anywhere: `uv run --script "$SKILLS_DIR/flight-live/scripts/cli.py" ...`
 - If `SKILLS_DIR` is not set: `uv run --script <skill-dir>/scripts/cli.py ...`
 - For process integration: `uv run --script <skill-dir>/scripts/cli.py --mode rpc`
 
 ## Core rule
+
 Prefer `--llm-json` unless user asks for human text.
 
 ## Fast pattern
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py \
   --origin GYE \
@@ -39,13 +43,16 @@ uv run --script <skill-dir>/scripts/cli.py \
 ```
 
 ## Failure handling
+
 Common failures:
+
 - missing `nix` in PATH (hard fail)
 - `agent-browser` unavailable via nix wrapper (hard fail)
 - provider execution/network failures (hard fail)
 - over-constrained filters (empty shortlist with guidance in `decision.actions`)
 
 Recovery order:
+
 1. verify `nix` works
 2. run `nix run github:numtide/llm-agents.nix#agent-browser -- --version`
 3. widen date window
@@ -54,7 +61,9 @@ Recovery order:
 6. relax `--stay-min/--stay-max`
 
 ## Evidence fields to trust most
+
 Top-level:
+
 - `warnings`
 - `summary.planner_received`
 - `summary.after_filters`
@@ -64,6 +73,7 @@ Top-level:
 - `decision.recommendation`
 
 Per result:
+
 - `effective_price`
 - `nonstop`
 - `depart_date` / `return_date`
@@ -72,9 +82,11 @@ Per result:
 - `hints`
 
 ## RPC usage
+
 Use RPC for strict JSONL envelopes (`ping`, `get_schema`, `search`).
 
 Reference docs:
+
 - `references/cheatsheet.md`
 - `references/workflows.md`
 - `references/rpc.md`

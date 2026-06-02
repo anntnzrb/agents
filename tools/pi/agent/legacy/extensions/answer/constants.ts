@@ -42,4 +42,5 @@ export const EMPTY_ANSWER_DEFAULT =
 export const SKIP_ANSWER_DEFAULT =
   "User chose to skip. Please choose a reasonable default based on context.";
 
-export const ANSWER_MESSAGE_PREFIX = "I answered your questions in the following way:\n\n";
+export const ANSWER_MESSAGE_PREFIX =
+  "I answered your questions in the following way:\n\n";

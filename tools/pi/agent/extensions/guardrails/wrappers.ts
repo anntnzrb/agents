@@ -65,7 +65,10 @@ export function firstExecutableIndex(tokens: string[]): number {
   return index;
 }
 
-export function unwrapCommand(tokens: string[], index: number): UnwrappedCommand {
+export function unwrapCommand(
+  tokens: string[],
+  index: number,
+): UnwrappedCommand {
   const executableToken = tokenAt(tokens, index);
   if (!executableToken) {
     return {};
@@ -197,12 +200,22 @@ function unwrapEnv(tokens: string[], index: number): UnwrappedCommand {
       return { nestedCommands: split ? [split] : [] };
     }
 
-    if (token === "-u" || token === "-C" || token === "--unset" || token === "--chdir" || token === "--argv0") {
+    if (
+      token === "-u" ||
+      token === "-C" ||
+      token === "--unset" ||
+      token === "--chdir" ||
+      token === "--argv0"
+    ) {
       i += 2;
       continue;
     }
 
-    if (token.startsWith("--unset=") || token.startsWith("--chdir=") || token.startsWith("--argv0=")) {
+    if (
+      token.startsWith("--unset=") ||
+      token.startsWith("--chdir=") ||
+      token.startsWith("--argv0=")
+    ) {
       i += 1;
       continue;
     }

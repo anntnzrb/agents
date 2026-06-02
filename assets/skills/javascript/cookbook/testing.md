@@ -4,12 +4,12 @@ Read this file for runner choice, test structure, async tests, mocking, integrat
 
 ## Pick the runner from repo context
 
-| Situation | Default |
-| --- | --- |
-| Vite / bundler repo with no runner yet | Vitest |
-| Existing Jest repo / React Native / legacy ecosystem hooks | Jest |
-| Browser UI behavior | Existing runner + Testing Library |
-| HTTP / DB boundary tests | Existing runner + real integration setup |
+| Situation                                                  | Default                                  |
+| ---------------------------------------------------------- | ---------------------------------------- |
+| Vite / bundler repo with no runner yet                     | Vitest                                   |
+| Existing Jest repo / React Native / legacy ecosystem hooks | Jest                                     |
+| Browser UI behavior                                        | Existing runner + Testing Library        |
+| HTTP / DB boundary tests                                   | Existing runner + real integration setup |
 
 Use the repo's current runner unless migration is the task.
 
@@ -45,6 +45,7 @@ Use `async` / `await` or returned Promises. Do not rely on hidden timing or `don
 ## Mocking strategy
 
 Mock external edges:
+
 - network
 - database
 - filesystem
@@ -123,6 +124,7 @@ it("creates a user", async () => {
 ```
 
 For DB integration tests:
+
 - create or migrate the schema for tests
 - isolate data per test or truncate tables between tests
 - close pools / connections in teardown
@@ -147,6 +149,7 @@ it("submits the form", async () => {
 ```
 
 Good query order:
+
 1. `getByRole`
 2. `getByLabelText`
 3. `getByText`
@@ -198,6 +201,7 @@ Use snapshots for stable structured output or small UI fragments. Keep them focu
 Coverage is a lagging indicator, not proof of correctness.
 
 Good targets:
+
 - error paths that actually matter
 - serialization / parsing boundaries
 - concurrency and timeout behavior

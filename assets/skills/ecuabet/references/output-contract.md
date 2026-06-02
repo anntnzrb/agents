@@ -16,7 +16,9 @@ Canonical output comes from `scripts/main.py`.
 ## Key objects
 
 ### `oneShot.topRecommendation`
+
 Core fields:
+
 - `marketFamily`
 - `marketName`
 - `selectionName`
@@ -28,22 +30,29 @@ Core fields:
 - `riskTier`
 
 ### `oneShot.shortlist`
+
 Ordered list of candidate picks. Keep ordering as ranking.
 
 ### `oneShot.globalConfidence`
+
 Global scalar in `[0, 1]` for recommendation reliability at current fetch time.
 
 ### `oneShot.feedHealth`
+
 Per-feed health and staleness impact.
 
 ### `decisionSummary.liveMetrics`
+
 Includes shots, xG, corners, fouls, cards, offsides, possession, saves.
 
 ### `decisionSummary.timeline`
+
 Merged event stream from SofaScore and ESPN.
 
 ### `decisionSummary.ecuabetMarkets`
+
 Market coverage and key lines:
+
 - `keyLines.1x2`
 - `keyLines.doubleChance`
 - `keyLines.btts`

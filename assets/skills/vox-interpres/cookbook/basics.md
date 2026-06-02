@@ -19,6 +19,7 @@ uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze ./song.flac -
 ```
 
 Outputs:
+
 - JSON analysis payload (stdout)
 - cache file under `~/.cache/vox-interpres/`
 
@@ -37,6 +38,7 @@ uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" chat ./song.flac
 ```
 
 Inside REPL:
+
 - ask natural questions
 - type `exit`, `quit`, or `:q` to end
 
@@ -88,6 +90,7 @@ jq '{tempo:.beats.tempo_bpm,key:(.key.key+" "+.key.mode),energy:.energy.dynamic_
 ## 9) Agent pattern (human asks, agent executes)
 
 Recommended loop:
+
 1. Human gives file path + question.
 2. Agent runs `ask` for direct answer.
 3. If low confidence / broad query, agent runs `analyze --json`.

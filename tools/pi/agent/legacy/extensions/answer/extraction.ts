@@ -32,9 +32,13 @@ const parseExtractionResult = (text: string): ExtractionResult | null => {
 /**
  * Extract response text blocks.
  */
-const extractResponseText = (parts: readonly { type: string; text?: string }[]): string => {
+const extractResponseText = (
+  parts: readonly { type: string; text?: string }[],
+): string => {
   return parts
-    .filter((part): part is { type: "text"; text: string } => part.type === "text")
+    .filter(
+      (part): part is { type: "text"; text: string } => part.type === "text",
+    )
     .map((part) => part.text)
     .join("\n");
 };
@@ -46,7 +50,7 @@ const runExtraction = async (
   ctx: ExtensionContext,
   model: ActiveModel,
   assistantText: string,
-  signal: AbortSignal
+  signal: AbortSignal,
 ): Promise<ExtractionResult | null> => {
   const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
   if (!auth.ok || !auth.apiKey) return null;
@@ -60,7 +64,7 @@ const runExtraction = async (
   const response = await complete(
     model,
     { systemPrompt: SYSTEM_PROMPT, messages: [userMessage] },
-    { apiKey: auth.apiKey, headers: auth.headers, signal }
+    { apiKey: auth.apiKey, headers: auth.headers, signal },
   );
 
   if (response.stopReason === "aborted") {
@@ -76,10 +80,14 @@ const runExtraction = async (
 export const extractQuestions = (
   ctx: ExtensionContext,
   model: ActiveModel,
-  assistantText: string
+  assistantText: string,
 ): Promise<ExtractionResult | null> => {
   return ctx.ui.custom<ExtractionResult | null>((tui, theme, _kb, done) => {
-    const loader = new BorderedLoader(tui, theme, `Extracting questions using ${model.id}...`);
+    const loader = new BorderedLoader(
+      tui,
+      theme,
+      `Extracting questions using ${model.id}...`,
+    );
     loader.onAbort = () => done(null);
 
     runExtraction(ctx, model, assistantText, loader.signal)

@@ -12,6 +12,7 @@ disable-model-invocation: true
 # Emacs
 
 Treat Emacs work as two connected systems:
+
 - the running Emacs state
 - the persistent config on disk
 
@@ -28,6 +29,7 @@ uv run --script <skill-dir>/scripts/cli.py ...
 Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
 
 ## Evidence order
+
 1. Runtime introspection via `uv run --script <skill-dir>/scripts/cli.py`
 2. Official manuals via `info`
 3. Local installed docs/source via `rg`
@@ -36,6 +38,7 @@ Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, execut
 Avoid cloning Emacs unless explicitly needed.
 
 ## Workflow
+
 1. Inspect runtime state first
 2. Inspect the relevant config files only as needed
 3. Pick the right persistence target
@@ -49,11 +52,13 @@ Avoid cloning Emacs unless explicitly needed.
 Default pattern: inspect -> preview -> apply -> verify.
 
 ## Output discipline
+
 - If the user asked for a report, note, patch file, or any other artifact at a specific path, create it before finalizing
 - Do not stop at an acknowledgement, plan, or partial progress update when the task asked for a concrete deliverable
 - After writing the requested artifact, summarize the result briefly
 
 ## Persistence targets
+
 - `early-init.el`
   - startup behavior
   - frame/UI defaults that should exist before normal init
@@ -66,14 +71,17 @@ Default pattern: inspect -> preview -> apply -> verify.
   - if the repo already splits config, edit the relevant module instead of bloating `init.el`
 
 ## Runtime introspection
+
 Default to `uv run --script <skill-dir>/scripts/cli.py` for Emacs communication. It dispatches to `scripts/emacsctl.py`, avoids fragile shell quoting, and makes common checks easy.
 
 Use raw `emacsclient` only when:
+
 - debugging the helper itself
 - the helper is unavailable
 - a truly tiny one-off probe is simpler and there is no quoting risk
 
 Prefer helper subcommands before custom Elisp when they fit the task:
+
 - `ping`
 - `face`
 - `buffer`
@@ -96,9 +104,11 @@ uv run --script <skill-dir>/scripts/cli.py feature server
 For reusable or multiline queries, prefer a temp `.el` file plus `eval-file`.
 
 ## Official manuals
+
 Prefer `info` for official semantics and version-matched behavior.
 
 Useful nodes:
+
 - `(emacs)Init File`
 - `(emacs)Package Installation`
 - `(emacs)Fonts`
@@ -111,21 +121,26 @@ Useful nodes:
 If `info` is unavailable, grep the local manual files. In Nix environments, `nix shell nixpkgs#texinfoInteractive -c info ...` is a convenient fallback.
 
 ## Local installed docs/source
+
 Use runtime queries to find the active Emacs installation, data dir, and library paths. Then search those paths with `rg`.
 
 Use this layer for:
+
 - implementation details
 - clarifying ambiguous manual wording
 - version-matched source inspection without cloning
 
 ## Corroboration
+
 Use public search only after the first three layers.
+
 - Grep.app: public usage patterns and config snippets
 - `gh search code`: repo-targeted corroboration
 
 Use corroboration to understand how people do things in practice, not as the primary source of truth for core Emacs behavior.
 
 ## Safe live-change pattern
+
 - Make the intended file change first for persistent behavior
 - Then apply live only to preview or verify the persistent change
 - Prefer precise reloads:
@@ -137,6 +152,7 @@ Use corroboration to understand how people do things in practice, not as the pri
 - If you test an ephemeral tweak before writing it, label it clearly as a preview and persist it before finishing
 
 ## Package and dependency policy
+
 - Package-manager side effects are opt-in only
 - Do not run `package-refresh-contents`, `package-install`, upgrades, or archive rewrites unless the user asked for installs/upgrades or the task explicitly requires them and you explain why
 - When modernizing old package bootstrap, preserve low-risk preference settings such as archive URLs or package policy variables unless there is a good reason to remove them
@@ -144,6 +160,7 @@ Use corroboration to understand how people do things in practice, not as the pri
 - On modern Emacs, verify bundled features from runtime/docs before bootstrapping external packages
 
 ## Guardrails
+
 - Do not trust memory alone for Emacs semantics; inspect runtime/docs/source
 - Do not assume a specific config layout, package set, theme, keybinding scheme, or distro integration; inspect first
 - Do not claim a startup-only change is live if it only fully applies on restart
@@ -155,6 +172,7 @@ Use corroboration to understand how people do things in practice, not as the pri
 - Be explicit about risk when live-evaluating changes in an already-running Emacs
 
 ## Resources
+
 - `scripts/cli.py`: public dispatcher for the reliable `emacsclient` wrapper
 - `scripts/emacsctl.py`: internal wrapper
 - `references/live-workflow.md`: inspect/apply/verify guidance and restart matrix

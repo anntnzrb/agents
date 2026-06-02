@@ -47,10 +47,16 @@ def _run_script(path: Path, args: list[str]) -> int:
 
 
 def _print_help() -> None:
-    print("usage: cli.py run [args...] | feed {ecuabet,sofascore,espn,open-meteo,understat} [args...]\n")
+    print(
+        "usage: cli.py run [args...] | feed {ecuabet,sofascore,espn,open-meteo,understat} [args...]\n"
+    )
     print("Cross-platform:")
-    print("  uv run --script <skill-dir>/scripts/cli.py run <match_id_or_url> --ecuabet <id> --no-raw --compact")
-    print("  uv run --script <skill-dir>/scripts/cli.py feed ecuabet <match_id_or_url> --no-raw --compact")
+    print(
+        "  uv run --script <skill-dir>/scripts/cli.py run <match_id_or_url> --ecuabet <id> --no-raw --compact"
+    )
+    print(
+        "  uv run --script <skill-dir>/scripts/cli.py feed ecuabet <match_id_or_url> --no-raw --compact"
+    )
     print("\nUse 'run --help' or 'feed <name> --help' for helper-specific flags.")
 
 
@@ -65,7 +71,9 @@ def main(argv: list[str] | None = None) -> int:
         return _run_script(SCRIPTS_DIR / "main.py", rest)
     if command == "feed":
         if not rest or rest[0] in {"-h", "--help"}:
-            print("usage: cli.py feed {ecuabet,sofascore,espn,open-meteo,understat} [args...]")
+            print(
+                "usage: cli.py feed {ecuabet,sofascore,espn,open-meteo,understat} [args...]"
+            )
             return 0
         feed, feed_args = rest[0], rest[1:]
         if feed not in FEEDS:

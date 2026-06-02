@@ -3,6 +3,7 @@
 Purpose: file-backed todo manager with a tool and /todos TUI.
 
 ## File map
+
 - index.ts: registration + GC on session start
 - tool.ts: todo tool implementation
 - command.ts: /todos TUI command
@@ -15,8 +16,10 @@ Purpose: file-backed todo manager with a tool and /todos TUI.
 - types.ts: shared types/schema
 
 ## Navigation
+
 Start at index.ts, then tool.ts or command.ts.
 
 ## Stop Rules
+
 - Keep scope file-backed and local to this todo manager.
 - Do not integrate external task systems or alter unrelated session state unless explicitly requested.

@@ -6,19 +6,33 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from .io import cache_path_for, ensure_out_dir, load_analysis, save_analysis, validate_audio_path
+from .io import (
+    cache_path_for,
+    ensure_out_dir,
+    load_analysis,
+    save_analysis,
+    validate_audio_path,
+)
 from .query import answer_question
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="vox-interpres", description="Analyze songs and answer questions.")
+    parser = argparse.ArgumentParser(
+        prog="vox-interpres", description="Analyze songs and answer questions."
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    analyze = subparsers.add_parser("analyze", help="Extract audio features and store analysis cache.")
+    analyze = subparsers.add_parser(
+        "analyze", help="Extract audio features and store analysis cache."
+    )
     _add_common_analysis_args(analyze)
-    analyze.add_argument("--json", action="store_true", help="Print analysis JSON to stdout.")
+    analyze.add_argument(
+        "--json", action="store_true", help="Print analysis JSON to stdout."
+    )
 
-    ask = subparsers.add_parser("ask", help="Answer one natural-language question over analysis.")
+    ask = subparsers.add_parser(
+        "ask", help="Answer one natural-language question over analysis."
+    )
     _add_common_analysis_args(ask)
     ask.add_argument("question", help="Question to answer.")
 
@@ -51,10 +65,21 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _add_common_analysis_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("audio", type=Path, help="Audio file (.mp3/.flac/.wav/.ogg/.m4a).")
-    parser.add_argument("--segment-start", type=float, default=0.0, help="Start offset in seconds.")
-    parser.add_argument("--segment-duration", type=float, default=None, help="Segment duration in seconds.")
-    parser.add_argument("--plots", action="store_true", help="Write waveform/spectrogram/chroma plots.")
+    parser.add_argument(
+        "audio", type=Path, help="Audio file (.mp3/.flac/.wav/.ogg/.m4a)."
+    )
+    parser.add_argument(
+        "--segment-start", type=float, default=0.0, help="Start offset in seconds."
+    )
+    parser.add_argument(
+        "--segment-duration",
+        type=float,
+        default=None,
+        help="Segment duration in seconds.",
+    )
+    parser.add_argument(
+        "--plots", action="store_true", help="Write waveform/spectrogram/chroma plots."
+    )
     parser.add_argument(
         "--out-dir",
         type=Path,
@@ -67,7 +92,9 @@ def _add_common_analysis_args(parser: argparse.ArgumentParser) -> None:
         default=True,
         help="Use analysis cache if present (use --no-cache to disable).",
     )
-    parser.add_argument("--refresh", action="store_true", help="Ignore cache and recompute analysis.")
+    parser.add_argument(
+        "--refresh", action="store_true", help="Ignore cache and recompute analysis."
+    )
 
 
 def _cmd_analyze(args: argparse.Namespace) -> int:
@@ -94,7 +121,9 @@ def _cmd_ask(args: argparse.Namespace) -> int:
 
 def _cmd_chat(args: argparse.Namespace) -> int:
     analysis, _, _ = _load_or_build_analysis(args)
-    print("chat ready. ask about tempo/key/energy/sections/metadata. type 'exit' to quit.")
+    print(
+        "chat ready. ask about tempo/key/energy/sections/metadata. type 'exit' to quit."
+    )
     while True:
         try:
             question = input("ask> ").strip()
@@ -112,7 +141,9 @@ def _cmd_chat(args: argparse.Namespace) -> int:
 def _load_or_build_analysis(args: argparse.Namespace):
     audio_path = validate_audio_path(Path(args.audio))
     out_dir = ensure_out_dir(Path(args.out_dir))
-    cache_path = cache_path_for(out_dir, audio_path, float(args.segment_start), args.segment_duration)
+    cache_path = cache_path_for(
+        out_dir, audio_path, float(args.segment_start), args.segment_duration
+    )
 
     use_cache = bool(args.cache) and not bool(args.refresh)
     if use_cache and cache_path.exists():

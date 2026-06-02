@@ -5,21 +5,25 @@ Assumption: run commands from the skill directory (where `SKILL.md` lives).
 Shortcut prompts are documented in `references/shortcuts.md`.
 
 ## Integrated one-shot
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py run 13821298 --ecuabet 13821298 --require-ecuabet --no-raw --compact
 ```
 
 ## Integrated watch
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py run 13821298 --ecuabet 13821298 --require-ecuabet --watch 20 --max-iterations 0 --no-raw --compact
 ```
 
 ## Write snapshot file
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py run 13821298 --ecuabet 13821298 --require-ecuabet --no-raw --output snapshots/latest.json
 ```
 
 ## Strict low-variance shortlist
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py run 13821298 \
   --ecuabet 13821298 \
@@ -33,6 +37,7 @@ uv run --script <skill-dir>/scripts/cli.py run 13821298 \
 ```
 
 ## Wider upside shortlist
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py run 13821298 \
   --ecuabet 13821298 \
@@ -47,6 +52,7 @@ uv run --script <skill-dir>/scripts/cli.py run 13821298 \
 ```
 
 ## Tune recommendation bounds
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py run 13821298 \
   --ecuabet 13821298 \
@@ -62,6 +68,7 @@ uv run --script <skill-dir>/scripts/cli.py run 13821298 \
 ```
 
 ## Per-feed debugging
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py feed ecuabet 13821298 --no-raw --compact
 uv run --script <skill-dir>/scripts/cli.py feed sofascore "RB Leipzig Wolfsburg" --no-raw --compact
@@ -71,6 +78,7 @@ uv run --script <skill-dir>/scripts/cli.py feed understat --league Bundesliga --
 ```
 
 ## Run tests
+
 ```bash
 cd scripts
 uv run pytest tests -q

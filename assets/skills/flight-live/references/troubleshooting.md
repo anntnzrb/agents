@@ -3,9 +3,11 @@
 ## Hard fail: missing nix
 
 Symptom:
+
 - `error: Kiwi web scraper requires 'nix' in PATH ...`
 
 Fix:
+
 1. install Nix
 2. verify with `nix --version`
 3. rerun
@@ -13,9 +15,11 @@ Fix:
 ## Hard fail: agent-browser wrapper unavailable
 
 Symptom:
+
 - `error: agent-browser is unavailable through nix wrapper ...`
 
 Fix:
+
 1. run `nix run github:numtide/llm-agents.nix#agent-browser -- --version`
 2. confirm flakes/nix-command enabled
 3. retry search
@@ -23,18 +27,22 @@ Fix:
 ## Date window invalid
 
 Symptom:
+
 - `error: depart-end must be >= depart-start`
 
 Fix:
+
 - correct date ordering
 
 ## No results after filters
 
 Symptom:
+
 - `warnings` says no planner offers after filters
 - empty `results`
 
 Fix order:
+
 1. widen departure window
 2. disable `--nonstop`
 3. remove/raise `--max-budget`
@@ -43,10 +51,12 @@ Fix order:
 ## Provider execution/network failures
 
 Symptoms:
+
 - `error: agent-browser execution failed via nix wrapper ...`
 - `error: agent-browser command timed out ...`
 
 Fix:
+
 - retry (transient)
 - verify wrapper works: `nix run github:numtide/llm-agents.nix#agent-browser -- --version`
 - reduce window size
@@ -54,6 +64,7 @@ Fix:
 ## RPC request errors
 
 Common issues:
+
 - non-JSON lines
 - wrong field types (e.g. string instead of integer)
 - missing required `search` fields
@@ -67,6 +78,7 @@ printf '%s\n' '{"id":"1","type":"ping"}' | uv run --script <skill-dir>/scripts/c
 ## Evidence priority when conflicted
 
 Trust order:
+
 1. `warnings`
 2. `summary.returned`
 3. `results[].effective_price`

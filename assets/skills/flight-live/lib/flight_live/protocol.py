@@ -4,7 +4,13 @@ from collections.abc import Sequence
 from statistics import mean
 from typing import NotRequired, TypedDict
 
-from .models import FlightLiveError, FlightOption, PlannerOffer, ResolvedPlace, SearchRequest
+from .models import (
+    FlightLiveError,
+    FlightOption,
+    PlannerOffer,
+    ResolvedPlace,
+    SearchRequest,
+)
 from .providers import fetch_kiwi_web_calendar, resolve_place
 from .scoring import rank_options
 
@@ -225,7 +231,10 @@ def get_schema_document() -> dict[str, object]:
                             "destination": {"type": "string"},
                             "departStart": {"type": "string", "format": "date"},
                             "departEnd": {"type": "string", "format": "date"},
-                            "tripType": {"type": "string", "enum": ["oneway", "roundtrip"]},
+                            "tripType": {
+                                "type": "string",
+                                "enum": ["oneway", "roundtrip"],
+                            },
                             "stayMin": {"type": ["integer", "null"], "minimum": 0},
                             "stayMax": {"type": ["integer", "null"], "minimum": 0},
                             "adults": {"type": ["integer", "null"], "minimum": 1},
@@ -318,7 +327,10 @@ def _filter_planner_offers(
 ) -> list[PlannerOffer]:
     filtered: list[PlannerOffer] = []
     for offer in offers:
-        if offer.depart_date < request.depart_start or offer.depart_date > request.depart_end:
+        if (
+            offer.depart_date < request.depart_start
+            or offer.depart_date > request.depart_end
+        ):
             continue
         if request.nonstop and not offer.nonstop:
             continue
@@ -356,8 +368,12 @@ def _build_insights(offers: Sequence[PlannerOffer]) -> InsightsPayload:
     if not offers:
         return insights
 
-    weekend_prices = [offer.price for offer in offers if offer.depart_date.weekday() in (4, 5, 6)]
-    weekday_prices = [offer.price for offer in offers if offer.depart_date.weekday() in (0, 1, 2, 3)]
+    weekend_prices = [
+        offer.price for offer in offers if offer.depart_date.weekday() in (4, 5, 6)
+    ]
+    weekday_prices = [
+        offer.price for offer in offers if offer.depart_date.weekday() in (0, 1, 2, 3)
+    ]
 
     if weekend_prices:
         insights["weekend_avg_price"] = round(mean(weekend_prices), 2)
@@ -376,7 +392,9 @@ def _build_insights(offers: Sequence[PlannerOffer]) -> InsightsPayload:
     return insights
 
 
-def _build_decision(*, ranked: Sequence[FlightOption], insights: InsightsPayload) -> DecisionPayload:
+def _build_decision(
+    *, ranked: Sequence[FlightOption], insights: InsightsPayload
+) -> DecisionPayload:
     if not ranked:
         return {
             "recommendation": "No viable options after filters.",
@@ -398,7 +416,9 @@ def _build_decision(*, ranked: Sequence[FlightOption], insights: InsightsPayload
 
     premium = insights.get("weekend_premium_pct")
     if isinstance(premium, float) and premium > 8:
-        actions.append("Prefer Tuesday-Thursday departures; observed weekend premium is high.")
+        actions.append(
+            "Prefer Tuesday-Thursday departures; observed weekend premium is high."
+        )
 
     recommendation = (
         f"Best current candidate: {best.origin}->{best.destination} on {best.depart_date.isoformat()}"

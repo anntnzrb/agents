@@ -7,6 +7,7 @@
 **Problem**: Generate an audio summary for a notebook.
 
 **Solution**:
+
 ```bash
 nlm audio-create <notebook-id> "Summarize the key points in a professional tone."
 ```
@@ -20,6 +21,7 @@ nlm audio-create <notebook-id> "Summarize the key points in a professional tone.
 **Problem**: Download the audio file locally.
 
 **Solution**:
+
 ```bash
 nlm audio-download <notebook-id> overview.mp3 --direct-rpc
 ```
@@ -33,6 +35,7 @@ nlm audio-download <notebook-id> overview.mp3 --direct-rpc
 **Problem**: Generate a video summary.
 
 **Solution**:
+
 ```bash
 nlm video-create <notebook-id> "Create a short overview video."
 ```

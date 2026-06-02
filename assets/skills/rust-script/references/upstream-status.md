@@ -10,6 +10,7 @@
 ## Current stabilization posture
 
 As of latest checked state:
+
 - tracking issue remains open
 - label includes `S-waiting-on-feedback`
 - feature remains nightly-gated (`-Zscript`)

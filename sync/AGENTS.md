@@ -25,6 +25,7 @@ This is the isolated sync application.
 ## Validation
 
 Run from repo root when sync code or tests change:
+
 - `bun ./sync/src/cli.ts`
 - `cd ./sync && bun run typecheck`
 - `cd ./sync && bun test`

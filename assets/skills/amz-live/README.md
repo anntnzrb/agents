@@ -62,10 +62,26 @@ Top-level shape:
   "type": "amz-live.search_results",
   "version": "1",
   "ok": true,
-  "source": {"mode": "html", "html_path": "tests/fixtures/search_results_fragment.html"},
-  "query": {"keywords": "usb c to usb c braided cable", "page": 1, "pages": 1, "amazon_sort": null},
-  "filters": {"min_rating": 4.5, "max_price": 9.0, "badge": null, "title_contains": null, "include": [], "exclude": [], "limit": 2},
-  "summary": {"raw_result_count": 3, "returned_result_count": 2},
+  "source": {
+    "mode": "html",
+    "html_path": "tests/fixtures/search_results_fragment.html"
+  },
+  "query": {
+    "keywords": "usb c to usb c braided cable",
+    "page": 1,
+    "pages": 1,
+    "amazon_sort": null
+  },
+  "filters": {
+    "min_rating": 4.5,
+    "max_price": 9.0,
+    "badge": null,
+    "title_contains": null,
+    "include": [],
+    "exclude": [],
+    "limit": 2
+  },
+  "summary": { "raw_result_count": 3, "returned_result_count": 2 },
   "results": []
 }
 ```

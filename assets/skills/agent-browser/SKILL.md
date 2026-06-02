@@ -16,18 +16,18 @@ Use `agent-browser` for browser tasks: navigate sites, fill forms, click control
 
 Read references only when the task crosses the trigger below. Keep this file as the default path for routine open/snapshot/interact/capture work.
 
-| Reference | Read when |
-|-----------|-----------|
-| `references/commands.md` | You need an option not shown here, exact CLI syntax, JSON output shape, downloads, cookies/storage, tabs, or command-specific flags. |
-| `references/common-patterns.md` | You need form submission, auth/state/session examples, data extraction, parallel sessions, CDP attachment, color scheme, visual browser, local file, or iOS Simulator examples. |
-| `references/snapshot-refs.md` | You will reuse element refs across changing DOM state, debug stale refs, use scoped snapshots, or need cursor-interactive element handling. |
-| `references/session-management.md` | You need named sessions, concurrent browser contexts, persistent cookies/localStorage, state files, or cleanup/TTL behavior. |
-| `references/authentication.md` | The task includes login, OAuth, 2FA, saved credentials, auth vault operations, or state reuse after authentication. |
-| `references/video-recording.md` | You need to record a headed/headless run for debugging, evidence, or documentation. |
-| `references/profiling.md` | You need Chrome DevTools traces, performance profiling, or timing diagnosis. |
-| `references/proxy-support.md` | You need proxy setup, geo-testing, proxy authentication, or rotating proxies. |
-| `references/advanced.md` | You need content boundaries, allowlists, action policy, output limits, diffing, timeout strategy, semantic locators, `eval`, persistent config, or advanced ref lifecycle troubleshooting. |
-| `references/native-mode.md` | You need the experimental Rust daemon/native mode, Chromium/Safari WebDriver notes, or native/default switching rules. |
+| Reference                          | Read when                                                                                                                                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `references/commands.md`           | You need an option not shown here, exact CLI syntax, JSON output shape, downloads, cookies/storage, tabs, or command-specific flags.                                                       |
+| `references/common-patterns.md`    | You need form submission, auth/state/session examples, data extraction, parallel sessions, CDP attachment, color scheme, visual browser, local file, or iOS Simulator examples.            |
+| `references/snapshot-refs.md`      | You will reuse element refs across changing DOM state, debug stale refs, use scoped snapshots, or need cursor-interactive element handling.                                                |
+| `references/session-management.md` | You need named sessions, concurrent browser contexts, persistent cookies/localStorage, state files, or cleanup/TTL behavior.                                                               |
+| `references/authentication.md`     | The task includes login, OAuth, 2FA, saved credentials, auth vault operations, or state reuse after authentication.                                                                        |
+| `references/video-recording.md`    | You need to record a headed/headless run for debugging, evidence, or documentation.                                                                                                        |
+| `references/profiling.md`          | You need Chrome DevTools traces, performance profiling, or timing diagnosis.                                                                                                               |
+| `references/proxy-support.md`      | You need proxy setup, geo-testing, proxy authentication, or rotating proxies.                                                                                                              |
+| `references/advanced.md`           | You need content boundaries, allowlists, action policy, output limits, diffing, timeout strategy, semantic locators, `eval`, persistent config, or advanced ref lifecycle troubleshooting. |
+| `references/native-mode.md`        | You need the experimental Rust daemon/native mode, Chromium/Safari WebDriver notes, or native/default switching rules.                                                                     |
 
 ## Entry Point
 
@@ -68,6 +68,7 @@ agent-browser click @e3
 agent-browser wait --load networkidle
 agent-browser snapshot -i
 ```
+
 </workflow>
 
 ## Command Chaining
@@ -126,6 +127,7 @@ For downloads, tabs/windows, cookies/storage, network, dialogs, JavaScript, glob
 ## Common Patterns
 
 Read `references/common-patterns.md` when you need complete examples for:
+
 - form submission;
 - auth vault and state persistence;
 - session persistence and parallel sessions;

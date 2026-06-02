@@ -1,7 +1,9 @@
 # Grep Extension (native override + auto-enable)
 
 ## Purpose
+
 Keep `grep` active; add repo-search ergonomics without changing the broad native search contract:
+
 - `type` filter (`ts`, `js`, `py`, `rs`, ...)
 - `paths` multipath + dedupe
 - `offset` pagination + bounded probing
@@ -19,6 +21,7 @@ Keep `grep` active; add repo-search ergonomics without changing the broad native
 - compact UI: shortened paths, explicit `offset:` / `limit:`, concise mode labels
 
 ## Files
+
 - `index.ts` — override, schema, activation hooks, pagination/output orchestration
 - `ripgrep.ts` — rg argv + output-mode process adapters
 - `logic.ts` — pure normalization/type-filter helpers
@@ -29,6 +32,7 @@ Keep `grep` active; add repo-search ergonomics without changing the broad native
 - `tsconfig.json` — strict TS config
 
 ## Behavior Notes
+
 - Dynamic activation preserves active tools while forcing `grep` on.
 - Overrides built-in `grep` with rg-backed paging, multipath, output modes, timeout, type ergonomics.
 - `pcre2`: passes `--pcre2` for look-around/backreferences unless `literal` is enabled.
@@ -38,5 +42,6 @@ Keep `grep` active; add repo-search ergonomics without changing the broad native
 - Explicit `glob` owns filtering; suppresses default `**/.git/**` exclusion.
 
 ## Stop Rules
+
 - Preserve native `grep` intent unless the task explicitly targets override behavior.
 - Keep changes tactical: schema, rg argv, pagination, output formatting, or compact rendering.

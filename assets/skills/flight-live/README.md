@@ -34,6 +34,7 @@ uv run --script scripts/cli.py --schema
 ```
 
 Wrapper behavior:
+
 - resolves skill root
 - auto-loads `./.env` from skill directory when present
 - executes: `uv run --script "$SKILL_DIR/scripts/cli.py" "$@"`
@@ -52,6 +53,7 @@ uv run --script <skill-dir>/scripts/cli.py \
 ```
 
 Useful flags:
+
 - `--trip-type oneway|roundtrip`
 - `--stay-min` / `--stay-max`
 - `--nonstop`
@@ -79,6 +81,7 @@ Prefer `--llm-json` for agents.
 
 JSONL, one request/response per line.
 Commands:
+
 - `ping`
 - `get_schema`
 - `search`

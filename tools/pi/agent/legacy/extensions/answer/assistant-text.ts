@@ -16,10 +16,12 @@ export type AssistantTextResult =
  * Join all text parts in a message into one string.
  */
 const extractMessageText = (
-  parts: readonly { type: string; text?: string }[]
+  parts: readonly { type: string; text?: string }[],
 ): string | null => {
   const textParts = parts
-    .filter((part): part is { type: "text"; text: string } => part.type === "text")
+    .filter(
+      (part): part is { type: "text"; text: string } => part.type === "text",
+    )
     .map((part) => part.text);
   return textParts.length > 0 ? textParts.join("\n") : null;
 };
@@ -28,7 +30,7 @@ const extractMessageText = (
  * Find the most recent assistant text in the branch.
  */
 export const findLastAssistantText = (
-  entries: readonly SessionEntry[]
+  entries: readonly SessionEntry[],
 ): AssistantTextResult => {
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i];

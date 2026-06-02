@@ -53,7 +53,6 @@ export function copyDirInto(srcDir: string, dstDir: string): boolean {
   }
 }
 
-
 export function runJobsWithPreserve(
   jobs: readonly Job[],
   preservePathsByDst: ReadonlyMap<string, readonly string[]> = new Map(),
@@ -61,21 +60,34 @@ export function runJobsWithPreserve(
   return jobs.every((job) => runJob(job, preservePathsByDst));
 }
 
-function runJob(job: Job, preservePathsByDst: ReadonlyMap<string, readonly string[]>): boolean {
+function runJob(
+  job: Job,
+  preservePathsByDst: ReadonlyMap<string, readonly string[]>,
+): boolean {
   try {
     if (job.kind === "Dir") {
       return job.scope === "Children"
         ? syncDirInto(job.src, job.dst, preservePathsByDst.get(job.dst) ?? [])
-        : syncManagedDir(job.src, job.dst, preservePathsByDst.get(job.dst) ?? []);
+        : syncManagedDir(
+            job.src,
+            job.dst,
+            preservePathsByDst.get(job.dst) ?? [],
+          );
     }
     return syncItem(job.src, job.dst);
   } catch (error) {
-    err(`unexpected error in ${job.kind === "Dir" ? "copy_dir_into" : "copy_item"}: ${panicMessage(error)}`);
+    err(
+      `unexpected error in ${job.kind === "Dir" ? "copy_dir_into" : "copy_item"}: ${panicMessage(error)}`,
+    );
     return false;
   }
 }
 
-function syncDirInto(srcDir: string, dstDir: string, preservePaths: readonly string[]): boolean {
+function syncDirInto(
+  srcDir: string,
+  dstDir: string,
+  preservePaths: readonly string[],
+): boolean {
   try {
     if (!isDirectoryLike(srcDir)) {
       err(`missing directory: ${srcDir}`);
@@ -91,7 +103,11 @@ function syncDirInto(srcDir: string, dstDir: string, preservePaths: readonly str
   }
 }
 
-function syncManagedDir(srcDir: string, dstDir: string, preservePaths: readonly string[]): boolean {
+function syncManagedDir(
+  srcDir: string,
+  dstDir: string,
+  preservePaths: readonly string[],
+): boolean {
   try {
     if (!isDirectoryLike(srcDir)) {
       err(`missing directory: ${srcDir}`);

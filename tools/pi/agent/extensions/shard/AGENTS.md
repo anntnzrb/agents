@@ -1,11 +1,13 @@
 # shard extension
 
 ## Purpose
+
 Minimal Pi-only child delegation primitive.
 Launch disposable child `pi` processes for bounded work and report results back to the parent.
 The parent session remains the orchestrator.
 
 ## Tool contract
+
 - Input uses only `tasks: string[]`; a single task is `tasks: ["..."]`.
 - `tasks[]` is an independent batch. Every task in one call may run concurrently.
 - Dependent phases must be split into multiple parent-orchestrated `shard` calls.
@@ -22,6 +24,7 @@ The parent session remains the orchestrator.
 - Child stdout/stderr have post-exit guards, and a child that emits a final response but fails to exit is terminated.
 
 ## Files
+
 - `index.ts` — tool registration, param validation, orchestration
 - `planning.ts` — pure task/mode/timeout/tool-selection helpers
 - `cli.ts` — child Pi argv + parent CLI inheritance + child prompts
@@ -32,6 +35,7 @@ The parent session remains the orchestrator.
 - `tsconfig.json` — strict TS config
 
 ## Invariants
+
 - Pi-only. No Codex/Claude/Gemini child launching.
 - Child Pi runs with `--no-session`.
 - Disable `shard` in child when `PI_SHARD_DEPTH > 0`.
@@ -42,10 +46,12 @@ The parent session remains the orchestrator.
 - JSON mode is machine truth; no tmux/PTY/job runtime here.
 
 ## Stop Rules
+
 - Do not use shard from child processes.
 - Do not put dependent phases in one shard call; return control to the parent between phases.
 - Keep parent orchestration responsibility explicit in prompts and reports.
 
 ## Navigation
+
 Start `index.ts` -> `planning.ts` -> `runner.ts` -> `results.ts`.
 If child argv/inheritance is wrong, inspect `cli.ts`.

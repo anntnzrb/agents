@@ -1,9 +1,12 @@
 import { complete, type Message } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, SessionEntry } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  SessionEntry,
+} from "@earendil-works/pi-coding-agent";
 import {
-	BorderedLoader,
-	convertToLlm,
-	serializeConversation,
+  BorderedLoader,
+  convertToLlm,
+  serializeConversation,
 } from "@earendil-works/pi-coding-agent";
 
 const SYSTEM_PROMPT = `You are a context transfer assistant. Given a conversation history and the user's goal for a new thread, generate a focused prompt that:
@@ -28,133 +31,151 @@ Files involved:
 ## Task
 [Clear description of what to do next based on the user's goal]`;
 
-type CommandCheckResult = { ok: true; goal: string } | { ok: false; message: string };
+type CommandCheckResult =
+  | { ok: true; goal: string }
+  | { ok: false; message: string };
 type PromptGenerationInput = {
-	conversationText: string;
-	goal: string;
+  conversationText: string;
+  goal: string;
 };
 
 const isMessageEntry = (
-	entry: SessionEntry,
+  entry: SessionEntry,
 ): entry is SessionEntry & { type: "message" } => entry.type === "message";
 
 const getMessages = (entries: readonly SessionEntry[]): readonly Message[] =>
-	entries.filter(isMessageEntry).map((entry) => entry.message);
+  entries.filter(isMessageEntry).map((entry) => entry.message);
 
-const buildPromptGenerationMessage = (input: PromptGenerationInput): Message => ({
-	role: "user",
-	content: [
-		{
-			type: "text",
-			text: `## Conversation History\n\n${input.conversationText}\n\n## User's Goal for New Thread\n\n${input.goal}`,
-		},
-	],
-	timestamp: Date.now(),
+const buildPromptGenerationMessage = (
+  input: PromptGenerationInput,
+): Message => ({
+  role: "user",
+  content: [
+    {
+      type: "text",
+      text: `## Conversation History\n\n${input.conversationText}\n\n## User's Goal for New Thread\n\n${input.goal}`,
+    },
+  ],
+  timestamp: Date.now(),
 });
 
 const validateCommand = (args: string): CommandCheckResult => {
-	const goal = args.trim();
-	return goal ? { ok: true, goal } : { ok: false, message: "Usage: /handoff <goal for new thread>" };
+  const goal = args.trim();
+  return goal
+    ? { ok: true, goal }
+    : { ok: false, message: "Usage: /handoff <goal for new thread>" };
 };
 
 const getConversationText = (entries: readonly SessionEntry[]): string =>
-	serializeConversation(convertToLlm(getMessages(entries)));
+  serializeConversation(convertToLlm(getMessages(entries)));
 
 const generateHandoffPrompt = async (
-	ctx: Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1],
-	input: PromptGenerationInput,
+  ctx: Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1],
+  input: PromptGenerationInput,
 ): Promise<string | null> =>
-	ctx.ui.custom<string | null>((tui, theme, _keybindings, done) => {
-		const loader = new BorderedLoader(tui, theme, "Generating handoff prompt...");
-		loader.onAbort = () => done(null);
+  ctx.ui.custom<string | null>((tui, theme, _keybindings, done) => {
+    const loader = new BorderedLoader(
+      tui,
+      theme,
+      "Generating handoff prompt...",
+    );
+    loader.onAbort = () => done(null);
 
-		const run = async () => {
-			const model = ctx.model;
-			if (!model) return null;
+    const run = async () => {
+      const model = ctx.model;
+      if (!model) return null;
 
-			const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-			if (!auth.ok || !auth.apiKey) {
-				throw new Error(auth.ok ? `No API key for ${model.provider}` : auth.error);
-			}
+      const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+      if (!auth.ok || !auth.apiKey) {
+        throw new Error(
+          auth.ok ? `No API key for ${model.provider}` : auth.error,
+        );
+      }
 
-			const response = await complete(
-				model,
-				{
-					systemPrompt: SYSTEM_PROMPT,
-					messages: [buildPromptGenerationMessage(input)],
-				},
-				{ apiKey: auth.apiKey, headers: auth.headers, signal: loader.signal },
-			);
+      const response = await complete(
+        model,
+        {
+          systemPrompt: SYSTEM_PROMPT,
+          messages: [buildPromptGenerationMessage(input)],
+        },
+        { apiKey: auth.apiKey, headers: auth.headers, signal: loader.signal },
+      );
 
-			if (response.stopReason === "aborted") return null;
-			return response.content
-				.filter((part): part is { type: "text"; text: string } => part.type === "text")
-				.map((part) => part.text)
-				.join("\n");
-		};
+      if (response.stopReason === "aborted") return null;
+      return response.content
+        .filter(
+          (part): part is { type: "text"; text: string } =>
+            part.type === "text",
+        )
+        .map((part) => part.text)
+        .join("\n");
+    };
 
-		run()
-			.then(done)
-			.catch((error) => {
-				console.error("Handoff generation failed:", error);
-				done(null);
-			});
+    run()
+      .then(done)
+      .catch((error) => {
+        console.error("Handoff generation failed:", error);
+        done(null);
+      });
 
-		return loader;
-	});
+    return loader;
+  });
 
 export default function handoffExtension(pi: ExtensionAPI) {
-	pi.registerCommand("handoff", {
-		description: "Transfer context to a new focused session",
-		handler: async (args, ctx) => {
-			if (!ctx.hasUI) {
-				ctx.ui.notify("handoff requires interactive mode", "error");
-				return;
-			}
+  pi.registerCommand("handoff", {
+    description: "Transfer context to a new focused session",
+    handler: async (args, ctx) => {
+      if (!ctx.hasUI) {
+        ctx.ui.notify("handoff requires interactive mode", "error");
+        return;
+      }
 
-			if (!ctx.model) {
-				ctx.ui.notify("No model selected", "error");
-				return;
-			}
+      if (!ctx.model) {
+        ctx.ui.notify("No model selected", "error");
+        return;
+      }
 
-			const commandCheck = validateCommand(args);
-			if (!commandCheck.ok) {
-				ctx.ui.notify(commandCheck.message, "error");
-				return;
-			}
+      const commandCheck = validateCommand(args);
+      if (!commandCheck.ok) {
+        ctx.ui.notify(commandCheck.message, "error");
+        return;
+      }
 
-			const branch = ctx.sessionManager.getBranch();
-			const messages = getMessages(branch);
-			if (messages.length === 0) {
-				ctx.ui.notify("No conversation to hand off", "error");
-				return;
-			}
+      const branch = ctx.sessionManager.getBranch();
+      const messages = getMessages(branch);
+      if (messages.length === 0) {
+        ctx.ui.notify("No conversation to hand off", "error");
+        return;
+      }
 
-			const generatedPrompt = await generateHandoffPrompt(ctx, {
-				conversationText: getConversationText(branch),
-				goal: commandCheck.goal,
-			});
-			if (generatedPrompt === null) {
-				ctx.ui.notify("Cancelled", "info");
-				return;
-			}
+      const generatedPrompt = await generateHandoffPrompt(ctx, {
+        conversationText: getConversationText(branch),
+        goal: commandCheck.goal,
+      });
+      if (generatedPrompt === null) {
+        ctx.ui.notify("Cancelled", "info");
+        return;
+      }
 
-			const editedPrompt = await ctx.ui.editor("Edit handoff prompt", generatedPrompt);
-			if (editedPrompt === undefined) {
-				ctx.ui.notify("Cancelled", "info");
-				return;
-			}
+      const editedPrompt = await ctx.ui.editor(
+        "Edit handoff prompt",
+        generatedPrompt,
+      );
+      if (editedPrompt === undefined) {
+        ctx.ui.notify("Cancelled", "info");
+        return;
+      }
 
-			const newSessionResult = await ctx.newSession({
-				parentSession: ctx.sessionManager.getSessionFile(),
-			});
-			if (newSessionResult.cancelled) {
-				ctx.ui.notify("New session cancelled", "info");
-				return;
-			}
+      const newSessionResult = await ctx.newSession({
+        parentSession: ctx.sessionManager.getSessionFile(),
+      });
+      if (newSessionResult.cancelled) {
+        ctx.ui.notify("New session cancelled", "info");
+        return;
+      }
 
-			ctx.ui.setEditorText(editedPrompt);
-			ctx.ui.notify("Handoff ready. Submit when ready.", "info");
-		},
-	});
+      ctx.ui.setEditorText(editedPrompt);
+      ctx.ui.notify("Handoff ready. Submit when ready.", "info");
+    },
+  });
 }

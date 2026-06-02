@@ -51,12 +51,12 @@ my-app/
 **server.ts:**
 
 ```typescript
-import express from 'express';
+import express from "express";
 
 const app = express();
 
-app.get('/', (_req, res) => {
-  res.send('Hello Express!');
+app.get("/", (_req, res) => {
+  res.send("Hello Express!");
 });
 
 export default app;
@@ -78,12 +78,12 @@ export default app;
 **server.ts:**
 
 ```typescript
-import { Hono } from 'hono';
+import { Hono } from "hono";
 
 const app = new Hono();
 
-app.get('/', c => {
-  return c.text('Hello Hono!');
+app.get("/", (c) => {
+  return c.text("Hello Hono!");
 });
 
 export default app;

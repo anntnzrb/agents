@@ -29,13 +29,25 @@ from shortcuts_local_inspector import (
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Inspect local Apple Shortcuts action graphs.")
-    parser.add_argument("--db", default=str(DEFAULT_DB), help="Path to Shortcuts.sqlite")
-    parser.add_argument("--name", action="append", help="Exact shortcut name (repeatable)")
+    parser = argparse.ArgumentParser(
+        description="Inspect local Apple Shortcuts action graphs."
+    )
+    parser.add_argument(
+        "--db", default=str(DEFAULT_DB), help="Path to Shortcuts.sqlite"
+    )
+    parser.add_argument(
+        "--name", action="append", help="Exact shortcut name (repeatable)"
+    )
     parser.add_argument("--contains", help="Substring filter for shortcut names")
-    parser.add_argument("--json", action="store_true", help="Print JSON instead of text output")
-    parser.add_argument("--raw", action="store_true", help="Include full decoded action objects")
-    parser.add_argument("--no-redact", action="store_true", help="Disable redaction in strings")
+    parser.add_argument(
+        "--json", action="store_true", help="Print JSON instead of text output"
+    )
+    parser.add_argument(
+        "--raw", action="store_true", help="Include full decoded action objects"
+    )
+    parser.add_argument(
+        "--no-redact", action="store_true", help="Disable redaction in strings"
+    )
     parser.add_argument(
         "--visible-only",
         action="store_true",
@@ -66,7 +78,9 @@ def _render_text(results: list[dict[str, Any]]) -> str:
     for shortcut in results:
         lines.append(f"Shortcut: {shortcut['name']}")
         lines.append(
-            "  id={pk} workflow_id={workflow_id} action_count={action_count}".format(**shortcut)
+            "  id={pk} workflow_id={workflow_id} action_count={action_count}".format(
+                **shortcut
+            )
         )
         if shortcut.get("hidden_from_library"):
             lines.append("  hidden_from_library=true")
@@ -121,7 +135,9 @@ def main() -> int:
     exact = set(args.name or [])
 
     run_stats_by_shortcut = load_run_stats(db_path) if args.include_run_stats else {}
-    smart_prompts_by_shortcut = load_smart_prompts(db_path) if args.include_smart_prompts else {}
+    smart_prompts_by_shortcut = (
+        load_smart_prompts(db_path) if args.include_smart_prompts else {}
+    )
     folder_map = load_folder_map() if args.include_folders else {}
 
     results: list[dict[str, Any]] = []

@@ -90,7 +90,9 @@ def parse_json_frames(rsc_payload: str) -> list[tuple[str, Any]]:
     return parsed_frames
 
 
-def extract_lists(parsed_frames: list[tuple[str, Any]]) -> tuple[list[Any], list[Any], list[Any]]:
+def extract_lists(
+    parsed_frames: list[tuple[str, Any]],
+) -> tuple[list[Any], list[Any], list[Any]]:
     candidates: dict[str, list[list[Any]]] = {
         "models": [],
         "hosts": [],
@@ -139,8 +141,7 @@ def extract_lists(parsed_frames: list[tuple[str, Any]]) -> tuple[list[Any], list
         scan(frame)
 
     selected = {
-        key: _pick_best(candidates[key])
-        for key in ("models", "hosts", "hostsModels")
+        key: _pick_best(candidates[key]) for key in ("models", "hosts", "hostsModels")
     }
 
     missing = [key for key, value in selected.items() if value is None]
@@ -154,7 +155,11 @@ def extract_lists(parsed_frames: list[tuple[str, Any]]) -> tuple[list[Any], list
             f"Missing sections in RSC payload: {', '.join(missing)}; candidate_sizes={diagnostics}"
         )
 
-    return selected["models"] or [], selected["hosts"] or [], selected["hostsModels"] or []
+    return (
+        selected["models"] or [],
+        selected["hosts"] or [],
+        selected["hostsModels"] or [],
+    )
 
 
 def _pick_best(options: list[list[Any]]) -> list[Any] | None:
@@ -189,7 +194,10 @@ def _looks_like_host_list(value: list[Any]) -> bool:
     hit = 0
     for item in sample:
         if isinstance(item.get("slug"), str) and isinstance(item.get("name"), str):
-            if any(k in item for k in ("website_url", "openai_compatible", "logo", "host_url")):
+            if any(
+                k in item
+                for k in ("website_url", "openai_compatible", "logo", "host_url")
+            ):
                 hit += 1
     return hit >= max(2, len(sample) // 2)
 
@@ -202,7 +210,10 @@ def _looks_like_model_list(value: list[Any]) -> bool:
     hit = 0
     for item in sample:
         if isinstance(item.get("slug"), str) and isinstance(item.get("name"), str):
-            if any(k in item for k in ("intelligence_index", "model_creator_id", "reasoning_model")):
+            if any(
+                k in item
+                for k in ("intelligence_index", "model_creator_id", "reasoning_model")
+            ):
                 hit += 1
     return hit >= max(2, len(sample) // 2)
 
@@ -394,7 +405,9 @@ def save_cache(
         "status_code": status_code,
         "body_file": CACHE_BODY_FILE,
     }
-    (cache_dir / CACHE_META_FILE).write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+    (cache_dir / CACHE_META_FILE).write_text(
+        json.dumps(meta, ensure_ascii=False), encoding="utf-8"
+    )
 
 
 def save_last_good_snapshot(cache_dir: Path, payload: dict[str, Any]) -> Path:

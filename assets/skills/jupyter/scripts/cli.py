@@ -43,7 +43,9 @@ def _run_script(path: Path, args: list[str]) -> int:
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0] in {"-h", "--help"}:
-        print("usage: cli.py {inspect,show,execute,validate,convert,clear,grep} [args...]\n")
+        print(
+            "usage: cli.py {inspect,show,execute,validate,convert,clear,grep} [args...]\n"
+        )
         print("Cross-platform:")
         print("  uv run --script <skill-dir>/scripts/cli.py inspect notebook.ipynb")
         print("  uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -i")

@@ -9,6 +9,7 @@ Common errors and how to fix them.
 **Problem**: `RuntimeError: Kernel 'python3' not found`
 
 **Solution**:
+
 ```bash
 # List available kernels
 jupyter kernelspec list
@@ -29,6 +30,7 @@ uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -k python
 **Problem**: `CellTimeoutError: Timeout waiting for execute reply`
 
 **Solution**:
+
 ```bash
 # Increase timeout (default: 600 seconds)
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -t 3600  # 1 hour
@@ -46,6 +48,7 @@ uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 5 -t 7200  
 **Problem**: Cell raises an exception, execution stops.
 
 **Solution**:
+
 ```bash
 # Continue past errors
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb --allow-errors -i
@@ -63,6 +66,7 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -o | grep -A 20 "
 **Problem**: Variable defined in cell 10, used in cell 5 after reordering.
 
 **Solution**:
+
 ```bash
 # Clear all outputs (resets execution order)
 uv run --script <skill-dir>/scripts/cli.py clear notebook.ipynb
@@ -80,6 +84,7 @@ uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -i
 **Problem**: Package works in terminal but fails in notebook execution.
 
 **Solution**:
+
 ```bash
 # Check which Python the kernel uses
 jupyter kernelspec list --json
@@ -98,6 +103,7 @@ uv add missing_package
 **Problem**: `JSONDecodeError: Expecting value`
 
 **Solution**:
+
 ```bash
 # Check if file is valid JSON
 python -c "import json; json.load(open('notebook.ipynb'))"
@@ -116,6 +122,7 @@ grep -n "<<<<<<" notebook.ipynb
 **Problem**: Notebook file is huge due to large outputs (dataframes, images).
 
 **Solution**:
+
 ```bash
 # Clear outputs
 uv run --script <skill-dir>/scripts/cli.py clear notebook.ipynb
@@ -154,6 +161,7 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o --raw
 **Problem**: Cell never completes, no timeout triggered.
 
 **Solution**:
+
 ```bash
 # Kill any running kernels
 jupyter notebook stop 8888
@@ -174,6 +182,7 @@ uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -t 60 -c 5
 **Problem**: `PermissionError: [Errno 13] Permission denied`
 
 **Solution**:
+
 ```bash
 # Check file permissions
 ls -la notebook.ipynb

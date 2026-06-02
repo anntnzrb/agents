@@ -51,14 +51,14 @@ Query Repology for outdated `nix_unstable` packages using User-Agent `nixpkgs-up
 
 Keep only packages meeting all criteria:
 
-| Criteria | Required Value |
-|----------|----------------|
-| Location | `pkgs/by-name/` |
-| Type | Rust OR Go |
-| has_patches | `false` |
-| complexity | `simple` |
-| Version bump | patch/minor only |
-| Platform | Must support current system |
+| Criteria     | Required Value              |
+| ------------ | --------------------------- |
+| Location     | `pkgs/by-name/`             |
+| Type         | Rust OR Go                  |
+| has_patches  | `false`                     |
+| complexity   | `simple`                    |
+| Version bump | patch/minor only            |
+| Platform     | Must support current system |
 
 Rust packages must use `buildRustPackage`/`cargoHash`; Go packages must use `buildGoModule`/`vendorHash`. Reject major bumps and platform-restricted packages that cannot be tested locally.
 
@@ -108,11 +108,11 @@ Clean up successful worktrees after reporting. Failed worktrees must already be 
 
 ## Failure handling
 
-| Failure | Action |
-|---------|--------|
-| Build timeout (>10m) | Discard, cleanup, report |
-| Build error | Discard, cleanup, report |
+| Failure               | Action                   |
+| --------------------- | ------------------------ |
+| Build timeout (>10m)  | Discard, cleanup, report |
+| Build error           | Discard, cleanup, report |
 | Review timeout (>10m) | Discard, cleanup, report |
-| Platform mismatch | Never present to user |
+| Platform mismatch     | Never present to user    |
 
 Cleanup commands are in `references/update-workflow.md` and `references/quick-reference.md`.

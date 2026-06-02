@@ -32,12 +32,12 @@ Read-only Amazon catalog search through the bundled skill-local CLI. Use it for 
 
 ## Required follow-up reads
 
-| Reference | Read when |
-|-----------|-----------|
-| `references/cheatsheet.md` | You need the shortest correct command for discovery, shortlist, details, scoring, zip-aware search, fixture parsing, or trusted fields. |
-| `references/workflows.md` | You need multi-step task routing for discovery, recommendation, cable/accessory filtering, finalist validation, location-sensitive reruns, detail enrichment, or user-facing answer shape. |
-| `references/rpc.md` | You are integrating with the CLI as a process, need `--mode rpc`, request/response schema, or field names such as `zipCode` / `query.zip_code`. |
-| `references/troubleshooting.md` | Live fetching is blocked, detail enrichment is sparse, results look locale/session-dependent, parser output changed, output fields conflict, or fixture-mode debugging is needed. |
+| Reference                       | Read when                                                                                                                                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `references/cheatsheet.md`      | You need the shortest correct command for discovery, shortlist, details, scoring, zip-aware search, fixture parsing, or trusted fields.                                                    |
+| `references/workflows.md`       | You need multi-step task routing for discovery, recommendation, cable/accessory filtering, finalist validation, location-sensitive reruns, detail enrichment, or user-facing answer shape. |
+| `references/rpc.md`             | You are integrating with the CLI as a process, need `--mode rpc`, request/response schema, or field names such as `zipCode` / `query.zip_code`.                                            |
+| `references/troubleshooting.md` | Live fetching is blocked, detail enrichment is sparse, results look locale/session-dependent, parser output changed, output fields conflict, or fixture-mode debugging is needed.          |
 
 ## Workflow
 
@@ -93,6 +93,7 @@ uv run --script <skill-dir>/scripts/cli.py "$QUERY" \
 ## Search controls
 
 High-signal flags:
+
 - `--max-price <n>`
 - `--min-rating <n>`
 - `--badge "Best Seller"`
@@ -110,6 +111,7 @@ High-signal flags:
 Use `--zip` when the user cares about shipping locality, delivery dates, stock differences by region, price differences by region, or “change delivery address” / “assume Miami” requests.
 
 Behavior:
+
 - `--zip` becomes Amazon query filter `rh=p_47:<zipcode>`
 - LLM JSON includes `query.zip_code`
 - RPC accepts `zipCode` and returns `query.zip_code`
@@ -130,6 +132,7 @@ Final pricing and delivery can still vary by session, account, Prime state, and 
 Connector terms matter more than generic quality metrics. Add negative guards aggressively, and set `--zip` before comparing finalists when delivery locale matters.
 
 Examples:
+
 - query says `usb c to usb c` → add `--exclude "usb a"`
 - not Lightning → add `--exclude lightning`
 - wants braided → add `--include braided`
@@ -140,6 +143,7 @@ Examples:
 Possible failures include Amazon anti-bot/captcha/503, geo-specific catalog differences, shipping locale changes, and markup drift.
 
 If blocked:
+
 1. retry with fewer detail fetches
 2. tighten query/filter terms
 3. use `--html <saved-file>` for local parsing/debug
@@ -151,6 +155,7 @@ When outputs conflict, trust roughly in this order: explicit filters/query terms
 ## Evidence fields to trust most
 
 Top-level:
+
 - `summary.raw_result_count`
 - `summary.returned_result_count`
 - `ranking`
@@ -158,6 +163,7 @@ Top-level:
 - `query.zip_code`
 
 Per result:
+
 - `price`
 - `rating`
 - `review_count`

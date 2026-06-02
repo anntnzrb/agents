@@ -3,11 +3,13 @@
 Key language features from 3.8, 3.9, and 3.10.
 
 ---
+
 ## Walrus Operator (3.8+)
 
 **Problem**: You need to assign a value and use it in an expression without splitting into multiple lines.
 
 **Solution**:
+
 ```python
 # Read until empty line
 while (line := input()) != "":
@@ -30,6 +32,7 @@ results = [y for x in data if (y := expensive(x)) > threshold]
 **Problem**: You want to prevent callers from using keyword arguments for certain parameters, ensuring API stability.
 
 **Solution**:
+
 ```python
 def greet(name, /, greeting="Hello"):
     return f"{greeting}, {name}!"
@@ -48,6 +51,7 @@ greet(name="Alice")         # TypeError - name is positional-only
 **Problem**: You're debugging or logging and want to print variable names along with their values.
 
 **Solution**:
+
 ```python
 x = 10
 y = 25
@@ -68,6 +72,7 @@ print(f"{user['name']=}")
 **Problem**: You need to merge dictionaries or update one dict with another's values.
 
 **Solution**:
+
 ```python
 defaults = {"host": "localhost", "port": 8080}
 overrides = {"port": 3000, "debug": True}
@@ -89,6 +94,7 @@ defaults |= overrides
 **Problem**: You want type hints without importing from the `typing` module.
 
 **Solution**:
+
 ```python
 # No more typing.List, typing.Dict imports
 def process(items: list[str]) -> dict[str, int]:
@@ -108,6 +114,7 @@ pairs: tuple[str, int] = ("age", 25)
 **Problem**: You need to cleanly remove known prefixes or suffixes from strings.
 
 **Solution**:
+
 ```python
 filename = "test_user_service.py"
 
@@ -127,6 +134,7 @@ filename.removesuffix(".py")       # "test_user_service"
 **Problem**: You need to match complex data structures and extract values in a clean, readable way.
 
 **Solution**:
+
 ```python
 def handle(command):
     match command.split():
@@ -163,6 +171,7 @@ match event:
 **Problem**: You want cleaner type hints for values that can be multiple types.
 
 **Solution**:
+
 ```python
 # Instead of Union[int, str]
 def process(value: int | str | None) -> str:
@@ -183,6 +192,7 @@ isinstance(x, int | str)  # Same as isinstance(x, (int, str))
 **Problem**: You need to use multiple context managers without deeply nested indentation.
 
 **Solution**:
+
 ```python
 with (
     open("input.txt") as src,
@@ -193,4 +203,3 @@ with (
 ```
 
 **Tip**: Parentheses allow you to format multiple context managers cleanly across multiple lines without backslash continuation.
-

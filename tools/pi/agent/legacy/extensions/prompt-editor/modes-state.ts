@@ -64,7 +64,9 @@ export function getRequestEditorRender(): (() => void) | undefined {
   return requestEditorRender;
 }
 
-export function setRequestEditorRender(callback: (() => void) | undefined): void {
+export function setRequestEditorRender(
+  callback: (() => void) | undefined,
+): void {
   requestEditorRender = callback;
 }
 
@@ -76,10 +78,16 @@ export function setCustomOverlay(overlay: ModeSpec | null): void {
   customOverlay = overlay;
 }
 
-export function setLastObservedModel(provider?: string, modelId?: string): void {
+export function setLastObservedModel(
+  provider?: string,
+  modelId?: string,
+): void {
   lastObservedModel = { provider, modelId };
 }
 
-export function getLastObservedModel(): { provider?: string; modelId?: string } {
+export function getLastObservedModel(): {
+  provider?: string;
+  modelId?: string;
+} {
   return lastObservedModel;
 }

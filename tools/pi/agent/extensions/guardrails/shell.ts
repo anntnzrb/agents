@@ -55,7 +55,10 @@ export function stripHeredocBodies(command: string): string {
     kept.push(line);
     HEREDOC_PATTERN.lastIndex = 0;
     for (const match of line.matchAll(HEREDOC_PATTERN)) {
-      if (match.index !== undefined && isOutsideQuotes(line.slice(0, match.index))) {
+      if (
+        match.index !== undefined &&
+        isOutsideQuotes(line.slice(0, match.index))
+      ) {
         pendingDelimiters.push(match[2] ?? "");
       }
     }
@@ -83,7 +86,11 @@ export function splitShellSegmentsDetailed(command: string): ShellSegment[] {
   const push = (separator?: "pipe" | "other") => {
     const trimmed = current.trim();
     if (trimmed.length > 0) {
-      segments.push({ text: trimmed, stdinFromPipe: nextStdinFromPipe, stdoutToPipe: separator === "pipe" });
+      segments.push({
+        text: trimmed,
+        stdinFromPipe: nextStdinFromPipe,
+        stdoutToPipe: separator === "pipe",
+      });
     }
     current = "";
     nextStdinFromPipe = separator === "pipe";

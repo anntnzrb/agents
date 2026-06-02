@@ -33,8 +33,12 @@ def _analysis() -> AnalysisResult:
             duration_s=120.0,
             tags={"artist": "test"},
         ),
-        key=KeyEstimate(key="A", mode="minor", confidence=0.72, chroma_profile=[0.1] * 12),
-        beats=BeatSummary(tempo_bpm=128.0, beat_count=250, first_beat_s=0.3, last_beat_s=119.5),
+        key=KeyEstimate(
+            key="A", mode="minor", confidence=0.72, chroma_profile=[0.1] * 12
+        ),
+        beats=BeatSummary(
+            tempo_bpm=128.0, beat_count=250, first_beat_s=0.3, last_beat_s=119.5
+        ),
         spectral=SpectralStats(
             centroid=_stats(2100.0),
             bandwidth=_stats(1200.0),
@@ -47,7 +51,9 @@ def _analysis() -> AnalysisResult:
             low_energy_ratio=0.25,
             high_energy_ratio=0.22,
         ),
-        section_hints=[SectionHint(start_s=0.0, end_s=30.0, label="intro", confidence=0.9)],
+        section_hints=[
+            SectionHint(start_s=0.0, end_s=30.0, label="intro", confidence=0.9)
+        ],
         notes=[],
         plot_files=[],
     )

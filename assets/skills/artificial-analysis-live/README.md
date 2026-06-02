@@ -5,6 +5,7 @@ AI-only extractor for the full Artificial Analysis provider-endpoint matrix.
 No human prose output. JSON only. Deterministic envelopes.
 
 Compatibility hardening:
+
 - key aliases + structural heuristics for upstream schema drift
 - ETag cache + 304 reuse
 - last-good fallback (unless `--strict`)
@@ -159,7 +160,7 @@ uv run --script <skill-dir>/scripts/cli.py --mode rpc
 ### Request format
 
 ```json
-{"id":"1","type":"fetch","args":{"strict":false}}
+{ "id": "1", "type": "fetch", "args": { "strict": false } }
 ```
 
 `type` supports:
@@ -185,7 +186,13 @@ Success:
 Error:
 
 ```json
-{"id":"1","type":"response","command":"fetch","success":false,"error":{"code":"...","message":"..."}}
+{
+  "id": "1",
+  "type": "response",
+  "command": "fetch",
+  "success": false,
+  "error": { "code": "...", "message": "..." }
+}
 ```
 
 ### RPC example

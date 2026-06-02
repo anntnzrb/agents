@@ -17,6 +17,7 @@ uv run --script <skill-dir>/scripts/cli.py run <match_id_or_url> \
 ```
 
 Report:
+
 - `oneShot.globalConfidence`
 - Top 3 from `oneShot.shortlist`
 - `decisionSummary.understatForm`
@@ -39,6 +40,7 @@ uv run --script <skill-dir>/scripts/cli.py run <match_id_or_url> \
 ```
 
 Monitor:
+
 - `decisionSummary.liveMetrics`
 - `decisionSummary.timeline`
 - `recommendations.shortlist[*].movement`
@@ -49,11 +51,14 @@ Monitor:
 Goal: resolve disagreements before recommending any line.
 
 Steps:
+
 1. Check `decisionSummary.scoreConsensus.consistent`.
 2. If inconsistent, inspect:
+
 - `feeds.sofascore.match`
 - `feeds.espn.match`
 - `feeds.ecuabet.match`
+
 3. Re-run one-shot and compare.
 4. If still inconsistent, downweight recommendation confidence in narrative and state risk.
 
@@ -62,9 +67,11 @@ Steps:
 Goal: user asks specifically for totals, BTTS, handicap, etc.
 
 Steps:
+
 1. Filter `decisionSummary.ecuabetMarkets.keyLines` to requested family.
 2. Compare with shortlist entries from same family.
 3. Keep picks with:
+
 - positive `expectedValue`
 - acceptable `riskTier` per user tolerance
 - no severe `feedHealth` penalties

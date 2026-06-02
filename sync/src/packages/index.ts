@@ -15,8 +15,17 @@ import {
   stagingDirFor,
 } from "./source.ts";
 import { packageHasBuildScript, packageIsHealthy } from "./validate.ts";
-export { cloneAttemptsForTests, commandForTests, githubSlugForTests, packageCacheDir } from "./source.ts";
-export { packageHasBuildScript, packageIsHealthy, validatePackageForTests } from "./validate.ts";
+export {
+  cloneAttemptsForTests,
+  commandForTests,
+  githubSlugForTests,
+  packageCacheDir,
+} from "./source.ts";
+export {
+  packageHasBuildScript,
+  packageIsHealthy,
+  validatePackageForTests,
+} from "./validate.ts";
 
 export interface PackageManifest {
   readonly packages: string[];
@@ -84,7 +93,10 @@ export function readPackageManifest(filePath: string): PackageManifest {
   return { packages };
 }
 
-export function patchRuntimeSettings(filePath: string, packagePaths: readonly string[]): void {
+export function patchRuntimeSettings(
+  filePath: string,
+  packagePaths: readonly string[],
+): void {
   let current = "{}";
   try {
     current = fs.readFileSync(filePath, "utf8");
@@ -116,7 +128,11 @@ export function patchRuntimeSettings(filePath: string, packagePaths: readonly st
   }
 }
 
-async function ensurePackage(source: string, cacheRoot: string, timeoutMs: number): Promise<string> {
+async function ensurePackage(
+  source: string,
+  cacheRoot: string,
+  timeoutMs: number,
+): Promise<string> {
   const finalDir = packageCacheDir(cacheRoot, source);
   if (packageIsHealthy(finalDir)) {
     return finalDir;
@@ -159,12 +175,16 @@ async function ensurePackage(source: string, cacheRoot: string, timeoutMs: numbe
   }
 }
 
-export async function bootstrapPackageTarget(target: PackageBootstrapTarget): Promise<boolean> {
+export async function bootstrapPackageTarget(
+  target: PackageBootstrapTarget,
+): Promise<boolean> {
   let manifest: PackageManifest;
   try {
     manifest = readPackageManifest(target.manifestPath);
   } catch (error) {
-    err(`package bootstrap failed: ${String(error instanceof Error ? error.message : error)}`);
+    err(
+      `package bootstrap failed: ${String(error instanceof Error ? error.message : error)}`,
+    );
     return false;
   }
 
@@ -173,14 +193,12 @@ export async function bootstrapPackageTarget(target: PackageBootstrapTarget): Pr
   for (const source of manifest.packages) {
     try {
       installedPaths.push(
-        await ensurePackage(
-          source,
-          target.cacheRoot,
-          target.timeoutMs,
-        ),
+        await ensurePackage(source, target.cacheRoot, target.timeoutMs),
       );
     } catch (error) {
-      err(`package bootstrap failed for ${source}: ${String(error instanceof Error ? error.message : error)}`);
+      err(
+        `package bootstrap failed for ${source}: ${String(error instanceof Error ? error.message : error)}`,
+      );
       success = false;
     }
   }
@@ -188,10 +206,11 @@ export async function bootstrapPackageTarget(target: PackageBootstrapTarget): Pr
   try {
     patchRuntimeSettings(target.runtimeSettingsPath, installedPaths);
   } catch (error) {
-    err(`package settings patch failed: ${String(error instanceof Error ? error.message : error)}`);
+    err(
+      `package settings patch failed: ${String(error instanceof Error ? error.message : error)}`,
+    );
     success = false;
   }
 
   return success;
 }
-

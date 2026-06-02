@@ -45,10 +45,14 @@ const pathCommandCandidates = (command: string): string[] => {
 
 const executableForCommand = (command: string, cwd?: string): string => {
   const resolved = resolveCommandPath(command, cwd);
-  return hasPathSeparator(resolved) ? resolved : (Bun.which(resolved) ?? resolved);
+  return hasPathSeparator(resolved)
+    ? resolved
+    : (Bun.which(resolved) ?? resolved);
 };
 
-const existingPathCommand = async (command: string): Promise<string | undefined> => {
+const existingPathCommand = async (
+  command: string,
+): Promise<string | undefined> => {
   for (const candidate of pathCommandCandidates(command)) {
     try {
       const metadata = await fs.stat(candidate);
@@ -64,7 +68,10 @@ const existingPathCommand = async (command: string): Promise<string | undefined>
   return undefined;
 };
 
-const resolveExecutable = async (command: string, cwd?: string): Promise<string | undefined> => {
+const resolveExecutable = async (
+  command: string,
+  cwd?: string,
+): Promise<string | undefined> => {
   const executable = executableForCommand(command, cwd);
   if (!hasPathSeparator(executable)) {
     return Bun.which(executable) ?? undefined;
@@ -72,8 +79,10 @@ const resolveExecutable = async (command: string, cwd?: string): Promise<string 
   return await existingPathCommand(executable);
 };
 
-export const commandExists = async (command: string, cwd?: string): Promise<boolean> =>
-  (await resolveExecutable(command, cwd)) !== undefined;
+export const commandExists = async (
+  command: string,
+  cwd?: string,
+): Promise<boolean> => (await resolveExecutable(command, cwd)) !== undefined;
 
 export const runCommandOutcome = async (
   command: readonly string[],
@@ -143,7 +152,9 @@ export const logCommandFailure = (
       console.error(`sync: missing command for ${action}: ${command[0]}`);
       return;
     case "Failure":
-      console.error(`sync: ${action} failed: ${command.join(" ")} (${outcome.detail})`);
+      console.error(
+        `sync: ${action} failed: ${command.join(" ")} (${outcome.detail})`,
+      );
       return;
     case "TimedOut":
       console.error(`sync: ${action} timed out: ${command.join(" ")}`);

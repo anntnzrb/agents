@@ -12,8 +12,12 @@ class TestRscExtraction(unittest.TestCase):
             (
                 "x",
                 {
-                    "model_rows": [{"slug": "m1", "name": "M1", "model_creator_id": "c1"}],
-                    "providers": [{"slug": "p1", "name": "Provider 1", "website_url": "https://x"}],
+                    "model_rows": [
+                        {"slug": "m1", "name": "M1", "model_creator_id": "c1"}
+                    ],
+                    "providers": [
+                        {"slug": "p1", "name": "Provider 1", "website_url": "https://x"}
+                    ],
                     "host_models": [
                         {"slug": "p1_model-1", "host_id": "h1", "model_id": "m1"},
                         {"slug": "p1_model-2", "host_id": "h1", "model_id": "m2"},
@@ -38,12 +42,28 @@ class TestRscExtraction(unittest.TestCase):
                         {"slug": "m2", "name": "Model 2", "intelligence_index": 11.0},
                     ],
                     "bucketB": [
-                        {"slug": "provider-1", "name": "Provider 1", "openai_compatible": True},
-                        {"slug": "provider-2", "name": "Provider 2", "openai_compatible": False},
+                        {
+                            "slug": "provider-1",
+                            "name": "Provider 1",
+                            "openai_compatible": True,
+                        },
+                        {
+                            "slug": "provider-2",
+                            "name": "Provider 2",
+                            "openai_compatible": False,
+                        },
                     ],
                     "bucketC": [
-                        {"slug": "provider-1_model-1", "host_id": "h1", "model_id": "m1"},
-                        {"slug": "provider-2_model-2", "host_id": "h2", "model_id": "m2"},
+                        {
+                            "slug": "provider-1_model-1",
+                            "host_id": "h1",
+                            "model_id": "m1",
+                        },
+                        {
+                            "slug": "provider-2_model-2",
+                            "host_id": "h2",
+                            "model_id": "m2",
+                        },
                     ],
                 },
             )

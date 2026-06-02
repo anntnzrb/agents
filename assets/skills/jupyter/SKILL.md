@@ -43,10 +43,10 @@ uv run --with ipykernel python -m ipykernel install --user --name uv-py
 
 Public dispatcher: `scripts/cli.py`.
 
-| Command | Purpose | Internal |
-|--------|---------|----------|
-| `inspect`, `show`, `execute`, `convert`, `clear`, `grep` | Full notebook CLI | `nb.py` |
-| `validate` | Quick syntax check | `validate.py` |
+| Command                                                  | Purpose            | Internal      |
+| -------------------------------------------------------- | ------------------ | ------------- |
+| `inspect`, `show`, `execute`, `convert`, `clear`, `grep` | Full notebook CLI  | `nb.py`       |
+| `validate`                                               | Quick syntax check | `validate.py` |
 
 `cli.py` carries inline dependencies (PEP 723); uv handles everything automatically.
 
@@ -111,6 +111,7 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o
 ### Edit Cell (Built-in Tool)
 
 Use Claude's `NotebookEdit` tool to modify cells:
+
 - `cell_id`: The cell ID or index
 - `new_source`: New cell content
 - `edit_mode`: "replace", "insert", or "delete"
@@ -128,17 +129,17 @@ uv run --script <skill-dir>/scripts/cli.py clear notebook.ipynb
 
 ## Tool Integration
 
-| Task | Tool |
-|------|------|
-| Read notebook structure | `uv run --script <skill-dir>/scripts/cli.py inspect` |
-| Read cell contents | `uv run --script <skill-dir>/scripts/cli.py show` or `read` tool |
-| Edit cells | `NotebookEdit` tool |
-| Execute cells | `uv run --script <skill-dir>/scripts/cli.py execute` |
-| View outputs | `uv run --script <skill-dir>/scripts/cli.py show -o` or `--output-only` |
-| Search cells | `uv run --script <skill-dir>/scripts/cli.py grep` |
-| Extract images | `uv run --script <skill-dir>/scripts/cli.py show -o --save-images DIR` |
-| Validate syntax | `uv run --script <skill-dir>/scripts/cli.py validate` |
-| Convert formats | `uv run --script <skill-dir>/scripts/cli.py convert` |
+| Task                    | Tool                                                                    |
+| ----------------------- | ----------------------------------------------------------------------- |
+| Read notebook structure | `uv run --script <skill-dir>/scripts/cli.py inspect`                    |
+| Read cell contents      | `uv run --script <skill-dir>/scripts/cli.py show` or `read` tool        |
+| Edit cells              | `NotebookEdit` tool                                                     |
+| Execute cells           | `uv run --script <skill-dir>/scripts/cli.py execute`                    |
+| View outputs            | `uv run --script <skill-dir>/scripts/cli.py show -o` or `--output-only` |
+| Search cells            | `uv run --script <skill-dir>/scripts/cli.py grep`                       |
+| Extract images          | `uv run --script <skill-dir>/scripts/cli.py show -o --save-images DIR`  |
+| Validate syntax         | `uv run --script <skill-dir>/scripts/cli.py validate`                   |
+| Convert formats         | `uv run --script <skill-dir>/scripts/cli.py convert`                    |
 
 ## References
 

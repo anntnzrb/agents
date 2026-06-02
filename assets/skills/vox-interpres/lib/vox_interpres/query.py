@@ -24,8 +24,22 @@ _INTENT_RULES: tuple[tuple[Intent, tuple[str, ...]], ...] = (
     ("duration", ("duration", "length", "how long", "runtime", "time")),
     ("energy", ("energy", "loud", "dynamic", "intense", "quiet")),
     ("spectral", ("spectral", "brightness", "timbre", "centroid", "rolloff")),
-    ("sections", ("section", "structure", "verse", "chorus", "bridge", "intro", "outro")),
-    ("metadata", ("metadata", "codec", "sample rate", "bitrate", "container", "channels", "ffprobe")),
+    (
+        "sections",
+        ("section", "structure", "verse", "chorus", "bridge", "intro", "outro"),
+    ),
+    (
+        "metadata",
+        (
+            "metadata",
+            "codec",
+            "sample rate",
+            "bitrate",
+            "container",
+            "channels",
+            "ffprobe",
+        ),
+    ),
 )
 
 
@@ -66,14 +80,26 @@ def _answer_for_intent(analysis: AnalysisResult, intent: Intent) -> str:
             f"confidence {analysis.key.confidence:.2f}."
         )
     if intent == "beats":
-        first = "n/a" if analysis.beats.first_beat_s is None else f"{analysis.beats.first_beat_s:.2f}s"
-        last = "n/a" if analysis.beats.last_beat_s is None else f"{analysis.beats.last_beat_s:.2f}s"
+        first = (
+            "n/a"
+            if analysis.beats.first_beat_s is None
+            else f"{analysis.beats.first_beat_s:.2f}s"
+        )
+        last = (
+            "n/a"
+            if analysis.beats.last_beat_s is None
+            else f"{analysis.beats.last_beat_s:.2f}s"
+        )
         return (
             f"Beat grid: {analysis.beats.beat_count} beats, first at {first}, "
             f"last at {last}, tempo {analysis.beats.tempo_bpm:.1f} BPM."
         )
     if intent == "duration":
-        segment = "full track" if analysis.segment_duration_s is None else f"segment {analysis.segment_duration_s:.2f}s"
+        segment = (
+            "full track"
+            if analysis.segment_duration_s is None
+            else f"segment {analysis.segment_duration_s:.2f}s"
+        )
         return (
             f"Analyzed {segment} from {analysis.segment_start_s:.2f}s; "
             f"effective duration {analysis.analysis_duration_s:.2f}s."

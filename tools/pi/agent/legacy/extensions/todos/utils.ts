@@ -21,7 +21,9 @@ export const normalizeTodoId = (id: string): string => {
   return trimmed;
 };
 
-export const validateTodoId = (id: string): { id: string } | { error: string } => {
+export const validateTodoId = (
+  id: string,
+): { id: string } | { error: string } => {
   const normalized = normalizeTodoId(id);
   if (!normalized || !TODO_ID_PATTERN.test(normalized)) {
     return { error: "Invalid todo id. Expected TODO-<hex>." };
@@ -57,11 +59,16 @@ export const sortTodos = (todos: TodoFrontMatter[]): TodoFrontMatter[] => {
 
 export const buildTodoSearchText = (todo: TodoFrontMatter): string => {
   const tags = todo.tags.join(" ");
-  const assignment = todo.assigned_to_session ? `assigned:${todo.assigned_to_session}` : "";
+  const assignment = todo.assigned_to_session
+    ? `assigned:${todo.assigned_to_session}`
+    : "";
   return `${formatTodoId(todo.id)} ${todo.id} ${todo.title} ${tags} ${todo.status} ${assignment}`.trim();
 };
 
-export const filterTodos = (todos: TodoFrontMatter[], query: string): TodoFrontMatter[] => {
+export const filterTodos = (
+  todos: TodoFrontMatter[],
+  query: string,
+): TodoFrontMatter[] => {
   const trimmed = query.trim();
   if (!trimmed) return todos;
 
@@ -112,7 +119,9 @@ export const getTodoStatus = (todo: TodoFrontMatter): string => {
 };
 
 export const formatAssignmentSuffix = (todo: TodoFrontMatter): string => {
-  return todo.assigned_to_session ? ` (assigned: ${todo.assigned_to_session})` : "";
+  return todo.assigned_to_session
+    ? ` (assigned: ${todo.assigned_to_session})`
+    : "";
 };
 
 export const formatTodoHeading = (todo: TodoFrontMatter): string => {
@@ -129,7 +138,7 @@ export const buildRefinePrompt = (todoId: string, title: string): string => {
 };
 
 export const splitTodosByAssignment = (
-  todos: TodoFrontMatter[]
+  todos: TodoFrontMatter[],
 ): {
   assignedTodos: TodoFrontMatter[];
   openTodos: TodoFrontMatter[];

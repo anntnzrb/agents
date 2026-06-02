@@ -9,6 +9,7 @@ Higher-signal queries and scope control.
 **Problem**: Match a call expression inside a larger pattern.
 
 **Solution**:
+
 ```bash
 sg -p 'if ($COND) { $BODY }' --selector call_expression -l ts src
 ```
@@ -22,6 +23,7 @@ sg -p 'if ($COND) { $BODY }' --selector call_expression -l ts src
 **Problem**: Pattern does not match; inspect structure.
 
 **Solution**:
+
 ```bash
 sg -p 'await $CALL($$$)' -l ts --debug-query=ast
 ```
@@ -35,6 +37,7 @@ sg -p 'await $CALL($$$)' -l ts --debug-query=ast
 **Problem**: Over-matching or under-matching.
 
 **Solution**:
+
 ```bash
 sg -p '$A && $A()' -l ts --strictness=ast src
 ```
@@ -48,6 +51,7 @@ sg -p '$A && $A()' -l ts --strictness=ast src
 **Problem**: Search only src TS, exclude tests.
 
 **Solution**:
+
 ```bash
 sg -p 'new $TYPE($$$)' -l ts --globs 'src/**/*.ts' --globs '!**/*.test.ts' .
 ```
@@ -61,6 +65,7 @@ sg -p 'new $TYPE($$$)' -l ts --globs 'src/**/*.ts' --globs '!**/*.test.ts' .
 **Problem**: Restrict search to a known file set.
 
 **Solution**:
+
 ```bash
 rg -l "console\\.log" src | xargs sg -p 'console.log($$$)' -l ts
 ```
@@ -74,6 +79,7 @@ rg -l "console\\.log" src | xargs sg -p 'console.log($$$)' -l ts
 **Problem**: Emit minimal JSON for tooling.
 
 **Solution**:
+
 ```bash
 sg -p 'new $TYPE($$$)' -l ts --json=compact src
 ```

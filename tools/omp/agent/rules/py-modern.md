@@ -18,6 +18,7 @@ Use modern Python when it is compatible with the project's declared runtime.
 First check the project's target version (`requires-python`, CI matrix, Docker image, pyright/ruff target version). Do not force syntax that the project cannot run.
 
 Modernization preferences:
+
 - Python 3.8+: use walrus `:=` when a value is assigned only to be immediately tested or reused in the condition.
   - Prefer `if match := pattern.search(text): ...` over `match = pattern.search(text); if match: ...`
   - Prefer `if (n := len(items)) > 0: ...` when `n` is useful in the guarded block.
@@ -44,6 +45,7 @@ Modernization preferences:
 - Python 3.14+: use pathlib copy/move APIs when available and clearer.
 
 General stdlib preferences:
+
 - Prefer `pathlib.Path` over `os.path` string manipulation.
 - Prefer timezone-aware datetimes (`datetime.now(UTC)`) over naive `utcnow()` / `utcfromtimestamp()`.
 - Prefer context managers for files/resources.

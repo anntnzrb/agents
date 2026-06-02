@@ -14,12 +14,14 @@ uv run --script <skill-dir>/scripts/cli.py \
 ```
 
 Inspect:
+
 - `summary.planner_received`
 - `summary.after_filters`
 - `insights.weekend_premium_pct`
 - top `results[].effective_price`
 
 If thin/noisy:
+
 - widen `--depart-start/--depart-end`
 - relax `--nonstop`
 - remove/raise `--max-budget`
@@ -28,6 +30,7 @@ If thin/noisy:
 ## 2. Decision pass
 
 Use payload fields, not prose instincts:
+
 - anchor recommendation on `results[0]`
 - include `decision.actions`
 - include at least one `decision.avoid`

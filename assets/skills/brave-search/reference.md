@@ -10,17 +10,20 @@
 Keep `.env` beside this skill and populate it from `.env.example`.
 
 Supported lookup order in `scripts/cli.py`:
+
 - `BRAVE_SEARCH_ENV_FILE`
 - `$SKILLS_DIR/brave-search/.env`
 - nearest ancestor `skills/brave-search/.env`
 
 Direct env vars still win:
+
 - `BRAVE_API_KEY`
 - legacy alias: `BRAVE_SEARCH_API_KEY`
 
 ## Main endpoints
 
 ### Web search
+
 - `GET /web/search`
 - Required param: `q`
 - Common params: `count`, `offset`, `freshness`, `country`, `search_lang`, `ui_lang`, `safesearch`, `summary`
@@ -32,6 +35,7 @@ brave-search web "machine learning tutorials" count=5 freshness=pw
 ```
 
 ### News search
+
 - `GET /news/search`
 - Required param: `q`
 - Common params: `count`, `freshness`, `country`, `search_lang`, `safesearch`
@@ -43,6 +47,7 @@ brave-search news "bun runtime" count=5 freshness=pd
 ```
 
 ### Local search
+
 - `GET /local/search`
 - Required param: `q`
 - Common params: `count`, `country`, `search_lang`
@@ -54,6 +59,7 @@ brave-search local "greek restaurants in san francisco" count=5
 ```
 
 ### Image search
+
 - `GET /images/search`
 - Required param: `q`
 - Common params: `count`, `country`, `search_lang`, `safesearch`
@@ -65,6 +71,7 @@ brave-search image "apollo 11" count=10 safesearch=strict
 ```
 
 ### Video search
+
 - `GET /videos/search`
 - Required param: `q`
 - Common params: `count`, `freshness`, `country`, `search_lang`

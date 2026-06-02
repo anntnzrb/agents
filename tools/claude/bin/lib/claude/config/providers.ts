@@ -85,7 +85,10 @@ export const providers = {
     sonnetModel: "minimax/minimax-m2.1",
     opusModel: "minimax/minimax-m2.1",
     apiKeyEnvVar: "OPENROUTER_API_KEY",
-    tokenValidator: createTokenValidator("OpenRouter mode", "OPENROUTER_API_KEY"),
+    tokenValidator: createTokenValidator(
+      "OpenRouter mode",
+      "OPENROUTER_API_KEY",
+    ),
     env: {} as EnvironmentConfig,
   },
 };

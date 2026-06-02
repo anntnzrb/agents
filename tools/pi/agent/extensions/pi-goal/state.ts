@@ -1,4 +1,7 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import type { GoalEventKind, GoalState } from "./format.js";
 import { goalContentForLLM } from "./prompts.js";
 
@@ -30,12 +33,13 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const getEntryData = (entry: unknown): GoalEntryData | undefined => {
   if (!isRecord(entry)) return undefined;
-  if (entry["type"] !== "custom" || entry["customType"] !== CUSTOM_TYPE) return undefined;
+  if (entry["type"] !== "custom" || entry["customType"] !== CUSTOM_TYPE)
+    return undefined;
   return isRecord(entry["data"]) ? (entry["data"] as GoalEntryData) : undefined;
 };
 
 export const latestStateFromSession = (
-  ctx: ExtensionContext
+  ctx: ExtensionContext,
 ): { goal: GoalState | null } => {
   const sessionManager = ctx.sessionManager as BranchSessionManager;
   const entries = sessionManager.getBranch?.() ?? sessionManager.getEntries();
@@ -61,7 +65,7 @@ export const persistGoal = (
   pi: ExtensionAPI,
   runtime: GoalRuntime,
   _ctx: ExtensionContext,
-  next: GoalState | null
+  next: GoalState | null,
 ): void => {
   runtime.goal = next;
   pi.appendEntry(CUSTOM_TYPE, { goal: next });
@@ -72,7 +76,10 @@ export const emitGoalEvent = (
   pi: ExtensionAPI,
   kind: GoalEventKind,
   state: GoalState,
-  options?: { triggerTurn?: boolean; deliverAs?: "steer" | "followUp" | "nextTurn" }
+  options?: {
+    triggerTurn?: boolean;
+    deliverAs?: "steer" | "followUp" | "nextTurn";
+  },
 ): void => {
   pi.sendMessage(
     {
@@ -81,16 +88,25 @@ export const emitGoalEvent = (
       display: true,
       details: { kind, goal: state, timestamp: Date.now() },
     },
-    options
+    options,
   );
 };
 
-export const queueContinuation = (pi: ExtensionAPI, runtime: GoalRuntime, state: GoalState): void => {
+export const queueContinuation = (
+  pi: ExtensionAPI,
+  runtime: GoalRuntime,
+  state: GoalState,
+): void => {
   if (runtime.continuationQueued || state.status !== "active") return;
   runtime.continuationQueued = true;
   void Promise.resolve().then(() => {
     runtime.continuationQueued = false;
-    if (!runtime.goal || runtime.goal.id !== state.id || runtime.goal.status !== "active") return;
+    if (
+      !runtime.goal ||
+      runtime.goal.id !== state.id ||
+      runtime.goal.status !== "active"
+    )
+      return;
     emitGoalEvent(pi, "continuation", runtime.goal, {
       triggerTurn: true,
       deliverAs: "followUp",
@@ -102,7 +118,7 @@ export const accountTurnEnd = (
   pi: ExtensionAPI,
   runtime: GoalRuntime,
   ctx: ExtensionContext,
-  now = Date.now()
+  now = Date.now(),
 ): GoalState | null => {
   if (!runtime.goal || runtime.goal.status !== "active") return null;
   const elapsed = runtime.activeTurnStartedAt

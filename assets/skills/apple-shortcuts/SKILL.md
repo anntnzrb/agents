@@ -11,6 +11,7 @@ disable-model-invocation: true
 # Apple Shortcuts
 
 ## Activation Triggers
+
 - "create a shortcut", "build a shortcut", "shortcut automation", "Siri shortcut".
 - Device-specific shortcut requests for iPhone, iPad, Mac, Apple Watch, Apple Vision Pro.
 - Requests to list, open, inspect, or run installed shortcuts from the Mac CLI.
@@ -20,6 +21,7 @@ disable-model-invocation: true
 - Requests to debug a failing shortcut or optimize shortcut reliability/performance.
 
 ## Core Workflow
+
 1. Scope the automation: goal, device(s), trigger type, input/output, side effects, and privacy constraints.
 2. Choose implementation path:
    - User-level shortcut only: use support-guide patterns.
@@ -53,16 +55,21 @@ Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, execut
 Corpus check policy: do not infer a missing corpus from `APPLE_SHORTCUTS_CORPUS` being unset in the parent shell. The helpers can also use `--corpus-root` or auto-discover the nearest `shortcuts-docs-corpus/`.
 
 - Search corpus for authoritative snippets:
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py search \
   --query "run shortcut from command line output type" --top 8
 ```
+
 - Filter search to official support docs:
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py search \
   --query "ask for input action" --group support --top 10
 ```
+
 - Generate a structured shortcut blueprint:
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py blueprint \
   --goal "capture meeting notes and send summary" \
@@ -72,43 +79,58 @@ uv run --script <skill-dir>/scripts/cli.py blueprint \
   --outputs "markdown note, copied summary" \
   --automation-type "manual"
 ```
+
 - Enumerate installed shortcuts with IDs/folders:
+
 ```bash
 shortcuts list --show-identifiers
 shortcuts list --folders
 ```
+
 - Open a shortcut in Shortcuts.app for manual inspection/editing:
+
 ```bash
 shortcuts view "My Shortcut"
 ```
+
 - Run an installed shortcut:
+
 ```bash
 shortcuts run "My Shortcut"
 shortcuts run "My Shortcut" --input-path ./input.txt
 printf '%s\n' "hello world" | shortcuts run "My Shortcut"
 ```
+
 - Decode local action graphs (safe redaction on by default):
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py inspect --visible-only --include-folders
 ```
+
 - Deep inspect one shortcut with run history + smart prompt permissions:
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py inspect \
   --name "LLM" \
   --include-run-stats \
   --include-smart-prompts
 ```
+
 - Raw export (use only when explicitly needed; includes sensitive data unless redaction remains enabled):
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py inspect --json --raw
 uv run --script <skill-dir>/scripts/cli.py inspect --json --raw --no-redact
 ```
+
 - Sign a generated `.shortcut` file for import:
+
 ```bash
 shortcuts sign --mode anyone --input MyShortcut.shortcut --output MyShortcut_signed.shortcut
 ```
 
 ## Local Introspection Protocol
+
 1. Inventory first: `shortcuts list --show-identifiers` and folder listing.
 2. Decode shortcut internals from `~/Library/Shortcuts/Shortcuts.sqlite` using `uv run --script <skill-dir>/scripts/cli.py inspect` (not `shortcuts view`, which only opens UI).
 3. Include `--include-run-stats` to report usage/outcome telemetry from `ZSHORTCUTRUNEVENT`.
@@ -117,12 +139,14 @@ shortcuts sign --mode anyone --input MyShortcut.shortcut --output MyShortcut_sig
 6. Keep redaction enabled by default; only use `--no-redact` when user explicitly asks for raw secrets.
 
 ## Mac CLI Operations
+
 - Use `shortcuts view "<name>"` only when the user explicitly wants to open/edit the shortcut in Shortcuts.app.
 - Use `shortcuts run "<name>"` for direct execution, `--input-path` for file input, and stdin piping for text input.
 - If `shortcuts run/view` fails with `The shortcut "Name" could not be found.`, re-run inventory first, then retry with exact casing and spacing.
 - For machine-readable automation output, pair execution with explicit CLI output flags when available; see `references/debug-playbook.md`.
 
 ## Output Contract
+
 - Always produce named sections:
   - `Goal`
   - `Target Devices`
@@ -138,6 +162,7 @@ shortcuts sign --mode anyone --input MyShortcut.shortcut --output MyShortcut_sig
 - When the user explicitly requests a raw `.shortcut` artifact, replace `Action Graph` with `Shortcut File Structure` and include signing/import steps.
 
 ## Device-Specific Rules
+
 - iPhone/iPad:
   - Prefer Shortcuts User Guide iOS pages for action behavior.
   - For automation triggers, separate personal vs home automation pathways.
@@ -153,6 +178,7 @@ shortcuts sign --mode anyone --input MyShortcut.shortcut --output MyShortcut_sig
   - Use App Intents + App Shortcuts docs; include phrase discoverability and Spotlight/Shortcuts surfaces.
 
 ## Troubleshooting Protocol
+
 1. Reproduce with minimal shortcut.
 2. Isolate failing action by binary split.
 3. Inspect input types entering each branch.
@@ -161,6 +187,7 @@ shortcuts sign --mode anyone --input MyShortcut.shortcut --output MyShortcut_sig
 6. Re-test on each target device class.
 
 ## Corpus and References
+
 - Start with `references/corpus-usage.md` to locate and query `shortcuts-docs-corpus`.
 - Use `references/workflows.md` for implementation flow and output structure.
 - Use `references/pattern-cookbook.md` for action-level patterns.
@@ -169,6 +196,7 @@ shortcuts sign --mode anyone --input MyShortcut.shortcut --output MyShortcut_sig
 - Use `references/plist-authoring.md` only for explicit raw `.shortcut`/plist authoring requests.
 
 ## Constraints
+
 - Use local corpus only. Do not fetch documentation from the web.
 - Prefer official Apple docs over community sources for normative behavior.
 - Treat community sources as pattern inspiration; mark them non-authoritative.

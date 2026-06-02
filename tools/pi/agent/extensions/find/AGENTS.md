@@ -1,7 +1,9 @@
 # Find Extension (native override + auto-enable)
 
 ## Purpose
+
 Keep `find` active; add file-discovery ergonomics without changing the broad native tool contract:
+
 - `hidden` toggle
 - `kind` filter:
   - `file` — default, `fd --type file`
@@ -16,6 +18,7 @@ Keep `find` active; add file-discovery ergonomics without changing the broad nat
 - compact UI: shortened paths, explicit `limit:` labels
 
 ## Files
+
 - `index.ts` — override, schema, activation hooks, fd execution, compact rendering
 - `logic.ts` — pure normalization + fd argv construction
 - `index.test.ts` — helper behavior
@@ -23,6 +26,7 @@ Keep `find` active; add file-discovery ergonomics without changing the broad nat
 - `tsconfig.json` — strict TS config
 
 ## Behavior Notes
+
 - Dynamic activation preserves active tools while forcing `find` on.
 - Overrides built-in `find` with fd-backed multipath, kind, ignore, timeout behavior.
 - Default `kind=file` matches tool contract; avoids surprise directories.
@@ -30,5 +34,6 @@ Keep `find` active; add file-discovery ergonomics without changing the broad nat
 - No mtime sort/cache/index complexity; tactical filesystem discovery only.
 
 ## Stop Rules
+
 - Preserve native `find` semantics unless the task explicitly targets the override behavior.
 - Keep changes tactical: schema, fd argv construction, deterministic paging, or compact rendering.

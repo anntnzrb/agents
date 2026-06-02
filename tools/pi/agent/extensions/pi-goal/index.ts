@@ -21,9 +21,11 @@ export default function piGoalExtension(pi: ExtensionAPI): void {
   registerGoalTools(pi, runtime);
 
   pi.registerCommand("goal", {
-    description: "Set, view, pause, resume, clear, or configure a long-running goal",
+    description:
+      "Set, view, pause, resume, clear, or configure a long-running goal",
     getArgumentCompletions: makeGoalArgumentCompletions(runtime),
-    handler: (args: string, ctx: Parameters<typeof handleGoalCommand>[3]) => handleGoalCommand(pi, runtime, args, ctx),
+    handler: (args: string, ctx: Parameters<typeof handleGoalCommand>[3]) =>
+      handleGoalCommand(pi, runtime, args, ctx),
   });
 
   pi.on("session_start", (event, ctx) => {
@@ -34,11 +36,15 @@ export default function piGoalExtension(pi: ExtensionAPI): void {
     syncGoalTools(pi, runtime);
 
     if (runtime.goal?.status === "active" && event.reason === "reload") {
-      const paused = { ...runtime.goal, status: "paused" as const, updatedAt: Date.now() };
+      const paused = {
+        ...runtime.goal,
+        status: "paused" as const,
+        updatedAt: Date.now(),
+      };
       persistGoal(pi, runtime, ctx, paused);
       ctx.ui.notify(
         `‖ Goal paused after reload: ${truncateObjective(paused.objective)}\nUse /goal resume to continue, or /goal clear to stop.`,
-        "info"
+        "info",
       );
       return;
     }
@@ -46,7 +52,7 @@ export default function piGoalExtension(pi: ExtensionAPI): void {
     if (runtime.goal?.status === "active") {
       ctx.ui.notify(
         `⚑ Goal restored: ${truncateObjective(runtime.goal.objective)}\nUse /goal pause to stop continuation, or /goal clear to remove it.`,
-        "info"
+        "info",
       );
     }
   });
@@ -60,8 +66,15 @@ export default function piGoalExtension(pi: ExtensionAPI): void {
   });
 
   pi.on("agent_end", (_event, ctx) => {
-    const hasPendingMessages = (ctx as typeof ctx & { hasPendingMessages?: () => boolean }).hasPendingMessages;
-    if (!runtime.goal || runtime.goal.status !== "active" || hasPendingMessages?.()) return;
+    const hasPendingMessages = (
+      ctx as typeof ctx & { hasPendingMessages?: () => boolean }
+    ).hasPendingMessages;
+    if (
+      !runtime.goal ||
+      runtime.goal.status !== "active" ||
+      hasPendingMessages?.()
+    )
+      return;
     queueContinuation(pi, runtime, runtime.goal);
   });
 }

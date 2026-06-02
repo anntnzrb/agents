@@ -13,6 +13,7 @@ disable-model-invocation: true
 Python: uv-first, Pyright strict, typed JSON/data shapes, boundary validation, practical tests, small composable modules.
 
 ## Activation Triggers
+
 - `.py`, `pyproject.toml`, uv commands, Python packaging, inline script metadata
 - pip/pip3/poetry/venv/virtualenv replacement or migration
 - Python typing, Pyright strict, inherited mypy, Ruff, pytest, Hypothesis
@@ -20,6 +21,7 @@ Python: uv-first, Pyright strict, typed JSON/data shapes, boundary validation, p
 - Async I/O, data pipelines, CLI tooling, parsing, test strategy
 
 ## Workflow
+
 ```text
 1. DETECT    -> package manager, runtime target, scripts, type/test gates
 2. ROUTE     -> read the required follow-up docs for async, typing, tests, syntax, patterns, packaging
@@ -30,6 +32,7 @@ Python: uv-first, Pyright strict, typed JSON/data shapes, boundary validation, p
 ```
 
 ## Core Principles
+
 - Respect the declared Python target first: `requires-python`, CI matrix, Docker image, Ruff `target-version`, Pyright config.
 - Prefer explicit types and error paths; Pyright strict is the default for new projects.
 - Keep raw JSON, env, CLI, API, and RPC data at boundaries; validate once with pydantic/msgspec or narrow typed code.
@@ -39,6 +42,7 @@ Python: uv-first, Pyright strict, typed JSON/data shapes, boundary validation, p
 - Use mypy only for inherited repos that already use it.
 
 ## uv Essentials
+
 Prefer `uv` over raw `python`, `pip`, `poetry`, and `python -m venv` when uv is the intended workflow.
 
 ```bash
@@ -66,6 +70,7 @@ Use inline script metadata for standalone scripts that need dependencies:
 ```
 
 ## Quality Gate Essentials
+
 - New projects: Pyright strict, Ruff lint/format, pytest.
 - Inherited projects: preserve the existing checker stack unless changing it is part of the task.
 - Baseline commands:
@@ -78,6 +83,7 @@ Use inline script metadata for standalone scripts that need dependencies:
 - Ruff baseline: `E`, `F`, `I`, `UP`, `B`, `SIM`; expand deliberately after the baseline is clean.
 
 ## Build Note
+
 Use `uv_build` for pure Python packages. For extension modules, prefer an appropriate backend such as `hatchling`.
 
 ```toml
@@ -89,7 +95,9 @@ build-backend = "uv_build"
 Prefer `src/` layout unless the repository has a strong reason not to.
 
 ## Required follow-up reads
+
 You MUST load only the references needed by the task:
+
 - Async I/O/concurrency/cancellation: `cookbook/async.md`
 - Typing, JSON/API/RPC boundaries, validation: `reference.md` and `cookbook/correctness.md`
 - Testing, pytest, property-based invariants: `cookbook/testing.md`, then narrower `cookbook/testing-*.md` only when needed
@@ -98,6 +106,7 @@ You MUST load only the references needed by the task:
 - Packaging, uv, script metadata, build backends: this file first; then project config and official tool output
 
 ## Must / Must Not
+
 - MUST type public APIs, validate untrusted inputs at boundaries, prefer pathlib, and respect the project runtime target.
 - MUST use `uv` for running Python, adding deps, script metadata, and env setup when uv is intended.
 - MUST keep validators, raw payloads, mocks, retries, and I/O out of core logic unless they are the domain being modeled.

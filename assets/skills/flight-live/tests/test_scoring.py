@@ -6,7 +6,9 @@ from flight_live.models import FlightOption
 from flight_live.scoring import rank_options
 
 
-def _option(*, depart: str, ret: str | None, price: float, transfers: int) -> FlightOption:
+def _option(
+    *, depart: str, ret: str | None, price: float, transfers: int
+) -> FlightOption:
     return FlightOption(
         origin="SFO",
         destination="JFK",
@@ -20,8 +22,12 @@ def _option(*, depart: str, ret: str | None, price: float, transfers: int) -> Fl
 
 
 def test_weekday_departure_beats_weekend_given_similar_price() -> None:
-    weekend = _option(depart="2026-05-16", ret="2026-05-20", price=280.0, transfers=0)  # Sat
-    weekday = _option(depart="2026-05-19", ret="2026-05-23", price=285.0, transfers=0)  # Tue
+    weekend = _option(
+        depart="2026-05-16", ret="2026-05-20", price=280.0, transfers=0
+    )  # Sat
+    weekday = _option(
+        depart="2026-05-19", ret="2026-05-23", price=285.0, transfers=0
+    )  # Tue
 
     ranked = rank_options([weekend, weekday], max_budget=None, prefer_nonstop=False)
 

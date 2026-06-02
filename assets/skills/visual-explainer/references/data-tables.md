@@ -3,6 +3,7 @@
 Use real `<table>` markup, not CSS Grid pretending to be a table.
 
 Required table features:
+
 - Sticky `<thead>`.
 - Subtle alternating rows.
 - Optional sticky first column when row identity matters.
@@ -15,6 +16,7 @@ Required table features:
 - `tabular-nums` for numeric columns.
 
 Status indicators MUST be styled elements, not emoji:
+
 - Green: match/pass/yes.
 - Red: gap/fail/no.
 - Amber: partial/warning.

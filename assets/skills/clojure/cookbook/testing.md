@@ -9,6 +9,7 @@ Practical recipes for testing Clojure applications with clojure.test, Kaocha, an
 **Problem**: You need to write simple unit tests for your Clojure functions.
 
 **Solution**:
+
 ```clojure
 (ns myapp.core-test
   (:require [clojure.test :refer [deftest is testing are]]
@@ -37,6 +38,7 @@ Practical recipes for testing Clojure applications with clojure.test, Kaocha, an
 **Problem**: You need to test equality, truthiness, types, and exceptions.
 
 **Solution**:
+
 ```clojure
 ;; Equality
 (is (= expected actual))
@@ -68,6 +70,7 @@ Practical recipes for testing Clojure applications with clojure.test, Kaocha, an
 **Problem**: You need to test the same function with multiple input/output pairs without duplicating test code.
 
 **Solution**:
+
 ```clojure
 (deftest test-fizzbuzz
   (are [n expected]
@@ -88,6 +91,7 @@ Practical recipes for testing Clojure applications with clojure.test, Kaocha, an
 **Problem**: You need to run setup and teardown code before and after tests.
 
 **Solution**:
+
 ```clojure
 ;; Per-test fixture
 (defn setup-fixture [f]
@@ -119,6 +123,7 @@ Practical recipes for testing Clojure applications with clojure.test, Kaocha, an
 **Problem**: You need to test asynchronous code with promises or core.async channels.
 
 **Solution**:
+
 ```clojure
 ;; Test async with promises
 (deftest test-async-operation
@@ -146,6 +151,7 @@ Practical recipes for testing Clojure applications with clojure.test, Kaocha, an
 **Problem**: You need a modern test runner with watch mode and better output.
 
 **Solution**:
+
 ```clojure
 ;; deps.edn
 {:aliases
@@ -186,6 +192,7 @@ Practical recipes for testing Clojure applications with clojure.test, Kaocha, an
 **Problem**: You need to run tests with different options like focusing on specific tests or skipping slow ones.
 
 **Solution**:
+
 ```bash
 # Run all tests
 clojure -X:test/run
@@ -212,6 +219,7 @@ clojure -X:test/run :skip-meta :slow
 **Problem**: You want to mark and selectively run slow, integration, or database tests.
 
 **Solution**:
+
 ```clojure
 ;; Mark slow tests
 (deftest ^:slow test-integration
@@ -234,6 +242,7 @@ clojure -X:test/run :skip-meta :slow
 **Problem**: You need to create test data with sensible defaults but allow customization.
 
 **Solution**:
+
 ```clojure
 (defn make-user
   ([] (make-user {}))
@@ -258,6 +267,7 @@ clojure -X:test/run :skip-meta :slow
 **Problem**: You need to test code that performs side effects like logging or HTTP calls.
 
 **Solution**:
+
 ```clojure
 ;; Capture side effects
 (deftest test-logging
@@ -281,6 +291,7 @@ clojure -X:test/run :skip-meta :slow
 **Problem**: You need to verify that code throws exceptions with specific types and messages.
 
 **Solution**:
+
 ```clojure
 (deftest test-validation-errors
   ;; Throws any exception
@@ -308,6 +319,7 @@ clojure -X:test/run :skip-meta :slow
 **Problem**: You need to test a private function directly.
 
 **Solution**:
+
 ```clojure
 ;; Access private var
 (deftest test-private
@@ -326,6 +338,7 @@ clojure -X:test/run :skip-meta :slow
 **Problem**: You want to test properties that should hold for many generated inputs, not just specific examples.
 
 **Solution**:
+
 ```clojure
 (require '[clojure.test.check :as tc]
          '[clojure.test.check.generators :as gen]
@@ -350,6 +363,7 @@ clojure -X:test/run :skip-meta :slow
 **Problem**: You need to generate complex domain-specific test data for property-based tests.
 
 **Solution**:
+
 ```clojure
 ;; Composite generator
 (def user-gen
@@ -374,6 +388,7 @@ clojure -X:test/run :skip-meta :slow
 **Problem**: You need a clear structure for organizing tests, fixtures, and helpers.
 
 **Solution**:
+
 ```text
 test/
 ├── myapp/
@@ -406,6 +421,7 @@ test/
 **Problem**: You need to share common test setup code, fixtures, and macros across multiple test namespaces.
 
 **Solution**:
+
 ```clojure
 ;; test/myapp/test_helpers.clj
 (ns myapp.test-helpers

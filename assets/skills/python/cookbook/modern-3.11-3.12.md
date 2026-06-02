@@ -3,11 +3,13 @@
 Concurrency, typing, and stdlib upgrades.
 
 ---
+
 ## Exception Groups (3.11+)
 
 **Problem**: You need to raise or handle multiple exceptions at once, common in concurrent code.
 
 **Solution**:
+
 ```python
 # Raise multiple exceptions
 raise ExceptionGroup("errors", [
@@ -33,6 +35,7 @@ except* TypeError as eg:
 **Problem**: You want to run multiple async tasks and ensure all complete or all cancel together on error.
 
 **Solution**:
+
 ```python
 import asyncio
 
@@ -53,6 +56,7 @@ async def main():
 **Problem**: You need to parse TOML configuration files without external dependencies.
 
 **Solution**:
+
 ```python
 import tomllib
 
@@ -72,6 +76,7 @@ data = tomllib.loads('[section]\nkey = "value"')
 **Problem**: You want method return types to correctly refer to the current class, not the parent.
 
 **Solution**:
+
 ```python
 from typing import Self
 
@@ -93,6 +98,7 @@ class Builder:
 **Problem**: You want to write generic functions and classes without the boilerplate of `TypeVar`.
 
 **Solution**:
+
 ```python
 # Old way
 from typing import TypeVar
@@ -128,6 +134,7 @@ def add[T: (int, float)](a: T, b: T) -> T:
 **Problem**: You want to create type aliases that are properly recognized as types, not runtime values.
 
 **Solution**:
+
 ```python
 # Old way
 from typing import TypeAlias
@@ -148,6 +155,7 @@ type Callback[T] = Callable[[T], None]
 **Problem**: You need to use quotes inside f-strings or format complex multiline expressions.
 
 **Solution**:
+
 ```python
 # Nested quotes (any quote style)
 print(f"User: {user["name"]}")  # Now works!
@@ -174,6 +182,7 @@ f"{x:=10}"  # This is a format spec, not walrus!
 **Problem**: You want to catch typos or signature mismatches when overriding parent class methods.
 
 **Solution**:
+
 ```python
 from typing import override
 
@@ -200,6 +209,7 @@ class Child(Parent):
 **Problem**: You need to process data in fixed-size chunks.
 
 **Solution**:
+
 ```python
 from itertools import batched
 
@@ -212,4 +222,3 @@ for batch in batched(large_dataset, 100):
 ```
 
 **Tip**: `batched()` is more efficient than manual chunking and handles the final partial batch automatically.
-

@@ -9,12 +9,14 @@ uv run --script <skill-dir>/scripts/cli.py "$QUERY" --llm-json --limit 10
 ```
 
 Then inspect:
+
 - `summary.raw_result_count`
 - connector/type mismatches
 - obvious junk brands
 - price bands
 
 If noisy, tighten with:
+
 - `--include ...`
 - `--exclude ...`
 - `--max-price ...`
@@ -34,6 +36,7 @@ uv run --script <skill-dir>/scripts/cli.py "$QUERY" \
 ```
 
 Inspect:
+
 - `results[].details.brand`
 - `results[].details.ships_from`
 - `results[].details.sold_by`
@@ -44,6 +47,7 @@ Inspect:
 ## 3. Query tightening loop
 
 Typical loop:
+
 1. broad query
 2. inspect junk
 3. add excludes
@@ -51,6 +55,7 @@ Typical loop:
 5. only then add details/scoring
 
 Examples:
+
 - wrong USB-A results → `--exclude "usb a"`
 - unwanted Lightning → `--exclude lightning`
 - wants braided only → `--include braided`
@@ -59,12 +64,14 @@ Examples:
 ## 4. User-facing answer pattern
 
 Prefer:
+
 - top 3 options
 - each: price, rating, review count, brand
 - mention merchant trust only when meaningful
 - mention one risk or mismatch if present
 
 Template:
+
 - **Option 1** — `$X` — `Y★` — `N reviews` — why it wins
 - **Option 2** — ...
 - **Option 3** — ...
@@ -89,6 +96,7 @@ uv run --script <skill-dir>/scripts/cli.py "usb c to usb c braided cable" \
 ```
 
 If still noisy:
+
 - add `--title-contains "usb c to usb c"`
 - add `--include certified`
 - raise `--min-rating`
@@ -105,6 +113,7 @@ uv run --script <skill-dir>/scripts/cli.py "$QUERY" \
 ```
 
 Good for:
+
 - schema work
 - output-contract checks
 - scoring regression checks

@@ -65,7 +65,9 @@ class FlightOption:
             "origin": self.origin,
             "destination": self.destination,
             "depart_date": self.depart_date.isoformat(),
-            "return_date": None if self.return_date is None else self.return_date.isoformat(),
+            "return_date": None
+            if self.return_date is None
+            else self.return_date.isoformat(),
             "price": self.price,
             "effective_price": self.effective_price,
             "currency": self.currency,

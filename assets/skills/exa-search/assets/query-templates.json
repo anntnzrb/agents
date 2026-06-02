@@ -12,9 +12,7 @@
   },
   "contents": {
     "command": "exa-search contents https://example.com/article",
-    "urls": [
-      "https://example.com/article"
-    ]
+    "urls": ["https://example.com/article"]
   },
   "answer": {
     "command": "exa-search answer \"<question>\"",

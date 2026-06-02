@@ -13,14 +13,17 @@
 ## Parameters
 
 ### Required
+
 - `q`: literal or regex pattern
 
 ### Search modifiers
+
 - `regexp=true`: treat `q` as a regex
 - `case=true`: match case
 - `words=true`: whole-word-ish matching
 
 ### Filters
+
 - `f.repo=owner/repo`
 - `f.path=src/`
 - `f.lang=TypeScript`

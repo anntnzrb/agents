@@ -9,6 +9,7 @@ End-to-end flow: natural language → workflow JSON → apply → enable MCP →
 **Problem**: Start from a plain-English request and end with a runnable MCP workflow.
 
 **Solution**:
+
 ```bash
 # 1) Export or create a JSON blueprint (by hand or with agent help)
 # Save as <WORKFLOW.json>
@@ -35,6 +36,7 @@ uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
 **Problem**: Keep updating a workflow without breaking MCP access.
 
 **Solution**:
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py export <WORKFLOW_ID> <WORKFLOW.json>
 # edit <WORKFLOW.json>

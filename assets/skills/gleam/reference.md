@@ -8,18 +8,18 @@
 
 Query Context7 library IDs (GitHub project = libraryId) for accurate, up-to-date information:
 
-| Topic | Library ID |
-|-------|---------------|
-| Standard library (list, dict, result, option) | `/gleam-lang/stdlib` |
-| Regular expressions | `/gleam-lang/regexp` |
-| Practical code examples, recipes | `/gleam-lang/cookbook` |
-| Testing with gleeunit | `/lpil/gleeunit` |
-| HTTP types (Request, Response, Method) | `/gleam-lang/http` |
-| Time, timestamps, durations, dates | `/gleam-lang/time` |
-| JSON encoding/decoding | `/gleam-lang/json` |
-| Data structures (heap, map, set, deque) | `/schurhammer/gleamy_structures` |
-| HTTP server (mist, WebSocket, SSE) | `/rawhat/mist` |
-| Package discovery, ecosystem | `/gleam-lang/awesome-gleam` |
+| Topic                                         | Library ID                       |
+| --------------------------------------------- | -------------------------------- |
+| Standard library (list, dict, result, option) | `/gleam-lang/stdlib`             |
+| Regular expressions                           | `/gleam-lang/regexp`             |
+| Practical code examples, recipes              | `/gleam-lang/cookbook`           |
+| Testing with gleeunit                         | `/lpil/gleeunit`                 |
+| HTTP types (Request, Response, Method)        | `/gleam-lang/http`               |
+| Time, timestamps, durations, dates            | `/gleam-lang/time`               |
+| JSON encoding/decoding                        | `/gleam-lang/json`               |
+| Data structures (heap, map, set, deque)       | `/schurhammer/gleamy_structures` |
+| HTTP server (mist, WebSocket, SSE)            | `/rawhat/mist`                   |
+| Package discovery, ecosystem                  | `/gleam-lang/awesome-gleam`      |
 
 ```
 task(
@@ -48,7 +48,6 @@ gh search issues "json decode" --repo gleam-lang/json
 ```
 
 **Query multiple repos in parallel** when topics overlap (e.g., HTTP server + HTTP types).
-
 
 ## Patterns
 
@@ -168,14 +167,13 @@ let name = "Alice"
 create(name:, email: "a@b.com")
 ```
 
-
 ## Anti-Patterns
 
-| Avoid | Do Instead |
-|-------|------------|
-| `import gleam/io.{println}` | `io.println(...)` |
-| `panic` for expected failures | Return `Result` |
-| `let assert` on user input | Pattern match + handle |
-| `list.at(items, n)` indexing | Pattern match or fold |
-| Nested `result.try` callbacks | `use` expressions |
-| Boolean flags for states | Sum types |
+| Avoid                         | Do Instead             |
+| ----------------------------- | ---------------------- |
+| `import gleam/io.{println}`   | `io.println(...)`      |
+| `panic` for expected failures | Return `Result`        |
+| `let assert` on user input    | Pattern match + handle |
+| `list.at(items, n)` indexing  | Pattern match or fold  |
+| Nested `result.try` callbacks | `use` expressions      |
+| Boolean flags for states      | Sum types              |

@@ -15,7 +15,12 @@ mock.module("@earendil-works/pi-tui", () => ({
   visibleWidth: (value: string) => value.length,
 }));
 
-const { buildGoalEventText, buildUpdateGoalCallText, buildUpdateGoalResultText, previewObjective } = await import("./render.js");
+const {
+  buildGoalEventText,
+  buildUpdateGoalCallText,
+  buildUpdateGoalResultText,
+  previewObjective,
+} = await import("./render.js");
 
 const goal = (overrides: Partial<GoalState> = {}): GoalState => ({
   version: 1,
@@ -35,27 +40,63 @@ const plainTheme = {
 
 describe("goal rendering", () => {
   test("renders compact goal events like tool telemetry", () => {
-    expect(buildGoalEventText({ details: { kind: "continuation", goal: goal() } }, {}, plainTheme)).toBe(
-      "⚑ goal · continuing\n  ↳ patch the extension and validate gates"
-    );
-    expect(buildGoalEventText({ details: { kind: "paused", goal: goal({ status: "paused" }) } }, {}, plainTheme)).toBe(
-      "‖ goal · paused · 1m\n  ↳ patch the extension and validate gates"
-    );
-    expect(buildGoalEventText({ details: { kind: "complete", goal: goal({ status: "complete" }) } }, {}, plainTheme)).toBe(
-      "✓ goal · achieved · 1m\n  ↳ patch the extension and validate gates"
+    expect(
+      buildGoalEventText(
+        { details: { kind: "continuation", goal: goal() } },
+        {},
+        plainTheme,
+      ),
+    ).toBe("⚑ goal · continuing\n  ↳ patch the extension and validate gates");
+    expect(
+      buildGoalEventText(
+        { details: { kind: "paused", goal: goal({ status: "paused" }) } },
+        {},
+        plainTheme,
+      ),
+    ).toBe("‖ goal · paused · 1m\n  ↳ patch the extension and validate gates");
+    expect(
+      buildGoalEventText(
+        { details: { kind: "complete", goal: goal({ status: "complete" }) } },
+        {},
+        plainTheme,
+      ),
+    ).toBe(
+      "✓ goal · achieved · 1m\n  ↳ patch the extension and validate gates",
     );
   });
 
   test("does not render expand hints", () => {
-    expect(buildGoalEventText({ details: { kind: "active", goal: goal() } }, {}, plainTheme)).not.toContain("ctrl+o");
+    expect(
+      buildGoalEventText(
+        { details: { kind: "active", goal: goal() } },
+        {},
+        plainTheme,
+      ),
+    ).not.toContain("ctrl+o");
   });
 
   test("omits elapsed usage for non-terminal historical events", () => {
-    expect(buildGoalEventText({ details: { kind: "active", goal: goal() } }, {}, plainTheme)).toBe(
-      "⚑ goal · active\n  ↳ patch the extension and validate gates"
-    );
-    expect(buildGoalEventText({ details: { kind: "continuation", goal: goal() } }, {}, plainTheme)).not.toContain("1m");
-    expect(buildGoalEventText({ details: { kind: "resumed", goal: goal() } }, {}, plainTheme)).toContain("1m");
+    expect(
+      buildGoalEventText(
+        { details: { kind: "active", goal: goal() } },
+        {},
+        plainTheme,
+      ),
+    ).toBe("⚑ goal · active\n  ↳ patch the extension and validate gates");
+    expect(
+      buildGoalEventText(
+        { details: { kind: "continuation", goal: goal() } },
+        {},
+        plainTheme,
+      ),
+    ).not.toContain("1m");
+    expect(
+      buildGoalEventText(
+        { details: { kind: "resumed", goal: goal() } },
+        {},
+        plainTheme,
+      ),
+    ).toContain("1m");
   });
 
   test("truncates objective previews", () => {
@@ -64,8 +105,14 @@ describe("goal rendering", () => {
   });
 
   test("renders update_goal as compact two-line tool telemetry", () => {
-    expect(buildUpdateGoalCallText(goal(), plainTheme)).toBe("✓ goal · complete\n  ↳ patch the extension and validate gates");
-    expect(buildUpdateGoalResultText("Goal marked complete.", false, plainTheme)).toBe("");
-    expect(buildUpdateGoalResultText("No goal is set.", true, plainTheme)).toBe("  No goal is set.");
+    expect(buildUpdateGoalCallText(goal(), plainTheme)).toBe(
+      "✓ goal · complete\n  ↳ patch the extension and validate gates",
+    );
+    expect(
+      buildUpdateGoalResultText("Goal marked complete.", false, plainTheme),
+    ).toBe("");
+    expect(buildUpdateGoalResultText("No goal is set.", true, plainTheme)).toBe(
+      "  No goal is set.",
+    );
   });
 });

@@ -15,7 +15,7 @@ import {
 export const renderAssignmentSuffix = (
   theme: Theme,
   todo: TodoFrontMatter,
-  currentSessionId?: string
+  currentSessionId?: string,
 ): string => {
   if (!todo.assigned_to_session) return "";
   const isCurrent = todo.assigned_to_session === currentSessionId;
@@ -27,11 +27,13 @@ export const renderAssignmentSuffix = (
 export const renderTodoHeading = (
   theme: Theme,
   todo: TodoFrontMatter,
-  currentSessionId?: string
+  currentSessionId?: string,
 ): string => {
   const closed = isTodoClosed(getTodoStatus(todo));
   const titleColor = closed ? "dim" : "text";
-  const tagText = todo.tags.length ? theme.fg("dim", ` [${todo.tags.join(", ")}]`) : "";
+  const tagText = todo.tags.length
+    ? theme.fg("dim", ` [${todo.tags.join(", ")}]`)
+    : "";
   const assignmentText = renderAssignmentSuffix(theme, todo, currentSessionId);
   return (
     theme.fg("accent", formatTodoId(todo.id)) +
@@ -46,11 +48,12 @@ export const renderTodoList = (
   theme: Theme,
   todos: TodoFrontMatter[],
   expanded: boolean,
-  currentSessionId?: string
+  currentSessionId?: string,
 ): string => {
   if (!todos.length) return theme.fg("dim", "No todos");
 
-  const { assignedTodos, openTodos, closedTodos } = splitTodosByAssignment(todos);
+  const { assignedTodos, openTodos, closedTodos } =
+    splitTodosByAssignment(todos);
   const lines: string[] = [];
   const pushSection = (label: string, sectionTodos: TodoFrontMatter[]) => {
     lines.push(theme.fg("muted", `${label} (${sectionTodos.length})`));
@@ -58,12 +61,18 @@ export const renderTodoList = (
       lines.push(theme.fg("dim", "  none"));
       return;
     }
-    const maxItems = expanded ? sectionTodos.length : Math.min(sectionTodos.length, 3);
+    const maxItems = expanded
+      ? sectionTodos.length
+      : Math.min(sectionTodos.length, 3);
     for (let i = 0; i < maxItems; i++) {
-      lines.push(`  ${renderTodoHeading(theme, sectionTodos[i], currentSessionId)}`);
+      lines.push(
+        `  ${renderTodoHeading(theme, sectionTodos[i], currentSessionId)}`,
+      );
     }
     if (!expanded && sectionTodos.length > maxItems) {
-      lines.push(theme.fg("dim", `  ... ${sectionTodos.length - maxItems} more`));
+      lines.push(
+        theme.fg("dim", `  ... ${sectionTodos.length - maxItems} more`),
+      );
     }
   };
 
@@ -81,7 +90,11 @@ export const renderTodoList = (
   return lines.join("\n");
 };
 
-export const renderTodoDetail = (theme: Theme, todo: TodoRecord, expanded: boolean): string => {
+export const renderTodoDetail = (
+  theme: Theme,
+  todo: TodoRecord,
+  expanded: boolean,
+): string => {
   const summary = renderTodoHeading(theme, todo);
   if (!expanded) return summary;
 
@@ -110,7 +123,8 @@ export const appendExpandHint = (theme: Theme, text: string): string => {
 export const formatTodoList = (todos: TodoFrontMatter[]): string => {
   if (!todos.length) return "No todos.";
 
-  const { assignedTodos, openTodos, closedTodos } = splitTodosByAssignment(todos);
+  const { assignedTodos, openTodos, closedTodos } =
+    splitTodosByAssignment(todos);
   const lines: string[] = [];
   const pushSection = (label: string, sectionTodos: TodoFrontMatter[]) => {
     lines.push(`${label} (${sectionTodos.length}):`);

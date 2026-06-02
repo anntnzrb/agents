@@ -64,7 +64,9 @@ export interface ExtensionDepsHookPlan {
 
 export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
   const assetNames = assetDirNames(syncEnv.assetsHome);
-  const harnesses = syncEnv.harnesses.map((harness) => buildHarnessPlan(syncEnv, harness, assetNames));
+  const harnesses = syncEnv.harnesses.map((harness) =>
+    buildHarnessPlan(syncEnv, harness, assetNames),
+  );
   return {
     harnesses,
     jobs: [
@@ -77,16 +79,29 @@ export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
   };
 }
 
-export const assetDirNames = (root: string): string[] => dirEntryNames(root, true);
+export const assetDirNames = (root: string): string[] =>
+  dirEntryNames(root, true);
 
-export const topLevelEntryNames = (root: string): string[] => dirEntryNames(root, false);
+export const topLevelEntryNames = (root: string): string[] =>
+  dirEntryNames(root, false);
 
-function buildHarnessPlan(syncEnv: SyncEnv, harness: Harness, assetNames: readonly string[]): HarnessPlan {
+function buildHarnessPlan(
+  syncEnv: SyncEnv,
+  harness: Harness,
+  assetNames: readonly string[],
+): HarnessPlan {
   const root = harnessRoot(harness);
   const sourceRoot = harnessSourceRoot(harness, syncEnv.toolsHome);
   const instructionTarget = harnessInstructionTarget(harness);
-  const currentEntryNames = currentManagedEntryNames(harness, sourceRoot, assetNames);
-  const cleanupEntryNames = uniqueSorted([...currentEntryNames, ...harness.compatManagedEntries]);
+  const currentEntryNames = currentManagedEntryNames(
+    harness,
+    sourceRoot,
+    assetNames,
+  );
+  const cleanupEntryNames = uniqueSorted([
+    ...currentEntryNames,
+    ...harness.compatManagedEntries,
+  ]);
   return {
     harness,
     statePath: harnessManagedStatePath(harness, syncEnv.managedStateHome),
@@ -99,7 +114,11 @@ function buildHarnessPlan(syncEnv: SyncEnv, harness: Harness, assetNames: readon
   };
 }
 
-function currentManagedEntryNames(harness: Harness, sourceRoot: string, assetNames: readonly string[]): string[] {
+function currentManagedEntryNames(
+  harness: Harness,
+  sourceRoot: string,
+  assetNames: readonly string[],
+): string[] {
   const names = new Set<string>();
   names.add(harnessInstructionFileName(harness));
   for (const entryName of topLevelEntryNames(sourceRoot)) {
@@ -120,7 +139,11 @@ function harnessDirJobs(harnesses: readonly HarnessPlan[]): Job[] {
   }));
 }
 
-function assetJobs(syncEnv: SyncEnv, harnesses: readonly HarnessPlan[], assetNames: readonly string[]): Job[] {
+function assetJobs(
+  syncEnv: SyncEnv,
+  harnesses: readonly HarnessPlan[],
+  assetNames: readonly string[],
+): Job[] {
   const jobs: Job[] = [];
   for (const assetName of assetNames) {
     const assetPath = join(syncEnv.assetsHome, assetName);
@@ -136,7 +159,10 @@ function assetJobs(syncEnv: SyncEnv, harnesses: readonly HarnessPlan[], assetNam
   return jobs;
 }
 
-function instructionJobs(syncEnv: SyncEnv, harnesses: readonly HarnessPlan[]): Job[] {
+function instructionJobs(
+  syncEnv: SyncEnv,
+  harnesses: readonly HarnessPlan[],
+): Job[] {
   return harnesses.map((plan) => ({
     src: join(syncEnv.assetsHome, SOURCE_AGENT_FILE),
     dst: plan.instructionTarget,
@@ -186,7 +212,10 @@ function buildHookPlans(
   });
 }
 
-const extensionHookStatePath = (managedStateHome: string, harness: Harness): string =>
+const extensionHookStatePath = (
+  managedStateHome: string,
+  harness: Harness,
+): string =>
   join(managedStateHome, `${harness.sourceName}.extension-deps.json`);
 
 function dirEntryNames(root: string, dirsOnly: boolean): string[] {
@@ -211,7 +240,8 @@ function dirEntryNames(root: string, dirsOnly: boolean): string[] {
   return uniqueSorted(names);
 }
 
-const uniqueSorted = (names: readonly string[]): string[] => [...new Set(names)].sort();
+const uniqueSorted = (names: readonly string[]): string[] =>
+  [...new Set(names)].sort();
 
 function isDirectory(root: string): boolean {
   try {
@@ -228,4 +258,5 @@ const isTopLevel = (entryName: string): boolean =>
   entryName !== "." &&
   entryName !== "..";
 
-export const isSafeManagedEntryName = (entryName: string): boolean => isTopLevel(entryName);
+export const isSafeManagedEntryName = (entryName: string): boolean =>
+  isTopLevel(entryName);

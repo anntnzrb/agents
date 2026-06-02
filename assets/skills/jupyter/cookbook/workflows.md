@@ -9,6 +9,7 @@ Common notebook workflows and recipes.
 **Problem**: Need to edit code, run it, and verify outputs without switching to browser.
 
 **Solution**:
+
 ```bash
 # 1. Inspect current state
 nb.py inspect notebook.ipynb
@@ -34,6 +35,7 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o
 **Problem**: Only want to run cells 3-7 after editing one of them.
 
 **Solution**:
+
 ```bash
 # Execute cells 3 through 7
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 3-7 -i
@@ -51,6 +53,7 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 3-7 --output-o
 **Problem**: Want to commit notebook without bloated outputs.
 
 **Solution**:
+
 ```bash
 # Validate syntax
 validate.py notebook.ipynb
@@ -71,6 +74,7 @@ git add notebook.ipynb
 **Problem**: Want to extract pure Python code for production use.
 
 **Solution**:
+
 ```bash
 # Convert to .py file
 nb.py convert notebook.ipynb --to py -o script.py
@@ -85,6 +89,7 @@ nb.py convert notebook.ipynb --to py -o script.py
 **Problem**: Need to share notebook as static HTML.
 
 **Solution**:
+
 ```bash
 # First ensure outputs are current
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -i
@@ -102,6 +107,7 @@ nb.py convert notebook.ipynb --to html -o report.html
 **Problem**: Notebook fails on imports, need to identify missing packages.
 
 **Solution**:
+
 ```bash
 # Execute just the import cells
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 0-2 --allow-errors
@@ -119,6 +125,7 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 0-2 -o
 **Problem**: Notebook takes long to run, want to execute incrementally.
 
 **Solution**:
+
 ```bash
 # Execute in batches
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 0-5 -i
@@ -138,6 +145,7 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 10 -o
 **Problem**: Want to see only the code cells, not markdown.
 
 **Solution**:
+
 ```bash
 # Show only code cells
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -t code
@@ -152,6 +160,7 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -t code
 **Problem**: Want to verify notebook is well-formed before sharing.
 
 **Solution**:
+
 ```bash
 # Quick syntax validation
 validate.py notebook.ipynb
@@ -169,6 +178,7 @@ validate.py notebook.ipynb --require-outputs
 **Problem**: Need to see the actual JSON structure of outputs (for debugging display issues).
 
 **Solution**:
+
 ```bash
 # Show raw output data
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o --raw
@@ -183,6 +193,7 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o --raw
 **Problem**: Need to find which cells define a function or import a specific module.
 
 **Solution**:
+
 ```bash
 # Find cells importing pandas
 nb.py grep "import pandas" notebook.ipynb
@@ -206,6 +217,7 @@ nb.py grep --cells-only "TODO" notebook.ipynb
 **Problem**: Need to save matplotlib plots or other images from notebook outputs.
 
 **Solution**:
+
 ```bash
 # Save all images from outputs to a directory
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -o --save-images ./images/

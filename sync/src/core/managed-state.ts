@@ -3,7 +3,11 @@ import { basename, dirname, join } from "node:path";
 import { isErrno } from "@runtime/errors.ts";
 
 import { SyncEnv } from "./harness.ts";
-import { buildSyncPlan, isSafeManagedEntryName, type SyncPlan } from "./plan.ts";
+import {
+  buildSyncPlan,
+  isSafeManagedEntryName,
+  type SyncPlan,
+} from "./plan.ts";
 import { err, panicMessage, rmEntry, warn } from "./index.ts";
 
 export interface ManagedSyncPlan {
@@ -20,7 +24,9 @@ export function planManagedEntries(syncEnv: SyncEnv): ManagedSyncPlan {
   return planManagedEntriesForSyncPlan(buildSyncPlan(syncEnv));
 }
 
-export function planManagedEntriesForSyncPlan(syncPlan: SyncPlan): ManagedSyncPlan {
+export function planManagedEntriesForSyncPlan(
+  syncPlan: SyncPlan,
+): ManagedSyncPlan {
   return {
     harnesses: syncPlan.harnesses.map((harnessPlan) => {
       const currentEntryNames = [...harnessPlan.currentEntryNames];
@@ -85,7 +91,9 @@ export function loadRecordedEntryNames(path: string): string[] {
   try {
     parsed = JSON.parse(content);
   } catch (error) {
-    warn(`managed state parse failed, ignoring ${path} (${panicMessage(error)})`);
+    warn(
+      `managed state parse failed, ignoring ${path} (${panicMessage(error)})`,
+    );
     return [];
   }
 
@@ -94,7 +102,9 @@ export function loadRecordedEntryNames(path: string): string[] {
     return [];
   }
   if (!parsed.every((entryName) => typeof entryName === "string")) {
-    warn(`managed state parse failed, ignoring ${path} (entries must be strings)`);
+    warn(
+      `managed state parse failed, ignoring ${path} (entries must be strings)`,
+    );
     return [];
   }
 
@@ -103,13 +113,18 @@ export function loadRecordedEntryNames(path: string): string[] {
     if (isSafeManagedEntryName(entryName)) {
       safeNames.add(entryName);
     } else {
-      warn(`ignoring unsafe managed entry ${JSON.stringify(entryName)} in ${path}`);
+      warn(
+        `ignoring unsafe managed entry ${JSON.stringify(entryName)} in ${path}`,
+      );
     }
   }
   return [...safeNames].sort();
 }
 
-export function writeRecordedEntryNames(path: string, entryNames: string[]): void {
+export function writeRecordedEntryNames(
+  path: string,
+  entryNames: string[],
+): void {
   const parent = dirname(path);
   try {
     fs.mkdirSync(parent, { recursive: true });
@@ -169,7 +184,10 @@ function createTempStateFile(path: string): { tempPath: string; fd: number } {
   const baseName = basename(path) || "managed-state.json";
   const nonce = Date.now().toString(16);
   for (let attempt = 0; attempt < 16; attempt += 1) {
-    const tempPath = join(dirname(path), `.${baseName}.${process.pid}.${nonce}-${attempt}.tmp`);
+    const tempPath = join(
+      dirname(path),
+      `.${baseName}.${process.pid}.${nonce}-${attempt}.tmp`,
+    );
     try {
       const fd = fs.openSync(tempPath, "wx");
       return { tempPath, fd };
@@ -180,8 +198,10 @@ function createTempStateFile(path: string): { tempPath: string; fd: number } {
     }
   }
 
-  throw new Error(`create temporary managed state near ${path} (name collision)`);
+  throw new Error(
+    `create temporary managed state near ${path} (name collision)`,
+  );
 }
 
-
-const uniqueSorted = (names: readonly string[]): string[] => [...new Set(names)].sort();
+const uniqueSorted = (names: readonly string[]): string[] =>
+  [...new Set(names)].sort();

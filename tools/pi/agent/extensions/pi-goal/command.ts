@@ -1,4 +1,7 @@
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+} from "@earendil-works/pi-coding-agent";
 
 type GoalCommandContext = ExtensionCommandContext & {
   isIdle: () => boolean;
@@ -7,11 +10,27 @@ type GoalCommandContext = ExtensionCommandContext & {
   };
 };
 type GoalMessageApi = ExtensionAPI & {
-  sendUserMessage: (content: string, options?: { deliverAs?: "steer" | "followUp" }) => Promise<void> | void;
+  sendUserMessage: (
+    content: string,
+    options?: { deliverAs?: "steer" | "followUp" },
+  ) => Promise<void> | void;
 };
 
-import { goalStatusLabel, goalUsageSummary, MAX_GOAL_OBJECTIVE_CHARS, statusLine, truncateObjective, type GoalState, type GoalStatus } from "./format.js";
-import { emitGoalEvent, persistGoal, queueContinuation, type GoalRuntime } from "./state.js";
+import {
+  goalStatusLabel,
+  goalUsageSummary,
+  MAX_GOAL_OBJECTIVE_CHARS,
+  statusLine,
+  truncateObjective,
+  type GoalState,
+  type GoalStatus,
+} from "./format.js";
+import {
+  emitGoalEvent,
+  persistGoal,
+  queueContinuation,
+  type GoalRuntime,
+} from "./state.js";
 
 const validateObjective = (objective: string): string | undefined => {
   if (objective.length === 0) return "Usage: /goal <objective>";
@@ -33,7 +52,9 @@ The command must:
 - Avoid vague objectives like "improve this" or "continue working".
 - Do not set, pause, resume, clear, or update a goal. Only draft the command for the user to copy-paste.`;
 
-export const buildGoalSuggestionPrompt = (intent: string): string => `Draft one copy-pasteable Pi /goal command from this user intent.
+export const buildGoalSuggestionPrompt = (
+  intent: string,
+): string => `Draft one copy-pasteable Pi /goal command from this user intent.
 
 <user_intent>
 ${intent.trim()}
@@ -42,7 +63,8 @@ ${intent.trim()}
 Use only the intent above as the authoritative task input. Do not infer missing requirements from the current conversation, session history, repository, or environment.
 ${goalSuggestionCommandRules}`;
 
-export const buildContextGoalSuggestionPrompt = (): string => `Draft one copy-pasteable Pi /goal command for the user's current work.
+export const buildContextGoalSuggestionPrompt =
+  (): string => `Draft one copy-pasteable Pi /goal command for the user's current work.
 
 Infer the objective from the recent conversation/session context. Prefer the most recent concrete task. Avoid stale context and do not invent requirements; if the objective is unclear, return a /goal command asking for clarification as the deliverable.
 ${goalSuggestionCommandRules}`;
@@ -61,7 +83,7 @@ export const handleGoalCommand = async (
   pi: ExtensionAPI,
   runtime: GoalRuntime,
   args: string,
-  ctx: ExtensionCommandContext
+  ctx: ExtensionCommandContext,
 ): Promise<void> => {
   const goalCtx = ctx as GoalCommandContext;
   const trimmed = args.trim();
@@ -74,20 +96,26 @@ export const handleGoalCommand = async (
     }
     ctx.ui.notify(
       `Goal ${goalStatusLabel(runtime.goal.status)}\n${goalUsageSummary(runtime.goal)}\n${statusLine(runtime.goal) ?? ""}`,
-      "info"
+      "info",
     );
     return;
   }
 
   if (trimmed === "suggest" || trimmed.startsWith("suggest ")) {
     const intent = trimmed.slice("suggest".length).trim();
-    const prompt = intent.length === 0 ? buildContextGoalSuggestionPrompt() : buildGoalSuggestionPrompt(intent);
+    const prompt =
+      intent.length === 0
+        ? buildContextGoalSuggestionPrompt()
+        : buildGoalSuggestionPrompt(intent);
     await (pi as GoalMessageApi).sendUserMessage(prompt);
     return;
   }
 
   if (trimmed === "statusbar" || trimmed.startsWith("statusbar ")) {
-    ctx.ui.notify("Goal status now lives in the custom footer and is always enabled when goal state exists.", "info");
+    ctx.ui.notify(
+      "Goal status now lives in the custom footer and is always enabled when goal state exists.",
+      "info",
+    );
     return;
   }
 
@@ -111,7 +139,8 @@ export const handleGoalCommand = async (
     const next: GoalState = { ...runtime.goal, status, updatedAt: now };
     persistGoal(pi, runtime, ctx, next);
     emitGoalEvent(pi, status === "active" ? "resumed" : "paused", next);
-    if (status === "active" && goalCtx.isIdle()) queueContinuation(pi, runtime, next);
+    if (status === "active" && goalCtx.isIdle())
+      queueContinuation(pi, runtime, next);
     return;
   }
 
@@ -121,7 +150,10 @@ export const handleGoalCommand = async (
     return;
   }
   if (runtime.goal && runtime.goal.status !== "complete") {
-    const ok = await goalCtx.ui.confirm("Replace goal?", `Current: ${truncateObjective(runtime.goal.objective)}\n\nNew: ${truncateObjective(trimmed)}`);
+    const ok = await goalCtx.ui.confirm(
+      "Replace goal?",
+      `Current: ${truncateObjective(runtime.goal.objective)}\n\nNew: ${truncateObjective(trimmed)}`,
+    );
     if (!ok) return;
   }
   const next = createGoal(trimmed, now);
@@ -129,13 +161,20 @@ export const handleGoalCommand = async (
   emitGoalEvent(pi, "active", next, { triggerTurn: goalCtx.isIdle() });
 };
 
-export const makeGoalArgumentCompletions = (runtime: GoalRuntime) => (prefix: string): Array<{ value: string; label: string }> | null => {
-  const values = ["status", "suggest"];
-  if (runtime.goal) values.push("clear");
-  if (runtime.goal?.status === "active") values.push("pause");
-  if (runtime.goal?.status === "paused") values.push("resume");
-  const filtered = values.filter((value) => value.startsWith(prefix));
-  return filtered.length === 0 ? null : filtered.map((value) => ({ value, label: value }));
-};
+export const makeGoalArgumentCompletions =
+  (runtime: GoalRuntime) =>
+  (prefix: string): Array<{ value: string; label: string }> | null => {
+    const values = ["status", "suggest"];
+    if (runtime.goal) values.push("clear");
+    if (runtime.goal?.status === "active") values.push("pause");
+    if (runtime.goal?.status === "paused") values.push("resume");
+    const filtered = values.filter((value) => value.startsWith(prefix));
+    return filtered.length === 0
+      ? null
+      : filtered.map((value) => ({ value, label: value }));
+  };
 
-export const __test = { buildContextGoalSuggestionPrompt, buildGoalSuggestionPrompt };
+export const __test = {
+  buildContextGoalSuggestionPrompt,
+  buildGoalSuggestionPrompt,
+};

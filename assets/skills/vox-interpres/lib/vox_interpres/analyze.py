@@ -24,8 +24,12 @@ from .models import (
 )
 
 _NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-_MAJOR_PROFILE = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
-_MINOR_PROFILE = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
+_MAJOR_PROFILE = np.array(
+    [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
+)
+_MINOR_PROFILE = np.array(
+    [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
+)
 
 
 def analyze_audio(
@@ -160,11 +164,15 @@ def _load_audio_segment(
         )
         return np.asarray(y, dtype=np.float64), int(sample_rate), [note]
     except FileNotFoundError as exc:
-        raise RuntimeError("librosa.load failed and ffmpeg is unavailable for fallback") from exc
+        raise RuntimeError(
+            "librosa.load failed and ffmpeg is unavailable for fallback"
+        ) from exc
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or "").strip()
         detail = f": {stderr}" if stderr else ""
-        raise RuntimeError(f"librosa.load failed and ffmpeg fallback failed{detail}") from exc
+        raise RuntimeError(
+            f"librosa.load failed and ffmpeg fallback failed{detail}"
+        ) from exc
     finally:
         try:
             temp_wav.unlink(missing_ok=True)
@@ -174,9 +182,13 @@ def _load_audio_segment(
 
 def _compute_chroma(y: NDArray[np.float64], sample_rate: int) -> NDArray[np.float64]:
     try:
-        return np.asarray(librosa.feature.chroma_cqt(y=y, sr=sample_rate), dtype=np.float64)
+        return np.asarray(
+            librosa.feature.chroma_cqt(y=y, sr=sample_rate), dtype=np.float64
+        )
     except Exception:
-        return np.asarray(librosa.feature.chroma_stft(y=y, sr=sample_rate), dtype=np.float64)
+        return np.asarray(
+            librosa.feature.chroma_stft(y=y, sr=sample_rate), dtype=np.float64
+        )
 
 
 def _estimate_key(chroma: NDArray[np.float64]) -> KeyEstimate:
@@ -252,7 +264,9 @@ def _stats(values: NDArray[np.float64]) -> NumericStats:
     )
 
 
-def _section_hints(y: NDArray[np.float64], sample_rate: int, duration_s: float) -> list[SectionHint]:
+def _section_hints(
+    y: NDArray[np.float64], sample_rate: int, duration_s: float
+) -> list[SectionHint]:
     onset_env = librosa.onset.onset_strength(y=y, sr=sample_rate)
     onset_times = librosa.times_like(onset_env, sr=sample_rate)
     onset_peaks = librosa.onset.onset_detect(
@@ -349,7 +363,11 @@ def _probe_metadata(audio_path: Path) -> FFProbeMetadata:
         audio_stream = {}
 
     tags_raw = format_obj.get("tags", {}) if isinstance(format_obj, dict) else {}
-    tags = {str(k): str(v) for k, v in tags_raw.items()} if isinstance(tags_raw, dict) else {}
+    tags = (
+        {str(k): str(v) for k, v in tags_raw.items()}
+        if isinstance(tags_raw, dict)
+        else {}
+    )
 
     return FFProbeMetadata(
         container=_maybe_str(format_obj.get("format_name")),
@@ -375,7 +393,9 @@ def _tool_notes() -> list[str]:
 
 def _read_version_line(tool: str) -> str | None:
     try:
-        proc = subprocess.run([tool, "-version"], capture_output=True, text=True, check=True)
+        proc = subprocess.run(
+            [tool, "-version"], capture_output=True, text=True, check=True
+        )
     except (FileNotFoundError, subprocess.CalledProcessError):
         return None
     line = proc.stdout.splitlines()[0].strip() if proc.stdout else ""

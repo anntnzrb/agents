@@ -14,7 +14,11 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
-import type { ClarifyAnswer, ClarifyQuestion, ClarifyResult } from "./models.js";
+import type {
+  ClarifyAnswer,
+  ClarifyQuestion,
+  ClarifyResult,
+} from "./models.js";
 import { getAutoSelectOption, getRecommendedOption } from "./results.js";
 
 type RenderOption = {
@@ -42,18 +46,20 @@ const TIMER_TICK_MS = 250;
 const MIN_IDLE_TIMEOUT_SECONDS = 60;
 const ACTIVE_TIMEOUT_SECONDS = 180;
 
-const hasOptions = (question: ClarifyQuestion): boolean => question.options.length > 0;
+const hasOptions = (question: ClarifyQuestion): boolean =>
+  question.options.length > 0;
 
 const getOptions = (question: ClarifyQuestion): RenderOption[] => [
   ...question.options,
   ...(question.allowOther ? [{ label: OTHER_LABEL, isOther: true }] : []),
 ];
 
-const isAnswered = (draft: DraftAnswer | undefined): boolean => Boolean(draft?.answer.trim());
+const isAnswered = (draft: DraftAnswer | undefined): boolean =>
+  Boolean(draft?.answer.trim());
 
 const getEditorText = (
   question: ClarifyQuestion | undefined,
-  draft: DraftAnswer | undefined
+  draft: DraftAnswer | undefined,
 ): string => {
   if (!question || !hasOptions(question)) {
     return draft?.answer ?? "";
@@ -72,7 +78,7 @@ const getEditorText = (
 
 const getEditorLabel = (
   question: ClarifyQuestion | undefined,
-  _selected: RenderOption | undefined
+  _selected: RenderOption | undefined,
 ): string => (question && hasOptions(question) ? "Note: " : "Answer: ");
 
 const formatAnswerSummary = (answer: ClarifyAnswer): string => {
@@ -86,7 +92,8 @@ const formatAnswerSummary = (answer: ClarifyAnswer): string => {
 
   if (answer.source === "other") {
     const selected = answer.selectedOption ?? "Other";
-    const freeform = answer.note ?? (answer.answer !== selected ? answer.answer : "");
+    const freeform =
+      answer.note ?? (answer.answer !== selected ? answer.answer : "");
     const text = freeform ? ` · Answer: ${freeform}` : "";
     return `${answer.id}: ${selected}${text}${mode}`;
   }
@@ -96,7 +103,7 @@ const formatAnswerSummary = (answer: ClarifyAnswer): string => {
 
 const toFinalAnswers = (
   questions: ClarifyQuestion[],
-  drafts: Map<string, DraftAnswer>
+  drafts: Map<string, DraftAnswer>,
 ): ClarifyAnswer[] =>
   questions.flatMap((question) => {
     const draft = drafts.get(question.id);
@@ -108,12 +115,18 @@ const toFinalAnswers = (
         answer: draft.answer,
         source: draft.source,
         mode: draft.mode,
-        ...(draft.selectedOption ? { selectedOption: draft.selectedOption } : {}),
+        ...(draft.selectedOption
+          ? { selectedOption: draft.selectedOption }
+          : {}),
         ...(draft.note ? { note: draft.note } : {}),
-        ...(draft.recommended !== undefined ? { recommended: draft.recommended } : {}),
+        ...(draft.recommended !== undefined
+          ? { recommended: draft.recommended }
+          : {}),
         ...(draft.default !== undefined ? { default: draft.default } : {}),
         ...(draft.timedOut ? { timedOut: true } : {}),
-        ...(draft.timeoutSeconds !== undefined ? { timeoutSeconds: draft.timeoutSeconds } : {}),
+        ...(draft.timeoutSeconds !== undefined
+          ? { timeoutSeconds: draft.timeoutSeconds }
+          : {}),
       },
     ];
   });
@@ -146,7 +159,7 @@ class ClarifyComponent implements Component {
     private readonly questions: ClarifyQuestion[],
     private readonly tui: TUI,
     private readonly theme: Theme,
-    private readonly done: (result: ClarifyResult) => void
+    private readonly done: (result: ClarifyResult) => void,
   ) {
     this.editor = new Editor(tui, buildEditorTheme(theme));
     this.editor.disableSubmit = true;
@@ -197,7 +210,9 @@ class ClarifyComponent implements Component {
 
   private getProgressCounts(): { answered: number; total: number } {
     return {
-      answered: this.questions.filter((question) => isAnswered(this.getDraft(question.id))).length,
+      answered: this.questions.filter((question) =>
+        isAnswered(this.getDraft(question.id)),
+      ).length,
       total: this.questions.length,
     };
   }
@@ -211,7 +226,10 @@ class ClarifyComponent implements Component {
   private restartTimeout(windowSeconds?: number): void {
     const baseSeconds = this.getCurrentTimeoutBaseSeconds();
     if (baseSeconds === undefined) return;
-    this.timeoutWindowSeconds = Math.max(baseSeconds, windowSeconds ?? baseSeconds);
+    this.timeoutWindowSeconds = Math.max(
+      baseSeconds,
+      windowSeconds ?? baseSeconds,
+    );
     this.timeoutStartedAt = Date.now();
   }
 
@@ -229,10 +247,14 @@ class ClarifyComponent implements Component {
   }
 
   private loadDraftIntoEditor(): void {
-    this.setEditorText(getEditorText(this.getCurrentQuestion(), this.getCurrentDraft()));
+    this.setEditorText(
+      getEditorText(this.getCurrentQuestion(), this.getCurrentDraft()),
+    );
   }
 
-  private createDraftFromSelection(mode: ClarifyAnswer["mode"]): DraftAnswer | undefined {
+  private createDraftFromSelection(
+    mode: ClarifyAnswer["mode"],
+  ): DraftAnswer | undefined {
     const question = this.getCurrentQuestion();
     if (!question) return undefined;
 
@@ -244,8 +266,12 @@ class ClarifyComponent implements Component {
         mode,
         selectedOption: selected.label,
         ...(note ? { note } : {}),
-        ...(selected.recommended !== undefined ? { recommended: selected.recommended } : {}),
-        ...(selected.default !== undefined ? { default: selected.default } : {}),
+        ...(selected.recommended !== undefined
+          ? { recommended: selected.recommended }
+          : {}),
+        ...(selected.default !== undefined
+          ? { default: selected.default }
+          : {}),
         ...(mode === "timeout"
           ? {
               timedOut: true,
@@ -298,7 +324,7 @@ class ClarifyComponent implements Component {
   private navigateTo(
     index: number,
     interaction = false,
-    saveMode: ClarifyAnswer["mode"] = "manual"
+    saveMode: ClarifyAnswer["mode"] = "manual",
   ): void {
     if (index < 0 || index >= this.questions.length) return;
     this.saveCurrentDraft(saveMode);
@@ -325,7 +351,9 @@ class ClarifyComponent implements Component {
     }
 
     if (draft?.source === "option" && draft.selectedOption) {
-      const selectedIndex = options.findIndex((option) => option.label === draft.selectedOption);
+      const selectedIndex = options.findIndex(
+        (option) => option.label === draft.selectedOption,
+      );
       this.optionIndex = selectedIndex >= 0 ? selectedIndex : 0;
       return;
     }
@@ -342,7 +370,9 @@ class ClarifyComponent implements Component {
       return;
     }
 
-    const recommendedIndex = options.findIndex((option) => option.label === recommended.label);
+    const recommendedIndex = options.findIndex(
+      (option) => option.label === recommended.label,
+    );
     this.optionIndex = recommendedIndex >= 0 ? recommendedIndex : 0;
   }
 
@@ -419,7 +449,7 @@ class ClarifyComponent implements Component {
     if (!selected) return;
 
     const selectedIndex = this.getCurrentOptions().findIndex(
-      (option) => option.label === selected.label
+      (option) => option.label === selected.label,
     );
     this.optionIndex = selectedIndex >= 0 ? selectedIndex : 0;
     this.setEditorText("");
@@ -438,7 +468,10 @@ class ClarifyComponent implements Component {
     const baseSeconds = this.getCurrentTimeoutBaseSeconds();
     if (baseSeconds === undefined || this.showingConfirmation) return undefined;
     const elapsedMs = Date.now() - this.timeoutStartedAt;
-    const remainingMs = Math.max(0, this.timeoutWindowSeconds * 1000 - elapsedMs);
+    const remainingMs = Math.max(
+      0,
+      this.timeoutWindowSeconds * 1000 - elapsedMs,
+    );
     return Math.ceil(remainingMs / 1000);
   }
 
@@ -562,22 +595,36 @@ class ClarifyComponent implements Component {
     if (!question) return "";
     const answered = isAnswered(this.getDraft(question.id));
     const current = index === this.currentIndex && !this.showingConfirmation;
-    const marker = current ? this.accent("▸") : answered ? this.success("✓") : this.dim("·");
+    const marker = current
+      ? this.accent("▸")
+      : answered
+        ? this.success("✓")
+        : this.dim("·");
     return `${marker} ${index + 1}:${question.id}`;
   }
 
-  private renderProgress(lines: string[], contentWidth: number, boxWidth: number): void {
+  private renderProgress(
+    lines: string[],
+    contentWidth: number,
+    boxWidth: number,
+  ): void {
     const counts = this.getProgressCounts();
     const summary = `${this.bold("Progress:")} ${counts.answered}/${counts.total} answered`;
     lines.push(this.renderBoxLine(summary, boxWidth));
 
-    const badges = this.questions.map((_, index) => this.renderProgressBadge(index)).join("  ");
+    const badges = this.questions
+      .map((_, index) => this.renderProgressBadge(index))
+      .join("  ");
     for (const line of wrapTextWithAnsi(badges, contentWidth)) {
       lines.push(this.renderBoxLine(line, boxWidth));
     }
   }
 
-  private renderQuestion(lines: string[], contentWidth: number, boxWidth: number): void {
+  private renderQuestion(
+    lines: string[],
+    contentWidth: number,
+    boxWidth: number,
+  ): void {
     const question = this.getCurrentQuestion();
     if (!question) return;
     const title = `${this.bold("Q:")} ${question.question}`;
@@ -586,47 +633,73 @@ class ClarifyComponent implements Component {
     }
   }
 
-  private renderWaiting(lines: string[], contentWidth: number, boxWidth: number): void {
+  private renderWaiting(
+    lines: string[],
+    contentWidth: number,
+    boxWidth: number,
+  ): void {
     const question = this.getCurrentQuestion();
     if (!question) return;
 
     const timeLeft = this.getTimeLeftSeconds();
-    const waitingText = timeLeft === undefined ? "Waiting..." : `Waiting... auto in ${timeLeft}s`;
+    const waitingText =
+      timeLeft === undefined ? "Waiting..." : `Waiting... auto in ${timeLeft}s`;
 
     lines.push(this.renderEmptyBoxLine(boxWidth));
     lines.push(
-      this.renderBoxLine(truncateToWidth(this.warning(waitingText), contentWidth), boxWidth)
+      this.renderBoxLine(
+        truncateToWidth(this.warning(waitingText), contentWidth),
+        boxWidth,
+      ),
     );
   }
 
-  private renderOptions(lines: string[], contentWidth: number, boxWidth: number): void {
+  private renderOptions(
+    lines: string[],
+    contentWidth: number,
+    boxWidth: number,
+  ): void {
     const question = this.getCurrentQuestion();
     if (!question || !hasOptions(question)) return;
     lines.push(this.renderEmptyBoxLine(boxWidth));
 
     for (const [index, option] of this.getCurrentOptions().entries()) {
-      const prefix = index === this.optionIndex ? this.accent(">") : this.dim("·");
+      const prefix =
+        index === this.optionIndex ? this.accent(">") : this.dim("·");
       const label = option.isOther ? `${option.label}…` : option.label;
       const markers = [
         option.recommended ? this.success("recommended") : "",
         !option.recommended && option.default ? this.success("default") : "",
       ].filter(Boolean);
-      const suffix = markers.length > 0 ? ` ${this.dim(`[${markers.join(" · ")}]`)}` : "";
-      lines.push(this.renderBoxLine(`${prefix} ${index + 1}. ${label}${suffix}`, boxWidth));
+      const suffix =
+        markers.length > 0 ? ` ${this.dim(`[${markers.join(" · ")}]`)}` : "";
+      lines.push(
+        this.renderBoxLine(
+          `${prefix} ${index + 1}. ${label}${suffix}`,
+          boxWidth,
+        ),
+      );
       if (!option.description) continue;
       for (const line of wrapTextWithAnsi(
         this.muted(option.description),
-        Math.max(16, contentWidth - 5)
+        Math.max(16, contentWidth - 5),
       )) {
         lines.push(this.renderBoxLine(`    ${line}`, boxWidth));
       }
     }
   }
 
-  private renderEditor(lines: string[], contentWidth: number, boxWidth: number): void {
+  private renderEditor(
+    lines: string[],
+    contentWidth: number,
+    boxWidth: number,
+  ): void {
     lines.push(this.renderEmptyBoxLine(boxWidth));
     const answerPrefix = this.bold(
-      getEditorLabel(this.getCurrentQuestion(), this.getCurrentOptions()[this.optionIndex])
+      getEditorLabel(
+        this.getCurrentQuestion(),
+        this.getCurrentOptions()[this.optionIndex],
+      ),
     );
     const editorWidth = Math.max(12, contentWidth - 5);
     const editorLines = this.editor.render(editorWidth);
@@ -639,9 +712,18 @@ class ClarifyComponent implements Component {
     }
   }
 
-  private renderReview(lines: string[], contentWidth: number, boxWidth: number): void {
+  private renderReview(
+    lines: string[],
+    contentWidth: number,
+    boxWidth: number,
+  ): void {
     lines.push(this.dim(`├${"─".repeat(Math.max(1, boxWidth - 2))}┤`));
-    lines.push(this.renderBoxLine(this.warning("Review answers before submit"), boxWidth));
+    lines.push(
+      this.renderBoxLine(
+        this.warning("Review answers before submit"),
+        boxWidth,
+      ),
+    );
 
     for (const answer of toFinalAnswers(this.questions, this.drafts)) {
       const summary = formatAnswerSummary(answer);
@@ -655,17 +737,23 @@ class ClarifyComponent implements Component {
       this.renderBoxLine(
         truncateToWidth(
           `${this.warning("Enter/y")}: submit · ${this.dim("Esc/n/Backspace")}: back`,
-          contentWidth
+          contentWidth,
         ),
-        boxWidth
-      )
+        boxWidth,
+      ),
     );
   }
 
-  private renderFooter(lines: string[], contentWidth: number, boxWidth: number): void {
+  private renderFooter(
+    lines: string[],
+    contentWidth: number,
+    boxWidth: number,
+  ): void {
     lines.push(this.dim(`├${"─".repeat(Math.max(1, boxWidth - 2))}┤`));
     const controls = `${this.dim("↑↓")} option · ${this.dim("Shift+Tab")} back · ${this.dim("Tab")} next · ${this.dim("Enter")} save/next · ${this.dim("Shift+Enter")} newline · ${this.dim("Esc")} cancel`;
-    lines.push(this.renderBoxLine(truncateToWidth(controls, contentWidth), boxWidth));
+    lines.push(
+      this.renderBoxLine(truncateToWidth(controls, contentWidth), boxWidth),
+    );
   }
 
   render(width: number): string[] {
@@ -676,9 +764,19 @@ class ClarifyComponent implements Component {
     const contentWidth = Math.max(24, boxWidth - 4);
     const header = `${this.bold(this.accent("Clarify"))} ${this.dim(`step ${this.currentIndex + 1}/${this.questions.length}`)}`;
 
-    lines.push(this.padLine(this.dim(`╭${"─".repeat(Math.max(1, boxWidth - 2))}╮`), width));
+    lines.push(
+      this.padLine(
+        this.dim(`╭${"─".repeat(Math.max(1, boxWidth - 2))}╮`),
+        width,
+      ),
+    );
     lines.push(this.padLine(this.renderBoxLine(header, boxWidth), width));
-    lines.push(this.padLine(this.dim(`├${"─".repeat(Math.max(1, boxWidth - 2))}┤`), width));
+    lines.push(
+      this.padLine(
+        this.dim(`├${"─".repeat(Math.max(1, boxWidth - 2))}┤`),
+        width,
+      ),
+    );
 
     this.renderProgress(lines, contentWidth, boxWidth);
     this.renderWaiting(lines, contentWidth, boxWidth);
@@ -693,7 +791,12 @@ class ClarifyComponent implements Component {
       this.renderFooter(lines, contentWidth, boxWidth);
     }
 
-    lines.push(this.padLine(this.dim(`╰${"─".repeat(Math.max(1, boxWidth - 2))}╯`), width));
+    lines.push(
+      this.padLine(
+        this.dim(`╰${"─".repeat(Math.max(1, boxWidth - 2))}╯`),
+        width,
+      ),
+    );
     this.cachedWidth = width;
     this.cachedLines = lines.map((line) => this.padLine(line, width));
     return this.cachedLines;
@@ -704,7 +807,7 @@ export const createClarifyComponent = (
   questions: ClarifyQuestion[],
   tui: TUI,
   theme: Theme,
-  done: (result: ClarifyResult) => void
+  done: (result: ClarifyResult) => void,
 ): Component => new ClarifyComponent(questions, tui, theme, done);
 
 export const renderCallText = (): string => "clarify · waiting for user";

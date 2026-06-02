@@ -4,29 +4,29 @@ Use this file when you need defaults, routing, or failure-mode triage before div
 
 ## Decision matrix
 
-| Situation | Default | Why |
-| --- | --- | --- |
-| Existing repo already uses ESM | Stay ESM | Format churn is rarely the fix |
-| Existing repo already uses CJS | Stay CJS unless interop pain is the task | Mixing both blindly multiplies failure modes |
-| Greenfield Node app / library | Prefer ESM | Better alignment with modern tooling and native `import` |
-| Browser / bundler app | Write ESM source | Bundler owns final output format |
-| Shipping package to mixed consumers | Consider dual exports only if demand is real | Dual mode adds surface area and testing burden |
-| Vite / bundler repo with no runner yet | Prefer Vitest | Zero-friction module story and fast watchless runs |
-| Existing Jest monorepo / ecosystem-heavy repo | Stay on Jest | Lower migration cost than novelty value |
-| Large payloads or long-lived flows | Prefer streams + cancellation | Prevent memory spikes and hanging work |
-| Weird language behavior | Check semantics before architecture | JS bugs are often coercion / binding / queue issues |
-| External I/O logic | Use integration tests | Unit mocks hide boundary breakage |
+| Situation                                     | Default                                      | Why                                                      |
+| --------------------------------------------- | -------------------------------------------- | -------------------------------------------------------- |
+| Existing repo already uses ESM                | Stay ESM                                     | Format churn is rarely the fix                           |
+| Existing repo already uses CJS                | Stay CJS unless interop pain is the task     | Mixing both blindly multiplies failure modes             |
+| Greenfield Node app / library                 | Prefer ESM                                   | Better alignment with modern tooling and native `import` |
+| Browser / bundler app                         | Write ESM source                             | Bundler owns final output format                         |
+| Shipping package to mixed consumers           | Consider dual exports only if demand is real | Dual mode adds surface area and testing burden           |
+| Vite / bundler repo with no runner yet        | Prefer Vitest                                | Zero-friction module story and fast watchless runs       |
+| Existing Jest monorepo / ecosystem-heavy repo | Stay on Jest                                 | Lower migration cost than novelty value                  |
+| Large payloads or long-lived flows            | Prefer streams + cancellation                | Prevent memory spikes and hanging work                   |
+| Weird language behavior                       | Check semantics before architecture          | JS bugs are often coercion / binding / queue issues      |
+| External I/O logic                            | Use integration tests                        | Unit mocks hide boundary breakage                        |
 
 ## Failure-mode router
 
-| Symptom | Likely causes | Read next |
-| --- | --- | --- |
-| `require is not defined`, `__dirname` missing, import path weirdness | ESM/CJS mismatch, `type: module`, bad exports | `cookbook/modules.md` |
-| `undefined` receiver, stale state, callback loses method context | call-site binding, closures, arrow vs function | `cookbook/semantics.md` |
-| Logs appear out of order, `setTimeout(..., 0)` loses to Promise, hanging async work | task queue ordering, forgotten `await`, unhandled rejection | `cookbook/async.md` |
-| Process exits late or memory keeps growing | open timers/listeners, unclosed streams, worker/process leaks | `cookbook/async.md`, `cookbook/node.md` |
-| UI jank or observer/event leaks | hot loops on main thread, too many listeners, bad DOM observation | `cookbook/browser.md`, `cookbook/patterns.md` |
-| Flaky tests around time, fetch, or UI | bad fake-timer usage, over-mocking, async assertions missing | `cookbook/testing.md` |
+| Symptom                                                                             | Likely causes                                                     | Read next                                     |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------- |
+| `require is not defined`, `__dirname` missing, import path weirdness                | ESM/CJS mismatch, `type: module`, bad exports                     | `cookbook/modules.md`                         |
+| `undefined` receiver, stale state, callback loses method context                    | call-site binding, closures, arrow vs function                    | `cookbook/semantics.md`                       |
+| Logs appear out of order, `setTimeout(..., 0)` loses to Promise, hanging async work | task queue ordering, forgotten `await`, unhandled rejection       | `cookbook/async.md`                           |
+| Process exits late or memory keeps growing                                          | open timers/listeners, unclosed streams, worker/process leaks     | `cookbook/async.md`, `cookbook/node.md`       |
+| UI jank or observer/event leaks                                                     | hot loops on main thread, too many listeners, bad DOM observation | `cookbook/browser.md`, `cookbook/patterns.md` |
+| Flaky tests around time, fetch, or UI                                               | bad fake-timer usage, over-mocking, async assertions missing      | `cookbook/testing.md`                         |
 
 ## Validation ladder
 

@@ -1,8 +1,17 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { ClarifyParamsSchema, type ClarifyResult } from "./models.js";
-import { buildSuccessText, normalizeQuestions, sortAnswers, validateQuestions } from "./results.js";
-import { createClarifyComponent, renderCallText, renderResultText } from "./ui.js";
+import {
+  buildSuccessText,
+  normalizeQuestions,
+  sortAnswers,
+  validateQuestions,
+} from "./results.js";
+import {
+  createClarifyComponent,
+  renderCallText,
+  renderResultText,
+} from "./ui.js";
 
 const DESCRIPTION = "Collect user decisions in interactive sessions.";
 
@@ -32,8 +41,9 @@ export default function clarifyExtension(pi: ExtensionAPI): void {
 
       ctx.ui.notify("Clarify waiting for user input", "info");
 
-      const result = await ctx.ui.custom<ClarifyResult>((tui, theme, _kb, done) =>
-        createClarifyComponent(questions, tui, theme, done)
+      const result = await ctx.ui.custom<ClarifyResult>(
+        (tui, theme, _kb, done) =>
+          createClarifyComponent(questions, tui, theme, done),
       );
 
       if (!result) {

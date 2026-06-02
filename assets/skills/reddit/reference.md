@@ -10,17 +10,20 @@
 Keep `.env` beside this skill and source it if you want persistent local defaults.
 
 Supported helper lookup order:
+
 - `REDDIT_ENV_FILE`
 - `$SKILLS_DIR/reddit/.env`
 - nearest ancestor `skills/reddit/.env`
 
 Common vars:
+
 - `REDDIT_USER_AGENT`
 - `REDDIT_BASE_URL`
 
 ## Public JSON endpoints used by the skill
 
 ### Browse subreddit
+
 - `GET /r/<subreddit>/<sort>.json`
 - Sorts: `hot`, `new`, `top`, `rising`, `controversial`
 - Common params: `limit`, `t`
@@ -32,6 +35,7 @@ reddit browse technology top time=week limit=10
 ```
 
 ### Search
+
 - `GET /search.json`
 - Common params: `q`, `sort`, `t`, `limit`
 - The helper can expand legacy args like `subreddits=`, `author=`, and `flair=` into Reddit search syntax.
@@ -43,6 +47,7 @@ reddit search "llm" subreddits='["programming"]' sort=new time=week limit=10
 ```
 
 ### Post + comments by subreddit/post id
+
 - `GET /r/<subreddit>/comments/<post_id>/.json`
 - Common params: `limit`, `sort`, `depth`
 
@@ -53,6 +58,7 @@ reddit post programming 1abcde comment_limit=20 comment_sort=top
 ```
 
 ### Post + comments by URL
+
 - Fetch `<reddit-url>.json`
 - Same comment params as above
 
@@ -63,6 +69,7 @@ reddit post-url "https://reddit.com/r/programming/comments/1abcde/example/" comm
 ```
 
 ### User profile + activity
+
 - `GET /user/<username>/about.json`
 - `GET /user/<username>/submitted.json`
 - `GET /user/<username>/comments.json`

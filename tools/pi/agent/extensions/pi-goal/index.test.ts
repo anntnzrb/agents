@@ -1,8 +1,22 @@
 import { describe, expect, test } from "bun:test";
-import { __test as commandTest, handleGoalCommand, makeGoalArgumentCompletions } from "./command.js";
-import { formatElapsed, type GoalState, goalUsage, statusLine } from "./format.js";
+import {
+  __test as commandTest,
+  handleGoalCommand,
+  makeGoalArgumentCompletions,
+} from "./command.js";
+import {
+  formatElapsed,
+  type GoalState,
+  goalUsage,
+  statusLine,
+} from "./format.js";
 import { continuationPrompt, goalContentForLLM } from "./prompts.js";
-import { accountTurnEnd, createGoalRuntime, latestStateFromSession, syncGoalTools } from "./state.js";
+import {
+  accountTurnEnd,
+  createGoalRuntime,
+  latestStateFromSession,
+  syncGoalTools,
+} from "./state.js";
 
 const goal = (overrides: Partial<GoalState> = {}): GoalState => ({
   version: 1,
@@ -34,29 +48,60 @@ describe("/goal parser", () => {
   const completionValues = (runtimeGoal: GoalState | null, prefix = "") => {
     const runtime = createGoalRuntime();
     runtime.goal = runtimeGoal;
-    return makeGoalArgumentCompletions(runtime)(prefix)?.map((item) => item.value) ?? [];
+    return (
+      makeGoalArgumentCompletions(runtime)(prefix)?.map((item) => item.value) ??
+      []
+    );
   };
 
   test("exposes dynamic lifecycle completions by goal state", () => {
     expect(completionValues(null).toSorted()).toEqual(["status", "suggest"]);
-    expect(completionValues(goal()).toSorted()).toEqual(["clear", "pause", "status", "suggest"]);
-    expect(completionValues(goal({ status: "paused" })).toSorted()).toEqual(["clear", "resume", "status", "suggest"]);
-    expect(completionValues(goal({ status: "complete" })).toSorted()).toEqual(["clear", "status", "suggest"]);
+    expect(completionValues(goal()).toSorted()).toEqual([
+      "clear",
+      "pause",
+      "status",
+      "suggest",
+    ]);
+    expect(completionValues(goal({ status: "paused" })).toSorted()).toEqual([
+      "clear",
+      "resume",
+      "status",
+      "suggest",
+    ]);
+    expect(completionValues(goal({ status: "complete" })).toSorted()).toEqual([
+      "clear",
+      "status",
+      "suggest",
+    ]);
   });
 
   test("filters dynamic completions by prefix", () => {
     expect(completionValues(goal(), "p")).toEqual(["pause"]);
-    expect(completionValues(goal({ status: "paused" }), "r")).toEqual(["resume"]);
+    expect(completionValues(goal({ status: "paused" }), "r")).toEqual([
+      "resume",
+    ]);
     expect(completionValues(goal(), "r")).toEqual([]);
-    expect(JSON.stringify(completionValues(goal(), "statusbar"))).not.toContain("statusbar");
+    expect(JSON.stringify(completionValues(goal(), "statusbar"))).not.toContain(
+      "statusbar",
+    );
   });
 
   test("builds an argument-driven meta-goal suggestion prompt", () => {
-    const prompt = commandTest.buildGoalSuggestionPrompt("clean six Excel sheets");
-    expect(prompt).toContain("Draft one copy-pasteable Pi /goal command from this user intent");
-    expect(prompt).toContain("<user_intent>\nclean six Excel sheets\n</user_intent>");
-    expect(prompt).toContain("Use only the intent above as the authoritative task input");
-    expect(prompt).toContain("Do not infer missing requirements from the current conversation");
+    const prompt = commandTest.buildGoalSuggestionPrompt(
+      "clean six Excel sheets",
+    );
+    expect(prompt).toContain(
+      "Draft one copy-pasteable Pi /goal command from this user intent",
+    );
+    expect(prompt).toContain(
+      "<user_intent>\nclean six Excel sheets\n</user_intent>",
+    );
+    expect(prompt).toContain(
+      "Use only the intent above as the authoritative task input",
+    );
+    expect(prompt).toContain(
+      "Do not infer missing requirements from the current conversation",
+    );
     expect(prompt).toContain("Return exactly one command and nothing else");
     expect(prompt).toContain("Adapt evidence to the actual domain");
     expect(prompt).toContain("Avoid hardcoded Pi-extension gates");
@@ -66,8 +111,12 @@ describe("/goal parser", () => {
 
   test("builds a blank suggest prompt from recent context", () => {
     const prompt = commandTest.buildContextGoalSuggestionPrompt();
-    expect(prompt).toContain("Draft one copy-pasteable Pi /goal command for the user's current work");
-    expect(prompt).toContain("Infer the objective from the recent conversation/session context");
+    expect(prompt).toContain(
+      "Draft one copy-pasteable Pi /goal command for the user's current work",
+    );
+    expect(prompt).toContain(
+      "Infer the objective from the recent conversation/session context",
+    );
     expect(prompt).toContain("Avoid stale context");
     expect(prompt).toContain("Return exactly one command and nothing else");
     expect(prompt).not.toContain("<user_intent>");
@@ -80,15 +129,25 @@ describe("/goal parser", () => {
     const runtime = createGoalRuntime();
 
     await handleGoalCommand(pi as never, runtime, "suggest", ctx as never);
-    await handleGoalCommand(pi as never, runtime, "suggest clean six Excel sheets", ctx as never);
+    await handleGoalCommand(
+      pi as never,
+      runtime,
+      "suggest clean six Excel sheets",
+      ctx as never,
+    );
 
     expect(sent).toHaveLength(2);
-    expect(sent[0]).toContain("Infer the objective from the recent conversation/session context");
-    expect(sent[1]).toContain("<user_intent>\nclean six Excel sheets\n</user_intent>");
-    expect(sent[1]).toContain("Do not infer missing requirements from the current conversation");
+    expect(sent[0]).toContain(
+      "Infer the objective from the recent conversation/session context",
+    );
+    expect(sent[1]).toContain(
+      "<user_intent>\nclean six Excel sheets\n</user_intent>",
+    );
+    expect(sent[1]).toContain(
+      "Do not infer missing requirements from the current conversation",
+    );
   });
 });
-
 
 describe("goal prompts", () => {
   test("continuation prompt keeps Codex-native audit language", () => {
@@ -96,12 +155,16 @@ describe("goal prompts", () => {
     expect(prompt).toContain("Continue working toward the active thread goal.");
     expect(prompt).toContain("<untrusted_objective>");
     expect(prompt).toContain("Build a prompt-to-artifact checklist");
-    expect(prompt).toContain("call update_goal with status \"complete\"");
+    expect(prompt).toContain('call update_goal with status "complete"');
   });
 
   test("llm-visible custom messages are actionable", () => {
-    expect(goalContentForLLM("continuation", goal())).toContain("Choose the next concrete action");
-    expect(goalContentForLLM("paused", goal())).toContain("Stop pursuing it for now");
+    expect(goalContentForLLM("continuation", goal())).toContain(
+      "Choose the next concrete action",
+    );
+    expect(goalContentForLLM("paused", goal())).toContain(
+      "Stop pursuing it for now",
+    );
   });
 });
 

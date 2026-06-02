@@ -9,6 +9,7 @@ Recipes for writing effective tests in Go using standard library and testify.
 **Problem**: How to test multiple inputs efficiently without duplicating test code?
 
 **Solution**:
+
 ```go
 func TestAdd(t *testing.T) {
     tests := []struct {
@@ -41,6 +42,7 @@ func TestAdd(t *testing.T) {
 **Problem**: How to test functions that return errors alongside regular values?
 
 **Solution**:
+
 ```go
 func TestParse(t *testing.T) {
     tests := []struct {
@@ -78,6 +80,7 @@ func TestParse(t *testing.T) {
 **Problem**: How to write cleaner assertions with better failure messages?
 
 **Solution**:
+
 ```go
 import "github.com/stretchr/testify/assert"
 
@@ -110,6 +113,7 @@ func TestExample(t *testing.T) {
 **Problem**: How to fail fast when setup steps fail, avoiding cascading errors?
 
 **Solution**:
+
 ```go
 import "github.com/stretchr/testify/require"
 
@@ -134,6 +138,7 @@ func TestWithSetup(t *testing.T) {
 **Problem**: How to test code that depends on external services or databases?
 
 **Solution**:
+
 ```go
 import "github.com/stretchr/testify/mock"
 
@@ -176,6 +181,7 @@ func TestService(t *testing.T) {
 **Problem**: How to share setup/teardown logic across related tests?
 
 **Solution**:
+
 ```go
 import (
     "testing"
@@ -219,6 +225,7 @@ func TestExampleSuite(t *testing.T) {
 **Problem**: How to speed up test execution by running independent tests concurrently?
 
 **Solution**:
+
 ```go
 func TestParallel(t *testing.T) {
     tests := []struct {
@@ -248,6 +255,7 @@ func TestParallel(t *testing.T) {
 **Problem**: How to measure and compare performance of functions?
 
 **Solution**:
+
 ```go
 func BenchmarkProcess(b *testing.B) {
     data := setupData()
@@ -288,6 +296,7 @@ func BenchmarkSizes(b *testing.B) {
 **Problem**: How to find edge cases and bugs by testing with random inputs?
 
 **Solution**:
+
 ```go
 func FuzzParse(f *testing.F) {
     // Seed corpus with known inputs
@@ -317,6 +326,7 @@ func FuzzParse(f *testing.F) {
 **Problem**: How to create reusable test utilities with proper error reporting?
 
 **Solution**:
+
 ```go
 func assertJSON(t *testing.T, expected, actual any) {
     t.Helper() // Reports caller's line on failure
@@ -347,6 +357,7 @@ func TestWithTempFile(t *testing.T) {
 **Problem**: How to test HTTP handlers without starting a real server?
 
 **Solution**:
+
 ```go
 import (
     "net/http"
@@ -374,6 +385,7 @@ func TestHandler(t *testing.T) {
 **Problem**: How to test code that makes HTTP requests to external services?
 
 **Solution**:
+
 ```go
 func TestClient(t *testing.T) {
     server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

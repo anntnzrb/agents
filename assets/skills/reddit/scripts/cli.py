@@ -72,7 +72,9 @@ def load_env() -> None:
         candidates.append(Path(os.environ["REDDIT_ENV_FILE"]).expanduser())
     candidates.append(skill_dir / ".env")
     if os.environ.get("SKILLS_DIR"):
-        candidates.append(Path(os.environ["SKILLS_DIR"]).expanduser() / "reddit" / ".env")
+        candidates.append(
+            Path(os.environ["SKILLS_DIR"]).expanduser() / "reddit" / ".env"
+        )
     candidates.append(ancestor_env("reddit"))
     for candidate in candidates:
         if candidate is not None and parse_env_file(candidate):
@@ -99,11 +101,13 @@ def alias_pair(pair: str) -> str:
     }
     for old, new in aliases.items():
         if pair.startswith(old):
-            return f"{new}{pair[len(old):]}"
+            return f"{new}{pair[len(old) :]}"
     return pair
 
 
-def request_get(url: str, params: list[tuple[str, str]], user_agent: str, emit: bool = True) -> tuple[int, bytes]:
+def request_get(
+    url: str, params: list[tuple[str, str]], user_agent: str, emit: bool = True
+) -> tuple[int, bytes]:
     if params:
         sep = "&" if "?" in url else "?"
         url = f"{url}{sep}{urllib.parse.urlencode(params)}"
@@ -123,7 +127,9 @@ def request_get(url: str, params: list[tuple[str, str]], user_agent: str, emit: 
         return 1, b""
 
 
-def split_limit_extra(args: list[str], default_limit: str) -> tuple[str, list[tuple[str, str]]]:
+def split_limit_extra(
+    args: list[str], default_limit: str
+) -> tuple[str, list[tuple[str, str]]]:
     limit = default_limit
     extra: list[tuple[str, str]] = []
     for raw in args:
@@ -141,12 +147,22 @@ def json_print(payload: Any) -> None:
 
 def explain(term: str) -> int:
     normalized = term.lower()
-    json_print({"term": normalized, "definition": GLOSSARY.get(normalized, "Unknown term in the built-in glossary. Search Reddit or the web for current community usage.")})
+    json_print(
+        {
+            "term": normalized,
+            "definition": GLOSSARY.get(
+                normalized,
+                "Unknown term in the built-in glossary. Search Reddit or the web for current community usage.",
+            ),
+        }
+    )
     return 0
 
 
 def listing_data(payload: Any, limit: int, cutoff: float) -> list[dict[str, Any]]:
-    children = payload.get("data", {}).get("children", []) if isinstance(payload, dict) else []
+    children = (
+        payload.get("data", {}).get("children", []) if isinstance(payload, dict) else []
+    )
     rows: list[dict[str, Any]] = []
     for child in children:
         data = child.get("data", {}) if isinstance(child, dict) else {}
@@ -165,7 +181,9 @@ def cutoff_for(range_name: str, now: float) -> float:
     }.get(range_name, 0)
 
 
-def user_analysis(base_url: str, user_agent: str, username: str, args: list[str]) -> int:
+def user_analysis(
+    base_url: str, user_agent: str, username: str, args: list[str]
+) -> int:
     posts_limit = 10
     comments_limit = 10
     time_range = "month"
@@ -203,8 +221,17 @@ def user_analysis(base_url: str, user_agent: str, username: str, args: list[str]
     recent_posts = listing_data(posts, posts_limit, cutoff)
     recent_comments = listing_data(comments, comments_limit, cutoff)
     top_source = listing_data(posts, 100, cutoff) + listing_data(comments, 100, cutoff)
-    counts = Counter(str(item.get("subreddit")) for item in top_source if item.get("subreddit") is not None)
-    top_subreddits = [{"subreddit": name, "count": count} for name, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:top_limit]]
+    counts = Counter(
+        str(item.get("subreddit"))
+        for item in top_source
+        if item.get("subreddit") is not None
+    )
+    top_subreddits = [
+        {"subreddit": name, "count": count}
+        for name, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[
+            :top_limit
+        ]
+    ]
     json_print(
         {
             "user": {
@@ -212,7 +239,8 @@ def user_analysis(base_url: str, user_agent: str, username: str, args: list[str]
                 "created_utc": about_data.get("created_utc"),
                 "link_karma": about_data.get("link_karma"),
                 "comment_karma": about_data.get("comment_karma"),
-                "total_karma": int(about_data.get("link_karma") or 0) + int(about_data.get("comment_karma") or 0),
+                "total_karma": int(about_data.get("link_karma") or 0)
+                + int(about_data.get("comment_karma") or 0),
                 "is_gold": about_data.get("is_gold"),
                 "is_mod": about_data.get("is_mod"),
                 "verified": about_data.get("verified"),
@@ -237,13 +265,20 @@ def main(argv: list[str]) -> int:
 
     if cmd == "browse":
         if not args:
-            print("usage: reddit browse <subreddit> [sort] [key=value ...]", file=sys.stderr)
+            print(
+                "usage: reddit browse <subreddit> [sort] [key=value ...]",
+                file=sys.stderr,
+            )
             return 2
         subreddit = args[0]
         sort = args[1] if len(args) > 1 and "=" not in args[1] else "hot"
         rest = args[2:] if len(args) > 1 and "=" not in args[1] else args[1:]
         limit, extra = split_limit_extra(rest, "10")
-        return request_get(f"{base_url}/r/{subreddit}/{sort}.json", [("limit", limit), *extra], user_agent)[0]
+        return request_get(
+            f"{base_url}/r/{subreddit}/{sort}.json",
+            [("limit", limit), *extra],
+            user_agent,
+        )[0]
 
     if cmd == "search":
         if not args:
@@ -286,14 +321,25 @@ def main(argv: list[str]) -> int:
             full_query += f" author:{author}"
         if flair:
             full_query += f' flair:"{flair}"'
-        return request_get(f"{base_url}/search.json", [("q", full_query), ("sort", sort), ("t", t), ("limit", limit), *extra], user_agent)[0]
+        return request_get(
+            f"{base_url}/search.json",
+            [("q", full_query), ("sort", sort), ("t", t), ("limit", limit), *extra],
+            user_agent,
+        )[0]
 
     if cmd == "post":
         if len(args) < 2:
-            print("usage: reddit post <subreddit> <post_id> [key=value ...]", file=sys.stderr)
+            print(
+                "usage: reddit post <subreddit> <post_id> [key=value ...]",
+                file=sys.stderr,
+            )
             return 2
         limit, extra = split_limit_extra(args[2:], "20")
-        return request_get(f"{base_url}/r/{args[0]}/comments/{args[1]}/.json", [("limit", limit), *extra], user_agent)[0]
+        return request_get(
+            f"{base_url}/r/{args[0]}/comments/{args[1]}/.json",
+            [("limit", limit), *extra],
+            user_agent,
+        )[0]
 
     if cmd == "post-url":
         if not args:
@@ -312,21 +358,37 @@ def main(argv: list[str]) -> int:
 
     if cmd == "user-posts":
         if not args:
-            print("usage: reddit user-posts <username> [key=value ...]", file=sys.stderr)
+            print(
+                "usage: reddit user-posts <username> [key=value ...]", file=sys.stderr
+            )
             return 2
         limit, extra = split_limit_extra(args[1:], "10")
-        return request_get(f"{base_url}/user/{args[0]}/submitted.json", [("limit", limit), *extra], user_agent)[0]
+        return request_get(
+            f"{base_url}/user/{args[0]}/submitted.json",
+            [("limit", limit), *extra],
+            user_agent,
+        )[0]
 
     if cmd == "user-comments":
         if not args:
-            print("usage: reddit user-comments <username> [key=value ...]", file=sys.stderr)
+            print(
+                "usage: reddit user-comments <username> [key=value ...]",
+                file=sys.stderr,
+            )
             return 2
         limit, extra = split_limit_extra(args[1:], "10")
-        return request_get(f"{base_url}/user/{args[0]}/comments.json", [("limit", limit), *extra], user_agent)[0]
+        return request_get(
+            f"{base_url}/user/{args[0]}/comments.json",
+            [("limit", limit), *extra],
+            user_agent,
+        )[0]
 
     if cmd == "user-analysis":
         if not args:
-            print("usage: reddit user-analysis <username> [posts_limit=<n>] [comments_limit=<n>] [time_range=<day|week|month|year|all>] [top_subreddits_limit=<n>]", file=sys.stderr)
+            print(
+                "usage: reddit user-analysis <username> [posts_limit=<n>] [comments_limit=<n>] [time_range=<day|week|month|year|all>] [top_subreddits_limit=<n>]",
+                file=sys.stderr,
+            )
             return 2
         try:
             return user_analysis(base_url, user_agent, args[0], args[1:])

@@ -18,7 +18,10 @@ export function stagingDirFor(finalDir: string): string {
   return withExtension(finalDir, `staging-${process.pid}-${now}`);
 }
 
-export async function replaceDirAtomically(src: string, dst: string): Promise<void> {
+export async function replaceDirAtomically(
+  src: string,
+  dst: string,
+): Promise<void> {
   const backup = withExtension(dst, "backup");
   rmEntry(backup);
   if (exists(dst)) {
@@ -40,13 +43,21 @@ export async function replaceDirAtomically(src: string, dst: string): Promise<vo
   }
 }
 
-export async function clonePackage(source: string, targetDir: string, timeoutMs: number): Promise<boolean> {
-  return clonePackageWithRunner(source, targetDir, await commandExists("gh"), (command) =>
-    runCommand(command, undefined, timeoutMs, "clone"),
+export async function clonePackage(
+  source: string,
+  targetDir: string,
+  timeoutMs: number,
+): Promise<boolean> {
+  return clonePackageWithRunner(
+    source,
+    targetDir,
+    await commandExists("gh"),
+    (command) => runCommand(command, undefined, timeoutMs, "clone"),
   );
 }
 
-export const githubSlugForTests = (source: string): string | null => githubRepoSlug(source);
+export const githubSlugForTests = (source: string): string | null =>
+  githubRepoSlug(source);
 
 export function commandForTests(source: string, targetDir: string): string[] {
   const command = cloneCommands(source, targetDir, true)[0];
@@ -64,15 +75,19 @@ export async function cloneAttemptsForTests(
 ): Promise<[boolean, string[][]]> {
   const attempts: string[][] = [];
   let index = 0;
-  const result = await clonePackageWithRunner(source, targetDir, ghAvailable, async (command) => {
-    attempts.push([...command]);
-    const outcome = outcomes[index] ?? false;
-    index += 1;
-    return outcome;
-  });
+  const result = await clonePackageWithRunner(
+    source,
+    targetDir,
+    ghAvailable,
+    async (command) => {
+      attempts.push([...command]);
+      const outcome = outcomes[index] ?? false;
+      index += 1;
+      return outcome;
+    },
+  );
   return [result, attempts];
 }
-
 
 function sourceSlug(source: string): string {
   const trimmed = source.trim().replace(/[\\/]+$/, "");
@@ -137,7 +152,11 @@ async function clonePackageWithRunner(
   return false;
 }
 
-function cloneCommands(source: string, targetDir: string, ghAvailable: boolean): string[][] {
+function cloneCommands(
+  source: string,
+  targetDir: string,
+  ghAvailable: boolean,
+): string[][] {
   const commands: string[][] = [];
   const slug = githubRepoSlug(source);
   if (slug && ghAvailable) {
@@ -163,7 +182,10 @@ function githubRepoSlug(source: string): string | null {
 }
 
 function splitOwnerRepo(rest: string): string | null {
-  const parts = rest.split("/").filter((part) => part.length > 0).slice(0, 2);
+  const parts = rest
+    .split("/")
+    .filter((part) => part.length > 0)
+    .slice(0, 2);
   if (parts.length !== 2) {
     return null;
   }

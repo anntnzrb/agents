@@ -25,7 +25,7 @@ const readLockInfo = async (lockPath: string): Promise<LockInfo | null> => {
 const acquireLock = async (
   todosDir: string,
   id: string,
-  ctx: ExtensionContext
+  ctx: ExtensionContext,
 ): Promise<(() => Promise<void>) | { error: string }> => {
   const lockPath = getLockPath(todosDir, id);
   const now = Date.now();
@@ -52,14 +52,18 @@ const acquireLock = async (
     } catch (error: unknown) {
       const record = error as { code?: string; message?: string };
       if (record?.code !== "EEXIST") {
-        return { error: `Failed to acquire lock: ${record?.message ?? "unknown error"}` };
+        return {
+          error: `Failed to acquire lock: ${record?.message ?? "unknown error"}`,
+        };
       }
       const stats = await fs.stat(lockPath).catch(() => null);
       const lockAge = stats ? now - stats.mtimeMs : LOCK_TTL_MS + 1;
       if (lockAge <= LOCK_TTL_MS) {
         const info = await readLockInfo(lockPath);
         const owner = info?.session ? ` (session ${info.session})` : "";
-        return { error: `Todo ${displayTodoId(id)} is locked${owner}. Try again later.` };
+        return {
+          error: `Todo ${displayTodoId(id)} is locked${owner}. Try again later.`,
+        };
       }
       if (!ctx.hasUI) {
         return {
@@ -68,7 +72,7 @@ const acquireLock = async (
       }
       const ok = await ctx.ui.confirm(
         "Todo locked",
-        `Todo ${displayTodoId(id)} appears locked. Steal the lock?`
+        `Todo ${displayTodoId(id)} appears locked. Steal the lock?`,
       );
       if (!ok) {
         return { error: `Todo ${displayTodoId(id)} remains locked.` };
@@ -84,7 +88,7 @@ export const withTodoLock = async <T>(
   todosDir: string,
   id: string,
   ctx: ExtensionContext,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
 ): Promise<T | { error: string }> => {
   const lock = await acquireLock(todosDir, id, ctx);
   if (typeof lock === "object" && "error" in lock) return lock;

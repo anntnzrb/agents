@@ -3,11 +3,13 @@
 Reduce, partials, dispatch, pipelines, and immutable data techniques.
 
 ---
+
 ## Reduce for Accumulation
 
 **Problem**: You need to combine all elements of a sequence into a single value using a custom operation.
 
 **Solution**:
+
 ```python
 from functools import reduce
 from operator import add, mul
@@ -37,6 +39,7 @@ assert result == "apple,banana,cherry"
 **Problem**: You need to create specialized versions of functions by fixing some arguments.
 
 **Solution**:
+
 ```python
 from functools import partial
 
@@ -66,6 +69,7 @@ assert say_hello("Alice") == "Hello, Alice!"
 **Problem**: You have expensive function calls that repeat with the same arguments.
 
 **Solution**:
+
 ```python
 from functools import lru_cache, cached_property
 
@@ -100,6 +104,7 @@ class User:
 **Problem**: You want different behavior based on the argument type without manual type checking.
 
 **Solution**:
+
 ```python
 from functools import singledispatch
 
@@ -129,6 +134,7 @@ assert process("hello") == "Default: hello"
 **Problem**: You want to combine multiple functions into a single function that applies them in sequence.
 
 **Solution**:
+
 ```python
 from typing import Callable, TypeVar
 
@@ -160,6 +166,7 @@ assert add_then_double(5) == 12  # (5 + 1) * 2
 **Problem**: You want to chain multiple transformations in a readable left-to-right order.
 
 **Solution**:
+
 ```python
 from functools import reduce
 from typing import Callable, Any
@@ -186,6 +193,7 @@ assert pipeline(5) == 16  # 5 -> 6 -> 18 -> 16
 **Problem**: You want method chaining for readable, type-safe data transformations.
 
 **Solution**:
+
 ```python
 from typing import Generic, TypeVar, Callable
 
@@ -227,6 +235,7 @@ assert result == 16
 **Problem**: You want immutable data structures that prevent accidental modification.
 
 **Solution**:
+
 ```python
 from dataclasses import dataclass
 
@@ -254,6 +263,7 @@ assert c2.x == 1  # New instance
 **Problem**: You need lightweight, immutable records with named fields.
 
 **Solution**:
+
 ```python
 from typing import NamedTuple
 
@@ -275,6 +285,7 @@ x, y = p1  # Unpack
 **Problem**: You need to prevent modifications to dictionaries or expose read-only views.
 
 **Solution**:
+
 ```python
 from types import MappingProxyType
 
@@ -301,6 +312,7 @@ assert new_numbers == (1, 2, 3, 4)
 **Problem**: You need to update data structures without mutating the original.
 
 **Solution**:
+
 ```python
 from copy import copy
 from dataclasses import dataclass

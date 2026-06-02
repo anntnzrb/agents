@@ -9,6 +9,7 @@ Read-only recipes for fast code exploration.
 **Problem**: Find all `console.log` calls in TS.
 
 **Solution**:
+
 ```bash
 sg -p 'console.log($$$)' -l ts src
 ```
@@ -22,6 +23,7 @@ sg -p 'console.log($$$)' -l ts src
 **Problem**: Find `if ($A) { $B }` patterns in JS.
 
 **Solution**:
+
 ```bash
 sg -p 'if ($A) { $B }' -l js .
 ```
@@ -35,6 +37,7 @@ sg -p 'if ($A) { $B }' -l js .
 **Problem**: List JS/TS function declarations.
 
 **Solution**:
+
 ```bash
 sg -p 'function $NAME($$$) { $$$ }' -l ts src
 ```
@@ -48,6 +51,7 @@ sg -p 'function $NAME($$$) { $$$ }' -l ts src
 **Problem**: Find Python function definitions.
 
 **Solution**:
+
 ```bash
 sg -p 'def $NAME($$$): $$$' -l py src
 ```
@@ -61,6 +65,7 @@ sg -p 'def $NAME($$$): $$$' -l py src
 **Problem**: Pipe matches to another script.
 
 **Solution**:
+
 ```bash
 sg -p 'new $TYPE($$$)' -l ts --json=stream src
 ```
@@ -74,6 +79,7 @@ sg -p 'new $TYPE($$$)' -l ts --json=stream src
 **Problem**: Search a snippet from stdin.
 
 **Solution**:
+
 ```bash
 cat snippet.ts | sg -p 'await $CALL($$$)' -l ts --stdin
 ```

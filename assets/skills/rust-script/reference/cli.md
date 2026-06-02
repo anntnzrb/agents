@@ -13,86 +13,86 @@ rust-script --clear-cache
 
 ### Script Execution
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--expr` | `-e` | Execute `<script>` as a literal expression and display the result |
-| `--loop` | `-l` | Execute `<script>` as a closure for each line from stdin |
-| `--count` | | Pass line number as second argument to loop closure |
+| Option    | Short | Description                                                       |
+| --------- | ----- | ----------------------------------------------------------------- |
+| `--expr`  | `-e`  | Execute `<script>` as a literal expression and display the result |
+| `--loop`  | `-l`  | Execute `<script>` as a closure for each line from stdin          |
+| `--count` |       | Pass line number as second argument to loop closure               |
 
 ### Dependencies & Features
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--dep <DEP>` | `-d` | Add dependency. Format: name or name=version |
-| `--extern <CRATE>` | `-x` | Add `#[macro_use] extern crate` (expr/loop only) |
-| `--unstable-feature <FEAT>` | `-u` | Add `#![feature(...)]` declaration |
+| Option                      | Short | Description                                      |
+| --------------------------- | ----- | ------------------------------------------------ |
+| `--dep <DEP>`               | `-d`  | Add dependency. Format: name or name=version     |
+| `--extern <CRATE>`          | `-x`  | Add `#[macro_use] extern crate` (expr/loop only) |
+| `--unstable-feature <FEAT>` | `-u`  | Add `#![feature(...)]` declaration               |
 
 ### Build Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--debug` | | Build debug executable (default: release) |
-| `--force` | `-f` | Force rebuild even if cached |
-| `--toolchain <VER>` | `-t` | Build with specific toolchain (e.g., `nightly`) |
-| `--test` | | Compile and run tests |
-| `--bench` | | Compile and run benchmarks (requires nightly) |
+| Option              | Short | Description                                     |
+| ------------------- | ----- | ----------------------------------------------- |
+| `--debug`           |       | Build debug executable (default: release)       |
+| `--force`           | `-f`  | Force rebuild even if cached                    |
+| `--toolchain <VER>` | `-t`  | Build with specific toolchain (e.g., `nightly`) |
+| `--test`            |       | Compile and run tests                           |
+| `--bench`           |       | Compile and run benchmarks (requires nightly)   |
 
 ### Output & Paths
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--cargo-output` | `-c` | Show cargo build output |
-| `--package` | `-p` | Generate package and print path, don't run |
-| `--pkg-path <PATH>` | | Specify package output directory |
-| `--base-path <PATH>` | `-b` | Base path for resolving dependencies |
+| Option               | Short | Description                                |
+| -------------------- | ----- | ------------------------------------------ |
+| `--cargo-output`     | `-c`  | Show cargo build output                    |
+| `--package`          | `-p`  | Generate package and print path, don't run |
+| `--pkg-path <PATH>`  |       | Specify package output directory           |
+| `--base-path <PATH>` | `-b`  | Base path for resolving dependencies       |
 
 ### Execution
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--wrapper <CMD>` | `-w` | Wrapper command (e.g., `rust-lldb`, `hyperfine`) |
+| Option            | Short | Description                                      |
+| ----------------- | ----- | ------------------------------------------------ |
+| `--wrapper <CMD>` | `-w`  | Wrapper command (e.g., `rust-lldb`, `hyperfine`) |
 
 ### Cache Management
 
-| Option | Description |
-|--------|-------------|
+| Option          | Description            |
+| --------------- | ---------------------- |
 | `--clear-cache` | Clear the script cache |
 
 ### Windows Only
 
-| Option | Description |
-|--------|-------------|
-| `--install-file-association` | Associate `.ers` files with rust-script |
-| `--uninstall-file-association` | Remove `.ers` file association |
+| Option                         | Description                             |
+| ------------------------------ | --------------------------------------- |
+| `--install-file-association`   | Associate `.ers` files with rust-script |
+| `--uninstall-file-association` | Remove `.ers` file association          |
 
 ## Environment Variables
 
 ### Set by rust-script (available to scripts)
 
-| Variable | Description |
-|----------|-------------|
-| `RUST_SCRIPT_PATH` | Absolute path to the script file |
+| Variable                | Description                            |
+| ----------------------- | -------------------------------------- |
+| `RUST_SCRIPT_PATH`      | Absolute path to the script file       |
 | `RUST_SCRIPT_BASE_PATH` | Base path for resolving relative paths |
-| `RUST_SCRIPT_PKG_NAME` | Generated Cargo package name |
-| `RUST_SCRIPT_SAFE_NAME` | Filename-safe version of script name |
+| `RUST_SCRIPT_PKG_NAME`  | Generated Cargo package name           |
+| `RUST_SCRIPT_SAFE_NAME` | Filename-safe version of script name   |
 
 ### For Debugging
 
-| Variable | Description |
-|----------|-------------|
+| Variable                     | Description            |
+| ---------------------------- | ---------------------- |
 | `RUST_LOG=rust_script=trace` | Enable verbose logging |
 
 ## Dependency Manifest Format
 
 Use doc comments with a cargo code block:
 
-```rust
+````rust
 //! ```cargo
 //! [dependencies]
 //! serde = "1.0"
 //! tokio = { version = "1", features = ["full"] }
 //! ```
-```
+````
 
 ## Examples
 

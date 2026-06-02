@@ -1,7 +1,7 @@
 # =============================================================================
 # Models
 # =============================================================================
-modelRoles: 
+modelRoles:
   default: opencode-go/mimo-v2.5-pro:high
   task: opencode-go/mimo-v2.5-pro:high
 
@@ -14,7 +14,7 @@ modelRoles:
 # =============================================================================
 # UI / Interaction
 # =============================================================================
-theme: 
+theme:
   dark: titanium
   light: light
 hideThinkingBlock: true
@@ -28,7 +28,7 @@ treeFilterMode: no-tools
 # =============================================================================
 # MCP / Memory
 # =============================================================================
-mcp: 
+mcp:
   enableProjectConfig: false
   discoveryMode: false
   notifications: false
@@ -44,17 +44,17 @@ mcp:
 # =============================================================================
 # Context / Branching
 # =============================================================================
-branchSummary: 
+branchSummary:
   enabled: true
   reserveTokens: 16384
 
 # =============================================================================
 # Tools
 # =============================================================================
-tools: 
+tools:
   discoveryMode: "off"
 readHashLines: true
-edit: 
+edit:
   mode: hashline
   # modelVariants:
   #   openai-codex/: apply_patch
@@ -63,28 +63,28 @@ edit:
 # =============================================================================
 # Task (Subagents)
 # =============================================================================
-task: 
+task:
   eager: true
   maxConcurrency: 16
   maxRecursionDepth: 1
   maxRuntimeMs: 3600000
-async: 
+async:
   enabled: true
-irc: 
+irc:
   enabled: true
 
 # =============================================================================
 # Code Intelligence
 # =============================================================================
-lsp: 
+lsp:
   enabled: false
 
 # =============================================================================
 # Bash Guardrails
 # =============================================================================
-bashInterceptor: 
+bashInterceptor:
   enabled: true
-  patterns: 
+  patterns:
     - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:echo|printf)\\s+.*(?:>|>>)\\s*(?:\"[^\"]+\"|'[^']+'|[^\\s\"']+)(?:\\s*(?:&&|\\|\\||;).*)?$|(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*cat\\s*<<[^\\n]*>\\s*(?:\"[^\"]+\"|'[^']+'|[^\\s\"']+)"
       tool: write
       message: "Use the `write` tool instead of echo/cat redirection. It handles encoding and provides confirmation."
@@ -174,9 +174,9 @@ bashInterceptor:
 # =============================================================================
 # Integrations / Providers
 # =============================================================================
-github: 
+github:
   enabled: true
-disabledProviders: 
+disabledProviders:
   - claude
   - claude-plugins
   - cline
@@ -192,15 +192,15 @@ disabledProviders:
 # =============================================================================
 # Misc
 # =============================================================================
-commands: 
+commands:
   enableClaudeProject: false
   enableClaudeUser: false
-secrets: 
+secrets:
   enabled: true
-startup: 
+startup:
   checkUpdate: false
 lastChangelogVersion: 15.7.5
-providers: 
+providers:
   webSearch: auto
 symbolPreset: unicode
 setupVersion: 1

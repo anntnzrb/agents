@@ -16,6 +16,7 @@ interruptMode: never
 Use strict, explicit Python typing. Treat untyped data as a boundary problem, not a core-logic lifestyle.
 
 Type-system defaults:
+
 - Prefer Pyright strict for new projects (`typeCheckingMode = "strict"`). Mypy is fine for inherited repos that already use it, but do not introduce it as the default gate when Pyright strict is available.
 - Public functions and methods should have explicit parameter and return types.
 - Avoid `Any`. If an external library forces `Any`, contain it at the boundary, narrow immediately, and document the narrowing.
@@ -30,6 +31,7 @@ Type-system defaults:
 - Prefer `@override` for subclass overrides when supported.
 
 JSON / API / RPC shape modeling:
+
 - Use `TypedDict` for dict-shaped payloads with known keys.
 - Use `Literal` for fixed field values and mode/status strings.
 - Use discriminated unions (`kind`, `type`, `event`, etc.) for small variant sets.
@@ -37,6 +39,7 @@ JSON / API / RPC shape modeling:
 - Do not pass raw `json.loads(...)`, `response.json()`, or CLI/env payloads through core logic without validation/narrowing.
 
 Boundary validation:
+
 - Validate untrusted bytes/JSON/env/CLI/API inputs once at the edge.
 - Use `msgspec` when fast typed decode/encode and lightweight structs fit.
 - Use `pydantic` when aliases, richer validation, compatibility, or ecosystem integration matters.

@@ -17,13 +17,19 @@ Minimal Pi-inspired JSONL RPC for the bundled skill-local CLI. Not full Pi RPC.
 Request:
 
 ```json
-{"id":"1","type":"ping"}
+{ "id": "1", "type": "ping" }
 ```
 
 Response:
 
 ```json
-{"id":"1","type":"response","command":"ping","success":true,"data":{"ok":true,"version":"1"}}
+{
+  "id": "1",
+  "type": "response",
+  "command": "ping",
+  "success": true,
+  "data": { "ok": true, "version": "1" }
+}
 ```
 
 ### get_schema
@@ -31,7 +37,7 @@ Response:
 Request:
 
 ```json
-{"id":"2","type":"get_schema"}
+{ "id": "2", "type": "get_schema" }
 ```
 
 Returns full schema/capability document.
@@ -39,6 +45,7 @@ Returns full schema/capability document.
 ### search
 
 Required fields:
+
 - `origin`
 - `destination`
 - `departStart` (ISO date)

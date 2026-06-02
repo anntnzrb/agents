@@ -1,6 +1,7 @@
 # vox-interpres roadmap (ideas)
 
 Status legend:
+
 - ✅ implemented
 - 🧪 proposed
 

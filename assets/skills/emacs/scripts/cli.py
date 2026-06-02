@@ -43,7 +43,9 @@ def main(argv: list[str] | None = None) -> int:
         print("  uv run --script <skill-dir>/scripts/cli.py ping")
         print("  uv run --script <skill-dir>/scripts/cli.py face default")
         print("  uv run --script <skill-dir>/scripts/cli.py eval-file query.el --json")
-        print("\nDelegates to scripts/emacsctl.py. Use 'help' for emacsctl subcommands if needed.")
+        print(
+            "\nDelegates to scripts/emacsctl.py. Use 'help' for emacsctl subcommands if needed."
+        )
         return 0
     return _run_script(argv)
 

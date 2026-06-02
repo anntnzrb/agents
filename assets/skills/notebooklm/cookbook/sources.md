@@ -7,6 +7,7 @@
 **Problem**: See what sources a notebook has.
 
 **Solution**:
+
 ```bash
 nlm sources <notebook-id>
 ```
@@ -20,6 +21,7 @@ nlm sources <notebook-id>
 **Problem**: Add new material to a notebook.
 
 **Solution**:
+
 ```bash
 nlm add <notebook-id> https://example.com/article
 nlm add <notebook-id> /path/to/file.pdf
@@ -34,6 +36,7 @@ nlm add <notebook-id> /path/to/file.pdf
 **Problem**: Remove an outdated source.
 
 **Solution**:
+
 ```bash
 nlm rm-source <notebook-id> <source-id>
 ```

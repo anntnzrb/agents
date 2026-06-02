@@ -2,15 +2,15 @@
 
 ## Data Structure Selection
 
-| Need | Data Structure |
-|------|----------------|
-| Indexed access, append at end | Vector `[]` |
-| Sequential prepend | List `'()` |
-| Key-value lookup | Map `{}` |
-| Membership testing, uniqueness | Set `#{}` |
-| FIFO queue | `clojure.lang.PersistentQueue/EMPTY` |
-| Ordered by key | Sorted map `(sorted-map)` |
-| Coordinate storage | Vector/tuple as map key |
+| Need                           | Data Structure                       |
+| ------------------------------ | ------------------------------------ |
+| Indexed access, append at end  | Vector `[]`                          |
+| Sequential prepend             | List `'()`                           |
+| Key-value lookup               | Map `{}`                             |
+| Membership testing, uniqueness | Set `#{}`                            |
+| FIFO queue                     | `clojure.lang.PersistentQueue/EMPTY` |
+| Ordered by key                 | Sorted map `(sorted-map)`            |
+| Coordinate storage             | Vector/tuple as map key              |
 
 ### When to Use What
 
@@ -376,16 +376,15 @@ myapp/
 
 ## Anti-Patterns
 
-| Avoid | Do Instead |
-|-------|------------|
-| Mutable state everywhere | Use atoms sparingly, prefer pure functions |
-| `(if (not x) ...)` | `(if-not x ...)` or `(when-not x ...)` |
-| `(not (= a b))` | `(not= a b)` |
-| `(first (filter pred coll))` | `(some pred coll)` |
-| Deep nesting | Threading macros `->`, `->>` |
-| `(into [] (map f coll))` | `(mapv f coll)` |
-| String concatenation | `(str a b c)` or `(format ...)` |
-| `(nth coll 0)` | `(first coll)` |
-| Manual recursion | `reduce`, `iterate`, `loop/recur` |
-| `def` inside functions | `let` bindings |
-
+| Avoid                        | Do Instead                                 |
+| ---------------------------- | ------------------------------------------ |
+| Mutable state everywhere     | Use atoms sparingly, prefer pure functions |
+| `(if (not x) ...)`           | `(if-not x ...)` or `(when-not x ...)`     |
+| `(not (= a b))`              | `(not= a b)`                               |
+| `(first (filter pred coll))` | `(some pred coll)`                         |
+| Deep nesting                 | Threading macros `->`, `->>`               |
+| `(into [] (map f coll))`     | `(mapv f coll)`                            |
+| String concatenation         | `(str a b c)` or `(format ...)`            |
+| `(nth coll 0)`               | `(first coll)`                             |
+| Manual recursion             | `reduce`, `iterate`, `loop/recur`          |
+| `def` inside functions       | `let` bindings                             |

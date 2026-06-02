@@ -1,4 +1,7 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -17,7 +20,8 @@ import type { ModelSelectEvent, ThinkingLevel } from "./types.ts";
 
 function expandUserPath(filePath: string): string {
   if (filePath === "~") return os.homedir();
-  if (filePath.startsWith("~/")) return path.join(os.homedir(), filePath.slice(2));
+  if (filePath.startsWith("~/"))
+    return path.join(os.homedir(), filePath.slice(2));
   return filePath;
 }
 
@@ -65,7 +69,10 @@ function getLockPathForFile(filePath: string): string {
   return `${filePath}.lock`;
 }
 
-async function withFileLock<T>(filePath: string, fn: () => Promise<T>): Promise<T> {
+async function withFileLock<T>(
+  filePath: string,
+  fn: () => Promise<T>,
+): Promise<T> {
   const lockPath = getLockPathForFile(filePath);
   await ensureDirForFile(lockPath);
 
@@ -75,8 +82,11 @@ async function withFileLock<T>(filePath: string, fn: () => Promise<T>): Promise<
       const handle = await fs.open(lockPath, "wx");
       try {
         await handle.writeFile(
-          JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }) + "\n",
-          "utf8"
+          JSON.stringify({
+            pid: process.pid,
+            createdAt: new Date().toISOString(),
+          }) + "\n",
+          "utf8",
         );
       } catch {
         // ignore
@@ -110,15 +120,26 @@ async function withFileLock<T>(filePath: string, fn: () => Promise<T>): Promise<
 }
 
 function isErrorCode(error: unknown, code: string): boolean {
-  return Boolean(error && typeof error === "object" && "code" in error && error.code === code);
+  return Boolean(
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === code,
+  );
 }
 
-async function atomicWriteUtf8(filePath: string, content: string): Promise<void> {
+async function atomicWriteUtf8(
+  filePath: string,
+  content: string,
+): Promise<void> {
   await ensureDirForFile(filePath);
 
   const dir = path.dirname(filePath);
   const base = path.basename(filePath);
-  const tmpPath = path.join(dir, `.${base}.tmp.${process.pid}.${Math.random().toString(16).slice(2)}`);
+  const tmpPath = path.join(
+    dir,
+    `.${base}.tmp.${process.pid}.${Math.random().toString(16).slice(2)}`,
+  );
 
   await fs.writeFile(tmpPath, content, "utf8");
 
@@ -154,7 +175,7 @@ type ModesPatch = {
 function computeModesPatch(
   base: ModesFile,
   next: ModesFile,
-  includeCurrentMode: boolean
+  includeCurrentMode: boolean,
 ): ModesPatch | null {
   const patch: ModesPatch = {};
 
@@ -162,7 +183,10 @@ function computeModesPatch(
     patch.currentMode = next.currentMode;
   }
 
-  const keys = new Set([...Object.keys(base.modes), ...Object.keys(next.modes)]);
+  const keys = new Set([
+    ...Object.keys(base.modes),
+    ...Object.keys(next.modes),
+  ]);
   const modesPatch: Record<ModeName, ModeSpecPatch | null> = {};
 
   for (const key of keys) {
@@ -179,12 +203,19 @@ function computeModesPatch(
     }
 
     const diff: ModeSpecPatch = {};
-    const fields: Array<keyof ModeSpec> = ["provider", "modelId", "thinkingLevel", "color"];
+    const fields: Array<keyof ModeSpec> = [
+      "provider",
+      "modelId",
+      "thinkingLevel",
+      "color",
+    ];
     for (const field of fields) {
       const previousValue = previous[field];
       const currentValue = current[field];
       if (previousValue !== currentValue) {
-        (diff as Record<keyof ModeSpec, ModeSpecPatch[keyof ModeSpecPatch]>)[field] = currentValue ?? null;
+        (diff as Record<keyof ModeSpec, ModeSpecPatch[keyof ModeSpecPatch]>)[
+          field
+        ] = currentValue ?? null;
       }
     }
     if (Object.keys(diff).length > 0) {
@@ -212,10 +243,8 @@ function applyModesPatch(target: ModesFile, patch: ModesPatch): void {
       continue;
     }
 
-    const targetSpec: Record<string, unknown> = ((target.modes[mode] ??= {}) as Record<
-      string,
-      unknown
-    >) ?? {};
+    const targetSpec: Record<string, unknown> =
+      ((target.modes[mode] ??= {}) as Record<string, unknown>) ?? {};
     for (const [key, value] of Object.entries(specPatch)) {
       if (value === null || value === undefined) {
         delete targetSpec[key];
@@ -229,12 +258,22 @@ function applyModesPatch(target: ModesFile, patch: ModesPatch): void {
 function normalizeThinkingLevel(level: unknown): ThinkingLevel | undefined {
   if (typeof level !== "string") return undefined;
   const value = level as ThinkingLevel;
-  const allowed: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
+  const allowed: ThinkingLevel[] = [
+    "off",
+    "minimal",
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+  ];
   return allowed.includes(value) ? value : undefined;
 }
 
 function sanitizeModeSpec(spec: unknown): ModeSpec {
-  const obj = (spec && typeof spec === "object" ? spec : {}) as Record<string, unknown>;
+  const obj = (spec && typeof spec === "object" ? spec : {}) as Record<
+    string,
+    unknown
+  >;
   return {
     provider: typeof obj.provider === "string" ? obj.provider : undefined,
     modelId: typeof obj.modelId === "string" ? obj.modelId : undefined,
@@ -243,7 +282,10 @@ function sanitizeModeSpec(spec: unknown): ModeSpec {
   };
 }
 
-function createDefaultModes(ctx: ExtensionContext, pi: ExtensionAPI): ModesFile {
+function createDefaultModes(
+  ctx: ExtensionContext,
+  pi: ExtensionAPI,
+): ModesFile {
   const currentModel = ctx.model;
   const currentThinking = pi.getThinkingLevel();
 
@@ -263,7 +305,11 @@ function createDefaultModes(ctx: ExtensionContext, pi: ExtensionAPI): ModesFile 
   };
 }
 
-function ensureDefaultModeEntries(file: ModesFile, ctx: ExtensionContext, pi: ExtensionAPI): void {
+function ensureDefaultModeEntries(
+  file: ModesFile,
+  ctx: ExtensionContext,
+  pi: ExtensionAPI,
+): void {
   for (const name of DEFAULT_MODE_ORDER) {
     if (!file.modes[name]) {
       const defaults = createDefaultModes(ctx, pi);
@@ -276,8 +322,14 @@ function ensureDefaultModeEntries(file: ModesFile, ctx: ExtensionContext, pi: Ex
     file.currentMode = "" as ModeName;
   }
 
-  if (!file.currentMode || !(file.currentMode in file.modes) || file.currentMode === CUSTOM_MODE_NAME) {
-    const first = Object.keys(file.modes).find((key) => key !== CUSTOM_MODE_NAME);
+  if (
+    !file.currentMode ||
+    !(file.currentMode in file.modes) ||
+    file.currentMode === CUSTOM_MODE_NAME
+  ) {
+    const first = Object.keys(file.modes).find(
+      (key) => key !== CUSTOM_MODE_NAME,
+    );
     file.currentMode = file.modes.default ? "default" : (first ?? "default");
   }
 }
@@ -285,12 +337,13 @@ function ensureDefaultModeEntries(file: ModesFile, ctx: ExtensionContext, pi: Ex
 async function loadModesFile(
   filePath: string,
   ctx: ExtensionContext,
-  pi: ExtensionAPI
+  pi: ExtensionAPI,
 ): Promise<ModesFile> {
   try {
     const raw = await fs.readFile(filePath, "utf8");
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const currentMode = typeof parsed.currentMode === "string" ? parsed.currentMode : "default";
+    const currentMode =
+      typeof parsed.currentMode === "string" ? parsed.currentMode : "default";
     const modesRaw =
       parsed.modes && typeof parsed.modes === "object"
         ? (parsed.modes as Record<string, unknown>)
@@ -318,7 +371,7 @@ export function orderedModeNames(modes: Record<string, ModeSpec>): string[] {
 export function getModeBorderColor(
   ctx: ExtensionContext,
   pi: ExtensionAPI,
-  mode: string
+  mode: string,
 ): (text: string) => string {
   const theme = ctx.ui.theme;
   const spec = runtime.data.modes[mode];
@@ -344,7 +397,7 @@ async function resolveModesPath(cwd: string): Promise<string> {
 export function inferModeFromSelection(
   ctx: ExtensionContext,
   pi: ExtensionAPI,
-  data: ModesFile
+  data: ModesFile,
 ): string | null {
   const provider = ctx.model?.provider;
   const modelId = ctx.model?.id;
@@ -389,7 +442,10 @@ export function inferModeFromSelection(
   return candidates[0] ?? null;
 }
 
-export async function ensureRuntime(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
+export async function ensureRuntime(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+): Promise<void> {
   const filePath = await resolveModesPath(ctx.cwd);
 
   const mtimeMs = await getMtimeMs(filePath);
@@ -415,13 +471,19 @@ export async function ensureRuntime(pi: ExtensionAPI, ctx: ExtensionContext): Pr
     if (!runtime.currentMode || !(runtime.currentMode in runtime.data.modes)) {
       runtime.currentMode = runtime.data.currentMode;
     }
-    if (!runtime.lastRealMode || !(runtime.lastRealMode in runtime.data.modes)) {
+    if (
+      !runtime.lastRealMode ||
+      !(runtime.lastRealMode in runtime.data.modes)
+    ) {
       runtime.lastRealMode = runtime.currentMode;
     }
   }
 }
 
-export async function persistRuntime(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
+export async function persistRuntime(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+): Promise<void> {
   if (!runtime.filePath) return;
 
   runtime.baseline ??= cloneModesFile(runtime.data);
@@ -453,7 +515,7 @@ export async function storeSelectionIntoMode(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
   mode: string,
-  selection: ModeSpec
+  selection: ModeSpec,
 ): Promise<void> {
   if (mode === CUSTOM_MODE_NAME) return;
 
@@ -472,7 +534,11 @@ export async function storeSelectionIntoMode(
   await persistRuntime(pi, ctx);
 }
 
-export async function applyMode(pi: ExtensionAPI, ctx: ExtensionContext, mode: string): Promise<void> {
+export async function applyMode(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  mode: string,
+): Promise<void> {
   await ensureRuntime(pi, ctx);
 
   if (mode === CUSTOM_MODE_NAME) {
@@ -503,14 +569,17 @@ export async function applyMode(pi: ExtensionAPI, ctx: ExtensionContext, mode: s
         const ok = await pi.setModel(model);
         modelAppliedOk = ok;
         if (!ok && ctx.hasUI) {
-          ctx.ui.notify(`No API key available for ${spec.provider}/${spec.modelId}`, "warning");
+          ctx.ui.notify(
+            `No API key available for ${spec.provider}/${spec.modelId}`,
+            "warning",
+          );
         }
       } else {
         modelAppliedOk = false;
         if (ctx.hasUI) {
           ctx.ui.notify(
             `Mode "${mode}" references unknown model ${spec.provider}/${spec.modelId}`,
-            "warning"
+            "warning",
           );
         }
       }
@@ -537,7 +606,10 @@ export function getCurrentMode(): string {
   return runtime.currentMode;
 }
 
-export async function restoreModeFromSelection(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
+export async function restoreModeFromSelection(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+): Promise<void> {
   await ensureRuntime(pi, ctx);
   setCustomOverlay(null);
 
@@ -555,7 +627,7 @@ export async function restoreModeFromSelection(pi: ExtensionAPI, ctx: ExtensionC
 export async function handleModelSelect(
   pi: ExtensionAPI,
   event: ModelSelectEvent,
-  ctx: ExtensionContext
+  ctx: ExtensionContext,
 ): Promise<void> {
   if (runtime.applying) return;
 

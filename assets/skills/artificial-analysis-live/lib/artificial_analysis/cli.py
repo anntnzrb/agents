@@ -62,23 +62,35 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command")
 
-    fetch_parser = subparsers.add_parser("fetch", help="Fetch live RSC data and write snapshot outputs.")
+    fetch_parser = subparsers.add_parser(
+        "fetch", help="Fetch live RSC data and write snapshot outputs."
+    )
     fetch_parser.add_argument("--output-json", type=Path, default=DEFAULT_OUTPUT_JSON)
-    fetch_parser.add_argument("--output-endpoints", type=Path, default=DEFAULT_OUTPUT_ENDPOINTS)
+    fetch_parser.add_argument(
+        "--output-endpoints", type=Path, default=DEFAULT_OUTPUT_ENDPOINTS
+    )
     fetch_parser.add_argument("--output-url", type=Path, default=DEFAULT_OUTPUT_URL)
     fetch_parser.add_argument("--cache-dir", type=Path, default=_default_cache_dir())
     fetch_parser.add_argument("--timeout-seconds", type=float, default=60.0)
     fetch_parser.add_argument("--min-endpoints", type=int, default=700)
     fetch_parser.add_argument("--min-providers", type=int, default=40)
-    fetch_parser.add_argument("--strict", action="store_true", help="Disable last-good fallback.")
+    fetch_parser.add_argument(
+        "--strict", action="store_true", help="Disable last-good fallback."
+    )
     fetch_parser.set_defaults(handler=_handle_fetch)
 
-    stats_parser = subparsers.add_parser("stats", help="Show snapshot counts and top providers.")
-    stats_parser.add_argument("snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON)
+    stats_parser = subparsers.add_parser(
+        "stats", help="Show snapshot counts and top providers."
+    )
+    stats_parser.add_argument(
+        "snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON
+    )
     stats_parser.add_argument("--top", type=int, default=10)
     stats_parser.set_defaults(handler=_handle_stats)
 
-    diff_parser = subparsers.add_parser("diff", help="Diff endpoint and provider changes between snapshots.")
+    diff_parser = subparsers.add_parser(
+        "diff", help="Diff endpoint and provider changes between snapshots."
+    )
     diff_parser.add_argument("old_snapshot", type=Path)
     diff_parser.add_argument("new_snapshot", type=Path)
     diff_parser.set_defaults(handler=_handle_diff)
@@ -87,10 +99,20 @@ def build_parser() -> argparse.ArgumentParser:
         "harness",
         help="Rank unique models by Harness = 50% Agentic Index + 50% Coding Index.",
     )
-    harness_parser.add_argument("snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON)
-    harness_parser.add_argument("--model", type=str, default=None, help="Model slug/name contains filter.")
-    harness_parser.add_argument("--creator", type=str, default=None, help="Creator/lab name contains filter.")
-    harness_parser.add_argument("--open-weights-only", action="store_true", help="Return only open-weights models.")
+    harness_parser.add_argument(
+        "snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON
+    )
+    harness_parser.add_argument(
+        "--model", type=str, default=None, help="Model slug/name contains filter."
+    )
+    harness_parser.add_argument(
+        "--creator", type=str, default=None, help="Creator/lab name contains filter."
+    )
+    harness_parser.add_argument(
+        "--open-weights-only",
+        action="store_true",
+        help="Return only open-weights models.",
+    )
     harness_parser.add_argument("--limit", type=int, default=50)
     harness_parser.set_defaults(handler=_handle_harness)
 
@@ -98,18 +120,37 @@ def build_parser() -> argparse.ArgumentParser:
         "coding",
         help="Fetch/query Coding Index capability rows, including coding-only output token composition.",
     )
-    coding_parser.add_argument("--output-json", type=Path, default=DEFAULT_CODING_OUTPUT_JSON)
+    coding_parser.add_argument(
+        "--output-json", type=Path, default=DEFAULT_CODING_OUTPUT_JSON
+    )
     coding_parser.add_argument("--timeout-seconds", type=float, default=60.0)
-    coding_parser.add_argument("--model", type=str, default=None, help="Model slug/name contains filter.")
-    coding_parser.add_argument("--creator", type=str, default=None, help="Creator/lab name contains filter.")
-    coding_parser.add_argument("--open-weights-only", action="store_true", help="Return only open-weights models.")
+    coding_parser.add_argument(
+        "--model", type=str, default=None, help="Model slug/name contains filter."
+    )
+    coding_parser.add_argument(
+        "--creator", type=str, default=None, help="Creator/lab name contains filter."
+    )
+    coding_parser.add_argument(
+        "--open-weights-only",
+        action="store_true",
+        help="Return only open-weights models.",
+    )
     coding_parser.add_argument(
         "--sort-by",
         type=str,
         default="coding",
-        choices=("coding", "output_tokens", "answer_tokens", "reasoning_tokens", "input_tokens", "cost"),
+        choices=(
+            "coding",
+            "output_tokens",
+            "answer_tokens",
+            "reasoning_tokens",
+            "input_tokens",
+            "cost",
+        ),
     )
-    coding_parser.add_argument("--order", type=str, default="auto", choices=("auto", "asc", "desc"))
+    coding_parser.add_argument(
+        "--order", type=str, default="auto", choices=("auto", "asc", "desc")
+    )
     coding_parser.add_argument("--limit", type=int, default=50)
     coding_parser.add_argument(
         "--include-benchmark-counts",
@@ -118,18 +159,40 @@ def build_parser() -> argparse.ArgumentParser:
     )
     coding_parser.set_defaults(handler=_handle_coding)
 
-    query_parser = subparsers.add_parser("query", help="Query model/provider benchmark rows from a snapshot.")
-    query_parser.add_argument("snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON)
-    query_parser.add_argument("--model", type=str, default=None, help="Model slug/name contains filter.")
-    query_parser.add_argument("--provider", type=str, default=None, help="Provider slug/name contains filter.")
-    query_parser.add_argument("--endpoint", type=str, default=None, help="Endpoint slug contains filter.")
+    query_parser = subparsers.add_parser(
+        "query", help="Query model/provider benchmark rows from a snapshot."
+    )
+    query_parser.add_argument(
+        "snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON
+    )
+    query_parser.add_argument(
+        "--model", type=str, default=None, help="Model slug/name contains filter."
+    )
+    query_parser.add_argument(
+        "--provider", type=str, default=None, help="Provider slug/name contains filter."
+    )
+    query_parser.add_argument(
+        "--endpoint", type=str, default=None, help="Endpoint slug contains filter."
+    )
     query_parser.add_argument(
         "--sort-by",
         type=str,
         default="intelligence",
-        choices=("harness", "intelligence", "agentic", "coding", "math", "price_blended", "speed", "ttfc", "e2e"),
+        choices=(
+            "harness",
+            "intelligence",
+            "agentic",
+            "coding",
+            "math",
+            "price_blended",
+            "speed",
+            "ttfc",
+            "e2e",
+        ),
     )
-    query_parser.add_argument("--order", type=str, default="auto", choices=("auto", "asc", "desc"))
+    query_parser.add_argument(
+        "--order", type=str, default="auto", choices=("auto", "asc", "desc")
+    )
     query_parser.add_argument("--limit", type=int, default=20)
     query_parser.set_defaults(handler=_handle_query)
 
@@ -137,15 +200,33 @@ def build_parser() -> argparse.ArgumentParser:
         "qa",
         help="Minimal NL question command that maps intent to query filters/sort.",
     )
-    qa_parser.add_argument("question", type=str, help="Natural-language question about models/providers.")
-    qa_parser.add_argument("snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON)
-    qa_parser.add_argument("--model", type=str, default=None, help="Override inferred model filter.")
-    qa_parser.add_argument("--provider", type=str, default=None, help="Override inferred provider filter.")
+    qa_parser.add_argument(
+        "question", type=str, help="Natural-language question about models/providers."
+    )
+    qa_parser.add_argument(
+        "snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON
+    )
+    qa_parser.add_argument(
+        "--model", type=str, default=None, help="Override inferred model filter."
+    )
+    qa_parser.add_argument(
+        "--provider", type=str, default=None, help="Override inferred provider filter."
+    )
     qa_parser.add_argument(
         "--sort-by",
         type=str,
         default=None,
-        choices=("harness", "intelligence", "agentic", "coding", "math", "price_blended", "speed", "ttfc", "e2e"),
+        choices=(
+            "harness",
+            "intelligence",
+            "agentic",
+            "coding",
+            "math",
+            "price_blended",
+            "speed",
+            "ttfc",
+            "e2e",
+        ),
         help="Override inferred sort metric.",
     )
     qa_parser.add_argument(
@@ -155,10 +236,14 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("asc", "desc"),
         help="Override inferred order.",
     )
-    qa_parser.add_argument("--limit", type=int, default=None, help="Override inferred result limit.")
+    qa_parser.add_argument(
+        "--limit", type=int, default=None, help="Override inferred result limit."
+    )
     qa_parser.set_defaults(handler=_handle_qa)
 
-    schema_parser = subparsers.add_parser("schema", help="Print machine-readable capability schema.")
+    schema_parser = subparsers.add_parser(
+        "schema", help="Print machine-readable capability schema."
+    )
     schema_parser.set_defaults(handler=_handle_schema)
 
     return parser
@@ -169,7 +254,16 @@ def _normalize_argv(argv: Sequence[str] | None) -> list[str]:
     if not values:
         return ["fetch"]
 
-    known_subcommands = {"fetch", "stats", "diff", "harness", "coding", "query", "qa", "schema"}
+    known_subcommands = {
+        "fetch",
+        "stats",
+        "diff",
+        "harness",
+        "coding",
+        "query",
+        "qa",
+        "schema",
+    }
     if any(token in known_subcommands for token in values):
         return values
     if any(token in {"-h", "--help"} for token in values):
@@ -216,7 +310,9 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
     if result.status_code == 304:
         body = load_cached_body(args.cache_dir, cache_meta)
         if body is None:
-            raise ExtractionError("Upstream returned 304 but no cached payload is available.")
+            raise ExtractionError(
+                "Upstream returned 304 but no cached payload is available."
+            )
         reused_cached_body = True
     else:
         body = result.body
@@ -229,7 +325,11 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
         frames = parse_json_frames(body)
         models, hosts, hosts_models = extract_lists(frames)
         slugs = endpoint_slugs(hosts_models)
-        sanity_check(slugs=slugs, min_endpoints=args.min_endpoints, min_providers=args.min_providers)
+        sanity_check(
+            slugs=slugs,
+            min_endpoints=args.min_endpoints,
+            min_providers=args.min_providers,
+        )
         payload = build_snapshot_payload(
             models=models,
             hosts=hosts,
@@ -252,10 +352,16 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
             fallback_source = f"file:{args.output_json}"
 
         if fallback_payload is None:
-            raise ExtractionError(f"Fresh parse failed and no last-good snapshot exists ({exc}).") from exc
+            raise ExtractionError(
+                f"Fresh parse failed and no last-good snapshot exists ({exc})."
+            ) from exc
 
         slugs = snapshot_slugs(fallback_payload)
-        sanity_check(slugs=slugs, min_endpoints=args.min_endpoints, min_providers=args.min_providers)
+        sanity_check(
+            slugs=slugs,
+            min_endpoints=args.min_endpoints,
+            min_providers=args.min_providers,
+        )
         payload = fallback_payload
         fallback_used = True
 
@@ -310,20 +416,28 @@ def _stats_payload(args: argparse.Namespace) -> dict[str, Any]:
     snapshot = load_snapshot(args.snapshot)
     slugs = snapshot_slugs(snapshot)
     providers = _provider_counts_from_snapshot(snapshot)
-    top = sorted(providers.items(), key=lambda item: (-item[1], item[0]))[: max(args.top, 0)]
+    top = sorted(providers.items(), key=lambda item: (-item[1], item[0]))[
+        : max(args.top, 0)
+    ]
 
     return {
         "snapshot": str(args.snapshot),
         "counts": {
-            "models": len(snapshot.get("models", [])) if isinstance(snapshot.get("models"), list) else 0,
-            "hosts": len(snapshot.get("hosts", [])) if isinstance(snapshot.get("hosts"), list) else 0,
+            "models": len(snapshot.get("models", []))
+            if isinstance(snapshot.get("models"), list)
+            else 0,
+            "hosts": len(snapshot.get("hosts", []))
+            if isinstance(snapshot.get("hosts"), list)
+            else 0,
             "hosts_models": len(snapshot.get("hosts_models", []))
             if isinstance(snapshot.get("hosts_models"), list)
             else 0,
             "endpoint_slugs": len(slugs),
             "providers": len(providers),
         },
-        "top_providers": [{"provider": name, "endpoints": count} for name, count in top],
+        "top_providers": [
+            {"provider": name, "endpoints": count} for name, count in top
+        ],
     }
 
 
@@ -376,8 +490,12 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
     frames = parse_json_frames(result.body)
     models = _extract_default_data_models(frames)
 
-    model_filter = args.model.lower() if isinstance(args.model, str) and args.model else None
-    creator_filter = args.creator.lower() if isinstance(args.creator, str) and args.creator else None
+    model_filter = (
+        args.model.lower() if isinstance(args.model, str) and args.model else None
+    )
+    creator_filter = (
+        args.creator.lower() if isinstance(args.creator, str) and args.creator else None
+    )
 
     rows: list[dict[str, Any]] = []
     skipped_missing_token_counts = 0
@@ -387,18 +505,36 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
 
         model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
         model_name = model.get("name") if isinstance(model.get("name"), str) else None
-        short_name = model.get("short_name") if isinstance(model.get("short_name"), str) else model_name
-        creator = model.get("model_creators") if isinstance(model.get("model_creators"), dict) else {}
-        creator_name = creator.get("name") if isinstance(creator.get("name"), str) else None
+        short_name = (
+            model.get("short_name")
+            if isinstance(model.get("short_name"), str)
+            else model_name
+        )
+        creator = (
+            model.get("model_creators")
+            if isinstance(model.get("model_creators"), dict)
+            else {}
+        )
+        creator_name = (
+            creator.get("name") if isinstance(creator.get("name"), str) else None
+        )
 
-        if model_filter and not _matches_any(model_filter, [model_slug, model_name, short_name]):
+        if model_filter and not _matches_any(
+            model_filter, [model_slug, model_name, short_name]
+        ):
             continue
-        if creator_filter and not _matches_any(creator_filter, [creator_name, creator.get("slug")]):
+        if creator_filter and not _matches_any(
+            creator_filter, [creator_name, creator.get("slug")]
+        ):
             continue
         if args.open_weights_only and model.get("is_open_weights") is not True:
             continue
 
-        token_counts = model.get("tokenCounts") if isinstance(model.get("tokenCounts"), dict) else None
+        token_counts = (
+            model.get("tokenCounts")
+            if isinstance(model.get("tokenCounts"), dict)
+            else None
+        )
         if token_counts is None:
             skipped_missing_token_counts += 1
             continue
@@ -407,7 +543,9 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
         reasoning_tokens = _number_or_none(token_counts.get("reasoningTokens"))
         output_tokens = _number_or_none(token_counts.get("outputTokens"))
         input_tokens = _number_or_none(token_counts.get("inputTokens"))
-        eval_cost = model.get("evalCost") if isinstance(model.get("evalCost"), dict) else {}
+        eval_cost = (
+            model.get("evalCost") if isinstance(model.get("evalCost"), dict) else {}
+        )
 
         row: dict[str, Any] = {
             "model_slug": model_slug,
@@ -452,11 +590,26 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
         "cost": "coding_eval_cost.total_cost",
     }
     reverse = _resolve_reverse(sort_key=args.sort_by, order=args.order)
-    rows.sort(key=lambda row: _nested_sort_metric(row, sort_key_map[args.sort_by], reverse=reverse))
+    rows.sort(
+        key=lambda row: _nested_sort_metric(
+            row, sort_key_map[args.sort_by], reverse=reverse
+        )
+    )
     limited = rows[: max(args.limit, 0)]
 
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
-    args.output_json.write_text(json.dumps({"meta": {"source_url": CODING_CAPABILITY_URL, "fetched_at": result.fetched_at}, "rows": rows}, ensure_ascii=False))
+    args.output_json.write_text(
+        json.dumps(
+            {
+                "meta": {
+                    "source_url": CODING_CAPABILITY_URL,
+                    "fetched_at": result.fetched_at,
+                },
+                "rows": rows,
+            },
+            ensure_ascii=False,
+        )
+    )
 
     return {
         "source": {
@@ -508,7 +661,9 @@ def _extract_default_data_models(frames: list[tuple[str, Any]]) -> list[Any]:
         scan(frame)
 
     if not candidates:
-        raise ExtractionError("Coding capability payload missing defaultData rows with tokenCounts.")
+        raise ExtractionError(
+            "Coding capability payload missing defaultData rows with tokenCounts."
+        )
     return max(candidates, key=len)
 
 
@@ -520,7 +675,11 @@ def _looks_like_coding_capability_rows(value: Any) -> bool:
         return False
     hits = 0
     for item in sample:
-        if isinstance(item.get("slug"), str) and "coding_index" in item and isinstance(item.get("tokenCounts"), dict):
+        if (
+            isinstance(item.get("slug"), str)
+            and "coding_index" in item
+            and isinstance(item.get("tokenCounts"), dict)
+        ):
             hits += 1
     return hits >= max(2, len(sample) // 2)
 
@@ -530,13 +689,21 @@ def _number_or_none(value: Any) -> int | float | None:
 
 
 def _share(part: int | float | None, total: int | float | None) -> float | None:
-    if not isinstance(part, int | float) or not isinstance(total, int | float) or total == 0:
+    if (
+        not isinstance(part, int | float)
+        or not isinstance(total, int | float)
+        or total == 0
+    ):
         return None
     return round(float(part) / float(total), 6)
 
 
 def _coding_component_token_counts(model: dict[str, Any]) -> dict[str, Any]:
-    eval_counts = model.get("eval_token_counts") if isinstance(model.get("eval_token_counts"), dict) else {}
+    eval_counts = (
+        model.get("eval_token_counts")
+        if isinstance(model.get("eval_token_counts"), dict)
+        else {}
+    )
     return {
         key: eval_counts.get(key)
         for key in ("terminalbench_hard", "scicode")
@@ -544,7 +711,9 @@ def _coding_component_token_counts(model: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _nested_sort_metric(row: dict[str, Any], path: str, *, reverse: bool) -> tuple[int, float]:
+def _nested_sort_metric(
+    row: dict[str, Any], path: str, *, reverse: bool
+) -> tuple[int, float]:
     current: Any = row
     for part in path.split("."):
         if not isinstance(current, dict):
@@ -563,8 +732,12 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
     if not isinstance(hosts_models, list):
         raise ExtractionError("Snapshot missing hosts_models list")
 
-    model_filter = args.model.lower() if isinstance(args.model, str) and args.model else None
-    creator_filter = args.creator.lower() if isinstance(args.creator, str) and args.creator else None
+    model_filter = (
+        args.model.lower() if isinstance(args.model, str) and args.model else None
+    )
+    creator_filter = (
+        args.creator.lower() if isinstance(args.creator, str) and args.creator else None
+    )
 
     seen: set[str] = set()
     rows: list[dict[str, Any]] = []
@@ -582,12 +755,20 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
             continue
 
         model_name = model.get("name") if isinstance(model.get("name"), str) else None
-        creator = model.get("model_creators") if isinstance(model.get("model_creators"), dict) else {}
-        creator_name = creator.get("name") if isinstance(creator.get("name"), str) else None
+        creator = (
+            model.get("model_creators")
+            if isinstance(model.get("model_creators"), dict)
+            else {}
+        )
+        creator_name = (
+            creator.get("name") if isinstance(creator.get("name"), str) else None
+        )
 
         if model_filter and not _matches_any(model_filter, [model_slug, model_name]):
             continue
-        if creator_filter and not _matches_any(creator_filter, [creator_name, creator.get("slug")]):
+        if creator_filter and not _matches_any(
+            creator_filter, [creator_name, creator.get("slug")]
+        ):
             continue
         if args.open_weights_only and model.get("is_open_weights") is not True:
             continue
@@ -617,7 +798,9 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
             }
         )
 
-    rows.sort(key=lambda row: (-float(row["harness"]), str(row.get("model_slug") or "")))
+    rows.sort(
+        key=lambda row: (-float(row["harness"]), str(row.get("model_slug") or ""))
+    )
     for index, row in enumerate(rows, start=1):
         row["rank"] = index
 
@@ -650,9 +833,19 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
     if not isinstance(hosts_models, list):
         raise ExtractionError("Snapshot missing hosts_models list")
 
-    model_filter = args.model.lower() if isinstance(args.model, str) and args.model else None
-    provider_filter = args.provider.lower() if isinstance(args.provider, str) and args.provider else None
-    endpoint_filter = args.endpoint.lower() if isinstance(args.endpoint, str) and args.endpoint else None
+    model_filter = (
+        args.model.lower() if isinstance(args.model, str) and args.model else None
+    )
+    provider_filter = (
+        args.provider.lower()
+        if isinstance(args.provider, str) and args.provider
+        else None
+    )
+    endpoint_filter = (
+        args.endpoint.lower()
+        if isinstance(args.endpoint, str) and args.endpoint
+        else None
+    )
 
     rows: list[dict[str, Any]] = []
     for item in hosts_models:
@@ -662,7 +855,11 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
         endpoint_slug = item.get("slug")
         model = item.get("model") if isinstance(item.get("model"), dict) else {}
         host = item.get("host") if isinstance(item.get("host"), dict) else {}
-        timescale = item.get("timescaleData") if isinstance(item.get("timescaleData"), dict) else {}
+        timescale = (
+            item.get("timescaleData")
+            if isinstance(item.get("timescaleData"), dict)
+            else {}
+        )
         e2e = (
             item.get("end_to_end_response_time_metrics")
             if isinstance(item.get("end_to_end_response_time_metrics"), dict)
@@ -679,7 +876,9 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
 
         if model_filter and not _matches_any(model_filter, [model_slug, model_name]):
             continue
-        if provider_filter and not _matches_any(provider_filter, [provider_slug, provider_name]):
+        if provider_filter and not _matches_any(
+            provider_filter, [provider_slug, provider_name]
+        ):
             continue
         if endpoint_filter and endpoint_filter not in endpoint_slug.lower():
             continue
@@ -733,11 +932,15 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
 
     top_providers = [
         {"provider": name, "endpoints": count}
-        for name, count in sorted(provider_counts.items(), key=lambda item: (-item[1], item[0]))[:10]
+        for name, count in sorted(
+            provider_counts.items(), key=lambda item: (-item[1], item[0])
+        )[:10]
     ]
     top_models = [
         {"model": name, "endpoints": count}
-        for name, count in sorted(model_counts.items(), key=lambda item: (-item[1], item[0]))[:10]
+        for name, count in sorted(
+            model_counts.items(), key=lambda item: (-item[1], item[0])
+        )[:10]
     ]
 
     return {
@@ -787,7 +990,9 @@ def _resolve_reverse(*, sort_key: str, order: str) -> bool:
     return True
 
 
-def _sort_metric(row: dict[str, Any], metric: str, *, reverse: bool) -> tuple[int, float]:
+def _sort_metric(
+    row: dict[str, Any], metric: str, *, reverse: bool
+) -> tuple[int, float]:
     value = row.get(metric)
     if isinstance(value, int | float):
         normalized = -float(value) if reverse else float(value)
@@ -923,13 +1128,46 @@ def _infer_provider(question: str, hosts_models: list[Any]) -> str | None:
 
 def _infer_sort(question: str) -> tuple[str, str]:
     q = question.lower()
-    if any(word in q for word in ("cheap", "cheapest", "lowest price", "low price", "precio", "barato")):
+    if any(
+        word in q
+        for word in (
+            "cheap",
+            "cheapest",
+            "lowest price",
+            "low price",
+            "precio",
+            "barato",
+        )
+    ):
         return ("price_blended", "asc")
-    if any(word in q for word in ("latency", "first token", "ttfc", "response time", "rápido en", "latencia")):
+    if any(
+        word in q
+        for word in (
+            "latency",
+            "first token",
+            "ttfc",
+            "response time",
+            "rápido en",
+            "latencia",
+        )
+    ):
         return ("ttfc", "asc")
-    if any(word in q for word in ("speed", "throughput", "tokens per second", "fastest", "rápido", "velocidad")):
+    if any(
+        word in q
+        for word in (
+            "speed",
+            "throughput",
+            "tokens per second",
+            "fastest",
+            "rápido",
+            "velocidad",
+        )
+    ):
         return ("speed", "desc")
-    if any(word in q for word in ("harness", "agent harness", "coding agent", "agentic coding")):
+    if any(
+        word in q
+        for word in ("harness", "agent harness", "coding agent", "agentic coding")
+    ):
         return ("harness", "desc")
     if any(word in q for word in ("agentic", "agent", "autonomous")):
         return ("agentic", "desc")
@@ -937,7 +1175,9 @@ def _infer_sort(question: str) -> tuple[str, str]:
         return ("coding", "desc")
     if any(word in q for word in ("math", "matemática", "matematica")):
         return ("math", "desc")
-    if any(word in q for word in ("quality", "best", "intelligence", "benchmark", "mejor")):
+    if any(
+        word in q for word in ("quality", "best", "intelligence", "benchmark", "mejor")
+    ):
         return ("intelligence", "desc")
     return ("intelligence", "desc")
 
@@ -1088,14 +1328,26 @@ def _capability_schema() -> dict[str, Any]:
                 "fields": ["id", "type|command", "args"],
             },
             "response": {
-                "success": {"fields": ["id", "type=response", "command", "success", "data"]},
-                "error": {"fields": ["id", "type=response", "command", "success=false", "error"]},
+                "success": {
+                    "fields": ["id", "type=response", "command", "success", "data"]
+                },
+                "error": {
+                    "fields": [
+                        "id",
+                        "type=response",
+                        "command",
+                        "success=false",
+                        "error",
+                    ]
+                },
             },
         },
     }
 
 
-def _error_response(request_id: Any, command: str, code: str, message: str) -> dict[str, Any]:
+def _error_response(
+    request_id: Any, command: str, code: str, message: str
+) -> dict[str, Any]:
     return {
         "id": request_id,
         "type": "response",
@@ -1108,7 +1360,9 @@ def _error_response(request_id: Any, command: str, code: str, message: str) -> d
     }
 
 
-def _success_response(request_id: Any, command: str, data: dict[str, Any]) -> dict[str, Any]:
+def _success_response(
+    request_id: Any, command: str, data: dict[str, Any]
+) -> dict[str, Any]:
     return {
         "id": request_id,
         "type": "response",
@@ -1121,14 +1375,18 @@ def _success_response(request_id: Any, command: str, data: dict[str, Any]) -> di
 def _arg_value(args: dict[str, Any], key: str, default: Any) -> Any:
     if key in args:
         return args[key]
-    camel = "".join(part.capitalize() if i else part for i, part in enumerate(key.split("_")))
+    camel = "".join(
+        part.capitalize() if i else part for i, part in enumerate(key.split("_"))
+    )
     return args.get(camel, default)
 
 
 def _fetch_namespace(args: dict[str, Any]) -> argparse.Namespace:
     return argparse.Namespace(
         output_json=Path(_arg_value(args, "output_json", str(DEFAULT_OUTPUT_JSON))),
-        output_endpoints=Path(_arg_value(args, "output_endpoints", str(DEFAULT_OUTPUT_ENDPOINTS))),
+        output_endpoints=Path(
+            _arg_value(args, "output_endpoints", str(DEFAULT_OUTPUT_ENDPOINTS))
+        ),
         output_url=Path(_arg_value(args, "output_url", str(DEFAULT_OUTPUT_URL))),
         cache_dir=Path(_arg_value(args, "cache_dir", str(_default_cache_dir()))),
         timeout_seconds=float(_arg_value(args, "timeout_seconds", 60.0)),
@@ -1157,7 +1415,9 @@ def _harness_namespace(args: dict[str, Any]) -> argparse.Namespace:
 
 def _coding_namespace(args: dict[str, Any]) -> argparse.Namespace:
     return argparse.Namespace(
-        output_json=Path(_arg_value(args, "output_json", str(DEFAULT_CODING_OUTPUT_JSON))),
+        output_json=Path(
+            _arg_value(args, "output_json", str(DEFAULT_CODING_OUTPUT_JSON))
+        ),
         timeout_seconds=float(_arg_value(args, "timeout_seconds", 60.0)),
         model=_arg_value(args, "model", None),
         creator=_arg_value(args, "creator", None),
@@ -1165,7 +1425,9 @@ def _coding_namespace(args: dict[str, Any]) -> argparse.Namespace:
         sort_by=str(_arg_value(args, "sort_by", "coding")),
         order=str(_arg_value(args, "order", "auto")),
         limit=int(_arg_value(args, "limit", 50)),
-        include_benchmark_counts=bool(_arg_value(args, "include_benchmark_counts", False)),
+        include_benchmark_counts=bool(
+            _arg_value(args, "include_benchmark_counts", False)
+        ),
     )
 
 
@@ -1174,7 +1436,9 @@ def _diff_namespace(args: dict[str, Any]) -> argparse.Namespace:
     new_snapshot = _arg_value(args, "new_snapshot", None)
     if not old_snapshot or not new_snapshot:
         raise CliUsageError("diff requires old_snapshot and new_snapshot")
-    return argparse.Namespace(old_snapshot=Path(str(old_snapshot)), new_snapshot=Path(str(new_snapshot)))
+    return argparse.Namespace(
+        old_snapshot=Path(str(old_snapshot)), new_snapshot=Path(str(new_snapshot))
+    )
 
 
 def _query_namespace(args: dict[str, Any]) -> argparse.Namespace:
@@ -1218,14 +1482,18 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
             request = json.loads(line)
         except json.JSONDecodeError:
             _emit_json(
-                _error_response(None, "unknown", "invalid_json", "Request line is not valid JSON."),
+                _error_response(
+                    None, "unknown", "invalid_json", "Request line is not valid JSON."
+                ),
                 stdout=output_stream,
             )
             continue
 
         if not isinstance(request, dict):
             _emit_json(
-                _error_response(None, "unknown", "invalid_request", "Request must be a JSON object."),
+                _error_response(
+                    None, "unknown", "invalid_request", "Request must be a JSON object."
+                ),
                 stdout=output_stream,
             )
             continue
@@ -1234,7 +1502,12 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
         command = request.get("type") or request.get("command")
         if not isinstance(command, str):
             _emit_json(
-                _error_response(request_id, "unknown", "missing_command", "Missing type/command field."),
+                _error_response(
+                    request_id,
+                    "unknown",
+                    "missing_command",
+                    "Missing type/command field.",
+                ),
                 stdout=output_stream,
             )
             continue
@@ -1242,36 +1515,65 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
         args_payload = request.get("args", {})
         if not isinstance(args_payload, dict):
             _emit_json(
-                _error_response(request_id, command, "invalid_args", "args must be an object."),
+                _error_response(
+                    request_id, command, "invalid_args", "args must be an object."
+                ),
                 stdout=output_stream,
             )
             continue
 
         try:
             if command == "ping":
-                response = _success_response(request_id, command, {"ok": True, "version": PROTOCOL_VERSION})
+                response = _success_response(
+                    request_id, command, {"ok": True, "version": PROTOCOL_VERSION}
+                )
             elif command in {"schema", "get_schema"}:
                 response = _success_response(request_id, command, _capability_schema())
             elif command == "fetch":
-                response = _success_response(request_id, command, _fetch_payload(_fetch_namespace(args_payload)))
+                response = _success_response(
+                    request_id, command, _fetch_payload(_fetch_namespace(args_payload))
+                )
             elif command == "stats":
-                response = _success_response(request_id, command, _stats_payload(_stats_namespace(args_payload)))
+                response = _success_response(
+                    request_id, command, _stats_payload(_stats_namespace(args_payload))
+                )
             elif command == "diff":
-                response = _success_response(request_id, command, _diff_payload(_diff_namespace(args_payload)))
+                response = _success_response(
+                    request_id, command, _diff_payload(_diff_namespace(args_payload))
+                )
             elif command == "harness":
-                response = _success_response(request_id, command, _harness_payload(_harness_namespace(args_payload)))
+                response = _success_response(
+                    request_id,
+                    command,
+                    _harness_payload(_harness_namespace(args_payload)),
+                )
             elif command == "coding":
-                response = _success_response(request_id, command, _coding_payload(_coding_namespace(args_payload)))
+                response = _success_response(
+                    request_id,
+                    command,
+                    _coding_payload(_coding_namespace(args_payload)),
+                )
             elif command == "query":
-                response = _success_response(request_id, command, _query_payload(_query_namespace(args_payload)))
+                response = _success_response(
+                    request_id, command, _query_payload(_query_namespace(args_payload))
+                )
             elif command == "qa":
-                response = _success_response(request_id, command, _qa_payload(_qa_namespace(args_payload)))
+                response = _success_response(
+                    request_id, command, _qa_payload(_qa_namespace(args_payload))
+                )
             else:
-                response = _error_response(request_id, command, "unknown_command", f"Unknown command: {command}")
+                response = _error_response(
+                    request_id,
+                    command,
+                    "unknown_command",
+                    f"Unknown command: {command}",
+                )
         except CliUsageError as exc:
             response = _error_response(request_id, command, "usage_error", str(exc))
         except ExtractionError as exc:
-            response = _error_response(request_id, command, "extraction_error", str(exc))
+            response = _error_response(
+                request_id, command, "extraction_error", str(exc)
+            )
         except OSError as exc:
             response = _error_response(request_id, command, "io_error", str(exc))
 

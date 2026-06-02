@@ -3,6 +3,7 @@
 ## Go 1.24+ Features
 
 ### Range-Over-Func (Iterators)
+
 Custom iterators using `iter.Seq` and `iter.Seq2`:
 
 ```go
@@ -37,6 +38,7 @@ for v := range Evens(10) {
 ```
 
 ### Standard Library Iterators
+
 ```go
 import (
     "slices"
@@ -57,6 +59,7 @@ maps.Collect(seq)       // Collect iterator into map
 ```
 
 ### Enhanced Generics
+
 ```go
 // Type inference improvements
 func Transform[S ~[]E, E, R any](s S, fn func(E) R) []R {
@@ -76,6 +79,7 @@ type Number interface {
 ## Project Structure
 
 ### Standard Layout
+
 ```
 project/
 ├── cmd/
@@ -95,6 +99,7 @@ project/
 ```
 
 ### Flat Structure (small projects)
+
 ```
 project/
 ├── main.go
@@ -105,6 +110,7 @@ project/
 ```
 
 ### Key Conventions
+
 - `cmd/` - Each subdirectory is a separate binary
 - `internal/` - Compiler-enforced private packages
 - `pkg/` - Only for truly reusable public libraries
@@ -113,6 +119,7 @@ project/
 ## Uber Style Guide Highlights
 
 ### Naming
+
 ```go
 // Unexported: camelCase
 var maxRetries = 3
@@ -129,6 +136,7 @@ type Reader interface { Read(p []byte) (n int, err error) }
 ```
 
 ### Error Handling
+
 ```go
 // Wrap errors with context
 if err := doThing(); err != nil {
@@ -147,6 +155,7 @@ var ErrNotFound = errors.New("not found")
 ```
 
 ### Prefer Composition
+
 ```go
 // Embed for delegation, not inheritance
 type Server struct {
@@ -159,6 +168,7 @@ func Process(r io.Reader) error { ... }
 ```
 
 ### Initialization
+
 ```go
 // Prefer var for zero values
 var buf bytes.Buffer
@@ -174,6 +184,7 @@ s := make([]int, 0, 100)
 ## golangci-lint Configuration
 
 ### Minimal `.golangci.yml`
+
 ```yaml
 run:
   timeout: 5m
@@ -202,30 +213,32 @@ linters-settings:
 ```
 
 ### Recommended Additional Linters
+
 ```yaml
 linters:
   enable:
     # Error handling
     - errcheck
-    - errorlint      # Error wrapping
-    - wrapcheck      # Wrap external errors
+    - errorlint # Error wrapping
+    - wrapcheck # Wrap external errors
 
     # Style
-    - gofumpt        # Stricter gofmt
-    - godot          # Comments end with period
-    - whitespace     # Unnecessary whitespace
+    - gofumpt # Stricter gofmt
+    - godot # Comments end with period
+    - whitespace # Unnecessary whitespace
 
     # Performance
-    - prealloc       # Preallocate slices
-    - bodyclose      # Close HTTP response bodies
+    - prealloc # Preallocate slices
+    - bodyclose # Close HTTP response bodies
 
     # Security
-    - gosec          # Security issues
+    - gosec # Security issues
 ```
 
 ## Module Best Practices
 
 ### go.mod Management
+
 ```go
 // Require specific versions
 require (
@@ -244,6 +257,7 @@ retract (
 ```
 
 ### Multi-Module Workspaces
+
 ```go
 // go.work
 go 1.24
@@ -259,29 +273,29 @@ use (
 
 Query Context7 for these library IDs based on the topic:
 
-| Topic | Library ID | Use For |
-|-------|------------|---------|
-| **Style & Idioms** | `/uber-go/guide` | Code style, naming, patterns |
-| **Linting** | `/golangci/golangci-lint` | Linter config, rules |
-| **Testing** | `/stretchr/testify` | Assertions, mocking, suites |
-| **Logging** | `/uber-go/zap` | High-performance structured logging |
-| **Logging (alt)** | `/rs/zerolog` | Zero-allocation JSON logging |
-| **Web/HTTP** | `/gin-gonic/gin` | HTTP framework, middleware |
-| **Web/HTTP (alt)** | `/go-chi/chi` | Lightweight router |
-| **Web/HTTP (alt)** | `/labstack/echo` | High-performance web framework |
-| **CLI** | `/spf13/cobra` | CLI applications, subcommands |
-| **CLI (TUI)** | `/charmbracelet/bubbletea` | Terminal UI applications |
-| **Config** | `/spf13/viper` | Configuration management |
-| **Config (alt)** | `/knadh/koanf` | Lightweight config library |
-| **Database/ORM** | `/go-gorm/gorm` | ORM, migrations, associations |
-| **Database (SQL)** | `/jmoiron/sqlx` | Extensions to database/sql |
-| **Database (Postgres)** | `/jackc/pgx` | PostgreSQL driver |
-| **DI** | `/uber-go/fx` | Dependency injection framework |
-| **DI (codegen)** | `/google/wire` | Compile-time DI |
-| **Validation** | `/go-playground/validator` | Struct validation |
-| **HTTP Client** | `/go-resty/resty` | REST client with retries |
-| **Concurrency** | `/sourcegraph/conc` | Structured concurrency |
-| **Worker Pools** | `/panjf2000/ants` | Goroutine pool |
-| **Errors** | `/uber-go/multierr` | Error aggregation |
-| **Errors (alt)** | `/samber/oops` | Error handling with context |
-| **Generics/Utils** | `/samber/lo` | Lodash-style utilities |
+| Topic                   | Library ID                 | Use For                             |
+| ----------------------- | -------------------------- | ----------------------------------- |
+| **Style & Idioms**      | `/uber-go/guide`           | Code style, naming, patterns        |
+| **Linting**             | `/golangci/golangci-lint`  | Linter config, rules                |
+| **Testing**             | `/stretchr/testify`        | Assertions, mocking, suites         |
+| **Logging**             | `/uber-go/zap`             | High-performance structured logging |
+| **Logging (alt)**       | `/rs/zerolog`              | Zero-allocation JSON logging        |
+| **Web/HTTP**            | `/gin-gonic/gin`           | HTTP framework, middleware          |
+| **Web/HTTP (alt)**      | `/go-chi/chi`              | Lightweight router                  |
+| **Web/HTTP (alt)**      | `/labstack/echo`           | High-performance web framework      |
+| **CLI**                 | `/spf13/cobra`             | CLI applications, subcommands       |
+| **CLI (TUI)**           | `/charmbracelet/bubbletea` | Terminal UI applications            |
+| **Config**              | `/spf13/viper`             | Configuration management            |
+| **Config (alt)**        | `/knadh/koanf`             | Lightweight config library          |
+| **Database/ORM**        | `/go-gorm/gorm`            | ORM, migrations, associations       |
+| **Database (SQL)**      | `/jmoiron/sqlx`            | Extensions to database/sql          |
+| **Database (Postgres)** | `/jackc/pgx`               | PostgreSQL driver                   |
+| **DI**                  | `/uber-go/fx`              | Dependency injection framework      |
+| **DI (codegen)**        | `/google/wire`             | Compile-time DI                     |
+| **Validation**          | `/go-playground/validator` | Struct validation                   |
+| **HTTP Client**         | `/go-resty/resty`          | REST client with retries            |
+| **Concurrency**         | `/sourcegraph/conc`        | Structured concurrency              |
+| **Worker Pools**        | `/panjf2000/ants`          | Goroutine pool                      |
+| **Errors**              | `/uber-go/multierr`        | Error aggregation                   |
+| **Errors (alt)**        | `/samber/oops`             | Error handling with context         |
+| **Generics/Utils**      | `/samber/lo`               | Lodash-style utilities              |

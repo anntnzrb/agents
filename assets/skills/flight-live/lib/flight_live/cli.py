@@ -19,8 +19,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--origin", help="Origin city/airport term or IATA.")
     parser.add_argument("--destination", help="Destination city/airport term or IATA.")
-    parser.add_argument("--depart-start", type=_iso_date, help="Departure window start (YYYY-MM-DD).")
-    parser.add_argument("--depart-end", type=_iso_date, help="Departure window end (YYYY-MM-DD).")
+    parser.add_argument(
+        "--depart-start", type=_iso_date, help="Departure window start (YYYY-MM-DD)."
+    )
+    parser.add_argument(
+        "--depart-end", type=_iso_date, help="Departure window end (YYYY-MM-DD)."
+    )
     parser.add_argument(
         "--trip-type",
         choices=("oneway", "roundtrip"),
@@ -171,7 +175,9 @@ def _exit_code(code: object) -> int:
     return code if isinstance(code, int) else 1
 
 
-def _parser_error(parser: argparse.ArgumentParser, message: str, *, stderr: TextIO) -> int:
+def _parser_error(
+    parser: argparse.ArgumentParser, message: str, *, stderr: TextIO
+) -> int:
     parser.print_usage(stderr)
     print(f"{parser.prog}: error: {message}", file=stderr)
     return 2

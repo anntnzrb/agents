@@ -5,8 +5,8 @@
   "skillBindings": {
     "python-tooling": {
       "requiresSkill": "python",
-      "requiredWorkflow": "Use uv workflow (`uv run`, `uv add`, `uv run --with`) and avoid raw python/pip/env tooling."
-    }
+      "requiredWorkflow": "Use uv workflow (`uv run`, `uv add`, `uv run --with`) and avoid raw python/pip/env tooling.",
+    },
   },
   "agentBash": {
     "rules": [
@@ -24,41 +24,36 @@
             "pythonw3",
             "py",
             "pypy",
-            "pypy3"
+            "pypy3",
           ],
           "patterns": [
             "^pythonw?(?:[23])?(?:\\.\\d+)*(?:\\.exe)?$",
             "^py(?:\\.exe)?$",
-            "^pypy(?:3)?(?:\\.exe)?$"
-          ]
+            "^pypy(?:3)?(?:\\.exe)?$",
+          ],
         },
         "action": {
           "type": "block",
           "message": "python/python3 is disabled. Use uv-based Python workflow.",
-          "requiresBinding": "python-tooling"
-        }
+          "requiresBinding": "python-tooling",
+        },
       },
       {
         "id": "no-pip",
         "match": {
           "type": "executable",
           "caseSensitive": false,
-          "names": [
-            "pip",
-            "pip2",
-            "pip3",
-            "pipx"
-          ],
+          "names": ["pip", "pip2", "pip3", "pipx"],
           "patterns": [
             "^pip(?:[23])?(?:\\.\\d+)*(?:\\.exe)?$",
-            "^pipx(?:\\.exe)?$"
-          ]
+            "^pipx(?:\\.exe)?$",
+          ],
         },
         "action": {
           "type": "block",
           "message": "pip/pip3 is disabled. Use uv-based Python workflow.",
-          "requiresBinding": "python-tooling"
-        }
+          "requiresBinding": "python-tooling",
+        },
       },
       {
         "id": "no-python-env-tools",
@@ -73,80 +68,80 @@
             "pipenv",
             "poetry",
             "rye",
-            "virtualenv"
+            "virtualenv",
           ],
           "patterns": [
-            "^(?:conda|hatch|mamba|pdm|pipenv|poetry|rye|virtualenv)(?:\\.exe)?$"
-          ]
+            "^(?:conda|hatch|mamba|pdm|pipenv|poetry|rye|virtualenv)(?:\\.exe)?$",
+          ],
         },
         "action": {
           "type": "block",
           "message": "Python env/package tooling is disabled. Use uv-based Python workflow.",
-          "requiresBinding": "python-tooling"
-        }
+          "requiresBinding": "python-tooling",
+        },
       },
       {
         "id": "no-python-m-pip",
         "match": {
           "type": "regex",
           "pattern": "\\b(?:pythonw?(?:[23])?(?:\\.\\d+)*|py|pypy3?)\\b[^\\n;|&]*(?:\\s-m\\s*pip\\b|\\s-mpip\\b)",
-          "flags": "i"
+          "flags": "i",
         },
         "action": {
           "type": "block",
           "message": "`python -m pip` is disabled. Use uv-based Python workflow.",
-          "requiresBinding": "python-tooling"
-        }
+          "requiresBinding": "python-tooling",
+        },
       },
       {
         "id": "no-python-m-venv",
         "match": {
           "type": "regex",
           "pattern": "\\b(?:pythonw?(?:[23])?(?:\\.\\d+)*|py|pypy3?)\\b[^\\n;|&]*(?:\\s-m\\s*venv\\b|\\s-mvenv\\b)",
-          "flags": "i"
+          "flags": "i",
         },
         "action": {
           "type": "block",
           "message": "`python -m venv` is disabled. Use uv-based Python workflow.",
-          "requiresBinding": "python-tooling"
-        }
+          "requiresBinding": "python-tooling",
+        },
       },
       {
         "id": "no-python-m-py-compile",
         "match": {
           "type": "regex",
           "pattern": "\\b(?:pythonw?(?:[23])?(?:\\.\\d+)*|py|pypy3?)\\b[^\\n;|&]*(?:\\s-m\\s*py_compile\\b|\\s-mpy_compile\\b)",
-          "flags": "i"
+          "flags": "i",
         },
         "action": {
           "type": "block",
           "message": "`python -m py_compile` is disabled. Use uv-based Python workflow.",
-          "requiresBinding": "python-tooling"
-        }
+          "requiresBinding": "python-tooling",
+        },
       },
       {
         "id": "prefer-native-file-discovery-rg-files",
         "match": {
           "type": "regex",
           "pattern": "\\b(?:rg|ripgrep)\\b[^\\n;|&]*\\s--files\\b",
-          "flags": "i"
+          "flags": "i",
         },
         "action": {
           "type": "warn",
-          "message": "Use native `find` tool for file lookup."
-        }
+          "message": "Use native `find` tool for file lookup.",
+        },
       },
       {
         "id": "prefer-native-file-discovery-git-ls-files",
         "match": {
           "type": "regex",
           "pattern": "\\bgit\\b[^\\n;|&]*\\bls-files\\b",
-          "flags": "i"
+          "flags": "i",
         },
         "action": {
           "type": "warn",
-          "message": "Use native `find` tool for file lookup."
-        }
+          "message": "Use native `find` tool for file lookup.",
+        },
       },
       {
         "id": "prefer-native-content-search",
@@ -165,28 +160,28 @@
             "grep",
             "ggrep",
             "findstr",
-            "select-string"
+            "select-string",
           ],
           "patterns": [
-            "^(?:rg|ripgrep|ag|ack(?:-grep)?|pt|ugrep|sift|grep|ggrep|findstr|select-string)(?:\\.exe)?$"
-          ]
+            "^(?:rg|ripgrep|ag|ack(?:-grep)?|pt|ugrep|sift|grep|ggrep|findstr|select-string)(?:\\.exe)?$",
+          ],
         },
         "action": {
           "type": "warn",
-          "message": "Use native `grep` tool for repo search."
-        }
+          "message": "Use native `grep` tool for repo search.",
+        },
       },
       {
         "id": "prefer-native-content-search-git-grep",
         "match": {
           "type": "regex",
           "pattern": "\\bgit\\b[^\\n;|&]*\\bgrep\\b",
-          "flags": "i"
+          "flags": "i",
         },
         "action": {
           "type": "warn",
-          "message": "Use native `grep` tool for repo search."
-        }
+          "message": "Use native `grep` tool for repo search.",
+        },
       },
       {
         "id": "prefer-native-file-discovery",
@@ -201,18 +196,18 @@
             "gfind",
             "locate",
             "mlocate",
-            "plocate"
+            "plocate",
           ],
           "patterns": [
-            "^(?:fd|fdfind|fd-find|find|gfind|locate|mlocate|plocate)(?:\\.exe)?$"
-          ]
+            "^(?:fd|fdfind|fd-find|find|gfind|locate|mlocate|plocate)(?:\\.exe)?$",
+          ],
         },
         "action": {
           "type": "warn",
-          "message": "Use native `find` tool for file lookup."
-        }
-      }
-    ]
+          "message": "Use native `find` tool for file lookup.",
+        },
+      },
+    ],
   },
   "protectedPaths": {
     "rules": [
@@ -222,8 +217,8 @@
         "tools": ["read"],
         "action": {
           "type": "block",
-          "message": "Reading .env files is blocked by guardrails."
-        }
+          "message": "Reading .env files is blocked by guardrails.",
+        },
       },
       {
         "id": "no-read-git",
@@ -231,8 +226,8 @@
         "tools": ["read"],
         "action": {
           "type": "block",
-          "message": "Reading .git internals is blocked by guardrails."
-        }
+          "message": "Reading .git internals is blocked by guardrails.",
+        },
       },
       {
         "id": "no-write-env",
@@ -240,8 +235,8 @@
         "tools": ["write", "edit"],
         "action": {
           "type": "block",
-          "message": "Writing .env files is blocked by guardrails."
-        }
+          "message": "Writing .env files is blocked by guardrails.",
+        },
       },
       {
         "id": "no-write-git",
@@ -249,8 +244,8 @@
         "tools": ["write", "edit"],
         "action": {
           "type": "block",
-          "message": "Writing .git internals is blocked by guardrails."
-        }
+          "message": "Writing .git internals is blocked by guardrails.",
+        },
       },
       {
         "id": "no-write-node-modules",
@@ -258,9 +253,9 @@
         "tools": ["write", "edit"],
         "action": {
           "type": "block",
-          "message": "Writing node_modules is blocked by guardrails."
-        }
-      }
-    ]
-  }
+          "message": "Writing node_modules is blocked by guardrails.",
+        },
+      },
+    ],
+  },
 }

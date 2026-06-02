@@ -329,6 +329,7 @@ def cmd_replace(args: argparse.Namespace) -> int:
 def cmd_delete(args: argparse.Namespace) -> int:
     if not args.reformat_ok:
         fail("delete reserializes XML and may reformat; pass --reformat-ok to proceed")
+
     def mutator(elements: List) -> int:
         return apply_delete(elements)
 
@@ -409,7 +410,9 @@ def build_parser() -> argparse.ArgumentParser:
     set_text_p.add_argument("--value")
     set_text_p.add_argument("--value-file")
     set_text_p.add_argument("--diff", action="store_true", help="Show unified diff")
-    set_text_p.add_argument("--in-place", action="store_true", help="Write changes in place")
+    set_text_p.add_argument(
+        "--in-place", action="store_true", help="Write changes in place"
+    )
     set_text_p.set_defaults(func=cmd_set_text)
     sub.add_parser("set-text", parents=[set_text_p], add_help=False)
 
@@ -418,14 +421,18 @@ def build_parser() -> argparse.ArgumentParser:
     set_attr_p.add_argument("--value")
     set_attr_p.add_argument("--value-file")
     set_attr_p.add_argument("--diff", action="store_true", help="Show unified diff")
-    set_attr_p.add_argument("--in-place", action="store_true", help="Write changes in place")
+    set_attr_p.add_argument(
+        "--in-place", action="store_true", help="Write changes in place"
+    )
     set_attr_p.set_defaults(func=cmd_set_attr)
     sub.add_parser("set-attr", parents=[set_attr_p], add_help=False)
 
     del_attr_p = common_parser()
     del_attr_p.add_argument("--name", required=True)
     del_attr_p.add_argument("--diff", action="store_true", help="Show unified diff")
-    del_attr_p.add_argument("--in-place", action="store_true", help="Write changes in place")
+    del_attr_p.add_argument(
+        "--in-place", action="store_true", help="Write changes in place"
+    )
     del_attr_p.set_defaults(func=cmd_del_attr)
     sub.add_parser("del-attr", parents=[del_attr_p], add_help=False)
 
@@ -444,7 +451,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Acknowledge that XML will be reserialized",
     )
     insert_p.add_argument("--diff", action="store_true", help="Show unified diff")
-    insert_p.add_argument("--in-place", action="store_true", help="Write changes in place")
+    insert_p.add_argument(
+        "--in-place", action="store_true", help="Write changes in place"
+    )
     insert_p.set_defaults(func=cmd_insert)
     sub.add_parser("insert", parents=[insert_p], add_help=False)
 
@@ -458,7 +467,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Acknowledge that XML will be reserialized",
     )
     replace_p.add_argument("--diff", action="store_true", help="Show unified diff")
-    replace_p.add_argument("--in-place", action="store_true", help="Write changes in place")
+    replace_p.add_argument(
+        "--in-place", action="store_true", help="Write changes in place"
+    )
     replace_p.set_defaults(func=cmd_replace)
     sub.add_parser("replace", parents=[replace_p], add_help=False)
 
@@ -469,7 +480,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Acknowledge that XML will be reserialized",
     )
     delete_p.add_argument("--diff", action="store_true", help="Show unified diff")
-    delete_p.add_argument("--in-place", action="store_true", help="Write changes in place")
+    delete_p.add_argument(
+        "--in-place", action="store_true", help="Write changes in place"
+    )
     delete_p.set_defaults(func=cmd_delete)
     sub.add_parser("delete", parents=[delete_p], add_help=False)
 

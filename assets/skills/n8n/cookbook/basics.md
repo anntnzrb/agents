@@ -9,6 +9,7 @@ Practical recipes for authoring workflows via REST and running them via MCP.
 **Problem**: See what workflows exist.
 
 **Solution**:
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py list --limit 10
 ```
@@ -22,6 +23,7 @@ uv run --script <skill-dir>/scripts/cli.py list --limit 10
 **Problem**: Expose a workflow so MCP can list/execute it.
 
 **Solution**:
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py mcp-enable <WORKFLOW_ID>
 uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
@@ -36,6 +38,7 @@ uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
 **Problem**: Execute a chat-triggered workflow.
 
 **Solution**:
+
 ```bash
 # Call n8n.execute_workflow via your MCP client
 # inputs: {"type":"chat","chatInput":"hello"}
@@ -50,6 +53,7 @@ uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
 **Problem**: Capture a workflow definition to edit or version-control.
 
 **Solution**:
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py export <WORKFLOW_ID> <OUT.json>
 ```
@@ -63,6 +67,7 @@ uv run --script <skill-dir>/scripts/cli.py export <WORKFLOW_ID> <OUT.json>
 **Problem**: Get exact `type` strings (e.g., `n8n-nodes-base.httpRequest`).
 
 **Solution (gh)**:
+
 ```bash
 # list node folders
 gh api repos/n8n-io/n8n/contents/packages/nodes-base/nodes \
@@ -82,7 +87,6 @@ Use DeepWiki on `n8n-io/n8n-docs` to list OpenAI‑compatible LLM nodes and loca
 **Tip**: After you find a file, fetch it with `gh api .../contents/... | base64 -d` to read the `node` field.
 **Tip**: Confirm exact `type` strings with `gh` or workflow export.
 
-
 ---
 
 ## Validate a Workflow JSON
@@ -90,6 +94,7 @@ Use DeepWiki on `n8n-io/n8n-docs` to list OpenAI‑compatible LLM nodes and loca
 **Problem**: Check a workflow file for missing fields or bad references.
 
 **Solution**:
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py validate <WORKFLOW.json>
 ```

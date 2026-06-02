@@ -9,6 +9,7 @@ Recipes for goroutines, channels, synchronization, and concurrent patterns in Go
 **Problem**: How to run multiple tasks concurrently and wait for all to complete?
 
 **Solution**:
+
 ```go
 import "sync"
 
@@ -36,6 +37,7 @@ func processAll(items []Item) {
 **Problem**: How to collect results from multiple concurrent goroutines?
 
 **Solution**:
+
 ```go
 func processAllWithResults(items []Item) []Result {
     results := make([]Result, len(items))
@@ -63,6 +65,7 @@ func processAllWithResults(items []Item) []Result {
 **Problem**: How to decouple data production from consumption using channels?
 
 **Solution**:
+
 ```go
 func producer(ch chan<- int) {
     for i := 0; i < 10; i++ {
@@ -93,6 +96,7 @@ func main() {
 **Problem**: How to distribute work across multiple workers and merge their results?
 
 **Solution**:
+
 ```go
 func fanOut(input <-chan int, workers int) []<-chan int {
     outputs := make([]<-chan int, workers)
@@ -134,6 +138,7 @@ func fanIn(channels ...<-chan int) <-chan int {
 **Problem**: How to avoid blocking forever when waiting for channel operations?
 
 **Solution**:
+
 ```go
 func doWithTimeout(ch <-chan Result, timeout time.Duration) (Result, error) {
     select {
@@ -154,6 +159,7 @@ func doWithTimeout(ch <-chan Result, timeout time.Duration) (Result, error) {
 **Problem**: How to gracefully stop long-running goroutines?
 
 **Solution**:
+
 ```go
 func longRunningTask(ctx context.Context) error {
     for {
@@ -189,6 +195,7 @@ err := longRunningTask(ctx)
 **Problem**: How to automatically cancel operations that take too long?
 
 **Solution**:
+
 ```go
 ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 defer cancel()
@@ -208,6 +215,7 @@ if errors.Is(err, context.DeadlineExceeded) {
 **Problem**: How to pass request-scoped data through function calls without changing signatures?
 
 **Solution**:
+
 ```go
 type ctxKey string
 
@@ -232,6 +240,7 @@ func UserIDFrom(ctx context.Context) (string, bool) {
 **Problem**: How to run concurrent operations and return on first error?
 
 **Solution**:
+
 ```go
 import "golang.org/x/sync/errgroup"
 
@@ -267,6 +276,7 @@ func fetchAll(urls []string) ([]Response, error) {
 **Problem**: How to limit the number of concurrent goroutines to avoid overwhelming resources?
 
 **Solution**:
+
 ```go
 func processWithLimit(items []Item, limit int) error {
     g := new(errgroup.Group)
@@ -292,6 +302,7 @@ func processWithLimit(items []Item, limit int) error {
 **Problem**: How to manage goroutine pools with a cleaner API than errgroup?
 
 **Solution**:
+
 ```go
 import "github.com/sourcegraph/conc/pool"
 
@@ -335,6 +346,7 @@ func processWithErrors(items []Item) error {
 **Problem**: How to process items concurrently but handle results in original order?
 
 **Solution**:
+
 ```go
 import "github.com/sourcegraph/conc/stream"
 
@@ -364,6 +376,7 @@ func processOrdered(items []Item) {
 **Problem**: How to safely access shared data from multiple goroutines?
 
 **Solution**:
+
 ```go
 type Counter struct {
     mu    sync.Mutex
@@ -392,6 +405,7 @@ func (c *Counter) Value() int {
 **Problem**: How to allow concurrent reads while ensuring exclusive writes?
 
 **Solution**:
+
 ```go
 type Cache struct {
     mu   sync.RWMutex
@@ -421,6 +435,7 @@ func (c *Cache) Set(key, value string) {
 **Problem**: How to ensure initialization code runs exactly once, even with concurrent calls?
 
 **Solution**:
+
 ```go
 type Client struct {
     initOnce sync.Once
@@ -444,6 +459,7 @@ func (c *Client) getConn() *Connection {
 **Problem**: How to use a map safely from multiple goroutines without manual locking?
 
 **Solution**:
+
 ```go
 var cache sync.Map
 
@@ -477,6 +493,7 @@ cache.Range(func(key, value any) bool {
 **Problem**: How to limit the rate of operations (e.g., API calls)?
 
 **Solution**:
+
 ```go
 import "golang.org/x/time/rate"
 

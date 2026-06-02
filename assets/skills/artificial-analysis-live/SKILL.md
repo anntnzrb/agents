@@ -31,6 +31,7 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 ## Commands
 
 ### fetch
+
 Get live snapshot from RSC source and write outputs.
 
 ```bash
@@ -38,6 +39,7 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 ```
 
 ### query
+
 Deterministic filter/sort over snapshot rows.
 
 ```bash
@@ -45,6 +47,7 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" query --mo
 ```
 
 ### qa
+
 Minimal NL command that maps question -> query args.
 
 ```bash
@@ -52,6 +55,7 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" qa "best p
 ```
 
 ### coding
+
 Fetch/query the Coding Index capability page and return **coding-index-only** token composition.
 
 ```bash
@@ -62,6 +66,7 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" coding --m
 Use this for Coding Index output token composition. These counts are scoped to the Coding Index evaluation only, not global Intelligence Index token counts. Output tokens are `answer_tokens + reasoning_tokens`; components are Terminal-Bench Hard + SciCode.
 
 ### stats
+
 Snapshot counts + top providers.
 
 ```bash
@@ -69,6 +74,7 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" stats
 ```
 
 ### diff
+
 Compare two snapshots.
 
 ```bash
@@ -76,6 +82,7 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" diff old.j
 ```
 
 ### schema
+
 Machine-readable capability contract.
 
 ```bash

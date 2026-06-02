@@ -43,7 +43,9 @@ describe("treex tree utils", () => {
   });
 
   test("returns ancestor-to-leaf segment", () => {
-    expect(entriesBetweenAncestorAndLeaf(sm as never, "b", "d").map((e) => e.id)).toEqual(["b", "c", "d"]);
+    expect(
+      entriesBetweenAncestorAndLeaf(sm as never, "b", "d").map((e) => e.id),
+    ).toEqual(["b", "c", "d"]);
   });
 
   test("groups assistant and tool result rows into one assistant turn", () => {

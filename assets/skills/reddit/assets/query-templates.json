@@ -22,10 +22,7 @@
   "searchInSubreddits": {
     "command": "reddit search \"<topic>\" subreddits='[\"cscareerquestions\",\"programming\"]' sort=new time=month limit=25",
     "query": "<topic>",
-    "subreddits": [
-      "cscareerquestions",
-      "programming"
-    ],
+    "subreddits": ["cscareerquestions", "programming"],
     "sort": "new",
     "time": "month",
     "limit": 25

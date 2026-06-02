@@ -6,12 +6,12 @@ Keep this file for fast decisions while coding. Load cookbooks for tutorials and
 
 For JSON/API/RPC/CLI/env payloads, keep known shapes in the type system while they are still dict-shaped.
 
-| Shape | Prefer | Example |
-|-------|--------|---------|
-| fixed object keys | `TypedDict` | API request/response payloads |
-| optional keys | `NotRequired` / `Required` | sparse updates |
-| fixed string values | `Literal` | `status: Literal["ok", "error"]` |
-| small variant set | discriminated union | `Created | Updated` with a `kind` tag |
+| Shape               | Prefer                     | Example                          |
+| ------------------- | -------------------------- | -------------------------------- | ------------------------ |
+| fixed object keys   | `TypedDict`                | API request/response payloads    |
+| optional keys       | `NotRequired` / `Required` | sparse updates                   |
+| fixed string values | `Literal`                  | `status: Literal["ok", "error"]` |
+| small variant set   | discriminated union        | `Created                         | Updated`with a`kind` tag |
 
 ```python
 from typing import Literal, NotRequired, TypedDict
@@ -30,6 +30,7 @@ Event = UserCreated | UserUpdated
 ```
 
 Boundary rule:
+
 1. Decode or receive untrusted data at the edge.
 2. Validate/narrow once with typed code, Pydantic `TypeAdapter`, or msgspec.
 3. Convert inward to `TypedDict`s or domain objects.
@@ -100,39 +101,39 @@ def parse_count(value: object) -> Result[int]:
 
 ## Anti-Patterns
 
-| Avoid | Do Instead |
-|-------|------------|
-| Mutable default args `def f(items=[])` | `def f(items: Sequence[T] | None = None)` or `field(default_factory=list)` |
-| `dict[str, Any]` for known payloads | `TypedDict` / `Literal` / discriminated unions |
-| `Any` for "accepts anything" | `object` plus narrowing |
-| Concrete mutable input types (`list[T]`) when only reading | `Sequence[T]`, `Iterable[T]`, `Mapping[K, V]` |
-| Abstract return types from concrete implementations | Concrete `list[T]`, `dict[K, V]`, domain objects |
-| `Optional[T]` / `Union[A, B]` on modern targets | `T | None` / `A | B` when runtime target allows |
-| `requests.get` in async code | `httpx.AsyncClient` or `await asyncio.to_thread(...)` for unavoidable blocking work |
-| Bare `asyncio.create_task()` | `TaskGroup` or tracked/cancelled task lifecycle |
-| Classes for data bags | `@dataclass(frozen=True, slots=True)` or `TypedDict` |
-| Inheritance hierarchies for behavior seams | Protocols + composition |
-| Mutating function arguments | Return new values / copy-on-write |
-| `try/except Exception` around core logic | Specific exceptions; boundary-level catch/log/map only |
-| Blind `dataclasses.asdict()` in hot paths | Explicit shallow projection or serializer |
-| `os.path` string manipulation | `pathlib.Path` |
-| Naive UTC `utcnow()` | timezone-aware `datetime.now(UTC)` |
+| Avoid                                                      | Do Instead                                                                          |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------- | ----------------------------- |
+| Mutable default args `def f(items=[])`                     | `def f(items: Sequence[T]                                                           | None = None)`or`field(default_factory=list)` |
+| `dict[str, Any]` for known payloads                        | `TypedDict` / `Literal` / discriminated unions                                      |
+| `Any` for "accepts anything"                               | `object` plus narrowing                                                             |
+| Concrete mutable input types (`list[T]`) when only reading | `Sequence[T]`, `Iterable[T]`, `Mapping[K, V]`                                       |
+| Abstract return types from concrete implementations        | Concrete `list[T]`, `dict[K, V]`, domain objects                                    |
+| `Optional[T]` / `Union[A, B]` on modern targets            | `T                                                                                  | None`/`A                                     | B` when runtime target allows |
+| `requests.get` in async code                               | `httpx.AsyncClient` or `await asyncio.to_thread(...)` for unavoidable blocking work |
+| Bare `asyncio.create_task()`                               | `TaskGroup` or tracked/cancelled task lifecycle                                     |
+| Classes for data bags                                      | `@dataclass(frozen=True, slots=True)` or `TypedDict`                                |
+| Inheritance hierarchies for behavior seams                 | Protocols + composition                                                             |
+| Mutating function arguments                                | Return new values / copy-on-write                                                   |
+| `try/except Exception` around core logic                   | Specific exceptions; boundary-level catch/log/map only                              |
+| Blind `dataclasses.asdict()` in hot paths                  | Explicit shallow projection or serializer                                           |
+| `os.path` string manipulation                              | `pathlib.Path`                                                                      |
+| Naive UTC `utcnow()`                                       | timezone-aware `datetime.now(UTC)`                                                  |
 
 ## Pitfalls and Fixes
 
-| Pitfall | Fix |
-|---------|-----|
-| Raw `response.json()` moves inward | Validate/narrow at the API adapter immediately |
-| Pydantic/msgspec everywhere | Validate once at the edge; convert inward |
-| Pydantic coercion hides bad input | Use strict mode where coercion is unsafe |
-| msgspec accepts unexpected keys | Use `forbid_unknown_fields=True` for closed payloads |
-| mypy/Pyright narrowing pain | Use `isinstance`, `match`, Protocols, or discriminated unions |
-| Shared mutable state | Prefer immutable data or copy-on-write |
-| Over-clever comprehensions | Extract a named pure function |
-| Async client leaks | Use `async with` or explicit application lifecycle |
-| Slow tests from real I/O | Use fixtures, `tmp_path`, local fakes, and boundary seams |
-| Hypothesis noise | Reserve for invariants/round-trips; keep strategies domain-shaped |
-| Ruff/formatter churn | Use `ruff format` as the only formatter |
+| Pitfall                            | Fix                                                               |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| Raw `response.json()` moves inward | Validate/narrow at the API adapter immediately                    |
+| Pydantic/msgspec everywhere        | Validate once at the edge; convert inward                         |
+| Pydantic coercion hides bad input  | Use strict mode where coercion is unsafe                          |
+| msgspec accepts unexpected keys    | Use `forbid_unknown_fields=True` for closed payloads              |
+| mypy/Pyright narrowing pain        | Use `isinstance`, `match`, Protocols, or discriminated unions     |
+| Shared mutable state               | Prefer immutable data or copy-on-write                            |
+| Over-clever comprehensions         | Extract a named pure function                                     |
+| Async client leaks                 | Use `async with` or explicit application lifecycle                |
+| Slow tests from real I/O           | Use fixtures, `tmp_path`, local fakes, and boundary seams         |
+| Hypothesis noise                   | Reserve for invariants/round-trips; keep strategies domain-shaped |
+| Ruff/formatter churn               | Use `ruff format` as the only formatter                           |
 
 ## Project Structure
 
@@ -156,13 +157,13 @@ my-project/
 
 ## Quick Data Structure Reminders
 
-| Need | Use |
-|------|-----|
-| Ordered mutable sequence | `list` |
+| Need                            | Use                                       |
+| ------------------------------- | ----------------------------------------- |
+| Ordered mutable sequence        | `list`                                    |
 | Fixed immutable record/sequence | `tuple` / `NamedTuple` / frozen dataclass |
-| Fast lookup by key | `dict` |
-| Membership/deduplication | `set` / `frozenset` |
-| FIFO queue | `collections.deque` |
-| Priority queue | `heapq` |
-| Counting | `collections.Counter` |
-| Grouping defaults | `collections.defaultdict` |
+| Fast lookup by key              | `dict`                                    |
+| Membership/deduplication        | `set` / `frozenset`                       |
+| FIFO queue                      | `collections.deque`                       |
+| Priority queue                  | `heapq`                                   |
+| Counting                        | `collections.Counter`                     |
+| Grouping defaults               | `collections.defaultdict`                 |

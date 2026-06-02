@@ -13,7 +13,9 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-USAGE = "usage: brave-search <web|news|local|image|video|summarizer-key|summarize|raw> ..."
+USAGE = (
+    "usage: brave-search <web|news|local|image|video|summarizer-key|summarize|raw> ..."
+)
 ENDPOINTS = {
     "web": "/web/search",
     "news": "/news/search",
@@ -63,14 +65,18 @@ def load_env() -> None:
         candidates.append(Path(os.environ["BRAVE_SEARCH_ENV_FILE"]).expanduser())
     candidates.append(skill_dir / ".env")
     if os.environ.get("SKILLS_DIR"):
-        candidates.append(Path(os.environ["SKILLS_DIR"]).expanduser() / "brave-search" / ".env")
+        candidates.append(
+            Path(os.environ["SKILLS_DIR"]).expanduser() / "brave-search" / ".env"
+        )
     candidates.append(ancestor_env("brave-search"))
     for candidate in candidates:
         if candidate is not None and parse_env_file(candidate):
             return
 
 
-def request_get(base_url: str, path: str, api_key: str, params: list[tuple[str, str]]) -> int:
+def request_get(
+    base_url: str, path: str, api_key: str, params: list[tuple[str, str]]
+) -> int:
     url = f"{base_url}{path}"
     if params:
         url = f"{url}?{urllib.parse.urlencode(params)}"
@@ -108,20 +114,30 @@ def main(argv: list[str]) -> int:
     load_env()
     api_key = os.environ.get("BRAVE_API_KEY") or os.environ.get("BRAVE_SEARCH_API_KEY")
     if not api_key:
-        print("BRAVE_API_KEY required (export it, use this skill's .env, or set BRAVE_SEARCH_ENV_FILE)", file=sys.stderr)
+        print(
+            "BRAVE_API_KEY required (export it, use this skill's .env, or set BRAVE_SEARCH_ENV_FILE)",
+            file=sys.stderr,
+        )
         return 2
 
-    base_url = os.environ.get("BRAVE_SEARCH_BASE_URL", "https://api.search.brave.com/res/v1").rstrip("/")
+    base_url = os.environ.get(
+        "BRAVE_SEARCH_BASE_URL", "https://api.search.brave.com/res/v1"
+    ).rstrip("/")
     cmd, args = argv[0], argv[1:]
 
     if cmd in ENDPOINTS:
         if not args:
             print(f"usage: brave-search {cmd} <query> [key=value ...]", file=sys.stderr)
             return 2
-        return request_get(base_url, ENDPOINTS[cmd], api_key, [("q", args[0]), *pairs(args[1:])])
+        return request_get(
+            base_url, ENDPOINTS[cmd], api_key, [("q", args[0]), *pairs(args[1:])]
+        )
     if cmd == "summarizer-key":
         if not args:
-            print("usage: brave-search summarizer-key <query> [key=value ...]", file=sys.stderr)
+            print(
+                "usage: brave-search summarizer-key <query> [key=value ...]",
+                file=sys.stderr,
+            )
             return 2
         import json
         import io
@@ -133,7 +149,10 @@ def main(argv: list[str]) -> int:
             with urllib.request.urlopen(req, timeout=60) as response:
                 buffer.write(response.read())
         except urllib.error.HTTPError as exc:
-            print(exc.read().decode("utf-8", errors="replace") or f"HTTP {exc.code}", file=sys.stderr)
+            print(
+                exc.read().decode("utf-8", errors="replace") or f"HTTP {exc.code}",
+                file=sys.stderr,
+            )
             return 22
         except urllib.error.URLError as exc:
             print(f"Brave Search network error: {exc.reason}", file=sys.stderr)
@@ -147,9 +166,17 @@ def main(argv: list[str]) -> int:
         return 0
     if cmd == "summarize":
         if not args:
-            print("usage: brave-search summarize <summary-key> [key=value ...]", file=sys.stderr)
+            print(
+                "usage: brave-search summarize <summary-key> [key=value ...]",
+                file=sys.stderr,
+            )
             return 2
-        return request_get(base_url, "/summarizer/search", api_key, [("key", args[0]), *pairs(args[1:])])
+        return request_get(
+            base_url,
+            "/summarizer/search",
+            api_key,
+            [("key", args[0]), *pairs(args[1:])],
+        )
     if cmd == "raw":
         if not args:
             print("usage: brave-search raw </path> [key=value ...]", file=sys.stderr)

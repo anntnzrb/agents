@@ -44,10 +44,10 @@ Only if the user explicitly asks about Context7 skills/registry, you MAY use rea
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| CLI command details, auth, errors, telemetry | `references/cli.md` | Before debugging command failures or using JSON/auth-related behavior |
-| Worked docs lookup examples | `cookbook/docs-lookup.md` | When choosing IDs, versions, or query wording |
+| Need                                         | Read                      | When                                                                  |
+| -------------------------------------------- | ------------------------- | --------------------------------------------------------------------- |
+| CLI command details, auth, errors, telemetry | `references/cli.md`       | Before debugging command failures or using JSON/auth-related behavior |
+| Worked docs lookup examples                  | `cookbook/docs-lookup.md` | When choosing IDs, versions, or query wording                         |
 
 ## Quick examples
 

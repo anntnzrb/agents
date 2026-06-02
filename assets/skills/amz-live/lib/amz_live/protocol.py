@@ -34,6 +34,7 @@ _LLM_JSON_REQUIRED_FIELDS = [
 ]
 _SEARCH_RESULTS_CACHE: dict[tuple[str, int, int, str | None, str | None], list[SearchResult]] = {}
 
+
 class SourcePayload(TypedDict):
     mode: Literal["html", "live"]
     html_path: NotRequired[str]
@@ -100,7 +101,6 @@ class SearchResultsPayload(TypedDict):
     enrichment: EnrichmentPayload
     results: list[SerializedSearchResultPayload]
     ranking: NotRequired[RankingPayload]
-
 
 
 def load_results(

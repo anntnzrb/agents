@@ -7,6 +7,7 @@
 **Problem**: See existing chat sessions on disk.
 
 **Solution**:
+
 ```bash
 nlm chat-list
 ```
@@ -20,6 +21,7 @@ nlm chat-list
 **Problem**: Use the built-in chat UI and commands.
 
 **Solution**:
+
 ```bash
 nlm chat <notebook-id>
 ```

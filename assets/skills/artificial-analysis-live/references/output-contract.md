@@ -19,18 +19,26 @@ Success:
 Error:
 
 ```json
-{"id":"...","type":"response","command":"...","success":false,"error":{"code":"...","message":"..."}}
+{
+  "id": "...",
+  "type": "response",
+  "command": "...",
+  "success": false,
+  "error": { "code": "...", "message": "..." }
+}
 ```
 
 ## Snapshot JSON structure
 
 Top-level keys:
+
 - `meta`
 - `models`
 - `hosts`
 - `hosts_models`
 
 `meta` includes:
+
 - `schema_version`
 - `source_url`
 - `source_mode`
@@ -40,6 +48,7 @@ Top-level keys:
 - `counts`
 
 `counts` includes:
+
 - `models`
 - `hosts`
 - `hosts_models`
@@ -51,6 +60,7 @@ Top-level keys:
 ## QA payload
 
 `qa` returns:
+
 - `question`
 - `parsed_intent` (`model`, `provider`, `sort_by`, `order`, `limit`)
 - `query` (full query payload)
@@ -60,6 +70,7 @@ Top-level keys:
 Each `query` row may include nulls when upstream does not provide a metric.
 
 High-signal fields:
+
 - identity: `endpoint_slug`, `model_slug`, `provider_slug`
 - quality: `intelligence`, `coding`, `math`, `gpqa`, `mmlu_pro`, `ifbench`, `scicode`, `tau2`
 - economics: `price_input`, `price_output`, `price_blended`

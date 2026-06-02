@@ -266,7 +266,11 @@ class AnalysisResult:
             beats=BeatSummary.from_dict(_as_dict(payload, "beats")),
             spectral=SpectralStats.from_dict(_as_dict(payload, "spectral")),
             energy=EnergyDynamics.from_dict(_as_dict(payload, "energy")),
-            section_hints=[SectionHint.from_dict(item) for item in sections_raw if isinstance(item, dict)],
+            section_hints=[
+                SectionHint.from_dict(item)
+                for item in sections_raw
+                if isinstance(item, dict)
+            ],
             notes=[str(x) for x in notes_raw],
             plot_files=[str(x) for x in plots_raw],
         )

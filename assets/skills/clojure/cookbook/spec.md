@@ -9,6 +9,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You need to import the clojure.spec libraries for validation and testing.
 
 **Solution**:
+
 ```clojure
 (require '[clojure.spec.alpha :as s]
          '[clojure.spec.gen.alpha :as gen]
@@ -24,6 +25,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You need to validate data against simple predicates like integers, strings, and custom constraints.
 
 **Solution**:
+
 ```clojure
 ;; Define specs with predicates
 (s/def ::age (s/and int? #(>= % 0) #(< % 150)))
@@ -58,6 +60,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You need to restrict a value to a specific set of allowed options.
 
 **Solution**:
+
 ```clojure
 (s/def ::status #{:pending :active :done :cancelled})
 (s/def ::color #{:red :green :blue})
@@ -75,6 +78,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You need to make a spec optional by allowing nil values.
 
 **Solution**:
+
 ```clojure
 (s/def ::optional-name (s/nilable string?))
 
@@ -91,6 +95,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You need to validate maps with specific required and optional keys.
 
 **Solution**:
+
 ```clojure
 ;; Required and optional keys (qualified)
 (s/def ::user
@@ -123,6 +128,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You need to validate homogeneous collections with type and size constraints.
 
 **Solution**:
+
 ```clojure
 ;; Homogeneous collection
 (s/def ::numbers (s/coll-of int?))
@@ -149,6 +155,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You need to validate sequences with complex patterns like optional parts and alternatives.
 
 **Solution**:
+
 ```clojure
 ;; cat: concatenation (named parts)
 (s/def ::http-request
@@ -189,6 +196,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You need to accept one of several types with labeled alternatives.
 
 **Solution**:
+
 ```clojure
 ;; s/or: labeled alternatives
 (s/def ::name-or-id
@@ -214,6 +222,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You need to define contracts for function arguments, return values, and relationships.
 
 **Solution**:
+
 ```clojure
 (defn calculate-discount [price percentage]
   (* price (- 1 (/ percentage 100.0))))
@@ -240,6 +249,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You want to catch invalid function calls during development.
 
 **Solution**:
+
 ```clojure
 ;; Turn on runtime checking (dev only!)
 (stest/instrument `calculate-discount)
@@ -263,6 +273,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You need to generate sample data that conforms to your specs for testing.
 
 **Solution**:
+
 ```clojure
 ;; Generate sample values
 (gen/sample (s/gen ::age) 5)
@@ -288,6 +299,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You want to test functions with many random inputs to find edge cases.
 
 **Solution**:
+
 ```clojure
 (require '[clojure.test.check.clojure-test :refer [defspec]]
          '[clojure.test.check.properties :as prop])
@@ -313,6 +325,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: The default generator doesn't create realistic data for your domain.
 
 **Solution**:
+
 ```clojure
 ;; Override default generator
 (s/def ::email
@@ -344,6 +357,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You need different validation rules based on a discriminator field.
 
 **Solution**:
+
 ```clojure
 ;; Dispatch on :type field
 (defmulti event-type :type)
@@ -383,6 +397,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You need to validate and transform data into a structured format.
 
 **Solution**:
+
 ```clojure
 ;; conform: validate and transform
 (s/conform ::name-or-id "Alice")
@@ -412,6 +427,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You need to organize domain specs in a maintainable way.
 
 **Solution**:
+
 ```clojure
 ;; specs.clj - Central spec definitions
 (ns myapp.specs
@@ -442,6 +458,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You need reusable functions to validate and handle errors consistently.
 
 **Solution**:
+
 ```clojure
 (defn validate! [spec data]
   (if (s/valid? spec data)
@@ -465,6 +482,7 @@ Data validation, generative testing, and runtime checking for Clojure.
 **Problem**: You want runtime assertions that data matches a spec within your functions.
 
 **Solution**:
+
 ```clojure
 ;; Enable spec assertions
 (s/check-asserts true)

@@ -29,12 +29,14 @@ Return list with: name, nixpkgs_version, newest_version."
 From Repology results, apply strict filtering. **Only keep packages that meet ALL criteria:**
 
 ### Must Pass ALL:
+
 1. **Location**: `pkgs/by-name/` only (not legacy paths)
 2. **Type**: Rust (`buildRustPackage`, `cargoHash`) OR Go (`buildGoModule`, `vendorHash`)
 3. **Version bump**: Patch or minor version (reject major bumps like 1.x → 2.x)
 4. **Platform**: Must support current platform (see platform check below)
 
 ### Check with Glob/Grep:
+
 ```bash
 # Check if package exists in by-name
 ls pkgs/by-name/*/<package>/package.nix
@@ -45,6 +47,7 @@ grep -l "buildGoModule\|vendorHash" pkgs/by-name/*/<package>/package.nix
 ```
 
 ### Platform Check (CRITICAL)
+
 ```bash
 # Get current system
 CURRENT_PLATFORM=$(nix eval --raw --impure --expr 'builtins.currentSystem')
@@ -103,6 +106,7 @@ Ask: "Which packages would you like to update? (enter numbers, e.g., 1,2)"
 ```
 
 **Never show:**
+
 - "may need manual work"
 - "complex"
 - "has patches"
@@ -112,9 +116,11 @@ Ask: "Which packages would you like to update? (enter numbers, e.g., 1,2)"
 ## Phase 5: Parallel Updates with Git Worktrees
 
 ### Why Worktrees?
+
 Multiple agents cannot `git switch` on the same repo simultaneously. Worktrees provide isolated working directories sharing the same git history.
 
 ### Setup Worktrees
+
 For each selected package, create isolated worktree:
 
 ```bash

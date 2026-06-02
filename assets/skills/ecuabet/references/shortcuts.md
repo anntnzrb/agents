@@ -7,58 +7,61 @@ Pattern: `<match_id> <trigger>`
 ## Core triggers
 
 - `<id> minmax`
-Return:
+  Return:
+
 1. best low-risk +EV picks
 2. best odds>=1.5 +EV picks
 3. best upside picks (include high risk)
-Always include: `odds`, `modelProbabilityPct`, `confidencePct`, `expectedValue`, `riskTier`.
+   Always include: `odds`, `modelProbabilityPct`, `confidencePct`, `expectedValue`, `riskTier`.
 
 - `<id> buckets`
-Return 3 buckets:
+  Return 3 buckets:
+
 1. `safe` (low risk)
 2. `balanced` (low+medium)
 3. `upside` (include high risk)
-If a bucket has no qualifying picks, return `NONE`.
+   If a bucket has no qualifying picks, return `NONE`.
 
 - `<id> lowrisk`
-Only low-risk picks, sorted by `expectedValue` desc, then `modelProbabilityPct` desc.
+  Only low-risk picks, sorted by `expectedValue` desc, then `modelProbabilityPct` desc.
 
 - `<id> value`
-Only positive-EV picks, any risk tier, sorted by EV desc.
+  Only positive-EV picks, any risk tier, sorted by EV desc.
 
 - `<id> prime`
-Strict now-bet filter:
+  Strict now-bet filter:
+
 1. `expectedValue > 0`
 2. `modelProbabilityPct >= 60`
 3. `confidencePct >= 65`
 4. `odds >= 1.5`
-Sort: `expectedValue` desc, then `modelProbabilityPct` desc, then `odds` desc.
-Return top 5 or `NONE`.
+   Sort: `expectedValue` desc, then `modelProbabilityPct` desc, then `odds` desc.
+   Return top 5 or `NONE`.
 
 ## Live triggers
 
 - `<id> live`
-Return current status/score + top recommendation + top 5 shortlist.
+  Return current status/score + top recommendation + top 5 shortlist.
 
 - `<id> watch`
-Run/advise watch-mode behavior and report only rank changes or confidence drops.
+  Run/advise watch-mode behavior and report only rank changes or confidence drops.
 
 - `<id> health`
-Return `feedHealth`, `feedErrors`, and confidence impact.
+  Return `feedHealth`, `feedErrors`, and confidence impact.
 
 ## Market triggers
 
 - `<id> totals`
-Only totals-family picks.
+  Only totals-family picks.
 
 - `<id> btts`
-Only BTTS picks.
+  Only BTTS picks.
 
 - `<id> handicap`
-Only handicap picks.
+  Only handicap picks.
 
 - `<id> 1x2`
-Only 1x2 picks.
+  Only 1x2 picks.
 
 ## Recommended minimal prompts
 

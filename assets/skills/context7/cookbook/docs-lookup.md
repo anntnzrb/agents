@@ -33,13 +33,13 @@ Good queries include three things:
 
 Examples:
 
-| Strong | Weak |
-| --- | --- |
-| `"extractor state rejection custom response"` | `"extractors"` |
+| Strong                                             | Weak           |
+| -------------------------------------------------- | -------------- |
+| `"extractor state rejection custom response"`      | `"extractors"` |
 | `"v2 TypeAdapter field validator model validator"` | `"validation"` |
-| `"reconcile owner references predicates cache"` | `"controller"` |
-| `"allocator comptime error unions build system"` | `"zig basics"` |
-| `"span processor exporter resource attributes"` | `"telemetry"` |
+| `"reconcile owner references predicates cache"`    | `"controller"` |
+| `"allocator comptime error unions build system"`   | `"zig basics"` |
+| `"span processor exporter resource attributes"`    | `"telemetry"`  |
 
 Do not send secrets, credentials, personal data, proprietary code, or large source snippets.
 

@@ -9,6 +9,7 @@ Recipes for extracting data from AoC inputs.
 **Problem**: Numbers scattered in text like `"pos=<3,-5>, vel=<-2,1>"`.
 
 **Solution**:
+
 ```python
 import re
 nums = [int(x) for x in re.findall(r'-?\d+', line)]
@@ -24,6 +25,7 @@ nums = [int(x) for x in re.findall(r'-?\d+', line)]
 **Problem**: Grid of characters, need 2D access.
 
 **Solution** (dense):
+
 ```python
 lines = input.strip().split('\n')
 grid = [list(line) for line in lines]
@@ -31,6 +33,7 @@ value = grid[row][col]
 ```
 
 **Solution** (sparse/dict):
+
 ```python
 grid = {}
 for row, line in enumerate(lines):
@@ -50,6 +53,7 @@ value = grid.get((row, col), '.')
 **Problem**: Input has sections separated by blank lines.
 
 **Solution**:
+
 ```python
 groups = input.strip().split('\n\n')
 for group in groups:
@@ -65,6 +69,7 @@ for group in groups:
 **Problem**: Lines like `"name: value"` or `"key=value"`.
 
 **Solution**:
+
 ```python
 data = {}
 for line in lines:
@@ -81,6 +86,7 @@ for line in lines:
 **Problem**: Lines like `"mov R1 42"` or `"jnz x -3"`.
 
 **Solution**:
+
 ```python
 for line in lines:
     parts = line.split()
@@ -100,6 +106,7 @@ for line in lines:
 **Problem**: Need to move in 4 directions on a grid.
 
 **Solution**:
+
 ```python
 UP, DOWN = (-1, 0), (1, 0)
 LEFT, RIGHT = (0, -1), (0, 1)
@@ -118,6 +125,7 @@ new_row, new_col = row + dr, col + dc
 **Problem**: Need diagonals too.
 
 **Solution**:
+
 ```python
 DIRS8 = [(dr, dc)
          for dr in [-1, 0, 1]
@@ -132,6 +140,7 @@ DIRS8 = [(dr, dc)
 **Problem**: Input uses `^v<>` or `UDLR` for directions.
 
 **Solution**:
+
 ```python
 DIR_MAP = {
     'U': (-1, 0), '^': (-1, 0),
@@ -149,6 +158,7 @@ dr, dc = DIR_MAP[char]
 **Problem**: Turn left/right on a grid.
 
 **Solution** (tuples):
+
 ```python
 # 90° clockwise:     (row, col) → (col, -row)
 # 90° counter-clock: (row, col) → (-col, row)
@@ -156,6 +166,7 @@ dr, dc = DIR_MAP[char]
 ```
 
 **Solution** (complex numbers):
+
 ```python
 pos = col + row * 1j
 turn_right = pos * -1j
@@ -171,6 +182,7 @@ turn_left = pos * 1j
 **Problem**: Hex grid with directions like `ne`, `sw`.
 
 **Solution** (cube coordinates, x + y + z = 0):
+
 ```python
 HEX_DIRS = {
     'e':  (1, -1, 0),  'w':  (-1, 1, 0),
@@ -193,6 +205,7 @@ def hex_distance(a, b):
 **Problem**: Need to check if position is valid.
 
 **Solution**:
+
 ```python
 def in_bounds(row, col, grid):
     return 0 <= row < len(grid) and 0 <= col < len(grid[0])
@@ -213,6 +226,7 @@ def neighbors(row, col, grid):
 **Problem**: Grid wraps around edges.
 
 **Solution**:
+
 ```python
 row = row % height
 col = col % width
@@ -225,6 +239,7 @@ col = col % width
 **Problem**: Avoid bounds checking by padding edges.
 
 **Solution**:
+
 ```python
 padded = [['#'] * (width + 2)]
 for line in lines:

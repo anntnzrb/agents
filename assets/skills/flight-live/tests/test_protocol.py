@@ -40,7 +40,9 @@ def test_search_protocol_with_monkeypatched_scraper(monkeypatch) -> None:
     def fake_resolve(query: str, *, locale: str, client=None) -> ResolvedPlace:
         del locale, client
         code = "GYE" if "guayaquil" in query.lower() else "MIA"
-        return ResolvedPlace(query=query, iata=code, name=query.title(), resolved_via_autocomplete=True)
+        return ResolvedPlace(
+            query=query, iata=code, name=query.title(), resolved_via_autocomplete=True
+        )
 
     offers = [
         PlannerOffer(

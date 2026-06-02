@@ -64,20 +64,29 @@ const main = async () => {
   const [, , ...args] = process.argv;
   const cwd = process.cwd();
 
-  const { isMode: isGlmMode } = parseProviderFlag(args, "--glm", validateGlmToken);
-  const { isMode: isMiniMaxMode } = parseProviderFlag(args, "--m2", validateMiniMaxToken);
+  const { isMode: isGlmMode } = parseProviderFlag(
+    args,
+    "--glm",
+    validateGlmToken,
+  );
+  const { isMode: isMiniMaxMode } = parseProviderFlag(
+    args,
+    "--m2",
+    validateMiniMaxToken,
+  );
   const { isMode: isChutesMode, model: chutesModel } = parseProviderFlag(
     args,
     "--chutes",
     validateChutesToken,
     "--chutes-model",
   );
-  const { isMode: isOpenRouterMode, model: openrouterModel } = parseProviderFlag(
-    args,
-    "--openrouter",
-    validateOpenRouterToken,
-    "--openrouter-model",
-  );
+  const { isMode: isOpenRouterMode, model: openrouterModel } =
+    parseProviderFlag(
+      args,
+      "--openrouter",
+      validateOpenRouterToken,
+      "--openrouter-model",
+    );
 
   await mergeConfigs();
   await createAndSaveSymlinks(cwd);

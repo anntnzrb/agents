@@ -3,15 +3,18 @@
 Use this reference for App Intents and App Shortcuts guidance without web fetches.
 
 ## Rule
+
 - Use only content already present in `shortcuts-docs-corpus`.
 - Do not call external documentation URLs from this skill.
 
 ## Where to Search in Corpus
+
 - Developer docs text: `expert-pack/text/developer/`
 - WWDC session text/transcripts: `expert-pack/text/wwdc/`
 - Developer/source manifest metadata: `expert-pack/manifests/source_catalog.tsv`
 
 ## Useful Search Queries
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py search --group developer --query "AppShortcutsProvider appShortcuts"
 uv run --script <skill-dir>/scripts/cli.py search --group developer --query "creating your first app intent"
@@ -21,6 +24,7 @@ uv run --script <skill-dir>/scripts/cli.py search --group wwdc --query "Implemen
 ```
 
 ## Integration Checklist
+
 1. Confirm intent boundaries and parameters.
 2. Verify phrase/discoverability guidance for App Shortcuts.
 3. Check Spotlight + Shortcuts surface behavior notes.

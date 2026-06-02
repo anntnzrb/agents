@@ -184,7 +184,7 @@ def _score_price(
     *,
     min_price: Decimal | None,
     max_price: Decimal | None,
- ) -> float:
+) -> float:
     if result.price is None:
         return -20.0
     if min_price is None or max_price is None or min_price == max_price:

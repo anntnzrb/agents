@@ -23,7 +23,9 @@ const normalizeOption = (option: {
   default: option.default === true || option.recommended === true,
 });
 
-export const normalizeQuestions = (questions: ClarifyQuestionInput[]): ClarifyQuestion[] =>
+export const normalizeQuestions = (
+  questions: ClarifyQuestionInput[],
+): ClarifyQuestion[] =>
   questions.map((question) => ({
     id: normalizeText(question.id),
     question: normalizeText(question.question),
@@ -37,13 +39,18 @@ export const normalizeQuestions = (questions: ClarifyQuestionInput[]): ClarifyQu
 const collectPreferredOptions = (options: ClarifyOption[]): ClarifyOption[] =>
   options.filter((option) => option.recommended || option.default);
 
-export const getRecommendedOption = (question: ClarifyQuestion): ClarifyOption | undefined =>
-  collectPreferredOptions(question.options)[0];
+export const getRecommendedOption = (
+  question: ClarifyQuestion,
+): ClarifyOption | undefined => collectPreferredOptions(question.options)[0];
 
-export const getAutoSelectOption = (question: ClarifyQuestion): ClarifyOption | undefined =>
+export const getAutoSelectOption = (
+  question: ClarifyQuestion,
+): ClarifyOption | undefined =>
   getRecommendedOption(question) ?? question.options[0];
 
-export const validateQuestions = (questions: ClarifyQuestion[]): string | null => {
+export const validateQuestions = (
+  questions: ClarifyQuestion[],
+): string | null => {
   if (questions.length < 1 || questions.length > 3) {
     return "clarify expects 1 to 3 questions.";
   }
@@ -51,10 +58,14 @@ export const validateQuestions = (questions: ClarifyQuestion[]): string | null =
   const seen = new Set<string>();
   for (const question of questions) {
     if (!question.id) return "Every clarify question needs a non-empty id.";
-    if (seen.has(question.id)) return `Duplicate clarify question id: ${question.id}`;
+    if (seen.has(question.id))
+      return `Duplicate clarify question id: ${question.id}`;
     seen.add(question.id);
     if (!question.question) return `Question ${question.id} is empty.`;
-    if (question.timeoutSeconds !== undefined && question.options.length === 0) {
+    if (
+      question.timeoutSeconds !== undefined &&
+      question.options.length === 0
+    ) {
       return `Question ${question.id} cannot use timeoutSeconds without options.`;
     }
 
@@ -65,7 +76,8 @@ export const validateQuestions = (questions: ClarifyQuestion[]): string | null =
     }
 
     for (const option of question.options) {
-      if (!option.label) return `Question ${question.id} has an empty option label.`;
+      if (!option.label)
+        return `Question ${question.id} has an empty option label.`;
       if (optionLabels.has(option.label)) {
         return `Question ${question.id} has duplicate option label: ${option.label}`;
       }
@@ -85,8 +97,11 @@ const formatAnswer = (answer: ClarifyAnswer): string => {
 
   if (answer.source === "other") {
     const selected = answer.selectedOption ?? "Other";
-    const freeform = answer.note ?? (answer.answer !== selected ? answer.answer : "");
-    return freeform ? `${answer.id}=${selected} (answer: ${freeform})` : `${answer.id}=${selected}`;
+    const freeform =
+      answer.note ?? (answer.answer !== selected ? answer.answer : "");
+    return freeform
+      ? `${answer.id}=${selected} (answer: ${freeform})`
+      : `${answer.id}=${selected}`;
   }
 
   return `${answer.id}=${answer.answer}`;
@@ -97,10 +112,12 @@ export const buildSuccessText = (answers: ClarifyAnswer[]): string =>
 
 export const sortAnswers = (
   answers: ClarifyAnswer[],
-  questions: ClarifyQuestion[]
+  questions: ClarifyQuestion[],
 ): ClarifyAnswer[] => {
-  const order = new Map(questions.map((question, index) => [question.id, index]));
+  const order = new Map(
+    questions.map((question, index) => [question.id, index]),
+  );
   return [...answers].sort(
-    (left, right) => (order.get(left.id) ?? 999) - (order.get(right.id) ?? 999)
+    (left, right) => (order.get(left.id) ?? 999) - (order.get(right.id) ?? 999),
   );
 };

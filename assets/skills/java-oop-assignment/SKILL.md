@@ -25,6 +25,7 @@ disable-model-invocation: true
 ### Phase 2: Plan
 
 Create a todo list with:
+
 - Files to CREATE (interfaces, enums, classes)
 - Files to MODIFY (implement methods, add `implements`)
 - Implementation order (dependencies first)
@@ -32,6 +33,7 @@ Create a todo list with:
 ### Phase 3: Implement
 
 For each task:
+
 1. **Interfaces/Enums first** - No dependencies
 2. **Abstract classes** - Base functionality
 3. **Concrete classes** - Extend/implement

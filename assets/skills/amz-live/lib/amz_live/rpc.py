@@ -279,7 +279,7 @@ def _read_int(
     *,
     default: int,
     minimum: int,
- ) -> int: ...
+) -> int: ...
 
 
 @overload
@@ -289,7 +289,7 @@ def _read_int(
     *,
     default: None,
     minimum: int,
- ) -> int | None: ...
+) -> int | None: ...
 
 
 def _read_int(

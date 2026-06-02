@@ -162,16 +162,16 @@ Detailed eval workflow lives in `references/eval-workflow.md`. Summary:
 
 ## Routing Table
 
-| Need | Read / Use |
-| --- | --- |
-| Exact JSON structures for evals, metadata, grading, benchmarks, feedback | `references/schemas.md` |
-| Detailed eval runner, timing capture, grading, benchmark aggregation, viewer, feedback, iteration loop | `references/eval-workflow.md` |
+| Need                                                                                                                     | Read / Use                               |
+| ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| Exact JSON structures for evals, metadata, grading, benchmarks, feedback                                                 | `references/schemas.md`                  |
+| Detailed eval runner, timing capture, grading, benchmark aggregation, viewer, feedback, iteration loop                   | `references/eval-workflow.md`            |
 | Trigger tuning, eval query generation, `eval_review.html`, `run_loop.py`, held-out scoring, before/after score reporting | `references/description-optimization.md` |
-| Package validation, `.skill` generation, presentation handoff | `references/packaging.md` |
-| Claude.ai, Cowork, browserless/headless, or server-unavailable adaptations | `references/runtime-modes.md` |
-| Assertion grading | `agents/grader.md` |
-| Benchmark and comparison analysis | `agents/analyzer.md` |
-| Rigorous blind A/B comparison between skill versions | `agents/comparator.md` |
+| Package validation, `.skill` generation, presentation handoff                                                            | `references/packaging.md`                |
+| Claude.ai, Cowork, browserless/headless, or server-unavailable adaptations                                               | `references/runtime-modes.md`            |
+| Assertion grading                                                                                                        | `agents/grader.md`                       |
+| Benchmark and comparison analysis                                                                                        | `agents/analyzer.md`                     |
+| Rigorous blind A/B comparison between skill versions                                                                     | `agents/comparator.md`                   |
 
 ## Description Optimization
 

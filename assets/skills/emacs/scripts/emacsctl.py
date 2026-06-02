@@ -97,7 +97,9 @@ def decode_base64_lisp_string(raw: str) -> str:
     try:
         return base64.b64decode(raw.encode("ascii")).decode("utf-8")
     except Exception as exc:  # pragma: no cover
-        raise EmacsCtlError(f"failed to decode emacsclient JSON payload: {exc}") from exc
+        raise EmacsCtlError(
+            f"failed to decode emacsclient JSON payload: {exc}"
+        ) from exc
 
 
 def print_json(data: object) -> None:
@@ -111,7 +113,9 @@ def json_eval(args: argparse.Namespace, expr: str) -> None:
     try:
         data = json.loads(payload)
     except json.JSONDecodeError as exc:
-        raise EmacsCtlError(f"Emacs returned invalid JSON: {exc}\nPayload: {payload}") from exc
+        raise EmacsCtlError(
+            f"Emacs returned invalid JSON: {exc}\nPayload: {payload}"
+        ) from exc
     print_json(data)
 
 
@@ -225,8 +229,8 @@ def cmd_load(args: argparse.Namespace) -> int:
     path = Path(args.path).expanduser().resolve()
     expr = (
         "(list "
-        f"(cons \"loaded\" {elisp_string(str(path))}) "
-        f"(cons \"result\" (load-file {elisp_string(str(path))})))"
+        f'(cons "loaded" {elisp_string(str(path))}) '
+        f'(cons "result" (load-file {elisp_string(str(path))})))'
     )
     json_eval(args, expr)
     return 0
@@ -255,43 +259,65 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(dest="command", required=True)
 
-    ping = sub.add_parser("ping", help="check connectivity and print runtime basics as JSON")
+    ping = sub.add_parser(
+        "ping", help="check connectivity and print runtime basics as JSON"
+    )
     ping.set_defaults(func=cmd_ping)
 
-    face = sub.add_parser("face", help="print family/height/font data for a face as JSON")
+    face = sub.add_parser(
+        "face", help="print family/height/font data for a face as JSON"
+    )
     face.add_argument("face", help="face symbol name, e.g. default or fixed-pitch")
     face.set_defaults(func=cmd_face)
 
     buffer_cmd = sub.add_parser("buffer", help="print current buffer basics as JSON")
     buffer_cmd.set_defaults(func=cmd_buffer)
 
-    key = sub.add_parser("key", help="resolve a key sequence in the current context as JSON")
+    key = sub.add_parser(
+        "key", help="resolve a key sequence in the current context as JSON"
+    )
     key.add_argument("key_sequence", help="key sequence, e.g. C-x C-f")
     key.set_defaults(func=cmd_key)
 
     library = sub.add_parser("library", help="locate a library on load-path as JSON")
-    library.add_argument("name", help="library name without .el, e.g. package or use-package")
+    library.add_argument(
+        "name", help="library name without .el, e.g. package or use-package"
+    )
     library.set_defaults(func=cmd_library)
 
-    feature = sub.add_parser("feature", help="check feature load state and likely library path as JSON")
+    feature = sub.add_parser(
+        "feature", help="check feature load state and likely library path as JSON"
+    )
     feature.add_argument("name", help="feature name, e.g. server or use-package")
     feature.set_defaults(func=cmd_feature)
 
     ev = sub.add_parser("eval", help="evaluate Elisp expression or read it from stdin")
-    ev.add_argument("expr", nargs="?", help="Elisp expression, or - / omitted to read from stdin")
-    ev.add_argument("--json", action="store_true", help="treat result as JSON-encodable and print parsed JSON")
+    ev.add_argument(
+        "expr", nargs="?", help="Elisp expression, or - / omitted to read from stdin"
+    )
+    ev.add_argument(
+        "--json",
+        action="store_true",
+        help="treat result as JSON-encodable and print parsed JSON",
+    )
     ev.set_defaults(func=cmd_eval)
 
     evf = sub.add_parser("eval-file", help="evaluate Elisp loaded from a file")
     evf.add_argument("path", help="path to .el file containing an Elisp expression")
-    evf.add_argument("--json", action="store_true", help="treat result as JSON-encodable and print parsed JSON")
+    evf.add_argument(
+        "--json",
+        action="store_true",
+        help="treat result as JSON-encodable and print parsed JSON",
+    )
     evf.set_defaults(func=cmd_eval_file)
 
     load = sub.add_parser("load", help="load-file PATH and print a small JSON result")
     load.add_argument("path", help="path to file to load into the running Emacs")
     load.set_defaults(func=cmd_load)
 
-    reload_init = sub.add_parser("reload-init", help="load the current user-init-file and print JSON")
+    reload_init = sub.add_parser(
+        "reload-init", help="load the current user-init-file and print JSON"
+    )
     reload_init.set_defaults(func=cmd_reload_init)
 
     return parser

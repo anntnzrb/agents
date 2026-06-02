@@ -56,19 +56,31 @@ def build_parser() -> argparse.ArgumentParser:
         description="Skill Creator utility dispatcher.",
         add_help=False,
     )
-    parser.add_argument("command", nargs="?", choices=sorted(COMMANDS), help="Utility to run")
-    parser.add_argument("args", nargs=argparse.REMAINDER, help="Arguments passed to the utility")
+    parser.add_argument(
+        "command", nargs="?", choices=sorted(COMMANDS), help="Utility to run"
+    )
+    parser.add_argument(
+        "args", nargs=argparse.REMAINDER, help="Arguments passed to the utility"
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0] in {"-h", "--help"}:
-        print("usage: cli.py {aggregate-benchmark,generate-review,package,quick-validate,improve-description,run-eval,run-loop,generate-report} [args...]\n")
+        print(
+            "usage: cli.py {aggregate-benchmark,generate-review,package,quick-validate,improve-description,run-eval,run-loop,generate-report} [args...]\n"
+        )
         print("Cross-platform:")
-        print("  uv run --script <skill-dir>/scripts/cli.py aggregate-benchmark <workspace>/iteration-N --skill-name <name>")
-        print("  uv run --script <skill-dir>/scripts/cli.py generate-review <workspace> --skill-name <name>")
-        print("  uv run --script <skill-dir>/scripts/cli.py package <path-to-skill-folder>")
+        print(
+            "  uv run --script <skill-dir>/scripts/cli.py aggregate-benchmark <workspace>/iteration-N --skill-name <name>"
+        )
+        print(
+            "  uv run --script <skill-dir>/scripts/cli.py generate-review <workspace> --skill-name <name>"
+        )
+        print(
+            "  uv run --script <skill-dir>/scripts/cli.py package <path-to-skill-folder>"
+        )
         print("\nUse '<command> --help' for utility-specific flags.")
         return 0
 

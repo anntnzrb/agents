@@ -83,7 +83,7 @@ export class SyncEnv {
     mcporterHome: string,
     managedStateHome: string,
     installTimeoutMs: number,
-    harnesses: readonly Harness[]
+    harnesses: readonly Harness[],
   ) {
     this.home = home;
     this.assetsHome = assetsHome;
@@ -96,7 +96,8 @@ export class SyncEnv {
 
   static fromSystem(): SyncEnv {
     const home = [process.env.HOME, process.env.USERPROFILE, os.homedir()].find(
-      (candidate): candidate is string => typeof candidate === "string" && candidate.trim().length > 0,
+      (candidate): candidate is string =>
+        typeof candidate === "string" && candidate.trim().length > 0,
     );
     if (!home) {
       throw new Error("missing HOME/USERPROFILE");
@@ -113,7 +114,7 @@ export class SyncEnv {
       path.join(home, ".mcporter"),
       path.join(home, MANAGED_STATE_SUBDIR),
       installTimeoutMs,
-      defaultHarnesses(home)
+      defaultHarnesses(home),
     );
   }
 
@@ -183,7 +184,9 @@ export function defaultHarnesses(home: string): readonly Harness[] {
 }
 
 export const harnessRoot = (harness: Harness): string =>
-  harness.runtimeSubdir ? path.join(harness.home, harness.runtimeSubdir) : harness.home;
+  harness.runtimeSubdir
+    ? path.join(harness.home, harness.runtimeSubdir)
+    : harness.home;
 
 export function harnessSourceRoot(harness: Harness, toolsHome: string): string {
   return harness.runtimeSubdir
@@ -191,17 +194,24 @@ export function harnessSourceRoot(harness: Harness, toolsHome: string): string {
     : path.join(toolsHome, harness.sourceName);
 }
 
-export const harnessInstructionTarget = (harness: Harness): string => path.join(harnessRoot(harness), harness.instructionFile);
+export const harnessInstructionTarget = (harness: Harness): string =>
+  path.join(harnessRoot(harness), harness.instructionFile);
 
-export const harnessInstructionFileName = (harness: Harness): string => harness.instructionFile;
+export const harnessInstructionFileName = (harness: Harness): string =>
+  harness.instructionFile;
 
-export function harnessRenameAsset(harness: Harness, assetName: string): string {
+export function harnessRenameAsset(
+  harness: Harness,
+  assetName: string,
+): string {
   const match = harness.assetRenames.find(([src]) => src === assetName);
   return match ? match[1] : assetName;
 }
 
-export const harnessManagedStatePath = (harness: Harness, managedStateHome: string): string =>
-  path.join(managedStateHome, `${harness.sourceName}.json`);
+export const harnessManagedStatePath = (
+  harness: Harness,
+  managedStateHome: string,
+): string => path.join(managedStateHome, `${harness.sourceName}.json`);
 
 function normalizeHooks(hooks: readonly HarnessHookSpec[]): HarnessHook[] {
   return hooks.map((hook) => {

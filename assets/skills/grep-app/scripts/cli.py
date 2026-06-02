@@ -63,7 +63,9 @@ def main(argv: list[str]) -> int:
         if not args:
             print("usage: grep-app regex <pattern> [key=value ...]", file=sys.stderr)
             return 2
-        return request_get(base_url, [("q", args[0]), ("regexp", "true"), *pairs(args[1:])])
+        return request_get(
+            base_url, [("q", args[0]), ("regexp", "true"), *pairs(args[1:])]
+        )
 
     print(USAGE, file=sys.stderr)
     return 2

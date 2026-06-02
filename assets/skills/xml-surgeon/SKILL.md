@@ -11,6 +11,7 @@ disable-model-invocation: true
 # Xml Surgeon
 
 ## Overview
+
 Use `scripts/cli.py` for XPath-based XML reads/edits with minimal formatting drift. Prefer dry-run + diff, then in-place write.
 
 ## Entry point
@@ -24,6 +25,7 @@ uv run --script <skill-dir>/scripts/cli.py ...
 Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
 
 ## Quick start
+
 - Inspect matches:
   - `uv run --script <skill-dir>/scripts/cli.py select --xpath "//field[@name='arch']" path/to/file.xml`
 - Read text or attr:
@@ -51,6 +53,7 @@ Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, execut
   - `uv run --script <skill-dir>/scripts/cli.py delete --xpath "//field[@name='x']" --diff --reformat-ok path/to/file.xml`
 
 ## Workflow
+
 - Inspect: `select` for match counts and sourcelines
 - Read: `show`, `children`, `outline`, or `context` for subtree/structure scanning
 - Dry-run: run mutating commands with `--diff` (no `--in-place`)
@@ -58,6 +61,7 @@ Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, execut
 - Verify: spot-check with `select` or `get`
 
 ## Tasks
+
 - Inspect/select: use `select`, `get`, `show`, `children`, `outline`, and `context` for precise targeting
 - Attribute edits: `set-attr`, `del-attr`
 - Text edits: `set-text` with `--value` or `--value-file`
@@ -65,6 +69,7 @@ Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, execut
 - Batch edits: pass multiple paths or globs (e.g., `**/*.xml`)
 
 ## Guardrails
+
 - Minimal diffs: `set-attr`, `del-attr`, and `set-text` are surgical and preserve formatting
 - Structural edits: `insert`, `replace`, `delete` reserialize XML and can reformat; require `--reformat-ok`
 - Large files: use `--huge` if parser complains
@@ -72,6 +77,7 @@ Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, execut
 - Indentation drift: use `--indent` on insert/replace if needed
 
 ## Resources
+
 - `scripts/cli.py`: public dispatcher
 - `scripts/main.py`: internal XML edit tool
 - `scripts/lib.py`: helper module used by the CLI

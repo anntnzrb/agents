@@ -35,7 +35,10 @@ function asStringArray(value: unknown): string[] | null {
   return value.every((item) => typeof item === "string") ? value : null;
 }
 
-function validateRegex(pattern: string, flags: string | undefined): string | null {
+function validateRegex(
+  pattern: string,
+  flags: string | undefined,
+): string | null {
   try {
     void new RegExp(pattern, flags ?? "");
     return null;
@@ -44,7 +47,10 @@ function validateRegex(pattern: string, flags: string | undefined): string | nul
   }
 }
 
-function normalizeBlockAction(value: unknown, path: string): BlockAction | string {
+function normalizeBlockAction(
+  value: unknown,
+  path: string,
+): BlockAction | string {
   if (!isObject(value)) {
     return `${path} must be an object`;
   }
@@ -60,21 +66,36 @@ function normalizeBlockAction(value: unknown, path: string): BlockAction | strin
   }
 
   const rawRequiresSkill = value["requiresSkill"];
-  if (rawRequiresSkill !== undefined && (typeof rawRequiresSkill !== "string" || rawRequiresSkill.trim().length === 0)) {
+  if (
+    rawRequiresSkill !== undefined &&
+    (typeof rawRequiresSkill !== "string" ||
+      rawRequiresSkill.trim().length === 0)
+  ) {
     return `${path}.requiresSkill must be a non-empty string`;
   }
 
   const rawRequiredWorkflow = value["requiredWorkflow"];
-  if (rawRequiredWorkflow !== undefined && (typeof rawRequiredWorkflow !== "string" || rawRequiredWorkflow.trim().length === 0)) {
+  if (
+    rawRequiredWorkflow !== undefined &&
+    (typeof rawRequiredWorkflow !== "string" ||
+      rawRequiredWorkflow.trim().length === 0)
+  ) {
     return `${path}.requiredWorkflow must be a non-empty string`;
   }
 
   const rawRequiresBinding = value["requiresBinding"];
-  if (rawRequiresBinding !== undefined && (typeof rawRequiresBinding !== "string" || rawRequiresBinding.trim().length === 0)) {
+  if (
+    rawRequiresBinding !== undefined &&
+    (typeof rawRequiresBinding !== "string" ||
+      rawRequiresBinding.trim().length === 0)
+  ) {
     return `${path}.requiresBinding must be a non-empty string`;
   }
 
-  if (rawRequiresBinding !== undefined && (rawRequiresSkill !== undefined || rawRequiredWorkflow !== undefined)) {
+  if (
+    rawRequiresBinding !== undefined &&
+    (rawRequiresSkill !== undefined || rawRequiredWorkflow !== undefined)
+  ) {
     return `${path} cannot combine requiresBinding with requiresSkill/requiredWorkflow`;
   }
 
@@ -94,7 +115,10 @@ function normalizeBlockAction(value: unknown, path: string): BlockAction | strin
   return out;
 }
 
-function normalizeBashAction(value: unknown, path: string): BashAction | string {
+function normalizeBashAction(
+  value: unknown,
+  path: string,
+): BashAction | string {
   if (!isObject(value)) {
     return `${path} must be an object`;
   }
@@ -110,17 +134,29 @@ function normalizeBashAction(value: unknown, path: string): BashAction | string 
   }
 
   const rawRequiresSkill = value["requiresSkill"];
-  if (rawRequiresSkill !== undefined && (typeof rawRequiresSkill !== "string" || rawRequiresSkill.trim().length === 0)) {
+  if (
+    rawRequiresSkill !== undefined &&
+    (typeof rawRequiresSkill !== "string" ||
+      rawRequiresSkill.trim().length === 0)
+  ) {
     return `${path}.requiresSkill must be a non-empty string`;
   }
 
   const rawRequiredWorkflow = value["requiredWorkflow"];
-  if (rawRequiredWorkflow !== undefined && (typeof rawRequiredWorkflow !== "string" || rawRequiredWorkflow.trim().length === 0)) {
+  if (
+    rawRequiredWorkflow !== undefined &&
+    (typeof rawRequiredWorkflow !== "string" ||
+      rawRequiredWorkflow.trim().length === 0)
+  ) {
     return `${path}.requiredWorkflow must be a non-empty string`;
   }
 
   const rawRequiresBinding = value["requiresBinding"];
-  if (rawRequiresBinding !== undefined && (typeof rawRequiresBinding !== "string" || rawRequiresBinding.trim().length === 0)) {
+  if (
+    rawRequiresBinding !== undefined &&
+    (typeof rawRequiresBinding !== "string" ||
+      rawRequiresBinding.trim().length === 0)
+  ) {
     return `${path}.requiresBinding must be a non-empty string`;
   }
 
@@ -134,7 +170,10 @@ function normalizeBashAction(value: unknown, path: string): BashAction | string 
     return `${path}.requiresBinding is only valid for block actions`;
   }
 
-  if (rawRequiresBinding !== undefined && (rawRequiresSkill !== undefined || rawRequiredWorkflow !== undefined)) {
+  if (
+    rawRequiresBinding !== undefined &&
+    (rawRequiresSkill !== undefined || rawRequiredWorkflow !== undefined)
+  ) {
     return `${path} cannot combine requiresBinding with requiresSkill/requiredWorkflow`;
   }
 
@@ -161,7 +200,10 @@ function normalizeBashAction(value: unknown, path: string): BashAction | string 
   };
 }
 
-function normalizeExecutableMatch(value: Record<string, unknown>, path: string): ExecutableMatch | string {
+function normalizeExecutableMatch(
+  value: Record<string, unknown>,
+  path: string,
+): ExecutableMatch | string {
   const rawNames = value["names"];
   const namesValue = rawNames === undefined ? [] : asStringArray(rawNames);
   if (rawNames !== undefined && namesValue === null) {
@@ -170,7 +212,8 @@ function normalizeExecutableMatch(value: Record<string, unknown>, path: string):
   const names = namesValue ?? [];
 
   const rawPatterns = value["patterns"];
-  const patternsValue = rawPatterns === undefined ? [] : asStringArray(rawPatterns);
+  const patternsValue =
+    rawPatterns === undefined ? [] : asStringArray(rawPatterns);
   if (rawPatterns !== undefined && patternsValue === null) {
     return `${path}.patterns must be an array of strings`;
   }
@@ -190,7 +233,8 @@ function normalizeExecutableMatch(value: Record<string, unknown>, path: string):
   if (rawCaseSensitive !== undefined && typeof rawCaseSensitive !== "boolean") {
     return `${path}.caseSensitive must be a boolean`;
   }
-  const caseSensitive = typeof rawCaseSensitive === "boolean" ? rawCaseSensitive : undefined;
+  const caseSensitive =
+    typeof rawCaseSensitive === "boolean" ? rawCaseSensitive : undefined;
 
   for (const [index, pattern] of patterns.entries()) {
     const error = validateRegex(pattern, flags);
@@ -213,7 +257,10 @@ function normalizeExecutableMatch(value: Record<string, unknown>, path: string):
   return out;
 }
 
-function normalizeRegexMatch(value: Record<string, unknown>, path: string): RegexMatch | string {
+function normalizeRegexMatch(
+  value: Record<string, unknown>,
+  path: string,
+): RegexMatch | string {
   const rawPattern = value["pattern"];
   if (typeof rawPattern !== "string" || rawPattern.length === 0) {
     return `${path}.pattern must be a non-empty string`;
@@ -288,7 +335,10 @@ function normalizeRule(value: unknown, index: number): Rule | string {
   return out;
 }
 
-function normalizeProtectedPathRule(value: unknown, index: number): ProtectedPathRule | string {
+function normalizeProtectedPathRule(
+  value: unknown,
+  index: number,
+): ProtectedPathRule | string {
   const path = `protectedPaths.rules[${index}]`;
   if (!isObject(value)) {
     return `${path} must be an object`;
@@ -331,7 +381,9 @@ function normalizeProtectedPathRule(value: unknown, index: number): ProtectedPat
   return out;
 }
 
-function normalizeSkillBindings(value: unknown): Record<string, SkillBinding> | string {
+function normalizeSkillBindings(
+  value: unknown,
+): Record<string, SkillBinding> | string {
   if (value === undefined) return {};
   if (!isObject(value)) return "skillBindings must be an object";
 
@@ -340,12 +392,19 @@ function normalizeSkillBindings(value: unknown): Record<string, SkillBinding> | 
     if (!isObject(entry)) return `skillBindings.${name} must be an object`;
 
     const rawRequiresSkill = entry["requiresSkill"];
-    if (typeof rawRequiresSkill !== "string" || rawRequiresSkill.trim().length === 0) {
+    if (
+      typeof rawRequiresSkill !== "string" ||
+      rawRequiresSkill.trim().length === 0
+    ) {
       return `skillBindings.${name}.requiresSkill must be a non-empty string`;
     }
 
     const rawRequiredWorkflow = entry["requiredWorkflow"];
-    if (rawRequiredWorkflow !== undefined && (typeof rawRequiredWorkflow !== "string" || rawRequiredWorkflow.trim().length === 0)) {
+    if (
+      rawRequiredWorkflow !== undefined &&
+      (typeof rawRequiredWorkflow !== "string" ||
+        rawRequiredWorkflow.trim().length === 0)
+    ) {
       return `skillBindings.${name}.requiredWorkflow must be a non-empty string`;
     }
 
@@ -375,12 +434,14 @@ function normalizeConfig(value: unknown): GuardrailsConfig | string {
     return skillBindings;
   }
 
-  const agentBashRaw = value["agentBash"] === undefined ? {} : value["agentBash"];
+  const agentBashRaw =
+    value["agentBash"] === undefined ? {} : value["agentBash"];
   if (!isObject(agentBashRaw)) {
     return "agentBash must be an object";
   }
 
-  const bashRulesValue = agentBashRaw["rules"] === undefined ? [] : agentBashRaw["rules"];
+  const bashRulesValue =
+    agentBashRaw["rules"] === undefined ? [] : agentBashRaw["rules"];
   if (!Array.isArray(bashRulesValue)) {
     return "agentBash.rules must be an array";
   }
@@ -401,12 +462,14 @@ function normalizeConfig(value: unknown): GuardrailsConfig | string {
     }
   }
 
-  const protectedPathsRaw = value["protectedPaths"] === undefined ? {} : value["protectedPaths"];
+  const protectedPathsRaw =
+    value["protectedPaths"] === undefined ? {} : value["protectedPaths"];
   if (!isObject(protectedPathsRaw)) {
     return "protectedPaths must be an object";
   }
 
-  const protectedPathRulesValue = protectedPathsRaw["rules"] === undefined ? [] : protectedPathsRaw["rules"];
+  const protectedPathRulesValue =
+    protectedPathsRaw["rules"] === undefined ? [] : protectedPathsRaw["rules"];
   if (!Array.isArray(protectedPathRulesValue)) {
     return "protectedPaths.rules must be an array";
   }

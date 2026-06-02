@@ -5,6 +5,7 @@ Read this file for Promise orchestration, event-loop order, cancellation, async 
 ## Event loop mental model
 
 Execution order:
+
 1. synchronous stack
 2. microtasks (`Promise.then`, `queueMicrotask`)
 3. macrotasks (`setTimeout`, I/O callbacks, message events)
@@ -38,13 +39,12 @@ Catch where you can add context or recover. Do not swallow errors just to keep t
 ```js
 async function loadPage(id) {
   try {
-    const [user, posts] = await Promise.all([
-      loadUser(id),
-      loadPosts(id),
-    ]);
+    const [user, posts] = await Promise.all([loadUser(id), loadPosts(id)]);
     return { user, posts };
   } catch (error) {
-    throw new Error(`loadPage failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `loadPage failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 ```
@@ -54,10 +54,10 @@ async function loadPage(id) {
 Use the combinator that matches the failure policy.
 
 ```js
-await Promise.all(tasks);        // all must succeed
+await Promise.all(tasks); // all must succeed
 await Promise.allSettled(tasks); // collect every outcome
-await Promise.race(tasks);       // first settle wins
-await Promise.any(tasks);        // first success wins
+await Promise.race(tasks); // first settle wins
+await Promise.any(tasks); // first success wins
 ```
 
 ### Avoid accidental serialization
@@ -81,9 +81,7 @@ Cancellation should be explicit for user-driven, long-lived, or retrying work.
 ```js
 async function fetchJSON(url, { signal, timeoutMs = 5000 } = {}) {
   const timeout = AbortSignal.timeout(timeoutMs);
-  const composite = signal
-    ? AbortSignal.any([signal, timeout])
-    : timeout;
+  const composite = signal ? AbortSignal.any([signal, timeout]) : timeout;
 
   const response = await fetch(url, { signal: composite });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);

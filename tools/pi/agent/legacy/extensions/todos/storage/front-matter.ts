@@ -4,7 +4,10 @@
 
 import type { TodoFrontMatter, TodoRecord } from "../types.ts";
 
-export const parseFrontMatter = (text: string, idFallback: string): TodoFrontMatter => {
+export const parseFrontMatter = (
+  text: string,
+  idFallback: string,
+): TodoFrontMatter => {
   const data: TodoFrontMatter = {
     id: idFallback,
     title: "",
@@ -22,13 +25,20 @@ export const parseFrontMatter = (text: string, idFallback: string): TodoFrontMat
     if (!parsed || typeof parsed !== "object") return data;
     if (typeof parsed.id === "string" && parsed.id) data.id = parsed.id;
     if (typeof parsed.title === "string") data.title = parsed.title;
-    if (typeof parsed.status === "string" && parsed.status) data.status = parsed.status;
-    if (typeof parsed.created_at === "string") data.created_at = parsed.created_at;
-    if (typeof parsed.assigned_to_session === "string" && parsed.assigned_to_session.trim()) {
+    if (typeof parsed.status === "string" && parsed.status)
+      data.status = parsed.status;
+    if (typeof parsed.created_at === "string")
+      data.created_at = parsed.created_at;
+    if (
+      typeof parsed.assigned_to_session === "string" &&
+      parsed.assigned_to_session.trim()
+    ) {
       data.assigned_to_session = parsed.assigned_to_session;
     }
     if (Array.isArray(parsed.tags)) {
-      data.tags = parsed.tags.filter((tag): tag is string => typeof tag === "string");
+      data.tags = parsed.tags.filter(
+        (tag): tag is string => typeof tag === "string",
+      );
     }
   } catch {
     return data;
@@ -54,13 +64,13 @@ const findJsonObjectEnd = (content: string): number => {
         escaped = true;
         continue;
       }
-      if (char === "\"") {
+      if (char === '"') {
         inString = false;
       }
       continue;
     }
 
-    if (char === "\"") {
+    if (char === '"') {
       inString = true;
       continue;
     }
@@ -80,7 +90,7 @@ const findJsonObjectEnd = (content: string): number => {
 };
 
 export const splitFrontMatter = (
-  content: string
+  content: string,
 ): { frontMatter: string; body: string } => {
   if (!content.startsWith("{")) {
     return { frontMatter: "", body: content };
@@ -96,7 +106,10 @@ export const splitFrontMatter = (
   return { frontMatter, body };
 };
 
-export const parseTodoContent = (content: string, idFallback: string): TodoRecord => {
+export const parseTodoContent = (
+  content: string,
+  idFallback: string,
+): TodoRecord => {
   const { frontMatter, body } = splitFrontMatter(content);
   const parsed = parseFrontMatter(frontMatter, idFallback);
   return {
@@ -121,7 +134,7 @@ export const serializeTodo = (todo: TodoRecord): string => {
       assigned_to_session: todo.assigned_to_session || undefined,
     },
     null,
-    2
+    2,
   );
 
   const body = todo.body ?? "";

@@ -217,7 +217,9 @@ def save_image_output(
             path = image_dir / f"cell_{cell_idx}_output_{output_idx}{ext}"
             content = data[mime_type]
             if mime_type == "image/svg+xml":
-                path.write_text(content if isinstance(content, str) else "".join(content))
+                path.write_text(
+                    content if isinstance(content, str) else "".join(content)
+                )
             else:
                 path.write_bytes(base64.b64decode(content))
             return path
@@ -292,7 +294,9 @@ def print_output(
                     print(strip_ansi(line))
 
 
-def validate_notebook(nb: "NotebookNode", require_outputs: bool = False) -> ValidationResult:
+def validate_notebook(
+    nb: "NotebookNode", require_outputs: bool = False
+) -> ValidationResult:
     """Validate notebook structure and code. Returns immutable result."""
     errors: list[str] = []
     warnings: list[str] = []
@@ -351,7 +355,9 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     for i, cell in enumerate(nb.cells):
         info = get_cell_info(cell, i)
         output_marker = "Yes" if info.has_output else "No"
-        print(f"{info.index:5} | {info.cell_type:8} | {info.lines:5} | {output_marker:10} | {info.first_line}")
+        print(
+            f"{info.index:5} | {info.cell_type:8} | {info.lines:5} | {output_marker:10} | {info.first_line}"
+        )
 
     return 0
 
@@ -361,7 +367,11 @@ def cmd_show(args: argparse.Namespace) -> int:
     nb = load_notebook(args.notebook)
     image_dir = Path(args.save_images) if args.save_images else None
 
-    indices = parse_cell_indices(args.cells, len(nb.cells)) if args.cells else list(range(len(nb.cells)))
+    indices = (
+        parse_cell_indices(args.cells, len(nb.cells))
+        if args.cells
+        else list(range(len(nb.cells)))
+    )
 
     for i in indices:
         if i >= len(nb.cells):
@@ -403,7 +413,8 @@ def cmd_execute(args: argparse.Namespace) -> int:
     client = NotebookClient(
         nb,
         timeout=args.timeout,
-        kernel_name=args.kernel or nb.metadata.get("kernelspec", {}).get("name", "python3"),
+        kernel_name=args.kernel
+        or nb.metadata.get("kernelspec", {}).get("name", "python3"),
     )
 
     try:
@@ -432,7 +443,11 @@ def cmd_execute(args: argparse.Namespace) -> int:
         save_notebook(nb, args.notebook)
         print(f"Saved: {args.notebook}", file=sys.stderr)
     else:
-        indices = parse_cell_indices(args.cells, len(nb.cells)) if args.cells else list(range(len(nb.cells)))
+        indices = (
+            parse_cell_indices(args.cells, len(nb.cells))
+            if args.cells
+            else list(range(len(nb.cells)))
+        )
         for i in indices:
             if i >= len(nb.cells):
                 continue
@@ -440,7 +455,9 @@ def cmd_execute(args: argparse.Namespace) -> int:
             if cell.cell_type == "code" and cell.get("outputs"):
                 print(f"\n--- CELL {i} OUTPUT ---")
                 for out_idx, out in enumerate(cell["outputs"]):
-                    print_output(out, image_dir=image_dir, cell_idx=i, output_idx=out_idx)
+                    print_output(
+                        out, image_dir=image_dir, cell_idx=i, output_idx=out_idx
+                    )
 
     return 0
 
@@ -484,7 +501,10 @@ def cmd_convert(args: argparse.Namespace) -> int:
 
     fmt = args.to.lower()
     if fmt not in exporter_map:
-        print(f"Unknown format: {fmt}. Available: {list(exporter_map.keys())}", file=sys.stderr)
+        print(
+            f"Unknown format: {fmt}. Available: {list(exporter_map.keys())}",
+            file=sys.stderr,
+        )
         return 1
 
     exporter = exporter_map[fmt]()
@@ -503,7 +523,9 @@ def cmd_clear(args: argparse.Namespace) -> int:
     """Clear all outputs from notebook."""
     nb = load_notebook(args.notebook)
 
-    cleared = sum(1 for cell in nb.cells if cell.cell_type == "code" and cell.get("outputs"))
+    cleared = sum(
+        1 for cell in nb.cells if cell.cell_type == "code" and cell.get("outputs")
+    )
 
     for cell in nb.cells:
         if cell.cell_type == "code":
@@ -564,7 +586,9 @@ def main() -> int:
     p_show = subparsers.add_parser("show", help="Show cell contents")
     p_show.add_argument("notebook", help="Path to notebook")
     p_show.add_argument("-c", "--cells", help="Cell indices (e.g., 0,2-4,7)")
-    p_show.add_argument("-t", "--type", choices=["code", "markdown"], help="Filter by type")
+    p_show.add_argument(
+        "-t", "--type", choices=["code", "markdown"], help="Filter by type"
+    )
     p_show.add_argument("-o", "--output", action="store_true", help="Include outputs")
     p_show.add_argument("--output-only", action="store_true", help="Show only outputs")
     p_show.add_argument("--raw", action="store_true", help="Show raw output data")
@@ -575,17 +599,25 @@ def main() -> int:
     p_exec = subparsers.add_parser("execute", help="Execute notebook")
     p_exec.add_argument("notebook", help="Path to notebook")
     p_exec.add_argument("-c", "--cells", help="Cell indices to execute")
-    p_exec.add_argument("-i", "--in-place", action="store_true", help="Save outputs back to file")
+    p_exec.add_argument(
+        "-i", "--in-place", action="store_true", help="Save outputs back to file"
+    )
     p_exec.add_argument("-k", "--kernel", help="Kernel name to use")
-    p_exec.add_argument("-t", "--timeout", type=int, default=600, help="Cell timeout (seconds)")
-    p_exec.add_argument("--allow-errors", action="store_true", help="Continue on cell errors")
+    p_exec.add_argument(
+        "-t", "--timeout", type=int, default=600, help="Cell timeout (seconds)"
+    )
+    p_exec.add_argument(
+        "--allow-errors", action="store_true", help="Continue on cell errors"
+    )
     p_exec.add_argument("--save-images", metavar="DIR", help="Save images to directory")
     p_exec.set_defaults(func=cmd_execute)
 
     # validate
     p_val = subparsers.add_parser("validate", help="Validate notebook")
     p_val.add_argument("notebook", help="Path to notebook")
-    p_val.add_argument("--require-outputs", action="store_true", help="Warn if cells have no outputs")
+    p_val.add_argument(
+        "--require-outputs", action="store_true", help="Warn if cells have no outputs"
+    )
     p_val.set_defaults(func=cmd_validate)
 
     # convert
@@ -604,9 +636,15 @@ def main() -> int:
     p_grep = subparsers.add_parser("grep", help="Search cells for pattern")
     p_grep.add_argument("pattern", help="Regex pattern to search for")
     p_grep.add_argument("notebook", help="Path to notebook")
-    p_grep.add_argument("-i", "--ignore-case", action="store_true", help="Case-insensitive search")
-    p_grep.add_argument("-C", "--context", action="store_true", help="Show full cell context")
-    p_grep.add_argument("--cells-only", action="store_true", help="Print only matching cell indices")
+    p_grep.add_argument(
+        "-i", "--ignore-case", action="store_true", help="Case-insensitive search"
+    )
+    p_grep.add_argument(
+        "-C", "--context", action="store_true", help="Show full cell context"
+    )
+    p_grep.add_argument(
+        "--cells-only", action="store_true", help="Print only matching cell indices"
+    )
     p_grep.set_defaults(func=cmd_grep)
 
     args = parser.parse_args()

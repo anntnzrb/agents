@@ -15,6 +15,7 @@ disable-model-invocation: true
 This skill uses `scripts/cli.py` as the public cross-platform entrypoint and local docs in `references/` for advanced execution patterns.
 
 ## Activation Triggers
+
 - User mentions `$ecuabet`.
 - User gives an Ecuabet match id/url and asks for predictions.
 - User asks for live refresh with cards/fouls/offsides/corners/weather/form context.
@@ -31,6 +32,7 @@ uv run --script <skill-dir>/scripts/cli.py ...
 Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, executable bits, or shebang dispatch.
 
 ## Layout
+
 - `scripts/cli.py`: public dispatcher (`run` and `feed`).
 - `scripts/main.py`: integrated internal entrypoint (all feeds + recommendations).
 - `scripts/ecuabet.py`: Ecuabet markets/tracker.
@@ -51,6 +53,7 @@ Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, execut
 Assumption: current directory is this skill folder (the one containing `SKILL.md`).
 
 ### One-shot integrated output
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py run <match_id_or_url> \
   --ecuabet <match_id_or_url> \
@@ -60,6 +63,7 @@ uv run --script <skill-dir>/scripts/cli.py run <match_id_or_url> \
 ```
 
 ### Live watch mode
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py run <match_id_or_url> \
   --ecuabet <match_id_or_url> \
@@ -71,6 +75,7 @@ uv run --script <skill-dir>/scripts/cli.py run <match_id_or_url> \
 ```
 
 ### Recommendation tuning
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py run <match_id_or_url> \
   --ecuabet <match_id_or_url> \
@@ -86,6 +91,7 @@ uv run --script <skill-dir>/scripts/cli.py run <match_id_or_url> \
 ```
 
 ### Per-feed debug
+
 ```bash
 uv run --script <skill-dir>/scripts/cli.py feed ecuabet <match_id_or_url> --no-raw --compact
 uv run --script <skill-dir>/scripts/cli.py feed sofascore "<team_a> <team_b>" --no-raw --compact
@@ -95,6 +101,7 @@ uv run --script <skill-dir>/scripts/cli.py feed understat --league La_Liga --sea
 ```
 
 ### Quality gate
+
 ```bash
 cd <skill-dir>/scripts
 uv run --with pytest pytest tests -q
@@ -103,6 +110,7 @@ uv run --with pytest pytest tests -q
 ## Output Focus
 
 Primary fields to report from `uv run --script <skill-dir>/scripts/cli.py run` output:
+
 - `oneShot.topRecommendation`
 - `oneShot.shortlist`
 - `oneShot.globalConfidence`

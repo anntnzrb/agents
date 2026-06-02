@@ -38,17 +38,24 @@ export function warn(message: string): void {
 }
 export { panicMessage } from "@runtime/errors.ts";
 
-export function parseTimeoutSeconds(value: string | undefined, defaultSeconds: number): number {
+export function parseTimeoutSeconds(
+  value: string | undefined,
+  defaultSeconds: number,
+): number {
   const parsed = value ? Number.parseInt(value, 10) : Number.NaN;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultSeconds;
 }
 
 export const syncTimeout = (): number => DEFAULT_SYNC_TIMEOUT_SECONDS;
 
-export const syncLockPath = (syncEnv: SyncEnv): string => path.join(syncEnv.managedStateHome, SYNC_LOCK_FILE);
+export const syncLockPath = (syncEnv: SyncEnv): string =>
+  path.join(syncEnv.managedStateHome, SYNC_LOCK_FILE);
 
 export function tryAcquireSyncLock(syncEnv: SyncEnv): SyncLock | undefined {
-  return tryAcquireSyncLockImpl(syncEnv.managedStateHome, syncLockPath(syncEnv));
+  return tryAcquireSyncLockImpl(
+    syncEnv.managedStateHome,
+    syncLockPath(syncEnv),
+  );
 }
 
 export function startSyncWatchdog(timeoutSeconds: number): void {
@@ -76,7 +83,10 @@ export async function runSync(syncEnv: SyncEnv): Promise<boolean> {
   const baseSuccess = cleanupSuccess
     ? (() => {
         try {
-          return runJobsWithPreserve(syncPlan.jobs, preservePathsByDst(extensionHookStates));
+          return runJobsWithPreserve(
+            syncPlan.jobs,
+            preservePathsByDst(extensionHookStates),
+          );
         } catch (error) {
           err(panicMessage(error));
           return false;
@@ -84,7 +94,9 @@ export async function runSync(syncEnv: SyncEnv): Promise<boolean> {
       })()
     : false;
 
-  const managedStateSuccess = baseSuccess ? recordManagedEntries(managedPlan) : true;
+  const managedStateSuccess = baseSuccess
+    ? recordManagedEntries(managedPlan)
+    : true;
   const hookSuccess =
     baseSuccess && managedStateSuccess
       ? await runSyncHooks(syncPlan.hooks, extensionHookStates)
@@ -131,7 +143,9 @@ async function runSyncHooks(
   let success = true;
   for (const hook of hooks) {
     const hookState =
-      hook.kind === "ExtensionDeps" ? extensionHookStates.get(hook.statePath)?.state : undefined;
+      hook.kind === "ExtensionDeps"
+        ? extensionHookStates.get(hook.statePath)?.state
+        : undefined;
     if (!(await runSyncHook(hook, hookState))) {
       success = false;
     }
@@ -156,7 +170,10 @@ async function runSyncHook(
         }
         const success = await installExtensionDeps(hook.root, hook.timeoutMs);
         if (success) {
-          recordExtensionHookState(hook, extensionHookState ?? prepareExtensionHookState(hook));
+          recordExtensionHookState(
+            hook,
+            extensionHookState ?? prepareExtensionHookState(hook),
+          );
         } else {
           clearExtensionHookState(hook.statePath);
         }

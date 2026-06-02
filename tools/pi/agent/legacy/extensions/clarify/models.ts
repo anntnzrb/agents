@@ -7,17 +7,17 @@ export const ClarifyOptionSchema = Type.Object({
   description: Type.Optional(
     Type.String({
       description: "Details.",
-    })
+    }),
   ),
   recommended: Type.Optional(
     Type.Boolean({
       description: "Recommended.",
-    })
+    }),
   ),
   default: Type.Optional(
     Type.Boolean({
       description: "Alias.",
-    })
+    }),
   ),
 });
 
@@ -31,18 +31,18 @@ export const ClarifyQuestionSchema = Type.Object({
   options: Type.Optional(
     Type.Array(ClarifyOptionSchema, {
       description: "Options.",
-    })
+    }),
   ),
   allowOther: Type.Optional(
     Type.Boolean({
       description: "Allow custom answer.",
-    })
+    }),
   ),
   timeoutSeconds: Type.Optional(
     Type.Integer({
       minimum: 1,
       description: "Auto-select timeout.",
-    })
+    }),
   ),
 });
 

@@ -19,6 +19,7 @@ Agent Readiness measures how prepared a codebase is for AI-assisted development.
 ## Quick Start
 
 Run `/readiness-report` to evaluate the current repository. The analysis:
+
 1. Scans repository structure, CI configs, and tooling
 2. Evaluates 81 criteria across 9 technical pillars
 3. Determines maturity level (L1-L5) based on 80% threshold per level
@@ -51,6 +52,7 @@ uv run --script <skill-dir>/scripts/cli.py run --repo-path . --format markdown
 ```
 
 This script checks for:
+
 - Configuration files (.eslintrc, pyproject.toml, etc.)
 - CI/CD workflows (.github/workflows/, .gitlab-ci.yml)
 - Documentation (README, AGENTS.md, CONTRIBUTING.md)
@@ -68,6 +70,7 @@ uv run --script <skill-dir>/scripts/cli.py report --analysis-file <temp-dir>/rea
 ### Step 3: Present Results
 
 The report includes:
+
 1. **Overall Score**: Pass rate percentage and maturity level achieved
 2. **Level Progress**: Bar showing L1-L5 completion percentages
 3. **Strengths**: Top-performing pillars with passing criteria
@@ -78,29 +81,29 @@ The report includes:
 
 Each pillar addresses specific failure modes in AI-assisted development:
 
-| Pillar | Purpose | Key Signals |
-|--------|---------|-------------|
-| **Style & Validation** | Catch bugs instantly | Linters, formatters, type checkers |
-| **Build System** | Fast, reliable builds | Build docs, CI speed, automation |
-| **Testing** | Verify correctness | Unit/integration tests, coverage |
-| **Documentation** | Guide the agent | AGENTS.md, README, architecture docs |
-| **Dev Environment** | Reproducible setup | Devcontainer, env templates |
-| **Debugging & Observability** | Diagnose issues | Logging, tracing, metrics |
-| **Security** | Protect the codebase | CODEOWNERS, secrets management |
-| **Task Discovery** | Find work to do | Issue templates, PR templates |
-| **Product & Analytics** | Error-to-insight loop | Error tracking, product analytics |
+| Pillar                        | Purpose               | Key Signals                          |
+| ----------------------------- | --------------------- | ------------------------------------ |
+| **Style & Validation**        | Catch bugs instantly  | Linters, formatters, type checkers   |
+| **Build System**              | Fast, reliable builds | Build docs, CI speed, automation     |
+| **Testing**                   | Verify correctness    | Unit/integration tests, coverage     |
+| **Documentation**             | Guide the agent       | AGENTS.md, README, architecture docs |
+| **Dev Environment**           | Reproducible setup    | Devcontainer, env templates          |
+| **Debugging & Observability** | Diagnose issues       | Logging, tracing, metrics            |
+| **Security**                  | Protect the codebase  | CODEOWNERS, secrets management       |
+| **Task Discovery**            | Find work to do       | Issue templates, PR templates        |
+| **Product & Analytics**       | Error-to-insight loop | Error tracking, product analytics    |
 
 See `references/criteria.md` for the complete list of 81 criteria per pillar.
 
 ## Five Maturity Levels
 
-| Level | Name | Description | Agent Capability |
-|-------|------|-------------|------------------|
-| L1 | Initial | Basic version control | Manual assistance only |
-| L2 | Managed | Basic CI/CD and testing | Simple, well-defined tasks |
-| L3 | Standardized | Production-ready for agents | Routine maintenance |
-| L4 | Measured | Comprehensive automation | Complex features |
-| L5 | Optimized | Full autonomous capability | End-to-end development |
+| Level | Name         | Description                 | Agent Capability           |
+| ----- | ------------ | --------------------------- | -------------------------- |
+| L1    | Initial      | Basic version control       | Manual assistance only     |
+| L2    | Managed      | Basic CI/CD and testing     | Simple, well-defined tasks |
+| L3    | Standardized | Production-ready for agents | Routine maintenance        |
+| L4    | Measured     | Comprehensive automation    | Complex features           |
+| L5    | Optimized    | Full autonomous capability  | End-to-end development     |
 
 **Level Progression**: To unlock a level, pass ≥80% of criteria at that level AND all previous levels.
 
@@ -117,6 +120,7 @@ See `references/maturity-levels.md` for detailed level requirements.
 ### Priority Order
 
 Fix gaps in this order:
+
 1. **L1-L2 failures**: Foundation issues blocking basic agent operation
 2. **L3 failures**: Production readiness gaps
 3. **High-impact L4+ failures**: Optimization opportunities
@@ -139,6 +143,7 @@ Fix gaps in this order:
 ## Automated Remediation
 
 After reviewing the report, common fixes can be automated:
+
 - Generate AGENTS.md from repository structure
 - Add missing issue/PR templates
 - Configure standard linters and formatters

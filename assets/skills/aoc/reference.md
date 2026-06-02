@@ -2,17 +2,17 @@
 
 ## Data Structure Selection
 
-| Need | Data Structure |
-|------|----------------|
-| Fast lookup by key | Hash map / Dictionary |
-| Ordered traversal | Sorted array / Tree |
-| Fast min/max extraction | Heap / Priority queue |
-| FIFO processing | Queue / Deque |
-| LIFO processing | Stack |
-| Membership testing | Set |
-| Counting occurrences | Counter / Frequency map |
-| Disjoint sets / Union-find | Union-Find structure |
-| Coordinate storage | Tuple as key in hash map |
+| Need                       | Data Structure           |
+| -------------------------- | ------------------------ |
+| Fast lookup by key         | Hash map / Dictionary    |
+| Ordered traversal          | Sorted array / Tree      |
+| Fast min/max extraction    | Heap / Priority queue    |
+| FIFO processing            | Queue / Deque            |
+| LIFO processing            | Stack                    |
+| Membership testing         | Set                      |
+| Counting occurrences       | Counter / Frequency map  |
+| Disjoint sets / Union-find | Union-Find structure     |
+| Coordinate storage         | Tuple as key in hash map |
 
 ### Space-Time Tradeoffs
 
@@ -65,14 +65,14 @@
 
 ### Common Part 2 Patterns
 
-| Pattern | Example | Response |
-|---------|---------|----------|
-| Scale up | 10 → 1,000,000 | Optimize algorithm |
-| Add dimensions | 2D grid → 3D | Generalize coordinates |
-| Reverse | "Find X" | "Given X, find Y" |
-| Many iterations | 1000 → 1 billion | Cycle detection |
-| Add constraints | New rules | Refactor logic |
-| Combine operations | Chain transforms | Compose functions |
+| Pattern            | Example          | Response               |
+| ------------------ | ---------------- | ---------------------- |
+| Scale up           | 10 → 1,000,000   | Optimize algorithm     |
+| Add dimensions     | 2D grid → 3D     | Generalize coordinates |
+| Reverse            | "Find X"         | "Given X, find Y"      |
+| Many iterations    | 1000 → 1 billion | Cycle detection        |
+| Add constraints    | New rules        | Refactor logic         |
+| Combine operations | Chain transforms | Compose functions      |
 
 ### Preparation Strategies
 
@@ -109,6 +109,6 @@
 
 - Descriptive variable names (not single letters except loop indices)
 - Functions do one thing
-- Comments explain *why*, not *what*
+- Comments explain _why_, not _what_
 - Assertions document assumptions
 - Consistent formatting throughout

@@ -26,7 +26,10 @@ describe("treex action helpers", () => {
       { id: "s1", type: "branch_summary", summary: "summary" },
     ];
 
-    expect(filterActionableEntries(entries).map((entry) => entry.id)).toEqual(["u1", "s1"]);
+    expect(filterActionableEntries(entries).map((entry) => entry.id)).toEqual([
+      "u1",
+      "s1",
+    ]);
   });
 
   test("updates all items in a group and keeps summarize default", () => {
@@ -40,6 +43,10 @@ describe("treex action helpers", () => {
     expect(items.every((item) => item.action === "summarize")).toBe(true);
 
     const updated = setGroupAction(items, "turn-1-assistant", "pick");
-    expect(updated.map((item) => item.action)).toEqual(["summarize", "pick", "pick"]);
+    expect(updated.map((item) => item.action)).toEqual([
+      "summarize",
+      "pick",
+      "pick",
+    ]);
   });
 });

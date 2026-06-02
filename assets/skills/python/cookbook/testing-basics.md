@@ -3,11 +3,13 @@
 Core pytest setup, unit tests, exceptions, floats, and fixtures.
 
 ---
+
 ## Setup pytest with Coverage
 
 **Problem**: Need to configure pytest with coverage reporting and best practices for a Python project.
 
 **Solution**:
+
 ```bash
 uv add --dev pytest pytest-cov pytest-asyncio
 ```
@@ -41,6 +43,7 @@ asyncio_mode = "auto"
 **Problem**: Need to test class methods, validation, and equality in a structured way.
 
 **Solution**:
+
 ```python
 # tests/test_entities.py
 import pytest
@@ -72,6 +75,7 @@ class TestUser:
 **Problem**: Need to verify that code raises the correct exceptions with specific messages.
 
 **Solution**:
+
 ```python
 def test_division_by_zero():
     with pytest.raises(ZeroDivisionError):
@@ -91,6 +95,7 @@ def test_value_error_message():
 **Problem**: Floating point arithmetic can produce slightly different results that fail equality checks.
 
 **Solution**:
+
 ```python
 def test_float_comparison():
     result = 0.1 + 0.2
@@ -110,6 +115,7 @@ def test_with_tolerance():
 **Problem**: Tests need shared setup objects like users or database connections with proper cleanup.
 
 **Solution**:
+
 ```python
 # tests/conftest.py
 import pytest
@@ -144,6 +150,7 @@ def test_save_user(database, user):
 **Problem**: Some fixtures are expensive to create and should be shared across multiple tests.
 
 **Solution**:
+
 ```python
 @pytest.fixture(scope="session")
 def app():

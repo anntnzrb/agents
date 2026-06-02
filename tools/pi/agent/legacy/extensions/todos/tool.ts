@@ -2,9 +2,17 @@
  * Tool registration for todo operations.
  */
 
-import type { ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionContext,
+  ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { TodoParams, type TodoAction, type TodoRecord, type TodoToolDetails } from "./types.ts";
+import {
+  TodoParams,
+  type TodoAction,
+  type TodoRecord,
+  type TodoToolDetails,
+} from "./types.ts";
 import {
   appendTodo,
   claimTodoAssignment,
@@ -18,9 +26,21 @@ import {
   releaseTodoAssignment,
   updateTodo,
 } from "./storage/index.ts";
-import { formatTodoId, normalizeTodoId, splitTodosByAssignment, validateTodoId } from "./utils.ts";
-import { appendExpandHint, renderTodoDetail, renderTodoList } from "./render.ts";
-import { serializeTodoForAgent, serializeTodoListForAgent } from "./serialize.ts";
+import {
+  formatTodoId,
+  normalizeTodoId,
+  splitTodosByAssignment,
+  validateTodoId,
+} from "./utils.ts";
+import {
+  appendExpandHint,
+  renderTodoDetail,
+  renderTodoList,
+} from "./render.ts";
+import {
+  serializeTodoForAgent,
+  serializeTodoListForAgent,
+} from "./serialize.ts";
 
 /**
  * Create the todo tool definition.
@@ -34,7 +54,8 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
       "Title is the short summary; body is long-form markdown notes (update replaces, append adds). " +
       "Todo ids are shown as TODO-<hex>; id parameters accept TODO-<hex> or the raw hex filename. " +
       "Claim tasks before working on them to avoid conflicts, and close them when complete.",
-    promptSnippet: "Manage persisted todos (list/get/create/update/claim/release/delete).",
+    promptSnippet:
+      "Manage persisted todos (list/get/create/update/claim/release/delete).",
     promptGuidelines: [
       "Use todo when work needs persisted task tracking across turns or sessions.",
       "Claim todo items before executing work and release or close them when done.",
@@ -52,7 +73,9 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
           const listedTodos = [...assignedTodos, ...openTodos];
           const currentSessionId = ctx.sessionManager.getSessionId();
           return {
-            content: [{ type: "text", text: serializeTodoListForAgent(listedTodos) }],
+            content: [
+              { type: "text", text: serializeTodoListForAgent(listedTodos) },
+            ],
             details: { action: "list", todos: listedTodos, currentSessionId },
           };
         }
@@ -122,7 +145,12 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
           }
 
           return {
-            content: [{ type: "text", text: serializeTodoForAgent(result as TodoRecord) }],
+            content: [
+              {
+                type: "text",
+                text: serializeTodoForAgent(result as TodoRecord),
+              },
+            ],
             details: { action: "create", todo: result as TodoRecord },
           };
         }
@@ -143,7 +171,7 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
               tags: params.tags,
               body: params.body,
             },
-            ctx
+            ctx,
           );
 
           if (typeof result === "object" && "error" in result) {
@@ -154,7 +182,12 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
           }
 
           return {
-            content: [{ type: "text", text: serializeTodoForAgent(result as TodoRecord) }],
+            content: [
+              {
+                type: "text",
+                text: serializeTodoForAgent(result as TodoRecord),
+              },
+            ],
             details: { action: "update", todo: result as TodoRecord },
           };
         }
@@ -166,7 +199,12 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
               details: { action: "append", error: "id required" },
             };
           }
-          const result = await appendTodo(todosDir, params.id, params.body ?? "", ctx);
+          const result = await appendTodo(
+            todosDir,
+            params.id,
+            params.body ?? "",
+            ctx,
+          );
           if (typeof result === "object" && "error" in result) {
             return {
               content: [{ type: "text", text: result.error }],
@@ -174,7 +212,12 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
             };
           }
           return {
-            content: [{ type: "text", text: serializeTodoForAgent(result as TodoRecord) }],
+            content: [
+              {
+                type: "text",
+                text: serializeTodoForAgent(result as TodoRecord),
+              },
+            ],
             details: { action: "append", todo: result as TodoRecord },
           };
         }
@@ -186,7 +229,12 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
               details: { action: "claim", error: "id required" },
             };
           }
-          const result = await claimTodoAssignment(todosDir, params.id, ctx, Boolean(params.force));
+          const result = await claimTodoAssignment(
+            todosDir,
+            params.id,
+            ctx,
+            Boolean(params.force),
+          );
           if (typeof result === "object" && "error" in result) {
             return {
               content: [{ type: "text", text: result.error }],
@@ -194,7 +242,12 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
             };
           }
           return {
-            content: [{ type: "text", text: serializeTodoForAgent(result as TodoRecord) }],
+            content: [
+              {
+                type: "text",
+                text: serializeTodoForAgent(result as TodoRecord),
+              },
+            ],
             details: { action: "claim", todo: result as TodoRecord },
           };
         }
@@ -210,7 +263,7 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
             todosDir,
             params.id,
             ctx,
-            Boolean(params.force)
+            Boolean(params.force),
           );
           if (typeof result === "object" && "error" in result) {
             return {
@@ -219,7 +272,12 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
             };
           }
           return {
-            content: [{ type: "text", text: serializeTodoForAgent(result as TodoRecord) }],
+            content: [
+              {
+                type: "text",
+                text: serializeTodoForAgent(result as TodoRecord),
+              },
+            ],
             details: { action: "release", todo: result as TodoRecord },
           };
         }
@@ -248,7 +306,12 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
           }
 
           return {
-            content: [{ type: "text", text: serializeTodoForAgent(result as TodoRecord) }],
+            content: [
+              {
+                type: "text",
+                text: serializeTodoForAgent(result as TodoRecord),
+              },
+            ],
             details: { action: "delete", todo: result as TodoRecord },
           };
         }
@@ -260,7 +323,8 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
       const id = typeof args.id === "string" ? args.id : "";
       const normalizedId = id ? normalizeTodoId(id) : "";
       const title = typeof args.title === "string" ? args.title : "";
-      let text = theme.fg("toolTitle", theme.bold("todo ")) + theme.fg("muted", action);
+      let text =
+        theme.fg("toolTitle", theme.bold("todo ")) + theme.fg("muted", action);
       if (normalizedId) {
         text += " " + theme.fg("accent", formatTodoId(normalizedId));
       }
@@ -285,7 +349,12 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
       }
 
       if (details.action === "list" || details.action === "list-all") {
-        let text = renderTodoList(theme, details.todos, expanded, details.currentSessionId);
+        let text = renderTodoList(
+          theme,
+          details.todos,
+          expanded,
+          details.currentSessionId,
+        );
         if (!expanded) {
           const { closedTodos } = splitTodosByAssignment(details.todos);
           if (closedTodos.length) {
@@ -317,7 +386,10 @@ export const createTodoTool = (todosDirLabel: string): ToolDefinition => {
                     : null;
       if (actionLabel) {
         const lines = text.split("\n");
-        lines[0] = theme.fg("success", "✓ ") + theme.fg("muted", `${actionLabel} `) + lines[0];
+        lines[0] =
+          theme.fg("success", "✓ ") +
+          theme.fg("muted", `${actionLabel} `) +
+          lines[0];
         text = lines.join("\n");
       }
       if (!expanded) {

@@ -3,11 +3,13 @@
 Parameterized fixtures, async tests, and mocking patterns.
 
 ---
+
 ## Run Tests with Multiple Backend Implementations
 
 **Problem**: Need to verify code works with different database backends or configurations.
 
 **Solution**:
+
 ```python
 @pytest.fixture(params=["postgres", "mysql", "sqlite"])
 def database(request):
@@ -27,6 +29,7 @@ def database(request):
 **Problem**: Need to create multiple instances of an object with different attributes in a single test.
 
 **Solution**:
+
 ```python
 @pytest.fixture
 def make_user():
@@ -50,6 +53,7 @@ def test_multiple_users(make_user):
 **Problem**: Need to test the same function with many different input/output combinations.
 
 **Solution**:
+
 ```python
 @pytest.mark.parametrize("input,expected", [
     (1, 2),
@@ -71,6 +75,7 @@ def test_double(input, expected):
 **Problem**: Need to test a function with every combination of two or more parameter sets.
 
 **Solution**:
+
 ```python
 @pytest.mark.parametrize("x", [1, 2, 3])
 @pytest.mark.parametrize("y", [10, 20])
@@ -88,6 +93,7 @@ def test_multiply(x, y):
 **Problem**: Parametrized test names like `test_age[0]` don't clearly indicate what's being tested.
 
 **Solution**:
+
 ```python
 @pytest.mark.parametrize("age,valid", [
     pytest.param(18, True, id="adult"),
@@ -113,6 +119,7 @@ def test_age_validation(age, valid):
 **Problem**: Need to test asynchronous functions and coroutines.
 
 **Solution**:
+
 ```python
 # tests/test_async.py
 import pytest
@@ -140,6 +147,7 @@ async def test_fetch_multiple_users():
 **Problem**: Tests need async setup like HTTP clients or database connections.
 
 **Solution**:
+
 ```python
 @pytest.fixture
 async def async_client():
@@ -162,6 +170,7 @@ async def test_api_call(async_client):
 **Problem**: Tests shouldn't call real databases or external APIs.
 
 **Solution**:
+
 ```python
 from unittest.mock import Mock, patch, AsyncMock
 
@@ -185,6 +194,7 @@ def test_with_mock():
 **Problem**: Need to mock imported functions like `requests.get` without modifying the code under test.
 
 **Solution**:
+
 ```python
 @patch("my_project.services.requests.get")
 def test_external_api(mock_get):
@@ -211,6 +221,7 @@ def test_with_context_manager():
 **Problem**: Need to mock async functions and verify they were awaited.
 
 **Solution**:
+
 ```python
 @pytest.fixture
 async def mock_api():
@@ -236,6 +247,7 @@ async def test_async_service(mock_api):
 **Problem**: Need to mock objects that use `__enter__` and `__exit__` like file handles.
 
 **Solution**:
+
 ```python
 from unittest.mock import MagicMock
 
@@ -257,6 +269,7 @@ def test_context_manager():
 **Problem**: Want to verify a method was called while still executing the real implementation.
 
 **Solution**:
+
 ```python
 from unittest.mock import patch
 

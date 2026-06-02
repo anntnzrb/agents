@@ -44,6 +44,7 @@ Use ±3 BPM windows, and prefer key confidence > 0.25 when matching.
 ## 4) Agent mediation protocol (recommended)
 
 For each user question:
+
 1. If scope small: run `ask` directly.
 2. If scope broad/ambiguous: run `analyze --json` first.
 3. Answer with explicit evidence fields.
@@ -58,6 +59,7 @@ jq '.plot_files' <temp-dir>/song.json
 ```
 
 Use plots for:
+
 - waveform density changes
 - spectral mass movement
 - chroma concentration trends
@@ -76,6 +78,7 @@ uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze ./song.flac -
 ```
 
 Now you have a portable packet:
+
 - analysis JSON
 - plot PNGs
 - deterministic fields for downstream automation
@@ -83,6 +86,7 @@ Now you have a portable packet:
 ## 8) Extension blueprints (not implemented yet)
 
 Potential upgrades:
+
 - beat timestamp export (`--beats-json`)
 - machine-readable ask/chat output (`--json`)
 - richer section detector (novelty curve / recurrence)

@@ -1,5 +1,8 @@
 import { CustomEditor } from "@earendil-works/pi-coding-agent";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -24,7 +27,7 @@ class PromptEditor extends CustomEditor {
   constructor(
     tui: ConstructorParameters<typeof CustomEditor>[0],
     theme: ConstructorParameters<typeof CustomEditor>[1],
-    keybindings: ConstructorParameters<typeof CustomEditor>[2]
+    keybindings: ConstructorParameters<typeof CustomEditor>[2],
   ) {
     super(tui, theme, keybindings);
     delete (this as { borderColor?: (text: string) => string }).borderColor;
@@ -59,7 +62,11 @@ class PromptEditor extends CustomEditor {
     const minRightBorder = 1;
     const maxLabelLen = Math.max(
       0,
-      width - prefix.length - labelLeftSpace.length - labelRightSpace.length - minRightBorder
+      width -
+        prefix.length -
+        labelLeftSpace.length -
+        labelRightSpace.length -
+        minRightBorder,
     );
     if (maxLabelLen <= 0) return lines;
     if (label.length > maxLabelLen) label = label.slice(0, maxLabelLen);
@@ -70,8 +77,10 @@ class PromptEditor extends CustomEditor {
 
     const right = "─".repeat(Math.max(0, remaining));
     const borderColor = this.borderColor as (text: string) => string;
-    const labelColor = this.modeLabelColor ?? ((text: string) => borderColor(text));
-    lines[0] = borderColor(prefix) + labelColor(labelChunk) + borderColor(right);
+    const labelColor =
+      this.modeLabelColor ?? ((text: string) => borderColor(text));
+    lines[0] =
+      borderColor(prefix) + labelColor(labelChunk) + borderColor(right);
     return lines;
   }
 
@@ -104,8 +113,13 @@ function collectUserPromptsFromEntries(entries: Array<unknown>): PromptEntry[] {
     if (!entry || typeof entry !== "object") continue;
     if (!("type" in entry) || entry.type !== "message") continue;
     if (!("message" in entry)) continue;
-    const message = entry.message as { role?: string; content?: Array<{ type: string; text?: string }>; timestamp?: number };
-    if (!message || message.role !== "user" || !Array.isArray(message.content)) continue;
+    const message = entry.message as {
+      role?: string;
+      content?: Array<{ type: string; text?: string }>;
+      timestamp?: number;
+    };
+    if (!message || message.role !== "user" || !Array.isArray(message.content))
+      continue;
     const text = extractText(message.content);
     if (!text) continue;
     const timestamp = Number(message.timestamp ?? Date.now());
@@ -120,7 +134,10 @@ function getSessionDirForCwd(cwd: string): string {
   return path.join(getGlobalAgentDir(), "sessions", safePath);
 }
 
-async function readTail(filePath: string, maxBytes = 256 * 1024): Promise<string> {
+async function readTail(
+  filePath: string,
+  maxBytes = 256 * 1024,
+): Promise<string> {
   let fileHandle: fs.FileHandle | undefined;
   try {
     const stats = await fs.stat(filePath);
@@ -148,10 +165,12 @@ async function readTail(filePath: string, maxBytes = 256 * 1024): Promise<string
 
 async function loadPromptHistoryForCwd(
   cwd: string,
-  excludeSessionFile?: string
+  excludeSessionFile?: string,
 ): Promise<PromptEntry[]> {
   const sessionDir = getSessionDirForCwd(path.resolve(cwd));
-  const resolvedExclude = excludeSessionFile ? path.resolve(excludeSessionFile) : undefined;
+  const resolvedExclude = excludeSessionFile
+    ? path.resolve(excludeSessionFile)
+    : undefined;
   const prompts: PromptEntry[] = [];
 
   let entries: Dirent[] = [];
@@ -172,15 +191,18 @@ async function loadPromptHistoryForCwd(
         } catch {
           return undefined;
         }
-      })
+      }),
   );
 
   const sortedFiles = files
-    .filter((file): file is { filePath: string; mtimeMs: number } => Boolean(file))
+    .filter((file): file is { filePath: string; mtimeMs: number } =>
+      Boolean(file),
+    )
     .sort((a, b) => b.mtimeMs - a.mtimeMs);
 
   for (const file of sortedFiles) {
-    if (resolvedExclude && path.resolve(file.filePath) === resolvedExclude) continue;
+    if (resolvedExclude && path.resolve(file.filePath) === resolvedExclude)
+      continue;
 
     const tail = await readTail(file.filePath);
     if (!tail) continue;
@@ -200,7 +222,12 @@ async function loadPromptHistoryForCwd(
         content?: Array<{ type: string; text?: string }>;
         timestamp?: number;
       };
-      if (!message || message.role !== "user" || !Array.isArray(message.content)) continue;
+      if (
+        !message ||
+        message.role !== "user" ||
+        !Array.isArray(message.content)
+      )
+        continue;
       const text = extractText(message.content);
       if (!text) continue;
       const timestamp = Number(message.timestamp ?? Date.now());
@@ -213,7 +240,10 @@ async function loadPromptHistoryForCwd(
   return prompts;
 }
 
-function buildHistoryList(currentSession: PromptEntry[], previousSessions: PromptEntry[]): PromptEntry[] {
+function buildHistoryList(
+  currentSession: PromptEntry[],
+  previousSessions: PromptEntry[],
+): PromptEntry[] {
   const all = [...currentSession, ...previousSessions];
   all.sort((a, b) => a.timestamp - b.timestamp);
 
@@ -232,12 +262,17 @@ function buildHistoryList(currentSession: PromptEntry[], previousSessions: Promp
 function historiesMatch(a: PromptEntry[], b: PromptEntry[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i += 1) {
-    if (a[i]?.text !== b[i]?.text || a[i]?.timestamp !== b[i]?.timestamp) return false;
+    if (a[i]?.text !== b[i]?.text || a[i]?.timestamp !== b[i]?.timestamp)
+      return false;
   }
   return true;
 }
 
-function setEditor(pi: ExtensionAPI, ctx: ExtensionContext, history: PromptEntry[]): void {
+function setEditor(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  history: PromptEntry[],
+): void {
   ctx.ui.setEditorComponent((tui, theme, keybindings) => {
     const editor = new PromptEditor(tui, theme, keybindings);
     setRequestEditorRender(() => editor.requestRenderNow());
@@ -273,7 +308,10 @@ export function applyEditor(pi: ExtensionAPI, ctx: ExtensionContext): void {
   setEditor(pi, ctx, immediateHistory);
 
   void (async () => {
-    const previousPrompts = await loadPromptHistoryForCwd(ctx.cwd, sessionFile ?? undefined);
+    const previousPrompts = await loadPromptHistoryForCwd(
+      ctx.cwd,
+      sessionFile ?? undefined,
+    );
     if (currentLoad !== loadCounter) return;
     if (ctx.ui.getEditorText() !== initialText) return;
     const history = buildHistoryList(currentPrompts, previousPrompts);

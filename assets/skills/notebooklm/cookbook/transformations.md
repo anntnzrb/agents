@@ -7,6 +7,7 @@
 **Problem**: Summarize specific sources within a notebook.
 
 **Solution**:
+
 ```bash
 nlm summarize <notebook-id> <source-id-1> <source-id-2>
 ```
@@ -20,6 +21,7 @@ nlm summarize <notebook-id> <source-id-1> <source-id-2>
 **Problem**: Ask for explanations based on selected sources.
 
 **Solution**:
+
 ```bash
 nlm explain <notebook-id> <source-id-1> <source-id-2>
 ```
@@ -33,6 +35,7 @@ nlm explain <notebook-id> <source-id-1> <source-id-2>
 **Problem**: Turn sources into a study guide.
 
 **Solution**:
+
 ```bash
 nlm study-guide <notebook-id> <source-id-1> <source-id-2>
 ```

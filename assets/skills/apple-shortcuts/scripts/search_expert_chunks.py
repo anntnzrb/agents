@@ -106,7 +106,9 @@ def main() -> int:
         help="Optional source-group filter.",
     )
     parser.add_argument("--top", type=int, default=8, help="Maximum results to return.")
-    parser.add_argument("--min-score", type=int, default=1, help="Minimum score threshold.")
+    parser.add_argument(
+        "--min-score", type=int, default=1, help="Minimum score threshold."
+    )
     parser.add_argument("--corpus-root", help="Path to shortcuts-docs-corpus root.")
     parser.add_argument("--json", action="store_true", help="Output JSON.")
     parser.add_argument(
@@ -125,7 +127,9 @@ def main() -> int:
     if args.show_corpus_root:
         print(f"corpus_root={corpus_root}", file=sys.stderr)
 
-    chunk_file = corpus_root / "expert-pack" / "chunks" / "shortcuts_expert_chunks.jsonl"
+    chunk_file = (
+        corpus_root / "expert-pack" / "chunks" / "shortcuts_expert_chunks.jsonl"
+    )
     terms = _tokenize(args.query)
 
     hits: list[dict] = []

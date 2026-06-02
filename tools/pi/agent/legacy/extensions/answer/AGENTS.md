@@ -3,6 +3,7 @@
 Purpose: /answer extracts questions from last assistant message, shows Q&A TUI, sends answers as a user turn.
 
 ## File map
+
 - index.ts: command wiring, guard checks, orchestration
 - constants.ts: prompts + defaults
 - types.ts: shared types
@@ -11,8 +12,10 @@ Purpose: /answer extracts questions from last assistant message, shows Q&A TUI, 
 - qna-component.ts: interactive TUI component
 
 ## Navigation
+
 Start at index.ts. For extraction flow see extraction.ts; for UI behavior see qna-component.ts.
 
 ## Stop Rules
+
 - Keep this extension focused on extracting questions, collecting answers, and sending the resulting user turn.
 - Do not change answer content policy or general assistant behavior from this extension.
