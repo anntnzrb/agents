@@ -6,7 +6,6 @@ compatibility: Requires `uv` and network access.
 metadata:
   author: anntnzrb
 allowed-tools: ""
-disable-model-invocation: true
 ---
 
 # artificial-analysis-live

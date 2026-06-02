@@ -5,8 +5,7 @@ license: GPL-3.0-or-later
 compatibility: Requires `uv` and `nix`. Uses bundled skill-local `scripts/cli.py`. Network access required.
 metadata:
   author: anntnzrb
-allowed-tools: ""
-disable-model-invocation: true
+  allowed-tools: ""
 ---
 
 # flight-live

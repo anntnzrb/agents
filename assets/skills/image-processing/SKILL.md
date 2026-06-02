@@ -5,8 +5,6 @@ license: GPL-3.0-or-later
 compatibility: claude-code-only
 metadata:
   author: anntnzrb
-allowed-tools: ""
-disable-model-invocation: true
 ---
 
 # Image Processing

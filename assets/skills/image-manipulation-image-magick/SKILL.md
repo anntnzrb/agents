@@ -5,8 +5,6 @@ license: GPL-3.0-or-later
 compatibility: Requires ImageMagick installed and available as `magick` on PATH. Cross-platform examples provided for PowerShell (Windows) and Bash (Linux/macOS).
 metadata:
   author: anntnzrb
-allowed-tools: ""
-disable-model-invocation: true
 ---
 
 # Image Manipulation with ImageMagick

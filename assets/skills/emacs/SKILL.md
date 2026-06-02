@@ -5,8 +5,7 @@ license: GPL-3.0-or-later
 compatibility: Requires `emacsclient` and `uv`. Best with a running Emacs server. `info` preferred for manuals; `rg` recommended for installed docs/source lookup.
 metadata:
   author: anntnzrb
-allowed-tools: ""
-disable-model-invocation: true
+  allowed-tools: ""
 ---
 
 # Emacs

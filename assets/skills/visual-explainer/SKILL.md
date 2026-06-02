@@ -6,7 +6,6 @@ compatibility: Requires a browser to view generated HTML files. Optional surf-cl
 metadata:
   author: anntnzrb
 allowed-tools: ""
-disable-model-invocation: true
 ---
 
 # Visual Explainer

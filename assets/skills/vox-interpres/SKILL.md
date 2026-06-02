@@ -6,7 +6,6 @@ compatibility: Requires `uv`, `ffmpeg`/`ffprobe`, and local audio files.
 metadata:
   author: anntnzrb
 allowed-tools: ""
-disable-model-invocation: true
 ---
 
 # vox-interpres

@@ -6,7 +6,6 @@ compatibility: Requires `uv`. Uses bundled skill-local `scripts/cli.py`. Network
 metadata:
   author: anntnzrb
 allowed-tools: ""
-disable-model-invocation: true
 ---
 
 # amz-live

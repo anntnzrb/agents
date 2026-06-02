@@ -5,7 +5,6 @@ license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
 allowed-tools: ""
-disable-model-invocation: true
 ---
 
 # NotebookLM CLI
