@@ -1,109 +1,92 @@
 ---
 name: golang
-description: Develop Go (Golang) applications using modern patterns, popular libraries, and idiomatic design. Activate when working with .go files, go.mod, go.sum, or user mentions Go, Golang, goroutines, channels, or Go libraries like gin, cobra, gorm.
+description: Develop Go applications with Go 1.26 stable, golangci-lint v2, slog, typed errors, idiomatic concurrency, and practical testing. Use whenever working with .go files, go.mod, go.work, go.sum, or user mentions Go/Golang, goroutines, channels, context, chi, cobra, pgx, sqlc, testcontainers, or Go concurrency/HTTP/CLI/database patterns.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
 allowed-tools: ""
-disable-model-invocation: true
 ---
 
-# Golang Development Skill
+# Go Development
+
+Go: Go 1.26 stable, golangci-lint v2, slog, typed errors, idiomatic concurrency, practical tests, small packages. Stdlib-first, framework-optional.
 
 ## Activation Triggers
 
-- Working with `.go` files, `go.mod`, `go.sum`, `go.work`
-- User mentions Go, Golang, or Go-specific terms
-- Questions about Go libraries, frameworks, or tooling
-- Concurrency patterns (goroutines, channels, context)
+- `.go`, `go.mod`, `go.sum`, `go.work`
+- Go-specific terms: goroutine, channel, context, struct, interface, errgroup, synctest, testcontainers
+- Go libraries: chi, cobra, kong, pgx, sqlc, slog, fx, bubbletea, connectrpc
+- Concurrency patterns, structured logging, HTTP routing, CLI tooling, database access, integration testing
 
-## Workflow: Research-First Approach
+## Workflow
 
-Before implementing, gather context from authoritative sources:
-
-```
-# Context7 docs for repo-specific guidance
-context7 docs /gin-gonic/gin "how to set up middleware"
-context7 docs /uber-go/zap "structured logging setup"
-
-# gh search code for real-world implementation examples
-gh search code "ratelimit.New(" --language=go
-gh search code "errgroup.WithContext(" --language=go
-
-# For style/idiom questions
-context7 docs /uber-go/guide "style guide patterns and idioms"
+```text
+1. DETECT    -> go.mod version/go.work structure, toolchain directive, package layout, golangci-lint config, test gates
+2. ROUTE     -> load the required follow-up docs for the task domain
+3. MODEL     -> typed structs, small interfaces, domain errors, discriminated states at boundaries
+4. COMPOSE   -> small packages, constructor injection, functional options, stdlib-first decisions
+5. VALIDATE  -> parse JSON/env/CLI/API/db input once at the edge; typed values inward
+6. VERIFY    -> repo-appropriate gate: golangci-lint -> go vet -> go test -race -count=1 ./...
 ```
 
-## Notes
+## Core Principles
 
-Repository routing table lives in `reference.md`.
+- Respect the `go` directive in go.mod first. Target Go 1.26 for new applications; libraries pin the minimum version they need.
+- Use stdlib when it is sufficient: `net/http` (Go 1.22+), `log/slog`, `slices`, `maps`, `errors`, `testing`, `iter`.
+- Add third-party libraries only when they solve a concrete problem stdlib does not: chi for sub-routing composition, pgx for postgres-specific features, sqlc for type-safe SQL codegen, testcontainers for integration tests.
+- Accept interfaces, return structs. Define interfaces at the consumer, not the provider.
+- Compose small single-responsibility packages. Use `internal/` for private code, `cmd/` for binaries.
+- Keep JSON/API/env/CLI data at boundaries; validate once with typed structs; convert inward.
+- Never use `interface{}` — use `any`. Never use archived `golang/mock` — use `uber-go/mock` or hand-written fakes.
+- Prefer explicit error paths: `fmt.Errorf("context: %w", err)` wrapping, `errors.Is`, `errors.Join`, `errors.AsType` (Go 1.26+).
+- Context is control flow, not data storage. Pass as first argument. Never store in structs.
 
-## CLI Quick Reference
+## Quality Gate Essentials
 
-### Module Management
+- **New projects:** golangci-lint v2 (`linters.default: standard` + `modernize`, `gosec`, `bodyclose`), go vet, go test (`-race -count=1 -shuffle=on ./...`).
+- **Inherited projects:** preserve existing gates unless changing them is part of the task.
+- **Baseline commands:**
+  ```bash
+  golangci-lint run ./...
+  go vet ./...
+  go test -race -count=1 -shuffle=on ./...
+  ```
+- Concurrency-heavy code: add `testing/synctest` (Go 1.25+) for deterministic tests.
+- Integration-heavy code: testcontainers-go + build tags (`//go:build integration`).
+- Fuzz entry points: `go test -fuzz=FuzzXxx -fuzztime=30s ./...`.
 
-```bash
-go mod init <module>       # Initialize module
-go mod tidy                # Sync dependencies
-go get <pkg>@latest        # Add/update dependency
-go get <pkg>@v1.2.3        # Specific version
-go mod download            # Download dependencies
-go mod why <pkg>           # Why is pkg needed
-go mod graph               # Dependency graph
-```
+## Required follow-up reads
 
-### Build & Run
+You MUST load only the references needed by the task:
 
-```bash
-go build ./...             # Build all packages
-go run .                   # Run current package
-go install ./cmd/...       # Install binaries
-go generate ./...          # Run go:generate directives
-```
+| Need | Read | When |
+|---|---|---|
+| Modern features by Go version | `cookbook/modern.md` | New project setup, version upgrade, feature discovery |
+| Go 1.22-1.23 features | `cookbook/modern-1.22-1.23.md` | Loop vars, ServeMux routing, range-over-func, rand/v2 |
+| Go 1.24-1.26 features | `cookbook/modern-1.24-1.26.md` | Swiss Tables, tool directive, synctest, new(expr), AsType |
+| Concurrency, goroutines, channels | `cookbook/concurrency.md` | Any goroutine/channel/errgroup/synctest task |
+| Error handling, wrapping, sentinels | `cookbook/errors.md` | Error wrapping, Is/As/AsType, Join, custom types |
+| Iterators, range-over-func | `cookbook/iterators.md` | iter.Seq/Seq2, stdlib iterator consumers, custom iterators |
+| Generics best practices | `cookbook/generics.md` | Generic types, constraints, when to avoid |
+| JSON/API/CLI boundaries | `cookbook/correctness.md` | Validation, typed boundaries, invariants, nil-safety |
+| HTTP services, routing, middleware | `cookbook/http-services.md` | ServeMux, chi, middleware chains, graceful shutdown |
+| Testing, table-driven, testify, benchmarks | `cookbook/testing.md` | Unit tests, benchmarks, fuzzing, integration test setup |
+| Patterns: DI, options, interfaces | `cookbook/patterns.md` | Constructor injection, functional options, repository |
+| Tooling: lint, format, build, CI | `cookbook/tooling.md` | golangci-lint config, gofumpt, buf, goreleaser, testcontainers |
+| Go conventions, project layout, quick decisions | `reference.md` | Syntax, layout, anti-patterns, routing table, CLI ref |
+| Update/audit the Go skill itself | `references/update-playbook.md` | When asked to refresh, audit, or update the skill for new Go releases |
+| Source ledger for Go/tooling claims | `references/sources.md` | When auditing sources, release notes, or updating the skill |
 
-### Testing
+## Must / Must Not
 
-```bash
-go test ./...              # Run all tests
-go test -v ./...           # Verbose output
-go test -race ./...        # Race detector
-go test -cover ./...       # Coverage summary
-go test -coverprofile=c.out ./... && go tool cover -html=c.out  # Coverage HTML
-go test -bench=. ./...     # Run benchmarks
-go test -fuzz=FuzzXxx ./...  # Fuzz testing
-go test -run=TestName      # Run specific test
-go test -count=1           # Disable test caching
-```
-
-### Linting (golangci-lint)
-
-```bash
-golangci-lint run          # Run all linters
-golangci-lint run --fix    # Auto-fix issues
-golangci-lint linters      # List available linters
-```
-
-### Workspaces (multi-module)
-
-```bash
-go work init ./mod1 ./mod2 # Initialize workspace
-go work use ./mod3         # Add module to workspace
-go work sync               # Sync workspace
-```
-
-### Other Tools
-
-```bash
-go fmt ./...               # Format code
-go vet ./...               # Static analysis
-go doc <pkg>               # View documentation
-go env                     # Environment variables
-go version                 # Go version
-```
-
-## Files
-
-- `reference.md` - Go 1.24+ features, project layout, Uber style highlights
-- `cookbook/testing.md` - Table-driven tests, testify, mocking, benchmarks
-- `cookbook/concurrency.md` - Goroutines, channels, context, errgroup
-- `cookbook/patterns.md` - Functional options, DI, error handling
+- MUST use `slog` for structured logging in new code when `go >= 1.21` (not `log`).
+- MUST wrap errors with `fmt.Errorf("context: %w", err)` and check with `errors.Is`. Use `errors.AsType[T]` when `go >= 1.26`; use `errors.As` for older `go` directives.
+- MUST use `any` (not `interface{}`), `os.ReadFile` (not `ioutil.ReadFile`).
+- MUST use `go mod tidy` after any dependency change.
+- MUST pass `context.Context` as the first parameter; never store it in structs.
+- MUST define interfaces where they're consumed; keep them small (1-3 methods).
+- MUST NOT ignore returned errors (linter gate: errcheck).
+- MUST NOT use archived `golang/mock` — use `uber-go/mock` or hand-written fakes.
+- MUST NOT use `src/` layout — module root is the project root.
+- MUST NOT use experimental/GOEXPERIMENT-only features as default practice.
+- MUST NOT carry raw `map[string]any` or `json.RawMessage` through core logic.

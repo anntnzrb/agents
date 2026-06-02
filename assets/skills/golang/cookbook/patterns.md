@@ -1,9 +1,22 @@
 # Patterns Cookbook
 
-Recipes for common Go design patterns: functional options, dependency injection, error handling, and more.
+Recipes for common Go design patterns: functional options, dependency injection, logging, and more.
 
 ---
 
+## Contents
+
+- [Functional Options](#functional-options)
+- [Functional Options with Validation](#functional-options-with-validation)
+- [Constructor Injection](#constructor-injection)
+- [Dependency Injection with uber-go/fx](#dependency-injection-with-uber-gofx)
+- [fx Lifecycle Hooks](#fx-lifecycle-hooks)
+- [Structured Logging with slog](#structured-logging-with-slog)
+- [slog HandlerOptions and Context-Aware Logging](#slog-handleroptions-and-context-aware-logging)
+- [Small Interfaces and Composition](#small-interfaces-and-composition)
+- [Repository Pattern](#repository-pattern)
+
+---
 ## Functional Options
 
 **Problem**: How to create flexible constructors with optional configuration?
@@ -50,7 +63,7 @@ server := NewServer(
 )
 ```
 
-**Tip**: Set sensible defaults in the constructor. Options only override what's explicitly set.
+**Tip**: Set sensible defaults before applying options. Options only override what's explicitly set. This pattern composes well — callers add options without changing signatures.
 
 ---
 
@@ -73,8 +86,18 @@ func WithPort(port int) Option {
     }
 }
 
+func WithTimeout(d time.Duration) Option {
+    return func(c *Config) error {
+        if d <= 0 {
+            return fmt.Errorf("timeout must be positive, got %v", d)
+        }
+        c.timeout = d
+        return nil
+    }
+}
+
 func NewConfig(opts ...Option) (*Config, error) {
-    c := &Config{port: 8080}
+    c := &Config{port: 8080, timeout: 30 * time.Second}
     for _, opt := range opts {
         if err := opt(c); err != nil {
             return nil, err
@@ -84,13 +107,13 @@ func NewConfig(opts ...Option) (*Config, error) {
 }
 ```
 
-**Tip**: Return errors from options for validation. This catches misconfigurations at startup.
+**Tip**: Return errors from option functions for validation. This catches misconfigurations at startup instead of at runtime. Each option validates its own domain — keep validation logic colocated with the option.
 
 ---
 
 ## Constructor Injection
 
-**Problem**: How to make code testable by injecting dependencies?
+**Problem**: How to make code testable and explicit about its dependencies?
 
 **Solution**:
 
@@ -104,14 +127,15 @@ func NewUserService(repo UserRepository, logger *slog.Logger) *UserService {
     return &UserService{repo: repo, logger: logger}
 }
 
-// Interface for testing
+// Interface defined at the consumer — not the implementation package
 type UserRepository interface {
-    Get(id string) (*User, error)
-    Save(user *User) error
+    Get(ctx context.Context, id string) (*User, error)
+    Save(ctx context.Context, user *User) error
 }
+
 ```
 
-**Tip**: Accept interfaces, return structs. Interfaces should be defined by the consumer, not the provider.
+**Tip**: Accept interfaces, return structs. Define interfaces where they are consumed, not where they are implemented. This keeps interfaces small and relevant. Do not inject `context.Context` — pass it as the first parameter to methods.
 
 ---
 
@@ -141,12 +165,12 @@ func main() {
 }
 
 // Constructors receive dependencies automatically
-func NewUserService(repo *UserRepository, log *zap.Logger) *UserService {
+func NewUserService(repo UserRepository, log *slog.Logger) *UserService {
     return &UserService{repo: repo, logger: log}
 }
 ```
 
-**Tip**: fx resolves dependencies by type. Use `fx.Annotate` with tags for multiple implementations of same type.
+**Tip**: fx resolves dependencies by type. Use `fx.Annotate` with named groups or tags when multiple implementations of the same type exist. For most applications, manual constructor injection is simpler and clearer — reach for fx when the dependency graph grows beyond 10+ constructors.
 
 ---
 
@@ -173,140 +197,110 @@ func NewDatabase(lc fx.Lifecycle) *sql.DB {
 }
 ```
 
-**Tip**: OnStart hooks run in dependency order; OnStop hooks run in reverse order.
+**Tip**: OnStart hooks run in dependency order; OnStop hooks run in reverse order. Each hook receives a context with the startup/shutdown timeout.
 
 ---
 
-## Error Wrapping
+## Structured Logging with slog
 
-**Problem**: How to add context to errors while preserving the original error?
+**Problem**: How to produce structured, machine-readable logs without third-party libraries?
 
 **Solution**:
 
 ```go
-func LoadConfig(path string) (*Config, error) {
-    data, err := os.ReadFile(path)
-    if err != nil {
-        return nil, fmt.Errorf("reading config %s: %w", path, err)
-    }
+import "log/slog"
 
-    var cfg Config
-    if err := json.Unmarshal(data, &cfg); err != nil {
-        return nil, fmt.Errorf("parsing config: %w", err)
-    }
+func main() {
+    logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-    return &cfg, nil
+    logger.Info("server started",
+        "port", 8080,
+        "env", os.Getenv("ENV"),
+    )
+
+    // Attributed errors
+    logger.Error("database connection failed",
+        "dsn", dsn,
+        "retries", 3,
+        slog.Any("err", err),
+    )
+
+    // Log groups for related fields
+    logger.Info("request completed",
+        slog.Group("request",
+            "method", r.Method,
+            "path", r.URL.Path,
+        ),
+        slog.Group("response",
+            "status", status,
+            "duration", time.Since(start),
+        ),
+    )
 }
 ```
 
-**Tip**: Use `%w` verb to wrap errors. This allows `errors.Is` and `errors.As` to inspect the chain.
+**Tip**: Use `slog.NewJSONHandler` for production (parseable), `slog.NewTextHandler` for development (readable). Pass loggers as constructor dependencies — never use a package-level global logger.
 
 ---
 
-## Sentinel Errors
+## slog HandlerOptions and Context-Aware Logging
 
-**Problem**: How to define and check for specific error conditions?
+**Problem**: How to control log levels, add static attributes, and propagate context values to logs?
 
 **Solution**:
 
 ```go
-var (
-    ErrNotFound     = errors.New("not found")
-    ErrUnauthorized = errors.New("unauthorized")
-    ErrInvalidInput = errors.New("invalid input")
-)
-
-func GetUser(id string) (*User, error) {
-    user := db.Find(id)
-    if user == nil {
-        return nil, ErrNotFound
-    }
-    return user, nil
-}
-
-// Check sentinel
-if errors.Is(err, ErrNotFound) {
-    http.Error(w, "user not found", http.StatusNotFound)
-}
-```
-
-**Tip**: Sentinel errors are package-level variables. Export them for callers to check against.
-
----
-
-## Custom Error Types
-
-**Problem**: How to include structured data in errors for programmatic handling?
-
-**Solution**:
-
-```go
-type ValidationError struct {
-    Field   string
-    Message string
-}
-
-func (e *ValidationError) Error() string {
-    return fmt.Sprintf("validation failed on %s: %s", e.Field, e.Message)
-}
-
-func Validate(u *User) error {
-    if u.Email == "" {
-        return &ValidationError{Field: "email", Message: "required"}
-    }
-    return nil
-}
-
-// Extract error data
-var valErr *ValidationError
-if errors.As(err, &valErr) {
-    fmt.Printf("field %s: %s\n", valErr.Field, valErr.Message)
-}
-```
-
-**Tip**: Use `errors.As` to extract typed errors from wrapped chains.
-
----
-
-## Multiple Errors with multierr
-
-**Problem**: How to collect and return multiple errors from a batch operation?
-
-**Solution**:
-
-```go
-import "go.uber.org/multierr"
-
-func validateAll(items []Item) error {
-    var errs error
-    for _, item := range items {
-        if err := validate(item); err != nil {
-            errs = multierr.Append(errs, err)
+// Handler with custom level and static attributes
+handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+    Level: slog.LevelInfo,
+    ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+        if a.Key == "time" {
+            a.Value = slog.StringValue(a.Value.Time().UTC().Format(time.RFC3339))
         }
-    }
-    return errs
+        return a
+    },
+})
+
+logger := slog.New(handler.WithAttrs([]slog.Attr{
+    slog.String("service", "api"),
+    slog.String("version", version),
+}))
+
+// Extract attributes from context
+func handleRequest(logger *slog.Logger, r *http.Request) {
+    ctx := r.Context()
+    logger.InfoContext(ctx, "handling request")
+    // Note: stdlib handlers do NOT automatically extract context values.
+    // Pass attributes explicitly or install a custom handler that reads from ctx.
 }
 
-// Inspect individual errors
-if errs := validateAll(items); errs != nil {
-    for _, err := range multierr.Errors(errs) {
-        log.Println(err)
-    }
+// Injecting request-scoped fields into context without passing logger around
+func logMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        ctx := context.WithValue(r.Context(), requestIDKey, generateID())
+        r = r.WithContext(ctx)
+
+        logger.LogAttrs(ctx, slog.LevelInfo, "request started",
+            slog.String("request_id", requestIDFrom(ctx)),
+            slog.String("method", r.Method),
+        )
+        next.ServeHTTP(w, r)
+    })
 }
 ```
 
-**Tip**: `multierr.Append` returns nil if both arguments are nil - safe for accumulation loops.
+**Tip**: `slog.LogAttrs` is the most efficient way to log — it avoids `any` allocation for attribute values. Use `HandlerOptions.AddSource` to include file/line in development. Use `HandlerOptions.ReplaceAttr` to redact secrets or reformat timestamps.
 
 ---
 
-## Small Interfaces
+## Small Interfaces and Composition
 
-**Problem**: How to design interfaces that are easy to implement and mock?
+**Problem**: How to design interfaces that are easy to implement, mock, and compose?
 
 **Solution**:
 
 ```go
-// Good: small, focused interfaces
+// Small, focused interfaces — 1-2 methods each
 type Reader interface {
     Read(p []byte) (n int, err error)
 }
@@ -315,113 +309,35 @@ type Writer interface {
     Write(p []byte) (n int, err error)
 }
 
-// Compose when needed
-type ReadWriter interface {
+type Closer interface {
+    Close() error
+}
+
+// Compose for broader contracts
+type ReadWriteCloser interface {
     Reader
     Writer
+    Closer
+}
+
+// Consumer-side example
+type UserFetcher interface {
+    Fetch(ctx context.Context, id string) (*User, error)
+}
+
+// A handler depends only on what it needs
+func NewHandler(fetcher UserFetcher, logger *slog.Logger) *Handler {
+    return &Handler{fetcher: fetcher, logger: logger}
 }
 ```
 
-**Tip**: The bigger the interface, the weaker the abstraction. Prefer 1-2 methods per interface.
-
----
-
-## Interface Segregation
-
-**Problem**: How to avoid forcing implementations to provide unused methods?
-
-**Solution**:
-
-```go
-// Instead of one large interface
-type UserService interface {
-    Get(id string) (*User, error)
-    Create(u *User) error
-    Update(u *User) error
-    Delete(id string) error
-}
-
-// Split by use case
-type UserGetter interface {
-    Get(id string) (*User, error)
-}
-
-type UserCreator interface {
-    Create(u *User) error
-}
-
-// Components depend only on what they need
-func NewHandler(getter UserGetter) *Handler {
-    return &Handler{users: getter}
-}
-```
-
-**Tip**: Define interfaces where they're used (consumer side), not where they're implemented.
-
----
-
-## Builder Pattern
-
-**Problem**: How to construct complex objects step-by-step with a fluent API?
-
-**Solution**:
-
-```go
-type RequestBuilder struct {
-    method  string
-    url     string
-    headers map[string]string
-    body    io.Reader
-}
-
-func NewRequest() *RequestBuilder {
-    return &RequestBuilder{
-        method:  "GET",
-        headers: make(map[string]string),
-    }
-}
-
-func (b *RequestBuilder) Method(m string) *RequestBuilder {
-    b.method = m
-    return b
-}
-
-func (b *RequestBuilder) URL(u string) *RequestBuilder {
-    b.url = u
-    return b
-}
-
-func (b *RequestBuilder) Header(k, v string) *RequestBuilder {
-    b.headers[k] = v
-    return b
-}
-
-func (b *RequestBuilder) Build() (*http.Request, error) {
-    req, err := http.NewRequest(b.method, b.url, b.body)
-    if err != nil {
-        return nil, err
-    }
-    for k, v := range b.headers {
-        req.Header.Set(k, v)
-    }
-    return req, nil
-}
-
-// Usage
-req, _ := NewRequest().
-    Method("POST").
-    URL("https://api.example.com").
-    Header("Content-Type", "application/json").
-    Build()
-```
-
-**Tip**: Return `*Builder` from each method for chaining. Put validation in `Build()`.
+**Tip**: The bigger the interface, the weaker the abstraction. Prefer 1-2 methods per interface. Compose small interfaces into larger ones at the call site when needed. Define interfaces where they are consumed, not where they are implemented.
 
 ---
 
 ## Repository Pattern
 
-**Problem**: How to abstract data access behind a clean interface?
+**Problem**: How to abstract data access behind a clean, testable interface?
 
 **Solution**:
 
@@ -447,97 +363,13 @@ func (r *postgresUserRepo) Get(ctx context.Context, id string) (*User, error) {
     err := r.db.QueryRowContext(ctx,
         "SELECT id, name, email FROM users WHERE id = $1", id,
     ).Scan(&user.ID, &user.Name, &user.Email)
-    if err == sql.ErrNoRows {
+    if errors.Is(err, sql.ErrNoRows) {
         return nil, ErrNotFound
+    if err != nil {
+        return nil, fmt.Errorf("querying user %s: %w", id, err)
     }
-    return &user, err
+    return &user, nil
 }
 ```
 
-**Tip**: Always accept `context.Context` as first parameter. Convert DB errors to domain errors.
-
----
-
-## HTTP Middleware
-
-**Problem**: How to add cross-cutting concerns (logging, auth, recovery) to HTTP handlers?
-
-**Solution**:
-
-```go
-type Middleware func(http.Handler) http.Handler
-
-func Logging(logger *slog.Logger) Middleware {
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            start := time.Now()
-            next.ServeHTTP(w, r)
-            logger.Info("request",
-                "method", r.Method,
-                "path", r.URL.Path,
-                "duration", time.Since(start),
-            )
-        })
-    }
-}
-
-func Recovery() Middleware {
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            defer func() {
-                if err := recover(); err != nil {
-                    w.WriteHeader(http.StatusInternalServerError)
-                }
-            }()
-            next.ServeHTTP(w, r)
-        })
-    }
-}
-
-// Chain middleware
-func Chain(h http.Handler, mw ...Middleware) http.Handler {
-    for i := len(mw) - 1; i >= 0; i-- {
-        h = mw[i](h)
-    }
-    return h
-}
-
-// Usage
-handler := Chain(myHandler, Logging(logger), Recovery())
-```
-
-**Tip**: Middleware wraps in reverse order - first in list runs first.
-
----
-
-## Graceful Shutdown
-
-**Problem**: How to stop a server cleanly, finishing in-flight requests?
-
-**Solution**:
-
-```go
-func main() {
-    server := &http.Server{Addr: ":8080", Handler: router}
-
-    go func() {
-        if err := server.ListenAndServe(); err != http.ErrServerClosed {
-            log.Fatal(err)
-        }
-    }()
-
-    quit := make(chan os.Signal, 1)
-    signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-    <-quit
-
-    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-    defer cancel()
-
-    if err := server.Shutdown(ctx); err != nil {
-        log.Fatal("shutdown error:", err)
-    }
-    log.Println("server stopped")
-}
-```
-
-**Tip**: `Shutdown` stops accepting new connections and waits for existing ones to complete.
+**Tip**: Always accept `context.Context` as the first parameter. Translate database-specific errors (`sql.ErrNoRows`) to domain-level sentinel errors so callers don't import the database driver.
