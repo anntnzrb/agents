@@ -2,8 +2,8 @@
 # Models
 # =============================================================================
 modelRoles:
-  default: opencode-go/deepseek-v4-pro:xhigh
-  task: opencode-go/deepseek-v4-pro:xhigh
+  default: opencode-go/deepseek-v4-pro:auto
+  task: opencode-go/deepseek-v4-pro:auto
 
   commit: opencode-go/deepseek-v4-flash:xhigh
   smol: opencode-go/deepseek-v4-flash:xhigh
@@ -24,6 +24,8 @@ steeringMode: all
 interruptMode: wait
 doubleEscapeAction: tree
 treeFilterMode: no-tools
+tui:
+  textSizing: true
 
 # =============================================================================
 # MCP / Memory
@@ -47,6 +49,8 @@ mcp:
 branchSummary:
   enabled: true
   reserveTokens: 16384
+compaction:
+  strategy: shake
 
 # =============================================================================
 # Tools
