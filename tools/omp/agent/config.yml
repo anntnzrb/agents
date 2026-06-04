@@ -2,8 +2,8 @@
 # Models
 # =============================================================================
 modelRoles:
-  default: opencode-go/deepseek-v4-pro:auto
-  task: opencode-go/deepseek-v4-pro:auto
+  default: opencode-go/deepseek-v4-pro:xhigh
+  task: opencode-go/deepseek-v4-pro:xhigh
 
   commit: opencode-go/deepseek-v4-flash:xhigh
   smol: opencode-go/deepseek-v4-flash:xhigh
