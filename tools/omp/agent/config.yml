@@ -2,8 +2,8 @@
 # Models
 # =============================================================================
 modelRoles:
-  default: opencode-go/deepseek-v4-pro:xhigh
-  task: opencode-go/deepseek-v4-pro:xhigh
+  default: openai-codex/gpt-5.5:low
+  task: openai-codex/gpt-5.5:low
 
   commit: opencode-go/deepseek-v4-flash:xhigh
   smol: opencode-go/deepseek-v4-flash:xhigh
