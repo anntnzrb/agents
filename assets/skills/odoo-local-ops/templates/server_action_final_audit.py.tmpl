@@ -1,0 +1,102 @@
+# Model: {{ model_name }}
+# Purpose: independent final audit only. No create/write/unlink. No sudo.
+
+Model = env['{{ model_name }}']
+EXPECTED_TOTAL = {{ expected_total }}
+EXPECTED_WRONG_REMAINING = 0
+EXPECTED_DISTRIBUTION = {{ expected_distribution_literal }}
+INDEPENDENT_DOMAIN = {{ independent_domain_literal }}
+WRONG_REMAINING_DOMAIN = {{ wrong_remaining_domain_literal }}
+LIVE_DOMAIN = {{ live_domain_literal }}
+APPROVED_LIVE_TOTAL = {{ approved_live_total }}
+LEFTOVER_TABLES = {{ leftover_tables_literal }}
+GROUP_FIELDS = [{{ group_fields_literal }}]
+failures = []
+
+
+def esc(value):
+    if value is None:
+        return 'null'
+    if value is False:
+        return 'false'
+    if value is True:
+        return 'true'
+    if isinstance(value, (int, float)):
+        return str(value)
+    text = str(value)
+    text = text.replace('\\', '\\\\').replace('"', '\\"')
+    text = text.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+    return '"' + text + '"'
+
+
+def pair(key, value):
+    return esc(key) + ':' + esc(value)
+
+
+def obj(items):
+    return '{' + ','.join(items) + '}'
+
+
+def arr(values):
+    return '[' + ','.join([esc(value) for value in values]) + ']'
+
+
+def group_obj(row, group_field):
+    group_value = row.get(group_field)
+    return obj([
+        pair('key', group_value and group_value[0] or False),
+        pair('label', group_value and group_value[1] or False),
+        pair('count', row.get(group_field + '_count') or row.get('__count') or 0),
+    ])
+
+
+def groups_payload(domain):
+    chunks = []
+    for group_field in GROUP_FIELDS[:3]:
+        rows = Model.read_group(domain, ['id:count'], [group_field], lazy=False)
+        chunks.append(obj([
+            pair('field', group_field),
+            'rows:' + '[' + ','.join([group_obj(row, group_field) for row in rows]) + ']',
+        ]))
+    return '[' + ','.join(chunks) + ']'
+
+
+total = Model.search_count(INDEPENDENT_DOMAIN)
+wrong_remaining = Model.search_count(WRONG_REMAINING_DOMAIN)
+live_total = Model.search_count(LIVE_DOMAIN)
+live_domain_delta = live_total - APPROVED_LIVE_TOTAL
+
+if total != EXPECTED_TOTAL:
+    failures.append(obj([pair('check', 'expected_total'), pair('expected', EXPECTED_TOTAL), pair('actual', total)]))
+if wrong_remaining != EXPECTED_WRONG_REMAINING:
+    failures.append(obj([pair('check', 'wrong_remaining_rows'), pair('expected', 0), pair('actual', wrong_remaining)]))
+
+# Distribution/invariant placeholder: compare EXPECTED_DISTRIBUTION with groups_payload(INDEPENDENT_DOMAIN).
+distribution = groups_payload(INDEPENDENT_DOMAIN)
+
+# Persistent leftovers check: pg_temp_* is intentionally excluded.
+env.cr.execute("""
+SELECT schemaname, tablename
+FROM pg_tables
+WHERE schemaname NOT LIKE 'pg_temp_%'
+  AND tablename = ANY(%s)
+""", [LEFTOVER_TABLES])
+leftovers = env.cr.dictfetchall()
+if leftovers:
+    failures.append(obj([pair('check', 'persistent_leftovers'), pair('actual', len(leftovers))]))
+
+status = failures and 'failed' or 'ok'
+payload = obj([
+    pair('status', status),
+    'failures:' + '[' + ','.join(failures) + ']',
+    pair('total', total),
+    pair('expected_total', EXPECTED_TOTAL),
+    pair('wrong_remaining', wrong_remaining),
+    pair('live_total', live_total),
+    pair('approved_live_total', APPROVED_LIVE_TOTAL),
+    pair('live_domain_delta', live_domain_delta),
+    pair('live_domain_delta_is_failure', False),
+    pair('persistent_leftovers', len(leftovers)),
+    'distribution:' + distribution,
+])
+raise UserError(payload)

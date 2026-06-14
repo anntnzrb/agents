@@ -1,0 +1,83 @@
+# Model: {{ model_name }}
+# Purpose: use only for small writes or when ORM business logic is required.
+# No sudo. Do not call commit/rollback.
+
+Model = env['{{ model_name }}']
+DOMAIN = {{ domain_literal }}
+TO_UPDATE_DOMAIN = DOMAIN + [{{ extra_predicates }}]
+EXPECTED_TO_UPDATE = {{ expected_to_update }}
+MAX_RECORDS = {{ max_records }}
+VALS = {{ vals_literal }}
+
+
+def esc(value):
+    if value is None:
+        return 'null'
+    if value is False:
+        return 'false'
+    if value is True:
+        return 'true'
+    if isinstance(value, (int, float)):
+        return str(value)
+    text = str(value)
+    text = text.replace('\\', '\\\\').replace('"', '\\"')
+    text = text.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+    return '"' + text + '"'
+
+
+def pair(key, value):
+    return esc(key) + ':' + esc(value)
+
+
+def obj(items):
+    return '{' + ','.join(items) + '}'
+
+
+pre_count = Model.search_count(TO_UPDATE_DOMAIN)
+if pre_count != EXPECTED_TO_UPDATE:
+    payload = obj([
+        pair('error', 'candidate_count_changed_before_write'),
+        pair('expected', EXPECTED_TO_UPDATE),
+        pair('actual', pre_count),
+        pair('write_executed', False),
+    ])
+    raise UserError(payload)
+
+records_to_update = Model.search(TO_UPDATE_DOMAIN, order='id asc', limit={{ max_records }})
+if len(records_to_update) != EXPECTED_TO_UPDATE:
+    payload = obj([
+        pair('error', 'limit_or_search_mismatch'),
+        pair('expected', EXPECTED_TO_UPDATE),
+        pair('actual', len(records_to_update)),
+        pair('write_executed', False),
+    ])
+    raise UserError(payload)
+
+records_to_update.write({{ vals_literal }})
+env.invalidate_all()
+remaining = Model.search_count(TO_UPDATE_DOMAIN)
+if remaining != 0:
+    payload = obj([
+        pair('error', 'postcheck_remaining_rows'),
+        pair('expected', 0),
+        pair('actual', remaining),
+        pair('write_executed', True),
+    ])
+    raise UserError(payload)
+
+payload = obj([
+    pair('status', 'ok'),
+    pair('updated', EXPECTED_TO_UPDATE),
+    pair('remaining', remaining),
+    pair('write_executed', True),
+])
+action = {
+    'type': 'ir.actions.client',
+    'tag': 'display_notification',
+    'params': {
+        'type': 'success',
+        'title': 'Server Action complete',
+        'message': payload,
+        'sticky': True,
+    },
+}

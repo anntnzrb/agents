@@ -21,6 +21,60 @@
         "Keeps route inspection clearly separate from route invocation.",
         "Describes write signals as heuristic risk indicators rather than proof."
       ]
+    },
+    {
+      "id": 3,
+      "prompt": "Necesito una acción de servidor Odoo 17 read-only para auditar crm.lead con un dominio explícito, devolver conteos por etapa/vendedor y copiar el script desde /tmp.",
+      "expected_output": "Provides a read-only Server Action workflow that writes the snippet under /tmp, copies with pbcopy, uses safe_eval-compatible code, and returns compact JSON via UserError.",
+      "files": [],
+      "expectations": [
+        "Mentions `/tmp` and `pbcopy` as the required clipboard workflow.",
+        "Uses no imports.",
+        "Uses `search_count` and `read_group`.",
+        "Returns compact JSON.",
+        "Uses `raise UserError` only because the action is read-only."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Necesito una Server Action que escriba 800 crm.lead en producción pero la UI se congela con ORM. Dame el patrón seguro.",
+      "expected_output": "Frames SQL as an exceptional production write path after audit/dry-run, with frozen temp candidates, exact pre/postchecks, and display_notification success semantics.",
+      "files": [],
+      "expectations": [
+        "Requires audit and dry-run before execution.",
+        "States SQL is only an exception when ORM/UI would freeze or time out.",
+        "Uses a temp table with `ON COMMIT DROP`.",
+        "Includes `active IS TRUE` and `IS DISTINCT FROM` where applicable.",
+        "Uses parameterized `env.cr.execute`.",
+        "Requires precheck and postcheck.",
+        "Uses `display_notification` on success.",
+        "Does not use `UserError` for success."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Mi Server Action hizo write y luego mostró UserError con updated=true, pero no cambió la base.",
+      "expected_output": "Explains that UserError after a write rolls back the transaction, recommends display_notification for success and UserError only for failure, then asks for or provides final audit.",
+      "files": [],
+      "expectations": [
+        "Explains rollback by exception.",
+        "Recommends success via `action = display_notification`.",
+        "Recommends `UserError` only for failure paths.",
+        "Recommends a final independent audit."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Quiero exportar 30000 registros desde una Server Action.",
+      "expected_output": "Rejects large modal JSON/export as unsafe, recommends compact summaries/samples or a proper external export path, and requires explicit domains.",
+      "files": [],
+      "expectations": [
+        "Warns against full modal JSON for 30000 records.",
+        "Recommends compact summaries, first/last/sample records, or an external export path.",
+        "Ignores unsafe inherited `active_domain` for global actions.",
+        "Uses explicit `domain = []` or another explicit domain.",
+        "Does not export full records unless explicitly requested."
+      ]
     }
   ]
 }

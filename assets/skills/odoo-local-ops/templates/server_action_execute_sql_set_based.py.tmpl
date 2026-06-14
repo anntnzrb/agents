@@ -1,0 +1,153 @@
+# Model: {{ model_name }}
+# Purpose: simple massive column writes only after audit/dry-run approval.
+# No sudo. Do not call commit/rollback.
+
+Model = env['{{ model_name }}']
+DOMAIN = {{ domain_literal }}
+EXPECTED_TO_UPDATE = {{ expected_to_update }}
+APPROVED_DRY_RUN_COUNT = {{ approved_dry_run_count }}
+SLUG = '{{ slug }}'
+TMP_TABLE = 'tmp_{{ slug }}_candidates'
+
+
+def esc(value):
+    if value is None:
+        return 'null'
+    if value is False:
+        return 'false'
+    if value is True:
+        return 'true'
+    if isinstance(value, (int, float)):
+        return str(value)
+    text = str(value)
+    text = text.replace('\\', '\\\\').replace('"', '\\"')
+    text = text.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+    return '"' + text + '"'
+
+
+def pair(key, value):
+    return esc(key) + ':' + esc(value)
+
+
+def obj(items):
+    return '{' + ','.join(items) + '}'
+
+
+def fail(items):
+    raise UserError(obj(items))
+
+
+current_count = Model.search_count(DOMAIN)
+if current_count != APPROVED_DRY_RUN_COUNT:
+    fail([
+        pair('error', 'COUNT_CHANGED_BEFORE_WRITE'),
+        pair('approved_count', APPROVED_DRY_RUN_COUNT),
+        pair('current_count', current_count),
+        pair('delta', current_count - APPROVED_DRY_RUN_COUNT),
+        pair('delta_fields', '{{ compact_delta_by_stage_user_program_period }}'),
+        pair('write_executed', False),
+    ])
+if current_count != EXPECTED_TO_UPDATE:
+    fail([
+        pair('error', 'precheck_count_mismatch'),
+        pair('expected', EXPECTED_TO_UPDATE),
+        pair('actual', current_count),
+        pair('write_executed', False),
+    ])
+
+env.cr.execute("SET LOCAL lock_timeout = '5s'")
+env.cr.execute("SET LOCAL statement_timeout = '60s'")
+env.cr.execute("DROP TABLE IF EXISTS tmp_{{ slug }}_candidates")
+
+# Candidate SQL must translate the ORM domain fully:
+# - include active IS TRUE for UI/ORM active_test
+# - translate M2M fields with EXISTS
+# - use IS DISTINCT FROM for nullable comparisons
+# - include exact excluded ids and target ids
+# - use env.cr.execute(sql, params); hardcode/whitelist identifiers only
+candidate_sql = """
+CREATE TEMP TABLE tmp_{{ slug }}_candidates ON COMMIT DROP AS
+SELECT target.id
+FROM {{ table_name }} AS target
+WHERE target.active IS TRUE
+  AND target.id = ANY(%s)
+  AND NOT (target.id = ANY(%s))
+  AND {{ nullable_field }} IS DISTINCT FROM %s
+  AND EXISTS (
+      SELECT 1
+      FROM {{ m2m_table }} AS rel
+      WHERE rel.{{ left_id }} = target.id
+        AND rel.{{ right_id }} = ANY(%s)
+  )
+  AND {{ additional_sql_predicates }}
+"""
+env.cr.execute(candidate_sql, [{{ target_ids_literal }}, {{ excluded_ids_literal }}, {{ comparison_value }}, {{ m2m_target_ids_literal }}])
+
+env.cr.execute("SELECT count(*) AS total, count(DISTINCT id) AS distinct_total FROM tmp_{{ slug }}_candidates")
+row = env.cr.dictfetchone()
+if row['total'] != row['distinct_total']:
+    fail([
+        pair('error', 'candidate_duplicate_ids'),
+        pair('expected', row['distinct_total']),
+        pair('actual', row['total']),
+        pair('write_executed', False),
+    ])
+if row['total'] != EXPECTED_TO_UPDATE:
+    fail([
+        pair('error', 'frozen_candidate_count_mismatch'),
+        pair('expected', EXPECTED_TO_UPDATE),
+        pair('actual', row['total']),
+        pair('write_executed', False),
+    ])
+
+env.cr.execute("CREATE UNIQUE INDEX tmp_{{ slug }}_candidates_id_idx ON tmp_{{ slug }}_candidates(id)")
+update_sql = """
+UPDATE {{ table_name }} AS target
+SET {{ sql_set_clause }}
+FROM tmp_{{ slug }}_candidates AS c
+WHERE target.id = c.id
+"""
+env.cr.execute(update_sql, [{{ update_params_literal }}])
+updated = env.cr.rowcount
+env.invalidate_all()
+if updated != EXPECTED_TO_UPDATE:
+    fail([
+        pair('error', 'updated_rowcount_mismatch'),
+        pair('expected', EXPECTED_TO_UPDATE),
+        pair('actual', updated),
+        pair('write_executed', True),
+    ])
+
+postcheck_sql = """
+SELECT count(*) AS wrong_remaining
+FROM {{ table_name }} AS target
+JOIN tmp_{{ slug }}_candidates AS c ON c.id = target.id
+WHERE {{ final_invariant_failure_sql }}
+"""
+env.cr.execute(postcheck_sql, [{{ postcheck_params_literal }}])
+post = env.cr.dictfetchone()
+if post['wrong_remaining'] != 0:
+    fail([
+        pair('error', 'postcheck_invariant_failed'),
+        pair('expected', 0),
+        pair('actual', post['wrong_remaining']),
+        pair('write_executed', True),
+    ])
+
+success_payload = obj([
+    pair('status', 'ok'),
+    pair('updated', updated),
+    pair('frozen_candidates', EXPECTED_TO_UPDATE),
+    pair('wrong_remaining', post['wrong_remaining']),
+    pair('write_executed', True),
+])
+action = {
+    'type': 'ir.actions.client',
+    'tag': 'display_notification',
+    'params': {
+        'type': 'success',
+        'title': 'Server Action complete',
+        'message': success_payload,
+        'sticky': True,
+    },
+}

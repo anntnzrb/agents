@@ -1,0 +1,93 @@
+# Model: {{ model_name }}
+# Purpose: dry run only. No create/write/unlink. No sudo. JSON directo.
+
+Model = env['{{ model_name }}']
+EXPECTED_TOTAL = {{ expected_total }}
+EXPECTED_TO_UPDATE = {{ expected_to_update }}
+DOMAIN = {{ domain_literal }}
+TO_UPDATE_DOMAIN = DOMAIN + [{{ extra_predicates }}]
+WRITE_EXECUTED = False
+GROUP_FIELDS = [{{ group_fields_literal }}]  # optional program/user/stage mappings by numeric IDs
+TARGET_IDS = {{ target_ids_literal }}
+EXCLUDED_IDS = {{ excluded_ids_literal }}
+
+
+def esc(value):
+    if value is None:
+        return 'null'
+    if value is False:
+        return 'false'
+    if value is True:
+        return 'true'
+    if isinstance(value, (int, float)):
+        return str(value)
+    text = str(value)
+    text = text.replace('\\', '\\\\').replace('"', '\\"')
+    text = text.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+    return '"' + text + '"'
+
+
+def pair(key, value):
+    return esc(key) + ':' + esc(value)
+
+
+def obj(items):
+    return '{' + ','.join(items) + '}'
+
+
+def arr(values):
+    return '[' + ','.join([esc(value) for value in values]) + ']'
+
+
+def m2o(value):
+    if not value:
+        return 'null'
+    return obj([pair('id', value[0]), pair('name', value[1])])
+
+
+def group_obj(row, group_field):
+    group_value = row.get(group_field)
+    return obj([
+        pair('key', group_value and group_value[0] or False),
+        pair('label', group_value and group_value[1] or False),
+        pair('count', row.get(group_field + '_count') or row.get('__count') or 0),
+    ])
+
+
+def groups_payload(domain):
+    chunks = []
+    for group_field in GROUP_FIELDS[:3]:
+        rows = Model.read_group(domain, ['id:count'], [group_field], lazy=False)
+        chunks.append(obj([
+            pair('field', group_field),
+            'rows:' + '[' + ','.join([group_obj(row, group_field) for row in rows]) + ']',
+        ]))
+    return '[' + ','.join(chunks) + ']'
+
+
+total = Model.search_count(DOMAIN)
+to_update = Model.search_count(TO_UPDATE_DOMAIN)
+first = Model.search(TO_UPDATE_DOMAIN, order='id asc', limit=1)
+last = Model.search(TO_UPDATE_DOMAIN, order='id desc', limit=1)
+error = False
+if total != EXPECTED_TOTAL:
+    error = 'total_count_mismatch'
+elif to_update != EXPECTED_TO_UPDATE:
+    error = 'to_update_count_mismatch'
+
+payload = obj([
+    pair('model', '{{ model_name }}'),
+    pair('status', error and 'failed' or 'ok'),
+    pair('error', error),
+    pair('domain_total', total),
+    pair('expected_total', EXPECTED_TOTAL),
+    pair('to_update', to_update),
+    pair('expected_to_update', EXPECTED_TO_UPDATE),
+    pair('first_to_update_id', first and first.id or False),
+    pair('last_to_update_id', last and last.id or False),
+    pair('target_ids', TARGET_IDS),
+    pair('excluded_ids', EXCLUDED_IDS),
+    'distribution:' + groups_payload(TO_UPDATE_DOMAIN),
+    pair('write_executed', WRITE_EXECUTED),
+])
+raise UserError(payload)

@@ -1,6 +1,6 @@
 ---
 name: odoo-local-ops
-description: "Inspect and safely operate local Odoo 17 workspaces and databases through the bundled Python CLI. Supports legacy Windows host installs and macOS/Linux Docker Compose runtimes such as /Users/Shared/odoo17. Use whenever the user wants to inspect odoo.conf, discover the active local database, read module metadata, list addon state, inspect PostgreSQL safely, or review likely mutating controller routes. Trigger even when the user only mentions local DB confusion, psql access, Docker Compose Odoo, module tables/models, or route safety."
+description: "Inspect and safely operate local Odoo 17 workspaces and databases through the bundled Python CLI. Supports legacy Windows host installs and macOS/Linux Docker Compose runtimes such as /Users/Shared/odoo17. Use whenever the user wants to inspect odoo.conf, discover the active local database, read module metadata, list addon state, inspect PostgreSQL safely, or review likely mutating controller routes. Use whenever the user needs production-safe Odoo Server Action guidance, safe_eval-compatible Python snippets, read-only audits, dry runs, clipboard-ready /tmp scripts, or guarded mass-update patterns. Trigger even when the user only mentions local DB confusion, psql access, Docker Compose Odoo, module tables/models, or route safety."
 ---
 
 # Odoo Local Ops
@@ -32,6 +32,11 @@ Do not replace it with raw `psql`, Docker Compose `exec`, shell pipelines, or in
 - safe PostgreSQL read queries for Odoo data
 - local route listing or controller write-risk review
 
+- Server Actions / ir.actions.server / Execute Python Code
+- safe_eval-compatible Python code for Odoo UI actions
+- production-safe audit, dry run, execute, or final audit action
+- copy a server action to clipboard / write it under /tmp
+- mass update from Odoo UI without freezing the browser
 ## Workflow
 
 1. Discover workspace/runtime from `cwd`.
@@ -42,6 +47,9 @@ Do not replace it with raw `psql`, Docker Compose `exec`, shell pipelines, or in
    - Compose backend uses `docker compose exec -T db psql ...`.
    - Host backend resolves `psql.exe`/`psql` from explicit flag, nearby install tree, `pg_path`, or PATH.
 4. Prefer JSON output.
+   - For Server Actions, always write the Python snippet to /tmp first, copy with pbcopy, and parse returned JSON from clipboard/output files. Never compose long snippets inline in chat.
+   - Default to read-only audit and dry-run snippets. Write snippets require explicit user intent plus precheck/postcheck and rollback-on-failure.
+   - Prefer ORM for small writes and business-logic-sensitive operations; use SQL set-based writes only when the UI/ORM path is likely to freeze, spam tracking, or time out, and only with a frozen candidate table and exact postcheck.
 5. Keep DB access read-only unless the user explicitly requests a gated write flow.
 6. For route review, list routes first, then scan for likely mutating handlers.
 
@@ -103,3 +111,7 @@ Read these when the task needs deeper rules:
 - `references/db-recipes.md` — DB inspection command selection and SQL recipes.
 - `references/output-contracts.md` — JSON output shapes and failure contracts.
 - `references/route-safety.md` — controller route risk heuristics.
+- `references/server-action-playbook.md` — end-to-end production workflow, /tmp + clipboard, audit/dry-run/execute/final-audit rules
+- `references/server-action-safe-eval.md` — Odoo 17 safe_eval context, forbidden imports/opcodes, output semantics
+- `references/server-action-sql-safety.md` — when SQL is allowed, temp tables, active_test translation, lock/statement timeouts, rollback rules
+- `references/server-action-templates.md` — clipboard-ready template catalog and when to use each template
