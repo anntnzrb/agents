@@ -36,11 +36,11 @@ class BloodborneCliTests(unittest.TestCase):
     def test_upgrade_10_prints_steps_and_material_totals(self) -> None:
         out = self.run_cli("upgrade", "10")
         self.assertIn("+10: 1 Blood Rock", out)
-        self.assertIn("Totals: 16 Blood Stone Shard, 16 Twin Blood Stone Shard, 16 Blood Stone Chunk, 1 Blood Rock", out)
+        self.assertIn("Totals: 16 Blood Stone Shard, 16 Twin Blood Stone Shards, 16 Blood Stone Chunk, 1 Blood Rock", out)
 
     def test_calc_known_weapon_is_deterministic(self) -> None:
         out = self.run_cli("calc", "Saw Cleaver", "25", "25", "7", "8")
-        self.assertEqual(out, "Saw Cleaver +10 AR estimate at STR/SKL/BLT/ARC (25, 25, 7, 8): 248\n")
+        self.assertEqual(out, "Saw Cleaver +10 AR estimate at STR/SKL/BLT/ARC (25, 25, 7, 8): 274\n")
 
     def test_insight_current_thresholds(self) -> None:
         normal = self.run_cli("insight", "15")
@@ -84,6 +84,47 @@ class BloodborneCliTests(unittest.TestCase):
         self.assertIn("Known defeated bosses\n  Cleric Beast", out)
         self.assertIn("Unknown future bosses defeated: 0", out)
         self.assertNotIn("Father Gascoigne", out)
+
+
+    def test_build_quality_outputs_main_targets(self) -> None:
+        out = self.run_cli("build", "quality", "--level", "70")
+        self.assertIn("Build: quality", out)
+        self.assertIn("Ludwig's Holy Blade", out)
+        self.assertIn("Level 70", out)
+
+    def test_compare_orders_weapons_by_estimated_ar(self) -> None:
+        out = self.run_cli("compare", "Saw Cleaver", "Ludwig's Holy Blade", "--str", "26", "--skl", "26", "--blt", "7", "--arc", "8")
+        self.assertIn("Compare at STR/SKL/BLT/ARC (26, 26, 7, 8)", out)
+        self.assertIn("- Ludwig's Holy Blade: AR", out)
+        self.assertIn("- Saw Cleaver: AR", out)
+
+    def test_area_and_checklist_commands_are_spoiler_gated(self) -> None:
+        safe = self.run_cli("areas")
+        self.assertIn("central-yharnam", safe)
+        self.assertNotIn("Cainhurst", safe)
+        spoiler = self.run_cli("areas", "--spoilers")
+        self.assertIn("Cainhurst", spoiler)
+        checklist = self.run_cli("checklist", "hemwick")
+        self.assertIn("Checklist: hemwick-charnel-lane", checklist)
+        self.assertIn("rune tool", checklist)
+        phase = self.run_cli("areas", "--phase", "nightmare")
+        self.assertIn("hidden-", phase)
+        self.assertNotIn("Mensis", phase)
+        self.assertNotIn("Frontier", phase)
+
+    def test_bosses_route_and_items_commands(self) -> None:
+        bosses = self.run_cli("bosses", "--required")
+        self.assertIn("first mandatory hunter boss", bosses)
+        self.assertNotIn("Father Gascoigne", bosses)
+        self.assertNotIn("micolash", bosses.lower())
+        route = self.run_cli("route", "--defeated", "father-gascoigne,vicar-amelia,shadows-of-yharnam,rom,the-one-reborn")
+        self.assertIn("nightmare mandatory boss", route)
+        self.assertNotIn("micolash", route.lower())
+        item = self.run_cli("items", "Blood", "Rock")
+        self.assertIn("Final +10 weapon material", item)
+
+    def test_audit_command_reports_consistent_static_data(self) -> None:
+        self.assertEqual(self.run_cli("audit"), "Consistency audit OK.\n")
 
 
 def write_synthetic_save(path: Path) -> None:

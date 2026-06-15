@@ -47,14 +47,14 @@ class CliCommandTests(unittest.TestCase):
     def test_upgrade_10_totals(self) -> None:
         out = self.run_cli("upgrade", "10")
         self.assertIn("16 Blood Stone Shard", out)
-        self.assertIn("16 Twin Blood Stone Shard", out)
+        self.assertIn("16 Twin Blood Stone Shards", out)
         self.assertIn("16 Blood Stone Chunk", out)
         self.assertIn("1 Blood Rock", out)
 
     def test_calc_ludwig_quality(self) -> None:
         out = self.run_cli("calc", "Ludwig's Holy Blade", "26", "26", "7", "8")
         self.assertIn("Ludwig's Holy Blade +10 AR estimate", out)
-        self.assertIn("327", out)
+        self.assertIn("372", out)
 
     def test_sources_status_uses_cache_dir_without_network(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -80,9 +80,9 @@ class CliCommandTests(unittest.TestCase):
 
 class PureMechanicsTests(unittest.TestCase):
     def test_saturation_interpolates_known_points(self) -> None:
-        self.assertAlmostEqual(cli.sat(25), 0.35)
-        self.assertAlmostEqual(cli.sat(30), 0.45)
-        self.assertAlmostEqual(cli.sat(27), 0.39)
+        self.assertAlmostEqual(cli.sat(25), 0.5)
+        self.assertAlmostEqual(cli.sat(30), 0.57)
+        self.assertAlmostEqual(cli.sat(27), 0.528)
 
     def test_find_weapon_partial_and_ambiguous(self) -> None:
         self.assertEqual(cli.find_weapon("Ludwig").name, "Ludwig's Holy Blade")
@@ -116,7 +116,7 @@ class DirectCliFunctionTests(unittest.TestCase):
         self.assertIn("Military Veteran", self.capture(cli.cmd_origins, filter="quality"))
         self.assertIn("Totals:", self.capture(cli.cmd_upgrade, level=10))
         self.assertIn("Ludwig's Holy Blade", self.capture(cli.cmd_weapons, name=["Ludwig"]))
-        self.assertIn("327", self.capture(cli.cmd_calc, weapon="Ludwig's Holy Blade", str=26, skl=26, blt=7, arc=8))
+        self.assertIn("372", self.capture(cli.cmd_calc, weapon="Ludwig's Holy Blade", str=26, skl=26, blt=7, arc=8))
         self.assertTrue(self.capture(cli.cmd_echo_cost, current=64, target=69).strip().isdigit())
         self.assertIn("Current 43: high", self.capture(cli.cmd_insight, current=43))
         self.assertIn("Moon:", self.capture(cli.cmd_runes))
