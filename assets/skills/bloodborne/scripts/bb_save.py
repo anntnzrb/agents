@@ -1,11 +1,29 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Literal, TypedDict
 
 USERNAME_TO_INV_OFFSET = 469
+UPGRADE_START = 84
+UPGRADE_RECORD_SIZE = 40
+SLOT_BLOCK_SIZE = 60
+GARBAGE_U64 = 0xFFFFFFFF00000000
+
+GEM_TYPE_SHAPES = {(0x01, 0x01), (0x01, 0x02), (0x01, 0x04), (0x01, 0x08), (0x01, 0x3F)}
+RUNE_TYPE_SHAPES = {(0x02, 0x01), (0x02, 0x02)}
+VALID_TYPE_SHAPES = GEM_TYPE_SHAPES | RUNE_TYPE_SHAPES
+
+SLOT_SHAPE: dict[int, str] = {
+    0x80000000: "closed",
+    1: "radial",
+    2: "triangle",
+    4: "waning",
+    8: "circle",
+    0x3F: "droplet",
+}
+
 USERNAME_TO_KEY_INV_OFFSET = 32201
 INV_TO_STORAGE_OFFSET = 34268
 USERNAME_TO_AOB = 68545
@@ -103,6 +121,25 @@ class InventoryEntry:
     item_id: int
     slot_index: int
 
+@dataclass(frozen=True)
+class UpgradeEntry:
+    upgrade_id: int
+    source: int
+    kind: str
+    shape: str
+    effect_ids: tuple[int, ...]
+    name: str
+    effect_desc: str
+    rating: int
+    location: str
+
+
+@dataclass(frozen=True)
+class SlotBlock:
+    article_key: int
+    slots: tuple[tuple[str, int | None], ...]
+
+
 
 @dataclass(frozen=True)
 class BossState:
@@ -116,6 +153,7 @@ def _load_json(name: str) -> Any:
 
 
 OFFSETS: list[StatSpec] = _load_json("offsets.json")
+UPGRADES: dict[str, Any] = _load_json("upgrades.json")
 BOSSES: list[BossSpec] = _load_json("bosses.json")
 ITEMS: dict[str, dict[str, dict[str, Any]]] = _load_json("items.json")
 WEAPONS: dict[str, dict[str, dict[str, Any]]] = _load_json("weapons.json")
@@ -204,6 +242,99 @@ def _lookup_armor(item_id: int) -> tuple[str, str] | None:
         if row:
             return str(row["item_name"]), category
     return None
+
+
+def _lookup_effect(effect_id: int) -> tuple[str, str, int]:
+    key = str(effect_id)
+    for section in ("runeEffects", "gemEffects"):
+        row = UPGRADES.get(section, {}).get(key)
+        if row:
+            return str(row.get("name", key)), str(row.get("effect", "")), int(row.get("rating", 0))
+    return f"Unknown effect {effect_id}", "", 0
+
+
+def _upgrades_end(data: memoryview, start: int, end: int) -> int:
+    limit = min(end, len(data))
+    offset = start
+    while offset + UPGRADE_RECORD_SIZE <= limit:
+        pair = (data[offset + 8], data[offset + 12])
+        if pair not in VALID_TYPE_SHAPES:
+            break
+        offset += UPGRADE_RECORD_SIZE
+    return offset
+
+
+def _parse_upgrades(data: memoryview, start: int, end: int) -> dict[int, UpgradeEntry]:
+    out: dict[int, UpgradeEntry] = {}
+    offset = start
+    limit = _upgrades_end(data, start, end)
+    while offset + UPGRADE_RECORD_SIZE <= limit:
+        type_id = data[offset + 8]
+        shape_id = data[offset + 12]
+        kind = "gem" if type_id == 1 else "rune"
+        shape = SLOT_SHAPE.get(shape_id, "-") if kind == "gem" else ("oath" if shape_id == 2 else "-")
+        effect_ids = tuple(_u_le(data, offset + 16 + index * 4, 4) for index in range(6))
+        name, effect_desc, rating = _lookup_effect(effect_ids[0])
+        upgrade_id = _u_le(data, offset, 4)
+        out[upgrade_id] = UpgradeEntry(
+            upgrade_id=upgrade_id,
+            source=_u_le(data, offset + 4, 4),
+            kind=kind,
+            shape=shape,
+            effect_ids=effect_ids,
+            name=name,
+            effect_desc=effect_desc,
+            rating=rating,
+            location="inventory",
+        )
+        offset += UPGRADE_RECORD_SIZE
+    return out
+
+
+def _parse_slot_blocks(data: memoryview, upgrades_end: int, username_offset: int) -> dict[int, list[tuple[str, int | None]]]:
+    out: dict[int, list[tuple[str, int | None]]] = {}
+    offset = upgrades_end
+    limit = min(username_offset - 147, len(data))
+    while offset + 8 <= limit:
+        if _u_le(data, offset, 8) == GARBAGE_U64:
+            offset += 8
+            continue
+        if offset + SLOT_BLOCK_SIZE > limit:
+            break
+        slots: list[tuple[str, int | None]] = []
+        for slot_offset in range(offset + 20, offset + SLOT_BLOCK_SIZE, 8):
+            shape_id = _u_le(data, slot_offset, 4)
+            shape = SLOT_SHAPE.get(shape_id)
+            if shape is None:
+                break
+            upgrade_id = _u_le(data, slot_offset + 4, 4)
+            slots.append((shape, upgrade_id if shape != "closed" and upgrade_id not in (0, 0xFFFFFFFF) else None))
+        if len(slots) != 5:
+            break
+        out[_u_le(data, offset, 8)] = slots
+        offset += SLOT_BLOCK_SIZE
+    return out
+
+
+def _read_upgrades(path: str | Path) -> dict[int, UpgradeEntry]:
+    data, layout = read_save(path)
+    view = memoryview(data)
+    upgrades = _parse_upgrades(view, UPGRADE_START, layout.username_offset)
+    blocks = _parse_slot_blocks(view, _upgrades_end(view, UPGRADE_START, layout.username_offset), layout.username_offset)
+    equipped = {upgrade_id for slots in blocks.values() for _, upgrade_id in slots if upgrade_id is not None}
+    for upgrade_id in equipped:
+        entry = upgrades.get(upgrade_id)
+        if entry is not None:
+            upgrades[upgrade_id] = replace(entry, location="equipped")
+    return upgrades
+
+
+def read_runes(path: str | Path) -> list[UpgradeEntry]:
+    return [entry for entry in _read_upgrades(path).values() if entry.kind == "rune"]
+
+
+def read_gems(path: str | Path) -> list[UpgradeEntry]:
+    return [entry for entry in _read_upgrades(path).values() if entry.kind == "gem"]
 
 
 def _parse_slots(data: memoryview, start: int, location: Literal["inventory", "key_inventory", "storage"], max_slots: int) -> list[InventoryEntry]:

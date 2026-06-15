@@ -24,6 +24,8 @@ from bb_save import (
     important_key_items,
     materials,
     read_bosses,
+    read_gems,
+    read_runes,
     read_inventory,
     read_stats,
     safe_boss_name,
@@ -661,8 +663,53 @@ SAVE_INVENTORY_SECTIONS = frozenset({"summary", "materials", "weapons", "keys"})
 SAVE_BOSS_SECTIONS = frozenset({"summary", "bosses"})
 
 
+def _upgrade_sort_key(entry: object) -> tuple[int, str, str]:
+    location = getattr(entry, "location")
+    return (0 if location == "equipped" else 1, location, getattr(entry, "name"))
+
+
+def print_save_runes(path: str) -> None:
+    rows = sorted(read_runes(path), key=_upgrade_sort_key)
+    print("Runes")
+    if not rows:
+        print("  None found")
+        return
+    for entry in rows:
+        tier = f"tier {entry.rating}" if entry.rating else "tier 0"
+        effect = f": {entry.effect_desc}" if entry.effect_desc else ""
+        print(f"  [{entry.location}] {entry.name} ({tier}){effect}")
+
+
+def print_save_gems(path: str) -> None:
+    rows = sorted(read_gems(path), key=_upgrade_sort_key)
+    counts: dict[str, int] = {}
+    for entry in rows:
+        counts[entry.shape] = counts.get(entry.shape, 0) + 1
+    print("Blood gems")
+    if counts:
+        print("  Owned by type: " + ", ".join(f"{shape} {count}" for shape, count in sorted(counts.items())))
+    else:
+        print("  None found")
+        return
+    equipped = [entry for entry in rows if entry.location == "equipped"]
+    if equipped:
+        print("  Equipped gems")
+        for entry in equipped:
+            tier = f"tier {entry.rating}" if entry.rating else "tier 0"
+            effect = f": {entry.effect_desc}" if entry.effect_desc else ""
+            print(f"    {entry.shape} {entry.name} ({tier}){effect}")
+
+
 def cmd_save(args: argparse.Namespace) -> None:
     save_path = args.path
+    if args.section == "runes":
+        print_save_runes(save_path)
+        return
+
+    if args.section == "gems":
+        print_save_gems(save_path)
+        return
+
     stats = read_stats(save_path)
     print("Save stats")
     print(
@@ -694,6 +741,7 @@ def cmd_save(args: argparse.Namespace) -> None:
             for boss in known:
                 print(f"  {safe_boss_name(boss.name)}")
         print(f"Unknown future bosses defeated: {unknown_defeated}")
+
 
 
 def consistency_issues(check_sources: bool = False) -> list[str]:
@@ -903,7 +951,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("audit"); sp.add_argument("--sources", action="store_true"); sp.set_defaults(func=cmd_audit)
     sp = sub.add_parser("track"); sp.add_argument("section", nargs="?", choices=["summary", "stats", "gear", "next"], default="summary"); sp.add_argument("--path"); sp.set_defaults(func=cmd_track)
     sp = sub.add_parser("sources"); sp.add_argument("action", choices=["list", "status", "refresh"]); sp.add_argument("keys", nargs="*"); sp.add_argument("--force", action="store_true"); sp.set_defaults(func=cmd_sources)
-    sp = sub.add_parser("save"); sp.add_argument("path"); sp.add_argument("section", nargs="?", choices=["summary", "stats", "materials", "weapons", "keys", "bosses"], default="summary"); sp.set_defaults(func=cmd_save)
+    sp = sub.add_parser("save"); sp.add_argument("path"); sp.add_argument("section", nargs="?", choices=["summary", "stats", "materials", "weapons", "keys", "bosses", "runes", "gems"], default="summary"); sp.set_defaults(func=cmd_save)
     return p
 
 
