@@ -38,11 +38,12 @@ Route user questions by intent, not by exact wording:
 | User asks about | First source | Then | Notes |
 |---|---|---|---|
 | current stats, exact inventory, defeated bosses, materials, key items | `save <path> summary` if a save path is provided | caller-supplied tracking file if no save path | Save parser is factual; tracking is contextual. |
-| where to allocate levels, build direction, weapon choice | `track`/`recommend` or `save` stats | `calc`, `softcaps`, `weapons` | Use current stats before generic advice. |
-| weapon AR, scaling, stat breakpoints | `calc`, `weapons`, `softcaps` | `sources status bb-wiki-scaling`; refresh if stale and source-backed answer requested | Do not guess AR. |
+| where to allocate levels, build direction, weapon choice | `build`, `track`/`recommend`, or `save` stats | `calc`, `compare`, `softcaps`, `weapons` | Use current stats before generic advice. |
+| weapon AR, scaling, stat breakpoints | `calc`, `compare`, `weapons`, `softcaps` | `sources status bb-wiki-scaling`; refresh if stale and source-backed answer requested | Do not guess AR. |
 | upgrade materials and upgrade order | `upgrade <level>` | `save materials` if a save exists | Main weapon first unless user explicitly pivots. |
 | Insight, runes, gems, farming, durability, consumables | `insight`, `runes`, `gems`, `farm` | source registry/live research when exact thresholds or shop unlocks matter | Keep thresholds spoiler-filtered. |
-| route planning / “what next?” | caller-supplied tracking file + save boss/key state | live research if exact route/item checklist requested | Never reveal future proper nouns unless user permits spoilers. |
+| areas, bosses, key items, checklist, “what did I miss?” | `areas`, `bosses`, `items`, `checklist` | live research only for full item-location checklists | Default commands use safe names where possible. |
+| route planning / “what next?” | `route` with explicit defeated IDs, caller-supplied tracking, or save boss/key state | live research if exact route/item checklist requested | Never reveal future proper nouns unless user permits spoilers. |
 | source-backed or latest-data request | `sources status` | `sources refresh <keys>` and web research | Cite source URLs in final. |
 | shadPS4/decrypted save analysis | `save <path> ...` | update local tracking only if user asks | Read-only; explicit path only. |
 
@@ -59,16 +60,24 @@ uv run --script <skill-dir>/scripts/cli.py echo-cost <current-level> <target-lev
 uv run --script <skill-dir>/scripts/cli.py insight [current]
 uv run --script <skill-dir>/scripts/cli.py runes
 uv run --script <skill-dir>/scripts/cli.py gems
-uv run --script <skill-dir>/scripts/cli.py farm [echoes|vials|twins|chunks|gems]
+uv run --script <skill-dir>/scripts/cli.py farm <echoes|vials|twins|chunks|gems>
+uv run --script <skill-dir>/scripts/cli.py build [quality|strength|skill|bloodtinge|arcane] [--level N]
+uv run --script <skill-dir>/scripts/cli.py compare "<weapon A>" "<weapon B>" --str N --skl N [--blt N] [--arc N]
+uv run --script <skill-dir>/scripts/cli.py areas [--phase start|evening|night|blood-moon|nightmare|dlc] [--spoilers]
+uv run --script <skill-dir>/scripts/cli.py bosses [--area <area>] [--required] [--spoilers]
+uv run --script <skill-dir>/scripts/cli.py items <name words> [--spoilers]
+uv run --script <skill-dir>/scripts/cli.py checklist <area> [--spoilers]
+uv run --script <skill-dir>/scripts/cli.py route [--defeated boss-id,boss-id] [--spoilers]
+uv run --script <skill-dir>/scripts/cli.py audit [--sources]
 uv run --script <skill-dir>/scripts/cli.py track [summary|stats|gear|next] --path <tracking-file>
 uv run --script <skill-dir>/scripts/cli.py recommend --path <tracking-file>
 uv run --script <skill-dir>/scripts/cli.py save <savefile> [summary|stats|materials|weapons|keys|bosses]
 uv run --script <skill-dir>/scripts/cli.py sources list
 uv run --script <skill-dir>/scripts/cli.py sources status
-uv run --script <skill-dir>/scripts/cli.py sources refresh [source-key ...]
+uv run --script <skill-dir>/scripts/cli.py sources refresh [source-key ...] [--force]
 ```
 
-Use `track` and `recommend` only with an explicit `--path <tracking-file>` or `BLOODBORNE_TRACKING_FILE`; the skill does not assume a filename. Use `save <path>` only for explicit savefiles supplied by the user; it is read-only and stateless. Prefer filtered `weapons "<known weapon>"`; avoid bare `weapons` in spoiler-sensitive flows because it lists late/DLC names. Use `sources status` before source-backed answers; use `sources refresh` when the relevant cache is older than 24 hours or missing.
+Use `audit` after changing static data or refreshing references; add `--sources` only when the generic source cache was intentionally refreshed and must be fresh. Use `track` and `recommend` only with an explicit `--path <tracking-file>` or `BLOODBORNE_TRACKING_FILE`; the skill does not assume a filename. Use `save <path>` only for explicit savefiles supplied by the user; it is read-only and stateless. Prefer filtered `weapons "<known weapon>"`; bare `weapons` lists only starter-safe weapons unless `--spoilers` is used. Avoid `areas --spoilers`, `bosses --spoilers`, or `items --spoilers` in spoiler-sensitive flows because they list late/DLC names. Use `route` with explicit defeated IDs or parsed save/tracking context for first-pass “what next?” answers. Use `sources status` before source-backed answers; use `sources refresh --force` only when bypassing the 24-hour cache is explicitly useful.
 
 ## Spoiler policy
 
@@ -112,7 +121,8 @@ The CLI has a curated source registry from live research:
 - `soulsmods/DSMapStudio` Paramdex is the safest licensed schema reference for Bloodborne PARAM field names (MIT), but it does not provide weapon rows.
 - Unlicensed calculators/repos are reference-only. Do not copy their code or data into the skill; use them only to cross-check formulas.
 
-The cache is user-local at `~/.cache/bloodborne-companion` unless `BLOODBORNE_CACHE_DIR` is set. Cached source pages include URL, license, fetch time, byte count, SHA-256, and a 24-hour TTL. Runtime remains stateless with respect to playthrough progress.
+
+The cache is user-local at `~/.cache/bloodborne-companion` unless `BLOODBORNE_CACHE_DIR` is set. Cached source pages include URL, license, fetch time, byte count, SHA-256, and a 24-hour TTL. Page revision metadata remains in cached HTML unless a future parser extracts it into metadata. Runtime remains stateless with respect to playthrough progress.
 
 ## Live research fallback
 
