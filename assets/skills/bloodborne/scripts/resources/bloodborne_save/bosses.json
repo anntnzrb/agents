@@ -1,0 +1,259 @@
+[
+  {
+    "name": "Cleric Beast",
+    "flags": [
+      {
+        "rel_offset": 21714,
+        "dead_value": 8,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Father Gascoigne",
+    "flags": [
+      {
+        "rel_offset": 21727,
+        "dead_value": 128,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Vicar Amelia",
+    "flags": [
+      {
+        "rel_offset": 21602,
+        "dead_value": 128,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Celestial Emissary",
+    "flags": [
+      {
+        "rel_offset": 21839,
+        "dead_value": 8,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Ebrietas",
+    "flags": [
+      {
+        "rel_offset": 21852,
+        "dead_value": 128,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Blood Starved Beast",
+    "flags": [
+      {
+        "rel_offset": 21477,
+        "dead_value": 128,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Shadow Of Yharnam",
+    "flags": [
+      {
+        "rel_offset": 22227,
+        "dead_value": 128,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Rom",
+    "flags": [
+      {
+        "rel_offset": 22602,
+        "dead_value": 128,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Witch Of Hemwick",
+    "flags": [
+      {
+        "rel_offset": 21352,
+        "dead_value": 128,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "One Reborn",
+    "flags": [
+      {
+        "rel_offset": 22352,
+        "dead_value": 128,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Martyr Logarius",
+    "flags": [
+      {
+        "rel_offset": 21977,
+        "dead_value": 128,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Dark Beast Paarl",
+    "flags": [
+      {
+        "rel_offset": 21464,
+        "dead_value": 8,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Amygdala",
+    "flags": [
+      {
+        "rel_offset": 22727,
+        "dead_value": 128,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Mergo's Wet Nurse",
+    "flags": [
+      {
+        "rel_offset": 22102,
+        "dead_value": 128,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Micolash",
+    "flags": [
+      {
+        "rel_offset": 22108,
+        "dead_value": 63,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Gehrman",
+    "flags": [
+      {
+        "rel_offset": 21102,
+        "dead_value": 128,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Moon Presence",
+    "flags": [
+      {
+        "rel_offset": 21108,
+        "dead_value": 32,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Ludwig",
+    "flags": [
+      {
+        "_comment": "Defeated flag",
+        "rel_offset": 22852,
+        "dead_value": 128,
+        "alive_value": 0,
+        "current_value": 0
+      },
+      {
+        "_comment": "Enable? 1",
+        "rel_offset": 6060,
+        "dead_value": 130,
+        "alive_value": 0,
+        "current_value": 0
+      },
+      {
+        "_comment": "Enable? 2",
+        "rel_offset": 6045,
+        "dead_value": 1,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Living Failures",
+    "flags": [
+      {
+        "rel_offset": 22983,
+        "dead_value": 32,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Lady Maria",
+    "flags": [
+      {
+        "rel_offset": 22977,
+        "dead_value": 128,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Kos",
+    "flags": [
+      {
+        "rel_offset": 23102,
+        "dead_value": 128,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  },
+  {
+    "name": "Laurence",
+    "flags": [
+      {
+        "rel_offset": 22858,
+        "dead_value": 32,
+        "alive_value": 0,
+        "current_value": 0
+      }
+    ]
+  }
+]

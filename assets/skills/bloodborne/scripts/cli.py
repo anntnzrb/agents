@@ -4,8 +4,8 @@
 # ///
 """Spoiler-safe Bloodborne lookup CLI for agents.
 
-Stateless: stores no player progress. When run in a workspace with tracking.md,
-read-only commands can summarize that local state.
+Stateless: stores no player progress. Tracking/save reads require an explicit
+path argument or an environment variable supplied by the caller.
 """
 
 from __future__ import annotations
@@ -20,6 +20,15 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+from bb_save import (
+    important_key_items,
+    materials,
+    read_bosses,
+    read_inventory,
+    read_stats,
+    safe_boss_name,
+    weapons as save_weapons,
+)
 
 CACHE_TTL_HOURS = 24
 DATA_SOURCE = "Embedded spoiler-safe constants plus source registry/cache for live verification."
@@ -84,8 +93,14 @@ SOURCES = {
         "machine": False,
         "risk": "Reference only; informal and unlicensed.",
     },
+    "noxde-save-editor": {
+        "url": "https://github.com/Noxde/Bloodborne-save-editor",
+        "license": "GPL-3.0",
+        "use": "Primary Bloodborne userdata layout reference and static resources for read-only shadPS4/decrypted-save parsing: offsets, boss flags, item/weapon/armor IDs, gems/runes.",
+        "machine": True,
+        "risk": "GPL-3.0 attribution applies to vendored resource JSON. Parser remains read-only and does not copy save-editing/writeback behavior.",
+    },
 }
-
 ORIGINS = {
     "milquetoast": (10, 11, 10, 12, 10, 9, 8, "Base/undecided"),
     "lone survivor": (10, 14, 11, 11, 10, 7, 7, "Max early VIT"),
@@ -223,14 +238,17 @@ def echo_cost(current: int, target: int) -> int:
 
 
 def tracking_path(path: str | None) -> Path | None:
-    p = Path(path or "tracking.md")
+    selected = path or os.environ.get("BLOODBORNE_TRACKING_FILE")
+    if not selected:
+        return None
+    p = Path(selected).expanduser()
     return p if p.exists() else None
 
 
 def read_tracking(path: str | None = None) -> str:
     p = tracking_path(path)
     if not p:
-        raise SystemExit("No tracking.md found in this workspace.")
+        raise SystemExit("Tracking file not found. Pass --path or set BLOODBORNE_TRACKING_FILE.")
     return p.read_text(encoding="utf-8")
 
 
@@ -480,12 +498,62 @@ def cmd_recommend(args: argparse.Namespace) -> None:
     print_bullets("Recommendation", recs)
 
 
+def cmd_save(args: argparse.Namespace) -> None:
+    save_path = args.path
+    stats = read_stats(save_path)
+    print("Save stats")
+    print(
+        "  "
+        + ", ".join(
+            f"{name} {stats[name]}"
+            for name in ("Level", "Health", "Stamina", "Echoes", "Insight", "Vitality", "Endurance", "Strength", "Skill", "Bloodtinge", "Arcane", "Ng")
+            if name in stats
+        )
+    )
+
+    if args.section in ("summary", "materials", "weapons", "keys"):
+        entries = read_inventory(save_path)
+    else:
+        entries = []
+
+    if args.section in ("summary", "materials"):
+        mats = materials(entries)
+        if mats:
+            print("Materials")
+            for entry in mats:
+                print(f"  {entry.name}: {entry.amount}")
+
+    if args.section in ("summary", "keys"):
+        keys = important_key_items(entries)
+        if keys:
+            print("Important key items")
+            for entry in keys:
+                print(f"  {entry.name}: {entry.amount}")
+
+    if args.section in ("summary", "weapons"):
+        weps = save_weapons(entries)
+        if weps:
+            print("Weapons")
+            for entry in weps:
+                print(f"  {entry.name}: {entry.amount}")
+
+    if args.section in ("summary", "bosses"):
+        bosses = read_bosses(save_path)
+        known = [boss for boss in bosses if boss.known and boss.defeated]
+        unknown_defeated = sum(1 for boss in bosses if not boss.known and boss.defeated)
+        if known:
+            print("Known defeated bosses")
+            for boss in known:
+                print(f"  {safe_boss_name(boss.name)}")
+        print(f"Unknown future bosses defeated: {unknown_defeated}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Bloodborne spoiler-safe companion CLI")
     sub = p.add_subparsers(required=True)
-    for name, fn in [("fresh", cmd_fresh), ("softcaps", cmd_softcaps), ("runes", cmd_runes), ("gems", cmd_gems), ("recommend", cmd_recommend)]:
+    for name, fn in [("fresh", cmd_fresh), ("softcaps", cmd_softcaps), ("runes", cmd_runes), ("gems", cmd_gems)]:
         sp = sub.add_parser(name); sp.set_defaults(func=fn)
-        if name == "recommend": sp.add_argument("--path")
+    sp = sub.add_parser("recommend"); sp.add_argument("--path"); sp.set_defaults(func=cmd_recommend)
     sp = sub.add_parser("origins"); sp.add_argument("filter", nargs="?"); sp.set_defaults(func=cmd_origins)
     sp = sub.add_parser("upgrade"); sp.add_argument("level", type=int); sp.set_defaults(func=cmd_upgrade)
     sp = sub.add_parser("weapons"); sp.add_argument("name", nargs="*"); sp.set_defaults(func=cmd_weapons)
@@ -495,6 +563,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("farm"); sp.add_argument("kind", choices=sorted(FARMS)); sp.set_defaults(func=cmd_farm)
     sp = sub.add_parser("track"); sp.add_argument("section", nargs="?", choices=["summary", "stats", "gear", "next"], default="summary"); sp.add_argument("--path"); sp.set_defaults(func=cmd_track)
     sp = sub.add_parser("sources"); sp.add_argument("action", choices=["list", "status", "refresh"]); sp.add_argument("keys", nargs="*"); sp.add_argument("--force", action="store_true"); sp.set_defaults(func=cmd_sources)
+    sp = sub.add_parser("save"); sp.add_argument("path"); sp.add_argument("section", nargs="?", choices=["summary", "stats", "materials", "weapons", "keys", "bosses"], default="summary"); sp.set_defaults(func=cmd_save)
     return p
 
 
