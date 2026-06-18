@@ -159,6 +159,68 @@ def build_parser() -> argparse.ArgumentParser:
     )
     coding_parser.set_defaults(handler=_handle_coding)
 
+    reasoning_parser = subparsers.add_parser(
+        "reasoning",
+        help="Profile models by reasoning selectivity (per-benchmark answer vs thinking token split).",
+    )
+    reasoning_parser.add_argument(
+        "snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON
+    )
+    reasoning_parser.add_argument(
+        "--model", type=str, default=None, help="Model slug/name contains filter."
+    )
+    reasoning_parser.add_argument(
+        "--creator", type=str, default=None, help="Creator/lab name contains filter."
+    )
+    reasoning_parser.add_argument(
+        "--open-weights-only",
+        action="store_true",
+        help="Return only open-weights models.",
+    )
+    reasoning_parser.add_argument(
+        "--class",
+        type=str,
+        default=None,
+        dest="classification",
+        choices=(
+            "selective_extreme",
+            "selective",
+            "moderate",
+            "uniform_heavy",
+            "hard_uniform_heavy",
+        ),
+        help="Filter by reasoning selectivity classification.",
+    )
+    reasoning_parser.add_argument(
+        "--selective-only",
+        action="store_true",
+        help="Return only selective thinkers (classification starts with selective).",
+    )
+    reasoning_parser.add_argument(
+        "--sort-by",
+        type=str,
+        default="harness",
+        choices=(
+            "harness",
+            "selectivity",
+            "reasoning_floor",
+            "weighted_reasoning_share",
+            "intelligence",
+            "agentic",
+            "coding",
+        ),
+    )
+    reasoning_parser.add_argument(
+        "--order", type=str, default="auto", choices=("auto", "asc", "desc")
+    )
+    reasoning_parser.add_argument("--limit", type=int, default=50)
+    reasoning_parser.add_argument(
+        "--benchmarks",
+        action="store_true",
+        help="Include per-benchmark reasoning share breakdown in each row.",
+    )
+    reasoning_parser.set_defaults(handler=_handle_reasoning)
+
     query_parser = subparsers.add_parser(
         "query", help="Query model/provider benchmark rows from a snapshot."
     )
@@ -260,6 +322,7 @@ def _normalize_argv(argv: Sequence[str] | None) -> list[str]:
         "diff",
         "harness",
         "coding",
+        "reasoning",
         "query",
         "qa",
         "schema",
@@ -827,6 +890,272 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+
+
+def _compute_reasoning_profile(model: dict[str, Any]) -> dict[str, Any] | None:
+    """Compute reasoning selectivity profile from canonical_eval_token_counts.
+
+    Returns None if no token-count data is available for this model.
+    """
+    canonical = model.get("canonical_eval_token_counts")
+    if not isinstance(canonical, dict) or not canonical:
+        iitc = model.get("intelligence_index_token_counts")
+        if isinstance(iitc, dict):
+            answer = _number_or_none(iitc.get("answer"))
+            reasoning = _number_or_none(iitc.get("reasoning"))
+            output = _number_or_none(iitc.get("output_tokens"))
+            if (
+                isinstance(answer, int | float)
+                and isinstance(reasoning, int | float)
+                and isinstance(output, int | float)
+                and output > 0
+            ):
+                wrs = reasoning / output
+                return {
+                    "reasoning_floor": None,
+                    "reasoning_floor_benchmark": None,
+                    "reasoning_ceiling": None,
+                    "reasoning_ceiling_benchmark": None,
+                    "selectivity_score": None,
+                    "weighted_reasoning_share": round(wrs, 4),
+                    "classification": None,
+                    "benchmark_count": 0,
+                    "warning": "Aggregate only; per-benchmark canonical_eval_token_counts unavailable.",
+                }
+        return None
+
+    shares: list[tuple[float, str]] = []
+    total_answer = 0
+    total_reasoning = 0
+    for bench_name, vals in canonical.items():
+        if not isinstance(vals, dict):
+            continue
+        a = vals.get("answer") or vals.get("answer_tokens", 0)
+        r = vals.get("reasoning") or vals.get("reasoning_tokens", 0)
+        if isinstance(a, int | float) and isinstance(r, int | float) and (a + r) > 0:
+            share = r / (a + r)
+            shares.append((share, bench_name))
+            total_answer += a
+            total_reasoning += r
+
+    if not shares:
+        return None
+
+    total_output = total_answer + total_reasoning
+    floor = min(shares, key=lambda s: s[0])
+    ceiling = max(shares, key=lambda s: s[0])
+    wrs = total_reasoning / total_output if total_output else 0
+    selectivity = ceiling[0] - floor[0]
+
+    if floor[0] < 0.10 and selectivity > 0.75:
+        classification = "selective_extreme"
+    elif floor[0] < 0.25 and selectivity > 0.60:
+        classification = "selective"
+    elif floor[0] < 0.50:
+        classification = "moderate"
+    elif floor[0] >= 0.60 and wrs >= 0.85:
+        classification = "hard_uniform_heavy"
+    elif floor[0] >= 0.50 and wrs >= 0.80:
+        classification = "uniform_heavy"
+    else:
+        classification = "unclassified"
+
+    return {
+        "reasoning_floor": round(floor[0], 4),
+        "reasoning_floor_benchmark": floor[1],
+        "reasoning_ceiling": round(ceiling[0], 4),
+        "reasoning_ceiling_benchmark": ceiling[1],
+        "selectivity_score": round(selectivity, 4),
+        "weighted_reasoning_share": round(wrs, 4),
+        "classification": classification,
+        "benchmark_count": len(shares),
+    }
+
+
+def _reasoning_benchmarks(model: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract per-benchmark reasoning share breakdown."""
+    canonical = model.get("canonical_eval_token_counts")
+    if not isinstance(canonical, dict):
+        return []
+    result: list[dict[str, Any]] = []
+    for bench_name, vals in canonical.items():
+        if not isinstance(vals, dict):
+            continue
+        a = vals.get("answer") or vals.get("answer_tokens", 0)
+        r = vals.get("reasoning") or vals.get("reasoning_tokens", 0)
+        if not isinstance(a, int | float) or not isinstance(r, int | float):
+            continue
+        output = a + r
+        if output <= 0:
+            continue
+        result.append(
+            {
+                "benchmark": bench_name,
+                "answer_tokens": int(a),
+                "reasoning_tokens": int(r),
+                "output_tokens": int(output),
+                "reasoning_share": round(float(r) / float(output), 4),
+            }
+        )
+    result.sort(key=lambda b: b["reasoning_share"])
+    return result
+
+
+def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
+    snapshot = load_snapshot(args.snapshot)
+    hosts_models = snapshot.get("hosts_models")
+    if not isinstance(hosts_models, list):
+        raise ExtractionError("Snapshot missing hosts_models list")
+
+    model_filter = (
+        args.model.lower() if isinstance(args.model, str) and args.model else None
+    )
+    creator_filter = (
+        args.creator.lower() if isinstance(args.creator, str) and args.creator else None
+    )
+
+    seen: set[str] = set()
+    rows: list[dict[str, Any]] = []
+    skipped_missing = 0
+
+    for item in hosts_models:
+        if not isinstance(item, dict):
+            continue
+        model = item.get("model") if isinstance(item.get("model"), dict) else {}
+        model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
+        if not model_slug or model_slug in seen:
+            continue
+        seen.add(model_slug)
+        if model.get("deleted") or model.get("deprecated"):
+            continue
+
+        model_name = model.get("name") if isinstance(model.get("name"), str) else None
+        creator = (
+            model.get("model_creators")
+            if isinstance(model.get("model_creators"), dict)
+            else {}
+        )
+        creator_name = (
+            creator.get("name") if isinstance(creator.get("name"), str) else None
+        )
+
+        if model_filter and not _matches_any(model_filter, [model_slug, model_name]):
+            continue
+        if creator_filter and not _matches_any(
+            creator_filter, [creator_name, creator.get("slug")]
+        ):
+            continue
+        if args.open_weights_only and model.get("is_open_weights") is not True:
+            continue
+
+        profile = _compute_reasoning_profile(model)
+        if profile is None:
+            skipped_missing += 1
+            continue
+
+        classification = profile.get("classification")
+        if args.classification and classification != args.classification:
+            continue
+        if args.selective_only and not classification.startswith("selective"):
+            continue
+
+        agentic = model.get("agentic_index")
+        coding = model.get("coding_index")
+        harness = (
+            (float(agentic) + float(coding)) / 2.0
+            if isinstance(agentic, int | float) and isinstance(coding, int | float)
+            else None
+        )
+
+        row: dict[str, Any] = {
+            "model_slug": model_slug,
+            "model_name": model_name,
+            "creator": creator_name,
+            "reasoning_model": model.get("reasoning_model"),
+            "is_open_weights": model.get("is_open_weights"),
+            "release_date": model.get("release_date"),
+            "context_window_tokens": model.get("context_window_tokens"),
+            "intelligence": model.get("intelligence_index"),
+            "agentic": agentic,
+            "coding": coding,
+            "harness": round(harness, 4) if harness is not None else None,
+            "reasoning_profile": profile,
+        }
+        if args.benchmarks:
+            row["per_benchmark"] = _reasoning_benchmarks(model)
+        rows.append(row)
+
+    sort_key_map = {
+        "harness": ("harness", True),
+        "selectivity": ("reasoning_profile.selectivity_score", True),
+        "reasoning_floor": ("reasoning_profile.reasoning_floor", False),
+        "weighted_reasoning_share": ("reasoning_profile.weighted_reasoning_share", False),
+        "intelligence": ("intelligence", True),
+        "agentic": ("agentic", True),
+        "coding": ("coding", True),
+    }
+    sort_path, desc_default = sort_key_map.get(args.sort_by, ("harness", True))
+    reverse = desc_default
+    if args.order == "asc":
+        reverse = False
+    elif args.order == "desc":
+        reverse = True
+
+    def _sort_key(row: dict[str, Any]) -> tuple[int, float]:
+        parts = sort_path.split(".")
+        current: Any = row
+        for part in parts:
+            if isinstance(current, dict):
+                current = current.get(part)
+            else:
+                current = None
+                break
+        if isinstance(current, int | float):
+            normalized = -float(current) if reverse else float(current)
+            return (0, normalized)
+        return (1, 0.0)
+
+    rows.sort(key=_sort_key)
+    limited = rows[: max(args.limit, 0)]
+    for index, row in enumerate(limited, start=1):
+        row["rank"] = index
+
+    return {
+        "snapshot": str(args.snapshot),
+        "definition": {
+            "name": "Reasoning Selectivity",
+            "scope": "max-effort Intelligence Index evaluation (canonical_eval_token_counts)",
+            "metrics": {
+                "reasoning_floor": "min(reasoning_share) across benchmarks — lower = more selective",
+                "reasoning_ceiling": "max(reasoning_share) across benchmarks",
+                "weighted_reasoning_share": "Σ reasoning_tokens / Σ (answer+reasoning)",
+                "selectivity_score": "reasoning_ceiling - reasoning_floor",
+            },
+            "classifications": {
+                "selective_extreme": "floor < 0.10 and selectivity_score > 0.75",
+                "selective": "floor < 0.25 and selectivity_score > 0.60",
+                "moderate": "0.25 <= floor < 0.50",
+                "uniform_heavy": "floor >= 0.50 and weighted_reasoning_share >= 0.80",
+                "hard_uniform_heavy": "floor >= 0.60 and weighted_reasoning_share >= 0.85",
+            },
+        },
+        "applied_filters": {
+            "model": args.model,
+            "creator": args.creator,
+            "open_weights_only": args.open_weights_only,
+            "classification": args.classification,
+            "selective_only": args.selective_only,
+            "sort_by": args.sort_by,
+            "order": args.order,
+            "limit": args.limit,
+        },
+        "counts": {
+            "ranked_models": len(rows),
+            "returned_models": len(limited),
+            "skipped_missing_profile": skipped_missing,
+        },
+        "rows": limited,
+    }
 def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
     snapshot = load_snapshot(args.snapshot)
     hosts_models = snapshot.get("hosts_models")
@@ -1214,6 +1543,11 @@ def _handle_coding(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_reasoning(args: argparse.Namespace) -> int:
+    _emit_json(_envelope("reasoning", _reasoning_payload(args)), stdout=sys.stdout)
+    return 0
+
+
 def _handle_query(args: argparse.Namespace) -> int:
     _emit_json(_envelope("query", _query_payload(args)), stdout=sys.stdout)
     return 0
@@ -1288,6 +1622,21 @@ def _capability_schema() -> dict[str, Any]:
                     "include_benchmark_counts": "bool include Terminal-Bench Hard and SciCode token counts",
                 },
                 "token_scope": "coding_index_only; not global Intelligence Index token counts",
+            },
+            "reasoning": {
+                "description": "Profile models by reasoning selectivity using per-benchmark canonical eval token counts.",
+                "args": ["snapshot(optional)"],
+                "flags": {
+                    "model": "str contains filter on model slug/name",
+                    "creator": "str contains filter on creator/lab name",
+                    "open_weights_only": "bool only include open-weights models",
+                    "class": "classification filter: selective_extreme|selective|moderate|uniform_heavy|hard_uniform_heavy",
+                    "selective_only": "bool only include selective thinkers",
+                    "sort_by": "harness|selectivity|reasoning_floor|weighted_reasoning_share|intelligence|agentic|coding",
+                    "order": "auto|asc|desc",
+                    "limit": "int max rows (default 50)",
+                    "benchmarks": "bool include per-benchmark reasoning share breakdown",
+                },
             },
             "query": {
                 "description": "Filter/sort endpoint benchmark rows by model/provider/endpoint.",
@@ -1431,6 +1780,21 @@ def _coding_namespace(args: dict[str, Any]) -> argparse.Namespace:
     )
 
 
+def _reasoning_namespace(args: dict[str, Any]) -> argparse.Namespace:
+    return argparse.Namespace(
+        snapshot=Path(_arg_value(args, "snapshot", str(DEFAULT_OUTPUT_JSON))),
+        model=_arg_value(args, "model", None),
+        creator=_arg_value(args, "creator", None),
+        open_weights_only=bool(_arg_value(args, "open_weights_only", False)),
+        classification=_arg_value(args, "class", None),
+        selective_only=bool(_arg_value(args, "selective_only", False)),
+        sort_by=str(_arg_value(args, "sort_by", "harness")),
+        order=str(_arg_value(args, "order", "auto")),
+        limit=int(_arg_value(args, "limit", 50)),
+        benchmarks=bool(_arg_value(args, "benchmarks", False)),
+    )
+
+
 def _diff_namespace(args: dict[str, Any]) -> argparse.Namespace:
     old_snapshot = _arg_value(args, "old_snapshot", None)
     new_snapshot = _arg_value(args, "new_snapshot", None)
@@ -1552,6 +1916,12 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                     request_id,
                     command,
                     _coding_payload(_coding_namespace(args_payload)),
+                )
+            elif command == "reasoning":
+                response = _success_response(
+                    request_id,
+                    command,
+                    _reasoning_payload(_reasoning_namespace(args_payload)),
                 )
             elif command == "query":
                 response = _success_response(

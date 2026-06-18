@@ -64,6 +64,20 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" coding --m
 
 Use this for Coding Index output token composition. These counts are scoped to the Coding Index evaluation only, not global Intelligence Index token counts. Output tokens are `answer_tokens + reasoning_tokens`; components are Terminal-Bench Hard + SciCode.
 
+
+### reasoning
+
+Profile models by reasoning selectivity — per-benchmark breakdown of answer vs thinking token splits at max effort.
+
+```bash
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" reasoning --sort-by selectivity --limit 10
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" reasoning --model minimax-m3 --benchmarks
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" reasoning --selective-only
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" reasoning --class selective_extreme
+```
+
+Uses `canonical_eval_token_counts` from the local snapshot — no live fetch needed. Metrics include reasoning floor (minimum reasoning share), reasoning ceiling, weighted reasoning share, and a selectivity classification. See `references/reasoning-selectivity.md` for definitions and caveats.
+
 ### stats
 
 Snapshot counts + top providers.
@@ -100,6 +114,7 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" --mode rpc
 
 - Tool output is JSON only.
 - Prefer `coding` for Coding Index token composition/cost breakdown questions.
+- Prefer `reasoning` for model reasoning selectivity and per-benchmark token split questions.
 - Prefer `query` for provider endpoint ranking answers.
 - Prefer `qa` only when user asks in plain language and speed matters.
 - If data freshness is critical, run `fetch` immediately before `query`/`qa`.
