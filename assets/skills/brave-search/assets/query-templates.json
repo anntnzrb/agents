@@ -1,47 +1,38 @@
 {
   "webSearch": {
-    "command": "brave-search web \"<topic>\" count=5 safesearch=moderate",
+    "command": "brave-search web \"<topic>\" result_filter=web",
     "query": "<topic>",
-    "count": 5,
-    "safesearch": "moderate"
-  },
-  "webSearchWithSummary": {
-    "command": "brave-search web \"<topic>\" count=5 safesearch=moderate summary=1",
-    "query": "<topic>",
-    "count": 5,
-    "safesearch": "moderate",
-    "summary": 1
+    "result_filter": "web"
   },
   "newsSearch": {
-    "command": "brave-search news \"<topic>\" count=5 freshness=pd",
+    "command": "brave-search news \"<topic>\" freshness=pd",
     "query": "<topic>",
-    "count": 5,
     "freshness": "pd"
   },
   "localSearch": {
-    "command": "brave-search local \"<business or place>\" count=5",
-    "query": "<business or place>",
-    "count": 5
+    "command": "brave-search local \"<business or place>\"",
+    "query": "<business or place>"
   },
   "imageSearch": {
-    "command": "brave-search image \"<topic>\" count=20 safesearch=strict",
+    "command": "brave-search image \"<topic>\" safesearch=strict",
     "query": "<topic>",
-    "count": 20,
     "safesearch": "strict"
   },
   "videoSearch": {
-    "command": "brave-search video \"<topic>\" count=20",
-    "query": "<topic>",
-    "count": 20
+    "command": "brave-search video \"<topic>\"",
+    "query": "<topic>"
   },
   "summarizerKey": {
-    "command": "brave-search summarizer-key \"<topic>\" count=5",
+    "command": "brave-search summarizer-key \"<topic>\"",
     "query": "<topic>",
-    "count": 5
+    "_deprecated": true,
+    "_note": "Legacy / experimental flow. Prefer default compact endpoints. Returns rc=1 when Brave declines to summarize."
   },
   "summarizer": {
     "command": "brave-search summarize \"<summary_key>\" inline_references=true",
     "key": "<summary_key>",
-    "inline_references": true
+    "inline_references": true,
+    "_deprecated": true,
+    "_note": "Legacy / experimental flow. Use raw passthrough or the compact endpoints instead."
   }
 }
