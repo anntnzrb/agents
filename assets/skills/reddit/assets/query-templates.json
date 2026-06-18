@@ -3,21 +3,27 @@
     "command": "reddit browse all hot limit=25",
     "subreddit": "all",
     "sort": "hot",
-    "limit": 25
+    "limit": 25,
+    "output": "compact listing envelope",
+    "raw_available": true
   },
   "browseSubredditTopWeek": {
     "command": "reddit browse technology top time=week limit=25",
     "subreddit": "technology",
     "sort": "top",
     "time": "week",
-    "limit": 25
+    "limit": 25,
+    "output": "compact listing envelope",
+    "raw_available": true
   },
   "searchGlobal": {
     "command": "reddit search \"<topic>\" sort=relevance time=all limit=25",
     "query": "<topic>",
     "sort": "relevance",
     "time": "all",
-    "limit": 25
+    "limit": 25,
+    "output": "compact search envelope",
+    "raw_available": true
   },
   "searchInSubreddits": {
     "command": "reddit search \"<topic>\" subreddits='[\"cscareerquestions\",\"programming\"]' sort=new time=month limit=25",
@@ -25,7 +31,10 @@
     "subreddits": ["cscareerquestions", "programming"],
     "sort": "new",
     "time": "month",
-    "limit": 25
+    "limit": 25,
+    "output": "compact search envelope",
+    "subreddits_arg": "must be a JSON list of non-empty strings",
+    "raw_available": true
   },
   "searchByAuthor": {
     "command": "reddit search \"<topic>\" author=<username> sort=top time=year limit=25",
@@ -33,7 +42,9 @@
     "author": "<username>",
     "sort": "top",
     "time": "year",
-    "limit": 25
+    "limit": 25,
+    "output": "compact search envelope",
+    "raw_available": true
   },
   "searchByFlair": {
     "command": "reddit search \"<topic>\" flair=\"<flair text>\" sort=new time=year limit=25",
@@ -41,14 +52,19 @@
     "flair": "<flair text>",
     "sort": "new",
     "time": "year",
-    "limit": 25
+    "limit": 25,
+    "output": "compact search envelope",
+    "raw_available": true
   },
   "getPostDetailsByUrl": {
     "command": "reddit post-url \"https://reddit.com/r/<subreddit>/comments/<post_id>/\" comment_limit=20 comment_sort=best comment_depth=3",
     "url": "https://reddit.com/r/<subreddit>/comments/<post_id>/",
     "comment_limit": 20,
     "comment_sort": "best",
-    "comment_depth": 3
+    "comment_depth": 3,
+    "output": "compact post+comments envelope",
+    "url_validation": "must use http:// or https://",
+    "raw_available": true
   },
   "getPostDetailsByIdAndSubreddit": {
     "command": "reddit post <subreddit> <post_id> comment_limit=20 comment_sort=best comment_depth=3",
@@ -56,7 +72,9 @@
     "subreddit": "<subreddit>",
     "comment_limit": 20,
     "comment_sort": "best",
-    "comment_depth": 3
+    "comment_depth": 3,
+    "output": "compact post+comments envelope",
+    "raw_available": true
   },
   "userAnalysisDefault": {
     "command": "reddit user-analysis <username> posts_limit=10 comments_limit=10 time_range=month top_subreddits_limit=10",
@@ -64,10 +82,26 @@
     "posts_limit": 10,
     "comments_limit": 10,
     "time_range": "month",
-    "top_subreddits_limit": 10
+    "top_subreddits_limit": 10,
+    "output": "structured user-analysis envelope",
+    "validation": {
+      "posts_limit": "non-negative integer",
+      "comments_limit": "non-negative integer",
+      "top_subreddits_limit": "non-negative integer",
+      "time_range": ["day", "week", "month", "year", "all"]
+    },
+    "raw_available": false
   },
   "redditExplainTerm": {
     "command": "reddit explain karma",
-    "term": "karma"
+    "term": "karma",
+    "output": "{term, definition} envelope",
+    "normalization": "trim, collapse whitespace, lowercase; treat '-' as space",
+    "raw_available": false
+  },
+  "rawPassthroughExample": {
+    "command": "reddit browse all hot limit=25 raw=1",
+    "description": "Skip the compact envelope; write the upstream Reddit JSON straight to stdout.",
+    "raw_available": true
   }
 }
