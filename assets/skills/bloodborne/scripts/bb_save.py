@@ -120,6 +120,7 @@ class InventoryEntry:
     amount: int
     item_id: int
     slot_index: int
+    reinforcement: int | None = None
 
 @dataclass(frozen=True)
 class UpgradeEntry:
@@ -364,7 +365,8 @@ def _parse_slots(data: memoryview, start: int, location: Literal["inventory", "k
             found = _lookup_weapon(item_id)
             if found:
                 name, category = found
-                out.append(InventoryEntry(location, "weapon", category, name, amount, item_id, slot_index))
+                reinforcement = (item_id % 10000) // 100
+                out.append(InventoryEntry(location, "weapon", category, name, amount, item_id, slot_index, reinforcement=reinforcement))
     return out
 
 
@@ -408,3 +410,7 @@ def important_key_items(entries: list[InventoryEntry]) -> list[InventoryEntry]:
 
 def weapons(entries: list[InventoryEntry]) -> list[InventoryEntry]:
     return [entry for entry in entries if entry.kind == "weapon" and entry.location == "inventory"]
+
+def weapon_reinforcement(entries: list[InventoryEntry]) -> dict[str, int]:
+    """Return dict of weapon name -> reinforcement level (+0 to +10)."""
+    return {e.name: e.reinforcement for e in entries if e.kind == "weapon" and e.location == "inventory" and e.reinforcement is not None}

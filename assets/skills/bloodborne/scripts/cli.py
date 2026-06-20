@@ -25,14 +25,15 @@ from bb_save import (
     materials,
     read_bosses,
     read_gems,
-    read_runes,
     read_inventory,
+    read_runes,
     read_stats,
     safe_boss_name,
+    weapon_reinforcement,
     weapons as save_weapons,
 )
-
 CACHE_TTL_HOURS = 24
+
 DATA_SOURCE = "Embedded spoiler-safe constants plus source registry/cache for live verification."
 UPDATED = "2026-06-15"
 CACHE_ENV = "BLOODBORNE_CACHE_DIR"
@@ -730,8 +731,15 @@ def cmd_save(args: argparse.Namespace) -> None:
         print_entries("Important key items", important_key_items(entries))
 
     if args.section in ("summary", "weapons"):
-        print_entries("Weapons", save_weapons(entries))
-
+        entries = read_inventory(save_path)
+        wr = weapon_reinforcement(entries)
+        weapon_rows = save_weapons(entries)
+        if weapon_rows:
+            print("Weapons")
+            for w in sorted(weapon_rows, key=lambda e: e.name):
+                level = wr.get(w.name)
+                level_str = f" +{level}" if level is not None and level > 0 else ""
+                print(f"  {w.name}{level_str}: {w.amount}")
     if args.section in SAVE_BOSS_SECTIONS:
         bosses = read_bosses(save_path)
         known = [boss for boss in bosses if boss.known and boss.defeated]
