@@ -206,7 +206,7 @@
       {
         "_comment": "Enable? 2",
         "rel_offset": 6045,
-        "dead_value": 1,
+        "dead_value": 128,
         "alive_value": 0,
         "current_value": 0
       }
