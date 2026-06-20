@@ -2,13 +2,13 @@
 # Models
 # =============================================================================
 modelRoles:
-  default: opencode-go/minimax-m3:xhigh
-  task: opencode-go/minimax-m3:xhigh
+  default: opencode-go/deepseek-v4-pro:xhigh
+  task: opencode-go/deepseek-v4-pro:xhigh
 
-  commit: opencode-go/minimax-m3:xhigh
-  smol: opencode-go/deepseek-v4-pro:xhigh
+  commit: opencode-go/deepseek-v4-flash:xhigh
+  smol: opencode-go/deepseek-v4-flash:xhigh
 
-  plan: openai-codex/gpt-5.5:high
+  plan: opencode-go/deepseek-v4-pro:xhigh
   slow: openai-codex/gpt-5.5:low
 
 # =============================================================================
