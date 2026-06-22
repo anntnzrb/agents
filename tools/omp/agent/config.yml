@@ -18,6 +18,7 @@ theme:
   dark: titanium
   light: light
 hideThinkingBlock: true
+inlineToolDescriptors: true
 collapseChangelog: true
 followUpMode: all
 steeringMode: all
@@ -26,6 +27,8 @@ doubleEscapeAction: tree
 treeFilterMode: no-tools
 tui:
   textSizing: true
+display:
+  showTokenUsage: true
 
 # =============================================================================
 # MCP / Memory
@@ -50,31 +53,26 @@ branchSummary:
   enabled: true
   reserveTokens: 16384
 compaction:
-  strategy: shake
+  strategy: snapcompact
+  supersedeReads: true
+  dropUseless: true
 
 # =============================================================================
 # Tools
 # =============================================================================
 tools:
   discoveryMode: "off"
-readHashLines: true
-edit:
-  mode: hashline
-  # modelVariants:
-  #   openai-codex/: apply_patch
-  #   openai/: apply_patch
+edit.mode: hashline
 
 # =============================================================================
 # Task (Subagents)
 # =============================================================================
 task:
-  eager: true
+  eager: "always"
   maxConcurrency: 16
   maxRecursionDepth: 1
   maxRuntimeMs: 3600000
 async:
-  enabled: true
-irc:
   enabled: true
 
 # =============================================================================
@@ -174,6 +172,8 @@ bashInterceptor:
       flags: i
       tool: bash
       message: "This is PowerShell syntax, not Bash. In OMP bash on Windows, invoke `pwsh.exe -NoProfile -NoLogo -NonInteractive -Command '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; <script>'`, or use a temporary `.ps1` under PowerShell temp with `-File` for quote-heavy commands."
+bash.stripTrailingHeadTail: true
+bash.autoBackground.thresholdMs: 60000
 
 # =============================================================================
 # Integrations / Providers
@@ -203,7 +203,6 @@ secrets:
   enabled: true
 startup:
   checkUpdate: false
-lastChangelogVersion: 15.7.5
 providers:
   webSearch: auto
 symbolPreset: unicode
