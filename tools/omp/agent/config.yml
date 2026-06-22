@@ -9,8 +9,17 @@ modelRoles:
   smol: opencode-go/deepseek-v4-flash:xhigh
 
   plan: opencode-go/deepseek-v4-pro:xhigh
+  advisor: opencode-go/deepseek-v4-pro:xhigh
   slow: openai-codex/gpt-5.5:low
 
+# =============================================================================
+# Advisor
+# =============================================================================
+advisor:
+  enabled: true
+  syncBacklog: 1
+  immuneTurns: 3
+  subagents: false
 # =============================================================================
 # UI / Interaction
 # =============================================================================
@@ -63,6 +72,15 @@ compaction:
 tools:
   discoveryMode: "off"
 edit.mode: hashline
+
+# =============================================================================
+# Eval kernels
+# =============================================================================
+eval:
+  py: true
+  js: false
+  rb: false
+  jl: false
 
 # =============================================================================
 # Task (Subagents)
