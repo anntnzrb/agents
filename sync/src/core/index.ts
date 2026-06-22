@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 
 import { SyncEnv } from "./harness.ts";
@@ -35,6 +37,26 @@ export function err(message: string): void {
 
 export function warn(message: string): void {
   console.error(`sync: warning: ${message}`);
+}
+
+async function ensurePythonEnv(): Promise<void> {
+  const venvPython = path.join(homedir(), ".omp", "python-env", "bin", "python");
+  if (existsSync(venvPython)) return;
+
+  if (!Bun.which("uv")) {
+    warn("uv not found; skipping python-env bootstrap.");
+    return;
+  }
+
+  const install = Bun.spawnSync(["uv", "python", "install"]);
+  if (!install.success) { warn("uv python install failed; skipping."); return; }
+
+  const find = Bun.spawnSync(["uv", "python", "find"], { stdout: "pipe" });
+  const latest = find.stdout?.toString().trim();
+  if (!latest) { warn("uv python find returned empty; skipping."); return; }
+
+  const venv = Bun.spawnSync(["uv", "venv", "--python", latest, path.join(homedir(), ".omp", "python-env")]);
+  if (!venv.success) warn("failed to create python-env");
 }
 export { panicMessage } from "@runtime/errors.ts";
 
@@ -113,6 +135,8 @@ export const main = async (): Promise<number> => {
     err(panicMessage(error));
     return 1;
   }
+  await ensurePythonEnv();
+
 
   let lock: SyncLock | undefined;
   try {
