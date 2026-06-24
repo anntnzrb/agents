@@ -1,0 +1,713 @@
+"""DS3 data catalogs: rings, spells, NPC quests, and catalog lookup helpers.
+
+Separated from ds3_core for maintainability — ~400 lines.
+Imports ds3_core for shared constants and utilities.
+"""
+
+from __future__ import annotations
+
+from ds3_core import *
+
+# ── Build-Rings Mapping ─────────────────────────────────────────
+# Maps build archetypes to recommended ring name sets.
+
+BUILD_RINGS: dict[str, set[str]] = {
+    "quality": {"Chloranthy Ring", "Ring of Favor", "Havel's Ring", "Ring of Steel Protection",
+                 "Prisoner's Chain", "Life Ring", "Wolf Ring", "Knight's Ring", "Hunter's Ring",
+                 "Lloyd's Sword Ring", "Lloyd's Shield Ring", "Pontiff's Right Eye",
+                 "Pontiff's Left Eye", "Hornet Ring", "Covetous Silver Serpent Ring",
+                 "Horsehoof Ring", "Leo Ring"},
+    "strength": {"Chloranthy Ring", "Ring of Favor", "Havel's Ring", "Ring of Steel Protection",
+                  "Prisoner's Chain", "Knight's Ring", "Wolf Ring", "Red Tearstone Ring",
+                  "Pontiff's Right Eye", "Hornet Ring", "Covetous Silver Serpent Ring",
+                  "Horsehoof Ring", "Knight Slayer's Ring"},
+    "dex": {"Chloranthy Ring", "Ring of Favor", "Havel's Ring", "Ring of Steel Protection",
+            "Prisoner's Chain", "Hunter's Ring", "Carthus Milkring", "Pontiff's Right Eye",
+            "Pontiff's Left Eye", "Hornet Ring", "Flynn's Ring", "Leo Ring",
+            "Wood Grain Ring", "Covetous Silver Serpent Ring"},
+    "sorcerer": {"Bellowing Dragoncrest Ring", "Young Dragon Ring", "Scholar Ring",
+                  "Sage Ring", "Dusk Crown Ring", "Magic Clutch Ring", "Darkmoon Ring",
+                  "Lingering Dragoncrest Ring", "Lloyd's Sword Ring", "Red Tearstone Ring",
+                  "Covetous Silver Serpent Ring", "Ashen Estus Ring", "Aldrich's Sapphire",
+                  "Deep Ring"},
+    "pyro": {"Great Swamp Ring", "Witch's Ring", "Sage Ring", "Fire Clutch Ring",
+              "Dark Clutch Ring", "Darkmoon Ring", "Lingering Dragoncrest Ring",
+              "Lloyd's Sword Ring", "Covetous Silver Serpent Ring", "Ashen Estus Ring"},
+    "cleric": {"Morne's Ring", "Ring of the Sun's First Born", "Priestess Ring",
+                "Sage Ring", "Lightning Clutch Ring", "Darkmoon Ring",
+                "Lingering Dragoncrest Ring", "Lloyd's Sword Ring",
+                "Covetous Silver Serpent Ring", "Ashen Estus Ring", "Saint's Ring",
+                "Deep Ring", "Aldrich's Sapphire"},
+    "luck": {"Covetous Gold Serpent Ring", "Covetous Silver Serpent Ring",
+              "Prisoner's Chain", "Ring of Favor", "Chloranthy Ring", "Wolf Ring",
+              "Bloodbite Ring", "Poisonbite Ring"},
+}
+
+# ── Spell-Type Key ──────────────────────────────────────────────
+
+SPELL_TYPE_KEY: dict[str, str] = {
+    "sorcery": "sorceries",
+    "miracle": "miracles",
+    "pyromancy": "pyromancies",
+}
+
+# ── Ring Category Metadata ──────────────────────────────────────
+
+RING_CATEGORY_ORDER = ["hp", "stamina", "equip_load", "defense", "elemental", "damage",
+                        "covenant", "stat", "spell", "discovery", "recovery",
+                        "utility", "resistance"]
+
+RING_CATEGORY_NAMES: dict[str, str] = {
+    "hp": "HP / Life", "stamina": "Stamina / Roll", "equip_load": "Equip Load / Favor",
+    "defense": "Physical Defense", "elemental": "Elemental Defense",
+    "damage": "Damage Boost (Clutch)", "covenant": "Covenant Rewards",
+    "stat": "Stat Boost", "spell": "Spell Enhancement",
+    "discovery": "Item Discovery & Souls", "recovery": "HP / FP Recovery",
+    "utility": "Combat & General Utility", "resistance": "Status Resistance",
+}
+
+# ── NPC Questlines Catalog ─────────────────────────────────────
+# 17 NPCs with questline steps, rewards, missable flags, and cutoff conditions.
+# Data from Fextralife Wiki cross-referenced with Wikidot (June 2026).
+
+NPC_QUESTS: dict[str, dict] = {
+    "greirat": {
+        "name": "Greirat of the Undead Settlement",
+        "location": "High Wall of Lothric (cell, needs key), then Firelink Shrine",
+        "steps": [
+            "Free him from a cell in the high-walled castle using a key found in the same area",
+            "After reaching the undead settlement, send him on his first scavenge run — he returns with new wares",
+            "After reaching the frozen valley, send him on a second scavenge run — he needs a friend (onion knight or trickster) already in the area to survive",
+            "After reaching the grand archives, send him on his third and final scavenge run — he will not return",
+            "His ashes can be found in the grand archives area if he dies on his third run",
+        ],
+        "missable": True,
+        "provides": ["Blue Tearstone Ring", "Pontiff's Left Eye (buy)", "access to thief merchant inventory", "various weapons and armor (buy)"],
+        "cutoff": "Sending him on his third run is always fatal; second run without a friend in the area kills him",
+    },
+    "siegward": {
+        "name": "Siegward of Catarina",
+        "location": "Undead Settlement (elevator tower), then various areas",
+        "steps": [
+            "Meet him coming up an elevator in the undead settlement; help him fight a fire demon on the rooftop below",
+            "Meet him outside the cleansing chapel in the cathedral area",
+            "Find him trapped in a well outside the chapel — buy his armor back from a trickster in Firelink Shrine and throw it down to him",
+            "Meet him in a frozen kitchen in the underground lake area",
+            "Find him in a dungeon cell in the cursed capital area — free him with the key found nearby",
+            "He joins you for the final fight against a giant lord of cinder — a cutscene plays and he gives you a special weapon for the fight",
+        ],
+        "missable": True,
+        "provides": ["Siegbräu (multiple)", "Emit Force (miracle)", "Storm Ruler", "Catarina Set", "Titanite Slab", "Pierce Shield", "gestures: Toast, Sleep, Rejoice"],
+        "cutoff": "Entering the giant lord's boss room without freeing him from the dungeon cell; not buying his armor from the trickster",
+    },
+    "anri": {
+        "name": "Anri of Astora",
+        "location": "Road of Sacrifices (Halfway Fortress), then Firelink Shrine, then catacombs",
+        "steps": [
+            "Meet Anri and Horace at the Halfway Fortress in the road of sacrifices",
+            "After defeating the deacons of the cathedral, find Anri in Firelink Shrine",
+            "Find Anri in the catacombs — they are looking for Horace (two encounters)",
+            "After the great bridge in the catacombs, you can find Horace in a lower cave; telling Anri about Horace leads to different outcomes",
+            "Find Anri at a church in the frozen valley",
+            "You can either help Anri face a devourer of gods (good ending), or follow the hollow's path from the sable church for a darker ritual",
+        ],
+        "missable": True,
+        "provides": ["Ring of the Evil Eye", "Anri's Straight Sword", "Elite Knight Set", "gestures: Quiet Resolve"],
+        "cutoff": "Killing the pontiff in the frozen valley before completing the catacombs steps; telling Anri about Horace's hollowed location ends their questline early",
+    },
+    "sirris": {
+        "name": "Sirris of the Sunless Realms",
+        "location": "Firelink Shrine (appears after reaching Road of Sacrifices or meeting Anri)",
+        "steps": [
+            "Appears in Firelink Shrine after you reach the road of sacrifices",
+            "Give a Dreamchaser's Ash to the shrine handmaid and reload — Sirris gives you a gesture",
+            "Her summon sign appears at the bridge near the frozen valley for a fight against a wanderer invader",
+            "Her summon sign appears outside the greatwood boss arena for a fight against a holy knight",
+            "After defeating the twin princes, her summon sign appears at the undead settlement pit for the final fight against the holy knight",
+            "Her body can be found outside Firelink Shrine; her equipment is at the pit where you fought the holy knight",
+        ],
+        "missable": True,
+        "provides": ["Darkmoon Ring", "Sunless Set", "Sunless Talisman", "Silvercat Ring", "gestures: Darkmoon Loyalty"],
+        "cutoff": "Offering a Pale Tongue to the mother of rebirth covenant locks her questline permanently",
+    },
+    "yoel": {
+        "name": "Yoel of Londor",
+        "location": "Foot of the High Wall (among dead pilgrims on cliff path to undead settlement)",
+        "steps": [
+            "Find him among dead pilgrims on the cliff path before the undead settlement entrance",
+            "Accept his service — he moves to Firelink Shrine",
+            "Use 'Draw Out True Strength' to gain a free level (gain a Dark Sigil, causing hollowing with each death)",
+            "Reload the area and draw out more strength — up to 5 free levels (requires accumulating hollowing via deaths first)",
+            "He dies after you reach the catacombs area — Yuria of Londor takes his place if you drew out all 5 levels",
+        ],
+        "missable": True,
+        "provides": ["5 free level-ups", "Dark Sigils (hollowing mechanic)", "gesture: Beckon"],
+        "cutoff": "Killing the watchers of the abyss before drawing all 5 levels; reaching the catacombs without 5 sigils means Yuria will not appear",
+    },
+    "yuria": {
+        "name": "Yuria of Londor",
+        "location": "Firelink Shrine (appears where Yoel stood, if you had 5 Dark Sigils when he died)",
+        "steps": [
+            "Appears in Firelink Shrine after Yoel dies (must have 5 Dark Sigils)",
+            "Teaches the Dignified Bow gesture; sells Londor items including two rings and a dark divine tome",
+            "Sends you on the Usurpation of Fire questline, centered around Anri of Astora",
+            "After finding the assassin in the church in the frozen valley, do not kill them — they serve Yuria's plan",
+            "The assassin will prepare Anri for a ritual in a hidden chamber in the frozen valley",
+            "Complete the game with the hollow's ending to fulfill Yuria's quest",
+        ],
+        "missable": True,
+        "provides": ["Untrue Dark Ring", "Untrue White Ring", "Londor Braille Divine Tome (buy)", "Morion Blade (via Orbeck quest)", "gesture: Dignified Bow"],
+        "cutoff": "Healing the Dark Sigil via the Fire Keeper makes her hostile; killing the assassin in the frozen valley church; killing the pontiff before the ritual",
+    },
+    "irina": {
+        "name": "Irina of Carim",
+        "location": "Undead Settlement (cell in the sewer area), then Firelink Shrine",
+        "steps": [
+            "Free her from a cell in the undead settlement sewers (buy the key from the handmaid using ashes found in the same area)",
+            "She moves to Firelink Shrine and becomes a miracle trainer",
+            "Give her Braille Divine Tomes — she accepts both holy and dark tomes",
+            "Dark tomes (deep or londor) corrupt her — Eygon will eventually take her away",
+            "Holy tomes only (carim + lothric) lead her to become a Fire Keeper — find her in the bell tower for a gesture",
+            "If corrupted, you can touch her with Morne's Gauntlets to get her soul and Eygon's gear",
+        ],
+        "missable": False,
+        "provides": ["Miracles (via tomes): Heal Aid, Heal, Med Heal, Great Heal, Replenishment, Homeward, Force, Bountiful Light, Tears of Denial, Caressing Tears", "gesture: Gentle Prayer (holy ending)"],
+        "cutoff": "Giving both dark tomes locks the good ending; she stays available through the game unless corrupted",
+    },
+    "cornyx": {
+        "name": "Cornyx of the Great Swamp",
+        "location": "Undead Settlement (cage near Cliff Underside bonfire), then Firelink Shrine",
+        "steps": [
+            "Free him from a cage in the undead settlement cliff area",
+            "He moves to Firelink Shrine and becomes a pyromancy trainer",
+            "Give him Pyromancy Tomes (Great Swamp, Carthus, Izalith, Quelana) to unlock spells",
+            "After giving him the Izalith tome, he mentions his old master; after the Quelana tome, you can find his set in the demon ruins",
+            "Can summon him for help against the old demon king",
+        ],
+        "missable": False,
+        "provides": ["Pyromancies (via tomes): Fireball, Fire Orb, Bursting Fireball, Great Chaos Fire Orb, Fire Surge, Fire Whip, Firestorm, Chaos Storm, Great Combustion, Sacred Flame, Profaned Flame, Poison Mist, Toxic Mist, Acid Surge, Flash Sweat, Carthus Beacon, Carthus Flame Arc, Rapport, Boulder Heave, Warmth (via Mound-Makers tome)"],
+        "cutoff": "None — stays available through the game",
+    },
+    "orbeck": {
+        "name": "Orbeck of Vinheim",
+        "location": "Road of Sacrifices (upper ledge near Crystal Sage boss area), then Firelink Shrine",
+        "steps": [
+            "Find him on an upper ledge in the road of sacrifices area — requires 10+ Intelligence to recruit",
+            "Give him any sorcery scroll before killing the abyss watchers, or he leaves permanently",
+            "Give him all 4 scrolls (Golden Scroll, Logan's Scroll, Crystal Scroll, Sage's Scroll) to unlock his full inventory",
+            "Buy all his sorceries and he'll mention leaving Firelink Shrine",
+            "His set and ashes appear in the grand archives after the twin princes area",
+            "Yuria of Londor may ask you to kill him — doing so yields the Morion Blade",
+        ],
+        "missable": True,
+        "provides": ["Sorceries (via scrolls)", "Slumbering Dragoncrest Ring", "Young Dragon Ring", "Orbeck's Set", "Clandestine Coat Set", "Morion Blade (via Yuria quest)"],
+        "cutoff": "Killing the abyss watchers without giving a scroll; can be killed for Yuria's quest at any point",
+    },
+    "karla": {
+        "name": "Karla",
+        "location": "Irithyll Dungeon (jail cell in the lowest level), then Firelink Shrine",
+        "steps": [
+            "Find her in a jail cell deep in the dungeon beneath the frozen valley — need the Jailer's Key Ring from the cursed capital",
+            "Free her and she moves to Firelink Shrine, becoming a dark trainer",
+            "Give her dark tomes that other trainers reject: Quelana Pyromancy Tome, Deep Braille Divine Tome, Londor Braille Divine Tome",
+        ],
+        "missable": False,
+        "provides": ["Dark sorceries: Affinity, Dark Edge, Darkbead-equivalent", "Dark pyromancies: Black Flame, Black Fire Orb, Black Serpent", "Dark miracles: Vow of Silence, Deep Protection, Gnaw, Dorhys' Gnawing", "Karla's Set"],
+        "cutoff": "None — stays available through the game",
+    },
+    "hawkwood": {
+        "name": "Hawkwood",
+        "location": "Firelink Shrine (sitting on the stairs near the bonfire from the start)",
+        "steps": [
+            "Talk to him on the stairs at Firelink Shrine — he gives a gesture and a Heavy Gem",
+            "After killing the abyss watchers, talk to him again; he mentions the path of the dragon",
+            "Speak to the blacksmith about Hawkwood and get the Hawkwood's Swordgrass item",
+            "Find the path to the dragon area past the consumed king's garden",
+            "Obtain the Twinkling Dragon Torso Stone from the dragon altar area",
+            "Hawkwood challenges you at the abyss watchers' bonfire for the dragon stone — defeat him",
+        ],
+        "missable": True,
+        "provides": ["Farron Ring", "Hawkwood's Shield", "Twinkling Dragon Torso Stone", "Heavy Gem", "gesture: Collapse"],
+        "cutoff": "Skipping his dialogue triggers; not checking back after abyss watchers",
+    },
+    "leonhard": {
+        "name": "Ringfinger Leonhard",
+        "location": "Firelink Shrine (leaning against the central throne), then various",
+        "steps": [
+            "Meet him leaning against Lothric's throne in Firelink Shrine — he gives 5 Cracked Red Eye Orbs",
+            "After obtaining a Pale Tongue (invasion or from undead settlement), talk to him for the Lift Chamber Key",
+            "Use the key to descend below the tower and defeat a darkwraith for the permanent Red Eye Orb",
+            "After reaching the cathedral of the deep, he gives the Applause gesture",
+            "After offering a Pale Tongue to the mother of rebirth and equipping her covenant, later find that Leonhard has killed her",
+            "Take the Black Eye Orb from her corpse and use it in the chamber of the princess above the frozen valley to invade and kill Leonhard",
+        ],
+        "missable": True,
+        "provides": ["Red Eye Orb (infinite invasions)", "Crescent Moon Sword", "Silver Mask", "gesture: Applause", "Soul of the Mother of Rebirth (restore or transpose for Bountiful Sunlight miracle)"],
+        "cutoff": "Progressing too far without triggering the invasion near the end of the game; not offering a Pale Tongue to the mother of rebirth covenant",
+    },
+    "patches": {
+        "name": "Unbreakable Patches",
+        "location": "Cathedral of the Deep (disguised), then Firelink Shrine",
+        "steps": [
+            "First encounter: opens a bridge trap in the cathedral area, then lowers you into a pit with giants",
+            "After escaping or reaching the mother of rebirth's bedchamber, find him in Firelink Shrine — he locks you in the tower",
+            "Escape the tower, then kick him down from the upper level — he survives and becomes a merchant",
+            "He sells Siegward's armor (needed for Siegward's quest) and various useful items",
+            "Can save Greirat on his second scavenge run if you tell him where Greirat went, he still has Siegward's armor, and you don't buy it back",
+        ],
+        "missable": False,
+        "provides": ["Patches Squat gesture", "Horsehoof Ring", "Masks and consumables (buy)", "Siegward's Armor (buy)", "gesture: Prostration (if forgiven)"],
+        "cutoff": "Killing him; missing the tower encounter means he never appears as a merchant",
+    },
+    "eygon": {
+        "name": "Eygon of Carim",
+        "location": "Undead Settlement (outside Irina's cell), then outside Firelink Shrine, then Iudex Gundyr arena",
+        "steps": [
+            "First found outside Irina's cell in the undead settlement sewers — he guards her",
+            "After freeing Irina, he moves to the entrance of Firelink Shrine",
+            "If you give Irina dark tomes (deep or londor), he becomes hostile and takes her away",
+            "Find them at the arena of the tutorial boss — defeat Eygon to get his gear",
+            "After Irina becomes a Fire Keeper (holy ending), find his body outside her old cell for his gear",
+        ],
+        "missable": True,
+        "provides": ["Moaning Shield", "Morne's Great Hammer", "Morne's Set", "Morne's Ring"],
+        "cutoff": "If Irina is not corrupted, he dies after she becomes a Fire Keeper; can be killed at any time for his gear",
+    },
+    "hodrick": {
+        "name": "Holy Knight Hodrick",
+        "location": "Undead Settlement (Mound-Makers covenant pit), then via Sirris's questline",
+        "steps": [
+            "Summon sign at the undead settlement pit — purple phantom for the Mound-Makers covenant",
+            "If you haven't killed the greatwood, his sign also appears near that boss arena for a fight alongside Sirris",
+            "Later encountered through Sirris's questline at the undead settlement pit (final fight)",
+        ],
+        "missable": True,
+        "provides": ["Vertebra Shackle (if killed as phantom)", "Hodrick's Set (via Sirris questline)", "Sunset Shield (via Sirris questline)"],
+        "cutoff": "Killing the greatwood removes the pit summon sign; failing Sirris's questline locks the final fight",
+    },
+    "heysel": {
+        "name": "Yellowfinger Heysel",
+        "location": "Road of Sacrifices (invader in the swamp area), then Keep Ruins",
+        "steps": [
+            "Invades in the swamp of the road of sacrifices",
+            "If you offer a Pale Tongue to the mother of rebirth before killing the abyss watchers, her summon sign appears near the Keep Ruins bonfire for help with the abyss watchers",
+            "Properly completing the interaction grants the Proper Bow gesture",
+        ],
+        "missable": True,
+        "provides": ["Xanthous Crown (drop on kill)", "Heysel Pick (drop on kill)", "gesture: Proper Bow (summon at Keep Ruins)"],
+        "cutoff": "Killing the abyss watchers before offering a Pale Tongue or before using the summon sign",
+    },
+    "creighton": {
+        "name": "Creighton the Wanderer",
+        "location": "Irithyll of the Boreal Valley (invader near Church of Yorshka)",
+        "steps": [
+            "Invades past the church in the frozen valley near a graveyard",
+            "Sirris's summon sign appears on the bridge for help against him as part of her questline",
+        ],
+        "missable": True,
+        "provides": ["Dragonslayer's Axe (drop on kill)", "Creighton's Set (drop on kill)"],
+        "cutoff": "Killing the pontiff before defeating the invasion; failing Sirris's questline",
+    },
+}
+
+# ── Spell Catalog ─────────────────────────────────────────────────
+# All base-game spells required for Master achievements.
+# Data from Fextralife Wiki + Wikidot, cross-referenced (June 2026).
+
+SPELLS: dict[str, list[dict]] = {
+    "sorceries": [
+        {"name": "Soul Arrow", "int_req": 10, "fth_req": 0, "slots": 1, "fp_cost": 7, "effect": "Fires a soul arrow dealing Magic damage.", "location": "Orbeck of Vinheim (1000 souls) or Sorcerer starting spell", "covenant_locked": False},
+        {"name": "Great Soul Arrow", "int_req": 15, "fth_req": 0, "slots": 1, "fp_cost": 10, "effect": "Fires a more powerful soul arrow dealing Magic damage.", "location": "Orbeck of Vinheim (2000 souls)", "covenant_locked": False},
+        {"name": "Heavy Soul Arrow", "int_req": 13, "fth_req": 0, "slots": 1, "fp_cost": 11, "effect": "Fires a heavy soul arrow dealing Magic damage.", "location": "Orbeck of Vinheim (2000 souls)", "covenant_locked": False},
+        {"name": "Great Heavy Soul Arrow", "int_req": 18, "fth_req": 0, "slots": 1, "fp_cost": 14, "effect": "Fires a more powerful heavy soul arrow dealing Magic damage.", "location": "Orbeck of Vinheim (4000 souls)", "covenant_locked": False},
+        {"name": "Farron Dart", "int_req": 8, "fth_req": 0, "slots": 1, "fp_cost": 3, "effect": "Fires a quick soul dart dealing Magic damage.", "location": "Orbeck of Vinheim (1000 souls)", "covenant_locked": False},
+        {"name": "Great Farron Dart", "int_req": 23, "fth_req": 0, "slots": 1, "fp_cost": 4, "effect": "Fires a powerful soul dart dealing Magic damage.", "location": "Orbeck of Vinheim after giving Sage's Scroll (2000 souls)", "covenant_locked": False},
+        {"name": "Farron Hail", "int_req": 28, "fth_req": 0, "slots": 1, "fp_cost": 4, "effect": "Fires a cascade of soul darts dealing Magic damage.", "location": "Orbeck of Vinheim after giving Sage's Scroll (5000 souls)", "covenant_locked": False},
+        {"name": "Homing Soulmass", "int_req": 20, "fth_req": 0, "slots": 1, "fp_cost": 20, "effect": "Summons five floating orbs that home onto enemies, dealing Magic damage.", "location": "Orbeck of Vinheim after giving Logan's Scroll (6000 souls)", "covenant_locked": False},
+        {"name": "Homing Crystal Soulmass", "int_req": 30, "fth_req": 0, "slots": 1, "fp_cost": 43, "effect": "Summons five floating crystal orbs that home onto enemies, dealing Magic damage.", "location": "Orbeck of Vinheim after giving Crystal Scroll (18000 souls)", "covenant_locked": False},
+        {"name": "Crystal Hail", "int_req": 18, "fth_req": 0, "slots": 1, "fp_cost": 19, "effect": "Rains small crystal soulmasses from above, dealing Magic damage.", "location": "Transpose Soul of a Crystal Sage (Ludleth, 1500 souls)", "covenant_locked": False},
+        {"name": "Soul Spear", "int_req": 32, "fth_req": 0, "slots": 1, "fp_cost": 32, "effect": "Fires a piercing soul spear dealing heavy Magic damage.", "location": "Orbeck of Vinheim after giving Logan's Scroll (5000 souls)", "covenant_locked": False},
+        {"name": "Crystal Soul Spear", "int_req": 48, "fth_req": 0, "slots": 1, "fp_cost": 46, "effect": "Fires a crystal soul spear dealing heavy Magic damage.", "location": "Orbeck of Vinheim after giving Crystal Scroll (15000 souls)", "covenant_locked": False},
+        {"name": "White Dragon Breath", "int_req": 50, "fth_req": 0, "slots": 1, "fp_cost": 25, "effect": "Emits a piercing beam of crystals along the ground, dealing Magic damage.", "location": "Transpose Soul of Consumed Oceiros (Ludleth, 10000 souls)", "covenant_locked": False},
+        {"name": "Soul Stream", "int_req": 45, "fth_req": 0, "slots": 2, "fp_cost": 55, "effect": "Fires a torrential volley of souls dealing Magic damage.", "location": "Grand Archives — behind an illusory wall on the upper levels", "covenant_locked": False},
+        {"name": "Soul Greatsword", "int_req": 22, "fth_req": 0, "slots": 1, "fp_cost": 23, "effect": "Sweeps with a soul greatsword, dealing Magic damage.", "location": "Yoel of Londor or Orbeck of Vinheim (5000 souls)", "covenant_locked": False},
+        {"name": "Farron Flashsword", "int_req": 23, "fth_req": 0, "slots": 1, "fp_cost": 4, "effect": "Cast a fast soul sword, dealing Magic damage.", "location": "Orbeck of Vinheim (5000 souls)", "covenant_locked": False},
+        {"name": "Magic Weapon", "int_req": 10, "fth_req": 0, "slots": 1, "fp_cost": 25, "effect": "Adds Magic damage weapon buff to right-hand weapon.", "location": "Yoel of Londor or Orbeck of Vinheim (4500 souls)", "covenant_locked": False},
+        {"name": "Great Magic Weapon", "int_req": 15, "fth_req": 0, "slots": 1, "fp_cost": 35, "effect": "Adds stronger Magic damage weapon buff to right-hand weapon.", "location": "Road of Sacrifices — near the shortcut door to Farron Keep", "covenant_locked": False},
+        {"name": "Crystal Magic Weapon", "int_req": 30, "fth_req": 0, "slots": 1, "fp_cost": 45, "effect": "Adds powerful Magic damage weapon buff to right-hand weapon.", "location": "Orbeck of Vinheim after giving Crystal Scroll (10000 souls)", "covenant_locked": False},
+        {"name": "Magic Shield", "int_req": 10, "fth_req": 0, "slots": 1, "fp_cost": 30, "effect": "Reinforces left-hand shield with Magic.", "location": "Yoel of Londor or Orbeck of Vinheim (4500 souls)", "covenant_locked": False},
+        {"name": "Great Magic Shield", "int_req": 18, "fth_req": 0, "slots": 1, "fp_cost": 60, "effect": "Greatly reinforces left-hand shield with Magic.", "location": "Irithyll Dungeon — dropped by a corpse-grub in a cell", "covenant_locked": False},
+        {"name": "Spook", "int_req": 10, "fth_req": 0, "slots": 1, "fp_cost": 15, "effect": "Silences movement and prevents non-lethal fall damage.", "location": "Orbeck of Vinheim (2000 souls)", "covenant_locked": False},
+        {"name": "Aural Decoy", "int_req": 18, "fth_req": 0, "slots": 1, "fp_cost": 15, "effect": "Creates a sound that may lure nearby enemies.", "location": "Yoel of Londor or Orbeck of Vinheim (2000 souls)", "covenant_locked": False},
+        {"name": "Pestilent Mist", "int_req": 30, "fth_req": 0, "slots": 1, "fp_cost": 13, "effect": "Releases a cloud of mist that eats away HP over time.", "location": "Orbeck of Vinheim after giving Sage's Scroll (1000 souls)", "covenant_locked": False},
+        {"name": "Cast Light", "int_req": 15, "fth_req": 0, "slots": 1, "fp_cost": 20, "effect": "Creates a hovering light source above the caster.", "location": "Orbeck of Vinheim after giving Golden Scroll (1000 souls)", "covenant_locked": False},
+        {"name": "Repair", "int_req": 15, "fth_req": 0, "slots": 1, "fp_cost": 20, "effect": "Restores durability of all equipped weapons and armor.", "location": "Orbeck of Vinheim after giving Golden Scroll (2000 souls)", "covenant_locked": False},
+        {"name": "Hidden Weapon", "int_req": 12, "fth_req": 0, "slots": 1, "fp_cost": 25, "effect": "Turns right-hand weapon invisible.", "location": "Orbeck of Vinheim after giving Golden Scroll (1500 souls)", "covenant_locked": False},
+        {"name": "Hidden Body", "int_req": 15, "fth_req": 0, "slots": 1, "fp_cost": 25, "effect": "Turns the caster nearly invisible.", "location": "Orbeck of Vinheim after giving Golden Scroll (3000 souls)", "covenant_locked": False},
+        {"name": "Chameleon", "int_req": 12, "fth_req": 0, "slots": 1, "fp_cost": 20, "effect": "Transform into an object that blends into surroundings.", "location": "Irithyll of the Boreal Valley — from the Old Woman of Londor (Anri questline)", "covenant_locked": False},
+        {"name": "Twisted Wall of Light", "int_req": 27, "fth_req": 0, "slots": 1, "fp_cost": 10, "effect": "Deflects incoming spells with light particles.", "location": "Orbeck of Vinheim after giving Golden Scroll (6000 souls)", "covenant_locked": False},
+        {"name": "Affinity", "int_req": 32, "fth_req": 0, "slots": 1, "fp_cost": 40, "effect": "Summons five black orbs that home onto enemies, dealing Dark damage.", "location": "Karla (15000 souls)", "covenant_locked": False},
+        {"name": "Dark Edge", "int_req": 30, "fth_req": 0, "slots": 1, "fp_cost": 26, "effect": "Slams down a large black blade dealing Dark damage.", "location": "Karla (8000 souls)", "covenant_locked": False},
+        {"name": "Deep Soul", "int_req": 12, "fth_req": 0, "slots": 1, "fp_cost": 6, "effect": "Fires a soul dregs dealing Dark damage.", "location": "Transpose Soul of the Deacons of the Deep (Ludleth)", "covenant_locked": False},
+        {"name": "Great Deep Soul", "int_req": 20, "fth_req": 0, "slots": 1, "fp_cost": 9, "effect": "Fires a slow, powerful soul dregs dealing Dark damage.", "location": "Aldrich Faithful covenant — Rank 1 (10 Human Dregs)", "covenant_locked": True},
+    ],
+    "miracles": [
+        {"name": "Heal", "int_req": 0, "fth_req": 12, "slots": 1, "fp_cost": 45, "effect": "Restores HP for self and nearby allies.", "location": "Irina of Carim (1000 souls) or Cleric starting spell", "covenant_locked": False},
+        {"name": "Heal Aid", "int_req": 0, "fth_req": 8, "slots": 1, "fp_cost": 27, "effect": "Restores a small amount of HP.", "location": "Shrine Handmaid (500 souls) or Herald starting spell", "covenant_locked": False},
+        {"name": "Med Heal", "int_req": 0, "fth_req": 15, "slots": 1, "fp_cost": 55, "effect": "Restores moderate HP for self and nearby allies.", "location": "Irina of Carim after giving Braille Divine Tome of Carim (3500 souls)", "covenant_locked": False},
+        {"name": "Great Heal", "int_req": 0, "fth_req": 25, "slots": 1, "fp_cost": 65, "effect": "Restores a large amount of HP for self and nearby allies.", "location": "Irithyll of the Boreal Valley — on a corpse in the swamp below the city entrance", "covenant_locked": False},
+        {"name": "Soothing Sunlight", "int_req": 0, "fth_req": 45, "slots": 1, "fp_cost": 80, "effect": "Restores a massive amount of HP for self and nearby allies.", "location": "Transpose Soul of the Dancer (Ludleth, 5000 souls)", "covenant_locked": False},
+        {"name": "Replenishment", "int_req": 0, "fth_req": 15, "slots": 1, "fp_cost": 30, "effect": "Gradually restores HP over time.", "location": "Irina of Carim (1000 souls)", "covenant_locked": False},
+        {"name": "Bountiful Light", "int_req": 0, "fth_req": 25, "slots": 1, "fp_cost": 45, "effect": "Gradually restores a large amount of HP over time.", "location": "Irina of Carim after giving Braille Divine Tome of Lothric (5000 souls)", "covenant_locked": False},
+        {"name": "Bountiful Sunlight", "int_req": 0, "fth_req": 35, "slots": 2, "fp_cost": 70, "effect": "Gradually restores large HP for self and nearby allies.", "location": "Transpose Soul of Rosaria (Ludleth)", "covenant_locked": False},
+        {"name": "Caressing Tears", "int_req": 0, "fth_req": 12, "slots": 1, "fp_cost": 14, "effect": "Cures bleed, poison, toxic, and frostbite for self and nearby allies.", "location": "Irina of Carim (1500 souls)", "covenant_locked": False},
+        {"name": "Tears of Denial", "int_req": 0, "fth_req": 15, "slots": 2, "fp_cost": 100, "effect": "When reaching 0 HP, endure with 1 HP instead of dying.", "location": "Irina of Carim after giving Braille Divine Tome of Carim (10000 souls)", "covenant_locked": False},
+        {"name": "Force", "int_req": 0, "fth_req": 12, "slots": 1, "fp_cost": 26, "effect": "Emits a shockwave staggering nearby foes and deflecting projectiles.", "location": "Irina of Carim after giving Braille Divine Tome of Carim (1000 souls)", "covenant_locked": False},
+        {"name": "Emit Force", "int_req": 0, "fth_req": 18, "slots": 1, "fp_cost": 20, "effect": "Launches a ranged shockwave dealing Physical damage.", "location": "Siegward of Catarina questline — Irithyll of the Boreal Valley", "covenant_locked": False},
+        {"name": "Wrath of the Gods", "int_req": 0, "fth_req": 30, "slots": 2, "fp_cost": 40, "effect": "Emits a powerful shockwave dealing Physical damage.", "location": "Profaned Capital — inside the hidden chapel in the toxic swamp", "covenant_locked": False},
+        {"name": "Lightning Spear", "int_req": 0, "fth_req": 20, "slots": 1, "fp_cost": 23, "effect": "Hurls a lightning spear dealing Lightning damage.", "location": "Farron Keep — on the bridge near the Old Wolf of Farron bonfire", "covenant_locked": False},
+        {"name": "Great Lightning Spear", "int_req": 0, "fth_req": 30, "slots": 1, "fp_cost": 32, "effect": "Hurls a giant lightning spear dealing Lightning damage.", "location": "Warriors of Sunlight covenant — Rank 2 (30 Sunlight Medals)", "covenant_locked": True},
+        {"name": "Lightning Stake", "int_req": 0, "fth_req": 35, "slots": 1, "fp_cost": 34, "effect": "Strikes the ground with a stake of lightning, dealing Lightning damage.", "location": "Smouldering Lake — dropped by the Carthus Sandworm", "covenant_locked": False},
+        {"name": "Lightning Storm", "int_req": 0, "fth_req": 45, "slots": 2, "fp_cost": 36, "effect": "Calls forth furious bolts of lightning around the caster.", "location": "Transpose Soul of the Nameless King (Ludleth, 5000 souls)", "covenant_locked": False},
+        {"name": "Sunlight Spear", "int_req": 0, "fth_req": 40, "slots": 1, "fp_cost": 48, "effect": "Hurls a sunlight spear dealing Lightning damage.", "location": "Transpose Soul of the Lords (Ludleth, 10000 souls)", "covenant_locked": False},
+        {"name": "Lightning Blade", "int_req": 0, "fth_req": 30, "slots": 1, "fp_cost": 50, "effect": "Adds Lightning damage weapon buff to right-hand weapon.", "location": "Irithyll Dungeon — drop from elevator shortcut near the dragon statue", "covenant_locked": False},
+        {"name": "Darkmoon Blade", "int_req": 0, "fth_req": 30, "slots": 1, "fp_cost": 50, "effect": "Adds Magic damage weapon buff to right-hand weapon.", "location": "Blade of the Darkmoon covenant — Rank 2 (30 Proofs of a Concord Kept)", "covenant_locked": True},
+        {"name": "Blessed Weapon", "int_req": 0, "fth_req": 15, "slots": 1, "fp_cost": 35, "effect": "Increases Physical AR and adds Blessed weapon buff (HP regen).", "location": "Irina of Carim after giving Braille Divine Tome of Lothric (8000 souls)", "covenant_locked": False},
+        {"name": "Dark Blade", "int_req": 0, "fth_req": 25, "slots": 1, "fp_cost": 35, "effect": "Adds Dark damage weapon buff to right-hand weapon.", "location": "Irina or Karla after giving Londor Braille Divine Tome (10000 souls)", "covenant_locked": False},
+        {"name": "Sacred Oath", "int_req": 0, "fth_req": 28, "slots": 2, "fp_cost": 65, "effect": "Increases damage and absorption for self and nearby allies.", "location": "Warriors of Sunlight covenant — Rank 1 (10 Sunlight Medals)", "covenant_locked": True},
+        {"name": "Deep Protection", "int_req": 0, "fth_req": 20, "slots": 1, "fp_cost": 25, "effect": "Slightly increases damage, absorption, resistances, and stamina regen.", "location": "Irina or Karla after giving Deep Braille Divine Tome (4000 souls)", "covenant_locked": False},
+        {"name": "Magic Barrier", "int_req": 0, "fth_req": 15, "slots": 1, "fp_cost": 30, "effect": "Increases Magic absorption.", "location": "Irina of Carim after giving Braille Divine Tome of Lothric (5000 souls)", "covenant_locked": False},
+        {"name": "Great Magic Barrier", "int_req": 0, "fth_req": 25, "slots": 2, "fp_cost": 40, "effect": "Greatly increases Magic absorption.", "location": "Archdragon Peak — on a roof near the Great Belfry bonfire", "covenant_locked": False},
+        {"name": "Homeward", "int_req": 0, "fth_req": 18, "slots": 1, "fp_cost": 30, "effect": "Warps to the last bonfire rested at or Firelink Shrine.", "location": "Irina of Carim (3000 souls)", "covenant_locked": False},
+        {"name": "Seek Guidance", "int_req": 0, "fth_req": 12, "slots": 1, "fp_cost": 15, "effect": "Displays extra messages and reveals summon signs without being embered.", "location": "Cathedral of the Deep — on a corpse past the first Giant Slave", "covenant_locked": False},
+        {"name": "Atonement", "int_req": 0, "fth_req": 18, "slots": 1, "fp_cost": 15, "effect": "Attracts enemies towards the caster.", "location": "Farron Keep — near the Farron Keep Perimeter bonfire", "covenant_locked": False},
+        {"name": "Vow of Silence", "int_req": 0, "fth_req": 30, "slots": 2, "fp_cost": 35, "effect": "Prevents spell casting in the vicinity (including your own).", "location": "Irina or Karla after giving Londor Braille Divine Tome (15000 souls)", "covenant_locked": False},
+        {"name": "Gnaw", "int_req": 0, "fth_req": 18, "slots": 1, "fp_cost": 15, "effect": "Launches a swarm of insects dealing Dark damage and bleed build-up.", "location": "Irina or Karla after giving Deep Braille Divine Tome (2000 souls)", "covenant_locked": False},
+        {"name": "Dorhys' Gnawing", "int_req": 0, "fth_req": 25, "slots": 1, "fp_cost": 20, "effect": "Launches a great swarm of insects dealing Dark damage and heavy bleed.", "location": "Irithyll of the Boreal Valley — behind an illusory railing near the central area", "covenant_locked": False},
+        {"name": "Dead Again", "int_req": 15, "fth_req": 23, "slots": 1, "fp_cost": 45, "effect": "Detonates nearby corpses dealing Dark damage.", "location": "Irina or Karla after giving Londor Braille Divine Tome (5000 souls)", "covenant_locked": False},
+        {"name": "Divine Pillars of Light", "int_req": 0, "fth_req": 30, "slots": 1, "fp_cost": 3, "effect": "Brings down multiple pillars of light dealing Physical damage.", "location": "Grand Archives — at the top inside a golden cage below the ceiling", "covenant_locked": False},
+        {"name": "Lifehunt Scythe", "int_req": 0, "fth_req": 22, "slots": 1, "fp_cost": 25, "effect": "Steals HP from foes using an illusory scythe dealing Dark damage.", "location": "Transpose Soul of Aldrich (Ludleth, 5000 souls)", "covenant_locked": False},
+    ],
+    "pyromancies": [
+        {"name": "Fireball", "int_req": 6, "fth_req": 6, "slots": 1, "fp_cost": 11, "effect": "Hurls a fireball dealing Fire damage.", "location": "Cornyx of the Great Swamp (1000 souls) or Pyromancer starting spell", "covenant_locked": False},
+        {"name": "Fire Orb", "int_req": 8, "fth_req": 8, "slots": 1, "fp_cost": 15, "effect": "Hurls a larger fireball dealing Fire damage.", "location": "Cornyx after giving Great Swamp Pyromancy Tome (3000 souls)", "covenant_locked": False},
+        {"name": "Bursting Fireball", "int_req": 18, "fth_req": 12, "slots": 1, "fp_cost": 14, "effect": "Hurls an exploding fireball dealing Fire damage.", "location": "Cornyx after giving Great Swamp Pyromancy Tome (5000 souls)", "covenant_locked": False},
+        {"name": "Great Chaos Fire Orb", "int_req": 0, "fth_req": 0, "slots": 2, "fp_cost": 25, "effect": "Hurls a large fireball that leaves a pool of lava, dealing Fire damage.", "location": "Cornyx after giving Izalith Pyromancy Tome (10000 souls)", "covenant_locked": False},
+        {"name": "Chaos Bed Vestiges", "int_req": 20, "fth_req": 10, "slots": 2, "fp_cost": 35, "effect": "Hurls a massive fireball dealing heavy Fire damage.", "location": "Transpose Soul of the Old Demon King (Ludleth, 5000 souls)", "covenant_locked": False},
+        {"name": "Fire Surge", "int_req": 6, "fth_req": 0, "slots": 1, "fp_cost": 2, "effect": "Emits a constant stream of fire, dealing Fire damage.", "location": "Cornyx of the Great Swamp (1000 souls)", "covenant_locked": False},
+        {"name": "Fire Whip", "int_req": 13, "fth_req": 8, "slots": 1, "fp_cost": 2, "effect": "Sweeps foes with a fire whip, dealing Fire damage.", "location": "Karla after giving Quelana Pyromancy Tome (10000 souls)", "covenant_locked": False},
+        {"name": "Firestorm", "int_req": 18, "fth_req": 0, "slots": 1, "fp_cost": 2, "effect": "Erects multiple flame pillars in vicinity, dealing Fire damage.", "location": "Karla after giving Quelana Pyromancy Tome (15000 souls)", "covenant_locked": False},
+        {"name": "Chaos Storm", "int_req": 0, "fth_req": 0, "slots": 2, "fp_cost": 3, "effect": "Erects multiple fire pillars that leave lava pools, dealing Fire damage.", "location": "Cornyx after giving Izalith Pyromancy Tome (12000 souls)", "covenant_locked": False},
+        {"name": "Great Combustion", "int_req": 10, "fth_req": 10, "slots": 1, "fp_cost": 20, "effect": "Casts a large, short-ranged fire burst dealing Fire damage.", "location": "Cornyx of the Great Swamp (3000 souls)", "covenant_locked": False},
+        {"name": "Sacred Flame", "int_req": 8, "fth_req": 8, "slots": 1, "fp_cost": 25, "effect": "Grabs an enemy and places a flame within them that explodes.", "location": "Smouldering Lake — beyond the area where Knight Slayer Tsorig is fought", "covenant_locked": False},
+        {"name": "Profaned Flame", "int_req": 25, "fth_req": 0, "slots": 1, "fp_cost": 30, "effect": "Creates a delayed explosion at the targeted location dealing Fire damage.", "location": "Irithyll Dungeon — at the bottom of the Giant Slave's cell", "covenant_locked": False},
+        {"name": "Black Fire Orb", "int_req": 20, "fth_req": 20, "slots": 1, "fp_cost": 22, "effect": "Hurls a black fireball dealing Dark damage.", "location": "Karla after giving Grave Warden Pyromancy Tome (10000 souls)", "covenant_locked": False},
+        {"name": "Black Flame", "int_req": 15, "fth_req": 15, "slots": 1, "fp_cost": 25, "effect": "Casts a giant black fire burst dealing Dark damage.", "location": "Karla after giving Grave Warden Pyromancy Tome (10000 souls)", "covenant_locked": False},
+        {"name": "Black Serpent", "int_req": 15, "fth_req": 15, "slots": 1, "fp_cost": 19, "effect": "Releases undulating black flames on the ground that home in dealing Dark damage.", "location": "Transpose Soul of High Lord Wolnir (Ludleth)", "covenant_locked": False},
+        {"name": "Boulder Heave", "int_req": 8, "fth_req": 12, "slots": 1, "fp_cost": 17, "effect": "Spews a boulder dealing Physical damage.", "location": "Transpose Soul of a Stray Demon (Ludleth)", "covenant_locked": False},
+        {"name": "Poison Mist", "int_req": 0, "fth_req": 10, "slots": 1, "fp_cost": 20, "effect": "Creates a poison mist cloud at the targeted location.", "location": "Cornyx after giving Great Swamp Pyromancy Tome (2000 souls)", "covenant_locked": False},
+        {"name": "Toxic Mist", "int_req": 0, "fth_req": 15, "slots": 1, "fp_cost": 30, "effect": "Creates a toxic cloud at the targeted location.", "location": "Smouldering Lake — inside a lava pool in the ruins below", "covenant_locked": False},
+        {"name": "Acid Surge", "int_req": 0, "fth_req": 13, "slots": 1, "fp_cost": 24, "effect": "Creates an acid cloud that corrodes weapons and armor.", "location": "Cornyx after giving Carthus Pyromancy Tome (6000 souls)", "covenant_locked": False},
+        {"name": "Flash Sweat", "int_req": 6, "fth_req": 6, "slots": 1, "fp_cost": 20, "effect": "Increases Fire absorption.", "location": "Cornyx of the Great Swamp (1500 souls)", "covenant_locked": False},
+        {"name": "Profuse Sweat", "int_req": 6, "fth_req": 6, "slots": 1, "fp_cost": 20, "effect": "Increases all resistances.", "location": "Cornyx after giving Great Swamp Pyromancy Tome (2000 souls)", "covenant_locked": False},
+        {"name": "Iron Flesh", "int_req": 8, "fth_req": 0, "slots": 1, "fp_cost": 45, "effect": "Greatly increases resistances but reduces movement and Lightning absorption.", "location": "Farron Keep — to the right outside the Farron Keep bonfire room", "covenant_locked": False},
+        {"name": "Power Within", "int_req": 10, "fth_req": 10, "slots": 1, "fp_cost": 30, "effect": "Increases attack and stamina regen but gradually drains HP.", "location": "Grand Archives — behind a movable bookcase in the dark section", "covenant_locked": False},
+        {"name": "Carthus Flame Arc", "int_req": 10, "fth_req": 10, "slots": 1, "fp_cost": 30, "effect": "Adds Fire damage weapon buff to right-hand weapon.", "location": "Cornyx after giving Carthus Pyromancy Tome (10000 souls)", "covenant_locked": False},
+        {"name": "Carthus Beacon", "int_req": 12, "fth_req": 12, "slots": 2, "fp_cost": 35, "effect": "Damage increases with consecutive attacks.", "location": "Cornyx after giving Carthus Pyromancy Tome (8000 souls)", "covenant_locked": False},
+        {"name": "Rapport", "int_req": 15, "fth_req": 0, "slots": 1, "fp_cost": 30, "effect": "Converts an enemy into a temporary ally.", "location": "Karla after giving Quelana Pyromancy Tome (7000 souls)", "covenant_locked": False},
+        {"name": "Warmth", "int_req": 0, "fth_req": 25, "slots": 2, "fp_cost": 50, "effect": "Creates a healing aura at the targeted location.", "location": "Mound Makers covenant — Rank 2 (30 Vertebra Shackles)", "covenant_locked": True},
+    ],
+}
+
+RINGS: list[dict] = [
+    # ── Life Ring series ──
+    {"name": "Life Ring", "effect": "Increases max HP by 7%", "location": "Starting gift, or sold by Shrine Handmaid after giving Dreamchaser's Ashes (early-game tower area)", "ng": "base", "weight": 0.3, "category": "hp", "builds": ["all"]},
+    {"name": "Life Ring +1", "effect": "Increases max HP by 8%", "location": "NG+: near the first bonfire in the High Wall of Lothric", "ng": "NG+", "weight": 0.3, "category": "hp", "builds": ["all"]},
+    {"name": "Life Ring +2", "effect": "Increases max HP by 9%", "location": "NG++: behind a hidden wall in the Cemetery of Ash", "ng": "NG++", "weight": 0.3, "category": "hp", "builds": ["all"]},
+    {"name": "Life Ring +3", "effect": "Increases max HP by 10%", "location": "DLC: behind a trick wall in the Ringed City streets", "ng": "NG++/DLC", "weight": 0.3, "category": "hp", "builds": ["all"]},
+
+    # ── Chloranthy Ring series ──
+    {"name": "Chloranthy Ring", "effect": "Increases stamina recovery speed (+7/s)", "location": "Undead Settlement: platform near the giant's tower", "ng": "base", "weight": 0.7, "category": "stamina", "builds": ["all"]},
+    {"name": "Chloranthy Ring +1", "effect": "Increases stamina recovery speed (+8/s)", "location": "NG+: Farron Keep swamp, on a ledge near the central bonfire", "ng": "NG+", "weight": 0.7, "category": "stamina", "builds": ["all"]},
+    {"name": "Chloranthy Ring +2", "effect": "Increases stamina recovery speed (+9/s)", "location": "NG++: Road of Sacrifices, on the path to the cathedral", "ng": "NG++", "weight": 0.7, "category": "stamina", "builds": ["all"]},
+    {"name": "Chloranthy Ring +3", "effect": "Increases stamina recovery speed (+10/s)", "location": "DLC: in the Dreg Heap, near a poison swamp", "ng": "NG++/DLC", "weight": 0.7, "category": "stamina", "builds": ["all"]},
+
+    # ── Havel's Ring series ──
+    {"name": "Havel's Ring", "effect": "Increases max equip load by 15%", "location": "Transposed from the soul of a stray demon above the Farron swamp (bridge area)", "ng": "base", "weight": 1.5, "category": "equip_load", "builds": ["all"]},
+    {"name": "Havel's Ring +1", "effect": "Increases max equip load by 17%", "location": "NG+: Irithyll Dungeon, near a giant's cell", "ng": "NG+", "weight": 1.5, "category": "equip_load", "builds": ["all"]},
+    {"name": "Havel's Ring +2", "effect": "Increases max equip load by 19%", "location": "NG++: Grand Archives, on a rooftop path", "ng": "NG++", "weight": 1.5, "category": "equip_load", "builds": ["all"]},
+    {"name": "Havel's Ring +3", "effect": "Increases max equip load by 21%", "location": "DLC: in the Ringed City, near the first bonfire", "ng": "NG++/DLC", "weight": 1.5, "category": "equip_load", "builds": ["all"]},
+
+    # ── Ring of Favor series ──
+    {"name": "Ring of Favor", "effect": "+3% HP, +10% stamina, +5% equip load", "location": "Irithyll water reserve: behind two hidden walls past the beast", "ng": "base", "weight": 1.5, "category": "equip_load", "builds": ["all"]},
+    {"name": "Ring of Favor +1", "effect": "+4.5% HP, +11% stamina, +6% equip load", "location": "NG+: Cathedral of the Deep, near the deacons' altar", "ng": "NG+", "weight": 1.5, "category": "equip_load", "builds": ["all"]},
+    {"name": "Ring of Favor +2", "effect": "+5.5% HP, +12% stamina, +6.5% equip load", "location": "NG++: Lothric Castle, on a corpse near the rooftops", "ng": "NG++", "weight": 1.5, "category": "equip_load", "builds": ["all"]},
+    {"name": "Ring of Favor +3", "effect": "+6% HP, +12.5% stamina, +7% equip load", "location": "DLC: in the Dreg Heap, beside a tree root path", "ng": "NG++/DLC", "weight": 1.5, "category": "equip_load", "builds": ["all"]},
+
+    # ── Ring of Steel Protection series ──
+    {"name": "Ring of Steel Protection", "effect": "Reduces physical damage taken by 10%", "location": "Untended Graves: on a corpse in the dark Firelink Shrine", "ng": "base", "weight": 1.2, "category": "defense", "builds": ["all"]},
+    {"name": "Ring of Steel Protection +1", "effect": "Reduces physical damage taken by 13%", "location": "NG+: Farron Keep, near the Old Wolf bonfire", "ng": "NG+", "weight": 1.2, "category": "defense", "builds": ["all"]},
+    {"name": "Ring of Steel Protection +2", "effect": "Reduces physical damage taken by 15%", "location": "NG++: Grand Archives, on a balcony", "ng": "NG++", "weight": 1.2, "category": "defense", "builds": ["all"]},
+    {"name": "Ring of Steel Protection +3", "effect": "Reduces physical damage taken by 17%", "location": "DLC: in the Ringed City, atop a tower", "ng": "NG++/DLC", "weight": 1.2, "category": "defense", "builds": ["all"]},
+
+    # ── Flame Stoneplate Ring series ──
+    {"name": "Flame Stoneplate Ring", "effect": "Increases fire damage absorption by 13%", "location": "Undead Settlement: near the giant's tower, on a hanging corpse", "ng": "base", "weight": 1.5, "category": "elemental", "builds": ["all"]},
+    {"name": "Flame Stoneplate Ring +1", "effect": "Increases fire damage absorption by 17%", "location": "NG+: Farron Keep, near the crab-filled water", "ng": "NG+", "weight": 1.5, "category": "elemental", "builds": ["all"]},
+    {"name": "Flame Stoneplate Ring +2", "effect": "Increases fire damage absorption by 20%", "location": "NG++: Smouldering Lake, near the ballista", "ng": "NG++", "weight": 1.5, "category": "elemental", "builds": ["all"]},
+
+    # ── Thunder Stoneplate Ring series ──
+    {"name": "Thunder Stoneplate Ring", "effect": "Increases lightning damage absorption by 13%", "location": "Irithyll: behind a hidden wall near the church", "ng": "base", "weight": 1.0, "category": "elemental", "builds": ["all"]},
+    {"name": "Thunder Stoneplate Ring +1", "effect": "Increases lightning damage absorption by 17%", "location": "NG+: Grand Archives, on a rooftop", "ng": "NG+", "weight": 1.0, "category": "elemental", "builds": ["all"]},
+    {"name": "Thunder Stoneplate Ring +2", "effect": "Increases lightning damage absorption by 20%", "location": "NG++: Cemetery of Ash, behind a hidden wall", "ng": "NG++", "weight": 1.0, "category": "elemental", "builds": ["all"]},
+
+    # ── Dark Stoneplate Ring series ──
+    {"name": "Dark Stoneplate Ring", "effect": "Increases dark damage absorption by 13%", "location": "Irithyll Dungeon: in a cell near the giant", "ng": "base", "weight": 0.8, "category": "elemental", "builds": ["all"]},
+    {"name": "Dark Stoneplate Ring +1", "effect": "Increases dark damage absorption by 17%", "location": "NG+: Irithyll, near the distant manor bonfire", "ng": "NG+", "weight": 0.8, "category": "elemental", "builds": ["all"]},
+    {"name": "Dark Stoneplate Ring +2", "effect": "Increases dark damage absorption by 20%", "location": "NG++: Farron Keep, in the poison swamp", "ng": "NG++", "weight": 0.8, "category": "elemental", "builds": ["all"]},
+
+    # ── Magic Stoneplate Ring series ──
+    {"name": "Magic Stoneplate Ring", "effect": "Increases magic damage absorption by 13%", "location": "Road of Sacrifices: behind a hidden wall near the Crystal Sage's area", "ng": "base", "weight": 0.8, "category": "elemental", "builds": ["all"]},
+    {"name": "Magic Stoneplate Ring +1", "effect": "Increases magic damage absorption by 17%", "location": "NG+: Consumed King's Garden, before the boss fog gate", "ng": "NG+", "weight": 0.8, "category": "elemental", "builds": ["all"]},
+    {"name": "Magic Stoneplate Ring +2", "effect": "Increases magic damage absorption by 20%", "location": "NG++: Grand Archives, near the first elevator", "ng": "NG++", "weight": 0.8, "category": "elemental", "builds": ["all"]},
+
+    # ── Speckled Stoneplate Ring ──
+    {"name": "Speckled Stoneplate Ring", "effect": "Increases fire, magic, lightning, and dark absorption by 5%", "location": "Smouldering Lake: in the lava area behind a wall", "ng": "base", "weight": 0.9, "category": "elemental", "builds": ["all"]},
+    {"name": "Speckled Stoneplate Ring +1", "effect": "Increases fire, magic, lightning, and dark absorption by 7%", "location": "NG++: Cemetery of Ash, near a large crystal lizard", "ng": "NG++", "weight": 0.9, "category": "elemental", "builds": ["all"]},
+
+    # ── Clutch Rings ──
+    {"name": "Fire Clutch Ring", "effect": "Increases fire attack by 15%, reduces physical absorption by 10%", "location": "Undead Settlement: on a corpse near the first bonfire", "ng": "base", "weight": 0.9, "category": "damage", "builds": ["pyro"]},
+    {"name": "Lightning Clutch Ring", "effect": "Increases lightning attack by 15%, reduces physical absorption by 10%", "location": "Archdragon Peak: on a corpse near the Dragon-Kin Mausoleum bonfire", "ng": "base", "weight": 0.8, "category": "damage", "builds": ["cleric"]},
+    {"name": "Dark Clutch Ring", "effect": "Increases dark attack by 15%, reduces physical absorption by 10%", "location": "Irithyll Dungeon: in a mimic chest", "ng": "base", "weight": 0.8, "category": "damage", "builds": ["pyro"]},
+    {"name": "Magic Clutch Ring", "effect": "Increases magic attack by 15%, reduces physical absorption by 10%", "location": "Irithyll: behind a hidden wall near the distant manor", "ng": "base", "weight": 0.7, "category": "damage", "builds": ["sorcerer"]},
+
+    # ── Wolf Ring series ──
+    {"name": "Wolf Ring", "effect": "Increases poise by 4", "location": "Covenant reward: Watchdogs of Farron rank 2 (30 Wolf's Blood Swordgrass)", "ng": "base", "weight": 1.5, "category": "covenant", "builds": ["all"]},
+    {"name": "Wolf Ring +1", "effect": "Increases poise by 6", "location": "NG+: Farron Keep, near the Farron Keep Perimeter bonfire", "ng": "NG+", "weight": 1.5, "category": "covenant", "builds": ["all"]},
+    {"name": "Wolf Ring +2", "effect": "Increases poise by 8", "location": "NG++: Irithyll, behind a hidden wall near the central bonfire", "ng": "NG++", "weight": 1.5, "category": "covenant", "builds": ["all"]},
+    {"name": "Wolf Ring +3", "effect": "Increases poise by 10", "location": "DLC: in the Ringed City, near the swamp area", "ng": "NG++/DLC", "weight": 1.5, "category": "covenant", "builds": ["all"]},
+
+    # ── Wood Grain Ring series ──
+    {"name": "Wood Grain Ring", "effect": "Extends roll invincibility frames slightly", "location": "Farron Keep: on a corpse near the basilisks in the poison swamp", "ng": "base", "weight": 0.3, "category": "stamina", "builds": ["dex"]},
+    {"name": "Wood Grain Ring +1", "effect": "Extends roll invincibility frames moderately", "location": "NG+: Irithyll, near the church bonfire", "ng": "NG+", "weight": 0.3, "category": "stamina", "builds": ["dex"]},
+    {"name": "Wood Grain Ring +2", "effect": "Extends roll invincibility frames noticeably", "location": "NG++: High Wall of Lothric, on a ledge below the dragon platforms", "ng": "NG++", "weight": 0.3, "category": "stamina", "builds": ["dex"]},
+
+    # ── Covetous Gold Serpent Ring series ──
+    {"name": "Covetous Gold Serpent Ring", "effect": "Item discovery +50 (boosts drop rate)", "location": "Irithyll Dungeon: in a cell near the giant, requires key", "ng": "base", "weight": 1.2, "category": "discovery", "builds": ["luck"]},
+    {"name": "Covetous Gold Serpent Ring +1", "effect": "Item discovery +75", "location": "NG+: Irithyll Dungeon, near the Profaned Capital bonfire", "ng": "NG+", "weight": 1.2, "category": "discovery", "builds": ["luck"]},
+    {"name": "Covetous Gold Serpent Ring +2", "effect": "Item discovery +100", "location": "NG++: Grand Archives, near the rooftop", "ng": "NG++", "weight": 1.2, "category": "discovery", "builds": ["luck"]},
+    {"name": "Covetous Gold Serpent Ring +3", "effect": "Item discovery +115", "location": "DLC: in the Dreg Heap, behind a hidden wall near the first angel", "ng": "NG++/DLC", "weight": 1.2, "category": "discovery", "builds": ["luck"]},
+
+    # ── Covetous Silver Serpent Ring series ──
+    {"name": "Covetous Silver Serpent Ring", "effect": "Souls gained +10%", "location": "Firelink Shrine: upstairs, accessed via tree-jump onto roof (requires the tower key or tree jump)", "ng": "base", "weight": 1.2, "category": "discovery", "builds": ["all"]},
+    {"name": "Covetous Silver Serpent Ring +1", "effect": "Souls gained +20%", "location": "NG+: Cemetery of Ash, behind a hidden wall near the first boss", "ng": "NG+", "weight": 1.2, "category": "discovery", "builds": ["all"]},
+    {"name": "Covetous Silver Serpent Ring +2", "effect": "Souls gained +30%", "location": "NG++: Kiln of the First Flame, on a ledge", "ng": "NG++", "weight": 1.2, "category": "discovery", "builds": ["all"]},
+    {"name": "Covetous Silver Serpent Ring +3", "effect": "Souls gained +35%", "location": "DLC: in the Ringed City, near the streets bonfire", "ng": "NG++/DLC", "weight": 1.2, "category": "discovery", "builds": ["all"]},
+
+    # ── Ring of the Evil Eye series ──
+    {"name": "Ring of the Evil Eye", "effect": "Restores 30 HP per enemy killed", "location": "Untended Graves: on a corpse in the dark Firelink Shrine", "ng": "base", "weight": 0.8, "category": "recovery", "builds": ["all"]},
+    {"name": "Ring of the Evil Eye +1", "effect": "Restores 33 HP per enemy killed", "location": "NG+: Irithyll, near the distant manor", "ng": "NG+", "weight": 0.8, "category": "recovery", "builds": ["all"]},
+    {"name": "Ring of the Evil Eye +2", "effect": "Restores 35 HP per enemy killed", "location": "NG++: Cemetery of Ash, near a large hollow", "ng": "NG++", "weight": 0.8, "category": "recovery", "builds": ["all"]},
+    {"name": "Ring of the Evil Eye +3", "effect": "Restores 37 HP per enemy killed", "location": "DLC: in the Ringed City, near the shared graves", "ng": "NG++/DLC", "weight": 0.8, "category": "recovery", "builds": ["all"]},
+
+    # ── Stat Rings ──
+    {"name": "Knight's Ring", "effect": "Raises Strength by 5", "location": "Lothric Castle: near the first bonfire, before the dragon bridge", "ng": "base", "weight": 0.8, "category": "stat", "builds": ["strength", "quality"]},
+    {"name": "Hunter's Ring", "effect": "Raises Dexterity by 5", "location": "Lothric Castle: in a room near the three-winged knight", "ng": "base", "weight": 0.8, "category": "stat", "builds": ["dex", "quality"]},
+    {"name": "Scholar Ring", "effect": "Raises Intelligence by 5", "location": "Lothric Castle: on a balcony near the archives entrance", "ng": "base", "weight": 0.7, "category": "stat", "builds": ["sorcerer"]},
+    {"name": "Priestess Ring", "effect": "Raises Faith by 5", "location": "Sold by Shrine Handmaid after giving a certain ash from the mid-game area", "ng": "base", "weight": 0.7, "category": "stat", "builds": ["cleric"]},
+    {"name": "Carthus Milkring", "effect": "Raises Dexterity by 3, makes rolls invisible", "location": "Catacombs of Carthus: on a corpse near the skeleton bridge", "ng": "base", "weight": 0.8, "category": "stat", "builds": ["dex"]},
+    {"name": "Prisoner's Chain", "effect": "+5 Vigor, +5 Endurance, +5 Vitality; reduces absorption by ~4%", "location": "Transposed from the soul of a boss in the Untended Graves", "ng": "base", "weight": 0.8, "category": "stat", "builds": ["all"]},
+
+    # ── Spell Rings ──
+    {"name": "Bellowing Dragoncrest Ring", "effect": "Boosts sorcery damage by 20%", "location": "Irithyll Dungeon: in a cell near the giant", "ng": "base", "weight": 0.7, "category": "spell", "builds": ["sorcerer"]},
+    {"name": "Young Dragon Ring", "effect": "Boosts sorcery damage by 12%", "location": "Starting equipment for Sorcerer class, or sold by a sorcery NPC after giving a scroll", "ng": "base", "weight": 0.7, "category": "spell", "builds": ["sorcerer"]},
+    {"name": "Great Swamp Ring", "effect": "Boosts pyromancy damage by 12%", "location": "Starting equipment for Pyromancer class, or found in the Farron Keep swamp near the giant crab", "ng": "base", "weight": 0.7, "category": "spell", "builds": ["pyro"]},
+    {"name": "Witch's Ring", "effect": "Boosts pyromancy damage by 20%", "location": "Catacombs of Carthus: behind a hidden wall near the first bonfire", "ng": "base", "weight": 0.7, "category": "spell", "builds": ["pyro"]},
+    {"name": "Morne's Ring", "effect": "Boosts miracle damage by 12%", "location": "Road of Sacrifices: on a corpse near the first bonfire", "ng": "base", "weight": 0.7, "category": "spell", "builds": ["cleric"]},
+    {"name": "Ring of the Sun's First Born", "effect": "Boosts miracle damage by 20%", "location": "Irithyll: behind a hidden wall near the distant manor bonfire", "ng": "base", "weight": 0.9, "category": "spell", "builds": ["cleric"]},
+    {"name": "Darkmoon Ring", "effect": "Adds 2 attunement slots", "location": "Covenant reward: Blade of the Darkmoon / Blue Sentinels rank 1 (10 Proofs of Concord Kept)", "ng": "base", "weight": 0.8, "category": "spell", "builds": ["sorcerer", "pyro", "cleric"]},
+    {"name": "Lingering Dragoncrest Ring", "effect": "Extends spell duration by 30%", "location": "Road of Sacrifices: behind a hidden wall near the Crystal Sage area", "ng": "base", "weight": 0.7, "category": "spell", "builds": ["sorcerer", "pyro", "cleric"]},
+    {"name": "Lingering Dragoncrest Ring +1", "effect": "Extends spell duration by 40%", "location": "NG+: Catacombs of Carthus, near the skeleton ball", "ng": "NG+", "weight": 0.7, "category": "spell", "builds": ["sorcerer", "pyro", "cleric"]},
+    {"name": "Lingering Dragoncrest Ring +2", "effect": "Extends spell duration by 50%", "location": "NG++: Road of Sacrifices, near the first bonfire", "ng": "NG++", "weight": 0.7, "category": "spell", "builds": ["sorcerer", "pyro", "cleric"]},
+    {"name": "Sage Ring", "effect": "Shortens spell casting time (adds 30 virtual dexterity)", "location": "Road of Sacrifices: in the water area near the Crystal Sage area", "ng": "base", "weight": 0.7, "category": "spell", "builds": ["sorcerer", "pyro", "cleric"]},
+    {"name": "Sage Ring +1", "effect": "Shortens spell casting time (adds 35 virtual dexterity)", "location": "NG+: Catacombs of Carthus, near the first bonfire", "ng": "NG+", "weight": 0.7, "category": "spell", "builds": ["sorcerer", "pyro", "cleric"]},
+    {"name": "Sage Ring +2", "effect": "Shortens spell casting time (adds 40 virtual dexterity)", "location": "NG++: Consumed King's Garden, near the bonfire", "ng": "NG++", "weight": 0.7, "category": "spell", "builds": ["sorcerer", "pyro", "cleric"]},
+    {"name": "Dusk Crown Ring", "effect": "Reduces spell FP cost by 20%, reduces max HP by 15%", "location": "Irithyll Dungeon: in a cell near the giant", "ng": "base", "weight": 0.6, "category": "spell", "builds": ["sorcerer"]},
+    {"name": "Farron Ring", "effect": "Reduces weapon skill FP cost by 30%", "location": "Road of Sacrifices: near the Halfway Fortress bonfire, behind a hidden wall", "ng": "base", "weight": 0.8, "category": "spell", "builds": ["all"]},
+    {"name": "Saint's Ring", "effect": "Adds 1 attunement slot", "location": "Sold by the miracle merchant in Firelink Shrine after giving the Braille Divine Tome of Carim", "ng": "base", "weight": 0.5, "category": "spell", "builds": ["cleric"]},
+    {"name": "Deep Ring", "effect": "Adds 1 attunement slot", "location": "Cathedral of the Deep: on a corpse near the first giant", "ng": "base", "weight": 0.5, "category": "spell", "builds": ["sorcerer", "cleric"]},
+
+    # ── Utility Rings ──
+    {"name": "Silvercat Ring", "effect": "Negates fall damage (except lethal falls)", "location": "Sold by an NPC in Firelink Shrine after giving a certain ash from Farron Keep", "ng": "base", "weight": 0.6, "category": "utility", "builds": ["all"]},
+    {"name": "Slumbering Dragoncrest Ring", "effect": "Muffles movement sounds and reduces enemy detection range", "location": "Sold by a sorcery NPC after giving a scroll from Farron Keep", "ng": "base", "weight": 0.6, "category": "utility", "builds": ["all"]},
+    {"name": "Obscuring Ring", "effect": "Makes you invisible to other players at a distance", "location": "Covenant reward: Rosaria's Fingers rank 1 (10 Pale Tongues)", "ng": "base", "weight": 0.6, "category": "covenant", "builds": ["all"]},
+    {"name": "Untrue Dark Ring", "effect": "Appears human (no hollowing effect) even when hollow; appears as host in multiplayer", "location": "Sold by an NPC merchant in Firelink Shrine after a certain quest event", "ng": "base", "weight": 0.6, "category": "utility", "builds": ["all"]},
+    {"name": "Untrue White Ring", "effect": "Appears as a phantom (white glow) in multiplayer", "location": "Sold by an NPC merchant in Firelink Shrine after a certain quest event", "ng": "base", "weight": 0.6, "category": "utility", "builds": ["all"]},
+    {"name": "Reversal Ring", "effect": "Changes character movement animations to opposite gender", "location": "Untended Graves: on a corpse in the dark Firelink Shrine", "ng": "base", "weight": 0.5, "category": "utility", "builds": ["all"]},
+    {"name": "Skull Ring", "effect": "Enemies are more likely to target you (increases aggro)", "location": "Catacombs of Carthus: on a corpse near the skeleton bridge", "ng": "base", "weight": 0.5, "category": "utility", "builds": ["all"]},
+    {"name": "Calamity Ring", "effect": "Doubles damage taken — challenge ring", "location": "Archdragon Peak: perform the Path of the Dragon gesture near the dragon statue at the first bonfire", "ng": "base", "weight": 0.0, "category": "utility", "builds": ["all"]},
+    {"name": "Estus Ring", "effect": "Increases HP restored by Estus flasks by 20%", "location": "Firelink Shrine: up the tower, behind a locked gate (requires tower key)", "ng": "base", "weight": 0.8, "category": "utility", "builds": ["all"]},
+    {"name": "Ashen Estus Ring", "effect": "Increases FP restored by Ashen Estus flasks by 20%", "location": "Untended Graves: on a corpse in the dark cemetery area", "ng": "base", "weight": 0.6, "category": "utility", "builds": ["sorcerer", "pyro", "cleric"]},
+    {"name": "Lloyd's Sword Ring", "effect": "Increases attack by 10% when HP is full", "location": "Cathedral of the Deep: on a corpse near the first giant", "ng": "base", "weight": 0.9, "category": "utility", "builds": ["all"]},
+    {"name": "Lloyd's Shield Ring", "effect": "Increases all absorption by 20% when HP is full", "location": "Sold by Shrine Handmaid after giving a certain ash from Cathedral of the Deep", "ng": "base", "weight": 0.9, "category": "utility", "builds": ["all"]},
+    {"name": "Blue Tearstone Ring", "effect": "Increases all absorption by 20% when HP is low (<20%)", "location": "Road of Sacrifices: on a corpse near the first bonfire", "ng": "base", "weight": 0.8, "category": "utility", "builds": ["all"]},
+    {"name": "Red Tearstone Ring", "effect": "Increases attack by 20% when HP is low (<20%)", "location": "Lothric Castle: near the first bonfire, on a corpse overlooking the bridge", "ng": "base", "weight": 0.8, "category": "utility", "builds": ["all"]},
+    {"name": "Ring of Sacrifice", "effect": "Lose this ring instead of souls when dying; prevents hollowing on death. Ring breaks on use.", "location": "Multiple sources: starting gift, merchants (limited stock), corpses throughout the game", "ng": "base", "weight": 1.0, "category": "utility", "builds": ["all"]},
+    {"name": "Sun Princess Ring", "effect": "Restores 2 HP per second", "location": "Untended Graves: on a corpse in the dark Firelink Shrine", "ng": "base", "weight": 0.6, "category": "recovery", "builds": ["all"]},
+    {"name": "Flynn's Ring", "effect": "Increases attack based on low equip load (max +15% at <2.4 weight)", "location": "Undead Settlement: near the giant's tower, behind a hidden wall", "ng": "base", "weight": 0.9, "category": "utility", "builds": ["dex"]},
+    {"name": "Horsehoof Ring", "effect": "Increases kick stamina damage to shields (+30%)", "location": "Sold by Shrine Handmaid after giving a certain ash from Undead Settlement", "ng": "base", "weight": 0.6, "category": "utility", "builds": ["strength", "quality"]},
+    {"name": "Knight Slayer's Ring", "effect": "Increases stamina damage to shields by 10%", "location": "Road of Sacrifices: on a corpse near the first bonfire", "ng": "base", "weight": 0.8, "category": "utility", "builds": ["strength"]},
+    {"name": "Hornet Ring", "effect": "Increases critical attack damage by 30% (ripostes and backstabs)", "location": "Untended Graves: behind a hidden wall near a black knight", "ng": "base", "weight": 0.9, "category": "utility", "builds": ["all"]},
+    {"name": "Leo Ring", "effect": "Increases thrust counter-attack damage by 15%", "location": "Irithyll: on a corpse near the distant manor bonfire", "ng": "base", "weight": 0.8, "category": "utility", "builds": ["dex", "quality"]},
+    {"name": "Pontiff's Right Eye", "effect": "Increases attack by 3/6/9% on successive hits (3 tiers)", "location": "Irithyll: behind a hidden wall near the distant manor bonfire", "ng": "base", "weight": 1.0, "category": "utility", "builds": ["dex", "quality"]},
+    {"name": "Pontiff's Left Eye", "effect": "Restores HP on successive hits (multiple hits needed to trigger)", "location": "Transposed from the soul of a major Irithyll boss", "ng": "base", "weight": 1.0, "category": "recovery", "builds": ["dex", "quality"]},
+    {"name": "Aldrich's Ruby", "effect": "Restores 85 HP on a critical attack (riposte/backstab)", "location": "Untended Graves: on a corpse in the dark Firelink Shrine", "ng": "base", "weight": 0.6, "category": "recovery", "builds": ["strength", "dex"]},
+    {"name": "Aldrich's Sapphire", "effect": "Restores 15 FP on a critical attack (riposte/backstab)", "location": "Cathedral of the Deep: on a corpse near the deacons' altar", "ng": "base", "weight": 0.6, "category": "utility", "builds": ["sorcerer", "cleric"]},
+
+    # ── Status Resistance Rings ──
+    {"name": "Bloodbite Ring", "effect": "Increases bleed resistance by 90 points", "location": "Undead Settlement: near the giant's tower, on a corpse", "ng": "base", "weight": 0.6, "category": "resistance", "builds": ["all"]},
+    {"name": "Bloodbite Ring +1", "effect": "Increases bleed resistance by 140 points", "location": "NG+: Irithyll Dungeon, in a cell near the giant", "ng": "NG+", "weight": 0.6, "category": "resistance", "builds": ["all"]},
+    {"name": "Poisonbite Ring", "effect": "Increases poison resistance by 90 points", "location": "Cathedral of the Deep: on a corpse in the watery area", "ng": "base", "weight": 0.6, "category": "resistance", "builds": ["all"]},
+    {"name": "Poisonbite Ring +1", "effect": "Increases poison resistance by 140 points", "location": "NG+: Irithyll, near the central fountain", "ng": "NG+", "weight": 0.6, "category": "resistance", "builds": ["all"]},
+    {"name": "Cursebite Ring", "effect": "Increases curse resistance by 150 points", "location": "Cathedral of the Deep: on a corpse near the area with many maggot-men", "ng": "base", "weight": 0.6, "category": "resistance", "builds": ["all"]},
+    {"name": "Fleshbite Ring", "effect": "Increases frost and poison resistance by 40 points", "location": "Irithyll: near the church bonfire, on a corpse outside", "ng": "base", "weight": 0.6, "category": "resistance", "builds": ["all"]},
+    {"name": "Fleshbite Ring +1", "effect": "Increases frost and poison resistance by 60 points", "location": "NG++: Cemetery of Ash, near the tower bonfire", "ng": "NG++", "weight": 0.6, "category": "resistance", "builds": ["all"]},
+]
+
+# ── Catalog Lookup Helpers ──────────────────────────────────────
+
+def rings_by_build(build: str) -> list[dict]:
+    """Return rings recommended for a given build archetype.
+
+    Args:
+        build: One of quality, strength, dex, sorcerer, pyro, cleric, luck.
+    Returns:
+        List of ring dicts sorted by category then name.
+    """
+    family = BUILD_RINGS.get(build, set())
+    filtered = [r for r in RINGS
+                if any(r["name"].startswith(fam) for fam in family)]
+    return sorted(filtered, key=lambda x: (x.get("category", "utility"), x["name"]))
+
+
+def rings_by_name(query: str) -> list[dict]:
+    """Find rings matching a case-insensitive substring.
+
+    Args:
+        query: Substring to match against ring names.
+    Returns:
+        List of matching ring dicts (empty if none found).
+    """
+    q = query.lower()
+    return [r for r in RINGS if q in r["name"].lower()]
+
+
+def spells_by_type(spell_type: str) -> list[dict]:
+    """Return all spells of a given type.
+
+    Args:
+        spell_type: One of 'sorcery', 'miracle', 'pyromancy'.
+    Returns:
+        Flat list of spell dicts for that type (empty if unknown type).
+    """
+    cat_key = SPELL_TYPE_KEY.get(spell_type)
+    if not cat_key:
+        return []
+    return list(SPELLS.get(cat_key, []))
+
+
+def spell_by_name(name: str) -> dict | None:
+    """Look up a spell by name (case-insensitive, exact or substring match).
+
+    Args:
+        name: Spell name to search for.
+    Returns:
+        Spell dict if found, None otherwise.
+    """
+    target = name.lower()
+    for spells in SPELLS.values():
+        for s in spells:
+            if s["name"].lower() == target or target in s["name"].lower():
+                return s
+    return None
+
+
+def spell_type_for(name: str) -> str | None:
+    """Return the type key ('sorcery', 'miracle', 'pyromancy') for a given spell name.
+
+    Args:
+        name: Spell name to look up.
+    Returns:
+        Type string if found, None otherwise.
+    """
+    target = name.lower()
+    for cat_label, cat_key in [("sorcery", "sorceries"), ("miracle", "miracles"), ("pyromancy", "pyromancies")]:
+        for s in SPELLS.get(cat_key, []):
+            if s["name"].lower() == target or target in s["name"].lower():
+                return cat_label
+    return None
+
+
+def spells_matching(query: str) -> list[tuple[str, dict]]:
+    """Find all spells matching a substring in name (case-insensitive).
+
+    Args:
+        query: Substring to match.
+    Returns:
+        List of (spell_type, spell_dict) tuples.
+    """
+    q = query.lower()
+    results: list[tuple[str, dict]] = []
+    for cat_label, cat_key in [("sorcery", "sorceries"), ("miracle", "miracles"), ("pyromancy", "pyromancies")]:
+        for s in SPELLS.get(cat_key, []):
+            if q in s["name"].lower():
+                results.append((cat_label, s))
+    return results
+
+
+def spells_achievement() -> dict[str, list[dict]]:
+    """Return all base-game spells needed for platinum Master achievements.
+
+    Returns:
+        A dict with keys 'sorceries', 'miracles', 'pyromancies' containing
+        the full spell lists (all base-game spells are required).
+    """
+    return SPELLS
+
+
+def npc_by_name(name: str) -> dict | None:
+    key = name.lower()
+    if key in NPC_QUESTS:
+        return NPC_QUESTS[key]
+    matches = [k for k in NPC_QUESTS if key in k]
+    if len(matches) == 1:
+        return NPC_QUESTS[matches[0]]
+    for k, n in NPC_QUESTS.items():
+        if key in n["name"].lower():
+            return n
+    return None
+
+
+def npc_keys_matching(query: str) -> list[str]:
+    q = query.lower()
+    result = [k for k, n in NPC_QUESTS.items() if q in k or q in n["name"].lower()]
+    return result
+
+
+def npcs_missable() -> list[tuple[str, dict]]:
+    return sorted(
+        [(k, n) for k, n in NPC_QUESTS.items() if n.get("missable")],
+        key=lambda x: x[1]["name"],
+    )
+
+
+
+
+# ── Exports for `from ds3_catalog import *` ─────────────────────
+__all__ = [
+    "BUILD_RINGS", "SPELL_TYPE_KEY", "RING_CATEGORY_ORDER", "RING_CATEGORY_NAMES",
+    "NPC_QUESTS", "SPELLS", "RINGS",
+    "rings_by_build", "rings_by_name", "spells_by_type", "spell_by_name",
+    "spell_type_for", "spells_matching", "spells_achievement",
+    "npc_by_name", "npc_keys_matching", "npcs_missable",
+]
+
