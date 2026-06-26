@@ -2,15 +2,15 @@
 # Models
 # =============================================================================
 modelRoles:
-  default: opencode-go/deepseek-v4-pro:xhigh
-  task: opencode-go/deepseek-v4-pro:xhigh
+  default: opencode-go/mimo-v2.5-pro:xhigh
+  task: opencode-go/mimo-v2.5-pro:xhigh
 
-  commit: opencode-go/minimax-m3:xhigh
+  commit: opencode-go/deepseek-v4-flash:xhigh
   smol: opencode-go/deepseek-v4-flash:xhigh
 
-  plan: opencode-go/deepseek-v4-pro:xhigh
-  advisor: opencode-go/deepseek-v4-pro:xhigh
-  slow: openai-codex/gpt-5.5:low
+  plan: opencode-go/mimo-v2.5-pro:xhigh
+  advisor: opencode-go/mimo-v2.5-pro:xhigh
+  slow: openai-codex/gpt-5.5:medium
 
 # =============================================================================
 # Advisor
@@ -62,7 +62,7 @@ branchSummary:
   enabled: true
   reserveTokens: 16384
 compaction:
-  strategy: snapcompact
+  #strategy: snapcompact
   supersedeReads: true
   dropUseless: true
 
