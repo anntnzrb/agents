@@ -83,6 +83,40 @@ CLASS_NAMES: dict[int, str] = {
 
 SAVE_PATH_DEFAULT: Path = Path.home() / "AppData" / "Roaming" / "DarkSoulsIII"
 
+ITEM_THING_COUNT: int = 6144
+STATS_SIZE: int = 0x1F0
+ITEMS_INVENTORY_COUNT_OFFSET: int = 0x128
+ITEMS_INVENTORY_OFFSET: int = 0x12C
+INVENTORY_CAPACITY: int = 0x780
+EVENT_FLAGS_VERIFIED: bool = False
+
+BOSS_EVENT_VALUES: dict[str, int] = {
+    "Iudex Gundyr": 0xE0,
+    "Vordt of the Boreal Valley": 0xC0,
+    "Curse-Rotted Greatwood": 0xC0,
+    "Crystal Sage": 0x28,
+    "Abyss Watchers": 0xC0,
+    "High Lord Wolnir": 0xC0,
+    "Oceiros, the Consumed King": 0x42,
+    "Champion Gundyr": 0x03,
+    "Dancer of the Boreal Valley": 0x20,
+    "Deacons of the Deep": 0xC0,
+    "Old Demon King": 0x02,
+    "Pontiff Sulyvahn": 0x20,
+    "Aldrich, Devourer of Gods": 0x80,
+    "Dragonslayer Armour": 0x80,
+    "Yhorm the Giant": 0xC0,
+    "Nameless King": 0x21,
+    "Twin Princes": 0x03,
+    "Soul of Cinder": 0xC0,
+    "Champion's Gravetender": 0x0C,
+    "Sister Friede": 0xC0,
+    "Halflight, Spear of the Church": 0xC0,
+    "Darkeater Midir": 0x30,
+    "Slave Knight Gael": 0xC0,
+    "Demon Prince": 0x80,
+}
+
 
 class BossStatus(TypedDict):
     name: str
@@ -105,6 +139,8 @@ class ItemEntry(TypedDict):
     item_type: str
     name: str
     quantity: int
+    reinforcement: int
+    base_item_id: int
 
 
 class InventoryResult(TypedDict):
@@ -119,7 +155,7 @@ class MissedKeyItem(TypedDict):
     name: str
     owned: bool
     check: bool
-
+    supported: bool
 
 class MissedSummary(TypedDict):
     current_area: str
@@ -190,47 +226,37 @@ def _read_save_cached(path: str, mtime_ns: int) -> tuple[bytes, list[bytes]]:
         raise ValueError(f"Expected >=11 slots, got {len(entries)}")
     return data, [_decrypt_entry(data, e) for e in entries]
 
+def _valid_stats_offset(slot: bytes, offset: int) -> bool:
+    if offset < 0 or offset + STATS_SIZE > len(slot):
+        return False
+    raw_name = slot[offset + 0x78 : offset + 0x78 + 32]
+    if any(raw_name[i] for i in range(1, len(raw_name), 2)):
+        return False
+    name_bytes = bytes(raw_name[i] for i in range(0, len(raw_name), 2)).rstrip(b"\x00")
+    if len(name_bytes) < 2 or not all(32 <= c < 127 for c in name_bytes):
+        return False
+    try:
+        stats = struct.unpack_from("<8I", slot, offset + 0x34)
+        soul_level = struct.unpack_from("<I", slot, offset + 0x60)[0]
+    except struct.error:
+        return False
+    return all(1 <= value <= 99 for value in stats) and 1 <= soul_level <= 999 and slot[offset + 0x9E] <= 9
+
+
 def _find_stats_offset(slot: bytes) -> int:
-    """Locate the Stats struct via name-anchored scan."""
-    limit = min(len(slot) - 0xA0, 0x60000)
-    for offset in range(0x78, limit, 2):
-        raw = slot[offset : offset + 32]
-        if any(raw[i] for i in range(1, 32, 2)):
-            continue
-        chars = bytes(raw[i] for i in range(0, 32, 2))
-        trimmed = chars.rstrip(b"\x00")
-        if len(trimmed) < 2:
-            continue
-        if not all(32 <= c < 127 for c in trimmed):
-            continue
-        so = offset - 0x78
-        if so < 0:
-            continue
-        try:
-            vals = struct.unpack_from("<8I", slot, so + 0x34)
-        except struct.error:
-            continue
-        if not all(1 <= v <= 99 for v in vals):
-            continue
-        sl = struct.unpack_from("<I", slot, so + 0x60)[0]
-        cls = slot[so + 0x9E]
-        if 1 <= sl <= 999 and cls <= 9:
-            return so
-    for offset in range(0, limit, 4):
-        try:
-            vals = struct.unpack_from("<8I", slot, offset)
-        except struct.error:
-            continue
-        if not all(1 <= v <= 99 for v in vals):
-            continue
-        so = offset - 0x34
-        if so < 0:
-            continue
-        sl = struct.unpack_from("<I", slot, so + 0x60)[0]
-        cls = slot[so + 0x9E]
-        if 1 <= sl <= 999 and cls <= 9:
-            return so
-    return -1
+    """Locate the Stats struct by walking the source-backed USER_DATA template."""
+    if len(slot) < 0x14:
+        return -1
+    header_unk10 = struct.unpack_from("<I", slot, 0x10)[0]
+    if header_unk10 not in (0x5C, 0x6C):
+        return -1
+    offset = header_unk10 + 4
+    for _ in range(ITEM_THING_COUNT):
+        if offset + 8 > len(slot):
+            return -1
+        unk00, unk04 = struct.unpack_from("<II", slot, offset)
+        offset += 8 if unk00 == 0 and unk04 == 0xFFFFFFFF else 60
+    return offset if _valid_stats_offset(slot, offset) else -1
 
 
 def read_stats(path: str | Path, slot: int = 0) -> StatBlock:
@@ -244,6 +270,7 @@ def read_stats(path: str | Path, slot: int = 0) -> StatBlock:
         raise RuntimeError("Could not locate Stats struct in save data")
     d = slot_data
     def _u32(off): return struct.unpack_from("<I", d, so + off)[0]
+    def _u16(off): return struct.unpack_from("<H", d, so + off)[0]
     def _u8(off): return d[so + off]
     name_raw = d[so + 0x78 : so + 0x78 + 32]
     name = name_raw.decode("utf-16-le", errors="replace").rstrip("\x00")
@@ -260,8 +287,8 @@ def read_stats(path: str | Path, slot: int = 0) -> StatBlock:
         class_=_u8(0x9E), gender=_u8(0x9F),
         embered=_u8(0xF0),
         estusAllocation=_u8(0xF2), ashenEstusAllocation=_u8(0xF3),
-        maxWeaponReinforcement=_u8(0xA2),
-        hollow=_u8(0xFC), yoelLevelUpsRemaining=_u8(0xFF),
+        maxWeaponReinforcement=_u8(0xA3),
+        hollow=_u16(0xEE), yoelLevelUpsRemaining=_u8(0xFF),
         charID=_u32(0x100),
         darkmoonPoints=_u8(0xBD), sunlightPoints=_u8(0xBE),
         moundmakerPoints=_u8(0xBF), fingersPoints=_u8(0xC1),
@@ -278,92 +305,85 @@ def read_name(path: str | Path, slot: int = 0) -> str:
 # Event flag / boss / bonfire readers
 # ---------------------------------------------------------------------------
 
-def _find_event_flag_start(slot: bytes) -> int:
-    """Return the DS3 1.15.2 event flag base if this slot can contain it.
+def _boss_flags_supported() -> bool:
+    return EVENT_FLAGS_VERIFIED and bool(BOSS_FLAGS) and all(name in BOSS_EVENT_VALUES for name in BOSS_FLAGS)
 
-    The save slot does not expose a lightweight signature here.  Treat the
-    known base as a version-specific layout constant, and validate every byte
-    this module will read from it instead of pretending to scan.
-    """
-    event_flag_start = 0x56ED0
-    max_flag_offset = -1
-    for offset in BOSS_FLAGS.values():
-        if offset > max_flag_offset:
-            max_flag_offset = offset
-    for offset in BONFIRE_FLAGS.values():
-        if offset > max_flag_offset:
-            max_flag_offset = offset
-    if max_flag_offset < 0:
+
+def _bonfire_flags_supported() -> bool:
+    return EVENT_FLAGS_VERIFIED and bool(BONFIRE_FLAGS)
+
+
+def _event_flags_supported() -> bool:
+    return _boss_flags_supported() or _bonfire_flags_supported()
+
+
+def _event_flag_start(slot: bytes) -> int:
+    """Return the alfi-derived event flag table start for a decrypted character slot."""
+    offset = 0x70
+    for _ in range(ITEM_THING_COUNT):
+        if offset + 8 > len(slot):
+            return -1
+        gaitem_handle, _item_id = struct.unpack_from("<II", slot, offset)
+        type_bits = gaitem_handle & 0xF0000000
+        offset += 60 if gaitem_handle and type_bits in (0x80000000, 0x90000000) else 8
+    try:
+        magic_start = offset + 0x13F
+        inventory_start = magic_start + 0x1DD
+        inventory_end = inventory_start + 0x8808
+        above_storage_counter = inventory_end + 0x11C
+        above_storage_size = struct.unpack_from("<I", slot, above_storage_counter)[0]
+        table_1_end = above_storage_counter + 4 + above_storage_size * 8
+        storage_box_start = table_1_end + 0x18C + 4
+        storage_box_end = storage_box_start + 0x8800
+        gesture_start = storage_box_end + 0x0C
+        gesture_end = gesture_start + 0xA4
+        table_2_size = struct.unpack_from("<I", slot, gesture_end)[0]
+        table_2_end = gesture_end + 4 + table_2_size * 4
+        new_game_plus = table_2_end + 0x92
+        event_start = new_game_plus + 0xBCC
+    except struct.error:
         return -1
-    max_flag_byte = max_flag_offset >> 3
-    if event_flag_start < 0 or event_flag_start + max_flag_byte >= len(slot):
-        return -1
-    ng_plus_offset = event_flag_start - 0xBCC
-    if not 0 <= ng_plus_offset < len(slot):
-        return -1
-    return event_flag_start
+    return event_start if 0 <= event_start < len(slot) else -1
+
+def read_ng_plus(path: str | Path, slot: int = 0) -> int:
+    """Return the Journey/NG+ counter stored before the event flag table."""
+    _, slots = read_save(path)
+    slot_data = slots[slot]
+    event_start = _event_flag_start(slot_data)
+    ng_offset = event_start - 0xBCC
+    if event_start < 0 or not 0 <= ng_offset < len(slot_data):
+        return 0
+    return slot_data[ng_offset]
 
 
 def read_bosses(path: str | Path, slot: int = 0) -> list[BossStatus]:
-    """Return boss defeat status list from the save file."""
+    """Return boss defeat status list from known event flag byte values."""
     _, slots = read_save(path)
     slot_data = slots[slot]
-    efs = _find_event_flag_start(slot_data)
-    if efs < 0:
-        return [
-            BossStatus(name=n, defeated=False, offset=off)
-            for n, off in BOSS_FLAGS.items()
-        ]
-    results: list[BossStatus] = []
+    event_start = _event_flag_start(slot_data)
+    if event_start < 0:
+        return [BossStatus(name=name, defeated=False, offset=offset) for name, offset in BOSS_FLAGS.items()]
+    base = event_start - 0x12
+    bosses: list[BossStatus] = []
     for name, offset in BOSS_FLAGS.items():
-        byte_idx = offset >> 3
-        bit_idx = offset & 7
-        flag_idx = efs + byte_idx
-        if not 0 <= flag_idx < len(slot_data):
-            defeated = False
-        else:
-            defeated = bool((slot_data[flag_idx] >> bit_idx) & 1)
-        results.append(BossStatus(name=name, defeated=defeated, offset=offset))
-    return results
+        expected = BOSS_EVENT_VALUES.get(name)
+        flag_offset = base + offset
+        defeated = expected is not None and 0 <= flag_offset < len(slot_data) and slot_data[flag_offset] == expected
+        bosses.append(BossStatus(name=name, defeated=defeated, offset=offset))
+    return bosses
 
 
 def read_bonfires(path: str | Path, slot: int = 0) -> dict[str, bool]:
-    """Return bonfire unlock status dict."""
-    _, slots = read_save(path)
-    slot_data = slots[slot]
-    efs = _find_event_flag_start(slot_data)
-    if efs < 0:
-        return {n: False for n in BONFIRE_FLAGS}
-    result = {}
-    for name, offset in BONFIRE_FLAGS.items():
-        byte_idx = offset >> 3
-        bit_idx = offset & 7
-        flag_idx = efs + byte_idx
-        if not 0 <= flag_idx < len(slot_data):
-            result[name] = False
-        else:
-            result[name] = bool((slot_data[flag_idx] >> bit_idx) & 1)
-    return result
-
-
-def read_ng_plus(path: str | Path, slot: int = 0) -> int:
-    """Return New Game cycle (0=NG, 1=NG+, etc)."""
-    _, slots = read_save(path)
-    slot_data = slots[slot]
-    efs = _find_event_flag_start(slot_data)
-    if efs < 0:
-        return 0
-    ng_off = efs - 0xBCC
-    if 0 <= ng_off < len(slot_data):
-        return slot_data[ng_off]
-    return 0
+    """Return bonfire unlock status; exact bonfire value mapping is not verified yet."""
+    del path, slot
+    return {name: False for name in BONFIRE_FLAGS}
 
 
 def read_progress(path: str | Path, slot: int = 0) -> ProgressSummary:
     """Return a complete progress summary."""
     s = read_stats(path, slot)
-    bosses = read_bosses(path, slot)
-    bonfires = read_bonfires(path, slot)
+    bosses = read_bosses(path, slot) if _boss_flags_supported() else []
+    bonfires = read_bonfires(path, slot) if _bonfire_flags_supported() else {}
     ng = read_ng_plus(path, slot)
     return ProgressSummary(
         stats=s,
@@ -443,23 +463,11 @@ def read_area_checklists() -> dict[str, dict[str, list[str]]]:
 
 
 def read_current_area(path: str | Path, slot: int = 0) -> str:
-    """Infer the furthest unlocked checklist area from bonfire flags."""
-    checklist_areas = read_area_checklists()
-    game_areas = _game_areas()
-    ordered_area_names = list(checklist_areas)
-    ordered_area_names.extend(name for name in game_areas if isinstance(name, str) and name not in checklist_areas)
-    ordered_area_names.extend(name for name in BONFIRE_FLAGS if name not in ordered_area_names)
-    if not ordered_area_names:
+    """Infer current area only when event-backed bonfire parsing is verified."""
+    del path, slot
+    if not _event_flags_supported():
         return ""
-    bonfires = read_bonfires(path, slot)
-    unlocked = {name for name, is_unlocked in bonfires.items() if is_unlocked}
-    current_area = ""
-    for area_name in ordered_area_names:
-        area = game_areas.get(area_name)
-        bonfire = area.get("bonfire") if isinstance(area, dict) else None
-        if area_name in unlocked or (isinstance(bonfire, str) and bonfire in unlocked):
-            current_area = area_name
-    return current_area
+    return ""
 
 
 def read_missed(path: str | Path, slot: int = 0) -> dict[str, object]:
@@ -468,18 +476,20 @@ def read_missed(path: str | Path, slot: int = 0) -> dict[str, object]:
     area_checklists = read_area_checklists()
     area_data = area_checklists.get(current_area, {})
     checklist_available = current_area in area_checklists
-    game_data = _read_resource_json("game_data.json")
     stats = read_stats(path, slot)
     progress = read_progress(path, slot)
     defeated = set(progress["bosses_defeated"])
     missing_bosses = [name for name in area_data.get("bosses", []) if name not in defeated]
-    total_estus = game_data.get("total_estus_shards", 0)
-    total_bones = game_data.get("total_bone_shards", 0)
+    total_estus = len(area_data.get("estus_shards", []))
+    total_bones = len(area_data.get("bone_shards", []))
     owned_keys = {_completion_key(name) for name in owned_item_names(path, slot)}
+    known_keys = {_completion_key(name) for name in _ITEM_NAMES.values()}
     key_items = []
     for name in area_data.get("key_items", []):
-        owned = _completion_key(name) in owned_keys
-        key_items.append({"name": name, "owned": owned, "check": not owned})
+        key = _completion_key(name)
+        supported = key in known_keys
+        owned = supported and key in owned_keys
+        key_items.append({"name": name, "owned": owned, "check": supported and not owned, "supported": supported})
     return {
         "current_area": current_area,
         "missing_bosses": missing_bosses,
@@ -543,18 +553,46 @@ def _item_name_for_id(item_id: int, fallback: str) -> str:
     _load_item_names()
     return _ITEM_NAMES.get(item_id, fallback)
 
+def _weapon_name_and_reinforcement(item_id: int) -> tuple[str | None, int, int]:
+    """Resolve infused/upgraded weapon item IDs.
+
+    DS3 weapon reinforcement is encoded as a small offset from the infused
+    base weapon ID. Resource JSON stores the +0 IDs, while saves store the
+    reinforced variant, e.g. Raw Sellsword Twinblades +2 as base + 2.
+    """
+    for reinforcement in range(0, 11):
+        base_item_id = item_id - reinforcement
+        name = _WEAPON_NAMES.get(base_item_id)
+        if name is not None:
+            return name, reinforcement, base_item_id
+    return None, 0, item_id
+
 
 def _completion_key(name: str) -> str:
     normalized = " ".join(name.replace(" +", "+").replace("+ ", "+").split())
+    normalized = normalized.replace("’", "'")
+    normalized = normalized.replace("Dorhy's", "Dorhys").replace("Dorhys'", "Dorhys")
     for suffix in (" Sorcery", " Pyromancy", " Miracle"):
         if normalized.endswith(suffix):
-            normalized = normalized[: -len(suffix)]
+            normalized = normalized.removesuffix(suffix)
             break
     return normalized.casefold()
 
 
 def _known_item_names(items: list[ItemEntry]) -> set[str]:
     return {item["name"] for item in items if not item["name"].startswith("Unknown ")}
+
+def _known_weapon_base_names(items: list[ItemEntry]) -> set[str]:
+    names: set[str] = set()
+    for item in items:
+        base_name = _WEAPON_NAMES.get(item["base_item_id"])
+        if base_name is not None:
+            names.add(base_name)
+    return names
+
+
+def _inventory_max_reinforcement(inventory: InventoryResult) -> int:
+    return max((item["reinforcement"] for item in inventory["weapons"]), default=0)
 
 
 def _inventory_owned_by_category(inventory: InventoryResult) -> dict[str, set[str]]:
@@ -569,7 +607,7 @@ def _inventory_owned_by_category(inventory: InventoryResult) -> dict[str, set[st
     spell_keys = {_completion_key(name) for name in spell_names}
     spells = {name for name in goods if _completion_key(name) in spell_keys}
     return {
-        "weapons": _known_item_names(inventory["weapons"]),
+        "weapons": _known_weapon_base_names(inventory["weapons"]),
         "armor": _known_item_names(inventory["armor"]),
         "rings": _known_item_names(inventory["rings"]),
         "spells": spells,
@@ -598,20 +636,36 @@ def read_inventory(path: str | Path, slot: int = 0) -> InventoryResult:
         (ITEM_TYPE_RING, "ring", _RING_NAMES, rings),
         (ITEM_TYPE_GOOD, "goods", _GOODS_NAMES, goods),
     )
-    seen_offsets: set[int] = set()
-    seen_entries: set[tuple[str, int]] = set()
+    stats_offset = _find_stats_offset(slot_data)
+    if stats_offset < 0:
+        raise RuntimeError("Could not locate Stats struct in save data")
+    items_offset = stats_offset + STATS_SIZE
+    count_offset = items_offset + ITEMS_INVENTORY_COUNT_OFFSET
+    rows_offset = items_offset + ITEMS_INVENTORY_OFFSET
+    if count_offset + 4 > len(slot_data):
+        raise RuntimeError("Could not locate Items inventory table in save data")
+    item_count = struct.unpack_from("<I", slot_data, count_offset)[0]
+    row_count = min(item_count, INVENTORY_CAPACITY)
 
-    for offset in range(0x70, max(0x70, len(slot_data) - 15), 4):
+    for index in range(row_count):
+        offset = rows_offset + index * 16
+        if offset + 16 > len(slot_data):
+            break
         gaitem_handle, item_id, quantity, _index = struct.unpack_from("<IIII", slot_data, offset)
         if item_id in (0, 0xFFFFFFFF):
             continue
         type_bits = gaitem_handle & 0xF0000000
 
         matched = None
+        reinforcement = 0
+        base_item_id = item_id
         for expected_type, item_type, names, target_list in category_maps:
             if type_bits != expected_type:
                 continue
-            name = names.get(item_id)
+            if item_type == "weapon":
+                name, reinforcement, base_item_id = _weapon_name_and_reinforcement(item_id)
+            else:
+                name = names.get(item_id)
             if name is None:
                 matched = None
                 break
@@ -623,19 +677,17 @@ def read_inventory(path: str | Path, slot: int = 0) -> InventoryResult:
         if matched[0] in ("goods", "ring") and quantity == 0:
             continue
 
-        dedupe_key = (matched[0], item_id)
-        if offset in seen_offsets or dedupe_key in seen_entries:
-            continue
-        seen_offsets.add(offset)
-        seen_entries.add(dedupe_key)
 
+        display_name = f"{matched[1]} +{reinforcement}" if reinforcement and matched[0] == "weapon" else matched[1]
         entry: ItemEntry = {
-            "slot": offset,
+            "slot": index,
             "gaitem_handle": gaitem_handle,
             "item_id": item_id,
             "item_type": matched[0],
-            "name": matched[1],
+            "name": display_name,
             "quantity": quantity if matched[0] in ("goods", "ring") and quantity > 0 else 1,
+            "reinforcement": reinforcement,
+            "base_item_id": base_item_id,
         }
         matched[2].append(entry)
 
@@ -696,7 +748,7 @@ def read_completion_status(path: str | Path, slot: int = 0) -> dict[str, object]
         for name in _string_list(checklist.get(category))
     }
     reinforcement_total = len(_string_list(checklist.get("reinforcement")))
-    reinforcement_owned = min(stats["maxWeaponReinforcement"], reinforcement_total)
+    reinforcement_owned = 0
     return {
         "rings": rings,
         "sorceries": sorceries,
@@ -706,8 +758,9 @@ def read_completion_status(path: str | Path, slot: int = 0) -> dict[str, object]
         "armor": _collection_status(owned_by_category["armor"], _ARMOR_NAMES),
         "goods": _collection_status(owned_by_category["goods"], _GOODS_NAMES, spell_keys),
         "reinforcement": {
+            "supported": False,
             "owned": reinforcement_owned,
-            "missing": max(0, reinforcement_total - reinforcement_owned),
+            "missing": reinforcement_total,
             "total": reinforcement_total,
         },
         "owned_by_category": owned_by_category,

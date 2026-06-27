@@ -51,9 +51,9 @@
   "reinforcement": {
     "source_json": "achievement_checklist.json",
     "source_keys": ["reinforcement"],
-    "inventory_types": ["weapon", "stats.maxWeaponReinforcement"],
-    "confidence": "high",
-    "notes": "The save stats expose maxWeaponReinforcement directly; individual weapon entries may also encode upgrade level, but the aggregate stat is sufficient for checklist progress."
+    "inventory_types": ["weapon"],
+    "confidence": "checklist_only_static",
+    "notes": "Weapon reinforcement checklist progress is currently reported as unsupported/static. The parser can expose per-weapon reinforcement fields from inventory entries, but completion progress is not save-backed end to end."
   },
   "infusions": {
     "source_json": "achievement_checklist.json",

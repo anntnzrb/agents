@@ -24,6 +24,7 @@ from ds3_save import (
     read_bonfires,
     read_bosses,
     read_name,
+    read_ng_plus,
     read_stats,
 )
 try:
@@ -591,7 +592,7 @@ def _print_completion_status(save_path: str) -> bool:
         ("sorceries", "Sorceries", "save"),
         ("pyromancies", "Pyromancies", "save"),
         ("miracles", "Miracles", "save"),
-        ("reinforcement", "Weapon reinforcement", "save"),
+        ("reinforcement", "Weapon reinforcement", "static"),
         ("gestures", "Gestures", "static"),
         ("infusions", "Infusions", "static"),
     )
@@ -683,21 +684,82 @@ def _print_inventory(save_path: str) -> None:
         _print_name_sample(items)
 
 
+def _boss_flags_supported(save_path: str) -> bool:
+    del save_path
+    try:
+        from ds3_save import _boss_flags_supported as parser_boss_flags_supported
+    except ImportError:
+        return False
+    return parser_boss_flags_supported()
+
+
+def _bonfire_flags_supported(save_path: str) -> bool:
+    del save_path
+    try:
+        from ds3_save import _bonfire_flags_supported as parser_bonfire_flags_supported
+    except ImportError:
+        return False
+    return parser_bonfire_flags_supported()
+
+def _tracked_boss_names() -> list[str]:
+    try:
+        from ds3_save import BOSS_FLAGS
+    except ImportError:
+        return []
+    return [str(name) for name in BOSS_FLAGS]
+
+
+def _tracked_bonfire_names() -> list[str]:
+    try:
+        from ds3_save import BONFIRE_FLAGS
+    except ImportError:
+        return []
+    return sorted(str(name) for name in BONFIRE_FLAGS)
+
+
+def _print_unsupported_event_flags(kind: str, names: list[str]) -> None:
+    print(f"  {kind}: save-backed event flag region unsupported")
+    if names:
+        print("  Tracked names (status unknown):")
+        for name in names:
+            print(f"    - {name}")
+
+
+def _max_weapon_label(stats: dict) -> str:
+    value = stats.get("maxWeaponReinforcement")
+    if isinstance(value, int):
+        return f"+{value}"
+    return "unsupported"
+
+
 def _print_save_overview(save_path: str, stats: dict, *, include_stats: bool) -> None:
-    bosses = read_bosses(save_path)
-    bonfires = read_bonfires(save_path)
-    defeated = sum(1 for boss in bosses if boss["defeated"])
-    unlocked = sum(1 for unlocked_flag in bonfires.values() if unlocked_flag)
+    boss_flags_supported = _boss_flags_supported(save_path)
+    bonfire_flags_supported = _bonfire_flags_supported(save_path)
     print(f"=== {read_name(save_path)} ===")
-    print(f"  Class: {CLASS_NAMES.get(stats['class_'], 'Unknown')}  |  SL: {stats['soulLevel']}  |  Souls: {stats['souls']:,}")
-    print(f"  Estus: {stats['estusAllocation']} HP / {stats['ashenEstusAllocation']} FP  |  Max weapon: +{stats['maxWeaponReinforcement']}")
-    print(f"  Bosses: {defeated}/{len(bosses)} defeated  |  Bonfires: {unlocked}/{len(bonfires)} unlocked")
+    journey = read_ng_plus(save_path)
+    journey_label = "NG" if journey == 0 else f"NG+{journey}"
+    print(f"  Class: {CLASS_NAMES.get(stats['class_'], 'Unknown')}  |  SL: {stats['soulLevel']}  |  Journey: {journey_label}  |  Souls: {stats['souls']:,}")
+    print(f"  Estus: {stats['estusAllocation']} HP / {stats['ashenEstusAllocation']} FP  |  Max weapon: {_max_weapon_label(stats)}")
+    if boss_flags_supported:
+        bosses = read_bosses(save_path)
+        defeated = sum(1 for boss in bosses if boss["defeated"])
+        print(f"  Bosses: {defeated}/{len(bosses)} defeated")
+    else:
+        print("  Bosses: unsupported (event flag region not verified)")
+    if bonfire_flags_supported:
+        bonfires = read_bonfires(save_path)
+        unlocked = sum(1 for unlocked_flag in bonfires.values() if unlocked_flag)
+        print(f"  Bonfires: {unlocked}/{len(bonfires)} unlocked")
+    else:
+        print("  Bonfires: unsupported (event flag region not verified)")
     print(f"  Embered: {'Yes' if stats['embered'] else 'No'}")
     stat_names = [("VGR", "vigor"), ("ATT", "attunement"), ("END", "endurance"),
                   ("VIT", "vitality"), ("STR", "strength"), ("DEX", "dexterity"),
                   ("INT", "intelligence"), ("FTH", "faith"), ("LCK", "luck")]
     if include_stats:
         print("  Stats: " + "  ".join(f"{label} {stats[key]}" for label, key in stat_names))
+        print(f"  HP: {stats['health']}/{stats['maxHealth']}  |  FP: {stats['mana']}/{stats['maxMana']}  |  Stamina: {stats['stamina']}/{stats['maxStamina']}")
+        print(f"  Hollowing: {stats['hollow']}  |  Base item discovery: {100 + stats['luck']}")
     else:
         first = stat_names[:5]
         second = stat_names[5:]
@@ -725,10 +787,21 @@ def _print_missed_result(missed: dict[str, object]) -> None:
             if isinstance(item, dict):
                 name = str(item.get("name", "Unknown"))
                 owned = item.get("owned")
+                supported = item.get("supported")
+                check = item.get("check")
             else:
                 name = str(item)
                 owned = None
-            status = "owned" if owned is True else "check"
+                supported = None
+                check = None
+            if supported is False:
+                status = "static"
+            elif owned is True:
+                status = "owned"
+            elif check is True:
+                status = "check"
+            else:
+                status = "unknown"
             print(f"    - {name} [{status}]")
     estus_found = missed.get("estus_shards_found")
     estus_total = missed.get("estus_shards_total")
@@ -753,15 +826,21 @@ def _print_save_achievements(save_path: str) -> None:
     has_status = _print_completion_status(save_path)
     checklist = read_completion_checklist()
     print("=== Completion Checklist ===" if not has_status else "\n=== Completion Checklist ===")
-    bosses = read_bosses(save_path)
-    defeated = [boss for boss in bosses if boss["defeated"]]
-    print(f"  Bosses: {len(defeated)}/{len(bosses)} defeated")
-    print("    " + ", ".join(boss["name"] for boss in defeated[:8]) if defeated else "    None recorded yet")
+    if _boss_flags_supported(save_path):
+        bosses = read_bosses(save_path)
+        defeated = [boss for boss in bosses if boss["defeated"]]
+        print(f"  Bosses: {len(defeated)}/{len(bosses)} defeated")
+        print("    " + ", ".join(boss["name"] for boss in defeated[:8]) if defeated else "    None recorded yet")
+    else:
+        print("  Bosses: unsupported (event flag region not verified)")
 
-    bonfires = read_bonfires(save_path)
-    unlocked = [name for name, is_unlocked in bonfires.items() if is_unlocked]
-    print(f"  Bonfires: {len(unlocked)}/{len(bonfires)} unlocked")
-    print("    " + ", ".join(sorted(unlocked)[:8]) if unlocked else "    None recorded yet")
+    if _bonfire_flags_supported(save_path):
+        bonfires = read_bonfires(save_path)
+        unlocked = [name for name, is_unlocked in bonfires.items() if is_unlocked]
+        print(f"  Bonfires: {len(unlocked)}/{len(bonfires)} unlocked")
+        print("    " + ", ".join(sorted(unlocked)[:8]) if unlocked else "    None recorded yet")
+    else:
+        print("  Bonfires: unsupported (event flag region not verified)")
 
     for label, key in (
         ("Rings", "rings"),
@@ -770,10 +849,10 @@ def _print_save_achievements(save_path: str) -> None:
         ("Miracles", "miracles"),
         ("Gestures (static checklist; not save-backed)", "gestures"),
         ("Infusions (static checklist; not save-backed)", "infusions"),
-        ("Weapon reinforcement", "reinforcement"),
+        ("Weapon reinforcement (static checklist; not save-backed)", "reinforcement"),
     ):
         values = checklist.get(key, [])
-        unit = "checklist entries" if key in {"gestures", "infusions"} else "tracked"
+        unit = "checklist entries" if key in {"gestures", "infusions", "reinforcement"} else "tracked"
         print(f"  {label}: {len(values)} {unit}")
         if values:
             print("    " + ", ".join(values[:8]) + (" ..." if len(values) > 8 else ""))
@@ -782,10 +861,10 @@ def _print_save_achievements(save_path: str) -> None:
 def _print_save_checklist(save_path: str, stats: dict) -> None:
     from ds3_save import read_area_checklists, read_current_area
     area_name = read_current_area(save_path)
-    area_data = read_area_checklists().get(area_name, {})
-    print(f"=== Current Area: {area_name} ===")
+    area_data = read_area_checklists().get(area_name, {}) if area_name else {}
+    print(f"=== Current Area: {area_name or 'Unknown'} ===")
     if not area_data:
-        print("  Area checklist data not yet available for this area.")
+        print("  Area checklist: unavailable; current area is unknown because bonfire event flags are unsupported.")
         return
 
     bosses = area_data.get("bosses", [])
@@ -826,10 +905,13 @@ def cmd_save(args) -> None:
         return
 
     if action == "bosses":
+        print("=== BOSSES ===")
+        if not _boss_flags_supported(save_path):
+            _print_unsupported_event_flags("Bosses", _tracked_boss_names())
+            return
         bosses = read_bosses(save_path)
         defeated = [b for b in bosses if b["defeated"]]
         alive = [b for b in bosses if not b["defeated"]]
-        print("=== BOSSES ===")
         if defeated:
             print(f"  Defeated ({len(defeated)}/{len(bosses)}):")
             for b in defeated:
@@ -841,10 +923,13 @@ def cmd_save(args) -> None:
         return
 
     if action == "bonfires":
+        print("=== BONFIRES ===")
+        if not _bonfire_flags_supported(save_path):
+            _print_unsupported_event_flags("Bonfires", _tracked_bonfire_names())
+            return
         bonfires = read_bonfires(save_path)
         unlocked = {n for n, u in bonfires.items() if u}
         locked = {n for n, u in bonfires.items() if not u}
-        print("=== BONFIRES ===")
         if unlocked:
             print(f"  Unlocked ({len(unlocked)}/{len(bonfires)}):")
             for n in sorted(unlocked):
@@ -926,40 +1011,16 @@ def cmd_save(args) -> None:
         if read_missed is not None:
             _print_missed_result(read_missed(save_path))
             return
-        gd = _load_game_data()
-
-        # Get current area from bonfires
-        bonfires = read_bonfires(save_path)
-        unlocked = [n for n, u in bonfires.items() if u]
-
-        # Find the furthest unlocked area
-        area_order = ["Cemetery of Ash", "High Wall of Lothric", "Undead Settlement",
-                      "Road of Sacrifices", "Cathedral of the Deep", "Catacombs of Carthus",
-                      "Irithyll of the Boreal Valley", "Irithyll Dungeon", "Lothric Castle",
-                      "Grand Archives", "Archdragon Peak", "Kiln of the First Flame"]
-        current_area = None
-        for area in reversed(area_order):
-            bonfire_name = gd.get("areas", {}).get(area, {}).get("bonfire")
-            if bonfire_name in unlocked:
-                current_area = area
-                break
-
-        if current_area is None:
-            current_area = area_order[0]
-
-        area_data = gd.get("areas", {}).get(current_area, {})
-        boss_status = {boss["name"]: boss["defeated"] for boss in read_bosses(save_path)}
-        missing_bosses = [boss for boss in area_data.get("bosses", []) if not boss_status.get(boss, False)]
-        missed = {
-            "current_area": current_area,
-            "missing_bosses": missing_bosses,
-            "key_items": [{"name": name, "owned": None} for name in area_data.get("key_items", [])],
+        _print_missed_result({
+            "current_area": "",
+            "missing_bosses": [],
+            "key_items": [],
+            "checklist_available": False,
             "estus_shards_found": None,
-            "estus_shards_total": gd.get("total_estus_shards", 0),
+            "estus_shards_total": 0,
             "bone_shards_found": None,
-            "bone_shards_total": gd.get("total_bone_shards", 0),
-        }
-        _print_missed_result(missed)
+            "bone_shards_total": 0,
+        })
         return
 
     _print_save_overview(save_path, stats, include_stats=(action == "stats"))
