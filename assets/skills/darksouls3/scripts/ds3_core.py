@@ -250,6 +250,7 @@ STARTER_WEAPONS: dict[str, dict] = {
     "claymore": {"base_damage": 138, "str_scale": "D", "dex_scale": "D", "str_req": 16, "dex_req": 13, "weight": 9.0, "category": "greatsword", "str_coeff": 0.50, "dex_coeff": 0.50},
     "zweihander": {"base_damage": 145, "str_scale": "D", "dex_scale": "D", "str_req": 19, "dex_req": 11, "weight": 10.0, "category": "ultra greatsword", "str_coeff": 0.70, "dex_coeff": 0.30},
     "uchigatana": {"base_damage": 115, "str_scale": "D", "dex_scale": "C", "str_req": 11, "dex_req": 16, "weight": 5.5, "category": "katana", "str_coeff": 0.30, "dex_coeff": 0.70},
+    "sellsword twinblades": {"base_damage": 79, "str_scale": "D", "dex_scale": "C", "str_req": 10, "dex_req": 16, "weight": 5.5, "category": "curved sword (paired)", "str_coeff": 0.30, "dex_coeff": 0.70},
     "estoc": {"base_damage": 102, "str_scale": "D", "dex_scale": "C", "str_req": 10, "dex_req": 12, "weight": 3.5, "category": "thrusting sword", "str_coeff": 0.30, "dex_coeff": 0.70},
     "mace": {"base_damage": 126, "str_scale": "B", "dex_scale": "-", "str_req": 12, "dex_req": 7, "weight": 5.0, "category": "hammer", "str_coeff": 0.85, "dex_coeff": 0.0},
     "battle axe": {"base_damage": 125, "str_scale": "C", "dex_scale": "D", "str_req": 12, "dex_req": 8, "weight": 4.0, "category": "axe", "str_coeff": 0.70, "dex_coeff": 0.30},

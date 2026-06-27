@@ -1,0 +1,72 @@
+{
+  "rings": {
+    "source_json": "achievement_checklist.json",
+    "source_keys": ["rings"],
+    "inventory_types": ["ring"],
+    "confidence": "high",
+    "notes": "All base-game checklist rings resolve against resources/rings.json after checklist/resource name normalization."
+  },
+  "sorceries": {
+    "source_json": "achievement_checklist.json",
+    "source_keys": ["sorceries"],
+    "inventory_types": ["goods"],
+    "confidence": "high",
+    "notes": "Sorcery scroll items are encoded in resources/goods_magic.json and surface through the save inventory goods bucket."
+  },
+  "pyromancies": {
+    "source_json": "achievement_checklist.json",
+    "source_keys": ["pyromancies"],
+    "inventory_types": ["goods"],
+    "confidence": "high",
+    "notes": "Pyromancy items are encoded in resources/goods_magic.json and surface through the save inventory goods bucket."
+  },
+  "miracles": {
+    "source_json": "achievement_checklist.json",
+    "source_keys": ["miracles"],
+    "inventory_types": ["goods"],
+    "confidence": "high",
+    "notes": "Miracle items are encoded in resources/goods_magic.json and surface through the save inventory goods bucket."
+  },
+  "goods_key_items": {
+    "source_json": "area_checklists.json",
+    "source_keys": ["*.key_items"],
+    "inventory_types": ["goods"],
+    "confidence": "medium",
+    "notes": "Most non-covenant/non-equipment area key items resolve through resources/goods_magic.json; weapon pickups and covenant memberships are separate categories."
+  },
+  "game_key_items": {
+    "source_json": "game_data.json",
+    "source_keys": ["areas.*.key_items"],
+    "inventory_types": ["goods"],
+    "confidence": "medium",
+    "notes": "Base game_data key items overlap with area_checklists and can be checked when the item name exists in goods_magic.json."
+  },
+  "area_weapons": {
+    "source_json": "area_checklists.json",
+    "source_keys": ["*.key_items"],
+    "inventory_types": ["weapon"],
+    "confidence": "medium",
+    "notes": "Some checklist key_items are weapon pickups such as Sellsword Twinblades and Butcher Knife; ownership is inventory-backed but grouped separately from goods."
+  },
+  "reinforcement": {
+    "source_json": "achievement_checklist.json",
+    "source_keys": ["reinforcement"],
+    "inventory_types": ["weapon", "stats.maxWeaponReinforcement"],
+    "confidence": "high",
+    "notes": "The save stats expose maxWeaponReinforcement directly; individual weapon entries may also encode upgrade level, but the aggregate stat is sufficient for checklist progress."
+  },
+  "infusions": {
+    "source_json": "achievement_checklist.json",
+    "source_keys": ["infusions"],
+    "inventory_types": ["weapon"],
+    "confidence": "low",
+    "notes": "Infusion is not a named inventory item in current static resources. It may be derivable from weapon item_id/entry fields, but should not be claimed from name resolution alone."
+  },
+  "gestures": {
+    "source_json": "achievement_checklist.json",
+    "source_keys": ["gestures"],
+    "inventory_types": [],
+    "confidence": "checklist_only_static",
+    "notes": "Gestures are static checklist entries only. Local resources do not include gesture/event-flag offsets, so save-backed ownership must be reported as unsupported."
+  }
+}

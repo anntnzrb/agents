@@ -1,7 +1,9 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
+# dependencies = ["pycryptodome"]
 # ///
+
 """Spoiler-safe Dark Souls 3 lookup CLI for agents.
 
 Stateless: stores no player progress. Tracking requires an explicit path argument.
@@ -14,9 +16,33 @@ import json
 import time
 from pathlib import Path
 
-from ds3_core import *
-from ds3_catalog import *
 from cli_catalog import *
+from ds3_catalog import *
+from ds3_core import *
+from ds3_save import (
+    CLASS_NAMES,
+    read_bonfires,
+    read_bosses,
+    read_name,
+    read_stats,
+)
+try:
+    from ds3_save import read_gestures, read_inventory
+except ImportError:
+    read_inventory = None
+    read_gestures = None
+try:
+    from ds3_save import read_missed
+except ImportError:
+    read_missed = None
+try:
+    from ds3_save import owned_item_names
+except ImportError:
+    owned_item_names = None
+try:
+    from ds3_save import read_completion_status
+except ImportError:
+    read_completion_status = None
 
 # ── argparse ─────────────────────────────────────────────────────
 
@@ -130,6 +156,12 @@ def build_parser() -> argparse.ArgumentParser:
     ri.add_argument("name", nargs="?", help="Ring name to search (case-insensitive substring match)")
     ri.add_argument("--build", choices=["quality", "strength", "dex", "sorcerer", "pyro", "cleric", "luck"], help="Filter rings by build archetype")
 
+
+    sp_save = sp.add_parser("save", help="Read save file data")
+    sp_save.add_argument("save_path", nargs="?", default="auto", help="Path to DS30000.sl2 file (or 'auto' to auto-detect)")
+    sp_save.add_argument("action", nargs="?", default="summary",
+        choices=["summary", "stats", "name", "level", "covenants", "bosses", "bonfires", "progress", "inventory", "gestures", "missed", "achievements", "checklist", "owned", "completion"],
+        help="Action to perform")
     return p
 
 # ── Command handlers ─────────────────────────────────────────────
@@ -158,13 +190,23 @@ def cmd_softcaps(args) -> None:
 
 def cmd_origins(args) -> None:
     filt = (args.filter or "").lower()
+    build_to_class = {
+        "quality": "knight",
+        "str": "warrior", "strength": "warrior",
+        "dex": "mercenary", "dexterity": "mercenary",
+        "int": "sorcerer",
+        "fth": "cleric", "faith": "cleric",
+        "pyro": "pyromancer", "pyromancer": "pyromancer",
+        "luck": "thief",
+    }
+    target_class = build_to_class.get(filt, "")
     print(f"{'Class':<14} {'LV':>3} {'VGR':>4} {'ATT':>4} {'END':>4} {'VIT':>4} {'STR':>4} {'DEX':>4} {'INT':>4} {'FTH':>4} {'LCK':>4}")
     print("-" * 64)
     for name, o in ORIGINS.items():
-        if filt == "" or filt in name:
+        if filt == "" or name == target_class or filt in name:
             print(f"{name.title():<14} {o['level']:>3} {o['vig']:>4} {o['att']:>4} {o['end']:>4} {o['vit']:>4} {o['str']:>4} {o['dex']:>4} {o['int']:>4} {o['fth']:>4} {o['lck']:>4}")
     if filt:
-        matching = [n for n in ORIGINS if filt in n]
+        matching = [n for n in ORIGINS if n == target_class or filt in n]
         if not matching:
             print(f"\nNo class matches '{args.filter}'. Available filters: quality, str, dex, int, fth, pyro, luck")
 
@@ -191,18 +233,18 @@ def cmd_soul_cost(args) -> None:
         print("Invalid: current level must be 1 or higher, target must be greater than current.")
         return
     cost = max(0, soul_cost(args.current, args.target))
-    print(f"=== Soul Cost ===")
+    print("=== Soul Cost ===")
     print(f"  From level {args.current} to {args.target}:")
     print(f"  Total: {cost:,} souls")
     print(f"  Levels: {args.target - args.current}")
 
 def cmd_estus(args) -> None:
     print("=== Estus Flask ===")
-    print(f"  Max uses: 15 (start with 3 HP + 1 FP = 4)")
+    print("  Max uses: 15 (start with 3 HP + 1 FP = 4)")
     print(f"  Estus Shards: {ESTUS_SHARDS_MAX} total (find in the world)")
     print(f"  Undead Bone Shards: {BONE_SHARDS_MAX} total (burn at Firelink bonfire)")
-    print(f"  Max heal potency: +10")
-    print(f"  Allotment: talk to the blacksmith to split between HP and FP Estus")
+    print("  Max heal potency: +10")
+    print("  Allotment: talk to the blacksmith to split between HP and FP Estus")
 
 def cmd_infusions(args) -> None:
     build_filter = args.build
@@ -222,11 +264,11 @@ def cmd_infusions(args) -> None:
             str_pct = w.get("str_coeff", 0.5)
             dex_pct = w.get("dex_coeff", 0.5)
             if str_pct > 0.6:
-                print(f"  Good with: Heavy (STR scaling benefit)")
+                print("  Good with: Heavy (STR scaling benefit)")
             if dex_pct > 0.6:
-                print(f"  Good with: Sharp (DEX scaling benefit)")
+                print("  Good with: Sharp (DEX scaling benefit)")
             if 0.4 <= str_pct <= 0.6 and 0.4 <= dex_pct <= 0.6:
-                print(f"  Good with: Refined (balanced scaling)")
+                print("  Good with: Refined (balanced scaling)")
     print()
     print("See also: build, weapons, compare")
 
@@ -301,7 +343,7 @@ def cmd_farm(args) -> None:
         print(f"=== {name} Farm ===")
         print(f"  {guide}")
         if "Silver Knights" in guide:
-            print(f"  Optimal setup: Symbol of Avarice + Gold Serpent Ring +3 + Crystal Sage Rapier + Rusted Coins + 60+ LCK = ~500 item discovery")
+            print("  Optimal setup: Symbol of Avarice + Gold Serpent Ring +3 + Crystal Sage Rapier + Rusted Coins + 60+ LCK = ~500 item discovery")
     else:
         print(f"Unknown item: {args.item}")
         print(f"Try: {', '.join(sorted(farming.keys()))}")
@@ -413,7 +455,7 @@ def cmd_sources(args) -> None:
     elif action == "status":
         cdir = cache_dir()
         files = list(cdir.glob("*.json"))
-        print(f"=== Cache Status ===")
+        print("=== Cache Status ===")
         print(f"  Directory: {cdir}")
         print(f"  Cached files: {len(files)}")
         for f in files:
@@ -479,7 +521,7 @@ def cmd_recommend(args) -> None:
         print(f"  Consider leveling END to 20+ (currently {stats.get('end', 0)}).")
     highest_dmg = max(stats.get("str", 0), stats.get("dex", 0), stats.get("int", 0), stats.get("fth", 0))
     if highest_dmg < 20 and sl > 30:
-        print(f"  Your damage stats are low. Pick one to push to 20-25.")
+        print("  Your damage stats are low. Pick one to push to 20-25.")
 
 
 def _cmd_areas_with_hint(args) -> None:
@@ -491,6 +533,438 @@ def _cmd_weapons_with_hint(args) -> None:
     cmd_weapons(args)
     print()
     print("See also: calc, compare, infusions, upgrade")
+
+SAVE_AUTO = Path.home() / "AppData" / "Roaming" / "DarkSoulsIII"
+
+def _find_save_path() -> str | None:
+    """Find the DS30000.sl2 file in the default save directory."""
+    if not SAVE_AUTO.exists():
+        return None
+    for user_dir in SAVE_AUTO.iterdir():
+        if user_dir.is_dir():
+            sl2 = user_dir / "DS30000.sl2"
+            if sl2.exists():
+                return str(sl2)
+    return None
+
+def _load_game_data() -> dict:
+    resources = Path(__file__).resolve().parent.parent / "resources"
+    return json.loads((resources / "game_data.json").read_text())
+
+
+def _current_area(save_path: str, game_data: dict) -> str:
+    bonfires = read_bonfires(save_path)
+    unlocked = {name for name, is_unlocked in bonfires.items() if is_unlocked}
+    areas = game_data.get("areas", {})
+    for area_name, area_data in reversed(list(areas.items())):
+        if area_data.get("bonfire") in unlocked:
+            return area_name
+    return next(iter(areas), "Cemetery of Ash")
+
+
+def _status_counts(value: object) -> tuple[int | None, int | None]:
+    if not isinstance(value, dict):
+        return (None, None)
+    found = value.get("found", value.get("owned", value.get("complete")))
+    total = value.get("total")
+    if isinstance(found, bool):
+        found = 1 if found else 0
+    if isinstance(found, (set, list, tuple)) and isinstance(total, int):
+        return (len(found), total)
+    if isinstance(found, int) and isinstance(total, int):
+        return (found, total)
+    owned_items = value.get("owned")
+    missing_items = value.get("missing")
+    if isinstance(owned_items, list) and isinstance(missing_items, list):
+        return (len(owned_items), len(owned_items) + len(missing_items))
+    return (None, None)
+
+
+def _print_completion_status(save_path: str) -> bool:
+    if read_completion_status is None:
+        return False
+    status = read_completion_status(save_path)
+    if not isinstance(status, dict):
+        return False
+    order = (
+        ("rings", "Rings", "save"),
+        ("sorceries", "Sorceries", "save"),
+        ("pyromancies", "Pyromancies", "save"),
+        ("miracles", "Miracles", "save"),
+        ("reinforcement", "Weapon reinforcement", "save"),
+        ("gestures", "Gestures", "static"),
+        ("infusions", "Infusions", "static"),
+    )
+    checklist = _completion_checklist()
+    rows: list[tuple[str, int, int, str]] = []
+    static_rows: list[tuple[str, int]] = []
+    for key, label, source in order:
+        if source == "static":
+            values = checklist.get(key, [])
+            if isinstance(values, list) and values:
+                static_rows.append((label, len(values)))
+            continue
+        if key not in status:
+            continue
+        found, total = _status_counts(status[key])
+        if found is None or total is None or total == 0:
+            continue
+        rows.append((label, found, total, source))
+    if not rows and not static_rows:
+        return False
+    print("=== Completion ===")
+    for label, found, total, source in rows:
+        print(f"  {label}: {found}/{total} (save-backed)")
+    for label, total in static_rows:
+        print(f"  {label}: {total} checklist entries (not save-backed)")
+    return True
+
+
+def _owned_name_set(save_path: str) -> set[str]:
+    if owned_item_names is None:
+        return set()
+    names = owned_item_names(save_path)
+    if isinstance(names, dict):
+        flattened: set[str] = set()
+        for values in names.values():
+            if isinstance(values, (set, list, tuple)):
+                flattened.update(str(value).casefold() for value in values)
+        return flattened
+    if isinstance(names, (set, list, tuple)):
+        return {str(name).casefold() for name in names}
+    return set()
+
+
+def _print_owned_items(save_path: str) -> None:
+    if owned_item_names is None:
+        print("  Owned item tracking not yet available.")
+        return
+    names = owned_item_names(save_path)
+    print("=== Owned Items ===")
+    if isinstance(names, dict):
+        for key in ("rings", "spells", "goods", "weapons"):
+            values = names.get(key, [])
+            if not isinstance(values, (set, list, tuple)):
+                continue
+            ordered = sorted(str(value) for value in values)
+            label = key.replace("_", " ").title()
+            print(f"  {label}: {len(ordered)} owned")
+            if ordered:
+                print("    " + ", ".join(ordered[:12]) + (" ..." if len(ordered) > 12 else ""))
+        return
+    if isinstance(names, (set, list, tuple)):
+        ordered = sorted(str(value) for value in names)
+        print(f"  Items: {len(ordered)} owned")
+        if ordered:
+            print("    " + ", ".join(ordered[:20]) + (" ..." if len(ordered) > 20 else ""))
+        return
+    print("  Owned item helper returned no printable data.")
+
+def _completion_checklist() -> dict[str, list[str]]:
+    from ds3_save import read_completion_checklist
+    return read_completion_checklist()
+
+
+def _print_name_sample(items: list[dict], limit: int = 12) -> None:
+    names = sorted(str(item.get("name", "Unknown")) for item in items)
+    if names:
+        print("    " + ", ".join(names[:limit]) + (" ..." if len(names) > limit else ""))
+
+
+def _print_inventory(save_path: str) -> None:
+    if read_inventory is None:
+        print("  Inventory parsing is not available.")
+        return
+    inv = read_inventory(save_path)
+    print(f"=== Inventory: {inv['total_items']} resolved items ===")
+    for label, key in (("Weapons", "weapons"), ("Armor", "armor"), ("Rings", "rings"), ("Goods", "goods")):
+        items = inv.get(key, [])
+        print(f"  {label}: {len(items)}")
+        _print_name_sample(items)
+
+
+def _print_save_overview(save_path: str, stats: dict, *, include_stats: bool) -> None:
+    bosses = read_bosses(save_path)
+    bonfires = read_bonfires(save_path)
+    defeated = sum(1 for boss in bosses if boss["defeated"])
+    unlocked = sum(1 for unlocked_flag in bonfires.values() if unlocked_flag)
+    print(f"=== {read_name(save_path)} ===")
+    print(f"  Class: {CLASS_NAMES.get(stats['class_'], 'Unknown')}  |  SL: {stats['soulLevel']}  |  Souls: {stats['souls']:,}")
+    print(f"  Estus: {stats['estusAllocation']} HP / {stats['ashenEstusAllocation']} FP  |  Max weapon: +{stats['maxWeaponReinforcement']}")
+    print(f"  Bosses: {defeated}/{len(bosses)} defeated  |  Bonfires: {unlocked}/{len(bonfires)} unlocked")
+    print(f"  Embered: {'Yes' if stats['embered'] else 'No'}")
+    stat_names = [("VGR", "vigor"), ("ATT", "attunement"), ("END", "endurance"),
+                  ("VIT", "vitality"), ("STR", "strength"), ("DEX", "dexterity"),
+                  ("INT", "intelligence"), ("FTH", "faith"), ("LCK", "luck")]
+    if include_stats:
+        print("  Stats: " + "  ".join(f"{label} {stats[key]}" for label, key in stat_names))
+    else:
+        first = stat_names[:5]
+        second = stat_names[5:]
+        print("  " + "  ".join(f"{label}: {stats[key]:>2}" for label, key in first))
+        print("  " + "  ".join(f"{label}: {stats[key]:>2}" for label, key in second))
+
+
+def _print_missed_result(missed: dict[str, object]) -> None:
+    area = missed.get("current_area") or "Unknown"
+    print(f"=== Missed: {area} ===")
+    checklist_available = missed.get("checklist_available", True)
+    missing_bosses = [str(boss) for boss in missed.get("missing_bosses", []) if isinstance(boss, str)]
+    if checklist_available is False:
+        print("  Area checklist: not available; boss/item missability unknown")
+    elif missing_bosses:
+        print("  Defeat/check:")
+        for boss in missing_bosses:
+            print(f"    - {boss}")
+    else:
+        print("  Bosses: clear")
+    key_items = missed.get("key_items", [])
+    if isinstance(key_items, list) and key_items:
+        print("  Key items:")
+        for item in key_items:
+            if isinstance(item, dict):
+                name = str(item.get("name", "Unknown"))
+                owned = item.get("owned")
+            else:
+                name = str(item)
+                owned = None
+            status = "owned" if owned is True else "check"
+            print(f"    - {name} [{status}]")
+    estus_found = missed.get("estus_shards_found")
+    estus_total = missed.get("estus_shards_total")
+    if missed.get("estus_shards_supported") is True and isinstance(estus_found, int) and isinstance(estus_total, int):
+        print(f"  Estus shards: {estus_found}/{estus_total} found (save-backed)")
+    elif isinstance(estus_total, int) and estus_total > 0:
+        print(f"  Estus shards: {estus_total} checklist entries (save-backed count unsupported)")
+    else:
+        print("  Estus shards: save-backed count unsupported")
+    bones_found = missed.get("bone_shards_found")
+    bones_total = missed.get("bone_shards_total")
+    if missed.get("bone_shards_supported") is True and isinstance(bones_found, int) and isinstance(bones_total, int):
+        print(f"  Undead bone shards: {bones_found}/{bones_total} found (save-backed)")
+    elif isinstance(bones_total, int) and bones_total > 0:
+        print(f"  Undead bone shards: {bones_total} checklist entries (save-backed count unsupported)")
+    else:
+        print("  Undead bone shards: save-backed count unsupported")
+
+
+def _print_save_achievements(save_path: str) -> None:
+    from ds3_save import read_completion_checklist
+    has_status = _print_completion_status(save_path)
+    checklist = read_completion_checklist()
+    print("=== Completion Checklist ===" if not has_status else "\n=== Completion Checklist ===")
+    bosses = read_bosses(save_path)
+    defeated = [boss for boss in bosses if boss["defeated"]]
+    print(f"  Bosses: {len(defeated)}/{len(bosses)} defeated")
+    print("    " + ", ".join(boss["name"] for boss in defeated[:8]) if defeated else "    None recorded yet")
+
+    bonfires = read_bonfires(save_path)
+    unlocked = [name for name, is_unlocked in bonfires.items() if is_unlocked]
+    print(f"  Bonfires: {len(unlocked)}/{len(bonfires)} unlocked")
+    print("    " + ", ".join(sorted(unlocked)[:8]) if unlocked else "    None recorded yet")
+
+    for label, key in (
+        ("Rings", "rings"),
+        ("Sorceries", "sorceries"),
+        ("Pyromancies", "pyromancies"),
+        ("Miracles", "miracles"),
+        ("Gestures (static checklist; not save-backed)", "gestures"),
+        ("Infusions (static checklist; not save-backed)", "infusions"),
+        ("Weapon reinforcement", "reinforcement"),
+    ):
+        values = checklist.get(key, [])
+        unit = "checklist entries" if key in {"gestures", "infusions"} else "tracked"
+        print(f"  {label}: {len(values)} {unit}")
+        if values:
+            print("    " + ", ".join(values[:8]) + (" ..." if len(values) > 8 else ""))
+
+
+def _print_save_checklist(save_path: str, stats: dict) -> None:
+    from ds3_save import read_area_checklists, read_current_area
+    area_name = read_current_area(save_path)
+    area_data = read_area_checklists().get(area_name, {})
+    print(f"=== Current Area: {area_name} ===")
+    if not area_data:
+        print("  Area checklist data not yet available for this area.")
+        return
+
+    bosses = area_data.get("bosses", [])
+    if bosses:
+        print(f"  Bosses ({len(bosses)}):")
+        for name in bosses:
+            print(f"    - {name}")
+
+    for label, key in (("Key items", "key_items"), ("NPCs", "npcs")):
+        values = area_data.get(key, [])
+        if values:
+            print(f"  {label} ({len(values)}):")
+            for value in values:
+                print(f"    - {value}")
+
+    print(f"  Estus shards: {len(area_data.get('estus_shards', []))}")
+    print(f"  Undead bone shards: {len(area_data.get('bone_shards', []))}")
+    print(f"  Current flask split: {stats['estusAllocation']} HP / {stats['ashenEstusAllocation']} FP")
+
+
+def cmd_save(args) -> None:
+    save_path = args.save_path
+    if save_path in ("auto", "~"):
+        save_path = _find_save_path()
+        if save_path is None:
+            print("No save file found in %APPDATA%/DarkSoulsIII/")
+            return
+    stats = read_stats(save_path)
+    action = args.action
+
+    if action == "name":
+        print(f"  Character: {read_name(save_path)}")
+        return
+
+    if action == "level":
+        print(f"  Soul Level: {stats['soulLevel']}")
+        print(f"  Souls: {stats['souls']:,}")
+        return
+
+    if action == "bosses":
+        bosses = read_bosses(save_path)
+        defeated = [b for b in bosses if b["defeated"]]
+        alive = [b for b in bosses if not b["defeated"]]
+        print("=== BOSSES ===")
+        if defeated:
+            print(f"  Defeated ({len(defeated)}/{len(bosses)}):")
+            for b in defeated:
+                print(f"    + {b['name']}")
+        if alive:
+            print(f"  Remaining ({len(alive)}/{len(bosses)}):")
+            for b in alive:
+                print(f"    - {b['name']}")
+        return
+
+    if action == "bonfires":
+        bonfires = read_bonfires(save_path)
+        unlocked = {n for n, u in bonfires.items() if u}
+        locked = {n for n, u in bonfires.items() if not u}
+        print("=== BONFIRES ===")
+        if unlocked:
+            print(f"  Unlocked ({len(unlocked)}/{len(bonfires)}):")
+            for n in sorted(unlocked):
+                print(f"    + {n}")
+        if locked:
+            print(f"  Locked ({len(locked)}/{len(bonfires)}):")
+            for n in sorted(locked):
+                print(f"    - {n}")
+        return
+
+    if action == "progress":
+        _print_save_overview(save_path, stats, include_stats=False)
+        return
+
+    if action == "covenants":
+        cov = {k: v for k, v in stats.items() if k.endswith('Points') and v > 0}
+        for name, pts in cov.items():
+            print(f"  {name}: {pts}")
+        if not cov:
+            print("  No covenant ranks yet.")
+        return
+
+    if action == "inventory":
+        _print_inventory(save_path)
+        return
+
+    if action == "gestures":
+        try:
+            from ds3_save import read_gestures
+            result = read_gestures(save_path)
+            if isinstance(result, dict) and result.get("supported") is False:
+                gestures = result.get("gestures", [])
+                names = [name for name in gestures if isinstance(name, str)]
+                print(f"=== Gestures ({len(names)} checklist entries; not save-backed) ===")
+                reason = result.get("reason")
+                if isinstance(reason, str) and reason:
+                    print(f"  Save ownership unsupported: {reason}")
+                if names:
+                    print("  Static checklist:")
+                    for name in names:
+                        print(f"    - {name}")
+                return
+            if isinstance(result, list):
+                unlocked = [g for g in result if isinstance(g, dict) and g.get("unlocked")]
+                locked = [g for g in result if isinstance(g, dict) and not g.get("unlocked")]
+                print(f"=== Gestures ({len(unlocked)}/{len(result)} unlocked) ===")
+                if unlocked:
+                    print("  Unlocked:")
+                    for g in unlocked:
+                        print(f"    + {g['name']}")
+                if locked:
+                    print("  Locked:")
+                    for g in locked:
+                        print(f"    - {g['name']}")
+            else:
+                print("  Gesture save ownership is not available.")
+        except ImportError:
+            print("  Gesture tracking not yet available.")
+        return
+
+    if action == "owned":
+        _print_owned_items(save_path)
+        return
+
+    if action == "completion":
+        if not _print_completion_status(save_path):
+            _print_save_achievements(save_path)
+        return
+
+    if action == "achievements":
+        _print_save_achievements(save_path)
+        return
+
+    if action == "checklist":
+        _print_save_checklist(save_path, stats)
+        return
+
+    if action == "missed":
+        if read_missed is not None:
+            _print_missed_result(read_missed(save_path))
+            return
+        gd = _load_game_data()
+
+        # Get current area from bonfires
+        bonfires = read_bonfires(save_path)
+        unlocked = [n for n, u in bonfires.items() if u]
+
+        # Find the furthest unlocked area
+        area_order = ["Cemetery of Ash", "High Wall of Lothric", "Undead Settlement",
+                      "Road of Sacrifices", "Cathedral of the Deep", "Catacombs of Carthus",
+                      "Irithyll of the Boreal Valley", "Irithyll Dungeon", "Lothric Castle",
+                      "Grand Archives", "Archdragon Peak", "Kiln of the First Flame"]
+        current_area = None
+        for area in reversed(area_order):
+            bonfire_name = gd.get("areas", {}).get(area, {}).get("bonfire")
+            if bonfire_name in unlocked:
+                current_area = area
+                break
+
+        if current_area is None:
+            current_area = area_order[0]
+
+        area_data = gd.get("areas", {}).get(current_area, {})
+        boss_status = {boss["name"]: boss["defeated"] for boss in read_bosses(save_path)}
+        missing_bosses = [boss for boss in area_data.get("bosses", []) if not boss_status.get(boss, False)]
+        missed = {
+            "current_area": current_area,
+            "missing_bosses": missing_bosses,
+            "key_items": [{"name": name, "owned": None} for name in area_data.get("key_items", [])],
+            "estus_shards_found": None,
+            "estus_shards_total": gd.get("total_estus_shards", 0),
+            "bone_shards_found": None,
+            "bone_shards_total": gd.get("total_bone_shards", 0),
+        }
+        _print_missed_result(missed)
+        return
+
+    _print_save_overview(save_path, stats, include_stats=(action == "stats"))
+
+
 # ── Entry point ──────────────────────────────────────────────────
 
 def main() -> None:
@@ -508,7 +982,7 @@ def main() -> None:
         "areas": _cmd_areas_with_hint, "bosses": cmd_bosses, "route": cmd_route,
         "achievements": cmd_achievements, "mods": cmd_mods, "audit": cmd_audit,
         "sources": cmd_sources, "spells": cmd_spells, "rings": cmd_rings,
-        "track": cmd_track, "recommend": cmd_recommend,
+        "track": cmd_track, "recommend": cmd_recommend, "save": cmd_save,
     }
     handler = handlers.get(args.command)
     if handler:

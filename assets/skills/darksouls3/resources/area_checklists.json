@@ -1,0 +1,124 @@
+{
+  "Cemetery of Ash": {
+    "bosses": [
+      "Iudex Gundyr"
+    ],
+    "key_items": [
+      "Ashen Estus Flask",
+      "Coiled Sword"
+    ],
+    "estus_shards": [],
+    "bone_shards": [],
+    "notes": [
+      "Base area data lists Ashen Estus Flask and Iudex Gundyr.",
+      "Checklist reference also tracks Coiled Sword from the Iudex Gundyr encounter."
+    ]
+  },
+  "High Wall of Lothric": {
+    "bosses": [
+      "Vordt of the Boreal Valley"
+    ],
+    "key_items": [
+      "Cell Key",
+      "Small Lothric Banner",
+      "Way of Blue covenant"
+    ],
+    "estus_shards": [
+      "Estus Shard on the altar in the lower building room"
+    ],
+    "bone_shards": [
+      "Undead Bone Shard listed by base area data"
+    ],
+    "notes": [
+      "Base area data lists one Estus Shard, one Undead Bone Shard, Cell Key, Small Lothric Banner, and Vordt of the Boreal Valley.",
+      "Checklist reference identifies the Estus Shard as being on an altar and the Way of Blue covenant from Emma."
+    ]
+  },
+  "Undead Settlement": {
+    "bosses": [
+      "Curse-Rotted Greatwood"
+    ],
+    "key_items": [
+      "Loretta's Bone",
+      "Mortician's Ashes",
+      "Warrior of Sunlight covenant",
+      "Mound-makers covenant",
+      "Transposing Kiln"
+    ],
+    "estus_shards": [
+      "Estus Shard by the burning tree with worshipping undead"
+    ],
+    "bone_shards": [
+      "Undead Bone Shard near the White Birch",
+      "Undead Bone Shard listed by base area data"
+    ],
+    "notes": [
+      "Base area data lists one Estus Shard, two Undead Bone Shards, Loretta's Bone, Mortician's Ashes, Warrior of Sunlight covenant, and Curse-Rotted Greatwood.",
+      "Checklist reference identifies one Undead Bone Shard near the White Birch and the Estus Shard by the burning tree.",
+      "Checklist reference tracks Mound-makers covenant before Curse-Rotted Greatwood and Transposing Kiln from Curse-Rotted Greatwood."
+    ]
+  },
+  "Road of Sacrifices": {
+    "bosses": [
+      "Crystal Sage"
+    ],
+    "key_items": [
+      "Farron Coal",
+      "Sellsword Twinblades",
+      "Butcher Knife",
+      "Braille Divine Tome of Carim",
+      "Blue Sentinels covenant",
+      "Great Swamp Pyromancy Tome"
+    ],
+    "estus_shards": [
+      "Estus Shard on a ledge near the Crucifixion Woods building"
+    ],
+    "bone_shards": [
+      "Undead Bone Shard listed by base area data"
+    ],
+    "notes": [
+      "Base area data lists one Estus Shard, one Undead Bone Shard, Farron Coal, Sellsword Twinblades, Butcher Knife, and Crystal Sage.",
+      "Checklist reference identifies the Estus Shard on a ledge near the Crucifixion Woods building and tracks Farron Coal.",
+      "Checklist reference tracks Braille Divine Tome of Carim, Blue Sentinels covenant, and Great Swamp Pyromancy Tome in this area."
+    ]
+  },
+  "Cathedral of the Deep": {
+    "bosses": [
+      "Deacons of the Deep"
+    ],
+    "key_items": [
+      "Paladin's Ashes",
+      "Deep Braille Divine Tome",
+      "Rosaria's Fingers covenant",
+      "Red Sign Soapstone"
+    ],
+    "estus_shards": [
+      "Estus Shard outside the Cleansing Chapel bonfire near an obelisk"
+    ],
+    "bone_shards": [
+      "Undead Bone Shard in the graveyard area with large arrows"
+    ],
+    "notes": [
+      "Supplemented from checklist reference; Cathedral of the Deep is not present in base game_data.json.",
+      "Checklist reference tracks Paladin's Ashes, the Cleansing Chapel Estus Shard, one Undead Bone Shard, Deep Braille Divine Tome, Rosaria's Fingers covenant, Red Sign Soapstone, and Deacons of the Deep."
+    ]
+  },
+  "Catacombs of Carthus": {
+    "bosses": [
+      "High Lord Wolnir"
+    ],
+    "key_items": [
+      "Carthus Pyromancy Tome",
+      "Grave Warden's Ashes",
+      "Grave Warden Pyromancy Tome"
+    ],
+    "estus_shards": [],
+    "bone_shards": [
+      "Undead Bone Shard from the skeleton ball near the bottom gate"
+    ],
+    "notes": [
+      "Supplemented from checklist reference; Catacombs of Carthus is not present in base game_data.json.",
+      "Checklist reference tracks Carthus Pyromancy Tome, one Undead Bone Shard from the skeleton ball, Grave Warden's Ashes, High Lord Wolnir, and Grave Warden Pyromancy Tome."
+    ]
+  }
+}

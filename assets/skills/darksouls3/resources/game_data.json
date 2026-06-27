@@ -1,0 +1,96 @@
+{
+  "_version": "1.0",
+  "areas": {
+    "Cemetery of Ash": {
+      "estus_shards": [],
+      "bone_shards": [],
+      "key_items": [
+        "Ashen Estus Flask"
+      ],
+      "bosses": [
+        "Iudex Gundyr"
+      ],
+      "npcs": [],
+      "bonfire": "Cemetery of Ash",
+      "previous": null,
+      "next": "High Wall of Lothric"
+    },
+    "High Wall of Lothric": {
+      "estus_shards": [
+        1
+      ],
+      "bone_shards": [
+        1
+      ],
+      "key_items": [
+        "Cell Key",
+        "Small Lothric Banner"
+      ],
+      "bosses": [
+        "Vordt of the Boreal Valley"
+      ],
+      "npcs": [
+        "Greirat",
+        "Emma"
+      ],
+      "bonfire": "High Wall of Lothric",
+      "previous": "Cemetery of Ash",
+      "next": "Undead Settlement"
+    },
+    "Undead Settlement": {
+      "estus_shards": [
+        1
+      ],
+      "bone_shards": [
+        2
+      ],
+      "key_items": [
+        "Loretta's Bone",
+        "Mortician's Ashes",
+        "Warrior of Sunlight covenant"
+      ],
+      "bosses": [
+        "Curse-Rotted Greatwood"
+      ],
+      "npcs": [
+        "Yoel",
+        "Cornyx",
+        "Siegward",
+        "Irina"
+      ],
+      "bonfire": "Undead Settlement",
+      "previous": "High Wall of Lothric",
+      "next": "Road of Sacrifices"
+    },
+    "Road of Sacrifices": {
+      "estus_shards": [
+        1
+      ],
+      "bone_shards": [
+        1
+      ],
+      "key_items": [
+        "Farron Coal",
+        "Sellsword Twinblades",
+        "Butcher Knife"
+      ],
+      "bosses": [
+        "Crystal Sage"
+      ],
+      "npcs": [
+        "Orbeck",
+        "Anri",
+        "Horace"
+      ],
+      "bonfire": "Road of Sacrifices",
+      "previous": "Undead Settlement",
+      "next": [
+        "Cathedral of the Deep",
+        "Catacombs of Carthus"
+      ]
+    }
+  },
+  "total_estus_shards": 11,
+  "total_bone_shards": 10,
+  "max_flask_uses": 15
+}
