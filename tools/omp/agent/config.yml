@@ -62,10 +62,13 @@ branchSummary:
   enabled: true
   reserveTokens: 16384
 compaction:
-  #strategy: snapcompact
+  enabled: true
+  midTurnEnabled: true
+  strategy: snapcompact
+  thresholdPercent: 80
+  remoteEnabled: true
   supersedeReads: true
   dropUseless: true
-
 # =============================================================================
 # Tools
 # =============================================================================
@@ -90,6 +93,10 @@ task:
   maxConcurrency: 16
   maxRecursionDepth: 1
   maxRuntimeMs: 3600000
+  isolation:
+    mode: auto
+    merge: patch
+    commits: generic
 async:
   enabled: true
 
@@ -112,11 +119,11 @@ bashInterceptor:
       tool: read
       message: "Use the `read` tool instead of cat/head/tail. It provides better context and handles binary files."
     - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(grep|rg|ripgrep|ag|ack)\\s+"
-      tool: search
-      message: "Use the `search` tool instead of grep/rg. It respects .gitignore and provides structured output."
+      tool: grep
+      message: "Use the `grep` tool instead of grep/rg. It respects .gitignore and provides structured output."
     - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:fd\\b|(?:(?:find|locate)\\s+.*(?:-name|-iname|-type|--type|-glob)))"
-      tool: find
-      message: "Use the `find` tool instead of find/fd. It respects .gitignore and is faster for glob patterns."
+      tool: glob
+      message: "Use the `glob` tool instead of find/fd. It respects .gitignore and is faster for glob patterns."
     - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*sed\\s+(-i|--in-place)"
       tool: edit
       message: "Use the `edit` tool instead of sed -i. It provides diff preview and fuzzy matching."
