@@ -4,27 +4,27 @@
     {
       "id": 1,
       "prompt": "I just started DS3. Give me spoiler-safe beginner priorities and what not to level yet.",
-      "expected_output": "Gives spoiler-safe beginner priorities, class/build defaults, and explicit stats to avoid early.",
+      "expected_output": "Gives spoiler-safe beginner priorities with layered, class/playstyle-agnostic stat guidance and no default class, weapon, or damage lane.",
       "files": [],
       "expectations": [
-        "Matches the new player persona and answers the prompt directly.",
-        "Uses or is consistent with these bundled CLI command paths: fresh, softcaps, origins dex.",
-        "Mentions Vigor/Endurance early.",
-        "Avoids Luck/INT/FTH/ATT unless build-specific.",
-        "Uses bundled fresh/softcaps/origins guidance."
+        "Matches the new player persona and answers the prompt directly without assuming a class, build, weapon, or preferred playstyle.",
+        "Uses or is consistent with these bundled CLI command paths: fresh, softcaps.",
+        "Prioritizes survival fundamentals such as Vigor/Endurance, roll/equip load, weapon requirements, and upgrading a chosen usable weapon.",
+        "Frames damage, utility, casting, and status stats as user-chosen lanes rather than universal avoid-or-pick rules.",
+        "Uses bundled fresh/softcaps guidance while staying spoiler-safe and class-agnostic."
       ]
     },
     {
       "id": 2,
       "prompt": "I picked Mercenary and use Sellsword Twinblades. What stats should I level next and why?",
-      "expected_output": "Provides Mercenary/Sellsword dexterity stat plan with endgame viability and infusion guidance.",
+      "expected_output": "Provides a Mercenary/Sellsword dexterity stat plan because the user supplied that context, with endgame viability and infusion guidance.",
       "files": [],
       "expectations": [
-        "Matches the DEX player persona and answers the prompt directly.",
+        "Matches the user-provided Mercenary/Sellsword context and answers the prompt directly without generalizing that route to unspecified users.",
         "Uses or is consistent with these bundled CLI command paths: build dexterity --level 120, weapons Sellsword Twinblades, infusions Sellsword Twinblades --build dexterity.",
-        "Names Sellsword Twinblades as endgame-capable.",
-        "Recommends Sharp for Dex once unlocked.",
-        "Keeps Strength at requirements unless pivoting."
+        "Names Sellsword Twinblades as endgame-capable for this stated route.",
+        "Recommends Sharp for Dex once unlocked in this stated context.",
+        "Keeps Strength at requirements unless this user pivots."
       ]
     },
     {
@@ -82,26 +82,26 @@
     {
       "id": 7,
       "prompt": "Compare early weapons for my DEX/quality route.",
-      "expected_output": "Compares relevant Dex/quality weapons using calculator/catalog output instead of vibes.",
+      "expected_output": "Compares relevant Dex/quality weapons for the user's stated route using calculator/catalog output instead of vibes.",
       "files": [],
       "expectations": [
-        "Matches the build optimizer persona and answers the prompt directly.",
+        "Matches the weapon comparison request and the user's stated DEX/quality context without making it a default recommendation.",
         "Uses or is consistent with these bundled CLI command paths: calc Sellsword Twinblades 10 40, compare Sellsword Twinblades Broadsword --str 10 --dex 40, weapons Broadsword.",
         "Uses calc/compare outputs.",
-        "Explains requirements and scaling.",
+        "Explains requirements and scaling as conditional tradeoffs for the stated route.",
         "Distinguishes current usability from final build value."
       ]
     },
     {
       "id": 8,
       "prompt": "How do I know Sharp is right and what coal/gem path is relevant?",
-      "expected_output": "Explains Sharp infusion requirements, when it beats Raw, and how it maps to Dex scaling.",
+      "expected_output": "Explains Sharp infusion requirements, when it beats Raw, and how it maps to Dex scaling when that matches the user's stated weapon/build context.",
       "files": [],
       "expectations": [
-        "Matches the infusion user persona and answers the prompt directly.",
+        "Matches the infusion user persona and answers the prompt directly without presenting Sharp/Dex/Sellsword as a default for unspecified users.",
         "Uses or is consistent with these bundled CLI command paths: infusions Sellsword Twinblades, infusions Sellsword Twinblades --build dexterity.",
         "Says Raw removes scaling.",
-        "Says Sharp improves Dex scaling.",
+        "Says Sharp improves Dex scaling when the user is pursuing a Dex-scaling route.",
         "Mentions coal/gem/unlock requirements without unnecessary spoilers.",
         "Uses live/source-backed retrieval or fresh cache provenance for exact coal/gem locations if the answer gives route/location detail."
       ]
