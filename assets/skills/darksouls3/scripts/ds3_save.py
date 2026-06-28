@@ -7,6 +7,7 @@ AES key: Atvaark/DarkSoulsIII.FileFormats.
 Save event layout/values: alfizari/Dark-Souls-3-Save-Editor-PS4-PC (MIT).
 Tracked bonfire bits: The Grand Archives DS3 CT SprjEventFlagMan records (reference-only; no license observed).
 """
+
 from __future__ import annotations
 
 import json as _json
@@ -14,7 +15,7 @@ import struct
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import TypeVar, TypedDict, cast
+from typing import TypedDict, TypeVar, cast
 
 from Crypto.Cipher import AES
 
@@ -54,7 +55,12 @@ def _bonfire_flag(item: object) -> BonfireFlag | None:
     name = item.get("name")
     offset = item.get("offset")
     bit = item.get("bit")
-    if isinstance(area, str) and isinstance(name, str) and isinstance(offset, int) and isinstance(bit, int):
+    if (
+        isinstance(area, str)
+        and isinstance(name, str)
+        and isinstance(offset, int)
+        and isinstance(bit, int)
+    ):
         return BonfireFlag(area=area, name=name, offset=offset, bit=bit)
     return None
 
@@ -89,6 +95,7 @@ _GOODS_NAMES: dict[int, str] = {}
 # ---------------------------------------------------------------------------
 # Types
 # ---------------------------------------------------------------------------
+
 
 class StatBlock(TypedDict):
     name: str
@@ -129,9 +136,16 @@ class StatBlock(TypedDict):
 
 
 CLASS_NAMES: dict[int, str] = {
-    0: "Deprived", 1: "Knight", 2: "Mercenary", 3: "Warrior",
-    4: "Herald", 5: "Thief", 6: "Assassin", 7: "Sorcerer",
-    8: "Pyromancer", 9: "Cleric",
+    0: "Deprived",
+    1: "Knight",
+    2: "Mercenary",
+    3: "Warrior",
+    4: "Herald",
+    5: "Thief",
+    6: "Assassin",
+    7: "Sorcerer",
+    8: "Pyromancer",
+    9: "Cleric",
 }
 
 SAVE_PATH_DEFAULT: Path = Path.home() / "AppData" / "Roaming" / "DarkSoulsIII"
@@ -184,6 +198,7 @@ class BonfireStatus(TypedDict):
     offset: int
     bit: int
 
+
 class ProgressSummary(TypedDict):
     stats: StatBlock
     bosses_defeated: list[str]
@@ -217,6 +232,7 @@ class MissedKeyItem(TypedDict):
     check: bool
     supported: bool
 
+
 class MissedSummary(TypedDict):
     current_area: str
     missing_bosses: list[str]
@@ -232,6 +248,7 @@ class MissedSummary(TypedDict):
 # ---------------------------------------------------------------------------
 # BND4 parsing
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class SlotEntry:
@@ -286,6 +303,7 @@ def _read_save_cached(path: str, mtime_ns: int) -> tuple[bytes, list[bytes]]:
         raise ValueError(f"Expected >=11 slots, got {len(entries)}")
     return data, [_decrypt_entry(data, e) for e in entries]
 
+
 def _valid_stats_offset(slot: bytes, offset: int) -> bool:
     if offset < 0 or offset + STATS_SIZE > len(slot):
         return False
@@ -300,7 +318,11 @@ def _valid_stats_offset(slot: bytes, offset: int) -> bool:
         soul_level = struct.unpack_from("<I", slot, offset + 0x60)[0]
     except struct.error:
         return False
-    return all(1 <= value <= 99 for value in stats) and 1 <= soul_level <= 999 and slot[offset + 0x9E] <= 9
+    return (
+        all(1 <= value <= 99 for value in stats)
+        and 1 <= soul_level <= 999
+        and slot[offset + 0x9E] <= 9
+    )
 
 
 def _find_stats_offset(slot: bytes) -> int:
@@ -329,30 +351,53 @@ def read_stats(path: str | Path, slot: int = 0) -> StatBlock:
     if so < 0:
         raise RuntimeError("Could not locate Stats struct in save data")
     d = slot_data
-    def _u32(off): return struct.unpack_from("<I", d, so + off)[0]
-    def _u16(off): return struct.unpack_from("<H", d, so + off)[0]
-    def _u8(off): return d[so + off]
+
+    def _u32(off):
+        return struct.unpack_from("<I", d, so + off)[0]
+
+    def _u16(off):
+        return struct.unpack_from("<H", d, so + off)[0]
+
+    def _u8(off):
+        return d[so + off]
+
     name_raw = d[so + 0x78 : so + 0x78 + 32]
     name = name_raw.decode("utf-16-le", errors="replace").rstrip("\x00")
     return StatBlock(
         name=name,
-        soulLevel=_u32(0x60), souls=_u32(0x64),
-        vigor=_u32(0x34), attunement=_u32(0x38), endurance=_u32(0x3C),
-        vitality=_u32(0x5C), strength=_u32(0x40), dexterity=_u32(0x44),
-        intelligence=_u32(0x48), faith=_u32(0x4C), luck=_u32(0x50),
+        soulLevel=_u32(0x60),
+        souls=_u32(0x64),
+        vigor=_u32(0x34),
+        attunement=_u32(0x38),
+        endurance=_u32(0x3C),
+        vitality=_u32(0x5C),
+        strength=_u32(0x40),
+        dexterity=_u32(0x44),
+        intelligence=_u32(0x48),
+        faith=_u32(0x4C),
+        luck=_u32(0x50),
         humanity=_u32(0x58),
-        health=_u32(0x08), maxHealth=_u32(0x10),
-        mana=_u32(0x14), maxMana=_u32(0x1C),
-        stamina=_u32(0x24), maxStamina=_u32(0x2C),
-        class_=_u8(0x9E), gender=_u8(0x9F),
+        health=_u32(0x08),
+        maxHealth=_u32(0x10),
+        mana=_u32(0x14),
+        maxMana=_u32(0x1C),
+        stamina=_u32(0x24),
+        maxStamina=_u32(0x2C),
+        class_=_u8(0x9E),
+        gender=_u8(0x9F),
         embered=_u8(0xF0),
-        estusAllocation=_u8(0xF2), ashenEstusAllocation=_u8(0xF3),
+        estusAllocation=_u8(0xF2),
+        ashenEstusAllocation=_u8(0xF3),
         maxWeaponReinforcement=_u8(0xA3),
-        hollow=_u16(0xEE), yoelLevelUpsRemaining=_u8(0xFF),
+        hollow=_u16(0xEE),
+        yoelLevelUpsRemaining=_u8(0xFF),
         charID=_u32(0x100),
-        darkmoonPoints=_u8(0xBD), sunlightPoints=_u8(0xBE),
-        moundmakerPoints=_u8(0xBF), fingersPoints=_u8(0xC1),
-        watchdogsPoints=_u8(0xC2), aldrichPoints=_u8(0xC3),
+        darkmoonPoints=_u8(0xBD),
+        sunlightPoints=_u8(0xBE),
+        moundmakerPoints=_u8(0xBF),
+        fingersPoints=_u8(0xC1),
+        watchdogsPoints=_u8(0xC2),
+        aldrichPoints=_u8(0xC3),
         wayOfBluePoints=_u8(0x101),
     )
 
@@ -364,6 +409,7 @@ def read_name(path: str | Path, slot: int = 0) -> str:
 # ---------------------------------------------------------------------------
 # Event flag / boss / bonfire readers
 # ---------------------------------------------------------------------------
+
 
 def _boss_flags_supported() -> bool:
     return bool(BOSS_FLAGS) and all(name in BOSS_EVENT_VALUES for name in BOSS_FLAGS)
@@ -405,6 +451,7 @@ def _event_flag_start(slot: bytes) -> int:
         return -1
     return event_start if 0 <= event_start < len(slot) else -1
 
+
 def read_ng_plus(path: str | Path, slot: int = 0) -> int:
     """Return the Journey/NG+ counter stored before the event flag table."""
     _, slots = read_save(path)
@@ -422,13 +469,20 @@ def read_bosses(path: str | Path, slot: int = 0) -> list[BossStatus]:
     slot_data = slots[slot]
     event_start = _event_flag_start(slot_data)
     if event_start < 0:
-        return [BossStatus(name=name, defeated=False, offset=offset) for name, offset in BOSS_FLAGS.items()]
+        return [
+            BossStatus(name=name, defeated=False, offset=offset)
+            for name, offset in BOSS_FLAGS.items()
+        ]
     base = event_start - 0x12
     bosses: list[BossStatus] = []
     for name, offset in BOSS_FLAGS.items():
         expected = BOSS_EVENT_VALUES.get(name)
         flag_offset = base + offset
-        defeated = expected is not None and 0 <= flag_offset < len(slot_data) and slot_data[flag_offset] == expected
+        defeated = (
+            expected is not None
+            and 0 <= flag_offset < len(slot_data)
+            and slot_data[flag_offset] == expected
+        )
         bosses.append(BossStatus(name=name, defeated=defeated, offset=offset))
     return bosses
 
@@ -455,7 +509,11 @@ def read_bonfire_statuses(path: str | Path, slot: int = 0) -> list[BonfireStatus
         offset = item["offset"]
         bit = item["bit"]
         flag_offset = base + offset + BONFIRE_SAVE_OFFSET_DELTA
-        unlocked = 0 <= bit < 8 and 0 <= flag_offset < len(slot_data) and bool(slot_data[flag_offset] & (1 << bit))
+        unlocked = (
+            0 <= bit < 8
+            and 0 <= flag_offset < len(slot_data)
+            and bool(slot_data[flag_offset] & (1 << bit))
+        )
         bonfires.append(
             BonfireStatus(
                 area=item["area"],
@@ -470,7 +528,10 @@ def read_bonfire_statuses(path: str | Path, slot: int = 0) -> list[BonfireStatus
 
 def read_bonfires(path: str | Path, slot: int = 0) -> dict[str, bool]:
     """Return exact source-backed bonfire unlock status keyed by area/name."""
-    return {f"{entry['area']} - {entry['name']}": entry["unlocked"] for entry in read_bonfire_statuses(path, slot)}
+    return {
+        f"{entry['area']} - {entry['name']}": entry["unlocked"]
+        for entry in read_bonfire_statuses(path, slot)
+    }
 
 
 def read_progress(path: str | Path, slot: int = 0) -> ProgressSummary:
@@ -504,7 +565,9 @@ def _string_list(value: object) -> list[str]:
 def _area_string_lists(value: object) -> dict[str, list[str]]:
     if not isinstance(value, dict):
         return {}
-    return {key: _string_list(item) for key, item in value.items() if isinstance(key, str)}
+    return {
+        key: _string_list(item) for key, item in value.items() if isinstance(key, str)
+    }
 
 
 def _game_areas() -> dict[str, object]:
@@ -518,7 +581,11 @@ def read_completion_checklist() -> dict[str, list[str]]:
     """Return the global completion checklist resource, or an empty fallback."""
     data = _read_resource_json("achievement_checklist.json")
     if data:
-        return {key: _string_list(value) for key, value in data.items() if isinstance(key, str)}
+        return {
+            key: _string_list(value)
+            for key, value in data.items()
+            if isinstance(key, str)
+        }
 
     checklist: dict[str, list[str]] = {}
     areas = _game_areas()
@@ -536,7 +603,11 @@ def read_area_checklists() -> dict[str, dict[str, list[str]]]:
     """Return area checklists keyed by area name, or an empty fallback."""
     data = _read_resource_json("area_checklists.json")
     if data:
-        return {key: _area_string_lists(value) for key, value in data.items() if isinstance(key, str)}
+        return {
+            key: _area_string_lists(value)
+            for key, value in data.items()
+            if isinstance(key, str)
+        }
 
     areas = _game_areas()
     if not areas:
@@ -547,8 +618,16 @@ def read_area_checklists() -> dict[str, dict[str, list[str]]]:
             result[area_name] = {
                 "bosses": _string_list(area.get("bosses")),
                 "key_items": _string_list(area.get("key_items")),
-                "estus_shards": [str(item) for item in area.get("estus_shards", []) if isinstance(item, (int, str))],
-                "bone_shards": [str(item) for item in area.get("bone_shards", []) if isinstance(item, (int, str))],
+                "estus_shards": [
+                    str(item)
+                    for item in area.get("estus_shards", [])
+                    if isinstance(item, (int, str))
+                ],
+                "bone_shards": [
+                    str(item)
+                    for item in area.get("bone_shards", [])
+                    if isinstance(item, (int, str))
+                ],
             }
     return result
 
@@ -580,7 +659,9 @@ def read_missed(path: str | Path, slot: int = 0) -> dict[str, object]:
     stats = read_stats(path, slot)
     progress = read_progress(path, slot)
     defeated = set(progress["bosses_defeated"])
-    missing_bosses = [name for name in area_data.get("bosses", []) if name not in defeated]
+    missing_bosses = [
+        name for name in area_data.get("bosses", []) if name not in defeated
+    ]
     total_estus = len(area_data.get("estus_shards", []))
     total_bones = len(area_data.get("bone_shards", []))
     owned_keys = {_completion_key(name) for name in owned_item_names(path, slot)}
@@ -590,7 +671,14 @@ def read_missed(path: str | Path, slot: int = 0) -> dict[str, object]:
         key = _completion_key(name)
         supported = key in known_keys
         owned = supported and key in owned_keys
-        key_items.append({"name": name, "owned": owned, "check": supported and not owned, "supported": supported})
+        key_items.append(
+            {
+                "name": name,
+                "owned": owned,
+                "check": supported and not owned,
+                "supported": supported,
+            }
+        )
     return {
         "current_area": current_area,
         "missing_bosses": missing_bosses,
@@ -634,7 +722,8 @@ def _load_item_names() -> None:
         return result
 
     for fname, cache in [
-        ("weapons.json", _WEAPON_NAMES), ("armor.json", _ARMOR_NAMES),
+        ("weapons.json", _WEAPON_NAMES),
+        ("armor.json", _ARMOR_NAMES),
         ("rings.json", _RING_NAMES),
         ("goods_magic.json", _GOODS_NAMES),
     ]:
@@ -649,6 +738,7 @@ def _load_item_names() -> None:
 def _item_name_for_id(item_id: int, fallback: str) -> str:
     _load_item_names()
     return _ITEM_NAMES.get(item_id, fallback)
+
 
 def _weapon_name_and_reinforcement(item_id: int) -> tuple[str | None, int, int]:
     """Resolve infused/upgraded weapon item IDs.
@@ -678,6 +768,7 @@ def _completion_key(name: str) -> str:
 
 def _known_item_names(items: list[ItemEntry]) -> set[str]:
     return {item["name"] for item in items if not item["name"].startswith("Unknown ")}
+
 
 def _known_weapon_base_names(items: list[ItemEntry]) -> set[str]:
     names: set[str] = set()
@@ -711,6 +802,7 @@ def _inventory_owned_by_category(inventory: InventoryResult) -> dict[str, set[st
         "goods": goods - spells,
     }
 
+
 def read_inventory(path: str | Path, slot: int = 0) -> InventoryResult:
     """Parse the full inventory from a save slot."""
     _load_item_names()
@@ -718,9 +810,9 @@ def read_inventory(path: str | Path, slot: int = 0) -> InventoryResult:
     slot_data = slots[slot]
 
     ITEM_TYPE_WEAPON = 0x80000000
-    ITEM_TYPE_ARMOR  = 0x90000000
-    ITEM_TYPE_GOOD   = 0xB0000000
-    ITEM_TYPE_RING   = 0xA0000000
+    ITEM_TYPE_ARMOR = 0x90000000
+    ITEM_TYPE_GOOD = 0xB0000000
+    ITEM_TYPE_RING = 0xA0000000
 
     weapons: list[ItemEntry] = []
     armors: list[ItemEntry] = []
@@ -748,7 +840,9 @@ def read_inventory(path: str | Path, slot: int = 0) -> InventoryResult:
         offset = rows_offset + index * 16
         if offset + 16 > len(slot_data):
             break
-        gaitem_handle, item_id, quantity, _index = struct.unpack_from("<IIII", slot_data, offset)
+        gaitem_handle, item_id, quantity, _index = struct.unpack_from(
+            "<IIII", slot_data, offset
+        )
         if item_id in (0, 0xFFFFFFFF):
             continue
         type_bits = gaitem_handle & 0xF0000000
@@ -760,7 +854,9 @@ def read_inventory(path: str | Path, slot: int = 0) -> InventoryResult:
             if type_bits != expected_type:
                 continue
             if item_type == "weapon":
-                name, reinforcement, base_item_id = _weapon_name_and_reinforcement(item_id)
+                name, reinforcement, base_item_id = _weapon_name_and_reinforcement(
+                    item_id
+                )
             else:
                 name = names.get(item_id)
             if name is None:
@@ -774,22 +870,30 @@ def read_inventory(path: str | Path, slot: int = 0) -> InventoryResult:
         if matched[0] in ("goods", "ring") and quantity == 0:
             continue
 
-
-        display_name = f"{matched[1]} +{reinforcement}" if reinforcement and matched[0] == "weapon" else matched[1]
+        display_name = (
+            f"{matched[1]} +{reinforcement}"
+            if reinforcement and matched[0] == "weapon"
+            else matched[1]
+        )
         entry: ItemEntry = {
             "slot": index,
             "gaitem_handle": gaitem_handle,
             "item_id": item_id,
             "item_type": matched[0],
             "name": display_name,
-            "quantity": quantity if matched[0] in ("goods", "ring") and quantity > 0 else 1,
+            "quantity": quantity
+            if matched[0] in ("goods", "ring") and quantity > 0
+            else 1,
             "reinforcement": reinforcement,
             "base_item_id": base_item_id,
         }
         matched[2].append(entry)
 
     return InventoryResult(
-        weapons=weapons, armor=armors, rings=rings, goods=goods,
+        weapons=weapons,
+        armor=armors,
+        rings=rings,
+        goods=goods,
         total_items=len(weapons) + len(armors) + len(rings) + len(goods),
     )
 
@@ -798,7 +902,12 @@ def owned_item_names(path: str | Path, slot: int = 0) -> set[str]:
     """Return all resolved inventory item names owned by the save slot."""
     inventory = read_inventory(path, slot)
     names: set[str] = set()
-    for items in (inventory["weapons"], inventory["armor"], inventory["rings"], inventory["goods"]):
+    for items in (
+        inventory["weapons"],
+        inventory["armor"],
+        inventory["rings"],
+        inventory["goods"],
+    ):
         for item in items:
             name = item["name"]
             if not name.startswith("Unknown"):
@@ -827,7 +936,11 @@ def read_completion_status(path: str | Path, slot: int = 0) -> dict[str, object]
     ) -> dict[str, object]:
         excluded = excluded_keys or set()
         known = sorted(
-            {name for name in known_names.values() if _completion_key(name) not in excluded},
+            {
+                name
+                for name in known_names.values()
+                if _completion_key(name) not in excluded
+            },
             key=_completion_key,
         )
         owned_keys = {_completion_key(name) for name in owned_names}
@@ -853,7 +966,9 @@ def read_completion_status(path: str | Path, slot: int = 0) -> dict[str, object]
         "miracles": miracles,
         "weapons": _collection_status(owned_by_category["weapons"], _WEAPON_NAMES),
         "armor": _collection_status(owned_by_category["armor"], _ARMOR_NAMES),
-        "goods": _collection_status(owned_by_category["goods"], _GOODS_NAMES, spell_keys),
+        "goods": _collection_status(
+            owned_by_category["goods"], _GOODS_NAMES, spell_keys
+        ),
         "reinforcement": {
             "supported": False,
             "owned": reinforcement_owned,
@@ -884,13 +999,33 @@ def read_gestures(path: str | Path, slot: int = 0) -> dict[str, object]:
 
 
 __all__ = [
-    "read_save", "read_stats", "read_name",
-    "read_bosses", "read_bonfires", "read_bonfire_statuses", "read_progress", "read_ng_plus",
-    "read_completion_checklist", "read_area_checklists",
-    "read_current_area", "read_missed",
-    "read_inventory", "owned_item_names", "read_completion_status", "read_gestures",
-    "StatBlock", "SlotEntry", "BossStatus", "BonfireStatus", "ProgressSummary",
-    "ItemEntry", "InventoryResult", "MissedSummary", "MissedKeyItem",
-    "CLASS_NAMES", "AES_KEY", "SAVE_PATH_DEFAULT",
+    "read_save",
+    "read_stats",
+    "read_name",
+    "read_bosses",
+    "read_bonfires",
+    "read_bonfire_statuses",
+    "read_progress",
+    "read_ng_plus",
+    "read_completion_checklist",
+    "read_area_checklists",
+    "read_current_area",
+    "read_missed",
+    "read_inventory",
+    "owned_item_names",
+    "read_completion_status",
+    "read_gestures",
+    "StatBlock",
+    "SlotEntry",
+    "BossStatus",
+    "BonfireStatus",
+    "ProgressSummary",
+    "ItemEntry",
+    "InventoryResult",
+    "MissedSummary",
+    "MissedKeyItem",
+    "CLASS_NAMES",
+    "AES_KEY",
+    "SAVE_PATH_DEFAULT",
     "BOSS_FLAGS",
 ]
