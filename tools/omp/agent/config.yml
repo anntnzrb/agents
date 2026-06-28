@@ -2,14 +2,14 @@
 # Models
 # =============================================================================
 modelRoles:
-  default: opencode-go/mimo-v2.5-pro:xhigh
-  task: opencode-go/mimo-v2.5-pro:xhigh
+  default: openai-codex/gpt-5.5:medium
+  task: openai-codex/gpt-5.5:low
 
-  commit: opencode-go/deepseek-v4-flash:xhigh
-  smol: opencode-go/deepseek-v4-flash:xhigh
+  commit: google-antigravity/gemini-3.1-flash-lite:xhigh
+  smol: google-antigravity/gemini-3.1-flash-lite:xhigh
 
-  plan: opencode-go/mimo-v2.5-pro:xhigh
-  advisor: opencode-go/mimo-v2.5-pro:xhigh
+  plan: openai-codex/gpt-5.5:medium
+  advisor: openai-codex/gpt-5.5:low
   slow: openai-codex/gpt-5.5:medium
 
 # =============================================================================
