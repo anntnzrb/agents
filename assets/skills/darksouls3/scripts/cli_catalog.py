@@ -351,25 +351,23 @@ def cmd_achievements(args) -> None:
             print(f"  Save-scum at final boss for all 3 endings from one kill.")
         return
 
-    print("=== Achievements (43 total, base game only) ===\n")
-    print("  DLCs have NO achievements. Platinum is base game only.")
-    print(f"  Covenant items needed:")
-    print(f"    Proof of Concord Kept x30 (hardest — ~6-10 hours farming)")
-    print(f"    Vertebra Shackle x30 (~4-6 hours)")
-    print(f"    Sunlight Medal x30 (~1-2 hours via co-op)")
-    print(f"    Wolf's Blood Swordgrass x30 (~2-4 hours)")
-    print(f"    Human Dregs x10 (~1-2 hours)")
-    print(f"    Pale Tongue x10 (~2-3 hours)")
     print(
-        f"  NG cycles needed: 3 (base rings, NG+ +1 rings, NG++ +2 rings plus Life Ring +3)"
-    )
-    print(f"  Master achievements (spell collections):")
-    print(f"    Master of Sorcery: 34 base-game sorceries")
-    print(f"    Master of Miracles: 35 base-game miracles")
-    print(f"    Master of Pyromancy: 27 base-game pyromancies")
-    print(f"    DLC spells do NOT count. Use `spells --achievement` for full lists.")
-    print(
-        f"  Master of Rings: all 107 base-game rings (+0, +1, +2, and NG++ Life Ring +3; DLC +3 rings do not count)"
+        "=== Achievements (43 total, base game only) ===\n\n"
+        "  DLCs have NO achievements. Platinum is base game only.\n"
+        "  Covenant items needed:\n"
+        "    Proof of Concord Kept x30 (hardest — ~6-10 hours farming)\n"
+        "    Vertebra Shackle x30 (~4-6 hours)\n"
+        "    Sunlight Medal x30 (~1-2 hours via co-op)\n"
+        "    Wolf's Blood Swordgrass x30 (~2-4 hours)\n"
+        "    Human Dregs x10 (~1-2 hours)\n"
+        "    Pale Tongue x10 (~2-3 hours)\n"
+        "  NG cycles needed: 3 (base rings, NG+ +1 rings, NG++ +2 rings plus Life Ring +3)\n"
+        "  Master achievements (spell collections):\n"
+        "    Master of Sorcery: 34 base-game sorceries\n"
+        "    Master of Miracles: 35 base-game miracles\n"
+        "    Master of Pyromancy: 27 base-game pyromancies\n"
+        "    DLC spells do NOT count. Use `spells --achievement` for full lists.\n"
+        "  Master of Rings: all 107 base-game rings (+0, +1, +2, and NG++ Life Ring +3; DLC +3 rings do not count)"
     )
     if args.plat_route:
         print(f"\n  Optimal plat route:")
