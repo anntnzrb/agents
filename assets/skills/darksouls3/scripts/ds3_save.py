@@ -15,14 +15,13 @@ import struct
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import TypedDict, TypeVar, cast
+from typing import TypedDict, cast
 
 from Crypto.Cipher import AES
 
 AES_KEY: bytes = bytes.fromhex("FD464D695E69A39A10E319A7ACE8B7FA")
 
 _resources_dir = Path(__file__).resolve().parent.parent / "resources"
-_JSONFallback = TypeVar("_JSONFallback")
 
 
 class BonfireFlag(TypedDict):
@@ -32,20 +31,8 @@ class BonfireFlag(TypedDict):
     bit: int
 
 
-def _load_resource_json(
-    name: str,
-    fallback: _JSONFallback,
-    *,
-    catch_decode_error: bool = True,
-) -> object | _JSONFallback:
-    try:
-        return _json.loads((_resources_dir / name).read_text(encoding="utf-8"))
-    except _json.JSONDecodeError:
-        if catch_decode_error:
-            return fallback
-        raise
-    except (FileNotFoundError, OSError):
-        return fallback
+def _load_resource_json(name: str) -> object:
+    return _json.loads((_resources_dir / name).read_text(encoding="utf-8"))
 
 
 def _bonfire_flag(item: object) -> BonfireFlag | None:
@@ -75,11 +62,11 @@ def _bonfire_flags(items: list[object]) -> list[BonfireFlag]:
 
 _event_flags = cast(
     dict[str, dict[str, int]],
-    _load_resource_json("event_flags.json", {"bosses": {}}, catch_decode_error=False),
+    _load_resource_json("event_flags.json"),
 )
 _bonfire_bit_flags_raw = cast(
     list[object],
-    _load_resource_json("bonfire_flags.json", [], catch_decode_error=False),
+    _load_resource_json("bonfire_flags.json"),
 )
 BOSS_FLAGS: dict[str, int] = _event_flags["bosses"]
 BONFIRE_SAVE_OFFSET_DELTA: int = 0x6F
@@ -550,7 +537,7 @@ def read_progress(path: str | Path, slot: int = 0) -> ProgressSummary:
 
 
 def _read_resource_json(name: str) -> dict[str, object]:
-    data = _load_resource_json(name, {})
+    data = _load_resource_json(name)
     if isinstance(data, dict):
         return data
     return {}
@@ -578,58 +565,21 @@ def _game_areas() -> dict[str, object]:
 
 
 def read_completion_checklist() -> dict[str, list[str]]:
-    """Return the global completion checklist resource, or an empty fallback."""
+    """Return the global completion checklist resource."""
     data = _read_resource_json("achievement_checklist.json")
-    if data:
-        return {
-            key: _string_list(value)
-            for key, value in data.items()
-            if isinstance(key, str)
-        }
-
-    checklist: dict[str, list[str]] = {}
-    areas = _game_areas()
-    if not areas:
-        return checklist
-    for area in areas.values():
-        if not isinstance(area, dict):
-            continue
-        for key in ("bosses", "key_items"):
-            checklist.setdefault(key, []).extend(_string_list(area.get(key)))
-    return checklist
+    return {
+        key: _string_list(value) for key, value in data.items() if isinstance(key, str)
+    }
 
 
 def read_area_checklists() -> dict[str, dict[str, list[str]]]:
-    """Return area checklists keyed by area name, or an empty fallback."""
+    """Return area checklists keyed by area name."""
     data = _read_resource_json("area_checklists.json")
-    if data:
-        return {
-            key: _area_string_lists(value)
-            for key, value in data.items()
-            if isinstance(key, str)
-        }
-
-    areas = _game_areas()
-    if not areas:
-        return {}
-    result: dict[str, dict[str, list[str]]] = {}
-    for area_name, area in areas.items():
-        if isinstance(area_name, str) and isinstance(area, dict):
-            result[area_name] = {
-                "bosses": _string_list(area.get("bosses")),
-                "key_items": _string_list(area.get("key_items")),
-                "estus_shards": [
-                    str(item)
-                    for item in area.get("estus_shards", [])
-                    if isinstance(item, (int, str))
-                ],
-                "bone_shards": [
-                    str(item)
-                    for item in area.get("bone_shards", [])
-                    if isinstance(item, (int, str))
-                ],
-            }
-    return result
+    return {
+        key: _area_string_lists(value)
+        for key, value in data.items()
+        if isinstance(key, str)
+    }
 
 
 def read_current_area(path: str | Path, slot: int = 0) -> str:
@@ -705,7 +655,7 @@ def _load_item_names() -> None:
         return
 
     def _parse_json(fname: str) -> dict[int, str]:
-        data = _load_resource_json(fname, {})
+        data = _load_resource_json(fname)
         if not isinstance(data, dict):
             return {}
         result: dict[int, str] = {}
