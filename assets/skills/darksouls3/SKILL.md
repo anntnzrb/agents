@@ -38,6 +38,14 @@ C:/Users/Nil/.config/agents/assets/skills/darksouls3
 5. Filter spoilers before replying. Do not paste future names, future locations, boss identities, quest outcomes, endings, or DLC reveals unless the user has introduced them or explicitly permits spoilers.
 6. Answer with the actionable result first, then observed command/source evidence, then caveats.
 
+## Recommendation policy
+
+- Recommendations are stateless, class-agnostic, and playstyle-aware by default. Do not infer the user's preferred class, build, weapon, damage stat, casting lane, or status plan from absent context.
+- Use save-backed/current facts only when the user provides them, an explicit tracking file contains them, or a save/CLI command observes them. Otherwise describe options as conditional tradeoffs, not as the user's build.
+- For new or unspecified players, layer advice: survival, roll/equip load, weapon requirements, upgrade priority, then user-chosen lanes such as Strength, Dexterity, Quality, Intelligence, Faith, Pyromancy, Luck/status, utility, or hybrid casting.
+- Treat classes, weapons, infusions, and archetypes as examples to compare after the user states goals or current facts. Do not imply a default start, default weapon, or default damage lane for unspecified users.
+
+
 ## Save-file support
 
 The CLI can read local DS3 `.sl2` saves read-only. It auto-detects:
@@ -196,7 +204,7 @@ Route by intent, not exact wording:
 | exact inventory or owned rings/spells/items | `save auto inventory`, `save auto owned`, `save auto completion` | live/static checklist if unresolved | Be conservative with unresolved IDs. |
 | "what did I miss?", current area checklist | `save auto missed`, `save auto checklist` | live research if checklist missing | Unknown area checklist means unknown, not clear. |
 | where to level next | `save auto stats`, `softcaps`, `build` | `calc`, `compare`, `infusions` | Use actual current stats. |
-| starting class / build archetype | `origins`, `build`, `softcaps` | source refresh/live if user requests citations | Knight quality, Warrior strength, Mercenary dex are common optimized starts. |
+| starting class / build archetype | `origins`, `build`, `softcaps` | source refresh/live if user requests citations | Compare classes/archetypes only after the user states goals or current facts; present multiple tradeoffs and do not imply a default start. |
 | weapon AR/scaling/breakpoints | `calc`, `compare`, `weapons`, `infusions` | MugenMonkey/SoulsPlanner/live for missing weapons | Do not guess AR. |
 | upgrade materials | `upgrade`, `farm` | `sources status` / `sources refresh fextralife-upgrades` / live research for exact routes and current source-backed locations | Main weapon first. |
 | equip load/fat roll | `equip-load`, `softcaps` | save stats if current VIT matters | Medium roll below 70%. |
