@@ -16,7 +16,9 @@ In Claude.ai, the core workflow is the same (draft → test → review → impro
 
 **Blind comparison**: Requires subagents. Skip it.
 
-**Packaging**: The `package_skill.py` script works anywhere with `uv` (or Python) and a filesystem. On Claude.ai, you can run it and the user can download the resulting `.skill` file.
+**Packaging**: The `package` CLI command works anywhere with `uv` (or Python) and a filesystem. On Claude.ai, run it and let the user download the resulting `.skill` file.
+
+**Updating an existing skill**: Preserve the skill's original directory name and `name` frontmatter when packaging an update. If the installed skill path is read-only, copy it to a writable temp directory, edit the copy, and package from there.
 
 ---
 
@@ -28,7 +30,8 @@ If you're in Cowork, the main things to know are:
 - You don't have a browser or display, so when generating the eval viewer, use `--static <output_path>` to write a standalone HTML file instead of starting a server. Then proffer a link that the user can click to open the HTML in their browser.
 - For whatever reason, the Cowork setup seems to disincline Claude from generating the eval viewer after running the tests, so just to reiterate: whether you're in Cowork or in Claude Code, after running tests, you should always generate the eval viewer for the human to look at examples before revising the skill yourself and trying to make corrections, using `generate_review.py` (not writing your own boutique html code). Sorry in advance but I'm gonna go all caps here: GENERATE THE EVAL VIEWER _BEFORE_ evaluating inputs yourself. You want to get them in front of the human ASAP!
 - Feedback works differently: since there's no running server, the viewer's "Submit All Reviews" button will download `feedback.json` as a file. You can then read it from there (you may have to request access first).
-- Packaging works — `package_skill.py` just needs Python and a filesystem.
-- Description optimization (`run_loop.py` / `run_eval.py`) should work in Cowork just fine since it uses `claude -p` via subprocess, not a browser, but please save it until you've fully finished making the skill and the user agrees it's in good shape.
+- Packaging works through the `package` CLI command with `uv` (or Python) and a filesystem.
+- Description optimization (`run_loop.py` / `run_eval.py`) should work in Cowork since it uses `claude -p` via subprocess, not a browser, but save it until the skill behavior is finished and the user agrees it is in good shape.
+- For existing-skill updates, follow the Claude.ai update guidance above.
 
 ---

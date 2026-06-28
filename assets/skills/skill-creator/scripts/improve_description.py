@@ -198,22 +198,12 @@ Please respond with only the new description text in <new_description> tags, not
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Improve a skill description based on eval results"
-    )
-    parser.add_argument(
-        "--eval-results",
-        required=True,
-        help="Path to eval results JSON (from run_eval.py)",
-    )
+    parser = argparse.ArgumentParser(description="Improve a skill description based on eval results")
+    parser.add_argument("--eval-results", required=True, help="Path to eval results JSON (from run_eval.py)")
     parser.add_argument("--skill-path", required=True, help="Path to skill directory")
-    parser.add_argument(
-        "--history", default=None, help="Path to history JSON (previous attempts)"
-    )
+    parser.add_argument("--history", default=None, help="Path to history JSON (previous attempts)")
     parser.add_argument("--model", required=True, help="Model for improvement")
-    parser.add_argument(
-        "--verbose", action="store_true", help="Print thinking to stderr"
-    )
+    parser.add_argument("--verbose", action="store_true", help="Print thinking to stderr")
     args = parser.parse_args()
 
     skill_path = Path(args.skill_path)
@@ -231,14 +221,9 @@ def main():
 
     if args.verbose:
         print(f"Current: {current_description}", file=sys.stderr)
-        print(
-            f"Score: {eval_results['summary']['passed']}/{eval_results['summary']['total']}",
-            file=sys.stderr,
-        )
+        print(f"Score: {eval_results['summary']['passed']}/{eval_results['summary']['total']}", file=sys.stderr)
 
-    client = anthropic.Anthropic()
     new_description = improve_description(
-        client=client,
         skill_name=name,
         skill_content=content,
         current_description=current_description,
@@ -253,16 +238,13 @@ def main():
     # Output as JSON with both the new description and updated history
     output = {
         "description": new_description,
-        "history": history
-        + [
-            {
-                "description": current_description,
-                "passed": eval_results["summary"]["passed"],
-                "failed": eval_results["summary"]["failed"],
-                "total": eval_results["summary"]["total"],
-                "results": eval_results["results"],
-            }
-        ],
+        "history": history + [{
+            "description": current_description,
+            "passed": eval_results["summary"]["passed"],
+            "failed": eval_results["summary"]["failed"],
+            "total": eval_results["summary"]["total"],
+            "results": eval_results["results"],
+        }],
     }
     print(json.dumps(output, indent=2))
 
