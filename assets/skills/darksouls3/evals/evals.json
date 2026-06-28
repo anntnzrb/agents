@@ -763,6 +763,42 @@
         "Avoids future names unless user opts in.",
         "Keeps guidance class/playstyle agnostic."
       ]
+    },
+    {
+      "id": 62,
+      "prompt": "Show me how the DS3 skill decides whether a source can support a save-backed claim.",
+      "expected_output": "Uses source provenance and evidence classes to separate save-backed parser sources from wiki/static/live-memory references.",
+      "files": [],
+      "expectations": [
+        "Uses or is consistent with the bundled CLI command path: sources explain alfizari-save-editor.",
+        "Distinguishes direct save/parser sources from wiki, static checklist, and live-memory reference sources.",
+        "Does not treat cache files as provenance records.",
+        "Does not use no-license/reference-only sources as copyable save-backed truth."
+      ]
+    },
+    {
+      "id": 63,
+      "prompt": "A cached source page says an item location. What should the skill cite in the final answer?",
+      "expected_output": "Explains that cache files are transport artifacts and final answers cite source keys/URLs with live or fresh-cache evidence.",
+      "files": [],
+      "expectations": [
+        "Uses or is consistent with bundled CLI command paths: sources policy, sources status, sources explain.",
+        "States that cache files are transport artifacts, not canonical provenance.",
+        "Requires source URLs or source keys for final citations.",
+        "Keeps exact item locations spoiler-gated and source-backed."
+      ]
+    },
+    {
+      "id": 64,
+      "prompt": "Can a live-memory DS3 event flag reference prove an offline .sl2 save state?",
+      "expected_output": "Rejects direct equivalence between live-memory event references and offline DS30000 save-byte claims unless validated.",
+      "files": [],
+      "expectations": [
+        "Explains that live-memory event semantics are reference/candidate evidence, not direct save offsets.",
+        "Requires direct save parser support or before/after save validation for save-backed claims.",
+        "Uses or is consistent with sources explain for reference-only sources.",
+        "Does not claim unsupported NPC, covenant, or quest states are save-backed."
+      ]
     }
   ]
 }

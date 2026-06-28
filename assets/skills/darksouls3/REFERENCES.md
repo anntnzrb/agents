@@ -48,6 +48,7 @@ Run these commands after changing source, save, or resource files:
 ```text
 uv run --script scripts/cli.py audit
 uv run --script scripts/cli.py sources policy
+uv run --script scripts/cli.py sources explain alfizari-save-editor
 uv run --script scripts/cli.py save auto summary
 uv run --script scripts/cli.py save auto bosses
 uv run --script scripts/cli.py save auto bonfires

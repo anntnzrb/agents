@@ -171,6 +171,8 @@ track [summary|stats|gear|next] --path <tracking-json>
 recommend --path <tracking-json>
 sources list
 sources status
+sources policy
+sources explain <source-key>
 sources refresh [source-key ...] [--force]
 ```
 
@@ -178,7 +180,7 @@ sources refresh [source-key ...] [--force]
 - `mods --current` summarizes current PC mod guidance.
 - `audit` runs skill data self-consistency checks.
 - `track`/`recommend` read an explicit user-supplied tracking JSON. The skill does not own or persist tracking state.
-- `sources refresh` updates cached source pages. Use when source-backed/current data is requested.
+- `sources policy` explains live-vs-local rules, `sources explain <key>` shows source provenance/allowed use, and `sources refresh` updates cached source pages for source-backed/current requests.
 
 ### Save commands
 
@@ -266,6 +268,7 @@ darksouls3/
     game_data.json
     goods_magic.json
     rings.json
+    source_registry.json
     weapons.json
 ```
 
@@ -275,13 +278,14 @@ Resource roles:
 - mechanic-invariant: `game_data.json`, `achievement_checklist.json`, and `completion_categories.json`; stable totals/category contracts and parser support metadata.
 - thin-catalog: `weapons.json`, `armor.json`, `rings.json`, and `goods_magic.json`; conservative item-name-to-ID maps for inventory resolution only, not gameplay-stat/guide tables.
 - area-checklist scaffold: `area_checklists.json`; small spoiler-filtered local checklist hints where curated, incomplete by design.
+- source-registry: `source_registry.json`; source-key metadata, allowed-use boundaries, license/copyability flags, and provenance caveats audited by `audit`.
 - eval-fixture: `evals/evals.json`; prompt expectations that enforce routing, spoiler safety, source policy, and command use.
 
 Source and license ranking lives in `REFERENCES.md`. Use it before replacing embedded resource data.
 
 ## Source registry and cache
 
-The CLI has 20 registered sources. Address them by key with `sources refresh <key>`:
+The CLI has 20 runtime registered sources plus supplemental provenance references. Address runtime sources by key with `sources refresh <key>` and inspect any registry key with `sources explain <key>`:
 
 ```text
 fextralife-stats      https://darksouls3.wiki.fextralife.com/Stats
@@ -311,6 +315,8 @@ Use:
 ```text
 sources list
 sources status
+sources policy
+sources explain <source-key>
 sources refresh [source-key ...] [--force]
 ```
 
