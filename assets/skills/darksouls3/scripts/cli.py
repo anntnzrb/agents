@@ -105,7 +105,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="ds3",
         description="Spoiler-safe Dark Souls 3 companion CLI",
-        epilog="Quick start: ds3 fresh | ds3 softcaps | ds3 origins\nExplore: ds3 build quality | ds3 weapons claymore | ds3 rings havel\nCompletion: ds3 achievements --missable | ds3 covenants darkmoon | ds3 farm proofs",
+        epilog=(
+            "Quick start: ds3 fresh | ds3 softcaps | ds3 origins\n"
+            "Explore: ds3 origins | ds3 weapons --all | ds3 rings\n"
+            "Completion: ds3 achievements --missable | ds3 covenants darkmoon | "
+            "ds3 farm proofs"
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     sp = p.add_subparsers(dest="command")
@@ -364,12 +369,15 @@ def cmd_fresh(args) -> None:
         "\n"
         "You are at the Cemetery of Ash. Light the first bonfire.\n"
         "\n"
-        "Immediate priorities:\n"
-        "  - Level VGR early; 20 is comfortable, 27 is the first big HP target.\n"
-        "  - Keep equip load under 70% for a medium roll.\n"
-        "  - Meet weapon requirements, then upgrade one main weapon before spreading stats/materials.\n"
-        "  - Avoid LCK/INT/FTH/ATT unless you are deliberately building bleed/casting/FP.\n"
-        "  - Do not level every stat evenly; pick one damage lane.\n"
+        "Layered early priorities:\n"
+        "  - Survival first: level VGR early; 20 is comfortable.\n"
+        "  - VGR 27 is the first big HP target when you want more cushion.\n"
+        "  - Keep equip load under 70% for a medium roll; add VIT or lighter gear.\n"
+        "  - Meet requirements for the weapon, catalyst, or tool you want to use.\n"
+        "  - Upgrade one main tool before spreading upgrade materials widely.\n"
+        "  - Choose stats that serve your plan: STR/DEX for physical weapons; "
+        "INT/FTH/ATT for spells, FP, or utility; LCK for status setups.\n"
+        "  - Focus a lane first, then branch once the core works.\n"
         "\n"
         "Key commands to get started:\n"
         "  ds3 softcaps  — stat breakpoints to plan your build\n"
@@ -705,10 +713,16 @@ def cmd_farm(args) -> None:
 
 def cmd_build(args) -> None:
     if not args.type:
-        print("=== Build Archetypes ===\n")
+        print(
+            "=== Build Archetype Examples ===\n\n"
+            "  These are planning templates, not defaults; pick or adapt one to "
+            "match your weapon, spell, status, or utility plan.\n"
+        )
         for name, b in BUILDS.items():
-            print(f"  {name.title()}: {b['class'].title()} start -> {b['note']}")
-        print("\n  Use `build <type>` for stat targets.")
+            print(
+                f"  {name.title()}: example start {b['class'].title()} -> {b['note']}"
+            )
+        print("\n  Use `build <type>` for that template's stat targets.")
         print()
         print("See also: softcaps, origins, infusions, weapons")
         return
