@@ -4,27 +4,80 @@
 BND4 structure: tremwil/DS3SaveUnpacker (MIT).
 Stats layout: JKAnderson/SoulsTemplates USER_DATA000_DS3.bt.
 AES key: Atvaark/DarkSoulsIII.FileFormats.
+Save event layout/values: alfizari/Dark-Souls-3-Save-Editor-PS4-PC (MIT).
+Tracked bonfire bits: The Grand Archives DS3 CT SprjEventFlagMan records (reference-only; no license observed).
 """
 from __future__ import annotations
 
 import json as _json
 import struct
-from functools import lru_cache
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
-from typing import TypedDict
+from typing import TypeVar, TypedDict, cast
 
 from Crypto.Cipher import AES
 
 AES_KEY: bytes = bytes.fromhex("FD464D695E69A39A10E319A7ACE8B7FA")
 
 _resources_dir = Path(__file__).resolve().parent.parent / "resources"
-try:
-    _event_flags = _json.loads((_resources_dir / "event_flags.json").read_text())
-except (FileNotFoundError, OSError):
-    _event_flags = {"bosses": {}, "bonfires": {}}
+_JSONFallback = TypeVar("_JSONFallback")
+
+
+class BonfireFlag(TypedDict):
+    area: str
+    name: str
+    offset: int
+    bit: int
+
+
+def _load_resource_json(
+    name: str,
+    fallback: _JSONFallback,
+    *,
+    catch_decode_error: bool = True,
+) -> object | _JSONFallback:
+    try:
+        return _json.loads((_resources_dir / name).read_text(encoding="utf-8"))
+    except _json.JSONDecodeError:
+        if catch_decode_error:
+            return fallback
+        raise
+    except (FileNotFoundError, OSError):
+        return fallback
+
+
+def _bonfire_flag(item: object) -> BonfireFlag | None:
+    if not isinstance(item, dict):
+        return None
+    area = item.get("area")
+    name = item.get("name")
+    offset = item.get("offset")
+    bit = item.get("bit")
+    if isinstance(area, str) and isinstance(name, str) and isinstance(offset, int) and isinstance(bit, int):
+        return BonfireFlag(area=area, name=name, offset=offset, bit=bit)
+    return None
+
+
+def _bonfire_flags(items: list[object]) -> list[BonfireFlag]:
+    flags: list[BonfireFlag] = []
+    for item in items:
+        if flag := _bonfire_flag(item):
+            flags.append(flag)
+    return flags
+
+
+_event_flags = cast(
+    dict[str, dict[str, int]],
+    _load_resource_json("event_flags.json", {"bosses": {}}, catch_decode_error=False),
+)
+_bonfire_bit_flags_raw = cast(
+    list[object],
+    _load_resource_json("bonfire_flags.json", [], catch_decode_error=False),
+)
 BOSS_FLAGS: dict[str, int] = _event_flags["bosses"]
-BONFIRE_FLAGS: dict[str, int] = _event_flags["bonfires"]
+BONFIRE_SAVE_OFFSET_DELTA: int = 0x6F
+BONFIRE_BIT_FLAGS: list[BonfireFlag] = _bonfire_flags(_bonfire_bit_flags_raw)
 
 # Item name caches (lazy-loaded)
 _ITEM_NAMES: dict[int, str] = {}
@@ -88,8 +141,8 @@ STATS_SIZE: int = 0x1F0
 ITEMS_INVENTORY_COUNT_OFFSET: int = 0x128
 ITEMS_INVENTORY_OFFSET: int = 0x12C
 INVENTORY_CAPACITY: int = 0x780
-EVENT_FLAGS_VERIFIED: bool = False
-
+# Event flag offsets/values are community-derived from alfizari/Dark-Souls-3-Save-Editor-PS4-PC
+# and cross-checked against The Grand Archives / SoulsModding flag IDs.
 BOSS_EVENT_VALUES: dict[str, int] = {
     "Iudex Gundyr": 0xE0,
     "Vordt of the Boreal Valley": 0xC0,
@@ -123,6 +176,13 @@ class BossStatus(TypedDict):
     defeated: bool
     offset: int
 
+
+class BonfireStatus(TypedDict):
+    area: str
+    name: str
+    unlocked: bool
+    offset: int
+    bit: int
 
 class ProgressSummary(TypedDict):
     stats: StatBlock
@@ -306,11 +366,11 @@ def read_name(path: str | Path, slot: int = 0) -> str:
 # ---------------------------------------------------------------------------
 
 def _boss_flags_supported() -> bool:
-    return EVENT_FLAGS_VERIFIED and bool(BOSS_FLAGS) and all(name in BOSS_EVENT_VALUES for name in BOSS_FLAGS)
+    return bool(BOSS_FLAGS) and all(name in BOSS_EVENT_VALUES for name in BOSS_FLAGS)
 
 
 def _bonfire_flags_supported() -> bool:
-    return EVENT_FLAGS_VERIFIED and bool(BONFIRE_FLAGS)
+    return bool(BONFIRE_BIT_FLAGS)
 
 
 def _event_flags_supported() -> bool:
@@ -373,10 +433,44 @@ def read_bosses(path: str | Path, slot: int = 0) -> list[BossStatus]:
     return bosses
 
 
+def read_bonfire_statuses(path: str | Path, slot: int = 0) -> list[BonfireStatus]:
+    """Return exact source-backed bonfire flags from TGA bits mapped into DS30000 bytes."""
+    _, slots = read_save(path)
+    slot_data = slots[slot]
+    event_start = _event_flag_start(slot_data)
+    if event_start < 0:
+        return [
+            BonfireStatus(
+                area=item["area"],
+                name=item["name"],
+                unlocked=False,
+                offset=item["offset"],
+                bit=item["bit"],
+            )
+            for item in BONFIRE_BIT_FLAGS
+        ]
+    base = event_start - 0x12
+    bonfires: list[BonfireStatus] = []
+    for item in BONFIRE_BIT_FLAGS:
+        offset = item["offset"]
+        bit = item["bit"]
+        flag_offset = base + offset + BONFIRE_SAVE_OFFSET_DELTA
+        unlocked = 0 <= bit < 8 and 0 <= flag_offset < len(slot_data) and bool(slot_data[flag_offset] & (1 << bit))
+        bonfires.append(
+            BonfireStatus(
+                area=item["area"],
+                name=item["name"],
+                unlocked=unlocked,
+                offset=offset,
+                bit=bit,
+            )
+        )
+    return bonfires
+
+
 def read_bonfires(path: str | Path, slot: int = 0) -> dict[str, bool]:
-    """Return bonfire unlock status; exact bonfire value mapping is not verified yet."""
-    del path, slot
-    return {name: False for name in BONFIRE_FLAGS}
+    """Return exact source-backed bonfire unlock status keyed by area/name."""
+    return {f"{entry['area']} - {entry['name']}": entry["unlocked"] for entry in read_bonfire_statuses(path, slot)}
 
 
 def read_progress(path: str | Path, slot: int = 0) -> ProgressSummary:
@@ -395,10 +489,7 @@ def read_progress(path: str | Path, slot: int = 0) -> ProgressSummary:
 
 
 def _read_resource_json(name: str) -> dict[str, object]:
-    try:
-        data = _json.loads((_resources_dir / name).read_text(encoding="utf-8"))
-    except (FileNotFoundError, OSError, _json.JSONDecodeError):
-        return {}
+    data = _load_resource_json(name, {})
     if isinstance(data, dict):
         return data
     return {}
@@ -463,10 +554,20 @@ def read_area_checklists() -> dict[str, dict[str, list[str]]]:
 
 
 def read_current_area(path: str | Path, slot: int = 0) -> str:
-    """Infer current area only when event-backed bonfire parsing is verified."""
-    del path, slot
-    if not _event_flags_supported():
+    """Infer latest reached checklist area from exact save-backed bonfire flags."""
+    if not _bonfire_flags_supported():
         return ""
+    statuses = read_bonfire_statuses(path, slot)
+    unlocked_areas = {entry["area"] for entry in statuses if entry["unlocked"]}
+    if not unlocked_areas:
+        return ""
+    areas = _game_areas()
+    for area_name, area_data in reversed(list(areas.items())):
+        if isinstance(area_data, dict) and area_name in unlocked_areas:
+            return area_name
+    for entry in reversed(statuses):
+        if entry["unlocked"]:
+            return entry["area"]
     return ""
 
 
@@ -514,13 +615,9 @@ def _load_item_names() -> None:
     """
     if _ITEM_NAMES:
         return
-    rdir = Path(__file__).resolve().parent.parent / "resources"
 
     def _parse_json(fname: str) -> dict[int, str]:
-        try:
-            data = _json.loads((rdir / fname).read_text(encoding="utf-8"))
-        except (FileNotFoundError, OSError, _json.JSONDecodeError):
-            return {}
+        data = _load_resource_json(fname, {})
         if not isinstance(data, dict):
             return {}
         result: dict[int, str] = {}
@@ -788,12 +885,12 @@ def read_gestures(path: str | Path, slot: int = 0) -> dict[str, object]:
 
 __all__ = [
     "read_save", "read_stats", "read_name",
-    "read_bosses", "read_bonfires", "read_progress", "read_ng_plus",
+    "read_bosses", "read_bonfires", "read_bonfire_statuses", "read_progress", "read_ng_plus",
     "read_completion_checklist", "read_area_checklists",
     "read_current_area", "read_missed",
     "read_inventory", "owned_item_names", "read_completion_status", "read_gestures",
-    "StatBlock", "SlotEntry", "BossStatus", "ProgressSummary",
+    "StatBlock", "SlotEntry", "BossStatus", "BonfireStatus", "ProgressSummary",
     "ItemEntry", "InventoryResult", "MissedSummary", "MissedKeyItem",
     "CLASS_NAMES", "AES_KEY", "SAVE_PATH_DEFAULT",
-    "BOSS_FLAGS", "BONFIRE_FLAGS",
+    "BOSS_FLAGS",
 ]

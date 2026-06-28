@@ -16,8 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 CACHE_TTL_HOURS = 24
-DATA_SOURCE = "Embedded spoiler-safe constants plus source registry/cache for live verification."
-UPDATED = "2026-06-24"
+DATA_SOURCE = "Embedded source-ranked constants plus source registry/cache for live verification."
+UPDATED = "2026-06-28"
 CACHE_ENV = "DS3_CACHE_DIR"
 CACHE_DIR = Path(os.environ.get(CACHE_ENV, "~/.cache/darksouls3-companion")).expanduser()
 
@@ -46,6 +46,10 @@ SOURCES: dict[str, SourceRecord] = {
     "cheat-sheet": SourceRecord("https://zkjellberg.github.io/dark-souls-3-cheat-sheet", "MIT", "Interactive checklist for rings, spells, gestures, and items."),
     "pcgamingwiki": SourceRecord("https://www.pcgamingwiki.com/wiki/Dark_Souls_III", "CC BY-NC-SA", "Technical fixes: FPS unlock, stutter fix, crash fixes, modding tools."),
     "soulsmods": SourceRecord("https://github.com/soulsmods", "MIT/GPL", "DSMapStudio, SoulsFormats, UXM, WitchyBND — modding toolchain."),
+    "alfizari-save-editor": SourceRecord("https://github.com/alfizari/Dark-Souls-3-Save-Editor-PS4-PC", "MIT", "Primary embedded provenance for DS30000 save layout, boss bytes, and historical event-layout cross-checks."),
+    "tga-ct": SourceRecord("https://github.com/The-Grand-Archives/Dark-Souls-III-CT-TGA", "No license observed", "Reference-only cross-check for runtime event flags and tracked per-bonfire SprjEventFlagMan bits.", machine=False, risk="Do not bulk-copy; reference/cross-check only."),
+    "paramdex-bonfire": SourceRecord("https://raw.githubusercontent.com/soulsmods/Paramdex/master/DS3/Defs/BONFIRE_WARP_PARAM_ST.xml", "License unclear", "Schema-only reference for DS3 bonfire warp PARAM field names.", machine=False, risk="Schema source, not save-byte or row-data source."),
+    "soulsmodding-flags": SourceRecord("https://soulsmodding.com/doku.php?id=ds3-refmat:event-flag-list", "Community wiki; license not verified", "Event flag ID semantics cross-check.", machine=False, risk="Event IDs are not DS30000 save-byte offsets."),
     "modengine1": SourceRecord("https://github.com/katalash/ModEngine", "No license observed", "Mod Engine 1 source (dinput8 passive proxy)."),
     "me3": SourceRecord("https://github.com/garyttierney/me3", "No license observed", "Mod Engine 3 source (injection-based launcher)."),
 }
@@ -69,8 +73,8 @@ def cache_put(key: str, content: str, meta: dict | None = None) -> None:
     p = cache_dir() / f"{key}.json"
     p.write_text(json.dumps({"ts": time.time(), "content": content, "meta": meta or {}}))
 
-def fetch_cached(key: str, url: str) -> str:
-    cached = cache_get(key)
+def fetch_cached(key: str, url: str, *, force: bool = False) -> str:
+    cached = None if force else cache_get(key)
     if cached:
         return cached
     req = urllib.request.Request(url, headers={"User-Agent": "ds3-companion/1.0"})

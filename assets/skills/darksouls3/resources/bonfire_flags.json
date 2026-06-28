@@ -1,0 +1,374 @@
+[
+  {
+    "area": "Cemetery of Ash",
+    "name": "Cemetery of Ash",
+    "offset": 23043,
+    "bit": 6
+  },
+  {
+    "area": "Cemetery of Ash",
+    "name": "Iudex Gundyr",
+    "offset": 23043,
+    "bit": 5
+  },
+  {
+    "area": "Cemetery of Ash",
+    "name": "Firelink Shrine",
+    "offset": 23043,
+    "bit": 7
+  },
+  {
+    "area": "Cemetery of Ash",
+    "name": "Untended Graves",
+    "offset": 23043,
+    "bit": 4
+  },
+  {
+    "area": "Cemetery of Ash",
+    "name": "Champion Gundyr",
+    "offset": 23043,
+    "bit": 3
+  },
+  {
+    "area": "High Wall of Lothric",
+    "name": "High Wall of Lothric",
+    "offset": 3842,
+    "bit": 6
+  },
+  {
+    "area": "High Wall of Lothric",
+    "name": "Tower on the Wall",
+    "offset": 3843,
+    "bit": 2
+  },
+  {
+    "area": "High Wall of Lothric",
+    "name": "Vordt of the Boreal Valley",
+    "offset": 3843,
+    "bit": 5
+  },
+  {
+    "area": "High Wall of Lothric",
+    "name": "Dancer of the Boreal Valley",
+    "offset": 3843,
+    "bit": 3
+  },
+  {
+    "area": "High Wall of Lothric",
+    "name": "Oceiros, the Consumed King",
+    "offset": 3843,
+    "bit": 6
+  },
+  {
+    "area": "Undead Settlement",
+    "name": "Foot of the High Wall",
+    "offset": 6403,
+    "bit": 3
+  },
+  {
+    "area": "Undead Settlement",
+    "name": "Undead Settlement",
+    "offset": 6403,
+    "bit": 7
+  },
+  {
+    "area": "Undead Settlement",
+    "name": "Dilapidated Bridge",
+    "offset": 6403,
+    "bit": 4
+  },
+  {
+    "area": "Undead Settlement",
+    "name": "Cliff Underside",
+    "offset": 6403,
+    "bit": 5
+  },
+  {
+    "area": "Road of Sacrifices",
+    "name": "Road of Sacrifices",
+    "offset": 11523,
+    "bit": 1
+  },
+  {
+    "area": "Road of Sacrifices",
+    "name": "Halfway Fortress",
+    "offset": 11523,
+    "bit": 7
+  },
+  {
+    "area": "Road of Sacrifices",
+    "name": "Crucifixion Woods",
+    "offset": 11523,
+    "bit": 0
+  },
+  {
+    "area": "Road of Sacrifices",
+    "name": "Farron Keep",
+    "offset": 11523,
+    "bit": 4
+  },
+  {
+    "area": "Road of Sacrifices",
+    "name": "Keep Ruins",
+    "offset": 11523,
+    "bit": 3
+  },
+  {
+    "area": "Road of Sacrifices",
+    "name": "Old Wolf of Farron",
+    "offset": 11523,
+    "bit": 2
+  },
+  {
+    "area": "Cathedral of the Deep",
+    "name": "Cathedral of the Deep",
+    "offset": 15363,
+    "bit": 4
+  },
+  {
+    "area": "Cathedral of the Deep",
+    "name": "Cleansing Chapel",
+    "offset": 15363,
+    "bit": 7
+  },
+  {
+    "area": "Cathedral of the Deep",
+    "name": "Rosaria's Bed Chamber",
+    "offset": 15363,
+    "bit": 5
+  },
+  {
+    "area": "Catacombs of Carthus",
+    "name": "Catacombs of Carthus",
+    "offset": 20483,
+    "bit": 1
+  },
+  {
+    "area": "Catacombs of Carthus",
+    "name": "Abandoned Tomb",
+    "offset": 20483,
+    "bit": 6
+  },
+  {
+    "area": "Catacombs of Carthus",
+    "name": "Demon Ruins",
+    "offset": 20483,
+    "bit": 4
+  },
+  {
+    "area": "Catacombs of Carthus",
+    "name": "Old King's Antechamber",
+    "offset": 20483,
+    "bit": 5
+  },
+  {
+    "area": "Irithyll of the Boreal Valley",
+    "name": "Irithyll of the Boreal Valley",
+    "offset": 19203,
+    "bit": 0
+  },
+  {
+    "area": "Irithyll of the Boreal Valley",
+    "name": "Central Irithyll",
+    "offset": 19203,
+    "bit": 3
+  },
+  {
+    "area": "Irithyll of the Boreal Valley",
+    "name": "Church of Yorshka",
+    "offset": 19203,
+    "bit": 7
+  },
+  {
+    "area": "Irithyll of the Boreal Valley",
+    "name": "Distant Manor",
+    "offset": 19203,
+    "bit": 2
+  },
+  {
+    "area": "Irithyll of the Boreal Valley",
+    "name": "Water Reserve",
+    "offset": 19203,
+    "bit": 1
+  },
+  {
+    "area": "Irithyll of the Boreal Valley",
+    "name": "Anor Londo",
+    "offset": 19203,
+    "bit": 4
+  },
+  {
+    "area": "Irithyll of the Boreal Valley",
+    "name": "Prison Tower",
+    "offset": 19202,
+    "bit": 7
+  },
+  {
+    "area": "Irithyll Dungeon",
+    "name": "Irithyll Dungeon",
+    "offset": 21763,
+    "bit": 7
+  },
+  {
+    "area": "Irithyll Dungeon",
+    "name": "Profaned Capital",
+    "offset": 21763,
+    "bit": 5
+  },
+  {
+    "area": "Archdragon Peak",
+    "name": "Archdragon Peak",
+    "offset": 8963,
+    "bit": 7
+  },
+  {
+    "area": "Archdragon Peak",
+    "name": "Dragon-Kin Mausoleum",
+    "offset": 8963,
+    "bit": 4
+  },
+  {
+    "area": "Archdragon Peak",
+    "name": "Great Belfry",
+    "offset": 8963,
+    "bit": 5
+  },
+  {
+    "area": "Lothric Castle",
+    "name": "Lothric Castle",
+    "offset": 5123,
+    "bit": 7
+  },
+  {
+    "area": "Lothric Castle",
+    "name": "Dragon Barracks",
+    "offset": 5123,
+    "bit": 5
+  },
+  {
+    "area": "Lothric Castle",
+    "name": "Grand Archives",
+    "offset": 14083,
+    "bit": 6
+  },
+  {
+    "area": "Kiln of the First Flame",
+    "name": "Flameless Shrine",
+    "offset": 24323,
+    "bit": 7
+  },
+  {
+    "area": "Kiln of the First Flame",
+    "name": "Kiln of the First Flame",
+    "offset": 24323,
+    "bit": 6
+  },
+  {
+    "area": "Painted World of Ariandel (DLC)",
+    "name": "Snowfield",
+    "offset": 25603,
+    "bit": 6
+  },
+  {
+    "area": "Painted World of Ariandel (DLC)",
+    "name": "Rope Bridge Cave",
+    "offset": 25603,
+    "bit": 5
+  },
+  {
+    "area": "Painted World of Ariandel (DLC)",
+    "name": "Ariandel Chapel",
+    "offset": 25603,
+    "bit": 2
+  },
+  {
+    "area": "Painted World of Ariandel (DLC)",
+    "name": "Corvian Settlement",
+    "offset": 25603,
+    "bit": 4
+  },
+  {
+    "area": "Painted World of Ariandel (DLC)",
+    "name": "Snowy Mountain Pass",
+    "offset": 25603,
+    "bit": 3
+  },
+  {
+    "area": "Painted World of Ariandel (DLC)",
+    "name": "Depths of the Painting",
+    "offset": 25603,
+    "bit": 0
+  },
+  {
+    "area": "The Dreg Heap",
+    "name": "The Dreg Heap",
+    "offset": 29443,
+    "bit": 6
+  },
+  {
+    "area": "The Dreg Heap",
+    "name": "Earthen Peak Ruins",
+    "offset": 29443,
+    "bit": 5
+  },
+  {
+    "area": "The Dreg Heap",
+    "name": "Within the Earthen Peak Ruins",
+    "offset": 29443,
+    "bit": 4
+  },
+  {
+    "area": "The Dreg Heap",
+    "name": "The Demon Prince",
+    "offset": 29443,
+    "bit": 7
+  },
+  {
+    "area": "The Ringed City (DLC)",
+    "name": "Mausoleum Lookout",
+    "offset": 30723,
+    "bit": 5
+  },
+  {
+    "area": "The Ringed City (DLC)",
+    "name": "Ringed Inner Wall",
+    "offset": 30723,
+    "bit": 4
+  },
+  {
+    "area": "The Ringed City (DLC)",
+    "name": "Ringed City Streets",
+    "offset": 30723,
+    "bit": 3
+  },
+  {
+    "area": "The Ringed City (DLC)",
+    "name": "Shared Grave",
+    "offset": 30723,
+    "bit": 2
+  },
+  {
+    "area": "The Ringed City (DLC)",
+    "name": "Church of Filianore",
+    "offset": 30723,
+    "bit": 7
+  },
+  {
+    "area": "The Ringed City (DLC)",
+    "name": "Darkeater Midir",
+    "offset": 30723,
+    "bit": 6
+  },
+  {
+    "area": "The Ringed City (DLC)",
+    "name": "Filianore's Rest",
+    "offset": 32003,
+    "bit": 6
+  },
+  {
+    "area": "The Ringed City (DLC)",
+    "name": "Slave Knight Gael",
+    "offset": 32003,
+    "bit": 7
+  }
+]

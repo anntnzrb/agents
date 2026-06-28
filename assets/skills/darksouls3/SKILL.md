@@ -61,7 +61,7 @@ name          character name only
 level         soul level and held souls
 covenants     nonzero covenant rank/point fields
 bosses        save-backed boss defeated/remaining list from known event flags
-bonfires      save-backed unlocked/locked bonfire list from known event flags
+bonfires      save-backed tracked per-bonfire unlock list from known TGA event bits mapped into DS30000 bytes
 progress      compact progress dashboard
 inventory     resolved weapons/armor/rings/goods from save inventory; conservative name matching
 owned         sorted owned item names from resolved inventory
@@ -75,8 +75,8 @@ gestures      static gesture checklist only; save-backed gesture offsets are una
 Truthfulness rules for save output:
 
 - Save reading is read-only. Never mutate `.sl2`.
-- Bosses/bonfires are save-backed only for event flags in `resources/event_flags.json`.
-- Rings, sorceries, pyromancies, miracles, and weapon reinforcement can be completion-counted from save-backed data when resolved.
+- Bosses are save-backed by known event flag bytes in `resources/event_flags.json`; tracked bonfires are save-backed by `resources/bonfire_flags.json` entries derived from TGA `SprjEventFlagMan` bit offsets and validated against the current DS30000 layout.
+- Rings, sorceries, pyromancies, and miracles can be completion-counted from save-backed inventory data when resolved; max weapon reinforcement is observable, but reinforcement achievement completion remains static/unsupported.
 - Gestures and infusions are not save-backed right now; they are static checklist entries only.
 - `missed` must not claim an area is clear if no area checklist exists. Treat "Area checklist: not available" as unknown, not complete.
 - Inventory name resolution is conservative. Unknown or unresolved raw IDs should not be claimed as owned collectibles.
@@ -239,6 +239,7 @@ Canonical files:
 ```text
 darksouls3/
   SKILL.md
+  REFERENCES.md
   scripts/
     cli.py
     ds3_core.py
@@ -249,7 +250,7 @@ darksouls3/
     achievement_checklist.json
     area_checklists.json
     armor.json
-    bonfires.json
+    bonfire_flags.json
     bosses.json
     completion_categories.json
     event_flags.json
@@ -261,19 +262,20 @@ darksouls3/
 
 Resource roles:
 
-- `event_flags.json`: known save event flag offsets for bosses and bonfires.
+- `event_flags.json`: known save event flag offsets for bosses.
+- `bonfire_flags.json`: tracked per-bonfire TGA `SprjEventFlagMan` byte offsets + bit positions for read-only DS30000 status checks.
 - `achievement_checklist.json`: rings, spells, gestures, infusions, reinforcement checklist.
 - `completion_categories.json`: maps checklist categories to save-backed/static support.
 - `area_checklists.json`: area-specific bosses/key items/NPCs/shards where known.
-- `game_data.json`: broad area graph, Estus/Bone totals, base static route data.
-- `weapons.json`, `armor.json`, `rings.json`, `goods_magic.json`: item-name maps for inventory and ownership resolution.
-- `bosses.json`, `bonfires.json`: metadata catalogs.
+- `weapons.json`, `armor.json`, `rings.json`, `goods_magic.json`: conservative item-name maps for inventory resolution; not authoritative gameplay stat tables.
 
 Do not reintroduce legacy names like `Bosses.json`, `bonfire.json`, `ring.json`, or `goods_magic_bulk.json`.
 
+Source and license ranking lives in `REFERENCES.md`. Use it before replacing embedded resource data.
+
 ## Source registry and cache
 
-The CLI has 16 registered sources. Address them by key with `sources refresh <key>`:
+The CLI has 20 registered sources. Address them by key with `sources refresh <key>`:
 
 ```text
 fextralife-stats      https://darksouls3.wiki.fextralife.com/Stats
@@ -290,6 +292,10 @@ soulsplanner          https://soulsplanner.com/darksouls3
 cheat-sheet           https://zkjellberg.github.io/dark-souls-3-cheat-sheet
 pcgamingwiki          https://www.pcgamingwiki.com/wiki/Dark_Souls_III
 soulsmods             https://github.com/soulsmods
+alfizari-save-editor https://github.com/alfizari/Dark-Souls-3-Save-Editor-PS4-PC
+tga-ct               https://github.com/The-Grand-Archives/Dark-Souls-III-CT-TGA
+paramdex-bonfire     https://raw.githubusercontent.com/soulsmods/Paramdex/master/DS3/Defs/BONFIRE_WARP_PARAM_ST.xml
+soulsmodding-flags   https://soulsmodding.com/doku.php?id=ds3-refmat:event-flag-list
 modengine1            https://github.com/katalash/ModEngine
 me3                   https://github.com/garyttierney/me3
 ```
@@ -314,7 +320,7 @@ Override with:
 DS3_CACHE_DIR=<path>
 ```
 
-Cache entries are JSON with fetch timestamp `ts`, raw `content`, and `meta` containing `url` and `sha256`. Staleness is evaluated against a 24-hour TTL. License strings are in the in-memory source registry/list output, not guaranteed in cache files. Runtime remains stateless with respect to playthrough progress.
+Cache entries are JSON with fetch timestamp `ts`, raw `content`, and `meta` containing `url` and `sha256`. Staleness is evaluated against a 24-hour TTL. License strings are in the in-memory source registry/list output and the source-use hierarchy is documented in `REFERENCES.md`; cache files are transport artifacts, not provenance records. Runtime remains stateless with respect to playthrough progress.
 
 ## Live research fallback
 

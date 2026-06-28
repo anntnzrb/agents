@@ -88,6 +88,52 @@
         "Cathedral of the Deep",
         "Catacombs of Carthus"
       ]
+    },
+    "Cathedral of the Deep": {
+      "estus_shards": [
+        1
+      ],
+      "bone_shards": [
+        1
+      ],
+      "key_items": [
+        "Paladin's Ashes",
+        "Deep Braille Divine Tome",
+        "Rosaria's Fingers covenant",
+        "Red Sign Soapstone"
+      ],
+      "bosses": [
+        "Deacons of the Deep"
+      ],
+      "npcs": [
+        "Rosaria",
+        "Patches",
+        "Siegward"
+      ],
+      "bonfire": "Cathedral of the Deep",
+      "previous": "Road of Sacrifices",
+      "next": "Catacombs of Carthus"
+    },
+    "Catacombs of Carthus": {
+      "estus_shards": [],
+      "bone_shards": [
+        1
+      ],
+      "key_items": [
+        "Carthus Pyromancy Tome",
+        "Grave Warden's Ashes",
+        "Grave Warden Pyromancy Tome"
+      ],
+      "bosses": [
+        "High Lord Wolnir"
+      ],
+      "npcs": [
+        "Anri",
+        "Horace"
+      ],
+      "bonfire": "Catacombs of Carthus",
+      "previous": "Road of Sacrifices",
+      "next": "Irithyll of the Boreal Valley"
     }
   },
   "total_estus_shards": 11,

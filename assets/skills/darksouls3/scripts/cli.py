@@ -429,6 +429,11 @@ def cmd_audit(args) -> None:
         issues.append(f"INFUSIONS: expected 15, got {len(INFUSIONS)}")
     if len(COVENANTS) != 9:
         issues.append(f"COVENANTS: expected 9, got {len(COVENANTS)}")
+    expected_spells = {"sorceries": 34, "miracles": 35, "pyromancies": 27}
+    for cat, expected in expected_spells.items():
+        actual = len(SPELLS.get(cat, []))
+        if actual != expected:
+            issues.append(f"SPELLS {cat}: expected {expected}, got {actual}")
     if issues:
         for i in issues:
             print(f"  FAIL: {i}")
@@ -437,11 +442,6 @@ def cmd_audit(args) -> None:
     print(f"  Sources: {len(SOURCES)} registered")
     print(f"  Builds: {len(BUILDS)} archetypes")
     print(f"  Starter weapons: {len(STARTER_WEAPONS)}")
-    expected_spells = {"sorceries": 34, "miracles": 35, "pyromancies": 27}
-    for cat, expected in expected_spells.items():
-        actual = len(SPELLS.get(cat, []))
-        if actual != expected:
-            issues.append(f"SPELLS {cat}: expected {expected}, got {actual}")
     print(f"  Spells: {sum(len(v) for v in SPELLS.values())} total "
           f"({len(SPELLS['sorceries'])} sorceries, {len(SPELLS['miracles'])} miracles, "
           f"{len(SPELLS['pyromancies'])} pyromancies)")
@@ -460,9 +460,15 @@ def cmd_sources(args) -> None:
         print(f"  Directory: {cdir}")
         print(f"  Cached files: {len(files)}")
         for f in files:
-            data = json.loads(f.read_text())
-            age_h = (time.time() - data["ts"]) / 3600
-            print(f"  {f.stem}: {age_h:.1f}h old ({'stale' if age_h > CACHE_TTL_HOURS else 'fresh'})")
+            try:
+                data = json.loads(f.read_text())
+                ts = data.get("ts")
+                if not isinstance(ts, (int, float)):
+                    raise ValueError("missing numeric ts")
+                age_h = (time.time() - ts) / 3600
+                print(f"  {f.stem}: {age_h:.1f}h old ({'stale' if age_h > CACHE_TTL_HOURS else 'fresh'})")
+            except (json.JSONDecodeError, OSError, ValueError) as exc:
+                print(f"  {f.stem}: invalid cache entry ({exc})")
     elif action == "refresh":
         keys = args.keys or list(SOURCES.keys())
         for key in keys:
@@ -470,7 +476,7 @@ def cmd_sources(args) -> None:
                 print(f"  Unknown source: {key}")
                 continue
             try:
-                content = fetch_cached(key, SOURCES[key].url)
+                content = fetch_cached(key, SOURCES[key].url, force=args.force)
                 print(f"  Refreshed: {key} ({len(content)} bytes)")
             except Exception as e:
                 print(f"  Failed: {key} — {e}")
@@ -548,19 +554,6 @@ def _find_save_path() -> str | None:
                 return str(sl2)
     return None
 
-def _load_game_data() -> dict:
-    resources = Path(__file__).resolve().parent.parent / "resources"
-    return json.loads((resources / "game_data.json").read_text())
-
-
-def _current_area(save_path: str, game_data: dict) -> str:
-    bonfires = read_bonfires(save_path)
-    unlocked = {name for name, is_unlocked in bonfires.items() if is_unlocked}
-    areas = game_data.get("areas", {})
-    for area_name, area_data in reversed(list(areas.items())):
-        if area_data.get("bonfire") in unlocked:
-            return area_name
-    return next(iter(areas), "Cemetery of Ash")
 
 
 def _status_counts(value: object) -> tuple[int | None, int | None]:
@@ -711,10 +704,10 @@ def _tracked_boss_names() -> list[str]:
 
 def _tracked_bonfire_names() -> list[str]:
     try:
-        from ds3_save import BONFIRE_FLAGS
+        from ds3_save import BONFIRE_BIT_FLAGS
     except ImportError:
         return []
-    return sorted(str(name) for name in BONFIRE_FLAGS)
+    return sorted(f"{item['area']} - {item['name']}" for item in BONFIRE_BIT_FLAGS)
 
 
 def _print_unsupported_event_flags(kind: str, names: list[str]) -> None:
@@ -749,7 +742,7 @@ def _print_save_overview(save_path: str, stats: dict, *, include_stats: bool) ->
     if bonfire_flags_supported:
         bonfires = read_bonfires(save_path)
         unlocked = sum(1 for unlocked_flag in bonfires.values() if unlocked_flag)
-        print(f"  Bonfires: {unlocked}/{len(bonfires)} unlocked")
+        print(f"  Tracked bonfires: {unlocked}/{len(bonfires)} unlocked")
     else:
         print("  Bonfires: unsupported (event flag region not verified)")
     print(f"  Embered: {'Yes' if stats['embered'] else 'No'}")
@@ -837,7 +830,7 @@ def _print_save_achievements(save_path: str) -> None:
     if _bonfire_flags_supported(save_path):
         bonfires = read_bonfires(save_path)
         unlocked = [name for name, is_unlocked in bonfires.items() if is_unlocked]
-        print(f"  Bonfires: {len(unlocked)}/{len(bonfires)} unlocked")
+        print(f"  Tracked bonfires: {len(unlocked)}/{len(bonfires)} unlocked")
         print("    " + ", ".join(sorted(unlocked)[:8]) if unlocked else "    None recorded yet")
     else:
         print("  Bonfires: unsupported (event flag region not verified)")
@@ -923,19 +916,19 @@ def cmd_save(args) -> None:
         return
 
     if action == "bonfires":
-        print("=== BONFIRES ===")
+        print("=== TRACKED BONFIRES ===")
         if not _bonfire_flags_supported(save_path):
-            _print_unsupported_event_flags("Bonfires", _tracked_bonfire_names())
+            _print_unsupported_event_flags("Tracked bonfires", _tracked_bonfire_names())
             return
         bonfires = read_bonfires(save_path)
         unlocked = {n for n, u in bonfires.items() if u}
         locked = {n for n, u in bonfires.items() if not u}
         if unlocked:
-            print(f"  Unlocked ({len(unlocked)}/{len(bonfires)}):")
+            print(f"  Unlocked ({len(unlocked)}/{len(bonfires)} tracked):")
             for n in sorted(unlocked):
                 print(f"    + {n}")
         if locked:
-            print(f"  Locked ({len(locked)}/{len(bonfires)}):")
+            print(f"  Locked ({len(locked)}/{len(bonfires)} tracked):")
             for n in sorted(locked):
                 print(f"    - {n}")
         return
