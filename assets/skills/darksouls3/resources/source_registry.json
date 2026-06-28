@@ -1,0 +1,406 @@
+{
+  "version": 1,
+  "entries": {
+    "fextralife-stats": {
+      "name": "Fextralife Stats",
+      "url": "https://darksouls3.wiki.fextralife.com/Stats",
+      "license": "CC BY-NC-SA",
+      "source_type": "wiki",
+      "allowed_use": [
+        "live cited stat/mechanics prose",
+        "softcap and derived-stat cross-checks"
+      ],
+      "not_allowed_for": [
+        "DS30000 save offsets",
+        "bulk embedded wiki text"
+      ],
+      "risk": "Spoiler-heavy wiki; summarize and cite live URLs for user-facing claims.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "fextralife-classes": {
+      "name": "Fextralife Classes",
+      "url": "https://darksouls3.wiki.fextralife.com/Classes",
+      "license": "CC BY-NC-SA",
+      "source_type": "wiki",
+      "allowed_use": [
+        "live cited starting-class table checks"
+      ],
+      "not_allowed_for": [
+        "default-build prescriptions",
+        "bulk embedded class prose"
+      ],
+      "risk": "Class pages can bias new-player advice; keep recommendations class-agnostic unless user chooses one.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "fextralife-weapons": {
+      "name": "Fextralife Weapons",
+      "url": "https://darksouls3.wiki.fextralife.com/Weapons",
+      "license": "CC BY-NC-SA",
+      "source_type": "wiki",
+      "allowed_use": [
+        "live cited weapon location/category checks"
+      ],
+      "not_allowed_for": [
+        "bulk weapon table imports",
+        "save inventory ID truth"
+      ],
+      "risk": "Late/DLC weapon names are spoilers.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "fextralife-infusions": {
+      "name": "Fextralife Infusion",
+      "url": "https://darksouls3.wiki.fextralife.com/Infusion",
+      "license": "CC BY-NC-SA",
+      "source_type": "wiki",
+      "allowed_use": [
+        "live cited infusion mechanics and coal requirement checks"
+      ],
+      "not_allowed_for": [
+        "save-backed infusion ownership claims",
+        "bulk copied pages"
+      ],
+      "risk": "Coal/location details can reveal future areas.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "fextralife-upgrades": {
+      "name": "Fextralife Upgrades",
+      "url": "https://darksouls3.wiki.fextralife.com/Upgrades",
+      "license": "CC BY-NC-SA",
+      "source_type": "wiki",
+      "allowed_use": [
+        "live cited upgrade-material costs and farming prose"
+      ],
+      "not_allowed_for": [
+        "bulk embedded route/location text"
+      ],
+      "risk": "Exact farming routes need spoiler permission/current-area filtering.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "fextralife-covenants": {
+      "name": "Fextralife Covenants",
+      "url": "https://darksouls3.wiki.fextralife.com/Covenants",
+      "license": "CC BY-NC-SA",
+      "source_type": "wiki",
+      "allowed_use": [
+        "live cited covenant mechanics and rank rewards"
+      ],
+      "not_allowed_for": [
+        "save-backed covenant quest state",
+        "bulk questline text"
+      ],
+      "risk": "Join methods and ranks can reveal NPC/area spoilers.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "fextralife-areas": {
+      "name": "Fextralife Areas",
+      "url": "https://darksouls3.wiki.fextralife.com/Areas",
+      "license": "CC BY-NC-SA",
+      "source_type": "wiki",
+      "allowed_use": [
+        "live cited area names/boss lists when spoilers permitted"
+      ],
+      "not_allowed_for": [
+        "canonical embedded progression state",
+        "save-backed boss/bonfire truth"
+      ],
+      "risk": "Spoiler-heavy.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "fextralife-progress": {
+      "name": "Fextralife Game Progress Route",
+      "url": "https://darksouls3.wiki.fextralife.com/Game+Progress+Route",
+      "license": "CC BY-NC-SA",
+      "source_type": "wiki",
+      "allowed_use": [
+        "live cited route comparison after spoiler permission"
+      ],
+      "not_allowed_for": [
+        "bundled walkthrough imports",
+        "save-backed route completion claims"
+      ],
+      "risk": "Full route and NPC quest spoilers.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "wikidot-stats": {
+      "name": "Wikidot Stats",
+      "url": "https://darksouls3.wikidot.com/stats",
+      "license": "CC BY-SA 3.0",
+      "source_type": "wiki",
+      "allowed_use": [
+        "secondary stat/mechanics cross-checks"
+      ],
+      "not_allowed_for": [
+        "DS30000 save offsets",
+        "bulk save/progress data"
+      ],
+      "risk": "Secondary source; prefer deterministic CLI for stable formulas.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "mugenmonkey": {
+      "name": "MugenMonkey Dark Souls 3",
+      "url": "https://mugenmonkey.com/darksouls3",
+      "license": "No license observed",
+      "source_type": "calculator",
+      "allowed_use": [
+        "manual AR/build sanity checks only"
+      ],
+      "not_allowed_for": [
+        "copied formulas or datasets",
+        "canonical embedded source"
+      ],
+      "risk": "No observed license; reference only.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "soulsplanner": {
+      "name": "SoulsPlanner Dark Souls 3",
+      "url": "https://soulsplanner.com/darksouls3",
+      "license": "No license observed",
+      "source_type": "calculator",
+      "allowed_use": [
+        "manual stat/build sanity checks only"
+      ],
+      "not_allowed_for": [
+        "copied formulas or datasets",
+        "canonical embedded source"
+      ],
+      "risk": "No observed license; reference only.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "cheat-sheet": {
+      "name": "Dark Souls 3 Cheat Sheet",
+      "url": "https://zkjellberg.github.io/dark-souls-3-cheat-sheet",
+      "license": "MIT",
+      "source_type": "checklist",
+      "allowed_use": [
+        "checklist/platinum cross-checks when transformed and attributed"
+      ],
+      "not_allowed_for": [
+        "save-backed ownership/progress without parser support"
+      ],
+      "risk": "Checklist completion is not save state.",
+      "machine_readable": true,
+      "copyable": true
+    },
+    "pcgamingwiki": {
+      "name": "PCGamingWiki Dark Souls III",
+      "url": "https://www.pcgamingwiki.com/wiki/Dark_Souls_III",
+      "license": "CC BY-NC-SA",
+      "source_type": "compatibility-wiki",
+      "allowed_use": [
+        "live cited PC fixes and compatibility context"
+      ],
+      "not_allowed_for": [
+        "gameplay/save/event facts",
+        "bulk embedded compatibility prose"
+      ],
+      "risk": "Currentness matters; live-check before version/tool claims.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "soulsmods": {
+      "name": "SoulsMods GitHub Organization",
+      "url": "https://github.com/soulsmods",
+      "license": "varies by repository",
+      "source_type": "modding-toolchain",
+      "allowed_use": [
+        "toolchain discovery and schema/source pointers"
+      ],
+      "not_allowed_for": [
+        "DS30000 save offsets without parser-specific validation"
+      ],
+      "risk": "Repository licenses vary; inspect file-level license before embedding.",
+      "machine_readable": true,
+      "copyable": false
+    },
+    "alfizari-save-editor": {
+      "name": "Dark Souls 3 Save Editor PS4/PC",
+      "url": "https://github.com/alfizari/Dark-Souls-3-Save-Editor-PS4-PC",
+      "license": "MIT",
+      "source_type": "save-tool",
+      "allowed_use": [
+        "DS30000 save layout constants",
+        "boss event-byte offsets",
+        "read-only parser cross-checks"
+      ],
+      "not_allowed_for": [
+        "save mutation UX",
+        "unsafe editing behavior",
+        "online cheat guidance"
+      ],
+      "risk": "Use only source facts needed for read-only parsing; never recommend mutation.",
+      "machine_readable": true,
+      "copyable": true
+    },
+    "tga-ct": {
+      "name": "The Grand Archives DS3 Cheat Table",
+      "url": "https://github.com/The-Grand-Archives/Dark-Souls-III-CT-TGA",
+      "license": "No license observed",
+      "source_type": "reverse-engineering-reference",
+      "allowed_use": [
+        "reference-only SprjEventFlagMan/event-flag cross-checks"
+      ],
+      "not_allowed_for": [
+        "bulk copying",
+        "online cheat guidance",
+        "sole source for save-backed DS30000 claims"
+      ],
+      "risk": "Runtime event flags are not automatically DS30000 save-byte offsets.",
+      "machine_readable": true,
+      "copyable": false
+    },
+    "paramdex-bonfire": {
+      "name": "SoulsMods Paramdex BONFIRE_WARP_PARAM_ST",
+      "url": "https://raw.githubusercontent.com/soulsmods/Paramdex/master/DS3/Defs/BONFIRE_WARP_PARAM_ST.xml",
+      "license": "License unclear",
+      "source_type": "schema-reference",
+      "allowed_use": [
+        "bonfire PARAM field-name semantics"
+      ],
+      "not_allowed_for": [
+        "save offsets",
+        "copied row data without license confirmation"
+      ],
+      "risk": "Schema names are not save-byte state.",
+      "machine_readable": true,
+      "copyable": false
+    },
+    "soulsmodding-flags": {
+      "name": "SoulsModding DS3 Event Flag List",
+      "url": "https://soulsmodding.com/doku.php?id=ds3-refmat:event-flag-list",
+      "license": "Community wiki; license not verified",
+      "source_type": "community-reference",
+      "allowed_use": [
+        "event flag semantic cross-checks"
+      ],
+      "not_allowed_for": [
+        "DS30000 save-byte offsets",
+        "bulk embedded flag tables"
+      ],
+      "risk": "Event IDs are semantics, not direct save offsets.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "modengine1": {
+      "name": "Mod Engine 1",
+      "url": "https://github.com/katalash/ModEngine",
+      "license": "No license observed",
+      "source_type": "mod-tool",
+      "allowed_use": [
+        "live/current mod-loader behavior reference"
+      ],
+      "not_allowed_for": [
+        "copied code",
+        "unsupported compatibility promises"
+      ],
+      "risk": "Current compatibility must be live-checked.",
+      "machine_readable": true,
+      "copyable": false
+    },
+    "me3": {
+      "name": "Mod Engine 3",
+      "url": "https://github.com/garyttierney/me3",
+      "license": "No license observed",
+      "source_type": "mod-tool",
+      "allowed_use": [
+        "live/current external launcher behavior reference"
+      ],
+      "not_allowed_for": [
+        "copied code",
+        "unsupported compatibility promises"
+      ],
+      "risk": "Current compatibility must be live-checked.",
+      "machine_readable": true,
+      "copyable": false
+    },
+    "ds3-save-inspector": {
+      "name": "DS3 Save Inspector",
+      "url": "https://github.com/Sh4dowking/DS3-Save-Inspector",
+      "license": "No license observed",
+      "source_type": "save-tool",
+      "allowed_use": [
+        "independent save-parser behavior and item-ID cross-check reference"
+      ],
+      "not_allowed_for": [
+        "copied parser code",
+        "sole source for save-backed claims until validated"
+      ],
+      "risk": "Useful reference; license unclear, so do not copy implementation or bulk CSV data.",
+      "machine_readable": true,
+      "copyable": false
+    },
+    "deathcounter": {
+      "name": "deathcounter",
+      "url": "https://github.com/rjansen/deathcounter",
+      "license": "No license observed",
+      "source_type": "live-memory-reference",
+      "allowed_use": [
+        "runtime event flag algorithm reference and semantic candidate generation"
+      ],
+      "not_allowed_for": [
+        "offline save parser truth",
+        "DS30000 save-byte offsets"
+      ],
+      "risk": "Live memory layout is not the `.sl2` save layout.",
+      "machine_readable": true,
+      "copyable": false
+    },
+    "nyacore-autosplitter": {
+      "name": "nyacore-autosplitter",
+      "url": "https://github.com/valkyaha/nyacore-autosplitter",
+      "license": "MIT",
+      "source_type": "autosplitter",
+      "allowed_use": [
+        "event flag decomposition concepts and boss/event schema cross-checks"
+      ],
+      "not_allowed_for": [
+        "direct DS30000 save offsets without validation"
+      ],
+      "risk": "Autosplitter/live-memory semantics still require save-file validation before save-backed claims.",
+      "machine_readable": true,
+      "copyable": true
+    },
+    "archipelago": {
+      "name": "Archipelago Dark Souls III integration",
+      "url": "https://github.com/ArchipelagoMW/Archipelago",
+      "license": "MIT",
+      "source_type": "randomizer",
+      "allowed_use": [
+        "item/location naming cross-checks and world model inspiration"
+      ],
+      "not_allowed_for": [
+        "save parser truth",
+        "canonical DS3 progression claims"
+      ],
+      "risk": "Randomizer abstractions may diverge from vanilla game state.",
+      "machine_readable": true,
+      "copyable": false
+    },
+    "ds3os": {
+      "name": "ds3os",
+      "url": "https://github.com/TLeonardUK/ds3os",
+      "license": "MIT",
+      "source_type": "server-tool",
+      "allowed_use": [
+        "online/server/mod compatibility reference when live-checked"
+      ],
+      "not_allowed_for": [
+        "single-player save facts",
+        "cheat guidance"
+      ],
+      "risk": "Online tooling has safety/ban-risk implications; cite current sources.",
+      "machine_readable": true,
+      "copyable": false
+    }
+  }
+}

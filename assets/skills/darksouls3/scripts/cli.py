@@ -40,7 +40,7 @@ from ds3_save import (
 )
 
 HEX_BYTE_WIDTH = 2
-SOURCE_USAGE = "Use: sources list | status | policy | refresh [keys...]"
+SOURCE_USAGE = "Use: sources list | status | policy | explain <key> | refresh [keys...]"
 SOURCE_POLICY_LINES: tuple[str, ...] = (
     "=== Source Policy ===",
     "  Local deterministic kernel:",
@@ -70,6 +70,41 @@ THIN_CATALOG_FILES: tuple[str, ...] = (
     "rings.json",
     "goods_magic.json",
 )
+REQUIRED_SOURCE_METADATA_FIELDS: tuple[str, ...] = (
+    "name",
+    "url",
+    "license",
+    "source_type",
+    "allowed_use",
+    "not_allowed_for",
+    "risk",
+    "machine_readable",
+    "copyable",
+)
+NO_COPY_LICENSE_MARKERS: tuple[str, ...] = (
+    "no license",
+    "unclear",
+    "not verified",
+    "community wiki",
+)
+NON_SAVE_SOURCE_TYPES: tuple[str, ...] = (
+    "wiki",
+    "calculator",
+    "checklist",
+    "compatibility-wiki",
+    "community-reference",
+    "mod-tool",
+    "modding-toolchain",
+    "reverse-engineering-reference",
+    "schema-reference",
+)
+SAVE_TRUTH_MARKERS: tuple[str, ...] = (
+    "save-backed",
+    "save backed",
+    "save truth",
+    "ds30000 truth",
+    "parser truth",
+)
 
 
 def _print_source_policy() -> None:
@@ -96,6 +131,112 @@ def _is_hex_byte_string(value: str) -> bool:
         and all(ch in "0123456789abcdefABCDEF" for ch in part)
         for part in parts
     )
+
+
+def _text_list(value: object) -> list[str]:
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return value
+    return []
+
+
+def _source_registry_entries() -> dict[str, object] | None:
+    try:
+        data = _resource_json("source_registry.json")
+    except (json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(data, dict) or data.get("version") != 1:
+        return None
+    entries = data.get("entries")
+    if not isinstance(entries, dict):
+        return None
+    return entries
+
+
+def _source_metadata(key: str) -> tuple[dict[str, object] | None, str]:
+    entries = _source_registry_entries()
+    if entries is None:
+        return None, "source_registry.json is missing or invalid"
+    entry = entries.get(key)
+    if not isinstance(entry, dict):
+        return None, f"unknown source key: {key}"
+    return entry, ""
+
+
+def _metadata_claims_save_truth(entry: dict[str, object]) -> bool:
+    text = " ".join(_text_list(entry.get("allowed_use"))).lower()
+    return any(marker in text for marker in SAVE_TRUTH_MARKERS)
+
+
+def _audit_source_registry() -> list[str]:
+    issues: list[str] = []
+    entries = _source_registry_entries()
+    if entries is None:
+        return ["source_registry.json: expected version 1 object with entries"]
+    for key in SOURCES:
+        if key not in entries:
+            issues.append(f"source_registry.json: missing source key {key}")
+    for key, entry in entries.items():
+        if not isinstance(entry, dict):
+            issues.append(f"source_registry.json {key}: expected object entry")
+            continue
+        for field in REQUIRED_SOURCE_METADATA_FIELDS:
+            if field not in entry:
+                issues.append(f"source_registry.json {key}: missing {field}")
+        for field in ("name", "url", "license", "source_type", "risk"):
+            value = entry.get(field)
+            if not isinstance(value, str) or not value.strip():
+                issues.append(f"source_registry.json {key}: invalid {field}")
+        for field in ("allowed_use", "not_allowed_for"):
+            values = entry.get(field)
+            if (
+                not isinstance(values, list)
+                or not values
+                or not all(isinstance(value, str) and value.strip() for value in values)
+            ):
+                issues.append(f"source_registry.json {key}: invalid {field}")
+        for field in ("machine_readable", "copyable"):
+            if not isinstance(entry.get(field), bool):
+                issues.append(f"source_registry.json {key}: invalid {field}")
+        license_text = str(entry.get("license", "")).lower()
+        if entry.get("copyable") is True and any(
+            marker in license_text for marker in NO_COPY_LICENSE_MARKERS
+        ):
+            issues.append(
+                f"source_registry.json {key}: unlicensed source marked copyable"
+            )
+        source_type = str(entry.get("source_type", ""))
+        if source_type != "save-tool" and _metadata_claims_save_truth(entry):
+            issues.append(
+                f"source_registry.json {key}: non-save source overclaims save truth"
+            )
+    return issues
+
+
+def _print_source_explain(key: str) -> None:
+    entry, error = _source_metadata(key)
+    if entry is None:
+        print(f"Unknown source: {key}" if not error else error)
+        return
+    print(f"=== Source: {key} ===")
+    print(f"Name: {entry.get('name')}")
+    print(f"URL: {entry.get('url')}")
+    print(f"License: {entry.get('license')}")
+    print(f"Type: {entry.get('source_type')}")
+    print(f"Machine-readable: {entry.get('machine_readable')}")
+    print(f"Copyable: {entry.get('copyable')}")
+    for label, field in (
+        ("Allowed use", "allowed_use"),
+        ("Not allowed for", "not_allowed_for"),
+    ):
+        values = _text_list(entry.get(field))
+        if values:
+            print(f"{label}:")
+            for value in values:
+                print(f"  - {value}")
+    risk = entry.get("risk")
+    if risk:
+        print(f"Risk: {risk}")
+    print("Caveat: cite source URLs/keys; cache files are transport artifacts.")
 
 
 # ── argparse ─────────────────────────────────────────────────────
@@ -297,6 +438,8 @@ def build_parser() -> argparse.ArgumentParser:
     src_sub.add_parser("list", help="List all registered sources")
     src_sub.add_parser("status", help="Show cache status")
     src_sub.add_parser("policy", help="Show live-vs-local source policy")
+    src_ex = src_sub.add_parser("explain", help="Explain one source key")
+    src_ex.add_argument("key", help="Source key to explain")
     src_rf = src_sub.add_parser("refresh", help="Refresh cached sources")
     src_rf.add_argument(
         "keys", nargs="*", help="Source keys to refresh (all if omitted)"
@@ -851,6 +994,7 @@ def cmd_audit(args) -> None:
             if not _is_hex_byte_string(item_id):
                 issues.append(f"{name}: invalid hex ID for {item_name!r}")
                 break
+    issues.extend(_audit_source_registry())
     if issues:
         for i in issues:
             print(f"  FAIL: {i}")
@@ -896,6 +1040,8 @@ def cmd_sources(args) -> None:
                 print(f"  {f.stem}: invalid cache entry ({exc})")
     elif action == "policy":
         _print_source_policy()
+    elif action == "explain":
+        _print_source_explain(args.key)
     elif action == "refresh":
         keys = args.keys or list(SOURCES.keys())
         for key in keys:
