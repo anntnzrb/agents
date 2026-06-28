@@ -1,0 +1,268 @@
+{
+  "skill_name": "darksouls3",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I just started DS3. Give me spoiler-safe beginner priorities and what not to level yet.",
+      "expected_output": "Gives spoiler-safe beginner priorities, class/build defaults, and explicit stats to avoid early.",
+      "files": [],
+      "expectations": [
+        "Matches the new player persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: fresh, softcaps, origins dex.",
+        "Mentions Vigor/Endurance early.",
+        "Avoids Luck/INT/FTH/ATT unless build-specific.",
+        "Uses bundled fresh/softcaps/origins guidance."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I picked Mercenary and use Sellsword Twinblades. What stats should I level next and why?",
+      "expected_output": "Provides Mercenary/Sellsword dexterity stat plan with endgame viability and infusion guidance.",
+      "files": [],
+      "expectations": [
+        "Matches the DEX player persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: build dexterity --level 120, weapons Sellsword Twinblades, infusions Sellsword Twinblades --build dexterity.",
+        "Names Sellsword Twinblades as endgame-capable.",
+        "Recommends Sharp for Dex once unlocked.",
+        "Keeps Strength at requirements unless pivoting."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Read my live save and tell me what to level next without guessing.",
+      "expected_output": "Uses live save commands when auto-detectable and separates observed stats from recommendations.",
+      "files": [],
+      "expectations": [
+        "Matches the current-save player persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: save auto stats, save auto summary, softcaps.",
+        "Reports observed stats/SL when available.",
+        "Labels parser limitations.",
+        "Does not infer unavailable boss/quest flags as facts."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "At VIT 10/15/22, can I use Fallen Knight or heavier armor with Twinblades under 70%?",
+      "expected_output": "Computes medium-roll constraints for several Vitality budgets and recommends armor tradeoffs.",
+      "files": [],
+      "expectations": [
+        "Matches the minmax armor player persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: equip-load --vitality 10, equip-load --vitality 15, equip-load --vitality 22.",
+        "Uses <70% equip load threshold.",
+        "Separates VIT 10/15/22 budgets.",
+        "Does not over-prioritize VIT before survival/damage."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "What bosses are available/next? Keep future spoilers hidden unless I ask.",
+      "expected_output": "Provides route/boss guidance with spoiler filtering by default and expanded names only when requested.",
+      "files": [],
+      "expectations": [
+        "Matches the route seeker persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: bosses, route, route --spoilers.",
+        "Keeps future names hidden by default.",
+        "Uses --spoilers only when explicitly needed.",
+        "Does not invent boss order outside data."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Show required bosses and boss list for current known areas.",
+      "expected_output": "Lists required and area-filtered boss information with clear area/source boundaries.",
+      "files": [],
+      "expectations": [
+        "Matches the completion player persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: bosses --required, bosses --area High Wall of Lothric --spoilers, bosses --area Cathedral of the Deep --spoilers.",
+        "Handles --required.",
+        "Handles area filtering.",
+        "States when names are spoiler-sensitive."
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Compare early weapons for my DEX/quality route.",
+      "expected_output": "Compares relevant Dex/quality weapons using calculator/catalog output instead of vibes.",
+      "files": [],
+      "expectations": [
+        "Matches the build optimizer persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: calc Sellsword Twinblades 10 40, compare Sellsword Twinblades Broadsword --str 10 --dex 40, weapons Broadsword.",
+        "Uses calc/compare outputs.",
+        "Explains requirements and scaling.",
+        "Distinguishes current usability from final build value."
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "How do I know Sharp is right and what coal/gem path is relevant?",
+      "expected_output": "Explains Sharp infusion requirements, when it beats Raw, and how it maps to Dex scaling.",
+      "files": [],
+      "expectations": [
+        "Matches the infusion user persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: infusions Sellsword Twinblades, infusions Sellsword Twinblades --build dexterity.",
+        "Says Raw removes scaling.",
+        "Says Sharp improves Dex scaling.",
+        "Mentions coal/gem/unlock requirements without unnecessary spoilers."
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "What materials do I need to upgrade my weapon and where should I farm?",
+      "expected_output": "Explains upgrade material costs and farm/pickup priorities for normal weapons.",
+      "files": [],
+      "expectations": [
+        "Matches the upgrade planner persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: upgrade 3, upgrade 4, farm shards, farm large-shards.",
+        "Distinguishes shards and large shards.",
+        "Uses upgrade command costs.",
+        "Warns not to split upgrades across too many weapons."
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "What is a good early/mid soul farm?",
+      "expected_output": "Gives early/mid soul farming options and soul-cost context without confusing covenant items for souls.",
+      "files": [],
+      "expectations": [
+        "Matches the level farmer persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: farm, farm souls, soul-cost 44 50.",
+        "Includes a souls farm target.",
+        "Uses soul-cost when level target is known.",
+        "Does not call Swordgrass/Proofs a soul farm.",
+        "Does not treat covenant-item farms such as Swordgrass as soul farms."
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "How many Estus/Bone shards exist and what should I check?",
+      "expected_output": "Reports Estus shard and undead bone shard totals/checklist role with spoiler-safe routing.",
+      "files": [],
+      "expectations": [
+        "Matches the survivability player persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: estus shards, estus bones, estus max.",
+        "Separates flask count from strength.",
+        "Explains bone shards are burned at Firelink.",
+        "Labels save-backed versus static checklist counts."
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Which covenant items matter for platinum and where do I farm them offline?",
+      "expected_output": "Identifies covenant rewards/items relevant to platinum and excludes non-required/DLC-only rank rewards.",
+      "files": [],
+      "expectations": [
+        "Matches the platinum farmer persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: covenants, covenants watchdogs, farm proofs, farm shackles, farm medals.",
+        "Accounts for all covenant categories.",
+        "Lists offline farms for required turn-ins.",
+        "Distinguishes Spears/Way of Blue from base-platinum reward paths."
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "Tell me ring/spell completion status and achievement risks.",
+      "expected_output": "Explains rings/spells/missables and platinum route risks with NG-cycle caveats.",
+      "files": [],
+      "expectations": [
+        "Matches the platinum checklist persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: rings --build dex, spells --achievement, achievements --missable, achievements --plat-route.",
+        "Mentions NG+/NG++ ring variants.",
+        "Mentions spells by achievement category.",
+        "Warns about missable route decisions.",
+        "Models Master of Rings as 107 base-game rings: +0, +1, +2, and NG++ Life Ring +3; DLC +3 rings are optional and not achievement-required."
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "Based on my save, tell boss/bonfire progress and softlock risks without guessing.",
+      "expected_output": "Uses save-backed progress commands while refusing fake certainty for unsupported quest/event state.",
+      "files": [],
+      "expectations": [
+        "Matches the save-backed platinum checker persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: save auto bosses, save auto bonfires, save auto achievements, save auto missed, save auto completion.",
+        "Uses bosses/bonfires/achievements/missed/completion when available.",
+        "Labels remaining/locked as not observed, not proof.",
+        "Gives safe next actions."
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "Tell me what my save proves I own; be conservative with unresolved IDs.",
+      "expected_output": "Reports owned/inventory evidence conservatively, including unresolved IDs where needed.",
+      "files": [],
+      "expectations": [
+        "Matches the inventory checker persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: save auto inventory, save auto owned.",
+        "Uses save inventory/owned outputs.",
+        "Separates resolved names from unknown IDs.",
+        "Does not claim pickup provenance."
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "What did I miss in my current area according to save-backed progress?",
+      "expected_output": "Uses current area/checklist data if available and labels missing checklist coverage as unknown.",
+      "files": [],
+      "expectations": [
+        "Matches the missed items user persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: save auto checklist, save auto missed.",
+        "Uses save checklist/missed.",
+        "Does not mark unavailable area checklist as complete.",
+        "Gives compact actionable cleanup."
+      ]
+    },
+    {
+      "id": 17,
+      "prompt": "How should I prepare for a second playthrough/platinum cleanup?",
+      "expected_output": "Gives NG+ platinum cleanup plan based on progress, achievements, and stat softcaps.",
+      "files": [],
+      "expectations": [
+        "Matches the NG+ planner persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: save auto progress, achievements --plat-route, softcaps.",
+        "Prioritizes cycle-limited items/endings.",
+        "Separates base-game from DLC.",
+        "Uses save progress if available.",
+        "Models Master of Rings as 107 base-game rings: +0, +1, +2, and NG++ Life Ring +3; DLC +3 rings are optional and not achievement-required."
+      ]
+    },
+    {
+      "id": 18,
+      "prompt": "What DS3 PC mods/fixes are safe/current and what are the compatibility risks?",
+      "expected_output": "Provides PC-native mod/fix guidance with Mod Engine distinctions and source status.",
+      "files": [],
+      "expectations": [
+        "Matches the PC modder persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: mods --current, sources list.",
+        "Distinguishes passive dinput8 from injection/Steam-only launchers.",
+        "Mentions compatibility/risk boundaries.",
+        "Uses sources list/status or live fallback."
+      ]
+    },
+    {
+      "id": 19,
+      "prompt": "Check source status and refresh when current docs matter.",
+      "expected_output": "Reports source/cache status and when refresh/live research is required.",
+      "files": [],
+      "expectations": [
+        "Matches the source-backed request persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: sources status.",
+        "Uses sources status/list/refresh semantics.",
+        "Explains cache TTL/provenance limits.",
+        "Does not treat cache files as provenance."
+      ]
+    },
+    {
+      "id": 20,
+      "prompt": "Validate bundled data and CLI health.",
+      "expected_output": "Validates bundled data and CLI health, reporting exact audit failures if any.",
+      "files": [],
+      "expectations": [
+        "Matches the skill maintainer persona and answers the prompt directly.",
+        "Uses or is consistent with these bundled CLI command paths: audit.",
+        "Runs or cites audit command.",
+        "Reports data integrity status.",
+        "Does not suppress failures."
+      ]
+    }
+  ]
+}

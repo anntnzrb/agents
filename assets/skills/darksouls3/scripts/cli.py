@@ -91,14 +91,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     cv = sp.add_parser("covenants", help="Covenant overview")
     cv.add_argument("id", nargs="?", help="Covenant ID (sunlight, darkmoon, etc.)")
+    cv.add_argument("--achievement", "--platinum", action="store_true", help="Show only platinum-relevant covenant rewards")
 
     np = sp.add_parser("npcs", help="NPC questline guide")
     np.add_argument("name", nargs="?", help="NPC name or key (e.g. greirat, siegward, anri, sirris)")
     np.add_argument("--all", action="store_true", help="Show all NPC questlines")
     np.add_argument("--missable", action="store_true", help="Show only missable questlines")
 
-    fm = sp.add_parser("farm", help="Farming guide for materials and covenant items")
-    fm.add_argument("item", nargs="?", help="Item to farm: shards, large-shards, chunks, slabs, twinkling, scales, proofs, shackles, medals, grass, dregs, tongues")
+    fm = sp.add_parser("farm", help="Farming guide for souls, materials, and covenant items")
+    fm.add_argument("item", nargs="?", help="Item to farm: souls, shards, large-shards, chunks, slabs, twinkling, scales, proofs, shackles, medals, grass, dregs, tongues")
 
     bd = sp.add_parser("build", help="Show build archetype")
     bd.add_argument("type", nargs="?", choices=["quality", "strength", "dexterity", "sorcerer", "pyromancer", "cleric", "luck"], help="Build type")
@@ -156,6 +157,7 @@ def build_parser() -> argparse.ArgumentParser:
     ri = sp.add_parser("rings", help="Rings catalog: browse, search, or filter by build")
     ri.add_argument("name", nargs="?", help="Ring name to search (case-insensitive substring match)")
     ri.add_argument("--build", choices=["quality", "strength", "dex", "sorcerer", "pyro", "cleric", "luck"], help="Filter rings by build archetype")
+    ri.add_argument("--spoilers", action="store_true", help="Show exact locations, including future/DLC areas")
 
 
     sp_save = sp.add_parser("save", help="Read save file data")
@@ -163,6 +165,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp_save.add_argument("action", nargs="?", default="summary",
         choices=["summary", "stats", "name", "level", "covenants", "bosses", "bonfires", "progress", "inventory", "gestures", "missed", "achievements", "checklist", "owned", "completion"],
         help="Action to perform")
+    sp_save.add_argument("--spoilers", action="store_true", help="Show locked/remaining future names in save-backed progress")
     return p
 
 # ── Command handlers ─────────────────────────────────────────────
@@ -172,13 +175,18 @@ def cmd_fresh(args) -> None:
     print()
     print("You are at the Cemetery of Ash. Light the first bonfire.")
     print()
+    print("Immediate priorities:")
+    print("  - Level VGR early; 20 is comfortable, 27 is the first big HP target.")
+    print("  - Keep equip load under 70% for a medium roll.")
+    print("  - Meet weapon requirements, then upgrade one main weapon before spreading stats/materials.")
+    print("  - Avoid LCK/INT/FTH/ATT unless you are deliberately building bleed/casting/FP.")
+    print("  - Do not level every stat evenly; pick one damage lane.")
+    print()
     print("Key commands to get started:")
     print("  ds3 softcaps  — stat breakpoints to plan your build")
     print("  ds3 origins   — view starting classes and their stats")
     print("  ds3 weapons   — weapon lookup and comparison")
     print("  ds3 estus     — flask shard and bone shard details")
-    print()
-    print("This companion covers: stats, weapons, areas, quests, rings, spells, mods.")
 
 def cmd_softcaps(args) -> None:
     print("=== Stat Softcaps ===\n")
@@ -240,12 +248,27 @@ def cmd_soul_cost(args) -> None:
     print(f"  Levels: {args.target - args.current}")
 
 def cmd_estus(args) -> None:
+    sub = args.sub
     print("=== Estus Flask ===")
+    if sub == "shards":
+        print(f"  Estus Shards: {ESTUS_SHARDS_MAX} total. Each shard adds one flask use, up to 15 total flasks.")
+        print("  Early checklist: Firelink rafters, High Wall anvil room, Undead Settlement burning tree, Road/woods ruins, Farron swamp fallen tower.")
+        print("  Use save auto summary for current flask count; exact shard pickup flags are not save-backed.")
+        return
+    if sub == "bones":
+        print(f"  Undead Bone Shards: {BONE_SHARDS_MAX} total. Burn at Firelink bonfire to improve healing, up to Estus +10.")
+        print("  Early checklist: Undead Settlement white birch tree, Farron Keep slug tower, Cathedral graveyard route.")
+        print("  Use save auto missed for current-area checklist hints; exact bone pickup flags are not save-backed.")
+        return
+    if sub == "allotment":
+        print("  Allotment: talk to the blacksmith to split total flasks between HP Estus and FP/Ashen Estus.")
+        print("  Pure melee usually wants mostly/all HP Estus; casters and weapon-art-heavy builds may reserve FP flasks.")
+        return
     print("  Max uses: 15 (start with 3 HP + 1 FP = 4)")
-    print(f"  Estus Shards: {ESTUS_SHARDS_MAX} total (find in the world)")
-    print(f"  Undead Bone Shards: {BONE_SHARDS_MAX} total (burn at Firelink bonfire)")
+    print(f"  Estus Shards: {ESTUS_SHARDS_MAX} total")
+    print(f"  Undead Bone Shards: {BONE_SHARDS_MAX} total")
     print("  Max heal potency: +10")
-    print("  Allotment: talk to the blacksmith to split between HP and FP Estus")
+    print("  Use: estus shards | estus bones | estus allotment")
 
 def cmd_infusions(args) -> None:
     build_filter = args.build
@@ -290,46 +313,84 @@ def cmd_equip_load(args) -> None:
         if args.favor: rings.append("Ring of Favor (+5%)")
         print(f"  Rings: {', '.join(rings)}")
 
+def _covenant_achievement_rewards(covenant: dict) -> list[tuple[str, str]]:
+    """Return covenant rank rewards that count toward base-game achievements."""
+    rewards: list[tuple[str, str]] = []
+    for rank, label in (("rank10", "Rank 1"), ("rank30", "Rank 2")):
+        reward = covenant.get(rank)
+        if not reward:
+            continue
+        text = str(reward).lower()
+        if any(token in text for token in ("ring", "miracle", "sorcery", "pyromancy", "platinum")):
+            rewards.append((label, str(reward)))
+    return rewards
+
+
 def cmd_covenants(args) -> None:
+    achievement_only = getattr(args, "achievement", False)
     if args.id:
         for c in COVENANTS:
             if c["id"] == args.id:
+                rewards = _covenant_achievement_rewards(c)
                 print(f"=== {c['name']} ===")
                 print(f"  Type: {c['type']}")
-                if c.get("rank10"):
-                    print(f"  Rank 1 (10 {c['item']}): {c['rank10']}")
-                if c.get("rank30"):
-                    print(f"  Rank 2 (30 {c['item']}): {c['rank30']}")
-                if c.get("farm"):
-                    print(f"  Offline farm: {c['farm']}")
+                if achievement_only:
+                    if not rewards:
+                        print("  Base-game platinum: no covenant rank reward required.")
+                    else:
+                        print(f"  Turn-in item: {c.get('item') or 'N/A'}")
+                        for label, reward in rewards:
+                            print(f"  {label}: {reward}")
+                        if c.get("farm"):
+                            print(f"  Offline farm: {c['farm']}")
+                else:
+                    if c.get("rank10"):
+                        print(f"  Rank 1 (10 {c['item']}): {c['rank10']}")
+                    if c.get("rank30"):
+                        print(f"  Rank 2 (30 {c['item']}): {c['rank30']}")
+                    if c.get("farm"):
+                        print(f"  Offline farm: {c['farm']}")
                 print()
                 print("See also: farm, achievements")
                 return
         print(f"Covenant '{args.id}' not found. IDs: {', '.join(c['id'] for c in COVENANTS)}")
         return
-    print("=== Covenants ===\n")
+    title = "Covenants — base-game platinum rewards" if achievement_only else "Covenants"
+    print(f"=== {title} ===\n")
+    not_required: list[dict] = []
     for c in COVENANTS:
+        rewards = _covenant_achievement_rewards(c)
+        if achievement_only and not rewards:
+            not_required.append(c)
+            continue
         item = c.get("item") or "N/A"
-        r10 = c.get("rank10") or "N/A"
         print(f"  {c['name']} ({c['id']}): {c['type']} — {item}")
-        if r10 != "N/A":
-            print(f"    Rank 1: {r10}")
+        if achievement_only:
+            for label, reward in rewards:
+                print(f"    {label}: {reward}")
+        elif c.get("rank10"):
+            print(f"    Rank 1: {c['rank10']}")
+    if achievement_only and not_required:
+        print("\n  No base-game platinum rank reward:")
+        for c in not_required:
+            note = "DLC covenant; not base-platinum" if c["id"] == "spears" else "not rank-reward relevant"
+            print(f"    {c['name']} ({c['id']}): {note}")
     print()
     print("See also: farm, achievements")
-
 def cmd_farm(args) -> None:
     farming: dict[str, tuple[str, str]] = {
-        "shards": ("Titanite Shard", "Early-game enemies. The shrine handmaid sells them after you give her an early-game ash."),
-        "large-shards": ("Large Titanite Shard", "Mid-game enemies. Handmaid sells after mid-game ash."),
+        "souls": ("Souls", "Early: Tower on the Wall Lothric Knight loop for safe souls plus titanite practice. Early-mid: giant-arrow cleanup in the settlement if unlocked; lazy but effective. Mid: Farron Keep Perimeter enemy-vs-enemy loop; rest, repeat, and let enemies damage each other. Equip Covetous Silver Serpent Ring if owned. Farm only to cover Vigor breakpoints, weapon upgrades, infusion fees, or a specific level gap; upgrades usually beat grinding raw levels."),
+        "shards": ("Titanite Shard", "Early-game pickups and common early enemies. Handmaid sells after the early ash; use guaranteed pickups before farming."),
+        "large-shards": ("Large Titanite Shard", "Mid-game pickups/enemies. Handmaid sells after the mid-game ash; farm only after guaranteed pickups dry up."),
         "chunks": ("Titanite Chunk", "Late-game enemies. Handmaid sells after late-game ash. Rare drop."),
         "slabs": ("Titanite Slab", "Fixed pickups only (8 per NG in base game, more in DLC). Cannot be farmed from enemies."),
         "twinkling": ("Twinkling Titanite", "Crystal lizards throughout the world. Handmaid sells after late-game ash."),
         "scales": ("Titanite Scale", "Crystal lizards near boss areas. Handmaid sells after late-game ash."),
-        "proofs": ("Proof of Concord Kept", "Silver Knights on stairs (mid-game cathedral). 1% base drop. Max item discovery reduces farm from ~10 hours to ~6."),
+        "proofs": ("Proof of Concord Kept", "Silver Knight stair farm. ~1% base drop. Base-game setup: Symbol of Avarice + Gold Serpent Ring + Crystal Sage Rapier + Rusted Coins + LCK. DLC +3 ring is optional, not platinum-required."),
         "shackles": ("Vertebra Shackle", "Skeletons in catacombs (mid-game area). ~1% drop. ~4-6 hours offline."),
         "medals": ("Sunlight Medal", "Lothric Knights (mid-game castle). ~3% drop. Faster via co-op."),
         "grass": ("Wolf's Blood Swordgrass", "3 Ghru enemies at bonfire (early swamp). ~3% drop. ~2-4 hours."),
-        "dregs": ("Human Dregs", "9 Deacons on balcony (mid-game castle). ~5% drop. ~1-2 hours."),
+        "dregs": ("Human Dregs", "Deacons on an upper balcony (mid-game castle). ~5% drop. ~1-2 hours."),
         "tongues": ("Pale Tongue", "Darkwraiths (early swamp). ~3% drop. ~2-3 hours."),
     }
     if not args.item:
@@ -343,8 +404,8 @@ def cmd_farm(args) -> None:
         name, guide = farming[item]
         print(f"=== {name} Farm ===")
         print(f"  {guide}")
-        if "Silver Knights" in guide:
-            print("  Optimal setup: Symbol of Avarice + Gold Serpent Ring +3 + Crystal Sage Rapier + Rusted Coins + 60+ LCK = ~500 item discovery")
+        if item == "proofs":
+            print("  Best optional boost if DLC is available: Gold Serpent Ring +3. DLC gear is not required for platinum.")
     else:
         print(f"Unknown item: {args.item}")
         print(f"Try: {', '.join(sorted(farming.keys()))}")
@@ -710,12 +771,18 @@ def _tracked_bonfire_names() -> list[str]:
     return sorted(f"{item['area']} - {item['name']}" for item in BONFIRE_BIT_FLAGS)
 
 
-def _print_unsupported_event_flags(kind: str, names: list[str]) -> None:
+def _print_unsupported_event_flags(kind: str, names: list[str], *, spoilers: bool = False) -> None:
     print(f"  {kind}: save-backed event flag region unsupported")
-    if names:
+    if names and spoilers:
         print("  Tracked names (status unknown):")
         for name in names:
             print(f"    - {name}")
+    elif names:
+        print(f"  {len(names)} tracked names hidden. Use --spoilers to show unknown/future names.")
+
+def _print_save_flag_caveat() -> None:
+    print("  Note: read-only save parse; boss/bonfire status uses known event flags only.")
+    print("  Remaining/locked means not observed in tracked flags, not a miss/lockout proof.")
 
 
 def _max_weapon_label(stats: dict) -> str:
@@ -745,6 +812,8 @@ def _print_save_overview(save_path: str, stats: dict, *, include_stats: bool) ->
         print(f"  Tracked bonfires: {unlocked}/{len(bonfires)} unlocked")
     else:
         print("  Bonfires: unsupported (event flag region not verified)")
+    if boss_flags_supported or bonfire_flags_supported:
+        _print_save_flag_caveat()
     print(f"  Embered: {'Yes' if stats['embered'] else 'No'}")
     stat_names = [("VGR", "vigor"), ("ATT", "attunement"), ("END", "endurance"),
                   ("VIT", "vitality"), ("STR", "strength"), ("DEX", "dexterity"),
@@ -900,7 +969,7 @@ def cmd_save(args) -> None:
     if action == "bosses":
         print("=== BOSSES ===")
         if not _boss_flags_supported(save_path):
-            _print_unsupported_event_flags("Bosses", _tracked_boss_names())
+            _print_unsupported_event_flags("Bosses", _tracked_boss_names(), spoilers=args.spoilers)
             return
         bosses = read_bosses(save_path)
         defeated = [b for b in bosses if b["defeated"]]
@@ -909,16 +978,22 @@ def cmd_save(args) -> None:
             print(f"  Defeated ({len(defeated)}/{len(bosses)}):")
             for b in defeated:
                 print(f"    + {b['name']}")
-        if alive:
+        if args.spoilers:
             print(f"  Remaining ({len(alive)}/{len(bosses)}):")
+        else:
+            print(f"  Remaining: {len(alive)}/{len(bosses)} hidden by default")
+        if alive and args.spoilers:
             for b in alive:
                 print(f"    - {b['name']}")
+        elif alive:
+            print("  Use --spoilers to show remaining boss names.")
+        _print_save_flag_caveat()
         return
 
     if action == "bonfires":
         print("=== TRACKED BONFIRES ===")
         if not _bonfire_flags_supported(save_path):
-            _print_unsupported_event_flags("Tracked bonfires", _tracked_bonfire_names())
+            _print_unsupported_event_flags("Tracked bonfires", _tracked_bonfire_names(), spoilers=args.spoilers)
             return
         bonfires = read_bonfires(save_path)
         unlocked = {n for n, u in bonfires.items() if u}
@@ -927,10 +1002,16 @@ def cmd_save(args) -> None:
             print(f"  Unlocked ({len(unlocked)}/{len(bonfires)} tracked):")
             for n in sorted(unlocked):
                 print(f"    + {n}")
-        if locked:
+        if args.spoilers:
             print(f"  Locked ({len(locked)}/{len(bonfires)} tracked):")
+        else:
+            print(f"  Locked: {len(locked)}/{len(bonfires)} hidden by default")
+        if locked and args.spoilers:
             for n in sorted(locked):
                 print(f"    - {n}")
+        elif locked:
+            print("  Use --spoilers to show locked/future bonfire names.")
+        _print_save_flag_caveat()
         return
 
     if action == "progress":

@@ -238,7 +238,7 @@ def cmd_achievements(args) -> None:
         covenant_rings = [r for r in RINGS if r.get("category") == "covenant"]
         print(f"\n  Rings (missable per NG cycle):")
         print(f"    {ng_plus} +1 rings — only in NG+, missable if not collected")
-        print(f"    {ng_plus2} +2 rings — only in NG++, missable if not collected")
+        print(f"    {ng_plus2} NG++ rings — +2 variants plus Life Ring +3, missable if not collected")
         print(f"    {len(covenant_rings)} covenant rank rings — rank-locked, offline farming required")
         print(f"    Master of Rings requires all 107 base-game rings across 3 NG cycles")
 
@@ -254,7 +254,7 @@ def cmd_achievements(args) -> None:
             print(f"\n  Optimal plat route (missable-aware):")
             print(f"  Playthrough 1: Full explore. Get Usurpation ending. Farm covenants.")
             print(f"  Playthrough 2: Boss rush. Get Link the Fire ending. Collect all +1 rings.")
-            print(f"  Playthrough 3: Boss rush to end. Collect all +2/+3 rings. Get End of Fire ending.")
+            print(f"  Playthrough 3: Boss rush to end. Collect all +2 rings plus the base-game Life Ring +3. Get End of Fire ending.")
             print(f"  Save-scum at final boss for all 3 endings from one kill.")
         return
 
@@ -267,18 +267,18 @@ def cmd_achievements(args) -> None:
     print(f"    Wolf's Blood Swordgrass x30 (~2-4 hours)")
     print(f"    Human Dregs x10 (~1-2 hours)")
     print(f"    Pale Tongue x10 (~2-3 hours)")
-    print(f"  NG cycles needed: 3 (for all rings: base, +1, +2, +3)")
+    print(f"  NG cycles needed: 3 (base rings, NG+ +1 rings, NG++ +2 rings plus Life Ring +3)")
     print(f"  Master achievements (spell collections):")
     print(f"    Master of Sorcery: 34 base-game sorceries")
     print(f"    Master of Miracles: 35 base-game miracles")
     print(f"    Master of Pyromancy: 27 base-game pyromancies")
     print(f"    DLC spells do NOT count. Use `spells --achievement` for full lists.")
-    print(f"  Master of Rings: all 107 base-game rings (+0, +1, +2, +3 variants)")
+    print(f"  Master of Rings: all 107 base-game rings (+0, +1, +2, and NG++ Life Ring +3; DLC +3 rings do not count)")
     if args.plat_route:
         print(f"\n  Optimal plat route:")
         print(f"  Playthrough 1: Full explore. Get Usurpation ending. Farm covenants.")
         print(f"  Playthrough 2: Boss rush. Get Link the Fire ending.")
-        print(f"  Playthrough 3: Boss rush to end. Collect all +2/+3 rings. Get End of Fire ending.")
+        print(f"  Playthrough 3: Boss rush to end. Collect all +2 rings plus the base-game Life Ring +3. Get End of Fire ending.")
         print(f"  Save-scum at final boss for all 3 endings from one kill.")
 
 

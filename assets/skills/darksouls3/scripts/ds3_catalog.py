@@ -424,7 +424,7 @@ RINGS: list[dict] = [
     {"name": "Life Ring", "effect": "Increases max HP by 7%", "location": "Starting gift, or sold by Shrine Handmaid after giving Dreamchaser's Ashes (early-game tower area)", "ng": "base", "weight": 0.3, "category": "hp", "builds": ["all"]},
     {"name": "Life Ring +1", "effect": "Increases max HP by 8%", "location": "NG+: near the first bonfire in the High Wall of Lothric", "ng": "NG+", "weight": 0.3, "category": "hp", "builds": ["all"]},
     {"name": "Life Ring +2", "effect": "Increases max HP by 9%", "location": "NG++: behind a hidden wall in the Cemetery of Ash", "ng": "NG++", "weight": 0.3, "category": "hp", "builds": ["all"]},
-    {"name": "Life Ring +3", "effect": "Increases max HP by 10%", "location": "DLC: behind a trick wall in the Ringed City streets", "ng": "NG++/DLC", "weight": 0.3, "category": "hp", "builds": ["all"]},
+    {"name": "Life Ring +3", "effect": "Increases max HP by 10%", "location": "NG++: Untended Graves, behind Holy King Lothric's throne in the dark Firelink Shrine", "ng": "NG++", "weight": 0.3, "category": "hp", "builds": ["all"]},
 
     # ── Chloranthy Ring series ──
     {"name": "Chloranthy Ring", "effect": "Increases stamina recovery speed (+7/s)", "location": "Undead Settlement: platform near the giant's tower", "ng": "base", "weight": 0.7, "category": "stamina", "builds": ["all"]},
