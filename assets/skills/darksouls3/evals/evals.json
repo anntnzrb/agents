@@ -102,7 +102,8 @@
         "Uses or is consistent with these bundled CLI command paths: infusions Sellsword Twinblades, infusions Sellsword Twinblades --build dexterity.",
         "Says Raw removes scaling.",
         "Says Sharp improves Dex scaling.",
-        "Mentions coal/gem/unlock requirements without unnecessary spoilers."
+        "Mentions coal/gem/unlock requirements without unnecessary spoilers.",
+        "Uses live/source-backed retrieval or fresh cache provenance for exact coal/gem locations if the answer gives route/location detail."
       ]
     },
     {
@@ -115,7 +116,8 @@
         "Uses or is consistent with these bundled CLI command paths: upgrade 3, upgrade 4, farm shards, farm large-shards.",
         "Distinguishes shards and large shards.",
         "Uses upgrade command costs.",
-        "Warns not to split upgrades across too many weapons."
+        "Warns not to split upgrades across too many weapons.",
+        "Treats farm/pickup locations as source-backed/live-check claims when giving exact route details."
       ]
     },
     {
@@ -142,7 +144,8 @@
         "Uses or is consistent with these bundled CLI command paths: estus shards, estus bones, estus max.",
         "Separates flask count from strength.",
         "Explains bone shards are burned at Firelink.",
-        "Labels save-backed versus static checklist counts."
+        "Labels save-backed versus static checklist counts.",
+        "Uses bundled totals for mechanics but live/source-backed lookup for exact shard route locations when requested."
       ]
     },
     {
@@ -155,7 +158,8 @@
         "Uses or is consistent with these bundled CLI command paths: covenants, covenants watchdogs, farm proofs, farm shackles, farm medals.",
         "Accounts for all covenant categories.",
         "Lists offline farms for required turn-ins.",
-        "Distinguishes Spears/Way of Blue from base-platinum reward paths."
+        "Distinguishes Spears/Way of Blue from base-platinum reward paths.",
+        "Uses live/source-backed retrieval or fresh cache provenance for exact covenant join/farm route details."
       ]
     },
     {
@@ -169,7 +173,8 @@
         "Mentions NG+/NG++ ring variants.",
         "Mentions spells by achievement category.",
         "Warns about missable route decisions.",
-        "Models Master of Rings as 107 base-game rings: +0, +1, +2, and NG++ Life Ring +3; DLC +3 rings are optional and not achievement-required."
+        "Models Master of Rings as 107 base-game rings: +0, +1, +2, and NG++ Life Ring +3; DLC +3 rings are optional and not achievement-required.",
+        "Distinguishes bundled static checklist guidance from live/source-backed exact item locations."
       ]
     },
     {
@@ -208,7 +213,8 @@
         "Uses or is consistent with these bundled CLI command paths: save auto checklist, save auto missed.",
         "Uses save checklist/missed.",
         "Does not mark unavailable area checklist as complete.",
-        "Gives compact actionable cleanup."
+        "Gives compact actionable cleanup.",
+        "If local area checklist coverage is missing or incomplete, routes exact cleanup to live/source-backed lookup instead of guessing."
       ]
     },
     {
@@ -235,7 +241,8 @@
         "Uses or is consistent with these bundled CLI command paths: mods --current, sources list.",
         "Distinguishes passive dinput8 from injection/Steam-only launchers.",
         "Mentions compatibility/risk boundaries.",
-        "Uses sources list/status or live fallback."
+        "Uses sources list/status or live fallback.",
+        "Requires live/source-backed lookup for latest mod versions/releases or current compatibility claims."
       ]
     },
     {
@@ -248,7 +255,8 @@
         "Uses or is consistent with these bundled CLI command paths: sources status.",
         "Uses sources status/list/refresh semantics.",
         "Explains cache TTL/provenance limits.",
-        "Does not treat cache files as provenance."
+        "Does not treat cache files as provenance.",
+        "States that cache files are transport artifacts and source URLs/keys are the provenance to cite."
       ]
     },
     {
