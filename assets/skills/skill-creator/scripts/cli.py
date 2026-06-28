@@ -1,10 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
-# dependencies = [
-#   "anthropic>=0.40",
-#   "PyYAML>=6.0",
-# ]
+# dependencies = ["PyYAML>=6.0"]
 # ///
 """Cross-platform dispatcher for skill-creator utilities."""
 
