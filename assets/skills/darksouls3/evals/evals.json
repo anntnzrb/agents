@@ -271,6 +271,498 @@
         "Reports data integrity status.",
         "Does not suppress failures."
       ]
+    },
+    {
+      "id": 21,
+      "prompt": "I'm new and confused by weapon scaling letters. How do I tell whether a weapon is good for my stats without picking a meta build?",
+      "expected_output": "Explains requirements, scaling letters, upgrade level, AR, and stat synergy in class/playstyle-neutral terms.",
+      "files": [],
+      "expectations": [
+        "Does not prescribe a default class, weapon, or build.",
+        "Explains that requirements, upgrade level, base damage, scaling, and moveset all matter.",
+        "Uses or is consistent with CLI command paths such as softcaps, stats, weapons, or calc when relevant.",
+        "Uses live/source-backed lookup for exact weapon-specific AR or scaling claims beyond bundled data."
+      ]
+    },
+    {
+      "id": 22,
+      "prompt": "What does two-handing actually do for Strength requirements and damage in DS3? Keep it spoiler-free.",
+      "expected_output": "Explains the practical two-handing Strength modifier and separates requirements from total damage/scaling.",
+      "files": [],
+      "expectations": [
+        "States that two-handing affects effective Strength for eligible weapons without overclaiming every damage detail.",
+        "Keeps the answer spoiler-free and mechanics-focused.",
+        "Mentions checking the actual weapon requirement/scaling instead of assuming one build path.",
+        "Uses live/source-backed lookup if giving exact breakpoints beyond bundled mechanics."
+      ]
+    },
+    {
+      "id": 23,
+      "prompt": "I'm comparing two weapons and one has lower damage but better scaling letters. Which should I use?",
+      "expected_output": "Gives a decision framework for base damage, scaling, upgrades, requirements, moveset, stamina, and user goals.",
+      "files": [],
+      "expectations": [
+        "Does not treat displayed AR or scaling letters alone as sufficient.",
+        "Asks for or conditions on current stats, upgrade level, infusion, and intended use.",
+        "Mentions moveset/range/speed/stamina as gameplay factors.",
+        "Recommends source-backed calculator or CLI/static lookup for exact AR."
+      ]
+    },
+    {
+      "id": 24,
+      "prompt": "Explain Raw, Heavy, Sharp, Refined, Crystal, Lightning, Chaos, Dark, Blood, Poison, and Hollow infusions at a high level.",
+      "expected_output": "Summarizes infusion families and what stat/playstyle each supports without declaring one universal best infusion.",
+      "files": [],
+      "expectations": [
+        "Groups infusions by role: no/low scaling, physical scaling, elemental/caster/hybrid, and status/luck.",
+        "Does not call one infusion universally best.",
+        "Mentions weapon-specific behavior and upgrade/buffability caveats.",
+        "Uses live/source-backed lookup for exact coals, locations, and per-weapon outcomes."
+      ]
+    },
+    {
+      "id": 25,
+      "prompt": "Can I buff an infused weapon, and how do coals fit into that?",
+      "expected_output": "Explains buffability and coal routing with caution that exact rules depend on infusion/weapon and should be source-checked.",
+      "files": [],
+      "expectations": [
+        "Separates weapon buffs from infusions and upgrade paths.",
+        "Explains that coals unlock infusion options rather than directly upgrading damage.",
+        "Avoids giving exact coal locations unless spoilers are allowed or requested.",
+        "Uses live/source-backed lookup for exact buffability and coal location claims."
+      ]
+    },
+    {
+      "id": 26,
+      "prompt": "I used a Sharp Gem and my damage went down. Did I mess up?",
+      "expected_output": "Explains that infusion can reduce damage if stats, upgrade level, weapon scaling, or buff plan do not support it yet.",
+      "files": [],
+      "expectations": [
+        "Frames the issue as stat/weapon/upgrade dependent, not player failure.",
+        "Suggests comparing before/after with current stats and upgrade level.",
+        "Notes that some infusions pay off later or only with specific stat investment.",
+        "Does not assume the user is playing dexterity unless explicitly stated."
+      ]
+    },
+    {
+      "id": 27,
+      "prompt": "Where should I go after my current boss? I want a nudge, not a spoiler dump.",
+      "expected_output": "Provides spoiler-safe routing strategy and asks for current boss/bonfire if needed; avoids future boss/location dumps by default.",
+      "files": [],
+      "expectations": [
+        "Does not list late-game bosses or areas unless the user permits spoilers.",
+        "Asks for or uses current boss/area/bonfire context.",
+        "Separates required progress from optional cleanup when source-backed.",
+        "Uses CLI save/boss/bonfire commands if a save path is available."
+      ]
+    },
+    {
+      "id": 28,
+      "prompt": "Give me the required boss order only. Hide optional and DLC bosses unless I ask.",
+      "expected_output": "Gives a spoiler-controlled required-boss route or explains spoiler implications before listing names.",
+      "files": [],
+      "expectations": [
+        "Respects the request to hide optional and DLC bosses.",
+        "Marks the response as route guidance rather than a complete encyclopedia dump.",
+        "Uses source-backed boss order/progression for exact route claims.",
+        "Avoids unrelated quest/NPC spoilers."
+      ]
+    },
+    {
+      "id": 29,
+      "prompt": "I want to do all bosses including DLC. How should the skill answer without ruining quests?",
+      "expected_output": "Gives high-level all-boss planning with spoiler controls and separate opt-in for exact route, quest outcomes, or DLC details.",
+      "files": [],
+      "expectations": [
+        "Acknowledges that all-boss routes can be spoiler-heavy.",
+        "Offers a layered route: no-spoiler landmarks first, exact names on request.",
+        "Separates DLC from base-game progression.",
+        "Uses live/source-backed route/boss sources for exact ordering."
+      ]
+    },
+    {
+      "id": 30,
+      "prompt": "What's the least awful way to farm Proof of a Concord Kept offline?",
+      "expected_output": "Explains offline/online covenant item acquisition and item-discovery prep without promising exact drop outcomes.",
+      "files": [],
+      "expectations": [
+        "Mentions Proof of a Concord Kept as a covenant/platinum grind.",
+        "Separates online covenant acquisition from offline enemy farming.",
+        "Discusses item discovery/repetition at a high level without inventing exact rates.",
+        "Uses live/source-backed lookup for exact enemies, locations, and rewards."
+      ]
+    },
+    {
+      "id": 31,
+      "prompt": "Which covenant items do I need for platinum, and can I avoid PvP?",
+      "expected_output": "Maps covenant item grinds to achievement needs and explains offline alternatives and tradeoffs.",
+      "files": [],
+      "expectations": [
+        "Separates platinum-required covenant rewards from optional covenant content.",
+        "Explains offline alternatives as slower or grindier without fake certainty.",
+        "Uses the bundled achievements/covenants commands where applicable.",
+        "Uses live/source-backed lookup for exact reward thresholds and farming locations."
+      ]
+    },
+    {
+      "id": 32,
+      "prompt": "I only care about achievements. Do DLC rings and spells count for platinum?",
+      "expected_output": "Clarifies base-game platinum scope versus DLC content and directs to collection commands/checklists.",
+      "files": [],
+      "expectations": [
+        "States that achievement/platinum scope must distinguish base game from DLC.",
+        "Uses or is consistent with bundled achievements, rings, and spells commands.",
+        "Does not dump every ring/spell location unless requested.",
+        "Uses live/source-backed lookup for exact achievement rules and item lists."
+      ]
+    },
+    {
+      "id": 33,
+      "prompt": "Can I get all rings in one playthrough, or do I need NG+ cycles?",
+      "expected_output": "Explains ring collection planning, NG-cycle variants, and spoiler/source caveats.",
+      "files": [],
+      "expectations": [
+        "Mentions that ring collection has cycle/version considerations.",
+        "Separates base-game achievement rings from DLC rings.",
+        "Uses ring catalog commands for known totals/categories.",
+        "Uses live/source-backed lookup for exact locations and cycle variants."
+      ]
+    },
+    {
+      "id": 34,
+      "prompt": "Which sorceries, miracles, and pyromancies are missable for achievements? No quest spoilers unless unavoidable.",
+      "expected_output": "Gives spoiler-safe collection planning and source-backed escalation for exact missables.",
+      "files": [],
+      "expectations": [
+        "Keeps quest/NPC outcome spoilers filtered by default.",
+        "Uses bundled spells achievement listing when possible.",
+        "Warns when exact missable locations require live/source-backed lookup.",
+        "Separates sorceries, miracles, and pyromancies clearly."
+      ]
+    },
+    {
+      "id": 35,
+      "prompt": "When should I start Ashes of Ariandel and The Ringed City? No boss spoilers.",
+      "expected_output": "Gives spoiler-safe DLC timing guidance with level/progression caveats and offers exact route only on request.",
+      "files": [],
+      "expectations": [
+        "Does not reveal DLC boss identities by default.",
+        "Separates access timing from recommended difficulty/readiness timing.",
+        "Mentions that exact route/progression is source-backed and spoiler-sensitive.",
+        "Avoids assuming melee/caster/build preference."
+      ]
+    },
+    {
+      "id": 36,
+      "prompt": "Does doing DLC affect base-game endings, NPC quests, or achievements?",
+      "expected_output": "Answers with spoiler controls and source-backed caveats about DLC/base-game separation.",
+      "files": [],
+      "expectations": [
+        "Separates base-game ending/achievement concerns from DLC content.",
+        "Avoids quest outcome spoilers unless requested.",
+        "Flags any exact quest interaction claim as source-backed/currentness-sensitive.",
+        "Offers a safe checklist approach."
+      ]
+    },
+    {
+      "id": 37,
+      "prompt": "Can I install Mod Engine or overhaul mods and still play online safely?",
+      "expected_output": "Gives current-source PC mod risk guidance, separates Mod Engine versions, online risk, backups, and no ban guarantees.",
+      "files": [],
+      "expectations": [
+        "Does not promise ban safety.",
+        "Uses live/source-backed lookup for current Mod Engine/ME3 status and compatibility.",
+        "Recommends backup/offline separation for modded play.",
+        "Distinguishes PC-native modding from emulation."
+      ]
+    },
+    {
+      "id": 38,
+      "prompt": "Where are my DS3 saves on PC, and what should I back up before modding?",
+      "expected_output": "Gives PC save path guidance, backup strategy, and live-source caveats for Steam/Proton/current PC state.",
+      "files": [],
+      "expectations": [
+        "Mentions the PC save-data location pattern or asks for platform if needed.",
+        "Recommends copying the full save folder before risky modding.",
+        "Uses PCGamingWiki/source-backed data for exact paths.",
+        "Does not expose or modify saves; guidance remains read-only."
+      ]
+    },
+    {
+      "id": 39,
+      "prompt": "My save might be corrupted. Can the skill inspect it safely and what should it refuse to do?",
+      "expected_output": "Explains read-only save inspection, backup-first handling, and refusal to mutate or repair saves blindly.",
+      "files": [],
+      "expectations": [
+        "Recommends backing up the save before any inspection.",
+        "Uses only read-only bundled save commands for local `.sl2` status.",
+        "Refuses mutation/repair claims unless explicitly implemented and safe.",
+        "Separates local parser facts from live recovery-tool research."
+      ]
+    },
+    {
+      "id": 40,
+      "prompt": "How do I use Estus Shards and Undead Bone Shards, and what's the difference?",
+      "expected_output": "Explains flask-count versus flask-strength upgrades and how the skill can track checklist status.",
+      "files": [],
+      "expectations": [
+        "Distinguishes Estus Shards from Undead Bone Shards.",
+        "Avoids exact item locations unless spoilers/source lookup are requested.",
+        "Uses save/checklist commands if a save path is available.",
+        "Uses live/source-backed lookup for exact locations."
+      ]
+    },
+    {
+      "id": 41,
+      "prompt": "I think I missed an Estus or Bone Shard. Can you help without spoiling future areas?",
+      "expected_output": "Offers spoiler-filtered checklist help based on current area/save context and live lookup only when exact locations are requested.",
+      "files": [],
+      "expectations": [
+        "Asks for current area/save context before naming future areas.",
+        "Uses local checklist/save commands when available.",
+        "Labels static-vs-save-backed limits instead of treating checklist hints as proof of completion.",
+        "Does not paste a full future-area list by default."
+      ]
+    },
+    {
+      "id": 42,
+      "prompt": "Which NPC questlines are missable? Give me only spoiler-safe guardrails.",
+      "expected_output": "Provides spoiler-minimized missable-quest guardrails and offers exact NPC steps only with spoiler permission/source lookup.",
+      "files": [],
+      "expectations": [
+        "Does not dump quest outcomes or late NPC names by default.",
+        "Explains that exact quest steps are source-backed/live lookup territory.",
+        "Labels bundled NPC missable guidance as static-vs-live/source-backed rather than final route authority.",
+        "Asks where the user is before naming future triggers."
+      ]
+    },
+    {
+      "id": 43,
+      "prompt": "How does Rosaria respec work, and will it break any questlines? Spoiler-safe answer first.",
+      "expected_output": "Explains respec/rebirth at a high level and flags quest-interaction details as spoiler/source-sensitive.",
+      "files": [],
+      "expectations": [
+        "Separates mechanics of respec from NPC quest consequences.",
+        "Avoids spoiling quest outcomes unless requested.",
+        "Uses live/source-backed lookup for exact limits/costs/consequences.",
+        "Does not assume a preferred build direction."
+      ]
+    },
+    {
+      "id": 44,
+      "prompt": "How does password co-op work? Does it affect invasions or summon range?",
+      "expected_output": "Explains password co-op and invasion/summon-range caveats with source-backed current mechanics.",
+      "files": [],
+      "expectations": [
+        "Separates co-op password matching from invasion matchmaking where source-backed.",
+        "Mentions summon range calculators for exact level/weapon matching.",
+        "Avoids unsafe network troubleshooting or cheat guidance.",
+        "Uses live/source-backed lookup for exact online mechanics."
+      ]
+    },
+    {
+      "id": 45,
+      "prompt": "Why can't my friend summon me? Give me a checklist before lore or spoilers.",
+      "expected_output": "Gives a practical co-op troubleshooting checklist: ember/status, area boss, password, level/weapon range, platform/network caveats.",
+      "files": [],
+      "expectations": [
+        "Keeps the answer gameplay/practical, not lore-heavy.",
+        "Checks password, ember/host state, area/boss state, and range/platform conditions.",
+        "Avoids pretending the skill can inspect network state.",
+        "Uses source-backed online mechanics for exact claims."
+      ]
+    },
+    {
+      "id": 46,
+      "prompt": "What do bleed, poison, toxic, frostbite, and dark damage actually do?",
+      "expected_output": "Explains status buildup/effects and damage types at a high level, with source-backed caveats for exact numbers.",
+      "files": [],
+      "expectations": [
+        "Separates buildup status effects from elemental/damage types.",
+        "Explains that exact resistances/buildup values are source-backed lookup territory.",
+        "Does not recommend a status build unless the user wants one.",
+        "Mentions counters or practical implications without overclaiming."
+      ]
+    },
+    {
+      "id": 47,
+      "prompt": "What is Hollowing? Is it the same as curse, and should I cure it?",
+      "expected_output": "Explains Hollowing/curse confusion, cosmetic/mechanical/quest caveats, and spoiler controls.",
+      "files": [],
+      "expectations": [
+        "Distinguishes Hollowing from other status concepts.",
+        "Avoids quest/ending spoilers unless the user asks.",
+        "Explains cure/avoidance tradeoffs at a high level.",
+        "Uses source-backed lookup for exact quest or ending interactions."
+      ]
+    },
+    {
+      "id": 48,
+      "prompt": "How do parry and riposte work for a beginner, and what should I practice on?",
+      "expected_output": "Gives spoiler-safe parry/riposte basics and practice advice while flagging exact frame data as source-specific.",
+      "files": [],
+      "expectations": [
+        "Explains timing, eligible attacks/tools, and riposte follow-up at a high level.",
+        "Does not present PvP frame claims without live/source-backed support.",
+        "Offers low-spoiler practice advice.",
+        "Does not assume parrying is required for all playstyles."
+      ]
+    },
+    {
+      "id": 49,
+      "prompt": "Does poise do anything in DS3, and why do heavy weapons feel different?",
+      "expected_output": "Explains poise/hyperarmor at a practical level and avoids old-myth overclaims.",
+      "files": [],
+      "expectations": [
+        "Answers that poise is situational/mechanic-dependent, not simply absent/useless.",
+        "Connects heavier weapons/armor and attack animations to practical stagger resistance when source-backed.",
+        "Warns that exact breakpoints/frame data need current/source-backed lookup.",
+        "Avoids PvP-only advice unless requested."
+      ]
+    },
+    {
+      "id": 50,
+      "prompt": "Should I consume boss souls or transpose them? I don't know what I want yet.",
+      "expected_output": "Gives a reversible-decision framework: avoid consuming unique souls until checking transposition options and user goals.",
+      "files": [],
+      "expectations": [
+        "Explains that boss souls can become unique weapons/spells/items via transposition.",
+        "Warns that consuming is irreversible for that cycle.",
+        "Asks for playstyle/goals before recommending a specific transposition.",
+        "Uses live/source-backed lookup for exact transposition options."
+      ]
+    },
+    {
+      "id": 51,
+      "prompt": "Which boss soul items are worth it for a caster versus a melee character?",
+      "expected_output": "Compares transposition options conditionally by stated archetype without universal best claims.",
+      "files": [],
+      "expectations": [
+        "Separates caster, melee, hybrid, and collection/achievement motives.",
+        "Does not declare a universal best boss soul item.",
+        "Uses source-backed lookup for exact boss soul rewards and requirements.",
+        "Mentions spoilers if naming future bosses/items would reveal content."
+      ]
+    },
+    {
+      "id": 52,
+      "prompt": "What's a good early soul farming approach that won't spoil late-game areas?",
+      "expected_output": "Provides spoiler-safe farming principles and asks for current area before naming routes.",
+      "files": [],
+      "expectations": [
+        "Does not name late-game farming spots by default.",
+        "Asks for current bonfire/area or uses save context.",
+        "Explains risk/reward, repetition, and gear/item-discovery only when relevant.",
+        "Uses live/source-backed lookup for exact route/location claims."
+      ]
+    },
+    {
+      "id": 53,
+      "prompt": "I found an Ember. Should I use it now, and what changes online/offline?",
+      "expected_output": "Explains Ember effects, HP/online/summon/invasion implications, and context-sensitive use.",
+      "files": [],
+      "expectations": [
+        "Explains core Ember effects without lore spoilers.",
+        "Separates offline survival use from online/summon/invasion implications.",
+        "Does not tell every user to hoard or spend embers universally.",
+        "Uses source-backed lookup for exact online mechanics if needed."
+      ]
+    },
+    {
+      "id": 54,
+      "prompt": "Can the skill help me plan a no-spoiler platinum route? I don't want boss names yet.",
+      "expected_output": "Creates a layered no-spoiler achievement plan and explains when exact source-backed lists are needed.",
+      "files": [],
+      "expectations": [
+        "Separates missables, covenants, endings, rings, spells, gestures, and NG-cycle planning.",
+        "Does not list future boss names by default.",
+        "Uses bundled achievement commands for broad structure.",
+        "Requires live/source-backed lookup for exact route/location details."
+      ]
+    },
+    {
+      "id": 55,
+      "prompt": "I want to know what I missed from my save, but I don't want future spoilers. What should you run?",
+      "expected_output": "Recommends read-only save commands and explains spoiler gating for bosses, bonfires, checklist, inventory, and completion.",
+      "files": [],
+      "expectations": [
+        "Uses `save auto summary` first when no explicit save path is provided.",
+        "Mentions read-only save inspection and no mutation.",
+        "Uses spoiler flags only when the user asks to reveal locked/future names.",
+        "Separates save-backed facts from static checklist guesses."
+      ]
+    },
+    {
+      "id": 56,
+      "prompt": "What are good rings for a caster, tanky melee, or light-roll character? Keep it as categories, not one build.",
+      "expected_output": "Gives ring categories by user goal and suggests catalog/search commands without prescribing one playstyle.",
+      "files": [],
+      "expectations": [
+        "Presents multiple goal-based categories rather than a single default setup.",
+        "Uses bundled rings catalog/build filters where applicable.",
+        "Requires live/source-backed lookup for exact locations and route details.",
+        "Does not assume the user's class or weapon."
+      ]
+    },
+    {
+      "id": 57,
+      "prompt": "I need help choosing between sorcery, miracles, pyromancy, or melee. How should I decide?",
+      "expected_output": "Compares playstyle tradeoffs and stat/resource commitments without claiming one is best for all users.",
+      "files": [],
+      "expectations": [
+        "Explains stat/resource commitments for INT/FTH/ATT/FP versus physical lanes.",
+        "Keeps recommendations conditional on desired gameplay, gear, and tolerance for setup.",
+        "Mentions that exact spell locations and progression require source-backed lookup.",
+        "Does not make class assumptions."
+      ]
+    },
+    {
+      "id": 58,
+      "prompt": "What's the difference between leveling Vigor, Vitality, Endurance, and Attunement?",
+      "expected_output": "Explains HP, equip load/defense, stamina, FP/slots in beginner-friendly terms with no build prescription.",
+      "files": [],
+      "expectations": [
+        "Correctly distinguishes VGR, VIT, END, and ATT roles.",
+        "Frames priority as dependent on survivability, equipment, stamina needs, and spell/FP use.",
+        "Uses softcaps/stats command where appropriate.",
+        "Does not say caster stats are only for deliberate exceptions."
+      ]
+    },
+    {
+      "id": 59,
+      "prompt": "I want exact item locations for coals and gems. How should the skill handle spoilers and sources?",
+      "expected_output": "Explains that exact locations are spoiler-sensitive and require live/source-backed lookup, while giving non-spoiler mechanics first.",
+      "files": [],
+      "expectations": [
+        "First explains what coals/gems do without future-area spoilers.",
+        "Asks for spoiler permission/current area before listing locations.",
+        "Uses live/source-backed lookup for exact locations.",
+        "Does not rely on bundled thin catalog for route/location claims."
+      ]
+    },
+    {
+      "id": 60,
+      "prompt": "Can I use Cheat Engine, save editors, or cheat tables for offline testing? What should the skill refuse?",
+      "expected_output": "Gives safety boundaries: read-only/reference use, no online cheat guidance, no save mutation, source/license caveats.",
+      "files": [],
+      "expectations": [
+        "Refuses online cheating or ban-evasion guidance.",
+        "Separates reference-only event flag/source use from user-facing cheat instructions.",
+        "Recommends backups and offline isolation for any risky tooling discussion.",
+        "Uses current/source-backed PC mod/tool status before making compatibility claims."
+      ]
+    },
+    {
+      "id": 61,
+      "prompt": "How do I ask the skill for help without spoilers if I only know my current bonfire and weapon?",
+      "expected_output": "Explains the best input format and routes to save/bonfire/weapon/build commands while preserving spoiler boundaries.",
+      "files": [],
+      "expectations": [
+        "Asks for current bonfire/area, weapon, stats, and spoiler tolerance.",
+        "Uses deterministic CLI first for mechanics/save-backed status.",
+        "Avoids future names unless user opts in.",
+        "Keeps guidance class/playstyle agnostic."
+      ]
     }
   ]
 }
