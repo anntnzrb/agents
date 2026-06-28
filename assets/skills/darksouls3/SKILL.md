@@ -9,7 +9,7 @@ allowed-tools: "Read, Bash, WebSearch"
 
 # Dark Souls 3 Companion
 
-Spoiler-safe Dark Souls 3 companion for gameplay advice, deterministic mechanics, build/math lookups, save-file inspection, achievement/checklist help, and PC mod guidance. Use the bundled CLI first. Use live web research only when the CLI/static resources cannot answer or the user explicitly asks for current/source-backed corroboration.
+Spoiler-safe Dark Souls 3 companion for gameplay advice, deterministic mechanics, build/math lookups, save-file inspection, achievement/checklist help, and PC mod guidance. Use the bundled CLI first for deterministic mechanics, save parsing, spoiler gates, and source/cache inspection. Use live research or a fresh source cache for user-facing external claims such as exact item locations, route steps, NPC quest details, current PC mod/tool status, contested facts, or any request for citations/currentness.
 
 This file is the operator manual. Assume an agent may read only `SKILL.md`; every public command and boundary needed to use the skill is documented here.
 
@@ -32,10 +32,11 @@ C:/Users/Nil/.config/agents/assets/skills/darksouls3
 ## Core workflow
 
 1. If the question depends on the user's current character/save, run `save auto summary` first unless the user provided a specific `.sl2` path.
-2. Use CLI commands for deterministic mechanics, math, static catalogs, save-backed progress, and first-pass recommendations.
-3. Use live research only for stale/missing data, exact route/checklist gaps, current mod versions, or explicit citation requests.
-4. Filter spoilers before replying. Do not paste future names, future locations, boss identities, quest outcomes, endings, or DLC reveals unless the user has introduced them or explicitly permits spoilers.
-5. Answer with the actionable result first, then evidence/command used, then caveats.
+2. Use CLI commands for deterministic mechanics, math, save-backed progress, spoiler-safe placeholders, source/cache inspection, and first-pass recommendations.
+3. Use live research or a fresh cache from `sources refresh <source-key>` for user-facing external facts: exact item locations, route/checklist gaps, NPC quest details, current mod versions/compatibility, contested claims, and explicit citation/currentness requests.
+4. Treat bundled catalogs as operational scaffolds, not authoritative guide prose. If a local catalog answer includes a location or route hint, present it as a bundled/static hint and live-check it before making a source-backed final claim.
+5. Filter spoilers before replying. Do not paste future names, future locations, boss identities, quest outcomes, endings, or DLC reveals unless the user has introduced them or explicitly permits spoilers.
+6. Answer with the actionable result first, then observed command/source evidence, then caveats.
 
 ## Save-file support
 
@@ -197,12 +198,12 @@ Route by intent, not exact wording:
 | where to level next | `save auto stats`, `softcaps`, `build` | `calc`, `compare`, `infusions` | Use actual current stats. |
 | starting class / build archetype | `origins`, `build`, `softcaps` | source refresh/live if user requests citations | Knight quality, Warrior strength, Mercenary dex are common optimized starts. |
 | weapon AR/scaling/breakpoints | `calc`, `compare`, `weapons`, `infusions` | MugenMonkey/SoulsPlanner/live for missing weapons | Do not guess AR. |
-| upgrade materials | `upgrade`, `farm` | source registry/live for exact route | Main weapon first. |
+| upgrade materials | `upgrade`, `farm` | `sources status` / `sources refresh fextralife-upgrades` / live research for exact routes and current source-backed locations | Main weapon first. |
 | equip load/fat roll | `equip-load`, `softcaps` | save stats if current VIT matters | Medium roll below 70%. |
-| rings/spells/covenants | `rings`, `spells`, `covenants`, `farm` | save completion if ownership matters | Avoid location spoilers unless permitted. |
-| areas/bosses/route | `areas`, `bosses`, `route`, save progress | live research for full route | Default spoiler-safe. |
-| achievements/platinum | `achievements`, `save auto achievements`, `save auto completion` | live checklist for exact cleanup | Base-game achievements only. |
-| mods/PC fixes | `mods --current` | live research for latest versions | Ask legit/cracked/online only if needed. |
+| rings/spells/covenants | `rings`, `spells`, `covenants`, `farm` | `save auto completion` when ownership matters; live/source-cache for exact locations, route steps, or covenant quest details | Avoid location spoilers unless permitted. |
+| areas/bosses/route | `areas`, `bosses`, `route`, `save auto progress` | live/source-cache for full route or exact checklist details | Default spoiler-safe. |
+| achievements/platinum | `achievements`, `save auto achievements`, `save auto completion` | live/source-cache for exact cleanup locations and quest step details | Base-game achievements only. |
+| mods/PC fixes | `sources status`, `mods --current` | live research for latest versions/releases/compatibility before final source-backed claims | Ask legit/cracked/online only if needed. |
 | source-backed/current data | `sources status`, `sources refresh`, web research | cite URLs | Cite final sources. |
 
 ## Spoiler policy
@@ -262,12 +263,11 @@ darksouls3/
 
 Resource roles:
 
-- `event_flags.json`: known save event flag offsets for bosses.
-- `bonfire_flags.json`: tracked per-bonfire TGA `SprjEventFlagMan` byte offsets + bit positions for read-only DS30000 status checks.
-- `achievement_checklist.json`: rings, spells, gestures, infusions, reinforcement checklist.
-- `completion_categories.json`: maps checklist categories to save-backed/static support.
-- `area_checklists.json`: area-specific bosses/key items/NPCs/shards where known.
-- `weapons.json`, `armor.json`, `rings.json`, `goods_magic.json`: conservative item-name maps for inventory resolution; not authoritative gameplay stat tables.
+- parser-required: `event_flags.json` and `bonfire_flags.json`; required for read-only `.sl2` boss/bonfire status checks.
+- mechanic-invariant: `game_data.json`, `achievement_checklist.json`, and `completion_categories.json`; stable totals/category contracts and parser support metadata.
+- thin-catalog: `weapons.json`, `armor.json`, `rings.json`, and `goods_magic.json`; conservative item-name-to-ID maps for inventory resolution only, not gameplay-stat/guide tables.
+- area-checklist scaffold: `area_checklists.json`; small spoiler-filtered local checklist hints where curated, incomplete by design.
+- eval-fixture: `evals/evals.json`; prompt expectations that enforce routing, spoiler safety, source policy, and command use.
 
 Do not reintroduce legacy names like `Bosses.json`, `bonfire.json`, `ring.json`, or `goods_magic_bulk.json`.
 
@@ -322,9 +322,11 @@ DS3_CACHE_DIR=<path>
 
 Cache entries are JSON with fetch timestamp `ts`, raw `content`, and `meta` containing `url` and `sha256`. Staleness is evaluated against a 24-hour TTL. License strings are in the in-memory source registry/list output and the source-use hierarchy is documented in `REFERENCES.md`; cache files are transport artifacts, not provenance records. Runtime remains stateless with respect to playthrough progress.
 
+Cache policy: cache files are transport artifacts. They may support fresh source-backed answers when within TTL, but they are not canonical truth and they do not replace source URLs, source keys, license/provenance records, or final-answer citations.
+
 ## Live research fallback
 
-Use web/Brave/Reddit when CLI coverage is missing, source cache is stale, or the user asks for source-backed corroboration. Keep queries spoiler-safe unless spoilers are permitted.
+Use web/Brave/Reddit/read URLs when CLI coverage is missing, source cache is stale, the user asks for source-backed/current data, or the claim is an exact location, route step, NPC quest detail, mod/tool compatibility fact, or contested gameplay detail. Keep queries spoiler-safe unless spoilers are permitted.
 
 Example queries:
 

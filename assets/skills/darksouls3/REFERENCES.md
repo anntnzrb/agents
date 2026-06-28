@@ -7,7 +7,7 @@ This file ranks the sources used by the DS3 companion skill and defines what eac
 | Rank | Source | Use for | Do not use for | License / provenance |
 |---:|---|---|---|---|
 | 1 | `alfizari/Dark-Souls-3-Save-Editor-PS4-PC` | DS30000 save layout, read-only event-byte offsets, and boss byte values | Mutation/editing behavior, UI code, unsafely writing saves | MIT; repo: <https://github.com/alfizari/Dark-Souls-3-Save-Editor-PS4-PC> |
-| 2 | bundled local resources after validation | Fast offline answers and save-backed status once backed by a ranked source | Claims beyond the source-backed rows | GPL skill resources with per-file provenance below |
+| 2 | bundled deterministic kernel | Save parser maps, CLI routing, spoiler gates, stable mechanics, eval fixtures, and conservative inventory ID resolution | User-facing guide prose, exact route/location/quest claims, current mod/tool claims, or any claim beyond the source-backed row purpose | GPL skill resources with per-file provenance below; local data is operational scaffold, not encyclopedia content |
 | 3 | The Grand Archives DS3 Cheat Table | Reference-only event flag and `SprjEventFlagMan` bit cross-checks, including tracked bonfire bits | Bulk copying, online cheat guidance, license-sensitive embedded data without transformation/attribution | No license observed; reference-only: <https://github.com/The-Grand-Archives/Dark-Souls-III-CT-TGA> |
 | 4 | SoulsMods / Paramdex | PARAM schema names and modding/toolchain concepts, especially `BONFIRE_WARP_PARAM_ST` field semantics | DS30000 save offsets, full gameplay row data, copied datasets unless license is confirmed | License varies/unclear by repo/file; reference URL: <https://raw.githubusercontent.com/soulsmods/Paramdex/master/DS3/Defs/BONFIRE_WARP_PARAM_ST.xml> |
 | 5 | SoulsModding event flag references | Event flag semantic cross-checks | Save-byte offsets; event IDs are not DS30000 offsets | Community wiki; DS3 page/license must be rechecked before embedding: <https://soulsmodding.com/doku.php?id=ds3-refmat:event-flag-list> |
@@ -21,13 +21,13 @@ This file ranks the sources used by the DS3 companion skill and defines what eac
 
 | File | Role | Primary source | Transformation / validation |
 |---|---|---|---|
-| `resources/event_flags.json` | Boss event-byte offsets | alfizari save editor, cross-checked with TGA/SoulsModding flag semantics | Names normalized to current skill display names; validated against the current local DS30000 save where available |
-| `resources/bonfire_flags.json` | Tracked exact per-bonfire offsets + bits | TGA `SprjEventFlagMan` binary records, mapped into DS30000 save bytes and cross-checked against alfizari-derived masks during construction | Non-bonfire event rows filtered out (`Coiled Sword embed`, `Enable Warp to High Wall`). Reads use `base = event_start - 0x12` and `base + tga_offset + 0x6F` |
-| `resources/area_checklists.json` | Small spoiler-filtered area checklists | local curated data, live wiki/checklist cross-checks as needed | Incomplete by design; missing checklist means unknown, not clear |
-| `resources/game_data.json` | Area graph and static totals | local curated data, cross-checked with current save behavior | Only areas with supported checklist/progress data should be added |
-| `resources/achievement_checklist.json` | Achievement categories for rings/spells/gestures/infusions/reinforcement | local curated data; DS3 Cheat Sheet/Fextralife/Wikidot are cross-check candidates | Save-backed categories must stay separated from static checklist categories |
-| `resources/completion_categories.json` | Maps completion categories to save-backed/static support | local parser contract | Do not mark gestures/infusions save-backed until offsets are sourced |
-| `resources/weapons.json`, `resources/armor.json`, `resources/rings.json`, `resources/goods_magic.json` | Conservative inventory name resolution | local extracted/curated maps | Resolver data is not an authoritative gameplay stat table; unresolved IDs must remain unknown |
+| `resources/event_flags.json` | parser-required boss event-byte offsets | alfizari save editor, cross-checked with TGA/SoulsModding flag semantics | Names normalized to current skill display names; validated against the current local DS30000 save where available |
+| `resources/bonfire_flags.json` | parser-required per-bonfire offsets + bits | TGA `SprjEventFlagMan` binary records, mapped into DS30000 save bytes and cross-checked against alfizari-derived masks during construction | Non-bonfire event rows filtered out (`Coiled Sword embed`, `Enable Warp to High Wall`). Reads use `base = event_start - 0x12` and `base + tga_offset + 0x6F` |
+| `resources/area_checklists.json` | area-checklist scaffold; spoiler-filtered hints only | local curated data, live wiki/checklist cross-checks as needed | Incomplete by design; missing checklist means unknown, not clear |
+| `resources/game_data.json` | mechanic-invariant area graph and totals | local curated data, cross-checked with current save behavior | Only areas with supported checklist/progress data should be added |
+| `resources/achievement_checklist.json` | mechanic-invariant achievement category lists | local curated data; DS3 Cheat Sheet/Fextralife/Wikidot are cross-check candidates | Save-backed categories must stay separated from static checklist categories |
+| `resources/completion_categories.json` | parser/eval contract for save-backed vs static support | local parser contract | Do not mark gestures/infusions save-backed until offsets are sourced |
+| `resources/weapons.json`, `resources/armor.json`, `resources/rings.json`, `resources/goods_magic.json` | thin-catalog inventory ID resolution | local extracted/curated maps | Resolver data is not an authoritative gameplay stat table; unresolved IDs must remain unknown |
 
 ## Replacement policy
 
@@ -36,6 +36,10 @@ This file ranks the sources used by the DS3 companion skill and defines what eac
 - Keep Fextralife/PCGamingWiki as **live/cited** references for prose and current guidance; avoid increasing embedded dependency on noncommercial wiki text.
 - Do not replace working local resources with broader but lower-quality tables just because they are larger.
 - Do not claim save-backed status for categories without sourced offsets. Current unsupported categories include gestures and infusions.
+- Prefer live retrieval or fresh cache for exact locations, route steps, NPC quest details, current PC/mod compatibility, and contested gameplay facts.
+- Local resource growth is allowed only when the data is required for parser correctness, deterministic CLI computation, spoiler safety, source provenance, or eval repeatability.
+- Do not add copied wiki prose, full walkthroughs, full questlines, boss strategy pages, lore descriptions, or bulk item-location text to bundled JSON resources.
+- Cache files are fetch receipts/transports, not canonical data sources; final answers should cite source URLs/source keys, not cache filenames.
 
 ## Verification requirements after source/resource changes
 
@@ -43,6 +47,7 @@ Run these commands after changing source, save, or resource files:
 
 ```text
 uv run --script scripts/cli.py audit
+uv run --script scripts/cli.py sources policy
 uv run --script scripts/cli.py save auto summary
 uv run --script scripts/cli.py save auto bosses
 uv run --script scripts/cli.py save auto bonfires
