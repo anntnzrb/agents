@@ -22,31 +22,22 @@ from ds3_catalog import *
 from ds3_core import *
 from ds3_core import CACHE_TTL_HOURS
 from ds3_save import (
+    BONFIRE_BIT_FLAGS,
+    BOSS_FLAGS,
     CLASS_NAMES,
+    _bonfire_flags_supported,
+    _boss_flags_supported,
+    owned_item_names,
     read_bonfires,
     read_bosses,
+    read_completion_status,
+    read_gestures,
+    read_inventory,
+    read_missed,
     read_name,
     read_ng_plus,
     read_stats,
 )
-
-try:
-    from ds3_save import read_gestures, read_inventory
-except ImportError:
-    read_inventory = None
-    read_gestures = None
-try:
-    from ds3_save import read_missed
-except ImportError:
-    read_missed = None
-try:
-    from ds3_save import owned_item_names
-except ImportError:
-    owned_item_names = None
-try:
-    from ds3_save import read_completion_status
-except ImportError:
-    read_completion_status = None
 
 HEX_BYTE_WIDTH = 2
 SOURCE_USAGE = "Use: sources list | status | policy | refresh [keys...]"
@@ -79,13 +70,6 @@ THIN_CATALOG_FILES: tuple[str, ...] = (
     "rings.json",
     "goods_magic.json",
 )
-LEGACY_RESOURCE_FILES: tuple[str, ...] = (
-    "Bosses.json",
-    "bonfire.json",
-    "bonfires.json",
-    "ring.json",
-    "goods_magic_bulk.json",
-)
 
 
 def _print_source_policy() -> None:
@@ -93,8 +77,12 @@ def _print_source_policy() -> None:
         sys.stdout.write(f"{line}\n")
 
 
+def _resources_dir() -> Path:
+    return Path(__file__).resolve().parent.parent / "resources"
+
+
 def _resource_path(name: str) -> Path:
-    return Path(__file__).resolve().parent.parent / "resources" / name
+    return _resources_dir() / name
 
 
 def _resource_json(name: str) -> object:
@@ -371,26 +359,24 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def cmd_fresh(args) -> None:
-    print("Welcome to Dark Souls 3, Ashen One.")
-    print()
-    print("You are at the Cemetery of Ash. Light the first bonfire.")
-    print()
-    print("Immediate priorities:")
-    print("  - Level VGR early; 20 is comfortable, 27 is the first big HP target.")
-    print("  - Keep equip load under 70% for a medium roll.")
     print(
-        "  - Meet weapon requirements, then upgrade one main weapon before spreading stats/materials."
+        "Welcome to Dark Souls 3, Ashen One.\n"
+        "\n"
+        "You are at the Cemetery of Ash. Light the first bonfire.\n"
+        "\n"
+        "Immediate priorities:\n"
+        "  - Level VGR early; 20 is comfortable, 27 is the first big HP target.\n"
+        "  - Keep equip load under 70% for a medium roll.\n"
+        "  - Meet weapon requirements, then upgrade one main weapon before spreading stats/materials.\n"
+        "  - Avoid LCK/INT/FTH/ATT unless you are deliberately building bleed/casting/FP.\n"
+        "  - Do not level every stat evenly; pick one damage lane.\n"
+        "\n"
+        "Key commands to get started:\n"
+        "  ds3 softcaps  — stat breakpoints to plan your build\n"
+        "  ds3 origins   — view starting classes and their stats\n"
+        "  ds3 weapons   — weapon lookup and comparison\n"
+        "  ds3 estus     — flask shard and bone shard details"
     )
-    print(
-        "  - Avoid LCK/INT/FTH/ATT unless you are deliberately building bleed/casting/FP."
-    )
-    print("  - Do not level every stat evenly; pick one damage lane.")
-    print()
-    print("Key commands to get started:")
-    print("  ds3 softcaps  — stat breakpoints to plan your build")
-    print("  ds3 origins   — view starting classes and their stats")
-    print("  ds3 weapons   — weapon lookup and comparison")
-    print("  ds3 estus     — flask shard and bone shard details")
 
 
 def cmd_softcaps(args) -> None:
@@ -770,32 +756,32 @@ def cmd_compare(args) -> None:
 
 
 def cmd_mods(args) -> None:
-    print("=== Mod Tools & Launchers ===\n")
-    print("  Mod Engine 1 (dinput8.dll passive proxy)")
-    print("    Mechanism: game loads dinput8.dll from folder; loads mod/ overrides")
-    print("    Compatibility: works with cracked + legit copies, no injection")
-    print("    Repo: github.com/katalash/ModEngine (GPL-3.0)")
-    print()
-    print("  Mod Engine 2 (ME2, external launcher)")
-    print("    Mechanism: launcher injects modengine2.dll via CreateRemoteThread")
-    print("    Compatibility: legit Steam copies; may fail on cracked (CODEX blocks)")
-    print("    Repo: github.com/soulsmods/ModEngine2")
-    print()
-    print("  Mod Engine 3 (ME3, external launcher)")
-    print("    Mechanism: profile-based mod loading, DLL injection")
-    print("    Compatibility: legit Steam copies only; CODEX blocks CreateRemoteThread")
-    print("    Repo: github.com/garyttierney/me3 (MIT)")
-    print()
-    print("=== Common Utility Mods ===\n")
-    print("  Proper PC Experience (#1545): FPS unlock, FoV, refresh rate, skip intros")
-    print("  FromStutterFix: general FromSoft frame-pacing fix (github.com/kh0nsu)")
     print(
-        "  Blue Sentinel (#723): anti-cheat + player overlay + save backups (online-safe)"
-    )
-    print("  Camera Fix (#2028): disable auto camera rotation (requires ME2/ME3)")
-    print("  PS4 Controller Icons (#278): replace Xbox glyphs with PlayStation glyphs")
-    print()
-    print(
+        "=== Mod Tools & Launchers ===\n"
+        "\n"
+        "  Mod Engine 1 (dinput8.dll passive proxy)\n"
+        "    Mechanism: game loads dinput8.dll from folder; loads mod/ overrides\n"
+        "    Compatibility: works with cracked + legit copies, no injection\n"
+        "    Repo: github.com/katalash/ModEngine (GPL-3.0)\n"
+        "\n"
+        "  Mod Engine 2 (ME2, external launcher)\n"
+        "    Mechanism: launcher injects modengine2.dll via CreateRemoteThread\n"
+        "    Compatibility: legit Steam copies; may fail on cracked (CODEX blocks)\n"
+        "    Repo: github.com/soulsmods/ModEngine2\n"
+        "\n"
+        "  Mod Engine 3 (ME3, external launcher)\n"
+        "    Mechanism: profile-based mod loading, DLL injection\n"
+        "    Compatibility: legit Steam copies only; CODEX blocks CreateRemoteThread\n"
+        "    Repo: github.com/garyttierney/me3 (MIT)\n"
+        "\n"
+        "=== Common Utility Mods ===\n"
+        "\n"
+        "  Proper PC Experience (#1545): FPS unlock, FoV, refresh rate, skip intros\n"
+        "  FromStutterFix: general FromSoft frame-pacing fix (github.com/kh0nsu)\n"
+        "  Blue Sentinel (#723): anti-cheat + player overlay + save backups (online-safe)\n"
+        "  Camera Fix (#2028): disable auto camera rotation (requires ME2/ME3)\n"
+        "  PS4 Controller Icons (#278): replace Xbox glyphs with PlayStation glyphs\n"
+        "\n"
         "  All mod data from Nexus Mods + GitHub. Use live research for latest versions."
     )
 
@@ -851,9 +837,6 @@ def cmd_audit(args) -> None:
             if not _is_hex_byte_string(item_id):
                 issues.append(f"{name}: invalid hex ID for {item_name!r}")
                 break
-    for legacy in LEGACY_RESOURCE_FILES:
-        if _resource_path(legacy).exists():
-            issues.append(f"legacy resource should not exist: resources/{legacy}")
     if issues:
         for i in issues:
             print(f"  FAIL: {i}")
@@ -1026,8 +1009,6 @@ def _status_counts(value: object) -> tuple[int | None, int | None]:
 
 
 def _print_completion_status(save_path: str) -> bool:
-    if read_completion_status is None:
-        return False
     status = read_completion_status(save_path)
     if not isinstance(status, dict):
         return False
@@ -1066,8 +1047,6 @@ def _print_completion_status(save_path: str) -> bool:
 
 
 def _owned_name_set(save_path: str) -> set[str]:
-    if owned_item_names is None:
-        return set()
     names = owned_item_names(save_path)
     if isinstance(names, dict):
         flattened: set[str] = set()
@@ -1081,9 +1060,6 @@ def _owned_name_set(save_path: str) -> set[str]:
 
 
 def _print_owned_items(save_path: str) -> None:
-    if owned_item_names is None:
-        print("  Owned item tracking not yet available.")
-        return
     names = owned_item_names(save_path)
     print("=== Owned Items ===")
     if isinstance(names, dict):
@@ -1127,9 +1103,6 @@ def _print_name_sample(items: list[dict], limit: int = 12) -> None:
 
 
 def _print_inventory(save_path: str) -> None:
-    if read_inventory is None:
-        print("  Inventory parsing is not available.")
-        return
     inv = read_inventory(save_path)
     print(f"=== Inventory: {inv['total_items']} resolved items ===")
     for label, key in (
@@ -1143,37 +1116,11 @@ def _print_inventory(save_path: str) -> None:
         _print_name_sample(items)
 
 
-def _boss_flags_supported(save_path: str) -> bool:
-    del save_path
-    try:
-        from ds3_save import _boss_flags_supported as parser_boss_flags_supported
-    except ImportError:
-        return False
-    return parser_boss_flags_supported()
-
-
-def _bonfire_flags_supported(save_path: str) -> bool:
-    del save_path
-    try:
-        from ds3_save import _bonfire_flags_supported as parser_bonfire_flags_supported
-    except ImportError:
-        return False
-    return parser_bonfire_flags_supported()
-
-
 def _tracked_boss_names() -> list[str]:
-    try:
-        from ds3_save import BOSS_FLAGS
-    except ImportError:
-        return []
     return [str(name) for name in BOSS_FLAGS]
 
 
 def _tracked_bonfire_names() -> list[str]:
-    try:
-        from ds3_save import BONFIRE_BIT_FLAGS
-    except ImportError:
-        return []
     return sorted(f"{item['area']} - {item['name']}" for item in BONFIRE_BIT_FLAGS)
 
 
@@ -1208,8 +1155,8 @@ def _max_weapon_label(stats: dict) -> str:
 
 
 def _print_save_overview(save_path: str, stats: dict, *, include_stats: bool) -> None:
-    boss_flags_supported = _boss_flags_supported(save_path)
-    bonfire_flags_supported = _bonfire_flags_supported(save_path)
+    boss_flags_supported = _boss_flags_supported()
+    bonfire_flags_supported = _bonfire_flags_supported()
     print(f"=== {read_name(save_path)} ===")
     journey = read_ng_plus(save_path)
     journey_label = "NG" if journey == 0 else f"NG+{journey}"
@@ -1341,7 +1288,7 @@ def _print_save_achievements(save_path: str) -> None:
         if not has_status
         else "\n=== Completion Checklist ==="
     )
-    if _boss_flags_supported(save_path):
+    if _boss_flags_supported():
         bosses = read_bosses(save_path)
         defeated = [boss for boss in bosses if boss["defeated"]]
         print(f"  Bosses: {len(defeated)}/{len(bosses)} defeated")
@@ -1353,7 +1300,7 @@ def _print_save_achievements(save_path: str) -> None:
     else:
         print("  Bosses: unsupported (event flag region not verified)")
 
-    if _bonfire_flags_supported(save_path):
+    if _bonfire_flags_supported():
         bonfires = read_bonfires(save_path)
         unlocked = [name for name, is_unlocked in bonfires.items() if is_unlocked]
         print(f"  Tracked bonfires: {len(unlocked)}/{len(bonfires)} unlocked")
@@ -1438,7 +1385,7 @@ def cmd_save(args) -> None:
 
     if action == "bosses":
         print("=== BOSSES ===")
-        if not _boss_flags_supported(save_path):
+        if not _boss_flags_supported():
             _print_unsupported_event_flags(
                 "Bosses", _tracked_boss_names(), spoilers=args.spoilers
             )
@@ -1464,7 +1411,7 @@ def cmd_save(args) -> None:
 
     if action == "bonfires":
         print("=== TRACKED BONFIRES ===")
-        if not _bonfire_flags_supported(save_path):
+        if not _bonfire_flags_supported():
             _print_unsupported_event_flags(
                 "Tracked bonfires", _tracked_bonfire_names(), spoilers=args.spoilers
             )
@@ -1505,44 +1452,35 @@ def cmd_save(args) -> None:
         return
 
     if action == "gestures":
-        try:
-            from ds3_save import read_gestures
-
-            result = read_gestures(save_path)
-            if isinstance(result, dict) and result.get("supported") is False:
-                gestures = result.get("gestures", [])
-                names = [name for name in gestures if isinstance(name, str)]
-                print(
-                    f"=== Gestures ({len(names)} checklist entries; not save-backed) ==="
-                )
-                reason = result.get("reason")
-                if isinstance(reason, str) and reason:
-                    print(f"  Save ownership unsupported: {reason}")
-                if names:
-                    print("  Static checklist:")
-                    for name in names:
-                        print(f"    - {name}")
-                return
-            if isinstance(result, list):
-                unlocked = [
-                    g for g in result if isinstance(g, dict) and g.get("unlocked")
-                ]
-                locked = [
-                    g for g in result if isinstance(g, dict) and not g.get("unlocked")
-                ]
-                print(f"=== Gestures ({len(unlocked)}/{len(result)} unlocked) ===")
-                if unlocked:
-                    print("  Unlocked:")
-                    for g in unlocked:
-                        print(f"    + {g['name']}")
-                if locked:
-                    print("  Locked:")
-                    for g in locked:
-                        print(f"    - {g['name']}")
-            else:
-                print("  Gesture save ownership is not available.")
-        except ImportError:
-            print("  Gesture tracking not yet available.")
+        result = read_gestures(save_path)
+        if isinstance(result, dict) and result.get("supported") is False:
+            gestures = result.get("gestures", [])
+            names = [name for name in gestures if isinstance(name, str)]
+            print(f"=== Gestures ({len(names)} checklist entries; not save-backed) ===")
+            reason = result.get("reason")
+            if isinstance(reason, str) and reason:
+                print(f"  Save ownership unsupported: {reason}")
+            if names:
+                print("  Static checklist:")
+                for name in names:
+                    print(f"    - {name}")
+            return
+        if isinstance(result, list):
+            unlocked = [g for g in result if isinstance(g, dict) and g.get("unlocked")]
+            locked = [
+                g for g in result if isinstance(g, dict) and not g.get("unlocked")
+            ]
+            print(f"=== Gestures ({len(unlocked)}/{len(result)} unlocked) ===")
+            if unlocked:
+                print("  Unlocked:")
+                for g in unlocked:
+                    print(f"    + {g['name']}")
+            if locked:
+                print("  Locked:")
+                for g in locked:
+                    print(f"    - {g['name']}")
+        else:
+            print("  Gesture save ownership is not available.")
         return
 
     if action == "owned":
@@ -1563,21 +1501,7 @@ def cmd_save(args) -> None:
         return
 
     if action == "missed":
-        if read_missed is not None:
-            _print_missed_result(read_missed(save_path))
-            return
-        _print_missed_result(
-            {
-                "current_area": "",
-                "missing_bosses": [],
-                "key_items": [],
-                "checklist_available": False,
-                "estus_shards_found": None,
-                "estus_shards_total": 0,
-                "bone_shards_found": None,
-                "bone_shards_total": 0,
-            }
-        )
+        _print_missed_result(read_missed(save_path))
         return
 
     _print_save_overview(save_path, stats, include_stats=(action == "stats"))
