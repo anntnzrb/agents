@@ -269,8 +269,6 @@ Resource roles:
 - area-checklist scaffold: `area_checklists.json`; small spoiler-filtered local checklist hints where curated, incomplete by design.
 - eval-fixture: `evals/evals.json`; prompt expectations that enforce routing, spoiler safety, source policy, and command use.
 
-Do not reintroduce legacy names like `Bosses.json`, `bonfire.json`, `ring.json`, or `goods_magic_bulk.json`.
-
 Source and license ranking lives in `REFERENCES.md`. Use it before replacing embedded resource data.
 
 ## Source registry and cache
