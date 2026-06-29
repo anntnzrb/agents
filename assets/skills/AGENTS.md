@@ -36,6 +36,13 @@
 - Return `127` for missing required external executables.
 - Platform-specific skills must fail clearly on unsupported OS instead of relying on shell failure.
 
+## Full Gate
+
+```
+uvx ruff format <path> # fmt
+uvx ruff check --select ALL <path> # aggressive lint (try to fix most)
+```
+
 ## Validation
 
 Use the `skill-creator` skill for skill creation, audits, packaging, or trigger/structure work.
