@@ -117,13 +117,13 @@ bashInterceptor:
       message: "Use the `write` tool instead of echo/cat redirection. It handles encoding and provides confirmation."
     - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(cat|head|tail|less|more)\\s+"
       tool: read
-      message: "Use the `read` tool instead of cat/head/tail. It provides better context and handles binary files."
+      message: "Use the `read` tool instead of cat/head/tail for direct file reads. Shell pipelines may use head/tail to trim command output."
     - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(grep|rg|ripgrep|ag|ack)\\s+"
       tool: grep
-      message: "Use the `grep` tool instead of grep/rg. It respects .gitignore and provides structured output."
-    - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:fd\\b|(?:(?:find|locate)\\s+.*(?:-name|-iname|-type|--type|-glob)))"
+      message: "Use the `grep` tool instead of grep/rg for file searches. Shell pipelines may use grep to filter command output."
+    - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:fd\\b|locate\\s+.*(?:-name|-iname|-type|--type|-glob)|find\\s+(?![^\\n;|&]*(?:-mtime|-mmin|-ctime|-cmin|-atime|-amin|-size|-exec|-execdir|-delete|-prune|-perm|-user|-group|-newer|-samefile)\\b)[^\\n;|&]*(?:-name|-iname|-type|--type|-glob))"
       tool: glob
-      message: "Use the `glob` tool instead of find/fd. It respects .gitignore and is faster for glob patterns."
+      message: "Use the `glob` tool for simple find/fd file discovery. Shell find is allowed for advanced predicates/actions like -mtime, -size, or -exec."
     - pattern: "(?:^|\\s*(?:&&|\\|\\||;)\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*sed\\s+(-i|--in-place)"
       tool: edit
       message: "Use the `edit` tool instead of sed -i. It provides diff preview and fuzzy matching."
