@@ -2,11 +2,11 @@
 # Models
 # =============================================================================
 modelRoles:
-  default: openai-codex/gpt-5.5:medium
+  default: openai-codex/gpt-5.5:low
   task: openai-codex/gpt-5.5:low
 
-  commit: google-antigravity/gemini-3.1-flash-lite:xhigh
-  smol: google-antigravity/gemini-3.1-flash-lite:xhigh
+  commit: google-antigravity/gemini-3.5-flash:xhigh
+  smol: google-antigravity/gemini-3.5-flash:xhigh
 
   plan: openai-codex/gpt-5.5:medium
   advisor: openai-codex/gpt-5.5:low
