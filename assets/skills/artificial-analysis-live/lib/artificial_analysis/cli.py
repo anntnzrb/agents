@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import UTC, datetime, timedelta
 import os
 import re
 import sys
@@ -32,10 +33,12 @@ from .rsc import (
 
 PROTOCOL_VERSION = "1"
 
-DEFAULT_OUTPUT_JSON = Path("artifacts/artificial-analysis/full-data.json")
-DEFAULT_OUTPUT_ENDPOINTS = Path("artifacts/artificial-analysis/endpoints.txt")
-DEFAULT_OUTPUT_URL = Path("artifacts/artificial-analysis/full-url.txt")
-DEFAULT_CODING_OUTPUT_JSON = Path("artifacts/artificial-analysis/coding-data.json")
+DEFAULT_ARTIFACT_DIR = Path("/tmp/artifacts/artificial-analysis")
+DEFAULT_OUTPUT_JSON = DEFAULT_ARTIFACT_DIR / "full-data.json"
+DEFAULT_OUTPUT_ENDPOINTS = DEFAULT_ARTIFACT_DIR / "endpoints.txt"
+DEFAULT_OUTPUT_URL = DEFAULT_ARTIFACT_DIR / "full-url.txt"
+DEFAULT_CODING_OUTPUT_JSON = DEFAULT_ARTIFACT_DIR / "coding-data.json"
+DEFAULT_SNAPSHOT_MAX_AGE = timedelta(hours=24)
 
 
 class CliUsageError(RuntimeError):
@@ -97,7 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     harness_parser = subparsers.add_parser(
         "harness",
-        help="Rank unique models by Harness = 50% Agentic Index + 50% Coding Index.",
+        help="Rank unique models by Harness = 50%% Agentic Index + 50%% Coding Index.",
     )
     harness_parser.add_argument(
         "snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON
@@ -362,6 +365,38 @@ def _envelope(command: str, data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _ensure_default_snapshot_fresh(path: Path, snapshot: dict[str, Any]) -> None:
+    if path != DEFAULT_OUTPUT_JSON:
+        return
+
+    meta = snapshot.get("meta")
+    fetched_at = meta.get("fetched_at") if isinstance(meta, dict) else None
+    if not isinstance(fetched_at, str) or not fetched_at:
+        raise ExtractionError(
+            f"Default snapshot missing meta.fetched_at: {path}. Run fetch first or pass an explicit snapshot path."
+        )
+
+    try:
+        fetched_at_dt = datetime.fromisoformat(fetched_at)
+    except ValueError as exc:
+        raise ExtractionError(
+            f"Default snapshot has invalid meta.fetched_at: {path}. Run fetch first or pass an explicit snapshot path."
+        ) from exc
+
+    if fetched_at_dt.tzinfo is None:
+        fetched_at_dt = fetched_at_dt.replace(tzinfo=UTC)
+    age = datetime.now(UTC) - fetched_at_dt.astimezone(UTC)
+    if age > DEFAULT_SNAPSHOT_MAX_AGE:
+        raise ExtractionError(
+            f"Default snapshot is stale ({fetched_at}, older than 24h): {path}. Run fetch first or pass an explicit snapshot path."
+        )
+
+
+def _load_reader_snapshot(path: Path) -> dict[str, Any]:
+    snapshot = load_snapshot(path)
+    _ensure_default_snapshot_fresh(path, snapshot)
+    return snapshot
+
 def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
     cache_meta = load_cache_metadata(args.cache_dir)
     sent_etag = cache_meta.etag if cache_meta is not None else None
@@ -411,7 +446,7 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
         fallback_source = "cache:last-good"
 
         if fallback_payload is None and args.output_json.exists():
-            fallback_payload = load_snapshot(args.output_json)
+            fallback_payload = _load_reader_snapshot(args.output_json)
             fallback_source = f"file:{args.output_json}"
 
         if fallback_payload is None:
@@ -476,7 +511,7 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _stats_payload(args: argparse.Namespace) -> dict[str, Any]:
-    snapshot = load_snapshot(args.snapshot)
+    snapshot = _load_reader_snapshot(args.snapshot)
     slugs = snapshot_slugs(snapshot)
     providers = _provider_counts_from_snapshot(snapshot)
     top = sorted(providers.items(), key=lambda item: (-item[1], item[0]))[
@@ -790,7 +825,7 @@ def _nested_sort_metric(
 
 
 def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
-    snapshot = load_snapshot(args.snapshot)
+    snapshot = _load_reader_snapshot(args.snapshot)
     hosts_models = snapshot.get("hosts_models")
     if not isinstance(hosts_models, list):
         raise ExtractionError("Snapshot missing hosts_models list")
@@ -1002,7 +1037,7 @@ def _reasoning_benchmarks(model: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
-    snapshot = load_snapshot(args.snapshot)
+    snapshot = _load_reader_snapshot(args.snapshot)
     hosts_models = snapshot.get("hosts_models")
     if not isinstance(hosts_models, list):
         raise ExtractionError("Snapshot missing hosts_models list")
@@ -1157,7 +1192,7 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
         "rows": limited,
     }
 def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
-    snapshot = load_snapshot(args.snapshot)
+    snapshot = _load_reader_snapshot(args.snapshot)
     hosts_models = snapshot.get("hosts_models")
     if not isinstance(hosts_models, list):
         raise ExtractionError("Snapshot missing hosts_models list")
@@ -1368,7 +1403,7 @@ def _qa_payload(args: argparse.Namespace) -> dict[str, Any]:
     if not question:
         raise CliUsageError("qa requires a non-empty question")
 
-    snapshot = load_snapshot(args.snapshot)
+    snapshot = _load_reader_snapshot(args.snapshot)
     hosts_models = snapshot.get("hosts_models")
     if not isinstance(hosts_models, list):
         raise ExtractionError("Snapshot missing hosts_models list")
@@ -1579,9 +1614,9 @@ def _capability_schema() -> dict[str, Any]:
                 "description": "Fetch live RSC payload, validate sanity thresholds, cache by ETag, and write outputs.",
                 "outputs": ["full-data.json", "endpoints.txt", "full-url.txt"],
                 "flags": {
-                    "output_json": "Path (default artifacts/artificial-analysis/full-data.json)",
-                    "output_endpoints": "Path (default artifacts/artificial-analysis/endpoints.txt)",
-                    "output_url": "Path (default artifacts/artificial-analysis/full-url.txt)",
+                    "output_json": "Path (default /tmp/artifacts/artificial-analysis/full-data.json)",
+                    "output_endpoints": "Path (default /tmp/artifacts/artificial-analysis/endpoints.txt)",
+                    "output_url": "Path (default /tmp/artifacts/artificial-analysis/full-url.txt)",
                     "cache_dir": "Path to ETag/payload cache",
                     "timeout_seconds": "float network timeout",
                     "min_endpoints": "int sanity threshold (default 700)",

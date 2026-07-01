@@ -117,7 +117,7 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" --mode rpc
 - Prefer `reasoning` for model reasoning selectivity and per-benchmark token split questions.
 - Prefer `query` for provider endpoint ranking answers.
 - Prefer `qa` only when user asks in plain language and speed matters.
-- If data freshness is critical, run `fetch` immediately before `query`/`qa`.
+- If data freshness is critical, run `fetch` immediately before `query`/`qa`; default `/tmp/artifacts/artificial-analysis/full-data.json` readers reject snapshots older than 24h, while explicit snapshot paths are treated as intentional historical data.
 
 ## Reliability defaults
 
