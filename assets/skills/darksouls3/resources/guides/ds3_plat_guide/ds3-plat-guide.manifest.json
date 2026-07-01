@@ -1,0 +1,37 @@
+{
+  "title": "Dark Souls III - Platinum Walkthrough",
+  "author": "Xillynoc",
+  "url": "https://psnprofiles.com/guide/18822-dark-souls-iii-platinum-walkthrough",
+  "published": "2024-05-19",
+  "updated": "2026-06-24",
+  "format": "ds3-guide-chunks-v1",
+  "chunk_count": 303,
+  "source_pdf_name": "ds3-plat-guide.pdf",
+  "source_pdf_sha256": "07698a900163fd2c87dc98a7f047371a41f78c291263f11321a6fe5ddd1b8bc1",
+  "source_type": "user-provided PDF export",
+  "copyable": false,
+  "tracked_artifact": true,
+  "source_pdf_tracked": false,
+  "usage": [
+    "local lookup",
+    "transformed cited answers"
+  ],
+  "constraints": [
+    "non-authoritative",
+    "non-save-backed",
+    "spoiler-heavy",
+    "not relicensable"
+  ],
+  "preprocessing": {
+    "pdf_boilerplate_removed": true,
+    "page_numbers_removed": true,
+    "line_wraps_reflowed": true,
+    "unicode_normalized": true,
+    "section_chunked": true,
+    "row_schema": {
+      "h": "heading path",
+      "k": "kind",
+      "t": "cleaned content"
+    }
+  }
+}
