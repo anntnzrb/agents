@@ -13,8 +13,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import sqlite3
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from cli_catalog import *
@@ -40,6 +43,31 @@ from ds3_save import (
 )
 
 HEX_BYTE_WIDTH = 2
+GUIDE_SEARCH_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "for",
+        "from",
+        "in",
+        "is",
+        "it",
+        "of",
+        "on",
+        "or",
+        "that",
+        "the",
+        "this",
+        "to",
+        "with",
+    }
+)
 SOURCE_USAGE = "Use: sources list | status | policy | explain <key> | refresh [keys...]"
 SOURCE_POLICY_LINES: tuple[str, ...] = (
     "=== Source Policy ===",
@@ -122,6 +150,224 @@ def _resource_path(name: str) -> Path:
 
 def _resource_json(name: str) -> object:
     return json.loads(_resource_path(name).read_text(encoding="utf-8"))
+
+
+GUIDE_DIR = _resources_dir() / "guides" / "ds3_plat_guide"
+GUIDE_MANIFEST_PATH = GUIDE_DIR / "ds3-plat-guide.manifest.json"
+GUIDE_CHUNKS_PATH = GUIDE_DIR / "ds3-plat-guide.chunks.jsonl"
+
+
+@dataclass(frozen=True, slots=True)
+class GuideChunk:
+    row: int
+    h: list[str]
+    k: str
+    t: str
+
+    @property
+    def heading_path(self) -> str:
+        return " > ".join(self.h) if self.h else "(no heading)"
+
+    def as_json(self) -> dict[str, object]:
+        return {"row": self.row, "h": self.h, "k": self.k, "t": self.t}
+
+
+def _guide_missing(path: Path) -> None:
+    print(
+        f"Missing DS3 platinum guide corpus: {path}",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
+
+
+def _load_guide_manifest() -> dict[str, object]:
+    if not GUIDE_MANIFEST_PATH.exists():
+        _guide_missing(GUIDE_MANIFEST_PATH)
+    data = json.loads(GUIDE_MANIFEST_PATH.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        print(
+            "Invalid DS3 platinum guide manifest: expected JSON object", file=sys.stderr
+        )
+        raise SystemExit(2)
+    return data
+
+
+def _coerce_guide_chunk(row: int, value: object) -> GuideChunk:
+    if not isinstance(value, dict):
+        print(
+            f"Invalid DS3 platinum guide chunk at row {row}: expected object",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    headings = value.get("h")
+    kind = value.get("k")
+    text = value.get("t")
+    if (
+        not isinstance(headings, list)
+        or not all(isinstance(item, str) for item in headings)
+        or not isinstance(kind, str)
+        or not isinstance(text, str)
+    ):
+        print(
+            f"Invalid DS3 platinum guide chunk at row {row}: expected h/k/t strings",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    return GuideChunk(row=row, h=headings, k=kind, t=text)
+
+
+def _load_guide_chunks() -> list[GuideChunk]:
+    if not GUIDE_CHUNKS_PATH.exists():
+        _guide_missing(GUIDE_CHUNKS_PATH)
+    chunks: list[GuideChunk] = []
+    with GUIDE_CHUNKS_PATH.open("r", encoding="utf-8") as handle:
+        for row, line in enumerate(handle, start=1):
+            if line.strip():
+                chunks.append(_coerce_guide_chunk(row, json.loads(line)))
+    return chunks
+
+
+def _guide_snippet(
+    text: str, terms: list[str] | None = None, *, width: int = 240
+) -> str:
+    compact = " ".join(text.split())
+    if len(compact) <= width:
+        return compact
+    start = 0
+    for term in terms or []:
+        found = compact.lower().find(term.lower())
+        if found >= 0:
+            start = max(0, found - 60)
+            break
+    end = min(len(compact), start + width)
+    prefix = "..." if start else ""
+    suffix = "..." if end < len(compact) else ""
+    return f"{prefix}{compact[start:end]}{suffix}"
+
+
+def _guide_header() -> str:
+    return "Source: Dark Souls III - Platinum Walkthrough (local generated corpus; spoiler-heavy, non-authoritative)."
+
+
+def _guide_tokens(query: str) -> list[str]:
+    tokens = [token.lower() for token in re.findall(r"[A-Za-z0-9']+", query)]
+    filtered = [
+        token
+        for token in tokens
+        if token not in GUIDE_SEARCH_STOPWORDS and (len(token) > 1 or token.isdigit())
+    ]
+    return filtered or tokens[:1]
+
+
+def _guide_fts_query(tokens: list[str]) -> str:
+    return " ".join(f'"{token}"' for token in tokens)
+
+
+def _guide_matches_filters(
+    chunk: GuideChunk, kind: str | None, heading: str | None
+) -> bool:
+    if kind and chunk.k.lower() != kind.lower():
+        return False
+    if heading and heading.lower() not in chunk.heading_path.lower():
+        return False
+    return True
+
+
+def _search_guide_fts(
+    chunks: list[GuideChunk],
+    tokens: list[str],
+    *,
+    kind: str | None,
+    heading: str | None,
+    limit: int,
+) -> list[tuple[GuideChunk, str]]:
+    conn = sqlite3.connect(":memory:")
+    try:
+        conn.execute("CREATE VIRTUAL TABLE guide USING fts5(heading, kind, text)")
+        conn.executemany(
+            "INSERT INTO guide(rowid, heading, kind, text) VALUES (?, ?, ?, ?)",
+            ((chunk.row, chunk.heading_path, chunk.k, chunk.t) for chunk in chunks),
+        )
+        sql = (
+            "SELECT rowid, snippet(guide, 2, '[', ']', '...', 32) "
+            "FROM guide WHERE guide MATCH ?"
+        )
+        params: list[object] = [_guide_fts_query(tokens)]
+        if kind:
+            sql += " AND lower(kind) = lower(?)"
+            params.append(kind)
+        if heading:
+            sql += " AND lower(heading) LIKE lower(?)"
+            params.append(f"%{heading}%")
+        sql += " ORDER BY bm25(guide) LIMIT ?"
+        params.append(limit)
+        by_row = {chunk.row: chunk for chunk in chunks}
+        return [
+            (by_row[int(row)], " ".join(str(snippet).split()))
+            for row, snippet in conn.execute(sql, params)
+            if int(row) in by_row
+        ]
+    finally:
+        conn.close()
+
+
+def _python_guide_score(chunk: GuideChunk, tokens: list[str]) -> int:
+    heading = chunk.heading_path.lower()
+    kind = chunk.k.lower()
+    text = chunk.t.lower()
+    score = 0
+    for token in tokens:
+        score += heading.count(token) * 8
+        score += kind.count(token) * 4
+        score += text.count(token)
+    return score
+
+
+def _guide_contains_all_tokens(chunk: GuideChunk, tokens: list[str]) -> bool:
+    haystack = f"{chunk.heading_path} {chunk.k} {chunk.t}".lower()
+    return all(token in haystack for token in tokens)
+
+
+def _search_guide_python(
+    chunks: list[GuideChunk],
+    tokens: list[str],
+    *,
+    kind: str | None,
+    heading: str | None,
+    limit: int,
+) -> list[tuple[GuideChunk, str]]:
+    ranked: list[tuple[int, int, GuideChunk]] = []
+    for chunk in chunks:
+        if not _guide_matches_filters(chunk, kind, heading):
+            continue
+        if not _guide_contains_all_tokens(chunk, tokens):
+            continue
+        score = _python_guide_score(chunk, tokens)
+        if score > 0:
+            ranked.append((-score, chunk.row, chunk))
+    ranked.sort()
+    return [(chunk, _guide_snippet(chunk.t, tokens)) for _, _, chunk in ranked[:limit]]
+
+
+def _search_guide_chunks(
+    chunks: list[GuideChunk],
+    query: str,
+    *,
+    kind: str | None,
+    heading: str | None,
+    limit: int,
+) -> list[tuple[GuideChunk, str]]:
+    tokens = _guide_tokens(query)
+    if not tokens or limit <= 0:
+        return []
+    try:
+        return _search_guide_fts(
+            chunks, tokens, kind=kind, heading=heading, limit=limit
+        )
+    except sqlite3.Error:
+        return _search_guide_python(
+            chunks, tokens, kind=kind, heading=heading, limit=limit
+        )
 
 
 def _is_hex_byte_string(value: str) -> bool:
@@ -448,6 +694,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--force", action="store_true", help="Force refresh even if not stale"
     )
 
+    guide = sp.add_parser(
+        "guide", help="Look up the spoiler-heavy generated platinum guide corpus"
+    )
+    guide_sub = guide.add_subparsers(dest="guide_action")
+    guide_sub.add_parser("info", help="Show guide corpus metadata")
+    guide_sub.add_parser("kinds", help="List chunk kinds")
+    guide_sub.add_parser("headings", help="List heading paths")
+    guide_get = guide_sub.add_parser("get", help="Get one guide chunk by 1-based row")
+    guide_get.add_argument("row", type=int, help="1-based JSONL row number")
+    guide_get.add_argument("--json", action="store_true", help="Print JSON object")
+    guide_search = guide_sub.add_parser("search", help="Search the guide corpus")
+    guide_search.add_argument("query", nargs="+", help="Search terms")
+    guide_search.add_argument("--kind", help="Filter by exact chunk kind")
+    guide_search.add_argument("--heading", help="Filter by heading path substring")
+    guide_search.add_argument(
+        "--limit", type=int, default=8, help="Maximum rows to print"
+    )
+    guide_search.add_argument("--json", action="store_true", help="Print JSON array")
     ri = sp.add_parser(
         "rings", help="Rings catalog: browse, search, or filter by build"
     )
@@ -504,6 +768,105 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 # ── Command handlers ─────────────────────────────────────────────
+
+
+def _print_guide_chunk(chunk: GuideChunk, snippet: str | None = None) -> None:
+    print(f"Row {chunk.row}: {chunk.heading_path}")
+    print(f"Kind: {chunk.k}")
+    print(f"Text: {snippet if snippet is not None else _guide_snippet(chunk.t)}")
+
+
+def _print_guide_matches(matches: list[tuple[GuideChunk, str]]) -> None:
+    print(_guide_header())
+    if not matches:
+        print("No guide rows matched.")
+        return
+    for index, (chunk, snippet) in enumerate(matches, start=1):
+        if index > 1:
+            print()
+        _print_guide_chunk(chunk, snippet)
+
+
+def cmd_guide(args) -> None:
+    action = args.guide_action
+    if not action:
+        print("Use: guide info | kinds | headings | get ROW [--json] | search QUERY...")
+        return
+
+    if action == "info":
+        manifest = _load_guide_manifest()
+        chunks = _load_guide_chunks()
+        print(_guide_header())
+        print(f"Title: {manifest.get('title', 'Unknown')}")
+        print(f"Author: {manifest.get('author', 'Unknown')}")
+        print(f"URL: {manifest.get('url', 'Unknown')}")
+        print(f"Updated: {manifest.get('updated', 'Unknown')}")
+        print(f"Chunks: {len(chunks)}")
+        print(
+            "Caveat: spoiler-heavy local lookup; verify against primary sources when citing."
+        )
+        return
+
+    chunks = _load_guide_chunks()
+    if action == "kinds":
+        counts: dict[str, int] = {}
+        for chunk in chunks:
+            counts[chunk.k] = counts.get(chunk.k, 0) + 1
+        print(_guide_header())
+        for kind, count in sorted(counts.items()):
+            print(f"{kind}: {count}")
+        return
+
+    if action == "headings":
+        print(_guide_header())
+        seen: set[str] = set()
+        for chunk in chunks:
+            heading = chunk.heading_path
+            if heading not in seen:
+                seen.add(heading)
+                print(heading)
+        return
+
+    if action == "get":
+        row = args.row
+        if row < 1 or row > len(chunks):
+            print(
+                f"Guide row out of range: {row} (valid: 1-{len(chunks)})",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
+        chunk = chunks[row - 1]
+        if args.json:
+            print(json.dumps(chunk.as_json(), ensure_ascii=False))
+        else:
+            print(_guide_header())
+            _print_guide_chunk(chunk, chunk.t)
+        return
+
+    if action == "search":
+        query = " ".join(args.query)
+        matches = _search_guide_chunks(
+            chunks,
+            query,
+            kind=args.kind,
+            heading=args.heading,
+            limit=args.limit,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    [
+                        chunk.as_json() | {"snippet": snippet}
+                        for chunk, snippet in matches
+                    ],
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            _print_guide_matches(matches)
+        return
+
+    print("Use: guide info | kinds | headings | get ROW [--json] | search QUERY...")
 
 
 def cmd_fresh(args) -> None:
@@ -1701,6 +2064,7 @@ def main() -> None:
         "sources": cmd_sources,
         "spells": cmd_spells,
         "rings": cmd_rings,
+        "guide": cmd_guide,
         "track": cmd_track,
         "recommend": cmd_recommend,
         "save": cmd_save,

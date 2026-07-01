@@ -161,10 +161,15 @@ estus [shards|bones|allotment|max]
 - `farm` covers titanite, covenant items, and tongues.
 - DS3 has 11 Estus Shards, 10 Undead Bone Shards, and max 15 flask uses.
 
-### Achievements, mods, audit, tracking, sources
+### Achievements, platinum guide, mods, audit, tracking, sources
 
 ```text
 achievements [--missable] [--plat-route]
+guide info
+guide kinds
+guide headings
+guide search [query] [--kind <kind>] [--heading <text>] [--limit N] [--json]
+guide get <row-number> [--json]
 mods [--current]
 audit
 track [summary|stats|gear|next] --path <tracking-json>
@@ -177,6 +182,7 @@ sources refresh [source-key ...] [--force]
 ```
 
 - `achievements` covers the 43 base-game achievements. DLC bosses/items are not required for platinum.
+- `guide search` / `guide get` query the tracked local PSNProfiles platinum walkthrough corpus. Treat results as spoiler-heavy corpus lookup, not parser truth or authoritative/save-backed data.
 - `mods --current` summarizes current PC mod guidance.
 - `audit` runs skill data self-consistency checks.
 - `track`/`recommend` read an explicit user-supplied tracking JSON. The skill does not own or persist tracking state.
@@ -212,7 +218,7 @@ Route by intent, not exact wording:
 | equip load/fat roll | `equip-load`, `softcaps` | save stats if current VIT matters | Medium roll below 70%. |
 | rings/spells/covenants | `rings`, `spells`, `covenants`, `farm` | `save auto completion` when ownership matters; live/source-cache for exact locations, route steps, or covenant quest details | Avoid location spoilers unless permitted. |
 | areas/bosses/route | `areas`, `bosses`, `route`, `save auto progress` | live/source-cache for full route or exact checklist details | Default spoiler-safe. |
-| achievements/platinum | `achievements`, `save auto achievements`, `save auto completion` | live/source-cache for exact cleanup locations and quest step details | Base-game achievements only. |
+| achievements/platinum | `achievements`, `save auto achievements`, `save auto completion`; `guide search` only for the specific local PSNProfiles platinum walkthrough corpus | `guide get` for an exact corpus row; live/source-cache for exact cleanup locations and quest step details | Guide corpus lookup is spoiler-heavy and not parser truth; base-game achievements only. |
 | mods/PC fixes | `sources status`, `mods --current` | live research for latest versions/releases/compatibility before final source-backed claims | Ask legit/cracked/online only if needed. |
 | source-backed/current data | `sources status`, `sources refresh`, web research | cite URLs | Cite final sources. |
 
@@ -270,6 +276,10 @@ darksouls3/
     rings.json
     source_registry.json
     weapons.json
+    guides/
+      ds3_plat_guide/
+        ds3-plat-guide.manifest.json
+        ds3-plat-guide.chunks.jsonl
 ```
 
 Resource roles:
@@ -279,6 +289,7 @@ Resource roles:
 - thin-catalog: `weapons.json`, `armor.json`, `rings.json`, and `goods_magic.json`; conservative item-name-to-ID maps for inventory resolution only, not gameplay-stat/guide tables.
 - area-checklist scaffold: `area_checklists.json`; small spoiler-filtered local checklist hints where curated, incomplete by design.
 - source-registry: `source_registry.json`; source-key metadata, allowed-use boundaries, license/copyability flags, and provenance caveats audited by `audit`.
+- local-guide corpus: `resources/guides/ds3_plat_guide/`; user-provided PSNProfiles platinum walkthrough corpus for spoiler-heavy local lookup only. The PDF is not tracked; use `scripts/preprocess_ds3_plat_guide.py` to regenerate processed artifacts.
 - eval-fixture: `evals/evals.json`; prompt expectations that enforce routing, spoiler safety, source policy, and command use.
 
 Source and license ranking lives in `REFERENCES.md`. Use it before replacing embedded resource data.
