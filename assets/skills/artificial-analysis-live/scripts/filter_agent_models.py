@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import UTC, datetime, timedelta
 import subprocess
 import sys
 from pathlib import Path
@@ -42,8 +43,9 @@ class Row(TypedDict):
     license: str | None
 
 
-DEFAULT_SNAPSHOT = Path("artifacts/artificial-analysis/full-data.json")
+DEFAULT_SNAPSHOT = Path("/tmp/artifacts/artificial-analysis/full-data.json")
 DEFAULT_SKILL_CLI = Path(__file__).resolve().parent / "cli.py"
+DEFAULT_SNAPSHOT_MAX_AGE = timedelta(hours=24)
 
 
 def number(value: Any) -> float | None:
@@ -84,8 +86,36 @@ def model_row(model: Json) -> Row:
     }
 
 
+def ensure_default_snapshot_fresh(snapshot: Path, raw: Json) -> None:
+    if snapshot != DEFAULT_SNAPSHOT:
+        return
+
+    meta = raw.get("meta")
+    fetched_at = meta.get("fetched_at") if isinstance(meta, dict) else None
+    if not isinstance(fetched_at, str) or not fetched_at:
+        raise ValueError(
+            f"default snapshot missing meta.fetched_at: {snapshot}. Run with --fetch first or pass --snapshot."
+        )
+
+    try:
+        fetched_at_dt = datetime.fromisoformat(fetched_at)
+    except ValueError as exc:
+        raise ValueError(
+            f"default snapshot has invalid meta.fetched_at: {snapshot}. Run with --fetch first or pass --snapshot."
+        ) from exc
+
+    if fetched_at_dt.tzinfo is None:
+        fetched_at_dt = fetched_at_dt.replace(tzinfo=UTC)
+    age = datetime.now(UTC) - fetched_at_dt.astimezone(UTC)
+    if age > DEFAULT_SNAPSHOT_MAX_AGE:
+        raise ValueError(
+            f"default snapshot is stale ({fetched_at}, older than 24h): {snapshot}. Run with --fetch first or pass --snapshot."
+        )
+
+
 def load_rows(snapshot: Path) -> list[Row]:
-    raw = json.loads(snapshot.read_text())
+    raw: Json = json.loads(snapshot.read_text())
+    ensure_default_snapshot_fresh(snapshot, raw)
     hosts_models = raw.get("hosts_models")
     if not isinstance(hosts_models, list):
         raise ValueError(f"snapshot missing hosts_models list: {snapshot}")
