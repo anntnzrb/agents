@@ -123,16 +123,16 @@ class StatBlock(TypedDict):
 
 
 CLASS_NAMES: dict[int, str] = {
-    0: "Deprived",
-    1: "Knight",
-    2: "Mercenary",
-    3: "Warrior",
-    4: "Herald",
-    5: "Thief",
-    6: "Assassin",
-    7: "Sorcerer",
-    8: "Pyromancer",
-    9: "Cleric",
+    0: "Knight",
+    1: "Mercenary",
+    2: "Warrior",
+    3: "Herald",
+    4: "Thief",
+    5: "Assassin",
+    6: "Sorcerer",
+    7: "Pyromancer",
+    8: "Cleric",
+    9: "Deprived",
 }
 
 SAVE_PATH_DEFAULT: Path = Path.home() / "AppData" / "Roaming" / "DarkSoulsIII"
@@ -170,6 +170,10 @@ BOSS_EVENT_VALUES: dict[str, int] = {
     "Slave Knight Gael": 0xC0,
     "Demon Prince": 0x80,
 }
+
+def _event_flag_matches(value: int, expected: int) -> bool:
+    return (value & expected) == expected
+
 
 
 class BossStatus(TypedDict):
@@ -468,7 +472,7 @@ def read_bosses(path: str | Path, slot: int = 0) -> list[BossStatus]:
         defeated = (
             expected is not None
             and 0 <= flag_offset < len(slot_data)
-            and slot_data[flag_offset] == expected
+            and _event_flag_matches(slot_data[flag_offset], expected)
         )
         bosses.append(BossStatus(name=name, defeated=defeated, offset=offset))
     return bosses
