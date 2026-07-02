@@ -764,6 +764,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Show locked/remaining future names in save-backed progress",
     )
+    sp_save.add_argument(
+        "--all",
+        action="store_true",
+        help="Show all resolved inventory/owned names instead of the compact sample",
+    )
+    sp_save.add_argument(
+        "--find",
+        metavar="TEXT",
+        help="Filter inventory/owned output by case-insensitive text",
+    )
     return p
 
 
@@ -1582,7 +1592,9 @@ def _owned_name_set(save_path: str) -> set[str]:
     return set()
 
 
-def _print_owned_items(save_path: str) -> None:
+def _print_owned_items(
+    save_path: str, *, show_all: bool = False, find: str | None = None
+) -> None:
     names = owned_item_names(save_path)
     print("=== Owned Items ===")
     if isinstance(names, dict):
@@ -1591,22 +1603,26 @@ def _print_owned_items(save_path: str) -> None:
             if not isinstance(values, (set, list, tuple)):
                 continue
             ordered = sorted(str(value) for value in values)
+            if find:
+                needle = find.casefold()
+                ordered = [name for name in ordered if needle in name.casefold()]
             label = key.replace("_", " ").title()
             print(f"  {label}: {len(ordered)} owned")
             if ordered:
-                print(
-                    "    "
-                    + ", ".join(ordered[:12])
-                    + (" ..." if len(ordered) > 12 else "")
-                )
+                shown = ordered if show_all else ordered[:12]
+                suffix = "" if show_all or len(ordered) <= 12 else " ..."
+                print("    " + ", ".join(shown) + suffix)
         return
     if isinstance(names, (set, list, tuple)):
         ordered = sorted(str(value) for value in names)
+        if find:
+            needle = find.casefold()
+            ordered = [name for name in ordered if needle in name.casefold()]
         print(f"  Items: {len(ordered)} owned")
         if ordered:
-            print(
-                "    " + ", ".join(ordered[:20]) + (" ..." if len(ordered) > 20 else "")
-            )
+            shown = ordered if show_all else ordered[:20]
+            suffix = "" if show_all or len(ordered) <= 20 else " ..."
+            print("    " + ", ".join(shown) + suffix)
         return
     print("  Owned item helper returned no printable data.")
 
@@ -1617,15 +1633,22 @@ def _completion_checklist() -> dict[str, list[str]]:
     return read_completion_checklist()
 
 
-def _print_name_sample(items: list[dict], limit: int = 12) -> None:
+def _print_name_sample(
+    items: list[dict], limit: int = 12, *, show_all: bool = False, find: str | None = None
+) -> None:
     names = sorted(str(item.get("name", "Unknown")) for item in items)
+    if find:
+        needle = find.casefold()
+        names = [name for name in names if needle in name.casefold()]
     if names:
-        print(
-            "    " + ", ".join(names[:limit]) + (" ..." if len(names) > limit else "")
-        )
+        shown = names if show_all else names[:limit]
+        suffix = "" if show_all or len(names) <= limit else " ..."
+        print("    " + ", ".join(shown) + suffix)
 
 
-def _print_inventory(save_path: str) -> None:
+def _print_inventory(
+    save_path: str, *, show_all: bool = False, find: str | None = None
+) -> None:
     inv = read_inventory(save_path)
     print(f"=== Inventory: {inv['total_items']} resolved items ===")
     for label, key in (
@@ -1635,8 +1658,15 @@ def _print_inventory(save_path: str) -> None:
         ("Goods", "goods"),
     ):
         items = inv.get(key, [])
+        if find:
+            needle = find.casefold()
+            items = [
+                item
+                for item in items
+                if needle in str(item.get("name", "Unknown")).casefold()
+            ]
         print(f"  {label}: {len(items)}")
-        _print_name_sample(items)
+        _print_name_sample(items, show_all=show_all, find=None)
 
 
 def _tracked_boss_names() -> list[str]:
@@ -1971,7 +2001,7 @@ def cmd_save(args) -> None:
         return
 
     if action == "inventory":
-        _print_inventory(save_path)
+        _print_inventory(save_path, show_all=args.all, find=args.find)
         return
 
     if action == "gestures":
@@ -2007,7 +2037,7 @@ def cmd_save(args) -> None:
         return
 
     if action == "owned":
-        _print_owned_items(save_path)
+        _print_owned_items(save_path, show_all=args.all, find=args.find)
         return
 
     if action == "completion":

@@ -72,8 +72,8 @@ covenants     nonzero covenant rank/point fields
 bosses        save-backed boss defeated/remaining list from known event flags
 bonfires      save-backed tracked per-bonfire unlock list from known TGA event bits mapped into DS30000 bytes
 progress      compact progress dashboard
-inventory     resolved weapons/armor/rings/goods from save inventory; conservative name matching
-owned         sorted owned item names from resolved inventory
+inventory     resolved weapons/armor/rings/goods from save inventory; conservative name matching; add --all or --find TEXT to avoid compact truncation
+owned         sorted owned item names from resolved inventory; add --all or --find TEXT to avoid compact truncation
 completion    save-backed achievement categories where possible; static-only categories labeled as such
 achievements  completion plus static achievement/checklist categories
 checklist     current-area static checklist if area data exists
@@ -86,7 +86,7 @@ Truthfulness rules for save output:
 - Save reading is read-only. Never mutate `.sl2`.
 - Bosses are save-backed by known event flag bytes in `resources/event_flags.json`; tracked bonfires are save-backed by `resources/bonfire_flags.json` entries derived from TGA `SprjEventFlagMan` bit offsets and validated against the current DS30000 layout.
 - Rings, sorceries, pyromancies, and miracles can be completion-counted from save-backed inventory data when resolved; max weapon reinforcement is observable, but reinforcement achievement completion remains static/unsupported.
-- Gestures and infusions are not save-backed right now; they are static checklist entries only.
+- Gestures are not save-backed right now; the parser can locate the gesture-adjacent save table, but local resources do not map gesture IDs/offsets to achievement names safely. Infusion variants can resolve as inventory item names when present in `weapons.json`, but infusion achievement completion remains static/unsupported.
 - `missed` must not claim an area is clear if no area checklist exists. Treat "Area checklist: not available" as unknown, not complete.
 - Inventory name resolution is conservative. Unknown or unresolved raw IDs should not be claimed as owned collectibles.
 
@@ -191,13 +191,21 @@ sources refresh [source-key ...] [--force]
 ### Save commands
 
 ```text
-save [auto|<path-to-DS30000.sl2>] [summary|stats|name|level|covenants|bosses|bonfires|progress|inventory|gestures|missed|achievements|checklist|owned|completion]
+save [auto|<path-to-DS30000.sl2>] [summary|stats|name|level|covenants|bosses|bonfires|progress|inventory|gestures|missed|achievements|checklist|owned|completion] [--all] [--find TEXT]
 ```
 
 Default is:
 
 ```text
 save auto summary
+```
+
+For inventory lookups, prefer scoped output over relying on compact samples:
+
+```text
+save auto inventory --find "Sellsword"
+save auto owned --find "Ring"
+save auto inventory --all
 ```
 
 Use save-backed data for current build/progress questions whenever possible. If save data contradicts the user's recollection, state the observed save facts and note that the file may be a different character, NG cycle, transferred save, edited save, or stale save.
@@ -209,7 +217,7 @@ Route by intent, not exact wording:
 | User asks about | First source | Then | Notes |
 |---|---|---|---|
 | current stats, SL, class, Estus, boss/bonfire progress | `save auto summary` / `save auto stats` | ask for save path only if auto-detect fails | Save parser is available. |
-| exact inventory or owned rings/spells/items | `save auto inventory`, `save auto owned`, `save auto completion` | live/static checklist if unresolved | Be conservative with unresolved IDs. |
+| exact inventory or owned rings/spells/items | `save auto inventory --find "<name>"`, `save auto owned --find "<name>"`, `save auto completion` | live/static checklist if unresolved | Compact inventory output truncates; use `--all` or `--find`. Be conservative with unresolved IDs. |
 | "what did I miss?", current area checklist | `save auto missed`, `save auto checklist` | live research if checklist missing | Unknown area checklist means unknown, not clear. |
 | where to level next | `save auto stats`, `softcaps`, `build` | `calc`, `compare`, `infusions` | Use actual current stats. |
 | starting class / build archetype | `origins`, `build`, `softcaps` | source refresh/live if user requests citations | Compare classes/archetypes only after the user states goals or current facts; present multiple tradeoffs and do not imply a default start. |
