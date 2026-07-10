@@ -97,6 +97,7 @@ def extract_lists(
         "models": [],
         "hosts": [],
         "hostsModels": [],
+        "rows": [],
     }
 
     alias_map: dict[str, tuple[str, ...]] = {
@@ -123,6 +124,8 @@ def extract_lists(
                         add_candidate("hostsModels", value)
 
                     # Structural fallback heuristics for breaking schema changes.
+                    if normalized == "rows" and _looks_like_current_endpoint_rows(value):
+                        add_candidate("rows", value)
                     if _looks_like_endpoint_list(value):
                         add_candidate("hostsModels", value)
                     if _looks_like_host_list(value):
@@ -143,6 +146,8 @@ def extract_lists(
     selected = {
         key: _pick_best(candidates[key]) for key in ("models", "hosts", "hostsModels")
     }
+    if selected["hostsModels"] is None:
+        selected["hostsModels"] = _normalize_current_rows(_pick_best(candidates["rows"]))
 
     missing = [key for key, value in selected.items() if value is None]
     if missing:
@@ -160,6 +165,118 @@ def extract_lists(
         selected["hosts"] or [],
         selected["hostsModels"] or [],
     )
+
+
+def _normalize_current_rows(rows: list[Any] | None) -> list[dict[str, Any]] | None:
+    if rows is None:
+        return None
+
+    endpoints = [
+        endpoint for row in rows if (endpoint := _normalize_current_row(row)) is not None
+    ]
+    if not endpoints:
+        return None
+    return endpoints
+
+
+def _normalize_current_row(row: Any) -> dict[str, Any] | None:
+    if not isinstance(row, dict):
+        return None
+
+    host = row.get("host")
+    model = row.get("model")
+    if not isinstance(host, dict) or not isinstance(model, dict):
+        return None
+
+    host_slug = host.get("slug")
+    model_slug = model.get("slug")
+    if not isinstance(host_slug, str) or not host_slug:
+        return None
+    if not isinstance(model_slug, str) or not model_slug:
+        return None
+
+    normalized_host = _normalize_camel_keys(host)
+    normalized_model = _normalize_camel_keys(model)
+    normalized_features = _normalize_camel_keys(row.get("features"))
+    normalized_pricing = _normalize_camel_keys(row.get("pricing"))
+    performance = row.get("performance")
+    if not isinstance(performance, dict):
+        performance = {}
+
+    endpoint: dict[str, Any] = {
+        "slug": f"{host_slug}_{model_slug}",
+        "name": row.get("label"),
+        "host_api_id": row.get("hostApiId"),
+        "host": normalized_host,
+        "model": normalized_model,
+        "timescaleData": {
+            "median_output_speed": performance.get("medianOutputTokensPerSecond"),
+            "median_time_to_first_chunk": performance.get(
+                "medianTimeToFirstTokenSeconds"
+            ),
+        },
+        "end_to_end_response_time_metrics": {
+            "total_time": performance.get("medianEndToEndResponseTimeSeconds")
+        },
+    }
+
+    if isinstance(normalized_features, dict):
+        endpoint.update(normalized_features)
+    if isinstance(normalized_pricing, dict):
+        endpoint.update(normalized_pricing)
+
+    return endpoint
+
+
+def _normalize_camel_keys(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            _camel_to_snake(key): _normalize_camel_keys(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_normalize_camel_keys(item) for item in value]
+    return value
+
+
+def _camel_to_snake(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+
+    result: list[str] = []
+    previous_lower = False
+    previous_lower_or_digit = False
+    for char in value.replace("-", "_"):
+        if char.isupper():
+            if previous_lower_or_digit:
+                result.append("_")
+            result.append(char.lower())
+            previous_lower = False
+            previous_lower_or_digit = False
+            continue
+        if char.isdigit() and previous_lower:
+            result.append("_")
+        result.append(char)
+        previous_lower = char.islower()
+        previous_lower_or_digit = previous_lower or char.isdigit()
+    return "".join(result)
+
+
+def _looks_like_current_endpoint_rows(value: list[Any]) -> bool:
+    sample = [item for item in value[:25] if isinstance(item, dict)]
+    if not sample:
+        return False
+
+    hits = 0
+    for item in sample:
+        host = item.get("host")
+        model = item.get("model")
+        if not isinstance(host, dict) or not isinstance(model, dict):
+            continue
+        if isinstance(host.get("slug"), str) and isinstance(model.get("slug"), str):
+            if any(key in item for key in ("features", "pricing", "performance")):
+                hits += 1
+    return hits >= max(1, len(sample) // 2)
 
 
 def _pick_best(options: list[list[Any]]) -> list[Any] | None:

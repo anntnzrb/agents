@@ -438,7 +438,7 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
             etag=response_etag,
         )
     except ExtractionError as exc:
-        if args.strict:
+        if args.strict or args.output_json == DEFAULT_OUTPUT_JSON:
             raise
 
         fallback_reason = str(exc)
