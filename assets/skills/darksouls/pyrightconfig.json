@@ -1,0 +1,10 @@
+{
+  "include": ["scripts", "tests"],
+  "extraPaths": ["scripts"],
+  // Basic mode is intentional for this standalone dynamic JSON-resource skill: untrusted JSON-backed scripts have behavioral test coverage.
+  "typeCheckingMode": "basic",
+  "exclude": [
+    // Standalone uv script with an intentionally isolated inline PyMuPDF dependency; corpus smoke tests exercise it separately.
+    "scripts/preprocess_dsr_plat_guide.py"
+  ]
+}
