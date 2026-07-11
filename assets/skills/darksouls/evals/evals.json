@@ -1,0 +1,1772 @@
+{
+  "skill_name": "darksouls",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I am playing Dark Souls Remastered blind and just finished my current area. What should I do next? Please do not name any future bosses, areas, NPCs, items, or story details. Give only a safe planning approach and ask what context you need.",
+      "expected_output": "A spoiler-safe response using generic placeholders, with no future proper names or route reveals; it should explain that the default output hides spoilers and ask for current context rather than guessing.",
+      "expectations": [
+        "Does not reveal a future boss, area, NPC, item, ending, or story name",
+        "Provides actionable generic next-step guidance or asks for current-area/progress context",
+        "Does not treat an incomplete checklist or absent save field as proof of completion"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Explain how to compare two one-handed weapons for a level 50 quality build in Dark Souls Remastered. Include the deterministic CLI commands you would run, what inputs matter for AR/scaling, and how equip load affects the recommendation. Do not invent numbers for weapons that are not in the bundled catalog.",
+      "expected_output": "A mechanics-first answer that routes through weapons/calc/compare/equip-load, distinguishes calculated output from recommendation, and refuses to invent AR for unknown catalog rows.",
+      "expectations": [
+        "Uses the canonical uv run --script <skill-dir>/scripts/cli.py entry point",
+        "Mentions weapon requirements, stats, upgrade level/path, scaling, and equipment weight as relevant inputs",
+        "States that unknown catalog rows produce unknown/unsupported results rather than guessed AR"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "What is the current safest way to use a PC mod loader with Dark Souls Remastered in July 2026, and is online play guaranteed safe? Please provide source-backed/current guidance and say exactly what you verified.",
+      "expected_output": "A dated, conservative answer that checks sources status/refresh and live sources, cites URLs/source keys, avoids a safety guarantee, and separates observed source claims from recommendations.",
+      "expectations": [
+        "Routes current claims through sources status and targeted refresh/live research",
+        "Does not guarantee anti-cheat, online, multiplayer, launcher, or version compatibility",
+        "Provides source URLs/source keys and a checked date or explicitly states what could not be verified",
+        "Does not provide DRM, anti-cheat, platform-protection, or save-editing bypass instructions"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Search the local PSNProfiles Dark Souls Remastered platinum guide for the section about a missable achievement involving a collectible, then show me the matching guide row and summarize the actionable step. I understand this may contain spoilers.",
+      "expected_output": "A targeted guide search/get response that identifies the transformed local corpus, keeps the result scoped, includes the provenance/spoiler/non-authoritative warning, and summarizes rather than dumping raw PDF text.",
+      "expectations": [
+        "Uses guide search followed by guide get (or explains why no row matched)",
+        "States that chunks are transformed from the user-provided PSNProfiles PDF and the PDF is not tracked",
+        "Warns that the corpus is spoiler-heavy, non-authoritative, not save/parser truth, and not permission to republish",
+        "Does not claim that the guide row proves the user's inventory or achievement state"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "I found a DSR save file. Can you tell me exactly which bosses, bonfires, inventory items, and achievements I have completed? If the parser cannot validate those fields, be explicit instead of inferring them. Also tell me whether your inspection changes the save.",
+      "expected_output": "A truthful read-only save response: it may report only verified container/name/stats/level/class fields, returns explicit unsupported for unvalidated bosses/bonfires/inventory/completion/achievement categories, and states that no bytes are written.",
+      "expectations": [
+        "Uses an explicit save path or explains auto-detection and runs a narrow summary/stats action",
+        "Does not claim DS3 offsets/layouts or fabricate boss, bonfire, inventory, or achievement values",
+        "Clearly says unsupported categories are unknown rather than zero/absent/complete",
+        "Clearly states save inspection is read-only and does not mutate, repair, decrypt, or re-encrypt the file"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Which starting class and early upgrade plan should I choose for Dark Souls Remastered? I have not said whether I prefer strength, dexterity, magic, or a hybrid. Give a useful comparison without assuming my build, and keep future locations spoiler-safe.",
+      "expected_output": "A conditional origins/build comparison with multiple tradeoffs, no default-class prescription, deterministic softcap/upgrade commands, and no unintroduced future names or exact locations.",
+      "expectations": [
+        "Uses origins/build/softcaps as appropriate and frames choices as conditional tradeoffs",
+        "Does not infer a preferred class, weapon, stat lane, or spell path from absent information",
+        "Keeps exact future locations and names hidden unless the user permits spoilers",
+        "Separates deterministic mechanics from source-backed location advice"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "I have no preference between strength, dexterity, magic, faith, or a hybrid. Use the documented origins command to compare every starting origin's level and stat spread, then explain how to choose conditionally without naming future areas or items.",
+      "expected_output": "A spoiler-safe comparison grounded in the full origins table, with tradeoffs tied to stated goals rather than a default recommendation.",
+      "expectations": [
+        "Uses the canonical origins command through the documented CLI entry point",
+        "Compares starting levels and relevant stat distributions instead of naming one universally best origin",
+        "States that the choice depends on the player's intended stats, equipment, or spell lane",
+        "Does not reveal future locations, NPCs, bosses, items, or story details"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Show the complete starting-origin table, including the lowest-level and highest-level origins, and explain how starting level changes the amount of later leveling needed. I have not chosen a build, so keep the comparison conditional and spoiler-safe.",
+      "expected_output": "The origins output is presented as deterministic reference data, with level tradeoffs explained without implying that a lower starting level is always superior.",
+      "expectations": [
+        "Uses origins without inventing classes or starting-stat values",
+        "Explains that a lower starting level can provide more flexible future level allocation while a higher one starts with more total levels",
+        "Does not infer a preferred strength, dexterity, magic, faith, or hybrid path",
+        "Keeps future proper names and exact locations out of the answer"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Give me the documented softcaps and test their boundary meaning: vitality at 27 and 40, endurance/strength/dexterity/intelligence at 40, faith at 30 and 50, and resistance at 30. Explain what changes after a softcap and whether any of these are hard limits.",
+      "expected_output": "A softcap reference that reports the deterministic breakpoints, identifies them as practical diminishing-return points rather than hard caps, and notes the endurance/equip-load distinction.",
+      "expectations": [
+        "Uses the softcaps command and reports the listed stat breakpoints without fabricating additional thresholds",
+        "Distinguishes a practical softcap from a hard maximum and says that weapon or spell coefficients can vary",
+        "Identifies endurance stamina gain stopping at 40 while equip-load gain continues beyond 40",
+        "Does not turn the breakpoints into an unconditional build prescription"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "I am undecided between a quality and a single-stat build. Show conditional planning baselines with `build quality --level 50` and `build strength --level 50`, and explain what information is still needed before recommending either one.",
+      "expected_output": "Two deterministic level-50 planning sketches are compared as conditional examples, with explicit separation between the CLI baseline and a personalized recommendation.",
+      "expectations": [
+        "Uses only the documented build types and the documented --level flag",
+        "Describes quality as a strength/dexterity tradeoff and strength as a single-stat lane without claiming either is universally best",
+        "Labels the output as a planning baseline rather than save-backed character state",
+        "Asks for goals, current stats, preferred weapon behavior, or playstyle before prescribing a path"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "Compare the conditional spell-oriented sketches from `build sorcery --level 30` and `build pyromancer --level 30`. I did not say which magic style I prefer; include the relevant stat focus and explain why the result is not a prescription.",
+      "expected_output": "A side-by-side conditional comparison that keeps sorcery and pyromancy mechanics distinct and does not infer the user's preferred magic path.",
+      "expectations": [
+        "Uses the documented sorcery and pyromancer build names with --level 30",
+        "Explains that sorcery emphasizes intelligence/attunement while pyromancy planning emphasizes attunement plus survivability and direct flame reinforcement",
+        "Does not claim intelligence or faith scales pyromancy-flame spell damage when the documented mechanics say it does not",
+        "Requests the user's goals before recommending one spell lane"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Calculate the leveling cost at the boundary where current level equals target level with `soul-cost 1 1`, then calculate one step with `soul-cost 1 2`. Explain what the two results mean and label the cost model correctly.",
+      "expected_output": "The equal-level request returns zero levels and zero souls, the one-step request reports a positive cost, and the answer identifies the formula as an approximate planning value.",
+      "expectations": [
+        "Uses the canonical soul-cost command with both current and target levels",
+        "Treats target equal to current as zero additional levels and zero souls rather than a negative cost",
+        "Treats target one level above current as one level with a positive cost",
+        "Labels the formula/output approximate and recommends the in-game UI for final confirmation"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "Exercise soul-cost input boundaries with `soul-cost 0 2` and `soul-cost 712 714`. Do not smooth over invalid levels or invent a result; tell me the accepted level range and how a target below or equal to current is handled.",
+      "expected_output": "Invalid levels are rejected explicitly, the valid range is stated as 1 through 713, and non-increasing valid requests are described as zero cost.",
+      "expectations": [
+        "Uses only the documented soul-cost command and numeric arguments",
+        "Rejects level 0 and level 714 instead of calculating or clamping them",
+        "States the accepted current and target level range as 1–713",
+        "Explains that a target at or below current yields zero additional cost for valid inputs"
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "For equip-load boundaries, run `equip-load --endurance 0` and `equip-load --endurance 99`, then explain what happens when carried weight is exactly 25%, 50%, and 100% of the printed maximum. Keep the answer mechanical and spoiler-safe.",
+      "expected_output": "The response reports both valid endpoint calculations and applies the inclusive fast, medium, and fat-roll thresholds without inventing an intermediate tier.",
+      "expectations": [
+        "Uses the documented equip-load command with the --endurance flag at both valid endpoints",
+        "States that exactly 25% is fast roll, exactly 50% is medium roll, and exactly 100% is fat roll",
+        "Explains that weight over 100% is overloaded and cannot roll or run",
+        "Does not introduce an undocumented 30% threshold or future location/item names"
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "Show the separate equip-load calculations for `equip-load --endurance 40 --havels` and `equip-load --endurance 40 --favor`. Also explain why I must not pass both ring flags together and avoid choosing a ring for me.",
+      "expected_output": "Two separate maximum-load calculations are shown, with the mutually exclusive ring flags and their conditional tradeoff made explicit.",
+      "expectations": [
+        "Runs the two documented commands separately, one with --havels and one with --favor",
+        "States that --havels and --favor are mutually exclusive and must not be combined",
+        "Explains that the rings modify maximum equip load without treating either as universally correct",
+        "Frames the choice around the user's equipment and goals rather than assuming a build preference"
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "Probe the equip-load endurance validation with `equip-load --endurance -1` and `equip-load --endurance 100`. Give the documented valid range and do not replace an error with a guessed maximum load.",
+      "expected_output": "Both out-of-range requests are rejected, with the valid endurance interval and the no-guessing boundary clearly stated.",
+      "expectations": [
+        "Uses the documented equip-load command and --endurance option",
+        "Rejects -1 and 100 as invalid rather than clamping them",
+        "States that endurance must be between 0 and 99 inclusive for this calculation",
+        "Does not fabricate a load value or infer a character's actual equipment"
+      ]
+    },
+    {
+      "id": 17,
+      "prompt": "Run `estus max` and explain every category it reports: starting/carry limits, ordinary-bonfire kindling, the Rite of Kindling, shard upgrades, and Fire Keeper Soul upgrades. Distinguish static rules from what a save actually owns.",
+      "expected_output": "The max Estus summary reports the static flask, kindling, shard, and potency limits while explicitly refusing to claim current ownership or split from an unavailable save.",
+      "expectations": [
+        "Uses the documented estus max command",
+        "Separates flask count, bonfire kindling, shard upgrades, and Fire Keeper Soul potency rather than conflating them",
+        "States that exact current flask split or ownership is save-dependent and not established by static output",
+        "Does not name future locations or claim that the static maximum is the user's current state"
+      ]
+    },
+    {
+      "id": 18,
+      "prompt": "Explain the three focused Estus queries by running `estus kindling`, `estus shards`, and `estus souls`. Include boundary behavior such as the ordinary kindling ceiling, Rite of Kindling capacity, shard maximum, and separate potency upgrades, while remaining spoiler-safe.",
+      "expected_output": "Each focused query is mapped to its own deterministic category, with kindling capacity, shard count, and potency progression kept separate from save-backed ownership.",
+      "expectations": [
+        "Uses only the documented estus subcommands kindling, shards, and souls",
+        "Reports ordinary kindling up to 10 uses and Rite of Kindling capacity up to 20 uses",
+        "Reports the static shard-upgrade maximum and explains that Fire Keeper Soul upgrades affect potency, not flask count",
+        "Labels these as static mechanics and does not infer the player's current inventory or progression"
+      ]
+    },
+    {
+      "id": 19,
+      "prompt": "I supplied the weapon name `Longsword` and permit that name to be shown. Run `weapons Longsword --json` and explain what the catalog record can establish without making any acquisition-location claims.",
+      "expected_output": "A machine-readable lookup for the supplied known row, limited to deterministic catalog fields and clearly separated from location or current-ownership claims.",
+      "expectations": [
+        "Uses the canonical weapons command with the documented --json flag",
+        "Treats Longsword as a known supplied catalog row and reports its available category, requirements, scaling, base attack, weight, and paths when present",
+        "Does not invent an acquisition location, upgrade history, or save ownership from the catalog row",
+        "Explains that catalog data is a deterministic lookup aid rather than an in-game status-screen proof"
+      ]
+    },
+    {
+      "id": 20,
+      "prompt": "I explicitly allow catalog weapon names but do not want future locations or story spoilers. Return a bounded machine-readable listing using `weapons --limit 3 --json`, and explain what the limit and spoiler gate do.",
+      "expected_output": "A JSON array containing at most three deterministic catalog rows, with the limit honored and no unrequested location or progression claims.",
+      "expectations": [
+        "Uses weapons with the documented --limit and --json flags",
+        "Returns no more than three rows and preserves the catalog's machine-readable representation",
+        "Explains that --json changes representation, not the spoiler policy",
+        "Does not add exact acquisition locations or future progression details"
+      ]
+    },
+    {
+      "id": 21,
+      "prompt": "Look up the user-supplied name `Catalog Placeholder` with `weapons \"Catalog Placeholder\" --json`. If that row is absent, keep the result explicitly unknown and do not substitute a similarly named weapon.",
+      "expected_output": "An explicit not-found/unknown response for the requested row, without a fabricated JSON record or nearest-name substitution.",
+      "expectations": [
+        "Uses the documented weapons lookup and --json syntax",
+        "States that the requested row is not present in the bundled catalog",
+        "Does not substitute another weapon or infer requirements, scaling, AR, weight, or upgrade paths",
+        "Keeps the unknown result distinct from a save-backed statement that the user does not own it"
+      ]
+    },
+    {
+      "id": 22,
+      "prompt": "Estimate the supplied known `Longsword` at the exact listed requirements with `calc \"Longsword\" 10 10 --json`. Explain every important machine-readable field and how the answer should label its numerical precision.",
+      "expected_output": "A JSON AR estimate showing the requirement boundary is met, component values, an estimated total, and an explicit approximation warning.",
+      "expectations": [
+        "Uses calc with the documented strength/dexterity positional arguments and --json",
+        "Recognizes that Longsword's 10 strength and 10 dexterity requirements are met at the requested boundary",
+        "Explains the components, estimated_ar, requirements_met, and shortfalls fields without treating the estimate as exact hidden-table AR",
+        "Preserves the approximate warning and recommends confirming final AR in the game status screen"
+      ]
+    },
+    {
+      "id": 23,
+      "prompt": "Estimate `Claymore` just below its strength requirement with `calc \"Claymore\" 15 10 --json`. Report the requirement boundary and tell me whether a non-strict estimate can still be useful without hiding the shortfall.",
+      "expected_output": "The known weapon produces an approximate JSON estimate with requirements_met false and an explicit strength shortfall, rather than silently treating the weapon as usable.",
+      "expectations": [
+        "Uses the documented calc command and --json flag",
+        "Identifies strength 15 versus the catalog requirement of 16 and records the shortfall",
+        "Keeps requirements_met false while distinguishing the estimate from an assertion that the player can wield the weapon",
+        "Labels the AR as approximate and does not claim exact in-game damage"
+      ]
+    },
+    {
+      "id": 24,
+      "prompt": "Run `calc \"Catalog Placeholder\" 20 20 --json` for an unknown user-supplied weapon. Explain the boundary between a supported catalog estimate and an unknown row; never extrapolate from another weapon's name or category.",
+      "expected_output": "The calculation is rejected or marked unknown because the row is not curated, with no invented AR components, upgrade level, or requirements.",
+      "expectations": [
+        "Uses calc with valid documented positional stats and --json",
+        "Reports that AR estimation supports only known rows in the bundled catalog",
+        "Does not return guessed AR, a nearest-name match, or fabricated JSON fields for the placeholder",
+        "States that a similarly named weapon cannot establish this weapon's path or damage"
+      ]
+    },
+    {
+      "id": 25,
+      "prompt": "I have not said whether I favor strength, dexterity, or a hybrid. Compare the supplied known rows `Longsword` and `Broadsword` at the same boundary stats with `compare \"Longsword\" \"Broadsword\" --str 10 --dex 10 --json`, then describe the result conditionally rather than choosing my build for me.",
+      "expected_output": "A JSON comparison using the same explicit stats for both known rows, sorted by the deterministic estimate, with approximate labeling and no universal recommendation.",
+      "expectations": [
+        "Uses compare with the documented --str, --dex, and --json flags",
+        "Applies the identical explicit strength/dexterity inputs to both known catalog rows",
+        "Explains that ordering is by estimated AR while retaining each row's approximation warning and requirements status",
+        "Does not infer a preferred build or claim that the higher estimate is universally the better weapon"
+      ]
+    },
+    {
+      "id": 26,
+      "prompt": "Compare `Longsword` against the unknown `Catalog Placeholder` with `compare \"Longsword\" \"Catalog Placeholder\" --str 20 --dex 20 --json`. I want a truthful boundary result, not a partial ranking or guessed AR for the missing row.",
+      "expected_output": "The mixed comparison identifies the unknown row and refuses to present a valid two-weapon ranking or substitute estimate.",
+      "expectations": [
+        "Uses compare with documented explicit stats and --json",
+        "States that comparison cannot be completed as a supported two-row calculation when one catalog row is unknown",
+        "Does not rank the known row against a fabricated value or silently drop the unknown row",
+        "Keeps the unknown-catalog boundary separate from any claim about inventory ownership"
+      ]
+    },
+    {
+      "id": 27,
+      "prompt": "For the supplied known `Longsword`, show the same lookup once as normal text with `weapons Longsword` and once as machine-readable output with `weapons Longsword --json`. Explain what may change in representation and what must not change in spoiler handling or catalog truth.",
+      "expected_output": "The two representations describe the same known catalog row, with JSON changing serialization only and neither form adding unsupported locations or ownership claims.",
+      "expectations": [
+        "Uses only the documented weapons command in text and --json forms",
+        "Explains that --json changes representation/schema rather than the underlying row",
+        "Keeps the same spoiler gate and does not reveal unrequested future locations or names",
+        "Does not treat either output as proof of the player's current upgrade or inventory state"
+      ]
+    },
+    {
+      "id": 28,
+      "prompt": "Show normal-path material boundaries with `upgrade 1 --type normal`, `upgrade 15 --type normal`, and `upgrade 16 --type normal`. Explain the supported maximum, cumulative material schedule, and how an over-maximum request is reported.",
+      "expected_output": "The normal path reports valid level-one and maximum-level schedules, while the level-16 request is capped/reported against the documented +15 maximum instead of inventing a +16 path.",
+      "expectations": [
+        "Uses the documented upgrade command with --type normal",
+        "Treats level 1 and level 15 as valid normal-path boundaries",
+        "Identifies +15 as the normal path maximum and reports an above-maximum request with an explicit maximum notice",
+        "Describes the cumulative titanite schedule as deterministic material data without claiming a location"
+      ]
+    },
+    {
+      "id": 29,
+      "prompt": "Compare the terminal material behavior of `upgrade 5 --type unique` and `upgrade 5 --type dragon`. Keep the paths separate, identify their reinforcement materials, and do not merge them into the normal path.",
+      "expected_output": "Both valid +5 path queries are explained independently, with unique using its own material route and dragon using Dragon Scale, without cross-path substitution.",
+      "expectations": [
+        "Uses the documented upgrade command with the unique and dragon type values",
+        "Recognizes +5 as the maximum for both requested paths",
+        "Keeps Twinkling Titanite for the unique path and Dragon Scale for the dragon path distinct",
+        "Does not infer weapon-specific acquisition locations or assume either path suits the user's build"
+      ]
+    },
+    {
+      "id": 30,
+      "prompt": "Plan materials for a fire-path endpoint with `upgrade 10 --type fire`, then use `farm titanite` only for a spoiler-safe farming category. Separate deterministic material requirements from any exact source or location claim, and say what would require current source research.",
+      "expected_output": "The answer gives the fire path's deterministic +10 material schedule and a generic titanite-farming direction, while refusing to invent exact locations and identifying source-backed research as a separate step.",
+      "expectations": [
+        "Uses the documented upgrade fire type and farm titanite command",
+        "Recognizes +10 as the fire path maximum and distinguishes its Green Titanite Shard/Red Titanite material stages",
+        "Keeps upgrade-menu material counts separate from exact farming locations or drop claims",
+        "States that current route/location details need source-cache or live research and remain spoiler-filtered by default"
+      ]
+    },
+    {
+      "id": 31,
+      "prompt": "I am exploring Dark Souls Remastered blind and want to know what kind of progression information is available without spoilers. Give me a safe overview of areas and route planning without naming any future area, boss, NPC, item, or story event.",
+      "expected_output": "Use the spoiler-safe default of the areas command and generic route language. Explain that future proper names and exact route reveals stay hidden until the user opts in, while offering to plan from user-supplied current context.",
+      "expectations": [
+        "Uses the canonical uv run --script <skill-dir>/scripts/cli.py entry point and the areas command without --spoilers",
+        "Does not reveal a future area, boss, NPC, item, ending, or story name",
+        "Provides useful generic progression planning or asks for current-area/progress context",
+        "Separates a safe local overview from exact location or route claims that need sources"
+      ]
+    },
+    {
+      "id": 32,
+      "prompt": "I explicitly permit spoilers. Show the full area and boss progression for Dark Souls Remastered, including proper names, and tell me which CLI forms you would use.",
+      "expected_output": "Honor the explicit opt-in by using the spoiler-enabled areas and boss commands, while still distinguishing deterministic CLI output from source-backed route details and not inventing unsupported facts.",
+      "expectations": [
+        "Uses areas --spoilers and bosses [--area <area>] [--spoilers] through the canonical CLI entry point",
+        "Recognizes that the user's explicit permission allows future proper names in this response",
+        "Does not claim that a catalog or incomplete checklist is a complete route or location source",
+        "Labels exact route, location, and quest details as requiring source-cache or live research"
+      ]
+    },
+    {
+      "id": 33,
+      "prompt": "I already supplied the name of my current area and the boss I just defeated. Use only those names I supplied to suggest what to check next, and do not introduce any other future proper names.",
+      "expected_output": "Echo only names explicitly supplied by the user, keep all other progression references generic, and offer a conditional next-step plan rather than guessing the next destination.",
+      "expectations": [
+        "Treats user-supplied area and boss names as permitted context but does not add unintroduced proper names",
+        "Uses generic phrases such as the next required boss, an optional area, or the current route for all other entities",
+        "Asks for or uses observed current progress instead of inferring an unseen route state",
+        "Does not present exact locations or quest steps without source-backed or live evidence"
+      ]
+    },
+    {
+      "id": 34,
+      "prompt": "I have a comma-separated list of boss IDs that I personally confirmed as defeated. Explain how to ask for a spoiler-safe next-step route from that list, without expanding the IDs into future boss names.",
+      "expected_output": "Use route --defeated <id,id,...> without --spoilers, treat the supplied IDs as the only progress facts, and redact future names while giving generic next-step guidance.",
+      "expectations": [
+        "Uses route --defeated <id,id,...> through uv run --script <skill-dir>/scripts/cli.py",
+        "Does not expand defeated IDs into unintroduced boss, area, NPC, item, or story names",
+        "Treats the user-confirmed IDs as input facts rather than asserting additional save progress",
+        "Explains that --spoilers is needed before future proper names may be shown"
+      ]
+    },
+    {
+      "id": 35,
+      "prompt": "I permit spoilers for route planning and want the named route after providing my defeated boss IDs. What should the CLI request look like, and what limits still apply to the answer?",
+      "expected_output": "Use route --defeated <id,id,...> --spoilers after the explicit opt-in, explain that names may now be displayed, and retain source and uncertainty boundaries for exact routes or locations.",
+      "expectations": [
+        "Uses route --defeated <id,id,...> --spoilers through the canonical CLI entry point",
+        "Requires explicit spoiler permission before showing future proper names",
+        "Does not turn route output into proof of inventory, quest completion, or exact item locations",
+        "Calls for source-cache or live research when the user asks for a fully verified route or location checklist"
+      ]
+    },
+    {
+      "id": 36,
+      "prompt": "My save parser reports that progress is unsupported. Can you still tell me exactly which area and boss I completed? Be explicit about what is unknown and suggest a safe way to proceed without spoilers.",
+      "expected_output": "State that unsupported save progress is unknown, do not infer completed areas or bosses, and combine a read-only save result with generic planning or user-supplied context.",
+      "expectations": [
+        "Uses save auto progress only as a read-only observation and reports unsupported fields explicitly",
+        "Does not convert unsupported progress into zero, absent, defeated, or complete",
+        "Keeps future area and boss names hidden unless the user permits spoilers",
+        "Offers a generic next-step plan or asks the user for current context instead of guessing"
+      ]
+    },
+    {
+      "id": 37,
+      "prompt": "The current-area checklist is incomplete. Tell me whether that proves the area is clear, and if not, give a spoiler-safe method for finding the next task.",
+      "expected_output": "Explain that an incomplete or unavailable checklist cannot prove an area is clear, then use a generic next-step method and recommend source-backed research for a complete cleanup list.",
+      "expectations": [
+        "States that an incomplete or unavailable checklist is unknown rather than proof of a clear area",
+        "Does not invent missing bosses, key items, NPCs, locations, or route steps",
+        "Keeps default output spoiler-safe with generic placeholders",
+        "Suggests save auto checklist or save auto missed only as bounded observations and source/live research for exact cleanup"
+      ]
+    },
+    {
+      "id": 38,
+      "prompt": "I want to inspect my current progress from an explicit DSR save path, but I do not want future names printed. Which documented save request and spoiler behavior should be used?",
+      "expected_output": "Use the documented save path plus progress or summary action without --spoilers, explain that JSON or text output remains gated, and state that unsupported progress is unknown.",
+      "expectations": [
+        "Uses save <path-to-DS30000.sl2> <action> with a documented action such as summary or progress",
+        "Does not add --spoilers when the user requests no future names",
+        "Explains that --json changes representation but does not bypass the spoiler gate",
+        "Does not claim unsupported bosses, bonfires, areas, or completion fields as save facts"
+      ]
+    },
+    {
+      "id": 39,
+      "prompt": "I know the exact name of the area I want to inspect and I am not asking for any other future names. Show how to query its bosses while preserving the spoiler boundary.",
+      "expected_output": "Pass only the user-supplied area name to bosses --area <area> without --spoilers, redact any unintroduced names, and note that an area query is not a complete source-backed checklist.",
+      "expectations": [
+        "Uses bosses --area <area> without --spoilers through the canonical CLI entry point",
+        "Allows the user-supplied area name but hides other future proper names",
+        "Does not claim the filtered output proves every boss, item, or quest step in the area",
+        "Recommends source-cache or live research for exact route and checklist completeness"
+      ]
+    },
+    {
+      "id": 40,
+      "prompt": "I have not told you my area, boss, save state, or preferred route. Give me a practical, spoiler-safe plan for deciding what to do next in Dark Souls Remastered.",
+      "expected_output": "Ask for the minimum current-context facts or provide a generic decision sequence covering survival, equipment, progression checks, and optional exploration without naming future content.",
+      "expectations": [
+        "Does not infer an area, boss, build, quest state, or route from absent information",
+        "Uses generic next-step language and omits future proper names, exact locations, and story details",
+        "Provides actionable checks such as current stats, equipment, resources, and known progress",
+        "Separates deterministic CLI observations from source-backed location or route advice"
+      ]
+    },
+    {
+      "id": 41,
+      "prompt": "I need an exact, source-backed route from my current progress, including destination order and location details. I have permitted spoilers. Explain the research and CLI workflow rather than making an uncited route claim.",
+      "expected_output": "Start with deterministic route/progress context, check sources status, refresh a relevant registered source when needed, and use live research for exact locations while citing and labeling uncertainty.",
+      "expectations": [
+        "Uses route or save auto progress for available deterministic context before external claims",
+        "Runs sources status and, when stale or absent, a targeted documented sources refresh such as fextralife-dsr",
+        "Uses source-cache or live research for exact route and location facts rather than relying on a thin catalog",
+        "Distinguishes observed CLI facts, source claims, calculations, and recommendations and cites the source used"
+      ]
+    },
+    {
+      "id": 42,
+      "prompt": "I am checking missable progression without spoilers. Explain what the achievements missable view can establish, what it cannot establish about my save, and how to continue safely.",
+      "expected_output": "Use achievements --missable without --spoilers for a static checklist, explicitly separate it from save-backed completion, and avoid naming future achievements, areas, or quest outcomes.",
+      "expectations": [
+        "Uses achievements --missable through the canonical CLI entry point without --spoilers",
+        "Labels the result as a static checklist rather than proof of the user's save state",
+        "Does not claim unsupported achievement completion, quest state, or progression as observed facts",
+        "Offers generic planning or asks for user-supplied context while keeping future names hidden"
+      ]
+    },
+    {
+      "id": 43,
+      "prompt": "Explain what the bundled ring catalog can and cannot tell me when I ask about rings without spoilers. I have not supplied a ring name and do not want future item names or locations revealed.",
+      "expected_output": "Use the spoiler-safe rings command as a thin catalog lookup, hide future names and locations, and explain that deterministic catalog rows are not authoritative acquisition guides.",
+      "expectations": [
+        "Uses rings through uv run --script <skill-dir>/scripts/cli.py without --spoilers",
+        "Does not reveal future ring names, item locations, route steps, or NPC details when no name was supplied",
+        "States that the bundled catalog is limited to rows present in local resources and is not encyclopedia or save truth",
+        "Directs exact acquisition locations to source-cache or live research"
+      ]
+    },
+    {
+      "id": 44,
+      "prompt": "I supplied the exact name of one ring I am considering. Look up only that user-supplied name, keep unrelated future item names hidden, and explain what an acquisition answer would still require.",
+      "expected_output": "Query the supplied name with rings <name> without --spoilers, preserve the supplied name as permitted context, and separate catalog identification from source-backed acquisition details.",
+      "expectations": [
+        "Uses rings <name> through the canonical CLI entry point with the user-supplied name as the query",
+        "Does not disclose unrelated future ring, item, area, boss, or NPC names",
+        "Treats a matching catalog row as a deterministic lookup result, not proof of ownership or exact location",
+        "Requires source-cache or live research before stating an exact acquisition location"
+      ]
+    },
+    {
+      "id": 45,
+      "prompt": "I want machine-readable ring results and I explicitly permit spoilers. Does --json bypass the spoiler gate, and what command should be used if I want named results?",
+      "expected_output": "Explain that --json preserves the schema but does not bypass the gate; because spoilers are explicitly permitted, use rings --json --spoilers and still label catalog limits and source boundaries.",
+      "expectations": [
+        "Uses the documented rings [<name>] [--limit N] [--json] [--spoilers] form, including rings --json --spoilers",
+        "States that --json changes representation only and obeys the same spoiler gate as text output",
+        "Recognizes the explicit permission as authorization to show future item names in this response",
+        "Does not treat JSON catalog rows as authoritative exact locations, ownership, or route evidence"
+      ]
+    },
+    {
+      "id": 46,
+      "prompt": "I requested `goods --json` while still playing blind. Tell me how to return structured data without leaking future item names, and what to do if I need an exact location later.",
+      "expected_output": "Use goods --json without --spoilers, apply the same redaction gate to machine-readable output, and defer exact locations to source-backed or live research after an appropriate spoiler decision.",
+      "expectations": [
+        "Uses goods [<name>] [--limit N] [--json] [--spoilers] in the canonical CLI form, with goods --json for this no-spoiler request",
+        "States that catalog JSON obeys the same spoiler gate and cannot be used to bypass redaction",
+        "Keeps future goods names and locations hidden when the user has not opted in",
+        "Requires source-cache or live research for exact acquisition locations rather than guessing from catalog data"
+      ]
+    },
+    {
+      "id": 47,
+      "prompt": "I need a deterministic farming overview for a material category, but I do not want a named farming spot or route. Explain what the farm command can establish and show a spoiler-safe invocation.",
+      "expected_output": "Use a documented farm category such as titanite without --spoilers, report only the deterministic category guidance, and state that named farming spots and routes need source-backed research.",
+      "expectations": [
+        "Uses farm [souls|titanite|humanity|moss] through the canonical CLI entry point without --spoilers",
+        "Does not invent or reveal a future farming area, enemy, NPC, or exact route",
+        "Distinguishes a category-level farming result from a source-backed location recommendation",
+        "Keeps advice conditional on the user's stated material need rather than assuming a build or progression state"
+      ]
+    },
+    {
+      "id": 48,
+      "prompt": "I permit spoilers and need the exact locations and route for farming a material. Explain the correct deterministic-plus-research workflow and how you would avoid presenting an uncited spot as fact.",
+      "expected_output": "Use farm for the documented material category, check sources status, refresh a relevant registered source when needed, and use live/source-backed research for exact spots, route steps, and current claims.",
+      "expectations": [
+        "Uses farm [souls|titanite|humanity|moss] for the deterministic category lookup",
+        "Runs sources status and a targeted documented sources refresh when the relevant cache is absent or stale",
+        "Uses source-cache or live research for exact farming locations and route steps instead of inventing them",
+        "Labels observed CLI output, source-backed facts, and recommendations separately and cites the source used"
+      ]
+    },
+    {
+      "id": 49,
+      "prompt": "Explain the deterministic Estus mechanics I can check without spoilers: maximum uses, shard totals, soul-related output, and kindling. Do not give any future locations.",
+      "expected_output": "Use the documented estus actions for mechanics and totals, explain the distinction between flask-use mechanics and acquisition locations, and keep all location claims out of the answer.",
+      "expectations": [
+        "Uses documented estus max, estus shards, estus souls, and estus kindling invocations as appropriate",
+        "States the stable mechanics or totals only when supported by deterministic output or the documented contract",
+        "Does not reveal future area, item, NPC, boss, or exact shard-location names",
+        "Separates Estus mechanics from source-backed acquisition routes"
+      ]
+    },
+    {
+      "id": 50,
+      "prompt": "Can a DSR save inspection prove that I own a particular ring or good? If inventory ownership is unsupported, say so clearly and do not infer it from a static catalog.",
+      "expected_output": "Use a read-only save inventory or owned action only to report the documented unsupported boundary, explain that a catalog row is not save ownership, and leave ownership unknown.",
+      "expectations": [
+        "Uses a documented save auto inventory or save auto owned action as a read-only check",
+        "Reports unsupported or unvalidated inventory ownership as unknown rather than owned, absent, or complete",
+        "Does not infer save state from rings or goods catalog JSON or static resource rows",
+        "States that save inspection does not mutate, repair, decrypt, or rewrite the file"
+      ]
+    },
+    {
+      "id": 51,
+      "prompt": "I know the name of a ring from my own playthrough and want its exact acquisition location. I permit spoilers for that item only; explain why the catalog lookup alone is insufficient.",
+      "expected_output": "Use the supplied name with rings <name> for deterministic identification, keep unrelated future names hidden, and obtain the exact location from a cited source-cache or live lookup rather than the catalog.",
+      "expectations": [
+        "Uses rings <name> with the user-supplied name and does not broaden the query to unrelated future items",
+        "Recognizes that explicit item-specific permission allows that supplied item name but not unrelated spoilers",
+        "States that a catalog row is a thin lookup aid and does not establish an exact acquisition location",
+        "Requires source-backed or live research and cites the source before stating the location"
+      ]
+    },
+    {
+      "id": 52,
+      "prompt": "I want to farm a resource but have not said which category, build, area, or progression point I have reached. Give a useful safe response without pretending to know the best spot.",
+      "expected_output": "Ask which documented farm category and relevant constraints apply, offer category-level planning with generic language, and avoid assuming a location, build, or progress state.",
+      "expectations": [
+        "Does not assume a resource category, build, area, route, or progress state that the user did not provide",
+        "Uses only documented farm categories when proposing a CLI next step",
+        "Keeps future farming locations, enemy names, and route details hidden by default",
+        "Explains that the best exact spot is a source-backed/live recommendation, not an inferred catalog fact"
+      ]
+    },
+    {
+      "id": 53,
+      "prompt": "I need the exact locations of Estus upgrades and have permitted spoilers. Which part can the CLI answer deterministically, and which part must be checked against a source or live research?",
+      "expected_output": "Use estus shards or another documented Estus action for deterministic mechanics, then use sources status and source-backed/live research for exact upgrade locations and route details.",
+      "expectations": [
+        "Uses documented estus actions such as estus shards for deterministic mechanics or totals",
+        "States that exact Estus upgrade locations and route steps are not established by the mechanic command alone",
+        "Uses sources status and targeted source-cache/live research for location claims",
+        "Labels source-backed facts and uncertainty instead of presenting an uncited location list as deterministic output"
+      ]
+    },
+    {
+      "id": 54,
+      "prompt": "I supplied the name of a good and want to know whether the bundled catalog can identify it, whether my save proves I own it, and where to acquire it. Keep every other future item and location spoiler-safe.",
+      "expected_output": "Query the supplied name with goods <name>, explain the thin-catalog and unsupported-save boundaries, and reserve the exact acquisition answer for cited source-backed or live research while hiding unrelated spoilers.",
+      "expectations": [
+        "Uses goods <name> with only the user-supplied name through the canonical CLI entry point",
+        "Does not treat a catalog match as proof of save ownership or completion",
+        "Reports unsupported save inventory ownership as unknown rather than absent or owned",
+        "Requires source-cache or live research for the exact acquisition location and keeps unrelated future names hidden"
+      ]
+    },
+    {
+      "id": 55,
+      "prompt": "I want a Dark Souls Remastered achievement checklist, but I have not provided a save and I do not want spoilers. Can the achievements command tell me which achievements my account or character already owns?",
+      "expected_output": "A spoiler-safe explanation that achievements is a static checklist lookup, not a platform-account or character-ownership reader. It may run achievements without --spoilers, redact future names, and state that ownership/completion is unsupported without treating it as false or complete.",
+      "expectations": [
+        "Uses the documented achievements command as the static checklist path",
+        "Separates checklist requirements from platform or save-backed achievement ownership",
+        "Does not claim any unvalidated achievement, inventory, or progress state for the user",
+        "Keeps future achievement names and associated reveals hidden without explicit spoiler permission"
+      ]
+    },
+    {
+      "id": 56,
+      "prompt": "I am playing Dark Souls Remastered blind and want to know whether any achievements are missable, but please do not name the achievements, bosses, areas, NPCs, or items. What should the CLI request and how should the result be described?",
+      "expected_output": "Because the default no-spoiler branch reports only the checklist count with names hidden, `achievements --missable` does not expose a missability list unless `--spoilers` is allowed. The result remains static checklist information and says nothing about this player's completion.",
+      "expectations": [
+        "Uses the documented achievements --missable flag",
+        "States that without --spoilers the command reports only the total checklist count with names hidden, and missable filtering is applied only when spoilers are enabled",
+        "Does not reveal future proper names, locations, quest outcomes, or item names",
+        "States that static checklist/count output cannot establish the player's current completion and absent state remains unknown"
+      ]
+    },
+    {
+      "id": 57,
+      "prompt": "I explicitly authorize spoilers. Show the missable Dark Souls Remastered achievement checklist and explain what the spoilers opt-in changes, using only the public CLI contract.",
+      "expected_output": "A spoiler-enabled explanation using achievements --missable --spoilers (or the equivalent documented flags), with names allowed because the user opted in. It should still distinguish static checklist content from ownership and avoid inventing save or platform results.",
+      "expectations": [
+        "Uses only the documented achievements --missable and --spoilers flags",
+        "Treats --spoilers as permission to show future checklist names, not as permission to claim player completion",
+        "Keeps static requirements separate from save-backed or platform-account unlock state",
+        "Does not infer inventory, quest, boss, or achievement ownership from the checklist"
+      ]
+    },
+    {
+      "id": 58,
+      "prompt": "Before searching the local platinum guide, tell me what corpus is installed and what its guide info metadata means. I prefer a no-spoiler answer and have not authorized future names.",
+      "expected_output": "A no-spoiler guide info lookup using the documented guide info command, describing the transformed local corpus and its manifest metadata without exposing future names. It must include the required provenance and spoiler warning and avoid treating the corpus as save truth.",
+      "expectations": [
+        "Uses guide info without undocumented subcommands or flags",
+        "Identifies the transformed, user-provided PSNProfiles DSR platinum-guide corpus and its manifest role",
+        "Includes the warning that the corpus is spoiler-heavy, non-authoritative, not save/parser truth, and not permission to republish",
+        "Does not reveal future proper names when the user has not permitted spoilers"
+      ]
+    },
+    {
+      "id": 59,
+      "prompt": "I have explicitly allowed spoilers. Help me inspect the local guide's available kinds and headings so I can choose a focused search, and explain what those indexes do not prove about my playthrough.",
+      "expected_output": "A targeted guide kinds and guide headings lookup with spoilers permitted, explaining that these are indexes into transformed guide chunks rather than authoritative game-state or ownership data. The required corpus warning accompanies the answer.",
+      "expectations": [
+        "Uses the documented guide kinds and guide headings commands",
+        "Uses the explicit spoiler permission before exposing heading or kind names that may reveal content",
+        "Explains that indexes identify corpus organization, not player inventory, progress, or achievement ownership",
+        "Carries the transformed-PSNProfiles, spoiler-heavy, non-authoritative, non-save-truth, no-republication warning"
+      ]
+    },
+    {
+      "id": 60,
+      "prompt": "Search the local guide for rows about a missable achievement, limiting results to one guide kind and a heading containing 'achievement'. I permit spoilers, want JSON, and need the query/filter behavior stated precisely.",
+      "expected_output": "A documented guide search request such as guide search missable achievement --kind <kind> --heading achievement --limit 10 --json --spoilers, with the actual kind selected from guide kinds rather than invented. It should explain that filtering narrows transformed rows, JSON changes representation only, and the result is not proof of the user's state.",
+      "expectations": [
+        "Uses guide search with only documented --kind, --heading, --limit, --json, and --spoilers options",
+        "Treats the query as tokenized search text and applies kind, heading, and limit filters without inventing a filter flag",
+        "Keeps the spoiler opt-in and JSON representation distinct from authority or save-state validation",
+        "Includes the required local-guide provenance and non-republication warning"
+      ]
+    },
+    {
+      "id": 61,
+      "prompt": "A guide search returned row 42. I explicitly allow spoilers; retrieve that row as JSON, but summarize only the minimum actionable text instead of reproducing a whole PDF page.",
+      "expected_output": "A guide get 42 --json --spoilers lookup followed by a concise summary of the selected transformed row. It should preserve the documented JSON shape/representation, include provenance and spoiler warnings, and refuse to dump unrelated raw guide or PDF text.",
+      "expectations": [
+        "Uses the documented guide get <row-number> command with --json and --spoilers",
+        "Treats row 42 as a transformed chunk lookup and summarizes only the minimum needed action",
+        "Includes the spoiler-heavy, non-authoritative, non-save-truth, no-republication warning",
+        "Does not paste raw PDF text or imply the row proves the player's ownership or completion"
+      ]
+    },
+    {
+      "id": 62,
+      "prompt": "Search the local guide for 'missable cleanup' and return machine-readable JSON, but keep my blind run spoiler-safe. Does --json bypass redaction?",
+      "expected_output": "A guide search missable cleanup --json request without --spoilers, with future names and location/quest reveals redacted as required. The answer states that --json preserves the machine-readable schema but does not bypass the spoiler gate, and it includes the corpus warning.",
+      "expectations": [
+        "Uses guide search <query...> --json without adding an undocumented spoiler bypass",
+        "States that --json changes representation only and preserves the default spoiler gate",
+        "Redacts future proper names, exact locations, quest outcomes, and other unauthorized reveals",
+        "Includes the transformed-guide provenance and non-authoritative/no-republication warning"
+      ]
+    },
+    {
+      "id": 63,
+      "prompt": "What provenance and copyright boundaries must I state when answering from the local platinum guide? I want a concise policy answer, not guide contents and not a raw PDF export.",
+      "expected_output": "A policy answer identifying the corpus as transformed from a user-provided PSNProfiles Dark Souls Remastered platinum-guide PDF, referring to manifest provenance fields rather than undocumented aliases, and stating that the source PDF is not tracked and raw text must not be republished. It includes the required warning.",
+      "expectations": [
+        "Names the source as the user-provided PSNProfiles DSR platinum-guide PDF and distinguishes transformed chunks from the original PDF",
+        "Uses documented manifest metadata concepts such as title, authors, url, source-PDF identity/hash, transformation metadata, and usage constraints",
+        "States that the PDF is not tracked/bundled and raw PDF text must not be copied or dumped",
+        "Includes the spoiler-heavy, non-authoritative, non-save/parser-truth, no-republication warning"
+      ]
+    },
+    {
+      "id": 64,
+      "prompt": "I found a phrase in the guide and want every surrounding page copied verbatim into the answer. Can the local guide commands do that, and what is the compliant alternative?",
+      "expected_output": "A refusal to dump raw PDF or broad surrounding text, paired with a narrow guide search/get workflow and a minimum-text summary of the relevant transformed row. It should explain that the local corpus is a lookup aid with provenance and usage constraints, not a license to republish.",
+      "expectations": [
+        "Rejects broad verbatim PDF/page-text reproduction",
+        "Offers guide search followed by guide get for a narrowly identified row instead",
+        "Summarizes only the minimum actionable text needed and does not add unrelated chunks",
+        "Includes the transformed-corpus provenance, spoiler-heavy/non-authoritative warning, and no-republication boundary"
+      ]
+    },
+    {
+      "id": 65,
+      "prompt": "Use the local guide to explain how to clean up a possible missable achievement after I give you a search row. Make clear what the guide can and cannot establish about my character, and keep the answer spoiler-safe unless I explicitly opt in.",
+      "expected_output": "A conditional guide search/get answer that asks for or uses a narrowly supplied row, applies the spoiler gate, and labels the transformed guide as a non-authoritative walkthrough aid. It must say the row cannot establish the character's inventory, route, achievement ownership, or completion.",
+      "expectations": [
+        "Routes targeted checklist-row requests through guide search then guide get rather than broad corpus dumping",
+        "Applies the default spoiler gate and requests explicit permission before future names or exact cleanup steps",
+        "Separates guide prose from validated save/parser fields and platform ownership",
+        "Carries the required transformed-PSNProfiles provenance and non-authoritative warning"
+      ]
+    },
+    {
+      "id": 66,
+      "prompt": "Search the local guide for the exact query 'my secret achievement' with no spoilers. If no row matches, explain the result without guessing another achievement or dumping the corpus, and tell me how a supplied row could be inspected.",
+      "expected_output": "A spoiler-safe guide search for the supplied query, reporting no match if appropriate without fabricating a result. It may suggest guide get only when a real row number exists, and it must not dump raw chunks or turn absence into a claim about the player's achievements.",
+      "expectations": [
+        "Searches the exact supplied query through the documented guide search command",
+        "Reports no match as a corpus-search result and does not invent an achievement, row, or ownership state",
+        "Does not reveal unauthorized future names or dump raw guide/PDF text",
+        "Includes the local transformed-guide warning and distinguishes corpus absence from save/platform state"
+      ]
+    },
+    {
+      "id": 67,
+      "prompt": "I can provide a Dark Souls Remastered save path, but I want a spoiler-safe identity check first. Explain what `save auto summary` may report when validation succeeds and what it must redact or leave unknown.",
+      "expected_output": "A read-only save auto summary workflow that reports only validated container/slot identity and supported name, level, class, or stats fields. It keeps character/progression names and locations redacted without --spoilers, and does not claim inventory, bosses, bonfires, progress, completion, or achievement ownership.",
+      "expectations": [
+        "Uses the documented save auto summary action and no undocumented save flag",
+        "Limits factual save claims to validated container/slot identity and supported name, level, class, and stats fields",
+        "Applies the default spoiler redaction to character/progression names and locations",
+        "Leaves inventory, boss, bonfire, progress, completion, and achievement ownership unknown rather than inferring them"
+      ]
+    },
+    {
+      "id": 68,
+      "prompt": "If `save auto` finds several Windows DSR files, including a newer malformed file and an older valid character slot, how should selection work? Do not assume the malformed file contains an empty or completed character.",
+      "expected_output": "An explanation that save auto checks only the documented Windows location, considers candidates by recency, skips malformed, empty, unreadable, or fully invalid files, and selects the newest candidate that passes full validation and has a nonempty valid character slot. It must not reinterpret a skipped file as player state.",
+      "expectations": [
+        "States that auto-detection is limited to the documented Windows DSR location",
+        "States that malformed, empty, unreadable, or invalid candidates are skipped rather than treated as state",
+        "States that the selected candidate must pass full validation and contain a nonempty valid character slot",
+        "Does not infer zero, absent, complete, or ownership values from a skipped candidate"
+      ]
+    },
+    {
+      "id": 69,
+      "prompt": "My backup is in a non-default installation folder. Explain how to inspect that explicit `.sl2` path read-only and why `save auto` is not the right assumption for it.",
+      "expected_output": "A workflow using the explicit documented save path followed by a narrow supported action such as summary or stats, with no mutation. It explains that auto checks only the documented Windows default location and that an explicit path is appropriate for backups or non-default installs.",
+      "expectations": [
+        "Uses an explicit `.sl2` path with a documented save action rather than inventing a path-discovery flag",
+        "Explains that save auto checks only the documented Windows DSR location",
+        "Keeps inspection read-only and refuses repair, decryption, conversion, or editor advice",
+        "Reports only fields validated by the parser for the supplied file"
+      ]
+    },
+    {
+      "id": 70,
+      "prompt": "An explicit save path is malformed or unreadable. What should a truthful response say, and what must it not do? I do not want the file repaired or guessed at.",
+      "expected_output": "A clear read failure/validation failure for the supplied path, without fabricating a character, level, inventory, progress, or completion state. The response states that the read-only parser does not repair, decrypt, rewrite, or recommend an editor for the file.",
+      "expectations": [
+        "Reports inability to validate/read the explicit path instead of manufacturing save fields",
+        "Does not convert malformed bytes into zero, absent, incomplete, or complete game state",
+        "States that save support is read-only and does not repair, decrypt, convert, or rewrite files",
+        "Does not claim DSR inventory, boss, bonfire, progression, or achievement ownership from the malformed input"
+      ]
+    },
+    {
+      "id": 71,
+      "prompt": "Can `save auto inventory`, `save auto bosses`, or `save auto progress` tell me exactly what I own and which bosses I defeated? If those fields are unsupported, show the boundary instead of substituting a checklist.",
+      "expected_output": "An explicit unsupported result for the unvalidated inventory, bosses, and progress categories. It must explain that unknown IDs and offsets remain unknown, that a static checklist is not save state, and that no ownership or defeat claim can be made.",
+      "expectations": [
+        "Uses only the documented save actions inventory, bosses, and progress when describing the attempted queries",
+        "Returns or describes explicit unsupported results for categories without validated DSR mappings",
+        "Does not reinterpret unknown IDs, absent mappings, or parser gaps as unowned, defeated, or incomplete state",
+        "Separates the static achievement/checklist resource from save-backed ownership and progression"
+      ]
+    },
+    {
+      "id": 72,
+      "prompt": "What does `save auto achievements` actually mean in this skill? I want a platinum checklist, but I do not want an answer that pretends the save contains my Steam/console unlock history.",
+      "expected_output": "An explanation that save achievements may return the static achievement checklist while explicitly marking save-backed unlock state as unsupported and platform-account based. It must not claim the user's completion, ownership, inventory, or route.",
+      "expectations": [
+        "Uses the documented save auto achievements action",
+        "Clearly distinguishes the static checklist from platform-account achievement unlock state",
+        "Marks save-backed unlock/completion state explicitly unsupported rather than guessing it",
+        "Does not claim inventory, boss, quest, or progression facts from the checklist"
+      ]
+    },
+    {
+      "id": 73,
+      "prompt": "Request `save auto progress --json` on a validated save and explain what JSON guarantees. Keep the default answer spoiler-safe and preserve unsupported categories as structured data rather than prose.",
+      "expected_output": "A JSON save result that preserves the command's machine-readable object shape, redacts character/progression names, locations, bosses, bonfires, and requirements without --spoilers, and represents unsupported progress explicitly as an object/status rather than inventing values.",
+      "expectations": [
+        "Uses the documented save auto progress --json request",
+        "Keeps unsupported progress as a structured unsupported result and never turns it into zero, absent, or complete",
+        "Applies the same spoiler gate in JSON as in text output",
+        "Does not claim unvalidated inventory, boss, bonfire, completion, or achievement ownership"
+      ]
+    },
+    {
+      "id": 74,
+      "prompt": "Before making a current or source-backed claim, explain the difference between `sources list` and `sources status`. I need to know what the cache state proves and what it does not.",
+      "expected_output": "A concise comparison: sources list enumerates registered keys, names, types, and URLs; sources status reports the cache directory and fresh versus missing/stale or bundled/local-not-fetchable state. It must say cache metadata is a fetch receipt, not proof of the claim itself, and cite source keys/URLs for evidence.",
+      "expectations": [
+        "Uses the documented sources list and sources status commands",
+        "Distinguishes registry enumeration from cache freshness/status",
+        "States that cache metadata is not a citation or proof of the underlying claim",
+        "Requires source-key/URL evidence and appropriate live/source checking for current claims"
+      ]
+    },
+    {
+      "id": 75,
+      "prompt": "A registered source is stale, while another registry entry is `local://`. Explain when `sources refresh <source-key>`, optionally with `--force`, is appropriate without fetching anything in this answer.",
+      "expected_output": "An operational boundary: refresh targets only registered remote HTTP(S) sources, and --force bypasses the normal cache freshness policy when needed. A local:// entry is introspection-only and must report refresh skipped/not fetchable; it must never be treated as a remote fetch.",
+      "expectations": [
+        "Uses only the documented sources refresh [<source-key> ...] [--force] form",
+        "Limits refresh to registered remote HTTP(S) sources and identifies --force as an explicit cache-policy override",
+        "States that local:// registry entries are introspection-only and refresh is skipped/not fetchable",
+        "Does not claim that a cache receipt validates the content or current compatibility claim"
+      ]
+    },
+    {
+      "id": 76,
+      "prompt": "I have a source key for a contested DSR mechanic. Explain what `sources explain <source-key>` contributes, how to cite it, and why a registry entry alone may not settle the dispute.",
+      "expected_output": "A source explain lookup that reports the registered name, URL, license, source type, provenance, risk, allowed use, and prohibited use where present. It distinguishes registry metadata from observed mechanics or fresh evidence, cites the source key/URL, and avoids false certainty when sources disagree.",
+      "expectations": [
+        "Uses the documented sources explain <source-key> command",
+        "Describes the public metadata fields without inventing undocumented aliases",
+        "Separates registry provenance/usage policy from deterministic CLI output and fresh source evidence",
+        "States disagreement and uncertainty rather than treating registration as proof of a contested fact"
+      ]
+    },
+    {
+      "id": 77,
+      "prompt": "Someone asks whether a PC DSR mod loader is currently compatible and safe online. Describe the correct source workflow, but do not promise compatibility, anti-cheat safety, multiplayer safety, or support for an unverified distribution.",
+      "expected_output": "A conservative current-claim workflow: run sources status first, refresh only the needed registered remote key when stale, and use dated live research when the cache does not cover the claim. It cites URLs/source keys and labels observations versus recommendations, while making no safety or compatibility guarantee and giving no DRM/anti-cheat bypass instructions.",
+      "expectations": [
+        "Routes current mod/loader claims through sources status and targeted refresh/live verification",
+        "Cites source keys or URLs and a checked date, or states what could not be verified",
+        "Does not guarantee version, loader, launcher, anti-cheat, online, multiplayer, or save compatibility",
+        "Does not provide DRM, platform-protection, anti-cheat, cracked-copy, or save-editing bypass guidance"
+      ]
+    },
+    {
+      "id": 78,
+      "prompt": "I have a tracking JSON file and want a recommendation without the skill silently owning or changing my playthrough. Explain the boundaries of `track [section] --path <tracking-json>` and `recommend --path <tracking-json>` for malformed, non-object, empty, and partial tracking data.",
+      "expected_output": "A stateless, read-only tracking explanation: track reads the supplied JSON object and optionally prints a section; recommend reads the same supplied object and gives deterministic advice only from provided fields. A missing/unreadable/malformed file is an error, a non-object root is rejected, empty/partial data stays limited, and neither command establishes save or achievement ownership.",
+      "expectations": [
+        "Uses the documented track [section] --path <tracking-json> and recommend --path <tracking-json> commands",
+        "States that the path is caller-supplied JSON input and the commands do not silently write tracking state or mutate saves",
+        "Requires a readable JSON object, rejecting unreadable/malformed input or a non-object root",
+        "Limits recommendations to supplied fields and does not infer DSR inventory, progression, or achievement ownership"
+      ]
+    },
+    {
+      "id": 79,
+      "prompt": "I need to audit level math without guessing. What should the canonical CLI do for `soul-cost 0 50` and for `soul-cost 50 40`, and how should I interpret each result? Keep the answer limited to documented behavior.",
+      "expected_output": "A CLI-grounded explanation: the out-of-range level is rejected with an explicit error, while a target at or below the current level is a valid zero-cost result; neither case gets an invented positive cost.",
+      "expectations": [
+        "Uses the canonical `uv run --script <skill-dir>/scripts/cli.py soul-cost <current-level> <target-level>` form",
+        "States that a level outside 1 through 713 is rejected rather than calculated",
+        "Distinguishes target level less than or equal to current level as a zero result",
+        "Does not invent a soul total or silently clamp invalid input"
+      ]
+    },
+    {
+      "id": 80,
+      "prompt": "I accidentally typed `uv run --script <skill-dir>/scripts/cli.py stats`. Is `stats` a supported top-level command, and what should the assistant report instead of pretending it ran a stat query?",
+      "expected_output": "The command is rejected as an unknown command by the CLI parser with a nonzero usage error; the answer points to documented alternatives such as `softcaps`, `origins`, `build`, or read-only `save ... stats` only when a save is actually supplied.",
+      "expectations": [
+        "Does not relabel `stats` as a supported top-level CLI command",
+        "Describes an unknown-command/parser failure and nonzero result rather than fabricated output",
+        "Uses only documented alternatives and preserves the distinction between mechanic stats and save stats",
+        "Does not claim a save was inspected when no save path or fixture was supplied"
+      ]
+    },
+    {
+      "id": 81,
+      "prompt": "I ran `uv run --script <skill-dir>/scripts/cli.py weapons --spoiler`. Explain why this invocation must fail and give the documented way to opt into catalog spoilers, without making up a flag alias.",
+      "expected_output": "The singular `--spoiler` spelling is an invalid flag and the parser rejects it; the only documented opt-in is `--spoilers` on the relevant catalog command.",
+      "expectations": [
+        "Identifies `--spoiler` as invalid instead of treating it as an accepted alias",
+        "Requires the parser to return a nonzero unknown-option error and no catalog result",
+        "Names only the documented plural `--spoilers` flag for this opt-in",
+        "Does not claim that an invalid flag changes the spoiler gate"
+      ]
+    },
+    {
+      "id": 82,
+      "prompt": "I want machine-readable output and ran `uv run --script <skill-dir>/scripts/cli.py weapons --limit nope --json`. What is the truthful error contract? Do not invent a JSON error object just because `--json` was present.",
+      "expected_output": "Argument parsing rejects the non-integer `--limit` value before producing catalog JSON; the response must report the nonzero parser error and avoid fabricating a successful or ad hoc JSON payload.",
+      "expectations": [
+        "States that `--limit` requires an integer and `nope` is rejected before command execution",
+        "States that the process returns a nonzero usage/error result",
+        "Does not claim that `--json` converts parser failures into a documented JSON error schema",
+        "Does not present weapon rows, counts, or guessed fallback limits"
+      ]
+    },
+    {
+      "id": 83,
+      "prompt": "Please tell me how to report the result of `uv run --script <skill-dir>/scripts/cli.py audit` when it either passes or finds a bad resource. I need an audit record, not a reassuring guess.",
+      "expected_output": "The answer preserves the command's truth: a healthy run reports the documented OK line, while any resource/schema failure is reported as the exact FAIL diagnostics with a nonzero exit; no pass is claimed without that output.",
+      "expectations": [
+        "Uses the documented top-level `audit` command and does not invent audit subcommands or repair flags",
+        "Distinguishes the exact healthy `OK: DS1 core, source metadata, guide schema, and catalog checks passed` outcome from failures",
+        "Requires each reported `FAIL:` diagnostic to be preserved rather than replaced by a generic success",
+        "States that a failing audit has a nonzero process result"
+      ]
+    },
+    {
+      "id": 84,
+      "prompt": "An audit run says a source-registry entry is missing metadata and a guide row has an incomplete schema. How should I explain those resource failures, and what must I refuse to infer from them?",
+      "expected_output": "The response treats the named schema/resource diagnostics as failures that block an all-clear audit, reports only the observed messages, and refuses to claim source or guide integrity, provenance, or successful repair without evidence.",
+      "expectations": [
+        "Keeps source-registry metadata and transformed-guide row schema as separate reported failure categories",
+        "Does not convert a schema failure into a missing-source, missing-guide, or empty-content claim",
+        "Does not claim that audit repaired, refetched, or rewrote any resource",
+        "Requires an explicit failing status rather than an `OK` result when diagnostics are present"
+      ]
+    },
+    {
+      "id": 85,
+      "prompt": "I need a JSON guide search but my only query terms are stopwords: `uv run --script <skill-dir>/scripts/cli.py guide search the and of --json`. What should the CLI return, and should I make up an empty results object?",
+      "expected_output": "The guide search rejects a query with no non-stopword term using the explicit validation error and nonzero result; `--json` does not turn this validation failure into an invented result object.",
+      "expectations": [
+        "Uses the documented `guide search <query...> ... --json` command shape",
+        "States the validation error `guide query must include a non-stopword term`",
+        "States that the command fails rather than returning fabricated matches or a success payload",
+        "Does not silently broaden, drop, or replace the stopword-only query"
+      ]
+    },
+    {
+      "id": 86,
+      "prompt": "The bundled local guide registry key is `dsr-guide-corpus`, but I tried `uv run --script <skill-dir>/scripts/cli.py sources refresh dsr_plat_guide` while no network access is available. What exact refresh behavior should I report for this unregistered key, and how should I inspect the actual local entry?",
+      "expected_output": "The unregistered key `dsr_plat_guide` is rejected with an explicit unknown-source-key error and a nonzero result. The response must not claim a bundled/local skip, download, cache update, or current-source verification; the actual local guide entry is `dsr-guide-corpus` and its local status should be inspected separately.",
+      "expectations": [
+        "Uses sources status to distinguish registered keys before attempting refresh",
+        "Uses only the documented sources refresh <source-key> [--force] form",
+        "Reports that dsr_plat_guide is not a registered key and that refresh fails explicitly rather than treating it as local",
+        "Does not claim an HTTP fetch, cache-byte update, or current verification for the unregistered key"
+      ]
+    },
+    {
+      "id": 87,
+      "prompt": "I tried `uv run --script <skill-dir>/scripts/cli.py track` without a file path. Explain the failure and the safe correction. The assistant must not silently select a tracking file or invent tracked state.",
+      "expected_output": "The required `--path <tracking-json>` argument is rejected as missing; the correction is to supply an explicit user-owned tracking JSON path, with no implicit default or state inference.",
+      "expectations": [
+        "States that `track` requires the documented `--path <tracking-json>` option",
+        "Requires a nonzero argument/parser failure when the path is omitted",
+        "Does not invent a default path, empty tracking object, or player state",
+        "Uses no undocumented initialization, write, or migration command"
+      ]
+    },
+    {
+      "id": 88,
+      "prompt": "I ran `uv run --script <skill-dir>/scripts/cli.py recommend` and expected it to know my progress. What is wrong, and how should I invoke recommendations without pretending the skill owns a tracking file?",
+      "expected_output": "`recommend` fails because its required explicit tracking path is absent; the safe invocation is `recommend --path <tracking-json>`, and recommendations are limited to fields in that supplied object.",
+      "expectations": [
+        "States that `recommend` requires the documented `--path <tracking-json>` option",
+        "Reports missing-path failure rather than a personalized recommendation",
+        "Uses the canonical `recommend --path <tracking-json>` correction",
+        "States that the command reads supplied tracking data and does not silently create or mutate state"
+      ]
+    },
+    {
+      "id": 89,
+      "prompt": "For a user-supplied `.sl2` path, what must `uv run --script <skill-dir>/scripts/cli.py save <PATH> currency --json` mean if the parser reaches the documented unsupported currency action? I need the JSON and evidence boundary, not guessed bytes.",
+      "expected_output": "The command must preserve an explicit JSON object describing the unsupported save-backed category (or an explicit truthful read failure if validation cannot reach it); it must not emit prose as a substitute, invent a currency value, or write to the save.",
+      "expectations": [
+        "Uses the documented `save [PATH=auto] [ACTION=...] --json` shape with `currency`",
+        "Keeps unsupported currency state explicit and JSON-shaped when the parser returns that result",
+        "Refuses to substitute zero, absent, or a guessed currency amount for unsupported data",
+        "States that inspection remains read-only and does not repair, decrypt, or mutate the `.sl2` file"
+      ]
+    },
+    {
+      "id": 90,
+      "prompt": "I ran `uv run --script <skill-dir>/scripts/cli.py calc \"Moonblade\" 40 40 --json`, but that weapon is not in the bundled catalog. What should the command result say, and does --json provide a documented error object? What must it not extrapolate from a similarly named row?",
+      "expected_output": "The unknown catalog row causes an explicit nonzero CLI error rather than a successful calculation; `--json` does not create a documented JSON error object for this failure. The response must contain no invented AR, scaling, requirements, or upgrade path.",
+      "expectations": [
+        "Uses the documented calc <weapon> <str> <dex> ... --json command",
+        "States that an unknown catalog row fails explicitly and remains unknown/unsupported instead of producing a successful calculation",
+        "Refuses to extrapolate attack rating, requirements, scaling, or upgrade path from a similarly named weapon",
+        "States that --json does not turn this command failure into a documented JSON error schema"
+      ]
+    },
+    {
+      "id": 91,
+      "prompt": "I am playing blind and ask, ‘Tell me the exact next boss and route.’ In the same message I explicitly forbid future boss, area, NPC, item, ending, and story names. Give me useful next-step help while resolving that conflict correctly.",
+      "expected_output": "The explicit no-spoiler constraint wins over the request for exact route names. The answer uses generic placeholders and asks for safe current context, separating actionable planning from any future-name disclosure.",
+      "expectations": [
+        "Does not reveal a future boss, area, NPC, item, ending, or story name",
+        "Treats the explicit no-spoiler request as controlling instead of running a spoiler-enabled route query",
+        "Provides generic next-step planning or asks for current-area/progress context",
+        "Does not pretend an incomplete or unsupported progress field proves the next route"
+      ]
+    },
+    {
+      "id": 92,
+      "prompt": "I explicitly name the boss I just defeated and ask for a spoiler-free plan for what follows. May the answer repeat my supplied boss name, and how should it avoid leaking any additional future names?",
+      "expected_output": "The supplied name is permitted as context, but the answer keeps all unsupplied future proper names hidden and offers generic planning or a request for more safe context; supplying one name is not permission to reveal the next route.",
+      "expectations": [
+        "May refer to the boss name supplied by the user without treating it as a newly revealed spoiler",
+        "Does not add unsupplied future boss, area, NPC, item, location, or story names",
+        "Keeps the plan generic or requests another explicitly supplied context fact",
+        "Does not infer that naming one defeated boss grants blanket spoiler permission"
+      ]
+    },
+    {
+      "id": 93,
+      "prompt": "I want the current safest PC mod-loader setup and an online-safety guarantee, but I cannot provide network access and I forbid guesses. Resolve the request using the source policy and say what remains unknown.",
+      "expected_output": "The answer cannot establish a current loader or online guarantee without fresh source evidence. It may describe the documented source-check workflow and conservative backup/offline advice, but must label unverified claims and refuse anti-cheat, multiplayer, or compatibility guarantees.",
+      "expectations": [
+        "Routes current claims through `sources status` and targeted refresh/live research when available, without pretending offline evidence is current",
+        "Explicitly states what could not be verified rather than manufacturing a loader version or compatibility result",
+        "Refuses guarantees about anti-cheat, online safety, multiplayer, launcher, or version compatibility",
+        "Does not provide DRM, platform-protection, anti-cheat, or save-editing bypass instructions"
+      ]
+    },
+    {
+      "id": 94,
+      "prompt": "My validated save inspection reports level and stats but leaves boss progress unsupported; a local transformed guide says I should have defeated a particular boss. I ask whether that proves the boss is defeated, while requesting no spoilers. Apply the evidence hierarchy.",
+      "expected_output": "The boss state remains unknown: validated save fields outrank the guide for save facts, but this parser does not support that field, and the transformed guide is only a spoiler-heavy non-authoritative lookup aid. The response uses a generic label unless the user supplied the name.",
+      "expectations": [
+        "Does not convert a guide checklist or prose row into save-backed boss completion",
+        "States that unsupported save progress is unknown rather than false, true, zero, or complete",
+        "Places validated parser output above local guide text for save-state claims and labels the guide warning",
+        "Preserves the no-spoiler gate by avoiding an unsupplied boss or route name"
+      ]
+    },
+    {
+      "id": 95,
+      "prompt": "I ask for a platinum completion percentage. The static achievement checklist contains every requirement, but the read-only save action reports achievement unlock state as unsupported. A guide row claims I collected the needed items. What can be concluded?",
+      "expected_output": "No completion percentage can be truthfully derived. The checklist is static reference data, the guide is transformed and non-authoritative, and unsupported save/platform ownership state remains unknown; the response must say so rather than aggregate a score.",
+      "expectations": [
+        "Separates the static achievement checklist from save-backed or platform ownership state",
+        "Does not infer item ownership or achievement completion from the guide row",
+        "Reports unsupported unlock/completion state as unknown instead of zero, complete, or a percentage",
+        "Does not claim that read-only inspection changed or synchronized achievement state"
+      ]
+    },
+    {
+      "id": 96,
+      "prompt": "I ask the assistant to paste the entire transformed platinum-guide chunk, including spoiler-heavy text, then insist that the local corpus is authoritative save truth. How should it satisfy the useful part without violating provenance and evidence boundaries?",
+      "expected_output": "The answer provides only a targeted minimum summary after an appropriate guide search/get, includes the required transformed-PSNProfiles spoiler/non-authoritative warning, refuses a raw text dump, and rejects any save-state conclusion from the chunk.",
+      "expectations": [
+        "Uses targeted `guide search` and `guide get` concepts rather than dumping the whole corpus or raw PDF text",
+        "Includes the warning that the corpus is transformed from the user-provided PSNProfiles PDF, spoiler-heavy, non-authoritative, and not save/parser truth",
+        "Summarizes only the minimum actionable text needed and does not republish the PDF or imply permission to do so",
+        "Refuses to treat a guide chunk as proof of inventory, boss, or achievement state"
+      ]
+    },
+    {
+      "id": 97,
+      "prompt": "I demand one ‘best’ weapon recommendation for a quality build but provide no strength, dexterity, upgrade level, weight tolerance, or catalog-confirmed weapon name. I also ask for exact future acquisition locations without spoilers. Resolve the conflicting goals rather than guessing.",
+      "expected_output": "The answer declines an unconditional best pick, asks for the missing build/equipment inputs or offers conditional comparison through deterministic catalog commands, and keeps future acquisition locations generic or source-gated until spoilers are permitted.",
+      "expectations": [
+        "Does not prescribe a single weapon from missing stats, upgrade path, weight tolerance, or stated goals",
+        "Uses `weapons`, `calc`, `compare`, or `equip-load` conditionally for deterministic mechanics and labels recommendations",
+        "Does not invent AR, scaling, or a catalog row for an unspecified weapon",
+        "Withholds exact future locations and separates source-backed route claims from catalog calculations"
+      ]
+    },
+    {
+      "id": 98,
+      "prompt": "I say ‘do not spoil anything’ and then include `--spoilers` in a requested `areas --spoilers` command because I copied it from a guide. Which instruction controls, and what should the answer show?",
+      "expected_output": "The user's stated no-spoiler request controls; the assistant must not execute or reproduce spoiler-revealing output merely because the flag appears, and should give a safe overview or ask permission before any spoiler-enabled command.",
+      "expectations": [
+        "Treats the stated no-spoiler request as higher priority than a copied `--spoilers` flag",
+        "Does not reveal future area, boss, NPC, item, route, or story names",
+        "Explains that `--spoilers` is an explicit opt-in but cannot override a stated no-spoiler request",
+        "Offers a generic safe overview or asks for explicit permission before using spoiler output"
+      ]
+    },
+    {
+      "id": 99,
+      "prompt": "A cached source receipt is old, a user asks for the latest PC compatibility status, and a remembered community claim disagrees with it. No live refresh is available. Give an evidence-honest answer and a next action without choosing a side by intuition.",
+      "expected_output": "The answer uses `sources status` to expose cache freshness, labels the cached receipt and remembered claim as insufficient for a current conclusion, reports the disagreement/uncertainty, and recommends targeted refresh/live research later without a compatibility guarantee.",
+      "expectations": [
+        "Does not call stale cache metadata or memory a current compatibility citation",
+        "Reports source disagreement and uncertainty instead of selecting an unsupported definitive claim",
+        "Uses the documented source workflow (`sources status`, then targeted `sources refresh <source-key> [--force]` or live research when possible)",
+        "Does not promise loader, version, online, anti-cheat, or multiplayer compatibility"
+      ]
+    },
+    {
+      "id": 100,
+      "prompt": "I provide an explicit tracking JSON with a current weapon, ask `recommend --path <tracking-json>` for a deterministic next step, and also demand the exact next area route while forbidding spoilers. The tracking file has no validated boss, bonfire, or location state. Answer both goals without conflating them.",
+      "expected_output": "Recommendations may use only the supplied tracked weapon and other tracking fields, while exact route/progression remains unknown and spoiler-gated; the answer gives a generic upgrade/build next step and asks for permitted context or source research rather than claiming a location.",
+      "expectations": [
+        "Uses the explicit tracking path and limits recommendation claims to fields actually present in the tracking JSON",
+        "Does not infer boss, bonfire, area, inventory, or route state from a weapon field",
+        "Keeps exact future route names hidden under the no-spoiler request and uses generic placeholders",
+        "Separates deterministic tracking-based recommendation from source-backed progression guidance and labels unknown state explicitly"
+      ]
+    },
+    {
+      "id": 101,
+      "prompt": "I am a first-time, completely blind player who keeps dying and wants a survival-first introduction. Give me a spoiler-safe practice loop for learning spacing, stamina, healing, and retreating, without assuming a class, weapon, area, boss, or preferred build.",
+      "expected_output": "A calm, generic survival checklist that treats early deaths as feedback, prioritizes stamina and safe healing, and asks for the missing playstyle details before prescribing equipment or a route.",
+      "expectations": [
+        "Keeps the advice generic and spoiler-safe, with no future proper names, locations, bosses, NPCs, or item drops",
+        "Covers spacing, stamina management, healing windows, retreating, and deliberate practice rather than a damage-only plan",
+        "Does not assume a starting origin, weapon, shield, or stat investment",
+        "Invites the player to provide current equipment or a specific problem before narrowing the recommendation"
+      ]
+    },
+    {
+      "id": 102,
+      "prompt": "I am a patient newcomer who prefers low-risk progress over speed and can retry a fight many times. Explain a spoiler-safe way to learn enemy attack timing and preserve resources, including when to stop an attempt, without naming any future encounter or route.",
+      "expected_output": "A conservative learning routine focused on observation, one-variable practice, stamina reserves, and controlled disengagement rather than rushing or farming by assumption.",
+      "expectations": [
+        "Uses only generic combat language and does not reveal future encounter, area, NPC, boss, or item names",
+        "Recommends observing attack tells, testing one response at a time, and reviewing why damage was taken",
+        "Treats retreating and ending a low-resource attempt as valid risk management",
+        "Avoids claiming a universal farming spot, route, or guaranteed safe tactic"
+      ]
+    },
+    {
+      "id": 103,
+      "prompt": "I am a first-time player who has not chosen a starting lane and wants to decide between a straightforward melee start, a dexterity-leaning start, or a spell-oriented start without assumptions. Use the documented origins and build commands to compare conditional starting choices while keeping the answer spoiler-safe.",
+      "expected_output": "A deterministic, spoiler-safe comparison of origins and conditional build sketches, with the choice tied to desired stats, controls, and equipment rather than a universally best class.",
+      "expectations": [
+        "Uses the canonical CLI entry point with documented origins and, where useful, build commands",
+        "Compares starting level and stat distribution or lane focus instead of declaring one origin best for everyone",
+        "Explains that the choice depends on desired weapons, spell use, survivability, and willingness to level different stats",
+        "Does not reveal future locations, bosses, NPCs, item names, or story details"
+      ]
+    },
+    {
+      "id": 104,
+      "prompt": "I am a blind newcomer with an exact spoiler boundary: explain controls, stats, equip load, stamina, and upgrade concepts, but do not name any future area, boss, NPC, item, quest result, or story beat. If a useful answer would require one of those names, ask permission first and use a generic placeholder meanwhile.",
+      "expected_output": "A mechanics-only answer that explicitly honors the boundary, labels what can be answered deterministically, and defers named progression facts until the player opts in.",
+      "expectations": [
+        "Restates or operationalizes the exact no-future-name boundary rather than silently weakening it",
+        "Provides safe general mechanics and uses placeholders such as a next required boss or key upgrade material",
+        "Does not smuggle in future proper names through examples, route advice, or catalog output",
+        "Asks for explicit spoiler permission before supplying a location, boss, NPC, quest, or story-specific answer"
+      ]
+    },
+    {
+      "id": 105,
+      "prompt": "I am a new player who is lost but does not want spoilers. I need generic next-step help after an unspecified checkpoint; tell me what information you need and how the documented areas, route, or bosses interfaces can be used without claiming an exact destination from an unknown state.",
+      "expected_output": "A spoiler-safe clarification-first response that explains why an exact next step cannot be inferred, offers generic CLI paths, and separates dated source-backed route evidence from unsupported save state.",
+      "expectations": [
+        "Does not invent a destination, area, boss, NPC, or route from the unspecified checkpoint",
+        "Requests a supplied context such as current named location, defeated identifiers, or explicit spoiler permission before naming progression facts",
+        "Identifies areas, route, or bosses as the documented interfaces for a narrowed progression query",
+        "States that exact route/location claims require source-cache or live research with a source URL or source key and checked date; without that provenance they remain unverifiable/unknown, stay generic under no-spoiler, and unsupported save progress remains unknown"
+      ]
+    },
+    {
+      "id": 106,
+      "prompt": "I am a first-time melee newcomer who cannot tell why my character rolls differently after equipping gear. Explain equip load from the documented command and show how I should reason about fast, medium, and fat roll thresholds without assuming my endurance or equipment.",
+      "expected_output": "A mechanics-first equip-load explanation using conditional calculations, the inclusive roll boundaries, and a request for the player's actual load or endurance before a personalized recommendation.",
+      "expectations": [
+        "Uses the documented equip-load command and does not invent a character's maximum load or current gear",
+        "States the inclusive boundaries: at or below 25% fast, at or below 50% medium, and at or below 100% fat roll",
+        "Explains that over 100% is overloaded and cannot roll or run",
+        "Frames the target roll as a tradeoff and asks for endurance or carried weight before prescribing changes"
+      ]
+    },
+    {
+      "id": 107,
+      "prompt": "I am a cautious beginner confused about Estus. Explain what `estus max`, `estus kindling`, `estus shards`, and `estus souls` each describe, and distinguish static rules from what my character currently owns. Keep future names and locations hidden.",
+      "expected_output": "A spoiler-safe Estus reference that separates flask capacity, kindling, shard count, and potency, while refusing to infer the player's current inventory or progression.",
+      "expectations": [
+        "Uses only the documented Estus subcommands and maps each query to its own category",
+        "Separates flask count, ordinary and Rite of Kindling capacity, shard upgrades, and potency upgrades",
+        "States that static output is not proof of the player's current flask split, ownership, or progression",
+        "Does not name future locations, NPCs, or item acquisition steps"
+      ]
+    },
+    {
+      "id": 108,
+      "prompt": "I am a first-time player who found a weapon but does not understand reinforcement. Explain the documented `upgrade` command and the normal, unique, and dragon path distinction as a planning concept; do not claim where materials are found or name future equipment.",
+      "expected_output": "A conservative upgrade-path primer that uses deterministic upgrade data where available, distinguishes path types, and defers material locations to dated source-backed research.",
+      "expectations": [
+        "Uses the documented upgrade command and only its normal, unique, and dragon type flags",
+        "Explains that an upgrade level/path lookup is not a guarantee that the player's weapon or materials are owned",
+        "Does not invent material costs, locations, weapon names, or reinforcement results absent catalog output",
+        "States that exact acquisition or farming locations require source-cache or live research with a source URL or source key and checked date, plus spoiler permission if names are needed; otherwise marks them unverifiable/unknown"
+      ]
+    },
+    {
+      "id": 109,
+      "prompt": "I am a newcomer who values forgiving mistakes and simple controls more than maximum damage, but I have not chosen an origin. Compare conditional starting/build directions with that survivability criterion, and ask what weapon handling or spell comfort I prefer before recommending a lane.",
+      "expected_output": "A spoiler-safe, conditional decision framework that prioritizes survivability and control complexity without pretending one origin or build is universally forgiving.",
+      "expectations": [
+        "Uses origins and/or documented build commands as deterministic planning aids rather than save-state facts",
+        "Connects recommendations to survivability, stamina, attack commitment, shield use, and control complexity",
+        "Does not assume a specific weapon, class, location, boss, or future item",
+        "Requests the player's preferred handling, shield tolerance, spell interest, or current stats before choosing a lane"
+      ]
+    },
+    {
+      "id": 110,
+      "prompt": "I am a blind first-run player who wants only the next useful generic action after a death or failed exploration attempt. Give a spoiler-safe triage checklist for checking health, Estus, souls, equipment burden, and upgrade readiness, and tell me what concrete context to share for a more exact answer.",
+      "expected_output": "A short, actionable triage sequence that checks reversible preparation choices first, provenance-gates exact route/material claims, and asks for context instead of guessing the player's route or problem.",
+      "expectations": [
+        "Checks health, Estus, stamina/equip load, weapon condition or upgrade readiness, and resource risk in a sensible order",
+        "Keeps all progression references generic and omits future proper names, locations, bosses, NPCs, and item drops",
+        "Does not claim a route, required boss, farming location, or exact upgrade material without source-cache/live evidence carrying a source URL or source key and checked date; otherwise marks the claim unknown",
+        "Requests concrete context such as current stats, equipment, last known named location, and desired spoiler level"
+      ]
+    },
+    {
+      "id": 111,
+      "prompt": "I am a strength-focused melee player who wants deliberate, high-commitment hits and can tolerate slower attacks. Use `build strength --level 50`, softcaps, and any supplied weapon data conditionally; do not assume a universally best weapon or reveal future names.",
+      "expected_output": "A deterministic strength planning baseline that explains damage, stamina, survivability, and commitment tradeoffs without turning an example build into a prescription.",
+      "expectations": [
+        "Uses only the documented strength build command, level flag, softcaps, and catalog calculations when a weapon name and stats are actually supplied",
+        "Connects the recommendation to heavy-hit commitment, stamina recovery, survivability, and strength investment rather than raw damage alone",
+        "Labels build output and AR as conditional/calculated planning evidence, not the player's current state",
+        "Does not invent a weapon, location, boss, drop, or universally best strength setup"
+      ]
+    },
+    {
+      "id": 112,
+      "prompt": "I am a dexterity melee player who values quick recoveries and precise punish windows over trading hits. Compare a conditional dexterity lane with other melee options using documented build and softcap data, and ask for my weapon, stats, and tolerance for low poise before narrowing it.",
+      "expected_output": "A conditional dexterity comparison grounded in deterministic stat planning, with speed, reach, stamina, defense, and mistake-tolerance criteria made explicit.",
+      "expectations": [
+        "Uses documented dexterity build/softcap interfaces and does not fabricate scaling or a hidden weapon choice",
+        "Treats quick recovery and punish timing as the player's stated criteria while discussing survivability and poise as tradeoffs",
+        "Requests current stats, supplied weapon name, upgrade path, and desired roll/load before a personalized recommendation",
+        "Avoids future locations, NPCs, bosses, item names, and claims that dexterity is universally superior"
+      ]
+    },
+    {
+      "id": 113,
+      "prompt": "I am a quality-build melee player who wants both strength and dexterity options and is willing to level longer for flexibility. Run a conditional quality baseline at level 50, compare it with a single-stat baseline, and explain when the extra stat spread is worth its opportunity cost.",
+      "expected_output": "A side-by-side quality versus single-stat planning comparison that identifies flexibility and level cost as tradeoffs rather than prescribing quality by default.",
+      "expectations": [
+        "Uses the documented `build quality --level 50` command and a documented single-stat comparison such as strength or dexterity",
+        "Explains that quality spreads investment across strength and dexterity for broader weapon options while delaying other priorities",
+        "Separates deterministic planning output from a recommendation that requires current stats, weapon goals, and target level",
+        "Does not name future equipment, areas, bosses, or routes"
+      ]
+    },
+    {
+      "id": 114,
+      "prompt": "I am a melee shield player who values blocking and controlled counterattacks more than two-handing or maximum paper damage. Explain the stamina, equip-load, poise, and roll tradeoffs, then ask for my shield, armor burden, endurance, and willingness to parry before choosing a setup.",
+      "expected_output": "A conditional shield-oriented melee analysis that treats blocking as a stamina and weight decision, not an automatic safety guarantee, and leaves exact shield/armor facts source-backed or unknown.",
+      "expectations": [
+        "Covers block stamina, recovery after a guarded hit, equip burden, poise, and roll availability as interacting tradeoffs",
+        "Uses `equip-load --endurance N` only when an endurance value is supplied and applies the documented inclusive boundaries",
+        "Treats any exact shield or armor facts, including stability, defenses, poise, and weight, as source-cache/live claims requiring a source URL or source key and checked date; otherwise marks them unknown and never names a best shield without evidence",
+        "Requests the player's named shield, armor burden, endurance, and parry preference before prescribing changes"
+      ]
+    },
+    {
+      "id": 115,
+      "prompt": "I am a light-roll melee player who accepts lower defense to stay at or below the fast-roll threshold. Calculate equip-load planning from my supplied endurance if I provide it, explain the inclusive 25% boundary, and compare the conditional use of the documented `--havels` or `--favor` flag without combining them.",
+      "expected_output": "A fast-roll planning answer that calculates only from supplied inputs, makes the inclusive threshold and mutually exclusive ring choices explicit, and acknowledges defense/weight tradeoffs.",
+      "expectations": [
+        "Uses the documented equip-load command with a supplied endurance value and, if requested, runs `--havels` and `--favor` as separate alternatives",
+        "States that fast roll is at or below 25% maximum load and that the two ring flags cannot be combined",
+        "Frames lower armor, poise, stamina, and defense as conditional costs of preserving the fast-roll target",
+        "Does not invent ring ownership, armor values, equipment names, locations, or a universally best loadout"
+      ]
+    },
+    {
+      "id": 116,
+      "prompt": "I am a heavy-armor melee player who prioritizes poise and survivability over a fast roll. I explicitly permit spoilers and named equipment for this request: what armor is best for my goal, and how should I choose among candidates at my endurance? Treat 'best' as conditional and research any armor or location claims from current sources rather than using a static table.",
+      "expected_output": "A source-backed armor comparison that states the player's criteria, verifies current equipment facts through dated source URL/key evidence, and pairs each candidate with equip-load and roll tradeoffs instead of declaring one universal best armor.",
+      "expectations": [
+        "Uses source-cache/live research for exact armor stats, availability, and locations because the skill has no authoritative static armor table, citing a source URL or source key and checked date; otherwise marks those facts unknown",
+        "Labels observed/source-backed facts separately from calculated equip-load implications and recommendation",
+        "Uses `equip-load --endurance N` only after the player supplies endurance N; the command has no carried-load argument, and applies the inclusive roll thresholds",
+        "Compares poise, defense, weight, stamina/roll consequences, and the player's stated survivability goal rather than naming a universal winner"
+      ]
+    },
+    {
+      "id": 117,
+      "prompt": "I am a fashion-constrained melee player: visual style is non-negotiable, but I want the lightest roll that my chosen outfit can support. I will supply the outfit or total weight; explain how to calculate the load boundary and how to trade armor and poise without replacing my aesthetic with a meta set.",
+      "expected_output": "A player-led fashion/load analysis that preserves the chosen appearance, calculates roll feasibility from supplied values, and presents reversible weight/defense compromises.",
+      "expectations": [
+        "Uses `equip-load --endurance N` only with supplied endurance and calculates the requested roll boundary from the player's supplied carried weight",
+        "Treats appearance as a hard constraint and discusses only conditional changes such as ring, weapon, shield, or one clothing piece",
+        "Explains inclusive fast/medium/fat thresholds without inventing armor or poise values",
+        "Does not substitute a named best armor set, future location, or unsupported catalog row for the player's stated outfit"
+      ]
+    },
+    {
+      "id": 118,
+      "prompt": "I am a quality melee player deciding between two weapons I already own, and I care about reliable damage across normal encounters rather than a speedrun record. Compare the named weapons at my supplied strength and dexterity with the documented `compare` command, explain approximation and upgrade-path limits, and do not infer a winner outside those inputs.",
+      "expected_output": "A bounded, calculated comparison of the two supplied catalog entries that identifies assumptions, scaling tradeoffs, and uncertainty instead of overgeneralizing the result.",
+      "expectations": [
+        "Uses the documented `compare` command with the player's supplied weapon names and strength/dexterity values",
+        "Labels AR as approximate and says when a weapon/path is unknown rather than extrapolating from a similar name",
+        "Explains that the result depends on upgrade path, moveset, stamina, reach, and the player's encounter priorities",
+        "Does not invent acquisition locations, future item names, or a universal quality-build winner"
+      ]
+    },
+    {
+      "id": 119,
+      "prompt": "I am a melee player preparing for one named boss and I explicitly permit spoilers, the boss name, and its area for this answer. Find the boss's weaknesses and recommend how my strength/dexterity setup should adapt, but treat weakness claims as contested and route them through source/live research with citations and conditional tactics.",
+      "expected_output": "A source-backed, spoiler-permitted boss preparation answer that distinguishes researched observations from build calculations and recommendations, showing disagreement or uncertainty rather than inventing a fixed weakness table.",
+      "expectations": [
+        "Uses source-cache/live research for the boss's weakness and encounter facts because the skill has no authoritative static weakness table",
+        "Cites the source URL or source key and reports disagreement or uncertainty when sources differ",
+        "Uses deterministic build, softcap, equip-load, calc, or compare commands only for the supplied character/weapon inputs",
+        "Frames tactics around the player's melee stats, stamina, load, and risk tolerance instead of claiming one mandatory strategy"
+      ]
+    },
+    {
+      "id": 120,
+      "prompt": "I am a no-shield melee challenge player who wants a dependable reinforcement plan and accepts slower, safer practice over burst damage. Explain generic upgrade planning by level and normal, unique, or dragon type, and identify what must be source-checked before naming materials or locations.",
+      "expected_output": "A challenge-aware generic upgrade decision that keeps the no-shield stamina and risk constraint visible, uses documented level/type lookups, and defers exact material or location claims to dated source-backed research.",
+      "expectations": [
+        "Uses only the documented `upgrade <level> [--type normal|unique|dragon]` interface for generic level/type lookup and does not pass a weapon name or imply weapon-specific results",
+        "Explains path tradeoffs conditionally, including commitment to a no-shield stamina/risk plan, without declaring one path universally best",
+        "States that exact material requirements, farming, and acquisition locations require source-cache/live research with a source URL or source key and checked date, plus spoiler handling; otherwise marks them unverifiable/unknown",
+        "Does not invent generic upgrade rows, material counts, future locations, bosses, NPCs, or imply that a level/type lookup proves weapon ownership"
+      ]
+    },
+    {
+      "id": 121,
+      "prompt": "I am a new sorcery player starting blind, want an intelligence-focused character around level 30, and do not want future names or locations spoiled. Show me a conditional starting-class/stat plan and explain what information you need before calling it optimal.",
+      "expected_output": "A spoiler-safe sorcery build sketch that uses build sorcery --level 30 together with origins and softcaps as deterministic evidence, labels the result as conditional, and asks about desired weapons, roll load, and playstyle instead of prescribing one universal plan. It must not invent spell locations or future names.",
+      "expectations": [
+        "Uses only the documented build sorcery --level 30, origins, and softcaps paths for deterministic build guidance",
+        "Labels stat and class advice as a conditional example and identifies missing goals or current stats",
+        "Keeps future spell, area, NPC, boss, and item names hidden under the blind/no-spoiler constraint",
+        "Does not claim an attunement-slot table or spell acquisition location that the CLI does not provide"
+      ]
+    },
+    {
+      "id": 122,
+      "prompt": "I roleplay a faith-first cleric and want a level-50 miracle build, but I refuse to respec around a generic meta answer. Explain the faith/stat tradeoffs, attunement uncertainty, and what should be checked before recommending a plan; keep future content hidden.",
+      "expected_output": "A conditional cleric plan based on build cleric --level 50, origins, and softcaps, with tradeoffs tied to the player's current stats, desired melee fallback, casting priorities, and equip-load goals. It should say that no documented attunement command supplies an exact slot table and should not invent miracle names or locations.",
+      "expectations": [
+        "Runs or proposes the documented build cleric --level 50, origins, and softcaps commands rather than an undocumented faith calculator",
+        "Compares faith, survivability, weapon, and load tradeoffs instead of declaring one mandatory cleric allocation",
+        "States the attunement-data boundary instead of fabricating slot thresholds or miracle requirements",
+        "Applies the default spoiler gate and omits future miracle, area, NPC, and location names"
+      ]
+    },
+    {
+      "id": 123,
+      "prompt": "I am doing a low-level pyromancy challenge and want to stay near level 1 while learning whether the CLI can tell me how many attunement slots or exact spell thresholds I have. Give safe next steps without inventing a location or a stat formula.",
+      "expected_output": "A low-level conditional response using build pyromancer --level 1, softcaps, and possibly soul-cost for a stated level target, while clearly explaining that the documented interface does not expose an exact attunement-slot or pyromancy-location table. Exact threshold, location, or acquisition claims require source-cache/live provenance with the source URL or source key and a checked date for current claims; absent provenance must be reported as unknown/unverifiable.",
+      "expectations": [
+        "Uses the documented build pyromancer --level 1 and softcaps paths, with soul-cost only for an explicit level comparison",
+        "Treats level-1 advice as a constrained example rather than proof of the player's actual stats or a universal challenge route",
+        "Does not invent attunement slots, spell formulas, spell names, or acquisition locations",
+        "Routes exact location or contested threshold claims to fresh source-cache/live research, cites the source URL or source key and checked date for current claims, and reports unsupported facts as unknown/unverifiable rather than static output"
+      ]
+    },
+    {
+      "id": 124,
+      "prompt": "I want a hybrid intelligence-and-melee character around level 60, have not chosen a weapon, and want to compare a sorcerer direction with a quality direction. Keep the answer spoiler-safe and tell me where the catalog stops being authoritative.",
+      "expected_output": "A comparison grounded in build sorcerer --level 60, build quality --level 60, origins, and softcaps, with conditional recommendations based on weapon choice and desired casting role. It should direct known weapon questions to weapons/calc/compare, identify unknown catalog rows without guessing, and avoid future names or locations.",
+      "expectations": [
+        "Uses only documented build sorcerer/build quality level forms plus origins and softcaps for the initial comparison",
+        "Requests the missing weapon, stats, and playstyle before turning a build sketch into a recommendation",
+        "Routes known weapon AR questions through weapons, calc, or compare and states that absent rows remain unknown",
+        "Does not extrapolate spell or weapon values from similarly named entries and preserves the no-spoiler gate"
+      ]
+    },
+    {
+      "id": 125,
+      "prompt": "I am a roleplay miracle caster who supplied the name of one specific miracle but wants no other future names. Can the documented catalog verify that named entry, and can you tell me where to obtain it without making up a route?",
+      "expected_output": "A narrowly scoped goods lookup may be attempted for the user-supplied name with the documented goods command and spoiler behavior, but only a present catalog row is deterministic. The answer must not invent a miracle entry, exact location, or route; acquisition details require source-cache/live research with the source URL or source key and checked date for current claims, or an explicit unknown/unverifiable result.",
+      "expectations": [
+        "Uses goods <name> only for the exact user-supplied catalog query and may add documented --json/--spoilers flags as appropriate",
+        "Distinguishes a known bundled catalog row from an unknown miracle or an unsupported spell database",
+        "Routes exact acquisition location and route claims through source-cache/live research with the source URL or source key and checked date for current claims, or reports them as unknown/unverifiable rather than inventing them",
+        "Does not reveal unrelated future miracle, area, NPC, or item names under the constrained spoiler request"
+      ]
+    },
+    {
+      "id": 126,
+      "prompt": "I am limiting a faith/pyromancy hybrid to level 18 for a no-respec challenge. Calculate the level-cost boundary from level 1 to 18, sketch conditional stat priorities, and be explicit about what attunement and spell ownership cannot be inferred.",
+      "expected_output": "A constrained hybrid sketch that uses soul-cost 1 18, build pyromancer --level 18 or build cleric --level 18 as the relevant direction, and softcaps. It should explain that level-cost math is deterministic but current stats, attunement slots, spell ownership, and locations are not established without supplied evidence.",
+      "expectations": [
+        "Uses the documented soul-cost 1 18 command for the requested level boundary",
+        "Selects a documented build direction and softcaps output while labeling priorities as conditional on the chosen hybrid role",
+        "Separates calculated level cost from the player's actual level, stats, attunement capacity, and owned spells",
+        "Does not invent spell locations, requirements, or ownership from a build template"
+      ]
+    },
+    {
+      "id": 127,
+      "prompt": "I am a sorcery collector looking for a spell name that may not exist in the bundled catalog. I want an exact description and location, but I have not authorized spoilers and I do not want a similarly named spell substituted.",
+      "expected_output": "The response should refuse to fabricate an unknown spell description, row, or location. It may try the narrow documented goods lookup for the supplied name, report an absent/unknown row plainly, and route a verified exact location to source-cache/live research while preserving spoiler redaction.",
+      "expectations": [
+        "Attempts only a narrowly supplied goods <name> lookup if catalog lookup is applicable, without inventing a spell-specific command",
+        "Reports an unknown or absent row as unknown and never substitutes a similarly named spell or extrapolates its effects",
+        "Routes exact location or contested spell facts to source-cache/live research and labels the evidence source",
+        "Keeps future spell, area, NPC, and item names hidden because spoiler permission was not given"
+      ]
+    },
+    {
+      "id": 128,
+      "prompt": "I am roleplaying a battle cleric who wants both miracles and pyromancy, currently has no fixed weapon, and values a medium roll over maximum damage. Compare conditional directions around level 45 without pretending the CLI knows my exact spell list.",
+      "expected_output": "A conditional comparison using build cleric --level 45, build pyromancer --level 45, softcaps, and possibly equip-load --endurance N once endurance is supplied. It should ask for current stats and load, explain that exact attunement/spell ownership is outside the documented build output, and avoid invented locations or future names. Exact location or acquisition claims require source-cache/live provenance with the source URL or source key and a checked date for current claims, or an explicit unknown/unverifiable result.",
+      "expectations": [
+        "Uses documented cleric and pyromancer build commands plus softcaps, and requests endurance before calculating a load boundary",
+        "Treats medium-roll preference and hybrid role as decision criteria rather than prescribing a single build",
+        "Does not claim exact spell inventory, attunement slots, or miracle/pyromancy requirements from the build command",
+        "Keeps location and future-name claims spoiler-safe and sends exact acquisition or location questions to source-cache/live research with the source URL or source key and checked date for current claims, or reports them as unknown/unverifiable"
+      ]
+    },
+    {
+      "id": 129,
+      "prompt": "I am a pure intelligence roleplayer and ask for the best armor for casting while keeping a fast roll. I have not supplied endurance, equipment, or spoiler permission. Explain how you would answer without pretending there is an authoritative static armor table.",
+      "expected_output": "A response that asks for endurance, current equipment, poise preference, and level, uses equip-load only when its inputs are supplied, and frames armor selection as a conditional tradeoff requiring source/live research. Exact armor facts require source-cache/live provenance with the source URL or source key and a checked date for current claims, or an explicit unknown/unverifiable result. It must not declare a universally best armor set or invent item locations, and it should keep future names hidden.",
+      "expectations": [
+        "Requests the missing endurance/equipment inputs before using documented equip-load calculations",
+        "Explains that the skill has no authoritative static best-armor table and routes exact armor facts to source-cache/live research with the source URL or source key and checked date for current claims, or reports them as unknown/unverifiable",
+        "Compares fast-roll, poise, defenses, weight, and casting goals conditionally rather than declaring one best set",
+        "Does not invent armor names, acquisition locations, or future content without spoiler permission"
+      ]
+    },
+    {
+      "id": 130,
+      "prompt": "I am a returning hybrid caster who remembers a spell only by an uncertain nickname and wants to know its stat requirement and where it is found. Please handle an unknown catalog term conservatively, ask whether I permit spoilers, and do not invent a location.",
+      "expected_output": "The answer should ask for the exact supplied name and spoiler preference, then use only a narrow goods lookup if appropriate. It must keep an uncertain nickname unresolved rather than map it to a guessed spell, distinguish deterministic catalog data from source-backed requirements/locations, and route the latter to fresh research with the source URL or source key and a checked date for current claims, or report them as unknown/unverifiable.",
+      "expectations": [
+        "Requests an exact spell name and explicit spoiler permission before exposing any future proper names",
+        "Uses only the documented goods lookup for a supplied term and reports ambiguity or absence without guessing",
+        "Separates bundled catalog evidence from source-backed stat requirements and exact locations, requiring the source URL or source key and checked date for current claims or an explicit unknown/unverifiable result",
+        "Does not fabricate a spell identity, requirement, route, or location from an uncertain nickname"
+      ]
+    },
+    {
+      "id": 131,
+      "prompt": "I am pursuing the Dark Souls Remastered platinum but have supplied no save and do not want spoilers. Tell me whether the achievement checklist can show what my account or character already owns, and give the safest documented request.",
+      "expected_output": "A spoiler-safe achievements lookup using the documented achievements command, with a clear separation between static requirements and platform/save ownership. It must say that achievement and platform ownership/unlock state are permanently unsupported by this skill, including when save or account evidence is supplied, and must not infer completion from the checklist.",
+      "expectations": [
+        "Uses the documented achievements command without --spoilers for the blind request",
+        "Separates static achievement requirements from platform-account or save-backed ownership, which is permanently unsupported by this skill",
+        "Never claims the player has or has not earned any achievement, because ownership and unlock state are permanently unsupported",
+        "Redacts future achievement, boss, area, NPC, and item names"
+      ]
+    },
+    {
+      "id": 132,
+      "prompt": "I am a no-glitch completionist on a first blind run and want to know which achievements are missable, but I do not permit names, locations, quest outcomes, or route spoilers. What can the CLI tell me and what can it never prove about my run?",
+      "expected_output": "A spoiler-safe achievements --missable request without --spoilers that reports only the generic checklist count (count-only; no missability list, future names, or route details). It must explain that no-glitch intent does not turn the checklist into live progress, and that achievement/platform ownership and current run completion are permanently unsupported.",
+      "expectations": [
+        "Uses the documented achievements --missable flag and no undocumented no-glitch option",
+        "Reports only the generic checklist count in the no-spoiler branch (count-only), with no missability list, future names, exact locations, quest outcomes, or route details",
+        "Describes the count as static checklist information rather than a record of this run",
+        "States that achievement/platform ownership and current run completion are permanently unsupported, not merely unknown pending evidence"
+      ]
+    },
+    {
+      "id": 133,
+      "prompt": "I am an exploit-allowed platinum hunter and care about the shortest legitimate-to-the-platform path. I may use in-game glitches, but I have no save backup and want to know whether this skill can edit unlocks or promise that an exploit will be online-safe.",
+      "expected_output": "A boundary-focused answer that can consult achievements or a sourced guide for requirements, but refuses save editing and does not promise online, anti-cheat, or platform safety. It must separate any exploit discussion from static checklist data; achievement/platform ownership and unlock state are permanently unsupported. Exact route or compatibility claims require current source-cache/live evidence with the source URL or source key and a checked date for current claims, or an explicit unknown/unverifiable result.",
+      "expectations": [
+        "Uses achievements and/or targeted guide lookup only for documented checklist or walkthrough information",
+        "Refuses save editing, unlock injection, or recommending an editor and does not imply unsupported mutation capability",
+        "Does not promise online safety, anti-cheat safety, or platform acceptance for an exploit",
+        "Separates static requirements from actual ownership/completion, which are permanently unsupported, and routes current route or compatibility claims to source-cache/live evidence with the source URL or source key and checked date for current claims, or reports them as unknown/unverifiable"
+      ]
+    },
+    {
+      "id": 134,
+      "prompt": "I am a guide-driven platinum player and explicitly allow spoilers. First show me how to inspect the installed local guide's kinds and headings, then search narrowly for a heading about missable cleanup. Explain what the corpus proves and include its provenance warning.",
+      "expected_output": "A spoiler-enabled guide kinds/guide headings inspection followed by targeted guide search using only documented filters once a real kind or heading is known. The answer must identify the transformed user-provided PSNProfiles DSR platinum-guide corpus, carry the spoiler-heavy/non-authoritative/non-save-truth/no-republication warning, and not treat rows as player state.",
+      "expectations": [
+        "Uses only guide kinds, guide headings, and guide search with documented --kind, --heading, --limit, --json, and --spoilers options",
+        "Uses an actually returned kind or heading rather than inventing filter values or undocumented flags",
+        "Includes the required transformed-PSNProfiles provenance and spoiler-heavy, non-authoritative, non-save/parser-truth, no-republication warning",
+        "Explains that guide indexes and rows organize walkthrough text and do not prove inventory, route completion, or achievement ownership"
+      ]
+    },
+    {
+      "id": 135,
+      "prompt": "I am a speed-conscious completionist who permits spoilers and wants the fastest safe cleanup route after I provide the IDs of bosses I have defeated. Explain which documented command can condition on those supplied IDs, and when a fresh source is still required.",
+      "expected_output": "A route request may use route --defeated with only the user's supplied IDs and --spoilers after permission, but exact route/location/NPC claims must be source-backed or live-checked with the source URL or source key and a checked date for current claims, or explicitly reported as unknown/unverifiable. The answer must avoid pretending that a static achievement checklist or absent save proves the defeated set or completion, and achievement/platform ownership remains permanently unsupported.",
+      "expectations": [
+        "Uses the documented route --defeated <id,id,...> --spoilers form only after receiving actual user-supplied IDs",
+        "Treats the defeated-ID list as user context, not as parser-validated save truth or platform ownership",
+        "Routes exact speed route, locations, farming, and NPC-step claims to fresh cached/live sources with the source URL or source key and checked date for current claims, or reports them as unknown/unverifiable when CLI output is insufficient",
+        "Keeps recommendation, observed deterministic output, source-backed claims, defeated-ID context, and permanently unsupported ownership/completion distinct"
+      ]
+    },
+    {
+      "id": 136,
+      "prompt": "I am a blind completionist who wants a checklist but forbids any guide text, future names, or spoilers. Can the static achievement list tell me which items I personally own, and what is the least revealing request?",
+      "expected_output": "A minimal achievements request without --spoilers, with generic redaction and an explicit statement that the static checklist cannot read personal inventory, save progress, or platform ownership. It must not substitute guide prose or claim a checklist item is complete.",
+      "expectations": [
+        "Uses achievements without --spoilers as the least revealing documented checklist path",
+        "Does not reveal future proper names, guide text, locations, or quest outcomes",
+        "States that static requirements cannot establish personal inventory, save progress, or platform ownership",
+        "Does not infer completed or missing checklist items from the absence of a supplied save"
+      ]
+    },
+    {
+      "id": 137,
+      "prompt": "I am a guide-driven completionist with spoilers allowed, found one useful phrase, and want every surrounding PDF page pasted verbatim. Can the local guide do that, and what compliant narrow workflow preserves provenance and copyright boundaries?",
+      "expected_output": "A refusal to dump or reproduce broad raw PDF/page text, paired with guide search followed by guide get for a narrowly identified row and a minimum-action summary. It must state the transformed-corpus provenance, spoiler-heavy/non-authoritative/non-save-truth warning, and no-republication boundary.",
+      "expectations": [
+        "Rejects broad verbatim PDF or surrounding-page reproduction even with spoiler permission",
+        "Offers the documented guide search then guide get workflow for a narrowly identified query/row",
+        "Summarizes only the minimum actionable transformed-row text and does not dump raw chunks",
+        "Includes the required PSNProfiles transformed-guide provenance, non-authoritative/non-save-truth warning, and no-republication statement"
+      ]
+    },
+    {
+      "id": 138,
+      "prompt": "I supplied a Windows DSR save path and explicitly allow spoilers. I want the achievement checklist plus a definitive answer about which platform trophies my account already owns. Show the documented save request and explain the evidence boundary.",
+      "expected_output": "A save achievements request such as save <path> achievements --json --spoilers may return the static checklist, but it must explicitly report that platform ownership/unlock state is unsupported. A validated save identity or character field cannot be promoted into trophy ownership or completion.",
+      "expectations": [
+        "Uses the documented read-only save <PATH> achievements --json --spoilers form for the supplied save",
+        "Separates the returned static checklist from platform-account trophy ownership and save-backed unlock state",
+        "Does not claim completion, inventory, quest, or trophy ownership from validated container/character metadata",
+        "Honors spoiler permission while still avoiding unsupported state claims"
+      ]
+    },
+    {
+      "id": 139,
+      "prompt": "I am a no-glitch checklist optimizer and ask whether achievements plus a static checklist can prove that I own every required weapon and item. I have not provided a validated save and want a conservative answer with no spoilers.",
+      "expected_output": "A spoiler-safe distinction between achievements' static requirements and ownership. The response may identify save inventory/owned actions as unsupported when relevant, but must not turn unsupported output into zero, absent, or complete and must not infer item ownership from a checklist.",
+      "expectations": [
+        "Uses achievements as a static requirement lookup and keeps it spoiler-safe",
+        "Explains that inventory/owned save categories are unsupported unless the parser explicitly validates them",
+        "Never converts unsupported ownership into zero, absent, complete, or an inferred checklist result",
+        "Does not reveal future weapon/item names or locations without explicit spoiler permission"
+      ]
+    },
+    {
+      "id": 140,
+      "prompt": "I am a returning completionist who explicitly permits spoilers and wants a targeted local-guide row for a specific missable achievement, followed by advice on whether my supplied checklist is complete. Keep the guide summary concise and distinguish every kind of evidence.",
+      "expected_output": "A targeted guide search and guide get workflow for the supplied achievement query, with spoiler permission, concise minimum-text summarization, and the mandatory transformed-guide warning. It must explain that guide prose and a static checklist do not establish this player's save progress, ownership, or completion; only supported parser fields can be stated as observed.",
+      "expectations": [
+        "Routes the targeted request through documented guide search then guide get rather than broad corpus export",
+        "Uses spoiler permission to show only the requested names and summarizes the minimum actionable row text",
+        "Carries the transformed user-provided PSNProfiles guide provenance and spoiler-heavy/non-authoritative/non-save-truth/no-republication warning",
+        "Separates guide claims and static checklist requirements from validated save fields and platform ownership"
+      ]
+    },
+    {
+      "id": 141,
+      "prompt": "I am a first-time PC co-op player who wants to summon a friend for a spoiler-safe DSR run, but I need current platform/online requirements checked rather than guessed. Explain the evidence workflow and what you can and cannot promise about today's connectivity or compatibility.",
+      "expected_output": "A dated, source-backed online co-op response that starts with sources status, refreshes only the needed registered remote source when stale, and uses live research if the cache does not cover the current requirement. It keeps the route spoiler-safe, distinguishes observed mechanics from current platform facts, and makes no connectivity, matchmaking, or compatibility guarantee.",
+      "expectations": [
+        "Routes current online/platform requirements through sources status plus targeted refresh or dated live research, with a source key or URL and checked date",
+        "Separates deterministic co-op mechanics from current service, platform, or version claims",
+        "Does not promise matchmaking, server availability, latency, or mod/online compatibility",
+        "Uses generic route language and does not reveal future area, boss, NPC, or item names without spoiler permission"
+      ]
+    },
+    {
+      "id": 142,
+      "prompt": "I am PvP-cautious and will only play an unmodified vanilla character online. I want to know whether a proposed PC setup is safe from anti-cheat action and whether invasions are currently available; give risk guidance, not a guarantee or a bypass.",
+      "expected_output": "A conservative answer that checks current PC/online claims through the source cache and dated live sources, cites the evidence, and labels risk recommendations separately from deterministic PvP mechanics. It refuses to guarantee anti-cheat safety, invasion availability, or account outcomes and gives no instructions to evade protections.",
+      "expectations": [
+        "Uses sources status first and current live/source evidence for anti-cheat, service, or availability claims, citing URL/source key and date",
+        "States that vanilla status and documented mechanics do not establish a safety guarantee",
+        "Refuses DRM, platform-protection, anti-cheat, matchmaking, or detection bypass instructions",
+        "Separates observed mechanics from current service observations and explicitly reports uncertainty or disagreement"
+      ]
+    },
+    {
+      "id": 143,
+      "prompt": "I am mod-curious but risk-averse: I would like a cosmetic/QoL mod for a private offline DSR test, while preserving a clean save backup. Explain a supported, PC-native risk workflow and how current loader information must be verified.",
+      "expected_output": "A conservative mod-risk workflow that checks sources status, performs a targeted refresh or dated live check, and cites a source URL or source key plus checked date for every current loader claim; when that provenance is unavailable, it marks the claim unknown or unverifiable. It recommends backups and offline testing, distinguishes cosmetic/QoL changes from gameplay or save changes, does not promise loader or save compatibility, and refuses cracked-copy, DRM, anti-cheat, or online-safety bypass advice.",
+      "expectations": [
+        "Checks the registered mod/loader source state before making current claims and, for every current loader claim, cites the source URL or source key plus checked date; reports the claim unknown or unverifiable when that provenance is unavailable",
+        "Recommends a clean backup and offline testing while keeping the skill's save support read-only",
+        "Distinguishes cosmetic/QoL changes from gameplay or save-changing mods and states that compatibility is not guaranteed",
+        "Provides no DRM, license, cracked-copy, platform-protection, anti-cheat, or online-safety bypass instructions"
+      ]
+    },
+    {
+      "id": 144,
+      "prompt": "I use a controller and have limited dexterity. Build a spoiler-safe, forgiving melee direction around reliable spacing, roll boundaries, and low-input options; do not assume a specific controller layout or invent accessibility features.",
+      "expected_output": "A personalized build discussion that uses deterministic CLI mechanics (`build`, `softcaps`, and, when needed, `equip-load`) and asks for current stats and goals. It treats the build as conditional, states inclusive roll thresholds, avoids undocumented remapping/accessibility claims, and keeps future names hidden.",
+      "expectations": [
+        "Uses only documented mechanics commands and requests the player's current stats, preferred inputs, and tolerance for weight or damage tradeoffs",
+        "States the inclusive fast-roll at or below 25% and mid-roll at or below 50% boundaries when discussing equip load",
+        "Presents a conditional example rather than prescribing one class, weapon, or control layout for an unspecified player",
+        "Does not invent controller bindings, remapping support, accessibility features, or spoiler-heavy item/location names"
+      ]
+    },
+    {
+      "id": 145,
+      "prompt": "I am doing a no-shield challenge run and permit spoilers only for mechanics, not future names. Give me a deterministic stamina/roll/weapon-planning approach and explain how to ask for the next route without leaking bosses or locations.",
+      "expected_output": "A spoiler-safe challenge plan grounded in `softcaps`, `build`, `equip-load`, and catalog calculations when the weapon row is known. It explains stamina, equip-load, and upgrade tradeoffs without inventing data, and routes any exact next-area, route-step, location, or acquisition claim through the spoiler-gated source-cache/live workflow, citing a source URL or source key plus checked date or explicitly marking the claim unknown or unverifiable.",
+      "expectations": [
+        "Uses documented deterministic commands such as softcaps, build, equip-load, weapons, calc, or compare only for supported mechanics/catalog rows",
+        "Labels AR as approximate and says an unknown weapon/path remains unknown rather than extrapolating",
+        "Keeps future boss, area, NPC, item, and route names redacted unless the player separately opts into spoilers",
+        "Identifies exact next-area, route-step, location, and acquisition claims as source-backed questions requiring a source URL or source key plus checked date, or an explicit unknown or unverifiable result when that provenance is unavailable"
+      ]
+    },
+    {
+      "id": 146,
+      "prompt": "I am a no-hit runner who wants a current practice plan and asks which boss is weakest to my weapon. I allow boss names, but I need dated evidence for current route information and a caveat that the skill has no authoritative static weakness table.",
+      "expected_output": "A careful response that uses deterministic mechanics/catalog output for the supplied weapon where possible, then uses dated cached/live sources for boss weakness and route claims. It presents conditional matchup tradeoffs, cites sources, and does not turn a community claim into an authoritative weakness fact.",
+      "expectations": [
+        "Uses the CLI first for supported weapon stats or approximate AR and clearly marks unknown catalog rows",
+        "Routes boss weakness, practice route, and current guide claims to dated source/cache or live research with URL/source-key provenance",
+        "States that the skill has no authoritative static boss-weakness table and presents recommendations as conditional",
+        "Does not reveal extra future locations or encounters beyond the names the player explicitly allowed"
+      ]
+    },
+    {
+      "id": 147,
+      "prompt": "I am a low-level PvP challenger who wants a level target and a light-roll melee setup, but I will not accept fabricated invasion brackets or current matchmaking population claims. Give deterministic math first and identify what needs live evidence.",
+      "expected_output": "A conditional low-level build using `build`, `softcaps`, `soul-cost`, and `equip-load` as appropriate, with calculated tradeoffs and inclusive roll thresholds. It labels invasion ranges, activity, and current matchmaking as source-backed/live questions, cites a source URL or source key plus checked date for each current PvP or platform claim, marks unavailable claims unknown or unverifiable, and makes no matchmaking guarantee.",
+      "expectations": [
+        "Uses documented level/build/equip-load commands for deterministic calculations and asks for the actual starting level, stats, and load goal",
+        "Does not invent a universal invasion bracket, population number, or current activity claim",
+        "Routes current PvP activity, invasion-range, matchmaking, or platform facts through sources status and dated live/source evidence with the source URL or source key plus checked date, or explicitly reports them unknown or unverifiable when that provenance is unavailable",
+        "States that a suggested level is a conditional recommendation, not a guarantee of matches or fair matchmaking"
+      ]
+    },
+    {
+      "id": 148,
+      "prompt": "I am offline-only because I do not want online features. Help me plan a spoiler-safe solo route and farming strategy, but do not claim that every drop, route step, or current offline behavior is in the deterministic catalog.",
+      "expected_output": "A spoiler-safe offline plan that uses `areas`, `route`, or `farm` with the default gate for an overview, while sending exact locations, drops, route steps, and contested/current facts to the source-cache/live path. It cites a source URL or source key plus checked date for each external or current claim, marks unavailable claims unknown or unverifiable, distinguishes deterministic mechanics from source claims, and asks before revealing future names.",
+      "expectations": [
+        "Uses documented areas, route, and farm commands without `--spoilers` unless the user explicitly opts in",
+        "Keeps future area, boss, NPC, item, and farming-location names generic by default",
+        "States that exact route, drop, location, and current-behavior claims require source-cache/live evidence with a source URL or source key plus checked date, or an explicit unknown or unverifiable result when that provenance is unavailable",
+        "Does not infer online requirements, availability, or current service facts for an offline-only request"
+      ]
+    },
+    {
+      "id": 149,
+      "prompt": "I am an accessibility-focused player who needs a low-stress, low-input melee plan and wants to know whether the PC version currently supports a particular controller/accessibility setup. Keep mechanics separate from current product facts and avoid promising unsupported features.",
+      "expected_output": "A personalized, spoiler-safe plan using deterministic build and equip-load tradeoffs, followed by a dated source/live check for current controller or accessibility support. It cites the product source, marks unsupported features as unknown, and does not prescribe a setup without the player's constraints.",
+      "expectations": [
+        "Uses build, softcaps, and equip-load for mechanics and asks for the player's input limitations, stamina tolerance, and current stats",
+        "Routes current controller/accessibility feature claims to official or dated source evidence with URL/source-key provenance",
+        "Does not invent remapping, assist, input-buffer, or accessibility support and labels unsupported claims unknown",
+        "Keeps route and item names spoiler-safe unless explicit permission is provided"
+      ]
+    },
+    {
+      "id": 150,
+      "prompt": "I am an online challenge-run organizer coordinating a no-death co-op event across different PC setups. I want a dated compatibility/risk brief and a spoiler-safe rules checklist, not instructions that bypass protections or a promise that everyone's sessions will work.",
+      "expected_output": "A source-backed event brief that checks current platform/mod/online facts through sources status and dated live evidence, separates deterministic challenge mechanics from live compatibility observations, and lists conservative offline/vanilla fallback rules. It makes no multiplayer, anti-cheat, or cross-setup guarantee and provides no bypass guidance.",
+      "expectations": [
+        "Cites dated official/primary or fresh community evidence for current platform, loader, and online claims and identifies source keys or URLs",
+        "Separates deterministic rules such as build/equip-load mechanics from observed current compatibility or service status",
+        "Includes a no-guarantee statement for connectivity, matchmaking, anti-cheat, multiplayer, and save compatibility",
+        "Keeps the event checklist spoiler-safe and refuses DRM, anti-cheat, platform-protection, or cracked-copy bypass instructions"
+      ]
+    },
+    {
+      "id": 151,
+      "prompt": "I am a returning veteran who has not played DSR in six years. Re-orient me with spoiler-safe mechanics and a conditional build check, then explain which current PC, online, or mod facts require dated research instead of memory.",
+      "expected_output": "A conservative re-entry workflow that starts with deterministic mechanics commands such as `fresh`, `softcaps`, `origins`, `build`, or `equip-load`, then uses sources status and dated live evidence for current platform, online, or mod claims. It asks for current stats and goals, keeps the route generic, and labels recommendations rather than presenting stale recollection as fact.",
+      "expectations": [
+        "Uses documented deterministic commands for mechanics and requests the veteran's current stats, build goal, and tolerance for relearning",
+        "Routes current PC, online, mod, or version claims through sources status and dated source/live evidence with URL/source-key provenance",
+        "Separates observed deterministic output from current source claims and clearly marks recommendations or uncertainty",
+        "Does not reveal future route, boss, NPC, item, or ending names without explicit spoiler permission"
+      ]
+    },
+    {
+      "id": 152,
+      "prompt": "I am returning with a backup `.sl2` from an old Windows install and want a read-only identity check before I launch the game. Explain explicit-path validation, supported fields, and what a newer malformed backup must not imply.",
+      "expected_output": "A read-only workflow using the explicit supplied `.sl2` path with `summary` or `stats`, reporting only fields validated by the DSR parser. It explains that `save auto` checks only the documented Windows location, skips malformed or invalid candidates, and never repairs, edits, decrypts, or infers state from a rejected backup.",
+      "expectations": [
+        "Uses an explicit `.sl2` path with a documented summary or stats action rather than an undocumented discovery flag",
+        "States that auto-detection is limited to the documented Windows DSR location and is not a substitute for an external backup path",
+        "Limits claims to validated container/slot identity and supported name, level, class, or stats fields",
+        "Treats malformed, empty, unreadable, or invalid files as skipped/read failures, never as zero, absent, complete, or owned state",
+        "Keeps save support read-only and refuses repair, rewrite, decryption, conversion, or editor instructions"
+      ]
+    },
+    {
+      "id": 153,
+      "prompt": "I am a technical user debugging a tracking integration. Test the documented `track` and `recommend` JSON boundaries conceptually for missing files, malformed JSON, a JSON array, an empty object, and a partial object; do not let the skill silently create state.",
+      "expected_output": "A precise boundary description: both commands read caller-supplied JSON, reject unreadable or malformed input and a non-object root such as an array, accept an object, and limit output to supplied fields. Empty or partial objects remain limited, neither command writes tracking state, and neither establishes save or achievement ownership.",
+      "expectations": [
+        "Uses only the documented `track [section] --path <tracking-json>` and `recommend --path <tracking-json>` forms",
+        "States that missing/unreadable files and malformed JSON are errors rather than empty tracking state",
+        "Rejects a non-object JSON root such as an array while accepting an object root, including empty or partial objects",
+        "States that the commands do not silently write files, mutate saves, or create achievement/inventory ownership",
+        "Limits recommendations and section output to fields actually supplied by the caller"
+      ]
+    },
+    {
+      "id": 154,
+      "prompt": "My save was migrated from another PC and I suspect an old or different game build. Ask for an explicit path and explain how validation, container/slot identity, unsupported offsets, and stale-save uncertainty affect what you may report without spoilers.",
+      "expected_output": "A cautious explicit-path save inspection that reports only parser-validated identity and supported fields, flags migration/build uncertainty, and leaves unknown IDs, offsets, and unsupported categories unknown. It does not claim the save is current, complete, or the same character beyond validated evidence and keeps names redacted by default.",
+      "expectations": [
+        "Requests or uses an explicit `.sl2` path and a documented summary/stats/name/level action rather than assuming `save auto` found the migrated file",
+        "Reports only validated container/slot identity and supported fields when the parser checks pass",
+        "Treats unknown IDs, unvalidated offsets, unsupported categories, stale files, and build mismatch as unknown rather than guessing",
+        "Does not claim inventory, bosses, bonfires, quests, progression, completion, or platform achievements from migration alone",
+        "Applies default spoiler redaction to character/progression names and locations unless spoilers are explicitly permitted"
+      ]
+    },
+    {
+      "id": 155,
+      "prompt": "I am a returning finite-catalog player with an unusual weapon name. Compare it with a familiar weapon for my stated stats, but prove the catalog-row boundary: unknown weapons must stay unknown and acquisition locations need separate evidence.",
+      "expected_output": "A deterministic `compare` or `calc` attempt for known catalog rows, with approximate AR and explicit upgrade-path caveats. If the unusual weapon is absent, the response says it is unknown and does not extrapolate from a similarly named item; exact acquisition claims go through dated source/cache research and spoiler gating.",
+      "expectations": [
+        "Uses documented `weapons`, `calc`, or `compare` commands with the supplied stats and JSON only when useful",
+        "States that AR and scaling are approximate for known rows and that an unknown weapon/path remains unknown",
+        "Never substitutes a similarly named catalog row or fabricates damage, scaling, upgrade, or ownership data",
+        "Routes exact acquisition locations and current availability to source-cache/live evidence with provenance",
+        "Keeps future item/location names hidden unless the returning player permits spoilers"
+      ]
+    },
+    {
+      "id": 156,
+      "prompt": "I am resuming a half-finished character after years away and do not remember where to go. Give me a spoiler-safe next-step method using only generic labels until I opt in, and explain why an unsupported save progress query cannot establish my route.",
+      "expected_output": "A spoiler-safe workflow that may inspect validated identity/stats, then uses `areas`, `route`, or `bosses` without `--spoilers` for a generic overview. It explicitly states that save progress/boss/bonfire mappings are unsupported, asks for defeated IDs only when supplied by the player, and routes exact route/location claims through source evidence.",
+      "expectations": [
+        "Uses documented save summary/stats only for validated fields and documented areas/route/bosses commands with the default spoiler gate",
+        "Keeps future area, boss, NPC, item, quest, and ending names redacted until explicit spoiler permission",
+        "States that unsupported save progress, boss, bonfire, completion, and checklist mappings cannot establish the player's current route",
+        "Uses exact route/location/NPC claims only with source-cache/live evidence and cites provenance",
+        "Does not turn a static checklist or incomplete save output into proof of what the player has done"
+      ]
+    },
+    {
+      "id": 157,
+      "prompt": "I maintain a local source cache and am returning to investigate a contested current PC loader claim. Walk through `sources list`, `status`, `explain`, and targeted `refresh --force`, including a local-only registry entry, and state exactly what the cache receipt proves.",
+      "expected_output": "A source workflow distinguishing registry enumeration, cache freshness, metadata explanation, and targeted remote refresh. It says `--force` overrides freshness policy only for registered remote HTTP(S) sources, local entries are introspection-only, and cache metadata is a fetch receipt rather than proof; current claims still need dated source URL/key evidence and disagreement handling.",
+      "expectations": [
+        "Uses only documented `sources list`, `sources status`, `sources explain <source-key>`, and `sources refresh [<source-key> ...] [--force]` forms",
+        "Distinguishes registered-source metadata from cache freshness and from observed or live evidence",
+        "Limits refresh to registered remote HTTP(S) sources and states that local:// entries are introspection-only/not fetchable",
+        "States that a cache receipt does not prove the underlying loader, compatibility, or safety claim",
+        "Cites source keys/URLs and a checked date for current claims and reports disagreement instead of false certainty"
+      ]
+    },
+    {
+      "id": 158,
+      "prompt": "I am returning for a platinum cleanup and want to know whether my old save proves achievements or completion. Give me the static checklist and a read-only save boundary without spoilers, separating platform ownership from unsupported save state.",
+      "expected_output": "A response using `achievements` or documented save achievements that clearly separates the static checklist from platform-account unlock history and save-backed completion. Unsupported completion, inventory, boss, quest, and ownership fields remain explicit unknown/unsupported results; guide lookups carry the required provenance and spoiler warning.",
+      "expectations": [
+        "Uses documented `achievements` and, if a save is supplied, `save ... achievements` without inventing an ownership flag",
+        "Distinguishes static checklist content from platform-account achievement ownership and save-backed completion",
+        "Leaves unsupported inventory, bosses, bonfires, progress, completion, quest, and ownership categories unknown",
+        "If using the local guide corpus, includes its transformed-PSNProfiles, spoiler-heavy, non-authoritative provenance warning",
+        "Keeps checklist names and route details spoiler-safe unless the player explicitly permits spoilers"
+      ]
+    },
+    {
+      "id": 159,
+      "prompt": "I am debugging a machine-readable save consumer. Show how `save <path> inventory --json` and `save <path> progress --json` return unsupported categories even though those readers ignore the supplied path, and distinguish that successful JSON result from a supported reader's malformed or unreadable path failure; do not invent a JSON error schema or turn errors into zeros.",
+      "expected_output": "The inventory and progress readers intentionally ignore the supplied path and return a successful machine-readable unsupported JSON object for `--json`; this is distinct from supported readers that attempt parsing and report malformed or unreadable paths as ordinary nonzero plain CLI errors, with no invented JSON error schema. It preserves the documented schema and spoiler gate, never invents inventory or progress values, and keeps save inspection read-only.",
+      "expectations": [
+        "Uses only the documented save path/action/`--json` syntax and the inventory and progress actions",
+        "Keeps a successful unsupported inventory/progress request machine-readable JSON and notes that these readers ignore and do not validate the supplied path; it does not convert the result to prose, zero, absent, or complete",
+        "Distinguishes the successful unsupported result from supported-reader malformed or unreadable path failures, which are nonzero plain errors rather than a structured JSON error",
+        "Applies the same spoiler redaction in JSON as text output and does not claim names, locations, bosses, bonfires, or requirements without permission",
+        "States that save support cannot repair, rewrite, decrypt, convert, or recommend an editor"
+      ]
+    },
+    {
+      "id": 160,
+      "prompt": "I am a returning player who wants a personalized checklist in my own JSON file: current stats, a no-spoiler route preference, and a few completed sections. Explain how to use `track` and `recommend` without silent writes, and how partial data limits advice.",
+      "expected_output": "A stateless tracking workflow using the caller-supplied JSON object with `track [section] --path` and `recommend --path`. It validates readable object-shaped JSON, preserves spoiler preferences, limits recommendations to supplied fields, treats partial data as incomplete, and never claims save or achievement ownership or silently updates the file.",
+      "expectations": [
+        "Uses the documented track and recommend commands with an explicit caller-supplied JSON path",
+        "Requires readable, valid JSON with an object root and treats malformed, missing, or non-object input as an error",
+        "States that empty or partial objects produce limited advice and cannot establish omitted stats, route progress, inventory, or achievements",
+        "Preserves the player's no-spoiler preference and does not reveal future names through a recommendation",
+        "States that the skill is stateless: it does not silently write tracking files, mutate saves, or convert recommendations into ownership facts"
+      ]
+    }
+  ]
+}
