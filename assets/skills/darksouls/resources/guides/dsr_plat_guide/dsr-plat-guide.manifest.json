@@ -1,0 +1,64 @@
+{
+  "title": "Dark Souls Remastered - Platinum Walkthrough",
+  "authors": [
+    "ExoCyberdemon",
+    "ThePlatinumBloke"
+  ],
+  "url": "https://psnprofiles.com/guide/16645-dark-souls-remastered-platinum-walkthrough-guide",
+  "format": "dsr-guide-chunks-v1",
+  "chunk_count": 160,
+  "source_pdf_name": "Dark Souls Remastered - Platinum Walkthrough Guide • PSNProfiles.com.pdf",
+  "source_pdf_sha256": "90b983961944904deae6d27c7e9ffdf9a4062162cc7a42c26b0e6d904ab21fc1",
+  "source_type": "user-provided PSNProfiles PDF export",
+  "source_pdf_tracked": false,
+  "tracked_artifact": true,
+  "copyable": false,
+  "usage": [
+    "local guide lookup",
+    "transformed, provenance-labeled answers only"
+  ],
+  "constraints": [
+    "non-authoritative walkthrough; verify mechanics against game data",
+    "copyrighted source is not redistributed",
+    "PDF is not copied or tracked",
+    "spoiler-heavy source; caller must gate spoilers",
+    "no save-file claims are inferred from this corpus"
+  ],
+  "provenance": {
+    "boundary": "Only transformed/reflowed excerpts are stored; source PDF remains user-local and is not an output artifact.",
+    "citation": "PSNProfiles guide URL and local chunk heading path; do not present chunks as official game documentation."
+  },
+  "extraction": {
+    "page_count": 1007,
+    "pages_with_text": 1007,
+    "extracted_chars": 371994,
+    "removed_chrome_lines": 8524,
+    "heading_count": 29,
+    "chunk_kind_counts": {
+      "build": 3,
+      "overview": 3,
+      "route": 115,
+      "spell": 39
+    },
+    "total_chunk_chars": 269616,
+    "min_chunk_chars": 81,
+    "max_chunk_chars": 2238,
+    "quality": "page-block text extraction with Unicode normalization, browser/PDF chrome removal, duplicate-line suppression, heading inference, paragraph reflow, and bounded chunking"
+  },
+  "preprocessing": {
+    "streamed_sha256": true,
+    "page_by_page": true,
+    "pdf_boilerplate_removed": true,
+    "page_numbers_removed": true,
+    "line_wraps_reflowed": true,
+    "unicode_normalized": true,
+    "section_chunked": true,
+    "target_chunk_chars": 1800,
+    "max_chunk_chars": 3200,
+    "row_schema": {
+      "h": "heading path",
+      "k": "conservative kind",
+      "t": "cleaned transformed content"
+    }
+  }
+}
