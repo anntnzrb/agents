@@ -1,0 +1,29 @@
+{
+  "game":"Dark Souls Remastered",
+  "rings":[
+    {"name":"Havel's Ring","weight":0.5,"category":"equip_load","effect":"increases maximum equip load by 50%","builds":["all","strength","quality"],"spoiler_level":0},
+    {"name":"Ring of Favor and Protection","weight":0.5,"category":"all-round","effect":"increases HP, stamina, and maximum equip load by 20%; breaks when removed","builds":["all","quality","strength","dexterity"],"spoiler_level":0},
+    {"name":"Cloranthy Ring","weight":0.2,"category":"stamina","effect":"increases stamina recovery speed by 20","builds":["all","quality","strength","dexterity"],"spoiler_level":0},
+    {"name":"Ring of Steel Protection","weight":0.6,"category":"defense","effect":"increases physical defense by 50","builds":["strength","quality"],"spoiler_level":0},
+    {"name":"Wolf Ring","weight":0.5,"category":"poise","effect":"increases poise by 40","builds":["strength","quality"],"spoiler_level":0},
+    {"name":"Dark Wood Grain Ring","weight":0.1,"category":"roll","effect":"changes the fast roll animation while below 25% equip load","builds":["dexterity","quality"],"spoiler_level":1},
+    {"name":"Ring of the Evil Eye","weight":1.0,"category":"recovery","effect":"restores 30 HP when an enemy dies nearby","builds":["all"],"spoiler_level":0},
+    {"name":"Covetous Silver Serpent Ring","weight":0.6,"category":"souls","effect":"increases souls gained by 20%","builds":["all","strength","dexterity"],"spoiler_level":1},
+    {"name":"Covetous Gold Serpent Ring","weight":1.2,"category":"discovery","effect":"increases item discovery by 200","builds":["all"],"spoiler_level":1},
+    {"name":"Red Tearstone Ring","weight":0.8,"category":"damage","effect":"increases damage by 50% while HP is 20% or lower","builds":["strength","dexterity","quality"],"spoiler_level":1},
+    {"name":"Bellowing Dragoncrest Ring","weight":0.7,"category":"spell_damage","effect":"increases sorcery damage by 20%","builds":["sorcery"],"spoiler_level":1},
+    {"name":"Great Swamp Ring","weight":0.6,"category":"spell_damage","effect":"increases pyromancy damage by 12%","builds":["pyromancy"],"spoiler_level":0},
+    {"name":"Ring of the Sun's Firstborn","weight":1.0,"category":"spell_damage","effect":"increases miracle damage by 20%","builds":["miracle"],"spoiler_level":1},
+    {"name":"Darkmoon Seance Ring","weight":0.8,"category":"attunement","effect":"adds one attunement slot","builds":["sorcery","miracle","pyromancy"],"spoiler_level":2},
+    {"name":"Dusk Crown Ring","weight":0.6,"category":"spell_uses","effect":"increases spell uses by 50% and halves maximum HP","builds":["sorcery","miracle","pyromancy"],"spoiler_level":2},
+    {"name":"White Seance Ring","weight":0.6,"category":"attunement","effect":"adds one attunement slot","builds":["sorcery","miracle","pyromancy"],"spoiler_level":1},
+    {"name":"Lingering Dragoncrest Ring","weight":0.7,"category":"spell_duration","effect":"extends spell duration by 50%","builds":["sorcery","pyromancy"],"spoiler_level":1},
+    {"name":"Magic Stoneplate Ring","weight":0.6,"category":"defense","effect":"increases magic defense by 40","builds":["all"],"spoiler_level":0},
+    {"name":"Flame Stoneplate Ring","weight":0.6,"category":"defense","effect":"increases fire defense by 40","builds":["all"],"spoiler_level":0},
+    {"name":"Thunder Stoneplate Ring","weight":0.6,"category":"defense","effect":"increases lightning defense by 40","builds":["all"],"spoiler_level":0},
+    {"name":"Poisonbite Ring","weight":0.6,"category":"resistance","effect":"increases poison resistance by 100","builds":["all"],"spoiler_level":0},
+    {"name":"Bloodbite Ring","weight":0.6,"category":"resistance","effect":"increases bleed resistance by 400","builds":["all"],"spoiler_level":0},
+    {"name":"Tiny Being's Ring","weight":0.6,"category":"hp","effect":"increases HP by 5%","builds":["all"],"spoiler_level":0},
+    {"name":"Leo Ring","weight":0.5,"category":"counter","effect":"increases counter damage for thrust attacks by 40%","builds":["dexterity","quality"],"spoiler_level":1}
+  ]
+}

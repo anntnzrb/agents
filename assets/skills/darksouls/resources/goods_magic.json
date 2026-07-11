@@ -1,0 +1,45 @@
+{
+  "game":"Dark Souls Remastered",
+  "sorceries":[
+    {"name":"Soul Arrow","slots":1,"intelligence":10,"uses":30,"effect":"basic magic projectile","spoiler_level":0},
+    {"name":"Great Soul Arrow","slots":1,"intelligence":14,"uses":20,"effect":"stronger magic projectile","spoiler_level":0},
+    {"name":"Heavy Soul Arrow","slots":1,"intelligence":12,"uses":20,"effect":"slow, high-damage magic projectile","spoiler_level":0},
+    {"name":"Homing Soulmass","slots":1,"intelligence":18,"uses":10,"effect":"creates homing magic orbs","spoiler_level":0},
+    {"name":"Soul Spear","slots":2,"intelligence":36,"uses":4,"effect":"piercing high-damage magic projectile","spoiler_level":1},
+    {"name":"Magic Weapon","slots":1,"intelligence":10,"uses":3,"effect":"adds magic damage to right-hand weapon","spoiler_level":0},
+    {"name":"Crystal Magic Weapon","slots":3,"intelligence":25,"uses":3,"effect":"strong weapon magic buff","spoiler_level":1},
+    {"name":"Fall Control","slots":1,"intelligence":15,"uses":10,"effect":"reduces fall damage and prevents stagger from safe falls","spoiler_level":0}
+  ],
+  "pyromancies":[
+    {"name":"Fireball","slots":1,"intelligence":10,"uses":8,"effect":"basic fire projectile","spoiler_level":0},
+    {"name":"Combustion","slots":1,"intelligence":10,"uses":16,"effect":"short-range fire burst","spoiler_level":0},
+    {"name":"Great Combustion","slots":1,"intelligence":10,"uses":8,"effect":"stronger short-range fire burst","spoiler_level":0},
+    {"name":"Great Fireball","slots":1,"intelligence":15,"uses":6,"effect":"strong fire projectile","spoiler_level":1},
+    {"name":"Fire Tempest","slots":1,"intelligence":6,"uses":3,"effect":"erupts multiple fire pillars around the caster","spoiler_level":1},
+    {"name":"Power Within","slots":1,"intelligence":10,"uses":1,"effect":"temporarily boosts damage and stamina recovery while draining HP","spoiler_level":1}
+  ],
+  "miracles":[
+    {"name":"Heal","slots":1,"faith":12,"uses":3,"effect":"restores HP","spoiler_level":0},
+    {"name":"Great Heal Excerpt","slots":1,"faith":14,"uses":3,"effect":"restores a moderate amount of HP","spoiler_level":0},
+    {"name":"Force","slots":1,"faith":12,"uses":21,"effect":"non-damaging shockwave that staggers and pushes","spoiler_level":0},
+    {"name":"Homeward","slots":1,"faith":18,"uses":1,"effect":"returns the caster to the last bonfire","spoiler_level":0},
+    {"name":"Lightning Spear","slots":1,"faith":20,"uses":10,"effect":"throws a lightning projectile","spoiler_level":1},
+    {"name":"Great Lightning Spear","slots":2,"faith":30,"uses":10,"effect":"stronger lightning projectile","spoiler_level":1},
+    {"name":"Wrath of the Gods","slots":1,"faith":28,"uses":3,"effect":"close-range shockwave with damage and knockback","spoiler_level":1},
+    {"name":"Sunlight Spear","slots":2,"faith":50,"uses":5,"effect":"very strong lightning projectile","spoiler_level":2}
+  ],
+  "goods":[
+    {"name":"Green Blossom","category":"consumable","effect":"temporarily increases stamina recovery","spoiler_level":0},
+    {"name":"Humanity","category":"resource","effect":"restores HP and increases humanity counter when used","spoiler_level":0},
+    {"name":"Transient Curse","category":"consumable","effect":"temporarily permits attacks against certain incorporeal enemies","spoiler_level":1},
+    {"name":"Purging Stone","category":"consumable","effect":"reduces curse buildup and can reverse curse","spoiler_level":1},
+    {"name":"Repair Powder","category":"consumable","effect":"repairs equipped weapon durability","spoiler_level":0},
+    {"name":"Charcoal Pine Resin","category":"buff","effect":"adds fire damage to a compatible right-hand weapon","spoiler_level":0},
+    {"name":"Gold Pine Resin","category":"buff","effect":"adds lightning damage to a compatible right-hand weapon","spoiler_level":0},
+    {"name":"Green Titanite Shard","category":"upgrade_material","effect":"used for elemental and magic upgrade paths","spoiler_level":0},
+    {"name":"Large Titanite Shard","category":"upgrade_material","effect":"used for normal weapon reinforcement","spoiler_level":0},
+    {"name":"Titanite Chunk","category":"upgrade_material","effect":"used for high-level normal and lightning reinforcement","spoiler_level":1},
+    {"name":"Titanite Slab","category":"upgrade_material","effect":"final normal reinforcement material","spoiler_level":1},
+    {"name":"Estus Flask","category":"healing","effect":"restores HP; uses refill at bonfires","spoiler_level":0}
+  ]
+}
