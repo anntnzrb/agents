@@ -1,0 +1,98 @@
+{
+  "game": "Dark Souls Remastered",
+  "platform": "PC (Steam Windows)",
+  "read_only": true,
+  "source_policy": {
+    "layout_source": {
+      "repository": "Piroshkiv/DSRSave",
+      "url": "https://github.com/Piroshkiv/DSRSave",
+      "files": [
+        "DSRSave/DSRSaveEditor.cs",
+        "DSRSave/Editors/NameEditor.cs",
+        "DSRSave/Editors/StatsEditor.cs"
+      ],
+      "retrieved": "2026-07-11",
+      "confidence": "medium",
+      "limits": "Community reverse-engineering; validated here only by container size, slot digest, AES block shape, duplicate-name agreement, and conservative field ranges."
+    },
+    "save_location": {
+      "path_template": "Documents/NBGI/DARK SOULS REMASTERED/<SteamID>/DRAKS0005.sl2",
+      "confidence": "medium",
+      "auto_detect": true,
+      "limits": "Auto-detection does not scan drives, AppData, arbitrary backups, or other FromSoftware game directories."
+    }
+  },
+  "container": {
+    "file_size": "0x4204D0",
+    "base_slot_offset": "0x02C0",
+    "slot_count": 11,
+    "slot_size": "0x060030",
+    "slot_header_size": 16,
+    "encrypted_user_data_size": "0x060020",
+    "cipher": "AES-128-CBC, no padding",
+    "key_source": "DSRSave/DSRSaveEditor.cs",
+    "digest": "MD5(encrypted user data) stored in slot header",
+    "validation": [
+      "Exact container size",
+      "Per-slot MD5 equality",
+      "AES-CBC block alignment",
+      "No writes or checksum regeneration"
+    ]
+  },
+  "categories": {
+    "container_and_slots": {
+      "status": "supported",
+      "confidence": "medium",
+      "validation": "Exact size and per-slot digest; empty slots are represented without character claims."
+    },
+    "character_identity": {
+      "status": "supported_when_validated",
+      "confidence": "medium",
+      "fields": ["slot", "name"],
+      "validation": "UTF-16LE names at 0x108 and 0x18C must both decode to printable, non-empty, identical strings."
+    },
+    "stats_and_level": {
+      "status": "supported_when_validated",
+      "confidence": "medium",
+      "fields": ["level", "class_id", "class_name", "vitality", "attunement", "endurance", "strength", "dexterity", "resistance", "intelligence", "faith"],
+      "validation": "Stat bytes must be 1..99; level must be 1..713; class id must be 0..9."
+    },
+    "humanity": {
+      "status": "supported_when_validated",
+      "confidence": "low",
+      "fields": ["humanity"],
+      "validation": "Offset is source-documented, but exposed only with full identity/stat validation."
+    },
+    "currency": {
+      "status": "unsupported",
+      "reason": "Current souls/currency offset is not validated for DSR Remastered."
+    },
+    "inventory": {
+      "status": "unsupported",
+      "reason": "Inventory record boundaries and item-handle semantics are not validated for DSR Remastered."
+    },
+    "owned_items": {
+      "status": "unsupported",
+      "reason": "Inventory ownership cannot be established without a validated DSR inventory layout."
+    },
+    "progress": {
+      "status": "unsupported",
+      "reason": "Boss, bonfire, and event-flag offsets are not validated for DSR Remastered."
+    },
+    "completion": {
+      "status": "unsupported",
+      "reason": "Completion requires validated inventory and event-flag layouts."
+    },
+    "achievement_unlocks": {
+      "status": "unsupported",
+      "static_checklist": "resources/achievement_checklist.json",
+      "reason": "Achievement unlock state is platform-account data and is not validated in DSR saves; static checklist labels remain available."
+    }
+  },
+  "failure_policy": {
+    "malformed_or_wrong_game": "Raise SaveReadError with an explanatory message; never return guessed fields.",
+    "missing_optional_crypto": "Raise SaveUnsupportedError; never inspect encrypted bytes as plaintext.",
+    "unsupported_category": "Return supported:false with reason and evidence.",
+    "mutations": "No mutation, decryption output writing, repair, re-encryption, or checksum changes are implemented."
+  }
+}
