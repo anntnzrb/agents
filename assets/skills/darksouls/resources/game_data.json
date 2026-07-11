@@ -1,0 +1,94 @@
+{
+  "game": "Dark Souls Remastered",
+  "platform_scope": "Remastered base game; mechanics shared by the original release unless noted",
+  "facts_policy": "Values are deterministic catalog references; upgrade and damage calculations are approximate unless explicitly marked exact.",
+  "origins": [
+    {"name":"Warrior","level":4,"stats":{"vitality":11,"attunement":9,"endurance":12,"strength":13,"dexterity":13,"resistance":11,"intelligence":9,"faith":9},"starting_gear":["Longsword","Wooden Shield","Warrior Set"]},
+    {"name":"Knight","level":5,"stats":{"vitality":14,"attunement":10,"endurance":10,"strength":11,"dexterity":11,"resistance":10,"intelligence":9,"faith":9},"starting_gear":["Broadsword","Knight Shield","Knight Set"]},
+    {"name":"Wanderer","level":3,"stats":{"vitality":10,"attunement":11,"endurance":10,"strength":10,"dexterity":14,"resistance":12,"intelligence":11,"faith":8},"starting_gear":["Scimitar","Wooden Shield","Wanderer Set"]},
+    {"name":"Thief","level":5,"stats":{"vitality":9,"attunement":11,"endurance":9,"strength":9,"dexterity":15,"resistance":10,"intelligence":12,"faith":11},"starting_gear":["Bandit's Knife","Target Shield","Thief Set"]},
+    {"name":"Bandit","level":4,"stats":{"vitality":12,"attunement":8,"endurance":14,"strength":14,"dexterity":9,"resistance":11,"intelligence":8,"faith":10},"starting_gear":["Battle Axe","Spider Shield","Brigand Set"]},
+    {"name":"Hunter","level":4,"stats":{"vitality":11,"attunement":9,"endurance":11,"strength":12,"dexterity":14,"resistance":11,"intelligence":9,"faith":9},"starting_gear":["Short Bow","Dagger","Leather Shield","Hunter Set"]},
+    {"name":"Sorcerer","level":3,"stats":{"vitality":8,"attunement":15,"endurance":8,"strength":9,"dexterity":11,"resistance":8,"intelligence":15,"faith":8},"starting_gear":["Mail Breaker","Sorcerer's Catalyst","Small Leather Shield","Sorcerer Set"]},
+    {"name":"Pyromancer","level":1,"stats":{"vitality":10,"attunement":12,"endurance":11,"strength":12,"dexterity":9,"resistance":12,"intelligence":10,"faith":8},"starting_gear":["Hand Axe","Cracked Round Shield","Pyromancy Flame","Pyromancer Set"]},
+    {"name":"Cleric","level":2,"stats":{"vitality":11,"attunement":11,"endurance":9,"strength":12,"dexterity":8,"resistance":11,"intelligence":8,"faith":14},"starting_gear":["Mace","Canvas Talisman","Cleric's Shield","Holy Robe"]},
+    {"name":"Deprived","level":6,"stats":{"vitality":11,"attunement":11,"endurance":11,"strength":11,"dexterity":11,"resistance":11,"intelligence":11,"faith":11},"starting_gear":["Club","Plank Shield","Tattered Cloth Set"]}
+  ],
+  "softcaps": {
+    "vitality":[27,40],
+    "attunement":[10,12,14,16,19,23,28,34,41,50],
+    "endurance":[40],
+    "strength":[40],
+    "dexterity":[40],
+    "intelligence":[40],
+    "faith":[30,50],
+    "resistance":[30],
+    "notes":"First values are common practical softcaps, not hard limits. Endurance stamina gain stops at 40; equip-load gain continues through 99. Weapon and spell coefficients vary by item."
+  },
+  "leveling": {
+    "soul_cost_formula":"floor(0.02 * target_level^3 + 3.06 * target_level^2 + 105.6 * target_level - 895)",
+    "formula_scope":"Approximate next-level cost for target_level; use the game UI for final confirmation."
+  },
+  "equip_load": {
+    "thresholds":[
+      {"max_fraction":0.25,"roll":"fast","description":"fast roll; lowest recovery frames"},
+      {"max_fraction":0.50,"roll":"medium","description":"medium roll"},
+      {"max_fraction":1.00,"roll":"fat","description":"slow roll"},
+      {"max_fraction":null,"roll":"overburdened","description":"cannot roll or run"}
+    ],
+    "formula":"current_weight / max_equip_load",
+    "notes":"DS1/Remastered uses 25% and 50% breakpoints with no intermediate 30% tier. Havel's Ring and Ring of Favor and Protection modify max load."
+  },
+  "upgrade_paths": {
+    "normal":{"max_level":15,"reinforcement":"Titanite Shard -> Large Titanite Shard -> Titanite Chunk -> Titanite Slab","infusions":["physical scaling retained"]},
+    "raw":{"max_level":5,"reinforcement":"Titanite Shard -> Large Titanite Shard -> Titanite Chunk","infusions":["higher base physical","reduced scaling"]},
+    "elemental":{"subpaths":["fire","chaos","lightning","magic","enchanted","divine","occult"],"notes":"Elemental is an umbrella label; each subpath has its own ember and material route."},
+    "fire":{"max_level":10,"reinforcement":"Green Titanite Shard -> Red Titanite Chunk -> Red Titanite Slab","infusions":["fire damage","no stat scaling at +10"]},
+    "chaos":{"max_level":5,"reinforcement":"Green Titanite Shard -> Red Titanite Chunk -> Red Titanite Slab","infusions":["fire damage","humanity increases chaos bonus","requires fire +5 ascension"]},
+    "lightning":{"max_level":5,"reinforcement":"Titanite Chunk -> Titanite Slab","infusions":["lightning damage","scaling removed"]},
+    "magic":{"max_level":10,"reinforcement":"Green Titanite Shard -> Blue Titanite Chunk -> Blue Titanite Slab","infusions":["magic damage","intelligence scaling"]},
+    "enchanted":{"max_level":5,"reinforcement":"Blue Titanite Chunk -> Blue Titanite Slab","infusions":["magic damage","higher intelligence scaling","lower physical component"]},
+    "crystal":{"max_level":5,"reinforcement":"Twinkling Titanite","infusions":["higher base damage","cannot be repaired normally","scaling retained"]},
+    "divine":{"max_level":10,"reinforcement":"Green Titanite Shard -> White Titanite Chunk -> White Titanite Slab","infusions":["magic damage","faith scaling","extra undead utility"]},
+    "occult":{"max_level":5,"reinforcement":"White Titanite Chunk -> White Titanite Slab","infusions":["magic damage","faith scaling","extra divine damage to certain targets"]},
+    "unique":{"max_level":5,"reinforcement":"Twinkling Titanite","infusions":["fixed weapon-specific moveset and scaling"]},
+    "dragon":{"max_level":5,"reinforcement":"Dragon Scale","infusions":["fixed dragon weapon properties"]},
+    "pyromancy":{"max_level":15,"reinforcement":"Pyromancy Flame reinforcement by a pyromancy trainer; ascended flame continues to +5","infusions":["spell damage is upgraded directly and does not use character stat scaling"]}
+  },
+  "estus": {
+    "starting_flasks":5,
+    "bonfire_kindling_increment":5,
+    "ordinary_bonfire_max":10,
+    "rite_of_kindling_max":20,
+    "fire_keeper_bonfire_note":"Fire Keeper bonfires begin at 10 and cannot be kindled by the player in the same way.",
+    "estus_shard_max_upgrades":7,
+    "max_flask_level":"+7"
+  },
+  "build_archetypes": {
+    "quality":{"primary_stats":["strength","dexterity"],"target_caps":{"strength":40,"dexterity":40},"safe_defaults":["Longsword","Claymore","Halberd"]},
+    "strength":{"primary_stats":["strength"],"target_caps":{"strength":40},"safe_defaults":["Great Club","Zweihander","Mace"]},
+    "dexterity":{"primary_stats":["dexterity"],"target_caps":{"dexterity":40},"safe_defaults":["Uchigatana","Balder Side Sword","Falchion"]},
+    "sorcery":{"primary_stats":["intelligence","attunement"],"target_caps":{"intelligence":40,"attunement":19},"safe_defaults":["Moonlight Greatsword","Sorcerer's Catalyst"]},
+    "miracle":{"primary_stats":["faith","attunement"],"target_caps":{"faith":30,"attunement":19},"safe_defaults":["Mace","Canvas Talisman"]},
+    "pyromancy":{"primary_stats":["attunement","vitality","endurance"],"target_caps":{"attunement":19},"safe_defaults":["Hand Axe","Pyromancy Flame"],"notes":"Pyromancy Flame damage is upgraded directly; intelligence and faith do not scale its spell damage in DS1."},
+    "dragon":{"primary_stats":["strength","dexterity"],"target_caps":{"strength":40,"dexterity":40},"safe_defaults":["Dragon Greatsword","Dragon King Greataxe"]}
+  },
+  "covenants": [
+    {"name":"Way of White","focus":"co-op matchmaking","spoiler_level":0},
+    {"name":"Princess Guard","focus":"miracle and co-op support","spoiler_level":1},
+    {"name":"Warrior of Sunlight","focus":"co-op and lightning miracles","spoiler_level":1},
+    {"name":"Forest Hunter","focus":"invasion defense","spoiler_level":1},
+    {"name":"Darkwraith","focus":"invasion","spoiler_level":2},
+    {"name":"Gravelord Servant","focus":"world-infection PvP","spoiler_level":2},
+    {"name":"Path of the Dragon","focus":"duels","spoiler_level":1},
+    {"name":"Chaos Servant","focus":"pyromancy access","spoiler_level":1},
+    {"name":"Darkmoon Blade","focus":"invasion defense and miracle rewards","spoiler_level":2}
+  ],
+  "farming_routes": [
+    {"id":"early_souls","label":"early-game soul loop","resource":"souls","spoiler_level":0,"notes":"Use a short repeatable route near the first hub; rest at a bonfire to reset."},
+    {"id":"large_titanite","label":"large titanite loop","resource":"large titanite shards","spoiler_level":1,"notes":"Target enemies that reliably drop large titanite; item-discovery gear is optional."},
+    {"id":"green_titanite","label":"green titanite loop","resource":"green titanite shards","spoiler_level":1,"notes":"Use a merchant or repeatable drop source; verify current inventory before spending souls."},
+    {"id":"humanity","label":"humanity loop","resource":"humanity","spoiler_level":1,"notes":"Repeatedly defeat the catalogued early-game enemy type with high item discovery."}
+  ],
+  "sources": ["official in-game descriptions and upgrade menus", "community-verified DS1/Remastered mechanics; values marked approximate require in-game confirmation"]
+}

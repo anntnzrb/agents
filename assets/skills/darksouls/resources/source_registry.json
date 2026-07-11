@@ -1,0 +1,256 @@
+{
+  "version": 1,
+  "entries": {
+    "fromsoftware-dsr-product": {
+      "name": "FromSoftware Dark Souls Remastered product page",
+      "url": "https://www.fromsoftware.jp/ww/products/darksoulsremastered.html",
+      "license": "Official site; terms apply",
+      "source_type": "official",
+      "allowed_use": [
+        "official product/platform identity",
+        "first-party release context"
+      ],
+      "not_allowed_for": [
+        "save offsets or parser mappings",
+        "copied gameplay tables or walkthrough prose"
+      ],
+      "risk": "Official product pages are not a complete mechanics reference; recheck regional availability and page currentness.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "bandai-dsr-product": {
+      "name": "Bandai Namco Dark Souls Remastered product page",
+      "url": "https://www.bandainamcoent.com/games/dark-souls-remastered",
+      "license": "Official site; terms apply",
+      "source_type": "official",
+      "allowed_use": [
+        "official product and edition context",
+        "published platform or feature statements"
+      ],
+      "not_allowed_for": [
+        "canonical item/stat data",
+        "save offsets, event flags, or achievement ownership",
+        "copied page prose"
+      ],
+      "risk": "Marketing/product page; use only for claims it actually publishes and check regional redirects.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "steam-dsr-store": {
+      "name": "Steam Dark Souls Remastered store listing",
+      "url": "https://store.steampowered.com/app/570940/DARK_SOULS_REMASTERED/",
+      "license": "Steam listing; terms apply",
+      "source_type": "primary-platform",
+      "allowed_use": [
+        "PC edition identity and published system/platform information",
+        "store-listed feature or release context"
+      ],
+      "not_allowed_for": [
+        "gameplay formulas or exact locations",
+        "save format or mod compatibility guarantees"
+      ],
+      "risk": "Store metadata can change and is not a mechanics authority; check the listing date/context.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "local-ds1-kernel": {
+      "name": "Bundled DSR deterministic kernel",
+      "url": "local://darksouls/scripts/ds1_core.py",
+      "license": "GPL-3.0-or-later skill resources",
+      "source_type": "bundled-kernel",
+      "allowed_use": [
+        "stable mechanics exposed by ds1_core.py",
+        "spoiler gates, source-cache policy, and guide-search interface",
+        "deterministic command behavior"
+      ],
+      "not_allowed_for": [
+        "user-facing route/location prose absent from a cited source",
+        "current mod/version claims",
+        "save-backed facts not returned by ds1_save.py"
+      ],
+      "risk": "The kernel is intentionally narrow; missing rows and unsupported categories must remain unknown.",
+      "machine_readable": true,
+      "copyable": true
+    },
+    "local-ds1-catalog": {
+      "name": "Bundled DSR catalog resources",
+      "url": "local://darksouls/resources/",
+      "license": "GPL-3.0-or-later skill resources; per-row provenance applies",
+      "source_type": "bundled-catalog",
+      "allowed_use": [
+        "known weapon/ring/goods/magic name lookup",
+        "deterministic AR and compare helpers for rows present"
+      ],
+      "not_allowed_for": [
+        "inventing missing weapon rows or AR",
+        "proving item ownership or acquisition location",
+        "bulk replacement with unlicensed datasets"
+      ],
+      "risk": "Thin catalog by design; unknown and ambiguous names must be reported as unknown.",
+      "machine_readable": true,
+      "copyable": true
+    },
+    "darksouls-wikidot": {
+      "name": "Dark Souls Wikidot",
+      "url": "https://darksouls.wikidot.com/",
+      "license": "Wiki license varies by page; verify before reuse",
+      "source_type": "community-wiki",
+      "allowed_use": [
+        "secondary mechanics cross-checks",
+        "live cited item, area, and route summaries after spoiler permission"
+      ],
+      "not_allowed_for": [
+        "DSR save offsets or parser truth",
+        "bulk page copying or unreviewed table imports"
+      ],
+      "risk": "Community pages can be incomplete or spoiler-heavy; cite the specific page and corroborate contested facts.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "fextralife-dsr": {
+      "name": "Fextralife Dark Souls wiki",
+      "url": "https://darksouls.wiki.fextralife.com/",
+      "license": "CC BY-NC-SA (site terms and page scope apply)",
+      "source_type": "community-wiki",
+      "allowed_use": [
+        "live cited route, location, NPC, boss, item, and farming prose",
+        "secondary mechanics cross-checks"
+      ],
+      "not_allowed_for": [
+        "canonical save/event data",
+        "bulk copied wiki prose or tables",
+        "unqualified current mod claims"
+      ],
+      "risk": "Spoiler-heavy and sometimes inconsistent; summarize and cite, do not embed.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "pcgamingwiki-dsr": {
+      "name": "PCGamingWiki Dark Souls Remastered",
+      "url": "https://www.pcgamingwiki.com/wiki/Dark_Souls_Remastered",
+      "license": "CC BY-NC-SA",
+      "source_type": "compatibility-wiki",
+      "allowed_use": [
+        "live cited PC settings, fixes, and compatibility context",
+        "current troubleshooting leads"
+      ],
+      "not_allowed_for": [
+        "gameplay/stat formulas",
+        "save offsets or achievement state",
+        "guaranteed compatibility or online safety"
+      ],
+      "risk": "Version, executable, OS, and mod-loader differences matter; verify current pages before claiming support.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "soulsplanner-dsr": {
+      "name": "SoulsPlanner Dark Souls calculator",
+      "url": "https://soulsplanner.com/darksouls",
+      "license": "No license observed",
+      "source_type": "calculator",
+      "allowed_use": [
+        "manual AR/build sanity cross-checks",
+        "comparison of discrepancies with local deterministic output"
+      ],
+      "not_allowed_for": [
+        "copied formulas or datasets",
+        "canonical embedded catalog rows",
+        "save or progression claims"
+      ],
+      "risk": "Reference-only unless licensing and version scope are established; do not present as proof.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "speedrun-dsr": {
+      "name": "Speedrun.com Dark Souls Remastered resources",
+      "url": "https://www.speedrun.com/dsr",
+      "license": "Community site; license varies by resource",
+      "source_type": "community-reference",
+      "allowed_use": [
+        "route and timing context when the user explicitly asks for speedrun guidance",
+        "community resource discovery"
+      ],
+      "not_allowed_for": [
+        "general-purpose safe route claims without spoiler permission",
+        "copied guide text or canonical gameplay data",
+        "save parser mappings"
+      ],
+      "risk": "Speedrun routes intentionally skip content and may be version/category-specific; identify category and patch.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "psnprofiles-dsr-guide": {
+      "name": "User-provided PSNProfiles Dark Souls Remastered platinum guide",
+      "url": "https://psnprofiles.com/guide/16645-dark-souls-remastered-platinum-walkthrough-guide",
+      "license": "User-provided PDF; redistribution rights not established",
+      "source_type": "local-user-guide",
+      "allowed_use": [
+        "targeted local guide search through transformed chunks",
+        "short attributed summaries after spoiler permission"
+      ],
+      "not_allowed_for": [
+        "tracking or bundling the source PDF",
+        "raw PDF text or long quotations",
+        "save/parser truth or authoritative mechanics",
+        "bulk republishing or relicensing"
+      ],
+      "risk": "Spoiler-heavy and non-authoritative. The PDF is not tracked; only generated manifest/chunks are retained.",
+      "machine_readable": false,
+      "copyable": false
+    },
+    "dsr-guide-corpus": {
+      "name": "Transformed DSR platinum-guide chunk corpus",
+      "url": "local://darksouls/resources/guides/dsr_plat_guide/",
+      "license": "Derived local artifact; source redistribution rights not established",
+      "source_type": "local-transformed-corpus",
+      "allowed_use": [
+        "guide search/get lookup through the CLI",
+        "minimum necessary attributed summary"
+      ],
+      "not_allowed_for": [
+        "raw-text dumping",
+        "claiming parser or save authority",
+        "adding copied guide prose elsewhere in resources"
+      ],
+      "risk": "Rows are transformed from a user-provided PDF and can contain future spoilers; preserve the corpus warning.",
+      "machine_readable": true,
+      "copyable": false
+    },
+    "piroshkiv-dsr-save": {
+      "name": "Piroshkiv DSRSave",
+      "url": "https://github.com/Piroshkiv/DSRSave",
+      "license": "MIT",
+      "source_type": "primary-save-research",
+      "allowed_use": [
+        "DSR PC container/slot integrity and AES/MD5 layout reference",
+        "name, stats, level, and class field offset cross-checks for read-only parsing"
+      ],
+      "not_allowed_for": [
+        "save mutation/editor workflows",
+        "unvalidated inventory, boss, bonfire, quest, or achievement offsets",
+        "DS3 layout reuse or online cheat guidance"
+      ],
+      "risk": "Use only the source rows independently validated by ds1_save.py; repository coverage does not prove every category.",
+      "machine_readable": true,
+      "copyable": true
+    },
+    "ds1-save-parser-contract": {
+      "name": "Validated local DSR read-only save parser contract",
+      "url": "local://darksouls/scripts/ds1_save.py",
+      "license": "GPL-3.0-or-later skill resources",
+      "source_type": "local-parser-contract",
+      "allowed_use": [
+        "only fields explicitly supported by ds1_save.py",
+        "explicit unsupported results for unvalidated categories"
+      ],
+      "not_allowed_for": [
+        "DS3 save layout reuse",
+        "save mutation, repair, decryption, or re-encryption",
+        "inference from unknown IDs, absent offsets, or static checklists"
+      ],
+      "risk": "DSR save versions and layouts require defensible validation; unsupported means unknown, not false.",
+      "machine_readable": true,
+      "copyable": true
+    }
+  }
+}
