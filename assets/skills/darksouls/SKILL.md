@@ -112,6 +112,28 @@ Raw chunk rows use `{ "h": string[], "k": string, "t": string }`; search results
 
 The manifest reports `title`, `authors`, `url`, source-PDF identity/hash, transformation metadata, and provenance/usage constraints; do not substitute undocumented keys such as `author`, `updated`, or `source`. The source PDF is not tracked or bundled, and raw PDF text must never be copied into the repository. Summarize only the minimum text needed. The corpus is produced by `uv run --script scripts/preprocess_dsr_plat_guide.py [pdf] [outdir]`; keep only the manifest/chunks outputs.
 
+### Local DSR Dadbod transcript corpus
+
+```text
+transcript [info|list|search [QUERY ...]|get VIDEO_INDEX CHUNK_INDEX] [--video-index N] [--limit N] [--json] [--spoilers]
+```
+
+These commands search only the separate transformed corpus at:
+
+```text
+resources/guides/dsr_dadbod_transcripts/dsr-dadbod-transcripts.manifest.json
+resources/guides/dsr_dadbod_transcripts/dsr-dadbod-transcripts.chunks.jsonl
+```
+
+The corpus contains 30 user-provided Dadbod video transcripts. It is a local, deterministic transformation of English `en-orig` automatic captions (source SHA-256 `99bfdb067225d0290c66520ec468f04a50643d541b8a9c37344c274eadbfd5f3`). Rights are unknown and `copyable` is false: retain only the transformed manifest/chunks and do not redistribute the source JSON or long transcript text. Preserve the exact source video IDs, URLs, caption tracks, and cue counts recorded in the manifest/chunks; do not invent titles or timestamps.
+
+Transcript text is spoiler-heavy, non-authoritative, potentially inaccurate, and **never mechanics, save, parser, or route truth**. Every transcript result must carry this warning:
+
+> Local Dadbod transcript lookup: user-provided English automatic captions; spoiler-heavy, non-authoritative, potentially inaccurate, rights unknown/copyable=false, and never mechanics/save/parser/route truth.
+
+Output is redacted by default: without `--spoilers`, `transcript info`/`list` expose metadata without titles or names, and `transcript search`/`get` expose no transcript text, identifiers, URLs, headings, or names. `--json` changes representation only and never bypasses the spoiler gate. To reveal transcript chunks, `transcript search` requires a non-empty query together with `--spoilers`; queryless search is summary-only to prevent a dump. `get` uses zero-based video/chunk indexes and rejects out-of-range indexes. Keep this corpus separate from the PSNProfiles guide corpus and from mechanics/catalog/save APIs.
+
+
 ### Sources, mods, and audit
 
 ```text
@@ -166,6 +188,7 @@ Mechanics that are normally safe include stats, softcaps, scaling, reinforcement
 3. **Official/primary sources** for product/platform facts and published requirements.
 4. **Fresh cached/live community sources** for routes, locations, NPC steps, farming, calculators, and current mod status.
 5. **Local transformed guide chunks** only for targeted walkthrough lookup, with provenance and spoiler warning.
+6. **Local Dadbod transcript chunks** only for narrowly requested transcript lookup, with provenance and the transcript warning; they are never mechanics/save/parser/route truth.
 
 Label claims as observed, source-backed, calculated, or recommendation. If sources disagree, show the disagreement and avoid false precision. Cache metadata is a fetch receipt, not a citation; cite the source URL/source key.
 
@@ -196,6 +219,9 @@ darksouls/
     guides/dsr_plat_guide/
       dsr-plat-guide.manifest.json
       dsr-plat-guide.chunks.jsonl
+    guides/dsr_dadbod_transcripts/
+      dsr-dadbod-transcripts.manifest.json
+      dsr-dadbod-transcripts.chunks.jsonl
   evals/evals.json
 ```
 

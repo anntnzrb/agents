@@ -50,6 +50,8 @@ The bundled deterministic resources are a narrow operational scaffold. Their pre
 | `scripts/ds1_frames.py` | code-only local DSR frame scanner | Reads an explicitly supplied install at runtime; no bundled or retained frame JSON, game assets, extracted names/parameter tables, raw payload bytes, or absolute paths. |
 | `resources/guides/dsr_plat_guide/dsr-plat-guide.manifest.json` | corpus receipt | Records user-provided PDF provenance, source URL/name, hash/processing/schema, and non-authoritative constraints. The PDF itself is not tracked. |
 | `resources/guides/dsr_plat_guide/dsr-plat-guide.chunks.jsonl` | local search index | Generated transformed rows only (`h`, `k`, `t`); no raw PDF or copied page dump. |
+| `resources/guides/dsr_dadbod_transcripts/dsr-dadbod-transcripts.manifest.json` | transcript corpus receipt | Records the exact source hash, 30 video IDs/URLs/tracks/cue counts, transformation/schema, and rights boundary; source JSON is not retained. |
+| `resources/guides/dsr_dadbod_transcripts/dsr-dadbod-transcripts.chunks.jsonl` | local transcript search index | Deterministically transformed per-video word chunks only; no cross-video chunks, invented titles/timestamps, or raw transcript dump. |
 
 Catalog output is spoiler-gated at the CLI boundary. A canonical name in a bundled row is not permission to expose a future item or location; default output should redact future names, and `--json` changes representation without bypassing the gate.
 
@@ -82,6 +84,18 @@ Every guide CLI result and every user-facing answer based on it must carry or be
 > Local guide lookup: transformed from the user-provided PSNProfiles platinum-guide PDF; spoiler-heavy, non-authoritative, not save/parser truth, and not permission to republish the PDF or its text.
 
 Guide output is spoiler-redacted by default; `--json` changes representation only and does not bypass the gate. Use `guide search` to find a narrow heading/term, then `guide get` for a specific row. Summarize the minimum relevant content, preserve uncertainty, and apply the user’s spoiler setting. Never quote long passages or regenerate the PDF from chunks. Do not claim that a guide row proves the user has or has not obtained an item.
+
+## Dadbod transcript provenance and warning
+
+The separate corpus is derived from the user-provided `dsr-dadbod-transcripts.json` source (30 videos, English `en-orig` automatic captions; source SHA-256 `99bfdb067225d0290c66520ec468f04a50643d541b8a9c37344c274eadbfd5f3`). The source JSON is not bundled or deleted in this phase. Rights are unknown and `copyable` is false. Retained artifacts are only the deterministic manifest and JSONL chunks under `resources/guides/dsr_dadbod_transcripts/`.
+
+Transformation is NFKC normalization plus whitespace collapse, split only at word boundaries into per-video chunks targeting approximately 1400 characters (maximum 1800); chunks never cross video boundaries and reconstruct normalized text with single spaces. Preserve exact source video IDs, URLs, caption tracks, and cue counts. Do not invent video titles or timestamps.
+
+Every transcript CLI result and every user-facing answer based on it must carry or be accompanied by this warning:
+
+> Local Dadbod transcript lookup: user-provided English automatic captions; spoiler-heavy, non-authoritative, potentially inaccurate, rights unknown/copyable=false, and never mechanics/save/parser/route truth.
+
+Transcript output is spoiler-redacted by default. `--json` never bypasses redaction; a queryless search is summary-only, while revealing transcript chunks requires both a non-empty query and `--spoilers`; get indexes are bounds-checked. Keep transcript evidence separate from the PSNProfiles guide corpus, deterministic mechanics/catalog output, and read-only save parser output.
 
 ## Save-support truthfulness
 
