@@ -251,6 +251,24 @@
       "risk": "DSR save versions and layouts require defensible validation; unsupported means unknown, not false.",
       "machine_readable": true,
       "copyable": true
+    },
+    "local-dsr-frame-extraction": {
+      "name": "Local DSR frame extraction scanner",
+      "url": "local://darksouls/scripts/ds1_frames.py",
+      "license": "Local proprietary/user-only game installation data; redistribution rights not granted",
+      "source_type": "local-proprietary-user-only",
+      "allowed_use": [
+        "read-only extraction from an explicitly supplied local DSR install",
+        "transient selected timing summaries through the frames CLI"
+      ],
+      "not_allowed_for": [
+        "bundling or retaining frame JSON, game assets, extracted names/parameter tables, raw payload bytes, or absolute install paths",
+        "writing the installation, caches, or output files",
+        "spell/equipment timing claims or resolved player-facing move labels"
+      ],
+      "risk": "Proprietary local game data is version- and install-dependent; goods timing can be representative and weapon move labels remain unresolved.",
+      "machine_readable": true,
+      "copyable": false
     }
   }
 }

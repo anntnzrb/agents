@@ -1,6 +1,6 @@
 ---
 name: darksouls
-description: "Spoiler-safe Dark Souls Remastered companion and reference. Use for DSR mechanics, stats, builds, starting classes, weapons, upgrade paths, equip load, rings, spells, farming, achievements/platinum, route planning, source-backed/current PC or mod questions, the bundled local PSNProfiles platinum-guide search, and read-only save inspection when a supported save is supplied. Do not use for save editing or unverified parser claims."
+description: "Spoiler-safe Dark Souls Remastered companion and reference. Use for DSR mechanics, stats, builds, starting classes, weapons, upgrade paths, equip load, rings, spells, local DSR animation-frame extraction, farming, achievements/platinum, route planning, source-backed/current PC or mod questions, the bundled local PSNProfiles platinum-guide search, and read-only save inspection when a supported save is supplied. Do not use for save editing or unverified parser claims."
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
@@ -59,6 +59,22 @@ rings [<name>] [--limit N] [--json] [--spoilers]
 goods [<name>] [--limit N] [--json] [--spoilers]
 ```
 Catalog results are deterministic only for rows present in the bundled resources. Without `--spoilers`, catalog output must not reveal future item names or locations beyond a name the user supplied; use generic redaction where required. `--json` preserves the command's machine-readable schema while applying the same spoiler gate. `calc`/`compare` produce approximate AR for known rows; they must say when a weapon or path is unknown and never extrapolate AR from a similarly named item. Exact acquisition locations are separate source-backed claims and may be spoiler-filtered.
+
+### Local DSR animation-frame scanner
+
+```text
+frames --install PATH [QUERY] [--kind all|weapon|item] [--limit N] [--json] [--spoilers]
+```
+
+`--install PATH` is required and must be an explicit local DSR installation path. The scanner is read-only: it must never write the installation, use a Steam/default/environment fallback, create a cache, or retain output files. Extracted frame JSON, game assets, names/parameter tables, raw payload bytes, and absolute local paths are not bundled or retained; output exists only in the current response. `--json` uses schema `dsr-frame-scan.v1`.
+
+JSON views expose `schema_version`, `frame_rate`, `summary`, `counts`, and `records`; selected views may add `spoilers`, `kind`, and `query`. The `item` kind means equipped goods, not spells. Without a query or spoiler opt-in, `records` is empty.
+
+With no query and no `--spoilers`, return summary/counts only. A query or explicit `--spoilers` opt-in may reveal selected names and timing; the normal skill spoiler policy still applies, and `--spoilers` never overrides a user’s explicit no-spoiler request.
+
+The scanner covers canonical visible base weapon roots excluding shields and ammunition, plus equipped goods with a real nonzero use animation; sentinel animation value `254` is excluded. Spells, spellcasting animations, armor, rings, shields, ammunition, and other equipment-specific timing are out of scope. Player-facing weapon move labels remain unresolved.
+
+Label frame evidence explicitly: `exact` preserves the local float32 timing windows and derived 30-FPS frames. Weapon timing is exact only when Event Type `1` `BehaviorJudgeID` joins a selector-matched `BehaviorParam_PC` row. Goods use-animation variation is `representative` while candidates remain unresolved; it may be labeled exact only when a sole local candidate exists. Exact extraction does not turn an unresolved move label into a named move.
 
 ### Progression, areas, bosses, farming, and achievements
 
@@ -168,6 +184,7 @@ darksouls/
     ds1_core.py
     ds1_catalog.py
     ds1_save.py
+    ds1_frames.py
   resources/
     game_data.json
     source_registry.json
@@ -182,4 +199,4 @@ darksouls/
   evals/evals.json
 ```
 
-`game_data.json` and the checklist are stable, curated contracts; catalogs are intentionally thin and conservative. Read `REFERENCES.md` when a source, cache, guide-corpus, or mod boundary matters. Do not add raw PDF text, copied wiki prose, broad location tables, or unlicensed datasets.
+`game_data.json` and the checklist are stable, curated contracts; catalogs are intentionally thin and conservative. `ds1_frames.py` is a code-only, read-only scanner: it consumes an explicitly supplied install at runtime and does not bundle or retain frame JSON, game assets, extracted names/parameter tables, raw payload bytes, or absolute paths. Read `REFERENCES.md` when a source, cache, guide-corpus, frame-scanner, or mod boundary matters. Do not add raw PDF text, copied wiki prose, broad location tables, or unlicensed datasets.

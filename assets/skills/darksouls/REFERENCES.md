@@ -1,12 +1,12 @@
 # Dark Souls Remastered Skill References
 
-This file is loaded when a response needs provenance, currentness, guide-corpus handling, or mod/save boundaries. It is an operator reference, not a walkthrough. The public contract is in `SKILL.md`.
+This file is loaded when a response needs provenance, currentness, guide-corpus handling, frame-extraction, or mod/save boundaries. It is an operator reference, not a walkthrough. The public contract is in `SKILL.md`.
 
 ## Source hierarchy
 
 Use the narrowest source that can support the claim:
 
-1. **Observed deterministic kernel/catalog output** — stable formulas, explicit catalog rows, and command behavior. Treat unknowns as unknowns.
+1. **Observed deterministic kernel/catalog/frame-scanner output** — stable formulas, explicit catalog rows, and read-only local frame extraction. Treat unknowns as unknowns.
 2. **Validated DSR read-only save mapping** — only fields that `ds1_save.py` identifies as supported from a defensible source and validation record.
 3. **Official or primary sources** — product/platform facts, official manuals, published patch or support statements, and first-party release information.
 4. **Fresh community references** — mechanics cross-checks, exact route/location/NPC/farming prose, calculators, mod releases, and compatibility pages. Cite the URL and check currentness for time-sensitive claims.
@@ -47,10 +47,29 @@ The bundled deterministic resources are a narrow operational scaffold. Their pre
 | `resources/goods_magic.json` | thin goods/spell/miracle/pyromancy map | Same resolver boundary; do not infer acquisition location or ownership from a name match alone. |
 | `resources/save_support.json` | parser evidence receipt | Records the DSRSave MIT provenance and the narrow container/name/stats/level/class support boundary; it must not imply inventory, boss, bonfire, quest, or achievement offsets. |
 | `resources/source_registry.json` | source allowlist and policy metadata | Keep URLs, license/copyability, allowed uses, prohibited uses, and risk notes truthful. |
+| `scripts/ds1_frames.py` | code-only local DSR frame scanner | Reads an explicitly supplied install at runtime; no bundled or retained frame JSON, game assets, extracted names/parameter tables, raw payload bytes, or absolute paths. |
 | `resources/guides/dsr_plat_guide/dsr-plat-guide.manifest.json` | corpus receipt | Records user-provided PDF provenance, source URL/name, hash/processing/schema, and non-authoritative constraints. The PDF itself is not tracked. |
 | `resources/guides/dsr_plat_guide/dsr-plat-guide.chunks.jsonl` | local search index | Generated transformed rows only (`h`, `k`, `t`); no raw PDF or copied page dump. |
 
 Catalog output is spoiler-gated at the CLI boundary. A canonical name in a bundled row is not permission to expose a future item or location; default output should redact future names, and `--json` changes representation without bypassing the gate.
+
+## Local DSR frame scanner
+
+`scripts/ds1_frames.py` exposes `scan_install(install: str | Path)`, `select_frame_records(scan, *, kind, query, spoilers, limit)`, and `to_jsonable(view)`, plus `FrameScannerError`, `FrameInstallError`, `FrameFormatError`, and `FrameQueryError`. Its public CLI contract is:
+
+```text
+frames --install PATH [QUERY] [--kind all|weapon|item] [--limit N] [--json] [--spoilers]
+```
+
+The install path is mandatory and explicit. The scanner is read-only and must not write the install, fall back to Steam/default/environment discovery, create caches or output files, or retain extracted data after the response. It is code-only: do not bundle or retain frame JSON, game assets, extracted names/parameter tables, raw payload bytes, or absolute local paths. JSON output uses schema `dsr-frame-scan.v1`. No query without `--spoilers` returns summary/counts only; queries and explicit spoiler opt-in may reveal selected names and timing, subject to the skill’s no-spoiler policy.
+
+JSON views use `schema_version`, `frame_rate`, `summary`, `counts`, and `records`; selected views may additionally carry `spoilers`, `kind`, and `query`. The `item` kind means equipped goods, not spells. Without a query or spoiler opt-in, `records` remains empty and only summary/counts are exposed.
+
+The extraction scope is canonical visible base weapon roots (excluding shields and ammunition) and equipped goods with a real nonzero use animation (sentinel `254` excluded). Spells, spellcasting animations, armor, rings, shields, ammunition, and other equipment-specific timing are out of scope. Weapon player-facing move labels remain unresolved.
+
+Evidence labels must distinguish `exact` from `representative`. `exact` preserves local float32 timing windows and derived 30-FPS frames; weapon timing receives this label only when Event Type `1` `BehaviorJudgeID` joins a selector-matched `BehaviorParam_PC` row. Goods use-animation timing is `representative` when variation is unresolved and may be `exact` only when a sole local candidate exists. Exact timing extraction does not establish a named player move.
+
+The scanner’s source is local proprietary/user-only installation data, registered as `local-dsr-frame-extraction`. It is non-copyable provenance: use only to produce a transient, selected summary from the user’s explicit install, never as permission to redistribute game data or reconstructed parameter tables.
 
 ## Guide-corpus provenance and warning
 

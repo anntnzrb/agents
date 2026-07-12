@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 import os
+import struct
 import subprocess
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import Callable, TypedDict, cast
 
 
 class CalcPayload(TypedDict):
@@ -56,6 +58,98 @@ def run_cli(
         check=False,
         timeout=60,
     )
+
+
+def _dcx(payload: bytes) -> bytes:
+    result = bytearray(0x4C)
+    result[:4] = b"DCX\0"
+    result.extend(zlib.compress(payload))
+    return bytes(result)
+
+
+def _bnd3(members: list[tuple[str, bytes]]) -> bytes:
+    table_offset = 0x20
+    entry_size = 0x18
+    data_offset = table_offset + entry_size * len(members)
+    names = [name.encode("ascii") + b"\0" for name, _ in members]
+    names_offset = data_offset + sum(len(payload) for _, payload in members)
+    result = bytearray(names_offset + sum(len(name) for name in names))
+    result[:4] = b"BND3"
+    struct.pack_into("<I", result, 0x10, len(members))
+    data_cursor = data_offset
+    name_cursor = names_offset
+    for index, ((_, payload), name) in enumerate(zip(members, names)):
+        struct.pack_into(
+            "<IIIII",
+            result,
+            table_offset,
+            0,
+            len(payload),
+            data_cursor,
+            index,
+            name_cursor,
+        )
+        result[data_cursor : data_cursor + len(payload)] = payload
+        result[name_cursor : name_cursor + len(name)] = name
+        table_offset += entry_size
+        data_cursor += len(payload)
+        name_cursor += len(name)
+    return bytes(result)
+
+
+def _param(
+    size: int,
+    row_id: int,
+    name: str,
+    configure: Callable[[memoryview], None] | None = None,
+) -> bytes:
+    row_offset = 0x3C
+    name_offset = row_offset + size
+    result = bytearray(name_offset + len(name) + 1)
+    struct.pack_into("<III", result, 0x30, row_id, row_offset, name_offset)
+    struct.pack_into("<I", result, 0x34, 0x3C)
+    row = memoryview(result)[row_offset:name_offset]
+    if configure is not None:
+        configure(row)
+    result[name_offset : name_offset + len(name)] = name.encode("ascii")
+    return bytes(result)
+
+
+def _empty_tae() -> bytes:
+    result = bytearray(0x78)
+    result[:4] = b"TAE "
+    result[7] = 0
+    struct.pack_into("<I", result, 0x08, 0x1000B)
+    struct.pack_into("<II", result, 0x54, 1, 0x5C)
+    struct.pack_into("<II", result, 0x5C, 6000, 0x70)
+    struct.pack_into("<iI", result, 0x70, 0, 0x74)
+    return bytes(result)
+
+
+def _synthetic_install(root: Path) -> None:
+    def weapon(row: memoryview) -> None:
+        struct.pack_into("<i", row, 0, 1)
+        row[226] = 0
+        row[227] = 0
+
+    def goods(row: memoryview) -> None:
+        row[62] = 1
+        row[68] |= 0x80
+
+    def behavior(row: memoryview) -> None:
+        struct.pack_into("<ii", row, 0, 1, 9)
+
+    game = root / "param" / "GameParam"
+    chr_dir = root / "chr"
+    game.mkdir(parents=True)
+    chr_dir.mkdir(parents=True)
+    members = [
+        ("EquipParamWeapon.param", _param(0x110, 1000, "synthetic_weapon", weapon)),
+        ("EquipParamGoods.param", _param(92, 1001, "synthetic_item", goods)),
+        ("BehaviorParam_PC.param", _param(20, 2000, "synthetic_behavior", behavior)),
+    ]
+    (game / "GameParam.parambnd.dcx").write_bytes(_dcx(_bnd3(members)))
+    (chr_dir / "c0000.anibnd.dcx").write_bytes(_dcx(_bnd3([("a00.tae", _empty_tae())])))
 
 
 class CliSmokeTests(unittest.TestCase):
@@ -141,6 +235,34 @@ class CliSmokeTests(unittest.TestCase):
         visible = run_cli("achievements", "--spoilers")
         self.assertEqual(visible.returncode, 0, visible.stderr)
         self.assertIn("- Enkindle", visible.stdout)
+
+    def test_frames_requires_an_explicit_install_argument(self) -> None:
+        result = run_cli("frames")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--install", result.stderr)
+
+    def test_frames_no_query_emits_only_a_summary_for_synthetic_install(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            _synthetic_install(Path(temporary))
+            files_before = {
+                path.relative_to(temporary): path.read_bytes()
+                for path in Path(temporary).rglob("*")
+                if path.is_file()
+            }
+            result = run_cli("frames", "--install", temporary)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            output = result.stdout.casefold()
+            self.assertIn("frame scan summary", output)
+            self.assertIn("weapons=", output)
+            self.assertIn("items=", output)
+            self.assertNotIn("synthetic_weapon", output)
+            self.assertNotIn("synthetic_item", output)
+            files_after = {
+                path.relative_to(temporary): path.read_bytes()
+                for path in Path(temporary).rglob("*")
+                if path.is_file()
+            }
+            self.assertEqual(files_after, files_before)
 
     def test_malformed_save_cli_fails_without_writing_input(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
