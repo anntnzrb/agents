@@ -216,6 +216,26 @@
       "machine_readable": true,
       "copyable": false
     },
+    "dsr-dadbod-transcripts": {
+      "name": "User-provided DSR Dadbod video transcripts",
+      "url": "local://darksouls/resources/guides/dsr_dadbod_transcripts/",
+      "license": "User-provided automatic-caption transcript source; rights unknown",
+      "source_type": "local-user-transcript-corpus",
+      "source_sha256": "99bfdb067225d0290c66520ec468f04a50643d541b8a9c37344c274eadbfd5f3",
+      "allowed_use": [
+        "narrow local transcript search/get through the transcript CLI",
+        "minimum necessary attributed summary after spoiler permission"
+      ],
+      "not_allowed_for": [
+        "bundling or redistributing the raw transcript JSON",
+        "raw transcript dumping or long quotations",
+        "mechanics, save, parser, or route truth",
+        "conflation with the PSNProfiles guide corpus or deterministic resources"
+      ],
+      "risk": "English en-orig automatic captions are spoiler-heavy, potentially inaccurate, and non-authoritative; preserve the warning and exact video provenance.",
+      "machine_readable": true,
+      "copyable": false
+    },
     "piroshkiv-dsr-save": {
       "name": "Piroshkiv DSRSave",
       "url": "https://github.com/Piroshkiv/DSRSave",
