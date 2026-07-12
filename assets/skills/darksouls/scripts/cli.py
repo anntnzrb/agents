@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import sys
 from pathlib import Path
@@ -51,6 +52,20 @@ except ImportError:
     pass
 else:
     save = cast(object, _save)
+
+frames: object | None = None
+
+
+def _need_frames() -> object:
+    global frames
+    if frames is None:
+        try:
+            frames = cast(object, importlib.import_module("ds1_frames"))
+        except ImportError:
+            _die(
+                "ds1_frames is not installed; complete the frame scanner module before running frames"
+            )
+    return frames
 
 
 def _die(message: str, code: int = 2) -> NoReturn:
@@ -997,6 +1012,81 @@ def cmd_save(args: argparse.Namespace) -> None:
     _json(result) if _flag(args, "json") else print(result)
 
 
+def _frame_record_line(row: object) -> str:
+    mapping = _as_mapping(row)
+    if mapping is None:
+        return _name(row)
+    label = _name(mapping)
+    timing_keys = (
+        "start_seconds",
+        "end_seconds",
+        "start_frame_30fps",
+        "end_frame_30fps",
+    )
+    timing = [f"{key}={mapping[key]}" for key in timing_keys if key in mapping]
+    return f"{label}: " + ", ".join(timing) if timing else label
+
+
+def cmd_frames(args: argparse.Namespace) -> None:
+    module = _need_frames()
+    install = _required_str(args, "install")
+    kind = _required_str(args, "kind")
+    query = _optional_str(args, "query")
+    limit = _required_int(args, "limit")
+    spoilers = _flag(args, "spoilers")
+    scan = _call(module, ("scan_install",), install)
+    view = _call(
+        module,
+        ("select_frame_records",),
+        scan,
+        kind=kind,
+        query=query,
+        spoilers=spoilers,
+        limit=limit,
+    )
+    rendered = _call(module, ("to_jsonable",), view)
+    payload = _as_mapping(rendered)
+    if payload is None:
+        _die("frame scanner returned an invalid view")
+    if _flag(args, "json"):
+        _json(payload)
+        return
+    records_value = payload.get("records", ())
+    records = (
+        cast(Sequence[object], records_value)
+        if isinstance(records_value, Sequence)
+        and not isinstance(records_value, (str, bytes))
+        else ()
+    )
+    if not spoilers and query is None:
+        counts = _as_mapping(payload.get("counts"))
+        if counts is None:
+            summary = _as_mapping(payload.get("summary"))
+            counts = (
+                {
+                    key: value
+                    for key, value in summary.items()
+                    if isinstance(value, (int, float)) and not isinstance(value, bool)
+                }
+                if summary is not None
+                else None
+            )
+        if counts:
+            count_text = ", ".join(
+                f"{key}={value}" for key, value in sorted(counts.items())
+            )
+            print(f"Frame scan summary: {count_text}")
+        else:
+            print(f"Frame scan summary: {len(records)} records")
+        print("Names and timing hidden; use a query or --spoilers.")
+        return
+    if not records:
+        print("No frame records matched.")
+        return
+    for row in records:
+        print(_frame_record_line(row))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="darksouls", description="Spoiler-safe Dark Souls Remastered companion"
@@ -1040,6 +1130,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p = sub.add_parser("farm")
     p.add_argument("item", choices=("souls", "titanite", "humanity", "moss"), nargs="?")
+    p.add_argument("--spoilers", action="store_true")
+    p = sub.add_parser("frames", help="read-only local DSR frame scan")
+    p.add_argument("--install", required=True)
+    p.add_argument("query", nargs="?")
+    p.add_argument("--kind", choices=("all", "weapon", "item"), default="all")
+    p.add_argument("--limit", type=int, default=50)
+    p.add_argument("--json", action="store_true")
     p.add_argument("--spoilers", action="store_true")
     for command, help_text in (
         ("weapons", "weapon catalog"),
@@ -1155,6 +1252,7 @@ def main() -> None:
         "equip-load": cmd_equip_load,
         "estus": cmd_estus,
         "farm": cmd_farm,
+        "frames": cmd_frames,
         "weapons": cmd_weapons,
         "rings": cmd_rings,
         "goods": cmd_goods,
