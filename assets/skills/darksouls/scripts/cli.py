@@ -33,6 +33,9 @@ from ds1_core import (
     load_guide_manifest,
     load_json_resource,
     load_sources,
+    transcript_summary,
+    search_transcript,
+    get_transcript_chunk,
     search_guide,
     soul_cost,
 )
@@ -848,6 +851,237 @@ def cmd_guide(args: argparse.Namespace) -> None:
     _die(f"unknown guide action: {action}")
 
 
+TRANSCRIPT_WARNING = (
+    "Local automatic-caption transcript lookup: user-provided English en-orig YouTube "
+    "captions; spoiler-heavy, non-authoritative, and recognition errors are possible. "
+    "This corpus is not mechanics/save/parser/route truth or a route recommendation."
+)
+
+_TRANSCRIPT_HIDDEN_KEYS = frozenset(
+    {
+        "caption_track",
+        "chunk_id",
+        "chunk_ids",
+        "display_name",
+        "h",
+        "heading",
+        "headings",
+        "id",
+        "identifier",
+        "name",
+        "provenance",
+        "sha256",
+        "snippet",
+        "source",
+        "source_id",
+        "source_sha256",
+        "source_url",
+        "t",
+        "text",
+        "title",
+        "track",
+        "tracks",
+        "transcript",
+        "url",
+        "urls",
+        "video",
+        "video_id",
+        "video_ids",
+        "video_title",
+        "video_url",
+    }
+)
+
+
+def _redact_transcript(value: object, key: str | None = None) -> object:
+    normalized = key.casefold() if key is not None else None
+    if isinstance(value, str) and value.casefold().startswith(
+        ("http://", "https://", "www.")
+    ):
+        return "hidden until spoilers are permitted"
+    if normalized in _TRANSCRIPT_HIDDEN_KEYS:
+        return "hidden until spoilers are permitted"
+    mapping = _as_mapping(value)
+    if mapping is not None:
+        return {
+            str(item_key): _redact_transcript(item_value, str(item_key))
+            for item_key, item_value in mapping.items()
+        }
+    if isinstance(value, list):
+        return [_redact_transcript(item, key) for item in cast(list[object], value)]
+    return value
+
+
+def _transcript_json(value: object) -> None:
+    if isinstance(value, list):
+        values = cast(list[object], value)
+        if not values:
+            _json({"results": [], "warning": TRANSCRIPT_WARNING})
+            return
+        rendered: list[object] = []
+        for item in values:
+            mapping = _as_mapping(item)
+            rendered.append(
+                {**mapping, "warning": TRANSCRIPT_WARNING}
+                if mapping is not None
+                else item
+            )
+        _json(rendered)
+        return
+    mapping = _as_mapping(value)
+    if mapping is not None:
+        _json({**mapping, "warning": TRANSCRIPT_WARNING})
+    else:
+        _json({"value": value, "warning": TRANSCRIPT_WARNING})
+
+
+def _transcript_call_summary(*, spoilers: bool) -> Mapping[str, object]:
+    try:
+        value = transcript_summary(spoilers=spoilers)
+    except Exception as exc:
+        _die(str(exc) or "transcript summary failed")
+    mapping = _as_mapping(value)
+    if mapping is None:
+        _die("transcript summary returned an invalid object")
+    return mapping
+
+
+def _transcript_rows(summary: Mapping[str, object]) -> list[object]:
+    videos = summary.get("videos")
+    if isinstance(videos, list):
+        return cast(list[object], videos)
+    count = summary.get("video_count")
+    if isinstance(count, int) and not isinstance(count, bool) and count >= 0:
+        return [{"video_index": index, "spoilers": "hidden"} for index in range(count)]
+    return []
+
+
+def _transcript_print_summary(
+    summary: Mapping[str, object], *, action: str, spoilers: bool, as_json: bool
+) -> None:
+    rendered: object = summary if spoilers else _redact_transcript(summary)
+    if as_json:
+        _transcript_json(rendered)
+        return
+    print(TRANSCRIPT_WARNING)
+    print(f"Transcript {action}:")
+    if isinstance(rendered, Mapping):
+        for key in sorted(rendered):
+            value = rendered[key]
+            if isinstance(value, (dict, list)):
+                value_text = json.dumps(value, ensure_ascii=False, sort_keys=True)
+            else:
+                value_text = str(value)
+            print(f"{key}: {value_text}")
+    else:
+        print(str(rendered))
+
+
+def cmd_transcript(args: argparse.Namespace) -> None:
+    action = _optional_str(args, "transcript_action") or "info"
+    spoilers = _flag(args, "spoilers")
+    as_json = _flag(args, "json")
+    if action in {"info", "list"}:
+        summary = _transcript_call_summary(spoilers=spoilers)
+        if action == "list":
+            rows = _transcript_rows(summary)
+            value: object = rows
+            if not spoilers:
+                value = _redact_transcript(value)
+            if as_json:
+                _transcript_json(value)
+            else:
+                print(TRANSCRIPT_WARNING)
+                for row in cast(list[object], value):
+                    print(json.dumps(row, ensure_ascii=False, sort_keys=True))
+            return
+        _transcript_print_summary(
+            summary, action="info", spoilers=spoilers, as_json=as_json
+        )
+        return
+    if action == "search":
+        query_parts = _str_list(args, "query")
+        query = " ".join(query_parts).strip()
+        if not query:
+            # A query-less search is deliberately summary-only, even with spoilers.
+            summary = _transcript_call_summary(spoilers=spoilers)
+            _transcript_print_summary(
+                summary, action="search summary", spoilers=spoilers, as_json=as_json
+            )
+            return
+        video_index = _value(args, "video_index")
+        if video_index is not None and (
+            not isinstance(video_index, int) or isinstance(video_index, bool)
+        ):
+            _die("argument 'video_index' must be an integer or null")
+        limit = _required_int(args, "limit")
+        try:
+            matches = search_transcript(
+                query,
+                video_index=cast(int | None, video_index),
+                limit=limit,
+                spoilers=spoilers,
+            )
+        except Exception as exc:
+            _die(str(exc) or "transcript search failed")
+        rows = list(cast(Sequence[object], matches))
+        if not spoilers:
+            hidden_rows: list[object] = []
+            for row in rows:
+                mapping = _as_mapping(row)
+                if mapping is None:
+                    continue
+                hidden_rows.append(
+                    {
+                        key: mapping[key]
+                        for key in ("video_index", "chunk_index")
+                        if key in mapping
+                    }
+                    | {"spoilers": "hidden"}
+                )
+            rows = hidden_rows
+        if as_json:
+            _transcript_json(rows)
+        elif not spoilers:
+            print(TRANSCRIPT_WARNING)
+            print(
+                f"{len(rows)} transcript chunks matched; "
+                "names/text hidden (use --spoilers)."
+            )
+        else:
+            print(TRANSCRIPT_WARNING)
+            for row in rows:
+                print(json.dumps(row, ensure_ascii=False, sort_keys=True))
+        return
+    if action == "get":
+        video_index = _required_int(args, "video_index")
+        chunk_index = _required_int(args, "chunk_index")
+        try:
+            row = get_transcript_chunk(video_index, chunk_index, spoilers=spoilers)
+        except Exception as exc:
+            _die(str(exc) or "transcript chunk lookup failed")
+        if not spoilers:
+            row = {
+                key: value
+                for key, value in (_as_mapping(row) or {}).items()
+                if key in {"video_index", "chunk_index"}
+            }
+            row["spoilers"] = "hidden"
+        if as_json:
+            _transcript_json(row)
+        elif not spoilers:
+            print(TRANSCRIPT_WARNING)
+            print(
+                f"Transcript chunk {video_index}/{chunk_index} found; "
+                "names/text hidden (use --spoilers)."
+            )
+        else:
+            print(TRANSCRIPT_WARNING)
+            print(json.dumps(row, ensure_ascii=False, sort_keys=True))
+        return
+    _die(f"unknown transcript action: {action}")
+
+
 def cmd_audit(_: argparse.Namespace) -> None:
     errors = list(audit_core())
     required = (
@@ -1201,6 +1435,46 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--limit", type=int, default=8)
     search.add_argument("--json", action="store_true")
     search.add_argument("--spoilers", action="store_true")
+    transcript = sub.add_parser(
+        "transcript", help="local DSR automatic-caption transcript"
+    )
+    transcript.set_defaults(
+        transcript_action=None,
+        json=False,
+        spoilers=False,
+        video_index=None,
+        limit=8,
+    )
+    transcript.add_argument("--video-index", type=int, dest="video_index")
+    transcript.add_argument("--limit", type=int, default=8)
+    transcript.add_argument("--json", action="store_true")
+    transcript.add_argument("--spoilers", action="store_true")
+    ts = transcript.add_subparsers(dest="transcript_action")
+
+    def _transcript_action_parser(name: str) -> argparse.ArgumentParser:
+        action_parser = ts.add_parser(name)
+        action_parser.add_argument(
+            "--json", action="store_true", default=argparse.SUPPRESS
+        )
+        action_parser.add_argument(
+            "--spoilers", action="store_true", default=argparse.SUPPRESS
+        )
+        return action_parser
+
+    _transcript_action_parser("info")
+    _transcript_action_parser("list")
+    search_transcript_parser = _transcript_action_parser("search")
+    search_transcript_parser.add_argument("query", nargs="*")
+    search_transcript_parser.add_argument(
+        "--video-index", type=int, dest="video_index", default=argparse.SUPPRESS
+    )
+    search_transcript_parser.add_argument(
+        "--limit", type=int, default=argparse.SUPPRESS
+    )
+    get_transcript_parser = _transcript_action_parser("get")
+    get_transcript_parser.add_argument("video_index", type=int)
+    get_transcript_parser.add_argument("chunk_index", type=int)
+
     sub.add_parser("audit")
     p = sub.add_parser("track")
     p.add_argument("--path", required=True)
@@ -1264,6 +1538,7 @@ def main() -> None:
         "achievements": cmd_achievements,
         "sources": cmd_sources,
         "guide": cmd_guide,
+        "transcript": cmd_transcript,
         "audit": cmd_audit,
         "track": cmd_track,
         "recommend": cmd_recommend,
