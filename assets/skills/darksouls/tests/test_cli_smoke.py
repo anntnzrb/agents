@@ -226,6 +226,92 @@ class CliSmokeTests(unittest.TestCase):
         self.assertTrue(row["t"].strip())
         self.assertNotEqual(row["spoilers"] if "spoilers" in row else None, "hidden")
 
+    def test_transcript_info_redacts_by_default_even_in_json_and_human_output(
+        self,
+    ) -> None:
+        hidden_json_result = run_cli("transcript", "info", "--json")
+        self.assertEqual(hidden_json_result.returncode, 0, hidden_json_result.stderr)
+        hidden_json = cast(dict[str, object], json.loads(hidden_json_result.stdout))
+        self.assertEqual(hidden_json["video_count"], 30)
+        self.assertEqual(hidden_json["chunk_count"], 672)
+        self.assertNotIn("videos", hidden_json)
+        warning = str(hidden_json["warning"])
+        self.assertIn("automatic-caption", warning)
+        self.assertIn("spoiler-heavy", warning)
+        self.assertIn("non-authoritative", warning)
+        self.assertIn("not mechanics/save/parser/route truth", warning)
+        hidden_human_result = run_cli("transcript", "list")
+        self.assertEqual(hidden_human_result.returncode, 0, hidden_human_result.stderr)
+
+        self.assertIn(
+            "Local automatic-caption transcript lookup", hidden_human_result.stdout
+        )
+        self.assertIn('"spoilers": "hidden"', hidden_human_result.stdout)
+        self.assertNotIn("LVTwgOlWWAM", hidden_human_result.stdout)
+        self.assertNotIn("https://www.youtube.com/watch", hidden_human_result.stdout)
+
+    def test_transcript_spoilers_reveal_metadata_and_chunk_text(self) -> None:
+        info = run_cli("transcript", "info", "--json", "--spoilers")
+        self.assertEqual(info.returncode, 0, info.stderr)
+        payload = cast(dict[str, object], json.loads(info.stdout))
+        videos = cast(list[dict[str, object]], payload["videos"])
+        self.assertEqual(len(videos), 30)
+        self.assertEqual(videos[0]["caption_track"], "en-orig")
+        self.assertTrue(str(videos[0]["video_id"]))
+
+        revealed = run_cli("transcript", "get", "0", "0", "--json", "--spoilers")
+        self.assertEqual(revealed.returncode, 0, revealed.stderr)
+        row = cast(dict[str, object], json.loads(revealed.stdout))
+        self.assertEqual(row["video_index"], 0)
+        self.assertEqual(row["chunk_index"], 0)
+        self.assertTrue(str(row["t"]).strip())
+        self.assertIn("video_id", row)
+
+    def test_transcript_search_query_and_spoiler_gates(self) -> None:
+        no_query = run_cli("transcript", "search", "--json")
+        self.assertEqual(no_query.returncode, 0, no_query.stderr)
+        no_query_payload = cast(dict[str, object], json.loads(no_query.stdout))
+        self.assertEqual(no_query_payload["video_count"], 30)
+        self.assertNotIn("videos", no_query_payload)
+
+        hidden = run_cli("transcript", "search", "walkthrough", "--json")
+        self.assertEqual(hidden.returncode, 0, hidden.stderr)
+        hidden_rows = cast(list[dict[str, object]], json.loads(hidden.stdout))
+        self.assertTrue(hidden_rows)
+        self.assertNotIn("t", hidden_rows[0])
+        self.assertEqual(hidden_rows[0]["spoilers"], "hidden")
+
+        revealed = run_cli(
+            "transcript", "search", "walkthrough", "--json", "--spoilers"
+        )
+        self.assertEqual(revealed.returncode, 0, revealed.stderr)
+        revealed_rows = cast(list[dict[str, object]], json.loads(revealed.stdout))
+        self.assertTrue(revealed_rows)
+        self.assertTrue(str(revealed_rows[0]["t"]).strip())
+
+    def test_transcript_get_bounds_and_corpus_warning(self) -> None:
+        out_of_range = run_cli("transcript", "get", "30", "0", "--json", "--spoilers")
+        self.assertNotEqual(out_of_range.returncode, 0)
+        self.assertIn("out of range", out_of_range.stderr.casefold())
+
+        hidden = run_cli("transcript", "get", "0", "0", "--json")
+        self.assertEqual(hidden.returncode, 0, hidden.stderr)
+        payload = cast(dict[str, object], json.loads(hidden.stdout))
+        self.assertNotIn("t", payload)
+        self.assertIn("warning", payload)
+        self.assertIn("automatic-caption", str(payload["warning"]))
+
+    def test_transcript_is_separate_from_guide_save_and_mechanics_contracts(
+        self,
+    ) -> None:
+        result = run_cli("transcript", "info", "--json", "--spoilers")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = result.stdout.casefold()
+        self.assertNotIn("psnprofiles", output)
+        self.assertNotIn("guide lookup", output)
+        self.assertNotIn("save state", output)
+        self.assertNotIn("mechanics catalog", output)
+
     def test_achievement_cli_exposes_static_labels_only_with_spoilers(self) -> None:
         hidden = run_cli("achievements")
         self.assertEqual(hidden.returncode, 0, hidden.stderr)

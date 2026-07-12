@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import tempfile
 import time
+import unicodedata
 import unittest
 from pathlib import Path
 from typing import TypedDict, cast
@@ -34,6 +36,59 @@ class GuideManifest(TypedDict):
 
 
 class GuideChunk(TypedDict):
+    h: list[str]
+    k: str
+    t: str
+
+
+class TranscriptManifestVideo(TypedDict):
+    video_index: int
+    playlist_index: int
+    video_id: str
+    url: str
+    caption_track: str
+    cue_count: int
+    chunk_count: int
+    raw_transcript_sha256: str
+    transcript_sha256: str
+    normalized_transcript_sha256: str
+
+
+class TranscriptProof(TypedDict):
+    video_index: int
+    normalized_transcript_sha256: str
+    reconstructed_char_count: int
+
+
+class TranscriptReconstruction(TypedDict):
+    video_proofs: list[TranscriptProof]
+
+
+class DadbodTranscriptManifest(TypedDict):
+    format: str
+    video_count: int
+    chunk_count: int
+    source_sha256: str
+    source_json_sha256: str
+    source_json_tracked: bool
+    copyable: bool
+    constraints: list[str]
+    videos: list[TranscriptManifestVideo]
+    normalized_reconstruction: TranscriptReconstruction
+
+
+class TranscriptChunkRecord(TypedDict):
+    video_index: int
+    chunk_index: int
+    playlist_index: int
+    video_id: str
+    url: str
+    caption_track: str
+    cue_count: int
+    source_sha256: str
+    transcript_sha256: str
+    raw_transcript_sha256: str
+    normalized_transcript_sha256: str
     h: list[str]
     k: str
     t: str
@@ -170,6 +225,161 @@ class GuideCorpusTests(unittest.TestCase):
                 rows.append(row)
         self.assertEqual(len(rows), manifest["chunk_count"])
         self.assertGreater(len(rows), 0)
+
+
+class DadbodTranscriptCorpusTests(unittest.TestCase):
+    transcript_dir = RESOURCES_DIR / "guides" / "dsr_dadbod_transcripts"
+
+    def test_manifest_and_chunks_preserve_schema_provenance_and_reconstruction(
+        self,
+    ) -> None:
+        manifest = cast(
+            DadbodTranscriptManifest,
+            json.loads(
+                (
+                    self.transcript_dir / "dsr-dadbod-transcripts.manifest.json"
+                ).read_text(encoding="utf-8")
+            ),
+        )
+        self.assertEqual(manifest["format"], "dsr-dadbod-transcript-chunks-v1")
+        self.assertEqual(manifest["video_count"], 30)
+        self.assertEqual(manifest["chunk_count"], 672)
+        expected_hash = (
+            "99bfdb067225d0290c66520ec468f04a50643d541b8a9c37344c274eadbfd5f3"
+        )
+        self.assertEqual(manifest["source_sha256"], expected_hash)
+        self.assertEqual(manifest["source_json_sha256"], expected_hash)
+        self.assertFalse(manifest["source_json_tracked"])
+        self.assertFalse(manifest["copyable"])
+        constraints = " ".join(manifest["constraints"])
+        self.assertIn("automatic captions", constraints.casefold())
+        self.assertIn("spoiler-heavy", constraints.casefold())
+        self.assertIn("non-authoritative", constraints.casefold())
+        self.assertIn("not mechanics/save/parser/route truth", constraints.casefold())
+
+        videos = manifest["videos"]
+        self.assertEqual([video["video_index"] for video in videos], list(range(30)))
+        self.assertEqual(sum(video["chunk_count"] for video in videos), 672)
+        for video in videos:
+            self.assertTrue(
+                {
+                    "video_index",
+                    "playlist_index",
+                    "video_id",
+                    "url",
+                    "caption_track",
+                    "cue_count",
+                    "chunk_count",
+                    "raw_transcript_sha256",
+                    "transcript_sha256",
+                    "normalized_transcript_sha256",
+                }.issubset(video)
+            )
+        self.assertTrue(
+            all(
+                isinstance(video["video_id"], str)
+                and isinstance(video["url"], str)
+                and str(video["url"]).startswith("https://www.youtube.com/watch?v=")
+                and video["caption_track"] == "en-orig"
+                and video["cue_count"] > 0
+                for video in videos
+            )
+        )
+
+        rows: list[TranscriptChunkRecord] = []
+        with (self.transcript_dir / "dsr-dadbod-transcripts.chunks.jsonl").open(
+            encoding="utf-8"
+        ) as handle:
+            for line_number, line in enumerate(handle, 1):
+                if not line.strip():
+                    continue
+                row = cast(TranscriptChunkRecord, json.loads(line))
+                self.assertEqual(
+                    set(row),
+                    {
+                        "video_index",
+                        "chunk_index",
+                        "playlist_index",
+                        "video_id",
+                        "url",
+                        "caption_track",
+                        "cue_count",
+                        "source_sha256",
+                        "transcript_sha256",
+                        "raw_transcript_sha256",
+                        "normalized_transcript_sha256",
+                        "h",
+                        "k",
+                        "t",
+                    },
+                    f"line {line_number}",
+                )
+                text = str(row["t"])
+                self.assertTrue(text)
+                self.assertEqual(text, " ".join(text.split()))
+                self.assertEqual(text, unicodedata.normalize("NFKC", text))
+                self.assertGreaterEqual(len(text), 80)
+                self.assertLessEqual(len(text), 1800)
+                self.assertEqual(row["source_sha256"], expected_hash)
+                self.assertEqual(row["caption_track"], "en-orig")
+                self.assertEqual(row["k"], "transcript")
+                self.assertEqual(
+                    row["video_id"], videos[row["video_index"]]["video_id"]
+                )
+                rows.append(row)
+        self.assertEqual(len(rows), manifest["chunk_count"])
+
+        by_video: dict[int, list[TranscriptChunkRecord]] = {}
+        for row in rows:
+            by_video.setdefault(row["video_index"], []).append(row)
+        proofs = manifest["normalized_reconstruction"]["video_proofs"]
+        for video_index, video_rows in by_video.items():
+            ordered = sorted(video_rows, key=lambda row: row["chunk_index"])
+            self.assertEqual(
+                [row["chunk_index"] for row in ordered],
+                list(range(len(ordered))),
+            )
+            reconstructed = " ".join(str(row["t"]) for row in ordered)
+            digest = hashlib.sha256(reconstructed.encode("utf-8")).hexdigest()
+            proof = next(item for item in proofs if item["video_index"] == video_index)
+            self.assertEqual(digest, proof["normalized_transcript_sha256"])
+            self.assertEqual(len(reconstructed), proof["reconstructed_char_count"])
+
+    def test_public_transcript_apis_validate_gating_and_bounds(self) -> None:
+        manifest = core.load_transcript_manifest()
+        rows = core.load_transcript_chunks()
+        self.assertEqual(manifest["format"], "dsr-dadbod-transcript-chunks-v1")
+        self.assertEqual(len(rows), 672)
+        hidden_videos = core.list_transcript_videos()
+        self.assertEqual(len(hidden_videos), 30)
+        self.assertEqual(hidden_videos[0], {"video_index": 0, "spoilers": "hidden"})
+        visible_videos = core.list_transcript_videos(spoilers=True)
+        self.assertEqual(visible_videos[0]["caption_track"], "en-orig")
+
+        summary = cast(dict[str, object], core.transcript_summary())
+        self.assertEqual(summary["video_count"], 30)
+        self.assertEqual(summary["chunk_count"], 672)
+        self.assertNotIn("videos", summary)
+        self.assertIn("automatic-caption", str(summary["warning"]))
+        self.assertIn("non-authoritative", str(summary["warning"]))
+        with self.assertRaises(ValueError):
+            core.search_transcript("")
+        hidden_matches = core.search_transcript("walkthrough", limit=2)
+        self.assertEqual(len(hidden_matches), 2)
+        self.assertEqual(hidden_matches[0]["spoilers"], "hidden")
+        matches = core.search_transcript("walkthrough", limit=2, spoilers=True)
+        self.assertEqual(len(matches), 2)
+        self.assertIn("snippet", matches[0])
+        first = cast(dict[str, object], core.get_transcript_chunk(0, 0, spoilers=True))
+        self.assertEqual(first["video_index"], 0)
+        self.assertEqual(first["chunk_index"], 0)
+        self.assertTrue(str(first["t"]).strip())
+        hidden = core.get_transcript_chunk(0, 0)
+        self.assertNotIn("t", hidden)
+        with self.assertRaises(IndexError):
+            core.get_transcript_chunk(30, 0, spoilers=True)
+        with self.assertRaises(IndexError):
+            core.get_transcript_chunk(0, 10_000, spoilers=True)
 
 
 class StaticAchievementAndSaveTests(unittest.TestCase):
