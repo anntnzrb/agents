@@ -596,84 +596,143 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     rows: list[dict[str, Any]] = []
-    skipped_missing_token_counts = 0
     for model in models:
         if not isinstance(model, dict) or model.get("deleted"):
             continue
 
         model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
         model_name = model.get("name") if isinstance(model.get("name"), str) else None
-        short_name = (
-            model.get("short_name")
-            if isinstance(model.get("short_name"), str)
-            else model_name
-        )
-        creator = (
-            model.get("model_creators")
-            if isinstance(model.get("model_creators"), dict)
-            else {}
-        )
+        short_name = _first_string(model, "short_name", "shortName") or model_name
+        creator = _first_dict(model, "model_creators", "modelCreator")
         creator_name = (
-            creator.get("name") if isinstance(creator.get("name"), str) else None
+            _first_string(creator, "name") if isinstance(creator, dict) else None
         )
+        coding_score = _first_number(model, "coding_index", "headlineValue")
 
         if model_filter and not _matches_any(
             model_filter, [model_slug, model_name, short_name]
         ):
             continue
         if creator_filter and not _matches_any(
-            creator_filter, [creator_name, creator.get("slug")]
+            creator_filter,
+            [
+                creator_name,
+                creator.get("slug") if isinstance(creator, dict) else None,
+            ],
         ):
             continue
-        if args.open_weights_only and model.get("is_open_weights") is not True:
+        is_open_weights = _first_bool(model, "is_open_weights", "isOpenWeights")
+        if args.open_weights_only and is_open_weights is not True:
             continue
 
         token_counts = (
             model.get("tokenCounts")
             if isinstance(model.get("tokenCounts"), dict)
-            else None
+            else {}
         )
-        if token_counts is None:
-            skipped_missing_token_counts += 1
-            continue
-
-        answer_tokens = _number_or_none(token_counts.get("answerTokens"))
-        reasoning_tokens = _number_or_none(token_counts.get("reasoningTokens"))
-        output_tokens = _number_or_none(token_counts.get("outputTokens"))
-        input_tokens = _number_or_none(token_counts.get("inputTokens"))
+        task_output = (
+            model.get("outputTokensPerTask")
+            if isinstance(model.get("outputTokensPerTask"), dict)
+            else {}
+        )
         eval_cost = (
             model.get("evalCost") if isinstance(model.get("evalCost"), dict) else {}
         )
+        task_cost = (
+            model.get("costPerTask")
+            if isinstance(model.get("costPerTask"), dict)
+            else {}
+        )
+        is_current = "headlineValue" in model
+
+        answer_tokens = _number_alias(token_counts, "answerTokens", "answer")
+        reasoning_tokens = _number_alias(token_counts, "reasoningTokens", "reasoning")
+        output_tokens = _number_alias(token_counts, "outputTokens", "output")
+        input_tokens = _number_alias(token_counts, "inputTokens", "input")
+        if is_current:
+            answer_tokens = _number_alias(task_output, "answer")
+            reasoning_tokens = _number_alias(task_output, "reasoning")
+            output_tokens = _number_alias(task_output, "output")
+            input_tokens = None
+
+        coding_token_counts = {
+            "scope": "coding_index_only",
+            "definition": (
+                "Tokens used to run the Coding Index evaluation. "
+                "output_tokens = answer_tokens + reasoning_tokens."
+            ),
+            "evidence_scope": (
+                "per_task" if is_current else "coding_evaluation_total"
+            ),
+            "input_tokens": input_tokens,
+            "answer_tokens": answer_tokens,
+            "reasoning_tokens": reasoning_tokens,
+            "output_tokens": output_tokens,
+            "answer_share_of_output": _share(answer_tokens, output_tokens),
+            "reasoning_share_of_output": _share(reasoning_tokens, output_tokens),
+        }
+        coding_eval_cost = {
+            "scope": "coding_index_evaluation_api",
+            "currency": "USD",
+            "definition": (
+                "Coding Index evaluation/API spend; not a plan quota or subscription price."
+            ),
+            "total_cost": _number_alias(eval_cost, "totalCost", "total"),
+            "input_cost": _number_alias(eval_cost, "inputCost", "input"),
+            "answer_cost": _number_alias(eval_cost, "answerCost", "answer"),
+            "reasoning_cost": _number_alias(eval_cost, "reasoningCost", "reasoning"),
+        }
+        coding_task_metrics = {
+            "scope": "coding_index_task",
+            "currency": "USD",
+            "definition": (
+                "Per-benchmark-task Coding Index output, API cost, and weighted decode time."
+            ),
+            "output_tokens_per_task": {
+                "output_tokens": _number_alias(task_output, "output", "outputTokens"),
+                "answer_tokens": _number_alias(task_output, "answer", "answerTokens"),
+                "reasoning_tokens": _number_alias(
+                    task_output, "reasoning", "reasoningTokens"
+                ),
+            },
+            "cost_per_task_usd": {
+                "total_cost": _number_alias(task_cost, "total", "totalCost"),
+                "input_cost": _number_alias(task_cost, "input", "inputCost"),
+                "non_cache_input_cost": _number_alias(
+                    task_cost, "nonCacheInput", "non_cache_input", "nonCacheInputCost"
+                ),
+                "cache_read_cost": _number_alias(
+                    task_cost, "cacheRead", "cache_read", "cacheReadCost"
+                ),
+                "cache_write_cost": _number_alias(
+                    task_cost, "cacheWrite", "cache_write", "cacheWriteCost"
+                ),
+                "output_cost": _number_alias(task_cost, "output", "outputCost"),
+                "reasoning_cost": _number_alias(
+                    task_cost, "reasoning", "reasoningCost"
+                ),
+                "answer_cost": _number_alias(task_cost, "answer", "answerCost"),
+            },
+            "time_per_task_seconds": _number_or_none(model.get("timePerTaskSeconds")),
+        }
 
         row: dict[str, Any] = {
             "model_slug": model_slug,
             "model_name": model_name,
             "short_name": short_name,
             "creator": creator_name,
-            "coding": model.get("coding_index"),
+            "coding": coding_score,
             "terminalbench_hard": model.get("terminalbench_hard"),
             "scicode": model.get("scicode"),
-            "reasoning_model": model.get("reasoning_model"),
+            "is_reasoning": _first_bool(model, "isReasoning", "reasoning_model"),
+            "reasoning_model": _first_bool(model, "reasoning_model", "isReasoning"),
             "deprecated": model.get("deprecated"),
-            "is_open_weights": model.get("is_open_weights"),
-            "release_date": model.get("release_date"),
+            "is_open_weights": is_open_weights,
+            "release_date": _first_string(model, "release_date", "releaseDate"),
             "context_window_tokens": model.get("context_window_tokens"),
-            "coding_token_counts": {
-                "scope": "coding_index_only",
-                "definition": "Tokens used to run the Coding Index evaluation. output_tokens = answer_tokens + reasoning_tokens.",
-                "input_tokens": input_tokens,
-                "answer_tokens": answer_tokens,
-                "reasoning_tokens": reasoning_tokens,
-                "output_tokens": output_tokens,
-                "answer_share_of_output": _share(answer_tokens, output_tokens),
-                "reasoning_share_of_output": _share(reasoning_tokens, output_tokens),
-            },
-            "coding_eval_cost": {
-                "total_cost": _number_or_none(eval_cost.get("totalCost")),
-                "input_cost": _number_or_none(eval_cost.get("inputCost")),
-                "answer_cost": _number_or_none(eval_cost.get("answerCost")),
-                "reasoning_cost": _number_or_none(eval_cost.get("reasoningCost")),
-            },
+            "coding_token_counts": coding_token_counts,
+            "coding_eval_cost": coding_eval_cost,
+            "coding_task_metrics": coding_task_metrics,
         }
         if args.include_benchmark_counts:
             row["coding_component_token_counts"] = _coding_component_token_counts(model)
@@ -718,7 +777,10 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
         "output_json": str(args.output_json),
         "definition": {
             "scope": "coding_index_only",
-            "warning": "These token counts are tied to the Coding Index capability page, not the global Intelligence Index token counts.",
+            "warning": (
+                "These token counts and costs are tied to the Coding Index evaluation, "
+                "not global Intelligence Index counts or plan quota."
+            ),
             "components": ["terminalbench_hard", "scicode"],
             "output_tokens": "answer_tokens + reasoning_tokens",
         },
@@ -734,7 +796,7 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
         "counts": {
             "matched_models": len(rows),
             "returned_models": len(limited),
-            "skipped_missing_token_counts": skipped_missing_token_counts,
+            "skipped_missing_token_counts": 0,
             "frames": len(frames),
         },
         "rows": limited,
@@ -752,6 +814,8 @@ def _extract_default_data_models(frames: list[tuple[str, Any]]) -> list[Any]:
             for value in node.values():
                 scan(value)
         elif isinstance(node, list):
+            if _looks_like_coding_capability_rows(node):
+                candidates.append(node)
             for item in node:
                 scan(item)
 
@@ -760,26 +824,66 @@ def _extract_default_data_models(frames: list[tuple[str, Any]]) -> list[Any]:
 
     if not candidates:
         raise ExtractionError(
-            "Coding capability payload missing defaultData rows with tokenCounts."
+            "Coding capability payload missing recognizable coding rows."
         )
     return max(candidates, key=len)
+
+
 
 
 def _looks_like_coding_capability_rows(value: Any) -> bool:
     if not isinstance(value, list):
         return False
     sample = [item for item in value[:25] if isinstance(item, dict)]
-    if len(sample) < 2:
+    if not sample:
         return False
-    hits = 0
-    for item in sample:
-        if (
-            isinstance(item.get("slug"), str)
-            and "coding_index" in item
-            and isinstance(item.get("tokenCounts"), dict)
-        ):
-            hits += 1
-    return hits >= max(2, len(sample) // 2)
+    hits = sum(
+        1
+        for item in sample
+        if isinstance(item.get("slug"), str)
+        and (
+            isinstance(item.get("coding_index"), int | float)
+            or isinstance(item.get("headlineValue"), int | float)
+        )
+    )
+    return hits >= max(1, len(sample) // 2)
+
+
+def _first_string(mapping: dict[str, Any], *keys: str) -> str | None:
+    for key in keys:
+        value = mapping.get(key)
+        if isinstance(value, str):
+            return value
+    return None
+
+
+def _first_number(mapping: dict[str, Any], *keys: str) -> int | float | None:
+    for key in keys:
+        value = mapping.get(key)
+        if isinstance(value, int | float):
+            return value
+    return None
+
+
+def _first_bool(mapping: dict[str, Any], *keys: str) -> bool | None:
+    for key in keys:
+        value = mapping.get(key)
+        if isinstance(value, bool):
+            return value
+    return None
+
+
+def _first_dict(mapping: dict[str, Any], *keys: str) -> dict[str, Any] | None:
+    for key in keys:
+        value = mapping.get(key)
+        if isinstance(value, dict):
+            return value
+    return None
+
+
+def _number_alias(mapping: dict[str, Any], *keys: str) -> int | float | None:
+    return _first_number(mapping, *keys)
+
 
 
 def _number_or_none(value: Any) -> int | float | None:

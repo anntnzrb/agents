@@ -5,7 +5,7 @@ All command outputs are JSON.
 ## CLI envelope
 
 ```json
-{"ok":true,"version":"1","command":"fetch|stats|diff|query|qa|schema","data":{...}}
+{"ok":true,"version":"1","command":"fetch|stats|diff|query|qa|coding|schema","data":{...}}
 ```
 
 ## RPC envelope
@@ -77,6 +77,52 @@ High-signal fields:
 - speed/latency: `speed`, `ttfc`, `e2e`
 - context: `context_window_tokens`, `host_api_id`
 
+
+## Coding rows
+
+`coding` returns model rows from the Coding capability page while preserving the
+CLI/RPC envelopes above. Extraction tolerates both observed source shapes:
+
+- legacy rows: `slug`, `coding_index`, `tokenCounts`, `evalCost`
+- current client-rendered RSC rows: `slug`, `headlineValue`, `modelCreator`,
+  `shortName`, `isReasoning`, `releaseDate`, `isOpenWeights`,
+  `outputTokensPerTask`, `costPerTask`, `evalCost`, `timePerTaskSeconds`
+
+The row's Coding Index score is retained when present even if optional task
+metrics are absent. Missing optional evidence is represented by `null` or an
+omitted key; rows are not discarded merely because token, cost, or time
+evidence is missing. Existing row keys remain compatible; the
+`coding_task_metrics` object is additive.
+
+### Coding Index scope
+
+- `coding` is the Coding Index score (`headlineValue` in current rows,
+  `coding_index` in legacy rows).
+- The score is scoped to the Coding Index evaluation: Terminal-Bench v2.1 and
+  SciCode. Component scores are pass-through evidence only; missing component
+  scores are not synthesized.
+- `coding_token_counts` and `coding_eval_cost`, when present from legacy
+  evidence, remain Coding-evaluation values rather than global Intelligence
+  Index values.
+
+### Optional task metrics
+
+When the current source provides them, `coding_task_metrics` contains only
+observed evidence:
+
+- `output_tokens_per_task`: object derived from `outputTokensPerTask`, with
+  `output_tokens`, `answer_tokens`, and `reasoning_tokens`, each a token count
+  **per benchmark task**. Input-token counts are not inferred.
+- `cost_per_task_usd`: object derived from `costPerTask`, with `total_cost`,
+  `input_cost`, `non_cache_input_cost`, `cache_read_cost`,
+  `cache_write_cost`, `output_cost`, `reasoning_cost`, and `answer_cost`, each
+  **Coding evaluation/API USD per benchmark task**.
+- `time_per_task_seconds`: scalar derived from `timePerTaskSeconds`; weighted
+  decode time in **seconds per benchmark task**.
+
+These costs are Coding evaluation/API USD measurements, not ChatGPT or Codex
+subscription-plan quota, allowance, or billing values; no plan-quota
+equivalence or conversion is implied.
 
 ## Reasoning rows
 

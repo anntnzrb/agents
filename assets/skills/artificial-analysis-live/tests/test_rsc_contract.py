@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
+from types import SimpleNamespace
+import tempfile
 import unittest
+from unittest.mock import patch
 
 import _path  # noqa: F401
+from artificial_analysis import cli
 from artificial_analysis.rsc import extract_lists, snapshot_slugs
 
 
@@ -191,6 +196,264 @@ class TestRscExtraction(unittest.TestCase):
         }
         slugs = snapshot_slugs(snapshot)
         self.assertEqual(slugs, ["provider-1_model-1", "provider-1_model-2"])
+
+    def _coding_payload(
+        self, frames: list[tuple[str, object]], **options: object
+    ) -> dict[str, object]:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            options = {
+                "output_json": str(Path(temp_dir) / "coding.json"),
+                **options,
+            }
+            args = cli._coding_namespace(options)
+            result = SimpleNamespace(
+                body="ignored",
+                fetched_at="2026-07-13T00:00:00+00:00",
+                status_code=200,
+            )
+            with (
+                patch.object(cli, "fetch_rsc", return_value=result),
+                patch.object(cli, "parse_json_frames", return_value=frames),
+            ):
+                return cli._coding_payload(args)
+
+    @staticmethod
+    def _current_row(
+        slug: str,
+        score: float,
+        creator: str,
+        *,
+        with_metrics: bool = True,
+    ) -> dict[str, object]:
+        row: dict[str, object] = {
+            "slug": slug,
+            "headlineValue": score,
+            "modelCreator": {"name": creator, "slug": creator.lower().replace(" ", "-")},
+            "shortName": slug.replace("-", " ").title(),
+            "isReasoning": True,
+            "releaseDate": "2026-07-01",
+            "isOpenWeights": False,
+        }
+        if with_metrics:
+            row.update(
+                {
+                    "outputTokensPerTask": {
+                        "output": 300,
+                        "answer": 200,
+                        "reasoning": 100,
+                    },
+                    "costPerTask": {
+                        "total": 1.25,
+                        "input": 0.10,
+                        "nonCacheInput": 0.08,
+                        "cacheRead": 0.01,
+                        "cacheWrite": 0.01,
+                        "output": 0.75,
+                        "reasoning": 0.25,
+                        "answer": 0.50,
+                    },
+                    "timePerTaskSeconds": 12.5,
+                }
+            )
+        return row
+
+    def test_coding_payload_normalizes_legacy_default_data(self) -> None:
+        frames = [
+            (
+                "legacy",
+                {
+                    "defaultData": [
+                        {
+                            "slug": "legacy-alpha",
+                            "name": "Legacy Alpha",
+                            "coding_index": 81.2,
+                            "tokenCounts": {
+                                "inputTokens": 500,
+                                "answerTokens": 200,
+                                "reasoningTokens": 100,
+                                "outputTokens": 300,
+                            },
+                            "evalCost": {
+                                "totalCost": 1.25,
+                                "inputCost": 0.10,
+                                "answerCost": 0.50,
+                                "reasoningCost": 0.25,
+                            },
+                        },
+                        {
+                            "slug": "legacy-beta",
+                            "name": "Legacy Beta",
+                            "coding_index": 72.4,
+                            "tokenCounts": {
+                                "inputTokens": 400,
+                                "answerTokens": 150,
+                                "reasoningTokens": 50,
+                                "outputTokens": 200,
+                            },
+                            "evalCost": {
+                                "totalCost": 0.80,
+                                "inputCost": 0.08,
+                                "answerCost": 0.30,
+                                "reasoningCost": 0.12,
+                            },
+                        },
+                    ]
+                },
+            )
+        ]
+
+        payload = self._coding_payload(frames)
+
+        self.assertEqual(payload["counts"]["matched_models"], 2)
+        row = payload["rows"][0]
+        self.assertEqual(row["model_slug"], "legacy-alpha")
+        self.assertEqual(row["coding"], 81.2)
+        self.assertEqual(row["coding_token_counts"]["input_tokens"], 500)
+        self.assertEqual(row["coding_token_counts"]["output_tokens"], 300)
+        self.assertEqual(row["coding_eval_cost"]["total_cost"], 1.25)
+        self.assertEqual(row["coding_eval_cost"]["answer_cost"], 0.50)
+
+    def test_coding_payload_normalizes_current_models_task_metrics(self) -> None:
+        frames = [
+            (
+                "current",
+                {
+                    "models": [
+                        self._current_row("current-alpha", 88.4, "OpenAI"),
+                        self._current_row("current-beta", 79.1, "OpenAI"),
+                    ]
+                },
+            )
+        ]
+
+        payload = self._coding_payload(frames)
+
+        self.assertEqual(payload["counts"]["matched_models"], 2)
+        row = payload["rows"][0]
+        self.assertEqual(row["model_slug"], "current-alpha")
+        self.assertEqual(row["short_name"], "Current Alpha")
+        self.assertEqual(row["creator"], "OpenAI")
+        self.assertEqual(row["coding"], 88.4)
+        self.assertEqual(row["is_reasoning"], True)
+        self.assertEqual(row["release_date"], "2026-07-01")
+        self.assertEqual(
+            row["coding_task_metrics"]["output_tokens_per_task"],
+            {"output_tokens": 300, "answer_tokens": 200, "reasoning_tokens": 100},
+        )
+        self.assertEqual(
+            row["coding_task_metrics"]["cost_per_task_usd"],
+            {
+                "total_cost": 1.25,
+                "input_cost": 0.10,
+                "non_cache_input_cost": 0.08,
+                "cache_read_cost": 0.01,
+                "cache_write_cost": 0.01,
+                "output_cost": 0.75,
+                "reasoning_cost": 0.25,
+                "answer_cost": 0.50,
+            },
+        )
+        self.assertEqual(
+            row["coding_task_metrics"]["time_per_task_seconds"], 12.5
+        )
+
+    def test_coding_payload_retains_current_score_without_task_metrics(self) -> None:
+        frames = [
+            (
+                "current",
+                {
+                    "models": [
+                        self._current_row(
+                            "score-only", 77.7, "OpenAI", with_metrics=False
+                        ),
+                        self._current_row(
+                            "score-only-peer", 70.0, "OpenAI", with_metrics=False
+                        ),
+                    ]
+                },
+            )
+        ]
+
+        payload = self._coding_payload(frames)
+        self.assertEqual(payload["counts"]["matched_models"], 2)
+
+        row = payload["rows"][0]
+        self.assertEqual(row["model_slug"], "score-only")
+        self.assertEqual(row["coding"], 77.7)
+        metrics = row["coding_task_metrics"]
+        self.assertEqual(
+            metrics["output_tokens_per_task"],
+            {
+                "output_tokens": None,
+                "answer_tokens": None,
+                "reasoning_tokens": None,
+            },
+        )
+        self.assertEqual(
+            metrics["cost_per_task_usd"],
+            {
+                "total_cost": None,
+                "input_cost": None,
+                "non_cache_input_cost": None,
+                "cache_read_cost": None,
+                "cache_write_cost": None,
+                "output_cost": None,
+                "reasoning_cost": None,
+                "answer_cost": None,
+            },
+        )
+        self.assertIsNone(metrics["time_per_task_seconds"])
+
+    def test_coding_payload_rejects_unrelated_provider_snapshot(self) -> None:
+        frames = [
+            (
+                "providers",
+                {
+                    "models": [
+                        {
+                            "slug": "provider-one_model-a",
+                            "name": "Provider One / Model A",
+                            "price1mInputTokens": 0.25,
+                        },
+                        {
+                            "slug": "provider-two_model-b",
+                            "name": "Provider Two / Model B",
+                            "price1mInputTokens": 0.10,
+                        },
+                    ]
+                },
+            )
+        ]
+
+        with self.assertRaises(cli.ExtractionError):
+            self._coding_payload(frames)
+
+    def test_coding_payload_filters_and_sorts_current_rows_deterministically(self) -> None:
+        frames = [
+            (
+                "current",
+                {
+                    "models": [
+                        self._current_row("lab-alpha", 75.0, "Target Lab"),
+                        self._current_row("lab-beta", 91.0, "Target Lab"),
+                        self._current_row("other", 99.0, "Other Lab"),
+                    ]
+                },
+            )
+        ]
+
+        payload = self._coding_payload(
+            frames,
+            creator="target lab",
+            sort_by="coding",
+            order="desc",
+            limit=10,
+        )
+
+        self.assertEqual(
+            [row["model_slug"] for row in payload["rows"]],
+            ["lab-beta", "lab-alpha"],
+        )
 
 
 if __name__ == "__main__":
