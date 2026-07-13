@@ -47,6 +47,9 @@ context_size = "medium"
 
 [tui]
 alternate_screen = "never"
+vim_mode_default = true
+status_line = ["model-with-reasoning", "current-dir", "git-branch", "run-state", "context-used", "codex-version", "task-progress"]
+status_line_use_colors = true
 
 # -----------------------------------------------------------------------------
 # AGENTS
