@@ -1,6 +1,6 @@
 ---
 name: typescript
-description: Develop TypeScript apps with TS 5.x patterns, repo-aware workflows, and production-first type safety. Use for .ts/.tsx/.mts/.cts, tsconfig.json, declaration files, package scripts, Node/Bun/Vite/Vitest/Jest toolchains, ESM/CJS issues, monorepos, JS-to-TS migration, type errors, or slow type-checks. Prefer repo scripts and the existing package manager. Pair with react-best-practices when React/Next render or bundle performance is central.
+description: "Develop and debug TypeScript: TS 5.x, tsconfig, modules, toolchains, monorepos, types, and tests."
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb

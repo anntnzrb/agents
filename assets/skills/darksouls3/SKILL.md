@@ -1,6 +1,6 @@
 ---
 name: darksouls3
-description: "Spoiler-safe Dark Souls 3 companion/reference skill. Use for DS3 gameplay questions: stats, builds, classes, weapons, infusions, upgrades, titanite, souls, Estus, covenants, combat mechanics, routing, farming, controls, item mechanics, achievements, mods, and no-spoiler guidance. Covers base game + DLCs. PC-native: no emulation. Mod-aware: supports Mod Engine 1 (dinput8 proxy / passive) and Mod Engine 3 (ME3 / injection-based for legit Steam)."
+description: Spoiler-safe Dark Souls 3 help for builds, mechanics, routes, achievements, and PC mods.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb

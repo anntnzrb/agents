@@ -1,6 +1,6 @@
 ---
 name: semantic-compression
-description: Aggressively remove grammatical scaffolding LLMs reconstruct while preserving meaning-carrying content. Output may be fragments. Use when compressing text for prompts, reducing token count, preparing context for LLM input, or making documentation more token-efficient. Applies LLM-aware compression rules that delete predictable grammar while preserving semantics.
+description: Compress prompts or documents aggressively while preserving meaning for LLM consumption.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb

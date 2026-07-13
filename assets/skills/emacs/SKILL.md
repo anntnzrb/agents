@@ -1,6 +1,6 @@
 ---
 name: emacs
-description: Operate Emacs as both a running editor/runtime and a configurable system. Use this whenever the user mentions Emacs, Emacs Lisp, init.el, early-init.el, packages, use-package, package.el, hooks, advice, keybindings, themes, faces, fonts, buffers, windows, frames, server/emacsclient, or wants to inspect, configure, debug, or live-patch a running Emacs instance. Prefer runtime introspection and persistent config edits over guesswork or session-only tweaks.
+description: Inspect, configure, debug, or automate Emacs, Emacs Lisp, init.el, packages, and runtime state.
 license: GPL-3.0-or-later
 compatibility: Requires `emacsclient` and `uv`. Best with a running Emacs server. `info` preferred for manuals; `rg` recommended for installed docs/source lookup.
 metadata:

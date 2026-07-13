@@ -1,6 +1,6 @@
 ---
 name: context7
-description: Retrieve current library, framework, SDK, API, CLI, and cloud-service documentation with the official ctx7 CLI. Use for Context7/ctx7 requests, API syntax, setup/configuration, version-specific changes, library-specific debugging, code examples, and any question where current docs matter. Uses `bun x ctx7@latest` only; no MCP, no installs, no persistent setup.
+description: Retrieve current library, framework, SDK, API, CLI, and cloud-service documentation via ctx7.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb

@@ -1,6 +1,6 @@
 ---
 name: brave-search
-description: Fallback search via the Brave Search HTTP API. Use for quick lookups, recency checks, images/videos/local results, and lightweight web research when Exa isn't ideal.
+description: Use Brave Search for quick, current web, image, video, or local-result lookups.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb

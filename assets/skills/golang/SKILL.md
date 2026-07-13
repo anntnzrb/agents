@@ -1,6 +1,6 @@
 ---
 name: golang
-description: Develop Go applications with Go 1.26 stable, golangci-lint v2, slog, typed errors, idiomatic concurrency, and practical testing. Use whenever working with .go files, go.mod, go.work, go.sum, or user mentions Go/Golang, goroutines, channels, context, chi, cobra, pgx, sqlc, testcontainers, or Go concurrency/HTTP/CLI/database patterns.
+description: "Develop and debug Go: .go modules, concurrency, HTTP, CLI, databases, errors, and tests."
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb

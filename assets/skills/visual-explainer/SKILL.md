@@ -1,6 +1,6 @@
 ---
 name: visual-explainer
-description: Generate self-contained HTML visual explanations for systems, code changes, plans, data, and technical concepts. Use for diagrams, architecture overviews, diff or plan reviews, project recaps, comparison tables, slide decks, and other visual explanations.
+description: Generate self-contained HTML visual explanations, diagrams, plan/diff reviews, and technical recaps.
 license: MIT
 compatibility: Requires a browser to view generated HTML files. Optional surf-cli for AI image generation.
 metadata:

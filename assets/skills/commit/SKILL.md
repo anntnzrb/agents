@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Create granular, logically grouped commits with precise staging or hunk selection. Use whenever the user asks to commit changes, split or preview commits, stage or unstage hunks, write or polish commit messages, manage changelog fragments, clean up commit history before handoff, or says /commit. Prefer multiple small truthful commits over one catch-all commit. In GitButler-managed repos, prefer `but`; elsewhere use `git`.
+description: Create, split, stage, unstage, or polish precise Git commits and commit history.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb

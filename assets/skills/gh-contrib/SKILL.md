@@ -1,6 +1,6 @@
 ---
 name: gh-contrib
-description: Create GitHub issues and PRs following contribution guidelines. Activate when user says 'contribute this', 'submit pr', 'open issue and pr', or wants to submit changes to upstream.
+description: Create upstream GitHub issues and pull requests following repository contribution rules.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb

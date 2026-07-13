@@ -1,6 +1,6 @@
 ---
 name: reddit
-description: Read Reddit directly via Reddit's public JSON endpoints. Use for subreddit browsing, search, post/comment retrieval, user activity analysis, and common Reddit glossary lookups.
+description: Browse, search, and retrieve Reddit posts, comments, subreddits, and user activity via JSON.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb

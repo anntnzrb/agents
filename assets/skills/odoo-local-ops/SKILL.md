@@ -1,6 +1,6 @@
 ---
 name: odoo-local-ops
-description: "Inspect and safely operate local Odoo 17 workspaces and databases through the bundled Python CLI. Supports legacy Windows host installs and macOS/Linux Docker Compose runtimes such as /Users/Shared/odoo17. Use whenever the user wants to inspect odoo.conf, discover the active local database, read module metadata, list addon state, inspect PostgreSQL safely, or review likely mutating controller routes. Use whenever the user needs production-safe Odoo Server Action guidance, safe_eval-compatible Python snippets, read-only audits, dry runs, clipboard-ready /tmp scripts, or guarded mass-update patterns. Trigger even when the user only mentions local DB confusion, psql access, Docker Compose Odoo, module tables/models, or route safety."
+description: Safely inspect and operate local Odoo 17 workspaces, databases, modules, and server actions.
 ---
 
 # Odoo Local Ops

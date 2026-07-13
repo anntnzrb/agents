@@ -1,6 +1,6 @@
 ---
 name: hammerspoon
-description: Operate Hammerspoon as a running macOS automation runtime and configurable Lua system. Use when the user mentions Hammerspoon, hs.*, Spoons, init.lua, MJConfigFile, hs.ipc, Lua hotkeys/window management, macOS automation, or wants to inspect, configure, debug, lint, format, test, or live-patch Hammerspoon. Prefer runtime introspection and live official docs/source over stale memory.
+description: Inspect, configure, debug, or automate Hammerspoon, hs.*, Lua hotkeys, and macOS windows.
 license: GPL-3.0-or-later
 compatibility: Requires `uv`. Runtime introspection requires Hammerspoon running with `require("hs.ipc")` and the `hs` CLI installed. Docs/source lookup requires network unless cached.
 metadata:

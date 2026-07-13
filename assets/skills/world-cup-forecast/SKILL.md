@@ -1,6 +1,6 @@
 ---
 name: world-cup-forecast
-description: AI-facing JSON-only World Cup forecasting CLI for current match score, odds, recent-form, xG/player/team context, and source-disagreement analysis. Use when the user asks to forecast World Cup scores, explain exact scores, compare odds/model signals, inspect today’s matches, or produce machine-readable prediction evidence. Always run the bundled live CLI rather than answering from memory.
+description: Forecast World Cup matches using current scores, odds, form, xG, players, and source disagreement.
 license: GPL-3.0-or-later
 compatibility: Requires uv and network access. Uses bundled skill-local scripts/cli.py. Outputs JSON only.
 metadata:

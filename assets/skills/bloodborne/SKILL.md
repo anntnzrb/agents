@@ -1,6 +1,6 @@
 ---
 name: bloodborne
-description: "Generic spoiler-safe Bloodborne companion/reference skill. Use for Bloodborne gameplay questions: stats, builds, origins, weapons, upgrades, echoes/vials, Insight, Caryll runes, Blood Gems, combat mechanics, routing, farming, controls, item mechanics, and no-spoiler guidance. Use local tracking only if the active workspace provides it; the skill itself stores no playthrough state."
+description: Spoiler-safe Bloodborne help for builds, mechanics, weapons, routing, farming, and progression.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb

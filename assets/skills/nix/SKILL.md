@@ -1,6 +1,6 @@
 ---
 name: nix
-description: Develop with Nix including packages, flakes, NixOS, and derivations. Activate when working with .nix files, flake.nix, flake.lock, or user mentions Nix, nixpkgs, NixOS, derivations, flakes, nix-shell, nix develop, home-manager, or packaging.
+description: Develop and debug Nix, nixpkgs, flakes, NixOS, derivations, shells, and Home Manager.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb

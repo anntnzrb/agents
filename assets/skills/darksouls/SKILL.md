@@ -1,6 +1,6 @@
 ---
 name: darksouls
-description: "Spoiler-safe Dark Souls Remastered companion and reference. Use for DSR mechanics, stats, builds, starting classes, weapons, upgrade paths, equip load, rings, spells, local DSR animation-frame extraction, farming, achievements/platinum, route planning, source-backed/current PC or mod questions, the bundled local PSNProfiles platinum-guide search, and read-only save inspection when a supported save is supplied. Do not use for save editing or unverified parser claims."
+description: Spoiler-safe Dark Souls Remastered help for builds, mechanics, routes, mods, and read-only saves.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb

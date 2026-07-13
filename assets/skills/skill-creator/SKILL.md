@@ -1,6 +1,6 @@
 ---
 name: skill-creator
-description: Create, audit, refactor, benchmark, and optimize skills. Use whenever the user wants a new skill, a second pass on an existing skill, help validating SKILL.md structure, evals, benchmarks, packaging, or trigger descriptions — even if they only ask for cleanup, iteration, or skill polish.
+description: Create, audit, refactor, validate, benchmark, or optimize Codex skills and their triggers.
 license: Apache-2.0
 metadata:
   author: Anthropic
