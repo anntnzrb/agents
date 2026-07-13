@@ -55,14 +55,19 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" qa "best p
 
 ### coding
 
-Fetch/query the Coding Index capability page and return **coding-index-only** token composition.
+Fetch/query the Coding Index capability page. It returns scored rows plus
+Coding-evaluation task evidence when the live page publishes it.
 
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" coding --sort-by coding --limit 10
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" coding --model gpt-5-5 --include-benchmark-counts
 ```
 
-Use this for Coding Index output token composition. These counts are scoped to the Coding Index evaluation only, not global Intelligence Index token counts. Output tokens are `answer_tokens + reasoning_tokens`; components are Terminal-Bench Hard + SciCode.
+Coding Index evidence is scoped to its own evaluation, not the global
+Intelligence Index or a subscription quota. Current rows may include per-task
+output composition, API USD cost, and weighted decode time; optional evidence
+is `null` when absent. The index is Terminal-Bench v2.1 plus SciCode; component
+scores are never synthesized.
 
 
 ### reasoning
@@ -130,4 +135,5 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" --mode rpc
 
 - Command usage: `README.md`
 - JSON envelopes and fields: `references/output-contract.md`
-- Failure modes and recovery: `references/troubleshooting.md`
+- Capability-page schema drift or a failed `coding` command: `references/capability-schema-drift.md`
+- Other failure modes and recovery: `references/troubleshooting.md`
