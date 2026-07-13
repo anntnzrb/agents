@@ -1,10 +1,11 @@
 # artificial-analysis troubleshooting
 
-## 1) Fresh fetch fails after upstream change
+## 1) Fresh fetch or capability command fails after upstream change
 
 Symptoms:
 
 - `extraction_error` with missing sections
+- a capability command returns no rows after its page changed
 
 Mitigations already built-in:
 
@@ -14,9 +15,11 @@ Mitigations already built-in:
 
 Actions:
 
-1. run without `--strict`
-2. inspect `schema` output for contract
-3. inspect current RSC payload and update heuristics
+1. run without `--strict` when the provider snapshot is affected;
+2. inspect `schema` output for the public contract;
+3. for `coding`, follow `capability-schema-drift.md` before changing extraction;
+4. inspect the current public RSC payload and add the smallest alias/structural repair;
+5. add offline legacy/current/negative fixtures and validate one live command.
 
 ## 2) 304 but no cached payload
 
