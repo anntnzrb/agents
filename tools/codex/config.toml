@@ -11,9 +11,9 @@ web_search = "live"
 # MODEL
 # -----------------------------------------------------------------------------
 
-model = "gpt-5.5"
-review_model = "gpt-5.5"
-model_reasoning_effort = "low"
+model = "gpt-5.6-terra"
+review_model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
 model_verbosity = "low"
 model_reasoning_summary = "detailed"
 personality = "pragmatic"
@@ -38,13 +38,8 @@ inherit = "core"
 # -----------------------------------------------------------------------------
 
 [features]
-child_agents_md = true # EXP
-multi_agent = true
-memories = true # EXP
-personality = true
-prevent_idle_sleep = true # EXP
-shell_snapshot = true
-unified_exec = true
+memories = true
+prevent_idle_sleep = true
 default_mode_request_user_input = true
 
 [tools.web_search]
@@ -58,16 +53,21 @@ alternate_screen = "never"
 # -----------------------------------------------------------------------------
 
 [agents]
-max_threads = 8
+# Root + up to three bounded subagents. More tends to add merge/review noise.
+max_threads = 4
 max_depth = 1
 
 [agents.explorer]
-description = "Use `explorer` for specific codebase questions."
+description = "Read-only codebase reconnaissance, dependency tracing, and test triage. Do not edit files."
 config_file = "agents/explorer.toml"
 
 [agents.worker]
-description = "Use for execution and production work."
+description = "Implement a bounded, well-scoped change and run relevant validation."
 config_file = "agents/worker.toml"
+
+[agents.reviewer]
+description = "Review diffs, test evidence, and failure modes. Do not edit files unless explicitly asked."
+config_file = "agents/reviewer.toml"
 
 # -----------------------------------------------------------------------------
 # MISC
