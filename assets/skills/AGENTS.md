@@ -18,6 +18,13 @@
   - Reference files over 300 lines MUST start with a table of contents or equivalent section index.
   - Do not place large always-loaded docs in skill-package `AGENTS.md`; use `references/` and route to them from `SKILL.md`.
 
+## Metadata Budget
+
+- `name` and `description` frontmatter load during skill discovery; treat them as scarce shared context across harnesses.
+- Keep each `description` to one trigger-focused sentence of at most 120 characters. Preserve the capability and concrete trigger nouns; move workflow detail into `SKILL.md` or references.
+- Validate every changed skill with `quick-validate`; it enforces the 120-character description cap.
+- Before adding a skill, prune or consolidate overlapping skills if the inventory would exceed this budget. Do not trade context capacity for keyword soup.
+
 ## Portability Constraints
 
 - Bundled skill entrypoints use `scripts/cli.py`, not Bash/sh/PowerShell wrappers.
@@ -51,6 +58,13 @@ Before handoff after skill executable changes:
 
 ```text
 uv run --script <skill-dir>/scripts/cli.py --help
+git diff --check
+```
+
+Before handoff after skill metadata changes:
+
+```text
+uv run --script assets/skills/skill-creator/scripts/cli.py quick-validate <changed-skill-dir>
 git diff --check
 ```
 

@@ -14,6 +14,9 @@ import yaml
 from pathlib import Path
 
 
+MAX_DESCRIPTION_CHARS = 120
+
+
 def validate_skill(skill_path):
     """Basic validation of a skill"""
     skill_path = Path(skill_path)
@@ -100,11 +103,11 @@ def validate_skill(skill_path):
         # Check for angle brackets
         if "<" in description or ">" in description:
             return False, "Description cannot contain angle brackets (< or >)"
-        # Check description length (max 1024 characters per spec)
-        if len(description) > 1024:
+        if len(description) > MAX_DESCRIPTION_CHARS:
             return (
                 False,
-                f"Description is too long ({len(description)} characters). Maximum is 1024 characters.",
+                f"Description is too long ({len(description)} characters). "
+                f"Maximum is {MAX_DESCRIPTION_CHARS} characters.",
             )
 
     # Validate compatibility field if present (optional)
