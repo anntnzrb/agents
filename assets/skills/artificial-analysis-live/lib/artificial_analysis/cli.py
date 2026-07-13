@@ -781,7 +781,7 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "These token counts and costs are tied to the Coding Index evaluation, "
                 "not global Intelligence Index counts or plan quota."
             ),
-            "components": ["terminalbench_hard", "scicode"],
+            "components": ["terminalbench_v2_1", "scicode"],
             "output_tokens": "answer_tokens + reasoning_tokens",
         },
         "applied_filters": {
