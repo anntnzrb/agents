@@ -1,6 +1,6 @@
 ---
 name: skill-creator
-description: Create, audit, refactor, validate, benchmark, or optimize Codex skills and their triggers.
+description: Create, audit, refactor, validate, benchmark, or optimize skills and their trigger metadata.
 license: Apache-2.0
 metadata:
   author: Anthropic
@@ -81,7 +81,7 @@ Start by understanding intent. If the current conversation already contains the 
 
 Ask only what remains unknown:
 
-1. What should this skill enable Claude to do?
+1. What should this skill enable?
 2. When should this skill trigger? (what user phrases/contexts)
 3. What's the expected output format?
 4. Should we set up test cases to verify the skill works? Skills with objectively verifiable outputs benefit from test cases. Skills with subjective outputs often skip them. Suggest the appropriate default based on skill type, but let the user decide.
@@ -139,7 +139,7 @@ Key patterns:
 - Keep inline snippets tiny.
 - Add a table of contents for reference files >300 lines.
 
-When a skill supports multiple domains or frameworks, organize by variant so Claude reads only the relevant reference file.
+When a skill supports multiple domains or frameworks, organize by variant so the agent reads only the relevant reference file.
 
 ## Eval Workflow Summary
 
@@ -169,7 +169,7 @@ Detailed eval workflow lives in `references/eval-workflow.md`. Summary:
 | Detailed eval runner, timing capture, grading, benchmark aggregation, viewer, feedback, iteration loop                   | `references/eval-workflow.md`            |
 | Trigger tuning, eval query generation, `eval_review.html`, `run_loop.py`, held-out scoring, before/after score reporting | `references/description-optimization.md` |
 | Package validation, `.skill` generation, presentation handoff                                                            | `references/packaging.md`                |
-| Claude.ai, Cowork, browserless/headless, or server-unavailable adaptations                                               | `references/runtime-modes.md`            |
+| Provider-specific, browserless/headless, or server-unavailable runtime adaptations                                       | `references/runtime-modes.md`            |
 | Assertion grading                                                                                                        | `agents/grader.md`                       |
 | Benchmark and comparison analysis                                                                                        | `agents/analyzer.md`                     |
 | Rigorous blind A/B comparison between skill versions                                                                     | `agents/comparator.md`                   |
