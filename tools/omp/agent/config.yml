@@ -35,6 +35,8 @@ steeringMode: all
 interruptMode: wait
 doubleEscapeAction: tree
 treeFilterMode: no-tools
+personality: pragmatic
+textVerbosity: low
 tui:
   textSizing: true
 display:
