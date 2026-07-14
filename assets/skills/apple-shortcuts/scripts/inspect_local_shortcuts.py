@@ -1,3 +1,8 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+# ///
 """
 Inspect local Apple Shortcuts definitions from Shortcuts.sqlite.
 
@@ -12,7 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any
+from typing import TypeGuard
 
 from shortcuts_local_inspector import (
     DEFAULT_DB,
@@ -27,27 +32,25 @@ from shortcuts_local_inspector import (
     summarize_action,
 )
 
+type JsonObject = dict[str, object]
+
+
+def _is_object_dict(value: object) -> TypeGuard[JsonObject]:
+    return type(value) is dict
+
+
+def _is_object_list(value: object) -> TypeGuard[list[object]]:
+    return isinstance(value, list)
+
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Inspect local Apple Shortcuts action graphs."
-    )
-    parser.add_argument(
-        "--db", default=str(DEFAULT_DB), help="Path to Shortcuts.sqlite"
-    )
-    parser.add_argument(
-        "--name", action="append", help="Exact shortcut name (repeatable)"
-    )
+    parser = argparse.ArgumentParser(description="Inspect local Apple Shortcuts action graphs.")
+    parser.add_argument("--db", default=str(DEFAULT_DB), help="Path to Shortcuts.sqlite")
+    parser.add_argument("--name", action="append", help="Exact shortcut name (repeatable)")
     parser.add_argument("--contains", help="Substring filter for shortcut names")
-    parser.add_argument(
-        "--json", action="store_true", help="Print JSON instead of text output"
-    )
-    parser.add_argument(
-        "--raw", action="store_true", help="Include full decoded action objects"
-    )
-    parser.add_argument(
-        "--no-redact", action="store_true", help="Disable redaction in strings"
-    )
+    parser.add_argument("--json", action="store_true", help="Print JSON instead of text output")
+    parser.add_argument("--raw", action="store_true", help="Include full decoded action objects")
+    parser.add_argument("--no-redact", action="store_true", help="Disable redaction in strings")
     parser.add_argument(
         "--visible-only",
         action="store_true",
@@ -71,17 +74,13 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _render_text(results: list[dict[str, Any]]) -> str:
+def _render_text(results: list[JsonObject]) -> str:
     if not results:
         return "No shortcuts matched filters."
     lines: list[str] = []
     for shortcut in results:
         lines.append(f"Shortcut: {shortcut['name']}")
-        lines.append(
-            "  id={pk} workflow_id={workflow_id} action_count={action_count}".format(
-                **shortcut
-            )
-        )
+        lines.append("  id={pk} workflow_id={workflow_id} action_count={action_count}".format(**shortcut))
         if shortcut.get("hidden_from_library"):
             lines.append("  hidden_from_library=true")
         if shortcut.get("folder"):
@@ -89,7 +88,7 @@ def _render_text(results: list[dict[str, Any]]) -> str:
         if shortcut.get("associated_bundle"):
             lines.append(f"  associated_app={shortcut['associated_bundle']}")
         run_stats = shortcut.get("run_stats")
-        if isinstance(run_stats, dict):
+        if _is_object_dict(run_stats):
             lines.append(
                 "  runs={total_runs} outcomes={outcomes} sources={sources} last_run={last_run}".format(
                     total_runs=run_stats.get("total_runs", 0),
@@ -99,18 +98,24 @@ def _render_text(results: list[dict[str, Any]]) -> str:
                 )
             )
         actions = shortcut.get("actions", [])
+        if not _is_object_list(actions):
+            actions = []
         if not actions:
             lines.append("  actions: (none)")
         else:
             for action in actions:
+                if not _is_object_dict(action):
+                    continue
                 line = f"  {action['index']}. {action['summary']}"
                 if action.get("action_uuid"):
                     line += f" [UUID={action['action_uuid']}]"
                 lines.append(line)
         smart_prompts = shortcut.get("smart_prompts", [])
-        if smart_prompts:
+        if _is_object_list(smart_prompts) and smart_prompts:
             lines.append("  smart_prompt_permissions:")
             for item in smart_prompts:
+                if not _is_object_dict(item):
+                    continue
                 lines.append(
                     "    - action_uuid={action_uuid} action_index={action_index} mode={mode} status={status} dest_bundle={dest} source_origin={origin}".format(
                         action_uuid=item.get("action_uuid", ""),
@@ -135,26 +140,24 @@ def main() -> int:
     exact = set(args.name or [])
 
     run_stats_by_shortcut = load_run_stats(db_path) if args.include_run_stats else {}
-    smart_prompts_by_shortcut = (
-        load_smart_prompts(db_path) if args.include_smart_prompts else {}
-    )
+    smart_prompts_by_shortcut = load_smart_prompts(db_path) if args.include_smart_prompts else {}
     folder_map = load_folder_map() if args.include_folders else {}
 
-    results: list[dict[str, Any]] = []
+    results: list[JsonObject] = []
     for row in rows:
         if not matches(row, exact, args.contains, args.visible_only):
             continue
         decoded = decode_actions(row.action_blob)
         if not args.no_redact:
-            decoded = redact_object(decoded)
+            decoded = [redacted for action in decoded if _is_object_dict(redacted := redact_object(action))]
 
-        actions = []
+        actions: list[JsonObject] = []
         action_index_by_uuid: dict[str, int] = {}
         for idx, action in enumerate(decoded, start=1):
             act_uuid = action_uuid(action)
             if act_uuid:
                 action_index_by_uuid[act_uuid] = idx
-            entry = {
+            entry: JsonObject = {
                 "index": idx,
                 "identifier": action.get("WFWorkflowActionIdentifier", ""),
                 "summary": summarize_action(action),
@@ -164,7 +167,7 @@ def main() -> int:
                 entry["raw"] = action
             actions.append(entry)
 
-        item: dict[str, Any] = {
+        item: JsonObject = {
             "pk": row.pk,
             "name": row.name,
             "workflow_id": row.workflow_id,

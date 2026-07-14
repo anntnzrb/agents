@@ -6,13 +6,12 @@ import sqlite3
 import subprocess
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
-
+from typing import TypeGuard
 
 DEFAULT_DB = Path("~/Library/Shortcuts/Shortcuts.sqlite").expanduser()
-APPLE_REFERENCE_DATE = datetime(2001, 1, 1, tzinfo=timezone.utc)
+APPLE_REFERENCE_DATE = datetime(2001, 1, 1, tzinfo=UTC)
 _OBJECT_REPLACEMENT = "\ufffc"
 _IDENTIFIER_LINE_RE = re.compile(r"^(?P<name>.+)\s+\((?P<id>[0-9A-F-]{36})\)$")
 
@@ -41,14 +40,39 @@ class SmartPromptPermission:
     source_origin: str
 
 
+type JsonObject = dict[str, object]
+
+
+def _is_object_dict(value: object) -> TypeGuard[JsonObject]:
+    return type(value) is dict
+
+
+def _is_object_list(value: object) -> TypeGuard[list[object]]:
+    return isinstance(value, list)
+
+
+def _row_value(row: sqlite3.Row, key: str) -> object:
+    return row[key]
+
+
+def _integer(value: object) -> int:
+    return value if isinstance(value, int) else 0
+
+
+def _text(value: object) -> str:
+    return value if isinstance(value, str) else ""
+
+
+def _bytes_or_none(value: object) -> bytes | None:
+    return value if isinstance(value, bytes) else None
+
+
 def clean_text(text: str) -> str:
     return " ".join(text.replace(_OBJECT_REPLACEMENT, "").split())
 
 
 def redact_text(text: str) -> str:
-    redacted = re.sub(
-        r"(Bearer\s+)([^\s\"']+)", r"\1<REDACTED>", text, flags=re.IGNORECASE
-    )
+    redacted = re.sub(r"(Bearer\s+)([^\s\"']+)", r"\1<REDACTED>", text, flags=re.IGNORECASE)
     redacted = re.sub(r"\b(cpk_[A-Za-z0-9._-]{12,})\b", "<REDACTED>", redacted)
     redacted = re.sub(r"\b(sk-[A-Za-z0-9._-]{12,})\b", "<REDACTED>", redacted)
     redacted = re.sub(r"\b(sk-proj-[A-Za-z0-9._-]{12,})\b", "<REDACTED>", redacted)
@@ -56,20 +80,20 @@ def redact_text(text: str) -> str:
     return redacted
 
 
-def redact_object(obj: Any) -> Any:
+def redact_object(obj: object) -> object:
     if isinstance(obj, str):
         return redact_text(obj)
-    if isinstance(obj, list):
+    if _is_object_list(obj):
         return [redact_object(item) for item in obj]
-    if isinstance(obj, dict):
-        return {str(key): redact_object(value) for key, value in obj.items()}
+    if _is_object_dict(obj):
+        return {key: redact_object(value) for key, value in obj.items()}
     return obj
 
 
-def _extract_text(value: Any) -> str:
+def _extract_text(value: object) -> str:
     if isinstance(value, str):
         return clean_text(value)
-    if isinstance(value, dict):
+    if _is_object_dict(value):
         if "string" in value and isinstance(value["string"], str):
             return clean_text(value["string"])
         if "Value" in value:
@@ -77,21 +101,21 @@ def _extract_text(value: Any) -> str:
     return ""
 
 
-def _pluck(params: dict[str, Any], key: str) -> str:
+def _pluck(params: JsonObject, key: str) -> str:
     value = params.get(key)
     if value is None:
         return ""
     return _extract_text(value)
 
 
-def _travel_label(field: Any) -> str:
-    if not isinstance(field, dict):
+def _travel_label(field: object) -> str:
+    if not _is_object_dict(field):
         return ""
     placemark = field.get("placemark")
-    if not isinstance(placemark, dict):
+    if not _is_object_dict(placemark):
         return ""
     address = placemark.get("addressDictionary", {})
-    if isinstance(address, dict):
+    if _is_object_dict(address):
         for key in ("Name", "Street", "City"):
             name = address.get(key)
             if isinstance(name, str) and name.strip():
@@ -99,15 +123,15 @@ def _travel_label(field: Any) -> str:
     return ""
 
 
-def _quantity_label(field: Any) -> str:
-    if not isinstance(field, dict):
+def _quantity_label(field: object) -> str:
+    if not _is_object_dict(field):
         return ""
     value = field.get("Value")
-    if not isinstance(value, dict):
+    if not _is_object_dict(value):
         return ""
     magnitude = value.get("Magnitude")
     unit = value.get("Unit")
-    if isinstance(magnitude, dict):
+    if _is_object_dict(magnitude):
         output_name = magnitude.get("OutputName")
         if isinstance(output_name, str) and output_name.strip():
             mag_str = f"var({output_name})"
@@ -120,18 +144,18 @@ def _quantity_label(field: Any) -> str:
     return clean_text(f"{mag_str} {unit}".strip())
 
 
-def action_uuid(action: dict[str, Any]) -> str:
+def action_uuid(action: JsonObject) -> str:
     params = action.get("WFWorkflowActionParameters")
-    if not isinstance(params, dict):
+    if not _is_object_dict(params):
         return ""
     value = params.get("UUID")
     return value if isinstance(value, str) else ""
 
 
-def summarize_action(action: dict[str, Any]) -> str:
+def summarize_action(action: JsonObject) -> str:
     identifier = str(action.get("WFWorkflowActionIdentifier", "<unknown>"))
     params = action.get("WFWorkflowActionParameters")
-    if not isinstance(params, dict):
+    if not _is_object_dict(params):
         return identifier
 
     if identifier == "is.workflow.actions.url":
@@ -157,7 +181,7 @@ def summarize_action(action: dict[str, Any]) -> str:
         if mode == 0:
             prompt = _pluck(params, "WFMenuPrompt")
             items = params.get("WFMenuItems")
-            if isinstance(items, list):
+            if _is_object_list(items):
                 return f"{identifier} | menu={items} prompt={prompt!r}"
         if mode == 1:
             title = _pluck(params, "WFMenuItemTitle")
@@ -168,7 +192,7 @@ def summarize_action(action: dict[str, Any]) -> str:
         name = _pluck(params, "WFWorkflowName")
         if not name:
             wf = params.get("WFWorkflow")
-            if isinstance(wf, dict):
+            if _is_object_dict(wf):
                 wf_name = wf.get("workflowName")
                 if isinstance(wf_name, str):
                     name = clean_text(wf_name)
@@ -182,11 +206,7 @@ def summarize_action(action: dict[str, Any]) -> str:
         if origin or destination:
             return f"{identifier} | from={origin} to={destination}"
     if identifier == "is.workflow.actions.lowpowermode.set":
-        return (
-            f"{identifier} | state=off"
-            if params.get("OnValue") == 0
-            else f"{identifier} | state=on"
-        )
+        return f"{identifier} | state=off" if params.get("OnValue") == 0 else f"{identifier} | state=on"
     if identifier == "is.workflow.actions.setbrightness":
         level = params.get("WFBrightness")
         if isinstance(level, (int, float)):
@@ -201,7 +221,7 @@ def summarize_action(action: dict[str, Any]) -> str:
             return f"{identifier} | type={sample_type} quantity={quantity}"
     if identifier == "is.workflow.actions.dnd.set":
         mode = params.get("FocusModes")
-        if isinstance(mode, dict):
+        if _is_object_dict(mode):
             display = mode.get("DisplayString")
             if isinstance(display, str) and display.strip():
                 return f"{identifier} | focus={clean_text(display)}"
@@ -237,50 +257,46 @@ def load_rows(db_path: Path) -> list[ShortcutRow]:
     for row in rows:
         out.append(
             ShortcutRow(
-                pk=int(row["Z_PK"]),
-                name=str(row["ZNAME"] or ""),
-                workflow_id=str(row["ZWORKFLOWID"] or ""),
-                action_count=int(row["ACTION_COUNT"]),
-                associated_bundle=row["ZASSOCIATEDAPPBUNDLEIDENTIFIER"],
-                hidden_from_library=bool(row["HIDDEN_FROM_LIBRARY"]),
-                action_blob=row["ZDATA"],
+                pk=_integer(_row_value(row, "Z_PK")),
+                name=_text(_row_value(row, "ZNAME")),
+                workflow_id=_text(_row_value(row, "ZWORKFLOWID")),
+                action_count=_integer(_row_value(row, "ACTION_COUNT")),
+                associated_bundle=_text(_row_value(row, "ZASSOCIATEDAPPBUNDLEIDENTIFIER")) or None,
+                hidden_from_library=bool(_integer(_row_value(row, "HIDDEN_FROM_LIBRARY"))),
+                action_blob=_bytes_or_none(_row_value(row, "ZDATA")),
             )
         )
     return out
 
 
-def decode_actions(blob: bytes | None) -> list[dict[str, Any]]:
+def decode_actions(blob: bytes | None) -> list[JsonObject]:
     if not blob:
         return []
     parsed = plistlib.loads(blob)
-    if not isinstance(parsed, list):
+    if not _is_object_list(parsed):
         return []
-    return [item for item in parsed if isinstance(item, dict)]
+    return [item for item in parsed if _is_object_dict(item)]
 
 
 def _decode_smart_prompt(blob: bytes) -> dict[str, str]:
     decoded = plistlib.loads(blob)
-    if not isinstance(decoded, dict):
+    if not _is_object_dict(decoded):
         return {}
     content_destination = decoded.get("ContentDestination", {})
-    app_descriptor = (
-        content_destination.get("appDescriptor", {})
-        if isinstance(content_destination, dict)
-        else {}
-    )
+    app_descriptor = content_destination.get("appDescriptor") if _is_object_dict(content_destination) else None
     source_attr = decoded.get("SourceContentAttribution", {})
-    origin = source_attr.get("origin", {}) if isinstance(source_attr, dict) else {}
+    origin = source_attr.get("origin") if _is_object_dict(source_attr) else None
     destination_bundle = ""
     destination_name = ""
     source_origin = ""
-    if isinstance(app_descriptor, dict):
+    if _is_object_dict(app_descriptor):
         bundle = app_descriptor.get("BundleIdentifier")
         name = app_descriptor.get("Name")
         if isinstance(bundle, str):
             destination_bundle = clean_text(bundle)
         if isinstance(name, str):
             destination_name = clean_text(name)
-    if isinstance(origin, dict):
+    if _is_object_dict(origin):
         origin_id = origin.get("identifier")
         if isinstance(origin_id, str):
             source_origin = clean_text(origin_id)
@@ -323,17 +339,18 @@ def load_smart_prompts(db_path: Path) -> dict[int, list[SmartPromptPermission]]:
     return grouped
 
 
-def _apple_timestamp_to_local_str(value: Any) -> str:
+def _apple_timestamp_to_local_str(value: object) -> str:
     if value is None:
         return ""
     try:
-        dt = APPLE_REFERENCE_DATE + timedelta(seconds=float(value))
+        seconds = float(value) if isinstance(value, (int, float, str)) else 0.0
+        dt = APPLE_REFERENCE_DATE + timedelta(seconds=seconds)
     except (TypeError, ValueError, OverflowError):
         return ""
     return dt.astimezone().strftime("%Y-%m-%d %H:%M:%S %z")
 
 
-def load_run_stats(db_path: Path) -> dict[int, dict[str, Any]]:
+def load_run_stats(db_path: Path) -> dict[int, dict[str, object]]:
     conn = _db_connect(db_path)
     try:
         outcome_rows = conn.execute(
@@ -347,38 +364,41 @@ def load_run_stats(db_path: Path) -> dict[int, dict[str, Any]]:
         ).fetchall()
     finally:
         conn.close()
-    stats: dict[int, dict[str, Any]] = {}
+    stats: dict[int, dict[str, object]] = {}
     for row in outcome_rows:
-        shortcut_pk = int(row["ZSHORTCUT"])
+        shortcut_pk = _integer(_row_value(row, "ZSHORTCUT"))
         entry = stats.setdefault(
             shortcut_pk,
             {"total_runs": 0, "outcomes": {}, "sources": {}, "last_run_local": ""},
         )
-        outcome_key = str(row["ZOUTCOME"])
-        count = int(row["C"])
-        entry["outcomes"][outcome_key] = count
-        entry["total_runs"] += count
+        outcome_key = _text(_row_value(row, "ZOUTCOME"))
+        count = _integer(_row_value(row, "C"))
+        outcomes = entry["outcomes"]
+        total_runs = entry["total_runs"]
+        if _is_object_dict(outcomes) and isinstance(total_runs, int):
+            outcomes[outcome_key] = count
+            entry["total_runs"] = total_runs + count
     for row in source_rows:
-        shortcut_pk = int(row["ZSHORTCUT"])
+        shortcut_pk = _integer(_row_value(row, "ZSHORTCUT"))
         entry = stats.setdefault(
             shortcut_pk,
             {"total_runs": 0, "outcomes": {}, "sources": {}, "last_run_local": ""},
         )
-        entry["sources"][str(row["SRC"])] = int(row["C"])
+        sources = entry["sources"]
+        if _is_object_dict(sources):
+            sources[_text(_row_value(row, "SRC"))] = _integer(_row_value(row, "C"))
     for row in last_rows:
-        shortcut_pk = int(row["ZSHORTCUT"])
+        shortcut_pk = _integer(_row_value(row, "ZSHORTCUT"))
         entry = stats.setdefault(
             shortcut_pk,
             {"total_runs": 0, "outcomes": {}, "sources": {}, "last_run_local": ""},
         )
-        entry["last_run_local"] = _apple_timestamp_to_local_str(row["LAST_DATE"])
+        entry["last_run_local"] = _apple_timestamp_to_local_str(_row_value(row, "LAST_DATE"))
     return stats
 
 
 def _run_shortcuts_cli(args: list[str]) -> str:
-    proc = subprocess.run(
-        ["shortcuts", *args], check=True, capture_output=True, text=True
-    )
+    proc = subprocess.run(["shortcuts", *args], check=True, capture_output=True, text=True)
     return proc.stdout
 
 
@@ -401,9 +421,7 @@ def load_folder_map() -> dict[str, str]:
     folders = [line.strip() for line in folder_output.splitlines() if line.strip()]
     for folder in folders:
         try:
-            out = _run_shortcuts_cli(
-                ["list", "--folder-name", folder, "--show-identifiers"]
-            )
+            out = _run_shortcuts_cli(["list", "--folder-name", folder, "--show-identifiers"])
         except subprocess.CalledProcessError:
             continue
         for line in out.splitlines():
@@ -411,9 +429,7 @@ def load_folder_map() -> dict[str, str]:
             if parsed:
                 mapping[parsed[1]] = folder
     try:
-        out_none = _run_shortcuts_cli(
-            ["list", "--folder-name", "none", "--show-identifiers"]
-        )
+        out_none = _run_shortcuts_cli(["list", "--folder-name", "none", "--show-identifiers"])
     except subprocess.CalledProcessError:
         out_none = ""
     for line in out_none.splitlines():
@@ -423,9 +439,7 @@ def load_folder_map() -> dict[str, str]:
     return mapping
 
 
-def matches(
-    row: ShortcutRow, exact: set[str], contains: str | None, visible_only: bool
-) -> bool:
+def matches(row: ShortcutRow, exact: set[str], contains: str | None, visible_only: bool) -> bool:
     if visible_only and row.hidden_from_library:
         return False
     if exact and row.name not in exact:

@@ -1,4 +1,8 @@
 #!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+# ///
 """
 Generate a structured Apple Shortcuts blueprint.
 
@@ -10,7 +14,33 @@ from __future__ import annotations
 
 import argparse
 import json
-from typing import Any
+from typing import TypedDict
+
+
+class BlueprintArgs(TypedDict):
+    goal: str
+    devices: str
+    trigger: str
+    inputs: str
+    outputs: str
+    automation_type: str
+    constraint: list[str] | None
+    failure_mode: list[str] | None
+
+
+class Blueprint(TypedDict):
+    goal: str
+    target_devices: list[str]
+    trigger: str
+    automation_type: str
+    inputs: list[str]
+    outputs: list[str]
+    constraints: list[str]
+    expected_failures: list[str]
+    action_graph: list[str]
+    variables: list[dict[str, str]]
+    failure_handling: list[str]
+    validation_matrix: list[dict[str, str]]
 
 
 def _split_csv(value: str) -> list[str]:
@@ -41,9 +71,7 @@ def _default_action_graph(trigger: str, automation_type: str) -> list[str]:
     return steps
 
 
-def _validation_matrix(
-    devices: list[str], automation_type: str
-) -> list[dict[str, str]]:
+def _validation_matrix(devices: list[str], automation_type: str) -> list[dict[str, str]]:
     matrix = [
         {"case": "Happy path", "expectation": "Correct output and completion status."},
         {"case": "Empty input", "expectation": "Graceful message and safe exit."},
@@ -67,23 +95,23 @@ def _validation_matrix(
     return matrix
 
 
-def build_blueprint(args: argparse.Namespace) -> dict[str, Any]:
-    devices = _split_csv(args.devices)
-    inputs = _split_csv(args.inputs)
-    outputs = _split_csv(args.outputs)
-    constraints = args.constraint or []
-    failures = args.failure_mode or []
+def build_blueprint(args: BlueprintArgs) -> Blueprint:
+    devices = _split_csv(args["devices"])
+    inputs = _split_csv(args["inputs"])
+    outputs = _split_csv(args["outputs"])
+    constraints = args["constraint"] or []
+    failures = args["failure_mode"] or []
 
     return {
-        "goal": args.goal,
+        "goal": args["goal"],
         "target_devices": devices,
-        "trigger": args.trigger,
-        "automation_type": args.automation_type,
+        "trigger": args["trigger"],
+        "automation_type": args["automation_type"],
         "inputs": inputs,
         "outputs": outputs,
         "constraints": constraints,
         "expected_failures": failures,
-        "action_graph": _default_action_graph(args.trigger, args.automation_type),
+        "action_graph": _default_action_graph(args["trigger"], args["automation_type"]),
         "variables": [
             {"name": "input_payload", "type": "Any", "source": "trigger/input action"},
             {
@@ -98,11 +126,11 @@ def build_blueprint(args: argparse.Namespace) -> dict[str, Any]:
             "Branch for permission and network failures.",
             "Provide explicit user-visible fallback output.",
         ],
-        "validation_matrix": _validation_matrix(devices, args.automation_type),
+        "validation_matrix": _validation_matrix(devices, args["automation_type"]),
     }
 
 
-def render_markdown(bp: dict[str, Any]) -> str:
+def render_markdown(bp: Blueprint) -> str:
     lines: list[str] = []
     lines.append("## Goal")
     lines.append(bp["goal"])
@@ -156,9 +184,7 @@ def render_markdown(bp: dict[str, Any]) -> str:
         lines.append(f"- {row['case']}: {row['expectation']}")
     lines.append("")
     lines.append("## Notes")
-    lines.append(
-        "- Replace generic action labels with exact Shortcuts action names before implementation."
-    )
+    lines.append("- Replace generic action labels with exact Shortcuts action names before implementation.")
     return "\n".join(lines)
 
 
@@ -166,13 +192,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate a Shortcuts blueprint.")
     parser.add_argument("--goal", required=True, help="Primary automation objective.")
     parser.add_argument("--devices", default="iPhone", help="Comma-separated devices.")
-    parser.add_argument(
-        "--trigger", default="Manual run from Shortcuts app", help="Trigger source."
-    )
+    parser.add_argument("--trigger", default="Manual run from Shortcuts app", help="Trigger source.")
     parser.add_argument("--inputs", default="", help="Comma-separated input contract.")
-    parser.add_argument(
-        "--outputs", default="", help="Comma-separated output contract."
-    )
+    parser.add_argument("--outputs", default="", help="Comma-separated output contract.")
     parser.add_argument(
         "--automation-type",
         choices=["manual", "personal", "home", "app-intents"],
@@ -195,10 +217,20 @@ def main() -> int:
         default="markdown",
         help="Output format.",
     )
-    args = parser.parse_args()
+    parsed = parser.parse_args()
+    args: BlueprintArgs = {
+        "goal": parsed.goal,
+        "devices": parsed.devices,
+        "trigger": parsed.trigger,
+        "inputs": parsed.inputs,
+        "outputs": parsed.outputs,
+        "automation_type": parsed.automation_type,
+        "constraint": parsed.constraint,
+        "failure_mode": parsed.failure_mode,
+    }
 
     blueprint = build_blueprint(args)
-    if args.format == "json":
+    if parsed.format == "json":
         print(json.dumps(blueprint, ensure_ascii=True, indent=2))
     else:
         print(render_markdown(blueprint))
