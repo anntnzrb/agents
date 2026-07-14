@@ -232,6 +232,25 @@ secrets:
 startup:
   checkUpdate: false
 providers:
-  webSearch: auto
+  webSearch: brave
+  webSearchExclude:
+    - perplexity
+    - anthropic
+    - codex
+    - xai
+    - zai
+    - tinyfish
+    - jina
+    - kagi
+    - tavily
+    - kimi
+    - synthetic
+    - searxng
+    - startpage
+    - duckduckgo
+    - ecosia
+    - google
+    - mojeek
+    - public
 symbolPreset: unicode
 setupVersion: 1
