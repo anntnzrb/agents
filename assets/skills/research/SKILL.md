@@ -31,11 +31,11 @@ Route research requests to the right source class, then return source-backed ans
 
 ### Web/live research
 
-- Use `brave-search` for fast scoping and recency checks.
-- Use `exa-search` for deeper multi-source synthesis and richer retrieval.
-- Escalate from Brave to Exa when coverage or quality is weak.
+- Prefer OMP built-ins first: use `web_search` for discovery and `browser` only for interactive or JavaScript-rendered pages.
+- Use `read` to retrieve a known static URL; it is a general retrieval tool, not a dedicated web-search route.
+- Use `brave-search` for fast scoping and recency checks when the built-ins are insufficient.
 
-`brave-search` and `exa-search` are direct HTTP skills.
+`brave-search` is a direct HTTP skill.
 
 ### Sentiment/discussion research
 
@@ -55,7 +55,7 @@ Route research requests to the right source class, then return source-backed ans
 ## Router workflow
 
 1. Classify request: code/docs, web/live, sentiment, or notebook KB.
-2. Select primary route from the map above.
+2. Select the primary route from the map above; for web/live work, start with the applicable OMP built-in.
 3. Execute route tools and collect source evidence.
 4. Add corroboration route when confidence is low, sources conflict, or claim impact is high.
 5. Return answer with provenance, confidence, and explicit gaps.
@@ -72,5 +72,5 @@ Route research requests to the right source class, then return source-backed ans
 
 - If library/API details are unclear, force `context7`.
 - If repo-specific behavior is unclear, force `deepwiki` and/or `gh`.
-- If web evidence is stale or shallow, escalate from `brave-search` to `exa-search`.
+- If web evidence is stale or shallow, use the available `brave-search` provider skill as a secondary route.
 - If sentiment claim drives decisions, include `reddit` plus one non-Reddit corroboration source.
