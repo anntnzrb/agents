@@ -23,6 +23,21 @@ Do not answer benchmark/provider questions from stale memory. Run the tool first
 
 ## Fast path
 
+Before fetching, copy the tracked template and set the official API key:
+
+```bash
+cp "$SKILLS_DIR/artificial-analysis-live/.env.example" "$SKILLS_DIR/artificial-analysis-live/.env"
+```
+
+`fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`; snapshot readers (`query`, `qa`,
+`stats`, `diff`, `harness`, and `reasoning`) do not. The loader uses an existing
+process value first, then `ARTIFICIAL_ANALYSIS_ENV_FILE`, the skill-root `.env`,
+`$SKILLS_DIR/artificial-analysis-live/.env`, then the first ancestor containing
+`skills/artificial-analysis-live/.env`. Do not pass keys through CLI or RPC.
+
+The skill-local `.env` is intentionally copied by generic asset sync into every
+generated tool home. Treat that replication as a secret-management risk.
+
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 ```
@@ -31,11 +46,17 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 
 ### fetch
 
-Get live snapshot from RSC source and write outputs.
+Get a live snapshot from the provider-leaderboard RSC source and the authenticated
+official model API.
 
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 ```
+
+The schema-v2 snapshot has one canonical model record per slug and slim provider
+endpoint records joined by `model_slug`. Canonical model pricing from the official
+API uses its 3:1 blend; endpoint pricing from RSC uses its 7:2:1 blend. Both are
+intentional because they describe different scopes, not duplicate prices.
 
 ### query
 

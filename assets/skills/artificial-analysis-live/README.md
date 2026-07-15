@@ -1,8 +1,33 @@
 # artificial-analysis
 
-AI-only extractor for the full Artificial Analysis provider-endpoint matrix.
+AI-only extractor for the Artificial Analysis model catalog and provider-endpoint
+matrix.
 
 No human prose output. JSON only. Deterministic envelopes.
+
+Live `fetch` combines two required sources:
+
+- provider endpoints from `https://artificialanalysis.ai/leaderboards/providers`
+  with header `RSC: 1`
+- canonical models from `https://artificialanalysis.ai/api/v2/data/llms/models`
+
+## Fetch credentials
+
+Only `fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`; commands that read an existing
+snapshot do not. Copy the tracked template at the skill root and fill the key:
+
+```bash
+cp <skill-dir>/.env.example <skill-dir>/.env
+```
+
+The dotenv loader keeps an existing process value, otherwise checks, in order:
+`ARTIFICIAL_ANALYSIS_ENV_FILE`, `<skill-root>/.env`,
+`$SKILLS_DIR/artificial-analysis-live/.env`, then the first ancestor containing
+`skills/artificial-analysis-live/.env`. Keys are not CLI or RPC arguments.
+
+Generic asset sync intentionally copies dotfiles into every generated tool home.
+Consequently, a skill-local `.env` is replicated to those managed targets; manage
+the secret with that risk in mind.
 
 Compatibility hardening:
 
@@ -10,8 +35,6 @@ Compatibility hardening:
 - ETag cache + 304 reuse
 - last-good fallback (unless `--strict`)
 - sanity thresholds (`min_endpoints`, `min_providers`)
-
-Source: `https://artificialanalysis.ai/leaderboards/providers` with header `RSC: 1`.
 
 ## Entry point
 
@@ -57,6 +80,19 @@ Cache/ETag behavior:
 - on `304`, reuses cached payload
 - if fresh parse fails sanity and not `--strict`, falls back to last-good snapshot
 - default `/tmp/artifacts/artificial-analysis/full-data.json` readers reject snapshots older than 24h; run `fetch` again or pass an explicit historical snapshot path
+
+### Snapshot schema v2
+
+`models` is the sole canonical, unique model table. `hosts_models` contains
+provider/endpoint observations and joins each one to `models` through
+`model_slug`; it does not repeat model metrics. Model identity, official
+evaluations, and the official API pricing object belong to canonical models.
+Provider speed, latency, context, feature, classification, and RSC pricing belong
+to endpoints.
+
+The official API's 3:1 model-pricing blend and RSC's 7:2:1 endpoint-pricing blend
+are both retained deliberately: one is model-scoped and the other is
+provider-endpoint-scoped.
 
 ## Stats
 
@@ -128,7 +164,8 @@ uv run --script <skill-dir>/scripts/cli.py query --model claude-opus-4-7 --sort-
 uv run --script <skill-dir>/scripts/cli.py query --provider deepinfra --sort-by intelligence --order desc --limit 20
 ```
 
-Returns endpoint rows with pricing, speed/latency, and benchmark metrics.
+Returns provider-endpoint rows joined to canonical model metrics, with endpoint
+pricing, speed/latency, and context.
 
 ## QA (minimum natural-language command)
 

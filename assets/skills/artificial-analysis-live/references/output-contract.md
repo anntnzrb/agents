@@ -28,7 +28,18 @@ Error:
 }
 ```
 
-## Snapshot JSON structure
+## Fetch credentials
+
+Only `fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`. Set it in a skill-local
+`.env` copied from `.env.example`; it is never a CLI or RPC argument. An existing
+process value wins, otherwise dotenv lookup is: `ARTIFICIAL_ANALYSIS_ENV_FILE`,
+`<skill-root>/.env`, `$SKILLS_DIR/artificial-analysis-live/.env`, then the first
+ancestor containing `skills/artificial-analysis-live/.env`.
+
+Generic asset sync intentionally copies dotfiles into every generated tool home,
+so a skill-local `.env` is replicated to those managed targets by design.
+
+## Snapshot JSON structure (schema v2)
 
 Top-level keys:
 
@@ -37,25 +48,24 @@ Top-level keys:
 - `hosts`
 - `hosts_models`
 
-`meta` includes:
+`meta` includes `schema_version: 2`, `counts`, and `sources`. `sources.rsc` and
+`sources.official_api` each expose source URL, status code, fetched-at timestamp,
+ETag when supplied, and `reused_cached_payload` when applicable. Source metadata
+does not include credentials or raw response bodies.
 
-- `schema_version`
-- `source_url`
-- `source_mode`
-- `fetched_at`
-- `status_code`
-- `etag`
-- `counts`
+`counts` includes unique canonical `models`, `hosts`, and endpoint
+`hosts_models` (plus endpoint/provider sanity counts where available).
 
-`counts` includes:
+`models` is the only model projection: exactly one canonical row per
+`slug`. Official API model identity, evaluations, and API pricing belong here.
+`hosts_models` is a slim provider-endpoint table; each row has `model_slug` and
+joins to that canonical model, while retaining endpoint/provider fields such as
+pricing, speed, latency, context, features, and classifications. It does not
+embed a `model` object.
 
-- `models`
-- `hosts`
-- `hosts_models`
-- `endpoint_slugs`
-- `providers_by_prefix`
-- `providers`
-- `frames`
+The model API's 3:1 pricing blend and RSC endpoint's 7:2:1 pricing blend are
+intentionally both present. They have model and provider-endpoint scope,
+respectively, and are not duplicate prices.
 
 ## QA payload
 
