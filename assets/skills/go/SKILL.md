@@ -1,46 +1,28 @@
 ---
 name: go
-description: Execute a plan with parallel agent orchestration when asked for /go or multi-agent work.
+description: Execute an existing plan with subagents when asked for /go, orchestrate, workflowz, delegation, or parallel agent work.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
 allowed-tools: ""
 ---
 
-# Go Orchestration Skill
+# Go
 
-Execute the plan using multi-level parallelism.
+Execute the existing plan through subagents. The parent agent owns the plan, integration, and final result.
 
-## Context
+## Workflow
 
-- Extract the plan from previous messages (source of truth)
-- If a todo-list tool exists, use it as supplementary reference, but prioritize the conversational plan
-- Optional arguments provide additional context: $ARGUMENTS
-
-## Step 1 - Analyze dependencies
-
-- Identify independent tasks (can run in parallel)
-- Identify dependent tasks (must wait)
-- Group into phases; each phase contains only independent tasks
-
-## Step 2 - Orchestrate
-
-- For each phase, spawn multiple subagents concurrently using parallel `spawn_agent` tool calls
-- Each subagent prompt must include:
-  1. Full context (architectural decisions, patterns, constraints from planning)
-  2. Specific task, files, and acceptance criteria
-  3. Instruction: "Batch ALL independent tool calls in a single message"
-  4. Expected return: "Return only: OK [confirmation] or BLOCKER [blocker]"
-
-## Step 3 - Execute phases
-
-- Phase N: spawn all independent agents in one parallel batch
-- Wait for phase completion
-- Phase N+1: spawn next batch (may depend on Phase N results)
-- On failure: stop, report blocker, await decision
+1. Extract every requested item and constraint from the conversation. Do not outsource top-level planning.
+2. Map dependencies. Dispatch genuinely independent, substantial slices together; keep prerequisites and trivial edits inline.
+3. Give each subagent a self-contained target, context, constraints, and observable acceptance criteria. Name file overlap and require coordination.
+4. Continue useful non-overlapping work while agents run. Wait only when a critical-path result blocks progress.
+5. Integrate results as they arrive. Inspect status, correct or reassign incomplete work, and handle failures individually rather than abandoning the run.
+6. Verify the combined deliverable end to end. Continue until every requested item is complete or a concrete blocker requires the user.
 
 ## Rules
 
-- Orchestration only; do not perform file operations directly
-- No redundant explanations; the plan is already understood
-- Compact output: report phases, agents spawned, and final status
+- Use the runtime's actual agent tools and lifecycle; do not invent parallel wrappers or assume waiting returns agent output.
+- Reuse or close agents when supported instead of leaking capacity.
+- Parent verification is authoritative; subagent self-reports are evidence, not proof.
+- Do not yield at a phase boundary or ask for confirmation when repository context can decide.
