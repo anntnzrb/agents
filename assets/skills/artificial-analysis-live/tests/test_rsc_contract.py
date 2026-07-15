@@ -8,7 +8,14 @@ from unittest.mock import patch
 
 import _path  # noqa: F401
 from artificial_analysis import cli
-from artificial_analysis.rsc import extract_lists, snapshot_slugs
+from artificial_analysis.rsc import (
+    FetchResult,
+    ExtractionError,
+    build_snapshot_payload,
+    extract_lists,
+    normalize_official_models,
+    snapshot_slugs,
+)
 
 
 class TestRscExtraction(unittest.TestCase):
@@ -454,6 +461,59 @@ class TestRscExtraction(unittest.TestCase):
             [row["model_slug"] for row in payload["rows"]],
             ["lab-beta", "lab-alpha"],
         )
+
+    def test_official_models_merge_into_unique_slim_schema_v2_snapshot(self) -> None:
+        rsc_model = {
+            "slug": "shared",
+            "name": "RSC name",
+            "agentic_index": 77,
+            "coding_index": 12,
+            "intelligence_index": 11,
+            "model_creators": {"name": "RSC"},
+        }
+        api = normalize_official_models(
+            '{"status":200,"prompt_options":{},"data":[{"id":"api-id","slug":"shared","name":"API name","release_date":"2026-01-01","model_creator":{"name":"API"},"evaluations":{"artificial_analysis_coding_index":42,"artificial_analysis_intelligence_index":null},"pricing":{"price_1m_blended_3_to_1":3},"median_output_tokens_per_second":9,"median_time_to_first_token_seconds":1,"median_time_to_first_answer_token":2},{"id":"api-only","slug":"api-only","name":"API only","model_creator":{},"evaluations":{},"pricing":{}}]}'
+        )
+        rsc_result = FetchResult("", 200, {"etag": "rsc"}, "2026-01-01T00:00:00+00:00")
+        api_result = FetchResult("", 200, {}, "2026-01-01T00:00:01+00:00")
+        payload = build_snapshot_payload(
+            models=[rsc_model],
+            hosts=[],
+            hosts_models=[
+                {"slug": "host_shared", "host": {"slug": "host"}, "model": rsc_model, "price_1m_blended_7_to_2_to_1": 4}
+            ],
+            frame_count=1,
+            rsc_result=rsc_result,
+            rsc_etag="rsc",
+            rsc_reused_cached_payload=False,
+            official_result=api_result,
+            official_models=api,
+        )
+        models = {model["slug"]: model for model in payload["models"]}
+        self.assertEqual(payload["meta"]["schema_version"], 2)
+        self.assertEqual(set(models), {"api-only", "shared"})
+        self.assertEqual(models["shared"]["name"], "API name")
+        self.assertEqual(models["shared"]["coding_index"], 42)
+        self.assertEqual(models["shared"]["intelligence_index"], 11)
+        endpoint = payload["hosts_models"][0]
+        self.assertEqual(endpoint["model_slug"], "shared")
+        self.assertNotIn("model", endpoint)
+        self.assertEqual(
+            payload["meta"]["sources"]["official_api"]["unmatched_rsc_model_slugs"],
+            [],
+        )
+        self.assertEqual(
+            payload["meta"]["sources"]["rsc"]["unmatched_api_model_slugs"],
+            ["api-only"],
+        )
+
+    def test_official_model_envelope_validation_rejects_malformed_rows(self) -> None:
+        with self.assertRaisesRegex(ExtractionError, "requires integer status"):
+            normalize_official_models('{"status":"200","prompt_options":{},"data":[]}')
+        with self.assertRaisesRegex(ExtractionError, "require non-empty slug"):
+            normalize_official_models(
+                '{"status":200,"prompt_options":{},"data":[{"slug":"","name":"x","model_creator":{},"evaluations":{},"pricing":{}}]}'
+            )
 
 
 if __name__ == "__main__":

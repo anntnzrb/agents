@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -10,11 +11,14 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 BASE_URL = "https://artificialanalysis.ai/leaderboards/providers"
+MODEL_API_URL = "https://artificialanalysis.ai/api/v2/data/llms/models"
+MODEL_API_KEY_ENV = "ARTIFICIAL_ANALYSIS_API_KEY"
+MODEL_API_BASE_URL_ENV = "ARTIFICIAL_ANALYSIS_API_BASE_URL"
 CODING_CAPABILITY_URL = "https://artificialanalysis.ai/models/capabilities/coding"
 CACHE_META_FILE = "providers-cache.json"
 CACHE_BODY_FILE = "providers.rsc"
 CACHE_LAST_GOOD_FILE = "last-good.json"
-SNAPSHOT_SCHEMA_VERSION = 1
+SNAPSHOT_SCHEMA_VERSION = 2
 
 
 class ExtractionError(RuntimeError):
@@ -72,6 +76,106 @@ def fetch_rsc(
                 fetched_at=fetched_at,
             )
         raise OSError(f"Upstream request failed: HTTP {exc.code}") from exc
+
+
+def fetch_models(
+    api_key: str,
+    *,
+    timeout_seconds: float = 60.0,
+    url: str | None = None,
+) -> FetchResult:
+    """Fetch the authenticated canonical-model source without retaining credentials."""
+    request_url = url or os.environ.get(MODEL_API_BASE_URL_ENV) or MODEL_API_URL
+    request = Request(
+        request_url,
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "artificial-analysis/0.3",
+            "x-api-key": api_key,
+        },
+    )
+    fetched_at = datetime.now(UTC).isoformat()
+
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:  # noqa: S310 (documented upstream URL)
+            return FetchResult(
+                body=response.read().decode("utf-8", errors="replace"),
+                status_code=response.status,
+                headers={key.lower(): value for key, value in response.headers.items()},
+                fetched_at=fetched_at,
+            )
+    except HTTPError as exc:
+        raise OSError(f"Official model API request failed: HTTP {exc.code}") from exc
+
+
+def normalize_official_models(api_payload: str) -> list[dict[str, object]]:
+    """Validate the public API envelope and project it into canonical field names."""
+    try:
+        parsed: object = json.loads(api_payload)
+    except json.JSONDecodeError as exc:
+        raise ExtractionError("Official model API returned invalid JSON.") from exc
+    if not isinstance(parsed, dict):
+        raise ExtractionError("Official model API envelope must be an object.")
+
+    status = parsed.get("status")
+    prompt_options = parsed.get("prompt_options")
+    rows = parsed.get("data")
+    if not isinstance(status, int) or not isinstance(prompt_options, dict) or not isinstance(rows, list):
+        raise ExtractionError(
+            "Official model API envelope requires integer status, object prompt_options, and list data."
+        )
+
+    return [_normalize_official_model(row) for row in rows]
+
+
+def _normalize_official_model(row: object) -> dict[str, object]:
+    if not isinstance(row, dict):
+        raise ExtractionError("Official model API data rows must be objects.")
+
+    slug = row.get("slug")
+    name = row.get("name")
+    creator = row.get("model_creator")
+    evaluations = row.get("evaluations")
+    pricing = row.get("pricing")
+    if (
+        not isinstance(slug, str)
+        or not slug
+        or not isinstance(name, str)
+        or not name
+        or not isinstance(creator, dict)
+        or not isinstance(evaluations, dict)
+        or not isinstance(pricing, dict)
+    ):
+        raise ExtractionError(
+            "Official model API rows require non-empty slug/name and object model_creator/evaluations/pricing."
+        )
+
+    normalized_evaluations = {
+        _OFFICIAL_EVALUATION_NAMES.get(key, key): value
+        for key, value in evaluations.items()
+        if isinstance(key, str)
+    }
+    return {
+        "id": row.get("id"),
+        "slug": slug,
+        "name": name,
+        "release_date": row.get("release_date"),
+        "creator": _normalize_camel_keys(creator),
+        "evaluations": normalized_evaluations,
+        "pricing": _normalize_camel_keys(pricing),
+        "median_output_tokens_per_second": row.get("median_output_tokens_per_second"),
+        "median_time_to_first_token_seconds": row.get("median_time_to_first_token_seconds"),
+        "median_time_to_first_answer_token": row.get("median_time_to_first_answer_token"),
+    }
+
+
+_OFFICIAL_EVALUATION_NAMES = {
+    "artificial_analysis_intelligence_index": "intelligence_index",
+    "artificial_analysis_coding_index": "coding_index",
+    "artificial_analysis_math_index": "math_index",
+    "terminalbench_v2_1": "terminalbench_v21",
+    "tau2": "tau_2",
+}
 
 
 def parse_json_frames(rsc_payload: str) -> list[tuple[str, Any]]:
@@ -372,37 +476,143 @@ def build_snapshot_payload(
     hosts: list[Any],
     hosts_models: list[Any],
     frame_count: int,
-    fetched_at: str,
-    status_code: int,
-    etag: str | None,
+    rsc_result: FetchResult,
+    rsc_etag: str | None,
+    rsc_reused_cached_payload: bool,
+    official_result: FetchResult,
+    official_models: list[dict[str, object]],
 ) -> dict[str, Any]:
-    slugs = endpoint_slugs(hosts_models)
+    slim_endpoints = _slim_endpoints(hosts_models)
+    canonical_models, unmatched_rsc, unmatched_api = _merge_canonical_models(
+        rsc_models=models,
+        rsc_endpoints=hosts_models,
+        official_models=official_models,
+    )
+    slugs = endpoint_slugs(slim_endpoints)
     providers_by_prefix = sorted({provider_from_slug(slug) for slug in slugs})
-    providers_by_host = sorted(_provider_slugs_from_hosts_models(hosts_models))
+    providers_by_host = sorted(_provider_slugs_from_hosts_models(slim_endpoints))
+    api_url = os.environ.get(MODEL_API_BASE_URL_ENV) or MODEL_API_URL
 
     return {
         "meta": {
             "schema_version": SNAPSHOT_SCHEMA_VERSION,
-            "source_url": BASE_URL,
-            "source_mode": "rsc",
-            "fetched_at": fetched_at,
-            "status_code": status_code,
-            "etag": etag,
+            "fetched_at": rsc_result.fetched_at,
+            "sources": {
+                "rsc": {
+                    "url": BASE_URL,
+                    "status_code": rsc_result.status_code,
+                    "fetched_at": rsc_result.fetched_at,
+                    "etag": rsc_etag,
+                    "reused_cached_payload": rsc_reused_cached_payload,
+                    "unmatched_api_model_slugs": unmatched_api,
+                },
+                "official_api": {
+                    "url": api_url,
+                    "status_code": official_result.status_code,
+                    "fetched_at": official_result.fetched_at,
+                    "etag": official_result.headers.get("etag"),
+                    "reused_cached_payload": False,
+                    "unmatched_rsc_model_slugs": unmatched_rsc,
+                },
+            },
             "counts": {
-                "models": len(models),
+                "models": len(canonical_models),
                 "hosts": len(hosts),
-                "hosts_models": len(hosts_models),
+                "hosts_models": len(slim_endpoints),
                 "endpoint_slugs": len(slugs),
                 "providers_by_prefix": len(providers_by_prefix),
                 "providers": len(providers_by_host),
                 "frames": frame_count,
             },
         },
-        "models": models,
+        "models": canonical_models,
         "hosts": hosts,
-        "hosts_models": hosts_models,
+        "hosts_models": slim_endpoints,
     }
 
+
+def _slim_endpoints(hosts_models: list[Any]) -> list[dict[str, Any]]:
+    endpoints: list[dict[str, Any]] = []
+    for endpoint in hosts_models:
+        if not isinstance(endpoint, dict):
+            continue
+        model = endpoint.get("model")
+        model_slug = (
+            model.get("slug")
+            if isinstance(model, dict) and isinstance(model.get("slug"), str)
+            else endpoint.get("model_slug")
+        )
+        if not isinstance(model_slug, str) or not model_slug:
+            continue
+        slim = {key: value for key, value in endpoint.items() if key != "model"}
+        slim["model_slug"] = model_slug
+        endpoints.append(slim)
+    return endpoints
+
+
+def _merge_canonical_models(
+    *,
+    rsc_models: list[Any],
+    rsc_endpoints: list[Any],
+    official_models: list[dict[str, object]],
+) -> tuple[list[dict[str, object]], list[str], list[str]]:
+    rsc_by_slug = _rsc_models_by_slug(rsc_models, rsc_endpoints)
+    official_by_slug = {model["slug"]: model for model in official_models if isinstance(model.get("slug"), str)}
+    all_slugs = sorted(set(rsc_by_slug) | set(official_by_slug))
+    merged = [
+        _merge_canonical_model(
+            rsc_by_slug.get(slug),
+            official_by_slug.get(slug),
+        )
+        for slug in all_slugs
+    ]
+    return (
+        merged,
+        sorted(set(rsc_by_slug) - set(official_by_slug)),
+        sorted(set(official_by_slug) - set(rsc_by_slug)),
+    )
+
+
+def _rsc_models_by_slug(
+    rsc_models: list[Any], rsc_endpoints: list[Any]
+) -> dict[str, dict[str, object]]:
+    values: dict[str, dict[str, object]] = {}
+    for candidate in [*rsc_models, *(item.get("model") for item in rsc_endpoints if isinstance(item, dict))]:
+        if not isinstance(candidate, dict):
+            continue
+        slug = candidate.get("slug")
+        if isinstance(slug, str) and slug:
+            values[slug] = dict(candidate) | values.get(slug, {})
+    return values
+
+
+def _merge_canonical_model(
+    rsc_model: dict[str, object] | None, official_model: dict[str, object] | None
+) -> dict[str, object]:
+    merged = dict(rsc_model or {})
+    if official_model is None:
+        if "creator" not in merged and isinstance(merged.get("model_creators"), dict):
+            merged["creator"] = merged["model_creators"]
+        return merged
+
+    for key in (
+        "id",
+        "slug",
+        "name",
+        "release_date",
+        "creator",
+        "pricing",
+        "median_output_tokens_per_second",
+        "median_time_to_first_token_seconds",
+        "median_time_to_first_answer_token",
+    ):
+        merged[key] = official_model[key]
+    evaluations = official_model["evaluations"]
+    if isinstance(evaluations, dict):
+        for name, value in evaluations.items():
+            if value is not None:
+                merged[name] = value
+    return merged
 
 def _provider_slugs_from_hosts_models(hosts_models: list[Any]) -> set[str]:
     values: set[str] = set()

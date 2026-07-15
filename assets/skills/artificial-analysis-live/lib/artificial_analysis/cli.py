@@ -13,16 +13,20 @@ from typing import Any, TextIO
 from .rsc import (
     BASE_URL,
     CODING_CAPABILITY_URL,
+    MODEL_API_KEY_ENV,
+    MODEL_API_URL,
     ExtractionError,
     build_full_url,
     build_snapshot_payload,
     endpoint_slugs,
     extract_lists,
+    fetch_models,
     fetch_rsc,
     load_cache_metadata,
     load_cached_body,
     load_last_good_snapshot,
     load_snapshot,
+    normalize_official_models,
     parse_json_frames,
     sanity_check,
     save_cache,
@@ -51,6 +55,66 @@ def _default_cache_dir() -> Path:
     return base / "artificial-analysis"
 
 
+def _parse_env_file(path: Path) -> dict[str, str]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {}
+
+    values: dict[str, str] = {}
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key:
+            continue
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        values[key] = value
+    return values
+
+
+def _dotenv_candidates() -> list[Path]:
+    candidates: list[Path] = []
+    if configured_path := os.environ.get("ARTIFICIAL_ANALYSIS_ENV_FILE"):
+        candidates.append(Path(configured_path).expanduser())
+
+    skill_root = Path(__file__).resolve().parents[2]
+    candidates.append(skill_root / ".env")
+    if skills_dir := os.environ.get("SKILLS_DIR"):
+        candidates.append(Path(skills_dir).expanduser() / "artificial-analysis-live" / ".env")
+
+    for ancestor in (Path.cwd(), *Path.cwd().parents):
+        candidate = ancestor / "skills" / "artificial-analysis-live" / ".env"
+        if candidate.exists():
+            candidates.append(candidate)
+            break
+    return candidates
+
+
+def _load_dotenv() -> None:
+    if os.environ.get(MODEL_API_KEY_ENV):
+        return
+    for path in _dotenv_candidates():
+        for key, value in _parse_env_file(path).items():
+            os.environ.setdefault(key, value)
+        if os.environ.get(MODEL_API_KEY_ENV):
+            return
+
+
+def _required_api_key() -> str:
+    _load_dotenv()
+    api_key = os.environ.get(MODEL_API_KEY_ENV)
+    if not api_key:
+        raise CliUsageError(
+            "ARTIFICIAL_ANALYSIS_API_KEY required; copy .env.example to .env and set the key."
+        )
+    return api_key
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="artificial-analysis",
@@ -66,7 +130,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     fetch_parser = subparsers.add_parser(
-        "fetch", help="Fetch live RSC data and write snapshot outputs."
+        "fetch", help="Fetch live RSC and authenticated official model data, then write a snapshot."
     )
     fetch_parser.add_argument("--output-json", type=Path, default=DEFAULT_OUTPUT_JSON)
     fetch_parser.add_argument(
@@ -397,31 +461,77 @@ def _load_reader_snapshot(path: Path) -> dict[str, Any]:
     _ensure_default_snapshot_fresh(path, snapshot)
     return snapshot
 
+
+def _schema_version(snapshot: dict[str, Any]) -> int:
+    meta = snapshot.get("meta")
+    return meta.get("schema_version") if isinstance(meta, dict) and isinstance(meta.get("schema_version"), int) else 1
+
+
+def _canonical_models(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    if _schema_version(snapshot) < 2:
+        return {}
+    models = snapshot.get("models")
+    if not isinstance(models, list):
+        raise ExtractionError("Schema-v2 snapshot missing models list")
+    return {
+        slug: item
+        for item in models
+        if isinstance(item, dict) and isinstance(slug := item.get("slug"), str) and slug
+    }
+
+
+def _model_rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    canonical = _canonical_models(snapshot)
+    if canonical:
+        return list(canonical.values())
+    hosts_models = snapshot.get("hosts_models")
+    if not isinstance(hosts_models, list):
+        raise ExtractionError("Snapshot missing hosts_models list")
+    return [
+        model
+        for item in hosts_models
+        if isinstance(item, dict)
+        and isinstance(model := item.get("model"), dict)
+        and isinstance(model.get("slug"), str)
+    ]
+
+
+def _creator(model: dict[str, Any]) -> dict[str, Any]:
+    creator = model.get("creator")
+    if isinstance(creator, dict):
+        return creator
+    legacy_creator = model.get("model_creators")
+    return legacy_creator if isinstance(legacy_creator, dict) else {}
+
 def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
+    api_key = _required_api_key()
     cache_meta = load_cache_metadata(args.cache_dir)
     sent_etag = cache_meta.etag if cache_meta is not None else None
-
-    result = fetch_rsc(timeout_seconds=args.timeout_seconds, if_none_match=sent_etag)
-    response_etag = result.headers.get("etag") or sent_etag
-
+    result = None
+    official_result = None
+    response_etag: str | None = sent_etag
     reused_cached_body = False
-    if result.status_code == 304:
-        body = load_cached_body(args.cache_dir, cache_meta)
-        if body is None:
-            raise ExtractionError(
-                "Upstream returned 304 but no cached payload is available."
-            )
-        reused_cached_body = True
-    else:
-        body = result.body
-
     fallback_used = False
     fallback_source: str | None = None
     fallback_reason: str | None = None
 
     try:
+        result = fetch_rsc(timeout_seconds=args.timeout_seconds, if_none_match=sent_etag)
+        official_result = fetch_models(api_key, timeout_seconds=args.timeout_seconds)
+        response_etag = result.headers.get("etag") or sent_etag
+        if result.status_code == 304:
+            body = load_cached_body(args.cache_dir, cache_meta)
+            if body is None:
+                raise ExtractionError(
+                    "Upstream returned 304 but no cached payload is available."
+                )
+            reused_cached_body = True
+        else:
+            body = result.body
+
         frames = parse_json_frames(body)
         models, hosts, hosts_models = extract_lists(frames)
+        official_models = normalize_official_models(official_result.body)
         slugs = endpoint_slugs(hosts_models)
         sanity_check(
             slugs=slugs,
@@ -433,27 +543,25 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
             hosts=hosts,
             hosts_models=hosts_models,
             frame_count=len(frames),
-            fetched_at=result.fetched_at,
-            status_code=result.status_code,
-            etag=response_etag,
+            rsc_result=result,
+            rsc_etag=response_etag,
+            rsc_reused_cached_payload=reused_cached_body,
+            official_result=official_result,
+            official_models=official_models,
         )
-    except ExtractionError as exc:
+    except (ExtractionError, OSError) as exc:
         if args.strict or args.output_json == DEFAULT_OUTPUT_JSON:
             raise
-
         fallback_reason = str(exc)
         fallback_payload = load_last_good_snapshot(args.cache_dir)
         fallback_source = "cache:last-good"
-
         if fallback_payload is None and args.output_json.exists():
             fallback_payload = _load_reader_snapshot(args.output_json)
             fallback_source = f"file:{args.output_json}"
-
         if fallback_payload is None:
             raise ExtractionError(
-                f"Fresh parse failed and no last-good snapshot exists ({exc})."
+                f"Fresh fetch failed and no last-good snapshot exists ({exc})."
             ) from exc
-
         slugs = snapshot_slugs(fallback_payload)
         sanity_check(
             slugs=slugs,
@@ -464,7 +572,6 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
         fallback_used = True
 
     full_url = build_full_url(slugs)
-
     write_outputs(
         output_json=args.output_json,
         output_endpoints=args.output_endpoints,
@@ -474,23 +581,37 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
         full_url=full_url,
     )
 
-    if not fallback_used:
+    if not fallback_used and result is not None:
         save_cache(
             cache_dir=args.cache_dir,
             fetched_at=result.fetched_at,
             status_code=result.status_code,
             etag=response_etag,
-            body=None if result.status_code == 304 else body,
+            body=None if result.status_code == 304 else result.body,
         )
         save_last_good_snapshot(args.cache_dir, payload)
 
     return {
-        "source": {
-            "url": BASE_URL,
-            "status_code": result.status_code,
-            "etag_sent": sent_etag,
-            "etag_received": response_etag,
-            "reused_cached_payload": reused_cached_body,
+        "sources": {
+            "rsc": {
+                "url": BASE_URL,
+                "status_code": result.status_code if result is not None else None,
+                "etag_sent": sent_etag,
+                "etag_received": response_etag,
+                "reused_cached_payload": reused_cached_body,
+            },
+            "official_api": {
+                "url": os.environ.get("ARTIFICIAL_ANALYSIS_API_BASE_URL") or MODEL_API_URL,
+                "status_code": (
+                    official_result.status_code if official_result is not None else None
+                ),
+                "etag_received": (
+                    official_result.headers.get("etag")
+                    if official_result is not None
+                    else None
+                ),
+                "reused_cached_payload": False,
+            },
         },
         "counts": payload.get("meta", {}).get("counts", {}),
         "outputs": {
@@ -498,9 +619,7 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
             "endpoints": str(args.output_endpoints),
             "url": str(args.output_url),
         },
-        "cache": {
-            "dir": str(args.cache_dir),
-        },
+        "cache": {"dir": str(args.cache_dir)},
         "fallback": {
             "used": fallback_used,
             "source": fallback_source,
@@ -930,9 +1049,7 @@ def _nested_sort_metric(
 
 def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
     snapshot = _load_reader_snapshot(args.snapshot)
-    hosts_models = snapshot.get("hosts_models")
-    if not isinstance(hosts_models, list):
-        raise ExtractionError("Snapshot missing hosts_models list")
+    models = _model_rows(snapshot)
 
     model_filter = (
         args.model.lower() if isinstance(args.model, str) and args.model else None
@@ -941,27 +1058,18 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
         args.creator.lower() if isinstance(args.creator, str) and args.creator else None
     )
 
-    seen: set[str] = set()
     rows: list[dict[str, Any]] = []
     skipped_missing = 0
 
-    for item in hosts_models:
-        if not isinstance(item, dict):
-            continue
-        model = item.get("model") if isinstance(item.get("model"), dict) else {}
+    for model in models:
         model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
-        if not model_slug or model_slug in seen:
+        if not model_slug:
             continue
-        seen.add(model_slug)
         if model.get("deleted") or model.get("deprecated"):
             continue
 
         model_name = model.get("name") if isinstance(model.get("name"), str) else None
-        creator = (
-            model.get("model_creators")
-            if isinstance(model.get("model_creators"), dict)
-            else {}
-        )
+        creator = _creator(model)
         creator_name = (
             creator.get("name") if isinstance(creator.get("name"), str) else None
         )
@@ -1142,9 +1250,7 @@ def _reasoning_benchmarks(model: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
     snapshot = _load_reader_snapshot(args.snapshot)
-    hosts_models = snapshot.get("hosts_models")
-    if not isinstance(hosts_models, list):
-        raise ExtractionError("Snapshot missing hosts_models list")
+    models = _model_rows(snapshot)
 
     model_filter = (
         args.model.lower() if isinstance(args.model, str) and args.model else None
@@ -1153,27 +1259,18 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
         args.creator.lower() if isinstance(args.creator, str) and args.creator else None
     )
 
-    seen: set[str] = set()
     rows: list[dict[str, Any]] = []
     skipped_missing = 0
 
-    for item in hosts_models:
-        if not isinstance(item, dict):
-            continue
-        model = item.get("model") if isinstance(item.get("model"), dict) else {}
+    for model in models:
         model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
-        if not model_slug or model_slug in seen:
+        if not model_slug:
             continue
-        seen.add(model_slug)
         if model.get("deleted") or model.get("deprecated"):
             continue
 
         model_name = model.get("name") if isinstance(model.get("name"), str) else None
-        creator = (
-            model.get("model_creators")
-            if isinstance(model.get("model_creators"), dict)
-            else {}
-        )
+        creator = _creator(model)
         creator_name = (
             creator.get("name") if isinstance(creator.get("name"), str) else None
         )
@@ -1300,10 +1397,9 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
     hosts_models = snapshot.get("hosts_models")
     if not isinstance(hosts_models, list):
         raise ExtractionError("Snapshot missing hosts_models list")
+    canonical_models = _canonical_models(snapshot)
 
-    model_filter = (
-        args.model.lower() if isinstance(args.model, str) and args.model else None
-    )
+    model_filter = args.model.lower() if isinstance(args.model, str) and args.model else None
     provider_filter = (
         args.provider.lower()
         if isinstance(args.provider, str) and args.provider
@@ -1319,10 +1415,35 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
     for item in hosts_models:
         if not isinstance(item, dict):
             continue
-
         endpoint_slug = item.get("slug")
-        model = item.get("model") if isinstance(item.get("model"), dict) else {}
+        if not isinstance(endpoint_slug, str) or "_" not in endpoint_slug:
+            continue
         host = item.get("host") if isinstance(item.get("host"), dict) else {}
+        if canonical_models:
+            endpoint_model_slug = item.get("model_slug")
+            model = (
+                canonical_models.get(endpoint_model_slug)
+                if isinstance(endpoint_model_slug, str)
+                else None
+            )
+            if model is None:
+                continue
+        else:
+            model = item.get("model") if isinstance(item.get("model"), dict) else {}
+
+        model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
+        model_name = model.get("name") if isinstance(model.get("name"), str) else None
+        provider_slug = host.get("slug") if isinstance(host.get("slug"), str) else None
+        provider_name = host.get("name") if isinstance(host.get("name"), str) else None
+        if model_filter and not _matches_any(model_filter, [model_slug, model_name]):
+            continue
+        if provider_filter and not _matches_any(
+            provider_filter, [provider_slug, provider_name]
+        ):
+            continue
+        if endpoint_filter and endpoint_filter not in endpoint_slug.lower():
+            continue
+
         timescale = (
             item.get("timescaleData")
             if isinstance(item.get("timescaleData"), dict)
@@ -1333,24 +1454,6 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
             if isinstance(item.get("end_to_end_response_time_metrics"), dict)
             else {}
         )
-
-        if not isinstance(endpoint_slug, str) or "_" not in endpoint_slug:
-            continue
-
-        model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
-        model_name = model.get("name") if isinstance(model.get("name"), str) else None
-        provider_slug = host.get("slug") if isinstance(host.get("slug"), str) else None
-        provider_name = host.get("name") if isinstance(host.get("name"), str) else None
-
-        if model_filter and not _matches_any(model_filter, [model_slug, model_name]):
-            continue
-        if provider_filter and not _matches_any(
-            provider_filter, [provider_slug, provider_name]
-        ):
-            continue
-        if endpoint_filter and endpoint_filter not in endpoint_slug.lower():
-            continue
-
         rows.append(
             {
                 "endpoint_slug": endpoint_slug,
@@ -1369,14 +1472,17 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "livecodebench": model.get("livecodebench"),
                 "ifbench": model.get("ifbench"),
                 "scicode": model.get("scicode"),
-                "tau2": model.get("tau2"),
+                "tau2": model.get("tau_2", model.get("tau2")),
                 "terminalbench_hard": model.get("terminalbench_hard"),
                 "release_date": model.get("release_date"),
                 "reasoning_model": model.get("reasoning_model"),
                 "is_open_weights": model.get("is_open_weights"),
                 "price_input": item.get("price_1m_input_tokens"),
                 "price_output": item.get("price_1m_output_tokens"),
-                "price_blended": item.get("price_1m_blended_3_to_1"),
+                "price_blended": item.get(
+                    "price_1m_blended_7_to_2_to_1",
+                    item.get("price_1m_blended_3_to_1"),
+                ),
                 "speed": timescale.get("median_output_speed"),
                 "ttfc": timescale.get("median_time_to_first_chunk"),
                 "e2e": e2e.get("total_time"),
@@ -1387,29 +1493,14 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
 
     sort_key = args.sort_by
     reverse = _resolve_reverse(sort_key=sort_key, order=args.order)
-
     rows.sort(key=lambda row: _sort_metric(row, sort_key, reverse=reverse))
     limited = rows[: max(args.limit, 0)]
-
     provider_counts = _provider_counts_from_rows(rows)
     model_counts: dict[str, int] = {}
     for row in rows:
         model_slug = row.get("model_slug")
         if isinstance(model_slug, str):
             model_counts[model_slug] = model_counts.get(model_slug, 0) + 1
-
-    top_providers = [
-        {"provider": name, "endpoints": count}
-        for name, count in sorted(
-            provider_counts.items(), key=lambda item: (-item[1], item[0])
-        )[:10]
-    ]
-    top_models = [
-        {"model": name, "endpoints": count}
-        for name, count in sorted(
-            model_counts.items(), key=lambda item: (-item[1], item[0])
-        )[:10]
-    ]
 
     return {
         "snapshot": str(args.snapshot),
@@ -1427,8 +1518,18 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
             "matched_providers": len(provider_counts),
             "matched_models": len(model_counts),
         },
-        "top_providers": top_providers,
-        "top_models": top_models,
+        "top_providers": [
+            {"provider": name, "endpoints": count}
+            for name, count in sorted(
+                provider_counts.items(), key=lambda item: (-item[1], item[0])
+            )[:10]
+        ],
+        "top_models": [
+            {"model": name, "endpoints": count}
+            for name, count in sorted(
+                model_counts.items(), key=lambda item: (-item[1], item[0])
+            )[:10]
+        ],
         "rows": limited,
     }
 
@@ -1512,7 +1613,7 @@ def _qa_payload(args: argparse.Namespace) -> dict[str, Any]:
     if not isinstance(hosts_models, list):
         raise ExtractionError("Snapshot missing hosts_models list")
 
-    inferred_model = args.model or _infer_model(question, hosts_models)
+    inferred_model = args.model or _infer_model(question, _model_rows(snapshot))
     inferred_provider = args.provider or _infer_provider(question, hosts_models)
     inferred_sort_by, inferred_order = _infer_sort(question)
 
@@ -1548,14 +1649,11 @@ def _normalize_for_match(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
 
 
-def _infer_model(question: str, hosts_models: list[Any]) -> str | None:
+def _infer_model(question: str, models: list[dict[str, Any]]) -> str | None:
     question_norm = _normalize_for_match(question)
     best: tuple[int, str] | None = None
 
-    for item in hosts_models:
-        if not isinstance(item, dict):
-            continue
-        model = item.get("model") if isinstance(item.get("model"), dict) else {}
+    for model in models:
         candidates = [model.get("slug"), model.get("name")]
         for candidate in candidates:
             if not isinstance(candidate, str):
@@ -1705,17 +1803,20 @@ def _handle_schema(_: argparse.Namespace) -> int:
 def _capability_schema() -> dict[str, Any]:
     return {
         "name": "artificial-analysis",
-        "description": "AI-only fetch/analyze tool for Artificial Analysis provider endpoint data.",
+        "description": "AI-only fetch/analyze tool for canonical Artificial Analysis models and provider endpoints.",
         "protocol_version": PROTOCOL_VERSION,
         "default_command": "fetch",
-        "source": {
-            "type": "rsc",
-            "url": BASE_URL,
-            "required_headers": ["RSC: 1"],
+        "sources": {
+            "rsc": {"url": BASE_URL, "required_headers": ["RSC: 1"]},
+            "official_api": {
+                "url": MODEL_API_URL,
+                "credential_env": MODEL_API_KEY_ENV,
+                "required_for": ["fetch"],
+            },
         },
         "commands": {
             "fetch": {
-                "description": "Fetch live RSC payload, validate sanity thresholds, cache by ETag, and write outputs.",
+                "description": "Fetch required RSC and authenticated official-model sources, merge schema-v2 data, validate sanity thresholds, cache RSC by ETag, and write outputs.",
                 "outputs": ["full-data.json", "endpoints.txt", "full-url.txt"],
                 "flags": {
                     "output_json": "Path (default /tmp/artifacts/artificial-analysis/full-data.json)",
@@ -2123,6 +2224,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         return int(handler(args))
+    except CliUsageError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     except ExtractionError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
