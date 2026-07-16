@@ -7,80 +7,42 @@ metadata:
 allowed-tools: ""
 ---
 
-# Effect MCP
+# Effect
 
-Current docs for `effect` and supported `@effect/*` packages.
+Use live Effect documentation for questions about `effect` and imported `@effect/*` packages.
 
-## Dependency
+If `mcporter` is not on PATH, replace the leading `mcporter` in each command below with `nix run github:numtide/llm-agents.nix#mcporter --`.
+## Workflow
 
-Load `mcporter` first. Use its `mcporter` helper.
+1. Confirm the server and discover its current tools:
 
-## Use for
-
-- Questions about `effect` or `effect-ts`
-- Questions about imported `@effect/*` packages
-- API lookup, examples, setup, migrations, and package selection in the Effect ecosystem
-- Terms like fibers, layers, runtime, schema, platform, sql, cli, ai, rpc, vitest, and typeclass
-
-## Flow
-
-1. Confirm the server is live and inspect the tool schemas.
-
-```bash
-mcporter list effect --schema
+```text
+mcporter list effect --brief
 ```
 
-2. Inspect local version signals before trusting doc output.
+2. Inspect only the tool needed for an unfamiliar or constraint-sensitive request:
 
-- Check `package.json`, lockfiles, and imports for `effect` / `@effect/*`.
-- Default assumption: if the user did not explicitly opt into beta, they want stable guidance.
-- Treat `effect@latest` and `effect@beta` as different channels, not interchangeable advice.
-
-3. Normalize requested libraries before any MCP call.
-
-- Intersect requested/imported libraries with the supported list in `reference.md`.
-- Never pass unsupported package names to `effect-doc-links` or `effect-documentation`.
-- Common unsupported-but-real packages include `@effect/platform-node`, `@effect/platform-bun`, `@effect/platform-browser`, `@effect/opentelemetry`, and `@effect/experimental`.
-- If the user's package is unsupported, say so explicitly and fall back. Only fetch adjacent supported docs when they provide useful background, and label them as adjacent context, not direct package docs.
-
-4. Use `effect-doc-links` for light package-to-resource mapping. No full docs.
-
-```bash
-mcporter call 'effect.effect-doc-links(libraries: ["effect", "@effect/platform"])' --output json
+```text
+mcporter list effect.<tool> --schema
 ```
 
-5. Use `effect-documentation` for the actual answer path.
+3. For a requested library, use `effect-doc-links` to find focused resources. Use
+`effect-documentation` only when the answer needs the documentation content:
 
-```bash
+```text
+mcporter call 'effect.effect-doc-links(libraries: ["effect"])'
 mcporter call 'effect.effect-documentation(libraries: ["effect"])'
-mcporter call 'effect.effect-documentation(libraries: ["effect", "@effect/sql"])'
 ```
 
-6. Answer from returned docs. Keep package names explicit so core `effect` and ecosystem guidance stay separate.
+Use the literal server and tool names above. Do not maintain or rely on a static package or tool
+catalog; the live schema is authoritative.
 
-## Library pick
+Do not pass package names through blindly: if the live response does not cover the requested package,
+use `context7`, `gh`, or `research` instead of presenting adjacent docs as direct coverage.
+Inspect returned content, not just the exit status; if MCP reports an error or broken resource despite exit 0, use `context7`, `gh`, or `research` and disclose the failure.
 
-- Start with `effect` for core APIs, runtime, fibers, layers, and standard library pieces.
-- Add `@effect/platform` for platform/runtime integration questions.
-- Add one ecosystem package at a time instead of pulling the whole catalog.
-- See `reference.md` for the full upstream-supported library list and the exact tool catalog.
+## Version safety
 
-## Version policy
-
-- `effect-mcp` returns current docs, not guaranteed stable-channel docs.
-- For core `effect`, upstream MCP reads `https://effect.website/llms-full.txt`.
-- For several ecosystem packages, upstream MCP reads README files from `Effect-TS/effect` `main`.
-- Those sources can include beta, unstable, or ahead-of-latest material.
-- Unknown or unsupported libraries can silently degrade to core `effect` docs if you pass them through anyway.
-- If the docs and the user's installed versions disagree, trust the user's installed versions.
-- If guidance appears to require Effect v4 beta, say so explicitly.
-- If the repo already pins `effect@4.0.0-beta.*` or matching beta ecosystem packages, you may discuss v4 APIs, but keep calling them beta and non-default for production.
-- Do not recommend v4 beta APIs for production work unless the user explicitly opted into beta or the repo already depends on beta versions.
-
-## Fallback
-
-- If the package or topic is outside upstream coverage, fall back to `context7`, `gh`, or `research`.
-- If the MCP response is too thin for the question, corroborate with `context7`, `gh`, or `research`.
-- If version/channel ambiguity remains, use npm metadata or repo manifests before giving migration advice.
-- For unsupported packages, prefer direct docs or repo manifests over MCP, because MCP may return misleading core `effect` material.
-- Do not guess or invent unsupported `@effect/*` APIs.
+Check the project's manifest, lockfile, and imports before recommending version-sensitive APIs. Treat
+returned documentation as current upstream material; when it conflicts with the installed version,
+follow the project and state the mismatch rather than guessing.
