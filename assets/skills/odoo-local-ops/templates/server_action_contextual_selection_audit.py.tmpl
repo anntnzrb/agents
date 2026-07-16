@@ -1,12 +1,37 @@
+# Odoo 17 Server Action: contextual read-only audit
 # Model: {{ model_name }}
 # Purpose: {{ purpose }}
-# Read-only contextual action. No create/write/unlink. No sudo. No imports.
+#
+# How to expose it:
+# 1. Create a Server Action for MODEL_NAME with "Execute Python Code".
+# 2. Use "Create Contextual Action" so it appears in the list/form Action menu.
+# 3. Configure Allowed Groups deliberately; this template never bypasses them.
+# 4. Select records, run the action, and copy the compact JSON from the modal.
+#
+# Safety contract:
+# - Reads only the IDs selected by the user (`active_ids`).
+# - EXTRA_DOMAIN may reduce that selection, but can never expand it.
+# - No imports, sudo, create, write, unlink, commit, rollback, or external calls.
+# - `raise UserError(...)` is intentional here because this action is read-only.
+#
+# Style note:
+# Do not add type annotations just for aesthetics. Odoo safe_eval is not a normal
+# Python module runtime, and compatibility/debuggability matter more here.
+# Keep the control flow explicit. Small helper functions are useful; clever
+# lambdas, nested abstractions, and dense comprehensions make production audits
+# harder to inspect and repair from the UI.
 
+# ---------- Customize only this block ----------
 MODEL_NAME = '{{ model_name }}'
 MAX_SELECTION = {{ max_selection }}
+SAMPLE_LIMIT = {{ sample_limit }}
 SAMPLE_FIELDS = [{{ sample_fields_literal }}]
+GROUP_FIELDS = [{{ group_fields_literal }}]  # zero to three stored fields
+EXTRA_DOMAIN = {{ extra_domain_literal }}  # use [] when every selected row applies
+# -----------------------------------------------
 
 
+# Minimal JSON encoder for safe_eval. `import json` is intentionally avoided.
 def esc(value):
     if value is None:
         return 'null'
@@ -30,38 +55,145 @@ def obj(items):
     return '{' + ','.join(items) + '}'
 
 
+def json_rows(rows):
+    return '[' + ','.join(rows) + ']'
+
+
+def json_values(values):
+    encoded = []
+    for value in values:
+        encoded.append(esc(value))
+    return '[' + ','.join(encoded) + ']'
+
+
+# Group output is deliberately compact: technical key, visible label, count.
+def group_row_json(row, group_field):
+    value = row.get(group_field)
+    key = value and isinstance(value, (list, tuple)) and value[0] or value or False
+    label = value and isinstance(value, (list, tuple)) and value[1] or value or False
+    count = row.get(group_field + '_count') or row.get('__count') or 0
+    return obj([pair('key', key), pair('label', label), pair('count', count)])
+
+
+# Odoo supplies `records`, but raw context is intentional in this audit: it lets
+# us report duplicated and stale IDs instead of silently normalizing them away.
+# Never trust inherited UI context blindly. A contextual action can be launched
+# from an unexpected model, with no selection, duplicated IDs, or stale IDs.
 active_model = env.context.get('active_model')
 active_ids = env.context.get('active_ids') or []
+unique_ids = []
+duplicate_ids = []
+for active_id in active_ids:
+    if active_id in unique_ids:
+        duplicate_ids.append(active_id)
+    else:
+        unique_ids.append(active_id)
+
 error = False
 if active_model != MODEL_NAME:
     error = 'active_model_mismatch'
-elif not active_ids:
+elif not unique_ids:
     error = 'empty_selection'
 elif len(active_ids) > MAX_SELECTION:
     error = 'selection_too_large'
 
 Model = env[MODEL_NAME]
-selected = error and Model.browse() or Model.browse(active_ids).exists()
-if not error and len(selected) != len(set(active_ids)):
-    error = 'missing_or_duplicate_selected_ids'
 
+# Validate configuration before querying records. This catches copy/paste field
+# mistakes cheaply and keeps failures deterministic.
+invalid_fields = []
+invalid_group_fields = []
+for field_name in SAMPLE_FIELDS + GROUP_FIELDS:
+    if field_name not in Model._fields and field_name not in invalid_fields:
+        invalid_fields.append(field_name)
+for group_field in GROUP_FIELDS:
+    if (
+        group_field in Model._fields
+        and not Model._fields[group_field].store
+        and group_field not in invalid_group_fields
+    ):
+        invalid_group_fields.append(group_field)
+if not error and (MAX_SELECTION < 1 or SAMPLE_LIMIT < 1):
+    error = 'invalid_numeric_limits'
+elif not error and invalid_fields:
+    error = 'invalid_configured_fields'
+elif not error and invalid_group_fields:
+    error = 'non_stored_group_fields'
+elif not error and len(GROUP_FIELDS) > 3:
+    error = 'too_many_group_fields'
+
+if error:
+    selected = Model.browse()
+else:
+    selected = Model.browse(unique_ids).exists()
+missing_ids = []
+if not error:
+    existing_ids = selected.ids
+    for selected_id in unique_ids:
+        if selected_id not in existing_ids:
+            missing_ids.append(selected_id)
+    if missing_ids:
+        error = 'missing_selected_ids'
+    elif duplicate_ids:
+        error = 'duplicate_selected_ids'
+
+# This is the critical scope rule: the explicit ID predicate is always present.
+# EXTRA_DOMAIN can only narrow the user selection.
+selected_domain = [('id', 'in', selected.ids)]
+audit_domain = selected_domain + EXTRA_DOMAIN
+if error:
+    audited = Model.browse()
+else:
+    audited = Model.search(audit_domain, order='id asc')
+
+# Samples are bounded. Never dump every selected record into a modal/clipboard.
 sample_rows = []
 if not error:
-    for row in selected.sorted('id')[:10].read(SAMPLE_FIELDS, load=False):
-        fields = [pair('id', row.get('id'))]
-        for field_name in SAMPLE_FIELDS:
-            if field_name != 'id':
-                fields.append(pair(field_name, row.get(field_name)))
+    sample_fields = []
+    for field_name in ['id'] + SAMPLE_FIELDS:
+        if field_name not in sample_fields:
+            sample_fields.append(field_name)
+    rows = audited[:SAMPLE_LIMIT].read(sample_fields, load=False)
+    for row in rows:
+        fields = []
+        for field_name in sample_fields:
+            fields.append(pair(field_name, row.get(field_name)))
         sample_rows.append(obj(fields))
+
+# read_group performs aggregation in PostgreSQL. This is preferable to loading
+# all rows and counting them in Python. Keep it to at most three dimensions.
+group_chunks = []
+if not error:
+    for group_field in GROUP_FIELDS[:3]:
+        grouped = Model.read_group(
+            audit_domain,
+            ['id:count'],
+            [group_field],
+            lazy=False,
+        )
+        group_rows = []
+        for row in grouped:
+            group_rows.append(group_row_json(row, group_field))
+        group_chunks.append(obj([
+            pair('field', group_field),
+            'rows:' + json_rows(group_rows),
+        ]))
 
 payload = obj([
     pair('status', error and 'failed' or 'ok'),
     pair('error', error),
     pair('model', MODEL_NAME),
+    pair('requested_count', len(active_ids)),
     pair('selected_count', len(selected)),
-    pair('first_id', selected and min(selected.ids) or False),
-    pair('last_id', selected and max(selected.ids) or False),
-    'sample:[' + ','.join(sample_rows) + ']',
+    pair('audited_count', len(audited)),
+    pair('first_id', audited and audited[0].id or False),
+    pair('last_id', audited and audited[-1].id or False),
+    'missing_ids:' + json_values(missing_ids),
+    'duplicate_ids:' + json_values(duplicate_ids),
+    'invalid_fields:' + json_values(invalid_fields),
+    'invalid_group_fields:' + json_values(invalid_group_fields),
+    'sample:' + json_rows(sample_rows),
+    'groups:' + json_rows(group_chunks),
     pair('write_executed', False),
 ])
 raise UserError(payload)

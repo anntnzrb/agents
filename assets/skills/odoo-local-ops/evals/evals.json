@@ -101,6 +101,118 @@
         "Does not recommend JSON-RPC when the user lacks administrator credentials.",
         "Escalates reusable, complex, secret-bearing, or test-heavy logic to an addon."
       ]
+    },
+    {
+      "id": 9,
+      "prompt": "La acción contextual de crm.lead se abrió sin seleccionar registros. Quiero un error compacto y cero escrituras.",
+      "expected_output": "Rejects the empty selection before reading business rows and reports empty_selection with write_executed false.",
+      "files": [],
+      "expectations": ["Checks active_ids before work.", "Reports `empty_selection`.", "Performs no writes or sudo."]
+    },
+    {
+      "id": 10,
+      "prompt": "Pegaron mi acción contextual de crm.lead en el menú de res.partner. Debe abortar sin adivinar.",
+      "expected_output": "Validates active_model against the configured model and aborts with a compact mismatch diagnostic.",
+      "files": [],
+      "expectations": ["Validates `active_model`.", "Reports `active_model_mismatch`.", "Does not browse the foreign model IDs as crm.lead."]
+    },
+    {
+      "id": 11,
+      "prompt": "Mi selección contextual contiene IDs duplicados y uno ya fue borrado por otro usuario. Audítalo de forma segura.",
+      "expected_output": "Detects duplicate IDs and stale/missing IDs through explicit normalization and exists() without expanding scope.",
+      "files": [],
+      "expectations": ["Detects duplicate IDs.", "Uses `.exists()` for stale records.", "Never expands beyond active_ids."]
+    },
+    {
+      "id": 12,
+      "prompt": "Un usuario seleccionó 12000 leads para una acción contextual read-only. Evita congelar el navegador.",
+      "expected_output": "Applies a configured selection cap and rejects oversized input before expensive reads or grouping.",
+      "files": [],
+      "expectations": ["Uses MAX_SELECTION.", "Reports `selection_too_large`.", "Does not dump all records."]
+    },
+    {
+      "id": 13,
+      "prompt": "De los leads seleccionados, audita solo activos en etapa 20 y agrupa por vendedor y programa sin traer todos a Python.",
+      "expected_output": "Keeps the active_ids predicate, adds an explicit narrowing domain, and uses read_group for bounded aggregations.",
+      "files": [],
+      "expectations": ["Always includes `('id', 'in', selected.ids)`.", "EXTRA_DOMAIN only narrows scope.", "Uses `read_group`.", "Limits grouping dimensions."]
+    },
+    {
+      "id": 14,
+      "prompt": "Configuré mal un nombre de campo en SAMPLE_FIELDS de la acción. Quiero un diagnóstico legible.",
+      "expected_output": "Checks configured fields against Model._fields and reports invalid_configured_fields before read().",
+      "files": [],
+      "expectations": ["Validates field names.", "Reports invalid fields compactly.", "Avoids a raw safe_eval traceback where possible."]
+    },
+    {
+      "id": 15,
+      "prompt": "Quiero que una Server Action read-only abra una vista con exactamente los registros auditados en vez de imprimirlos todos.",
+      "expected_output": "Returns an ir.actions.act_window with an explicit ID domain after audit and avoids large JSON output.",
+      "files": [],
+      "expectations": ["Uses `action =` rather than return.", "Uses an explicit bounded ID domain.", "Does not export every record."]
+    },
+    {
+      "id": 16,
+      "prompt": "La acción global heredó active_domain desde una vista distinta. Necesito auditar todo crm.lead.",
+      "expected_output": "Ignores inherited active_domain and uses an explicit model plus explicit global domain.",
+      "files": [],
+      "expectations": ["Does not trust `active_domain`.", "Uses `env['crm.lead']` explicitly.", "Uses an explicit domain such as `[]`."]
+    },
+    {
+      "id": 17,
+      "prompt": "Diseña el dry-run de una corrección de 113 leads con 2 exclusiones y conteos por vendedor.",
+      "expected_output": "Uses the dry-run template with expected totals, frozen target/excluded IDs, grouping, and write_executed false.",
+      "files": [],
+      "expectations": ["Checks expected totals.", "Reports target and excluded IDs compactly.", "Uses read_group.", "Performs no writes."]
+    },
+    {
+      "id": 18,
+      "prompt": "Corrige 40 registros con ORM porque necesito constraints y tracking. Si cambió el conteo, aborta.",
+      "expected_output": "Uses the small ORM execution template with exact precheck, bounded search, write(), postcheck, rollback-on-error, and notification-on-success.",
+      "files": [],
+      "expectations": ["Uses ORM write.", "Checks candidate count before write.", "Checks final invariant.", "Uses display_notification on success."]
+    },
+    {
+      "id": 19,
+      "prompt": "Haz una actualización SQL masiva donde el dominio incluye active_test, M2M y valores nullable.",
+      "expected_output": "Translates ORM semantics explicitly into parameterized SQL with frozen unique candidates and timeouts.",
+      "files": [],
+      "expectations": ["Includes active IS TRUE.", "Uses EXISTS for M2M.", "Uses IS DISTINCT FROM.", "Uses a temp table and unique candidate check.", "Uses lock and statement timeouts."]
+    },
+    {
+      "id": 20,
+      "prompt": "Después de ejecutar una corrección, necesito una auditoría final independiente y detectar tablas temporales persistentes.",
+      "expected_output": "Uses the final-audit template, independent domains, invariant counts, live deltas, and persistent-leftover checks.",
+      "files": [],
+      "expectations": ["Runs read-only.", "Uses independent domains.", "Separates live delta from invariant failure.", "Checks persistent leftovers."]
+    },
+    {
+      "id": 21,
+      "prompt": "Crea una automatización On save que no se dispare por cualquier write ni entre en recursión.",
+      "expected_output": "Requires trigger fields, idempotent logic, and a context/invariant guard against recursive writes.",
+      "files": [],
+      "expectations": ["Specifies trigger fields.", "Requires idempotence.", "Addresses recursive writes.", "Does not misuse On UI change as a backend hook."]
+    },
+    {
+      "id": 22,
+      "prompt": "Quiero recibir un webhook en una Automated Action y usar su payload para encontrar un registro.",
+      "expected_output": "Treats the generated URL as a secret, validates payload shape and identifiers, and uses a narrow target resolver.",
+      "files": [],
+      "expectations": ["Treats webhook URL as secret.", "Validates payload.", "Uses a narrow record lookup.", "Does not log unrestricted payloads or credentials."]
+    },
+    {
+      "id": 23,
+      "prompt": "Necesito procesar trabajo cada diez minutos sin dejar la pestaña abierta y sin repetir registros.",
+      "expected_output": "Recommends a scheduled action with small ordered idempotent batches and escalation to an addon for durable complexity.",
+      "files": [],
+      "expectations": ["Uses a scheduled action.", "Uses bounded ordered batches.", "Requires idempotence.", "Avoids a long browser-triggered action."]
+    },
+    {
+      "id": 24,
+      "prompt": "La lógica ya tiene secretos, tres APIs externas, reintentos y se reutiliza en varias acciones. ¿La dejo como snippet?",
+      "expected_output": "Rejects a large Server Action and moves tested logic into an addon method, leaving only a minimal invocation if appropriate.",
+      "files": [],
+      "expectations": ["Escalates to a custom addon.", "Keeps secrets out of the snippet.", "Requires tests, retries, and observability in normal code.", "Does not recommend JSON-RPC as a permission bypass."]
     }
   ]
 }
