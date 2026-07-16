@@ -13,6 +13,14 @@ The audited production deployment uses Odoo 17 on Python 3.10. Treat that as a
 deployment fact, not a universal Odoo 17 guarantee. Re-run the capability audit
 after changing the Odoo image or Python runtime.
 
+The production gauntlet completed 43/43 checks with `write_executed: false` on
+`crm.lead`. This confirmed actual execution—not merely opcode compatibility—of
+function annotations, an import-free decorator without closure, positional-only
+and keyword-only arguments, generator functions and expressions, list/dict/set
+comprehensions, `map`, `filter`, `reduce`, a higher-order pipeline, literal
+`match`, simple walrus, dict merge, self-documenting f-strings, ordered set-backed
+deduplication, Odoo recordset operations, `search_count`, and `read_group`.
+
 Python syntax support has two gates:
 
 1. The construct must compile on Python 3.10.
@@ -53,17 +61,18 @@ Restricted functional built-ins confirmed in production include `map`,
 | Construct | Status | Guidance |
 | --- | --- | --- |
 | Small local helper without closure | supported | Prefer named pure helpers for repeated transformations. |
-| Function parameter/return annotations using visible built-ins | opcode-compatible | Usually omit in UI snippets: they add little runtime value and no static checker runs there. |
+| Function parameter/return annotations using visible built-ins | production-confirmed | Use sparingly for helper contracts; no static checker runs in the UI. |
 | Variable annotation | forbidden | Emits `SETUP_ANNOTATIONS`. |
-| List/dict/set comprehension | supported | Keep it single-purpose and bounded. |
-| Generator expression | supported | Useful with `sum`, `all`, or `any`; never hide ORM queries inside it. |
-| `map` / `filter` / `reduce` | supported | Prefer a comprehension, `sum`, or an explicit loop when clearer. Always give `reduce` an initializer. |
-| Ordered deduplication with `set` + `list` | supported | Use a set for O(1) membership and a list to preserve order. |
-| Simple walrus expression | supported | Use only when it removes duplicate work without obscuring control flow. |
+| List/dict/set comprehension | production-confirmed | Keep it single-purpose and bounded. |
+| Generator function/expression | production-confirmed | Useful with `sum`, `all`, or `any`; never hide ORM queries inside it. |
+| `map` / `filter` / `reduce` | production-confirmed | Prefer a comprehension, `sum`, or an explicit loop when clearer. Always give `reduce` an initializer. |
+| Ordered deduplication with `set` + `list` | production-confirmed | Use a set for O(1) membership and a list to preserve order. |
+| Import-free decorator without closure | production-confirmed | Useful only for a real local contract; imported and closure-producing decorators remain unavailable. |
+| Simple walrus expression | production-confirmed | Use only when it removes duplicate work without obscuring control flow. |
 | Walrus inside a comprehension at module scope | forbidden | Can emit blacklisted `STORE_GLOBAL`. |
-| Dict merge `left | right` | supported | Use for small copy-on-write dictionaries, not record mutation. |
-| Self-documenting f-string | supported | Useful for diagnostics, but compact JSON remains the audit output contract. |
-| `match` against scalar literals plus wildcard | opcode-compatible | Use only when it is clearer than an `if/elif` chain. |
+| Dict merge `left | right` | production-confirmed | Use for small copy-on-write dictionaries, not record mutation. |
+| Self-documenting f-string | production-confirmed | Useful for diagnostics, but compact JSON remains the audit output contract. |
+| `match` against scalar literals plus wildcard | production-confirmed | Use only when it is clearer than an `if/elif` chain. |
 | Sequence, mapping, or class structural patterns | forbidden | Emit unsupported `MATCH_*`/`GET_LEN` opcodes. |
 | Closure capturing an outer local | forbidden | Emits unsupported `LOAD_CLOSURE`/`LOAD_DEREF`; pass values explicitly instead. |
 | Specific `try/except` | supported | Catch only errors the snippet can handle; never convert an unknown failure into `ok`. |

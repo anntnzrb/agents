@@ -16,6 +16,14 @@ Use for a read-only contextual action launched from the list/form Action menu. I
 
 Required placeholders: model name, purpose, maximum selection size, sample limit, sample fields, grouping fields, and an optional narrowing domain.
 
+### `templates/server_action_modern_python_gauntlet_crm_lead.py.tmpl`
+
+Use after an Odoo/Python runtime or image change to re-check the production
+`safe_eval` surface on `crm.lead`. It performs 43 read-only checks covering
+modern Python 3.10 syntax, functional helpers, wrappers, bounded ORM operations,
+and explicitly reports excluded unsafe constructs. Run it on at most 1000
+selected leads and compare the returned counts with the known 43/43 baseline.
+
 ### `templates/server_action_dry_run.py.tmpl`
 
 Use for no-write validation of target counts/distribution and JSON output before approval.
