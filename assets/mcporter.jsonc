@@ -5,6 +5,10 @@
       "description": "DeepWiki MCP",
       "serverUrl": "https://mcp.deepwiki.com/mcp",
     },
+    "openai-docs": {
+      "description": "OpenAI Developer Docs MCP",
+      "serverUrl": "https://developers.openai.com/mcp",
+    },
     "linear": {
       "description": "Linear MCP",
       "serverUrl": "https://mcp.linear.app/mcp",

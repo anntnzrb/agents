@@ -1,6 +1,6 @@
 ---
 name: mcporter
-description: Manage MCP servers, tool calls, endpoints, auth/OAuth, and configuration through MCPorter.
+description: Manage, authenticate, inspect, and call configured MCP servers with MCPorter.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
@@ -9,57 +9,54 @@ allowed-tools: ""
 
 # MCPorter
 
-Use MCPorter to manage MCP servers, tool calls, configuration, and OAuth—not as a generic all-server workflow.
+Use MCPorter for generic configured-server management. Use a focused skill when one exists.
 
-Define `mcporter` once per shell:
+## Invocation
 
-`mcporter() { nix run github:numtide/llm-agents.nix#mcporter -- "$@"; }`
-
-Then use `mcporter <command>` below.
-
-## Discovery
+If `mcporter` is not on `PATH`, use:
 
 ```text
-mcporter list
-mcporter list <server> --brief
-mcporter list <server>.<tool> --schema
+nix run github:numtide/llm-agents.nix#mcporter -- <command>
 ```
 
-Start with `list <server> --brief`. For an unfamiliar or constraint-sensitive call, inspect only
-`<server>.<tool>` with `--schema`; it already returns the full schema. Use
-`list <server> --all-parameters` instead when an expanded signature is enough. Do not combine
-`--brief` with `--schema`, `--all-parameters`, `--json`, or `--verbose`; do not combine `--schema`
-with `--all-parameters`.
+Pass `--config <path>` only for a non-default registry. Inspect configuration before changing it.
 
-## Calls
+## Discovery and calls
 
-```text
-mcporter call <server.tool> key=value
-mcporter call '<server.tool(arg: "value")>'
-mcporter call <server.tool> --args '{"key":["value"]}'
-```
-
-Use `key=value` for simple values, function-call syntax for typed literals, and `--args '<JSON object>'`
-for arrays, objects, `null`, or multiline content. Use `key=@file` for file content; `@@` begins a
-literal `@`. Quote shell-sensitive values.
-
-## Configuration and health
+Start with the least expensive query, then inspect only the chosen tool:
 
 ```text
 mcporter config list
-mcporter config get <name>
-mcporter config doctor
+mcporter list
+mcporter list <server> --brief
+mcporter list <server>.<tool> --schema
+mcporter list <server>.<tool> --all-parameters
+mcporter call <server>.<tool> key=value
+mcporter call <server>.<tool> --args '{"key":["value"]}'
+```
+
+Use `--all-parameters` when optional arguments matter. Use `key=value` or `key:value` for simple values and `--args` for objects, arrays, null, or multiline data. Do not expose secrets in output or logs.
+
+For a deterministic health check that never begins OAuth:
+
+```text
 mcporter list <server> --status --no-oauth --exit-code
 ```
 
-Use the status command and its exit code as the cached-auth health check. Inspect config before changing
-it; use `config doctor` for configuration failures.
-
-## Authentication
+## Configuration and auth
 
 ```text
+mcporter config get <name>
+mcporter config doctor
 mcporter auth <server|url>
 ```
 
-Authenticate only when the server requires OAuth or reports an auth failure. Never expose, copy, or log
-tokens; report persistent 401/403 responses rather than attempting writes.
+Authenticate only when required. Treat missing environment substitutions and persistent 401/403 responses as prerequisites; do not invent credentials or rewrite server definitions.
+
+## Required follow-up reads
+
+| Need | Read | When |
+|---|---|---|
+| Local names, transports, and substitutions | `assets/mcporter.jsonc` | Before selecting a configured server |
+| Tool arguments and output | `mcporter list <server>.<tool> --schema` | After selecting a tool |
+| Server behavior | Focused skill/reference | When available |
