@@ -28,7 +28,7 @@ theme:
   dark: titanium
   light: light
 hideThinkingBlock: true
-inlineToolDescriptors: true
+inlineToolDescriptors: auto
 collapseChangelog: true
 followUpMode: all
 steeringMode: all
@@ -47,7 +47,6 @@ display:
 # =============================================================================
 mcp:
   enableProjectConfig: false
-  discoveryMode: false
   notifications: false
 # memory:
 #   backend: local
@@ -75,8 +74,6 @@ compaction:
 # =============================================================================
 # Tools
 # =============================================================================
-tools:
-  discoveryMode: "off"
 edit.mode: hashline
 
 # =============================================================================
@@ -93,6 +90,7 @@ eval:
 # =============================================================================
 task:
   eager: "always"
+  prewalk: true
   maxConcurrency: 16
   maxRecursionDepth: 1
   maxRuntimeMs: 3600000
@@ -200,7 +198,6 @@ bashInterceptor:
       flags: i
       tool: bash
       message: "This is PowerShell syntax, not Bash. In OMP bash on Windows, invoke `pwsh.exe -NoProfile -NoLogo -NonInteractive -Command '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; <script>'`, or use a temporary `.ps1` under PowerShell temp with `-File` for quote-heavy commands."
-bash.stripTrailingHeadTail: true
 bash.autoBackground.thresholdMs: 60000
 
 # =============================================================================
