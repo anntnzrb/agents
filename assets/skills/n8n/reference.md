@@ -1,90 +1,33 @@
 # n8n Reference
 
-## REST API (authoring)
+## Bundled REST CLI
 
-- Base path: `/api/v1`
-- Auth header: `X-N8N-API-KEY: <key>`
-- Docs: `<N8N_BASE_URL>/api/v1/docs`
+The CLI calls the n8n REST API at `<N8N_BASE_URL>/api/v1` with `X-N8N-API-KEY`.
 
-Common endpoints:
-
-- `GET /api/v1/workflows`
-- `POST /api/v1/workflows`
-- `PUT /api/v1/workflows/{id}`
-- `POST /api/v1/workflows/{id}/activate`
-- `POST /api/v1/workflows/{id}/deactivate`
-- `GET /api/v1/executions`
-
-## MCP (runtime)
-
-- Instance-level MCP for listing and running enabled workflows
-
-Notes:
-
-- Use `supergateway` for streamable HTTP endpoints
-
-## Node lookup
-
-- Exa: built-in node library docs (`https://docs.n8n.io/integrations/builtin/node-types/`)
-- Context7: `/n8n-io/n8n-docs` for node docs + examples
-- DeepWiki: repo Q&A over `n8n-io/n8n-docs`; pair with `gh` or workflow export to confirm `type` strings
-- `gh`: list node folders, then search by keyword and open the `*.node.json` file to read the `node` field
-- Inspect `type` fields from exported workflows to confirm exact identifiers
-
-## MCP config snippet (template)
-
-Add after you have the MCP URL and token:
-
-```json
-{
-  "mcpServers": {
-    "n8n": {
-      "description": "n8n MCP",
-      "command": "bun",
-      "args": [
-        "x",
-        "supergateway",
-        "--streamableHttp",
-        "<N8N_MCP_URL>",
-        "--header",
-        "Authorization: Bearer <N8N_MCP_TOKEN>"
-      ]
-    }
-  }
-}
-```
-
-## Environment
-
-Tracked template: `.env.example`
-
-Common vars:
-
-- `N8N_BASE_URL`
-- `N8N_API_KEY`
-- `N8N_MCP_URL`
-- `N8N_MCP_TOKEN`
-
-`n8nctl.py` lookup order:
-
-- `N8N_ENV_FILE`
-- `$SKILLS_DIR/n8n/.env`
-- nearest ancestor `skills/n8n/.env`
-
-## n8nctl (uv script)
-
-The `scripts/n8nctl.py` helper wraps REST calls and avoids curl/jq.
-
-Required env vars:
+Required environment:
 
 - `N8N_BASE_URL`
 - `N8N_API_KEY`
 
-Examples:
+The CLI loads `N8N_ENV_FILE`, then its skill-local `.env`, then the nearest ancestor `skills/n8n/.env`. It reports a missing required variable before making a request.
 
-```bash
+Use the bundled CLI rather than raw HTTP:
+
+```text
 uv run --script <skill-dir>/scripts/cli.py list --limit 5
+uv run --script <skill-dir>/scripts/cli.py get <WORKFLOW_ID>
 uv run --script <skill-dir>/scripts/cli.py export <WORKFLOW_ID> <OUT.json>
-uv run --script <skill-dir>/scripts/cli.py mcp-enable <WORKFLOW_ID>
 uv run --script <skill-dir>/scripts/cli.py validate <WORKFLOW.json>
 ```
+
+## Optional MCPorter route
+
+The configured `n8n` MCPorter entry passes `N8N_MCP_URL` to `supergateway` and sends `N8N_MCP_TOKEN` as a bearer token. Both variables must be set.
+
+```text
+mcporter list n8n --brief
+mcporter list n8n.<tool> --schema
+mcporter call n8n.<tool> --args '<JSON object>'
+```
+
+Check `assets/mcporter.jsonc` for the selected registry's transport. Endpoint availability and exposed tools are instance-specific.
