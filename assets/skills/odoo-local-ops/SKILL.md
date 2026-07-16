@@ -112,6 +112,7 @@ Read these when the task needs deeper rules:
 - `references/output-contracts.md` — JSON output shapes and failure contracts.
 - `references/route-safety.md` — controller route risk heuristics.
 - `references/server-action-playbook.md` — end-to-end production workflow, /tmp + clipboard, audit/dry-run/execute/final-audit rules
+- `references/server-action-capabilities.md` — Odoo 17 capability map, contextual actions, automation/webhook/cron choices, and when code belongs in a module
 - `references/server-action-safe-eval.md` — Odoo 17 safe_eval context, forbidden imports/opcodes, output semantics
 - `references/server-action-sql-safety.md` — when SQL is allowed, temp tables, active_test translation, lock/statement timeouts, rollback rules
 - `references/server-action-templates.md` — clipboard-ready template catalog and when to use each template

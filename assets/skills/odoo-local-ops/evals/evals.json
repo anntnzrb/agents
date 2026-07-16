@@ -75,6 +75,32 @@
         "Uses explicit `domain = []` or another explicit domain.",
         "Does not export full records unless explicitly requested."
       ]
+    },
+    {
+      "id": 7,
+      "prompt": "En Odoo 17 quiero una acción contextual read-only que audite únicamente los crm.lead seleccionados desde el menú Acción. No debe ampliar el dominio ni usar JSON-RPC.",
+      "expected_output": "Uses the contextual-selection template, validates active_model and active_ids, caps the selection, resolves exists(), and returns compact JSON without external credentials.",
+      "files": [],
+      "expectations": [
+        "Uses or follows `server_action_contextual_selection_audit.py.tmpl`.",
+        "Validates `active_model` and `active_ids`.",
+        "Never expands beyond the selected IDs.",
+        "Uses no imports, sudo, writes, JSON-RPC, or credentials.",
+        "Returns compact JSON with `write_executed: false`."
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Explícame qué alternativas ofrece Odoo 17 además de Execute Python Code para automatizar, encadenar acciones o integrar otro sistema, y cuándo debería crear un módulo.",
+      "expected_output": "Explains code/create/write/webhook/multi, contextual actions, automation triggers and scheduled actions, then gives a decision boundary for moving durable logic into an addon.",
+      "files": [],
+      "expectations": [
+        "Covers the five Odoo 17 server action states.",
+        "Explains contextual actions, automation rules, and scheduled actions.",
+        "Treats webhook URLs and payloads as sensitive.",
+        "Does not recommend JSON-RPC when the user lacks administrator credentials.",
+        "Escalates reusable, complex, secret-bearing, or test-heavy logic to an addon."
+      ]
     }
   ]
 }

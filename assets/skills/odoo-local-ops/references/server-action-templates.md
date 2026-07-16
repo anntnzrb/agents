@@ -10,6 +10,12 @@ Use for read-only audit; ends with `raise UserError(payload)`.
 
 Required placeholders: model name, domain, expected counts, target ids, excluded ids, fields to update, final invariant checks.
 
+### `templates/server_action_contextual_selection_audit.py.tmpl`
+
+Use for a read-only contextual action launched from the list/form Action menu. It validates `active_model`, resolves only the selected `active_ids`, rejects an empty or oversized selection, and returns compact JSON.
+
+Required placeholders: model name, purpose, maximum selection size, sample fields.
+
 ### `templates/server_action_dry_run.py.tmpl`
 
 Use for no-write validation of target counts/distribution and JSON output before approval.

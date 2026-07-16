@@ -1,0 +1,67 @@
+# Model: {{ model_name }}
+# Purpose: {{ purpose }}
+# Read-only contextual action. No create/write/unlink. No sudo. No imports.
+
+MODEL_NAME = '{{ model_name }}'
+MAX_SELECTION = {{ max_selection }}
+SAMPLE_FIELDS = [{{ sample_fields_literal }}]
+
+
+def esc(value):
+    if value is None:
+        return 'null'
+    if value is False:
+        return 'false'
+    if value is True:
+        return 'true'
+    if isinstance(value, (int, float)):
+        return str(value)
+    text = str(value)
+    text = text.replace('\\', '\\\\').replace('"', '\\"')
+    text = text.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+    return '"' + text + '"'
+
+
+def pair(key, value):
+    return esc(key) + ':' + esc(value)
+
+
+def obj(items):
+    return '{' + ','.join(items) + '}'
+
+
+active_model = env.context.get('active_model')
+active_ids = env.context.get('active_ids') or []
+error = False
+if active_model != MODEL_NAME:
+    error = 'active_model_mismatch'
+elif not active_ids:
+    error = 'empty_selection'
+elif len(active_ids) > MAX_SELECTION:
+    error = 'selection_too_large'
+
+Model = env[MODEL_NAME]
+selected = error and Model.browse() or Model.browse(active_ids).exists()
+if not error and len(selected) != len(set(active_ids)):
+    error = 'missing_or_duplicate_selected_ids'
+
+sample_rows = []
+if not error:
+    for row in selected.sorted('id')[:10].read(SAMPLE_FIELDS, load=False):
+        fields = [pair('id', row.get('id'))]
+        for field_name in SAMPLE_FIELDS:
+            if field_name != 'id':
+                fields.append(pair(field_name, row.get(field_name)))
+        sample_rows.append(obj(fields))
+
+payload = obj([
+    pair('status', error and 'failed' or 'ok'),
+    pair('error', error),
+    pair('model', MODEL_NAME),
+    pair('selected_count', len(selected)),
+    pair('first_id', selected and min(selected.ids) or False),
+    pair('last_id', selected and max(selected.ids) or False),
+    'sample:[' + ','.join(sample_rows) + ']',
+    pair('write_executed', False),
+])
+raise UserError(payload)
