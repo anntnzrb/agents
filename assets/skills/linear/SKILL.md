@@ -9,6 +9,7 @@ compatibility: Requires MCPorter configuration and Linear authentication.
 Use the literal MCPorter server name `linear` for Linear work. Treat the live server schema as
 authority; do not maintain a static tool inventory.
 
+If `mcporter` is not on PATH, replace the leading `mcporter` in each command below with `nix run github:numtide/llm-agents.nix#mcporter --`.
 ## Connect and discover
 
 If MCPorter does not load the SSOT config, add `--config <path-to-mcporter.jsonc>` to every command.
@@ -38,7 +39,7 @@ mcporter call linear.<tool> --args '{"id":"ENG-42","labels":["Bug"]}' --output j
 mcporter call linear.<tool> body=@comment.md --output json
 ```
 
-Use `key=value`/`key:value` for scalars, function syntax for typed literals, and `--args '<JSON object>'`
+Use `key=value` for simple scalars, function syntax for typed literals, and `--args '<JSON object>'`
 for arrays, objects, `null`, or multiline content. Use `key=@path` for UTF-8 files; `@@` is a literal
 `@`. Quote shell-sensitive values. Use `--save-images <directory>` for image responses.
 
