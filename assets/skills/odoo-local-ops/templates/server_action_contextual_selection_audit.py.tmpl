@@ -83,10 +83,12 @@ active_model = env.context.get('active_model')
 active_ids = env.context.get('active_ids') or []
 unique_ids = []
 duplicate_ids = []
+seen_ids = set()
 for active_id in active_ids:
-    if active_id in unique_ids:
+    if active_id in seen_ids:
         duplicate_ids.append(active_id)
     else:
+        seen_ids.add(active_id)
         unique_ids.append(active_id)
 
 error = False
