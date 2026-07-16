@@ -1,76 +1,112 @@
 ---
 name: linear
-description: Manage Linear issues, projects, teams, cycles, comments, and documentation through MCPorter.
-compatibility: Requires Linear configured and authenticated in MCPorter under server name `linear`.
+description: "Manage Linear through MCPorter: discover live tools, inspect schemas, and safely read or change data."
+compatibility: Requires MCPorter configuration and Linear authentication.
 ---
 
 # Linear
 
-## Overview
+Use this skill for Linear issues, projects, documents, cycles, releases, diffs, comments, and workspace
+planning. Use MCPorter rather than a harness-specific integration. Treat the live server schema as the
+authority: Linear's tool surface evolves.
 
-This skill provides structured workflows for managing issues, projects, and teams through MCPorter.
+## Connect and orient
 
-## Prerequisites
-- Linear must be configured and authenticated in MCPorter under server name `linear`
-- Confirm access to the relevant Linear workspace, teams, and projects
+The SSOT MCPorter config names the server `linear`. If MCPorter does not automatically load the desired
+config, add `--config <path-to-mcporter.jsonc>` to every command.
 
-## Tool Routing
-- Execute operations with `mcporter call linear.<tool>`.
-- Run `mcporter list linear --schema` only when the needed tool signature is unknown.
+```text
+mcporter config get linear
+mcporter list linear --status --json
+mcporter list linear --brief
+```
 
-## Required Workflow
+The config entry needs a reachable Linear MCP endpoint. If discovery reports authentication or access
+failure, run `mcporter auth linear`, complete the OAuth flow, then repeat the status check. Never expose,
+copy, or log tokens. A 401/403 after auth usually means the authenticated account lacks workspace access;
+report it rather than attempting a write.
 
-**Follow these steps in order. Do not skip steps.**
+## Compact discovery and schemas
 
-### Step 0: Verify Linear access
+Start with `mcporter list linear --brief`, not the full schema dump. Select a candidate by capability,
+then inspect only that tool before a call:
 
-If Linear is unavailable through MCPorter server `linear`, run `mcporter auth linear`, then verify workspace access. Continue with Step 1 after access is available.
+```text
+mcporter list linear.save_issue --schema
+mcporter list linear.save_issue --schema --all-parameters
+```
 
-### Step 1
-Clarify the user's goal and scope (e.g., issue triage, sprint planning, documentation audit, workload balance). Confirm team/project, priority, labels, cycle, and due dates as needed.
+Use the live name and signature returned by MCPorter; do not infer old `create_*`/`update_*` names or
+maintain a static inventory. The current surface groups naturally into:
 
-### Step 2
-Select the appropriate workflow (see Practical Workflows below) and identify the Linear tools you will need. Confirm required identifiers (issue ID, project ID, team key) before calling tools.
+- attachments; agent skills; comments; cycles; documents and image extraction
+- issues, statuses, and labels; projects, milestones, and project labels
+- release pipelines, releases, and release notes; diffs and threads
+- teams and users; documentation search; project/initiative status updates
 
-### Step 3
-Execute Linear operations in logical batches through `mcporter call linear.<tool>`:
-- Read first (list/get/search) to build context.
-- Create or update next (issues, projects, labels, comments) with all required fields.
-- For bulk operations, explain the grouping logic before applying changes.
+For an unfamiliar request, first discover the category, then the targeted schema. Re-inspect the schema
+after a validation error or when the operation has replacement, null-clearing, or mutually exclusive fields.
 
-### Step 4
-Summarize results, call out remaining gaps or blockers, and propose next actions (additional issues, label changes, assignments, or follow-up comments).
+## Call conventions
 
-## Available Tools
+Use JSON output for machine-readable results; use `text`, `markdown`, or `raw` only when their presentation
+is specifically needed.
 
-Issue Management: `list_issues`, `get_issue`, `create_issue`, `update_issue`, `list_my_issues`, `list_issue_statuses`, `list_issue_labels`, `create_issue_label`
+```text
+mcporter call linear.list_issues team=ENG limit=10 --output json
+mcporter call 'linear.save_issue(id: "ENG-42", priority: 1)' --output json
+mcporter call linear.save_issue --args '{"id":"ENG-42","labels":["Bug"],"cycle":null}' --output json
+mcporter call linear.save_comment issueId=ENG-42 body=@comment.md --output json
+```
 
-Project & Team: `list_projects`, `get_project`, `create_project`, `update_project`, `list_teams`, `get_team`, `list_users`
+Use `key=value` or `key:value` for simple scalar arguments. Use function-call syntax for typed literals,
+and `--args '<JSON object>'` for arrays, objects, `null`, or multiline content. Use `key=@path` for long
+UTF-8 Markdown; `@@` starts a literal `@`. Quote shell-sensitive values. `--raw-strings` and `--no-coerce`
+disable normal coercion when a schema requires a string that resembles a number or boolean. For image
+responses, use `--save-images <directory>` rather than copying encoded content into context.
 
-Documentation & Collaboration: `list_documents`, `get_document`, `search_documentation`, `list_comments`, `create_comment`, `list_cycles`
+## Read before write
 
-## Practical Workflows
+1. Resolve ambiguous team, user, project, cycle, status, label, release, or issue names with the relevant
+   `list_*`/`get_*` call. Use small limits and filters; follow cursors only as needed.
+2. Read the target entity immediately before mutation and inspect the targeted write schema.
+3. State the intended change, affected identifiers, and whether it creates, updates, archives, or deletes.
+   Ask for confirmation when the user's intent is ambiguous or the change is broad/destructive.
+4. Make the smallest write. Do not batch independent writes until the first result is understood.
+5. Re-read the changed entity or bounded listing and report the returned identifiers and remaining failures.
 
-- Sprint Planning: Review open issues for a target team, pick top items by priority, and create a new cycle (e.g., "Q1 Performance Sprint") with assignments.
-- Bug Triage: List critical/high-priority bugs, rank by user impact, and move the top items to "In Progress."
-- Documentation Audit: Search documentation (e.g., API auth), then open labeled "documentation" issues for gaps or outdated sections with detailed fixes.
-- Team Workload Balance: Group active issues by assignee, flag anyone with high load, and suggest or apply redistributions.
-- Release Planning: Create a project (e.g., "v2.0 Release") with milestones (feature freeze, beta, docs, launch) and generate issues with estimates.
-- Cross-Project Dependencies: Find all "blocked" issues, identify blockers, and create linked issues if missing.
-- Automated Status Updates: Find your issues with stale updates and add status comments based on current state/blockers.
-- Smart Labeling: Analyze unlabeled issues, suggest/apply labels, and create missing label categories.
-- Sprint Retrospectives: Generate a report for the last completed cycle, note completed vs. pushed work, and open discussion issues for patterns.
+`save_*` tools may create when their `id` is omitted and update when supplied. In particular:
 
-## Tips for Maximum Productivity
+- `save_issue` creation requires `title` and `team`; `labels` replaces the complete label set, while
+  omitted fields remain unchanged and documented nullable fields clear only when passed as `null`.
+- Do not combine issue release replacement with release add/remove fields; inspect the schema for other
+  mutually exclusive fields.
+- `save_comment` requires `body` plus exactly one parent target when starting a thread; replies use
+  `parentId`. Do not duplicate comments after an ambiguous timeout—read first.
+- Deleting/archiving, attachment upload/finalization, and bulk edits require explicit user intent plus
+  a fresh schema read. Preserve upload sequencing and signed-request requirements from the live schema.
 
-- Batch operations for related changes; consider smart templates for recurring issue structures.
-- Use natural queries when possible ("Show me what John is working on this week").
-- Leverage context: reference prior issues in new requests.
-- Break large updates into smaller batches to avoid rate limits; cache or reuse filters when listing frequently.
+## Practical workflows
 
-## Troubleshooting
+**Triage:** `list_teams` → `list_issue_statuses`/`list_issue_labels` → filtered `list_issues` → review
+each selected `get_issue` → `save_issue` one issue at a time → `get_issue` verification.
 
-- Authentication: Run `mcporter auth linear`, then verify workspace permissions and API access.
-- Tool Calling Errors: Confirm the model supports multiple tool calls, provide all required fields, and split complex requests.
-- Missing Data: Refresh token, verify workspace access, check for archived projects, and confirm correct team selection.
-- Performance: Remember Linear API rate limits; batch bulk operations, use specific filters, or cache frequent queries.
+**Project or release planning:** resolve team/project/pipeline with list/get tools → inspect the relevant
+`save_project`, `save_milestone`, `save_release`, or `save_release_note` schema → create/update → re-read
+the project, milestone, or release. Do not assume milestones, pipelines, or release stages exist.
+
+**Research and reporting:** use filtered list/get calls, `get_diff`/`get_diff_threads`, documents, and
+`search_documentation`; preserve read-only mode unless the user explicitly requests a change. Summarize
+scope, filters, IDs, and pagination limits so results are reproducible.
+
+**Comments and docs:** read the issue/project/document and existing comments first; draft Markdown in a
+file for long content; save once, then list/get to verify placement and content.
+
+## Fail safely
+
+- Unknown tool or argument: run targeted `list linear.<tool> --schema --all-parameters`; do not guess.
+- Validation error: correct the payload against that schema; do not silently drop fields.
+- Network timeout or uncertain write result: read the target/search for the intended result before retrying.
+- Pagination or incomplete data: narrow filters, use `cursor`, and disclose the boundary.
+- Auth, permission, rate-limit, or unavailable-server errors: retain the error context, avoid mutations,
+  and report the concrete next step.
