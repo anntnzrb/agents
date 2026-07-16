@@ -213,6 +213,48 @@
       "expected_output": "Rejects a large Server Action and moves tested logic into an addon method, leaving only a minimal invocation if appropriate.",
       "files": [],
       "expectations": ["Escalates to a custom addon.", "Keeps secrets out of the snippet.", "Requires tests, retries, and observability in normal code.", "Does not recommend JSON-RPC as a permission bypass."]
+    },
+    {
+      "id": 25,
+      "prompt": "Producción usa Odoo 17 con Python 3.10. ¿Puedo usar cualquier sintaxis de Python 3.10 en Execute Python Code?",
+      "expected_output": "Separates Python parser compatibility from Odoo safe_eval opcode compatibility and treats the observed version as deployment-specific.",
+      "files": [],
+      "expectations": ["States the two compatibility gates.", "Treats Python 3.10 as a deployment fact.", "Does not equate installed packages with importable modules."]
+    },
+    {
+      "id": 26,
+      "prompt": "Deduplica active_ids preservando el orden sin volver cuadrático el Server Action.",
+      "expected_output": "Uses a set for membership and a list for stable order, while reporting duplicates explicitly.",
+      "files": [],
+      "expectations": ["Uses a set-backed membership check.", "Preserves input order.", "Reports duplicates.", "Does not use itertools."]
+    },
+    {
+      "id": 27,
+      "prompt": "Quiero reemplazar un if/elif por match/case dentro de una Server Action Odoo 17.",
+      "expected_output": "Allows only scalar literal matching when clearer and rejects structural sequence, mapping, or class patterns because their opcodes are not allowed.",
+      "files": [],
+      "expectations": ["Distinguishes literal matching from structural matching.", "Mentions safe_eval opcodes.", "Does not force match when if/elif is clearer."]
+    },
+    {
+      "id": 28,
+      "prompt": "Haz el snippet más funcional usando comprehensions, generators, map, filter y reduce.",
+      "expected_output": "Uses bounded pure transformations selectively while keeping ORM and side effects in an explicit imperative shell.",
+      "files": [],
+      "expectations": ["Prefers comprehensions or built-ins when clearer.", "Uses a reduce initializer if reduce is justified.", "Keeps ORM operations vectorized.", "Rejects abstraction for its own sake."]
+    },
+    {
+      "id": 29,
+      "prompt": "Añade typing moderno y funciones anidadas con closures al código que pegaré en safe_eval.",
+      "expected_output": "Explains that function annotations may compile but provide little value in the UI, variable annotations and closures can emit forbidden opcodes, and values should be passed explicitly.",
+      "files": [],
+      "expectations": ["Distinguishes function from variable annotations.", "Rejects captured closures.", "Prioritizes safe_eval compatibility over decorative typing."]
+    },
+    {
+      "id": 30,
+      "prompt": "Usa walrus, with, dict merge y f-strings para modernizar una Server Action Odoo 17.",
+      "expected_output": "Applies only constructs verified against Python 3.10 and Odoo's opcode allowlist, allowing simple walrus/dict merge/f-strings while rejecting with and walrus comprehensions.",
+      "files": [],
+      "expectations": ["Allows simple walrus only when clearer.", "Allows small copy-on-write dict merge.", "Rejects with statements.", "Rejects walrus inside module-scope comprehensions."]
     }
   ]
 }
