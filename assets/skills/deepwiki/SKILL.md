@@ -1,49 +1,23 @@
 ---
 name: deepwiki
-description: Query GitHub repository documentation and codebase Q&A through DeepWiki MCP.
+description: Query public GitHub repository documentation and codebase questions through the configured DeepWiki MCP server.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
 allowed-tools: ""
 ---
 
-# DeepWiki MCP
+# DeepWiki
 
-Use DeepWiki MCP for public GitHub repo documentation and Q&A.
+Use the configured MCPorter `deepwiki` server for public GitHub repository documentation and targeted codebase Q&A. Do not assume native DeepWiki tools are mounted.
 
-## Constraints
+If `mcporter` is not on PATH, replace the leading `mcporter` in each command below with `nix run github:numtide/llm-agents.nix#mcporter --`.
+## Workflow
 
-- Public repos only (private needs Devin account)
-- `repoName` must be `owner/repo`
+1. Start with `mcporter list deepwiki --brief` only when available tools are unknown or may have changed.
+2. Require `repoName=owner/repo`.
+3. Map an unfamiliar repository with `mcporter call deepwiki.read_wiki_structure repoName=facebook/react`; fetch contents only after narrowing: `mcporter call deepwiki.read_wiki_contents repoName=facebook/react`.
+4. Ask narrow questions with `mcporter call deepwiki.ask_question repoName=facebook/react question='Where is concurrent rendering implemented?'`; inspect only its schema with `mcporter list deepwiki.ask_question --schema` when argument details matter.
+5. If DeepWiki is insufficient, use an appropriate public-web research source and say so.
 
-## Suggested flow
-
-1. `read_wiki_structure` for topic map
-2. `read_wiki_contents` for scoped docs
-3. `ask_question` for targeted Q&A  
-   If empty/insufficient: fall back to Exa/Brave.
-
-## Notes
-
-- `read_wiki_contents` can be large; use `ask_question` for narrow answers
-
-## Quick start
-
-```bash
-read_wiki_structure repoName="owner/repo"
-```
-
-## Common calls
-
-```bash
-read_wiki_contents repoName="owner/repo"
-ask_question repoName="owner/repo" question="..."
-```
-
-## Query templates
-
-See `assets/query-templates.json` for reusable parameter templates.
-
-## Reference
-
-See `reference.md` for server URL details, tool catalog, and defaults.
+`read_wiki_contents` can be large; do not fetch it before narrowing the topic.
