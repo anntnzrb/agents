@@ -9,84 +9,57 @@ allowed-tools: ""
 
 # MCPorter
 
-Use MCPorter to list MCP servers, call tools, and manage MCP config.
+Use MCPorter to manage MCP servers, tool calls, configuration, and OAuth—not as a generic all-server workflow.
 
 Define `mcporter` once per shell:
 
 `mcporter() { nix run github:numtide/llm-agents.nix#mcporter -- "$@"; }`
 
-Then use `mcporter <command>` everywhere below.
+Then use `mcporter <command>` below.
 
-## When to use
+## Discovery
 
-- MCP discovery: list configured servers/tools
-- Schema checks: confirm required params and types
-- Auth/OAuth setup for HTTP servers
-- Ad-hoc servers (HTTP/SSE/stdio)
-
-## Discovery checklist
-
-```bash
-mcporter list                         # configured servers
-mcporter list <server> --schema       # required params + enums
-mcporter config list                  # config entries
-```
-
-## Quick start
-
-```bash
+```text
 mcporter list
-mcporter list <server>
+mcporter list <server> --brief
+mcporter list <server>.<tool> --schema
+```
 
+Start with `list <server> --brief`. For an unfamiliar or constraint-sensitive call, inspect only
+`<server>.<tool>` with `--schema`; it already returns the full schema. Use
+`list <server> --all-parameters` instead when an expanded signature is enough. Do not combine
+`--brief` with `--schema`, `--all-parameters`, `--json`, or `--verbose`; do not combine `--schema`
+with `--all-parameters`.
+
+## Calls
+
+```text
 mcporter call <server.tool> key=value
 mcporter call '<server.tool(arg: "value")>'
-
-mcporter auth <server|url>
+mcporter call <server.tool> --args '{"key":["value"]}'
 ```
 
-## Common workflows
+Use `key=value` for simple values, function-call syntax for typed literals, and `--args '<JSON object>'`
+for arrays, objects, `null`, or multiline content. Use `key=@file` for file content; `@@` begins a
+literal `@`. Quote shell-sensitive values.
 
-### List tools
+## Configuration and health
 
-```bash
-mcporter list <server>
-mcporter describe <server>            # alias of list
-mcporter list <server> --all-parameters
-mcporter list <server> --schema
-```
-
-### Call tools
-
-```bash
-mcporter call <server.tool> key=value
-mcporter call '<server.tool(arg: "value")>'
-
-# Structured output (best for agents)
-mcporter call <server.tool> key=value --output json
-```
-
-### Ad-hoc MCP servers
-
-```bash
-# HTTP/SSE
-mcporter list --http-url https://example.com/mcp --name example
-mcporter call --http-url https://example.com/mcp example_tool key=value
-
-# Stdio
-mcporter call --stdio "bun run ./server.ts" --name local-tools tool_name key=value
-```
-
-### OAuth / Auth
-
-```bash
-mcporter auth <server|url>
-```
-
-Use when the server requires OAuth. If an ad-hoc HTTP server returns 401/403, MCPorter can auto-promote it to OAuth during auth.
-
-## Troubleshooting
-
-```bash
+```text
 mcporter config list
 mcporter config get <name>
+mcporter config doctor
+mcporter list <server> --status --no-oauth --exit-code
 ```
+
+Use the status command and its exit code as the cached-auth health check. Inspect config before changing
+it; use `config doctor` for configuration failures.
+
+## Authentication
+
+```text
+mcporter auth <server|url>
+```
+
+Authenticate only when the server requires OAuth or reports an auth failure. Never expose, copy, or log
+tokens; report persistent 401/403 responses rather than attempting writes.
