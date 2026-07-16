@@ -19,6 +19,7 @@ The section ID (in parentheses) is the filename prefix used to group rules.
 
 **Impact:** HIGH  
 **Description:** Optimizing server-side rendering and data fetching eliminates server-side waterfalls and reduces response times.
+Security-sensitive Server Actions also require `server-auth-actions.md`.
 
 ## 4. Client-Side Data Fetching (client)
 

@@ -1,6 +1,6 @@
 ---
 name: react-best-practices
-description: Write, review, or optimize React and Next.js components, data fetching, rendering, and bundles.
+description: Write, review, or optimize React and Next.js performance, data fetching, bundles, and Server Actions security.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
@@ -28,6 +28,7 @@ Reference these guidelines when:
 | Pick a rule category by impact      | `rules/_sections.md`          |
 | Apply a specific optimization       | Matching `rules/<rule-id>.md` |
 | Review all expanded Vercel guidance | `references/vercel-guide.md`  |
+| Secure Next.js Server Actions      | `rules/server-auth-actions.md` |
 | Package overview for humans         | `README.md`                   |
 
 ## Category Prefixes
