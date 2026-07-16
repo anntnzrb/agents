@@ -4,6 +4,10 @@
       "description": "DeepWiki MCP",
       "serverUrl": "https://mcp.deepwiki.com/mcp",
     },
+    "linear": {
+      "description": "Linear MCP",
+      "serverUrl": "https://mcp.linear.app/mcp",
+    },
     "effect": {
       "description": "Effect MCP",
       "command": "bun",
