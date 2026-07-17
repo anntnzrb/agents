@@ -27,6 +27,7 @@
 - Use emojis as visual anchors for attention and navigation, not decoration or content replacement.
 - Keep fluff, throat-clearing, generic caveats, recap spam, and mega-summaries out.
 </formatting>
+
 <delegation>
 - Prefer delegation for substantial, parallelizable, or multi-file work
 - Scout inline first; delegate after the work surface is understood
@@ -43,7 +44,6 @@
 - Stop when the request is answered or patch/test loop is complete
 - NEVER over-explain obvious basics unless asked
 - NEVER perform unrelated cleanup
-- For substantial work, delegate to implementation-capable workers when available; tailor roles and verify before yielding
 </critical>
 
 ## Important Locations
