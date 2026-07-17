@@ -120,9 +120,13 @@ def normalize_official_models(api_payload: str) -> list[dict[str, object]]:
     status = parsed.get("status")
     prompt_options = parsed.get("prompt_options")
     rows = parsed.get("data")
-    if not isinstance(status, int) or not isinstance(prompt_options, dict) or not isinstance(rows, list):
+    if (
+        not isinstance(status, int)
+        or not isinstance(prompt_options, dict)
+        or not isinstance(rows, list)
+    ):
         raise ExtractionError(
-            "Official model API envelope requires integer status, object prompt_options, and list data."
+            "Official model API envelope requires integer status, object prompt_options, and list data.",
         )
 
     return [_normalize_official_model(row) for row in rows]
@@ -147,7 +151,7 @@ def _normalize_official_model(row: object) -> dict[str, object]:
         or not isinstance(pricing, dict)
     ):
         raise ExtractionError(
-            "Official model API rows require non-empty slug/name and object model_creator/evaluations/pricing."
+            "Official model API rows require non-empty slug/name and object model_creator/evaluations/pricing.",
         )
 
     normalized_evaluations = {
@@ -164,8 +168,12 @@ def _normalize_official_model(row: object) -> dict[str, object]:
         "evaluations": normalized_evaluations,
         "pricing": _normalize_camel_keys(pricing),
         "median_output_tokens_per_second": row.get("median_output_tokens_per_second"),
-        "median_time_to_first_token_seconds": row.get("median_time_to_first_token_seconds"),
-        "median_time_to_first_answer_token": row.get("median_time_to_first_answer_token"),
+        "median_time_to_first_token_seconds": row.get(
+            "median_time_to_first_token_seconds",
+        ),
+        "median_time_to_first_answer_token": row.get(
+            "median_time_to_first_answer_token",
+        ),
     }
 
 
@@ -228,7 +236,9 @@ def extract_lists(
                         add_candidate("hostsModels", value)
 
                     # Structural fallback heuristics for breaking schema changes.
-                    if normalized == "rows" and _looks_like_current_endpoint_rows(value):
+                    if normalized == "rows" and _looks_like_current_endpoint_rows(
+                        value,
+                    ):
                         add_candidate("rows", value)
                     if _looks_like_endpoint_list(value):
                         add_candidate("hostsModels", value)
@@ -251,7 +261,9 @@ def extract_lists(
         key: _pick_best(candidates[key]) for key in ("models", "hosts", "hostsModels")
     }
     if selected["hostsModels"] is None:
-        selected["hostsModels"] = _normalize_current_rows(_pick_best(candidates["rows"]))
+        selected["hostsModels"] = _normalize_current_rows(
+            _pick_best(candidates["rows"]),
+        )
 
     missing = [key for key, value in selected.items() if value is None]
     if missing:
@@ -261,7 +273,7 @@ def extract_lists(
             if values
         }
         raise ExtractionError(
-            f"Missing sections in RSC payload: {', '.join(missing)}; candidate_sizes={diagnostics}"
+            f"Missing sections in RSC payload: {', '.join(missing)}; candidate_sizes={diagnostics}",
         )
 
     return (
@@ -276,7 +288,9 @@ def _normalize_current_rows(rows: list[Any] | None) -> list[dict[str, Any]] | No
         return None
 
     endpoints = [
-        endpoint for row in rows if (endpoint := _normalize_current_row(row)) is not None
+        endpoint
+        for row in rows
+        if (endpoint := _normalize_current_row(row)) is not None
     ]
     if not endpoints:
         return None
@@ -316,11 +330,11 @@ def _normalize_current_row(row: Any) -> dict[str, Any] | None:
         "timescaleData": {
             "median_output_speed": performance.get("medianOutputTokensPerSecond"),
             "median_time_to_first_chunk": performance.get(
-                "medianTimeToFirstTokenSeconds"
+                "medianTimeToFirstTokenSeconds",
             ),
         },
         "end_to_end_response_time_metrics": {
-            "total_time": performance.get("medianEndToEndResponseTimeSeconds")
+            "total_time": performance.get("medianEndToEndResponseTimeSeconds"),
         },
     }
 
@@ -557,7 +571,11 @@ def _merge_canonical_models(
     official_models: list[dict[str, object]],
 ) -> tuple[list[dict[str, object]], list[str], list[str]]:
     rsc_by_slug = _rsc_models_by_slug(rsc_models, rsc_endpoints)
-    official_by_slug = {model["slug"]: model for model in official_models if isinstance(model.get("slug"), str)}
+    official_by_slug = {
+        model["slug"]: model
+        for model in official_models
+        if isinstance(model.get("slug"), str)
+    }
     all_slugs = sorted(set(rsc_by_slug) | set(official_by_slug))
     merged = [
         _merge_canonical_model(
@@ -574,10 +592,14 @@ def _merge_canonical_models(
 
 
 def _rsc_models_by_slug(
-    rsc_models: list[Any], rsc_endpoints: list[Any]
+    rsc_models: list[Any],
+    rsc_endpoints: list[Any],
 ) -> dict[str, dict[str, object]]:
     values: dict[str, dict[str, object]] = {}
-    for candidate in [*rsc_models, *(item.get("model") for item in rsc_endpoints if isinstance(item, dict))]:
+    for candidate in [
+        *rsc_models,
+        *(item.get("model") for item in rsc_endpoints if isinstance(item, dict)),
+    ]:
         if not isinstance(candidate, dict):
             continue
         slug = candidate.get("slug")
@@ -587,7 +609,8 @@ def _rsc_models_by_slug(
 
 
 def _merge_canonical_model(
-    rsc_model: dict[str, object] | None, official_model: dict[str, object] | None
+    rsc_model: dict[str, object] | None,
+    official_model: dict[str, object] | None,
 ) -> dict[str, object]:
     merged = dict(rsc_model or {})
     if official_model is None:
@@ -614,6 +637,7 @@ def _merge_canonical_model(
                 merged[name] = value
     return merged
 
+
 def _provider_slugs_from_hosts_models(hosts_models: list[Any]) -> set[str]:
     values: set[str] = set()
     for item in hosts_models:
@@ -633,11 +657,11 @@ def sanity_check(*, slugs: list[str], min_endpoints: int, min_providers: int) ->
     provider_count = len({provider_from_slug(slug) for slug in slugs})
     if len(slugs) < min_endpoints:
         raise ExtractionError(
-            f"Too few endpoints extracted ({len(slugs)} < {min_endpoints}). Payload format likely changed."
+            f"Too few endpoints extracted ({len(slugs)} < {min_endpoints}). Payload format likely changed.",
         )
     if provider_count < min_providers:
         raise ExtractionError(
-            f"Too few providers extracted ({provider_count} < {min_providers}). Payload format likely changed."
+            f"Too few providers extracted ({provider_count} < {min_providers}). Payload format likely changed.",
         )
 
 
@@ -733,7 +757,8 @@ def save_cache(
         "body_file": CACHE_BODY_FILE,
     }
     (cache_dir / CACHE_META_FILE).write_text(
-        json.dumps(meta, ensure_ascii=False), encoding="utf-8"
+        json.dumps(meta, ensure_ascii=False),
+        encoding="utf-8",
     )
 
 

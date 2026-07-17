@@ -1,5 +1,13 @@
 # Slide Deck Patterns
 
+## Section index
+
+- Planning, engine, typography, transitions, and navigation
+- SlideEngine, auto-fit, and slide layouts
+- Decorative SVG and imagery
+- Composition, readability, density, and responsive height
+- Curated presets
+
 CSS patterns, JS engine, slide type layouts, transitions, navigation chrome, and curated presets for self-contained HTML slide presentations. All slides are viewport-fit (100dvh), single-file, same philosophy as scrollable pages.
 
 **When to use slides:** Only when the user explicitly requests them — `/generate-slides`, `--slides` flag on an existing prompt, or natural language like "as a slide deck." Never auto-select slide format.
@@ -1133,17 +1141,17 @@ Slides should reach for visuals before defaulting to text alone. If a slide coul
 which surf
 
 # Generate (one per target slide)
-surf gemini "descriptive prompt matching deck palette" --generate-image /tmp/ve-slide-title.png --aspect-ratio 16:9
+surf gemini "descriptive prompt matching deck palette" --generate-image <temp-dir>/ve-slide-title.png --aspect-ratio 16:9
 
 # Base64 encode for self-containment (macOS)
-TITLE_IMG=$(base64 -i /tmp/ve-slide-title.png)
-# Linux: TITLE_IMG=$(base64 -w 0 /tmp/ve-slide-title.png)
+TITLE_IMG=$(base64 -i <temp-dir>/ve-slide-title.png)
+# Linux: TITLE_IMG=$(base64 -w 0 <temp-dir>/ve-slide-title.png)
 
 # Embed in the slide
 # <div class="slide__bg" style="background-image:url('data:image/png;base64,${TITLE_IMG}')"></div>
 
 # Clean up
-rm /tmp/ve-slide-title.png
+# Delete <temp-dir>/ve-slide-title.png after embedding.
 ```
 
 **Prompt craft for slides:** Be specific about style, dominant colors, and mood. Pull colors from the preset's CSS variables. Examples:

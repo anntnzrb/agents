@@ -2,6 +2,8 @@
 
 Minimal Pi-inspired JSONL RPC for the bundled skill-local CLI. Not full Pi RPC.
 
+Read this before process integration or consuming RPC request/response fields.
+
 ## Transport
 
 - one JSON object per stdin line

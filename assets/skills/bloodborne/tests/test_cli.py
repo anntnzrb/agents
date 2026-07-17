@@ -7,7 +7,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 SKILL_DIR = Path(__file__).resolve().parents[1]
 CLI = SKILL_DIR / "scripts" / "cli.py"
 
@@ -36,29 +35,47 @@ class BloodborneCliTests(unittest.TestCase):
     def test_upgrade_10_prints_steps_and_material_totals(self) -> None:
         out = self.run_cli("upgrade", "10")
         self.assertIn("+10: 1 Blood Rock", out)
-        self.assertIn("Totals: 16 Blood Stone Shard, 16 Twin Blood Stone Shards, 16 Blood Stone Chunk, 1 Blood Rock", out)
+        self.assertIn(
+            "Totals: 16 Blood Stone Shard, 16 Twin Blood Stone Shards, 16 Blood Stone Chunk, 1 Blood Rock",
+            out,
+        )
 
     def test_calc_known_weapon_is_deterministic(self) -> None:
         out = self.run_cli("calc", "Saw Cleaver", "25", "25", "7", "8")
-        self.assertEqual(out, "Saw Cleaver +10 AR estimate at STR/SKL/BLT/ARC (25, 25, 7, 8): 274\n")
+        self.assertEqual(
+            out,
+            "Saw Cleaver +10 AR estimate at STR/SKL/BLT/ARC (25, 25, 7, 8): 274\n",
+        )
 
     def test_insight_current_thresholds(self) -> None:
         normal = self.run_cli("insight", "15")
         above = self.run_cli("insight", "16")
         high = self.run_cli("insight", "40")
         self.assertIn("- Current 15: normal/low. Fine to hold.", normal)
-        self.assertIn("- Current 16: above difficulty threshold; spend if struggling.", above)
-        self.assertIn("- Current 40: high. Spend some if you want a smoother run.", high)
+        self.assertIn(
+            "- Current 16: above difficulty threshold; spend if struggling.",
+            above,
+        )
+        self.assertIn(
+            "- Current 40: high. Spend some if you want a smoother run.",
+            high,
+        )
 
     def test_farm_outputs_selected_route(self) -> None:
         out = self.run_cli("farm", "vials")
         self.assertIn("Farm: vials\n", out)
-        self.assertIn("Usually buy vials with farmed echoes instead of farming drops.", out)
+        self.assertIn(
+            "Usually buy vials with farmed echoes instead of farming drops.",
+            out,
+        )
 
     def test_sources_list_and_status_do_not_need_network(self) -> None:
         listed = self.run_cli("sources", "list", "bb-wiki-weapons")
         status = self.run_cli("sources", "status", "bb-wiki-weapons")
-        self.assertIn("bb-wiki-weapons: https://www.bloodborne-wiki.com/p/weapons.html", listed)
+        self.assertIn(
+            "bb-wiki-weapons: https://www.bloodborne-wiki.com/p/weapons.html",
+            listed,
+        )
         self.assertIn("license: CC BY-SA 3.0", listed)
         self.assertIn("use:", listed)
         self.assertEqual(status, "bb-wiki-weapons: missing\n")
@@ -85,7 +102,6 @@ class BloodborneCliTests(unittest.TestCase):
         self.assertIn("Unknown future bosses defeated: 0", out)
         self.assertNotIn("Father Gascoigne", out)
 
-
     def test_build_quality_outputs_main_targets(self) -> None:
         out = self.run_cli("build", "quality", "--level", "70")
         self.assertIn("Build: quality", out)
@@ -93,7 +109,19 @@ class BloodborneCliTests(unittest.TestCase):
         self.assertIn("Level 70", out)
 
     def test_compare_orders_weapons_by_estimated_ar(self) -> None:
-        out = self.run_cli("compare", "Saw Cleaver", "Ludwig's Holy Blade", "--str", "26", "--skl", "26", "--blt", "7", "--arc", "8")
+        out = self.run_cli(
+            "compare",
+            "Saw Cleaver",
+            "Ludwig's Holy Blade",
+            "--str",
+            "26",
+            "--skl",
+            "26",
+            "--blt",
+            "7",
+            "--arc",
+            "8",
+        )
         self.assertIn("Compare at STR/SKL/BLT/ARC (26, 26, 7, 8)", out)
         self.assertIn("- Ludwig's Holy Blade: AR", out)
         self.assertIn("- Saw Cleaver: AR", out)
@@ -117,7 +145,11 @@ class BloodborneCliTests(unittest.TestCase):
         self.assertIn("first mandatory hunter boss", bosses)
         self.assertNotIn("Father Gascoigne", bosses)
         self.assertNotIn("micolash", bosses.lower())
-        route = self.run_cli("route", "--defeated", "father-gascoigne,vicar-amelia,shadows-of-yharnam,rom,the-one-reborn")
+        route = self.run_cli(
+            "route",
+            "--defeated",
+            "father-gascoigne,vicar-amelia,shadows-of-yharnam,rom,the-one-reborn",
+        )
         self.assertIn("nightmare mandatory boss", route)
         self.assertNotIn("micolash", route.lower())
         item = self.run_cli("items", "Blood", "Rock")
@@ -152,13 +184,16 @@ def write_synthetic_save(path: Path) -> None:
     }
     for rel_offset, value in stats.items():
         width = 1 if rel_offset == 68_831 else 4
-        data[username_offset + rel_offset : username_offset + rel_offset + width] = value.to_bytes(width, "little")
+        data[username_offset + rel_offset : username_offset + rel_offset + width] = (
+            value.to_bytes(width, "little")
+        )
 
     write_weapon_slot(data, inventory_offset, 7_000_000, 1)
     write_item_slot(data, inventory_offset + 16, 3_000, 6)
     write_item_slot(data, key_inventory_offset, 4_103, 1)
     data[username_offset + 68_545 + 21_714] = 8  # Cleric Beast defeated.
     path.write_bytes(data)
+
 
 def write_item_slot(data: bytearray, offset: int, item_id: int, amount: int) -> None:
     data[offset + 7] = 0xB0

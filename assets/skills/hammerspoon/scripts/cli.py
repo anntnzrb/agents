@@ -49,7 +49,9 @@ def main(argv: list[str] | None = None) -> int:
         print()
         print("Runtime commands:")
         print("  status [--json]              Hammerspoon health, version, config dir")
-        print("  doctor [--json]              status + Accessibility/MJConfigFile checks")
+        print(
+            "  doctor [--json]              status + Accessibility/MJConfigFile checks",
+        )
         print("  eval [--json] <lua>          evaluate Lua via hs CLI")
         print("  eval-file [--json] <path>    evaluate a Lua file via hs CLI")
         print("  reload [--json]              trigger hs.reload()")
@@ -80,9 +82,7 @@ def main(argv: list[str] | None = None) -> int:
         print("  annotations status [--json]")
         print("  lsp-config print")
         print()
-        print(
-            "Delegates to scripts/hsctl.py. Use 'help' for hsctl subcommand details."
-        )
+        print("Delegates to scripts/hsctl.py. Use 'help' for hsctl subcommand details.")
         return 0
     return _run_script(argv)
 

@@ -124,3 +124,34 @@ For user-facing source-backed answers, identify the source key and link the regi
 - **Recommendation:** judgment/tradeoff, not a fact.
 
 If a claim is an inference, label it `[INFERENCE]`. Include a checked date for current claims where practical. Keep citations proportional; do not expose internal cache paths or unintroduced spoiler names.
+
+## Resource contract
+
+```text
+darksouls/
+  SKILL.md
+  REFERENCES.md
+  scripts/
+    cli.py
+    ds1_core.py
+    ds1_catalog.py
+    ds1_save.py
+    ds1_frames.py
+  resources/
+    game_data.json
+    source_registry.json
+    weapons.json
+    rings.json
+    goods_magic.json
+    achievement_checklist.json
+    save_support.json
+    guides/dsr_plat_guide/
+      dsr-plat-guide.manifest.json
+      dsr-plat-guide.chunks.jsonl
+    guides/dsr_dadbod_transcripts/
+      dsr-dadbod-transcripts.manifest.json
+      dsr-dadbod-transcripts.chunks.jsonl
+  evals/evals.json
+```
+
+`game_data.json` and the checklist are stable, curated contracts; catalogs are intentionally thin and conservative. `ds1_frames.py` is a code-only, read-only scanner: it consumes an explicitly supplied install at runtime and does not bundle or retain frame JSON, game assets, extracted names/parameter tables, raw payload bytes, or absolute paths. Read `REFERENCES.md` when a source, cache, guide-corpus, frame-scanner, or mod boundary matters. Do not add raw PDF text, copied wiki prose, broad location tables, or unlicensed datasets.

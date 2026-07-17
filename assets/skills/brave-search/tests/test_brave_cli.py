@@ -30,7 +30,12 @@ SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "cli.py"
 class FakeResponse:
     """Minimal urllib response stand-in (context-manager + .read())."""
 
-    def __init__(self, body: bytes = b"", status: int = 200, headers: dict | None = None):
+    def __init__(
+        self,
+        body: bytes = b"",
+        status: int = 200,
+        headers: dict | None = None,
+    ):
         self._body = body
         self.status = status
         self.headers = headers or {}
@@ -48,7 +53,11 @@ class FakeResponse:
 class CallRecorder:
     """Fake urlopen that records every call and returns/raises a fixed value."""
 
-    def __init__(self, return_value: FakeResponse | None = None, side_effect: BaseException | None = None):
+    def __init__(
+        self,
+        return_value: FakeResponse | None = None,
+        side_effect: BaseException | None = None,
+    ):
         self.calls: list[dict] = []
         self.return_value = return_value
         self.side_effect = side_effect
@@ -68,7 +77,7 @@ class CallRecorder:
                 "headers": headers,
                 "args": args,
                 "kwargs": kwargs,
-            }
+            },
         )
         if self.side_effect is not None:
             raise self.side_effect
@@ -113,8 +122,13 @@ def _stub_response(payload: dict) -> FakeResponse:
 
 def _err_field(envelope: dict, name: str):
     """Pull ``error.<name>`` from an envelope that uses either flat dotted keys
-    (``{"error.provider": ...}``) or a nested ``{"error": {"provider": ...}}``."""
-    if "error" in envelope and isinstance(envelope["error"], dict) and name in envelope["error"]:
+    (``{"error.provider": ...}``) or a nested ``{"error": {"provider": ...}}``.
+    """
+    if (
+        "error" in envelope
+        and isinstance(envelope["error"], dict)
+        and name in envelope["error"]
+    ):
         return envelope["error"][name]
     return envelope.get(f"error.{name}")
 
@@ -138,7 +152,9 @@ def test_web_applies_default_count_and_result_filter(brave_cli, monkeypatch, cap
     qs = _request_qs(recorder.calls[0])
     # parse_qs returns list-of-one for any present value.
     assert qs.get("count") == ["5"], f"count default missing; got qs={qs}"
-    assert qs.get("result_filter") == ["web"], f"result_filter default missing; got qs={qs}"
+    assert qs.get("result_filter") == ["web"], (
+        f"result_filter default missing; got qs={qs}"
+    )
     assert qs.get("q") == ["rust async"], f"q missing or wrong; got qs={qs}"
 
 
@@ -162,7 +178,7 @@ def test_compact_web_projection_drops_noisy_fields(brave_cli, monkeypatch, capsy
                 "meta_url": {"scheme": "https", "netloc": "example.com"},
                 "profile": {"name": "spammy"},
                 "thumbnail": {"src": "https://cdn.example.com/thumb.jpg"},
-            }
+            },
         ],
     }
     recorder = CallRecorder(return_value=_stub_response(payload))
@@ -187,7 +203,9 @@ def test_compact_web_projection_drops_noisy_fields(brave_cli, monkeypatch, capsy
     for kept in ("title", "url", "description"):
         assert kept in first, f"{kept!r} must be kept; got keys: {sorted(first)}"
     for dropped in ("videos", "mixed", "meta_url", "profile", "thumbnail"):
-        assert dropped not in first, f"{dropped!r} must be dropped; got keys: {sorted(first)}"
+        assert dropped not in first, (
+            f"{dropped!r} must be dropped; got keys: {sorted(first)}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -268,14 +286,23 @@ def test_http_html_error_emits_compact_json(brave_cli, monkeypatch, capsys):
     err_lines = [ln for ln in captured.err.splitlines() if ln.strip()]
     assert len(err_lines) == 1, f"expected single-line stderr; got: {err_lines!r}"
     envelope = json.loads(err_lines[0])
-    assert _err_field(envelope, "provider") == "brave-search", f"bad provider: {envelope}"
-    assert _err_field(envelope, "status") == 502, f"bad status: {envelope}"
-    assert isinstance(_err_field(envelope, "message"), str) and _err_field(envelope, "message"), (
-        f"bad message: {envelope}"
+    assert _err_field(envelope, "provider") == "brave-search", (
+        f"bad provider: {envelope}"
     )
-    assert _err_field(envelope, "body_bytes") == len(html_body), f"bad body_bytes: {envelope}"
-    assert isinstance(_err_field(envelope, "body_preview"), str), f"bad body_preview: {envelope}"
-    assert isinstance(_err_field(envelope, "body_truncated"), bool), f"bad body_truncated: {envelope}"
+    assert _err_field(envelope, "status") == 502, f"bad status: {envelope}"
+    assert isinstance(_err_field(envelope, "message"), str) and _err_field(
+        envelope,
+        "message",
+    ), f"bad message: {envelope}"
+    assert _err_field(envelope, "body_bytes") == len(html_body), (
+        f"bad body_bytes: {envelope}"
+    )
+    assert isinstance(_err_field(envelope, "body_preview"), str), (
+        f"bad body_preview: {envelope}"
+    )
+    assert isinstance(_err_field(envelope, "body_truncated"), bool), (
+        f"bad body_truncated: {envelope}"
+    )
 
 
 # ---------------------------------------------------------------------------

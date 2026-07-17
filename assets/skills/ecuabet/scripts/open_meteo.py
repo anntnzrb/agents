@@ -312,13 +312,16 @@ def write_snapshot(
         target = output
         target.parent.mkdir(parents=True, exist_ok=True)
 
-    target.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n")
+    target.write_text(
+        json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     return target
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Fetch Open-Meteo weather by location or coordinates."
+        description="Fetch Open-Meteo weather by location or coordinates.",
     )
     parser.add_argument(
         "location",
@@ -328,7 +331,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--latitude", type=float)
     parser.add_argument("--longitude", type=float)
     parser.add_argument(
-        "--country-code", help="Optional geocoding country filter, e.g. ES"
+        "--country-code",
+        help="Optional geocoding country filter, e.g. ES",
     )
     parser.add_argument(
         "--at",
@@ -417,7 +421,10 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912
 
             if args.output:
                 path = write_snapshot(
-                    snapshot, args.output, iteration, watch_mode=watch_mode
+                    snapshot,
+                    args.output,
+                    iteration,
+                    watch_mode=watch_mode,
                 )
                 print(path)
             elif args.compact:

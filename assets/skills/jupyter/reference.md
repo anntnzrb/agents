@@ -1,6 +1,6 @@
 # Jupyter Reference
 
-Conceptual information about notebook structure, execution model, and best practices.
+Read this reference before structural notebook edits or execution design.
 
 ## Notebook Structure (nbformat v4)
 

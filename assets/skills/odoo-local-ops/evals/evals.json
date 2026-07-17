@@ -6,7 +6,7 @@
       "expected_output": "Uses the bundled CLI to inspect runtime, reports the effective database source, and does not fall back to raw shell or psql commands.",
       "files": [],
       "expectations": [
-        "Uses the bundled `odooctl.py` CLI via `uv run` rather than raw shell or psql commands.",
+        "Uses the bundled `scripts/cli.py` via `uv run --script` rather than raw shell or psql commands.",
         "Reports the effective local database and runtime backend.",
         "Keeps output free of secrets."
       ]
@@ -24,11 +24,11 @@
     },
     {
       "id": 3,
-      "prompt": "Necesito una acción de servidor Odoo 17 read-only para auditar crm.lead con un dominio explícito, devolver conteos por etapa/vendedor y copiar el script desde /tmp.",
-      "expected_output": "Provides a read-only Server Action workflow that writes the snippet under /tmp, copies with pbcopy, uses safe_eval-compatible code, and returns compact JSON via UserError.",
+      "prompt": "Necesito una acción de servidor Odoo 17 read-only para auditar crm.lead con un dominio explícito, devolver conteos por etapa/vendedor y copiar el script desde un directorio temporal.",
+      "expected_output": "Provides a read-only Server Action workflow that writes the snippet under <temp-dir>, copies with pbcopy on macOS, uses safe_eval-compatible code, and returns compact JSON via UserError.",
       "files": [],
       "expectations": [
-        "Mentions `/tmp` and `pbcopy` as the required clipboard workflow.",
+        "Mentions `<temp-dir>` and the platform clipboard workflow.",
         "Uses no imports.",
         "Uses `search_count` and `read_group`.",
         "Returns compact JSON.",

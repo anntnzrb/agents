@@ -19,10 +19,8 @@ Research-first Nix development using **parallel Context7 `docs` queries** for ac
 3. SYNTHESIZE → Combine results into actionable guidance
 ```
 
-## Notes
+## Required follow-up reads
 
-Repo routing tables, query patterns, and Context7 library IDs live in `reference.md`.
-
-## References
-
-- [reference.md](reference.md) - Repo routing, Context7 queries, topic mapping
+| Need | Read | When |
+| --- | --- | --- |
+| Repository routing, Context7 queries, topic mapping | `reference.md` | Before selecting documentation sources |

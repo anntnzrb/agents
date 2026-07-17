@@ -1,10 +1,8 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
 # dependencies = []
 # ///
-"""
-Inspect local Apple Shortcuts definitions from Shortcuts.sqlite.
+"""Inspect local Apple Shortcuts definitions from Shortcuts.sqlite.
 
 Usage:
   uv run --script <skill-dir>/scripts/cli.py inspect
@@ -44,13 +42,35 @@ def _is_object_list(value: object) -> TypeGuard[list[object]]:
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Inspect local Apple Shortcuts action graphs.")
-    parser.add_argument("--db", default=str(DEFAULT_DB), help="Path to Shortcuts.sqlite")
-    parser.add_argument("--name", action="append", help="Exact shortcut name (repeatable)")
+    parser = argparse.ArgumentParser(
+        description="Inspect local Apple Shortcuts action graphs.",
+    )
+    parser.add_argument(
+        "--db",
+        default=str(DEFAULT_DB),
+        help="Path to Shortcuts.sqlite",
+    )
+    parser.add_argument(
+        "--name",
+        action="append",
+        help="Exact shortcut name (repeatable)",
+    )
     parser.add_argument("--contains", help="Substring filter for shortcut names")
-    parser.add_argument("--json", action="store_true", help="Print JSON instead of text output")
-    parser.add_argument("--raw", action="store_true", help="Include full decoded action objects")
-    parser.add_argument("--no-redact", action="store_true", help="Disable redaction in strings")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON instead of text output",
+    )
+    parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="Include full decoded action objects",
+    )
+    parser.add_argument(
+        "--no-redact",
+        action="store_true",
+        help="Disable redaction in strings",
+    )
     parser.add_argument(
         "--visible-only",
         action="store_true",
@@ -80,7 +100,11 @@ def _render_text(results: list[JsonObject]) -> str:
     lines: list[str] = []
     for shortcut in results:
         lines.append(f"Shortcut: {shortcut['name']}")
-        lines.append("  id={pk} workflow_id={workflow_id} action_count={action_count}".format(**shortcut))
+        lines.append(
+            "  id={pk} workflow_id={workflow_id} action_count={action_count}".format(
+                **shortcut,
+            ),
+        )
         if shortcut.get("hidden_from_library"):
             lines.append("  hidden_from_library=true")
         if shortcut.get("folder"):
@@ -95,7 +119,7 @@ def _render_text(results: list[JsonObject]) -> str:
                     outcomes=run_stats.get("outcomes", {}),
                     sources=run_stats.get("sources", {}),
                     last_run=run_stats.get("last_run_local", ""),
-                )
+                ),
             )
         actions = shortcut.get("actions", [])
         if not _is_object_list(actions):
@@ -124,7 +148,7 @@ def _render_text(results: list[JsonObject]) -> str:
                         status=item.get("status", ""),
                         dest=item.get("destination_bundle", ""),
                         origin=item.get("source_origin", ""),
-                    )
+                    ),
                 )
         lines.append("")
     return "\n".join(lines).rstrip()
@@ -140,7 +164,9 @@ def main() -> int:
     exact = set(args.name or [])
 
     run_stats_by_shortcut = load_run_stats(db_path) if args.include_run_stats else {}
-    smart_prompts_by_shortcut = load_smart_prompts(db_path) if args.include_smart_prompts else {}
+    smart_prompts_by_shortcut = (
+        load_smart_prompts(db_path) if args.include_smart_prompts else {}
+    )
     folder_map = load_folder_map() if args.include_folders else {}
 
     results: list[JsonObject] = []
@@ -149,7 +175,11 @@ def main() -> int:
             continue
         decoded = decode_actions(row.action_blob)
         if not args.no_redact:
-            decoded = [redacted for action in decoded if _is_object_dict(redacted := redact_object(action))]
+            decoded = [
+                redacted
+                for action in decoded
+                if _is_object_dict(redacted := redact_object(action))
+            ]
 
         actions: list[JsonObject] = []
         action_index_by_uuid: dict[str, int] = {}

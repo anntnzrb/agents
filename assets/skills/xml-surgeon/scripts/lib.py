@@ -5,11 +5,11 @@ import difflib
 import glob
 import re
 import sys
+from collections.abc import Iterable
 from io import BytesIO
-from typing import Iterable, List, Tuple
+from xml.sax.saxutils import escape as xml_escape
 
 from lxml import etree
-from xml.sax.saxutils import escape as xml_escape
 
 
 def fail(msg: str, code: int = 2) -> None:
@@ -22,7 +22,7 @@ def read_bytes(path: str) -> bytes:
         return f.read()
 
 
-def detect_decl_and_encoding(data: bytes) -> Tuple[bool, str | None]:
+def detect_decl_and_encoding(data: bytes) -> tuple[bool, str | None]:
     m = re.match(rb"\s*<\?xml\s+[^>]*\?>", data)
     has_decl = bool(m)
     enc = None
@@ -43,8 +43,10 @@ def parser(huge: bool, recover: bool) -> etree.XMLParser:
 
 
 def parse_doc(
-    path: str, huge: bool, recover: bool
-) -> Tuple[etree._ElementTree, bytes, bool, str | None]:
+    path: str,
+    huge: bool,
+    recover: bool,
+) -> tuple[etree._ElementTree, bytes, bool, str | None]:
     data = read_bytes(path)
     has_decl, enc = detect_decl_and_encoding(data)
     try:
@@ -57,7 +59,7 @@ def parse_doc(
 def serialize(tree: etree._ElementTree, has_decl: bool, enc: str | None) -> bytes:
     docinfo = tree.docinfo
     encoding = enc or docinfo.encoding or "utf-8"
-    doctype = docinfo.doctype if docinfo.doctype else None
+    doctype = docinfo.doctype or None
     buf = BytesIO()
     tree.write(
         buf,
@@ -69,8 +71,8 @@ def serialize(tree: etree._ElementTree, has_decl: bool, enc: str | None) -> byte
     return buf.getvalue()
 
 
-def expand_paths(raw_paths: Iterable[str]) -> List[str]:
-    paths: List[str] = []
+def expand_paths(raw_paths: Iterable[str]) -> list[str]:
+    paths: list[str] = []
     for raw in raw_paths:
         if any(ch in raw for ch in "*?[]"):
             matches = glob.glob(raw, recursive=True)
@@ -87,7 +89,7 @@ def expand_paths(raw_paths: Iterable[str]) -> List[str]:
     return out
 
 
-def parse_ns(ns_items: List[str]) -> dict:
+def parse_ns(ns_items: list[str]) -> dict:
     ns_map = {}
     for item in ns_items:
         if "=" not in item:
@@ -99,21 +101,21 @@ def parse_ns(ns_items: List[str]) -> dict:
     return ns_map
 
 
-def select(tree: etree._ElementTree, xpath: str, ns_map: dict) -> List:
+def select(tree: etree._ElementTree, xpath: str, ns_map: dict) -> list:
     try:
         return tree.xpath(xpath, namespaces=ns_map)
     except etree.XPathEvalError as exc:
         fail(f"XPath error: {exc}")
 
 
-def ensure_elements(items: List) -> List[etree._Element]:
+def ensure_elements(items: list) -> list[etree._Element]:
     elements = [x for x in items if isinstance(x, etree._Element)]
     if len(elements) != len(items):
         fail("XPath must select elements for this operation")
     return elements
 
 
-def limit(items: List, limit_count: int | None) -> List:
+def limit(items: list, limit_count: int | None) -> list:
     if limit_count is None:
         return items
     return items[:limit_count]
@@ -125,18 +127,18 @@ def read_text_arg(value: str | None, value_file: str | None) -> str:
     if value is not None and value_file is not None:
         fail("use only one of --value or --value-file")
     if value_file:
-        with open(value_file, "r", encoding="utf-8") as f:
+        with open(value_file, encoding="utf-8") as f:
             return f.read()
     return value or ""
 
 
-def read_xml_fragment(xml: str | None, xml_file: str | None) -> List[etree._Element]:
+def read_xml_fragment(xml: str | None, xml_file: str | None) -> list[etree._Element]:
     if xml is None and xml_file is None:
         fail("provide --xml or --xml-file")
     if xml is not None and xml_file is not None:
         fail("use only one of --xml or --xml-file")
     if xml_file:
-        with open(xml_file, "r", encoding="utf-8") as f:
+        with open(xml_file, encoding="utf-8") as f:
             xml = f.read()
     assert xml is not None
     wrapper = f"<_wrap>{xml}</_wrap>"
@@ -180,7 +182,7 @@ def child_indent(parent: etree._Element) -> str:
     return "\n"
 
 
-def set_tails(nodes: List[etree._Element], tail: str | None) -> None:
+def set_tails(nodes: list[etree._Element], tail: str | None) -> None:
     if tail is None:
         return
     for n in nodes:
@@ -188,8 +190,8 @@ def set_tails(nodes: List[etree._Element], tail: str | None) -> None:
 
 
 def apply_insert(
-    elements: List[etree._Element],
-    nodes: List[etree._Element],
+    elements: list[etree._Element],
+    nodes: list[etree._Element],
     position: str,
     indent_override: str | None,
 ) -> int:
@@ -228,8 +230,8 @@ def apply_insert(
 
 
 def apply_replace(
-    elements: List[etree._Element],
-    nodes: List[etree._Element],
+    elements: list[etree._Element],
+    nodes: list[etree._Element],
     indent_override: str | None,
 ) -> int:
     changed = 0
@@ -249,7 +251,7 @@ def apply_replace(
     return changed
 
 
-def apply_delete(elements: List[etree._Element]) -> int:
+def apply_delete(elements: list[etree._Element]) -> int:
     changed = 0
     for el in elements:
         parent = el.getparent()
@@ -260,7 +262,7 @@ def apply_delete(elements: List[etree._Element]) -> int:
     return changed
 
 
-def apply_set_text(elements: List[etree._Element], value: str) -> int:
+def apply_set_text(elements: list[etree._Element], value: str) -> int:
     changed = 0
     for el in elements:
         if el.text != value:
@@ -269,7 +271,7 @@ def apply_set_text(elements: List[etree._Element], value: str) -> int:
     return changed
 
 
-def apply_set_attr(elements: List[etree._Element], name: str, value: str) -> int:
+def apply_set_attr(elements: list[etree._Element], name: str, value: str) -> int:
     changed = 0
     for el in elements:
         if el.get(name) != value:
@@ -278,7 +280,7 @@ def apply_set_attr(elements: List[etree._Element], name: str, value: str) -> int
     return changed
 
 
-def apply_del_attr(elements: List[etree._Element], name: str) -> int:
+def apply_del_attr(elements: list[etree._Element], name: str) -> int:
     changed = 0
     for el in elements:
         if name in el.attrib:
@@ -322,7 +324,7 @@ def element_outer_xml(el: etree._Element, pretty: bool) -> str:
 
 
 def element_inner_xml(el: etree._Element, pretty: bool) -> str:
-    parts: List[str] = []
+    parts: list[str] = []
     if el.text:
         parts.append(el.text)
     for child in el:
@@ -332,12 +334,12 @@ def element_inner_xml(el: etree._Element, pretty: bool) -> str:
                 encoding="unicode",
                 pretty_print=pretty,
                 with_tail=True,
-            )
+            ),
         )
     return "".join(parts)
 
 
-def child_tag_counts(el: etree._Element) -> List[Tuple[str, int]]:
+def child_tag_counts(el: etree._Element) -> list[tuple[str, int]]:
     counts: dict[str, int] = {}
     for child in el:
         tag = str(child.tag)
@@ -351,7 +353,7 @@ def truncate(text: str, max_chars: int | None) -> str:
     return f"{text[:max_chars]}..."
 
 
-def decode_lines(data: bytes, enc: str | None) -> List[str]:
+def decode_lines(data: bytes, enc: str | None) -> list[str]:
     encoding = enc or "utf-8"
     try:
         text = data.decode(encoding)
@@ -360,7 +362,7 @@ def decode_lines(data: bytes, enc: str | None) -> List[str]:
     return text.splitlines()
 
 
-def format_attrs(el: etree._Element, attr_names: List[str]) -> str:
+def format_attrs(el: etree._Element, attr_names: list[str]) -> str:
     if not attr_names:
         return ""
     parts = []
@@ -375,12 +377,12 @@ def format_attrs(el: etree._Element, attr_names: List[str]) -> str:
 def outline_lines(
     el: etree._Element,
     max_depth: int,
-    attr_names: List[str],
+    attr_names: list[str],
     max_children: int | None,
     max_nodes: int | None,
     include_root: bool = True,
-) -> List[str]:
-    lines: List[str] = []
+) -> list[str]:
+    lines: list[str] = []
     count = 0
 
     def emit(node: etree._Element, depth: int) -> bool:
@@ -430,7 +432,7 @@ def encode_text(text: str, enc: str | None) -> bytes:
     return text.encode(encoding)
 
 
-def line_starts(text: str) -> List[int]:
+def line_starts(text: str) -> list[int]:
     starts = [0]
     for idx, ch in enumerate(text):
         if ch == "\n":
@@ -498,13 +500,13 @@ def del_attr_in_tag(tag_text: str, name: str) -> tuple[str, bool]:
 
 def apply_attr_surgical(
     text: str,
-    elements: List[etree._Element],
+    elements: list[etree._Element],
     name: str,
     value: str | None,
     set_value: bool,
 ) -> tuple[str, int]:
     starts = line_starts(text)
-    edits: List[tuple[int, int, str]] = []
+    edits: list[tuple[int, int, str]] = []
     seen = set()
 
     for el in elements:
@@ -534,16 +536,18 @@ def apply_attr_surgical(
 
 
 def apply_text_surgical(
-    text: str, elements: List[etree._Element], value: str
+    text: str,
+    elements: list[etree._Element],
+    value: str,
 ) -> tuple[str, int]:
     starts = line_starts(text)
-    edits: List[tuple[int, int, str]] = []
+    edits: list[tuple[int, int, str]] = []
     seen = set()
 
     for el in elements:
         if len(el):
             fail(
-                "set-text only supports elements without child elements in surgical mode"
+                "set-text only supports elements without child elements in surgical mode",
             )
         line = el.sourceline or 0
         if line <= 0 or line > len(starts):

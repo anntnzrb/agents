@@ -64,7 +64,9 @@ def _synthetic_save() -> bytearray:
     for boss in bb_save.BOSSES:
         if boss["name"] in {"Cleric Beast", "Rom"}:
             for flag in boss["flags"]:
-                data[USERNAME_OFFSET + bb_save.USERNAME_TO_AOB + flag["rel_offset"]] |= flag["dead_value"]
+                data[
+                    USERNAME_OFFSET + bb_save.USERNAME_TO_AOB + flag["rel_offset"]
+                ] |= flag["dead_value"]
     return data
 
 
@@ -87,8 +89,14 @@ class SaveReaderSyntheticTests(unittest.TestCase):
         self.assertEqual(layout.username_offset, USERNAME_OFFSET)
         self.assertEqual(layout.inventory_offset, INVENTORY_OFFSET)
         self.assertEqual(layout.face_offset, FACE_OFFSET)
-        self.assertEqual(layout.key_inventory_offset, USERNAME_OFFSET + bb_save.USERNAME_TO_KEY_INV_OFFSET)
-        self.assertEqual(layout.storage_offset, INVENTORY_OFFSET + bb_save.INV_TO_STORAGE_OFFSET)
+        self.assertEqual(
+            layout.key_inventory_offset,
+            USERNAME_OFFSET + bb_save.USERNAME_TO_KEY_INV_OFFSET,
+        )
+        self.assertEqual(
+            layout.storage_offset,
+            INVENTORY_OFFSET + bb_save.INV_TO_STORAGE_OFFSET,
+        )
 
         stats = bb_save.read_stats(self.save_path)
         expected = {
@@ -111,10 +119,22 @@ class SaveReaderSyntheticTests(unittest.TestCase):
 
     def test_material_key_item_extraction_and_filters(self) -> None:
         entries = bb_save.read_inventory(self.save_path)
-        mats = {(entry.location, entry.name): entry.amount for entry in bb_save.materials(entries)}
-        self.assertEqual(mats, {("inventory", "Blood Stone Shard"): 16, ("storage", "Twin Blood Stone Shards"): 8})
+        mats = {
+            (entry.location, entry.name): entry.amount
+            for entry in bb_save.materials(entries)
+        }
+        self.assertEqual(
+            mats,
+            {
+                ("inventory", "Blood Stone Shard"): 16,
+                ("storage", "Twin Blood Stone Shards"): 8,
+            },
+        )
         keys = bb_save.important_key_items(entries)
-        self.assertEqual([(entry.location, entry.name, entry.amount) for entry in keys], [("key_inventory", "Cainhurst Summons", 1)])
+        self.assertEqual(
+            [(entry.location, entry.name, entry.amount) for entry in keys],
+            [("key_inventory", "Cainhurst Summons", 1)],
+        )
         self.assertTrue(all(entry.item_id != 999999 for entry in entries))
 
     def test_boss_filtering_reports_known_defeated_only(self) -> None:
@@ -132,7 +152,13 @@ class SaveReaderSyntheticTests(unittest.TestCase):
         bb_save.read_inventory(self.save_path)
         bb_save.read_bosses(self.save_path)
         result = subprocess.run(
-            [sys.executable, str(SCRIPTS_DIR / "cli.py"), "save", str(self.save_path), "summary"],
+            [
+                sys.executable,
+                str(SCRIPTS_DIR / "cli.py"),
+                "save",
+                str(self.save_path),
+                "summary",
+            ],
             check=True,
             text=True,
             capture_output=True,
@@ -157,7 +183,13 @@ class SaveReaderSyntheticTests(unittest.TestCase):
         for section, (included, excluded) in commands.items():
             with self.subTest(section=section):
                 result = subprocess.run(
-                    [sys.executable, str(SCRIPTS_DIR / "cli.py"), "save", str(self.save_path), section],
+                    [
+                        sys.executable,
+                        str(SCRIPTS_DIR / "cli.py"),
+                        "save",
+                        str(self.save_path),
+                        section,
+                    ],
                     check=True,
                     text=True,
                     capture_output=True,
@@ -181,7 +213,9 @@ class SaveReaderRealFixtureTests(unittest.TestCase):
     def test_external_save_fixture_is_read_only_when_configured(self) -> None:
         fixture_env = os.environ.get("BLOODBORNE_TEST_SAVE")
         if not fixture_env:
-            self.skipTest("Set BLOODBORNE_TEST_SAVE to exercise an external save fixture")
+            self.skipTest(
+                "Set BLOODBORNE_TEST_SAVE to exercise an external save fixture",
+            )
         fixture = Path(fixture_env)
         if not fixture.exists() or fixture.is_dir():
             self.skipTest("Optional user save fixture is unavailable")

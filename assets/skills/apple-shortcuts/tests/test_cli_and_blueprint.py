@@ -7,7 +7,9 @@ import make_blueprint
 import pytest
 
 
-def test_dispatcher_preserves_argv_and_propagates_exit_code(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_dispatcher_preserves_argv_and_propagates_exit_code(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     original_argv = sys.argv[:]
     observed: dict[str, object] = {}
 
@@ -28,7 +30,8 @@ def test_dispatcher_preserves_argv_and_propagates_exit_code(monkeypatch: pytest.
 
 
 def test_dispatcher_maps_string_exit_to_failure(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     def fail_with_message(path: str, run_name: str) -> None:
         del path, run_name
@@ -39,7 +42,9 @@ def test_dispatcher_maps_string_exit_to_failure(
     assert capsys.readouterr().err == "bad\n"
 
 
-def test_dispatcher_help_and_blueprint_contract(capsys: pytest.CaptureFixture[str]) -> None:
+def test_dispatcher_help_and_blueprint_contract(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     assert cli.main(["--help"]) == 0
     assert "uv run --script" in capsys.readouterr().out
 
@@ -82,5 +87,11 @@ def test_blueprint_variants_cover_trigger_and_empty_contracts() -> None:
         "constraint": None,
         "failure_mode": None,
     }
-    assert make_blueprint.build_blueprint(siri)["action_graph"][0] == "Capture/resolve spoken parameters"
-    assert make_blueprint.build_blueprint(home)["action_graph"][0] == "Evaluate automation trigger payload"
+    assert (
+        make_blueprint.build_blueprint(siri)["action_graph"][0]
+        == "Capture/resolve spoken parameters"
+    )
+    assert (
+        make_blueprint.build_blueprint(home)["action_graph"][0]
+        == "Evaluate automation trigger payload"
+    )

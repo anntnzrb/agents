@@ -1,5 +1,12 @@
 # CSS Patterns for Diagrams
 
+## Section index
+
+- Theme, atmosphere, links, sections, code, and directory trees
+- Overflow, Mermaid containers, grids, connectors, and animations
+- Charts, responsive behavior, badges, lists, KPIs, and comparisons
+- Collapsibles, prose-page elements, and generated images
+
 Reusable patterns for layout, connectors, theming, and visual effects in self-contained HTML diagrams.
 
 ## Theme Setup

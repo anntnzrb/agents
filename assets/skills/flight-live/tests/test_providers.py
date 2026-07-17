@@ -4,7 +4,6 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-
 from flight_live.models import FlightLiveError
 from flight_live.providers import (
     _ensure_agent_browser_available,
@@ -36,10 +35,12 @@ def test_fetch_kiwi_calendar_with_monkeypatched_sources(monkeypatch) -> None:
     snapshot = (_FIXTURES / "kiwi_snapshot_sample.txt").read_text(encoding="utf-8")
 
     monkeypatch.setattr(
-        "flight_live.providers._ensure_agent_browser_available", lambda: None
+        "flight_live.providers._ensure_agent_browser_available",
+        lambda: None,
     )
     monkeypatch.setattr(
-        "flight_live.providers.scrape_kiwi_snapshot_text", lambda url: snapshot
+        "flight_live.providers.scrape_kiwi_snapshot_text",
+        lambda url: snapshot,
     )
 
     def fake_lookup(term: str, *, locale: str) -> dict[str, str]:

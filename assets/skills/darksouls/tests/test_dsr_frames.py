@@ -8,7 +8,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 
-
 SKILL_DIR = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = SKILL_DIR / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
@@ -127,7 +126,7 @@ class DsrFrameSelectionTests(unittest.TestCase):
             "timing": {"label": "goods.category_representative_only", "start_frame": 9},
         }
         return cast(
-            frames.ScanResult,
+            "frames.ScanResult",
             SimpleNamespace(
                 schema_version="dsr-frame-scan.v1",
                 frame_rate=30,
@@ -147,8 +146,12 @@ class DsrFrameSelectionTests(unittest.TestCase):
         scan = self._scan()
         hidden = frames.to_jsonable(
             frames.select_frame_records(
-                scan, kind="all", query=None, spoilers=False, limit=50
-            )
+                scan,
+                kind="all",
+                query=None,
+                spoilers=False,
+                limit=50,
+            ),
         )
         text = repr(hidden)
         self.assertNotIn("Synthetic Sword", text)
@@ -156,14 +159,22 @@ class DsrFrameSelectionTests(unittest.TestCase):
 
         selected = frames.to_jsonable(
             frames.select_frame_records(
-                scan, kind="weapon", query="sword", spoilers=False, limit=50
-            )
+                scan,
+                kind="weapon",
+                query="sword",
+                spoilers=False,
+                limit=50,
+            ),
         )
         self.assertIn("Synthetic Sword", repr(selected))
         revealed = frames.to_jsonable(
             frames.select_frame_records(
-                scan, kind="all", query=None, spoilers=True, limit=50
-            )
+                scan,
+                kind="all",
+                query=None,
+                spoilers=True,
+                limit=50,
+            ),
         )
         self.assertIn("Synthetic Sword", repr(revealed))
         self.assertIn("Synthetic Flask", repr(revealed))
@@ -198,18 +209,26 @@ class DsrFrameSelectionTests(unittest.TestCase):
 
         selected = frames.to_jsonable(
             frames.select_frame_records(
-                scan, kind="weapon", query="DAGGER", spoilers=False, limit=50
-            )
+                scan,
+                kind="weapon",
+                query="DAGGER",
+                spoilers=False,
+                limit=50,
+            ),
         )
-        exact_records = cast(list[dict[str, object]], selected["records"])
+        exact_records = cast("list[dict[str, object]]", selected["records"])
         self.assertEqual([record["name"] for record in exact_records], ["Dagger"])
 
         fallback = frames.to_jsonable(
             frames.select_frame_records(
-                scan, kind="weapon", query="dag", spoilers=False, limit=50
-            )
+                scan,
+                kind="weapon",
+                query="dag",
+                spoilers=False,
+                limit=50,
+            ),
         )
-        fallback_records = cast(list[dict[str, object]], fallback["records"])
+        fallback_records = cast("list[dict[str, object]]", fallback["records"])
         self.assertEqual(
             [record["name"] for record in fallback_records],
             ["Dagger", "Dagger Long", "Dark Dagger"],
@@ -218,22 +237,38 @@ class DsrFrameSelectionTests(unittest.TestCase):
     def test_kind_query_and_limit_are_validated_and_applied(self) -> None:
         scan = self._scan()
         limited = frames.select_frame_records(
-            scan, kind="all", query="synthetic", spoilers=True, limit=1
+            scan,
+            kind="all",
+            query="synthetic",
+            spoilers=True,
+            limit=1,
         )
         payload = frames.to_jsonable(limited)
-        records = cast(list[object], payload.get("records", []))
+        records = cast("list[object]", payload.get("records", []))
         self.assertEqual(len(records), 1)
         with self.assertRaises(frames.FrameQueryError):
             frames.select_frame_records(
-                scan, kind="armor", query=None, spoilers=True, limit=50
+                scan,
+                kind="armor",
+                query=None,
+                spoilers=True,
+                limit=50,
             )
         with self.assertRaises(frames.FrameQueryError):
             frames.select_frame_records(
-                scan, kind="all", query=None, spoilers=False, limit=-1
+                scan,
+                kind="all",
+                query=None,
+                spoilers=False,
+                limit=-1,
             )
         with self.assertRaises(frames.FrameQueryError):
             frames.select_frame_records(
-                scan, kind="all", query="missing", spoilers=False, limit=50
+                scan,
+                kind="all",
+                query="missing",
+                spoilers=False,
+                limit=50,
             )
 
 
@@ -270,8 +305,12 @@ class DsrFrameInstallTests(unittest.TestCase):
         )
         payload = frames.to_jsonable(
             frames.select_frame_records(
-                scan, kind="all", query=None, spoilers=False, limit=50
-            )
+                scan,
+                kind="all",
+                query=None,
+                spoilers=False,
+                limit=50,
+            ),
         )
         self.assertEqual(payload.get("schema_version"), "dsr-frame-scan.v1")
         self.assertNotIn("source_path", repr(payload))

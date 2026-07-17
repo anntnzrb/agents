@@ -2,6 +2,8 @@
 
 This file ranks the sources used by the DS3 companion skill and defines what each source is allowed to support. It is an operator/reference document, not user-facing gameplay advice.
 
+Read this before replacing embedded resources or making provenance-sensitive parser/source claims.
+
 ## Source priority
 
 | Rank | Source | Use for | Do not use for | License / provenance |
@@ -56,7 +58,7 @@ uv run --script scripts/cli.py save auto summary
 uv run --script scripts/cli.py save auto bosses
 uv run --script scripts/cli.py save auto bonfires
 uv run --script scripts/cli.py save auto checklist
-uv run python -m py_compile scripts/ds3_save.py scripts/cli.py scripts/ds3_core.py scripts/ds3_catalog.py scripts/cli_catalog.py
+uvx ruff check --select E9,F63,F7,F82 scripts/ds3_save.py scripts/cli.py scripts/ds3_core.py scripts/ds3_catalog.py scripts/cli_catalog.py
 ```
 
 If `save auto` cannot find a local save, run the non-save gates and validate with an explicit `.sl2` path before changing save-backed claims.

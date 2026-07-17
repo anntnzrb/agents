@@ -2,6 +2,15 @@
 
 Practical recipes for testing Clojure applications with clojure.test, Kaocha, and test.check.
 
+Read this when writing Clojure tests, fixtures, async checks, Kaocha config, or generative tests.
+
+## Section index
+
+- Assertions, table tests, fixtures, and async tests
+- Kaocha configuration, execution, and metadata filters
+- Test data, side effects, exceptions, and private functions
+- Property tests, generators, organization, and shared utilities
+
 ---
 
 ## Write Basic Unit Tests

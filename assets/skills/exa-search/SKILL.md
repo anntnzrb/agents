@@ -84,6 +84,9 @@ uv run --script <skill-dir>/scripts/cli.py --help
 
 See `assets/query-templates.json`.
 
-## Reference
+## Required follow-up reads
 
-See `reference.md`.
+| Need | Read | When |
+| --- | --- | --- |
+| HTTP endpoints and payload routing | `references/http.md` | Advanced endpoint or raw payload work |
+| Reusable query shapes | `assets/query-templates.json` | Constructing a supported CLI request |

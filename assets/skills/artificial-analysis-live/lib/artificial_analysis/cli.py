@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import UTC, datetime, timedelta
 import os
 import re
 import sys
+import tempfile
 from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -37,7 +38,7 @@ from .rsc import (
 
 PROTOCOL_VERSION = "1"
 
-DEFAULT_ARTIFACT_DIR = Path("/tmp/artifacts/artificial-analysis")
+DEFAULT_ARTIFACT_DIR = Path(tempfile.gettempdir()) / "artifacts" / "artificial-analysis"
 DEFAULT_OUTPUT_JSON = DEFAULT_ARTIFACT_DIR / "full-data.json"
 DEFAULT_OUTPUT_ENDPOINTS = DEFAULT_ARTIFACT_DIR / "endpoints.txt"
 DEFAULT_OUTPUT_URL = DEFAULT_ARTIFACT_DIR / "full-url.txt"
@@ -85,7 +86,9 @@ def _dotenv_candidates() -> list[Path]:
     skill_root = Path(__file__).resolve().parents[2]
     candidates.append(skill_root / ".env")
     if skills_dir := os.environ.get("SKILLS_DIR"):
-        candidates.append(Path(skills_dir).expanduser() / "artificial-analysis-live" / ".env")
+        candidates.append(
+            Path(skills_dir).expanduser() / "artificial-analysis-live" / ".env",
+        )
 
     for ancestor in (Path.cwd(), *Path.cwd().parents):
         candidate = ancestor / "skills" / "artificial-analysis-live" / ".env"
@@ -110,7 +113,7 @@ def _required_api_key() -> str:
     api_key = os.environ.get(MODEL_API_KEY_ENV)
     if not api_key:
         raise CliUsageError(
-            "ARTIFICIAL_ANALYSIS_API_KEY required; copy .env.example to .env and set the key."
+            "ARTIFICIAL_ANALYSIS_API_KEY required; copy .env.example to .env and set the key.",
         )
     return api_key
 
@@ -130,11 +133,14 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     fetch_parser = subparsers.add_parser(
-        "fetch", help="Fetch live RSC and authenticated official model data, then write a snapshot."
+        "fetch",
+        help="Fetch live RSC and authenticated official model data, then write a snapshot.",
     )
     fetch_parser.add_argument("--output-json", type=Path, default=DEFAULT_OUTPUT_JSON)
     fetch_parser.add_argument(
-        "--output-endpoints", type=Path, default=DEFAULT_OUTPUT_ENDPOINTS
+        "--output-endpoints",
+        type=Path,
+        default=DEFAULT_OUTPUT_ENDPOINTS,
     )
     fetch_parser.add_argument("--output-url", type=Path, default=DEFAULT_OUTPUT_URL)
     fetch_parser.add_argument("--cache-dir", type=Path, default=_default_cache_dir())
@@ -142,21 +148,28 @@ def build_parser() -> argparse.ArgumentParser:
     fetch_parser.add_argument("--min-endpoints", type=int, default=700)
     fetch_parser.add_argument("--min-providers", type=int, default=40)
     fetch_parser.add_argument(
-        "--strict", action="store_true", help="Disable last-good fallback."
+        "--strict",
+        action="store_true",
+        help="Disable last-good fallback.",
     )
     fetch_parser.set_defaults(handler=_handle_fetch)
 
     stats_parser = subparsers.add_parser(
-        "stats", help="Show snapshot counts and top providers."
+        "stats",
+        help="Show snapshot counts and top providers.",
     )
     stats_parser.add_argument(
-        "snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON
+        "snapshot",
+        nargs="?",
+        type=Path,
+        default=DEFAULT_OUTPUT_JSON,
     )
     stats_parser.add_argument("--top", type=int, default=10)
     stats_parser.set_defaults(handler=_handle_stats)
 
     diff_parser = subparsers.add_parser(
-        "diff", help="Diff endpoint and provider changes between snapshots."
+        "diff",
+        help="Diff endpoint and provider changes between snapshots.",
     )
     diff_parser.add_argument("old_snapshot", type=Path)
     diff_parser.add_argument("new_snapshot", type=Path)
@@ -167,13 +180,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Rank unique models by Harness = 50%% Agentic Index + 50%% Coding Index.",
     )
     harness_parser.add_argument(
-        "snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON
+        "snapshot",
+        nargs="?",
+        type=Path,
+        default=DEFAULT_OUTPUT_JSON,
     )
     harness_parser.add_argument(
-        "--model", type=str, default=None, help="Model slug/name contains filter."
+        "--model",
+        type=str,
+        default=None,
+        help="Model slug/name contains filter.",
     )
     harness_parser.add_argument(
-        "--creator", type=str, default=None, help="Creator/lab name contains filter."
+        "--creator",
+        type=str,
+        default=None,
+        help="Creator/lab name contains filter.",
     )
     harness_parser.add_argument(
         "--open-weights-only",
@@ -188,14 +210,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fetch/query Coding Index capability rows, including coding-only output token composition.",
     )
     coding_parser.add_argument(
-        "--output-json", type=Path, default=DEFAULT_CODING_OUTPUT_JSON
+        "--output-json",
+        type=Path,
+        default=DEFAULT_CODING_OUTPUT_JSON,
     )
     coding_parser.add_argument("--timeout-seconds", type=float, default=60.0)
     coding_parser.add_argument(
-        "--model", type=str, default=None, help="Model slug/name contains filter."
+        "--model",
+        type=str,
+        default=None,
+        help="Model slug/name contains filter.",
     )
     coding_parser.add_argument(
-        "--creator", type=str, default=None, help="Creator/lab name contains filter."
+        "--creator",
+        type=str,
+        default=None,
+        help="Creator/lab name contains filter.",
     )
     coding_parser.add_argument(
         "--open-weights-only",
@@ -216,7 +246,10 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     coding_parser.add_argument(
-        "--order", type=str, default="auto", choices=("auto", "asc", "desc")
+        "--order",
+        type=str,
+        default="auto",
+        choices=("auto", "asc", "desc"),
     )
     coding_parser.add_argument("--limit", type=int, default=50)
     coding_parser.add_argument(
@@ -231,13 +264,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Profile models by reasoning selectivity (per-benchmark answer vs thinking token split).",
     )
     reasoning_parser.add_argument(
-        "snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON
+        "snapshot",
+        nargs="?",
+        type=Path,
+        default=DEFAULT_OUTPUT_JSON,
     )
     reasoning_parser.add_argument(
-        "--model", type=str, default=None, help="Model slug/name contains filter."
+        "--model",
+        type=str,
+        default=None,
+        help="Model slug/name contains filter.",
     )
     reasoning_parser.add_argument(
-        "--creator", type=str, default=None, help="Creator/lab name contains filter."
+        "--creator",
+        type=str,
+        default=None,
+        help="Creator/lab name contains filter.",
     )
     reasoning_parser.add_argument(
         "--open-weights-only",
@@ -278,7 +320,10 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     reasoning_parser.add_argument(
-        "--order", type=str, default="auto", choices=("auto", "asc", "desc")
+        "--order",
+        type=str,
+        default="auto",
+        choices=("auto", "asc", "desc"),
     )
     reasoning_parser.add_argument("--limit", type=int, default=50)
     reasoning_parser.add_argument(
@@ -289,19 +334,32 @@ def build_parser() -> argparse.ArgumentParser:
     reasoning_parser.set_defaults(handler=_handle_reasoning)
 
     query_parser = subparsers.add_parser(
-        "query", help="Query model/provider benchmark rows from a snapshot."
+        "query",
+        help="Query model/provider benchmark rows from a snapshot.",
     )
     query_parser.add_argument(
-        "snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON
+        "snapshot",
+        nargs="?",
+        type=Path,
+        default=DEFAULT_OUTPUT_JSON,
     )
     query_parser.add_argument(
-        "--model", type=str, default=None, help="Model slug/name contains filter."
+        "--model",
+        type=str,
+        default=None,
+        help="Model slug/name contains filter.",
     )
     query_parser.add_argument(
-        "--provider", type=str, default=None, help="Provider slug/name contains filter."
+        "--provider",
+        type=str,
+        default=None,
+        help="Provider slug/name contains filter.",
     )
     query_parser.add_argument(
-        "--endpoint", type=str, default=None, help="Endpoint slug contains filter."
+        "--endpoint",
+        type=str,
+        default=None,
+        help="Endpoint slug contains filter.",
     )
     query_parser.add_argument(
         "--sort-by",
@@ -320,7 +378,10 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     query_parser.add_argument(
-        "--order", type=str, default="auto", choices=("auto", "asc", "desc")
+        "--order",
+        type=str,
+        default="auto",
+        choices=("auto", "asc", "desc"),
     )
     query_parser.add_argument("--limit", type=int, default=20)
     query_parser.set_defaults(handler=_handle_query)
@@ -330,16 +391,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Minimal NL question command that maps intent to query filters/sort.",
     )
     qa_parser.add_argument(
-        "question", type=str, help="Natural-language question about models/providers."
+        "question",
+        type=str,
+        help="Natural-language question about models/providers.",
     )
     qa_parser.add_argument(
-        "snapshot", nargs="?", type=Path, default=DEFAULT_OUTPUT_JSON
+        "snapshot",
+        nargs="?",
+        type=Path,
+        default=DEFAULT_OUTPUT_JSON,
     )
     qa_parser.add_argument(
-        "--model", type=str, default=None, help="Override inferred model filter."
+        "--model",
+        type=str,
+        default=None,
+        help="Override inferred model filter.",
     )
     qa_parser.add_argument(
-        "--provider", type=str, default=None, help="Override inferred provider filter."
+        "--provider",
+        type=str,
+        default=None,
+        help="Override inferred provider filter.",
     )
     qa_parser.add_argument(
         "--sort-by",
@@ -366,12 +438,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override inferred order.",
     )
     qa_parser.add_argument(
-        "--limit", type=int, default=None, help="Override inferred result limit."
+        "--limit",
+        type=int,
+        default=None,
+        help="Override inferred result limit.",
     )
     qa_parser.set_defaults(handler=_handle_qa)
 
     schema_parser = subparsers.add_parser(
-        "schema", help="Print machine-readable capability schema."
+        "schema",
+        help="Print machine-readable capability schema.",
     )
     schema_parser.set_defaults(handler=_handle_schema)
 
@@ -437,14 +513,14 @@ def _ensure_default_snapshot_fresh(path: Path, snapshot: dict[str, Any]) -> None
     fetched_at = meta.get("fetched_at") if isinstance(meta, dict) else None
     if not isinstance(fetched_at, str) or not fetched_at:
         raise ExtractionError(
-            f"Default snapshot missing meta.fetched_at: {path}. Run fetch first or pass an explicit snapshot path."
+            f"Default snapshot missing meta.fetched_at: {path}. Run fetch first or pass an explicit snapshot path.",
         )
 
     try:
         fetched_at_dt = datetime.fromisoformat(fetched_at)
     except ValueError as exc:
         raise ExtractionError(
-            f"Default snapshot has invalid meta.fetched_at: {path}. Run fetch first or pass an explicit snapshot path."
+            f"Default snapshot has invalid meta.fetched_at: {path}. Run fetch first or pass an explicit snapshot path.",
         ) from exc
 
     if fetched_at_dt.tzinfo is None:
@@ -452,7 +528,7 @@ def _ensure_default_snapshot_fresh(path: Path, snapshot: dict[str, Any]) -> None
     age = datetime.now(UTC) - fetched_at_dt.astimezone(UTC)
     if age > DEFAULT_SNAPSHOT_MAX_AGE:
         raise ExtractionError(
-            f"Default snapshot is stale ({fetched_at}, older than 24h): {path}. Run fetch first or pass an explicit snapshot path."
+            f"Default snapshot is stale ({fetched_at}, older than 24h): {path}. Run fetch first or pass an explicit snapshot path.",
         )
 
 
@@ -464,7 +540,11 @@ def _load_reader_snapshot(path: Path) -> dict[str, Any]:
 
 def _schema_version(snapshot: dict[str, Any]) -> int:
     meta = snapshot.get("meta")
-    return meta.get("schema_version") if isinstance(meta, dict) and isinstance(meta.get("schema_version"), int) else 1
+    return (
+        meta.get("schema_version")
+        if isinstance(meta, dict) and isinstance(meta.get("schema_version"), int)
+        else 1
+    )
 
 
 def _canonical_models(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -503,6 +583,7 @@ def _creator(model: dict[str, Any]) -> dict[str, Any]:
     legacy_creator = model.get("model_creators")
     return legacy_creator if isinstance(legacy_creator, dict) else {}
 
+
 def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
     api_key = _required_api_key()
     cache_meta = load_cache_metadata(args.cache_dir)
@@ -516,14 +597,17 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
     fallback_reason: str | None = None
 
     try:
-        result = fetch_rsc(timeout_seconds=args.timeout_seconds, if_none_match=sent_etag)
+        result = fetch_rsc(
+            timeout_seconds=args.timeout_seconds,
+            if_none_match=sent_etag,
+        )
         official_result = fetch_models(api_key, timeout_seconds=args.timeout_seconds)
         response_etag = result.headers.get("etag") or sent_etag
         if result.status_code == 304:
             body = load_cached_body(args.cache_dir, cache_meta)
             if body is None:
                 raise ExtractionError(
-                    "Upstream returned 304 but no cached payload is available."
+                    "Upstream returned 304 but no cached payload is available.",
                 )
             reused_cached_body = True
         else:
@@ -560,7 +644,7 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
             fallback_source = f"file:{args.output_json}"
         if fallback_payload is None:
             raise ExtractionError(
-                f"Fresh fetch failed and no last-good snapshot exists ({exc})."
+                f"Fresh fetch failed and no last-good snapshot exists ({exc}).",
             ) from exc
         slugs = snapshot_slugs(fallback_payload)
         sanity_check(
@@ -601,7 +685,8 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "reused_cached_payload": reused_cached_body,
             },
             "official_api": {
-                "url": os.environ.get("ARTIFICIAL_ANALYSIS_API_BASE_URL") or MODEL_API_URL,
+                "url": os.environ.get("ARTIFICIAL_ANALYSIS_API_BASE_URL")
+                or MODEL_API_URL,
                 "status_code": (
                     official_result.status_code if official_result is not None else None
                 ),
@@ -683,7 +768,7 @@ def _diff_payload(args: argparse.Namespace) -> dict[str, Any]:
                     "before": before,
                     "after": after,
                     "delta": delta,
-                }
+                },
             )
 
     return {
@@ -729,7 +814,8 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
         coding_score = _first_number(model, "coding_index", "headlineValue")
 
         if model_filter and not _matches_any(
-            model_filter, [model_slug, model_name, short_name]
+            model_filter,
+            [model_slug, model_name, short_name],
         ):
             continue
         if creator_filter and not _matches_any(
@@ -780,9 +866,7 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "Tokens used to run the Coding Index evaluation. "
                 "output_tokens = answer_tokens + reasoning_tokens."
             ),
-            "evidence_scope": (
-                "per_task" if is_current else "coding_evaluation_total"
-            ),
+            "evidence_scope": ("per_task" if is_current else "coding_evaluation_total"),
             "input_tokens": input_tokens,
             "answer_tokens": answer_tokens,
             "reasoning_tokens": reasoning_tokens,
@@ -811,24 +895,37 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "output_tokens": _number_alias(task_output, "output", "outputTokens"),
                 "answer_tokens": _number_alias(task_output, "answer", "answerTokens"),
                 "reasoning_tokens": _number_alias(
-                    task_output, "reasoning", "reasoningTokens"
+                    task_output,
+                    "reasoning",
+                    "reasoningTokens",
                 ),
             },
             "cost_per_task_usd": {
                 "total_cost": _number_alias(task_cost, "total", "totalCost"),
                 "input_cost": _number_alias(task_cost, "input", "inputCost"),
                 "non_cache_input_cost": _number_alias(
-                    task_cost, "nonCacheInput", "non_cache_input", "nonCacheInputCost"
+                    task_cost,
+                    "nonCacheInput",
+                    "non_cache_input",
+                    "nonCacheInputCost",
                 ),
                 "cache_read_cost": _number_alias(
-                    task_cost, "cacheRead", "cache_read", "cacheReadCost"
+                    task_cost,
+                    "cacheRead",
+                    "cache_read",
+                    "cacheReadCost",
                 ),
                 "cache_write_cost": _number_alias(
-                    task_cost, "cacheWrite", "cache_write", "cacheWriteCost"
+                    task_cost,
+                    "cacheWrite",
+                    "cache_write",
+                    "cacheWriteCost",
                 ),
                 "output_cost": _number_alias(task_cost, "output", "outputCost"),
                 "reasoning_cost": _number_alias(
-                    task_cost, "reasoning", "reasoningCost"
+                    task_cost,
+                    "reasoning",
+                    "reasoningCost",
                 ),
                 "answer_cost": _number_alias(task_cost, "answer", "answerCost"),
             },
@@ -868,8 +965,10 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
     reverse = _resolve_reverse(sort_key=args.sort_by, order=args.order)
     rows.sort(
         key=lambda row: _nested_sort_metric(
-            row, sort_key_map[args.sort_by], reverse=reverse
-        )
+            row,
+            sort_key_map[args.sort_by],
+            reverse=reverse,
+        ),
     )
     limited = rows[: max(args.limit, 0)]
 
@@ -884,7 +983,7 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "rows": rows,
             },
             ensure_ascii=False,
-        )
+        ),
     )
 
     return {
@@ -943,11 +1042,9 @@ def _extract_default_data_models(frames: list[tuple[str, Any]]) -> list[Any]:
 
     if not candidates:
         raise ExtractionError(
-            "Coding capability payload missing recognizable coding rows."
+            "Coding capability payload missing recognizable coding rows.",
         )
     return max(candidates, key=len)
-
-
 
 
 def _looks_like_coding_capability_rows(value: Any) -> bool:
@@ -1004,12 +1101,11 @@ def _number_alias(mapping: dict[str, Any], *keys: str) -> int | float | None:
     return _first_number(mapping, *keys)
 
 
-
 def _number_or_none(value: Any) -> int | float | None:
     return value if isinstance(value, int | float) else None
 
 
-def _share(part: int | float | None, total: int | float | None) -> float | None:
+def _share(part: float | None, total: float | None) -> float | None:
     if (
         not isinstance(part, int | float)
         or not isinstance(total, int | float)
@@ -1033,7 +1129,10 @@ def _coding_component_token_counts(model: dict[str, Any]) -> dict[str, Any]:
 
 
 def _nested_sort_metric(
-    row: dict[str, Any], path: str, *, reverse: bool
+    row: dict[str, Any],
+    path: str,
+    *,
+    reverse: bool,
 ) -> tuple[int, float]:
     current: Any = row
     for part in path.split("."):
@@ -1077,7 +1176,8 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
         if model_filter and not _matches_any(model_filter, [model_slug, model_name]):
             continue
         if creator_filter and not _matches_any(
-            creator_filter, [creator_name, creator.get("slug")]
+            creator_filter,
+            [creator_name, creator.get("slug")],
         ):
             continue
         if args.open_weights_only and model.get("is_open_weights") is not True:
@@ -1105,11 +1205,11 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "reasoning_model": model.get("reasoning_model"),
                 "is_open_weights": model.get("is_open_weights"),
                 "context_window_tokens": model.get("context_window_tokens"),
-            }
+            },
         )
 
     rows.sort(
-        key=lambda row: (-float(row["harness"]), str(row.get("model_slug") or ""))
+        key=lambda row: (-float(row["harness"]), str(row.get("model_slug") or "")),
     )
     for index, row in enumerate(rows, start=1):
         row["rank"] = index
@@ -1135,8 +1235,6 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
         },
         "rows": limited,
     }
-
-
 
 
 def _compute_reasoning_profile(model: dict[str, Any]) -> dict[str, Any] | None:
@@ -1242,7 +1340,7 @@ def _reasoning_benchmarks(model: dict[str, Any]) -> list[dict[str, Any]]:
                 "reasoning_tokens": int(r),
                 "output_tokens": int(output),
                 "reasoning_share": round(float(r) / float(output), 4),
-            }
+            },
         )
     result.sort(key=lambda b: b["reasoning_share"])
     return result
@@ -1278,7 +1376,8 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
         if model_filter and not _matches_any(model_filter, [model_slug, model_name]):
             continue
         if creator_filter and not _matches_any(
-            creator_filter, [creator_name, creator.get("slug")]
+            creator_filter,
+            [creator_name, creator.get("slug")],
         ):
             continue
         if args.open_weights_only and model.get("is_open_weights") is not True:
@@ -1325,7 +1424,10 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
         "harness": ("harness", True),
         "selectivity": ("reasoning_profile.selectivity_score", True),
         "reasoning_floor": ("reasoning_profile.reasoning_floor", False),
-        "weighted_reasoning_share": ("reasoning_profile.weighted_reasoning_share", False),
+        "weighted_reasoning_share": (
+            "reasoning_profile.weighted_reasoning_share",
+            False,
+        ),
         "intelligence": ("intelligence", True),
         "agentic": ("agentic", True),
         "coding": ("coding", True),
@@ -1392,6 +1494,8 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
         },
         "rows": limited,
     }
+
+
 def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
     snapshot = _load_reader_snapshot(args.snapshot)
     hosts_models = snapshot.get("hosts_models")
@@ -1399,7 +1503,9 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
         raise ExtractionError("Snapshot missing hosts_models list")
     canonical_models = _canonical_models(snapshot)
 
-    model_filter = args.model.lower() if isinstance(args.model, str) and args.model else None
+    model_filter = (
+        args.model.lower() if isinstance(args.model, str) and args.model else None
+    )
     provider_filter = (
         args.provider.lower()
         if isinstance(args.provider, str) and args.provider
@@ -1438,7 +1544,8 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
         if model_filter and not _matches_any(model_filter, [model_slug, model_name]):
             continue
         if provider_filter and not _matches_any(
-            provider_filter, [provider_slug, provider_name]
+            provider_filter,
+            [provider_slug, provider_name],
         ):
             continue
         if endpoint_filter and endpoint_filter not in endpoint_slug.lower():
@@ -1488,7 +1595,7 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "e2e": e2e.get("total_time"),
                 "context_window_tokens": item.get("context_window_tokens"),
                 "host_api_id": item.get("host_api_id"),
-            }
+            },
         )
 
     sort_key = args.sort_by
@@ -1521,13 +1628,15 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
         "top_providers": [
             {"provider": name, "endpoints": count}
             for name, count in sorted(
-                provider_counts.items(), key=lambda item: (-item[1], item[0])
+                provider_counts.items(),
+                key=lambda item: (-item[1], item[0]),
             )[:10]
         ],
         "top_models": [
             {"model": name, "endpoints": count}
             for name, count in sorted(
-                model_counts.items(), key=lambda item: (-item[1], item[0])
+                model_counts.items(),
+                key=lambda item: (-item[1], item[0]),
             )[:10]
         ],
         "rows": limited,
@@ -1560,7 +1669,10 @@ def _resolve_reverse(*, sort_key: str, order: str) -> bool:
 
 
 def _sort_metric(
-    row: dict[str, Any], metric: str, *, reverse: bool
+    row: dict[str, Any],
+    metric: str,
+    *,
+    reverse: bool,
 ) -> tuple[int, float]:
     value = row.get(metric)
     if isinstance(value, int | float):
@@ -1819,9 +1931,9 @@ def _capability_schema() -> dict[str, Any]:
                 "description": "Fetch required RSC and authenticated official-model sources, merge schema-v2 data, validate sanity thresholds, cache RSC by ETag, and write outputs.",
                 "outputs": ["full-data.json", "endpoints.txt", "full-url.txt"],
                 "flags": {
-                    "output_json": "Path (default /tmp/artifacts/artificial-analysis/full-data.json)",
-                    "output_endpoints": "Path (default /tmp/artifacts/artificial-analysis/endpoints.txt)",
-                    "output_url": "Path (default /tmp/artifacts/artificial-analysis/full-url.txt)",
+                    "output_json": "Path (default <temp-dir>/artifacts/artificial-analysis/full-data.json)",
+                    "output_endpoints": "Path (default <temp-dir>/artifacts/artificial-analysis/endpoints.txt)",
+                    "output_url": "Path (default <temp-dir>/artifacts/artificial-analysis/full-url.txt)",
                     "cache_dir": "Path to ETag/payload cache",
                     "timeout_seconds": "float network timeout",
                     "min_endpoints": "int sanity threshold (default 700)",
@@ -1918,7 +2030,7 @@ def _capability_schema() -> dict[str, Any]:
             },
             "response": {
                 "success": {
-                    "fields": ["id", "type=response", "command", "success", "data"]
+                    "fields": ["id", "type=response", "command", "success", "data"],
                 },
                 "error": {
                     "fields": [
@@ -1927,7 +2039,7 @@ def _capability_schema() -> dict[str, Any]:
                         "command",
                         "success=false",
                         "error",
-                    ]
+                    ],
                 },
             },
         },
@@ -1935,7 +2047,10 @@ def _capability_schema() -> dict[str, Any]:
 
 
 def _error_response(
-    request_id: Any, command: str, code: str, message: str
+    request_id: Any,
+    command: str,
+    code: str,
+    message: str,
 ) -> dict[str, Any]:
     return {
         "id": request_id,
@@ -1950,7 +2065,9 @@ def _error_response(
 
 
 def _success_response(
-    request_id: Any, command: str, data: dict[str, Any]
+    request_id: Any,
+    command: str,
+    data: dict[str, Any],
 ) -> dict[str, Any]:
     return {
         "id": request_id,
@@ -1974,7 +2091,7 @@ def _fetch_namespace(args: dict[str, Any]) -> argparse.Namespace:
     return argparse.Namespace(
         output_json=Path(_arg_value(args, "output_json", str(DEFAULT_OUTPUT_JSON))),
         output_endpoints=Path(
-            _arg_value(args, "output_endpoints", str(DEFAULT_OUTPUT_ENDPOINTS))
+            _arg_value(args, "output_endpoints", str(DEFAULT_OUTPUT_ENDPOINTS)),
         ),
         output_url=Path(_arg_value(args, "output_url", str(DEFAULT_OUTPUT_URL))),
         cache_dir=Path(_arg_value(args, "cache_dir", str(_default_cache_dir()))),
@@ -2005,7 +2122,7 @@ def _harness_namespace(args: dict[str, Any]) -> argparse.Namespace:
 def _coding_namespace(args: dict[str, Any]) -> argparse.Namespace:
     return argparse.Namespace(
         output_json=Path(
-            _arg_value(args, "output_json", str(DEFAULT_CODING_OUTPUT_JSON))
+            _arg_value(args, "output_json", str(DEFAULT_CODING_OUTPUT_JSON)),
         ),
         timeout_seconds=float(_arg_value(args, "timeout_seconds", 60.0)),
         model=_arg_value(args, "model", None),
@@ -2015,7 +2132,7 @@ def _coding_namespace(args: dict[str, Any]) -> argparse.Namespace:
         order=str(_arg_value(args, "order", "auto")),
         limit=int(_arg_value(args, "limit", 50)),
         include_benchmark_counts=bool(
-            _arg_value(args, "include_benchmark_counts", False)
+            _arg_value(args, "include_benchmark_counts", False),
         ),
     )
 
@@ -2041,7 +2158,8 @@ def _diff_namespace(args: dict[str, Any]) -> argparse.Namespace:
     if not old_snapshot or not new_snapshot:
         raise CliUsageError("diff requires old_snapshot and new_snapshot")
     return argparse.Namespace(
-        old_snapshot=Path(str(old_snapshot)), new_snapshot=Path(str(new_snapshot))
+        old_snapshot=Path(str(old_snapshot)),
+        new_snapshot=Path(str(new_snapshot)),
     )
 
 
@@ -2087,7 +2205,10 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
         except json.JSONDecodeError:
             _emit_json(
                 _error_response(
-                    None, "unknown", "invalid_json", "Request line is not valid JSON."
+                    None,
+                    "unknown",
+                    "invalid_json",
+                    "Request line is not valid JSON.",
                 ),
                 stdout=output_stream,
             )
@@ -2096,7 +2217,10 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
         if not isinstance(request, dict):
             _emit_json(
                 _error_response(
-                    None, "unknown", "invalid_request", "Request must be a JSON object."
+                    None,
+                    "unknown",
+                    "invalid_request",
+                    "Request must be a JSON object.",
                 ),
                 stdout=output_stream,
             )
@@ -2120,7 +2244,10 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
         if not isinstance(args_payload, dict):
             _emit_json(
                 _error_response(
-                    request_id, command, "invalid_args", "args must be an object."
+                    request_id,
+                    command,
+                    "invalid_args",
+                    "args must be an object.",
                 ),
                 stdout=output_stream,
             )
@@ -2129,21 +2256,29 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
         try:
             if command == "ping":
                 response = _success_response(
-                    request_id, command, {"ok": True, "version": PROTOCOL_VERSION}
+                    request_id,
+                    command,
+                    {"ok": True, "version": PROTOCOL_VERSION},
                 )
             elif command in {"schema", "get_schema"}:
                 response = _success_response(request_id, command, _capability_schema())
             elif command == "fetch":
                 response = _success_response(
-                    request_id, command, _fetch_payload(_fetch_namespace(args_payload))
+                    request_id,
+                    command,
+                    _fetch_payload(_fetch_namespace(args_payload)),
                 )
             elif command == "stats":
                 response = _success_response(
-                    request_id, command, _stats_payload(_stats_namespace(args_payload))
+                    request_id,
+                    command,
+                    _stats_payload(_stats_namespace(args_payload)),
                 )
             elif command == "diff":
                 response = _success_response(
-                    request_id, command, _diff_payload(_diff_namespace(args_payload))
+                    request_id,
+                    command,
+                    _diff_payload(_diff_namespace(args_payload)),
                 )
             elif command == "harness":
                 response = _success_response(
@@ -2165,11 +2300,15 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                 )
             elif command == "query":
                 response = _success_response(
-                    request_id, command, _query_payload(_query_namespace(args_payload))
+                    request_id,
+                    command,
+                    _query_payload(_query_namespace(args_payload)),
                 )
             elif command == "qa":
                 response = _success_response(
-                    request_id, command, _qa_payload(_qa_namespace(args_payload))
+                    request_id,
+                    command,
+                    _qa_payload(_qa_namespace(args_payload)),
                 )
             else:
                 response = _error_response(
@@ -2182,7 +2321,10 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
             response = _error_response(request_id, command, "usage_error", str(exc))
         except ExtractionError as exc:
             response = _error_response(
-                request_id, command, "extraction_error", str(exc)
+                request_id,
+                command,
+                "extraction_error",
+                str(exc),
             )
         except OSError as exc:
             response = _error_response(request_id, command, "io_error", str(exc))

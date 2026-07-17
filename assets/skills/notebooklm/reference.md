@@ -1,5 +1,7 @@
 # NotebookLM Skill Reference
 
+Read this reference before nontrivial NotebookLM CLI work or troubleshooting.
+
 ## Core commands
 
 ```bash

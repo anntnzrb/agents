@@ -17,9 +17,10 @@ fails or for broad comparison; live contracts MUST override it.
 nix run github:numtide/llm-agents.nix#mcporter -- --config assets/mcporter.jsonc list deepwiki --schema --json
 ```
 
-MUST attempt that command before relying on this snapshot. NEVER invent
-structured response fields: all tools publish only the common string envelope
-below, not a schema for the string's semantic content.
+The command above captured this broad snapshot. Runtime calls MUST use live
+brief discovery plus the selected tool's schema first. NEVER invent structured
+response fields: all tools publish only the common string envelope below, not
+a schema for the string's semantic content.
 
 ## Inventory
 
@@ -195,13 +196,13 @@ MUST respect the limit without claiming schema enforcement. MCPorter renders
 
 ## Discovery and drift
 
-- MUST discover the complete live schema first:
+- MUST discover the live inventory first:
 
   ```text
-  mcporter --config assets/mcporter.jsonc list deepwiki --schema
+  mcporter --config assets/mcporter.jsonc list deepwiki --brief
   ```
 
-- MAY narrow discovery after the complete inventory is known:
+- MUST inspect the selected tool's live schema:
 
   ```text
   mcporter --config assets/mcporter.jsonc list deepwiki.ask_question --schema

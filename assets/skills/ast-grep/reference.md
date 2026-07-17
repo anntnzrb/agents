@@ -1,5 +1,7 @@
 # Reference
 
+Read this when exact read-only ast-grep flags, strictness, selectors, scope, or output formats matter.
+
 ## Command choice
 
 - Prefer `sg` if available. Fallback `ast-grep run`. Last resort: `nix run nixpkgs#ast-grep -- run`

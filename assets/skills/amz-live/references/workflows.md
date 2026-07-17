@@ -1,5 +1,7 @@
 # Workflows
 
+Read this for multi-pass discovery, ranking, enrichment, or location-aware recommendations.
+
 ## 1. Discovery pass
 
 Goal: broad candidate set, low request cost.

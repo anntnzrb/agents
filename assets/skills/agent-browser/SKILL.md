@@ -15,18 +15,18 @@ Use `agent-browser` for browser tasks: navigate sites, fill forms, click control
 
 Read references only when the task crosses the trigger below. Keep this file as the default path for routine open/snapshot/interact/capture work.
 
-| Reference                          | Read when                                                                                                                                                                                  |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `references/commands.md`           | You need an option not shown here, exact CLI syntax, JSON output shape, downloads, cookies/storage, tabs, or command-specific flags.                                                       |
-| `references/common-patterns.md`    | You need form submission, auth/state/session examples, data extraction, parallel sessions, CDP attachment, color scheme, visual browser, local file, or iOS Simulator examples.            |
-| `references/snapshot-refs.md`      | You will reuse element refs across changing DOM state, debug stale refs, use scoped snapshots, or need cursor-interactive element handling.                                                |
-| `references/session-management.md` | You need named sessions, concurrent browser contexts, persistent cookies/localStorage, state files, or cleanup/TTL behavior.                                                               |
-| `references/authentication.md`     | The task includes login, OAuth, 2FA, saved credentials, auth vault operations, or state reuse after authentication.                                                                        |
-| `references/video-recording.md`    | You need to record a headed/headless run for debugging, evidence, or documentation.                                                                                                        |
-| `references/profiling.md`          | You need Chrome DevTools traces, performance profiling, or timing diagnosis.                                                                                                               |
-| `references/proxy-support.md`      | You need proxy setup, geo-testing, proxy authentication, or rotating proxies.                                                                                                              |
-| `references/advanced.md`           | You need content boundaries, allowlists, action policy, output limits, diffing, timeout strategy, semantic locators, `eval`, persistent config, or advanced ref lifecycle troubleshooting. |
-| `references/native-mode.md`        | You need the experimental Rust daemon/native mode, Chromium/Safari WebDriver notes, or native/default switching rules.                                                                     |
+| Need | Read | When |
+| --- | --- | --- |
+| Full command syntax | `references/commands.md` | For options, JSON, downloads, cookies/storage, tabs, or command flags not shown here |
+| Worked browser flows | `references/common-patterns.md` | For forms, auth/state, extraction, parallel sessions, CDP, visual mode, local files, or iOS Simulator |
+| Ref lifecycle | `references/snapshot-refs.md` | Before reusing refs across DOM changes or debugging stale/scoped refs |
+| Session state | `references/session-management.md` | For named/concurrent sessions, persistent state, cleanup, or TTL behavior |
+| Authentication | `references/authentication.md` | For login, OAuth, 2FA, credentials, auth vault, or saved-state reuse |
+| Recording | `references/video-recording.md` | When recording a run for evidence or debugging |
+| Profiling | `references/profiling.md` | For DevTools traces or timing diagnosis |
+| Proxies | `references/proxy-support.md` | For geo-testing, proxy auth, or rotation |
+| Advanced controls | `references/advanced.md` | For boundaries, allowlists, action policy, limits, diffing, timeouts, locators, `eval`, or config |
+| Native mode | `references/native-mode.md` | Before using the experimental Rust daemon or switching browser backends |
 
 ## Entry Point
 

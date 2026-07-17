@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
 # dependencies = []
@@ -81,7 +80,7 @@ def load_env() -> None:
     candidates.append(skill_dir / ".env")
     if os.environ.get("SKILLS_DIR"):
         candidates.append(
-            Path(os.environ["SKILLS_DIR"]).expanduser() / "brave-search" / ".env"
+            Path(os.environ["SKILLS_DIR"]).expanduser() / "brave-search" / ".env",
         )
     candidates.append(ancestor_env("brave-search"))
     for candidate in candidates:
@@ -117,7 +116,10 @@ def looks_like_html(text: str) -> bool:
 def html_to_text(body: bytes) -> str:
     text = body.decode("utf-8", errors="replace")
     text = re.sub(
-        r"<(script|style)\b[^>]*>.*?</\1>", " ", text, flags=re.DOTALL | re.IGNORECASE
+        r"<(script|style)\b[^>]*>.*?</\1>",
+        " ",
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
     )
     text = re.sub(r"<[^>]+>", " ", text)
     text = _html.unescape(text)
@@ -141,7 +143,9 @@ def emit_provider_error(
         preview = decoded.strip()
     if len(preview) > PREVIEW_LIMIT:
         preview = preview[:PREVIEW_LIMIT]
-    truncated = bool(body) and (body_bytes > PREVIEW_LIMIT or len(decoded) > PREVIEW_LIMIT)
+    truncated = bool(body) and (
+        body_bytes > PREVIEW_LIMIT or len(decoded) > PREVIEW_LIMIT
+    )
     err = {
         "error.provider": PROVIDER,
         "error.status": status,
@@ -171,7 +175,11 @@ def project_web_results(payload: Any) -> list[dict[str, Any]]:
             value = _str(item.get(field))
             if value is not None:
                 entry[field] = value
-        source = (item.get("profile") or {}).get("name") if isinstance(item.get("profile"), dict) else None
+        source = (
+            (item.get("profile") or {}).get("name")
+            if isinstance(item.get("profile"), dict)
+            else None
+        )
         if isinstance(source, str):
             entry["source"] = source
         if "cluster" in item and isinstance(item["cluster"], list):
@@ -201,7 +209,11 @@ def project_news_results(payload: Any) -> list[dict[str, Any]]:
             value = _str(item.get(field))
             if value is not None:
                 entry[field] = value
-        source = (item.get("profile") or {}).get("name") if isinstance(item.get("profile"), dict) else None
+        source = (
+            (item.get("profile") or {}).get("name")
+            if isinstance(item.get("profile"), dict)
+            else None
+        )
         if isinstance(source, str):
             entry["source"] = source
         out.append(entry)
@@ -219,7 +231,11 @@ def project_local_results(payload: Any) -> list[dict[str, Any]]:
             value = _str(item.get(field))
             if value is not None:
                 entry[field] = value
-        source = (item.get("profile") or {}).get("name") if isinstance(item.get("profile"), dict) else None
+        source = (
+            (item.get("profile") or {}).get("name")
+            if isinstance(item.get("profile"), dict)
+            else None
+        )
         if isinstance(source, str):
             entry["source"] = source
         out.append(entry)
@@ -232,7 +248,9 @@ def project_image_results(payload: Any) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         thumb = item.get("thumbnail") if isinstance(item.get("thumbnail"), dict) else {}
-        props = item.get("properties") if isinstance(item.get("properties"), dict) else {}
+        props = (
+            item.get("properties") if isinstance(item.get("properties"), dict) else {}
+        )
         entry: dict[str, Any] = {
             "title": _str(item.get("title")),
             "url": _str(item.get("url")),
@@ -313,13 +331,17 @@ def run_endpoint(cmd: str, base_url: str, api_key: str, args: list[str]) -> int:
             n = validate_count(value)
             if n is None:
                 return usage_error(
-                    f"count must be an integer {COUNT_MIN}..{COUNT_MAX} (got {value!r})"
+                    f"count must be an integer {COUNT_MIN}..{COUNT_MAX} (got {value!r})",
                 )
             count_value = n
         validated.append((key, value))
     extra = validated
 
-    if cmd == "web" and not raw_mode and not any(k == "result_filter" for k, _ in extra):
+    if (
+        cmd == "web"
+        and not raw_mode
+        and not any(k == "result_filter" for k, _ in extra)
+    ):
         extra.append(("result_filter", "web"))
 
     params = [("q", query), *extra]
@@ -329,9 +351,17 @@ def run_endpoint(cmd: str, base_url: str, api_key: str, args: list[str]) -> int:
         with urllib.request.urlopen(req, timeout=60) as response:
             body = response.read()
     except urllib.error.HTTPError as exc:
-        return emit_provider_error(status=exc.code, message=f"HTTP {exc.code}", body=exc.read())
+        return emit_provider_error(
+            status=exc.code,
+            message=f"HTTP {exc.code}",
+            body=exc.read(),
+        )
     except urllib.error.URLError as exc:
-        return emit_provider_error(status=None, message=f"network error: {exc.reason}", body=b"")
+        return emit_provider_error(
+            status=None,
+            message=f"network error: {exc.reason}",
+            body=b"",
+        )
 
     if raw_mode:
         sys.stdout.buffer.write(body)
@@ -341,7 +371,9 @@ def run_endpoint(cmd: str, base_url: str, api_key: str, args: list[str]) -> int:
         payload = json.loads(body)
     except json.JSONDecodeError as exc:
         return emit_provider_error(
-            status=None, message=f"invalid JSON in response: {exc.msg}", body=body
+            status=None,
+            message=f"invalid JSON in response: {exc.msg}",
+            body=body,
         )
 
     envelope: dict[str, Any] = {
@@ -351,7 +383,9 @@ def run_endpoint(cmd: str, base_url: str, api_key: str, args: list[str]) -> int:
         "results": PROJECTORS[cmd](payload),
     }
     query_obj = payload.get("query")
-    more = query_obj.get("more_results_available") if isinstance(query_obj, dict) else None
+    more = (
+        query_obj.get("more_results_available") if isinstance(query_obj, dict) else None
+    )
     if isinstance(more, bool):
         envelope["more_results_available"] = more
     json_print(envelope)
@@ -368,16 +402,30 @@ def run_summarizer_key(base_url: str, api_key: str, args: list[str]) -> int:
         with urllib.request.urlopen(req, timeout=60) as response:
             body = response.read()
     except urllib.error.HTTPError as exc:
-        return emit_provider_error(status=exc.code, message=f"HTTP {exc.code}", body=exc.read())
+        return emit_provider_error(
+            status=exc.code,
+            message=f"HTTP {exc.code}",
+            body=exc.read(),
+        )
     except urllib.error.URLError as exc:
-        return emit_provider_error(status=None, message=f"network error: {exc.reason}", body=b"")
+        return emit_provider_error(
+            status=None,
+            message=f"network error: {exc.reason}",
+            body=b"",
+        )
     try:
         payload = json.loads(body)
     except json.JSONDecodeError as exc:
         return emit_provider_error(
-            status=None, message=f"invalid JSON in response: {exc.msg}", body=body
+            status=None,
+            message=f"invalid JSON in response: {exc.msg}",
+            body=body,
         )
-    key = (payload.get("summarizer") or {}).get("key") if isinstance(payload, dict) else None
+    key = (
+        (payload.get("summarizer") or {}).get("key")
+        if isinstance(payload, dict)
+        else None
+    )
     if not isinstance(key, str) or not key:
         return emit_provider_error(
             status=None,
@@ -390,8 +438,15 @@ def run_summarizer_key(base_url: str, api_key: str, args: list[str]) -> int:
 
 def run_summarize(base_url: str, api_key: str, args: list[str]) -> int:
     if not args:
-        return usage_error("usage: brave-search summarize <summary-key> [key=value ...]")
-    return raw_get(base_url, "/summarizer/search", api_key, [("key", args[0]), *pairs(args[1:])])
+        return usage_error(
+            "usage: brave-search summarize <summary-key> [key=value ...]",
+        )
+    return raw_get(
+        base_url,
+        "/summarizer/search",
+        api_key,
+        [("key", args[0]), *pairs(args[1:])],
+    )
 
 
 def run_raw(base_url: str, api_key: str, args: list[str]) -> int:
@@ -402,7 +457,10 @@ def run_raw(base_url: str, api_key: str, args: list[str]) -> int:
 
 
 def raw_get(
-    base_url: str, path: str, api_key: str, params: list[tuple[str, str]]
+    base_url: str,
+    path: str,
+    api_key: str,
+    params: list[tuple[str, str]],
 ) -> int:
     url = f"{base_url}{path}"
     if params:
@@ -413,9 +471,17 @@ def raw_get(
             sys.stdout.buffer.write(response.read())
         return 0
     except urllib.error.HTTPError as exc:
-        return emit_provider_error(status=exc.code, message=f"HTTP {exc.code}", body=exc.read())
+        return emit_provider_error(
+            status=exc.code,
+            message=f"HTTP {exc.code}",
+            body=exc.read(),
+        )
     except urllib.error.URLError as exc:
-        return emit_provider_error(status=None, message=f"network error: {exc.reason}", body=b"")
+        return emit_provider_error(
+            status=None,
+            message=f"network error: {exc.reason}",
+            body=b"",
+        )
 
 
 def main(argv: list[str]) -> int:
@@ -427,11 +493,12 @@ def main(argv: list[str]) -> int:
     api_key = os.environ.get("BRAVE_API_KEY") or os.environ.get("BRAVE_SEARCH_API_KEY")
     if not api_key:
         return usage_error(
-            "BRAVE_API_KEY required (export it, use this skill's .env, or set BRAVE_SEARCH_ENV_FILE)"
+            "BRAVE_API_KEY required (export it, use this skill's .env, or set BRAVE_SEARCH_ENV_FILE)",
         )
 
     base_url = os.environ.get(
-        "BRAVE_SEARCH_BASE_URL", "https://api.search.brave.com/res/v1"
+        "BRAVE_SEARCH_BASE_URL",
+        "https://api.search.brave.com/res/v1",
     ).rstrip("/")
     cmd, args = argv[0], argv[1:]
 

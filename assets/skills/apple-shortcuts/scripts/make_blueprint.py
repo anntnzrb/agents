@@ -1,10 +1,8 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
 # dependencies = []
 # ///
-"""
-Generate a structured Apple Shortcuts blueprint.
+"""Generate a structured Apple Shortcuts blueprint.
 
 Usage:
   uv run --script <skill-dir>/scripts/cli.py blueprint --goal "..." --devices "iPhone,Mac"
@@ -66,12 +64,15 @@ def _default_action_graph(trigger: str, automation_type: str) -> list[str]:
             "Run core task actions",
             "Format output for target surfaces",
             "Emit final result (notification, file, clipboard, app handoff)",
-        ]
+        ],
     )
     return steps
 
 
-def _validation_matrix(devices: list[str], automation_type: str) -> list[dict[str, str]]:
+def _validation_matrix(
+    devices: list[str],
+    automation_type: str,
+) -> list[dict[str, str]]:
     matrix = [
         {"case": "Happy path", "expectation": "Correct output and completion status."},
         {"case": "Empty input", "expectation": "Graceful message and safe exit."},
@@ -83,14 +84,14 @@ def _validation_matrix(devices: list[str], automation_type: str) -> list[dict[st
             {
                 "case": "Cross-device run parity",
                 "expectation": "Equivalent behavior on each target device.",
-            }
+            },
         )
     if automation_type in {"personal", "home"}:
         matrix.append(
             {
                 "case": "Automation re-entry",
                 "expectation": "No infinite loop; cooldown or state gate works.",
-            }
+            },
         )
     return matrix
 
@@ -184,7 +185,9 @@ def render_markdown(bp: Blueprint) -> str:
         lines.append(f"- {row['case']}: {row['expectation']}")
     lines.append("")
     lines.append("## Notes")
-    lines.append("- Replace generic action labels with exact Shortcuts action names before implementation.")
+    lines.append(
+        "- Replace generic action labels with exact Shortcuts action names before implementation.",
+    )
     return "\n".join(lines)
 
 
@@ -192,9 +195,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate a Shortcuts blueprint.")
     parser.add_argument("--goal", required=True, help="Primary automation objective.")
     parser.add_argument("--devices", default="iPhone", help="Comma-separated devices.")
-    parser.add_argument("--trigger", default="Manual run from Shortcuts app", help="Trigger source.")
+    parser.add_argument(
+        "--trigger",
+        default="Manual run from Shortcuts app",
+        help="Trigger source.",
+    )
     parser.add_argument("--inputs", default="", help="Comma-separated input contract.")
-    parser.add_argument("--outputs", default="", help="Comma-separated output contract.")
+    parser.add_argument(
+        "--outputs",
+        default="",
+        help="Comma-separated output contract.",
+    )
     parser.add_argument(
         "--automation-type",
         choices=["manual", "personal", "home", "app-intents"],

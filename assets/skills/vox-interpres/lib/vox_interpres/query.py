@@ -55,7 +55,7 @@ def classify_intents(question: str) -> list[Intent]:
     for intent, tokens in _INTENT_RULES:
         if any(token in q for token in tokens):
             intents.append(intent)
-    return intents if intents else ["summary"]
+    return intents or ["summary"]
 
 
 def classify_intent(question: str) -> Intent:

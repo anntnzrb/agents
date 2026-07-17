@@ -126,13 +126,13 @@ import ds1_save as save  # noqa: E402
 
 class CatalogMechanicsTests(unittest.TestCase):
     def test_origin_lookup_is_canonical_and_returns_independent_data(self) -> None:
-        knight = cast(OriginRecord, catalog.origin_lookup("KNIGHT"))
+        knight = cast("OriginRecord", catalog.origin_lookup("KNIGHT"))
         self.assertEqual(knight["name"], "Knight")
         self.assertEqual(knight["level"], 5)
         self.assertIn("strength", knight["stats"])
 
         knight["stats"]["strength"] = -1
-        other_knight = cast(OriginRecord, catalog.origin_lookup("knight"))
+        other_knight = cast("OriginRecord", catalog.origin_lookup("knight"))
         self.assertEqual(other_knight["stats"]["strength"], 11)
 
     def test_softcaps_and_attunement_thresholds_are_explicit(self) -> None:
@@ -158,26 +158,30 @@ class CatalogMechanicsTests(unittest.TestCase):
 
     def test_equip_load_thresholds_are_inclusive_at_quarter_and_half(self) -> None:
         self.assertEqual(
-            cast(EquipLoadState, catalog.equip_load_state(25, 100))["roll"], "fast"
+            cast("EquipLoadState", catalog.equip_load_state(25, 100))["roll"],
+            "fast",
         )
         self.assertEqual(
-            cast(EquipLoadState, catalog.equip_load_state(25.01, 100))["roll"], "medium"
+            cast("EquipLoadState", catalog.equip_load_state(25.01, 100))["roll"],
+            "medium",
         )
         self.assertEqual(
-            cast(EquipLoadState, catalog.equip_load_state(50, 100))["roll"], "medium"
+            cast("EquipLoadState", catalog.equip_load_state(50, 100))["roll"],
+            "medium",
         )
         self.assertEqual(
-            cast(EquipLoadState, catalog.equip_load_state(50.01, 100))["roll"], "fat"
+            cast("EquipLoadState", catalog.equip_load_state(50.01, 100))["roll"],
+            "fat",
         )
         self.assertEqual(
-            cast(EquipLoadState, catalog.equip_load_state(100.01, 100))["roll"],
+            cast("EquipLoadState", catalog.equip_load_state(100.01, 100))["roll"],
             "overburdened",
         )
         with self.assertRaises(catalog.CatalogError):
             catalog.equip_load_state(1, 0)
 
     def test_upgrade_path_metadata_and_cli_path_data_agree(self) -> None:
-        normal = cast(UpgradePathRecord, catalog.upgrade_path_lookup("NORMAL"))
+        normal = cast("UpgradePathRecord", catalog.upgrade_path_lookup("NORMAL"))
         self.assertEqual(normal["name"], "normal")
         self.assertEqual(normal["max_level"], 15)
         self.assertIn("Titanite Shard", normal["reinforcement"])
@@ -191,9 +195,11 @@ class GuideCorpusTests(unittest.TestCase):
     def test_manifest_and_jsonl_use_the_declared_transformed_row_schema(self) -> None:
         guide_dir = RESOURCES_DIR / "guides" / "dsr_plat_guide"
         manifest = cast(
-            GuideManifest,
+            "GuideManifest",
             json.loads(
-                (guide_dir / "dsr-plat-guide.manifest.json").read_text(encoding="utf-8")
+                (guide_dir / "dsr-plat-guide.manifest.json").read_text(
+                    encoding="utf-8",
+                ),
             ),
         )
         self.assertEqual(manifest["format"], "dsr-guide-chunks-v1")
@@ -205,17 +211,17 @@ class GuideCorpusTests(unittest.TestCase):
                 and "not copied" in str(constraint).casefold()
                 and "tracked" in str(constraint).casefold()
                 for constraint in manifest["constraints"]
-            )
+            ),
         )
 
         rows: list[GuideChunk] = []
         with (guide_dir / "dsr-plat-guide.chunks.jsonl").open(
-            encoding="utf-8"
+            encoding="utf-8",
         ) as handle:
             for line_number, line in enumerate(handle, 1):
                 if not line.strip():
                     continue
-                row = cast(GuideChunk, json.loads(line))
+                row = cast("GuideChunk", json.loads(line))
                 self.assertEqual(set(row), {"h", "k", "t"}, f"line {line_number}")
                 self.assertIsInstance(row["h"], list)
                 self.assertTrue(all(isinstance(item, str) for item in row["h"]))
@@ -234,11 +240,11 @@ class DadbodTranscriptCorpusTests(unittest.TestCase):
         self,
     ) -> None:
         manifest = cast(
-            DadbodTranscriptManifest,
+            "DadbodTranscriptManifest",
             json.loads(
                 (
                     self.transcript_dir / "dsr-dadbod-transcripts.manifest.json"
-                ).read_text(encoding="utf-8")
+                ).read_text(encoding="utf-8"),
             ),
         )
         self.assertEqual(manifest["format"], "dsr-dadbod-transcript-chunks-v1")
@@ -273,7 +279,7 @@ class DadbodTranscriptCorpusTests(unittest.TestCase):
                     "raw_transcript_sha256",
                     "transcript_sha256",
                     "normalized_transcript_sha256",
-                }.issubset(video)
+                }.issubset(video),
             )
         self.assertTrue(
             all(
@@ -283,17 +289,17 @@ class DadbodTranscriptCorpusTests(unittest.TestCase):
                 and video["caption_track"] == "en-orig"
                 and video["cue_count"] > 0
                 for video in videos
-            )
+            ),
         )
 
         rows: list[TranscriptChunkRecord] = []
         with (self.transcript_dir / "dsr-dadbod-transcripts.chunks.jsonl").open(
-            encoding="utf-8"
+            encoding="utf-8",
         ) as handle:
             for line_number, line in enumerate(handle, 1):
                 if not line.strip():
                     continue
-                row = cast(TranscriptChunkRecord, json.loads(line))
+                row = cast("TranscriptChunkRecord", json.loads(line))
                 self.assertEqual(
                     set(row),
                     {
@@ -324,7 +330,8 @@ class DadbodTranscriptCorpusTests(unittest.TestCase):
                 self.assertEqual(row["caption_track"], "en-orig")
                 self.assertEqual(row["k"], "transcript")
                 self.assertEqual(
-                    row["video_id"], videos[row["video_index"]]["video_id"]
+                    row["video_id"],
+                    videos[row["video_index"]]["video_id"],
                 )
                 rows.append(row)
         self.assertEqual(len(rows), manifest["chunk_count"])
@@ -356,7 +363,7 @@ class DadbodTranscriptCorpusTests(unittest.TestCase):
         visible_videos = core.list_transcript_videos(spoilers=True)
         self.assertEqual(visible_videos[0]["caption_track"], "en-orig")
 
-        summary = cast(dict[str, object], core.transcript_summary())
+        summary = cast("dict[str, object]", core.transcript_summary())
         self.assertEqual(summary["video_count"], 30)
         self.assertEqual(summary["chunk_count"], 672)
         self.assertNotIn("videos", summary)
@@ -370,7 +377,10 @@ class DadbodTranscriptCorpusTests(unittest.TestCase):
         matches = core.search_transcript("walkthrough", limit=2, spoilers=True)
         self.assertEqual(len(matches), 2)
         self.assertIn("snippet", matches[0])
-        first = cast(dict[str, object], core.get_transcript_chunk(0, 0, spoilers=True))
+        first = cast(
+            "dict[str, object]",
+            core.get_transcript_chunk(0, 0, spoilers=True),
+        )
         self.assertEqual(first["video_index"], 0)
         self.assertEqual(first["chunk_index"], 0)
         self.assertTrue(str(first["t"]).strip())
@@ -384,7 +394,7 @@ class DadbodTranscriptCorpusTests(unittest.TestCase):
 
 class StaticAchievementAndSaveTests(unittest.TestCase):
     def test_achievements_are_static_only_and_save_state_is_unsupported(self) -> None:
-        result = cast(AchievementResult, save.read_achievements())
+        result = cast("AchievementResult", save.read_achievements())
         self.assertTrue(result["supported"])
         self.assertTrue(result["static"])
         self.assertFalse(result["save_backed"])

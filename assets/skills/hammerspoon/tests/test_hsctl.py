@@ -1,8 +1,8 @@
 """Tests for hsctl.py — Hammerspoon skill CLI engine."""
 
 import argparse
+import io
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -15,6 +15,9 @@ _skill_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_skill_dir / "scripts"))
 
 import hsctl
+
+TEMP_DIR = tempfile.gettempdir()
+TEMP_HS_DIR = str(Path(TEMP_DIR) / "hs")
 
 
 class TestArgParsing(unittest.TestCase):
@@ -44,8 +47,9 @@ class TestStatus(unittest.TestCase):
         with (
             mock.patch.object(hsctl, "_hs_binary", return_value="/usr/local/bin/hs"),
             mock.patch.object(
-                hsctl, "_run_hs_json",
-                return_value=(True, {"version": "1.1.1", "configDir": "/tmp/hs"}, ""),
+                hsctl,
+                "_run_hs_json",
+                return_value=(True, {"version": "1.1.1", "configDir": TEMP_HS_DIR}, ""),
             ),
         ):
             rc = hsctl.cmd_status(ns)
@@ -56,8 +60,9 @@ class TestStatus(unittest.TestCase):
         with (
             mock.patch.object(hsctl, "_hs_binary", return_value="/usr/local/bin/hs"),
             mock.patch.object(
-                hsctl, "_run_hs_json",
-                return_value=(True, {"version": "1.1.0", "configDir": "/tmp/hs"}, ""),
+                hsctl,
+                "_run_hs_json",
+                return_value=(True, {"version": "1.1.0", "configDir": TEMP_HS_DIR}, ""),
             ),
         ):
             rc = hsctl.cmd_status(ns)
@@ -68,7 +73,8 @@ class TestStatus(unittest.TestCase):
         with (
             mock.patch.object(hsctl, "_hs_binary", return_value="/usr/local/bin/hs"),
             mock.patch.object(
-                hsctl, "_run_hs_json",
+                hsctl,
+                "_run_hs_json",
                 return_value=(False, None, "connection refused"),
             ),
         ):
@@ -82,8 +88,9 @@ class TestDoctor(unittest.TestCase):
         with (
             mock.patch.object(hsctl, "_hs_binary", return_value="/usr/local/bin/hs"),
             mock.patch.object(
-                hsctl, "_run_hs_json",
-                return_value=(True, {"version": "1.1.1", "configDir": "/tmp"}, ""),
+                hsctl,
+                "_run_hs_json",
+                return_value=(True, {"version": "1.1.1", "configDir": TEMP_DIR}, ""),
             ),
         ):
             rc = hsctl.cmd_doctor(ns)
@@ -100,7 +107,8 @@ class TestEval(unittest.TestCase):
     def test_eval_text(self) -> None:
         ns = argparse.Namespace(lua="return 42", json=False)
         with mock.patch.object(
-            hsctl, "_run_hs",
+            hsctl,
+            "_run_hs",
             return_value=(0, "42\n", ""),
         ):
             rc = hsctl.cmd_eval(ns)
@@ -109,7 +117,8 @@ class TestEval(unittest.TestCase):
     def test_eval_json(self) -> None:
         ns = argparse.Namespace(lua="return 42", json=True)
         with mock.patch.object(
-            hsctl, "_run_hs_json",
+            hsctl,
+            "_run_hs_json",
             return_value=(True, 42, ""),
         ):
             rc = hsctl.cmd_eval(ns)
@@ -118,7 +127,8 @@ class TestEval(unittest.TestCase):
     def test_eval_fail(self) -> None:
         ns = argparse.Namespace(lua="bad code", json=False)
         with mock.patch.object(
-            hsctl, "_run_hs",
+            hsctl,
+            "_run_hs",
             return_value=(1, "", "syntax error"),
         ):
             rc = hsctl.cmd_eval(ns)
@@ -129,7 +139,8 @@ class TestEval(unittest.TestCase):
         with (
             mock.patch.object(sys, "stdin", data="return 1 + 1"),  # type: ignore[attr-defined]
             mock.patch.object(
-                hsctl, "_run_hs",
+                hsctl,
+                "_run_hs",
                 return_value=(0, "2\n", ""),
             ),
         ):
@@ -148,13 +159,14 @@ class TestEvalFile(unittest.TestCase):
             ns.path = f.name  # type: ignore[attr-defined]
         try:
             with mock.patch.object(
-                hsctl, "_run_hs_json",
+                hsctl,
+                "_run_hs_json",
                 return_value=(True, 42, ""),
             ):
                 rc = hsctl.cmd_eval_file(ns)
                 self.assertEqual(rc, 0)
         finally:
-            os.unlink(f.name)
+            Path(f.name).unlink(missing_ok=True)
 
 
 class TestInspectCommands(unittest.TestCase):
@@ -200,7 +212,8 @@ class TestInspectCommands(unittest.TestCase):
     def test_config_fail(self) -> None:
         ns = argparse.Namespace(json=False)
         with mock.patch.object(
-            hsctl, "_run_hs_json",
+            hsctl,
+            "_run_hs_json",
             return_value=(False, None, "error"),
         ):
             rc = hsctl.cmd_config(ns)
@@ -211,7 +224,11 @@ class TestDocsCommands(unittest.TestCase):
     _sample_index = "<html><body><a href='hs.window.html'>hs.window</a><a href='hs.ipc.html'>hs.ipc</a></body></html>"
 
     def test_fetch_docs_index(self) -> None:
-        with mock.patch.object(hsctl, "fetch_url", return_value=(self._sample_index, False)):
+        with mock.patch.object(
+            hsctl,
+            "fetch_url",
+            return_value=(self._sample_index, False),
+        ):
             html = hsctl._fetch_docs_index()
             self.assertIn("hs.window", html)
 
@@ -223,10 +240,17 @@ class TestDocsCommands(unittest.TestCase):
 
     def test_docs_search_module_match_json(self) -> None:
         ns = argparse.Namespace(query="hs.window", json=True)
-        with mock.patch.object(
-            hsctl, "_fetch_docs_index", return_value=self._sample_index,
-        ), mock.patch.object(
-            hsctl, "_fetch_module_doc", return_value="",
+        with (
+            mock.patch.object(
+                hsctl,
+                "_fetch_docs_index",
+                return_value=self._sample_index,
+            ),
+            mock.patch.object(
+                hsctl,
+                "_fetch_module_doc",
+                return_value="",
+            ),
         ):
             rc = hsctl.cmd_docs_search(ns)
             self.assertEqual(rc, 0)
@@ -234,15 +258,19 @@ class TestDocsCommands(unittest.TestCase):
     def test_docs_module_json(self) -> None:
         ns = argparse.Namespace(module="hs.window", json=True)
         with mock.patch.object(
-            hsctl, "_fetch_module_doc",
+            hsctl,
+            "_fetch_module_doc",
             return_value='<h4>hs.window.moveToUnit</h4><div class="signature"><code>hs.window:moveToUnit(unit)</code></div>',
         ):
             rc = hsctl.cmd_docs_module(ns)
             self.assertEqual(rc, 0)
+
     def test_docs_refresh_json(self) -> None:
         ns = argparse.Namespace(if_needed=False, json=True)
         with mock.patch.object(
-            hsctl, "fetch_url", return_value=("ok", False),
+            hsctl,
+            "fetch_url",
+            return_value=("ok", False),
         ):
             rc = hsctl.cmd_docs_refresh(ns)
             self.assertEqual(rc, 0)
@@ -252,7 +280,8 @@ class TestSourceCommands(unittest.TestCase):
     def test_source_search_json(self) -> None:
         ns = argparse.Namespace(pattern="cliInstall", json=True)
         with mock.patch.object(
-            hsctl, "_fetch_github_raw",
+            hsctl,
+            "_fetch_github_raw",
             return_value="function cliInstall(p, s)\n  local path = p or '/usr/local'\nend\n",
         ):
             rc = hsctl.cmd_source_search(ns)
@@ -261,7 +290,9 @@ class TestSourceCommands(unittest.TestCase):
     def test_source_search_no_match(self) -> None:
         ns = argparse.Namespace(pattern="nonexistent_xyz", json=True)
         with mock.patch.object(
-            hsctl, "_fetch_github_raw", return_value="-- empty\n",
+            hsctl,
+            "_fetch_github_raw",
+            return_value="-- empty\n",
         ):
             rc = hsctl.cmd_source_search(ns)
             self.assertEqual(rc, 0)
@@ -269,7 +300,8 @@ class TestSourceCommands(unittest.TestCase):
     def test_source_fetch_json(self) -> None:
         ns = argparse.Namespace(if_needed=False, json=True)
         with mock.patch.object(
-            hsctl, "_gh_ls_remote_sha",
+            hsctl,
+            "_gh_ls_remote_sha",
             return_value="abc123def456",
         ):
             rc = hsctl.cmd_source_fetch(ns)
@@ -279,10 +311,15 @@ class TestSourceCommands(unittest.TestCase):
 class TestSpoonsCommands(unittest.TestCase):
     def test_spoons_search_json(self) -> None:
         ns = argparse.Namespace(query="Clip", json=True)
-        listing = json.dumps([
-            {"name": "ClipboardTool.spoon", "path": "Source/ClipboardTool.spoon",
-             "html_url": "https://github.com/Hammerspoon/Spoons/tree/master/Source/ClipboardTool.spoon"},
-        ])
+        listing = json.dumps(
+            [
+                {
+                    "name": "ClipboardTool.spoon",
+                    "path": "Source/ClipboardTool.spoon",
+                    "html_url": "https://github.com/Hammerspoon/Spoons/tree/master/Source/ClipboardTool.spoon",
+                },
+            ],
+        )
         with mock.patch.object(hsctl, "_fetch_github_raw", return_value=listing):
             rc = hsctl.cmd_spoons_search(ns)
             self.assertEqual(rc, 0)
@@ -290,7 +327,8 @@ class TestSpoonsCommands(unittest.TestCase):
     def test_spoons_source_json(self) -> None:
         ns = argparse.Namespace(name="AClock", json=True)
         with mock.patch.object(
-            hsctl, "_fetch_github_raw",
+            hsctl,
+            "_fetch_github_raw",
             return_value="-- AClock.lua\nlocal obj = {}\nreturn obj\n",
         ):
             rc = hsctl.cmd_spoons_source(ns)
@@ -299,7 +337,8 @@ class TestSpoonsCommands(unittest.TestCase):
     def test_spoons_source_error(self) -> None:
         ns = argparse.Namespace(name="NoSpoon", json=False)
         with mock.patch.object(
-            hsctl, "_fetch_github_raw",
+            hsctl,
+            "_fetch_github_raw",
             side_effect=RuntimeError("404"),
         ):
             rc = hsctl.cmd_spoons_source(ns)
@@ -308,55 +347,174 @@ class TestSpoonsCommands(unittest.TestCase):
 
 class TestLintFmt(unittest.TestCase):
     def test_lint_missing_tool(self) -> None:
-        ns = argparse.Namespace(path="/tmp", json=False)
+        ns = argparse.Namespace(path=TEMP_DIR, json=False)
         with mock.patch.object(hsctl, "_discover_tool", return_value=None):
             rc = hsctl.cmd_lint(ns)
             self.assertNotEqual(rc, 0)
 
     def test_lint_json(self) -> None:
-        ns = argparse.Namespace(path="/tmp", json=True)
-        with mock.patch.object(
-            hsctl, "_discover_tool", return_value="/usr/local/bin/luacheck",
-        ), mock.patch.object(
-            subprocess, "run",
-            return_value=subprocess.CompletedProcess(
-                args=[], returncode=0, stdout="", stderr="",
+        ns = argparse.Namespace(path=TEMP_DIR, json=True)
+        with (
+            mock.patch.object(
+                hsctl,
+                "_discover_tool",
+                return_value="/usr/local/bin/luacheck",
+            ),
+            mock.patch.object(
+                subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess(
+                    args=[],
+                    returncode=0,
+                    stdout="",
+                    stderr="",
+                ),
             ),
         ):
             rc = hsctl.cmd_lint(ns)
             self.assertEqual(rc, 0)
 
+    def test_lint_failure_json_sets_ok_false_and_returns_nonzero(self) -> None:
+        ns = argparse.Namespace(path=TEMP_DIR, json=True)
+        with (
+            mock.patch.object(
+                hsctl,
+                "_discover_tool",
+                return_value="/usr/local/bin/luacheck",
+            ),
+            mock.patch.object(
+                subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess(
+                    args=[],
+                    returncode=1,
+                    stdout="file.lua:1:1: warning",
+                    stderr="",
+                ),
+            ),
+            mock.patch.object(sys, "stdout", new_callable=io.StringIO) as stdout,
+        ):
+            rc = hsctl.cmd_lint(ns)
+
+        self.assertNotEqual(rc, 0)
+        self.assertFalse(json.loads(stdout.getvalue())["ok"])
+
     def test_fmt_missing_tool(self) -> None:
-        ns = argparse.Namespace(path="/tmp", check=True, write=False, json=False)
+        ns = argparse.Namespace(path=TEMP_DIR, check=True, write=False, json=False)
         with mock.patch.object(hsctl, "_discover_tool", return_value=None):
             rc = hsctl.cmd_fmt(ns)
             self.assertNotEqual(rc, 0)
 
     def test_fmt_check_json(self) -> None:
-        ns = argparse.Namespace(path="/tmp", check=True, write=False, json=True)
-        with mock.patch.object(
-            hsctl, "_discover_tool", return_value="/usr/local/bin/stylua",
-        ), mock.patch.object(
-            subprocess, "run",
-            return_value=subprocess.CompletedProcess(
-                args=[], returncode=0, stdout="", stderr="",
+        ns = argparse.Namespace(path=TEMP_DIR, check=True, write=False, json=True)
+        with (
+            mock.patch.object(
+                hsctl,
+                "_discover_tool",
+                return_value="/usr/local/bin/stylua",
+            ),
+            mock.patch.object(
+                subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess(
+                    args=[],
+                    returncode=0,
+                    stdout="",
+                    stderr="",
+                ),
             ),
         ):
             rc = hsctl.cmd_fmt(ns)
             self.assertEqual(rc, 0)
 
+    def test_fmt_check_failure_json_sets_ok_false_and_returns_nonzero(self) -> None:
+        ns = argparse.Namespace(path=TEMP_DIR, check=True, write=False, json=True)
+        with (
+            mock.patch.object(
+                hsctl,
+                "_discover_tool",
+                return_value="/usr/local/bin/stylua",
+            ),
+            mock.patch.object(
+                subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess(
+                    args=[],
+                    returncode=1,
+                    stdout="formatting differs",
+                    stderr="",
+                ),
+            ),
+            mock.patch.object(sys, "stdout", new_callable=io.StringIO) as stdout,
+        ):
+            rc = hsctl.cmd_fmt(ns)
+
+        self.assertNotEqual(rc, 0)
+        self.assertFalse(json.loads(stdout.getvalue())["ok"])
+
+    def test_fmt_write_failure_json_sets_ok_false_and_returns_nonzero(self) -> None:
+        ns = argparse.Namespace(path=TEMP_DIR, check=False, write=True, json=True)
+        with (
+            mock.patch.object(
+                hsctl,
+                "_discover_tool",
+                return_value="/usr/local/bin/stylua",
+            ),
+            mock.patch.object(
+                subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess(
+                    args=[],
+                    returncode=2,
+                    stdout="",
+                    stderr="formatter failed",
+                ),
+            ),
+            mock.patch.object(sys, "stdout", new_callable=io.StringIO) as stdout,
+        ):
+            rc = hsctl.cmd_fmt(ns)
+
+        self.assertNotEqual(rc, 0)
+        self.assertFalse(json.loads(stdout.getvalue())["ok"])
+
 
 class TestTestAnnotations(unittest.TestCase):
     def test_test_missing_tool(self) -> None:
-        ns = argparse.Namespace(path="/tmp", json=False)
+        ns = argparse.Namespace(path=TEMP_DIR, json=False)
         with mock.patch.object(hsctl, "_discover_tool", return_value=None):
             rc = hsctl.cmd_test(ns)
             self.assertNotEqual(rc, 0)
 
+    def test_test_failure_json_sets_ok_false_and_returns_nonzero(self) -> None:
+        ns = argparse.Namespace(path=TEMP_DIR, json=True)
+        with (
+            mock.patch.object(
+                hsctl,
+                "_discover_tool",
+                return_value="/usr/local/bin/busted",
+            ),
+            mock.patch.object(
+                subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess(
+                    args=[],
+                    returncode=1,
+                    stdout="1 failure",
+                    stderr="",
+                ),
+            ),
+            mock.patch.object(sys, "stdout", new_callable=io.StringIO) as stdout,
+        ):
+            rc = hsctl.cmd_test(ns)
+
+        self.assertNotEqual(rc, 0)
+        self.assertFalse(json.loads(stdout.getvalue())["ok"])
+
     def test_annotations_status_json(self) -> None:
         ns = argparse.Namespace(json=True)
         with mock.patch.object(
-            hsctl, "_run_hs_json",
+            hsctl,
+            "_run_hs_json",
             return_value=(True, "/Users/test/.hammerspoon", ""),
         ):
             rc = hsctl.cmd_annotations_status(ns)
@@ -365,7 +523,8 @@ class TestTestAnnotations(unittest.TestCase):
     def test_lsp_config_print_json(self) -> None:
         ns = argparse.Namespace(json=True)
         with mock.patch.object(
-            hsctl, "_run_hs_json",
+            hsctl,
+            "_run_hs_json",
             return_value=(True, "/Users/test/.hammerspoon", ""),
         ):
             rc = hsctl.cmd_lsp_config(ns)

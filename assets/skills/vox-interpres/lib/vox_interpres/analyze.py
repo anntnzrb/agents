@@ -12,23 +12,23 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .models import (
+    SCHEMA_VERSION,
     AnalysisResult,
     BeatSummary,
     EnergyDynamics,
     FFProbeMetadata,
     KeyEstimate,
     NumericStats,
-    SCHEMA_VERSION,
     SectionHint,
     SpectralStats,
 )
 
 _NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 _MAJOR_PROFILE = np.array(
-    [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
+    [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88],
 )
 _MINOR_PROFILE = np.array(
-    [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
+    [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17],
 )
 
 
@@ -165,13 +165,13 @@ def _load_audio_segment(
         return np.asarray(y, dtype=np.float64), int(sample_rate), [note]
     except FileNotFoundError as exc:
         raise RuntimeError(
-            "librosa.load failed and ffmpeg is unavailable for fallback"
+            "librosa.load failed and ffmpeg is unavailable for fallback",
         ) from exc
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or "").strip()
         detail = f": {stderr}" if stderr else ""
         raise RuntimeError(
-            f"librosa.load failed and ffmpeg fallback failed{detail}"
+            f"librosa.load failed and ffmpeg fallback failed{detail}",
         ) from exc
     finally:
         try:
@@ -183,11 +183,13 @@ def _load_audio_segment(
 def _compute_chroma(y: NDArray[np.float64], sample_rate: int) -> NDArray[np.float64]:
     try:
         return np.asarray(
-            librosa.feature.chroma_cqt(y=y, sr=sample_rate), dtype=np.float64
+            librosa.feature.chroma_cqt(y=y, sr=sample_rate),
+            dtype=np.float64,
         )
     except Exception:
         return np.asarray(
-            librosa.feature.chroma_stft(y=y, sr=sample_rate), dtype=np.float64
+            librosa.feature.chroma_stft(y=y, sr=sample_rate),
+            dtype=np.float64,
         )
 
 
@@ -265,7 +267,9 @@ def _stats(values: NDArray[np.float64]) -> NumericStats:
 
 
 def _section_hints(
-    y: NDArray[np.float64], sample_rate: int, duration_s: float
+    y: NDArray[np.float64],
+    sample_rate: int,
+    duration_s: float,
 ) -> list[SectionHint]:
     onset_env = librosa.onset.onset_strength(y=y, sr=sample_rate)
     onset_times = librosa.times_like(onset_env, sr=sample_rate)
@@ -394,7 +398,10 @@ def _tool_notes() -> list[str]:
 def _read_version_line(tool: str) -> str | None:
     try:
         proc = subprocess.run(
-            [tool, "-version"], capture_output=True, text=True, check=True
+            [tool, "-version"],
+            capture_output=True,
+            text=True,
+            check=True,
         )
     except (FileNotFoundError, subprocess.CalledProcessError):
         return None

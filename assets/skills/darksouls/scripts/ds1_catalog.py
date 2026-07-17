@@ -11,10 +11,10 @@ from __future__ import annotations
 import json
 import math
 import re
-from functools import lru_cache
+from collections.abc import Iterable, Mapping
+from functools import cache
 from pathlib import Path
-from typing import Any, Iterable, Mapping, cast, overload
-
+from typing import Any, cast, overload
 
 _ROOT = Path(__file__).resolve().parent.parent
 _RESOURCE_DIR = _ROOT / "resources"
@@ -42,25 +42,27 @@ def _read_json(filename: str) -> dict[str, Any]:
         raise CatalogError(f"DS1 catalog resource is invalid JSON: {filename}") from exc
     if not isinstance(value, dict):
         raise CatalogError(f"DS1 catalog resource must contain an object: {filename}")
-    return cast(dict[str, Any], value)
+    return cast("dict[str, Any]", value)
 
 
 def _record_list(
-    resource: Mapping[str, Any], key: str, filename: str
+    resource: Mapping[str, Any],
+    key: str,
+    filename: str,
 ) -> tuple[Record, ...]:
     """Read one resource list and validate its JSON object entries."""
     raw = resource.get(key)
     if not isinstance(raw, list):
         raise CatalogError(
-            f"DS1 catalog resource key '{key}' must contain a list: {filename}"
+            f"DS1 catalog resource key '{key}' must contain a list: {filename}",
         )
     records: list[Record] = []
     for index, value in enumerate(raw):
         if not isinstance(value, dict):
             raise CatalogError(
-                f"DS1 catalog resource list '{key}' entry {index} must contain an object: {filename}"
+                f"DS1 catalog resource list '{key}' entry {index} must contain an object: {filename}",
             )
-        records.append(cast(Record, value))
+        records.append(cast("Record", value))
     return tuple(records)
 
 
@@ -69,27 +71,27 @@ def _mapping(resource: Mapping[str, Any], key: str, filename: str) -> dict[str, 
     raw = resource.get(key)
     if not isinstance(raw, dict):
         raise CatalogError(
-            f"DS1 catalog resource key '{key}' must contain an object: {filename}"
+            f"DS1 catalog resource key '{key}' must contain an object: {filename}",
         )
-    return cast(dict[str, Any], raw)
+    return cast("dict[str, Any]", raw)
 
 
-@lru_cache(maxsize=None)
+@cache
 def _game_data() -> dict[str, Any]:
     return _read_json("game_data.json")
 
 
-@lru_cache(maxsize=None)
+@cache
 def _weapons() -> tuple[Record, ...]:
     return _record_list(_read_json("weapons.json"), "weapons", "weapons.json")
 
 
-@lru_cache(maxsize=None)
+@cache
 def _rings() -> tuple[Record, ...]:
     return _record_list(_read_json("rings.json"), "rings", "rings.json")
 
 
-@lru_cache(maxsize=None)
+@cache
 def _goods_magic() -> dict[str, tuple[Record, ...]]:
     raw = _read_json("goods_magic.json")
     return {
@@ -123,7 +125,10 @@ def _norm(value: str) -> str:
 
 
 def _matches(
-    records: Iterable[dict[str, Any]], query: str, *, label: str
+    records: Iterable[dict[str, Any]],
+    query: str,
+    *,
+    label: str,
 ) -> list[dict[str, Any]]:
     q = _norm(query)
     if not q:
@@ -136,11 +141,12 @@ def _matches(
     if not matches:
         sample = ", ".join(
             sorted(
-                (str(item.get("name", "")) for item in all_records), key=str.casefold
-            )[:8]
+                (str(item.get("name", "")) for item in all_records),
+                key=str.casefold,
+            )[:8],
         )
         raise UnknownCatalogEntry(
-            f"Unknown DS1 {label} '{query}'. Catalog examples: {sample}"
+            f"Unknown DS1 {label} '{query}'. Catalog examples: {sample}",
         )
     return sorted(matches, key=lambda item: str(item.get("name", "")).casefold())
 
@@ -157,9 +163,9 @@ def _copy(record: Mapping[str, Any] | list[Any]) -> dict[str, Any] | list[Any]:
     # JSON round-trip gives callers an independent result without exposing cache state.
     value = json.loads(json.dumps(record))
     if isinstance(value, dict):
-        return cast(dict[str, Any], value)
+        return cast("dict[str, Any]", value)
     if isinstance(value, list):
-        return cast(list[Any], value)
+        return cast("list[Any]", value)
     raise CatalogError("DS1 catalog record could not be copied")
 
 
@@ -168,11 +174,14 @@ def _string_values(value: object, *, context: str) -> tuple[str, ...]:
         raise CatalogError(f"DS1 {context} must be a list of strings")
     if not all(isinstance(item, str) for item in value):
         raise CatalogError(f"DS1 {context} must be a list of strings")
-    return tuple(cast(str, item) for item in value)
+    return tuple(cast("str", item) for item in value)
 
 
 def list_weapons(
-    query: str = "", *, category: str = "", upgrade_path: str = ""
+    query: str = "",
+    *,
+    category: str = "",
+    upgrade_path: str = "",
 ) -> list[dict[str, Any]]:
     """Return deterministic weapon records filtered by name/category/path."""
     records: Iterable[dict[str, Any]] = WEAPONS
@@ -185,7 +194,7 @@ def list_weapons(
         path = _norm(upgrade_path)
         if path not in {_norm(item) for item in UPGRADE_PATHS}:
             raise CatalogError(
-                f"Unknown DS1 upgrade path '{upgrade_path}'. Known paths: {', '.join(sorted(UPGRADE_PATHS))}"
+                f"Unknown DS1 upgrade path '{upgrade_path}'. Known paths: {', '.join(sorted(UPGRADE_PATHS))}",
             )
         records = [
             item
@@ -195,7 +204,8 @@ def list_weapons(
     return [
         _copy(item)
         for item in sorted(
-            records, key=lambda item: str(item.get("name", "")).casefold()
+            records,
+            key=lambda item: str(item.get("name", "")).casefold(),
         )
     ]
 
@@ -206,13 +216,16 @@ def weapon_lookup(name: str) -> dict[str, Any]:
     if len(matches) != 1:
         names = ", ".join(item["name"] for item in matches)
         raise CatalogError(
-            f"Weapon query '{name}' is ambiguous; choose one of: {names}"
+            f"Weapon query '{name}' is ambiguous; choose one of: {names}",
         )
     return _copy(matches[0])
 
 
 def list_rings(
-    query: str = "", *, category: str = "", build: str = ""
+    query: str = "",
+    *,
+    category: str = "",
+    build: str = "",
 ) -> list[dict[str, Any]]:
     records: Iterable[dict[str, Any]] = RINGS
     if query:
@@ -225,7 +238,7 @@ def list_rings(
         candidates = {key, str(build).casefold()}
         if not any(_norm(item) in candidates for item in BUILD_ARCHETYPES):
             raise CatalogError(
-                f"Unknown DS1 build archetype '{build}'. Known builds: {', '.join(sorted(BUILD_ARCHETYPES))}"
+                f"Unknown DS1 build archetype '{build}'. Known builds: {', '.join(sorted(BUILD_ARCHETYPES))}",
             )
         records = [
             item
@@ -236,7 +249,8 @@ def list_rings(
     return [
         _copy(item)
         for item in sorted(
-            records, key=lambda item: str(item.get("name", "")).casefold()
+            records,
+            key=lambda item: str(item.get("name", "")).casefold(),
         )
     ]
 
@@ -245,13 +259,16 @@ def ring_lookup(name: str) -> dict[str, Any]:
     matches = _matches(RINGS, name, label="ring")
     if len(matches) != 1:
         raise CatalogError(
-            f"Ring query '{name}' is ambiguous; choose one of: {', '.join(item['name'] for item in matches)}"
+            f"Ring query '{name}' is ambiguous; choose one of: {', '.join(item['name'] for item in matches)}",
         )
     return _copy(matches[0])
 
 
 def list_goods(
-    query: str = "", *, kind: str = "", spell_type: str = ""
+    query: str = "",
+    *,
+    kind: str = "",
+    spell_type: str = "",
 ) -> list[dict[str, Any]]:
     """List spells and goods; ``kind`` accepts sorcery/pyromancy/miracle/goods."""
     records: list[dict[str, Any]] = []
@@ -264,7 +281,7 @@ def list_goods(
             selected = key
         else:
             raise CatalogError(
-                f"Unknown DS1 goods/spell kind '{kind}'. Known kinds: sorcery, pyromancy, miracle, goods"
+                f"Unknown DS1 goods/spell kind '{kind}'. Known kinds: sorcery, pyromancy, miracle, goods",
             )
     keys = [selected] if selected else list(GOODS_MAGIC)
     for key in keys:
@@ -282,11 +299,12 @@ def list_goods(
 
 def goods_lookup(name: str, *, kind: str = "") -> dict[str, Any]:
     selected = SPELL_TYPE_KEY.get(
-        kind.casefold(), "goods" if kind.casefold() == "goods" else ""
+        kind.casefold(),
+        "goods" if kind.casefold() == "goods" else "",
     )
     if kind and not selected:
         raise CatalogError(
-            f"Unknown DS1 goods/spell kind '{kind}'. Known kinds: sorcery, pyromancy, miracle, goods"
+            f"Unknown DS1 goods/spell kind '{kind}'. Known kinds: sorcery, pyromancy, miracle, goods",
         )
     if selected:
         source = (item | {"kind": selected} for item in GOODS_MAGIC.get(selected, ()))
@@ -299,7 +317,7 @@ def goods_lookup(name: str, *, kind: str = "") -> dict[str, Any]:
     matches = _matches(source, name, label="goods/spell")
     if len(matches) != 1:
         raise CatalogError(
-            f"Goods/spell query '{name}' is ambiguous; choose one of: {', '.join(item['name'] for item in matches)}"
+            f"Goods/spell query '{name}' is ambiguous; choose one of: {', '.join(item['name'] for item in matches)}",
         )
     return _copy(matches[0])
 
@@ -308,7 +326,7 @@ def origin_lookup(name: str) -> dict[str, Any]:
     matches = _matches(ORIGINS, name, label="origin")
     if len(matches) != 1:
         raise CatalogError(
-            f"Origin query '{name}' is ambiguous; choose one of: {', '.join(item['name'] for item in matches)}"
+            f"Origin query '{name}' is ambiguous; choose one of: {', '.join(item['name'] for item in matches)}",
         )
     return _copy(matches[0])
 
@@ -324,12 +342,12 @@ def upgrade_path_lookup(name: str) -> dict[str, Any]:
     key = next((key for key in UPGRADE_PATHS if _norm(key) == _norm(name)), None)
     if key is None:
         raise CatalogError(
-            f"Unknown DS1 upgrade path '{name}'. Known paths: {', '.join(sorted(UPGRADE_PATHS))}"
+            f"Unknown DS1 upgrade path '{name}'. Known paths: {', '.join(sorted(UPGRADE_PATHS))}",
         )
     metadata = UPGRADE_PATHS[key]
     result: dict[str, Any]
     if isinstance(metadata, Mapping):
-        result = cast(dict[str, Any], _copy(metadata))
+        result = cast("dict[str, Any]", _copy(metadata))
     elif isinstance(metadata, list):
         # Keep list-shaped schedules under a named field rather than indexing
         # them as though they were path metadata mappings.
@@ -396,7 +414,7 @@ def _upgrade_factor(path: str, level: int) -> float:
     key = next((name for name in limits if _norm(name) == _norm(path)), None)
     if key is None:
         raise CatalogError(
-            f"Unknown DS1 upgrade path '{path}'. Known paths: {', '.join(sorted(limits))}"
+            f"Unknown DS1 upgrade path '{path}'. Known paths: {', '.join(sorted(limits))}",
         )
     if (
         isinstance(level, bool)
@@ -405,7 +423,7 @@ def _upgrade_factor(path: str, level: int) -> float:
         or level > limits[key]
     ):
         raise CatalogError(
-            f"Upgrade level for {key} must be an integer from 0 through {limits[key]}"
+            f"Upgrade level for {key} must be an integer from 0 through {limits[key]}",
         )
     if key == "normal":
         return 1.0 + 0.035 * level
@@ -434,11 +452,11 @@ def weapon_ar(
         _norm(record.get("name", "")) == _norm(item.get("name", "")) for item in WEAPONS
     ):
         raise UnknownCatalogEntry(
-            "AR estimation only supports weapons in the curated DS1 catalog"
+            "AR estimation only supports weapons in the curated DS1 catalog",
         )
     if record.get("category") in {"catalyst", "talisman", "pyromancy_flame"}:
         raise CatalogError(
-            f"AR estimation is not defined for DS1 spell tools such as '{record['name']}'"
+            f"AR estimation is not defined for DS1 spell tools such as '{record['name']}'",
         )
     path = next(
         (
@@ -450,7 +468,7 @@ def weapon_ar(
     )
     if path is None:
         raise CatalogError(
-            f"Weapon '{record['name']}' does not support DS1 upgrade path '{upgrade_path}'"
+            f"Weapon '{record['name']}' does not support DS1 upgrade path '{upgrade_path}'",
         )
     factor = _upgrade_factor(path, upgrade_level)
     values = _stats(stats)
@@ -526,7 +544,8 @@ def compare_weapons(
         for name in values
     ]
     return sorted(
-        results, key=lambda item: (-item["estimated_ar"], item["name"].casefold())
+        results,
+        key=lambda item: (-item["estimated_ar"], item["name"].casefold()),
     )
 
 
@@ -538,7 +557,7 @@ def equip_load_state(current_weight: object, max_load: object) -> dict[str, Any]
         or current_weight < 0
     ):
         raise CatalogError(
-            "Current weight must be non-negative and max equip load must be positive"
+            "Current weight must be non-negative and max equip load must be positive",
         )
     fraction = float(current_weight) / float(max_load)
     if fraction <= 0.25:
@@ -559,7 +578,10 @@ def equip_load_state(current_weight: object, max_load: object) -> dict[str, Any]
 
 
 def estus_totals(
-    *, kindled: object = 0, rite_of_kindling: bool = False, fire_keeper: bool = False
+    *,
+    kindled: object = 0,
+    rite_of_kindling: bool = False,
+    fire_keeper: bool = False,
 ) -> dict[str, Any]:
     if (
         isinstance(kindled, bool)
@@ -569,7 +591,7 @@ def estus_totals(
     ):
         limit = 3 if rite_of_kindling else 1
         raise CatalogError(
-            f"Kindled bonfire count must be an integer from 0 through {limit}"
+            f"Kindled bonfire count must be an integer from 0 through {limit}",
         )
     if fire_keeper:
         total = 10
@@ -587,12 +609,12 @@ def build_recommendations(build: str) -> dict[str, Any]:
     key = next((name for name in BUILD_ARCHETYPES if _norm(name) == _norm(build)), None)
     if key is None:
         raise CatalogError(
-            f"Unknown DS1 build archetype '{build}'. Known builds: {', '.join(sorted(BUILD_ARCHETYPES))}"
+            f"Unknown DS1 build archetype '{build}'. Known builds: {', '.join(sorted(BUILD_ARCHETYPES))}",
         )
     raw_archetype = BUILD_ARCHETYPES[key]
     if not isinstance(raw_archetype, Mapping):
         raise CatalogError(f"DS1 build archetype '{key}' has invalid metadata")
-    archetype = cast(dict[str, Any], _copy(raw_archetype))
+    archetype = cast("dict[str, Any]", _copy(raw_archetype))
     weapons: list[dict[str, Any]] = []
     for name in _string_values(
         archetype.get("safe_defaults", ()),
@@ -630,14 +652,13 @@ def catalog_lookup(kind: str, query: str) -> dict[str, Any]:
         "miracles",
     }:
         return goods_lookup(
-            query, kind=key if key not in {"good", "spell", "spells"} else ""
+            query,
+            kind=key if key not in {"good", "spell", "spells"} else "",
         )
     if key in {"origin", "origins", "class", "classes"}:
         return origin_lookup(query)
     raise CatalogError(
-        "Unknown DS1 catalog kind '{}'; choose weapon, ring, goods, spell, or origin".format(
-            kind
-        )
+        f"Unknown DS1 catalog kind '{kind}'; choose weapon, ring, goods, spell, or origin",
     )
 
 
@@ -686,30 +707,30 @@ def audit_catalog() -> list[str]:
                 continue
             if not isinstance(resource[key], expected_type):
                 errors.append(
-                    f"{filename} top-level key '{key}' must be a {expected_type.__name__}"
+                    f"{filename} top-level key '{key}' must be a {expected_type.__name__}",
                 )
         for key, expected_type in expected.items():
             raw_records = resource.get(key)
             if expected_type is not list or not isinstance(raw_records, list):
                 continue
-            for index, candidate in enumerate(cast(list[object], raw_records)):
+            for index, candidate in enumerate(cast("list[object]", raw_records)):
                 if not isinstance(candidate, Mapping):
                     errors.append(
-                        f"{filename} top-level list '{key}' entry {index} is not an object"
+                        f"{filename} top-level list '{key}' entry {index} is not an object",
                     )
                     continue
-                record = cast(Mapping[str, object], candidate)
+                record = cast("Mapping[str, object]", candidate)
                 required = entry_schemas.get(key)
                 if required is None:
                     if key != "origins" and not isinstance(record.get("name"), str):
                         errors.append(
-                            f"{filename} top-level list '{key}' entry {index} is missing a name"
+                            f"{filename} top-level list '{key}' entry {index} is missing a name",
                         )
                     continue
                 for field, field_type in required.items():
                     if field not in record:
                         errors.append(
-                            f"{filename} top-level list '{key}' entry {index} is missing required field '{field}'"
+                            f"{filename} top-level list '{key}' entry {index} is missing required field '{field}'",
                         )
                         continue
                     value = record[field]
@@ -719,48 +740,48 @@ def audit_catalog() -> list[str]:
                     if not valid_type:
                         errors.append(
                             f"{filename} top-level list '{key}' entry {index} field '{field}' "
-                            f"must be a {field_type.__name__}"
+                            f"must be a {field_type.__name__}",
                         )
     upgrade_paths_raw = GAME_DATA.get("upgrade_paths")
     if isinstance(upgrade_paths_raw, Mapping):
-        upgrade_paths = cast(Mapping[object, object], upgrade_paths_raw)
+        upgrade_paths = cast("Mapping[object, object]", upgrade_paths_raw)
         for key, metadata in upgrade_paths.items():
             if not isinstance(key, str) or not isinstance(metadata, Mapping):
                 errors.append(
-                    "game_data.json upgrade_paths entries must map names to objects"
+                    "game_data.json upgrade_paths entries must map names to objects",
                 )
                 break
     return errors
 
 
 __all__ = [
-    "CatalogError",
-    "UnknownCatalogEntry",
-    "GAME_DATA",
-    "WEAPONS",
-    "RINGS",
-    "GOODS_MAGIC",
-    "ORIGINS",
-    "UPGRADE_PATHS",
     "BUILD_ARCHETYPES",
     "COVENANTS",
     "FARMING_ROUTES",
+    "GAME_DATA",
+    "GOODS_MAGIC",
+    "ORIGINS",
+    "RINGS",
     "SPELL_TYPE_KEY",
-    "list_weapons",
-    "weapon_lookup",
-    "list_rings",
-    "ring_lookup",
-    "list_goods",
-    "goods_lookup",
-    "catalog_lookup",
-    "origin_lookup",
-    "list_origins",
-    "upgrade_path_lookup",
+    "UPGRADE_PATHS",
+    "WEAPONS",
+    "CatalogError",
+    "UnknownCatalogEntry",
     "audit_catalog",
-    "soul_cost",
-    "weapon_ar",
+    "build_recommendations",
+    "catalog_lookup",
     "compare_weapons",
     "equip_load_state",
     "estus_totals",
-    "build_recommendations",
+    "goods_lookup",
+    "list_goods",
+    "list_origins",
+    "list_rings",
+    "list_weapons",
+    "origin_lookup",
+    "ring_lookup",
+    "soul_cost",
+    "upgrade_path_lookup",
+    "weapon_ar",
+    "weapon_lookup",
 ]

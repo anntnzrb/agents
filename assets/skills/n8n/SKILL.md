@@ -18,7 +18,8 @@ The MCP catalog is instance state.
 
 - NEVER infer tools, arguments, or response fields.
 - Live discovery MUST define tools and input schemas.
-- Published schemas or observed calls MUST define response fields.
+- Only published output schemas are contractual.
+- Observed calls MUST remain samples, not contracts.
 
 ## Bundled REST CLI
 

@@ -16,7 +16,7 @@ uv run --script <skill-dir>/scripts/cli.py ...
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py --help
-uv run --with pytest pytest
+uv run --with pytest pytest <skill-dir>/tests
 ```
 
 ## Credentials
@@ -27,17 +27,15 @@ No API keys. No env vars required.
 
 ## Wrapper
 
-Run from the skill root:
-
-```bash
-uv run --script scripts/cli.py --schema
+```text
+uv run --script <skill-dir>/scripts/cli.py --schema
 ```
 
 Wrapper behavior:
 
 - resolves skill root
-- auto-loads `./.env` from skill directory when present
-- executes: `uv run --script "$SKILL_DIR/scripts/cli.py" "$@"`
+- auto-loads `.env` from the skill directory when present
+- imports the bundled `flight_live` CLI from `lib/`
 
 ## CLI
 

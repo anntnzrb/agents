@@ -63,65 +63,6 @@ uv run --script <skill-dir>/scripts/cli.py quick-validate <path-to-skill-folder>
 
 Read `references/eval-workflow.md` for detailed aggregate/review usage. Read `references/packaging.md` for package validation and handoff details.
 
-## Communicating With the User
-
-Adapt to the user's technical level. Many users can follow concise coding jargon; some cannot. Use context cues.
-
-- "evaluation" and "benchmark" are borderline but usually OK.
-- Explain "JSON" or "assertion" unless the user signals familiarity.
-- Define terms briefly when in doubt.
-- Reduce burden: extract intent from conversation history before asking.
-- Ask for confirmation before moving past ambiguous requirements.
-
-## Core Authoring Rules
-
-### Capture intent
-
-Start by understanding intent. If the current conversation already contains the workflow, extract the tools, step sequence, corrections, input formats, output formats, and success criteria before asking questions.
-
-Ask only what remains unknown:
-
-1. What should this skill enable?
-2. When should this skill trigger? (what user phrases/contexts)
-3. What's the expected output format?
-4. Should we set up test cases to verify the skill works? Skills with objectively verifiable outputs benefit from test cases. Skills with subjective outputs often skip them. Suggest the appropriate default based on skill type, but let the user decide.
-
-### Research before writing
-
-Ask about edge cases, input/output formats, example files, success criteria, and dependencies. Wait to write test prompts until the workflow is clear. Research docs, similar skills, or best practices when useful. Use subagents in parallel when available; otherwise research inline. Bring context back to the user instead of making them carry it.
-
-### Write `SKILL.md`
-
-Compose:
-
-- **name**: Skill identifier.
-- **description**: Trigger contract + capability. This is the primary trigger. Put all "when to use" guidance here, not in the body. Skills tend to undertrigger, so write a pushy description with explicit contexts and nearby user phrasing.
-- **compatibility**: Required tools or dependencies. OPTIONAL; rarely needed.
-- **body**: Imperative instructions, examples, references, workflows, and resource pointers.
-
-Skill anatomy:
-
-```text
-skill-name/
-├── SKILL.md (required)
-│   ├── YAML frontmatter (name, description required)
-│   └── Markdown instructions
-└── Bundled Resources (optional)
-    ├── scripts/    - Executable code for deterministic/repetitive tasks
-    ├── references/ - Docs loaded into context as needed
-    └── assets/     - Files used in output (templates, icons, fonts)
-```
-
-### Safety and surprise
-
-Skills MUST match the user's stated intent. They NEVER contain malware, exploit code, unauthorized-access workflows, data exfiltration, or misleading behavior. Roleplay and harmless persona skills are acceptable when accurately described.
-
-### Writing style
-
-Use imperative instructions. Explain why instructions matter instead of leaning on rigid MUSTs. Use RFC keywords for technical and operational constraints, not taste. Give the model enough purpose and theory of mind to generalize beyond examples. Draft, reread cold, then improve.
-
-Define output formats with exact templates when structure matters. Use examples for transformations and style choices, but keep examples small and realistic.
-
 ## Progressive Disclosure Rules
 
 Skills load in three levels:
@@ -161,18 +102,19 @@ Detailed eval workflow lives in `references/eval-workflow.md`. Summary:
 - NEVER use `/skill-test` or custom review HTML.
 </critical>
 
-## Routing Table
+## Required follow-up reads
 
-| Need                                                                                                                     | Read / Use                               |
-| ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
-| Exact JSON structures for evals, metadata, grading, benchmarks, feedback                                                 | `references/schemas.md`                  |
-| Detailed eval runner, timing capture, grading, benchmark aggregation, viewer, feedback, iteration loop                   | `references/eval-workflow.md`            |
-| Trigger tuning, eval query generation, `eval_review.html`, `run_loop.py`, held-out scoring, before/after score reporting | `references/description-optimization.md` |
-| Package validation, `.skill` generation, presentation handoff                                                            | `references/packaging.md`                |
-| Provider-specific, browserless/headless, or server-unavailable runtime adaptations                                       | `references/runtime-modes.md`            |
-| Assertion grading                                                                                                        | `agents/grader.md`                       |
-| Benchmark and comparison analysis                                                                                        | `agents/analyzer.md`                     |
-| Rigorous blind A/B comparison between skill versions                                                                     | `agents/comparator.md`                   |
+| Need | Read | When |
+| --- | --- | --- |
+| Intent capture, research, authoring, and user communication | `references/authoring.md` | Creating or materially refactoring a skill |
+| Exact eval/benchmark JSON | `references/schemas.md` | Creating or validating artifacts |
+| Eval, timing, grading, viewer, iteration | `references/eval-workflow.md` | Running evaluations |
+| Trigger tuning and held-out scoring | `references/description-optimization.md` | Optimizing metadata descriptions |
+| Package validation and handoff | `references/packaging.md` | Packaging a skill |
+| Runtime-specific adaptations | `references/runtime-modes.md` | The default runner is unavailable |
+| Assertion grading | `agents/grader.md` | Grading an eval run |
+| Benchmark analysis | `agents/analyzer.md` | Comparing benchmark results |
+| Blind A/B comparison | `agents/comparator.md` | Comparing skill versions |
 
 ## Description Optimization
 

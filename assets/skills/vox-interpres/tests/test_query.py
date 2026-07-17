@@ -19,7 +19,7 @@ def _analysis() -> AnalysisResult:
     return AnalysisResult(
         schema_version=1,
         generated_at="2026-01-01T00:00:00Z",
-        file_path="/tmp/demo.mp3",
+        file_path="<audio-file>",
         segment_start_s=0.0,
         segment_duration_s=None,
         analysis_duration_s=120.0,
@@ -34,10 +34,16 @@ def _analysis() -> AnalysisResult:
             tags={"artist": "test"},
         ),
         key=KeyEstimate(
-            key="A", mode="minor", confidence=0.72, chroma_profile=[0.1] * 12
+            key="A",
+            mode="minor",
+            confidence=0.72,
+            chroma_profile=[0.1] * 12,
         ),
         beats=BeatSummary(
-            tempo_bpm=128.0, beat_count=250, first_beat_s=0.3, last_beat_s=119.5
+            tempo_bpm=128.0,
+            beat_count=250,
+            first_beat_s=0.3,
+            last_beat_s=119.5,
         ),
         spectral=SpectralStats(
             centroid=_stats(2100.0),
@@ -52,7 +58,7 @@ def _analysis() -> AnalysisResult:
             high_energy_ratio=0.22,
         ),
         section_hints=[
-            SectionHint(start_s=0.0, end_s=30.0, label="intro", confidence=0.9)
+            SectionHint(start_s=0.0, end_s=30.0, label="intro", confidence=0.9),
         ],
         notes=[],
         plot_files=[],

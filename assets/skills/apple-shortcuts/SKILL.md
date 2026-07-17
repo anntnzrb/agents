@@ -49,12 +49,12 @@ uv run --script "$SKILL_DIR/scripts/cli.py" blueprint \
   --automation-type "manual"
 
 # Validate and sign an explicitly requested artifact
-uv run --script "$SKILL_DIR/scripts/validate_shortcut.py" /path/to/Shortcut.xml
-bash "$SKILL_DIR/scripts/sign_shortcut.sh" /path/to/Shortcut.xml \
+uv run --script "$SKILL_DIR/scripts/cli.py" validate <shortcut.xml>
+uv run --script "$SKILL_DIR/scripts/cli.py" sign <shortcut.xml> \
   --name "Shortcut Name" --output-dir /path/to/output
 ```
 
-`sign_shortcut.sh` needs macOS and the built-in `shortcuts` CLI. It archives the XML, retries Apple signing after binary-plist conversion when needed, and emits the archive/signed paths as JSON. `--output-dir` is required: it never writes to an implicit location.
+`sign` needs macOS and the built-in `shortcuts` CLI. It archives the XML, retries Apple signing after binary-plist conversion when needed, and emits the archive/signed paths as JSON. `--output-dir` is required: it never writes to an implicit location.
 
 ## Artifact rules
 
@@ -75,7 +75,16 @@ uv run --script "$SKILL_DIR/scripts/cli.py" search \
   --query "ask for input action" --group support --top 10
 ```
 
-See `references/corpus-usage.md` only when corpus search is needed; see `references/plist-authoring.md` for XML structure, `references/debug-playbook.md` for failures, and `references/developer-integration.md` for App Intents.
+## Required follow-up reads
+
+| Need | Read | When |
+| --- | --- | --- |
+| Local corpus lookup | `references/corpus-usage.md` | Only when corpus search is needed |
+| Artifact XML/plist structure | `references/plist-authoring.md` | Before authoring an importable artifact |
+| Failure diagnosis | `references/debug-playbook.md` | When validation, signing, permissions, or runtime behavior fails |
+| App Intents and App Shortcuts | `references/developer-integration.md` | For app-supplied actions or developer integration |
+| Common blueprint patterns | `references/pattern-cookbook.md` | When the action graph needs reusable input/control-flow patterns |
+| End-to-end route variants | `references/workflows.md` | When selecting among user-level, artifact, inspection, and developer workflows |
 
 ## Output contract
 

@@ -1,12 +1,10 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
 #     "httpx>=0.27",
 # ]
 # ///
-"""
-n8nctl - Minimal REST CLI for n8n workflow authoring.
+"""n8nctl - Minimal REST CLI for n8n workflow authoring.
 
 Usage:
   n8nctl.py list [--limit N] [--active true|false]
@@ -33,7 +31,10 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 import httpx
 
@@ -127,7 +128,11 @@ def _request(
     with httpx.Client(timeout=30.0) as client:
         try:
             resp = client.request(
-                method, url, params=params, json=body, headers=headers
+                method,
+                url,
+                params=params,
+                json=body,
+                headers=headers,
             )
         except httpx.HTTPError as exc:
             _fail(f"request failed: {exc}")
@@ -167,11 +172,12 @@ def _workflow_payload(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _validate_workflow_data(data: dict[str, Any], path: Path) -> dict[str, Any]:
-    errors: list[str] = []
+    errors = [
+        f"missing key: {key}"
+        for key in ("name", "nodes", "connections", "settings")
+        if key not in data
+    ]
     warnings: list[str] = []
-    for key in ("name", "nodes", "connections", "settings"):
-        if key not in data:
-            errors.append(f"missing key: {key}")
     if errors:
         return {"valid": False, "errors": errors, "warnings": warnings}
 
@@ -225,14 +231,15 @@ def _validate_workflow_data(data: dict[str, Any], path: Path) -> dict[str, Any]:
                     target = edge.get("node")
                     if isinstance(target, str) and target not in name_set:
                         errors.append(
-                            f"connection from {src_name} to missing node: {target}"
+                            f"connection from {src_name} to missing node: {target}",
                         )
 
-    if isinstance(settings, dict):
-        if "availableInMCP" in settings and not isinstance(
-            settings["availableInMCP"], bool
-        ):
-            warnings.append("settings.availableInMCP should be boolean")
+    if (
+        isinstance(settings, dict)
+        and "availableInMCP" in settings
+        and not isinstance(settings["availableInMCP"], bool)
+    ):
+        warnings.append("settings.availableInMCP should be boolean")
 
     return {
         "valid": len(errors) == 0,
@@ -257,14 +264,14 @@ def cmd_get(cfg: Config, args: argparse.Namespace) -> dict[str, Any]:
 
 def cmd_create(cfg: Config, args: argparse.Namespace) -> dict[str, Any]:
     payload = _workflow_payload(
-        _require_workflow_fields(_load_json(args.path), args.path)
+        _require_workflow_fields(_load_json(args.path), args.path),
     )
     return _request(cfg, "POST", "/api/v1/workflows", body=payload)
 
 
 def cmd_update(cfg: Config, args: argparse.Namespace) -> dict[str, Any]:
     payload = _workflow_payload(
-        _require_workflow_fields(_load_json(args.path), args.path)
+        _require_workflow_fields(_load_json(args.path), args.path),
     )
     return _request(cfg, "PUT", f"/api/v1/workflows/{args.workflow_id}", body=payload)
 
@@ -293,7 +300,7 @@ def cmd_mcp_enable(cfg: Config, args: argparse.Namespace) -> dict[str, Any]:
             "nodes": wf.get("nodes"),
             "connections": wf.get("connections"),
             "settings": settings,
-        }
+        },
     )
     return _request(cfg, "PUT", f"/api/v1/workflows/{args.workflow_id}", body=payload)
 

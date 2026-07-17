@@ -72,7 +72,7 @@ def handle_rpc_line(line: str) -> RpcResponse:
             message="JSON request must be an object.",
         )
 
-    request = cast(Mapping[str, object], parsed)
+    request = cast("Mapping[str, object]", parsed)
     request_id = _read_request_id(request.get("id"))
     try:
         command = _read_command(request)
@@ -328,7 +328,7 @@ def _read_terms(request: Mapping[str, object], key: str) -> list[str]:
     if not isinstance(value, Sequence) or isinstance(value, bytes | bytearray):
         raise ValueError(f"{key} must be a string or array of strings")
 
-    value = cast(Sequence[object], value)
+    value = cast("Sequence[object]", value)
     terms: list[str] = []
     for item in value:
         if not isinstance(item, str):

@@ -1,5 +1,7 @@
 # Nixpkgs Update Quick Reference
 
+Read this reference before running update, platform, worktree, or cleanup commands.
+
 ## Platform Detection
 
 ```bash
@@ -21,16 +23,16 @@ nix eval .#<pkg>.meta.platforms --json
 
 ```bash
 # Create worktree with new branch
-git worktree add /tmp/nixpkgs-<pkg>-<ver> -b <pkg>-<ver> master
+git worktree add <temp-dir>/nixpkgs-<pkg>-<ver> -b <pkg>-<ver> master
 
 # List worktrees
 git worktree list
 
 # Remove worktree
-git worktree remove /tmp/nixpkgs-<pkg>-<ver>
+git worktree remove <temp-dir>/nixpkgs-<pkg>-<ver>
 
 # Force remove (if dirty)
-git worktree remove /tmp/nixpkgs-<pkg>-<ver> --force
+git worktree remove <temp-dir>/nixpkgs-<pkg>-<ver> --force
 
 # Prune stale worktrees
 git worktree prune

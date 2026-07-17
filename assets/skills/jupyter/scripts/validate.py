@@ -1,12 +1,10 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
 #     "nbformat>=5.9",
 # ]
 # ///
-"""
-Lightweight notebook validator - checks syntax without heavy dependencies.
+"""Lightweight notebook validator - checks syntax without heavy dependencies.
 
 Usage:
     validate.py notebook.ipynb [--require-outputs]

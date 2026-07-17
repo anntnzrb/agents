@@ -12,6 +12,10 @@ class FlightLiveError(RuntimeError):
     """Base runtime error for flight-live."""
 
 
+class MissingExecutableError(FlightLiveError):
+    """Required external executable is unavailable."""
+
+
 @dataclass(slots=True, frozen=True)
 class ResolvedPlace:
     query: str

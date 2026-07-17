@@ -2,6 +2,8 @@
 
 Read-only recipes for fast code exploration.
 
+Read this for common call-site, definition, import, and file-match recipes.
+
 ---
 
 ## Find call sites

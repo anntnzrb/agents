@@ -13,7 +13,7 @@ __all__: list[str] = []
 
 
 def load_fixture() -> dict[str, object]:
-    return json.loads(FIXTURE.read_text())
+    return json.loads(FIXTURE.read_text(encoding="utf-8"))
 
 
 def test_shortlist_shape() -> None:
@@ -73,7 +73,7 @@ def test_staleness_penalizes_confidence() -> None:
     assert float(result["globalConfidence"]) < 0.7
     assert isinstance(result.get("globalConfidencePct"), float)
     espn_health = recommendations.get_dict(
-        recommendations.get_dict(result["feedHealth"]).get("espn")
+        recommendations.get_dict(result["feedHealth"]).get("espn"),
     )
     assert espn_health.get("ok") is False
     assert isinstance(espn_health.get("confidencePct"), float)

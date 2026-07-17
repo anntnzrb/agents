@@ -4,7 +4,7 @@ Use this file only as a bundled routing fallback when the live migration guide c
 
 For latest, current, default, or unspecified-model upgrades:
 
-1. Run `node <skill-dir>/scripts/resolve-latest-model-info.cjs`.
+1. Run `uv run --script <skill-dir>/scripts/cli.py latest-model`.
 2. Fetch the returned `migrationGuideUrl` and `promptingGuideUrl` exactly.
 3. Treat the live guides as canonical.
 4. If remote retrieval fails, disclose that bundled fallback guidance is being used.

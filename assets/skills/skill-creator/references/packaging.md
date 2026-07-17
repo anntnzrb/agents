@@ -22,7 +22,7 @@ uv run --script <skill-dir>/scripts/cli.py package <path-to-skill-folder>
 
 ## Updating an existing skill
 
-When packaging an update, preserve the original skill identity: keep the directory name and `name` frontmatter unchanged so the output replaces the expected skill rather than creating a new sibling skill. If the installed source is read-only, copy it to a writable temp directory, edit the copy, then package from the copy. If direct output writes fail due to permissions, stage the `.skill` in `/tmp/` first and copy it to the requested destination.
+When packaging an update, preserve the original skill identity: keep the directory name and `name` frontmatter unchanged so the output replaces the expected skill rather than creating a new sibling skill. If the installed source is read-only, copy it to a writable temp directory, edit the copy, then package from the copy. If direct output writes fail due to permissions, stage the `.skill` in `<temp-dir>` first and copy it to the requested destination.
 
 ## Package and present
 

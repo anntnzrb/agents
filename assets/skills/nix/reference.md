@@ -1,5 +1,7 @@
 # Reference Guide
 
+Read this reference before selecting Context7 repositories or query patterns.
+
 ## Repo Routing
 
 ### Language & Concepts

@@ -22,7 +22,6 @@ rust-script -l '|line| line.to_uppercase()'
 ## Embedded deps pattern
 
 ````rust
-#!/usr/bin/env rust-script
 //! ```cargo
 //! [dependencies]
 //! serde = { version = "1", features = ["derive"] }
@@ -50,7 +49,7 @@ Cons:
 
 From `rust-script` to Cargo-native script:
 
-- switch shebang to `cargo -Zscript` (or `cargo +nightly -Zscript` when using rustup selector workflow)
+- invoke the file through `<CARGO_SCRIPT_CMD>`; do not rely on executable bits or interpreter dispatch
 - migrate manifest to frontmatter (`---cargo` block)
 - replace `rust-script`-specific env assumptions with standard Cargo script behavior
 

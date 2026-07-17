@@ -25,6 +25,30 @@
 - Validate every changed skill with `quick-validate`; it enforces the 120-character description cap.
 - Before adding a skill, prune or consolidate overlapping skills if the inventory would exceed this budget. Do not trade context capacity for keyword soup.
 
+## Model-facing text
+
+- Treat skill bodies, loaded references, agent definitions, and tool descriptions as model-facing prompts.
+- Write dense, imperative prose. Keep one decision per bullet; delete ceremony, repetition, and predictable grammar.
+- Preserve negation, uncertainty, causality, conditions, quantities, temporal boundaries, permissions, proper nouns, and technical terms.
+- Use uppercase RFC 2119 keywords only for genuine requirements, prohibitions, or strong preferences. NEVER convert factual descriptions, schemas, code, or examples.
+- Use structural tags only when their names match real semantics. NEVER invent tags solely for emphasis.
+- Put critical constraints near the first decision they govern. Repeat them only when a long prompt could hide them.
+- Pair a prohibition with its positive alternative when the alternative is not obvious.
+- Keep tactical bullets short by splitting distinct claims; do not enforce an arbitrary word-count target.
+- Examples MUST use exact runnable syntax or clearly marked placeholders.
+
+## Tool and MCP prompt authoring
+
+- Tool prompts teach when and why to use a tool, non-obvious input grammar, cross-tool routing, output caveats, and failures the agent can correct.
+- Let the machine-readable schema own field names, types, requiredness, enums, and ranges. Repeat schema mechanics only when the schema is unavailable or history proves the reminder prevents failures.
+- Discover the live inventory first, then inspect only the selected tool's schema. Use dated full-schema snapshots only for broad selection or discovery failure; NEVER load a snapshot before an available targeted schema.
+- Input schemas do not imply output schemas. Only a published output schema is contractual; observed responses are samples.
+- Keep implementation internals, recovery machinery, caching, telemetry, and performance details out unless they change the agent's decision.
+- Worked examples MUST match the real call grammar. Anti-patterns MUST come from observed failures, not speculation.
+- Before deleting apparently redundant prompt text, inspect `git blame` and the relevant commit or issue. Failure-prevention scar tissue stays unless evidence supersedes it.
+- Schema inferability makes text a prune candidate, never an automatic deletion.
+- Automated overlap probes are OPTIONAL. They MUST use the actual wire schema and rendered prompt; provider-specific probes are not repository-wide requirements.
+
 ## Portability Constraints
 
 - Bundled skill entrypoints use `scripts/cli.py`, not Bash/sh/PowerShell wrappers.

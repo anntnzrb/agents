@@ -9,6 +9,7 @@ Examples:
     uv run --script <skill-dir>/scripts/cli.py status --json
     uv run --script <skill-dir>/scripts/cli.py docs module hs.ipc --json
     uv run --script <skill-dir>/scripts/cli.py lint ~/.config/hammerspoon --json
+
 """
 
 from __future__ import annotations
@@ -27,8 +28,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-
 # ── cache ──────────────────────────────────────────────────────────────
+
 
 def _cache_root() -> Path:
     xdg = os.environ.get("XDG_CACHE_HOME")
@@ -58,7 +59,7 @@ def _write_cache_meta(url: str, etag: str | None, last_modified: str | None) -> 
         meta["last_modified"] = last_modified
     path = _cache_meta_for_url(url)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(meta))
+    path.write_text(json.dumps(meta), encoding="utf-8")
 
 
 def _read_cache_meta(url: str) -> dict | None:
@@ -66,7 +67,7 @@ def _read_cache_meta(url: str) -> dict | None:
     if not path.exists():
         return None
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return None
 
@@ -79,6 +80,7 @@ def _is_cache_stale(url: str, ttl: int = 86400) -> bool:
 
 
 # ── HTTP helpers ────────────────────────────────────────────────────────
+
 
 def fetch_url(
     url: str,
@@ -112,7 +114,7 @@ def fetch_url(
             last_mod = resp.headers.get("Last-Modified")
             body = resp.read().decode("utf-8", errors="replace")
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_text(body)
+            cache_path.write_text(body, encoding="utf-8")
             _write_cache_meta(url, etag, last_mod)
             return body, False
     except urllib.error.HTTPError as exc:
@@ -131,11 +133,24 @@ def fetch_url(
 
 # ── output helpers ──────────────────────────────────────────────────────
 
+
 def _emit_json(data: dict, exit_ok: bool = True) -> int:
     data.setdefault("ok", exit_ok)
     json.dump(data, sys.stdout, indent=2, ensure_ascii=False)
     sys.stdout.write("\n")
-    return 0 if exit_ok else 1
+    if exit_ok:
+        return 0
+    error = data.get("error")
+    if isinstance(error, str) and error.startswith(
+        (
+            "hs CLI not found",
+            "luacheck not found",
+            "stylua not found",
+            "busted not found",
+        ),
+    ):
+        return 127
+    return 1
 
 
 def _discover_tool(name: str, *extra_paths: str) -> str | None:
@@ -151,6 +166,7 @@ def _discover_tool(name: str, *extra_paths: str) -> str | None:
 
 # ── runtime commands ────────────────────────────────────────────────────
 
+
 def _hs_binary() -> str | None:
     """Find the hs CLI binary (Homebrew or hs.ipc.cliInstall)."""
     return _discover_tool("hs", "/usr/local/bin", "/opt/homebrew/bin")
@@ -160,27 +176,37 @@ def _run_hs(lua: str, timeout: int = 5) -> tuple[int, str, str]:
     """Run a Lua snippet through the hs CLI. Returns (rc, stdout, stderr)."""
     hs_bin = _hs_binary()
     if hs_bin is None:
-        return 1, "", (
-            "hs CLI not found. Install with:\n"
-            "  hs.ipc.cliInstall()  (from Hammerspoon Console)\n"
-            "and ensure require('hs.ipc') is in your init.lua"
+        return (
+            127,
+            "",
+            (
+                "hs CLI not found. Install with:\n"
+                "  hs.ipc.cliInstall()  (from Hammerspoon Console)\n"
+                "and ensure require('hs.ipc') is in your init.lua"
+            ),
         )
     try:
         proc = subprocess.run(
             [hs_bin, "-c", lua],
-            capture_output=True, text=True, timeout=timeout,
+            check=False,
+            shell=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
         )
         return proc.returncode, proc.stdout, proc.stderr
     except subprocess.TimeoutExpired:
-        return 2, "", (
-            "hs timed out — is Hammerspoon running?\n"
-            "Ensure Hammerspoon.app is launched and require('hs.ipc') is in your init.lua"
+        return (
+            2,
+            "",
+            (
+                "hs timed out — is Hammerspoon running?\n"
+                "Ensure Hammerspoon.app is launched and require('hs.ipc') is in your init.lua"
+            ),
         )
 
 
-def _run_hs_json(
-    expr: str, timeout: int = 5
-) -> tuple[bool, object, str]:
+def _run_hs_json(expr: str, timeout: int = 5) -> tuple[bool, object, str]:
     """Run Lua via hs, encoding result as JSON."""
     escaped = expr.replace("\\", "\\\\").replace("\x00", "\\0")
     wrapper = (
@@ -215,11 +241,11 @@ def cmd_status(args: argparse.Namespace) -> int:
         if args.json:
             return _emit_json(result, exit_ok=False)
         print(result["error"])
-        return 1
+        return 127
 
     ok, data, err = _run_hs_json(
         "hs.json.encode({version=hs.processInfo['version'] or 'unknown', "
-        "configDir=tostring(hs.configDir)})"
+        "configDir=tostring(hs.configDir)})",
     )
     if ok and isinstance(data, dict):
         result["hs_works"] = True
@@ -248,45 +274,64 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     result: dict = {"ok": True, "checks": []}
 
     hs_bin = _hs_binary()
-    result["checks"].append({
-        "name": "hs binary", "ok": hs_bin is not None,
-        "detail": hs_bin or "not found on PATH",
-        "fix": ("Run hs.ipc.cliInstall() from Hammerspoon Console; "
-                "ensure require('hs.ipc') in init.lua") if not hs_bin else None,
-    })
+    result["checks"].append(
+        {
+            "name": "hs binary",
+            "ok": hs_bin is not None,
+            "detail": hs_bin or "not found on PATH",
+            "fix": (
+                "Run hs.ipc.cliInstall() from Hammerspoon Console; "
+                "ensure require('hs.ipc') in init.lua"
+            )
+            if not hs_bin
+            else None,
+        },
+    )
     if not hs_bin:
         result["ok"] = False
 
     ok, data, err = _run_hs_json(
         "hs.json.encode({version=hs.processInfo['version'] or 'unknown', "
         "configDir=tostring(hs.configDir), "
-        "accessibility=hs.canCheckAccessibility and hs.checkAccessibility()})"
+        "accessibility=hs.canCheckAccessibility and hs.checkAccessibility()})",
     )
     if ok and isinstance(data, dict):
-        result["checks"].append({
-            "name": "hs IPC", "ok": True,
-            "detail": f"version={data.get('version')}, configDir={data.get('configDir')}",
-        })
+        result["checks"].append(
+            {
+                "name": "hs IPC",
+                "ok": True,
+                "detail": f"version={data.get('version')}, configDir={data.get('configDir')}",
+            },
+        )
     else:
         result["ok"] = False
-        result["checks"].append({
-            "name": "hs IPC", "ok": False,
-            "detail": err or "eval failed",
-            "fix": "Ensure require('hs.ipc') is in your init.lua",
-        })
+        result["checks"].append(
+            {
+                "name": "hs IPC",
+                "ok": False,
+                "detail": err or "eval failed",
+                "fix": "Ensure require('hs.ipc') is in your init.lua",
+            },
+        )
 
-    result["checks"].append({
-        "name": "accessibility", "ok": True,
-        "detail": "Cannot verify from CLI; grant in System Settings > Privacy > Accessibility",
-    })
+    result["checks"].append(
+        {
+            "name": "accessibility",
+            "ok": True,
+            "detail": "Cannot verify from CLI; grant in System Settings > Privacy > Accessibility",
+        },
+    )
 
     if args.json:
-        return _emit_json(result, exit_ok=result["ok"])
+        code = _emit_json(result, exit_ok=result["ok"])
+        return 127 if hs_bin is None else code
     for c in result["checks"]:
         status = "PASS" if c["ok"] else "FAIL"
         print(f"[{status}] {c['name']}: {c['detail']}")
         if c.get("fix"):
             print(f"       fix: {c['fix']}")
+    if hs_bin is None:
+        return 127
     return 0 if result["ok"] else 1
 
 
@@ -309,7 +354,7 @@ def cmd_eval(args: argparse.Namespace) -> int:
     rc, stdout, stderr = _run_hs(lua)
     if rc != 0:
         print(stderr or stdout or "hs failed", file=sys.stderr)
-        return 1
+        return rc
     sys.stdout.write(stdout)
     return 0
 
@@ -328,7 +373,7 @@ def cmd_eval_file(args: argparse.Namespace) -> int:
     rc, stdout, stderr = _run_hs(lua)
     if rc != 0:
         print(stderr or stdout or "hs failed", file=sys.stderr)
-        return 1
+        return rc
     sys.stdout.write(stdout)
     return 0
 
@@ -342,7 +387,7 @@ def cmd_reload(args: argparse.Namespace) -> int:
     rc, stdout, stderr = _run_hs("hs.reload()")
     if rc != 0:
         print(stderr or "reload failed", file=sys.stderr)
-        return 1
+        return rc
     print("config reloaded")
     return 0
 
@@ -359,62 +404,77 @@ def _inspect_hs(label: str, expr: str, args: argparse.Namespace) -> int:
 
 
 def cmd_windows(args: argparse.Namespace) -> int:
-    return _inspect_hs("windows", (
-        "hs.json.encode(function()"
-        " local r={}; for _,w in ipairs(hs.window.allWindows()) do"
-        " r[#r+1]={id=w:id(),title=tostring(w:title()),"
-        " app=w:application() and w:application():name() or '?',"
-        " screen=w:screen() and w:screen():name() or '?',"
-        " frame={x=w:frame().x,y=w:frame().y,w=w:frame().w,h=w:frame().h}}"
-        " end; return r end())"
-    ), args)
+    return _inspect_hs(
+        "windows",
+        (
+            "hs.json.encode(function()"
+            " local r={}; for _,w in ipairs(hs.window.allWindows()) do"
+            " r[#r+1]={id=w:id(),title=tostring(w:title()),"
+            " app=w:application() and w:application():name() or '?',"
+            " screen=w:screen() and w:screen():name() or '?',"
+            " frame={x=w:frame().x,y=w:frame().y,w=w:frame().w,h=w:frame().h}}"
+            " end; return r end())"
+        ),
+        args,
+    )
 
 
 def cmd_apps(args: argparse.Namespace) -> int:
-    return _inspect_hs("apps", (
-        "hs.json.encode(function()"
-        " local r={}; for _,a in ipairs(hs.application.runningApplications()) do"
-        " r[#r+1]={name=tostring(a:name()),bundleID=tostring(a:bundleID()),"
-        " pid=a:pid(),frontmost=a:isFrontmost() or false}"
-        " end; return r end())"
-    ), args)
+    return _inspect_hs(
+        "apps",
+        (
+            "hs.json.encode(function()"
+            " local r={}; for _,a in ipairs(hs.application.runningApplications()) do"
+            " r[#r+1]={name=tostring(a:name()),bundleID=tostring(a:bundleID()),"
+            " pid=a:pid(),frontmost=a:isFrontmost() or false}"
+            " end; return r end())"
+        ),
+        args,
+    )
 
 
 def cmd_screens(args: argparse.Namespace) -> int:
-    return _inspect_hs("screens", (
-        "hs.json.encode(function()"
-        " local r={}; for _,s in ipairs(hs.screen.allScreens()) do"
-        " r[#r+1]={name=tostring(s:name()),id=s:id(),"
-        " frame={x=s:frame().x,y=s:frame().y,w=s:frame().w,h=s:frame().h}}"
-        " end; return r end())"
-    ), args)
+    return _inspect_hs(
+        "screens",
+        (
+            "hs.json.encode(function()"
+            " local r={}; for _,s in ipairs(hs.screen.allScreens()) do"
+            " r[#r+1]={name=tostring(s:name()),id=s:id(),"
+            " frame={x=s:frame().x,y=s:frame().y,w=s:frame().w,h=s:frame().h}}"
+            " end; return r end())"
+        ),
+        args,
+    )
 
 
 def cmd_hotkeys(args: argparse.Namespace) -> int:
-    return _inspect_hs("hotkeys", (
-        "hs.json.encode(function()"
-        " local r={}; local hks=hs.hotkey.getHotkeys(); for _,hk in ipairs(hks) do"
-        " local mods={}; local mks=hk.mods; if mks.cmd then mods[#mods+1]='cmd' end;"
-        " if mks.alt then mods[#mods+1]='alt' end;"
-        " if mks.ctrl then mods[#mods+1]='ctrl' end;"
-        " if mks.shift then mods[#mods+1]='shift' end;"
-        " r[#r+1]={mods=mods,key=tostring(hk.key),"
-        " message=tostring(hk.msg)}"
-        " end; return r end())"
-    ), args)
+    return _inspect_hs(
+        "hotkeys",
+        (
+            "hs.json.encode(function()"
+            " local r={}; local hks=hs.hotkey.getHotkeys(); for _,hk in ipairs(hks) do"
+            " local mods={}; local mks=hk.mods; if mks.cmd then mods[#mods+1]='cmd' end;"
+            " if mks.alt then mods[#mods+1]='alt' end;"
+            " if mks.ctrl then mods[#mods+1]='ctrl' end;"
+            " if mks.shift then mods[#mods+1]='shift' end;"
+            " r[#r+1]={mods=mods,key=tostring(hk.key),"
+            " message=tostring(hk.msg)}"
+            " end; return r end())"
+        ),
+        args,
+    )
 
 
 def cmd_spoons_loaded(args: argparse.Namespace) -> int:
-    return _inspect_hs("spoons", (
-        "hs.json.encode(function()"
-        " local r=hs.spoons.list(); return r end())"
-    ), args)
+    return _inspect_hs(
+        "spoons",
+        ("hs.json.encode(function() local r=hs.spoons.list(); return r end())"),
+        args,
+    )
 
 
 def cmd_config(args: argparse.Namespace) -> int:
-    ok, data, err = _run_hs_json(
-        "hs.json.encode(tostring(hs.configDir))"
-    )
+    ok, data, err = _run_hs_json("hs.json.encode(tostring(hs.configDir))")
     if not ok:
         if args.json:
             return _emit_json({"ok": False, "error": err}, exit_ok=False)
@@ -454,10 +514,12 @@ class _DocsHTMLParser(html.parser.HTMLParser):
         if tag == "a" and self._in_a:
             self._in_a = False
             if self._current_href and self._current_text:
-                self.modules.append({
-                    "href": self._current_href,
-                    "name": self._current_text.strip(),
-                })
+                self.modules.append(
+                    {
+                        "href": self._current_href,
+                        "name": self._current_text.strip(),
+                    },
+                )
 
     def handle_data(self, data: str) -> None:
         if self._in_a:
@@ -505,12 +567,14 @@ def cmd_docs_search(args: argparse.Namespace) -> int:
     # Search module names first
     for m in modules:
         if query.lower() in m["name"].lower():
-            results.append({
-                "kind": "module",
-                "name": m["name"],
-                "url": f"{DOCS_BASE}{m['href']}",
-                "excerpt": m["name"],
-            })
+            results.append(
+                {
+                    "kind": "module",
+                    "name": m["name"],
+                    "url": f"{DOCS_BASE}{m['href']}",
+                    "excerpt": m["name"],
+                },
+            )
 
     # Then search doc bodies for matching modules (limit: first 8 matches)
     count = 0
@@ -526,12 +590,14 @@ def cmd_docs_search(args: argparse.Namespace) -> int:
         hits = _search_in_text(doc, query)
         if hits:
             count += 1
-            results.append({
-                "kind": "api",
-                "module": m["name"],
-                "url": f"{DOCS_BASE}{m['name']}.html",
-                "matches": hits[:3],
-            })
+            results.append(
+                {
+                    "kind": "api",
+                    "module": m["name"],
+                    "url": f"{DOCS_BASE}{m['name']}.html",
+                    "matches": hits[:3],
+                },
+            )
 
     if args.json:
         return _emit_json({"ok": True, "query": query, "results": results})
@@ -555,17 +621,19 @@ def _parse_module_signatures(html: str) -> list[dict]:
     # Match Hammerspoon doc signature blocks
     pattern = re.compile(
         r'<a[^>]*name="([^"]*)"[^>]*></a>\s*'
-        r'<h4>(hs\.\S+)</h4>\s*(?:<div[^>]*>\s*)?'
+        r"<h4>(hs\.\S+)</h4>\s*(?:<div[^>]*>\s*)?"
         r'<div[^>]*class="[^"]*signature[^"]*"[^>]*>\s*'
-        r'<code>(.*?)</code>',
+        r"<code>(.*?)</code>",
         re.DOTALL | re.IGNORECASE,
     )
     for m in pattern.finditer(html):
-        results.append({
-            "anchor": m.group(1),
-            "symbol": m.group(2),
-            "signature": re.sub(r'\s+', ' ', m.group(3).strip()),
-        })
+        results.append(
+            {
+                "anchor": m.group(1),
+                "symbol": m.group(2),
+                "signature": re.sub(r"\s+", " ", m.group(3).strip()),
+            },
+        )
 
     return results
 
@@ -576,11 +644,14 @@ def cmd_docs_module(args: argparse.Namespace) -> int:
     sigs = _parse_module_signatures(html)
 
     if args.json:
-        return _emit_json({
-            "ok": True, "module": name,
-            "url": f"{DOCS_BASE}{name}.html",
-            "signatures": sigs,
-        })
+        return _emit_json(
+            {
+                "ok": True,
+                "module": name,
+                "url": f"{DOCS_BASE}{name}.html",
+                "signatures": sigs,
+            },
+        )
 
     print(f"MODULE: {name}")
     print(f"URL: {DOCS_BASE}{name}.html")
@@ -604,11 +675,15 @@ def cmd_docs_api(args: argparse.Namespace) -> int:
     matches = [s for s in sigs if symbol in s.get("symbol", "")]
 
     if args.json:
-        return _emit_json({
-            "ok": True, "symbol": symbol, "module": module,
-            "url": f"{DOCS_BASE}{module}.html",
-            "results": matches,
-        })
+        return _emit_json(
+            {
+                "ok": True,
+                "symbol": symbol,
+                "module": module,
+                "url": f"{DOCS_BASE}{module}.html",
+                "results": matches,
+            },
+        )
 
     print(f"MODULE: {module}")
     print(f"URL: {DOCS_BASE}{module}.html")
@@ -643,13 +718,15 @@ SOURCE_URLS = {
     "hammerspoon": "https://raw.githubusercontent.com/Hammerspoon/hammerspoon/master/extensions/ipc/ipc.lua",
 }
 
-SPOONS_LIST_URL = (
-    "https://raw.githubusercontent.com/Hammerspoon/Spoons/master/Spoons/"
-)
+SPOONS_LIST_URL = "https://raw.githubusercontent.com/Hammerspoon/Spoons/master/Spoons/"
 
 
 def _fetch_github_raw(url: str) -> str:
-    return fetch_url(url, headers={"Accept": "application/vnd.github.v3.raw"}, timeout=20)[0]
+    return fetch_url(
+        url,
+        headers={"Accept": "application/vnd.github.v3.raw"},
+        timeout=20,
+    )[0]
 
 
 def _gh_ls_remote_sha(repo: str) -> str | None:
@@ -660,7 +737,11 @@ def _gh_ls_remote_sha(repo: str) -> str | None:
     try:
         proc = subprocess.run(
             [git, "ls-remote", f"https://github.com/{repo}", "HEAD"],
-            capture_output=True, text=True, timeout=15,
+            check=False,
+            shell=False,
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         if proc.returncode == 0 and proc.stdout.strip():
             return proc.stdout.split()[0]
@@ -681,12 +762,14 @@ def cmd_source_search(args: argparse.Namespace) -> int:
             continue
         for i, line in enumerate(text.splitlines(), 1):
             if pattern.lower() in line.lower():
-                results.append({
-                    "source": name,
-                    "url": url,
-                    "line": i,
-                    "text": line.strip()[:200],
-                })
+                results.append(
+                    {
+                        "source": name,
+                        "url": url,
+                        "line": i,
+                        "text": line.strip()[:200],
+                    },
+                )
 
     if args.json:
         return _emit_json({"ok": True, "query": pattern, "results": results})
@@ -725,7 +808,7 @@ def cmd_spoons_search(args: argparse.Namespace) -> int:
     query = args.query
     try:
         listing = _fetch_github_raw(
-            "https://api.github.com/repos/Hammerspoon/Spoons/contents/Source"
+            "https://api.github.com/repos/Hammerspoon/Spoons/contents/Source",
         )
         entries = json.loads(listing) if listing.strip() else []
     except Exception as exc:
@@ -759,7 +842,10 @@ def cmd_spoons_source(args: argparse.Namespace) -> int:
         text = _fetch_github_raw(url)
     except Exception as exc:
         if args.json:
-            return _emit_json({"ok": False, "error": str(exc), "url": url}, exit_ok=False)
+            return _emit_json(
+                {"ok": False, "error": str(exc), "url": url},
+                exit_ok=False,
+            )
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
@@ -767,11 +853,16 @@ def cmd_spoons_source(args: argparse.Namespace) -> int:
     lines = text.count("\n")
 
     if args.json:
-        return _emit_json({
-            "ok": True, "name": name, "url": url,
-            "size_bytes": size, "lines": lines,
-            "preview": text[:2000],
-        })
+        return _emit_json(
+            {
+                "ok": True,
+                "name": name,
+                "url": url,
+                "size_bytes": size,
+                "lines": lines,
+                "preview": text[:2000],
+            },
+        )
 
     print(f"SPOON: {name}")
     print(f"URL: {url}")
@@ -784,6 +875,7 @@ def cmd_spoons_source(args: argparse.Namespace) -> int:
 
 # ── Lua quality commands ────────────────────────────────────────────────
 
+
 def cmd_lint(args: argparse.Namespace) -> int:
     path = Path(args.path).expanduser().resolve()
     luacheck = _discover_tool("luacheck")
@@ -792,19 +884,28 @@ def cmd_lint(args: argparse.Namespace) -> int:
         if args.json:
             return _emit_json({"ok": False, "error": msg}, exit_ok=False)
         print(msg, file=sys.stderr)
-        return 1
+        return 127
 
     rc = subprocess.run(
         [luacheck, str(path), "--globals", "hs", "spoon", "--formatter", "plain"],
-        capture_output=True, text=True, timeout=30,
+        check=False,
+        shell=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     if args.json:
         issues = [line.strip() for line in rc.stdout.splitlines() if line.strip()]
-        return _emit_json({
-            "ok": True, "exit_code": rc.returncode,
-            "tool": luacheck, "path": str(path),
-            "issues": issues,
-        })
+        return _emit_json(
+            {
+                "ok": rc.returncode == 0,
+                "exit_code": rc.returncode,
+                "tool": luacheck,
+                "path": str(path),
+                "issues": issues,
+            },
+            exit_ok=rc.returncode == 0,
+        )
     sys.stdout.write(rc.stdout)
     if rc.stderr:
         sys.stderr.write(rc.stderr)
@@ -819,20 +920,29 @@ def cmd_fmt(args: argparse.Namespace) -> int:
         if args.json:
             return _emit_json({"ok": False, "error": msg}, exit_ok=False)
         print(msg, file=sys.stderr)
-        return 1
+        return 127
 
     if args.check:
         rc = subprocess.run(
             [stylua, "--check", str(path)],
-            capture_output=True, text=True, timeout=30,
+            check=False,
+            shell=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         ok = rc.returncode == 0
         if args.json:
-            return _emit_json({
-                "ok": ok, "check": "passed" if ok else "issues found",
-                "tool": stylua, "path": str(path),
-                "output": rc.stdout.strip() or rc.stderr.strip(),
-            })
+            return _emit_json(
+                {
+                    "ok": ok,
+                    "check": "passed" if ok else "issues found",
+                    "tool": stylua,
+                    "path": str(path),
+                    "output": rc.stdout.strip() or rc.stderr.strip(),
+                },
+                exit_ok=rc.returncode == 0,
+            )
         if not ok:
             print(rc.stdout or rc.stderr or "formatting issues")
         else:
@@ -842,13 +952,22 @@ def cmd_fmt(args: argparse.Namespace) -> int:
     # --write
     rc = subprocess.run(
         [stylua, str(path)],
-        capture_output=True, text=True, timeout=30,
+        check=False,
+        shell=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     if args.json:
-        return _emit_json({
-            "ok": True, "tool": stylua, "path": str(path),
-            "output": rc.stdout.strip() or "formatted",
-        })
+        return _emit_json(
+            {
+                "ok": rc.returncode == 0,
+                "tool": stylua,
+                "path": str(path),
+                "output": rc.stdout.strip() or "formatted",
+            },
+            exit_ok=rc.returncode == 0,
+        )
     print(rc.stdout.strip() or "formatted")
     return rc.returncode
 
@@ -861,20 +980,28 @@ def cmd_test(args: argparse.Namespace) -> int:
         if args.json:
             return _emit_json({"ok": False, "error": msg}, exit_ok=False)
         print(msg, file=sys.stderr)
-        return 1
+        return 127
 
     rc = subprocess.run(
         [busted, str(path)],
-        capture_output=True, text=True, timeout=60,
+        check=False,
+        shell=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     output = rc.stdout + rc.stderr
     if args.json:
-        return _emit_json({
-            "ok": rc.returncode == 0,
-            "tool": busted, "path": str(path),
-            "exit_code": rc.returncode,
-            "output": output,
-        })
+        return _emit_json(
+            {
+                "ok": rc.returncode == 0,
+                "tool": busted,
+                "path": str(path),
+                "exit_code": rc.returncode,
+                "output": output,
+            },
+            exit_ok=rc.returncode == 0,
+        )
     sys.stdout.write(output)
     return rc.returncode
 
@@ -944,6 +1071,7 @@ def cmd_lsp_config(args: argparse.Namespace) -> int:
 
 
 # ── argument parser ─────────────────────────────────────────────────────
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(

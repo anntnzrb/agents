@@ -56,9 +56,7 @@ COMMENT_FIELDS: tuple[str, ...] = (
 )
 WHITESPACE_RE = re.compile(r"\s+")
 HTTP_URL_RE = re.compile(r"^https?://", re.IGNORECASE)
-HTML_SCRIPT_RE = re.compile(
-    r"<(script|style)[^>]*>.*?</\1>", re.DOTALL | re.IGNORECASE
-)
+HTML_SCRIPT_RE = re.compile(r"<(script|style)[^>]*>.*?</\1>", re.DOTALL | re.IGNORECASE)
 HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 GLOSSARY = {
@@ -119,7 +117,7 @@ def load_env() -> None:
     candidates.append(skill_dir / ".env")
     if os.environ.get("SKILLS_DIR"):
         candidates.append(
-            Path(os.environ["SKILLS_DIR"]).expanduser() / "reddit" / ".env"
+            Path(os.environ["SKILLS_DIR"]).expanduser() / "reddit" / ".env",
         )
     candidates.append(ancestor_env("reddit"))
     for candidate in candidates:
@@ -160,7 +158,8 @@ def consume_raw_flag(args: list[str]) -> tuple[bool, list[str]]:
 
 
 def split_limit_extra(
-    args: list[str], default_limit: str
+    args: list[str],
+    default_limit: str,
 ) -> tuple[str, list[tuple[str, str]]]:
     limit = default_limit
     extra: list[tuple[str, str]] = []
@@ -178,6 +177,7 @@ def split_limit_extra(
 
 def json_print(payload: Any) -> None:
     print(json.dumps(payload, separators=(",", ":")))
+
 
 def _strip_html_preview(text: str) -> str:
     """Return a text-only preview with HTML tags/entities removed and whitespace collapsed.
@@ -215,7 +215,7 @@ def emit_error(
             "body_bytes": body_bytes,
             "body_preview": preview,
             "body_truncated": truncated,
-        }
+        },
     }
     if kind is not None:
         payload["error"]["kind"] = kind
@@ -265,7 +265,9 @@ def request_get(
 
 
 def fetch_json(
-    url: str, params: list[tuple[str, str]], user_agent: str
+    url: str,
+    params: list[tuple[str, str]],
+    user_agent: str,
 ) -> tuple[int, Any]:
     code, body = request_get(url, params, user_agent, raw=False)
     if code != 0:
@@ -306,7 +308,7 @@ def validate_url(url: str) -> str:
 def validate_time_range(value: str) -> str:
     if value not in TIME_RANGES:
         raise ValueError(
-            f"time_range must be one of {sorted(TIME_RANGES)} (got {value!r})"
+            f"time_range must be one of {sorted(TIME_RANGES)} (got {value!r})",
         )
     return value
 
@@ -316,7 +318,7 @@ def parse_subreddits(value: str) -> list[str]:
         parsed = json.loads(value)
     except json.JSONDecodeError as exc:
         raise ValueError(
-            "subreddits= must be a JSON list of non-empty strings"
+            "subreddits= must be a JSON list of non-empty strings",
         ) from exc
     if not isinstance(parsed, list):
         raise ValueError("subreddits= must be a JSON list of non-empty strings")
@@ -357,7 +359,7 @@ def validate_browse_args(
     if "=" not in rest[0]:
         if rest[0] not in BROWSE_SORTS:
             raise ValueError(
-                f"browse sort must be one of {sorted(BROWSE_SORTS)} (got {rest[0]!r})"
+                f"browse sort must be one of {sorted(BROWSE_SORTS)} (got {rest[0]!r})",
             )
         sort = rest[0]
         rest = rest[1:]
@@ -366,7 +368,7 @@ def validate_browse_args(
     for item in rest:
         if "=" not in item:
             raise ValueError(
-                f"unexpected positional argument after key=value: {item!r}"
+                f"unexpected positional argument after key=value: {item!r}",
             )
     return subreddit, sort, rest
 
@@ -592,7 +594,10 @@ def cutoff_for(range_name: str, now: float) -> float:
 
 
 def user_analysis(
-    base_url: str, user_agent: str, username: str, args: list[str]
+    base_url: str,
+    user_agent: str,
+    username: str,
+    args: list[str],
 ) -> int:
     posts_limit = 10
     comments_limit = 10
@@ -603,11 +608,13 @@ def user_analysis(
         try:
             if pair.startswith("posts_limit="):
                 posts_limit = parse_non_negative_int(
-                    "posts_limit", pair.removeprefix("posts_limit=")
+                    "posts_limit",
+                    pair.removeprefix("posts_limit="),
                 )
             elif pair.startswith("comments_limit="):
                 comments_limit = parse_non_negative_int(
-                    "comments_limit", pair.removeprefix("comments_limit=")
+                    "comments_limit",
+                    pair.removeprefix("comments_limit="),
                 )
             elif pair.startswith("time_range="):
                 time_range = validate_time_range(pair.removeprefix("time_range="))
@@ -638,9 +645,7 @@ def user_analysis(
     cutoff = cutoff_for(time_range, now)
     recent_posts = listing_data(posts, posts_limit, cutoff)
     recent_comments = listing_data(comments, comments_limit, cutoff)
-    top_source = listing_data(posts, 100, cutoff) + listing_data(
-        comments, 100, cutoff
-    )
+    top_source = listing_data(posts, 100, cutoff) + listing_data(comments, 100, cutoff)
     counts = Counter(
         str(item.get("subreddit"))
         for item in top_source
@@ -676,7 +681,7 @@ def user_analysis(
                 for c in recent_comments
             ],
             "top_subreddits": top_subreddits,
-        }
+        },
     )
     return 0
 
@@ -719,7 +724,7 @@ def cmd_browse(base_url: str, user_agent: str, args: list[str]) -> int:
             },
             payload=payload,
             limit=safe_int(limit, 10),
-        )
+        ),
     )
     return 0
 
@@ -787,7 +792,7 @@ def cmd_search(base_url: str, user_agent: str, args: list[str]) -> int:
             meta={"query": full_query, "sort": sort, "time": t},
             payload=payload,
             limit=safe_int(limit, 10),
-        )
+        ),
     )
     return 0
 
@@ -832,7 +837,10 @@ def cmd_post_url(base_url: str, user_agent: str, args: list[str]) -> int:
         clean_url = clean_url.removesuffix(".json") + ".json"
     limit, extra = split_limit_extra(args[1:], "20")
     code, body = request_get(
-        clean_url, [("limit", limit), *extra], user_agent, raw=raw_mode
+        clean_url,
+        [("limit", limit), *extra],
+        user_agent,
+        raw=raw_mode,
     )
     if code != 0 or raw_mode:
         return code
@@ -855,7 +863,10 @@ def cmd_user(base_url: str, user_agent: str, args: list[str]) -> int:
     if not args:
         return usage_error("usage: reddit user <username>")
     code, body = request_get(
-        f"{base_url}/user/{args[0]}/about.json", [], user_agent, raw=raw_mode
+        f"{base_url}/user/{args[0]}/about.json",
+        [],
+        user_agent,
+        raw=raw_mode,
     )
     if code != 0 or raw_mode:
         return code
@@ -902,7 +913,7 @@ def cmd_user_posts(base_url: str, user_agent: str, args: list[str]) -> int:
             meta={"user": args[0]},
             payload=payload,
             limit=safe_int(limit, 10),
-        )
+        ),
     )
     return 0
 
@@ -936,7 +947,7 @@ def cmd_user_comments(base_url: str, user_agent: str, args: list[str]) -> int:
             meta={"user": args[0]},
             payload=payload,
             limit=safe_int(limit, 10),
-        )
+        ),
     )
     return 0
 
@@ -974,7 +985,7 @@ def main(argv: list[str]) -> int:
                 "usage: reddit user-analysis <username> "
                 "[posts_limit=<n>] [comments_limit=<n>] "
                 "[time_range=<day|week|month|year|all>] "
-                "[top_subreddits_limit=<n>]"
+                "[top_subreddits_limit=<n>]",
             )
         return user_analysis(base_url, user_agent, args[0], args[1:])
     if cmd == "explain":

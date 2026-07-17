@@ -97,8 +97,10 @@ gh search code "collections.deque" --language=python # BFS patterns
 gh search code "fn dijkstra" --language=rust
 ```
 
-## References
+## Required follow-up reads
 
-- [algorithms.md](cookbook/algorithms.md) - Graph traversal, DP, cycle detection, search
-- [parsing.md](cookbook/parsing.md) - Input formats, grids, coordinates, hex grids
-- [reference.md](reference.md) - Data structures, optimization, anti-patterns
+| Need | Read | When |
+| --- | --- | --- |
+| Algorithm recipes | `cookbook/algorithms.md` | When selecting or implementing graph, DP, cycle, or search algorithms |
+| Parsing recipes | `cookbook/parsing.md` | For grids, grouped input, coordinates, hex grids, or irregular text |
+| General design reference | `reference.md` | For data structures, optimization, Part 2 adaptation, or anti-patterns |

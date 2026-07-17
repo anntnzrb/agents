@@ -1,10 +1,8 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
 # dependencies = []
 # ///
-"""
-Search the local Shortcuts expert chunk index.
+"""Search the local Shortcuts expert chunk index.
 
 Usage:
   uv run --script <skill-dir>/scripts/cli.py search --query "ask for input action"
@@ -36,7 +34,10 @@ def _load_record(line: str) -> ChunkRecord | None:
 def _record_sort_key(record: ChunkRecord) -> tuple[int, int]:
     score = record.get("score", 0)
     char_len = record.get("char_len", 0)
-    return (score if isinstance(score, int) else 0, char_len if isinstance(char_len, int) else 0)
+    return (
+        score if isinstance(score, int) else 0,
+        char_len if isinstance(char_len, int) else 0,
+    )
 
 
 def _resolve_corpus_root(explicit: str | None) -> Path:
@@ -66,14 +67,21 @@ def _resolve_corpus_root(explicit: str | None) -> Path:
         if chunks.is_file():
             return cand
 
-    raise FileNotFoundError("Could not locate shortcuts-docs-corpus. Use --corpus-root or set APPLE_SHORTCUTS_CORPUS.")
+    raise FileNotFoundError(
+        "Could not locate shortcuts-docs-corpus. Use --corpus-root or set APPLE_SHORTCUTS_CORPUS.",
+    )
 
 
 def _tokenize(text: str) -> list[str]:
     return re.findall(r"[a-z0-9_+-]{2,}", text.lower())
 
 
-def _score(query: str, query_terms: Iterable[str], group: str | None, rec: ChunkRecord) -> int:
+def _score(
+    query: str,
+    query_terms: Iterable[str],
+    group: str | None,
+    rec: ChunkRecord,
+) -> int:
     rec_group = str(rec.get("source_group", ""))
     if group and rec_group != group:
         return 0
@@ -126,7 +134,12 @@ def main() -> int:
         help="Optional source-group filter.",
     )
     parser.add_argument("--top", type=int, default=8, help="Maximum results to return.")
-    parser.add_argument("--min-score", type=int, default=1, help="Minimum score threshold.")
+    parser.add_argument(
+        "--min-score",
+        type=int,
+        default=1,
+        help="Minimum score threshold.",
+    )
     parser.add_argument("--corpus-root", help="Path to shortcuts-docs-corpus root.")
     parser.add_argument("--json", action="store_true", help="Output JSON.")
     parser.add_argument(
@@ -145,7 +158,9 @@ def main() -> int:
     if args.show_corpus_root:
         print(f"corpus_root={corpus_root}", file=sys.stderr)
 
-    chunk_file = corpus_root / "expert-pack" / "chunks" / "shortcuts_expert_chunks.jsonl"
+    chunk_file = (
+        corpus_root / "expert-pack" / "chunks" / "shortcuts_expert_chunks.jsonl"
+    )
     terms = _tokenize(args.query)
 
     hits: list[ChunkRecord] = []
@@ -184,7 +199,9 @@ def main() -> int:
     print(f"Query: {args.query}")
     print()
     for idx, rec in enumerate(hits, start=1):
-        print(f"[{idx}] score={rec['score']} group={rec.get('source_group')} path={rec.get('path')} id={rec.get('id')}")
+        print(
+            f"[{idx}] score={rec['score']} group={rec.get('source_group')} path={rec.get('path')} id={rec.get('id')}",
+        )
         print(f"    {rec.get('excerpt', '')}")
         print()
 

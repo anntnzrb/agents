@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 """Build the local, spoiler-gated DSR Dadbod transcript corpus.
 
 The input is a user-local JSON export of English ``en-orig`` automatic captions.
@@ -68,7 +67,7 @@ def normalize(text: str) -> str:
 def _require_mapping(value: object, label: str) -> dict[str, object]:
     if not isinstance(value, dict):
         raise ValueError(f"{label} must be an object")
-    return cast(dict[str, object], value)
+    return cast("dict[str, object]", value)
 
 
 def _require_string(record: dict[str, object], key: str, label: str) -> str:
@@ -85,12 +84,12 @@ def validate_source(
     top = _require_mapping(payload, "source JSON")
     if set(top) != TOP_LEVEL_KEYS:
         raise ValueError(
-            "source JSON keys must be exactly " + ", ".join(sorted(TOP_LEVEL_KEYS))
+            "source JSON keys must be exactly " + ", ".join(sorted(TOP_LEVEL_KEYS)),
         )
     source = _require_mapping(top["source"], "source")
     if set(source) != SOURCE_KEYS:
         raise ValueError(
-            "source metadata keys must be exactly " + ", ".join(sorted(SOURCE_KEYS))
+            "source metadata keys must be exactly " + ", ".join(sorted(SOURCE_KEYS)),
         )
     for key in SOURCE_KEYS:
         _require_string(source, key, "source")
@@ -111,31 +110,37 @@ def validate_source(
         if set(item) != RECORD_KEYS:
             raise ValueError(
                 f"transcripts[{expected_index - 1}] keys must be exactly "
-                + ", ".join(sorted(RECORD_KEYS))
+                + ", ".join(sorted(RECORD_KEYS)),
             )
         playlist_index = item.get("playlist_index")
         if type(playlist_index) is not int or playlist_index != expected_index:
             raise ValueError(
-                f"transcripts[{expected_index - 1}].playlist_index must be {expected_index}"
+                f"transcripts[{expected_index - 1}].playlist_index must be {expected_index}",
             )
         video_id = _require_string(
-            item, "video_id", f"transcripts[{expected_index - 1}]"
+            item,
+            "video_id",
+            f"transcripts[{expected_index - 1}]",
         )
         url = _require_string(item, "url", f"transcripts[{expected_index - 1}]")
         caption_track = _require_string(
-            item, "caption_track", f"transcripts[{expected_index - 1}]"
+            item,
+            "caption_track",
+            f"transcripts[{expected_index - 1}]",
         )
         if not video_id or not url or caption_track != "en-orig":
             raise ValueError(
-                f"transcripts[{expected_index - 1}] has invalid video_id/url/caption_track"
+                f"transcripts[{expected_index - 1}] has invalid video_id/url/caption_track",
             )
         cue_count = item.get("cue_count")
         if type(cue_count) is not int or cue_count < 0:
             raise ValueError(
-                f"transcripts[{expected_index - 1}].cue_count must be a non-negative integer"
+                f"transcripts[{expected_index - 1}].cue_count must be a non-negative integer",
             )
         transcript = _require_string(
-            item, "transcript", f"transcripts[{expected_index - 1}]"
+            item,
+            "transcript",
+            f"transcripts[{expected_index - 1}]",
         )
         if not transcript.strip():
             raise ValueError(f"transcripts[{expected_index - 1}].transcript is empty")
@@ -147,7 +152,7 @@ def validate_source(
                 "caption_track": caption_track,
                 "cue_count": cue_count,
                 "transcript": transcript,
-            }
+            },
         )
     return source, records
 
@@ -186,13 +191,14 @@ def chunk_words(text: str) -> list[str]:
 
 
 def transform(
-    source_path: Path, outdir: Path
+    source_path: Path,
+    outdir: Path,
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
     raw_bytes = source_path.read_bytes()
     source_sha256 = _sha256_bytes(raw_bytes)
     if source_sha256 != EXPECTED_SOURCE_SHA256:
         raise ValueError(
-            f"source SHA-256 mismatch: expected {EXPECTED_SOURCE_SHA256}, got {source_sha256}"
+            f"source SHA-256 mismatch: expected {EXPECTED_SOURCE_SHA256}, got {source_sha256}",
         )
     try:
         payload = json.loads(raw_bytes.decode("utf-8"))
@@ -227,7 +233,7 @@ def transform(
                     "h": [f"Video {video_index + 1:03d}"],
                     "k": "transcript",
                     "t": text,
-                }
+                },
             )
         videos.append(
             {
@@ -243,10 +249,10 @@ def transform(
                 "normalized_transcript_sha256": normalized_transcript_sha256,
                 "normalized_char_count": len(normalized),
                 "reconstructed_char_count": len(reconstructed),
-            }
+            },
         )
 
-    lengths = [len(cast(str, row["t"])) for row in rows]
+    lengths = [len(cast("str", row["t"])) for row in rows]
     manifest: dict[str, object] = {
         "title": "Dark Souls Remastered Dadbod walkthrough transcripts",
         "format": "dsr-dadbod-transcript-chunks-v1",
@@ -317,7 +323,7 @@ def transform(
         },
         "extraction": {
             "total_normalized_chars": sum(
-                cast(int, video["normalized_char_count"]) for video in videos
+                cast("int", video["normalized_char_count"]) for video in videos
             ),
             "min_chunk_chars": min(lengths),
             "max_chunk_chars": max(lengths),
@@ -329,7 +335,9 @@ def transform(
 
 
 def write_outputs(
-    outdir: Path, manifest: dict[str, object], rows: list[dict[str, object]]
+    outdir: Path,
+    manifest: dict[str, object],
+    rows: list[dict[str, object]],
 ) -> None:
     outdir.mkdir(parents=True, exist_ok=True)
     chunks_path = outdir / "dsr-dadbod-transcripts.chunks.jsonl"
@@ -348,7 +356,7 @@ def write_outputs(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Generate the local DSR Dadbod transcript corpus from user-provided JSON."
+        description="Generate the local DSR Dadbod transcript corpus from user-provided JSON.",
     )
     parser.add_argument("source", nargs="?", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("outdir", nargs="?", type=Path, default=DEFAULT_OUTDIR)
@@ -361,7 +369,7 @@ def main(argv: list[str] | None = None) -> int:
         write_outputs(args.outdir.expanduser().resolve(), manifest, rows)
     except (OSError, ValueError) as exc:
         parser.error(str(exc))
-    extraction = cast(dict[str, object], manifest["extraction"])
+    extraction = cast("dict[str, object]", manifest["extraction"])
     print(
         json.dumps(
             {
@@ -372,7 +380,7 @@ def main(argv: list[str] | None = None) -> int:
                 "max_chunk_chars": extraction["max_chunk_chars"],
             },
             ensure_ascii=False,
-        )
+        ),
     )
     return 0
 

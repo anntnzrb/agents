@@ -1,5 +1,7 @@
 # Workflows
 
+Read this when selecting an end-to-end blueprint, artifact, inspection, or app-integration route.
+
 ## Workflow A: New Shortcut (User-Level)
 
 1. Capture intent:

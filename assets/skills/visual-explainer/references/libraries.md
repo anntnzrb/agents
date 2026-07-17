@@ -1,5 +1,12 @@
 # External Libraries (CDN)
 
+## Section index
+
+- [Mermaid.js](#mermaidjs--diagramming-engine)
+- [Chart.js](#chartjs--data-visualizations)
+- [anime.js](#animejs--orchestrated-animations)
+- [Google Fonts](#google-fonts--typography)
+
 Optional CDN libraries for cases where pure CSS/HTML isn't enough. Only include what the diagram actually needs — most diagrams need zero external JS.
 
 ## Mermaid.js — Diagramming Engine

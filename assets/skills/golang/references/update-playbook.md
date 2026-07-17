@@ -38,7 +38,7 @@ Read: `references/sources.md` — update the "Go Releases & Language" section.
 - Follow the pattern in `cookbook/modern-1.24-1.26.md`: feature table, code examples with Problems/Solutions/Tips.
 - Update `cookbook/modern.md` (the index) with the new version row.
 
-### 4. Update `reference.md`
+### 4. Update `references/guide.md`
 
 - Update the "Stable Modern Go Feature Table".
 - Update CLI quick reference for any new commands or flag changes.
@@ -92,7 +92,7 @@ When investigating what changed:
 When updating, follow this order (earlier files feed later ones):
 
 1. `references/sources.md` — source ledger
-2. `reference.md` — feature table, CLI ref, layout, tooling, routing
+2. `references/guide.md` — feature table, CLI ref, layout, tooling, routing
 3. `cookbook/modern.md` + version files — language/runtime features
 4. Topic cookbooks — domain-specific recipes
 5. `SKILL.md` — routing table and triggers (last, since it references everything else)

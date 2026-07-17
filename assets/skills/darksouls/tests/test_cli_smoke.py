@@ -7,8 +7,9 @@ import subprocess
 import tempfile
 import unittest
 import zlib
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, TypedDict, cast
+from typing import TypedDict, cast
 
 
 class CalcPayload(TypedDict):
@@ -44,7 +45,8 @@ SKILL_DIR = Path(__file__).resolve().parents[1]
 
 
 def run_cli(
-    *arguments: str, env: dict[str, str] | None = None
+    *arguments: str,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     process_env = os.environ.copy()
     if env:
@@ -161,7 +163,7 @@ class CliSmokeTests(unittest.TestCase):
 
         calculated = run_cli("calc", "Claymore", "40", "40", "--json")
         self.assertEqual(calculated.returncode, 0, calculated.stderr)
-        payload = cast(CalcPayload, json.loads(calculated.stdout))
+        payload = cast("CalcPayload", json.loads(calculated.stdout))
         self.assertEqual(payload["name"], "Claymore")
         self.assertTrue(payload["approximate"])
         self.assertTrue(payload["requirements_met"])
@@ -170,10 +172,17 @@ class CliSmokeTests(unittest.TestCase):
 
     def test_compare_json_contains_both_requested_weapons(self) -> None:
         compared = run_cli(
-            "compare", "Longsword", "Claymore", "--str", "40", "--dex", "40", "--json"
+            "compare",
+            "Longsword",
+            "Claymore",
+            "--str",
+            "40",
+            "--dex",
+            "40",
+            "--json",
         )
         self.assertEqual(compared.returncode, 0, compared.stderr)
-        rows = cast(list[CompareRow], json.loads(compared.stdout))
+        rows = cast("list[CompareRow]", json.loads(compared.stdout))
         self.assertEqual({row["name"] for row in rows}, {"Longsword", "Claymore"})
         self.assertTrue(all(row["approximate"] for row in rows))
 
@@ -204,7 +213,7 @@ class CliSmokeTests(unittest.TestCase):
     def test_guide_get_hides_transformed_text_by_default(self) -> None:
         redacted = run_cli("guide", "get", "1", "--json")
         self.assertEqual(redacted.returncode, 0, redacted.stderr)
-        hidden = cast(HiddenGuidePayload, json.loads(redacted.stdout))
+        hidden = cast("HiddenGuidePayload", json.loads(redacted.stdout))
         self.assertEqual(hidden["row"], 1)
         self.assertEqual(hidden["spoilers"], "hidden")
         self.assertNotIn("h", hidden)
@@ -219,7 +228,8 @@ class CliSmokeTests(unittest.TestCase):
         revealed = run_cli("guide", "get", "1", "--json", "--spoilers")
         self.assertEqual(revealed.returncode, 0, revealed.stderr)
         row = cast(
-            RevealedGuidePayloadWithOptionalSpoilers, json.loads(revealed.stdout)
+            "RevealedGuidePayloadWithOptionalSpoilers",
+            json.loads(revealed.stdout),
         )
         self.assertEqual(row["row"], 1)
         self.assertIsInstance(row["h"], list)
@@ -231,7 +241,7 @@ class CliSmokeTests(unittest.TestCase):
     ) -> None:
         hidden_json_result = run_cli("transcript", "info", "--json")
         self.assertEqual(hidden_json_result.returncode, 0, hidden_json_result.stderr)
-        hidden_json = cast(dict[str, object], json.loads(hidden_json_result.stdout))
+        hidden_json = cast("dict[str, object]", json.loads(hidden_json_result.stdout))
         self.assertEqual(hidden_json["video_count"], 30)
         self.assertEqual(hidden_json["chunk_count"], 672)
         self.assertNotIn("videos", hidden_json)
@@ -244,7 +254,8 @@ class CliSmokeTests(unittest.TestCase):
         self.assertEqual(hidden_human_result.returncode, 0, hidden_human_result.stderr)
 
         self.assertIn(
-            "Local automatic-caption transcript lookup", hidden_human_result.stdout
+            "Local automatic-caption transcript lookup",
+            hidden_human_result.stdout,
         )
         self.assertIn('"spoilers": "hidden"', hidden_human_result.stdout)
         self.assertNotIn("LVTwgOlWWAM", hidden_human_result.stdout)
@@ -253,15 +264,15 @@ class CliSmokeTests(unittest.TestCase):
     def test_transcript_spoilers_reveal_metadata_and_chunk_text(self) -> None:
         info = run_cli("transcript", "info", "--json", "--spoilers")
         self.assertEqual(info.returncode, 0, info.stderr)
-        payload = cast(dict[str, object], json.loads(info.stdout))
-        videos = cast(list[dict[str, object]], payload["videos"])
+        payload = cast("dict[str, object]", json.loads(info.stdout))
+        videos = cast("list[dict[str, object]]", payload["videos"])
         self.assertEqual(len(videos), 30)
         self.assertEqual(videos[0]["caption_track"], "en-orig")
         self.assertTrue(str(videos[0]["video_id"]))
 
         revealed = run_cli("transcript", "get", "0", "0", "--json", "--spoilers")
         self.assertEqual(revealed.returncode, 0, revealed.stderr)
-        row = cast(dict[str, object], json.loads(revealed.stdout))
+        row = cast("dict[str, object]", json.loads(revealed.stdout))
         self.assertEqual(row["video_index"], 0)
         self.assertEqual(row["chunk_index"], 0)
         self.assertTrue(str(row["t"]).strip())
@@ -270,22 +281,26 @@ class CliSmokeTests(unittest.TestCase):
     def test_transcript_search_query_and_spoiler_gates(self) -> None:
         no_query = run_cli("transcript", "search", "--json")
         self.assertEqual(no_query.returncode, 0, no_query.stderr)
-        no_query_payload = cast(dict[str, object], json.loads(no_query.stdout))
+        no_query_payload = cast("dict[str, object]", json.loads(no_query.stdout))
         self.assertEqual(no_query_payload["video_count"], 30)
         self.assertNotIn("videos", no_query_payload)
 
         hidden = run_cli("transcript", "search", "walkthrough", "--json")
         self.assertEqual(hidden.returncode, 0, hidden.stderr)
-        hidden_rows = cast(list[dict[str, object]], json.loads(hidden.stdout))
+        hidden_rows = cast("list[dict[str, object]]", json.loads(hidden.stdout))
         self.assertTrue(hidden_rows)
         self.assertNotIn("t", hidden_rows[0])
         self.assertEqual(hidden_rows[0]["spoilers"], "hidden")
 
         revealed = run_cli(
-            "transcript", "search", "walkthrough", "--json", "--spoilers"
+            "transcript",
+            "search",
+            "walkthrough",
+            "--json",
+            "--spoilers",
         )
         self.assertEqual(revealed.returncode, 0, revealed.stderr)
-        revealed_rows = cast(list[dict[str, object]], json.loads(revealed.stdout))
+        revealed_rows = cast("list[dict[str, object]]", json.loads(revealed.stdout))
         self.assertTrue(revealed_rows)
         self.assertTrue(str(revealed_rows[0]["t"]).strip())
 
@@ -296,7 +311,7 @@ class CliSmokeTests(unittest.TestCase):
 
         hidden = run_cli("transcript", "get", "0", "0", "--json")
         self.assertEqual(hidden.returncode, 0, hidden.stderr)
-        payload = cast(dict[str, object], json.loads(hidden.stdout))
+        payload = cast("dict[str, object]", json.loads(hidden.stdout))
         self.assertNotIn("t", payload)
         self.assertIn("warning", payload)
         self.assertIn("automatic-caption", str(payload["warning"]))

@@ -2,6 +2,15 @@
 
 Transform code at compile time with macros, create DSLs, and master Clojure's metaprogramming capabilities.
 
+Read this only when functions cannot express the required compile-time transformation.
+
+## Section index
+
+- Macro-versus-function choice and syntax quoting
+- Hygiene, double evaluation, expansion, and debugging
+- Control flow, resource management, assertions, and source metadata
+- DSLs, test-framework macros, and macro tests
+
 ---
 
 ## Choosing Between Macros and Functions

@@ -57,7 +57,7 @@ Results:
 Command:
 
 ```bash
-uv run --script assets/skills/vox-interpres/scripts/cli.py ask ~/repos/.tmp/rest-in-peace-1996.flac "tempo and key?" --refresh
+uv run --script assets/skills/vox-interpres/scripts/cli.py ask <audio-file> "tempo and key?" --refresh
 ```
 
 Observed:
@@ -69,7 +69,7 @@ Observed:
 Command:
 
 ```bash
-uv run --script assets/skills/vox-interpres/scripts/cli.py analyze ~/repos/.tmp/rest-in-peace-1996.flac --segment-start 60 --segment-duration 30 --json
+uv run --script assets/skills/vox-interpres/scripts/cli.py analyze <audio-file> --segment-start 60 --segment-duration 30 --json
 ```
 
 Observed:
@@ -81,7 +81,7 @@ Observed:
 Command:
 
 ```bash
-uv run --script assets/skills/vox-interpres/scripts/cli.py ask ~/repos/.tmp/rest-in-peace-1996.flac "show metadata codec bitrate sample rate channels" --refresh
+uv run --script assets/skills/vox-interpres/scripts/cli.py ask <audio-file> "show metadata codec bitrate sample rate channels" --refresh
 ```
 
 Observed:

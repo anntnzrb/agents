@@ -2,6 +2,15 @@
 
 Data validation, generative testing, and runtime checking for Clojure.
 
+Read this when defining specs, conforming data, generating examples, or instrumenting functions.
+
+## Section index
+
+- Predicates, sets, nils, maps, collections, and regex specs
+- Alternatives and function contracts
+- Runtime checking and sample generation
+- Custom generators, polymorphic data, conforming, and organization
+
 ---
 
 ## Setup clojure.spec

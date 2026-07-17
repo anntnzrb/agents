@@ -2,6 +2,8 @@
 
 All command outputs are JSON.
 
+Read this before consuming CLI/RPC envelopes, snapshot fields, coding evidence, or reasoning metrics.
+
 ## CLI envelope
 
 ```json

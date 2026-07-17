@@ -2,6 +2,8 @@
 
 Compact element references that reduce context usage dramatically for AI agents.
 
+Read this when refs may become stale or snapshots need scoping/debugging.
+
 **Related**: [commands.md](commands.md) for full command reference, [SKILL.md](../SKILL.md) for quick start.
 
 ## Contents

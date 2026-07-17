@@ -5,7 +5,7 @@ This skill includes a deliberately narrow, modified subset of
 commit `2de03bffe4ce8802e06d184931d9e4ec366a2ef2` (2026-06-15):
 
 - `scripts/validate_shortcut.py`
-- `scripts/sign_shortcut.sh`
+- `scripts/sign_shortcut.py`
 - `scripts/select_shortcut_icon_color.py`
 - required JSON catalogs in `data/`
 

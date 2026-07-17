@@ -2,6 +2,8 @@
 
 Proxy configuration for geo-testing, rate limiting avoidance, and corporate environments.
 
+Read this before configuring proxy URLs, authentication, sessions, or rotation.
+
 **Related**: [commands.md](commands.md) for global options, [SKILL.md](../SKILL.md) for quick start.
 
 ## Contents
@@ -78,7 +80,6 @@ agent-browser open https://external.com          # Via proxy
 ### Geo-Location Testing
 
 ```bash
-#!/bin/bash
 # Test site from different regions using geo-located proxies
 
 PROXIES=(
@@ -103,7 +104,6 @@ done
 ### Rotating Proxies for Scraping
 
 ```bash
-#!/bin/bash
 # Rotate through proxy list to avoid rate limiting
 
 PROXY_LIST=(
@@ -134,7 +134,6 @@ done
 ### Corporate Network Access
 
 ```bash
-#!/bin/bash
 # Access internal sites via corporate proxy
 
 export HTTP_PROXY="http://corpproxy.company.com:8080"

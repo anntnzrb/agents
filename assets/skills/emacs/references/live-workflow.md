@@ -24,9 +24,10 @@ Use this order unless there is a strong reason not to:
    - `uv run --script <skill-dir>/scripts/cli.py feature server`
    - `uv run --script <skill-dir>/scripts/cli.py eval ...`
 2. Official manuals
-   - `info '(emacs)...'`
-   - `info '(elisp)...'`
-   - `info '(use-package)...'`
+   - `info '(emacs)Init File'`
+   - `info '(elisp)Faces'`
+   - `info '(elisp)Named Features'`
+   - `info '(use-package)Top'`
 3. Local installed docs/source
    - use runtime state to locate the active Emacs install
    - search local manuals and Lisp source with `rg`

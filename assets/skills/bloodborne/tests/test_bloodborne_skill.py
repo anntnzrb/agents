@@ -17,6 +17,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 import io
 from contextlib import redirect_stdout
 from types import SimpleNamespace
+
 import bb_save  # noqa: E402
 import cli  # noqa: E402
 
@@ -58,7 +59,12 @@ class CliCommandTests(unittest.TestCase):
 
     def test_sources_status_uses_cache_dir_without_network(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            out = self.run_cli("sources", "status", "bb-wiki-scaling", env={"BLOODBORNE_CACHE_DIR": tmp})
+            out = self.run_cli(
+                "sources",
+                "status",
+                "bb-wiki-scaling",
+                env={"BLOODBORNE_CACHE_DIR": tmp},
+            )
         self.assertIn("bb-wiki-scaling: missing", out)
 
     def test_sources_list_includes_save_editor_attribution(self) -> None:
@@ -102,7 +108,6 @@ class PureMechanicsTests(unittest.TestCase):
                 self.assertIn("risk", source)
 
 
-
 class DirectCliFunctionTests(unittest.TestCase):
     def capture(self, func, **kwargs: object) -> str:
         buf = io.StringIO()
@@ -113,11 +118,29 @@ class DirectCliFunctionTests(unittest.TestCase):
     def test_core_command_functions_emit_expected_content(self) -> None:
         self.assertIn("Sources registered", self.capture(cli.cmd_fresh))
         self.assertIn("VIT:", self.capture(cli.cmd_softcaps))
-        self.assertIn("Military Veteran", self.capture(cli.cmd_origins, filter="quality"))
+        self.assertIn(
+            "Military Veteran",
+            self.capture(cli.cmd_origins, filter="quality"),
+        )
         self.assertIn("Totals:", self.capture(cli.cmd_upgrade, level=10))
-        self.assertIn("Ludwig's Holy Blade", self.capture(cli.cmd_weapons, name=["Ludwig"]))
-        self.assertIn("372", self.capture(cli.cmd_calc, weapon="Ludwig's Holy Blade", str=26, skl=26, blt=7, arc=8))
-        self.assertTrue(self.capture(cli.cmd_echo_cost, current=64, target=69).strip().isdigit())
+        self.assertIn(
+            "Ludwig's Holy Blade",
+            self.capture(cli.cmd_weapons, name=["Ludwig"]),
+        )
+        self.assertIn(
+            "372",
+            self.capture(
+                cli.cmd_calc,
+                weapon="Ludwig's Holy Blade",
+                str=26,
+                skl=26,
+                blt=7,
+                arc=8,
+            ),
+        )
+        self.assertTrue(
+            self.capture(cli.cmd_echo_cost, current=64, target=69).strip().isdigit(),
+        )
         self.assertIn("Current 43: high", self.capture(cli.cmd_insight, current=43))
         self.assertIn("Moon:", self.capture(cli.cmd_runes))
         self.assertIn("Tempering", self.capture(cli.cmd_gems))
@@ -128,16 +151,28 @@ class DirectCliFunctionTests(unittest.TestCase):
             old = cli.CACHE_DIR
             cli.CACHE_DIR = Path(tmp)
             try:
-                self.assertEqual(cli.source_keys(["noxde-save-editor"]), ["noxde-save-editor"])
+                self.assertEqual(
+                    cli.source_keys(["noxde-save-editor"]),
+                    ["noxde-save-editor"],
+                )
                 with self.assertRaises(SystemExit):
                     cli.source_keys(["missing-source"])
-                out = self.capture(cli.cmd_sources, action="status", keys=["noxde-save-editor"], force=False)
+                out = self.capture(
+                    cli.cmd_sources,
+                    action="status",
+                    keys=["noxde-save-editor"],
+                    force=False,
+                )
                 self.assertIn("noxde-save-editor: missing", out)
-                listed = self.capture(cli.cmd_sources, action="list", keys=["noxde-save-editor"], force=False)
+                listed = self.capture(
+                    cli.cmd_sources,
+                    action="list",
+                    keys=["noxde-save-editor"],
+                    force=False,
+                )
                 self.assertIn("GPL-3.0", listed)
             finally:
                 cli.CACHE_DIR = old
-
 
     def test_tracking_and_recommendation_paths(self) -> None:
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as fh:
@@ -151,7 +186,7 @@ class DirectCliFunctionTests(unittest.TestCase):
                 "| SKL | 18 |\n"
                 "| BLT | 7 |\n"
                 "| ARC | 8 |\n"
-                "Ludwig's Holy Blade +6\n"
+                "Ludwig's Holy Blade +6\n",
             )
             path = Path(fh.name)
         try:
@@ -171,7 +206,7 @@ class DirectCliFunctionTests(unittest.TestCase):
         class FakeResponse:
             headers = HeaderDict({"content-type": "text/html"})
 
-            def __enter__(self) -> "FakeResponse":
+            def __enter__(self) -> FakeResponse:
                 return self
 
             def __exit__(self, *_args: object) -> None:
@@ -196,8 +231,13 @@ class DirectCliFunctionTests(unittest.TestCase):
                 meta = cli.fetch_source("bb-wiki-scaling", force=True)
                 self.assertEqual(meta["status"], "refreshed")
                 self.assertTrue(html_path.exists())
-                self.assertEqual(cli.fetch_source("bb-wiki-scaling")["status"], "fresh-cache")
-                self.assertIsNotNone(cli.cache_age_hours(cli.cache_meta("bb-wiki-scaling")))
+                self.assertEqual(
+                    cli.fetch_source("bb-wiki-scaling")["status"],
+                    "fresh-cache",
+                )
+                self.assertIsNotNone(
+                    cli.cache_age_hours(cli.cache_meta("bb-wiki-scaling")),
+                )
             finally:
                 cli.CACHE_DIR = old_cache
                 cli.urllib.request.urlopen = old_urlopen  # type: ignore[assignment]
@@ -208,11 +248,13 @@ class DirectCliFunctionTests(unittest.TestCase):
         self.assertIn("Milquetoast", self.capture(cli.cmd_origins, filter=None))
         self.assertIn("Saw Cleaver", self.capture(cli.cmd_weapons, name=[]))
         self.assertIn("normal/low", self.capture(cli.cmd_insight, current=5))
-        self.assertIn("above difficulty threshold", self.capture(cli.cmd_insight, current=20))
+        self.assertIn(
+            "above difficulty threshold",
+            self.capture(cli.cmd_insight, current=20),
+        )
         parser = cli.build_parser()
         args = parser.parse_args(["softcaps"])
         self.assertIs(args.func, cli.cmd_softcaps)
-
 
     def test_invalid_save_fails_cleanly(self) -> None:
         with tempfile.NamedTemporaryFile() as fh:
@@ -248,11 +290,21 @@ class DocumentationAndResourceTests(unittest.TestCase):
 
     def test_vendored_resources_exist_and_are_valid_json(self) -> None:
         resource_dir = SCRIPTS_DIR / "resources" / "bloodborne_save"
-        for name in ("offsets.json", "bosses.json", "items.json", "weapons.json", "armors.json", "upgrades.json"):
+        for name in (
+            "offsets.json",
+            "bosses.json",
+            "items.json",
+            "weapons.json",
+            "armors.json",
+            "upgrades.json",
+        ):
             with self.subTest(name=name):
                 payload = json.loads((resource_dir / name).read_text(encoding="utf-8"))
                 self.assertTrue(payload)
-        self.assertIn("GPL-3.0", (resource_dir / "SOURCES.md").read_text(encoding="utf-8"))
+        self.assertIn(
+            "GPL-3.0",
+            (resource_dir / "SOURCES.md").read_text(encoding="utf-8"),
+        )
 
 
 if __name__ == "__main__":

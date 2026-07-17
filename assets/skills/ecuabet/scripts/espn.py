@@ -97,7 +97,7 @@ def resolve_event_by_query(
                 "state": status,
                 "matchScore": score,
                 "priority": priority,
-            }
+            },
         )
 
     if not candidates:
@@ -109,7 +109,9 @@ def resolve_event_by_query(
 
 
 def safe_get_json(
-    client: httpx.Client, url: str, params: dict[str, Any] | None = None
+    client: httpx.Client,
+    url: str,
+    params: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     try:
         response = client.get(url, params=params)
@@ -166,7 +168,7 @@ def collect_key_events(
                 "team": (event.get("team") or {}).get("displayName"),
                 "scoringPlay": event.get("scoringPlay"),
                 "wallclock": event.get("wallclock"),
-            }
+            },
         )
 
     summary_counts = {
@@ -209,7 +211,7 @@ def collect_competitors(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 "score": c.get("score"),
                 "winner": c.get("winner"),
                 "record": c.get("records"),
-            }
+            },
         )
     return out
 
@@ -315,13 +317,16 @@ def write_snapshot(
         target = output
         target.parent.mkdir(parents=True, exist_ok=True)
 
-    target.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n")
+    target.write_text(
+        json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     return target
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Fetch ESPN soccer event summary by id/url/query."
+        description="Fetch ESPN soccer event summary by id/url/query.",
     )
     parser.add_argument(
         "match",

@@ -9,125 +9,115 @@ allowed-tools: ""
 
 # GitHub Discussions Answerer
 
-All work delegated to `general` subagents.
+Find code-verifiable answers. Keep discovery and analysis read-only.
 
 ## Constraints
 
-- **Target: 10 answers** → find 1.5x candidates
-- **Post ALL verified** (may be lower or higher, that's fine)
-- **100% code-verified** via `gh` CLI
-- **Discard only uncertain** → post everything that passes
-- **Auto-post** immediately after analysis
-- **Read-only until Phase 3** → Phases 1-2 use only GET/query operations; no mutations
+- Target 10 posted answers; discover roughly 15 candidates.
+- Answers MUST be verified against repository code or docs.
+- Discard uncertain candidates. Keep every verified candidate.
+- External posting requires explicit user authorization.
+- NEVER post during discovery or analysis.
+- Use the runtime's actual agent tools; NEVER invent wrappers.
 
-## Workflow
+## Phase 1: Discover
 
-### Phase 1: Discovery
+Calculate date boundaries from today. Query GitHub Discussions read-only:
 
-Search for unanswered discussions via GitHub API:
-
-```
-task(subagent_type="general", description="Search unanswered discussions", prompt="
-Run these searches to find unanswered discussions. Calculate dates from today.
-
-SEARCH 1 - Last 30 days, Q&A with no replies:
+```text
 gh api graphql -f query='{
-  search(query: \"is:open comments:0 created:>YYYY-MM-DD category:Q&A NOT author:bot\", type: DISCUSSION, first: 100) {
+  search(query: "is:open comments:0 created:>YYYY-MM-DD category:Q&A NOT author:bot", type: DISCUSSION, first: 100) {
     nodes { ... on Discussion { title number url bodyText repository { nameWithOwner } category { name } } }
   }
 }'
+```
 
-SEARCH 2 - Popular repos (stars>100), any unanswered:
+Run complementary searches for:
+
+- repositories with `stars:>100`
+- Help or Support categories from the last 14 days
+- General discussions that ask actionable questions
+
+Merge and deduplicate by `owner/repo#number`.
+
+Prioritize Q&A, Questions, Help, Support, Troubleshooting, Technical, Development, and Usage.
+
+Skip:
+
+- feature requests, RFCs, proposals, or announcements
+- roadmap, ETA, or maintainer-priority questions
+- bot-created discussions
+- bodies shorter than 20 characters
+- discussions with existing comments
+- questions lacking a code-verifiable answer
+
+Return roughly 15 candidates as `[owner/repo#number] title - category`.
+
+## Phase 2: Analyze
+
+Fan out independent candidates through available read-only agents. Each assignment MUST include the
+repository, discussion number, title, constraints, and acceptance criteria.
+
+Read-only commands:
+
+```text
+gh api repos/<owner>/<repo>/discussions/<number>
+gh search code '<keyword>' --repo <owner>/<repo>
+gh api repos/<owner>/<repo>/contents/<path> --jq '.content' | base64 -d
+```
+
+A verified answer MUST provide at least one:
+
+- exact configuration or command
+- code fix with file and line evidence
+- actionable workaround
+- mechanism-backed explanation
+- repository documentation link
+
+Discard answers that merely restate limitations or uncertainty.
+
+Return `VERIFIED: <answer>` or `DISCARD: <reason>`.
+
+## Phase 3: Authorize and post
+
+Present the verified answers before mutation. If the user has not explicitly authorized posting,
+request one confirmation for the complete batch.
+
+Post only authorized answers:
+
+```text
 gh api graphql -f query='{
-  search(query: \"is:open comments:0 stars:>100 NOT author:bot NOT title:RFC\", type: DISCUSSION, first: 100) {
-    nodes { ... on Discussion { title number url bodyText repository { nameWithOwner } category { name } } }
+  repository(owner:"<owner>", name:"<repo>") {
+    discussion(number:<number>) { id }
   }
 }'
 
-SEARCH 3 - Last 14 days, Help/Support categories:
-gh api graphql -f query='{
-  search(query: \"is:open comments:0 created:>YYYY-MM-DD NOT author:bot NOT title:proposal\", type: DISCUSSION, first: 100) {
-    nodes { ... on Discussion { title number url bodyText repository { nameWithOwner } category { name } } }
+gh api graphql \
+  -f query='mutation AddDiscussionComment($discussionId: ID!, $body: String!) {
+  addDiscussionComment(input: {discussionId: $discussionId, body: $body}) {
+    comment { url }
   }
-}'
-
-Merge results, deduplicate by repo#number.
-
-INCLUDE categories (prioritized):
-1. Q&A, Questions, Help, Support, Troubleshooting (highest priority)
-2. General (if contains a question mark or asks 'how to')
-3. Technical, Development, Usage (if asking for help)
-
-HARD SKIP (not answerable with code research):
-- Feature requests ('add X', 'would be nice if', 'please implement')
-- Timeline/roadmap questions ('when will X', 'release plan', 'ETA')
-- Questions only maintainers can answer (prioritization, future plans)
-- Bot-created discussions (mvnpm, dependabot, renovate, github-actions)
-- RFCs/proposals/announcements/newsletters
-- Release notes or changelogs
-- Discussions with only emoji or very short body (<20 chars)
-- Already answered discussions (comments > 0)
-
-Return exactly 15 candidates: [repo#number] title - category
-")
+}' \
+  -F discussionId='<discussion-id>' \
+  -F 'body=@<answer-file>'
 ```
 
-### Phase 2: Parallel Analysis
+Write the exact authorized answer to `<answer-file>`. Pass it as the typed `$body` variable; NEVER
+interpolate answer text into the GraphQL document or a shell command.
 
-Launch analyses for ALL candidates in parallel (one subagent per candidate):
+After an uncertain timeout, re-read the discussion before retrying. This prevents duplicate comments.
 
-```
-task(subagent_type="general", description="Analyze discussion", prompt="
-Analyze [repo]#[number]: [title]
+Unsubscribe only when explicitly requested:
 
-READ-ONLY: Only use GET/query operations. Do NOT post, create, or mutate anything.
-
-1. Read discussion: gh api repos/OWNER/REPO/discussions/NUMBER
-2. Search code: gh search code 'keyword' repo:OWNER/REPO
-3. Read files: gh api repos/OWNER/REPO/contents/PATH --jq '.content' | base64 -d
-4. Check README/docs for relevant info
-
-VERIFIED answers must provide ACTIONABLE value:
-- Code fixes with file:line references
-- Configuration solutions with exact syntax
-- Workarounds when expected feature is missing
-- Technical explanation of WHY something doesn't work
-- Links to relevant documentation in the repo
-
-DISCARD if answer would just restate the question:
-- 'Feature X doesn't exist' (user knows, that's why they asked)
-- 'No timeline available' (useless)
-- 'This is a known limitation' (without workaround)
-
-Return VERIFIED: [1-2 sentence answer with actionable fix] OR DISCARD: [reason]
-")
+```text
+gh api -X DELETE /notifications/threads/<thread-id>/subscription
 ```
 
-### Phase 3: Post All Verified
+Re-read each posted comment. Return posted URLs and every failed or skipped mutation.
 
-Post ALL verified answers in parallel (one subagent per answer):
+## Answer format
 
-```
-task(subagent_type="general", description="Post discussion answer", prompt="
-Post answer for [repo]#[number]:
-
-1. Get discussion ID:
-   gh api graphql -f query='{ repository(owner:\"X\", name:\"Y\") { discussion(number:N) { id } } }'
-
-2. Post the answer:
-   gh api graphql -f query='mutation { addDiscussionComment(input: { discussionId: \"ID\", body: \"ANSWER\" }) { comment { url } } }'
-
-3. Unsubscribe from notifications
-   THREAD_ID=$(gh api /notifications --jq '.[] | select(.subject.url | contains(\"OWNER/REPO/discussions/NUMBER\")) | .id')
-   gh api -X DELETE /notifications/threads/$THREAD_ID/subscription
-
-Return posted URL.
-")
-```
-
-## Answer Format
-
-- 1-2 sentences max
-- File:line if relevant
-- No fluff, no AI-speak
-- Must give user something they can DO, not just confirm what they know
+- One or two sentences.
+- Include file and line evidence when relevant.
+- Give a concrete action.
+- Remove fluff and AI-speak.

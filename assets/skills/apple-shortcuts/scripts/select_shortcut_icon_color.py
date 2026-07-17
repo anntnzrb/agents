@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
 # dependencies = []
@@ -8,6 +7,7 @@
 Examples:
   uv run --script scripts/select_shortcut_icon_color.py --prompt "Build a weather shortcut"
   uv run --script scripts/select_shortcut_icon_color.py --prompt "Expense tracker" --icon "calculator" --color gold
+
 """
 
 from __future__ import annotations
@@ -60,28 +60,62 @@ STOP_WORDS = {
 ICON_QUERY_PATTERNS = [
     re.compile(
         r"\b(?:use|set|choose|pick|with|make)\s+(?:a|an|the)?\s*([a-z0-9][a-z0-9 '&+./_-]{1,60}?)\s+(?:icon|glyph|symbol)\b",
-        re.I,
+        re.IGNORECASE,
     ),
     re.compile(
         r"\b(?:icon|glyph|symbol)\s*(?:to|as|is|named|name)?\s*([a-z0-9][a-z0-9 '&+./_-]{1,60})\b",
-        re.I,
+        re.IGNORECASE,
     ),
-    re.compile(r"\b(?:sf\s*symbol|sfsymbol|sf-symbol)\s*(?:to|as|is|named)?\s*([a-z0-9._+-]{1,60})\b", re.I),
+    re.compile(
+        r"\b(?:sf\s*symbol|sfsymbol|sf-symbol)\s*(?:to|as|is|named)?\s*([a-z0-9._+-]{1,60})\b",
+        re.IGNORECASE,
+    ),
 ]
 
 GLYPH_NUMBER_PATTERNS = [
-    re.compile(r"\b(?:glyph|icon|symbol)\s*(?:number|id|code)?\s*#?\s*(\d{5})\b", re.I),
+    re.compile(
+        r"\b(?:glyph|icon|symbol)\s*(?:number|id|code)?\s*#?\s*(\d{5})\b",
+        re.IGNORECASE,
+    ),
     re.compile(r"\b#(\d{5})\b"),
 ]
 
 HEX_COLOR_RE = re.compile(r"#([0-9a-fA-F]{6})\b")
 
 COLOR_HINTS = {
-    "Red": {"alert", "urgent", "danger", "critical", "alarm", "warning", "error", "security"},
+    "Red": {
+        "alert",
+        "urgent",
+        "danger",
+        "critical",
+        "alarm",
+        "warning",
+        "error",
+        "security",
+    },
     "Orange": {"warning", "caution", "attention"},
     "Yellow": {"sun", "bright", "sunny", "daylight"},
-    "Gold": {"money", "finance", "budget", "expense", "invoice", "payment", "bank", "billing", "crypto"},
-    "Green": {"health", "fitness", "run", "workout", "exercise", "wellness", "eco", "habit"},
+    "Gold": {
+        "money",
+        "finance",
+        "budget",
+        "expense",
+        "invoice",
+        "payment",
+        "bank",
+        "billing",
+        "crypto",
+    },
+    "Green": {
+        "health",
+        "fitness",
+        "run",
+        "workout",
+        "exercise",
+        "wellness",
+        "eco",
+        "habit",
+    },
     "Teal": {"automation", "shortcut", "workflow", "routine"},
     "Cyan": {"weather", "cloud", "sky", "water"},
     "Blue": {"travel", "map", "navigation", "flight", "internet", "network", "weather"},
@@ -89,7 +123,15 @@ COLOR_HINTS = {
     "Purple": {"ai", "assistant", "creative", "music", "podcast", "magic", "design"},
     "Lavender": {"journal", "mindfulness", "dream", "calm"},
     "Pink": {"social", "chat", "message", "family", "love", "photo"},
-    "Gray": {"system", "settings", "utility", "tools", "developer", "terminal", "debug"},
+    "Gray": {
+        "system",
+        "settings",
+        "utility",
+        "tools",
+        "developer",
+        "terminal",
+        "debug",
+    },
     "Sage": {"notes", "organize", "documents", "files", "archive"},
     "Tan": {"book", "read", "writing", "manual"},
 }
@@ -97,10 +139,37 @@ COLOR_HINTS = {
 ICON_HINTS: dict[int, set[str]] = {
     59714: {"weather", "forecast", "cloud", "sky"},
     59715: {"rain", "storm", "precipitation", "weather"},
-    59395: {"expense", "expenses", "finance", "budget", "money", "invoice", "billing", "payment"},
+    59395: {
+        "expense",
+        "expenses",
+        "finance",
+        "budget",
+        "money",
+        "invoice",
+        "billing",
+        "payment",
+    },
     59680: {"calculator", "calculate", "sum", "totals", "math"},
-    59412: {"translate", "translation", "language", "languages", "dictionary", "global", "international"},
-    61529: {"terminal", "shell", "bash", "zsh", "cli", "developer", "code", "script", "command"},
+    59412: {
+        "translate",
+        "translation",
+        "language",
+        "languages",
+        "dictionary",
+        "global",
+        "international",
+    },
+    61529: {
+        "terminal",
+        "shell",
+        "bash",
+        "zsh",
+        "cli",
+        "developer",
+        "code",
+        "script",
+        "command",
+    },
     59414: {"message", "messages", "chat", "conversation", "text", "sms"},
     59773: {"mail", "email", "inbox", "envelope"},
     59682: {"camera", "photo", "picture", "snapshot", "image"},
@@ -204,7 +273,9 @@ def _load_json(path: Path) -> Any:
         return json.load(handle)
 
 
-def _load_data(skill_root: Path) -> tuple[dict[str, str], dict[str, dict[str, Any]], list[dict[str, Any]]]:
+def _load_data(
+    skill_root: Path,
+) -> tuple[dict[str, str], dict[str, dict[str, Any]], list[dict[str, Any]]]:
     data_dir = skill_root / "data"
     glyph_map = _load_json(data_dir / "shortcuts-official-glyph-mapping.json")
     glyph_synonyms = _load_json(data_dir / "shortcuts-glyph-synonyms.json")
@@ -212,7 +283,10 @@ def _load_data(skill_root: Path) -> tuple[dict[str, str], dict[str, dict[str, An
     return glyph_map, glyph_synonyms, colors
 
 
-def _build_index(glyph_map: dict[str, str], glyph_synonyms: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+def _build_index(
+    glyph_map: dict[str, str],
+    glyph_synonyms: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
     index: list[dict[str, Any]] = []
 
     for glyph_str, official_name in glyph_map.items():
@@ -247,13 +321,16 @@ def _build_index(glyph_map: dict[str, str], glyph_synonyms: dict[str, dict[str, 
                 "name_tokens": name_tokens,
                 "syn_tokens": syn_tokens,
                 "all_tokens": name_tokens | syn_tokens,
-            }
+            },
         )
 
     return index
 
 
-def _extract_explicit_glyph(prompt: str, glyph_map: dict[str, str]) -> tuple[int | None, str | None]:
+def _extract_explicit_glyph(
+    prompt: str,
+    glyph_map: dict[str, str],
+) -> tuple[int | None, str | None]:
     for pattern in GLYPH_NUMBER_PATTERNS:
         match = pattern.search(prompt)
         if not match:
@@ -337,7 +414,10 @@ def _resolve_icon(
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     explicit_glyph, explicit_glyph_reason = (None, None)
     if icon_override is None:
-        explicit_glyph, explicit_glyph_reason = _extract_explicit_glyph(prompt, glyph_map)
+        explicit_glyph, explicit_glyph_reason = _extract_explicit_glyph(
+            prompt,
+            glyph_map,
+        )
 
     if explicit_glyph is not None:
         name = glyph_map[str(explicit_glyph)]
@@ -348,7 +428,9 @@ def _resolve_icon(
             "reason": explicit_glyph_reason,
             "confidence": 1.0,
         }
-        candidates = [{"glyph_number": explicit_glyph, "symbol_name": name, "score": 999}]
+        candidates = [
+            {"glyph_number": explicit_glyph, "symbol_name": name, "score": 999},
+        ]
         return icon, candidates
 
     explicit_query = _normalize(icon_override or "") if icon_override else None
@@ -374,7 +456,9 @@ def _resolve_icon(
             "reason": "no relevant icon match in prompt",
             "confidence": 0.0,
         }
-        return icon, [{"glyph_number": DEFAULT_GLYPH, "symbol_name": fallback_name, "score": 0}]
+        return icon, [
+            {"glyph_number": DEFAULT_GLYPH, "symbol_name": fallback_name, "score": 0},
+        ]
 
     top_score, best = scored[0]
     second_score = scored[1][0] if len(scored) > 1 else 0
@@ -410,7 +494,7 @@ def _resolve_icon(
                 "glyph_number": entry["glyph"],
                 "symbol_name": entry["name"],
                 "score": score,
-            }
+            },
         )
 
     return icon, candidates
@@ -423,9 +507,18 @@ def _extract_color_query(prompt: str, colors: list[dict[str, Any]]) -> str | Non
     color_names = [c["name"].lower() for c in colors]
     name_pattern = "|".join(re.escape(name) for name in color_names)
     patterns = [
-        re.compile(rf"\b(?:icon|shortcut)\s*(?:color|colour)\s*(?:to|as|is|=)?\s*({name_pattern})\b", re.I),
-        re.compile(rf"\b({name_pattern})\b(?=[^.!?]{{0,24}}\b(?:icon|glyph|symbol|color|colour)\b)", re.I),
-        re.compile(rf"\b(?:color|colour)\s+(?:it\s+)?({name_pattern})\b", re.I),
+        re.compile(
+            rf"\b(?:icon|shortcut)\s*(?:color|colour)\s*(?:to|as|is|=)?\s*({name_pattern})\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            rf"\b({name_pattern})\b(?=[^.!?]{{0,24}}\b(?:icon|glyph|symbol|color|colour)\b)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            rf"\b(?:color|colour)\s+(?:it\s+)?({name_pattern})\b",
+            re.IGNORECASE,
+        ),
     ]
     for pattern in patterns:
         match = pattern.search(prompt)
@@ -435,7 +528,10 @@ def _extract_color_query(prompt: str, colors: list[dict[str, Any]]) -> str | Non
     return None
 
 
-def _resolve_color_by_alias(query: str, colors: list[dict[str, Any]]) -> tuple[dict[str, Any] | None, str | None]:
+def _resolve_color_by_alias(
+    query: str,
+    colors: list[dict[str, Any]],
+) -> tuple[dict[str, Any] | None, str | None]:
     normalized = _normalize(query)
     if not normalized:
         return None, None
@@ -456,7 +552,9 @@ def _resolve_color_by_alias(query: str, colors: list[dict[str, Any]]) -> tuple[d
 
     if numeric is not None:
         for color in colors:
-            if numeric == int(color["value"]) or numeric in [int(v) for v in color.get("aliases", [])]:
+            if numeric == int(color["value"]) or numeric in [
+                int(v) for v in color.get("aliases", [])
+            ]:
                 return color, f"explicit color value {numeric}"
 
     return None, None
@@ -473,7 +571,13 @@ def _resolve_color(
     if explicit_query:
         if explicit_query.startswith("#") and len(explicit_query) == 7:
             target_rgb = _rgb_from_hex(explicit_query)
-            closest = min(colors, key=lambda color: _distance_rgb(target_rgb, _rgb_from_hex(color["hex"])))
+            closest = min(
+                colors,
+                key=lambda color: _distance_rgb(
+                    target_rgb,
+                    _rgb_from_hex(color["hex"]),
+                ),
+            )
             return {
                 "value": int(closest["value"]),
                 "name": closest["name"],
@@ -519,11 +623,17 @@ def _resolve_color(
         # A small bias to keep icon + color visually coherent for known themes.
         if color_name == "Purple" and {"robot", "brain", "sparkles"} & icon_tokens:
             score += 8
-        if color_name == "Gold" and {"dollar", "dollar sign", "credit card"} & icon_tokens:
+        if (
+            color_name == "Gold"
+            and {"dollar", "dollar sign", "credit card"} & icon_tokens
+        ):
             score += 8
         if color_name == "Blue" and {"cloud", "airplane", "map"} & icon_tokens:
             score += 8
-        if color_name == "Gray" and {"gear", "tools", "wrench", "command"} & icon_tokens:
+        if (
+            color_name == "Gray"
+            and {"gear", "tools", "wrench", "command"} & icon_tokens
+        ):
             score += 8
 
         if score > best_score:
@@ -531,7 +641,10 @@ def _resolve_color(
             best_color = color
 
     if best_color is None or best_score == 0:
-        default = next((c for c in colors if int(c["value"]) == DEFAULT_COLOR_VALUE), colors[0])
+        default = next(
+            (c for c in colors if int(c["value"]) == DEFAULT_COLOR_VALUE),
+            colors[0],
+        )
         return {
             "value": int(default["value"]),
             "name": default["name"],
@@ -550,7 +663,10 @@ def _resolve_color(
 
 
 def resolve_icon_color(
-    prompt: str, icon_override: str | None, color_override: str | None, top: int = 5
+    prompt: str,
+    icon_override: str | None,
+    color_override: str | None,
+    top: int = 5,
 ) -> dict[str, Any]:
     script_path = Path(__file__).resolve()
     skill_root = script_path.parents[1]
@@ -582,11 +698,30 @@ def resolve_icon_color(
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Resolve Shortcuts icon/color from natural language")
-    parser.add_argument("--prompt", required=True, help="Original user prompt used to build the shortcut")
-    parser.add_argument("--icon", default=None, help="Optional explicit icon query (name/synonym/glyph number)")
-    parser.add_argument("--color", default=None, help="Optional explicit color query (name/synonym/value/#RRGGBB)")
-    parser.add_argument("--top", type=int, default=5, help="How many icon candidates to include")
+    parser = argparse.ArgumentParser(
+        description="Resolve Shortcuts icon/color from natural language",
+    )
+    parser.add_argument(
+        "--prompt",
+        required=True,
+        help="Original user prompt used to build the shortcut",
+    )
+    parser.add_argument(
+        "--icon",
+        default=None,
+        help="Optional explicit icon query (name/synonym/glyph number)",
+    )
+    parser.add_argument(
+        "--color",
+        default=None,
+        help="Optional explicit color query (name/synonym/value/#RRGGBB)",
+    )
+    parser.add_argument(
+        "--top",
+        type=int,
+        default=5,
+        help="How many icon candidates to include",
+    )
     return parser
 
 
@@ -594,7 +729,12 @@ def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
 
-    payload = resolve_icon_color(args.prompt, args.icon, args.color, top=max(1, args.top))
+    payload = resolve_icon_color(
+        args.prompt,
+        args.icon,
+        args.color,
+        top=max(1, args.top),
+    )
     print(json.dumps(payload, indent=2, ensure_ascii=True))
     return 0
 

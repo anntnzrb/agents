@@ -1,6 +1,5 @@
 #!/usr/bin/env -S uv run --script
-"""
-Aggregate individual run results into benchmark summary statistics.
+"""Aggregate individual run results into benchmark summary statistics.
 
 Reads grading.json files from run directories and produces:
 - run_summary with mean, stddev, min, max for each metric
@@ -32,6 +31,7 @@ The script supports two directory layouts:
             │   └── run-1/grading.json
             └── without_skill/
                 └── run-1/grading.json
+
 """
 
 import argparse
@@ -65,8 +65,7 @@ def calculate_stats(values: list[float]) -> dict:
 
 
 def load_run_results(benchmark_dir: Path) -> dict:
-    """
-    Load all run results from a benchmark directory.
+    """Load all run results from a benchmark directory.
 
     Returns dict keyed by config name (e.g. "with_skill"/"without_skill",
     or "new_skill"/"old_skill"), each containing a list of run results.
@@ -79,7 +78,7 @@ def load_run_results(benchmark_dir: Path) -> dict:
         search_dir = benchmark_dir
     else:
         print(
-            f"No eval directories found in {benchmark_dir} or {benchmark_dir / 'runs'}"
+            f"No eval directories found in {benchmark_dir} or {benchmark_dir / 'runs'}",
         )
         return {}
 
@@ -144,7 +143,8 @@ def load_run_results(benchmark_dir: Path) -> dict:
                         with open(timing_file) as tf:
                             timing_data = json.load(tf)
                         result["time_seconds"] = timing_data.get(
-                            "total_duration_seconds", 0.0
+                            "total_duration_seconds",
+                            0.0,
                         )
                         result["tokens"] = timing_data.get("total_tokens", 0)
                     except json.JSONDecodeError:
@@ -162,7 +162,7 @@ def load_run_results(benchmark_dir: Path) -> dict:
                 for exp in raw_expectations:
                     if "text" not in exp or "passed" not in exp:
                         print(
-                            f"Warning: expectation in {grading_file} missing required fields (text, passed, evidence): {exp}"
+                            f"Warning: expectation in {grading_file} missing required fields (text, passed, evidence): {exp}",
                         )
                 result["expectations"] = raw_expectations
 
@@ -180,8 +180,7 @@ def load_run_results(benchmark_dir: Path) -> dict:
 
 
 def aggregate_results(results: dict) -> dict:
-    """
-    Aggregate run results into summary statistics.
+    """Aggregate run results into summary statistics.
 
     Returns run_summary with stats for each configuration and delta.
     """
@@ -218,13 +217,16 @@ def aggregate_results(results: dict) -> dict:
         baseline = {}
 
     delta_pass_rate = primary.get("pass_rate", {}).get("mean", 0) - baseline.get(
-        "pass_rate", {}
+        "pass_rate",
+        {},
     ).get("mean", 0)
     delta_time = primary.get("time_seconds", {}).get("mean", 0) - baseline.get(
-        "time_seconds", {}
+        "time_seconds",
+        {},
     ).get("mean", 0)
     delta_tokens = primary.get("tokens", {}).get("mean", 0) - baseline.get(
-        "tokens", {}
+        "tokens",
+        {},
     ).get("mean", 0)
 
     run_summary["delta"] = {
@@ -237,11 +239,11 @@ def aggregate_results(results: dict) -> dict:
 
 
 def generate_benchmark(
-    benchmark_dir: Path, skill_name: str = "", skill_path: str = ""
+    benchmark_dir: Path,
+    skill_name: str = "",
+    skill_path: str = "",
 ) -> dict:
-    """
-    Generate complete benchmark.json from run results.
-    """
+    """Generate complete benchmark.json from run results."""
     results = load_run_results(benchmark_dir)
     run_summary = aggregate_results(results)
 
@@ -266,7 +268,7 @@ def generate_benchmark(
                     },
                     "expectations": result["expectations"],
                     "notes": result["notes"],
-                }
+                },
             )
 
     # Determine eval IDs from results
@@ -323,21 +325,21 @@ def generate_markdown(benchmark: dict) -> str:
     a_pr = a_summary.get("pass_rate", {})
     b_pr = b_summary.get("pass_rate", {})
     lines.append(
-        f"| Pass Rate | {a_pr.get('mean', 0) * 100:.0f}% ± {a_pr.get('stddev', 0) * 100:.0f}% | {b_pr.get('mean', 0) * 100:.0f}% ± {b_pr.get('stddev', 0) * 100:.0f}% | {delta.get('pass_rate', '—')} |"
+        f"| Pass Rate | {a_pr.get('mean', 0) * 100:.0f}% ± {a_pr.get('stddev', 0) * 100:.0f}% | {b_pr.get('mean', 0) * 100:.0f}% ± {b_pr.get('stddev', 0) * 100:.0f}% | {delta.get('pass_rate', '—')} |",
     )
 
     # Format time
     a_time = a_summary.get("time_seconds", {})
     b_time = b_summary.get("time_seconds", {})
     lines.append(
-        f"| Time | {a_time.get('mean', 0):.1f}s ± {a_time.get('stddev', 0):.1f}s | {b_time.get('mean', 0):.1f}s ± {b_time.get('stddev', 0):.1f}s | {delta.get('time_seconds', '—')}s |"
+        f"| Time | {a_time.get('mean', 0):.1f}s ± {a_time.get('stddev', 0):.1f}s | {b_time.get('mean', 0):.1f}s ± {b_time.get('stddev', 0):.1f}s | {delta.get('time_seconds', '—')}s |",
     )
 
     # Format tokens
     a_tokens = a_summary.get("tokens", {})
     b_tokens = b_summary.get("tokens", {})
     lines.append(
-        f"| Tokens | {a_tokens.get('mean', 0):.0f} ± {a_tokens.get('stddev', 0):.0f} | {b_tokens.get('mean', 0):.0f} ± {b_tokens.get('stddev', 0):.0f} | {delta.get('tokens', '—')} |"
+        f"| Tokens | {a_tokens.get('mean', 0):.0f} ± {a_tokens.get('stddev', 0):.0f} | {b_tokens.get('mean', 0):.0f} ± {b_tokens.get('stddev', 0):.0f} | {delta.get('tokens', '—')} |",
     )
 
     # Notes section
@@ -351,16 +353,22 @@ def generate_markdown(benchmark: dict) -> str:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Aggregate benchmark run results into summary statistics"
+        description="Aggregate benchmark run results into summary statistics",
     )
     parser.add_argument(
-        "benchmark_dir", type=Path, help="Path to the benchmark directory"
+        "benchmark_dir",
+        type=Path,
+        help="Path to the benchmark directory",
     )
     parser.add_argument(
-        "--skill-name", default="", help="Name of the skill being benchmarked"
+        "--skill-name",
+        default="",
+        help="Name of the skill being benchmarked",
     )
     parser.add_argument(
-        "--skill-path", default="", help="Path to the skill being benchmarked"
+        "--skill-path",
+        default="",
+        help="Path to the skill being benchmarked",
     )
     parser.add_argument(
         "--output",
@@ -398,7 +406,7 @@ def main():
     configs = [k for k in run_summary if k != "delta"]
     delta = run_summary.get("delta", {})
 
-    print(f"\nSummary:")
+    print("\nSummary:")
     for config in configs:
         pr = run_summary[config]["pass_rate"]["mean"]
         label = config.replace("_", " ").title()

@@ -2,6 +2,8 @@
 
 Run with `uv run --script <skill-dir>/scripts/cli.py ...`, replacing `<skill-dir>` with this skill directory.
 
+Read this when the shortest correct Amazon query command is needed.
+
 ## Best default
 
 ```bash

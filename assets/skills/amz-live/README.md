@@ -2,6 +2,8 @@
 
 Tiny read-only Amazon search CLI.
 
+Read this only when maintaining the CLI, parser, tests, or machine-readable contracts.
+
 Fetch live search result cards or parse saved Amazon search HTML, then filter locally.
 
 ## Entry point

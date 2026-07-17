@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
@@ -28,7 +27,7 @@ import fitz
 TITLE = "Dark Souls Remastered - Platinum Walkthrough"
 FALLBACK_URL = "https://psnprofiles.com/guide/16645-dark-souls-remastered-platinum-walkthrough-guide"
 DEFAULT_PDF = Path(
-    "C:/Users/Nil/Downloads/Dark Souls Remastered - Platinum Walkthrough Guide • PSNProfiles.com.pdf"
+    "C:/Users/Nil/Downloads/Dark Souls Remastered - Platinum Walkthrough Guide • PSNProfiles.com.pdf",
 )
 DEFAULT_OUTDIR = (
     Path(__file__).resolve().parents[1] / "resources" / "guides" / "dsr_plat_guide"
@@ -67,7 +66,7 @@ UNICODE_TRANSLATION = str.maketrans(
         "\u2013": "-",
         "\u2014": "-",
         "\ufeff": "",
-    }
+    },
 )
 KNOWN_HEADINGS = {
     "OVERVIEW",
@@ -150,37 +149,49 @@ CHROME_EXACT = {
 CHROME_PATTERNS = [
     re.compile(
         r"^\s*Dark Souls Remastered\s*-\s*Platinum Walkthrough(?:\s*Guide)?(?:\s*-\s*PSNProfiles\.com)?\s*$",
-        re.I,
+        re.IGNORECASE,
     ),
-    re.compile(r"^\s*GUIDES\s*>.*DARK SOULS REMASTERED.*$", re.I),
-    re.compile(r"^\s*https?://psnprofiles\.com/guide/[^ ]+\s+\d+\s*/\s*\d+\s*$", re.I),
-    re.compile(r"^\s*https?://psnprofiles\.com/guide/[^ ]+\s*$", re.I),
-    re.compile(r"^\s*\d{1,2}/\d{1,2}/\d{2,4},?\s+\d{1,2}:\d{2}\s*[AP]M\s*$", re.I),
+    re.compile(r"^\s*GUIDES\s*>.*DARK SOULS REMASTERED.*$", re.IGNORECASE),
+    re.compile(
+        r"^\s*https?://psnprofiles\.com/guide/[^ ]+\s+\d+\s*/\s*\d+\s*$",
+        re.IGNORECASE,
+    ),
+    re.compile(r"^\s*https?://psnprofiles\.com/guide/[^ ]+\s*$", re.IGNORECASE),
+    re.compile(
+        r"^\s*\d{1,2}/\d{1,2}/\d{2,4},?\s+\d{1,2}:\d{2}\s*[AP]M\s*$",
+        re.IGNORECASE,
+    ),
     re.compile(r"^\s*\d+\s*/\s*\d+\s*$"),
-    re.compile(r"^\s*Page\s+\d+(?:\s+of\s+\d+)?\s*$", re.I),
-    re.compile(r"^\s*(?:\d+[,.]?\d*|\d+\s+RATINGS|\d+\s+COMMENTS)\s*$", re.I),
-    re.compile(r"^\s*(?:A gameplay guide by|Published|Updated)\b.*$", re.I),
-    re.compile(r"^\s*[A-Za-z][A-Za-z0-9_-]+\s+and\s+[A-Za-z][A-Za-z0-9_-]+\s*$", re.I),
-    re.compile(r"^\s*©\s*20\d{2}.*$", re.I),
-    re.compile(r"^\s*No\s+\d+.*Troph(?:y|ies).*$", re.I),
+    re.compile(r"^\s*Page\s+\d+(?:\s+of\s+\d+)?\s*$", re.IGNORECASE),
+    re.compile(r"^\s*(?:\d+[,.]?\d*|\d+\s+RATINGS|\d+\s+COMMENTS)\s*$", re.IGNORECASE),
+    re.compile(r"^\s*(?:A gameplay guide by|Published|Updated)\b.*$", re.IGNORECASE),
+    re.compile(
+        r"^\s*[A-Za-z][A-Za-z0-9_-]+\s+and\s+[A-Za-z][A-Za-z0-9_-]+\s*$",
+        re.IGNORECASE,
+    ),
+    re.compile(r"^\s*©\s*20\d{2}.*$", re.IGNORECASE),
+    re.compile(r"^\s*No\s+\d+.*Troph(?:y|ies).*$", re.IGNORECASE),
     re.compile(
         r"^\s*(?:HOME|FORUMS|GUIDES|LEADERBOARD|GAMES|TROPHIES|SESSIONS|LOG IN|CREATE ACCOUNT)(?:\s+(?:HOME|FORUMS|GUIDES|LEADERBOARD|GAMES|TROPHIES|SESSIONS|LOG IN|CREATE ACCOUNT))+\s*$",
-        re.I,
+        re.IGNORECASE,
     ),
-    re.compile(r"^\s*(?:Part\s+\d+:[^:]+)\s+(?:Part\s+\d+:.*){1,}$", re.I),
-    re.compile(r"^\s*\d+\s+Trophies\s+-\s+[\d,]+\s+Points.*RELATED GUIDES.*$", re.I),
+    re.compile(r"^\s*(?:Part\s+\d+:[^:]+)\s+(?:Part\s+\d+:.*){1,}$", re.IGNORECASE),
+    re.compile(
+        r"^\s*\d+\s+Trophies\s+-\s+[\d,]+\s+Points.*RELATED GUIDES.*$",
+        re.IGNORECASE,
+    ),
 ]
 INLINE_CHROME_PATTERNS = [
-    re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4},?\s+\d{1,2}:\d{2}\s*[AP]M\b", re.I),
+    re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4},?\s+\d{1,2}:\d{2}\s*[AP]M\b", re.IGNORECASE),
     re.compile(
         r"\bDark Souls Remastered\s*-\s*Platinum Walkthrough(?:\s*Guide)?\s*-\s*PSNProfiles\.com\b",
-        re.I,
+        re.IGNORECASE,
     ),
     re.compile(
         r"\b(?:HOME|FORUMS|GUIDES|LEADERBOARD|GAMES|TROPHIES|SESSIONS|LOG IN|CREATE ACCOUNT){2,}\b",
-        re.I,
+        re.IGNORECASE,
     ),
-    re.compile(r"\bGUIDE CONTENTS\b", re.I),
+    re.compile(r"\bGUIDE CONTENTS\b", re.IGNORECASE),
 ]
 
 
@@ -205,7 +216,7 @@ def is_boilerplate(line: str) -> bool:
     return (
         not line
         or line.casefold() in {item.casefold() for item in CHROME_EXACT}
-        or len(re.findall(r"\bPart\s+\d+\s*:", line, flags=re.I)) >= 3
+        or len(re.findall(r"\bPart\s+\d+\s*:", line, flags=re.IGNORECASE)) >= 3
         or any(pattern.match(line) for pattern in CHROME_PATTERNS)
     )
 
@@ -422,30 +433,32 @@ def stream_chunks(pdf_path: Path, chunks_path: Path) -> dict[str, object]:
             if author_match := re.search(
                 r"A gameplay guide by\s+(.+?)(?=\s*(?:-|•)\s*Published\b)",
                 metadata_text,
-                re.I,
+                re.IGNORECASE,
             ):
                 candidate = re.sub(
                     r"^(?:A gameplay guide by\s*)+",
                     "",
                     author_match.group(1).strip(),
-                    flags=re.I,
+                    flags=re.IGNORECASE,
                 )
-                for author in re.split(r"\s+and\s+", candidate, flags=re.I):
+                for author in re.split(r"\s+and\s+", candidate, flags=re.IGNORECASE):
                     if author and author not in authors:
                         authors.append(author)
             previous = None
             pending_author = False
             for raw_line in page_text.splitlines():
                 line = clean_inline_chrome(norm(raw_line))
-                if re.search(r"A gameplay guide by", line, re.I):
+                if re.search(r"A gameplay guide by", line, re.IGNORECASE):
                     pending_author = True
                 if pending_author:
-                    if re.search(r"\bPublished\b", line, re.I):
+                    if re.search(r"\bPublished\b", line, re.IGNORECASE):
                         pending_author = False
                     removed_chrome += 1
                     continue
                 if url_match := re.search(
-                    r"https?://psnprofiles\.com/guide/[A-Za-z0-9_-]+", line, re.I
+                    r"https?://psnprofiles\.com/guide/[A-Za-z0-9_-]+",
+                    line,
+                    re.IGNORECASE,
                 ):
                     url = url_match.group(0)
                 if is_boilerplate(line):
@@ -479,15 +492,18 @@ def stream_chunks(pdf_path: Path, chunks_path: Path) -> dict[str, object]:
                                 row: GuideChunk = {
                                     "h": current_heading or ["Overview"],
                                     "k": classify(
-                                        current_heading or ["Overview"], rendered
+                                        current_heading or ["Overview"],
+                                        rendered,
                                     ),
                                     "t": rendered,
                                 }
                                 output.write(
                                     json.dumps(
-                                        row, ensure_ascii=False, separators=(",", ":")
+                                        row,
+                                        ensure_ascii=False,
+                                        separators=(",", ":"),
                                     )
-                                    + "\n"
+                                    + "\n",
                                 )
                                 chunk_count += 1
                                 counters[row["k"]] += 1
@@ -502,15 +518,18 @@ def stream_chunks(pdf_path: Path, chunks_path: Path) -> dict[str, object]:
                             row = {
                                 "h": current_heading or ["Overview"],
                                 "k": classify(
-                                    current_heading or ["Overview"], rendered
+                                    current_heading or ["Overview"],
+                                    rendered,
                                 ),
                                 "t": rendered,
                             }
                             output.write(
                                 json.dumps(
-                                    row, ensure_ascii=False, separators=(",", ":")
+                                    row,
+                                    ensure_ascii=False,
+                                    separators=(",", ":"),
                                 )
-                                + "\n"
+                                + "\n",
                             )
                             chunk_count += 1
                             counters[row["k"]] += 1
@@ -525,7 +544,7 @@ def stream_chunks(pdf_path: Path, chunks_path: Path) -> dict[str, object]:
                     "t": rendered,
                 }
                 output.write(
-                    json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
+                    json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n",
                 )
                 chunk_count += 1
                 counters[row["k"]] += 1
@@ -547,7 +566,7 @@ def stream_chunks(pdf_path: Path, chunks_path: Path) -> dict[str, object]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Generate the local DSR platinum guide corpus from a user-provided PDF."
+        description="Generate the local DSR platinum guide corpus from a user-provided PDF.",
     )
     parser.add_argument("pdf", nargs="?", type=Path, default=DEFAULT_PDF)
     parser.add_argument("outdir", nargs="?", type=Path, default=DEFAULT_OUTDIR)
@@ -620,7 +639,8 @@ def main(argv: list[str] | None = None) -> int:
         manifest["extraction"]["min_chunk_chars"] = min(lengths)
         manifest["extraction"]["max_chunk_chars"] = max(lengths)
     (outdir / "dsr-plat-guide.manifest.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
     )
     sys.stdout.write(
         json.dumps(
@@ -633,7 +653,7 @@ def main(argv: list[str] | None = None) -> int:
             },
             ensure_ascii=False,
         )
-        + "\n"
+        + "\n",
     )
     return 0
 

@@ -112,7 +112,7 @@ HTTP errors return exit code `22`. Network errors return `1`. Validation errors 
 - `user-analysis` numeric args must be non-negative integers; `time_range` must be `day|week|month|year|all`. Invalid values return rc=2 (no silent "all" fallback).
 - `explain` lower-cases and trims whitespace; hyphens are treated as spaces for glossary lookup. Empty / whitespace-only input is rc=2.
 
-## Need | Read | When
+## Required follow-up reads
 
 | Need | Read | When |
 | --- | --- | --- |

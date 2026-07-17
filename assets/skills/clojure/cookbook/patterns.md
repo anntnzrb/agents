@@ -2,6 +2,15 @@
 
 Essential patterns for working with Clojure's data structures, sequences, and functional programming idioms.
 
+Read this when collection choice, lazy sequences, transducers, reducers, map transforms, or zippers matter.
+
+## Section index
+
+- Collections and core operations
+- Sequence transforms, grouping, search, and laziness
+- Transducers, reducers, and comprehensions
+- Map transformations and zippers
+
 ---
 
 ## Choosing the Right Collection

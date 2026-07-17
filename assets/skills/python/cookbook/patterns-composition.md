@@ -2,6 +2,20 @@
 
 Reduce, partials, dispatch, pipelines, and immutable data techniques.
 
+## Contents
+
+- [Reduce](#reduce-for-accumulation)
+- [Partial application](#partial-application)
+- [Memoization](#memoization)
+- [Function overloading](#function-overloading)
+- [Function composition](#function-composition)
+- [Pipeline pattern](#pipeline-pattern)
+- [Fluent pipeline class](#fluent-pipeline-class)
+- [Frozen dataclasses](#frozen-dataclasses)
+- [NamedTuple](#namedtuple-for-immutability)
+- [Immutable collections](#immutable-collections)
+- [Copy-on-write](#copy-on-write-pattern)
+
 ---
 
 ## Reduce for Accumulation

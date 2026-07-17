@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
 # dependencies = []
@@ -64,7 +63,8 @@ def main(argv: list[str]) -> int:
             print("usage: grep-app regex <pattern> [key=value ...]", file=sys.stderr)
             return 2
         return request_get(
-            base_url, [("q", args[0]), ("regexp", "true"), *pairs(args[1:])]
+            base_url,
+            [("q", args[0]), ("regexp", "true"), *pairs(args[1:])],
         )
 
     print(USAGE, file=sys.stderr)

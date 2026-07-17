@@ -2,6 +2,8 @@
 
 Login flows, session persistence, OAuth, 2FA, and authenticated browsing.
 
+Read this before automating authentication, saved state, OAuth, or 2FA.
+
 **Related**: [session-management.md](session-management.md) for state persistence details, [SKILL.md](../SKILL.md) for quick start.
 
 ## Contents
@@ -145,7 +147,6 @@ agent-browser open https://app.example.com/dashboard
 For sessions with expiring tokens:
 
 ```bash
-#!/bin/bash
 # Wrapper that handles token refresh
 
 STATE_FILE="./auth-state.json"

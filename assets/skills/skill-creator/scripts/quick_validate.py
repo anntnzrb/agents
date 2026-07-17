@@ -3,16 +3,13 @@
 # requires-python = ">=3.12"
 # dependencies = ["PyYAML>=6.0"]
 # ///
-"""
-Quick validation script for skills - minimal version
-"""
+"""Quick validation script for skills - minimal version"""
 
-import sys
-import os
 import re
-import yaml
+import sys
 from pathlib import Path
 
+import yaml
 
 MAX_DESCRIPTION_CHARS = 120
 

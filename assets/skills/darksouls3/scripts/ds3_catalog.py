@@ -316,7 +316,7 @@ NPC_QUESTS: dict[str, dict] = {
         ],
         "missable": False,
         "provides": [
-            "Pyromancies (via tomes): Fireball, Fire Orb, Bursting Fireball, Great Chaos Fire Orb, Fire Surge, Fire Whip, Firestorm, Chaos Storm, Great Combustion, Sacred Flame, Profaned Flame, Poison Mist, Toxic Mist, Acid Surge, Flash Sweat, Carthus Beacon, Carthus Flame Arc, Rapport, Boulder Heave, Warmth (via Mound-Makers tome)"
+            "Pyromancies (via tomes): Fireball, Fire Orb, Bursting Fireball, Great Chaos Fire Orb, Fire Surge, Fire Whip, Firestorm, Chaos Storm, Great Combustion, Sacred Flame, Profaned Flame, Poison Mist, Toxic Mist, Acid Surge, Flash Sweat, Carthus Beacon, Carthus Flame Arc, Rapport, Boulder Heave, Warmth (via Mound-Makers tome)",
         ],
         "cutoff": "None — stays available through the game",
     },
@@ -2500,8 +2500,10 @@ def rings_by_build(build: str) -> list[dict]:
 
     Args:
         build: One of quality, strength, dex, sorcerer, pyro, cleric, luck.
+
     Returns:
         List of ring dicts sorted by category then name.
+
     """
     family = BUILD_RINGS.get(build, set())
     filtered = [r for r in RINGS if any(r["name"].startswith(fam) for fam in family)]
@@ -2513,8 +2515,10 @@ def rings_by_name(query: str) -> list[dict]:
 
     Args:
         query: Substring to match against ring names.
+
     Returns:
         List of matching ring dicts (empty if none found).
+
     """
     q = query.lower()
     return [r for r in RINGS if q in r["name"].lower()]
@@ -2525,8 +2529,10 @@ def spells_by_type(spell_type: str) -> list[dict]:
 
     Args:
         spell_type: One of 'sorcery', 'miracle', 'pyromancy'.
+
     Returns:
         Flat list of spell dicts for that type (empty if unknown type).
+
     """
     cat_key = SPELL_TYPE_KEY.get(spell_type)
     if not cat_key:
@@ -2539,8 +2545,10 @@ def spell_by_name(name: str) -> dict | None:
 
     Args:
         name: Spell name to search for.
+
     Returns:
         Spell dict if found, None otherwise.
+
     """
     target = name.lower()
     for spells in SPELLS.values():
@@ -2555,8 +2563,10 @@ def spell_type_for(name: str) -> str | None:
 
     Args:
         name: Spell name to look up.
+
     Returns:
         Type string if found, None otherwise.
+
     """
     target = name.lower()
     for cat_label, cat_key in [
@@ -2575,8 +2585,10 @@ def spells_matching(query: str) -> list[tuple[str, dict]]:
 
     Args:
         query: Substring to match.
+
     Returns:
         List of (spell_type, spell_dict) tuples.
+
     """
     q = query.lower()
     results: list[tuple[str, dict]] = []
@@ -2597,6 +2609,7 @@ def spells_achievement() -> dict[str, list[dict]]:
     Returns:
         A dict with keys 'sorceries', 'miracles', 'pyromancies' containing
         the full spell lists (all base-game spells are required).
+
     """
     return SPELLS
 
@@ -2630,20 +2643,20 @@ def npcs_missable() -> list[tuple[str, dict]]:
 # ── Exports for `from ds3_catalog import *` ─────────────────────
 __all__ = [
     "BUILD_RINGS",
-    "SPELL_TYPE_KEY",
-    "RING_CATEGORY_ORDER",
-    "RING_CATEGORY_NAMES",
     "NPC_QUESTS",
-    "SPELLS",
     "RINGS",
-    "rings_by_build",
-    "rings_by_name",
-    "spells_by_type",
-    "spell_by_name",
-    "spell_type_for",
-    "spells_matching",
-    "spells_achievement",
+    "RING_CATEGORY_NAMES",
+    "RING_CATEGORY_ORDER",
+    "SPELLS",
+    "SPELL_TYPE_KEY",
     "npc_by_name",
     "npc_keys_matching",
     "npcs_missable",
+    "rings_by_build",
+    "rings_by_name",
+    "spell_by_name",
+    "spell_type_for",
+    "spells_achievement",
+    "spells_by_type",
+    "spells_matching",
 ]

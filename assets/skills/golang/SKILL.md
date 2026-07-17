@@ -73,7 +73,7 @@ You MUST load only the references needed by the task:
 | Testing, table-driven, testify, benchmarks | `cookbook/testing.md` | Unit tests, benchmarks, fuzzing, integration test setup |
 | Patterns: DI, options, interfaces | `cookbook/patterns.md` | Constructor injection, functional options, repository |
 | Tooling: lint, format, build, CI | `cookbook/tooling.md` | golangci-lint config, gofumpt, buf, goreleaser, testcontainers |
-| Go conventions, project layout, quick decisions | `reference.md` | Syntax, layout, anti-patterns, routing table, CLI ref |
+| Go conventions, project layout, quick decisions | `references/guide.md` | Syntax, layout, anti-patterns, routing table, CLI ref |
 | Update/audit the Go skill itself | `references/update-playbook.md` | When asked to refresh, audit, or update the skill for new Go releases |
 | Source ledger for Go/tooling claims | `references/sources.md` | When auditing sources, release notes, or updating the skill |
 

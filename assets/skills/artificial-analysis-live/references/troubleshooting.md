@@ -1,5 +1,7 @@
 # artificial-analysis troubleshooting
 
+Read this when credentials, extraction, freshness, caching, or upstream requests fail.
+
 ## 1) Fresh fetch or capability command fails after upstream change
 
 Symptoms:

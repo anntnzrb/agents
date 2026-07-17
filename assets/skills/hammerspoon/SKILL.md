@@ -93,8 +93,8 @@ These fetch official Hammerspoon API docs from `hammerspoon.org/docs/` and cache
 
 Agents should navigate search results by exact symbols, module names, and source URLs.
 
-
 ## Live source and Spoons
+
 ```text
 uv run --script <skill-dir>/scripts/cli.py source search <pattern>
 uv run --script <skill-dir>/scripts/cli.py source fetch [--if-needed]
@@ -136,7 +136,7 @@ These discover tools on PATH (`luacheck`, `stylua`, `busted`, `lua-language-serv
 ## Guardrails
 
 - Do not trust memory alone for Hammerspoon APIs; inspect runtime/docs/source.
-- Do not assume a specific config layout, Spoond set, hotkey scheme, or config location; inspect first.
+- Do not assume a specific config layout, Spoon set, hotkey scheme, or config location; inspect first.
 - Do not auto-install the `hs` CLI or Hammerspoon itself without explicit user request.
 - Do not reload Hammerspoon after read-only inspection commands.
 - Do not mutate the user's `init.lua` unless the task explicitly asks for persistent config changes.

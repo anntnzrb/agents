@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["pycryptodome"]
@@ -11,8 +10,9 @@ import argparse
 import importlib
 import json
 import sys
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Callable, Mapping, NoReturn, Sequence, TypedDict, cast
+from typing import NoReturn, TypedDict, cast
 
 from ds1_core import (
     AREAS,
@@ -29,15 +29,15 @@ from ds1_core import (
     cache_get,
     equip_load_max,
     fetch_cached,
+    get_transcript_chunk,
     load_guide_chunks,
     load_guide_manifest,
     load_json_resource,
     load_sources,
-    transcript_summary,
-    search_transcript,
-    get_transcript_chunk,
     search_guide,
+    search_transcript,
     soul_cost,
+    transcript_summary,
 )
 
 catalog: object | None = None
@@ -46,7 +46,7 @@ try:  # Sibling modules are supplied by the catalog/save workers before release.
 except ImportError:  # construction-time import only; commands fail clearly if absent
     pass
 else:
-    catalog = cast(object, _catalog)
+    catalog = cast("object", _catalog)
 
 save: object | None = None
 try:
@@ -54,7 +54,7 @@ try:
 except ImportError:
     pass
 else:
-    save = cast(object, _save)
+    save = cast("object", _save)
 
 frames: object | None = None
 
@@ -63,10 +63,10 @@ def _need_frames() -> object:
     global frames
     if frames is None:
         try:
-            frames = cast(object, importlib.import_module("ds1_frames"))
+            frames = cast("object", importlib.import_module("ds1_frames"))
         except ImportError:
             _die(
-                "ds1_frames is not installed; complete the frame scanner module before running frames"
+                "ds1_frames is not installed; complete the frame scanner module before running frames",
             )
     return frames
 
@@ -79,7 +79,7 @@ def _die(message: str, code: int = 2) -> NoReturn:
 def _need_catalog() -> object:
     if catalog is None:
         _die(
-            "ds1_catalog is not installed; complete the catalog module before running this command"
+            "ds1_catalog is not installed; complete the catalog module before running this command",
         )
     return catalog
 
@@ -87,13 +87,13 @@ def _need_catalog() -> object:
 def _need_save() -> object:
     if save is None:
         _die(
-            "ds1_save is not installed; complete the save module before running save commands"
+            "ds1_save is not installed; complete the save module before running save commands",
         )
     return save
 
 
 def _value(args: argparse.Namespace, name: str) -> object:
-    values = cast(Mapping[str, object], vars(args))
+    values = cast("Mapping[str, object]", vars(args))
     return values.get(name)
 
 
@@ -144,7 +144,7 @@ def _str_list(args: argparse.Namespace, name: str) -> list[str]:
     value = _value(args, name)
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         _die(f"argument {name!r} must be a list of strings")
-    return cast(list[str], value)
+    return cast("list[str]", value)
 
 
 class _GuideRow(TypedDict):
@@ -159,46 +159,54 @@ class _GuideResult(_GuideRow):
 
 
 def _guide_rows() -> list[_GuideRow]:
-    return cast(list[_GuideRow], load_guide_chunks())
+    return cast("list[_GuideRow]", load_guide_chunks())
 
 
 def _guide_manifest() -> Mapping[str, object]:
-    return cast(Mapping[str, object], load_guide_manifest())
+    return cast("Mapping[str, object]", load_guide_manifest())
 
 
 def _search_guide(
-    query: str, *, kind: str | None = None, heading: str | None = None, limit: int = 8
+    query: str,
+    *,
+    kind: str | None = None,
+    heading: str | None = None,
+    limit: int = 8,
 ) -> list[_GuideResult]:
     return cast(
-        list[_GuideResult], search_guide(query, kind=kind, heading=heading, limit=limit)
+        "list[_GuideResult]",
+        search_guide(query, kind=kind, heading=heading, limit=limit),
     )
 
 
 def _string_values(value: object) -> tuple[str, ...]:
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
-        return tuple(str(item) for item in cast(Sequence[object], value))
+        return tuple(str(item) for item in cast("Sequence[object]", value))
     return ()
 
 
 def _area_rows() -> tuple[Mapping[str, object], ...]:
-    return cast(tuple[Mapping[str, object], ...], AREAS)
+    return cast("tuple[Mapping[str, object], ...]", AREAS)
 
 
 def _as_mapping(value: object) -> Mapping[str, object] | None:
     if isinstance(value, Mapping):
-        return cast(Mapping[str, object], value)
+        return cast("Mapping[str, object]", value)
     return None
 
 
 def _get_callable(module: object, name: str) -> Callable[..., object] | None:
-    fn = cast(object, getattr(module, name, None))
+    fn = cast("object", getattr(module, name, None))
     if callable(fn):
-        return cast(Callable[..., object], fn)
+        return cast("Callable[..., object]", fn)
     return None
 
 
 def _call(
-    module: object, names: Sequence[str], *args: object, **kwargs: object
+    module: object,
+    names: Sequence[str],
+    *args: object,
+    **kwargs: object,
 ) -> object:
     for name in names:
         fn = _get_callable(module, name)
@@ -215,7 +223,7 @@ def _json(value: object) -> None:
 
 
 def _resource_rows(name: str, key: str | None = None) -> list[dict[str, object]]:
-    value = cast(object, load_json_resource(name, []))
+    value = cast("object", load_json_resource(name, []))
     if isinstance(value, Mapping) and key:
         selected = value.get(key)
         if isinstance(selected, list):
@@ -223,7 +231,7 @@ def _resource_rows(name: str, key: str | None = None) -> list[dict[str, object]]
     if not isinstance(value, list):
         return []
     rows: list[dict[str, object]] = []
-    for row in cast(list[object], value):
+    for row in cast("list[object]", value):
         mapping = _as_mapping(row)
         if mapping is not None:
             rows.append(dict(mapping))
@@ -236,7 +244,7 @@ def _name(value: object) -> str:
     mapping = _as_mapping(value)
     if mapping is not None:
         return str(
-            mapping.get("name", mapping.get("title", mapping.get("id", "unknown")))
+            mapping.get("name", mapping.get("title", mapping.get("id", "unknown"))),
         )
     return str(value)
 
@@ -256,7 +264,7 @@ def _redact_save(value: object, key: str | None = None) -> object:
     if mapping is not None:
         return {str(k): _redact_save(v, str(k).casefold()) for k, v in mapping.items()}
     if isinstance(value, list):
-        values = cast(list[object], value)
+        values = cast("list[object]", value)
         if key in {"bosses", "bonfires"}:
             return ["hidden until spoilers are permitted" for _ in values]
         return [_redact_save(item, key) for item in values]
@@ -277,12 +285,12 @@ def _guide_json(value: object) -> None:
             _json({"results": [], "warning": GUIDE_WARNING})
         else:
             rendered: list[object] = []
-            for row in cast(list[object], value):
+            for row in cast("list[object]", value):
                 mapping = _as_mapping(row)
                 rendered.append(
                     {**mapping, "warning": GUIDE_WARNING}
                     if mapping is not None
-                    else row
+                    else row,
                 )
             _json(rendered)
     else:
@@ -296,12 +304,12 @@ def _guide_json(value: object) -> None:
 def cmd_fresh(_: argparse.Namespace) -> None:
     print("Dark Souls Remastered — fresh start")
     print(
-        "  Priorities: unlock the first hub, meet weapon requirements, and reinforce one main weapon."
+        "  Priorities: unlock the first hub, meet weapon requirements, and reinforce one main weapon.",
     )
     print("  Keep equip load below 25% for fast roll or below 50% for mid roll.")
     print("  Vitality 30 and Endurance 40 are useful early planning breakpoints.")
     print(
-        "  Estus is improved at bonfires; do not assume an unverified save parser result."
+        "  Estus is improved at bonfires; do not assume an unverified save parser result.",
     )
     print("  Next: softcaps | origins | build | weapons | estus")
 
@@ -311,7 +319,7 @@ def cmd_softcaps(_: argparse.Namespace) -> None:
     for stat, points in SOFTCAPS.items():
         print(
             f"{stat.title()}: "
-            + "; ".join(f"{level} ({desc})" for level, desc in points)
+            + "; ".join(f"{level} ({desc})" for level, desc in points),
         )
 
 
@@ -339,7 +347,7 @@ def cmd_origins(args: argparse.Namespace) -> None:
     for name in selected:
         row = ORIGINS[name]
         print(
-            f"{name.title():<13} {row['level']:>2} {row['vit']:>3} {row['att']:>3} {row['end']:>3} {row['str']:>3} {row['dex']:>3} {row['int']:>3} {row['fth']:>3} {row['res']:>3}"
+            f"{name.title():<13} {row['level']:>2} {row['vit']:>3} {row['att']:>3} {row['end']:>3} {row['str']:>3} {row['dex']:>3} {row['int']:>3} {row['fth']:>3} {row['res']:>3}",
         )
 
 
@@ -399,10 +407,10 @@ def cmd_build(args: argparse.Namespace) -> None:
     print(f"Origin: {origin.title()} | Focus: {note}")
     print(
         "Targets: "
-        + ", ".join(f"{key.upper()} {value}" for key, value in stats.items())
+        + ", ".join(f"{key.upper()} {value}" for key, value in stats.items()),
     )
     print(
-        "Adjust VIT/END first for survivability; this is a planning baseline, not a save-backed character state."
+        "Adjust VIT/END first for survivability; this is a planning baseline, not a save-backed character state.",
     )
 
 
@@ -412,7 +420,7 @@ def cmd_soul_cost(args: argparse.Namespace) -> None:
     except ValueError as exc:
         _die(str(exc))
     print(
-        f"Levels: {max(0, _required_int(args, 'target') - _required_int(args, 'current'))}"
+        f"Levels: {max(0, _required_int(args, 'target') - _required_int(args, 'current'))}",
     )
     print(f"Souls required: {total:,}")
 
@@ -421,7 +429,7 @@ def cmd_upgrade(args: argparse.Namespace) -> None:
     path = UPGRADE_PATHS.get(_required_str(args, "type"))
     if path is None:
         _die(
-            f"unknown upgrade type '{_required_str(args, 'type')}'; valid: {', '.join(UPGRADE_PATHS)}"
+            f"unknown upgrade type '{_required_str(args, 'type')}'; valid: {', '.join(UPGRADE_PATHS)}",
         )
     if _required_int(args, "level") < 1:
         _die("target upgrade level must be positive")
@@ -438,11 +446,11 @@ def cmd_upgrade(args: argparse.Namespace) -> None:
                     + ", ".join(
                         f"{count}x {key.replace('_', ' ')}"
                         for key, count in cumulative.items()
-                    )
+                    ),
                 )
             else:
                 print(
-                    "  No material schedule; this path is reinforced directly by its trainer."
+                    "  No material schedule; this path is reinforced directly by its trainer.",
                 )
             if _required_int(args, "level") > len(path):
                 print(f"  Max for this path is +{len(path)}.")
@@ -469,19 +477,19 @@ def cmd_estus(args: argparse.Namespace) -> None:
     print("=== Estus and kindling (DS1) ===")
     if _required_str(args, "sub") in ("max", "shards"):
         print(
-            f"Estus Shards: {ESTUS_SHARDS_MAX} total (not all shard ownership is save-validated)."
+            f"Estus Shards: {ESTUS_SHARDS_MAX} total (not all shard ownership is save-validated).",
         )
     if _required_str(args, "sub") in ("max", "souls"):
         print(
-            f"Fire Keeper Souls: {FIRE_KEEPER_SOULS_MAX} planned upgrades; potency is separate from flask count."
+            f"Fire Keeper Souls: {FIRE_KEEPER_SOULS_MAX} planned upgrades; potency is separate from flask count.",
         )
     if _required_str(args, "sub") in ("max", "kindling"):
         print(
-            f"Kindling levels: {', '.join(map(str, KINDLING_LEVELS))}; Rite of Kindling enables 20 uses at a bonfire."
+            f"Kindling levels: {', '.join(map(str, KINDLING_LEVELS))}; Rite of Kindling enables 20 uses at a bonfire.",
         )
     if _required_str(args, "sub") == "max":
         print(
-            f"Maximum carried flasks: {ESTUS_MAX}; exact current split is save-dependent."
+            f"Maximum carried flasks: {ESTUS_MAX}; exact current split is save-dependent.",
         )
 
 
@@ -509,13 +517,16 @@ def cmd_farm(args: argparse.Namespace) -> None:
         _die(f"unknown farm target '{key}'; valid: {', '.join(farms)}")
     location, note = farms[key]
     print(
-        f"{key.title()}: {location if _flag(args, 'spoilers') else 'a safe, already-reached farming loop'}"
+        f"{key.title()}: {location if _flag(args, 'spoilers') else 'a safe, already-reached farming loop'}",
     )
     print(note)
 
 
 def _catalog_items(
-    kind: str, query: str | None = None, *, spoilers: bool = False
+    kind: str,
+    query: str | None = None,
+    *,
+    spoilers: bool = False,
 ) -> list[object]:
     module = _need_catalog()
     names = {
@@ -526,7 +537,7 @@ def _catalog_items(
     value = _call(module, names, query or "")
     if not isinstance(value, list):
         return []
-    rows = cast(list[object], value)
+    rows = cast("list[object]", value)
     if spoilers or query:
         return rows
     result: list[object] = []
@@ -570,7 +581,9 @@ def cmd_weapons(args: argparse.Namespace) -> None:
 
 def cmd_rings(args: argparse.Namespace) -> None:
     rows = _catalog_items(
-        "rings", _optional_str(args, "name"), spoilers=_flag(args, "spoilers")
+        "rings",
+        _optional_str(args, "name"),
+        spoilers=_flag(args, "spoilers"),
     )[: _required_int(args, "limit")]
     if _flag(args, "json"):
         _json(rows)
@@ -581,7 +594,9 @@ def cmd_rings(args: argparse.Namespace) -> None:
 
 def cmd_goods(args: argparse.Namespace) -> None:
     rows = _catalog_items(
-        "goods", _optional_str(args, "name"), spoilers=_flag(args, "spoilers")
+        "goods",
+        _optional_str(args, "name"),
+        spoilers=_flag(args, "spoilers"),
     )[: _required_int(args, "limit")]
     if _flag(args, "json"):
         _json(rows)
@@ -685,16 +700,16 @@ def cmd_achievements(args: argparse.Namespace) -> None:
 
 def _source_policy() -> None:
     print(
-        "Local: deterministic DS1 mechanics, bundled catalog metadata, validated save fields only."
+        "Local: deterministic DS1 mechanics, bundled catalog metadata, validated save fields only.",
     )
     print(
-        "Live: current source status, contested mechanics, exact locations, and guide context."
+        "Live: current source status, contested mechanics, exact locations, and guide context.",
     )
     print(
-        "Cache: DS1_CACHE_DIR transport cache only, 24-hour TTL; cite source keys/URLs, never cache files."
+        "Cache: DS1_CACHE_DIR transport cache only, 24-hour TTL; cite source keys/URLs, never cache files.",
     )
     print(
-        "PDF: transformed local JSONL chunks only; copyrighted source text is not tracked or copied."
+        "PDF: transformed local JSONL chunks only; copyrighted source text is not tracked or copied.",
     )
 
 
@@ -727,7 +742,7 @@ def cmd_sources(args: argparse.Namespace) -> None:
         if source is None:
             _die(f"unknown source key: {_required_str(args, 'key')}")
         print(
-            f"{source.name}\nURL: {source.url}\nLicense: {source.license}\nType: {source.source_type}"
+            f"{source.name}\nURL: {source.url}\nLicense: {source.license}\nType: {source.source_type}",
         )
         if source.provenance:
             print(f"Provenance: {source.provenance}")
@@ -735,7 +750,8 @@ def cmd_sources(args: argparse.Namespace) -> None:
             print(f"Risk: {source.risk}")
         print("Allowed use: " + ("; ".join(source.allowed_use) or "not specified"))
         print(
-            "Not allowed for: " + ("; ".join(source.not_allowed_for) or "not specified")
+            "Not allowed for: "
+            + ("; ".join(source.not_allowed_for) or "not specified"),
         )
         return
     if action == "refresh":
@@ -791,14 +807,14 @@ def cmd_guide(args: argparse.Namespace) -> None:
         print(GUIDE_WARNING)
         if not _flag(args, "spoilers"):
             heading_count = len(
-                dict.fromkeys(" > ".join(str(x) for x in row["h"]) for row in rows)
+                dict.fromkeys(" > ".join(str(x) for x in row["h"]) for row in rows),
             )
             print(f"{heading_count} heading paths (hidden; use --spoilers)")
         else:
             print(
                 "\n".join(
-                    dict.fromkeys(" > ".join(str(x) for x in row["h"]) for row in rows)
-                )
+                    dict.fromkeys(" > ".join(str(x) for x in row["h"]) for row in rows),
+                ),
             )
         return
     if action == "get":
@@ -812,14 +828,14 @@ def cmd_guide(args: argparse.Namespace) -> None:
             else:
                 print(GUIDE_WARNING)
                 print(
-                    f"Guide row {_required_int(args, 'row')} found; content hidden (use --spoilers)."
+                    f"Guide row {_required_int(args, 'row')} found; content hidden (use --spoilers).",
                 )
         elif _flag(args, "json"):
             _guide_json(row)
         else:
             print(GUIDE_WARNING)
             print(
-                f"Row {_required_int(args, 'row')}: {' > '.join(row['h'])}\n{row['t']}"
+                f"Row {_required_int(args, 'row')}: {' > '.join(row['h'])}\n{row['t']}",
             )
         return
     if action == "search":
@@ -839,7 +855,7 @@ def cmd_guide(args: argparse.Namespace) -> None:
             else:
                 print(GUIDE_WARNING)
                 print(
-                    f"{len(matches)} guide rows matched; names/text hidden (use --spoilers)."
+                    f"{len(matches)} guide rows matched; names/text hidden (use --spoilers).",
                 )
         elif _flag(args, "json"):
             _guide_json(matches)
@@ -889,14 +905,14 @@ _TRANSCRIPT_HIDDEN_KEYS = frozenset(
         "video_ids",
         "video_title",
         "video_url",
-    }
+    },
 )
 
 
 def _redact_transcript(value: object, key: str | None = None) -> object:
     normalized = key.casefold() if key is not None else None
     if isinstance(value, str) and value.casefold().startswith(
-        ("http://", "https://", "www.")
+        ("http://", "https://", "www."),
     ):
         return "hidden until spoilers are permitted"
     if normalized in _TRANSCRIPT_HIDDEN_KEYS:
@@ -908,13 +924,13 @@ def _redact_transcript(value: object, key: str | None = None) -> object:
             for item_key, item_value in mapping.items()
         }
     if isinstance(value, list):
-        return [_redact_transcript(item, key) for item in cast(list[object], value)]
+        return [_redact_transcript(item, key) for item in cast("list[object]", value)]
     return value
 
 
 def _transcript_json(value: object) -> None:
     if isinstance(value, list):
-        values = cast(list[object], value)
+        values = cast("list[object]", value)
         if not values:
             _json({"results": [], "warning": TRANSCRIPT_WARNING})
             return
@@ -924,7 +940,7 @@ def _transcript_json(value: object) -> None:
             rendered.append(
                 {**mapping, "warning": TRANSCRIPT_WARNING}
                 if mapping is not None
-                else item
+                else item,
             )
         _json(rendered)
         return
@@ -949,7 +965,7 @@ def _transcript_call_summary(*, spoilers: bool) -> Mapping[str, object]:
 def _transcript_rows(summary: Mapping[str, object]) -> list[object]:
     videos = summary.get("videos")
     if isinstance(videos, list):
-        return cast(list[object], videos)
+        return cast("list[object]", videos)
     count = summary.get("video_count")
     if isinstance(count, int) and not isinstance(count, bool) and count >= 0:
         return [{"video_index": index, "spoilers": "hidden"} for index in range(count)]
@@ -957,7 +973,11 @@ def _transcript_rows(summary: Mapping[str, object]) -> list[object]:
 
 
 def _transcript_print_summary(
-    summary: Mapping[str, object], *, action: str, spoilers: bool, as_json: bool
+    summary: Mapping[str, object],
+    *,
+    action: str,
+    spoilers: bool,
+    as_json: bool,
 ) -> None:
     rendered: object = summary if spoilers else _redact_transcript(summary)
     if as_json:
@@ -992,11 +1012,14 @@ def cmd_transcript(args: argparse.Namespace) -> None:
                 _transcript_json(value)
             else:
                 print(TRANSCRIPT_WARNING)
-                for row in cast(list[object], value):
+                for row in cast("list[object]", value):
                     print(json.dumps(row, ensure_ascii=False, sort_keys=True))
             return
         _transcript_print_summary(
-            summary, action="info", spoilers=spoilers, as_json=as_json
+            summary,
+            action="info",
+            spoilers=spoilers,
+            as_json=as_json,
         )
         return
     if action == "search":
@@ -1006,7 +1029,10 @@ def cmd_transcript(args: argparse.Namespace) -> None:
             # A query-less search is deliberately summary-only, even with spoilers.
             summary = _transcript_call_summary(spoilers=spoilers)
             _transcript_print_summary(
-                summary, action="search summary", spoilers=spoilers, as_json=as_json
+                summary,
+                action="search summary",
+                spoilers=spoilers,
+                as_json=as_json,
             )
             return
         video_index = _value(args, "video_index")
@@ -1018,13 +1044,13 @@ def cmd_transcript(args: argparse.Namespace) -> None:
         try:
             matches = search_transcript(
                 query,
-                video_index=cast(int | None, video_index),
+                video_index=cast("int | None", video_index),
                 limit=limit,
                 spoilers=spoilers,
             )
         except Exception as exc:
             _die(str(exc) or "transcript search failed")
-        rows = list(cast(Sequence[object], matches))
+        rows = list(cast("Sequence[object]", matches))
         if not spoilers:
             hidden_rows: list[object] = []
             for row in rows:
@@ -1037,7 +1063,7 @@ def cmd_transcript(args: argparse.Namespace) -> None:
                         for key in ("video_index", "chunk_index")
                         if key in mapping
                     }
-                    | {"spoilers": "hidden"}
+                    | {"spoilers": "hidden"},
                 )
             rows = hidden_rows
         if as_json:
@@ -1046,7 +1072,7 @@ def cmd_transcript(args: argparse.Namespace) -> None:
             print(TRANSCRIPT_WARNING)
             print(
                 f"{len(rows)} transcript chunks matched; "
-                "names/text hidden (use --spoilers)."
+                "names/text hidden (use --spoilers).",
             )
         else:
             print(TRANSCRIPT_WARNING)
@@ -1073,7 +1099,7 @@ def cmd_transcript(args: argparse.Namespace) -> None:
             print(TRANSCRIPT_WARNING)
             print(
                 f"Transcript chunk {video_index}/{chunk_index} found; "
-                "names/text hidden (use --spoilers)."
+                "names/text hidden (use --spoilers).",
             )
         else:
             print(TRANSCRIPT_WARNING)
@@ -1095,7 +1121,7 @@ def cmd_audit(_: argparse.Namespace) -> None:
         "machine_readable",
         "copyable",
     )
-    registry_value = cast(object, load_json_resource("source_registry.json", {}))
+    registry_value = cast("object", load_json_resource("source_registry.json", {}))
     registry = _as_mapping(registry_value)
     entries = _as_mapping(registry.get("entries", {})) if registry is not None else None
     if entries is None or not entries:
@@ -1124,7 +1150,7 @@ def cmd_audit(_: argparse.Namespace) -> None:
         if checker is not None:
             result = checker()
             if isinstance(result, list):
-                errors.extend(str(x) for x in cast(list[object], result))
+                errors.extend(str(x) for x in cast("list[object]", result))
     if errors:
         for error in errors:
             print(f"FAIL: {error}")
@@ -1134,7 +1160,7 @@ def cmd_audit(_: argparse.Namespace) -> None:
 
 def _read_track(path: str) -> Mapping[str, object]:
     try:
-        value = cast(object, json.loads(Path(path).read_text(encoding="utf-8")))
+        value = cast("object", json.loads(Path(path).read_text(encoding="utf-8")))
     except (OSError, ValueError) as exc:
         _die(f"cannot read tracking JSON: {exc}")
     mapping = _as_mapping(value)
@@ -1153,7 +1179,7 @@ def cmd_track(args: argparse.Namespace) -> None:
 def cmd_recommend(args: argparse.Namespace) -> None:
     data = _read_track(_required_str(args, "path"))
     print(
-        "Recommendations are deterministic and based only on supplied tracking fields."
+        "Recommendations are deterministic and based only on supplied tracking fields.",
     )
     if not data:
         print("No tracked state; start with fresh, build, or estus.")
@@ -1195,11 +1221,12 @@ def cmd_save(args: argparse.Namespace) -> None:
             if finder is not None:
                 found_candidates = finder()
                 if isinstance(found_candidates, Sequence) and not isinstance(
-                    found_candidates, (str, bytes)
+                    found_candidates,
+                    (str, bytes),
                 ):
                     candidates = [
                         str(candidate)
-                        for candidate in cast(Sequence[object], found_candidates)
+                        for candidate in cast("Sequence[object]", found_candidates)
                     ]
                 else:
                     candidates = []
@@ -1214,7 +1241,8 @@ def cmd_save(args: argparse.Namespace) -> None:
         for candidate in candidates:
             try:
                 reader = next(
-                    (_get_callable(module, name) for name in readers[action]), None
+                    (_get_callable(module, name) for name in readers[action]),
+                    None,
                 )
                 if reader is None:
                     _die(f"required API is missing: {' / '.join(readers[action])}")
@@ -1231,7 +1259,7 @@ def cmd_save(args: argparse.Namespace) -> None:
             _json(rendered)
         else:
             print(
-                f"Unsupported: {mapping.get('reason', 'save category is not validated')}"
+                f"Unsupported: {mapping.get('reason', 'save category is not validated')}",
             )
         return
     if not _flag(args, "spoilers"):
@@ -1287,7 +1315,7 @@ def cmd_frames(args: argparse.Namespace) -> None:
         return
     records_value = payload.get("records", ())
     records = (
-        cast(Sequence[object], records_value)
+        cast("Sequence[object]", records_value)
         if isinstance(records_value, Sequence)
         and not isinstance(records_value, (str, bytes))
         else ()
@@ -1323,7 +1351,8 @@ def cmd_frames(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="darksouls", description="Spoiler-safe Dark Souls Remastered companion"
+        prog="darksouls",
+        description="Spoiler-safe Dark Souls Remastered companion",
     )
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("fresh")
@@ -1360,7 +1389,10 @@ def build_parser() -> argparse.ArgumentParser:
     rings.add_argument("--favor", action="store_true")
     p = sub.add_parser("estus")
     p.add_argument(
-        "sub", choices=("max", "shards", "souls", "kindling"), nargs="?", default="max"
+        "sub",
+        choices=("max", "shards", "souls", "kindling"),
+        nargs="?",
+        default="max",
     )
     p = sub.add_parser("farm")
     p.add_argument("item", choices=("souls", "titanite", "humanity", "moss"), nargs="?")
@@ -1436,7 +1468,8 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--json", action="store_true")
     search.add_argument("--spoilers", action="store_true")
     transcript = sub.add_parser(
-        "transcript", help="local DSR automatic-caption transcript"
+        "transcript",
+        help="local DSR automatic-caption transcript",
     )
     transcript.set_defaults(
         transcript_action=None,
@@ -1454,10 +1487,14 @@ def build_parser() -> argparse.ArgumentParser:
     def _transcript_action_parser(name: str) -> argparse.ArgumentParser:
         action_parser = ts.add_parser(name)
         action_parser.add_argument(
-            "--json", action="store_true", default=argparse.SUPPRESS
+            "--json",
+            action="store_true",
+            default=argparse.SUPPRESS,
         )
         action_parser.add_argument(
-            "--spoilers", action="store_true", default=argparse.SUPPRESS
+            "--spoilers",
+            action="store_true",
+            default=argparse.SUPPRESS,
         )
         return action_parser
 
@@ -1466,10 +1503,15 @@ def build_parser() -> argparse.ArgumentParser:
     search_transcript_parser = _transcript_action_parser("search")
     search_transcript_parser.add_argument("query", nargs="*")
     search_transcript_parser.add_argument(
-        "--video-index", type=int, dest="video_index", default=argparse.SUPPRESS
+        "--video-index",
+        type=int,
+        dest="video_index",
+        default=argparse.SUPPRESS,
     )
     search_transcript_parser.add_argument(
-        "--limit", type=int, default=argparse.SUPPRESS
+        "--limit",
+        type=int,
+        default=argparse.SUPPRESS,
     )
     get_transcript_parser = _transcript_action_parser("get")
     get_transcript_parser.add_argument("video_index", type=int)

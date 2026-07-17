@@ -1,5 +1,7 @@
 # Troubleshooting
 
+Read this when fetching, parsing, detail enrichment, locale handling, or fixtures fail.
+
 ## Amazon blocked request
 
 Symptoms:

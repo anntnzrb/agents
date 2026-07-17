@@ -60,7 +60,7 @@ and schemas.
 uv run --script <skill-dir>/scripts/cli.py export <WORKFLOW_ID> <OUT.json>
 ```
 
-**Tip**: Edit JSON, then apply with `n8nctl.py update`.
+**Tip**: Edit JSON, then apply with `uv run --script <skill-dir>/scripts/cli.py update`.
 
 ---
 

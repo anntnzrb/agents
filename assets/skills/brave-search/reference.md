@@ -1,5 +1,7 @@
 # Brave Search HTTP Reference
 
+Read this before consuming projected fields, raw payloads, or provider-error envelopes.
+
 ## Base URL
 
 - `https://api.search.brave.com/res/v1`

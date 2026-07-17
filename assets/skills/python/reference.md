@@ -6,12 +6,12 @@ Keep this file for fast decisions while coding. Load cookbooks for tutorials and
 
 For JSON/API/RPC/CLI/env payloads, keep known shapes in the type system while they are still dict-shaped.
 
-| Shape               | Prefer                     | Example                          |
-| ------------------- | -------------------------- | -------------------------------- | ------------------------ |
-| fixed object keys   | `TypedDict`                | API request/response payloads    |
-| optional keys       | `NotRequired` / `Required` | sparse updates                   |
-| fixed string values | `Literal`                  | `status: Literal["ok", "error"]` |
-| small variant set   | discriminated union        | `Created                         | Updated`with a`kind` tag |
+| Shape               | Prefer                     | Example                              |
+| ------------------- | -------------------------- | ------------------------------------ |
+| fixed object keys   | `TypedDict`                | API request/response payloads        |
+| optional keys       | `NotRequired` / `Required` | sparse updates                       |
+| fixed string values | `Literal`                  | `status: Literal["ok", "error"]`   |
+| small variant set   | discriminated union        | `Created \| Updated` with a `kind` tag |
 
 ```python
 from typing import Literal, NotRequired, TypedDict

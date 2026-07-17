@@ -32,20 +32,20 @@
 
 Literal search:
 
-```bash
-grep-app search "useState(" f.lang=TypeScript
+```text
+uv run --script <skill-dir>/scripts/cli.py search "useState(" f.lang=TypeScript
 ```
 
 Regex search:
 
-```bash
-grep-app regex "useState\\(" f.lang=TypeScript
+```text
+uv run --script <skill-dir>/scripts/cli.py regex "useState\\(" f.lang=TypeScript
 ```
 
 Scoped search:
 
-```bash
-grep-app search "errgroup.WithContext(" f.repo=golang/sync
+```text
+uv run --script <skill-dir>/scripts/cli.py search "errgroup.WithContext(" f.repo=golang/sync
 ```
 
 ## Response shape

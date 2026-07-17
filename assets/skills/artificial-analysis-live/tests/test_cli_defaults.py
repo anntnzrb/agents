@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
 import os
-from pathlib import Path
 import tempfile
 import unittest
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+
 import _path  # noqa: F401
 from artificial_analysis import cli
 
-
-TMP_ARTIFACT_DIR = Path("/tmp/artifacts/artificial-analysis")
+TMP_ARTIFACT_DIR = Path(tempfile.gettempdir()) / "artifacts" / "artificial-analysis"
 TMP_SNAPSHOT = TMP_ARTIFACT_DIR / "full-data.json"
 TMP_ENDPOINTS = TMP_ARTIFACT_DIR / "endpoints.txt"
 TMP_URL = TMP_ARTIFACT_DIR / "full-url.txt"
@@ -56,22 +56,20 @@ class TestCliDefaultPaths(unittest.TestCase):
 
         self.assertEqual(
             flags["output_json"],
-            "Path (default /tmp/artifacts/artificial-analysis/full-data.json)",
+            "Path (default <temp-dir>/artifacts/artificial-analysis/full-data.json)",
         )
         self.assertEqual(
             flags["output_endpoints"],
-            "Path (default /tmp/artifacts/artificial-analysis/endpoints.txt)",
+            "Path (default <temp-dir>/artifacts/artificial-analysis/endpoints.txt)",
         )
         self.assertEqual(
             flags["output_url"],
-            "Path (default /tmp/artifacts/artificial-analysis/full-url.txt)",
+            "Path (default <temp-dir>/artifacts/artificial-analysis/full-url.txt)",
         )
 
     def test_default_snapshot_guard_rejects_stale_tmp_snapshot(self) -> None:
         stale_snapshot = {
-            "meta": {
-                "fetched_at": (datetime.now(UTC) - timedelta(days=2)).isoformat()
-            }
+            "meta": {"fetched_at": (datetime.now(UTC) - timedelta(days=2)).isoformat()},
         }
 
         with self.assertRaisesRegex(cli.ExtractionError, "Default snapshot is stale"):
@@ -80,7 +78,10 @@ class TestCliDefaultPaths(unittest.TestCase):
     def test_default_snapshot_guard_allows_explicit_stale_snapshot(self) -> None:
         stale_snapshot = {"meta": {"fetched_at": "2000-01-01T00:00:00+00:00"}}
 
-        cli._ensure_default_snapshot_fresh(Path("fixtures/old-snapshot.json"), stale_snapshot)
+        cli._ensure_default_snapshot_fresh(
+            Path("fixtures/old-snapshot.json"),
+            stale_snapshot,
+        )
 
     def test_fetch_requires_exact_key_error_before_network(self) -> None:
         with (
@@ -103,13 +104,19 @@ class TestCliDefaultPaths(unittest.TestCase):
             with (
                 patch.dict(
                     os.environ,
-                    {"ARTIFICIAL_ANALYSIS_API_KEY": "process-key", "UNRELATED": "process-value"},
+                    {
+                        "ARTIFICIAL_ANALYSIS_API_KEY": "process-key",
+                        "UNRELATED": "process-value",
+                    },
                     clear=True,
                 ),
                 patch.object(cli, "_dotenv_candidates", return_value=[env_file]),
             ):
                 cli._load_dotenv()
-                self.assertEqual(os.environ["ARTIFICIAL_ANALYSIS_API_KEY"], "process-key")
+                self.assertEqual(
+                    os.environ["ARTIFICIAL_ANALYSIS_API_KEY"],
+                    "process-key",
+                )
                 self.assertEqual(os.environ["UNRELATED"], "process-value")
 
     def test_schema_v2_readers_join_slim_endpoints_to_canonical_models(self) -> None:
@@ -128,7 +135,7 @@ class TestCliDefaultPaths(unittest.TestCase):
                     sort_by="intelligence",
                     order="auto",
                     limit=10,
-                )
+                ),
             )
             harness = cli._harness_payload(
                 SimpleNamespace(
@@ -137,7 +144,7 @@ class TestCliDefaultPaths(unittest.TestCase):
                     creator=None,
                     open_weights_only=False,
                     limit=10,
-                )
+                ),
             )
         self.assertEqual(query["rows"][0]["model_name"], "Model A")
         self.assertEqual(query["rows"][0]["price_blended"], 4)

@@ -99,7 +99,7 @@ Run the narrow tests, the full skill test suite, and one fresh public live comma
 ```bash
 uv run --with pytest pytest -q tests/test_rsc_contract.py
 uv run --with pytest pytest -q tests
-uv run python -m py_compile lib/artificial_analysis/cli.py
+uvx ruff check --select E9,F63,F7,F82 lib/artificial_analysis/cli.py
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" coding --model gpt-5-6 --sort-by cost --limit 5
 uv run --script "$SKILLS_DIR/skill-creator/scripts/cli.py" quick-validate "$SKILLS_DIR/artificial-analysis-live"
 ```

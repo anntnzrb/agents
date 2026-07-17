@@ -202,14 +202,15 @@ def normalize_markets(details: dict[str, Any]) -> list[dict[str, Any]]:
                 "groups": market_groups.get(market_id, []),
                 "selectionCount": len(selections),
                 "selections": selections,
-            }
+            },
         )
 
     return normalized
 
 
 def extract_tracker_event(
-    tracker: dict[str, Any], event_id: int
+    tracker: dict[str, Any],
+    event_id: int,
 ) -> dict[str, Any] | None:
     events = tracker.get("events", []) or []
     for event in events:
@@ -265,7 +266,7 @@ def selection_digest(
                     "selectionName": selection.get("name"),
                     "price": price,
                     "impliedProbability": implied,
-                }
+                },
             )
 
     all_open.sort(key=lambda x: (x["price"], str(x.get("marketName"))))
@@ -432,7 +433,8 @@ class EcuabetMatchClient:
         params = self._common_params(event_id)
         params["showNonBoosts"] = str(self._config.show_non_boosts).lower()
         response = self._client.get(
-            f"{self._config.base_url}/GetEventDetails", params=params
+            f"{self._config.base_url}/GetEventDetails",
+            params=params,
         )
         response.raise_for_status()
         return response.json()
@@ -464,7 +466,10 @@ def write_snapshot(
         target = output
         target.parent.mkdir(parents=True, exist_ok=True)
 
-    target.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n")
+    target.write_text(
+        json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     return target
 
 
@@ -473,7 +478,7 @@ def parse_args() -> argparse.Namespace:
         description=(
             "Fetch live Ecuabet sportsbook data for a match URL/id "
             "using Altenar widget endpoints."
-        )
+        ),
     )
     parser.add_argument(
         "match",
@@ -555,7 +560,8 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912
         and args.odds_floor > args.odds_ceiling
     ):
         print(
-            "error: --odds-floor cannot be greater than --odds-ceiling", file=sys.stderr
+            "error: --odds-floor cannot be greater than --odds-ceiling",
+            file=sys.stderr,
         )
         return 2
 

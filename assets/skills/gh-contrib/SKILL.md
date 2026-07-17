@@ -11,19 +11,24 @@ allowed-tools: ""
 
 ## Prerequisites
 
-- Changes committed in a feature branch
-- Duplicates already verified by user
+- Changes committed in a feature branch.
+- Repository contribution rules inspected read-only.
+- Duplicate issues and pull requests checked read-only.
+- External writes require explicit user authorization.
 
 ## Workflow
 
 ### 1. Check Contribution Guidelines
 
-Deploy explore agent to find contribution guidelines:
+Inspect contribution guidelines read-only:
 
 - Look for CONTRIBUTING.md, README, issue/PR templates
 - Extract: title format, target branch, required labels
 
 ### 2. Detect Fork & Push
+
+Inspect remotes first. Before pushing, state the fork, branch, issue, and PR plan. If the user's request
+did not explicitly authorize those writes, ask once before continuing.
 
 ```bash
 git remote -v  # identify fork remote
@@ -57,6 +62,10 @@ Closes #<issue-number>"
 ```bash
 gh issue comment <issue-number> --repo <owner>/<repo> --body "PR: #<pr-number>"
 ```
+
+### 6. Verify
+
+Re-read the created issue and pull request. Report their URLs and any failed or skipped mutation.
 
 ## Default Conventions
 

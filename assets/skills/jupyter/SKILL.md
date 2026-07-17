@@ -60,13 +60,13 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 0,2-4      # specific cells
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -o            # include outputs
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb --output-only # outputs only
-uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -o --save-images ./images/  # save images to dir
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -o --save-images <images-dir>
 
 # Execute cells
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb            # all cells, show output
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -i         # save outputs back to file
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 0,2-4   # specific cells
-uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb --save-images ./outputs/  # save images
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb --save-images <outputs-dir>
 
 # Search cells
 uv run --script <skill-dir>/scripts/cli.py grep "import pandas" notebook.ipynb      # find cells with pattern
@@ -140,8 +140,10 @@ uv run --script <skill-dir>/scripts/cli.py clear notebook.ipynb
 | Validate syntax         | `uv run --script <skill-dir>/scripts/cli.py validate`                   |
 | Convert formats         | `uv run --script <skill-dir>/scripts/cli.py convert`                    |
 
-## References
+## Required follow-up reads
 
-- [reference.md](reference.md) - Notebook structure, execution model, best practices
-- [cookbook/workflows.md](cookbook/workflows.md) - Common workflow recipes
-- [cookbook/troubleshooting.md](cookbook/troubleshooting.md) - Error handling and debugging
+| Need | Read | When |
+| --- | --- | --- |
+| Notebook structure and execution model | `reference.md` | Before structural edits or execution design |
+| Common notebook workflows | `cookbook/workflows.md` | When a documented workflow matches |
+| Errors and recovery | `cookbook/troubleshooting.md` | After execution, kernel, or format failure |

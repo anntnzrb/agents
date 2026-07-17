@@ -6,8 +6,8 @@ Server Actions created from the Odoo UI under Settings/Technical/Actions/Server 
 
 ## Hard rules
 
-- Write every snippet to /tmp/<descriptive>.py before copying it; copy with pbcopy < /tmp/<descriptive>.py.
-- Capture outputs with pbpaste > /tmp/<descriptive>_output.txt, then parse JSON into /tmp/<descriptive>_output.json.
+- Write every snippet to `<temp-dir>/<descriptive>.py` before copying it; copy with `pbcopy < <temp-dir>/<descriptive>.py` on macOS.
+- Capture outputs with `pbpaste > <temp-dir>/<descriptive>_output.txt` on macOS, then parse JSON into `<temp-dir>/<descriptive>_output.json`.
 - Read-only audits may end with raise UserError(payload_json); write success must never raise UserError.
 - A write action succeeds by assigning action = {'type': 'ir.actions.client', 'tag': 'display_notification', ...}.
 - A write action fails by raising UserError(...), intentionally rolling back the transaction.

@@ -2,6 +2,8 @@
 
 Capture Chrome DevTools performance profiles during browser automation for performance analysis.
 
+Read this before recording or diagnosing a performance trace.
+
 **Related**: [commands.md](commands.md) for full command reference, [SKILL.md](../SKILL.md) for quick start.
 
 ## Contents
@@ -80,7 +82,6 @@ agent-browser profiler stop ./interaction-profile.json
 ### CI Performance Regression Checks
 
 ```bash
-#!/bin/bash
 agent-browser profiler start
 agent-browser navigate https://app.example.com
 agent-browser wait --load networkidle

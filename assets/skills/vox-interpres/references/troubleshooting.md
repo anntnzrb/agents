@@ -102,7 +102,7 @@ Fix order:
 
 1. run with `--refresh`
 2. use `--no-cache`
-3. clear cache dir `~/.cache/vox-interpres`
+3. clear the cache directory reported by the CLI
 
 ## 10) reproducibility checklist
 

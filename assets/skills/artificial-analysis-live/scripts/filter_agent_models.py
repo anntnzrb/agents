@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
 # ///
@@ -21,9 +20,10 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import UTC, datetime, timedelta
 import subprocess
 import sys
+import tempfile
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, TypedDict
 
@@ -43,7 +43,9 @@ class Row(TypedDict):
     license: str | None
 
 
-DEFAULT_SNAPSHOT = Path("/tmp/artifacts/artificial-analysis/full-data.json")
+DEFAULT_SNAPSHOT = (
+    Path(tempfile.gettempdir()) / "artifacts" / "artificial-analysis" / "full-data.json"
+)
 DEFAULT_SKILL_CLI = Path(__file__).resolve().parent / "cli.py"
 DEFAULT_SNAPSHOT_MAX_AGE = timedelta(hours=24)
 
@@ -94,14 +96,14 @@ def ensure_default_snapshot_fresh(snapshot: Path, raw: Json) -> None:
     fetched_at = meta.get("fetched_at") if isinstance(meta, dict) else None
     if not isinstance(fetched_at, str) or not fetched_at:
         raise ValueError(
-            f"default snapshot missing meta.fetched_at: {snapshot}. Run with --fetch first or pass --snapshot."
+            f"default snapshot missing meta.fetched_at: {snapshot}. Run with --fetch first or pass --snapshot.",
         )
 
     try:
         fetched_at_dt = datetime.fromisoformat(fetched_at)
     except ValueError as exc:
         raise ValueError(
-            f"default snapshot has invalid meta.fetched_at: {snapshot}. Run with --fetch first or pass --snapshot."
+            f"default snapshot has invalid meta.fetched_at: {snapshot}. Run with --fetch first or pass --snapshot.",
         ) from exc
 
     if fetched_at_dt.tzinfo is None:
@@ -109,7 +111,7 @@ def ensure_default_snapshot_fresh(snapshot: Path, raw: Json) -> None:
     age = datetime.now(UTC) - fetched_at_dt.astimezone(UTC)
     if age > DEFAULT_SNAPSHOT_MAX_AGE:
         raise ValueError(
-            f"default snapshot is stale ({fetched_at}, older than 24h): {snapshot}. Run with --fetch first or pass --snapshot."
+            f"default snapshot is stale ({fetched_at}, older than 24h): {snapshot}. Run with --fetch first or pass --snapshot.",
         )
 
 
@@ -211,7 +213,7 @@ def emit_markdown(rows: list[Row]) -> None:
     for idx, row in enumerate(rows, start=1):
         print(
             f"| {idx} | {row['name']} | {fmt(row['open_weights'])} | "
-            f"{fmt(row['omni'])} | {fmt(row['tbench'])} | {fmt(row['ifbench'])} | {row['license'] or '-'} |"
+            f"{fmt(row['omni'])} | {fmt(row['tbench'])} | {fmt(row['ifbench'])} | {row['license'] or '-'} |",
         )
 
 
@@ -228,8 +230,8 @@ def emit_tsv(rows: list[Row]) -> None:
                     fmt(row["tbench"]),
                     fmt(row["ifbench"]),
                     row["license"] or "-",
-                ]
-            )
+                ],
+            ),
         )
 
 
@@ -247,26 +249,34 @@ def fetch_snapshot(skill_cli: Path) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Filter Artificial Analysis models for coding-agent use."
+        description="Filter Artificial Analysis models for coding-agent use.",
     )
     parser.add_argument("--snapshot", type=Path, default=DEFAULT_SNAPSHOT)
     parser.add_argument(
-        "--fetch", action="store_true", help="refresh AA snapshot before filtering"
+        "--fetch",
+        action="store_true",
+        help="refresh AA snapshot before filtering",
     )
     parser.add_argument("--skill-cli", type=Path, default=DEFAULT_SKILL_CLI)
     parser.add_argument(
-        "--open-weight", choices=["all", "true", "false"], default="all"
+        "--open-weight",
+        choices=["all", "true", "false"],
+        default="all",
     )
     parser.add_argument("--min-omni", type=float, default=-20.0)
     parser.add_argument("--min-tbench", type=float, default=0.30)
     parser.add_argument("--min-ifbench", type=float, default=0.55)
     parser.add_argument(
-        "--sort-by", choices=["tbench", "omni", "ifbench", "name"], default="tbench"
+        "--sort-by",
+        choices=["tbench", "omni", "ifbench", "name"],
+        default="tbench",
     )
     parser.add_argument("--asc", action="store_true", help="sort ascending")
     parser.add_argument("--limit", type=int, default=0, help="0 means no limit")
     parser.add_argument(
-        "--format", choices=["markdown", "tsv", "json"], default="markdown"
+        "--format",
+        choices=["markdown", "tsv", "json"],
+        default="markdown",
     )
     return parser.parse_args()
 

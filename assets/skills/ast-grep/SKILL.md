@@ -24,7 +24,11 @@ Read-only CLI search with `sg` or `ast-grep`. AST-aware grep for code exploratio
 - Read-only: never use `--rewrite`, `-r`, `--update-all`, or `--interactive`
 - Stdin requires `--lang`
 
-## Resources
+## Required follow-up reads
 
-- `reference.md`: flags, strictness, selectors, output formats
-- `cookbook/`: troubleshooting and recipes
+| Need | Read | When |
+| --- | --- | --- |
+| Flags and matching semantics | `reference.md` | For strictness, selectors, output, globs, config, or stdin |
+| Basic patterns | `cookbook/basics.md` | For common read-only find-usage recipes |
+| Advanced patterns | `cookbook/advanced.md` | For selectors, relationships, or tighter scope control |
+| Recovery | `cookbook/troubleshooting.md` | When parsing, language detection, quoting, or binary resolution fails |

@@ -2,6 +2,8 @@
 
 Complete reference for all agent-browser commands. For quick start and common patterns, see SKILL.md.
 
+Read this when the router omits a required command, flag, or output contract.
+
 ## Navigation
 
 ```bash

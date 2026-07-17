@@ -3,7 +3,9 @@ name: fact-check
 description: Verify a generated document against actual code and git history
 ---
 
-Load the visual-explainer skill and fact-check the document named by `$@`. If no argument is given, use the most recently modified HTML file in `~/.agent/diagrams/`.
+Load the visual-explainer skill and fact-check the document named by `$@`. If no
+argument is given, use the most recently modified HTML file in
+`~/.agent/diagrams/`.
 
 ## Claim extraction
 

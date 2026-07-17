@@ -86,35 +86,23 @@ Match output to task size:
 
 Defaults, validation order, and interop rules live in `reference.md`.
 
-## Read Next
+## Required follow-up reads
 
-Read the smallest relevant file before implementing when the task crosses one of these boundaries:
-
-- weird coercion / `this` / closure / prototype bugs -> `cookbook/semantics.md`
-- modern syntax, transforms, iterators, immutable updates -> `cookbook/patterns.md`
-- promises, cancellation, event loop, queues, async iterators -> `cookbook/async.md`
-- ESM/CJS, exports, resolution, dynamic import -> `cookbook/modules.md`
-- Node.js APIs, streams, workers, processes -> `cookbook/node.md`
-- browser APIs, workers, storage, observers, perf APIs -> `cookbook/browser.md`
-- tests, mocks, fixtures, timers, Testing Library -> `cookbook/testing.md`
-- routing matrix, validation defaults, failure modes -> `reference.md`
+| Need | Read | When |
+| --- | --- | --- |
+| Coercion, `this`, closures, prototypes | `cookbook/semantics.md` | Debugging language-semantics failures |
+| Syntax, transforms, iterators, immutable updates | `cookbook/patterns.md` | Selecting implementation patterns |
+| Promises, cancellation, queues, async iterators | `cookbook/async.md` | Designing or debugging async flow |
+| ESM/CJS, exports, resolution, dynamic imports | `cookbook/modules.md` | Crossing module boundaries |
+| Node.js APIs, streams, workers, processes | `cookbook/node.md` | Node runtime behavior matters |
+| Browser APIs, workers, storage, observers | `cookbook/browser.md` | Browser runtime behavior matters |
+| Tests, mocks, fixtures, timers, Testing Library | `cookbook/testing.md` | Testing behavior or flakiness |
+| Routing, validation defaults, failure modes | `reference.md` | Before implementation when route is unclear |
 
 ## Assets
 
 - `assets/vitest.config.mjs` - minimal starter Vitest config for JS repos
 - `assets/jest.config.mjs` - minimal starter Jest config for JS repos
-
-## Files
-
-- `reference.md` - decision matrix, interop defaults, validation ladder
-- `cookbook/semantics.md` - language quirks and debugging heuristics
-- `cookbook/patterns.md` - ES2023+ syntax, transforms, generators, perf-friendly patterns
-- `cookbook/async.md` - concurrency, event loop, cancellation, streams
-- `cookbook/modules.md` - package/module structure and resolution
-- `cookbook/node.md` - Node.js runtime patterns
-- `cookbook/browser.md` - browser runtime patterns
-- `cookbook/testing.md` - Jest/Vitest/Testing Library patterns
-- `evals/evals.json` - starter eval prompts for future skill iteration
 
 ## Research tools
 

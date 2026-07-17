@@ -125,16 +125,16 @@ For each selected package, create isolated worktree:
 
 ```bash
 # From main repo (stays on master, untouched)
-git worktree add /tmp/nixpkgs-<package>-<version> -b <package>-<version> master
+git worktree add <temp-dir>/nixpkgs-<package>-<version> -b <package>-<version> master
 ```
 
 ### Launch Parallel Agents
 
-```
-// Single message with N Task calls, each with its own worktree:
-task(subagent_type="general", description="Update pkg1", prompt="Update pkg1 in /tmp/nixpkgs-pkg1-v1...")
-task(subagent_type="general", description="Update pkg2", prompt="Update pkg2 in /tmp/nixpkgs-pkg2-v2...")
-```
+Use the current harness's implementation-capable worker or subagent primitive.
+Launch all selected packages in one parallel batch, with one worker per worktree.
+Give each worker the package, old version, target version, exact worktree path,
+constraints, and acceptance checks from the prompt template below. Do not assume a
+literal `task(...)` API or a harness-specific worker type.
 
 ### Update Agent Prompt Template
 
@@ -144,7 +144,7 @@ Current version: <OLD_VERSION>
 Target version: <NEW_VERSION>
 
 ## Setup
-Working directory: /tmp/nixpkgs-<PACKAGE>-<NEW_VERSION>
+Working directory: <temp-dir>/nixpkgs-<PACKAGE>-<NEW_VERSION>
 (Worktree already created, you are on branch <PACKAGE>-<NEW_VERSION>)
 
 ## IMPORTANT RULES
@@ -155,7 +155,7 @@ Working directory: /tmp/nixpkgs-<PACKAGE>-<NEW_VERSION>
 ## Steps
 
 1. **Verify worktree:**
-   cd /tmp/nixpkgs-<PACKAGE>-<NEW_VERSION>
+   cd <temp-dir>/nixpkgs-<PACKAGE>-<NEW_VERSION>
    git status  # Should show branch <PACKAGE>-<NEW_VERSION>
 
 2. **Run nix-update (with timeout):**
@@ -169,7 +169,7 @@ Working directory: /tmp/nixpkgs-<PACKAGE>-<NEW_VERSION>
    If timeout: ABORT, cleanup worktree, report "build timeout"
    If build fails: ABORT, cleanup worktree, report "build failed"
 
-   ./result/bin/<BINARY> --version
+   result/bin/<BINARY> --version
 
 4. **Test dependent packages (MANDATORY - DO NOT SKIP):**
    timeout 600 nix run nixpkgs#nixpkgs-review -- wip --print-result
@@ -209,7 +209,7 @@ EOF
 
 ## On Failure
 If any step fails or times out:
-1. Cleanup: git worktree remove /tmp/nixpkgs-<PACKAGE>-<NEW_VERSION> --force
+1. Cleanup: git worktree remove <temp-dir>/nixpkgs-<PACKAGE>-<NEW_VERSION> --force
 2. Delete branch: git branch -D <PACKAGE>-<NEW_VERSION>
 3. Report failure with reason
 ```
@@ -219,7 +219,7 @@ If any step fails or times out:
 After all agents complete, cleanup:
 
 ```bash
-git worktree remove /tmp/nixpkgs-<package>-<version>
+git worktree remove <temp-dir>/nixpkgs-<package>-<version>
 # Repeat for each worktree
 ```
 

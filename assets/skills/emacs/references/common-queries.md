@@ -18,10 +18,9 @@ uv run --script <skill-dir>/scripts/cli.py face fixed-pitch
 uv run --script <skill-dir>/scripts/cli.py face variable-pitch
 ```
 
-For a combined query:
+For a combined query, write this form to `<temp-dir>/emacs-query.el`:
 
-```bash
-cat <<'ELISP' | uv run --script <skill-dir>/scripts/cli.py eval - --json
+```elisp
 (list
   (cons "default_family" (face-attribute 'default :family nil 'default))
   (cons "default_height" (face-attribute 'default :height nil 'default))
@@ -30,7 +29,10 @@ cat <<'ELISP' | uv run --script <skill-dir>/scripts/cli.py eval - --json
   (cons "variable_pitch_family" (face-attribute 'variable-pitch :family nil 'default))
   (cons "variable_pitch_height" (face-attribute 'variable-pitch :height nil 'default))
   (cons "frame_font" (or (frame-parameter nil 'font) "")))
-ELISP
+```
+
+```text
+uv run --script <skill-dir>/scripts/cli.py eval-file <temp-dir>/emacs-query.el --json
 ```
 
 ## Current buffer context
@@ -55,54 +57,64 @@ uv run --script <skill-dir>/scripts/cli.py library use-package
 
 ## Variable values
 
-Use a custom eval when there is no dedicated helper subcommand yet:
+When no helper exists, write this form to `<temp-dir>/emacs-query.el`:
 
-```bash
-cat <<'ELISP' | uv run --script <skill-dir>/scripts/cli.py eval - --json
+```elisp
 (list
   (cons "inhibit_startup_message" inhibit-startup-message)
   (cons "use_dialog_box" use-dialog-box)
   (cons "package_enable_at_startup" package-enable-at-startup))
-ELISP
+```
+
+```text
+uv run --script <skill-dir>/scripts/cli.py eval-file <temp-dir>/emacs-query.el --json
 ```
 
 ## Mode state
 
-```bash
-cat <<'ELISP' | uv run --script <skill-dir>/scripts/cli.py eval - --json
+Write this form to `<temp-dir>/emacs-query.el`:
+
+```elisp
 (list
   (cons "menu_bar_mode" (bound-and-true-p menu-bar-mode))
   (cons "tool_bar_mode" (bound-and-true-p tool-bar-mode))
   (cons "scroll_bar_mode" (bound-and-true-p scroll-bar-mode))
   (cons "blink_cursor_mode" (bound-and-true-p blink-cursor-mode)))
-ELISP
+```
+
+```text
+uv run --script <skill-dir>/scripts/cli.py eval-file <temp-dir>/emacs-query.el --json
 ```
 
 ## Locate docs/source roots
 
-```bash
-cat <<'ELISP' | uv run --script <skill-dir>/scripts/cli.py eval - --json
+Write this form to `<temp-dir>/emacs-query.el`:
+
+```elisp
 (list
   (cons "data_directory" data-directory)
   (cons "invocation_directory" invocation-directory)
   (cons "info_directories" Info-directory-list)
   (cons "package_library" (or (locate-library "package") "")))
-ELISP
+```
+
+```text
+uv run --script <skill-dir>/scripts/cli.py eval-file <temp-dir>/emacs-query.el --json
 ```
 
 Then search locally with `rg`.
 
 ## Eval from file
 
-For larger forms, prefer a temp file:
+For larger forms, write the query to `<temp-dir>/emacs-query.el`:
 
-```bash
-cat > <temp-dir>/emacs-query.el <<'ELISP'
+```elisp
 (list
   (cons "default_family" (face-attribute 'default :family nil 'default))
   (cons "default_height" (face-attribute 'default :height nil 'default)))
-ELISP
+```
 
+```text
 uv run --script <skill-dir>/scripts/cli.py eval-file <temp-dir>/emacs-query.el --json
 ```
 

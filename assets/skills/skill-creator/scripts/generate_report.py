@@ -25,7 +25,7 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
     if history:
         for r in history[0].get("train_results", history[0].get("results", [])):
             train_queries.append(
-                {"query": r["query"], "should_trigger": r.get("should_trigger", True)}
+                {"query": r["query"], "should_trigger": r.get("should_trigger", True)},
             )
         if history[0].get("test_results"):
             for r in history[0].get("test_results", []):
@@ -33,7 +33,7 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
                     {
                         "query": r["query"],
                         "should_trigger": r.get("should_trigger", True),
-                    }
+                    },
                 )
 
     refresh_tag = (
@@ -166,7 +166,7 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
     <div class="explainer">
         <strong>Optimizing your skill's description.</strong> This page updates automatically as Claude tests different versions of your skill's description. Each row is an iteration — a new description attempt. The columns show test queries: green checkmarks mean the skill triggered correctly (or correctly didn't trigger), red crosses mean it got it wrong. The "Train" score shows performance on queries used to improve the description; the "Test" score shows performance on held-out queries the optimizer hasn't seen. When it's done, Claude will apply the best-performing description to your skill.
     </div>
-"""
+""",
     ]
 
     # Summary section
@@ -208,14 +208,14 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
     for qinfo in train_queries:
         polarity = "positive-col" if qinfo["should_trigger"] else "negative-col"
         html_parts.append(
-            f'                <th class="{polarity}">{html.escape(qinfo["query"])}</th>\n'
+            f'                <th class="{polarity}">{html.escape(qinfo["query"])}</th>\n',
         )
 
     # Add column headers for test queries (different color)
     for qinfo in test_queries:
         polarity = "positive-col" if qinfo["should_trigger"] else "negative-col"
         html_parts.append(
-            f'                <th class="test-col {polarity}">{html.escape(qinfo["query"])}</th>\n'
+            f'                <th class="test-col {polarity}">{html.escape(qinfo["query"])}</th>\n',
         )
 
     html_parts.append("""            </tr>
@@ -226,11 +226,12 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
     # Find best iteration for highlighting
     if test_queries:
         best_iter = max(history, key=lambda h: h.get("test_passed") or 0).get(
-            "iteration"
+            "iteration",
         )
     else:
         best_iter = max(
-            history, key=lambda h: h.get("train_passed", h.get("passed", 0))
+            history,
+            key=lambda h: h.get("train_passed", h.get("passed", 0)),
         ).get("iteration")
 
     # Add rows for each iteration
@@ -271,7 +272,7 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
                 ratio = correct / total
                 if ratio >= 0.8:
                     return "score-good"
-                elif ratio >= 0.5:
+                if ratio >= 0.5:
                     return "score-ok"
             return "score-bad"
 
@@ -298,7 +299,7 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
             css_class = "pass" if did_pass else "fail"
 
             html_parts.append(
-                f'                <td class="result {css_class}">{icon}<span class="rate">{triggers}/{runs}</span></td>\n'
+                f'                <td class="result {css_class}">{icon}<span class="rate">{triggers}/{runs}</span></td>\n',
             )
 
         # Add result for each test query (with different background)
@@ -312,7 +313,7 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
             css_class = "pass" if did_pass else "fail"
 
             html_parts.append(
-                f'                <td class="result test-result {css_class}">{icon}<span class="rate">{triggers}/{runs}</span></td>\n'
+                f'                <td class="result test-result {css_class}">{icon}<span class="rate">{triggers}/{runs}</span></td>\n',
             )
 
         html_parts.append("            </tr>\n")
@@ -332,16 +333,22 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate HTML report from run_loop output"
+        description="Generate HTML report from run_loop output",
     )
     parser.add_argument(
-        "input", help="Path to JSON output from run_loop.py (or - for stdin)"
+        "input",
+        help="Path to JSON output from run_loop.py (or - for stdin)",
     )
     parser.add_argument(
-        "-o", "--output", default=None, help="Output HTML file (default: stdout)"
+        "-o",
+        "--output",
+        default=None,
+        help="Output HTML file (default: stdout)",
     )
     parser.add_argument(
-        "--skill-name", default="", help="Skill name to include in the report title"
+        "--skill-name",
+        default="",
+        help="Skill name to include in the report title",
     )
     args = parser.parse_args()
 

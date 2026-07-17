@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Dark Souls 3 save file parser -- read-only .sl2 decryptor + stat reader.
 
 BND4 structure: tremwil/DS3SaveUnpacker (MIT).
@@ -61,11 +60,11 @@ def _bonfire_flags(items: list[object]) -> list[BonfireFlag]:
 
 
 _event_flags = cast(
-    dict[str, dict[str, int]],
+    "dict[str, dict[str, int]]",
     _load_resource_json("event_flags.json"),
 )
 _bonfire_bit_flags_raw = cast(
-    list[object],
+    "list[object]",
     _load_resource_json("bonfire_flags.json"),
 )
 BOSS_FLAGS: dict[str, int] = _event_flags["bosses"]
@@ -171,9 +170,9 @@ BOSS_EVENT_VALUES: dict[str, int] = {
     "Demon Prince": 0x80,
 }
 
+
 def _event_flag_matches(value: int, expected: int) -> bool:
     return (value & expected) == expected
-
 
 
 class BossStatus(TypedDict):
@@ -512,7 +511,7 @@ def read_bonfire_statuses(path: str | Path, slot: int = 0) -> list[BonfireStatus
                 unlocked=unlocked,
                 offset=offset,
                 bit=bit,
-            )
+            ),
         )
     return bonfires
 
@@ -631,7 +630,7 @@ def read_missed(path: str | Path, slot: int = 0) -> dict[str, object]:
                 "owned": owned,
                 "check": supported and not owned,
                 "supported": supported,
-            }
+            },
         )
     return {
         "current_area": current_area,
@@ -701,7 +700,7 @@ def _weapon_name_and_reinforcement(item_id: int) -> tuple[str | None, int, int]:
     base weapon ID. Resource JSON stores the +0 IDs, while saves store the
     reinforced variant, e.g. Raw Sellsword Twinblades +2 as base + 2.
     """
-    for reinforcement in range(0, 11):
+    for reinforcement in range(11):
         base_item_id = item_id - reinforcement
         name = _WEAPON_NAMES.get(base_item_id)
         if name is not None:
@@ -744,7 +743,7 @@ def _inventory_owned_by_category(inventory: InventoryResult) -> dict[str, set[st
         *(
             set(_string_list(checklist.get(key)))
             for key in ("sorceries", "pyromancies", "miracles")
-        )
+        ),
     )
     spell_keys = {_completion_key(name) for name in spell_names}
     spells = {name for name in goods if _completion_key(name) in spell_keys}
@@ -795,7 +794,9 @@ def read_inventory(path: str | Path, slot: int = 0) -> InventoryResult:
         if offset + 16 > len(slot_data):
             break
         gaitem_handle, item_id, quantity, _index = struct.unpack_from(
-            "<IIII", slot_data, offset
+            "<IIII",
+            slot_data,
+            offset,
         )
         if item_id in (0, 0xFFFFFFFF):
             continue
@@ -809,7 +810,7 @@ def read_inventory(path: str | Path, slot: int = 0) -> InventoryResult:
                 continue
             if item_type == "weapon":
                 name, reinforcement, base_item_id = _weapon_name_and_reinforcement(
-                    item_id
+                    item_id,
                 )
             else:
                 name = names.get(item_id)
@@ -921,7 +922,9 @@ def read_completion_status(path: str | Path, slot: int = 0) -> dict[str, object]
         "weapons": _collection_status(owned_by_category["weapons"], _WEAPON_NAMES),
         "armor": _collection_status(owned_by_category["armor"], _ARMOR_NAMES),
         "goods": _collection_status(
-            owned_by_category["goods"], _GOODS_NAMES, spell_keys
+            owned_by_category["goods"],
+            _GOODS_NAMES,
+            spell_keys,
         ),
         "reinforcement": {
             "supported": False,
@@ -953,33 +956,33 @@ def read_gestures(path: str | Path, slot: int = 0) -> dict[str, object]:
 
 
 __all__ = [
+    "AES_KEY",
+    "BOSS_FLAGS",
+    "CLASS_NAMES",
+    "SAVE_PATH_DEFAULT",
+    "BonfireStatus",
+    "BossStatus",
+    "InventoryResult",
+    "ItemEntry",
+    "MissedKeyItem",
+    "MissedSummary",
+    "ProgressSummary",
+    "SlotEntry",
+    "StatBlock",
+    "owned_item_names",
+    "read_area_checklists",
+    "read_bonfire_statuses",
+    "read_bonfires",
+    "read_bosses",
+    "read_completion_checklist",
+    "read_completion_status",
+    "read_current_area",
+    "read_gestures",
+    "read_inventory",
+    "read_missed",
+    "read_name",
+    "read_ng_plus",
+    "read_progress",
     "read_save",
     "read_stats",
-    "read_name",
-    "read_bosses",
-    "read_bonfires",
-    "read_bonfire_statuses",
-    "read_progress",
-    "read_ng_plus",
-    "read_completion_checklist",
-    "read_area_checklists",
-    "read_current_area",
-    "read_missed",
-    "read_inventory",
-    "owned_item_names",
-    "read_completion_status",
-    "read_gestures",
-    "StatBlock",
-    "SlotEntry",
-    "BossStatus",
-    "BonfireStatus",
-    "ProgressSummary",
-    "ItemEntry",
-    "InventoryResult",
-    "MissedSummary",
-    "MissedKeyItem",
-    "CLASS_NAMES",
-    "AES_KEY",
-    "SAVE_PATH_DEFAULT",
-    "BOSS_FLAGS",
 ]

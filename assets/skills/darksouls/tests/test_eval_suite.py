@@ -4,7 +4,6 @@ import json
 import unittest
 from pathlib import Path
 
-
 SKILL_DIR = Path(__file__).resolve().parents[1]
 EVALS_PATH = SKILL_DIR / "evals" / "evals.json"
 
@@ -44,7 +43,9 @@ class EvalSuiteSchemaTests(unittest.TestCase):
             expectations = record["expectations"]
             self.assertIsInstance(expectations, list, f"eval {record_id} expectations")
             self.assertGreaterEqual(
-                len(expectations), 3, f"eval {record_id} expectations"
+                len(expectations),
+                3,
+                f"eval {record_id} expectations",
             )
             self.assertLessEqual(len(expectations), 5, f"eval {record_id} expectations")
             for expectation in expectations:
@@ -59,7 +60,7 @@ class EvalSuiteSchemaTests(unittest.TestCase):
                     self.assertTrue(file_path.strip(), f"eval {record_id} file")
 
             record_text[record_id] = " ".join(
-                [record["prompt"], record["expected_output"], *expectations]
+                [record["prompt"], record["expected_output"], *expectations],
             ).casefold()
 
         self.assertEqual(sorted(ids), list(range(1, 161)))

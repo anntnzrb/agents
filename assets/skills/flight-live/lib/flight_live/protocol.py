@@ -89,7 +89,7 @@ def search_flights(request: SearchRequest) -> SearchPayload:
     warnings: list[str] = []
     if not filtered:
         warnings.append(
-            "No planner offers after filters. Widen date window, relax nonstop, or remove budget cap."
+            "No planner offers after filters. Widen date window, relax nonstop, or remove budget cap.",
         )
 
     insights = _build_insights(filtered)
@@ -393,7 +393,9 @@ def _build_insights(offers: Sequence[PlannerOffer]) -> InsightsPayload:
 
 
 def _build_decision(
-    *, ranked: Sequence[FlightOption], insights: InsightsPayload
+    *,
+    ranked: Sequence[FlightOption],
+    insights: InsightsPayload,
 ) -> DecisionPayload:
     if not ranked:
         return {
@@ -417,7 +419,7 @@ def _build_decision(
     premium = insights.get("weekend_premium_pct")
     if isinstance(premium, float) and premium > 8:
         actions.append(
-            "Prefer Tuesday-Thursday departures; observed weekend premium is high."
+            "Prefer Tuesday-Thursday departures; observed weekend premium is high.",
         )
 
     recommendation = (

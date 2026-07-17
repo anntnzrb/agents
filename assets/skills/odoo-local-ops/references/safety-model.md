@@ -17,7 +17,7 @@ That means:
 
 Host runtime DB access uses `psql.exe`/`psql` discovered from the local install tree or PATH.
 
-Compose runtime DB access uses `docker compose exec -T db psql ...` through the CLI. Agents should still invoke `odooctl.py`, not raw Compose commands, so redaction and read-only guards remain centralized.
+Compose runtime DB access uses `docker compose exec -T db psql ...` through the CLI. Agents should still invoke `uv run --script <skill-dir>/scripts/cli.py`, not raw Compose commands, so redaction and read-only guards remain centralized.
 
 ## Read-only SQL rules
 

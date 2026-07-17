@@ -10,7 +10,7 @@ from functools import lru_cache
 from urllib.parse import quote_plus, urlencode
 from urllib.request import Request, urlopen
 
-from .models import FlightLiveError, PlannerOffer, ResolvedPlace
+from .models import FlightLiveError, MissingExecutableError, PlannerOffer, ResolvedPlace
 
 _IATA_RE = re.compile(r"^[A-Za-z]{3}$")
 
@@ -115,7 +115,7 @@ def fetch_kiwi_web_calendar(
                 default_destination=destination_place["iata"],
                 month_hint=anchor,
                 include_return=trip_type == "roundtrip",
-            )
+            ),
         )
 
     if len(all_offers) == 0 and len(errors) > 0:
@@ -154,7 +154,7 @@ def build_kiwi_results_url(
             "infants": 0,
             "cabinClass": "ECONOMY",
             "currency": currency.lower(),
-        }
+        },
     )
     return (
         f"https://www.kiwi.com/{quote_plus(market_part)}/search/results/"
@@ -219,7 +219,7 @@ def parse_kiwi_price_buttons(
                 transfers=None,
                 airline=None,
                 source="kiwi_web_scrape",
-            )
+            ),
         )
 
     return offers
@@ -338,26 +338,27 @@ def _lookup_kiwi_place(term: str, *, locale: str) -> dict[str, str]:
 @lru_cache(maxsize=1)
 def _ensure_agent_browser_available() -> None:
     if shutil.which("nix") is None:
-        raise FlightLiveError(
+        raise MissingExecutableError(
             "Kiwi web scraper requires `nix` in PATH. Install Nix, then run: "
-            "nix run github:numtide/llm-agents.nix#agent-browser -- --version"
+            "nix run github:numtide/llm-agents.nix#agent-browser -- --version",
         )
 
     try:
         result = subprocess.run(
             ["nix", "run", _AGENT_BROWSER_FLAKE, "--", "--version"],
             check=False,
+            shell=False,
             capture_output=True,
             text=True,
             timeout=90,
         )
     except FileNotFoundError as exc:
-        raise FlightLiveError(
-            "`nix` executable is missing. Install Nix and retry."
+        raise MissingExecutableError(
+            "`nix` executable is missing. Install Nix and retry.",
         ) from exc
     except subprocess.TimeoutExpired as exc:
         raise FlightLiveError(
-            "Timed out while validating agent-browser via nix. Check network/Nix setup, then retry."
+            "Timed out while validating agent-browser via nix. Check network/Nix setup, then retry.",
         ) from exc
 
     if result.returncode != 0:
@@ -365,7 +366,7 @@ def _ensure_agent_browser_available() -> None:
         raise FlightLiveError(
             "agent-browser is unavailable through nix wrapper. "
             "Run `nix run github:numtide/llm-agents.nix#agent-browser -- --version` manually. "
-            f"stderr: {stderr or 'no stderr'}"
+            f"stderr: {stderr or 'no stderr'}",
         )
 
 
@@ -385,18 +386,19 @@ def _run_agent_browser(args: list[str], *, timeout: int) -> str:
             completed = subprocess.run(
                 cmd,
                 check=True,
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=timeout,
             )
             return completed.stdout
         except FileNotFoundError as exc:
-            raise FlightLiveError(
-                "`nix` executable is missing. Install Nix and retry."
+            raise MissingExecutableError(
+                "`nix` executable is missing. Install Nix and retry.",
             ) from exc
         except subprocess.TimeoutExpired:
             last_error = FlightLiveError(
-                "agent-browser command timed out. Retry with a narrower date window or better connectivity."
+                "agent-browser command timed out. Retry with a narrower date window or better connectivity.",
             )
         except subprocess.CalledProcessError as exc:
             stderr = (exc.stderr or "").strip()[:320]
@@ -406,7 +408,7 @@ def _run_agent_browser(args: list[str], *, timeout: int) -> str:
             last_error = FlightLiveError(
                 "agent-browser execution failed via nix wrapper. "
                 "Check `nix run github:numtide/llm-agents.nix#agent-browser -- --version` and network access. "
-                f"command={' '.join(args)}; output: {diagnostic}"
+                f"command={' '.join(args)}; output: {diagnostic}",
             )
             if not transient or attempt == 1:
                 break
@@ -443,7 +445,7 @@ def _http_get_json(url: str, *, params: Mapping[str, object]) -> object:
 
     if status >= 400:
         raise FlightLiveError(
-            f"HTTP {status} from provider {url}: {body[:200].strip()}"
+            f"HTTP {status} from provider {url}: {body[:200].strip()}",
         )
 
     try:

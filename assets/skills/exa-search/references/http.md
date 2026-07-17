@@ -29,8 +29,8 @@ Direct env vars still win:
 
 Example:
 
-```bash
-exa-search search "observability stack for small startups" 5
+```text
+uv run --script <skill-dir>/scripts/cli.py search "observability stack for small startups" 5
 ```
 
 ### Contents
@@ -40,9 +40,9 @@ exa-search search "observability stack for small startups" 5
 
 Example:
 
-```bash
-exa-search contents https://example.com/article
-exa-search contents https://example.com/a https://example.com/b
+```text
+uv run --script <skill-dir>/scripts/cli.py contents https://example.com/article
+uv run --script <skill-dir>/scripts/cli.py contents https://example.com/a https://example.com/b
 ```
 
 ### Find Similar
@@ -52,8 +52,8 @@ exa-search contents https://example.com/a https://example.com/b
 
 Example:
 
-```bash
-exa-search find-similar https://example.com/article
+```text
+uv run --script <skill-dir>/scripts/cli.py find-similar https://example.com/article
 ```
 
 ### Answer
@@ -63,8 +63,8 @@ exa-search find-similar https://example.com/article
 
 Example:
 
-```bash
-exa-search answer "What is OpenTelemetry?"
+```text
+uv run --script <skill-dir>/scripts/cli.py answer "What is OpenTelemetry?"
 ```
 
 ### Research
@@ -74,18 +74,18 @@ exa-search answer "What is OpenTelemetry?"
 
 Example:
 
-```bash
-exa-search research "Compare modern web search APIs for agent use" exa-research
+```text
+uv run --script <skill-dir>/scripts/cli.py research "Compare modern web search APIs for agent use" exa-research
 ```
 
 ## Raw requests
 
 Use `post` when you need payload control beyond the convenience wrappers.
 
-```bash
-exa-search post /search '{"query":"rust","numResults":5}'
-exa-search post /contents '{"urls":["https://example.com"]}'
-exa-search post /answer '{"query":"What is Bun?"}'
+```text
+uv run --script <skill-dir>/scripts/cli.py post /search '{"query":"rust","numResults":5}'
+uv run --script <skill-dir>/scripts/cli.py post /contents '{"urls":["https://example.com"]}'
+uv run --script <skill-dir>/scripts/cli.py post /answer '{"query":"What is Bun?"}'
 ```
 
 ## Notes

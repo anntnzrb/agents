@@ -1,5 +1,14 @@
 # Reference Guide
 
+Read this when core Clojure data, naming, project layout, error handling, or `deps.edn` details are needed.
+
+## Section index
+
+- Data structures, naming, and best practices
+- REPL workflow, performance, and code organization
+- Idioms, error handling, and project structure
+- `deps.edn`, dependency types, core patterns, and anti-patterns
+
 ## Data Structure Selection
 
 | Need                           | Data Structure                       |

@@ -60,3 +60,15 @@ nlm chat <notebook-id>
 
 - If user says "talk to my knowledge base", ask which notebook ID to use
 - No implicit state: do not assume a last-used notebook
+
+## Required follow-up reads
+
+| Need | Read | When |
+| --- | --- | --- |
+| Full command and authentication reference | `reference.md` | Before nontrivial CLI use or troubleshooting |
+| Basic notebook operations | `cookbook/basics.md` | Listing, creating, renaming, or deleting notebooks |
+| Chat workflows | `cookbook/chat.md` | Asking questions or managing chat sessions |
+| Source operations | `cookbook/sources.md` | Adding, listing, or removing sources |
+| Source transformations | `cookbook/transformations.md` | Summaries, outlines, FAQs, timelines, or TOCs |
+| Media workflows | `cookbook/media.md` | Audio or media operations |
+| Artifact workflows | `cookbook/artifacts.md` | Creating, inspecting, or deleting artifacts |

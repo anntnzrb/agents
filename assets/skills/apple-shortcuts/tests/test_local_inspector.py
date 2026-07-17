@@ -28,26 +28,39 @@ def _create_database(path: Path) -> None:
         CREATE TABLE ZSHORTCUTACTIONS (ZSHORTCUT INTEGER, ZDATA BLOB);
         CREATE TABLE ZSHORTCUTRUNEVENT (ZSHORTCUT INTEGER, ZOUTCOME TEXT, ZSOURCE TEXT, ZDATE REAL);
         CREATE TABLE ZSMARTPROMPTPERMISSION (Z_PK INTEGER, ZSHORTCUT INTEGER, ZACTIONUUID TEXT, ZDATA BLOB);
-        """
+        """,
     )
     actions = [
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.gettext",
-            "WFWorkflowActionParameters": {"UUID": "A", "WFTextActionText": "Bearer secret-token"},
-        }
+            "WFWorkflowActionParameters": {
+                "UUID": "A",
+                "WFTextActionText": "Bearer secret-token",
+            },
+        },
     ]
     smart_prompt = {
         "Mode": "Ask",
         "Status": "Allowed",
         "DataType": "Text",
-        "ContentDestination": {"appDescriptor": {"BundleIdentifier": "com.example.app", "Name": "Example"}},
+        "ContentDestination": {
+            "appDescriptor": {"BundleIdentifier": "com.example.app", "Name": "Example"},
+        },
         "SourceContentAttribution": {"origin": {"identifier": "com.example.source"}},
     }
-    conn.execute("INSERT INTO ZSHORTCUT VALUES (1, 'Visible', 'ABC', 1, 'com.example.app', 0)")
-    conn.execute("INSERT INTO ZSHORTCUTACTIONS VALUES (1, ?)", (plistlib.dumps(actions),))
+    conn.execute(
+        "INSERT INTO ZSHORTCUT VALUES (1, 'Visible', 'ABC', 1, 'com.example.app', 0)",
+    )
+    conn.execute(
+        "INSERT INTO ZSHORTCUTACTIONS VALUES (1, ?)",
+        (plistlib.dumps(actions),),
+    )
     conn.execute("INSERT INTO ZSHORTCUTRUNEVENT VALUES (1, 'success', 'widget', 0)")
     conn.execute("INSERT INTO ZSHORTCUTRUNEVENT VALUES (1, 'failure', 'widget', 1)")
-    conn.execute("INSERT INTO ZSMARTPROMPTPERMISSION VALUES (10, 1, 'A', ?)", (plistlib.dumps(smart_prompt),))
+    conn.execute(
+        "INSERT INTO ZSMARTPROMPTPERMISSION VALUES (10, 1, 'A', ?)",
+        (plistlib.dumps(smart_prompt),),
+    )
     conn.commit()
     conn.close()
 
@@ -89,11 +102,17 @@ def test_redaction_is_recursive_and_tolerates_empty_plist_blob() -> None:
 
 
 def test_inspection_cli_outputs_redacted_json(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     database = tmp_path / "Shortcuts.sqlite"
     _create_database(database)
-    monkeypatch.setattr(sys, "argv", ["inspect", "--db", str(database), "--json", "--raw", "--include-run-stats"])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["inspect", "--db", str(database), "--json", "--raw", "--include-run-stats"],
+    )
     assert inspect_local_shortcuts.main() == 0
     payload: object = json.loads(capsys.readouterr().out)
     assert _is_object_list(payload)

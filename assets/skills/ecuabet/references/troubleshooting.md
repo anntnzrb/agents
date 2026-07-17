@@ -40,7 +40,7 @@ Checks:
 
 - Override league with `--understat-league`.
 - Verify team naming from `match.home` and `match.away`.
-- Retry direct `scripts/understat.py` with explicit `--home-team` and `--away-team`.
+- Retry `feed understat` through `scripts/cli.py` with explicit teams.
 
 ## 4) Low confidence output
 

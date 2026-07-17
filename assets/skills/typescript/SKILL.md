@@ -76,14 +76,14 @@ echo "$PM"
 - Perf trace: `npx tsc --extendedDiagnostics --incremental false`
 - Resolution trace: `npx tsc --traceResolution`
 
-## Notes
+## Required follow-up reads
 
-Read when scope narrows:
-
-- config, module mode, migration, monorepos -> `reference.md`
-- advanced types, unions, branded types, helper patterns -> `cookbook/types.md`
-- type tests, `@ts-expect-error`, Vitest, tsd -> `cookbook/testing.md`
-- starter configs -> `assets/tsconfig-bundler.json`, `assets/tsconfig-nodenext.json`
+| Need | Read | When |
+| --- | --- | --- |
+| Config, modules, migration, monorepos | `reference.md` | Scope includes toolchain/config |
+| Advanced type patterns | `cookbook/types.md` | Designing non-trivial types |
+| Type/runtime tests | `cookbook/testing.md` | Adding or debugging tests |
+| Starter compiler config | `assets/tsconfig-bundler.json`, `assets/tsconfig-nodenext.json` | Creating a new matching config |
 
 ## Research Tools
 
@@ -92,11 +92,3 @@ gh search code "satisfies Record<string, unknown>" --language=TypeScript
 gh search code "expectTypeOf<" --language=TypeScript
 gh search code "\"moduleResolution\": \"NodeNext\"" --language=JSON
 ```
-
-## Files
-
-- `reference.md` - runtime-mode choice, error patterns, migration, monorepos
-- `cookbook/types.md` - high-signal type patterns
-- `cookbook/testing.md` - compile-time and runtime test patterns
-- `assets/tsconfig-bundler.json` - strict bundler-first app baseline
-- `assets/tsconfig-nodenext.json` - strict Node/Bun baseline

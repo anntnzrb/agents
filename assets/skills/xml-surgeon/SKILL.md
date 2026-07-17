@@ -75,9 +75,9 @@ Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, execut
 - Namespaces: pass `--ns prefix=uri` and use `prefix:tag` in XPath
 - Indentation drift: use `--indent` on insert/replace if needed
 
-## Resources
+## Required follow-up reads
 
-- `scripts/cli.py`: public dispatcher
-- `scripts/main.py`: internal XML edit tool
-- `scripts/lib.py`: helper module used by the CLI
-- `references/xml-surgeon.md`: XPath tips, minimal-diff notes, large-file hints
+| Need | Read | When |
+| --- | --- | --- |
+| XPath/minimal-diff guidance | `references/xml-surgeon.md` | Complex selectors or formatting risk |
+| Internal command behavior | `scripts/main.py`, `scripts/lib.py` | Debugging the public CLI |

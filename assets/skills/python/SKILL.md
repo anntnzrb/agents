@@ -95,14 +95,16 @@ Prefer `src/` layout unless the repository has a strong reason not to.
 
 ## Required follow-up reads
 
-You MUST load only the references needed by the task:
+Only task-relevant references MUST be loaded.
 
-- Async I/O/concurrency/cancellation: `cookbook/async.md`
-- Typing, JSON/API/RPC boundaries, validation: `reference.md` and `cookbook/correctness.md`
-- Testing, pytest, property-based invariants: `cookbook/testing.md`, then narrower `cookbook/testing-*.md` only when needed
-- Modern syntax/runtime compatibility: `cookbook/modern.md` and `cookbook/modern-3.11-3.12.md`
-- Functional patterns, iterators, design patterns: `cookbook/patterns.md`, `cookbook/patterns-core.md`, `cookbook/patterns-iterators.md`, or `cookbook/design-patterns.md`
-- Packaging, uv, script metadata, build backends: this file first; then project config and official tool output
+| Need | Read | When |
+| --- | --- | --- |
+| Async I/O, concurrency, cancellation | `cookbook/async.md` | Async behavior is central |
+| Typing and data boundaries | `reference.md`, `cookbook/correctness.md` | JSON, API, RPC, CLI, or validation boundaries matter |
+| Testing and property-based invariants | `cookbook/testing.md`, then matching `cookbook/testing-*.md` | Designing or debugging tests |
+| Modern syntax and runtime compatibility | `cookbook/modern.md`, then matching version guide | Target-version behavior matters |
+| Functional, iterator, or design patterns | `cookbook/patterns.md`, then matching pattern guide | Choosing an implementation pattern |
+| Packaging, uv, metadata, build backends | This file, project config, official tool output | Packaging or dependency work |
 
 ## Must / Must Not
 

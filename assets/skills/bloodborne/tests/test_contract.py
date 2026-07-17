@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
 # ///
@@ -51,7 +50,9 @@ CLI = load_cli()
 
 
 class DocumentationContractTests(unittest.TestCase):
-    def test_skill_doc_mentions_save_stateless_cache_and_registry_boundaries(self) -> None:
+    def test_skill_doc_mentions_save_stateless_cache_and_registry_boundaries(
+        self,
+    ) -> None:
         text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
         lowered = text.lower()
 
@@ -85,16 +86,22 @@ class VendoredResourceTests(unittest.TestCase):
         for filename in RESOURCE_JSON:
             with self.subTest(filename=filename):
                 path = SAVE_RESOURCE_DIR / filename
-                self.assertTrue(path.is_file(), f"missing vendored resource: {filename}")
+                self.assertTrue(
+                    path.is_file(),
+                    f"missing vendored resource: {filename}",
+                )
                 with path.open("r", encoding="utf-8") as handle:
                     parsed = json.load(handle)
                 self.assertTrue(parsed, f"empty JSON resource: {filename}")
                 self.assertIsInstance(parsed, (dict, list), filename)
 
-    def test_license_file_exists_for_vendored_gpl_resources(self) -> None:
-        license_path = SAVE_RESOURCE_DIR / "Noxde-Bloodborne-save-editor-GPL-3.0-LICENSE"
-        self.assertTrue(license_path.is_file())
-        self.assertIn("GNU GENERAL PUBLIC LICENSE", license_path.read_text(encoding="utf-8", errors="replace"))
+    def test_vendored_resources_retain_gpl_provenance(self) -> None:
+        skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+        sources_text = (SAVE_RESOURCE_DIR / "SOURCES.md").read_text(encoding="utf-8")
+
+        self.assertIn("license: GPL-3.0-or-later", skill_text)
+        self.assertIn("Noxde/Bloodborne-save-editor", sources_text)
+        self.assertIn("License: GPL-3.0", sources_text)
 
 
 class SourceRegistryContractTests(unittest.TestCase):
@@ -104,7 +111,9 @@ class SourceRegistryContractTests(unittest.TestCase):
         for key, source in CLI.SOURCES.items():
             with self.subTest(key=key):
                 self.assertRegex(key, r"^[a-z0-9_.-]+$")
-                self.assertTrue(str(source.get("url", "")).startswith(("https://", "http://")))
+                self.assertTrue(
+                    str(source.get("url", "")).startswith(("https://", "http://")),
+                )
                 self.assertTrue(source.get("license"))
                 self.assertTrue(source.get("use"))
                 self.assertIn(source.get("machine"), (True, False))
@@ -119,7 +128,15 @@ class SourceRegistryContractTests(unittest.TestCase):
             env = os.environ.copy()
             env["BLOODBORNE_CACHE_DIR"] = tmp
             result = subprocess.run(
-                ["uv", "run", "--script", str(CLI_PATH), "sources", "status", "noxde-save-editor"],
+                [
+                    "uv",
+                    "run",
+                    "--script",
+                    str(CLI_PATH),
+                    "sources",
+                    "status",
+                    "noxde-save-editor",
+                ],
                 check=True,
                 capture_output=True,
                 text=True,

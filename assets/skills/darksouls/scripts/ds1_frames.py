@@ -14,9 +14,10 @@ import re
 import struct
 import zlib
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Sequence, cast
+from typing import Any, cast
 
 FRAME_RATE = 30
 _WEAPON_ROW_SIZE = 0x110
@@ -127,7 +128,7 @@ def _read_dcx_bnd3(path: Path) -> tuple[_Member, ...]:
         compressed = path.read_bytes()
     except OSError as exc:
         raise FrameInstallError(
-            f"cannot read required install file: {path.name}"
+            f"cannot read required install file: {path.name}",
         ) from exc
     if len(compressed) < 0x50 or compressed[:4] != b"DCX\0":
         raise FrameFormatError(f"{path.name}: expected DCX")
@@ -226,7 +227,7 @@ def _read_tae(data: bytes) -> tuple[_Animation, ...]:
                     round(start * FRAME_RATE),
                     round(end * FRAME_RATE),
                     judge,
-                )
+                ),
             )
         animations.append(_Animation(animation_id, tuple(events)))
     return tuple(animations)
@@ -267,10 +268,9 @@ def _param_rows(data: bytes, minimum_size: int) -> list[tuple[int, int, int]]:
                 ):
                     layout = candidate
                     break
-        else:
-            if entries[0][candidate] + minimum_size <= len(data):
-                layout = candidate
-                break
+        elif entries[0][candidate] + minimum_size <= len(data):
+            layout = candidate
+            break
     if layout is None:
         raise FrameFormatError("PARAM row index has no fixed row stride")
     rows: list[tuple[int, int, int]] = []
@@ -329,12 +329,13 @@ def _norm(value: str) -> str:
 
 
 def _weapon_name(
-    row_id: int, names: Mapping[int, Sequence[str]]
+    row_id: int,
+    names: Mapping[int, Sequence[str]],
 ) -> tuple[str | None, int | None, str]:
     aliases = {100_000: 100, 350_000: 315_700, 1_105_000: 1_103_900}
     candidates = [aliases[row_id]] if row_id in aliases else []
     candidates.extend(
-        (row_id, row_id - 100, row_id - 1100, row_id - 1000, row_id - 200)
+        (row_id, row_id - 100, row_id - 1100, row_id - 1000, row_id - 200),
     )
     upgrade = (
         "crystal ",
@@ -356,7 +357,8 @@ def _weapon_name(
         seen.add(message_id)
         for value in names.get(message_id, ()):
             if not value.casefold().startswith(upgrade) and not re.search(
-                r"\+\d+$", value
+                r"\+\d+$",
+                value,
             ):
                 found.append((value, message_id))
     unique = list(dict.fromkeys(found))
@@ -448,7 +450,7 @@ def _decode_goods_rows(data: bytes) -> list[dict[str, Any]]:
                 "goods_use_anim": row[62],
                 "goods_category": row[61],
                 "flags": flags,
-            }
+            },
         )
     return rows
 
@@ -470,7 +472,7 @@ def scan_install(install: str | Path) -> ScanResult:
     anim_path = root / "chr" / "c0000.anibnd.dcx"
     if not game_path.is_file() or not anim_path.is_file():
         raise FrameInstallError(
-            "DSR install is missing required GameParam or c0000 animation bundle"
+            "DSR install is missing required GameParam or c0000 animation bundle",
         )
     game = _read_dcx_bnd3(game_path)
     weapon_member = _member(game, "EquipParamWeapon.param")
@@ -489,11 +491,15 @@ def scan_install(install: str | Path) -> ScanResult:
                 "behavior_judge_id": _i32(behavior_member.data, offset + 4),
                 "ref_type": behavior_member.data[offset + 9],
                 "ref_id": _i32(behavior_member.data, offset + 12),
-            }
+            },
         )
     banks: dict[int, tuple[str, tuple[_Animation, ...]]] = {}
     for member in _read_dcx_bnd3(anim_path):
-        match = re.search(r"(?:^|/)a(\d+)\.tae$", member.name.replace("\\", "/"), re.I)
+        match = re.search(
+            r"(?:^|/)a(\d+)\.tae$",
+            member.name.replace("\\", "/"),
+            re.IGNORECASE,
+        )
         if match:
             banks[int(match.group(1))] = (member.name, _read_tae(member.data))
     english_weapon: Mapping[int, Sequence[str]] = {}
@@ -556,7 +562,7 @@ def scan_install(install: str | Path) -> ScanResult:
                                 "end": event.end_frame,
                             },
                             "evidence": "confirmed_event1_behavior_judge_join",
-                        }
+                        },
                     )
         if not actions:
             actions.append(
@@ -569,7 +575,7 @@ def scan_install(install: str | Path) -> ScanResult:
                     "end_seconds": None,
                     "frames_30fps": None,
                     "evidence": "no_confirmed_event1_behavior_judge_join",
-                }
+                },
             )
         name, message_id, name_status = _weapon_name(row_id, english)
         weapon_records.append(
@@ -610,7 +616,7 @@ def scan_install(install: str | Path) -> ScanResult:
                     if bank
                     else "unresolved_missing_local_bank",
                 },
-            }
+            },
         )
     timing_by_category: dict[int, dict[str, Any]] = {}
     a00 = banks.get(0)
@@ -623,7 +629,8 @@ def scan_install(install: str | Path) -> ScanResult:
             values.sort(key=lambda item: item.animation_id)
             base = 6000 + category * 100
             chosen = next(
-                (item for item in values if item.animation_id == base), values[0]
+                (item for item in values if item.animation_id == base),
+                values[0],
             )
             timing_by_category[category] = {
                 "status": "category_exact"
@@ -649,12 +656,14 @@ def scan_install(install: str | Path) -> ScanResult:
             }
     item_records: list[Mapping[str, Any]] = []
     for row in goods_rows:
-        flags = cast(Mapping[str, bool], row["flags"])
+        flags = cast("Mapping[str, bool]", row["flags"])
         category = int(row["goods_use_anim"])
         if not (flags.get("isEquip") or flags.get("isConsume")) or category in (0, 254):
             continue
         names, name_evidence = _goods_name(
-            str(row["parameter_name"]), english_item, japanese
+            str(row["parameter_name"]),
+            english_item,
+            japanese,
         )
         mapping = timing_by_category.get(
             category,
@@ -683,7 +692,7 @@ def scan_install(install: str | Path) -> ScanResult:
                     "sfx_variation_id": row["sfx_variation_id"],
                     "variation_status": "unresolved",
                 },
-            }
+            },
         )
     sources = {
         "game_param": "param/GameParam/GameParam.parambnd.dcx",
@@ -692,13 +701,13 @@ def scan_install(install: str | Path) -> ScanResult:
     resolved_actions = sum(
         1
         for item in weapon_records
-        for action in cast(Sequence[Mapping[str, object]], item["actions"])
+        for action in cast("Sequence[Mapping[str, object]]", item["actions"])
         if action.get("status") == "resolved"
     )
     unresolved_actions = sum(
         1
         for item in weapon_records
-        for action in cast(Sequence[Mapping[str, object]], item["actions"])
+        for action in cast("Sequence[Mapping[str, object]]", item["actions"])
         if action.get("status") == "unresolved"
     )
     return ScanResult(
@@ -806,7 +815,7 @@ def to_jsonable(view: ScanResult | Mapping[str, Any]) -> dict[str, Any]:
             return [clean(item) for item in value]
         return value
 
-    return cast(dict[str, Any], clean(view))
+    return cast("dict[str, Any]", clean(view))
 
 
 def main() -> None:
@@ -826,22 +835,22 @@ def main() -> None:
             query=args.query,
             spoilers=args.spoilers,
             limit=args.limit,
-        )
+        ),
     )
     import json
 
     print(
         json.dumps(output, ensure_ascii=False, sort_keys=True)
         if args.json
-        else output["summary"]
+        else output["summary"],
     )
 
 
 __all__ = [
-    "FrameScannerError",
-    "FrameInstallError",
     "FrameFormatError",
+    "FrameInstallError",
     "FrameQueryError",
+    "FrameScannerError",
     "ScanResult",
     "scan_install",
     "select_frame_records",

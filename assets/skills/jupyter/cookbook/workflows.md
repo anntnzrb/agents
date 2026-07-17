@@ -12,7 +12,7 @@ Common notebook workflows and recipes.
 
 ```bash
 # 1. Inspect current state
-nb.py inspect notebook.ipynb
+uv run --script <skill-dir>/scripts/cli.py inspect notebook.ipynb
 
 # 2. Edit cell (use NotebookEdit tool in Claude)
 
@@ -56,7 +56,7 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 3-7 --output-o
 
 ```bash
 # Validate syntax
-validate.py notebook.ipynb
+uv run --script <skill-dir>/scripts/cli.py validate notebook.ipynb
 
 # Clear all outputs
 uv run --script <skill-dir>/scripts/cli.py clear notebook.ipynb
@@ -77,7 +77,7 @@ git add notebook.ipynb
 
 ```bash
 # Convert to .py file
-nb.py convert notebook.ipynb --to py -o script.py
+uv run --script <skill-dir>/scripts/cli.py convert notebook.ipynb --to py -o script.py
 ```
 
 **Tip**: The output includes cell markers as comments for reference.
@@ -95,7 +95,7 @@ nb.py convert notebook.ipynb --to py -o script.py
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -i
 
 # Then convert to HTML
-nb.py convert notebook.ipynb --to html -o report.html
+uv run --script <skill-dir>/scripts/cli.py convert notebook.ipynb --to html -o report.html
 ```
 
 **Tip**: For PDF, use `--to pdf` but requires additional system dependencies.
@@ -163,10 +163,10 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -t code
 
 ```bash
 # Quick syntax validation
-validate.py notebook.ipynb
+uv run --script <skill-dir>/scripts/cli.py validate notebook.ipynb
 
 # Check if all cells have been executed
-validate.py notebook.ipynb --require-outputs
+uv run --script <skill-dir>/scripts/cli.py validate notebook.ipynb --require-outputs
 ```
 
 **Tip**: Fix syntax errors before execution to avoid cryptic kernel errors.
@@ -196,19 +196,19 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o --raw
 
 ```bash
 # Find cells importing pandas
-nb.py grep "import pandas" notebook.ipynb
+uv run --script <skill-dir>/scripts/cli.py grep "import pandas" notebook.ipynb
 
 # Find function definitions (case-insensitive regex)
-nb.py grep -i "def.*process" notebook.ipynb
+uv run --script <skill-dir>/scripts/cli.py grep -i "def.*process" notebook.ipynb
 
 # Show full cell context around matches
-nb.py grep -C "class.*Model" notebook.ipynb
+uv run --script <skill-dir>/scripts/cli.py grep -C "class.*Model" notebook.ipynb
 
 # Get just cell indices (for piping to execute)
-nb.py grep --cells-only "TODO" notebook.ipynb
+uv run --script <skill-dir>/scripts/cli.py grep --cells-only "TODO" notebook.ipynb
 ```
 
-**Tip**: Use `--cells-only` output with `-c` flag: `uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c $(nb.py grep --cells-only "import" notebook.ipynb)`
+**Tip**: Pass the returned `--cells-only` indices to `execute -c <indices>`.
 
 ---
 
@@ -220,13 +220,13 @@ nb.py grep --cells-only "TODO" notebook.ipynb
 
 ```bash
 # Save all images from outputs to a directory
-uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -o --save-images ./images/
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -o --save-images <images-dir>
 
 # Save images after executing
-uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb --save-images ./outputs/
+uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb --save-images <outputs-dir>
 
 # Extract images from specific cells only
-uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5,10-12 -o --save-images ./figures/
+uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5,10-12 -o --save-images <figures-dir>
 ```
 
 **Tip**: Images are saved as `cell_N_output_M.png` (or `.jpg`, `.svg`). Supports PNG, JPEG, and SVG formats.

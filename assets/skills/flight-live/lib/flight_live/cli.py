@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from datetime import date
 from typing import TextIO
 
-from .models import FlightLiveError, SearchRequest
+from .models import FlightLiveError, MissingExecutableError, SearchRequest
 from .protocol import get_schema_document, search_flights, serialize_results
 from .rpc import run_rpc
 
@@ -20,10 +20,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--origin", help="Origin city/airport term or IATA.")
     parser.add_argument("--destination", help="Destination city/airport term or IATA.")
     parser.add_argument(
-        "--depart-start", type=_iso_date, help="Departure window start (YYYY-MM-DD)."
+        "--depart-start",
+        type=_iso_date,
+        help="Departure window start (YYYY-MM-DD).",
     )
     parser.add_argument(
-        "--depart-end", type=_iso_date, help="Departure window end (YYYY-MM-DD)."
+        "--depart-end",
+        type=_iso_date,
+        help="Departure window end (YYYY-MM-DD).",
     )
     parser.add_argument(
         "--trip-type",
@@ -118,6 +122,9 @@ def main(
             planner_limit=args.planner_limit,
         )
         payload = search_flights(request)
+    except MissingExecutableError as exc:
+        print(f"error: {exc}", file=error_stream)
+        return 127
     except (FlightLiveError, ValueError) as exc:
         print(f"error: {exc}", file=error_stream)
         return 1
@@ -176,7 +183,10 @@ def _exit_code(code: object) -> int:
 
 
 def _parser_error(
-    parser: argparse.ArgumentParser, message: str, *, stderr: TextIO
+    parser: argparse.ArgumentParser,
+    message: str,
+    *,
+    stderr: TextIO,
 ) -> int:
     parser.print_usage(stderr)
     print(f"{parser.prog}: error: {message}", file=stderr)

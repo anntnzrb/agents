@@ -40,7 +40,8 @@ def _run_script(path: Path, args: list[str]) -> int:
 
 def _run_analyze_and_report(args: list[str]) -> int:
     parser = argparse.ArgumentParser(
-        prog="cli.py run", description="Analyze a repo, then print a report."
+        prog="cli.py run",
+        description="Analyze a repo, then print a report.",
     )
     parser.add_argument("--repo-path", "-r", default=".", help="Repository to analyze")
     parser.add_argument(
@@ -50,10 +51,16 @@ def _run_analyze_and_report(args: list[str]) -> int:
     )
     parser.add_argument("--output", "-o", help="Report output file; defaults to stdout")
     parser.add_argument(
-        "--format", "-f", choices=["markdown", "brief", "json"], default="markdown"
+        "--format",
+        "-f",
+        choices=["markdown", "brief", "json"],
+        default="markdown",
     )
     parser.add_argument(
-        "--quiet", "-q", action="store_true", help="Suppress analyzer progress"
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Suppress analyzer progress",
     )
     ns = parser.parse_args(args)
 
@@ -77,10 +84,10 @@ def main(argv: list[str] | None = None) -> int:
         print("Cross-platform:")
         print("  uv run --script <skill-dir>/scripts/cli.py analyze --repo-path .")
         print(
-            "  uv run --script <skill-dir>/scripts/cli.py report --analysis-file <temp-dir>/readiness_analysis.json"
+            "  uv run --script <skill-dir>/scripts/cli.py report --analysis-file <temp-dir>/readiness_analysis.json",
         )
         print(
-            "  uv run --script <skill-dir>/scripts/cli.py run --repo-path . --format brief"
+            "  uv run --script <skill-dir>/scripts/cli.py run --repo-path . --format brief",
         )
         print("\nUse '<command> --help' for command-specific flags.")
         return 0

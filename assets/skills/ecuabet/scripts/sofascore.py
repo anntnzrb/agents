@@ -112,20 +112,21 @@ def extract_event_candidates(results: list[dict[str, Any]]) -> list[dict[str, An
                 "statusType": status_type,
                 "priority": priority,
                 "score": row.get("score", 0),
-            }
+            },
         )
     out.sort(
         key=lambda x: (
             x["priority"],
             -(x.get("startTimestamp") or 0),
             -(x.get("score") or 0),
-        )
+        ),
     )
     return out
 
 
 def resolve_event_id(
-    client: httpx.Client, query: str
+    client: httpx.Client,
+    query: str,
 ) -> tuple[int, list[dict[str, Any]]]:
     response = client.get(f"{BASE_URL}/search/all", params={"q": query})
     response.raise_for_status()
@@ -138,7 +139,9 @@ def resolve_event_id(
 
 
 def safe_get_json(
-    client: httpx.Client, url: str, params: dict[str, Any] | None = None
+    client: httpx.Client,
+    url: str,
+    params: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     try:
         response = client.get(url, params=params)
@@ -251,7 +254,7 @@ def collect_odds(odds_payload: dict[str, Any] | None) -> list[dict[str, Any]]:
                     "change": choice.get("change"),
                     "sourceId": choice.get("sourceId"),
                     "winning": choice.get("winning"),
-                }
+                },
             )
 
         markets.append(
@@ -265,7 +268,7 @@ def collect_odds(odds_payload: dict[str, Any] | None) -> list[dict[str, Any]]:
                 "suspended": market.get("suspended"),
                 "selectionCount": len(picks),
                 "selections": picks,
-            }
+            },
         )
 
     return markets
@@ -369,13 +372,16 @@ def write_snapshot(
         target = output
         target.parent.mkdir(parents=True, exist_ok=True)
 
-    target.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n")
+    target.write_text(
+        json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     return target
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Fetch SofaScore match snapshot by event id/url/query."
+        description="Fetch SofaScore match snapshot by event id/url/query.",
     )
     parser.add_argument(
         "match",
@@ -425,16 +431,20 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912
                 return 1
 
             incidents_payload = safe_get_json(
-                client, f"{BASE_URL}/event/{event_id}/incidents"
+                client,
+                f"{BASE_URL}/event/{event_id}/incidents",
             )
             statistics_payload = safe_get_json(
-                client, f"{BASE_URL}/event/{event_id}/statistics"
+                client,
+                f"{BASE_URL}/event/{event_id}/statistics",
             )
             lineups_payload = safe_get_json(
-                client, f"{BASE_URL}/event/{event_id}/lineups"
+                client,
+                f"{BASE_URL}/event/{event_id}/lineups",
             )
             odds_payload = safe_get_json(
-                client, f"{BASE_URL}/event/{event_id}/odds/1/all"
+                client,
+                f"{BASE_URL}/event/{event_id}/odds/1/all",
             )
 
             snapshot = build_snapshot(

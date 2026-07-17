@@ -15,6 +15,7 @@ Examples:
   uv run --script <skill-dir>/scripts/cli.py eval-file <temp-dir>/query.el --json
   uv run --script <skill-dir>/scripts/cli.py reload-init
   uv run --script <skill-dir>/scripts/cli.py load path/to/init.el
+
 """
 
 from __future__ import annotations
@@ -85,7 +86,13 @@ def run_emacsclient(args: argparse.Namespace, form: str) -> str:
         cmd += ["--server-file", args.server_file]
     cmd += ["--eval", form]
 
-    result = subprocess.run(cmd, text=True, capture_output=True)
+    result = subprocess.run(
+        cmd,
+        check=False,
+        shell=False,
+        text=True,
+        capture_output=True,
+    )
     if result.returncode != 0:
         raise EmacsCtlError(format_error(result.stderr or result.stdout))
     return result.stdout.strip()
@@ -98,7 +105,7 @@ def decode_base64_lisp_string(raw: str) -> str:
         return base64.b64decode(raw.encode("ascii")).decode("utf-8")
     except Exception as exc:  # pragma: no cover
         raise EmacsCtlError(
-            f"failed to decode emacsclient JSON payload: {exc}"
+            f"failed to decode emacsclient JSON payload: {exc}",
         ) from exc
 
 
@@ -114,7 +121,7 @@ def json_eval(args: argparse.Namespace, expr: str) -> None:
         data = json.loads(payload)
     except json.JSONDecodeError as exc:
         raise EmacsCtlError(
-            f"Emacs returned invalid JSON: {exc}\nPayload: {payload}"
+            f"Emacs returned invalid JSON: {exc}\nPayload: {payload}",
         ) from exc
     print_json(data)
 
@@ -260,12 +267,14 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     ping = sub.add_parser(
-        "ping", help="check connectivity and print runtime basics as JSON"
+        "ping",
+        help="check connectivity and print runtime basics as JSON",
     )
     ping.set_defaults(func=cmd_ping)
 
     face = sub.add_parser(
-        "face", help="print family/height/font data for a face as JSON"
+        "face",
+        help="print family/height/font data for a face as JSON",
     )
     face.add_argument("face", help="face symbol name, e.g. default or fixed-pitch")
     face.set_defaults(func=cmd_face)
@@ -274,26 +283,31 @@ def build_parser() -> argparse.ArgumentParser:
     buffer_cmd.set_defaults(func=cmd_buffer)
 
     key = sub.add_parser(
-        "key", help="resolve a key sequence in the current context as JSON"
+        "key",
+        help="resolve a key sequence in the current context as JSON",
     )
     key.add_argument("key_sequence", help="key sequence, e.g. C-x C-f")
     key.set_defaults(func=cmd_key)
 
     library = sub.add_parser("library", help="locate a library on load-path as JSON")
     library.add_argument(
-        "name", help="library name without .el, e.g. package or use-package"
+        "name",
+        help="library name without .el, e.g. package or use-package",
     )
     library.set_defaults(func=cmd_library)
 
     feature = sub.add_parser(
-        "feature", help="check feature load state and likely library path as JSON"
+        "feature",
+        help="check feature load state and likely library path as JSON",
     )
     feature.add_argument("name", help="feature name, e.g. server or use-package")
     feature.set_defaults(func=cmd_feature)
 
     ev = sub.add_parser("eval", help="evaluate Elisp expression or read it from stdin")
     ev.add_argument(
-        "expr", nargs="?", help="Elisp expression, or - / omitted to read from stdin"
+        "expr",
+        nargs="?",
+        help="Elisp expression, or - / omitted to read from stdin",
     )
     ev.add_argument(
         "--json",
@@ -316,7 +330,8 @@ def build_parser() -> argparse.ArgumentParser:
     load.set_defaults(func=cmd_load)
 
     reload_init = sub.add_parser(
-        "reload-init", help="load the current user-init-file and print JSON"
+        "reload-init",
+        help="load the current user-init-file and print JSON",
     )
     reload_init.set_defaults(func=cmd_reload_init)
 

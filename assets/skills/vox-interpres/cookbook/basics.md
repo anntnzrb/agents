@@ -21,7 +21,7 @@ uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze ./song.flac -
 Outputs:
 
 - JSON analysis payload (stdout)
-- cache file under `~/.cache/vox-interpres/`
+- cache path reported by the CLI
 
 ## 3) Ask quick questions (single shot)
 
@@ -68,7 +68,7 @@ uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze ./song.flac -
 ```bash
 uv run --script "$SKILLS_DIR/vox-interpres/scripts/cli.py" analyze ./song.flac \
   --plots \
-  --out-dir ~/.cache/vox-interpres \
+  --out-dir <output-dir> \
   --json
 ```
 

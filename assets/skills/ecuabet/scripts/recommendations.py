@@ -219,7 +219,7 @@ def extract_market_candidates(
                     "odds": odds,
                     "line": line,
                     "groupKey": group_key,
-                }
+                },
             )
 
     for family in TOTAL_MARKET_FAMILIES:
@@ -248,7 +248,7 @@ def extract_market_candidates(
                         "odds": odds,
                         "line": inferred_line,
                         "groupKey": f"{family}:{line_text}",
-                    }
+                    },
                 )
 
     for row in candidates:
@@ -425,7 +425,9 @@ def extract_signal_bundle(snapshot: dict[str, object]) -> dict[str, object]:  # 
     tempo = 0.0
     if projected_goals is not None:
         tempo = clamp(
-            (projected_goals - DEFAULT_EXPECTED_GOALS) / GOAL_SCALE, -1.0, 1.0
+            (projected_goals - DEFAULT_EXPECTED_GOALS) / GOAL_SCALE,
+            -1.0,
+            1.0,
         )
 
     weather = get_dict(decision_summary.get("weather"))
@@ -473,7 +475,9 @@ def extract_signal_bundle(snapshot: dict[str, object]) -> dict[str, object]:  # 
 
 
 def infer_selection_profile(
-    candidate: dict[str, object], home_name: str, away_name: str
+    candidate: dict[str, object],
+    home_name: str,
+    away_name: str,
 ) -> dict[str, object]:
     market_name = normalize_text(candidate.get("marketName"))
     selection_name = normalize_text(candidate.get("selectionName"))
@@ -635,7 +639,7 @@ def update_line_history(
                 "ts": now_iso,
                 "odds": price,
                 "implied": as_float(row.get("impliedProbability")),
-            }
+            },
         )
         if len(history) > limit:
             del history[:-limit]
@@ -823,7 +827,7 @@ def build_recommendations(
                 "riskTier": tier,
                 "movement": movement,
                 "sortScore": round(sort_score, 6),
-            }
+            },
         )
 
     shortlist = shortlist_candidates(

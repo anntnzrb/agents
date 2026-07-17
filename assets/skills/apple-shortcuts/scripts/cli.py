@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
 # dependencies = []
@@ -19,6 +18,8 @@ COMMANDS = {
     "search": SCRIPTS_DIR / "search_expert_chunks.py",
     "blueprint": SCRIPTS_DIR / "make_blueprint.py",
     "inspect": SCRIPTS_DIR / "inspect_local_shortcuts.py",
+    "sign": SCRIPTS_DIR / "sign_shortcut.py",
+    "validate": SCRIPTS_DIR / "validate_shortcut.py",
 }
 
 
@@ -47,19 +48,36 @@ def build_parser() -> argparse.ArgumentParser:
         description="Apple Shortcuts helper dispatcher.",
         add_help=False,
     )
-    parser.add_argument("command", nargs="?", choices=sorted(COMMANDS), help="Helper to run")
-    parser.add_argument("args", nargs=argparse.REMAINDER, help="Arguments passed to the helper")
+    parser.add_argument(
+        "command",
+        nargs="?",
+        choices=sorted(COMMANDS),
+        help="Helper to run",
+    )
+    parser.add_argument(
+        "args",
+        nargs=argparse.REMAINDER,
+        help="Arguments passed to the helper",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0] in {"-h", "--help"}:
-        print("usage: cli.py {search,blueprint,inspect} [args...]\n")
+        print("usage: cli.py {search,blueprint,inspect,sign,validate} [args...]\n")
         print("Cross-platform:")
-        print("  uv run --script <skill-dir>/scripts/cli.py search --query 'ask for input action'")
-        print("  uv run --script <skill-dir>/scripts/cli.py blueprint --goal '...' --devices 'iPhone,Mac'")
+        print(
+            "  uv run --script <skill-dir>/scripts/cli.py search --query 'ask for input action'",
+        )
+        print(
+            "  uv run --script <skill-dir>/scripts/cli.py blueprint --goal '...' --devices 'iPhone,Mac'",
+        )
         print("  uv run --script <skill-dir>/scripts/cli.py inspect --visible-only")
+        print("  uv run --script <skill-dir>/scripts/cli.py validate <shortcut-file>")
+        print(
+            "  uv run --script <skill-dir>/scripts/cli.py sign <shortcut-file> --output-dir <dir>",
+        )
         print("\nUse '<command> --help' for helper-specific flags.")
         return 0
 

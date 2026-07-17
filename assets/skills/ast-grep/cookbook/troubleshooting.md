@@ -1,5 +1,7 @@
 # Troubleshooting Cookbook
 
+Read this when binary resolution, quoting, language parsing, or patterns fail.
+
 ---
 
 ## sg not found

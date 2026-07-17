@@ -15,7 +15,7 @@ Common errors and how to fix them.
 jupyter kernelspec list
 
 # Install Python kernel if missing
-python -m ipykernel install --user
+uv run --with ipykernel python -m ipykernel install --user
 
 # Or specify a different kernel
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -k python
@@ -106,7 +106,7 @@ uv add missing_package
 
 ```bash
 # Check if file is valid JSON
-python -c "import json; json.load(open('notebook.ipynb'))"
+uv run python -c "import json; json.load(open('notebook.ipynb'))"
 
 # If corrupt, try to recover
 # Often caused by merge conflicts - look for <<<<<<< markers
@@ -166,7 +166,7 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o --raw
 # Kill any running kernels
 jupyter notebook stop 8888
 
-# Or find and kill Python processes
+# On macOS/Linux, inspect matching Python processes
 ps aux | grep python | grep jupyter
 
 # Execute with shorter timeout
@@ -206,10 +206,10 @@ chown $USER notebook.ipynb
 The scripts use inline dependencies with `uv run`. If uv isn't handling deps:
 
 ```bash
-# Ensure uv is installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Install uv using the official instructions for your platform
+# https://docs.astral.sh/uv/getting-started/installation/
 
-# The shebang handles the rest automatically
+# Inline script metadata handles the dependencies automatically
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb
 ```
 

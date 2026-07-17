@@ -2,6 +2,8 @@
 
 Recipes for extracting data from AoC inputs.
 
+Read this when the puzzle input needs structured, grid, grouped, or coordinate parsing.
+
 ---
 
 ## Extract All Integers

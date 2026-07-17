@@ -56,15 +56,15 @@ Compose example:
 {
   "runtime": {
     "backend": "compose",
-    "root": "/Users/Shared/odoo17",
-    "config_path": "/Users/Shared/odoo17/config/odoo.conf",
+    "root": "<odoo-runtime>",
+    "config_path": "<odoo-runtime>/config/odoo.conf",
     "compose_command": "/usr/local/bin/docker compose",
     "env": {
       "POSTGRES_PASSWORD": "<redacted>"
     }
   },
-  "root": "/Users/Shared/odoo17",
-  "config_path": "/Users/Shared/odoo17/config/odoo.conf",
+  "root": "<odoo-runtime>",
+  "config_path": "<odoo-runtime>/config/odoo.conf",
   "config": {
     "db_host": "db",
     "db_port": "5432",
@@ -72,8 +72,8 @@ Compose example:
     "db_name": "etech"
   },
   "addons_paths": [
-    "/Users/Shared/odoo17/source/odoo-17.0+e.20260527/odoo/addons",
-    "/Users/annt/repos/etech/odoo/addons"
+    "<odoo-runtime>/source/<odoo-version>/odoo/addons",
+    "<custom-addons>/addons"
   ],
   "effective_db_name": "etech",
   "psql": {

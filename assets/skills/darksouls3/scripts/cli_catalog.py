@@ -13,7 +13,7 @@ from ds3_core import *
 def _print_static_catalog_note(kind: str) -> None:
     sys.stdout.write(
         f"  Note: bundled {kind} catalog is static scaffold data; "
-        "live-check exact locations/routes for source-backed final answers.\n"
+        "live-check exact locations/routes for source-backed final answers.\n",
     )
 
 
@@ -22,7 +22,7 @@ def cmd_weapons(args) -> None:
         print("=== Starter Weapons ===\n")
         for name, w in STARTER_WEAPONS.items():
             print(
-                f"  {name.title()}: {w['base_damage']} DMG, {w['str_scale']}/{w['dex_scale']} scaling, req {w['str_req']} STR/{w['dex_req']} DEX, {w['weight']} wt ({w['category']})"
+                f"  {name.title()}: {w['base_damage']} DMG, {w['str_scale']}/{w['dex_scale']} scaling, req {w['str_req']} STR/{w['dex_req']} DEX, {w['weight']} wt ({w['category']})",
             )
         return
     name = args.name.lower()
@@ -34,7 +34,7 @@ def cmd_weapons(args) -> None:
         print(f"  Scaling: STR {w['str_scale']} / DEX {w['dex_scale']}")
         print(f"  Requirements: {w['str_req']} STR / {w['dex_req']} DEX")
         print(f"  Weight: {w['weight']}")
-        print(f"  Upgrade: Normal (Titanite)")
+        print("  Upgrade: Normal (Titanite)")
         for stats_label, stats in [
             ("base (10/10)", {"str": 10, "dex": 10}),
             ("20/20", {"str": 20, "dex": 20}),
@@ -44,7 +44,7 @@ def cmd_weapons(args) -> None:
             print(f"  AR at {stats_label}: ~{ar}")
     else:
         print(
-            f"  Weapon '{args.name}' not in starter dataset. Use live research for full weapon list."
+            f"  Weapon '{args.name}' not in starter dataset. Use live research for full weapon list.",
         )
         print(f"  Known weapons: {', '.join(sorted(STARTER_WEAPONS.keys()))}")
 
@@ -64,7 +64,7 @@ def cmd_calc(args) -> None:
     ar = weapon_ar(w, stats)
     print(f"=== {name.title()} AR ===")
     print(
-        f"  Stats: STR {stats['str']} / DEX {stats['dex']} / INT {stats['int']} / FTH {stats['fth']}"
+        f"  Stats: STR {stats['str']} / DEX {stats['dex']} / INT {stats['int']} / FTH {stats['fth']}",
     )
     print(f"  Base damage: {w['base_damage']}")
     print(f"  Scaling: STR {w['str_scale']} / DEX {w['dex_scale']}")
@@ -117,7 +117,7 @@ def cmd_areas(args) -> None:
         phase_label = ["Starter", "Early", "Mid", "Late", "DLC"][phase]
         req = "REQUIRED" if required else "optional"
         print(
-            f"  [{phase_label}] {name} ({req}, {bonfires} bonfire{'s' if bonfires > 1 else ''})"
+            f"  [{phase_label}] {name} ({req}, {bonfires} bonfire{'s' if bonfires > 1 else ''})",
         )
         if bosses:
             for b in bosses:
@@ -170,17 +170,17 @@ def cmd_bosses(args) -> None:
     if args.spoilers:
         for bid, phase, req, _, _ in all_bosses:
             print(
-                f"  [{phase}] {bid.replace('_', ' ').title()} {'(required)' if req else '(optional)'}"
+                f"  [{phase}] {bid.replace('_', ' ').title()} {'(required)' if req else '(optional)'}",
             )
     else:
         for bid, phase, req, spoiler_level, _ in all_bosses:
             if spoiler_level <= 0 or is_known(bid):
                 print(
-                    f"  [{phase}] {bid.replace('_', ' ').title()} {'(required)' if req else '(optional)'}"
+                    f"  [{phase}] {bid.replace('_', ' ').title()} {'(required)' if req else '(optional)'}",
                 )
             else:
                 print(
-                    f"  [{phase}] A boss you haven't encountered yet {'(required)' if req else '(optional)'}"
+                    f"  [{phase}] A boss you haven't encountered yet {'(required)' if req else '(optional)'}",
                 )
 
 
@@ -251,7 +251,7 @@ def cmd_route(args) -> None:
                     if phase not in hinted:
                         hinted.add(phase)
                         print(
-                            f"    → The next required boss awaits in {phase_hints.get(phase, 'an upcoming area')}"
+                            f"    → The next required boss awaits in {phase_hints.get(phase, 'an upcoming area')}",
                         )
         else:
             print("\n  All required bosses defeated! Only optional/DLC bosses remain.")
@@ -266,11 +266,11 @@ def cmd_route(args) -> None:
         print("  4. Late-game castle → Archives → Final area")
         print("  5. DLC accessible from early cathedral and late-game area")
         print(
-            "\n  Use --spoilers for full route. Use --defeated for personalized path."
+            "\n  Use --spoilers for full route. Use --defeated for personalized path.",
         )
         return
     print(
-        "  [Spoiler route omitted — too long for CLI. Use Fextralife Game Progress Route.]"
+        "  [Spoiler route omitted — too long for CLI. Use Fextralife Game Progress Route.]",
     )
 
 
@@ -281,13 +281,13 @@ def cmd_achievements(args) -> None:
         print("  Plan ahead or you'll need another NG cycle.\n")
 
         # Covenant items — all missable since offline farming is the only reliable path
-        print(f"  Covenant Items (all missable — offline farming required):")
-        print(f"    Proof of Concord Kept x30 (hardest — ~6-10 hours farming)")
-        print(f"    Vertebra Shackle x30 (~4-6 hours)")
-        print(f"    Sunlight Medal x30 (~1-2 hours via co-op)")
-        print(f"    Wolf's Blood Swordgrass x30 (~2-4 hours)")
-        print(f"    Human Dregs x10 (~1-2 hours)")
-        print(f"    Pale Tongue x10 (~2-3 hours)")
+        print("  Covenant Items (all missable — offline farming required):")
+        print("    Proof of Concord Kept x30 (hardest — ~6-10 hours farming)")
+        print("    Vertebra Shackle x30 (~4-6 hours)")
+        print("    Sunlight Medal x30 (~1-2 hours via co-op)")
+        print("    Wolf's Blood Swordgrass x30 (~2-4 hours)")
+        print("    Human Dregs x10 (~1-2 hours)")
+        print("    Pale Tongue x10 (~2-3 hours)")
 
         # Gestures from NPC questlines
         gesture_map: dict[str, str] = {}
@@ -300,7 +300,7 @@ def cmd_achievements(args) -> None:
                         if g:
                             gesture_map[g] = v["name"]
         print(
-            f"\n  Gestures ({len(gesture_map)} NPC-questline dependent, all missable):"
+            f"\n  Gestures ({len(gesture_map)} NPC-questline dependent, all missable):",
         )
         for g in sorted(gesture_map):
             print(f"    {g} — {gesture_map[g]}")
@@ -309,46 +309,46 @@ def cmd_achievements(args) -> None:
         ng_plus = sum(1 for r in RINGS if r.get("ng") == "NG+")
         ng_plus2 = sum(1 for r in RINGS if r.get("ng") == "NG++")
         covenant_rings = [r for r in RINGS if r.get("category") == "covenant"]
-        print(f"\n  Rings (missable per NG cycle):")
+        print("\n  Rings (missable per NG cycle):")
         print(f"    {ng_plus} +1 rings — only in NG+, missable if not collected")
         print(
-            f"    {ng_plus2} NG++ rings — +2 variants plus Life Ring +3, missable if not collected"
+            f"    {ng_plus2} NG++ rings — +2 variants plus Life Ring +3, missable if not collected",
         )
         print(
-            f"    {len(covenant_rings)} covenant rank rings — rank-locked, offline farming required"
+            f"    {len(covenant_rings)} covenant rank rings — rank-locked, offline farming required",
         )
         print(
-            f"    Master of Rings requires all 107 base-game rings across 3 NG cycles"
+            "    Master of Rings requires all 107 base-game rings across 3 NG cycles",
         )
 
         # Endings — three of four missable per playthrough
-        print(f"\n  Endings (3 of 4 missable per playthrough):")
+        print("\n  Endings (3 of 4 missable per playthrough):")
         print(
-            f"    1. To Link the First Flame — walk to bonfire after final boss (default)"
+            "    1. To Link the First Flame — walk to bonfire after final boss (default)",
         )
         print(
-            f"    2. The End of Fire — give Fire Keeper Eyes to Fire Keeper, summon her at end"
+            "    2. The End of Fire — give Fire Keeper Eyes to Fire Keeper, summon her at end",
         )
-        print(f"    3. The Usurpation of Fire — Yuria's questline, need 8 Dark Sigils")
+        print("    3. The Usurpation of Fire — Yuria's questline, need 8 Dark Sigils")
         print(
-            f"    4. Unkindled Ending — attack Fire Keeper during End of Fire cutscene"
+            "    4. Unkindled Ending — attack Fire Keeper during End of Fire cutscene",
         )
         print(
-            f"  Tip: Save-scum at the final boss for all 3 achievement endings from one kill."
+            "  Tip: Save-scum at the final boss for all 3 achievement endings from one kill.",
         )
 
         if args.plat_route:
-            print(f"\n  Optimal plat route (missable-aware):")
+            print("\n  Optimal plat route (missable-aware):")
             print(
-                f"  Playthrough 1: Full explore. Get Usurpation ending. Farm covenants."
+                "  Playthrough 1: Full explore. Get Usurpation ending. Farm covenants.",
             )
             print(
-                f"  Playthrough 2: Boss rush. Get Link the Fire ending. Collect all +1 rings."
+                "  Playthrough 2: Boss rush. Get Link the Fire ending. Collect all +1 rings.",
             )
             print(
-                f"  Playthrough 3: Boss rush to end. Collect all +2 rings plus the base-game Life Ring +3. Get End of Fire ending."
+                "  Playthrough 3: Boss rush to end. Collect all +2 rings plus the base-game Life Ring +3. Get End of Fire ending.",
             )
-            print(f"  Save-scum at final boss for all 3 endings from one kill.")
+            print("  Save-scum at final boss for all 3 endings from one kill.")
         return
 
     print(
@@ -367,16 +367,16 @@ def cmd_achievements(args) -> None:
         "    Master of Miracles: 35 base-game miracles\n"
         "    Master of Pyromancy: 27 base-game pyromancies\n"
         "    DLC spells do NOT count. Use `spells --achievement` for full lists.\n"
-        "  Master of Rings: all 107 base-game rings (+0, +1, +2, and NG++ Life Ring +3; DLC +3 rings do not count)"
+        "  Master of Rings: all 107 base-game rings (+0, +1, +2, and NG++ Life Ring +3; DLC +3 rings do not count)",
     )
     if args.plat_route:
-        print(f"\n  Optimal plat route:")
-        print(f"  Playthrough 1: Full explore. Get Usurpation ending. Farm covenants.")
-        print(f"  Playthrough 2: Boss rush. Get Link the Fire ending.")
+        print("\n  Optimal plat route:")
+        print("  Playthrough 1: Full explore. Get Usurpation ending. Farm covenants.")
+        print("  Playthrough 2: Boss rush. Get Link the Fire ending.")
         print(
-            f"  Playthrough 3: Boss rush to end. Collect all +2 rings plus the base-game Life Ring +3. Get End of Fire ending."
+            "  Playthrough 3: Boss rush to end. Collect all +2 rings plus the base-game Life Ring +3. Get End of Fire ending.",
         )
-        print(f"  Save-scum at final boss for all 3 endings from one kill.")
+        print("  Save-scum at final boss for all 3 endings from one kill.")
 
 
 def cmd_spells(args) -> None:
@@ -392,7 +392,7 @@ def cmd_spells(args) -> None:
         print("  Master of Sorcery (34 sorceries)")
         print("  Master of Miracles (35 miracles)")
         print("  Master of Pyromancy (27 pyromancies)")
-        print(f"  Total: 96 spells across 3 achievements\n")
+        print("  Total: 96 spells across 3 achievements\n")
         for cat_key, cat_label in [
             ("sorceries", "Sorceries"),
             ("miracles", "Miracles"),
@@ -435,7 +435,7 @@ def cmd_spells(args) -> None:
             if not reqs:
                 reqs = "—"
             print(
-                f"  {s['name']}{cov_mark}  [{reqs}]  {s['slots']} slot(s) — {s['fp_cost']} FP"
+                f"  {s['name']}{cov_mark}  [{reqs}]  {s['slots']} slot(s) — {s['fp_cost']} FP",
             )
             print(f"    {s['effect']}")
             print(f"    Location: {s['location']}")
@@ -464,12 +464,12 @@ def cmd_spells(args) -> None:
                     print(f"  Location: {loc}")
                     if s["covenant_locked"]:
                         print(
-                            f"  ⚠ Covenant-locked — requires online or offline farming"
+                            "  ⚠ Covenant-locked — requires online or offline farming",
                         )
                     _print_static_catalog_note("spell")
                     return
         print(
-            f"Spell '{args.name}' not found. Try: spells (to list all) or spells <partial-name>"
+            f"Spell '{args.name}' not found. Try: spells (to list all) or spells <partial-name>",
         )
         return
 
@@ -492,11 +492,11 @@ def cmd_spells(args) -> None:
             if not reqs:
                 reqs = "—"
             print(
-                f"    {s['name']}{cov_mark}  [{reqs} | {s['slots']} slot(s) | {s['fp_cost']} FP]"
+                f"    {s['name']}{cov_mark}  [{reqs} | {s['slots']} slot(s) | {s['fp_cost']} FP]",
             )
     print(f"\n  Total: {total_spells} spells")
     print(
-        f"  Use `spells <name>` for details, `spells --type` to filter, `spells --achievement` for plat list"
+        "  Use `spells <name>` for details, `spells --type` to filter, `spells --achievement` for plat list",
     )
     _print_static_catalog_note("spell")
 
@@ -692,7 +692,7 @@ def cmd_rings(args) -> None:
             print(f"  {r['name']:<38} wt={r['weight']}{ng_tag}")
         print()
     print(
-        f"Total: {len(RINGS)} rings. Use 'rings <name>' for detail, 'rings --build <type>' to filter."
+        f"Total: {len(RINGS)} rings. Use 'rings <name>' for detail, 'rings --build <type>' to filter.",
     )
     _print_static_catalog_note("ring")
 
@@ -708,11 +708,11 @@ def cmd_npcs(args) -> None:
             if n.get("cutoff"):
                 print(f"  Cutoff: {n['cutoff']}")
             if n.get("provides"):
-                print(f"  Provides:")
+                print("  Provides:")
                 for p in n["provides"]:
                     print(f"    - {p}")
             if n.get("steps"):
-                print(f"  Quest Steps:")
+                print("  Quest Steps:")
                 for i, step in enumerate(n["steps"], 1):
                     print(f"    {i}. {step}")
             _print_static_catalog_note("NPC quest")
@@ -727,11 +727,11 @@ def cmd_npcs(args) -> None:
             if n.get("cutoff"):
                 print(f"  Cutoff: {n['cutoff']}")
             if n.get("provides"):
-                print(f"  Provides:")
+                print("  Provides:")
                 for p in n["provides"]:
                     print(f"    - {p}")
             if n.get("steps"):
-                print(f"  Quest Steps:")
+                print("  Quest Steps:")
                 for i, step in enumerate(n["steps"], 1):
                     print(f"    {i}. {step}")
             _print_static_catalog_note("NPC quest")
@@ -740,7 +740,7 @@ def cmd_npcs(args) -> None:
             print(f"Multiple matches for '{args.name}': {', '.join(matches)}")
             return
         print(
-            f"NPC '{args.name}' not found. Known NPCs: {', '.join(sorted(NPC_QUESTS.keys()))}"
+            f"NPC '{args.name}' not found. Known NPCs: {', '.join(sorted(NPC_QUESTS.keys()))}",
         )
         return
     if args.missable:
@@ -756,6 +756,6 @@ def cmd_npcs(args) -> None:
     for key, n in sorted(NPC_QUESTS.items()):
         miss = " [MISSABLE]" if n.get("missable") else ""
         print(f"  {n['name']} ({key}): {n.get('location', 'unknown')}{miss}")
-    print(f"\nUse `npcs <name>` for full questline details.")
-    print(f"Use `npcs --missable` for missable-only list.")
+    print("\nUse `npcs <name>` for full questline details.")
+    print("Use `npcs --missable` for missable-only list.")
     _print_static_catalog_note("NPC quest")

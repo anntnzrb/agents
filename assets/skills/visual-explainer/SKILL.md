@@ -20,19 +20,20 @@ Generate self-contained HTML pages that explain systems, code changes, plans, da
 - Open generated pages in the browser when running normally. In Pi package installs, use `visual_explainer` with `prepare` for planning/context and `render` only after the complete HTML document exists.
 - The final page must be a complete self-contained HTML document, including embedded CSS and any needed JS.
 
-## Reference routing
+## Required follow-up reads
 
 Read only the references needed for the current output:
 
-| Need | Read |
-|---|---|
-| Text-heavy architecture/cards | `./templates/architecture.html` |
-| Mermaid flowcharts, sequence, ER, state, class, C4, data flow | `./templates/mermaid-flowchart.html`, Mermaid sections in `./references/libraries.md` |
-| Data tables, comparisons, audits | `./templates/data-table.html` |
-| Slide decks | `./templates/slide-deck.html`, `./references/slide-patterns.md` |
-| CSS layout, overflow, depth, collapsibles, SVG connectors, generated images | `./references/css-patterns.md` |
-| Pages with 4+ major sections | `./references/responsive-nav.md` |
-| Prose-heavy pages | “Prose Page Elements” in `css-patterns.md`, typography sections in `libraries.md` |
+| Need | Read | When |
+|---|---|---|
+| Text-heavy architecture/cards | `templates/architecture.html` | Building that page shape |
+| Mermaid diagrams | `templates/mermaid-flowchart.html`, Mermaid sections in `references/libraries.md` | A graph is the chosen representation |
+| Data tables, comparisons, audits | `templates/data-table.html` | Tabular HTML is chosen |
+| Slide decks | `templates/slide-deck.html`, `references/slide-patterns.md` | Slides are explicitly requested |
+| Layout, overflow, depth, connectors, images | `references/css-patterns.md` | The selected layout needs those patterns |
+| 4+ major page sections | `references/responsive-nav.md` | Adding responsive section navigation |
+| Prose-heavy pages | Prose sections in `references/css-patterns.md` and `references/libraries.md` | Prose dominates the page |
+| Command workflows | Matching file under `commands/` | Running that named command |
 
 ## Choose the representation
 

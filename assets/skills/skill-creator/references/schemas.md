@@ -1,5 +1,16 @@
 # JSON Schemas
 
+## Section index
+
+- [evals.json](#evalsjson)
+- [history.json](#historyjson)
+- [grading.json](#gradingjson)
+- [metrics.json](#metricsjson)
+- [timing.json](#timingjson)
+- [benchmark.json](#benchmarkjson)
+- [comparison.json](#comparisonjson)
+- [analysis.json](#analysisjson)
+
 This document defines the JSON schemas used by skill-creator.
 
 ---

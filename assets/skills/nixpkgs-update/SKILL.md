@@ -11,12 +11,14 @@ allowed-tools: ""
 
 Batch workflow for contributing package updates to NixOS/nixpkgs. Uses Repology API for discovery, strict filtering for easy updates, and git worktrees for parallel execution.
 
-## Reference routing
+## Required follow-up reads
 
-- Detailed phase prompts, examples, PR templates, and failure handling: `references/update-workflow.md`
-- Command quick reference, platform checks, and candidate/failure tables: `references/quick-reference.md`
+| Need | Read | When |
+| --- | --- | --- |
+| Phase prompts, PR templates, failure handling | `references/update-workflow.md` | Before executing or delegating updates |
+| Commands, platform checks, candidate tables | `references/quick-reference.md` | Before running update commands |
 
-Load these references before executing the workflow. Preserve exact command syntax from references when delegating update work.
+Exact referenced command syntax MUST survive delegation.
 
 ## Workflow
 
@@ -74,7 +76,7 @@ Present only validated easy candidates as a multi-select table with package, ver
 Create one worktree per selected package:
 
 ```bash
-git worktree add /tmp/nixpkgs-<package>-<version> -b <package>-<version> master
+git worktree add <temp-dir>/nixpkgs-<package>-<version> -b <package>-<version> master
 ```
 
 Launch one update agent per worktree. Each agent must:

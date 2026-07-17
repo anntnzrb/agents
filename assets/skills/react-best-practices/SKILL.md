@@ -21,15 +21,15 @@ Reference these guidelines when:
 - Refactoring existing React/Next.js code
 - Optimizing bundle size or load times
 
-## Routing
+## Required follow-up reads
 
-| Need                                | Load                          |
-| ----------------------------------- | ----------------------------- |
-| Pick a rule category by impact      | `rules/_sections.md`          |
-| Apply a specific optimization       | Matching `rules/<rule-id>.md` |
-| Review all expanded Vercel guidance | `references/vercel-guide.md`  |
-| Secure Next.js Server Actions      | `rules/server-auth-actions.md` |
-| Package overview for humans         | `README.md`                   |
+| Need | Read | When |
+| --- | --- | --- |
+| Pick a rule category by impact | `rules/_sections.md` | Before selecting optimization rules |
+| Apply a specific optimization | Matching `rules/<rule-id>.md` | After identifying the bottleneck |
+| Review expanded Vercel guidance | `references/vercel-guide.md` | Broad review or insufficient rule detail |
+| Secure Next.js Server Actions | `rules/server-auth-actions.md` | Creating or reviewing Server Actions |
+| Package overview for humans | `README.md` | Human-facing package context is needed |
 
 ## Category Prefixes
 

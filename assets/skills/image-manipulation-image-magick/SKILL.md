@@ -70,6 +70,12 @@ Use this skill when you need to:
 
 Detailed command examples and reusable snippets live in `references/command-examples.md`.
 
+## Required follow-up reads
+
+| Need | Read | When |
+| --- | --- | --- |
+| Platform-specific commands and batch loops | `references/command-examples.md` | Building PowerShell or Bash operations |
+
 ## Safety Constraints
 
 1. **Always quote file paths** that may contain spaces.

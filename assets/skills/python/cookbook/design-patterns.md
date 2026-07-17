@@ -2,6 +2,15 @@
 
 Functional and OOP patterns in Python using Protocols.
 
+## Contents
+
+- [Builder pattern](#builder-pattern-fluent-api)
+- [Dependency injection](#dependency-injection)
+- [Factory pattern](#factory-pattern)
+- [Strategy pattern](#strategy-pattern)
+- [Repository pattern](#repository-pattern)
+- [Observer pattern](#observer-pattern-event-based)
+
 ---
 
 ## Builder Pattern (Fluent API)

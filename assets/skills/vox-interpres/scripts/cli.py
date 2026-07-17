@@ -19,6 +19,5 @@ sys.path.insert(0, str(SKILL_DIR / "lib"))
 
 from vox_interpres.cli import main
 
-
 if __name__ == "__main__":
     raise SystemExit(main())

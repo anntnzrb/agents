@@ -144,7 +144,9 @@ def as_int(value: object, default: int = 0) -> int:
 
 
 def filter_head_to_head(
-    matches: list[dict[str, Any]], home: str, away: str
+    matches: list[dict[str, Any]],
+    home: str,
+    away: str,
 ) -> list[dict[str, Any]]:
     h = normalize_text(home)
     a = normalize_text(away)
@@ -161,7 +163,8 @@ def filter_head_to_head(
 
 
 def team_form_summary(
-    team_matches: list[dict[str, Any]], team_title: str
+    team_matches: list[dict[str, Any]],
+    team_title: str,
 ) -> dict[str, Any]:
     finished = [m for m in team_matches if m.get("isResult")]
     recent = sorted(finished, key=lambda x: x.get("datetime") or "", reverse=True)[:5]
@@ -212,7 +215,8 @@ def team_form_summary(
 
 
 def team_season_totals(
-    team_matches: list[dict[str, Any]], team_title: str
+    team_matches: list[dict[str, Any]],
+    team_title: str,
 ) -> dict[str, Any]:
     finished = [m for m in team_matches if m.get("isResult")]
     n_team = normalize_text(team_title)
@@ -336,11 +340,12 @@ def league_table_signals(league_team_data: dict[str, Any]) -> list[dict[str, Any
                 "xGFor": round(xg, 3),
                 "xGAgainst": round(xga, 3),
                 "xGDiff": round(xg - xga, 3),
-            }
+            },
         )
 
     rows.sort(
-        key=lambda x: (x["points"], x["goalDifference"], x["goalsFor"]), reverse=True
+        key=lambda x: (x["points"], x["goalDifference"], x["goalsFor"]),
+        reverse=True,
     )
     for idx, row in enumerate(rows, start=1):
         row["positionByPoints"] = idx
@@ -363,7 +368,9 @@ def build_team_snapshot(
     context_data = endpoint.get_context_data(season=season)
 
     players_sorted = sorted(
-        player_data, key=lambda x: float(x.get("xG", 0.0)), reverse=True
+        player_data,
+        key=lambda x: float(x.get("xG", 0.0)),
+        reverse=True,
     )
 
     top = [
@@ -392,7 +399,9 @@ def build_team_snapshot(
         "recentMatches": [
             extract_match_view(x)
             for x in sorted(
-                match_data, key=lambda m: m.get("datetime") or "", reverse=True
+                match_data,
+                key=lambda m: m.get("datetime") or "",
+                reverse=True,
             )[:10]
         ],
         "topPlayersByXG": top,
@@ -459,7 +468,11 @@ def build_snapshot(  # noqa: PLR0913
 
 
 def write_snapshot(
-    snapshot: dict[str, Any], output: Path, iteration: int, *, watch_mode: bool
+    snapshot: dict[str, Any],
+    output: Path,
+    iteration: int,
+    *,
+    watch_mode: bool,
 ) -> Path:
     output = output.expanduser()
     if watch_mode:
@@ -470,13 +483,16 @@ def write_snapshot(
         target = output
         target.parent.mkdir(parents=True, exist_ok=True)
 
-    target.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n")
+    target.write_text(
+        json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     return target
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Fetch Understat league/team data for match modeling."
+        description="Fetch Understat league/team data for match modeling.",
     )
     parser.add_argument("--league", default="La_Liga")
     parser.add_argument("--season", default=default_season())
@@ -588,7 +604,10 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912
 
             if args.output:
                 path = write_snapshot(
-                    snapshot, args.output, iteration, watch_mode=watch_mode
+                    snapshot,
+                    args.output,
+                    iteration,
+                    watch_mode=watch_mode,
                 )
                 print(path)
             elif args.compact:

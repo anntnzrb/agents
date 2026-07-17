@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
 # ///
@@ -17,9 +16,11 @@ import os
 import re
 import time
 import urllib.request
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Literal, TypedDict
+from typing import Literal, TypedDict
+
 from bb_save import (
     important_key_items,
     materials,
@@ -30,14 +31,21 @@ from bb_save import (
     read_stats,
     safe_boss_name,
     weapon_reinforcement,
+)
+from bb_save import (
     weapons as save_weapons,
 )
+
 CACHE_TTL_HOURS = 24
 
-DATA_SOURCE = "Embedded spoiler-safe constants plus source registry/cache for live verification."
+DATA_SOURCE = (
+    "Embedded spoiler-safe constants plus source registry/cache for live verification."
+)
 UPDATED = "2026-06-15"
 CACHE_ENV = "BLOODBORNE_CACHE_DIR"
-CACHE_DIR = Path(os.environ.get(CACHE_ENV, "~/.cache/bloodborne-companion")).expanduser()
+CACHE_DIR = Path(
+    os.environ.get(CACHE_ENV, "~/.cache/bloodborne-companion"),
+).expanduser()
 
 SOURCES: dict[str, SourceRecord] = {
     "bb-wiki-scaling": {
@@ -126,26 +134,103 @@ SOFTCAPS = {
 }
 
 SAT_POINTS = [
-    (5, .025), (6, .030), (7, .035), (8, .040), (9, .045), (10, .050),
-    (11, .080), (12, .110), (13, .140), (14, .170), (15, .200),
-    (16, .230), (17, .260), (18, .290), (19, .320), (20, .350),
-    (21, .380), (22, .410), (23, .440), (24, .470), (25, .500),
-    (26, .514), (27, .528), (28, .542), (29, .556), (30, .570),
-    (31, .584), (32, .598), (33, .612), (34, .626), (35, .640),
-    (36, .654), (37, .668), (38, .682), (39, .696), (40, .710),
-    (41, .724), (42, .738), (43, .752), (44, .766), (45, .780),
-    (46, .794), (47, .808), (48, .822), (49, .836), (50, .850),
-    (51, .853), (52, .856), (53, .859), (54, .862), (55, .865),
-    (56, .868), (57, .871), (58, .874), (59, .878), (60, .881),
-    (61, .884), (62, .887), (63, .890), (64, .893), (65, .896),
-    (66, .899), (67, .902), (68, .905), (69, .908), (70, .911),
-    (71, .914), (72, .917), (73, .920), (74, .923), (75, .927),
-    (76, .930), (77, .933), (78, .936), (79, .939), (80, .942),
-    (81, .945), (82, .948), (83, .951), (84, .954), (85, .957),
-    (86, .960), (87, .963), (88, .966), (89, .969), (90, .972),
-    (91, .975), (92, .979), (93, .982), (94, .985), (95, .988),
-    (96, .991), (97, .994), (98, .997), (99, 1.000),
+    (5, 0.025),
+    (6, 0.030),
+    (7, 0.035),
+    (8, 0.040),
+    (9, 0.045),
+    (10, 0.050),
+    (11, 0.080),
+    (12, 0.110),
+    (13, 0.140),
+    (14, 0.170),
+    (15, 0.200),
+    (16, 0.230),
+    (17, 0.260),
+    (18, 0.290),
+    (19, 0.320),
+    (20, 0.350),
+    (21, 0.380),
+    (22, 0.410),
+    (23, 0.440),
+    (24, 0.470),
+    (25, 0.500),
+    (26, 0.514),
+    (27, 0.528),
+    (28, 0.542),
+    (29, 0.556),
+    (30, 0.570),
+    (31, 0.584),
+    (32, 0.598),
+    (33, 0.612),
+    (34, 0.626),
+    (35, 0.640),
+    (36, 0.654),
+    (37, 0.668),
+    (38, 0.682),
+    (39, 0.696),
+    (40, 0.710),
+    (41, 0.724),
+    (42, 0.738),
+    (43, 0.752),
+    (44, 0.766),
+    (45, 0.780),
+    (46, 0.794),
+    (47, 0.808),
+    (48, 0.822),
+    (49, 0.836),
+    (50, 0.850),
+    (51, 0.853),
+    (52, 0.856),
+    (53, 0.859),
+    (54, 0.862),
+    (55, 0.865),
+    (56, 0.868),
+    (57, 0.871),
+    (58, 0.874),
+    (59, 0.878),
+    (60, 0.881),
+    (61, 0.884),
+    (62, 0.887),
+    (63, 0.890),
+    (64, 0.893),
+    (65, 0.896),
+    (66, 0.899),
+    (67, 0.902),
+    (68, 0.905),
+    (69, 0.908),
+    (70, 0.911),
+    (71, 0.914),
+    (72, 0.917),
+    (73, 0.920),
+    (74, 0.923),
+    (75, 0.927),
+    (76, 0.930),
+    (77, 0.933),
+    (78, 0.936),
+    (79, 0.939),
+    (80, 0.942),
+    (81, 0.945),
+    (82, 0.948),
+    (83, 0.951),
+    (84, 0.954),
+    (85, 0.957),
+    (86, 0.960),
+    (87, 0.963),
+    (88, 0.966),
+    (89, 0.969),
+    (90, 0.972),
+    (91, 0.975),
+    (92, 0.979),
+    (93, 0.982),
+    (94, 0.985),
+    (95, 0.988),
+    (96, 0.991),
+    (97, 0.994),
+    (98, 0.997),
+    (99, 1.000),
 ]
+
 
 @dataclass(frozen=True)
 class Weapon:
@@ -155,6 +240,7 @@ class Weapon:
     scaling: tuple[float, float, float, float]
     style: str
     rally: int
+
 
 Phase = Literal["start", "evening", "night", "blood-moon", "nightmare", "dlc"]
 
@@ -185,40 +271,220 @@ class BossRecord(TypedDict):
 
 
 WEAPONS = {
-    w.name.lower(): w for w in [
-        Weapon("Saw Cleaver", (8,7,0,0), (180,0,0), (.60,.40,0,.55), "Quality", 55),
-        Weapon("Saw Spear", (7,8,0,0), (170,0,0), (.50,.63,0,.62), "Quality", 55),
-        Weapon("Hunter Axe", (9,8,0,0), (196,0,0), (.65,.35,0,.55), "Quality/STR", 125),
-        Weapon("Threaded Cane", (7,9,0,0), (156,0,0), (.29,.90,0,.65), "SKL", 65),
-        Weapon("Kirkhammer", (16,10,0,0), (210,0,0), (1.00,.29,0,.70), "STR", 120),
-        Weapon("Ludwig's Holy Blade", (16,12,0,0), (200,0,0), (.80,.80,0,.88), "Quality", 110),
-        Weapon("Rifle Spear", (10,11,9,0), (170,170,0), (.30,.70,.65,0), "SKL/BLT", 70),
-        Weapon("Stake Driver", (18,9,0,0), (170,0,0), (.60,.55,0,.63), "Quality", 65),
-        Weapon("Blade of Mercy", (7,11,0,0), (120,0,60), (0,1.10,0,.70), "SKL", 40),
-        Weapon("Tonitrus", (12,8,0,0), (160,0,80), (.65,.25,0,.49), "STR/ARC", 65),
-        Weapon("Chikage", (10,14,12,0), (184,184,0), (.25,.65,1.10,0), "BLT", 60),
-        Weapon("Reiterpallasch", (8,12,10,0), (150,150,0), (.20,1.00,.40,0), "SKL/BLT", 80),
-        Weapon("Logarius' Wheel", (20,12,0,10), (200,0,50), (1.10,0,0,.60), "STR/ARC", 50),
-        Weapon("Burial Blade", (10,12,0,0), (160,0,60), (.30,.75,0,.70), "SKL", 80),
-        Weapon("Beast Claw", (14,12,0,0), (150,0,0), (.60,.35,0,.52), "Quality", 35),
-        Weapon("Beasthunter Saif", (9,11,0,0), (180,0,0), (.30,.70,0,.55), "SKL", 50),
-        Weapon("Beast Cutter", (11,9,0,0), (184,0,0), (.60,.30,0,.49), "Quality/STR", 50),
-        Weapon("Church Pick", (9,14,0,0), (176,0,0), (.40,.70,0,.60), "Quality/SKL", 80),
-        Weapon("Holy Moonlight Sword", (16,12,0,14), (180,0,100), (.80,.60,0,.49), "Quality/ARC", 110),
-        Weapon("Simon's Bowblade", (8,15,9,0), (160,160,0), (0,1.10,1.10,0), "SKL/BLT", 55),
-        Weapon("Rakuyo", (10,20,0,0), (164,0,0), (0,1.00,0,.55), "SKL", 60),
-        Weapon("Boom Hammer", (14,8,0,0), (180,0,120), (.90,.25,0,.63), "STR", 65),
-        Weapon("Whirligig Saw", (18,12,0,0), (190,0,0), (1.10,.30,0,.77), "STR", 120),
-        Weapon("Bloodletter", (14,6,16,0), (180,180,0), (1.00,0,1.10,0), "STR/BLT", 80),
-        Weapon("Amygdalan Arm", (17,9,0,0), (160,0,80), (.90,.25,0,.63), "STR/ARC", 100),
-        Weapon("Kos Parasite", (0,0,0,20), (60,0,60), (0,0,0,1.60), "ARC", 30),
+    w.name.lower(): w
+    for w in [
+        Weapon(
+            "Saw Cleaver",
+            (8, 7, 0, 0),
+            (180, 0, 0),
+            (0.60, 0.40, 0, 0.55),
+            "Quality",
+            55,
+        ),
+        Weapon(
+            "Saw Spear",
+            (7, 8, 0, 0),
+            (170, 0, 0),
+            (0.50, 0.63, 0, 0.62),
+            "Quality",
+            55,
+        ),
+        Weapon(
+            "Hunter Axe",
+            (9, 8, 0, 0),
+            (196, 0, 0),
+            (0.65, 0.35, 0, 0.55),
+            "Quality/STR",
+            125,
+        ),
+        Weapon(
+            "Threaded Cane",
+            (7, 9, 0, 0),
+            (156, 0, 0),
+            (0.29, 0.90, 0, 0.65),
+            "SKL",
+            65,
+        ),
+        Weapon(
+            "Kirkhammer",
+            (16, 10, 0, 0),
+            (210, 0, 0),
+            (1.00, 0.29, 0, 0.70),
+            "STR",
+            120,
+        ),
+        Weapon(
+            "Ludwig's Holy Blade",
+            (16, 12, 0, 0),
+            (200, 0, 0),
+            (0.80, 0.80, 0, 0.88),
+            "Quality",
+            110,
+        ),
+        Weapon(
+            "Rifle Spear",
+            (10, 11, 9, 0),
+            (170, 170, 0),
+            (0.30, 0.70, 0.65, 0),
+            "SKL/BLT",
+            70,
+        ),
+        Weapon(
+            "Stake Driver",
+            (18, 9, 0, 0),
+            (170, 0, 0),
+            (0.60, 0.55, 0, 0.63),
+            "Quality",
+            65,
+        ),
+        Weapon(
+            "Blade of Mercy",
+            (7, 11, 0, 0),
+            (120, 0, 60),
+            (0, 1.10, 0, 0.70),
+            "SKL",
+            40,
+        ),
+        Weapon(
+            "Tonitrus",
+            (12, 8, 0, 0),
+            (160, 0, 80),
+            (0.65, 0.25, 0, 0.49),
+            "STR/ARC",
+            65,
+        ),
+        Weapon(
+            "Chikage",
+            (10, 14, 12, 0),
+            (184, 184, 0),
+            (0.25, 0.65, 1.10, 0),
+            "BLT",
+            60,
+        ),
+        Weapon(
+            "Reiterpallasch",
+            (8, 12, 10, 0),
+            (150, 150, 0),
+            (0.20, 1.00, 0.40, 0),
+            "SKL/BLT",
+            80,
+        ),
+        Weapon(
+            "Logarius' Wheel",
+            (20, 12, 0, 10),
+            (200, 0, 50),
+            (1.10, 0, 0, 0.60),
+            "STR/ARC",
+            50,
+        ),
+        Weapon(
+            "Burial Blade",
+            (10, 12, 0, 0),
+            (160, 0, 60),
+            (0.30, 0.75, 0, 0.70),
+            "SKL",
+            80,
+        ),
+        Weapon(
+            "Beast Claw",
+            (14, 12, 0, 0),
+            (150, 0, 0),
+            (0.60, 0.35, 0, 0.52),
+            "Quality",
+            35,
+        ),
+        Weapon(
+            "Beasthunter Saif",
+            (9, 11, 0, 0),
+            (180, 0, 0),
+            (0.30, 0.70, 0, 0.55),
+            "SKL",
+            50,
+        ),
+        Weapon(
+            "Beast Cutter",
+            (11, 9, 0, 0),
+            (184, 0, 0),
+            (0.60, 0.30, 0, 0.49),
+            "Quality/STR",
+            50,
+        ),
+        Weapon(
+            "Church Pick",
+            (9, 14, 0, 0),
+            (176, 0, 0),
+            (0.40, 0.70, 0, 0.60),
+            "Quality/SKL",
+            80,
+        ),
+        Weapon(
+            "Holy Moonlight Sword",
+            (16, 12, 0, 14),
+            (180, 0, 100),
+            (0.80, 0.60, 0, 0.49),
+            "Quality/ARC",
+            110,
+        ),
+        Weapon(
+            "Simon's Bowblade",
+            (8, 15, 9, 0),
+            (160, 160, 0),
+            (0, 1.10, 1.10, 0),
+            "SKL/BLT",
+            55,
+        ),
+        Weapon("Rakuyo", (10, 20, 0, 0), (164, 0, 0), (0, 1.00, 0, 0.55), "SKL", 60),
+        Weapon(
+            "Boom Hammer",
+            (14, 8, 0, 0),
+            (180, 0, 120),
+            (0.90, 0.25, 0, 0.63),
+            "STR",
+            65,
+        ),
+        Weapon(
+            "Whirligig Saw",
+            (18, 12, 0, 0),
+            (190, 0, 0),
+            (1.10, 0.30, 0, 0.77),
+            "STR",
+            120,
+        ),
+        Weapon(
+            "Bloodletter",
+            (14, 6, 16, 0),
+            (180, 180, 0),
+            (1.00, 0, 1.10, 0),
+            "STR/BLT",
+            80,
+        ),
+        Weapon(
+            "Amygdalan Arm",
+            (17, 9, 0, 0),
+            (160, 0, 80),
+            (0.90, 0.25, 0, 0.63),
+            "STR/ARC",
+            100,
+        ),
+        Weapon("Kos Parasite", (0, 0, 0, 20), (60, 0, 60), (0, 0, 0, 1.60), "ARC", 30),
     ]
 }
 
 STARTER_WEAPON_NAMES = frozenset({"Saw Cleaver", "Hunter Axe", "Threaded Cane"})
 
 
-UPGRADES = {1:("Blood Stone Shard",3),2:("Blood Stone Shard",5),3:("Blood Stone Shard",8),4:("Twin Blood Stone Shards",3),5:("Twin Blood Stone Shards",5),6:("Twin Blood Stone Shards",8),7:("Blood Stone Chunk",3),8:("Blood Stone Chunk",5),9:("Blood Stone Chunk",8),10:("Blood Rock",1)}
+UPGRADES = {
+    1: ("Blood Stone Shard", 3),
+    2: ("Blood Stone Shard", 5),
+    3: ("Blood Stone Shard", 8),
+    4: ("Twin Blood Stone Shards", 3),
+    5: ("Twin Blood Stone Shards", 5),
+    6: ("Twin Blood Stone Shards", 8),
+    7: ("Blood Stone Chunk", 3),
+    8: ("Blood Stone Chunk", 5),
+    9: ("Blood Stone Chunk", 8),
+    10: ("Blood Rock", 1),
+}
 
 INSIGHT = [
     "1 Insight: leveling is enabled.",
@@ -245,29 +511,136 @@ GEMS = [
 ]
 
 FARMS = {
-    "echoes": ["Equip Moon rune if available.", "Use the safest high-density route already unlocked; spend leftovers on vials/bullets.", "If enemies die in 1-2 hits, route speed beats theoretical payout."],
-    "vials": ["Usually buy vials with farmed echoes instead of farming drops.", "If broke, kill large humanoid enemies on a short known route, then buy vials with echoes."],
-    "twins": ["Twin Blood Stone Shards are the +4 to +6 tier.", "If shop does not sell them yet, progress/explore already-unlocked routes and loot thoroughly.", "Do not split twins across side weapons until main weapon reaches +6."],
-    "chunks": ["Chunks are +7 to +9 and scarce. Main weapon first.", "Do not chunk backup weapons on first playthrough unless main is already +9."],
-    "gems": ["Farm only if stuck. Otherwise slot best Tempering gems found naturally.", "Physical ATK up beats fancy effects for quality builds."],
+    "echoes": [
+        "Equip Moon rune if available.",
+        "Use the safest high-density route already unlocked; spend leftovers on vials/bullets.",
+        "If enemies die in 1-2 hits, route speed beats theoretical payout.",
+    ],
+    "vials": [
+        "Usually buy vials with farmed echoes instead of farming drops.",
+        "If broke, kill large humanoid enemies on a short known route, then buy vials with echoes.",
+    ],
+    "twins": [
+        "Twin Blood Stone Shards are the +4 to +6 tier.",
+        "If shop does not sell them yet, progress/explore already-unlocked routes and loot thoroughly.",
+        "Do not split twins across side weapons until main weapon reaches +6.",
+    ],
+    "chunks": [
+        "Chunks are +7 to +9 and scarce. Main weapon first.",
+        "Do not chunk backup weapons on first playthrough unless main is already +9.",
+    ],
+    "gems": [
+        "Farm only if stuck. Otherwise slot best Tempering gems found naturally.",
+        "Physical ATK up beats fancy effects for quality builds.",
+    ],
 }
 
 AREAS: list[AreaRecord] = [
-    {"id": "hunters-dream", "name": "Hunter's Dream", "phase": "start", "safe": True, "optional": False},
-    {"id": "central-yharnam", "name": "Central Yharnam", "phase": "start", "safe": True, "optional": False},
-    {"id": "cathedral-ward", "name": "Cathedral Ward", "phase": "evening", "safe": True, "optional": False},
-    {"id": "old-yharnam", "name": "Old Yharnam", "phase": "evening", "safe": True, "optional": True},
-    {"id": "healing-church-workshop", "name": "Healing Church Workshop", "phase": "evening", "safe": False, "optional": True},
-    {"id": "hemwick-charnel-lane", "name": "Hemwick Charnel Lane", "phase": "night", "safe": False, "optional": True},
-    {"id": "forbidden-woods", "name": "Forbidden Woods", "phase": "night", "safe": False, "optional": False},
-    {"id": "byrgenwerth", "name": "Byrgenwerth", "phase": "night", "safe": False, "optional": False},
-    {"id": "yahargul", "name": "Yahar'gul", "phase": "blood-moon", "safe": False, "optional": False},
-    {"id": "upper-cathedral-ward", "name": "Upper Cathedral Ward", "phase": "blood-moon", "safe": False, "optional": True},
-    {"id": "cainhurst", "name": "Cainhurst", "phase": "blood-moon", "safe": False, "optional": True},
-    {"id": "lecture-building", "name": "Lecture Building", "phase": "nightmare", "safe": False, "optional": False},
-    {"id": "nightmare-frontier", "name": "Nightmare Frontier", "phase": "nightmare", "safe": False, "optional": True},
-    {"id": "nightmare-of-mensis", "name": "Nightmare of Mensis", "phase": "nightmare", "safe": False, "optional": False},
-    {"id": "hypogean-gaol", "name": "Hypogean Gaol", "phase": "evening", "safe": False, "optional": True},
+    {
+        "id": "hunters-dream",
+        "name": "Hunter's Dream",
+        "phase": "start",
+        "safe": True,
+        "optional": False,
+    },
+    {
+        "id": "central-yharnam",
+        "name": "Central Yharnam",
+        "phase": "start",
+        "safe": True,
+        "optional": False,
+    },
+    {
+        "id": "cathedral-ward",
+        "name": "Cathedral Ward",
+        "phase": "evening",
+        "safe": True,
+        "optional": False,
+    },
+    {
+        "id": "old-yharnam",
+        "name": "Old Yharnam",
+        "phase": "evening",
+        "safe": True,
+        "optional": True,
+    },
+    {
+        "id": "healing-church-workshop",
+        "name": "Healing Church Workshop",
+        "phase": "evening",
+        "safe": False,
+        "optional": True,
+    },
+    {
+        "id": "hemwick-charnel-lane",
+        "name": "Hemwick Charnel Lane",
+        "phase": "night",
+        "safe": False,
+        "optional": True,
+    },
+    {
+        "id": "forbidden-woods",
+        "name": "Forbidden Woods",
+        "phase": "night",
+        "safe": False,
+        "optional": False,
+    },
+    {
+        "id": "byrgenwerth",
+        "name": "Byrgenwerth",
+        "phase": "night",
+        "safe": False,
+        "optional": False,
+    },
+    {
+        "id": "yahargul",
+        "name": "Yahar'gul",
+        "phase": "blood-moon",
+        "safe": False,
+        "optional": False,
+    },
+    {
+        "id": "upper-cathedral-ward",
+        "name": "Upper Cathedral Ward",
+        "phase": "blood-moon",
+        "safe": False,
+        "optional": True,
+    },
+    {
+        "id": "cainhurst",
+        "name": "Cainhurst",
+        "phase": "blood-moon",
+        "safe": False,
+        "optional": True,
+    },
+    {
+        "id": "lecture-building",
+        "name": "Lecture Building",
+        "phase": "nightmare",
+        "safe": False,
+        "optional": False,
+    },
+    {
+        "id": "nightmare-frontier",
+        "name": "Nightmare Frontier",
+        "phase": "nightmare",
+        "safe": False,
+        "optional": True,
+    },
+    {
+        "id": "nightmare-of-mensis",
+        "name": "Nightmare of Mensis",
+        "phase": "nightmare",
+        "safe": False,
+        "optional": False,
+    },
+    {
+        "id": "hypogean-gaol",
+        "name": "Hypogean Gaol",
+        "phase": "evening",
+        "safe": False,
+        "optional": True,
+    },
     {"id": "dlc", "name": "DLC route", "phase": "dlc", "safe": False, "optional": True},
 ]
 
@@ -292,20 +665,118 @@ AREA_ALIASES = {
 }
 
 BOSSES: list[BossRecord] = [
-    {"id": "cleric-beast", "safe": "early optional beast boss", "name": "Cleric Beast", "area": "central-yharnam", "required": False, "phase": "start"},
-    {"id": "father-gascoigne", "safe": "first mandatory hunter boss", "name": "Father Gascoigne", "area": "central-yharnam", "required": True, "phase": "start"},
-    {"id": "blood-starved-beast", "safe": "early optional poison beast boss", "name": "Blood-starved Beast", "area": "old-yharnam", "required": False, "phase": "evening"},
-    {"id": "vicar-amelia", "safe": "Cathedral Ward mandatory boss", "name": "Vicar Amelia", "area": "cathedral-ward", "required": True, "phase": "evening"},
-    {"id": "witch-of-hemwick", "safe": "optional utility boss", "name": "Witch of Hemwick", "area": "hemwick-charnel-lane", "required": False, "phase": "night"},
-    {"id": "shadows-of-yharnam", "safe": "midgame mandatory boss", "name": "Shadows of Yharnam", "area": "forbidden-woods", "required": True, "phase": "night"},
-    {"id": "darkbeast-paarl", "safe": "optional electric beast boss", "name": "Darkbeast Paarl", "area": "hypogean-gaol", "required": False, "phase": "evening"},
-    {"id": "the-one-reborn", "safe": "blood-moon mandatory boss", "name": "The One Reborn", "area": "yahargul", "required": True, "phase": "blood-moon"},
-    {"id": "celestial-emissary", "safe": "late optional boss", "name": "Celestial Emissary", "area": "upper-cathedral-ward", "required": False, "phase": "blood-moon"},
-    {"id": "ebrietas", "safe": "late optional boss", "name": "Ebrietas", "area": "upper-cathedral-ward", "required": False, "phase": "blood-moon"},
-    {"id": "martyr-logarius", "safe": "late optional boss", "name": "Martyr Logarius", "area": "cainhurst", "required": False, "phase": "blood-moon"},
-    {"id": "amygdala", "safe": "nightmare optional boss", "name": "Amygdala", "area": "nightmare-frontier", "required": False, "phase": "nightmare"},
-    {"id": "micolash", "safe": "nightmare mandatory boss", "name": "Micolash", "area": "nightmare-of-mensis", "required": True, "phase": "nightmare"},
-    {"id": "mergos-wet-nurse", "safe": "late mandatory boss", "name": "Mergo's Wet Nurse", "area": "nightmare-of-mensis", "required": True, "phase": "nightmare"},
+    {
+        "id": "cleric-beast",
+        "safe": "early optional beast boss",
+        "name": "Cleric Beast",
+        "area": "central-yharnam",
+        "required": False,
+        "phase": "start",
+    },
+    {
+        "id": "father-gascoigne",
+        "safe": "first mandatory hunter boss",
+        "name": "Father Gascoigne",
+        "area": "central-yharnam",
+        "required": True,
+        "phase": "start",
+    },
+    {
+        "id": "blood-starved-beast",
+        "safe": "early optional poison beast boss",
+        "name": "Blood-starved Beast",
+        "area": "old-yharnam",
+        "required": False,
+        "phase": "evening",
+    },
+    {
+        "id": "vicar-amelia",
+        "safe": "Cathedral Ward mandatory boss",
+        "name": "Vicar Amelia",
+        "area": "cathedral-ward",
+        "required": True,
+        "phase": "evening",
+    },
+    {
+        "id": "witch-of-hemwick",
+        "safe": "optional utility boss",
+        "name": "Witch of Hemwick",
+        "area": "hemwick-charnel-lane",
+        "required": False,
+        "phase": "night",
+    },
+    {
+        "id": "shadows-of-yharnam",
+        "safe": "midgame mandatory boss",
+        "name": "Shadows of Yharnam",
+        "area": "forbidden-woods",
+        "required": True,
+        "phase": "night",
+    },
+    {
+        "id": "darkbeast-paarl",
+        "safe": "optional electric beast boss",
+        "name": "Darkbeast Paarl",
+        "area": "hypogean-gaol",
+        "required": False,
+        "phase": "evening",
+    },
+    {
+        "id": "the-one-reborn",
+        "safe": "blood-moon mandatory boss",
+        "name": "The One Reborn",
+        "area": "yahargul",
+        "required": True,
+        "phase": "blood-moon",
+    },
+    {
+        "id": "celestial-emissary",
+        "safe": "late optional boss",
+        "name": "Celestial Emissary",
+        "area": "upper-cathedral-ward",
+        "required": False,
+        "phase": "blood-moon",
+    },
+    {
+        "id": "ebrietas",
+        "safe": "late optional boss",
+        "name": "Ebrietas",
+        "area": "upper-cathedral-ward",
+        "required": False,
+        "phase": "blood-moon",
+    },
+    {
+        "id": "martyr-logarius",
+        "safe": "late optional boss",
+        "name": "Martyr Logarius",
+        "area": "cainhurst",
+        "required": False,
+        "phase": "blood-moon",
+    },
+    {
+        "id": "amygdala",
+        "safe": "nightmare optional boss",
+        "name": "Amygdala",
+        "area": "nightmare-frontier",
+        "required": False,
+        "phase": "nightmare",
+    },
+    {
+        "id": "micolash",
+        "safe": "nightmare mandatory boss",
+        "name": "Micolash",
+        "area": "nightmare-of-mensis",
+        "required": True,
+        "phase": "nightmare",
+    },
+    {
+        "id": "mergos-wet-nurse",
+        "safe": "late mandatory boss",
+        "name": "Mergo's Wet Nurse",
+        "area": "nightmare-of-mensis",
+        "required": True,
+        "phase": "nightmare",
+    },
 ]
 
 ITEMS = {
@@ -325,29 +796,109 @@ ITEMS = {
 }
 
 CHECKLISTS = {
-    "hunters-dream": ["Equip right-hand and left-hand weapons.", "Use workshop functions only after the relevant tool/menu appears.", "Return here to level, fortify, repair, and manage storage."],
-    "central-yharnam": ["Choose main weapon/firearm.", "Open shortcuts before pushing bosses.", "Upgrade main weapon to +2/+3 when materials allow.", "Practice parry on large humanoids."],
-    "cathedral-ward": ["Use the workshop: fortify weapon, slot Tempering gems, repair only when warned.", "Prioritize VIT/END baseline before damage stats.", "Open gates/shortcuts before boss attempts."],
-    "old-yharnam": ["Bring antidotes.", "Use short safe farming loops if vial/antidote-starved.", "Fire/serrated pressure helps beasts.", "Finish the area before over-investing in side weapons."],
-    "hypogean-gaol": ["Optional side route.", "Open shortcuts before committing.", "Electric beast route links back to Old Yharnam."],
-    "hemwick-charnel-lane": ["Clear for the rune tool if not already done.", "After getting the tool, equip Moon/Clockwise/Anti-Clockwise as needed.", "Use the obelisk route only if carrying Cainhurst Summons."],
-    "forbidden-woods": ["Keep weapon at +6 or better if possible.", "Unlock shortcuts aggressively.", "Do not dump points into BLT/ARC on quality unless meeting a specific requirement."],
-    "byrgenwerth": ["Expect a world-state gate.", "Before triggering major progress, spend Insight if current enemies feel overtuned."],
-    "yahargul": ["Clear side cells and shortcuts.", "Check for late upgrade materials.", "After boss, treat the area as done unless chasing specific loot."],
-    "upper-cathedral-ward": ["Use frenzy/bolt caution.", "Clear both bosses if doing optional completion.", "Cosmic Eye Watcher Badge is the key shop unlock."],
-    "lecture-building": ["Clear both floors.", "Use dense enemies as an echo farm if safe.", "Touch both nightmare entry lamps before committing."],
-    "cainhurst": ["Optional, harder route.", "Good before late nightmares if your weapon is +8/+9.", "Proceed from Hemwick obelisk with Cainhurst Summons."],
-    "nightmare-frontier": ["Optional nightmare route.", "Bring poison/frenzy awareness.", "Do after lower-level optional routes if minmaxing."],
-    "nightmare-of-mensis": ["Main late route.", "Aim to collect Blood Rock before final +10.", "Spend Insight down if frenzy pressure is obnoxious."],
-    "dlc": ["Optional high-difficulty route.", "Delay until the main weapon and stats feel stable.", "Use explicit spoiler permission before asking for exact area/boss names."],
+    "hunters-dream": [
+        "Equip right-hand and left-hand weapons.",
+        "Use workshop functions only after the relevant tool/menu appears.",
+        "Return here to level, fortify, repair, and manage storage.",
+    ],
+    "central-yharnam": [
+        "Choose main weapon/firearm.",
+        "Open shortcuts before pushing bosses.",
+        "Upgrade main weapon to +2/+3 when materials allow.",
+        "Practice parry on large humanoids.",
+    ],
+    "cathedral-ward": [
+        "Use the workshop: fortify weapon, slot Tempering gems, repair only when warned.",
+        "Prioritize VIT/END baseline before damage stats.",
+        "Open gates/shortcuts before boss attempts.",
+    ],
+    "old-yharnam": [
+        "Bring antidotes.",
+        "Use short safe farming loops if vial/antidote-starved.",
+        "Fire/serrated pressure helps beasts.",
+        "Finish the area before over-investing in side weapons.",
+    ],
+    "hypogean-gaol": [
+        "Optional side route.",
+        "Open shortcuts before committing.",
+        "Electric beast route links back to Old Yharnam.",
+    ],
+    "hemwick-charnel-lane": [
+        "Clear for the rune tool if not already done.",
+        "After getting the tool, equip Moon/Clockwise/Anti-Clockwise as needed.",
+        "Use the obelisk route only if carrying Cainhurst Summons.",
+    ],
+    "forbidden-woods": [
+        "Keep weapon at +6 or better if possible.",
+        "Unlock shortcuts aggressively.",
+        "Do not dump points into BLT/ARC on quality unless meeting a specific requirement.",
+    ],
+    "byrgenwerth": [
+        "Expect a world-state gate.",
+        "Before triggering major progress, spend Insight if current enemies feel overtuned.",
+    ],
+    "yahargul": [
+        "Clear side cells and shortcuts.",
+        "Check for late upgrade materials.",
+        "After boss, treat the area as done unless chasing specific loot.",
+    ],
+    "upper-cathedral-ward": [
+        "Use frenzy/bolt caution.",
+        "Clear both bosses if doing optional completion.",
+        "Cosmic Eye Watcher Badge is the key shop unlock.",
+    ],
+    "lecture-building": [
+        "Clear both floors.",
+        "Use dense enemies as an echo farm if safe.",
+        "Touch both nightmare entry lamps before committing.",
+    ],
+    "cainhurst": [
+        "Optional, harder route.",
+        "Good before late nightmares if your weapon is +8/+9.",
+        "Proceed from Hemwick obelisk with Cainhurst Summons.",
+    ],
+    "nightmare-frontier": [
+        "Optional nightmare route.",
+        "Bring poison/frenzy awareness.",
+        "Do after lower-level optional routes if minmaxing.",
+    ],
+    "nightmare-of-mensis": [
+        "Main late route.",
+        "Aim to collect Blood Rock before final +10.",
+        "Spend Insight down if frenzy pressure is obnoxious.",
+    ],
+    "dlc": [
+        "Optional high-difficulty route.",
+        "Delay until the main weapon and stats feel stable.",
+        "Use explicit spoiler permission before asking for exact area/boss names.",
+    ],
 }
 
 BUILD_ARCHETYPES = {
-    "quality": ["Origin: Military Veteran.", "Starter-safe weapons: Saw Cleaver, Ludwig's Holy Blade.", "Targets: VIT 30-40, END 15-20, STR 25, SKL 25, then STR/SKL toward 50.", "Gems: Tempering physical."],
-    "strength": ["Origin: Violent Past.", "Targets: VIT 30-40, END 15-20, STR 25 then 50, SKL only for requirements.", "Gems: Tempering/Adept only when you understand moveset damage types."],
-    "skill": ["Origin: Professional.", "Targets: VIT 30-40, END 15-20, SKL 25 then 50, STR only for requirements.", "Bonus: stronger viscerals."],
-    "bloodtinge": ["Origin: Noble Scion.", "Not beginner-default. BLT 25/50 only if using blood weapons/firearm scaling."],
-    "arcane": ["Origin: Cruel Fate.", "Not quality-default. ARC 25/50 for converted weapons; tools keep scaling high."],
+    "quality": [
+        "Origin: Military Veteran.",
+        "Starter-safe weapons: Saw Cleaver, Ludwig's Holy Blade.",
+        "Targets: VIT 30-40, END 15-20, STR 25, SKL 25, then STR/SKL toward 50.",
+        "Gems: Tempering physical.",
+    ],
+    "strength": [
+        "Origin: Violent Past.",
+        "Targets: VIT 30-40, END 15-20, STR 25 then 50, SKL only for requirements.",
+        "Gems: Tempering/Adept only when you understand moveset damage types.",
+    ],
+    "skill": [
+        "Origin: Professional.",
+        "Targets: VIT 30-40, END 15-20, SKL 25 then 50, STR only for requirements.",
+        "Bonus: stronger viscerals.",
+    ],
+    "bloodtinge": [
+        "Origin: Noble Scion.",
+        "Not beginner-default. BLT 25/50 only if using blood weapons/firearm scaling.",
+    ],
+    "arcane": [
+        "Origin: Cruel Fate.",
+        "Not quality-default. ARC 25/50 for converted weapons; tools keep scaling high.",
+    ],
 }
 
 
@@ -386,6 +937,7 @@ def ar(w: Weapon, stats: tuple[int, int, int, int]) -> int:
 def echo_cost(current: int, target: int) -> int:
     def cost(lvl: int) -> float:
         return 0.02 * lvl**3 + 3.06 * lvl**2 + 105.6 * lvl - 895
+
     return max(0, round(sum(cost(l) for l in range(current, target))))
 
 
@@ -400,13 +952,33 @@ def tracking_path(path: str | None) -> Path | None:
 def read_tracking(path: str | None = None) -> str:
     p = tracking_path(path)
     if not p:
-        raise SystemExit("Tracking file not found. Pass --path or set BLOODBORNE_TRACKING_FILE.")
+        raise SystemExit(
+            "Tracking file not found. Pass --path or set BLOODBORNE_TRACKING_FILE.",
+        )
     return p.read_text(encoding="utf-8")
 
 
 def extract_stats(text: str) -> dict[str, int]:
     out: dict[str, int] = {}
-    aliases = {"vit":"VIT", "vitality":"VIT", "end":"END", "endurance":"END", "str":"STR", "strength":"STR", "skl":"SKL", "skill":"SKL", "skills":"SKL", "blt":"BLT", "blood":"BLT", "bloodtinge":"BLT", "arc":"ARC", "arcane":"ARC", "level":"LVL", "lvl":"LVL", "insight":"Insight"}
+    aliases = {
+        "vit": "VIT",
+        "vitality": "VIT",
+        "end": "END",
+        "endurance": "END",
+        "str": "STR",
+        "strength": "STR",
+        "skl": "SKL",
+        "skill": "SKL",
+        "skills": "SKL",
+        "blt": "BLT",
+        "blood": "BLT",
+        "bloodtinge": "BLT",
+        "arc": "ARC",
+        "arcane": "ARC",
+        "level": "LVL",
+        "lvl": "LVL",
+        "insight": "Insight",
+    }
     for line in text.splitlines():
         clean = re.sub(r"[*`|:-]", " ", line).strip()
         m = re.match(r"([A-Za-z ]+?)\s+(\d{1,3})\b", clean)
@@ -416,7 +988,11 @@ def extract_stats(text: str) -> dict[str, int]:
         if k:
             out[k] = int(m.group(2))
     # Also catch compact stat row: VIT 30 | END 17 ...
-    for k, v in re.findall(r"\b(VIT|END|STR|SKL|BLT|ARC|LVL|Insight)\b\s*[:=]?\s*(\d{1,3})", text, re.I):
+    for k, v in re.findall(
+        r"\b(VIT|END|STR|SKL|BLT|ARC|LVL|Insight)\b\s*[:=]?\s*(\d{1,3})",
+        text,
+        re.IGNORECASE,
+    ):
         out[aliases.get(k.lower(), k.upper())] = int(v)
     return out
 
@@ -424,7 +1000,11 @@ def extract_stats(text: str) -> dict[str, int]:
 def extract_gear(text: str) -> list[str]:
     lines = []
     for line in text.splitlines():
-        if re.search(r"\+\d|Saw Cleaver|Ludwig|Pistol|Sprayer|Hunter Axe|Threaded Cane", line, re.I):
+        if re.search(
+            r"\+\d|Saw Cleaver|Ludwig|Pistol|Sprayer|Hunter Axe|Threaded Cane",
+            line,
+            re.IGNORECASE,
+        ):
             lines.append(line.strip(" -|"))
     return lines[:8]
 
@@ -469,12 +1049,22 @@ def fetch_source(key: str, force: bool = False) -> dict[str, object]:
     src = SOURCES[key]
     old = cache_meta(key)
     age = cache_age_hours(old)
-    if html_path.exists() and old and age is not None and age < CACHE_TTL_HOURS and not force:
+    if (
+        html_path.exists()
+        and old
+        and age is not None
+        and age < CACHE_TTL_HOURS
+        and not force
+    ):
         return {**old, "status": "fresh-cache"}
 
     req = urllib.request.Request(
         str(src["url"]),
-        headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.9"},
+        headers={
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        },
     )
     with urllib.request.urlopen(req, timeout=20) as response:
         body = response.read()
@@ -525,20 +1115,32 @@ def cmd_sources(args: argparse.Namespace) -> None:
         for key in keys:
             meta = cache_meta(key)
             age = cache_age_hours(meta)
-            state = "missing" if age is None else ("fresh" if age < CACHE_TTL_HOURS else "stale")
-            suffix = "" if age is None else f", age {age:.1f}h, sha256 {str(meta.get('sha256', ''))[:12]}"
+            state = (
+                "missing"
+                if age is None
+                else ("fresh" if age < CACHE_TTL_HOURS else "stale")
+            )
+            suffix = (
+                ""
+                if age is None
+                else f", age {age:.1f}h, sha256 {str(meta.get('sha256', ''))[:12]}"
+            )
             print(f"{key}: {state}{suffix}")
         return
     if args.action == "refresh":
         for key in keys:
             meta = fetch_source(key, force=args.force)
-            print(f"{key}: {meta['status']}, {meta['bytes']} bytes, {meta['fetched_at_utc']}, {meta['path']}")
+            print(
+                f"{key}: {meta['status']}, {meta['bytes']} bytes, {meta['fetched_at_utc']}, {meta['path']}",
+            )
 
 
 def cmd_fresh(_: argparse.Namespace) -> None:
     print(f"Data source: {DATA_SOURCE}")
     print(f"Updated: {UPDATED}")
-    print(f"Cache policy: refresh live research notes every {CACHE_TTL_HOURS}h when a question depends on external/source freshness.")
+    print(
+        f"Cache policy: refresh live research notes every {CACHE_TTL_HOURS}h when a question depends on external/source freshness.",
+    )
     print(f"Sources registered: {len(SOURCES)}")
     print(f"Cache dir: {CACHE_DIR}")
 
@@ -553,7 +1155,9 @@ def cmd_origins(args: argparse.Namespace) -> None:
     if filt:
         rows = [(k, v) for k, v in rows if filt in k or filt in v[-1].lower()]
     for name, (lvl, vit, end, str_, skl, blt, arc_, best) in rows:
-        print(f"{name.title()}: LVL {lvl}, VIT {vit}, END {end}, STR {str_}, SKL {skl}, BLT {blt}, ARC {arc_} — {best}")
+        print(
+            f"{name.title()}: LVL {lvl}, VIT {vit}, END {end}, STR {str_}, SKL {skl}, BLT {blt}, ARC {arc_} — {best}",
+        )
 
 
 def cmd_upgrade(args: argparse.Namespace) -> None:
@@ -571,9 +1175,15 @@ def cmd_upgrade(args: argparse.Namespace) -> None:
 def cmd_weapons(args: argparse.Namespace) -> None:
     if args.name:
         w = find_weapon(" ".join(args.name))
-        print(f"{w.name}: req STR/SKL/BLT/ARC {w.req}; +10 atk phys/blood/element {w.base}; scaling {w.scaling}; style {w.style}; rally {w.rally}")
+        print(
+            f"{w.name}: req STR/SKL/BLT/ARC {w.req}; +10 atk phys/blood/element {w.base}; scaling {w.scaling}; style {w.style}; rally {w.rally}",
+        )
         return
-    rows = WEAPONS.values() if getattr(args, "spoilers", False) else [w for w in WEAPONS.values() if w.name in STARTER_WEAPON_NAMES]
+    rows = (
+        WEAPONS.values()
+        if getattr(args, "spoilers", False)
+        else [w for w in WEAPONS.values() if w.name in STARTER_WEAPON_NAMES]
+    )
     for w in rows:
         print(f"{w.name}: {w.style}, req {w.req}")
 
@@ -592,9 +1202,15 @@ def cmd_insight(args: argparse.Namespace) -> None:
     items = list(INSIGHT)
     if args.current is not None:
         if args.current >= 40:
-            items.insert(0, f"Current {args.current}: high. Spend some if you want a smoother run.")
+            items.insert(
+                0,
+                f"Current {args.current}: high. Spend some if you want a smoother run.",
+            )
         elif args.current > 15:
-            items.insert(0, f"Current {args.current}: above difficulty threshold; spend if struggling.")
+            items.insert(
+                0,
+                f"Current {args.current}: above difficulty threshold; spend if struggling.",
+            )
         else:
             items.insert(0, f"Current {args.current}: normal/low. Fine to hold.")
     print_bullets("Insight", items)
@@ -628,7 +1244,9 @@ def cmd_track(args: argparse.Namespace) -> None:
 def cmd_recommend(args: argparse.Namespace) -> None:
     text = read_tracking(getattr(args, "path", None))
     s = extract_stats(text)
-    vit, end, str_, skl, blt, arc_ = (s.get(k, 0) for k in ("VIT", "END", "STR", "SKL", "BLT", "ARC"))
+    vit, end, str_, skl, blt, arc_ = (
+        s.get(k, 0) for k in ("VIT", "END", "STR", "SKL", "BLT", "ARC")
+    )
     recs = []
     if vit and vit < 30:
         recs.append("Level VIT toward 30 first if dying fast.")
@@ -643,11 +1261,19 @@ def cmd_recommend(args: argparse.Namespace) -> None:
     else:
         recs.append("Damage target: STR/SKL toward 50/50, main weapon upgrades first.")
     if blt and blt > 7:
-        recs.append("BLT was raised; only continue if committing to blood weapons/firearm damage.")
+        recs.append(
+            "BLT was raised; only continue if committing to blood weapons/firearm damage.",
+        )
     if arc_ and arc_ <= 8:
-        recs.append("ARC 8 is only for basic tool/Flame Sprayer access; do not keep leveling ARC for a physical quality build.")
-    recs.append("Upgrade priority: main weapon first; backup only after main hits current material ceiling.")
-    recs.append("Supply rule: farm echoes, then buy vials/bullets; do not rely on vial drops unless broke.")
+        recs.append(
+            "ARC 8 is only for basic tool/Flame Sprayer access; do not keep leveling ARC for a physical quality build.",
+        )
+    recs.append(
+        "Upgrade priority: main weapon first; backup only after main hits current material ceiling.",
+    )
+    recs.append(
+        "Supply rule: farm echoes, then buy vials/bullets; do not rely on vial drops unless broke.",
+    )
     print_bullets("Recommendation", recs)
 
 
@@ -665,8 +1291,8 @@ SAVE_BOSS_SECTIONS = frozenset({"summary", "bosses"})
 
 
 def _upgrade_sort_key(entry: object) -> tuple[int, str, str]:
-    location = getattr(entry, "location")
-    return (0 if location == "equipped" else 1, location, getattr(entry, "name"))
+    location = entry.location
+    return (0 if location == "equipped" else 1, location, entry.name)
 
 
 def print_save_runes(path: str) -> None:
@@ -688,7 +1314,10 @@ def print_save_gems(path: str) -> None:
         counts[entry.shape] = counts.get(entry.shape, 0) + 1
     print("Blood gems")
     if counts:
-        print("  Owned by type: " + ", ".join(f"{shape} {count}" for shape, count in sorted(counts.items())))
+        print(
+            "  Owned by type: "
+            + ", ".join(f"{shape} {count}" for shape, count in sorted(counts.items())),
+        )
     else:
         print("  None found")
         return
@@ -717,12 +1346,27 @@ def cmd_save(args: argparse.Namespace) -> None:
         "  "
         + ", ".join(
             f"{name} {stats[name]}"
-            for name in ("Level", "Health", "Stamina", "Echoes", "Insight", "Vitality", "Endurance", "Strength", "Skill", "Bloodtinge", "Arcane", "Ng")
+            for name in (
+                "Level",
+                "Health",
+                "Stamina",
+                "Echoes",
+                "Insight",
+                "Vitality",
+                "Endurance",
+                "Strength",
+                "Skill",
+                "Bloodtinge",
+                "Arcane",
+                "Ng",
+            )
             if name in stats
-        )
+        ),
     )
 
-    entries = read_inventory(save_path) if args.section in SAVE_INVENTORY_SECTIONS else []
+    entries = (
+        read_inventory(save_path) if args.section in SAVE_INVENTORY_SECTIONS else []
+    )
 
     if args.section in ("summary", "materials"):
         print_entries("Materials", materials(entries))
@@ -751,7 +1395,6 @@ def cmd_save(args: argparse.Namespace) -> None:
         print(f"Unknown future bosses defeated: {unknown_defeated}")
 
 
-
 def consistency_issues(check_sources: bool = False) -> list[str]:
     issues: list[str] = []
     source_required = {"url", "license", "use", "machine", "risk"}
@@ -762,16 +1405,26 @@ def consistency_issues(check_sources: bool = False) -> list[str]:
         if not re.fullmatch(r"[a-z0-9_.-]+", key):
             issues.append(f"source {key} has non-slug key")
     source_scaling = {
-        "saw cleaver": (.60, .40, 0, .55),
-        "ludwig's holy blade": (.80, .80, 0, .88),
-        "beast claw": (.60, .35, 0, .52),
-        "holy moonlight sword": (.80, .60, 0, .49),
+        "saw cleaver": (0.60, 0.40, 0, 0.55),
+        "ludwig's holy blade": (0.80, 0.80, 0, 0.88),
+        "beast claw": (0.60, 0.35, 0, 0.52),
+        "holy moonlight sword": (0.80, 0.60, 0, 0.49),
     }
     for key, expected in source_scaling.items():
         actual = WEAPONS[key].scaling
         if actual != expected:
-            issues.append(f"weapon scaling mismatch for {WEAPONS[key].name}: {actual} != {expected}")
-    source_saturation = {15: .200, 20: .350, 25: .500, 30: .570, 40: .710, 50: .850, 99: 1.000}
+            issues.append(
+                f"weapon scaling mismatch for {WEAPONS[key].name}: {actual} != {expected}",
+            )
+    source_saturation = {
+        15: 0.200,
+        20: 0.350,
+        25: 0.500,
+        30: 0.570,
+        40: 0.710,
+        50: 0.850,
+        99: 1.000,
+    }
     sat_by_level = dict(SAT_POINTS)
     for level, expected in source_saturation.items():
         actual = sat_by_level.get(level)
@@ -799,7 +1452,9 @@ def consistency_issues(check_sources: bool = False) -> list[str]:
             issues.append(f"boss {boss['id']} points to unknown area {boss['area']}")
         area_phase = next(area["phase"] for area in AREAS if area["id"] == boss["area"])
         if boss["phase"] != area_phase:
-            issues.append(f"boss {boss['id']} phase {boss['phase']} differs from area phase {area_phase}")
+            issues.append(
+                f"boss {boss['id']} phase {boss['phase']} differs from area phase {area_phase}",
+            )
     for checklist_area in CHECKLISTS:
         if checklist_area not in area_ids:
             issues.append(f"checklist points to unknown area {checklist_area}")
@@ -825,7 +1480,6 @@ def cmd_audit(args: argparse.Namespace) -> None:
         raise SystemExit(1)
     suffix = " + fresh source cache" if args.sources else ""
     print(f"Consistency audit OK{suffix}.")
-
 
 
 def boss_name(record: BossRecord, spoilers: bool) -> str:
@@ -860,7 +1514,9 @@ def cmd_areas(args: argparse.Namespace) -> None:
         if args.phase and area["phase"] != args.phase:
             continue
         opt = "optional" if area["optional"] else "main"
-        ident = area["id"] if args.spoilers or area["safe"] else f"hidden-{hidden_index}"
+        ident = (
+            area["id"] if args.spoilers or area["safe"] else f"hidden-{hidden_index}"
+        )
         if ident.startswith("hidden-"):
             hidden_index += 1
         print(f"- {ident}: {area_name(area, args.spoilers)} ({area['phase']}, {opt})")
@@ -879,15 +1535,27 @@ def cmd_bosses(args: argparse.Namespace) -> None:
         ident = boss["id"] if args.spoilers or introduced else f"hidden-{hidden_index}"
         if ident.startswith("hidden-"):
             hidden_index += 1
-        area_label = area["id"] if args.spoilers or introduced or area["safe"] else area_name(area, False)
-        print(f"- {ident}: {boss_name(boss, args.spoilers or introduced)}; area {area_label}; {'required' if boss['required'] else 'optional'}")
+        area_label = (
+            area["id"]
+            if args.spoilers or introduced or area["safe"]
+            else area_name(area, False)
+        )
+        print(
+            f"- {ident}: {boss_name(boss, args.spoilers or introduced)}; area {area_label}; {'required' if boss['required'] else 'optional'}",
+        )
 
 
 def cmd_items(args: argparse.Namespace) -> None:
     if not args.query and not args.spoilers:
-        raise SystemExit("Provide an item query, or pass --spoilers to list all indexed items.")
+        raise SystemExit(
+            "Provide an item query, or pass --spoilers to list all indexed items.",
+        )
     q = " ".join(args.query).lower()
-    rows = [(name, text) for name, text in ITEMS.items() if not q or q in name.lower() or q in text.lower()]
+    rows = [
+        (name, text)
+        for name, text in ITEMS.items()
+        if not q or q in name.lower() or q in text.lower()
+    ]
     if not rows:
         raise SystemExit("No item match.")
     print("Items")
@@ -909,7 +1577,9 @@ def cmd_build(args: argparse.Namespace) -> None:
         raise SystemExit(f"Unknown build style: {args.style}")
     items = list(BUILD_ARCHETYPES[key])
     if args.level:
-        items.append(f"Level {args.level}: obey softcaps; weapon upgrades beat damage stats until requirements/25 caps.")
+        items.append(
+            f"Level {args.level}: obey softcaps; weapon upgrades beat damage stats until requirements/25 caps.",
+        )
     print_bullets(f"Build: {key}", items)
 
 
@@ -926,7 +1596,11 @@ def cmd_compare(args: argparse.Namespace) -> None:
 
 
 def cmd_route(args: argparse.Namespace) -> None:
-    defeated = {x.strip().lower().replace("_", "-") for x in args.defeated.split(",") if x.strip()}
+    defeated = {
+        x.strip().lower().replace("_", "-")
+        for x in args.defeated.split(",")
+        if x.strip()
+    }
     required = [b for b in BOSSES if b["required"]]
     next_boss = next((b for b in required if b["id"] not in defeated), None)
     if next_boss:
@@ -935,37 +1609,129 @@ def cmd_route(args: argparse.Namespace) -> None:
         print(f"Next required pressure point: {name} ({area}).")
     else:
         print("Required boss list exhausted in this lightweight route table.")
-    print("Safe optional check before late push: Hemwick/rune tool, Cainhurst invitation route, Upper Cathedral route, main weapon upgrades.")
+    print(
+        "Safe optional check before late push: Hemwick/rune tool, Cainhurst invitation route, Upper Cathedral route, main weapon upgrades.",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Bloodborne spoiler-safe companion CLI")
     sub = p.add_subparsers(required=True)
-    for name, fn in [("fresh", cmd_fresh), ("softcaps", cmd_softcaps), ("runes", cmd_runes), ("gems", cmd_gems)]:
-        sp = sub.add_parser(name); sp.set_defaults(func=fn)
-    sp = sub.add_parser("recommend"); sp.add_argument("--path"); sp.set_defaults(func=cmd_recommend)
-    sp = sub.add_parser("origins"); sp.add_argument("filter", nargs="?"); sp.set_defaults(func=cmd_origins)
-    sp = sub.add_parser("upgrade"); sp.add_argument("level", type=int); sp.set_defaults(func=cmd_upgrade)
-    sp = sub.add_parser("weapons"); sp.add_argument("name", nargs="*"); sp.add_argument("--spoilers", action="store_true"); sp.set_defaults(func=cmd_weapons)
-    sp = sub.add_parser("calc"); sp.add_argument("weapon"); sp.add_argument("str", type=int); sp.add_argument("skl", type=int); sp.add_argument("blt", type=int); sp.add_argument("arc", type=int); sp.set_defaults(func=cmd_calc)
-    sp = sub.add_parser("compare"); sp.add_argument("weapons", nargs="+"); sp.add_argument("--str", type=int, required=True); sp.add_argument("--skl", type=int, required=True); sp.add_argument("--blt", type=int, default=0); sp.add_argument("--arc", type=int, default=0); sp.set_defaults(func=cmd_compare)
-    sp = sub.add_parser("echo-cost"); sp.add_argument("current", type=int); sp.add_argument("target", type=int); sp.set_defaults(func=cmd_echo_cost)
-    sp = sub.add_parser("insight"); sp.add_argument("current", nargs="?", type=int); sp.set_defaults(func=cmd_insight)
-    sp = sub.add_parser("farm"); sp.add_argument("kind", choices=sorted(FARMS)); sp.set_defaults(func=cmd_farm)
-    sp = sub.add_parser("build"); sp.add_argument("style", choices=sorted(BUILD_ARCHETYPES)); sp.add_argument("--level", type=int); sp.set_defaults(func=cmd_build)
-    sp = sub.add_parser("areas"); sp.add_argument("--phase", choices=["start", "evening", "night", "blood-moon", "nightmare", "dlc"]); sp.add_argument("--spoilers", action="store_true"); sp.set_defaults(func=cmd_areas)
-    sp = sub.add_parser("bosses"); sp.add_argument("--area"); sp.add_argument("--required", action="store_true"); sp.add_argument("--spoilers", action="store_true"); sp.set_defaults(func=cmd_bosses)
-    sp = sub.add_parser("items"); sp.add_argument("query", nargs="*"); sp.add_argument("--spoilers", action="store_true"); sp.set_defaults(func=cmd_items)
-    sp = sub.add_parser("checklist"); sp.add_argument("area"); sp.add_argument("--spoilers", action="store_true"); sp.set_defaults(func=cmd_checklist)
-    sp = sub.add_parser("route"); sp.add_argument("--defeated", default=""); sp.add_argument("--spoilers", action="store_true"); sp.set_defaults(func=cmd_route)
-    sp = sub.add_parser("audit"); sp.add_argument("--sources", action="store_true"); sp.set_defaults(func=cmd_audit)
-    sp = sub.add_parser("track"); sp.add_argument("section", nargs="?", choices=["summary", "stats", "gear", "next"], default="summary"); sp.add_argument("--path"); sp.set_defaults(func=cmd_track)
-    sp = sub.add_parser("sources"); sp.add_argument("action", choices=["list", "status", "refresh"]); sp.add_argument("keys", nargs="*"); sp.add_argument("--force", action="store_true"); sp.set_defaults(func=cmd_sources)
-    sp = sub.add_parser("save"); sp.add_argument("path"); sp.add_argument("section", nargs="?", choices=["summary", "stats", "materials", "weapons", "keys", "bosses", "runes", "gems"], default="summary"); sp.set_defaults(func=cmd_save)
+    for name, fn in [
+        ("fresh", cmd_fresh),
+        ("softcaps", cmd_softcaps),
+        ("runes", cmd_runes),
+        ("gems", cmd_gems),
+    ]:
+        sp = sub.add_parser(name)
+        sp.set_defaults(func=fn)
+    sp = sub.add_parser("recommend")
+    sp.add_argument("--path")
+    sp.set_defaults(func=cmd_recommend)
+    sp = sub.add_parser("origins")
+    sp.add_argument("filter", nargs="?")
+    sp.set_defaults(func=cmd_origins)
+    sp = sub.add_parser("upgrade")
+    sp.add_argument("level", type=int)
+    sp.set_defaults(func=cmd_upgrade)
+    sp = sub.add_parser("weapons")
+    sp.add_argument("name", nargs="*")
+    sp.add_argument("--spoilers", action="store_true")
+    sp.set_defaults(func=cmd_weapons)
+    sp = sub.add_parser("calc")
+    sp.add_argument("weapon")
+    sp.add_argument("str", type=int)
+    sp.add_argument("skl", type=int)
+    sp.add_argument("blt", type=int)
+    sp.add_argument("arc", type=int)
+    sp.set_defaults(func=cmd_calc)
+    sp = sub.add_parser("compare")
+    sp.add_argument("weapons", nargs="+")
+    sp.add_argument("--str", type=int, required=True)
+    sp.add_argument("--skl", type=int, required=True)
+    sp.add_argument("--blt", type=int, default=0)
+    sp.add_argument("--arc", type=int, default=0)
+    sp.set_defaults(func=cmd_compare)
+    sp = sub.add_parser("echo-cost")
+    sp.add_argument("current", type=int)
+    sp.add_argument("target", type=int)
+    sp.set_defaults(func=cmd_echo_cost)
+    sp = sub.add_parser("insight")
+    sp.add_argument("current", nargs="?", type=int)
+    sp.set_defaults(func=cmd_insight)
+    sp = sub.add_parser("farm")
+    sp.add_argument("kind", choices=sorted(FARMS))
+    sp.set_defaults(func=cmd_farm)
+    sp = sub.add_parser("build")
+    sp.add_argument("style", choices=sorted(BUILD_ARCHETYPES))
+    sp.add_argument("--level", type=int)
+    sp.set_defaults(func=cmd_build)
+    sp = sub.add_parser("areas")
+    sp.add_argument(
+        "--phase",
+        choices=["start", "evening", "night", "blood-moon", "nightmare", "dlc"],
+    )
+    sp.add_argument("--spoilers", action="store_true")
+    sp.set_defaults(func=cmd_areas)
+    sp = sub.add_parser("bosses")
+    sp.add_argument("--area")
+    sp.add_argument("--required", action="store_true")
+    sp.add_argument("--spoilers", action="store_true")
+    sp.set_defaults(func=cmd_bosses)
+    sp = sub.add_parser("items")
+    sp.add_argument("query", nargs="*")
+    sp.add_argument("--spoilers", action="store_true")
+    sp.set_defaults(func=cmd_items)
+    sp = sub.add_parser("checklist")
+    sp.add_argument("area")
+    sp.add_argument("--spoilers", action="store_true")
+    sp.set_defaults(func=cmd_checklist)
+    sp = sub.add_parser("route")
+    sp.add_argument("--defeated", default="")
+    sp.add_argument("--spoilers", action="store_true")
+    sp.set_defaults(func=cmd_route)
+    sp = sub.add_parser("audit")
+    sp.add_argument("--sources", action="store_true")
+    sp.set_defaults(func=cmd_audit)
+    sp = sub.add_parser("track")
+    sp.add_argument(
+        "section",
+        nargs="?",
+        choices=["summary", "stats", "gear", "next"],
+        default="summary",
+    )
+    sp.add_argument("--path")
+    sp.set_defaults(func=cmd_track)
+    sp = sub.add_parser("sources")
+    sp.add_argument("action", choices=["list", "status", "refresh"])
+    sp.add_argument("keys", nargs="*")
+    sp.add_argument("--force", action="store_true")
+    sp.set_defaults(func=cmd_sources)
+    sp = sub.add_parser("save")
+    sp.add_argument("path")
+    sp.add_argument(
+        "section",
+        nargs="?",
+        choices=[
+            "summary",
+            "stats",
+            "materials",
+            "weapons",
+            "keys",
+            "bosses",
+            "runes",
+            "gems",
+        ],
+        default="summary",
+    )
+    sp.set_defaults(func=cmd_save)
     return p
 
 
 def main() -> None:
     args = build_parser().parse_args()
     args.func(args)
+
 
 if __name__ == "__main__":
     main()

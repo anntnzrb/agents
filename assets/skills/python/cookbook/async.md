@@ -2,6 +2,20 @@
 
 Deep dive into async programming in Python 3.14+.
 
+## Contents
+
+- [Running concurrent tasks](#running-concurrent-tasks-with-taskgroup)
+- [Gathering results](#gathering-multiple-results)
+- [Timeouts](#adding-timeouts-to-async-operations)
+- [Async generators and comprehensions](#creating-async-generators)
+- [Async context managers](#creating-class-based-async-context-managers)
+- [HTTP requests, clients, and retries](#making-http-requests-with-httpx)
+- [Exception groups and degradation](#handling-exception-groups)
+- [Blocking code and rate limits](#running-blocking-code-in-async-context)
+- [Events, queues, and locks](#coordinating-tasks-with-events)
+- [Anti-patterns](#anti-patterns-to-avoid)
+- [Quick reference](#quick-reference)
+
 ---
 
 ## Running Concurrent Tasks with TaskGroup

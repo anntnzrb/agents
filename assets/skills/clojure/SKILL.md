@@ -64,11 +64,13 @@ gh search code "(comp (map" --language=clojure
 gh search code "(s/def ::" --language=clojure
 ```
 
-## References
+## Required follow-up reads
 
-- [reference.md](reference.md) - Data structures, best practices, idioms, error handling
-- [patterns.md](cookbook/patterns.md) - Functional patterns, sequences, transducers
-- [concurrency.md](cookbook/concurrency.md) - Atoms, refs, agents, core.async
-- [spec.md](cookbook/spec.md) - clojure.spec validation & generative testing
-- [testing.md](cookbook/testing.md) - clojure.test, Kaocha configuration
-- [macros.md](cookbook/macros.md) - Metaprogramming patterns
+| Need | Read | When |
+| --- | --- | --- |
+| Core language/project reference | `reference.md` | For data structures, idioms, errors, layout, or `deps.edn` |
+| Functional patterns | `cookbook/patterns.md` | For sequences, transducers, maps, reducers, or zippers |
+| Concurrency | `cookbook/concurrency.md` | For atoms, refs, agents, dynamic vars, `core.async`, futures, or promises |
+| Specs | `cookbook/spec.md` | For validation, conforming, generators, or function instrumentation |
+| Testing | `cookbook/testing.md` | For `clojure.test`, Kaocha, fixtures, async tests, or test.check |
+| Macros | `cookbook/macros.md` | Only when a function cannot express the required compile-time transformation |

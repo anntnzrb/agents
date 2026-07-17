@@ -22,15 +22,14 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-import httpx
-from understatapi import UnderstatClient
-
 import ecuabet
 import espn
+import httpx
 import open_meteo
 import recommendations
 import sofascore
 import understat
+from understatapi import UnderstatClient
 
 __all__: list[str] = []
 
@@ -128,11 +127,13 @@ def infer_league_hints(  # noqa: C901
     for text in candidates:
         if understat_league is None:
             understat_league = next(
-                (value for key, value in UNDERSTAT_LEAGUE_HINTS if key in text), None
+                (value for key, value in UNDERSTAT_LEAGUE_HINTS if key in text),
+                None,
             )
         if espn_league is None:
             espn_league = next(
-                (value for key, value in ESPN_LEAGUE_HINTS if key in text), None
+                (value for key, value in ESPN_LEAGUE_HINTS if key in text),
+                None,
             )
         if understat_league and espn_league:
             break
@@ -157,7 +158,11 @@ def as_float(value: object) -> float | None:
 
 
 def write_snapshot(
-    snapshot: dict[str, Any], output: Path, iteration: int, *, watch_mode: bool
+    snapshot: dict[str, Any],
+    output: Path,
+    iteration: int,
+    *,
+    watch_mode: bool,
 ) -> Path:
     output = output.expanduser()
     if watch_mode:
@@ -168,7 +173,10 @@ def write_snapshot(
         target = output
         target.parent.mkdir(parents=True, exist_ok=True)
 
-    target.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n")
+    target.write_text(
+        json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     return target
 
 
@@ -177,7 +185,7 @@ def parse_args() -> argparse.Namespace:
         description=(
             "Fetch Ecuabet + SofaScore + ESPN + Open-Meteo + Understat in one "
             "decision-ready snapshot."
-        )
+        ),
     )
     parser.add_argument(
         "match",
@@ -200,10 +208,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ecuabet-country-code", default=ecuabet.DEFAULT_COUNTRY_CODE)
     parser.add_argument("--ecuabet-culture", default=ecuabet.DEFAULT_CULTURE)
     parser.add_argument(
-        "--ecuabet-timezone-offset", type=int, default=ecuabet.DEFAULT_TIMEZONE_OFFSET
+        "--ecuabet-timezone-offset",
+        type=int,
+        default=ecuabet.DEFAULT_TIMEZONE_OFFSET,
     )
     parser.add_argument(
-        "--ecuabet-device-type", type=int, default=ecuabet.DEFAULT_DEVICE_TYPE
+        "--ecuabet-device-type",
+        type=int,
+        default=ecuabet.DEFAULT_DEVICE_TYPE,
     )
     parser.add_argument("--ecuabet-num-format", default=ecuabet.DEFAULT_NUM_FORMAT)
     parser.add_argument("--ecuabet-base-url", default=ecuabet.DEFAULT_BASE_URL)
@@ -320,7 +332,8 @@ def market_lookup(ecuabet_snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]
 
 
 def market_open_selections(
-    market: dict[str, Any], limit: int = 40
+    market: dict[str, Any],
+    limit: int = 40,
 ) -> list[dict[str, Any]]:
     rows = []
     for sel in market.get("selections") or []:
@@ -335,7 +348,7 @@ def market_open_selections(
                 "price": price,
                 "impliedProbability": implied,
                 "impliedProbabilityPct": implied_pct,
-            }
+            },
         )
     rows.sort(key=lambda x: (x["price"], x["name"] or ""))
     return rows[:limit]
@@ -382,7 +395,8 @@ def totals_ladder(market: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def pick_team_stats(
-    espn_stats: dict[str, Any], team_name: str | None
+    espn_stats: dict[str, Any],
+    team_name: str | None,
 ) -> dict[str, Any]:
     if not team_name:
         return {}
@@ -468,20 +482,20 @@ def derive_decision_summary(
     status_board = {
         "sofascore": {
             "status": (((sofa or {}).get("match") or {}).get("status") or {}).get(
-                "description"
+                "description",
             ),
             "time": (((sofa or {}).get("match") or {}).get("status") or {}).get(
-                "description"
+                "description",
             )
             if sofa
             else None,
         },
         "espn": {
             "status": (((espn_snap or {}).get("match") or {}).get("status") or {}).get(
-                "detail"
+                "detail",
             ),
             "clock": (((espn_snap or {}).get("match") or {}).get("status") or {}).get(
-                "clock"
+                "clock",
             ),
         },
         "ecuabet": {
@@ -578,14 +592,15 @@ def derive_decision_summary(
         key_pack = {
             "1x2": market_open_selections(lookup.get("1x2") or {}),
             "doubleChance": market_open_selections(
-                lookup.get("doble oportunidad") or {}
+                lookup.get("doble oportunidad") or {},
             ),
             "btts": market_open_selections(lookup.get("ambos equipos marcan") or {}),
             "handicap": market_open_selections(lookup.get("handicap") or {}, limit=80),
             "firstGoal": market_open_selections(lookup.get("primer gol") or {}),
             "lastGoal": market_open_selections(lookup.get("ultimo gol") or {}),
             "correctScore": market_open_selections(
-                lookup.get("marcador exacto") or {}, limit=80
+                lookup.get("marcador exacto") or {},
+                limit=80,
             ),
             "totals": totals_ladder(total_market or {}),
             "totals_1st_half": totals_ladder(total_1h or {}),
@@ -595,7 +610,7 @@ def derive_decision_summary(
         digest = ecuabet_snap.get("marketDigest") or {}
         open_selections = digest.get("openSelections") or []
         open_selections.sort(
-            key=lambda x: (x.get("price") or 9999, x.get("marketName") or "")
+            key=lambda x: (x.get("price") or 9999, x.get("marketName") or ""),
         )
         filtered = digest.get("filteredSelections") or []
         filtered.sort(key=lambda x: (x.get("price") or 9999, x.get("marketName") or ""))
@@ -656,7 +671,8 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912,PLR0915
         and args.odds_floor > args.odds_ceiling
     ):
         print(
-            "error: --odds-floor cannot be greater than --odds-ceiling", file=sys.stderr
+            "error: --odds-floor cannot be greater than --odds-ceiling",
+            file=sys.stderr,
         )
         return 2
     if args.recommend_top <= 0:
@@ -741,7 +757,8 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912,PLR0915
             show_non_boosts=args.ecuabet_show_non_boosts,
         )
         ecuabet_client = ecuabet.EcuabetMatchClient(
-            config=ecu_cfg, timeout=args.timeout
+            config=ecu_cfg,
+            timeout=args.timeout,
         )
         ecu_request_params = {
             "base_url": ecu_cfg.base_url,
@@ -764,16 +781,17 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912,PLR0915
         if ecuabet_client and ecuabet_event_id is not None:
             try:
                 preloaded_ecuabet_details = ecuabet_client.fetch_details(
-                    ecuabet_event_id
+                    ecuabet_event_id,
                 )
                 seed_home_name, seed_away_name = team_names_from_ecuabet_details(
-                    preloaded_ecuabet_details
+                    preloaded_ecuabet_details,
                 )
                 seed_match_date = date_yyyymmdd_from_iso(
-                    preloaded_ecuabet_details.get("startDate")
+                    preloaded_ecuabet_details.get("startDate"),
                 )
                 inferred_understat, inferred_espn = infer_league_hints(
-                    sofa_event=None, ecuabet_details=preloaded_ecuabet_details
+                    sofa_event=None,
+                    ecuabet_details=preloaded_ecuabet_details,
                 )
                 if args.understat_league is None and inferred_understat:
                     understat_league_in_use = inferred_understat
@@ -788,7 +806,8 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912,PLR0915
                 sofa_query = f"{seed_home_name} {seed_away_name}"
             if sofa_query:
                 sofa_event_id, sofa_candidates = sofascore.resolve_event_id(
-                    client, sofa_query
+                    client,
+                    sofa_query,
                 )
             elif numeric_match_id is not None:
                 sofa_event_id = numeric_match_id
@@ -833,23 +852,28 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912,PLR0915
 
             try:
                 sofa_event_payload = sofascore.safe_get_json(
-                    client, f"{sofascore.BASE_URL}/event/{sofa_event_id}"
+                    client,
+                    f"{sofascore.BASE_URL}/event/{sofa_event_id}",
                 )
                 if not sofa_event_payload:
                     msg = f"SofaScore event {sofa_event_id} not found"
                     raise ValueError(msg)  # noqa: TRY301
 
                 sofa_incidents = sofascore.safe_get_json(
-                    client, f"{sofascore.BASE_URL}/event/{sofa_event_id}/incidents"
+                    client,
+                    f"{sofascore.BASE_URL}/event/{sofa_event_id}/incidents",
                 )
                 sofa_statistics = sofascore.safe_get_json(
-                    client, f"{sofascore.BASE_URL}/event/{sofa_event_id}/statistics"
+                    client,
+                    f"{sofascore.BASE_URL}/event/{sofa_event_id}/statistics",
                 )
                 sofa_lineups = sofascore.safe_get_json(
-                    client, f"{sofascore.BASE_URL}/event/{sofa_event_id}/lineups"
+                    client,
+                    f"{sofascore.BASE_URL}/event/{sofa_event_id}/lineups",
                 )
                 sofa_odds = sofascore.safe_get_json(
-                    client, f"{sofascore.BASE_URL}/event/{sofa_event_id}/odds/1/all"
+                    client,
+                    f"{sofascore.BASE_URL}/event/{sofa_event_id}/odds/1/all",
                 )
 
                 sofa_snapshot = sofascore.build_snapshot(
@@ -867,7 +891,8 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912,PLR0915
                 home_name = (event.get("homeTeam") or {}).get("name")
                 away_name = (event.get("awayTeam") or {}).get("name")
                 inferred_understat, inferred_espn = infer_league_hints(
-                    sofa_event=event, ecuabet_details=preloaded_ecuabet_details
+                    sofa_event=event,
+                    ecuabet_details=preloaded_ecuabet_details,
                 )
                 if args.understat_league is None and inferred_understat:
                     understat_league_in_use = inferred_understat
@@ -934,7 +959,7 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912,PLR0915
                     )
                     if not home_name or not away_name:
                         ecu_home, ecu_away = team_names_from_ecuabet_details(
-                            ecu_details
+                            ecu_details,
                         )
                         home_name = home_name or ecu_home
                         away_name = away_name or ecu_away
@@ -957,7 +982,7 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912,PLR0915
                     )
                 else:
                     venue_coords = (event.get("venue") or {}).get(
-                        "venueCoordinates"
+                        "venueCoordinates",
                     ) or {}
                     lat = venue_coords.get("latitude")
                     lon = venue_coords.get("longitude")
@@ -968,7 +993,7 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912,PLR0915
                             "longitude": lon,
                             "country": (
                                 ((event.get("venue") or {}).get("country") or {}).get(
-                                    "name"
+                                    "name",
                                 )
                             ),
                             "timezone": None,
@@ -976,7 +1001,7 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912,PLR0915
                         }
                     else:
                         city_name = ((event.get("venue") or {}).get("city") or {}).get(
-                            "name"
+                            "name",
                         )
                         if not city_name:
                             msg = (
@@ -1021,7 +1046,7 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912,PLR0915
                     try:
                         dt_utc = datetime.fromtimestamp(start_ts, tz=timezone.utc)
                         at_time_local = dt_utc.astimezone(ZoneInfo(tz_name)).replace(
-                            tzinfo=None
+                            tzinfo=None,
                         )
                     except (ValueError, ZoneInfo.NotFoundError):
                         at_time_local = None
@@ -1045,7 +1070,7 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912,PLR0915
                     u_league = understat.canonical_league(understat_league_in_use)
                     league_ep = understat_client.league(u_league)
                     league_matches = league_ep.get_match_data(
-                        season=args.understat_season
+                        season=args.understat_season,
                     )
                     league_teams = league_ep.get_team_data(season=args.understat_season)
 
@@ -1162,7 +1187,10 @@ def main() -> int:  # noqa: C901,PLR0911,PLR0912,PLR0915
             path: Path | None = None
             if args.output:
                 path = write_snapshot(
-                    snapshot, args.output, iteration, watch_mode=watch_mode
+                    snapshot,
+                    args.output,
+                    iteration,
+                    watch_mode=watch_mode,
                 )
             if path is not None:
                 print(path)

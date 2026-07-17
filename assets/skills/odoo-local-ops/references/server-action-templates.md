@@ -1,6 +1,6 @@
 # Server Action template catalog
 
-Templates are starting points; copy to `/tmp/<task>.py`, edit there, then `pbcopy < /tmp/<task>.py`.
+Templates are starting points; copy to `<temp-dir>/<task>.py`, edit there, then use the platform clipboard command.
 
 ## Templates
 
@@ -50,6 +50,6 @@ Required placeholders: model name, domain, expected counts, target ids, excluded
 
 ### `templates/server_action_clipboard_workflow.md.tmpl`
 
-Use as a local workflow reminder for `/tmp`, `pbcopy`, `pbpaste`, JSON parsing.
+Use as a macOS workflow reminder for `<temp-dir>`, `pbcopy`, `pbpaste`, and JSON parsing.
 
 Required placeholders: model name, domain, expected counts, target ids, excluded ids, fields to update, final invariant checks.

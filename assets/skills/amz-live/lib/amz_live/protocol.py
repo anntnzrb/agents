@@ -303,7 +303,7 @@ def serialize_results(
     scores_by_asin = scores_by_asin or {}
     serialized: list[SerializedSearchResultPayload] = []
     for index, result in enumerate(results, start=1):
-        item = cast(SerializedSearchResultPayload, result.to_dict())
+        item = cast("SerializedSearchResultPayload", result.to_dict())
         if details:
             detail = details_by_asin.get(result.asin)
             item["details"] = detail.to_dict() if detail is not None else None

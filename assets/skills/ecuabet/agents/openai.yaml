@@ -1,4 +1,4 @@
 interface:
   display_name: "Ecuabet Match Intel"
   short_description: "Advanced multi-feed match intelligence"
-  default_prompt: "Use $ecuabet with an Ecuabet match id/url, run scripts/main.py, and return one-shot recommendations with confidence, EV, and feed diagnostics."
+  default_prompt: "Use $ecuabet with an Ecuabet match id/url, run the public scripts/cli.py entrypoint, and return one-shot recommendations with confidence, EV, and feed diagnostics."

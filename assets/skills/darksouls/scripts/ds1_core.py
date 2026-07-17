@@ -16,9 +16,10 @@ import sqlite3
 import time
 import unicodedata
 import urllib.request
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, TypeAlias, TypedDict, cast
+from typing import TypeAlias, TypedDict, cast
 
 JsonValue: TypeAlias = (
     None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
@@ -91,7 +92,7 @@ def _as_object(value: JsonValue) -> JsonObject | None:
 
 
 def _load_json_text(path: Path) -> JsonValue:
-    return cast(JsonValue, json.loads(path.read_text(encoding="utf-8")))
+    return cast("JsonValue", json.loads(path.read_text(encoding="utf-8")))
 
 
 CACHE_TTL_HOURS = 24
@@ -224,7 +225,8 @@ def cache_put(key: str, content: str, meta: dict[str, JsonValue] | None = None) 
         "meta": {} if meta is None else meta,
     }
     _cache_file(key).write_text(
-        json.dumps(payload, ensure_ascii=False), encoding="utf-8"
+        json.dumps(payload, ensure_ascii=False),
+        encoding="utf-8",
     )
 
 
@@ -234,7 +236,8 @@ def fetch_cached(key: str, url: str, *, force: bool = False) -> str:
         if hit is not None:
             return hit
     request = urllib.request.Request(
-        url, headers={"User-Agent": "darksouls-companion/1.0"}
+        url,
+        headers={"User-Agent": "darksouls-companion/1.0"},
     )
     with urllib.request.urlopen(request, timeout=12) as response:
         content = response.read().decode("utf-8", errors="replace")
@@ -438,7 +441,7 @@ def equip_load_max(endurance: int, havels: bool = False, favor: bool = False) ->
         raise ValueError("endurance must be between 0 and 99")
     if havels and favor:
         raise ValueError(
-            "Havel's Ring and Ring of Favor and Protection are mutually exclusive"
+            "Havel's Ring and Ring of Favor and Protection are mutually exclusive",
         )
     value = endurance * 2.0
     if havels:
@@ -487,7 +490,7 @@ UPGRADE_PATHS: dict[str, list[tuple[int, int, dict[str, int]]]] = {
             ("titanite_chunk", 2),
             ("titanite_chunk", 2),
             ("titanite_slab", 1),
-        )
+        ),
     ),
     "raw": _material_path(
         (
@@ -496,7 +499,7 @@ UPGRADE_PATHS: dict[str, list[tuple[int, int, dict[str, int]]]] = {
             ("large_titanite_shard", 2),
             ("large_titanite_shard", 2),
             ("large_titanite_shard", 3),
-        )
+        ),
     ),
     "fire": _material_path(
         (
@@ -510,7 +513,7 @@ UPGRADE_PATHS: dict[str, list[tuple[int, int, dict[str, int]]]] = {
             ("red_titanite_chunk", 2),
             ("red_titanite_chunk", 2),
             ("red_titanite_slab", 1),
-        )
+        ),
     ),
     "chaos": _material_path(
         (
@@ -519,7 +522,7 @@ UPGRADE_PATHS: dict[str, list[tuple[int, int, dict[str, int]]]] = {
             ("red_titanite_chunk", 2),
             ("red_titanite_chunk", 2),
             ("red_titanite_slab", 1),
-        )
+        ),
     ),
     "lightning": _material_path(
         (
@@ -528,7 +531,7 @@ UPGRADE_PATHS: dict[str, list[tuple[int, int, dict[str, int]]]] = {
             ("titanite_chunk", 2),
             ("titanite_chunk", 2),
             ("titanite_slab", 1),
-        )
+        ),
     ),
     "magic": _material_path(
         (
@@ -542,7 +545,7 @@ UPGRADE_PATHS: dict[str, list[tuple[int, int, dict[str, int]]]] = {
             ("blue_titanite_chunk", 2),
             ("blue_titanite_chunk", 2),
             ("blue_titanite_slab", 1),
-        )
+        ),
     ),
     "enchanted": _material_path(
         (
@@ -551,7 +554,7 @@ UPGRADE_PATHS: dict[str, list[tuple[int, int, dict[str, int]]]] = {
             ("blue_titanite_chunk", 2),
             ("blue_titanite_chunk", 2),
             ("blue_titanite_slab", 1),
-        )
+        ),
     ),
     "divine": _material_path(
         (
@@ -565,7 +568,7 @@ UPGRADE_PATHS: dict[str, list[tuple[int, int, dict[str, int]]]] = {
             ("white_titanite_chunk", 2),
             ("white_titanite_chunk", 2),
             ("white_titanite_slab", 1),
-        )
+        ),
     ),
     "occult": _material_path(
         (
@@ -574,7 +577,7 @@ UPGRADE_PATHS: dict[str, list[tuple[int, int, dict[str, int]]]] = {
             ("white_titanite_chunk", 2),
             ("white_titanite_chunk", 2),
             ("white_titanite_slab", 1),
-        )
+        ),
     ),
     "unique": _material_path(tuple(("twinkling_titanite", 1) for _ in range(5))),
     "crystal": _material_path(tuple(("twinkling_titanite", 1) for _ in range(5))),
@@ -670,7 +673,10 @@ AREAS: tuple[Area, ...] = (
 
 
 def spoiler_safe(
-    name: str, *, spoilers: bool = False, known: Iterable[str] = ()
+    name: str,
+    *,
+    spoilers: bool = False,
+    known: Iterable[str] = (),
 ) -> str:
     if spoilers or name.lower() in {str(x).lower() for x in known}:
         return name
@@ -682,7 +688,28 @@ GUIDE_DIR = _resources_dir() / "guides" / "dsr_plat_guide"
 GUIDE_MANIFEST_PATH = GUIDE_DIR / "dsr-plat-guide.manifest.json"
 GUIDE_CHUNKS_PATH = GUIDE_DIR / "dsr-plat-guide.chunks.jsonl"
 GUIDE_STOPWORDS = frozenset(
-    "a an and are as at be by for from in is it of on or the this to with".split()
+    [
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "for",
+        "from",
+        "in",
+        "is",
+        "it",
+        "of",
+        "on",
+        "or",
+        "the",
+        "this",
+        "to",
+        "with",
+    ],
 )
 
 
@@ -702,7 +729,7 @@ def load_guide_chunks() -> list[GuideChunk]:
         for row, line in enumerate(handle, 1):
             if not line.strip():
                 continue
-            value = _as_object(cast(JsonValue, json.loads(line)))
+            value = _as_object(cast("JsonValue", json.loads(line)))
             headings = None if value is None else value.get("h")
             kind = None if value is None else value.get("k")
             text = None if value is None else value.get("t")
@@ -718,7 +745,7 @@ def load_guide_chunks() -> list[GuideChunk]:
                     "h": [str(item) for item in headings],
                     "k": kind,
                     "t": text,
-                }
+                },
             )
     return rows
 
@@ -763,7 +790,7 @@ def search_guide(
             statement += " AND lower(heading) LIKE lower(?)"
             params.append(f"%{heading}%")
         fetched = cast(
-            list[tuple[object, ...]],
+            "list[tuple[object, ...]]",
             connection.execute(statement, params).fetchall(),
         )
         row_ids: set[int] = set()
@@ -820,7 +847,7 @@ TRANSCRIPT_WARNING = (
 def _transcript_required_str(value: JsonValue | None, field: str, context: str) -> str:
     if not isinstance(value, str) or not value:
         raise ValueError(
-            f"invalid transcript {context}: {field} must be a non-empty string"
+            f"invalid transcript {context}: {field} must be a non-empty string",
         )
     return value
 
@@ -828,7 +855,7 @@ def _transcript_required_str(value: JsonValue | None, field: str, context: str) 
 def _transcript_required_int(value: JsonValue | None, field: str, context: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value < 0:
         raise ValueError(
-            f"invalid transcript {context}: {field} must be a non-negative integer"
+            f"invalid transcript {context}: {field} must be a non-negative integer",
         )
     return value
 
@@ -837,7 +864,7 @@ def _transcript_hash(value: JsonValue | None, field: str, context: str) -> str:
     result = _transcript_required_str(value, field, context).lower()
     if not re.fullmatch(r"[0-9a-f]{64}", result):
         raise ValueError(
-            f"invalid transcript {context}: {field} must be a SHA-256 hex digest"
+            f"invalid transcript {context}: {field} must be a SHA-256 hex digest",
         )
     return result
 
@@ -852,10 +879,11 @@ def _transcript_manifest_fields(
     format_name = _transcript_required_str(manifest.get("format"), "format", "manifest")
     if format_name != TRANSCRIPT_FORMAT:
         raise ValueError(
-            f"invalid transcript manifest: format must be {TRANSCRIPT_FORMAT!r}"
+            f"invalid transcript manifest: format must be {TRANSCRIPT_FORMAT!r}",
         )
     source_hash_value = manifest.get(
-        "source_json_sha256", manifest.get("source_sha256")
+        "source_json_sha256",
+        manifest.get("source_sha256"),
     )
     source_hash = _transcript_hash(source_hash_value, "source_json_sha256", "manifest")
     if source_hash != TRANSCRIPT_SOURCE_SHA256:
@@ -868,37 +896,51 @@ def _transcript_manifest_fields(
         video = _as_object(item)
         if video is None:
             raise ValueError(
-                f"invalid transcript manifest video {index}: expected object"
+                f"invalid transcript manifest video {index}: expected object",
             )
         declared_video_index = _transcript_required_int(
-            video.get("video_index"), "video_index", f"video {index}"
+            video.get("video_index"),
+            "video_index",
+            f"video {index}",
         )
         if declared_video_index != index:
             raise ValueError(
-                f"invalid transcript manifest video {index}: video_index must be {index}"
+                f"invalid transcript manifest video {index}: video_index must be {index}",
             )
         playlist_index = _transcript_required_int(
-            video.get("playlist_index"), "playlist_index", f"video {index}"
+            video.get("playlist_index"),
+            "playlist_index",
+            f"video {index}",
         )
         if playlist_index != index + 1:
             raise ValueError(
-                f"invalid transcript manifest video {index}: playlist_index must be {index + 1}"
+                f"invalid transcript manifest video {index}: playlist_index must be {index + 1}",
             )
         video_id = _transcript_required_str(
-            video.get("video_id"), "video_id", f"video {index}"
+            video.get("video_id"),
+            "video_id",
+            f"video {index}",
         )
         url = _transcript_required_str(video.get("url"), "url", f"video {index}")
         caption_track = _transcript_required_str(
-            video.get("caption_track"), "caption_track", f"video {index}"
+            video.get("caption_track"),
+            "caption_track",
+            f"video {index}",
         )
         cue_count = _transcript_required_int(
-            video.get("cue_count"), "cue_count", f"video {index}"
+            video.get("cue_count"),
+            "cue_count",
+            f"video {index}",
         )
         chunk_count = _transcript_required_int(
-            video.get("chunk_count"), "chunk_count", f"video {index}"
+            video.get("chunk_count"),
+            "chunk_count",
+            f"video {index}",
         )
         transcript_hash = _transcript_hash(
-            video.get("transcript_sha256"), "transcript_sha256", f"video {index}"
+            video.get("transcript_sha256"),
+            "transcript_sha256",
+            f"video {index}",
         )
         normalized_hash = _transcript_hash(
             video.get("normalized_transcript_sha256"),
@@ -912,7 +954,7 @@ def _transcript_manifest_fields(
         )
         if transcript_hash != normalized_hash or transcript_hash != raw_hash:
             raise ValueError(
-                f"invalid transcript manifest video {index}: transcript hashes disagree"
+                f"invalid transcript manifest video {index}: transcript hashes disagree",
             )
         videos.append(
             {
@@ -926,17 +968,21 @@ def _transcript_manifest_fields(
                 "raw_transcript_sha256": raw_hash,
                 "transcript_sha256": transcript_hash,
                 "normalized_transcript_sha256": normalized_hash,
-            }
+            },
         )
     video_count = _transcript_required_int(
-        manifest.get("video_count"), "video_count", "manifest"
+        manifest.get("video_count"),
+        "video_count",
+        "manifest",
     )
     chunk_count = _transcript_required_int(
-        manifest.get("chunk_count"), "chunk_count", "manifest"
+        manifest.get("chunk_count"),
+        "chunk_count",
+        "manifest",
     )
     if video_count != len(videos):
         raise ValueError(
-            "invalid transcript manifest: video_count does not match videos"
+            "invalid transcript manifest: video_count does not match videos",
         )
     if video_count == 0:
         raise ValueError("invalid transcript manifest: videos cannot be empty")
@@ -946,7 +992,7 @@ def _transcript_manifest_fields(
 def load_transcript_manifest() -> JsonObject:
     if not TRANSCRIPT_MANIFEST_PATH.exists():
         raise FileNotFoundError(
-            f"missing local transcript corpus: {TRANSCRIPT_MANIFEST_PATH}"
+            f"missing local transcript corpus: {TRANSCRIPT_MANIFEST_PATH}",
         )
     try:
         value = _load_json_text(TRANSCRIPT_MANIFEST_PATH)
@@ -966,59 +1012,63 @@ def load_transcript_chunks() -> list[TranscriptChunk]:
     )
     if not TRANSCRIPT_CHUNKS_PATH.exists():
         raise FileNotFoundError(
-            f"missing local transcript corpus: {TRANSCRIPT_CHUNKS_PATH}"
+            f"missing local transcript corpus: {TRANSCRIPT_CHUNKS_PATH}",
         )
     rows: list[TranscriptChunk] = []
     try:
         handle = TRANSCRIPT_CHUNKS_PATH.open(encoding="utf-8")
     except OSError as exc:
         raise OSError(
-            f"cannot read local transcript corpus: {TRANSCRIPT_CHUNKS_PATH}"
+            f"cannot read local transcript corpus: {TRANSCRIPT_CHUNKS_PATH}",
         ) from exc
     with handle:
         for line_number, line in enumerate(handle, 1):
             if not line.strip():
                 raise ValueError(
-                    f"invalid transcript row {line_number}: blank lines are not allowed"
+                    f"invalid transcript row {line_number}: blank lines are not allowed",
                 )
             try:
-                value = cast(JsonValue, json.loads(line))
+                value = cast("JsonValue", json.loads(line))
             except (ValueError, json.JSONDecodeError) as exc:
                 raise ValueError(
-                    f"invalid transcript row {line_number}: malformed JSON"
+                    f"invalid transcript row {line_number}: malformed JSON",
                 ) from exc
             row = _as_object(value)
             if row is None:
                 raise ValueError(
-                    f"invalid transcript row {line_number}: expected object"
+                    f"invalid transcript row {line_number}: expected object",
                 )
             video_index = _transcript_required_int(
-                row.get("video_index"), "video_index", f"row {line_number}"
+                row.get("video_index"),
+                "video_index",
+                f"row {line_number}",
             )
             chunk_index = _transcript_required_int(
-                row.get("chunk_index"), "chunk_index", f"row {line_number}"
+                row.get("chunk_index"),
+                "chunk_index",
+                f"row {line_number}",
             )
             if video_index >= video_count:
                 raise ValueError(
-                    f"invalid transcript row {line_number}: video_index out of range"
+                    f"invalid transcript row {line_number}: video_index out of range",
                 )
             video = videos[video_index]
             if chunk_index < 0:
                 raise ValueError(
-                    f"invalid transcript row {line_number}: chunk_index out of range"
+                    f"invalid transcript row {line_number}: chunk_index out of range",
                 )
             if row.get("playlist_index") != video["playlist_index"]:
                 raise ValueError(
-                    f"invalid transcript row {line_number}: playlist_index mismatch"
+                    f"invalid transcript row {line_number}: playlist_index mismatch",
                 )
             headings = row.get("h")
             if headings != [f"Video {video_index + 1:03d}"]:
                 raise ValueError(
-                    f"invalid transcript row {line_number}: h must be opaque video heading"
+                    f"invalid transcript row {line_number}: h must be opaque video heading",
                 )
             if row.get("k") != "transcript":
                 raise ValueError(
-                    f"invalid transcript row {line_number}: k must be 'transcript'"
+                    f"invalid transcript row {line_number}: k must be 'transcript'",
                 )
             text_value = row.get("t")
             text = _transcript_required_str(text_value, "t", f"row {line_number}")
@@ -1028,23 +1078,33 @@ def load_transcript_chunks() -> list[TranscriptChunk]:
                 or text != _transcript_normalize(text)
             ):
                 raise ValueError(
-                    f"invalid transcript row {line_number}: t must be normalized and 80..1800 characters"
+                    f"invalid transcript row {line_number}: t must be normalized and 80..1800 characters",
                 )
             video_id = _transcript_required_str(
-                row.get("video_id"), "video_id", f"row {line_number}"
+                row.get("video_id"),
+                "video_id",
+                f"row {line_number}",
             )
             url = _transcript_required_str(row.get("url"), "url", f"row {line_number}")
             caption_track = _transcript_required_str(
-                row.get("caption_track"), "caption_track", f"row {line_number}"
+                row.get("caption_track"),
+                "caption_track",
+                f"row {line_number}",
             )
             cue_count = _transcript_required_int(
-                row.get("cue_count"), "cue_count", f"row {line_number}"
+                row.get("cue_count"),
+                "cue_count",
+                f"row {line_number}",
             )
             row_source_hash = _transcript_hash(
-                row.get("source_sha256"), "source_sha256", f"row {line_number}"
+                row.get("source_sha256"),
+                "source_sha256",
+                f"row {line_number}",
             )
             transcript_hash = _transcript_hash(
-                row.get("transcript_sha256"), "transcript_sha256", f"row {line_number}"
+                row.get("transcript_sha256"),
+                "transcript_sha256",
+                f"row {line_number}",
             )
             raw_hash = _transcript_hash(
                 row.get("raw_transcript_sha256"),
@@ -1067,7 +1127,7 @@ def load_transcript_chunks() -> list[TranscriptChunk]:
                 or normalized_hash != video["normalized_transcript_sha256"]
             ):
                 raise ValueError(
-                    f"invalid transcript row {line_number}: provenance mismatch"
+                    f"invalid transcript row {line_number}: provenance mismatch",
                 )
             rows.append(
                 {
@@ -1085,11 +1145,11 @@ def load_transcript_chunks() -> list[TranscriptChunk]:
                     "transcript_sha256": transcript_hash,
                     "raw_transcript_sha256": raw_hash,
                     "normalized_transcript_sha256": normalized_hash,
-                }
+                },
             )
     if len(rows) != manifest_chunk_count:
         raise ValueError(
-            "invalid transcript corpus: chunk_count does not match JSONL rows"
+            "invalid transcript corpus: chunk_count does not match JSONL rows",
         )
     if [(row["video_index"], row["chunk_index"]) for row in rows] != sorted(
         (row["video_index"], row["chunk_index"]) for row in rows
@@ -1104,11 +1164,11 @@ def load_transcript_chunks() -> list[TranscriptChunk]:
         video_rows = by_video[video_index]
         if len(video_rows) != video["chunk_count"]:
             raise ValueError(
-                f"invalid transcript corpus: video {video_index} chunk_count does not match rows"
+                f"invalid transcript corpus: video {video_index} chunk_count does not match rows",
             )
         if [row["chunk_index"] for row in video_rows] != list(range(len(video_rows))):
             raise ValueError(
-                f"invalid transcript corpus: video {video_index} chunk indexes are not contiguous"
+                f"invalid transcript corpus: video {video_index} chunk indexes are not contiguous",
             )
         reconstructed = " ".join(row["t"] for row in video_rows)
         if (
@@ -1116,7 +1176,7 @@ def load_transcript_chunks() -> list[TranscriptChunk]:
             != video["transcript_sha256"]
         ):
             raise ValueError(
-                f"invalid transcript corpus: video {video_index} transcript hash mismatch"
+                f"invalid transcript corpus: video {video_index} transcript hash mismatch",
             )
     return rows
 
@@ -1222,10 +1282,10 @@ def search_transcript(
         or video_index < 0
     ):
         raise ValueError(
-            "transcript video_index must be a non-negative integer or null"
+            "transcript video_index must be a non-negative integer or null",
         )
     if video_index is not None and video_index >= len(
-        {row["video_index"] for row in rows}
+        {row["video_index"] for row in rows},
     ):
         raise IndexError("transcript video_index out of range")
     out: list[dict[str, JsonValue]] = []
@@ -1250,7 +1310,7 @@ def search_transcript(
                     "k": row["k"],
                     "t": row["t"],
                     "snippet": row["t"][:280] + ("..." if len(row["t"]) > 280 else ""),
-                }
+                },
             )
         else:
             out.append(
@@ -1258,7 +1318,7 @@ def search_transcript(
                     "video_index": row["video_index"],
                     "chunk_index": row["chunk_index"],
                     "spoilers": "hidden",
-                }
+                },
             )
         if len(out) >= limit:
             break
@@ -1266,7 +1326,10 @@ def search_transcript(
 
 
 def get_transcript_chunk(
-    video_index: int, chunk_index: int, *, spoilers: bool = False
+    video_index: int,
+    chunk_index: int,
+    *,
+    spoilers: bool = False,
 ) -> dict[str, JsonValue]:
     if (
         not isinstance(video_index, int)

@@ -79,7 +79,6 @@ uv run --script <skill-dir>/scripts/cli.py feed understat --league Bundesliga --
 
 ## Run tests
 
-```bash
-cd scripts
-uv run pytest tests -q
+```text
+uv run --with pytest pytest <skill-dir>/scripts/tests -q
 ```

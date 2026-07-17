@@ -16,14 +16,14 @@ This is about **risk visibility**, not route execution.
 
 List all discovered routes:
 
-```bash
-uv run scripts/odooctl.py route list --json
+```text
+uv run --script <skill-dir>/scripts/cli.py route list --json
 ```
 
 List only routes with heuristic write signals:
 
-```bash
-uv run scripts/odooctl.py route scan-writes --json
+```text
+uv run --script <skill-dir>/scripts/cli.py route scan-writes --json
 ```
 
 Use `--json` by default.
@@ -32,10 +32,10 @@ Use `--json` by default.
 
 Route scanning should work from the resolved addon paths for the current runtime backend.
 
-For the current Compose runtime, that usually means:
+For a Compose runtime, that usually means:
 
-- `/Users/Shared/odoo17/source/odoo-17.0+e.20260527/odoo/addons`
-- `/Users/annt/repos/etech/odoo/addons`
+- `<odoo-runtime>/source/<odoo-version>/odoo/addons`
+- `<custom-addons>/addons`
 
 For host runtimes, it means addon paths derived from `odoo.conf`.
 
@@ -94,9 +94,9 @@ Each discovered route should include enough context for review:
 
 Use this order:
 
-1. `uv run scripts/odooctl.py env inspect --json`
-2. `uv run scripts/odooctl.py route list --json`
-3. `uv run scripts/odooctl.py route scan-writes --json`
+1. `uv run --script <skill-dir>/scripts/cli.py env inspect --json`
+2. `uv run --script <skill-dir>/scripts/cli.py route list --json`
+3. `uv run --script <skill-dir>/scripts/cli.py route scan-writes --json`
 4. read the flagged handler source before considering any invocation
 
 Do not jump from route discovery straight to conclusions about production safety.

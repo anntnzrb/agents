@@ -4,7 +4,7 @@ Sources:
 
 - Odoo docs `https://www.odoo.com/documentation/17.0/developer/reference/backend/actions.html`
 - Odoo docs `https://www.odoo.com/documentation/17.0/applications/studio/automated_actions.html`
-- Local source `/Users/Shared/odoo17/source/odoo-17.0+e.20260527/odoo/addons/base/models/ir_actions.py`, anchors `_run_action_code_multi` and `_get_eval_context`.
+- Local source `<odoo-source>/odoo/addons/base/models/ir_actions.py`, anchors `_run_action_code_multi` and `_get_eval_context`.
 - Odoo 17 upstream `odoo/tools/safe_eval.py`, especially `_SAFE_OPCODES` and `_BUILTINS`.
 
 ## Known production runtime profile

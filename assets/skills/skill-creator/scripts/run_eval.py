@@ -165,12 +165,20 @@ def run_single_query(
                                 continue
                             tool_name = content_item.get("name", "")
                             tool_input = content_item.get("input", {})
-                            if tool_name == "Skill" and clean_name in tool_input.get(
-                                "skill", ""
-                            ):
-                                triggered = True
-                            elif tool_name == "Read" and clean_name in tool_input.get(
-                                "file_path", ""
+                            if (
+                                tool_name == "Skill"
+                                and clean_name
+                                in tool_input.get(
+                                    "skill",
+                                    "",
+                                )
+                            ) or (
+                                tool_name == "Read"
+                                and clean_name
+                                in tool_input.get(
+                                    "file_path",
+                                    "",
+                                )
                             ):
                                 triggered = True
                             return triggered
@@ -248,7 +256,7 @@ def run_eval(
                 "triggers": sum(triggers),
                 "runs": len(triggers),
                 "pass": did_pass,
-            }
+            },
         )
 
     passed = sum(1 for r in results if r["pass"])
@@ -268,24 +276,38 @@ def run_eval(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run trigger evaluation for a skill description"
+        description="Run trigger evaluation for a skill description",
     )
     parser.add_argument("--eval-set", required=True, help="Path to eval set JSON file")
     parser.add_argument("--skill-path", required=True, help="Path to skill directory")
     parser.add_argument(
-        "--description", default=None, help="Override description to test"
+        "--description",
+        default=None,
+        help="Override description to test",
     )
     parser.add_argument(
-        "--num-workers", type=int, default=10, help="Number of parallel workers"
+        "--num-workers",
+        type=int,
+        default=10,
+        help="Number of parallel workers",
     )
     parser.add_argument(
-        "--timeout", type=int, default=30, help="Timeout per query in seconds"
+        "--timeout",
+        type=int,
+        default=30,
+        help="Timeout per query in seconds",
     )
     parser.add_argument(
-        "--runs-per-query", type=int, default=3, help="Number of runs per query"
+        "--runs-per-query",
+        type=int,
+        default=3,
+        help="Number of runs per query",
     )
     parser.add_argument(
-        "--trigger-threshold", type=float, default=0.5, help="Trigger rate threshold"
+        "--trigger-threshold",
+        type=float,
+        default=0.5,
+        help="Trigger rate threshold",
     )
     parser.add_argument(
         "--model",
@@ -293,7 +315,9 @@ def main():
         help="Model to use for claude -p (default: user's configured model)",
     )
     parser.add_argument(
-        "--verbose", action="store_true", help="Print progress to stderr"
+        "--verbose",
+        action="store_true",
+        help="Print progress to stderr",
     )
     args = parser.parse_args()
 
@@ -326,7 +350,8 @@ def main():
     if args.verbose:
         summary = output["summary"]
         print(
-            f"Results: {summary['passed']}/{summary['total']} passed", file=sys.stderr
+            f"Results: {summary['passed']}/{summary['total']} passed",
+            file=sys.stderr,
         )
         for r in output["results"]:
             status = "PASS" if r["pass"] else "FAIL"

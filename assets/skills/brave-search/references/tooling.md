@@ -1,5 +1,7 @@
 # Tooling Reference
 
+Read this when command layout, credential lookup, or error behavior matters.
+
 The Brave Search skill exposes one cross-platform Python CLI:
 
 ```text

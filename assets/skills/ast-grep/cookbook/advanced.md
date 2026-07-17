@@ -2,6 +2,8 @@
 
 Higher-signal queries and scope control.
 
+Read this for structural selectors, relationships, or precise scope control.
+
 ---
 
 ## Match a sub-node with selector

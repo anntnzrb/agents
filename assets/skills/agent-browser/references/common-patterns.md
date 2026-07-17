@@ -2,6 +2,8 @@
 
 Detailed browser automation patterns moved from SKILL.md. Preserve command syntax when copying these examples.
 
+Read this for worked form, auth, extraction, session, CDP, local-file, or mobile-browser flows.
+
 ### Form Submission
 
 ```text

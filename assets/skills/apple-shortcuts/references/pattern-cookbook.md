@@ -2,6 +2,8 @@
 
 Use these patterns to build robust shortcuts quickly.
 
+Read this when the blueprint needs reusable input, control-flow, or failure-handling patterns.
+
 ## Pattern 1: Input Normalization
 
 - Use `Ask for Input` or Share Sheet input.

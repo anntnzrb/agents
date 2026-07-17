@@ -41,7 +41,10 @@ def test_search_protocol_with_monkeypatched_scraper(monkeypatch) -> None:
         del locale, client
         code = "GYE" if "guayaquil" in query.lower() else "MIA"
         return ResolvedPlace(
-            query=query, iata=code, name=query.title(), resolved_via_autocomplete=True
+            query=query,
+            iata=code,
+            name=query.title(),
+            resolved_via_autocomplete=True,
         )
 
     offers = [

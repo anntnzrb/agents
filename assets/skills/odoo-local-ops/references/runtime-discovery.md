@@ -1,9 +1,11 @@
 # Runtime discovery
 
+Read this reference when workspace or runtime discovery is ambiguous or fails.
+
 This skill supports two local Odoo runtime families:
 
 - **host runtime**: classic local install, especially Windows, with host PostgreSQL and `psql.exe`/`psql`.
-- **Compose runtime**: Docker Compose Odoo stack with a PostgreSQL `db` service, including the macOS runtime at `/Users/Shared/odoo17`.
+- **Compose runtime**: Docker Compose Odoo stack with a PostgreSQL `db` service.
 
 ## Discovery goals
 
@@ -23,7 +25,6 @@ Use this order:
 1. explicit `--runtime-dir`
 2. `ODOO17_RUNTIME_DIR`
 3. nearest ancestor/sibling named `odoo17` containing `docker-compose.yml`
-4. `/Users/Shared/odoo17`
 
 A Compose runtime must contain:
 
@@ -80,16 +81,16 @@ Parse it as the base runtime configuration, including at minimum:
 - `addons_path`
 - `pg_path`
 
-Do not assume `db_name` is set. If unresolved, report that. The current `/Users/Shared/odoo17` Compose runtime may default to `etech` because it is a known local restored runtime.
+Do not assume `db_name` is set. If unresolved, report that. A Compose runtime may provide `ODOO17_DEFAULT_DB` as an explicit local fallback.
 
 ## Effective value precedence
 
 Use this model when reporting runtime:
 
-1. explicit CLI flags to `odooctl.py`
+1. explicit public CLI flags
 2. Compose runtime env
 3. `odoo.conf`
-4. documented local fallback for known runtime only
+4. `ODOO17_DEFAULT_DB` for an explicitly configured Compose runtime
 5. unresolved
 
 For inspection output, include provenance for each resolved value when practical, such as `source: compose-env` or `source: odoo-conf`.
@@ -106,7 +107,7 @@ Resolve the effective database name conservatively:
 
 1. explicit `--db`
 2. `odoo.conf` `db_name` if concrete and not false-like
-3. known local Compose default `etech` only for `/Users/Shared/odoo17`
+3. Compose `ODOO17_DEFAULT_DB` when configured
 4. unresolved
 
 If unresolved, say so plainly instead of guessing.

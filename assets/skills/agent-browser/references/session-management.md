@@ -2,6 +2,8 @@
 
 Multiple isolated browser sessions with state persistence and concurrent browsing.
 
+Read this before using named sessions, saved state, concurrency, or cleanup policies.
+
 **Related**: [authentication.md](authentication.md) for login patterns, [SKILL.md](../SKILL.md) for quick start.
 
 ## Contents
@@ -76,10 +78,9 @@ agent-browser open https://app.example.com/dashboard
 ### Authenticated Session Reuse
 
 ```bash
-#!/bin/bash
 # Save login state once, reuse many times
 
-STATE_FILE="/tmp/auth-state.json"
+STATE_FILE="<temp-dir>/auth-state.json"
 
 # Check if we have saved state
 if [[ -f "$STATE_FILE" ]]; then
@@ -102,7 +103,6 @@ fi
 ### Concurrent Scraping
 
 ```bash
-#!/bin/bash
 # Scrape multiple sites concurrently
 
 # Start all sessions
@@ -130,8 +130,8 @@ agent-browser --session variant-a open "https://app.com?variant=a"
 agent-browser --session variant-b open "https://app.com?variant=b"
 
 # Compare
-agent-browser --session variant-a screenshot /tmp/variant-a.png
-agent-browser --session variant-b screenshot /tmp/variant-b.png
+agent-browser --session variant-a screenshot <temp-dir>/variant-a.png
+agent-browser --session variant-b screenshot <temp-dir>/variant-b.png
 ```
 
 ## Default Session
@@ -183,7 +183,7 @@ agent-browser --session scrape close
 echo "*.auth-state.json" >> .gitignore
 
 # Delete after use
-rm /tmp/auth-state.json
+rm <temp-dir>/auth-state.json
 ```
 
 ### 4. Timeout Long Sessions

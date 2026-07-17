@@ -1,5 +1,7 @@
 # Debug Playbook
 
+Read this when a shortcut fails validation, import, permissions, or runtime execution.
+
 ## Symptom: Shortcut stops mid-run
 
 - Check the first action that depends on external state (permissions, network, app data).

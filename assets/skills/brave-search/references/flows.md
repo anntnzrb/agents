@@ -1,5 +1,7 @@
 # Example Flows
 
+Read this when a lookup needs a multi-step web, news, image, video, or local flow.
+
 All flows run through `scripts/cli.py`:
 
 ```text

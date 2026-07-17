@@ -1,6 +1,5 @@
 #!/usr/bin/env -S uv run --script
-"""
-Repository Readiness Analyzer
+"""Repository Readiness Analyzer
 
 Analyzes a repository across eight technical pillars to determine
 agent readiness. Outputs a JSON file with detailed criteria evaluation.
@@ -16,10 +15,9 @@ import os
 import re
 import subprocess
 import tempfile
-from dataclasses import dataclass, field, asdict
-from pathlib import Path
-from typing import Optional
+from dataclasses import asdict, dataclass, field
 from enum import Enum
+from pathlib import Path
 
 
 class CriterionStatus(str, Enum):
@@ -72,7 +70,8 @@ class RepoAnalyzer:
     def __init__(self, repo_path: str):
         self.repo_path = Path(repo_path).resolve()
         self.result = AnalysisResult(
-            repo_path=str(self.repo_path), repo_name=self.repo_path.name
+            repo_path=str(self.repo_path),
+            repo_name=self.repo_path.name,
         )
         self._file_cache: dict[str, bool] = {}
         self._content_cache: dict[str, str] = {}
@@ -106,7 +105,7 @@ class RepoAnalyzer:
                 return True
         return False
 
-    def _read_file(self, path: str) -> Optional[str]:
+    def _read_file(self, path: str) -> str | None:
         """Read file content, with caching."""
         if path in self._content_cache:
             return self._content_cache[path]
@@ -144,7 +143,11 @@ class RepoAnalyzer:
         """Run a command and return (exit_code, output)."""
         try:
             result = subprocess.run(
-                cmd, cwd=self.repo_path, capture_output=True, text=True, timeout=timeout
+                cmd,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
             )
             return result.returncode, result.stdout + result.stderr
         except Exception as e:
@@ -154,7 +157,7 @@ class RepoAnalyzer:
         """Detect repository type for criterion skipping."""
         # Check for library indicators
         if self._file_exists("setup.py", "setup.cfg") and not self._file_exists(
-            "Dockerfile"
+            "Dockerfile",
         ):
             if "library" in str(self._read_file("setup.py") or "").lower():
                 self.result.repo_type = "library"
@@ -163,7 +166,7 @@ class RepoAnalyzer:
         if self._file_exists("pyproject.toml"):
             content = self._read_file("pyproject.toml") or ""
             if "[project]" in content and "Dockerfile" not in os.listdir(
-                self.repo_path
+                self.repo_path,
             ):
                 # Likely a library
                 readme = self._read_file("README.md") or ""
@@ -188,7 +191,10 @@ class RepoAnalyzer:
 
         # Check for monorepo
         if self._file_exists(
-            "packages/*", "apps/*", "lerna.json", "pnpm-workspace.yaml"
+            "packages/*",
+            "apps/*",
+            "lerna.json",
+            "pnpm-workspace.yaml",
         ):
             self.result.repo_type = "monorepo"
             return
@@ -217,7 +223,7 @@ class RepoAnalyzer:
         if self._file_exists("*.cpp", "*.cc", "**/*.cpp", "CMakeLists.txt"):
             languages.append("C++")
 
-        self.result.languages = languages if languages else ["Unknown"]
+        self.result.languages = languages or ["Unknown"]
 
     def _should_skip(self, criterion_id: str) -> tuple[bool, str]:
         """Determine if a criterion should be skipped based on repo type."""
@@ -320,7 +326,10 @@ class RepoAnalyzer:
             total = sum(1 for c in criteria if c.status != CriterionStatus.SKIP)
 
             self.result.pillars[pillar_name] = PillarResult(
-                name=pillar_name, passed=passed, total=total, criteria=criteria
+                name=pillar_name,
+                passed=passed,
+                total=total,
+                criteria=criteria,
             )
 
             self.result.total_passed += passed
@@ -328,11 +337,17 @@ class RepoAnalyzer:
 
         if self.result.total_criteria > 0:
             self.result.pass_rate = round(
-                (self.result.total_passed / self.result.total_criteria) * 100, 1
+                (self.result.total_passed / self.result.total_criteria) * 100,
+                1,
             )
 
     def _make_result(
-        self, criterion_id: str, pillar: str, level: int, passed: bool, reason: str
+        self,
+        criterion_id: str,
+        pillar: str,
+        level: int,
+        passed: bool,
+        reason: str,
     ) -> CriterionResult:
         """Create a criterion result, handling skips."""
         should_skip, skip_reason = self._should_skip(criterion_id)
@@ -388,7 +403,7 @@ class RepoAnalyzer:
                 "Formatter configured"
                 if formatter_found
                 else "No formatter config found",
-            )
+            ),
         )
 
         # L1: lint_config
@@ -415,7 +430,7 @@ class RepoAnalyzer:
                 1,
                 lint_found,
                 "Linter configured" if lint_found else "No linter config found",
-            )
+            ),
         )
 
         # L1: type_check
@@ -434,7 +449,7 @@ class RepoAnalyzer:
                 1,
                 type_check,
                 "Type checking configured" if type_check else "No type checking found",
-            )
+            ),
         )
 
         # L2: strict_typing
@@ -456,12 +471,15 @@ class RepoAnalyzer:
                 "Strict typing enabled"
                 if strict_typing
                 else "Strict typing not enabled",
-            )
+            ),
         )
 
         # L2: pre_commit_hooks
         pre_commit = self._file_exists(
-            ".pre-commit-config.yaml", ".pre-commit-config.yml", ".husky", ".husky/*"
+            ".pre-commit-config.yaml",
+            ".pre-commit-config.yml",
+            ".husky",
+            ".husky/*",
         )
         results.append(
             self._make_result(
@@ -472,7 +490,7 @@ class RepoAnalyzer:
                 "Pre-commit hooks configured"
                 if pre_commit
                 else "No pre-commit hooks found",
-            )
+            ),
         )
 
         # L2: naming_consistency
@@ -495,7 +513,7 @@ class RepoAnalyzer:
                 "Naming conventions enforced"
                 if naming
                 else "No naming convention enforcement",
-            )
+            ),
         )
 
         # L2: large_file_detection
@@ -512,7 +530,7 @@ class RepoAnalyzer:
                 "Large file detection configured"
                 if large_file
                 else "No large file detection",
-            )
+            ),
         )
 
         # L3: code_modularization
@@ -526,7 +544,7 @@ class RepoAnalyzer:
                 "Module boundaries enforced"
                 if modular
                 else "No module boundary enforcement",
-            )
+            ),
         )
 
         # L3: cyclomatic_complexity
@@ -548,13 +566,13 @@ class RepoAnalyzer:
                 "Complexity analysis configured"
                 if complexity
                 else "No complexity analysis",
-            )
+            ),
         )
 
         # L3: dead_code_detection
         dead_code = False
         workflows = list(self.repo_path.glob(".github/workflows/*.yml")) + list(
-            self.repo_path.glob(".github/workflows/*.yaml")
+            self.repo_path.glob(".github/workflows/*.yaml"),
         )
         for wf in workflows[:5]:
             content = wf.read_text(errors="ignore")
@@ -570,7 +588,7 @@ class RepoAnalyzer:
                 "Dead code detection enabled"
                 if dead_code
                 else "No dead code detection",
-            )
+            ),
         )
 
         # L3: duplicate_code_detection
@@ -589,7 +607,7 @@ class RepoAnalyzer:
                 "Duplicate detection enabled"
                 if duplicate
                 else "No duplicate detection",
-            )
+            ),
         )
 
         # L4: tech_debt_tracking
@@ -606,7 +624,7 @@ class RepoAnalyzer:
                 4,
                 tech_debt,
                 "Tech debt tracking enabled" if tech_debt else "No tech debt tracking",
-            )
+            ),
         )
 
         # L4: n_plus_one_detection
@@ -625,7 +643,7 @@ class RepoAnalyzer:
                 4,
                 n_plus_one,
                 "N+1 detection enabled" if n_plus_one else "No N+1 query detection",
-            )
+            ),
         )
 
         return results
@@ -662,7 +680,7 @@ class RepoAnalyzer:
                 "Build commands documented"
                 if build_doc
                 else "Build commands not documented",
-            )
+            ),
         )
 
         # L1: deps_pinned
@@ -686,7 +704,7 @@ class RepoAnalyzer:
                 "Dependencies pinned with lockfile"
                 if lockfile
                 else "No lockfile found",
-            )
+            ),
         )
 
         # L1: vcs_cli_tools
@@ -702,7 +720,7 @@ class RepoAnalyzer:
                 1,
                 vcs_cli,
                 "VCS CLI authenticated" if vcs_cli else "VCS CLI not authenticated",
-            )
+            ),
         )
 
         # L2: fast_ci_feedback
@@ -722,7 +740,7 @@ class RepoAnalyzer:
                 2,
                 ci_exists,
                 "CI workflow configured" if ci_exists else "No CI configuration found",
-            )
+            ),
         )
 
         # L2: single_command_setup
@@ -748,12 +766,13 @@ class RepoAnalyzer:
                 "Single command setup documented"
                 if single_cmd
                 else "No single command setup",
-            )
+            ),
         )
 
         # L2: release_automation
         release_auto = self._search_files(
-            ".github/workflows/*.yml", r"(release|publish|deploy)"
+            ".github/workflows/*.yml",
+            r"(release|publish|deploy)",
         ) or self._search_files(".github/workflows/*.yaml", r"(release|publish|deploy)")
         results.append(
             self._make_result(
@@ -764,7 +783,7 @@ class RepoAnalyzer:
                 "Release automation configured"
                 if release_auto
                 else "No release automation",
-            )
+            ),
         )
 
         # L2: deployment_frequency (check for recent releases)
@@ -778,12 +797,13 @@ class RepoAnalyzer:
                 "Regular deployments"
                 if release_auto_exists
                 else "Deployment frequency unclear",
-            )
+            ),
         )
 
         # L3: release_notes_automation
         release_notes = self._search_files(
-            ".github/workflows/*.yml", r"(changelog|release.notes|latest.changes)"
+            ".github/workflows/*.yml",
+            r"(changelog|release.notes|latest.changes)",
         )
         results.append(
             self._make_result(
@@ -794,7 +814,7 @@ class RepoAnalyzer:
                 "Release notes automated"
                 if release_notes
                 else "No release notes automation",
-            )
+            ),
         )
 
         # L3: agentic_development
@@ -810,7 +830,7 @@ class RepoAnalyzer:
                 3,
                 agentic,
                 "AI agent commits found" if agentic else "No AI agent commits detected",
-            )
+            ),
         )
 
         # L3: automated_pr_review
@@ -831,7 +851,7 @@ class RepoAnalyzer:
                 "Automated PR review configured"
                 if pr_review
                 else "No automated PR review",
-            )
+            ),
         )
 
         # L3: feature_flag_infrastructure
@@ -845,7 +865,7 @@ class RepoAnalyzer:
                 "Feature flags configured"
                 if feature_flags
                 else "No feature flag system",
-            )
+            ),
         )
 
         # L4: build_performance_tracking
@@ -861,7 +881,7 @@ class RepoAnalyzer:
                 "Build caching configured"
                 if build_perf
                 else "No build performance tracking",
-            )
+            ),
         )
 
         # L4: heavy_dependency_detection (for JS bundles)
@@ -881,7 +901,7 @@ class RepoAnalyzer:
                 "Bundle size tracking configured"
                 if heavy_deps
                 else "No bundle size tracking",
-            )
+            ),
         )
 
         # L4: unused_dependencies_detection
@@ -901,7 +921,7 @@ class RepoAnalyzer:
                 "Unused deps detection enabled"
                 if unused_deps
                 else "No unused deps detection",
-            )
+            ),
         )
 
         # L4: dead_feature_flag_detection
@@ -915,12 +935,15 @@ class RepoAnalyzer:
                 "Dead flag detection enabled"
                 if dead_flags
                 else "No dead flag detection",
-            )
+            ),
         )
 
         # L4: monorepo_tooling
         monorepo_tools = self._file_exists(
-            "lerna.json", "nx.json", "turbo.json", "pnpm-workspace.yaml"
+            "lerna.json",
+            "nx.json",
+            "turbo.json",
+            "pnpm-workspace.yaml",
         )
         results.append(
             self._make_result(
@@ -931,7 +954,7 @@ class RepoAnalyzer:
                 "Monorepo tooling configured"
                 if monorepo_tools
                 else "No monorepo tooling",
-            )
+            ),
         )
 
         # L4: version_drift_detection
@@ -945,14 +968,15 @@ class RepoAnalyzer:
                 "Version drift detection enabled"
                 if version_drift
                 else "No version drift detection",
-            )
+            ),
         )
 
         # L5: progressive_rollout
         progressive = False
         for pattern in ["*.yml", "*.yaml"]:
             if self._search_files(
-                f".github/workflows/{pattern}", r"canary|gradual|rollout"
+                f".github/workflows/{pattern}",
+                r"canary|gradual|rollout",
             ):
                 progressive = True
                 break
@@ -965,7 +989,7 @@ class RepoAnalyzer:
                 "Progressive rollout configured"
                 if progressive
                 else "No progressive rollout",
-            )
+            ),
         )
 
         # L5: rollback_automation
@@ -979,7 +1003,7 @@ class RepoAnalyzer:
                 "Rollback automation configured"
                 if rollback
                 else "No rollback automation",
-            )
+            ),
         )
 
         return results
@@ -1009,7 +1033,7 @@ class RepoAnalyzer:
                 1,
                 tests_exist,
                 "Unit tests found" if tests_exist else "No unit tests found",
-            )
+            ),
         )
 
         # L1: unit_tests_runnable
@@ -1038,7 +1062,7 @@ class RepoAnalyzer:
                 "Test commands documented"
                 if test_cmd
                 else "Test commands not documented",
-            )
+            ),
         )
 
         # L2: test_naming_conventions
@@ -1059,7 +1083,7 @@ class RepoAnalyzer:
                 "Test naming conventions enforced"
                 if naming
                 else "No test naming conventions",
-            )
+            ),
         )
 
         # L2: test_isolation
@@ -1084,7 +1108,7 @@ class RepoAnalyzer:
                 "Tests support isolation/parallelism"
                 if isolation
                 else "No test isolation",
-            )
+            ),
         )
 
         # L3: integration_tests_exist
@@ -1105,7 +1129,7 @@ class RepoAnalyzer:
                 "Integration tests found"
                 if integration
                 else "No integration tests found",
-            )
+            ),
         )
 
         # L3: test_coverage_thresholds
@@ -1126,7 +1150,7 @@ class RepoAnalyzer:
                 "Coverage thresholds enforced"
                 if coverage
                 else "No coverage thresholds",
-            )
+            ),
         )
 
         # L4: flaky_test_detection
@@ -1147,7 +1171,7 @@ class RepoAnalyzer:
                 "Flaky test handling configured"
                 if flaky
                 else "No flaky test detection",
-            )
+            ),
         )
 
         # L4: test_performance_tracking
@@ -1166,7 +1190,7 @@ class RepoAnalyzer:
                 "Test performance tracked"
                 if test_perf
                 else "No test performance tracking",
-            )
+            ),
         )
 
         return results
@@ -1185,7 +1209,7 @@ class RepoAnalyzer:
                 1,
                 readme,
                 "README exists" if readme else "No README found",
-            )
+            ),
         )
 
         # L2: agents_md
@@ -1197,13 +1221,13 @@ class RepoAnalyzer:
                 2,
                 agents_md,
                 "AGENTS.md exists" if agents_md else "No AGENTS.md found",
-            )
+            ),
         )
 
         # L2: documentation_freshness
         freshness = False
         code, output = self._run_command(
-            ["git", "log", "-1", "--format=%ci", "--", "README.md"]
+            ["git", "log", "-1", "--format=%ci", "--", "README.md"],
         )
         if code == 0 and output.strip():
             freshness = True
@@ -1216,7 +1240,7 @@ class RepoAnalyzer:
                 "Documentation recently updated"
                 if freshness
                 else "Documentation may be stale",
-            )
+            ),
         )
 
         # L3: api_schema_docs
@@ -1239,12 +1263,13 @@ class RepoAnalyzer:
                 "API documentation exists"
                 if api_docs
                 else "No API documentation found",
-            )
+            ),
         )
 
         # L3: automated_doc_generation
         doc_gen = self._search_files(
-            ".github/workflows/*.yml", r"(docs|documentation|mkdocs|sphinx|typedoc)"
+            ".github/workflows/*.yml",
+            r"(docs|documentation|mkdocs|sphinx|typedoc)",
         )
         results.append(
             self._make_result(
@@ -1255,12 +1280,15 @@ class RepoAnalyzer:
                 "Doc generation automated"
                 if doc_gen
                 else "No automated doc generation",
-            )
+            ),
         )
 
         # L3: service_flow_documented
         diagrams = self._file_exists(
-            "**/*.mermaid", "**/*.puml", "docs/architecture*", "docs/**/*.md"
+            "**/*.mermaid",
+            "**/*.puml",
+            "docs/architecture*",
+            "docs/**/*.md",
         )
         results.append(
             self._make_result(
@@ -1271,12 +1299,14 @@ class RepoAnalyzer:
                 "Architecture documented"
                 if diagrams
                 else "No architecture documentation",
-            )
+            ),
         )
 
         # L3: skills
         skills = self._file_exists(
-            ".claude/skills/**", ".factory/skills/**", ".skills/**"
+            ".claude/skills/**",
+            ".factory/skills/**",
+            ".skills/**",
         )
         results.append(
             self._make_result(
@@ -1285,7 +1315,7 @@ class RepoAnalyzer:
                 3,
                 skills,
                 "Skills directory exists" if skills else "No skills directory",
-            )
+            ),
         )
 
         # L4: agents_md_validation
@@ -1305,7 +1335,7 @@ class RepoAnalyzer:
                 "AGENTS.md validation in CI"
                 if agents_validation
                 else "No AGENTS.md validation",
-            )
+            ),
         )
 
         return results
@@ -1330,7 +1360,7 @@ class RepoAnalyzer:
                 "Environment template exists"
                 if env_template
                 else "No environment template",
-            )
+            ),
         )
 
         # L3: devcontainer
@@ -1342,7 +1372,7 @@ class RepoAnalyzer:
                 3,
                 devcontainer,
                 "Devcontainer configured" if devcontainer else "No devcontainer found",
-            )
+            ),
         )
 
         # L3: devcontainer_runnable
@@ -1360,7 +1390,7 @@ class RepoAnalyzer:
                 "Devcontainer appears valid"
                 if devcontainer_valid
                 else "Devcontainer not runnable",
-            )
+            ),
         )
 
         # L3: database_schema
@@ -1381,12 +1411,15 @@ class RepoAnalyzer:
                 "Database schema managed"
                 if db_schema
                 else "No database schema management",
-            )
+            ),
         )
 
         # L3: local_services_setup
         local_services = self._file_exists(
-            "docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"
+            "docker-compose.yml",
+            "docker-compose.yaml",
+            "compose.yml",
+            "compose.yaml",
         )
         results.append(
             self._make_result(
@@ -1397,7 +1430,7 @@ class RepoAnalyzer:
                 "Local services configured"
                 if local_services
                 else "No local services setup",
-            )
+            ),
         )
 
         return results
@@ -1440,12 +1473,13 @@ class RepoAnalyzer:
                 "Structured logging configured"
                 if logging_found
                 else "No structured logging",
-            )
+            ),
         )
 
         # L2: code_quality_metrics
         quality_metrics = self._search_files(
-            ".github/workflows/*.yml", r"(coverage|sonar|quality)"
+            ".github/workflows/*.yml",
+            r"(coverage|sonar|quality)",
         )
         results.append(
             self._make_result(
@@ -1456,7 +1490,7 @@ class RepoAnalyzer:
                 "Code quality metrics tracked"
                 if quality_metrics
                 else "No quality metrics",
-            )
+            ),
         )
 
         # L3: error_tracking_contextualized
@@ -1470,7 +1504,7 @@ class RepoAnalyzer:
                 3,
                 error_tracking,
                 "Error tracking configured" if error_tracking else "No error tracking",
-            )
+            ),
         )
 
         # L3: distributed_tracing
@@ -1487,7 +1521,7 @@ class RepoAnalyzer:
                 "Distributed tracing configured"
                 if tracing
                 else "No distributed tracing",
-            )
+            ),
         )
 
         # L3: metrics_collection
@@ -1502,7 +1536,7 @@ class RepoAnalyzer:
                 3,
                 metrics,
                 "Metrics collection configured" if metrics else "No metrics collection",
-            )
+            ),
         )
 
         # L3: health_checks
@@ -1518,7 +1552,7 @@ class RepoAnalyzer:
                 3,
                 health,
                 "Health checks implemented" if health else "No health checks found",
-            )
+            ),
         )
 
         # L4: profiling_instrumentation
@@ -1532,12 +1566,14 @@ class RepoAnalyzer:
                 4,
                 profiling,
                 "Profiling configured" if profiling else "No profiling instrumentation",
-            )
+            ),
         )
 
         # L4: alerting_configured
         alerting = self._file_exists(
-            "**/alerts*.yml", "**/alertmanager*", "monitoring/**"
+            "**/alerts*.yml",
+            "**/alertmanager*",
+            "monitoring/**",
         )
         results.append(
             self._make_result(
@@ -1546,12 +1582,13 @@ class RepoAnalyzer:
                 4,
                 alerting,
                 "Alerting configured" if alerting else "No alerting configuration",
-            )
+            ),
         )
 
         # L4: deployment_observability
         deploy_obs = self._search_files(
-            ".github/workflows/*.yml", r"(datadog|grafana|newrelic|deploy.*notify)"
+            ".github/workflows/*.yml",
+            r"(datadog|grafana|newrelic|deploy.*notify)",
         )
         results.append(
             self._make_result(
@@ -1562,7 +1599,7 @@ class RepoAnalyzer:
                 "Deployment observability configured"
                 if deploy_obs
                 else "No deployment observability",
-            )
+            ),
         )
 
         # L4: runbooks_documented
@@ -1574,7 +1611,7 @@ class RepoAnalyzer:
                 4,
                 runbooks,
                 "Runbooks documented" if runbooks else "No runbooks found",
-            )
+            ),
         )
 
         # L5: circuit_breakers
@@ -1589,7 +1626,7 @@ class RepoAnalyzer:
                 5,
                 circuit,
                 "Circuit breakers configured" if circuit else "No circuit breakers",
-            )
+            ),
         )
 
         return results
@@ -1617,7 +1654,7 @@ class RepoAnalyzer:
                 "Comprehensive .gitignore"
                 if comprehensive
                 else "Incomplete .gitignore",
-            )
+            ),
         )
 
         # L2: secrets_management
@@ -1635,7 +1672,7 @@ class RepoAnalyzer:
                 2,
                 secrets_mgmt,
                 "Secrets properly managed" if secrets_mgmt else "No secrets management",
-            )
+            ),
         )
 
         # L2: codeowners
@@ -1647,12 +1684,13 @@ class RepoAnalyzer:
                 2,
                 codeowners,
                 "CODEOWNERS configured" if codeowners else "No CODEOWNERS file",
-            )
+            ),
         )
 
         # L2: branch_protection
         branch_rules = self._file_exists(
-            ".github/branch-protection.yml", ".github/rulesets/**"
+            ".github/branch-protection.yml",
+            ".github/rulesets/**",
         )
         results.append(
             self._make_result(
@@ -1663,12 +1701,14 @@ class RepoAnalyzer:
                 "Branch protection configured"
                 if branch_rules
                 else "Branch protection unclear",
-            )
+            ),
         )
 
         # L3: dependency_update_automation
         dep_updates = self._file_exists(
-            ".github/dependabot.yml", "renovate.json", ".renovaterc"
+            ".github/dependabot.yml",
+            "renovate.json",
+            ".renovaterc",
         )
         results.append(
             self._make_result(
@@ -1679,7 +1719,7 @@ class RepoAnalyzer:
                 "Dependency updates automated"
                 if dep_updates
                 else "No dependency automation",
-            )
+            ),
         )
 
         # L3: log_scrubbing
@@ -1696,12 +1736,13 @@ class RepoAnalyzer:
                 3,
                 log_scrub,
                 "Log scrubbing configured" if log_scrub else "No log scrubbing",
-            )
+            ),
         )
 
         # L3: pii_handling
         pii = self._search_files(
-            "**/*.py", r"(redact|sanitize|mask|pii)"
+            "**/*.py",
+            r"(redact|sanitize|mask|pii)",
         ) or self._search_files("**/*.ts", r"(redact|sanitize|mask|pii)")
         results.append(
             self._make_result(
@@ -1710,12 +1751,13 @@ class RepoAnalyzer:
                 3,
                 pii,
                 "PII handling implemented" if pii else "No PII handling found",
-            )
+            ),
         )
 
         # L4: automated_security_review
         security_scan = self._search_files(
-            ".github/workflows/*.yml", r"(codeql|snyk|sonar|security)"
+            ".github/workflows/*.yml",
+            r"(codeql|snyk|sonar|security)",
         )
         results.append(
             self._make_result(
@@ -1726,12 +1768,13 @@ class RepoAnalyzer:
                 "Security scanning enabled"
                 if security_scan
                 else "No security scanning",
-            )
+            ),
         )
 
         # L4: secret_scanning
         secret_scan = self._search_files(
-            ".github/workflows/*.yml", r"(gitleaks|trufflehog|secret)"
+            ".github/workflows/*.yml",
+            r"(gitleaks|trufflehog|secret)",
         )
         results.append(
             self._make_result(
@@ -1740,7 +1783,7 @@ class RepoAnalyzer:
                 4,
                 secret_scan,
                 "Secret scanning enabled" if secret_scan else "No secret scanning",
-            )
+            ),
         )
 
         # L5: dast_scanning
@@ -1752,7 +1795,7 @@ class RepoAnalyzer:
                 5,
                 dast,
                 "DAST scanning enabled" if dast else "No DAST scanning",
-            )
+            ),
         )
 
         # L5: privacy_compliance
@@ -1766,7 +1809,7 @@ class RepoAnalyzer:
                 "Privacy compliance documented"
                 if privacy
                 else "No privacy documentation",
-            )
+            ),
         )
 
         return results
@@ -1778,7 +1821,8 @@ class RepoAnalyzer:
 
         # L2: issue_templates
         issue_templates = self._file_exists(
-            ".github/ISSUE_TEMPLATE/**", ".github/ISSUE_TEMPLATE.md"
+            ".github/ISSUE_TEMPLATE/**",
+            ".github/ISSUE_TEMPLATE.md",
         )
         results.append(
             self._make_result(
@@ -1789,7 +1833,7 @@ class RepoAnalyzer:
                 "Issue templates configured"
                 if issue_templates
                 else "No issue templates",
-            )
+            ),
         )
 
         # L2: issue_labeling_system
@@ -1808,7 +1852,7 @@ class RepoAnalyzer:
                 2,
                 labels,
                 "Issue labels configured" if labels else "No issue labeling system",
-            )
+            ),
         )
 
         # L2: pr_templates
@@ -1824,7 +1868,7 @@ class RepoAnalyzer:
                 2,
                 pr_template,
                 "PR template configured" if pr_template else "No PR template",
-            )
+            ),
         )
 
         # L3: backlog_health
@@ -1838,7 +1882,7 @@ class RepoAnalyzer:
                 "Contributing guidelines exist"
                 if backlog
                 else "No contributing guidelines",
-            )
+            ),
         )
 
         return results
@@ -1881,7 +1925,7 @@ class RepoAnalyzer:
                 "Error-to-issue pipeline exists"
                 if error_pipeline
                 else "No error-to-issue pipeline",
-            )
+            ),
         )
 
         # L5: product_analytics_instrumentation
@@ -1906,7 +1950,7 @@ class RepoAnalyzer:
                 5,
                 analytics,
                 "Product analytics configured" if analytics else "No product analytics",
-            )
+            ),
         )
 
         return results
@@ -1937,15 +1981,18 @@ class RepoAnalyzer:
                 break
 
         # Only set achieved level if at least L1 is passed
-        self.result.achieved_level = achieved if achieved > 0 else 0
+        self.result.achieved_level = max(0, achieved)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Analyze repository for agent readiness"
+        description="Analyze repository for agent readiness",
     )
     parser.add_argument(
-        "--repo-path", "-r", default=".", help="Path to the repository to analyze"
+        "--repo-path",
+        "-r",
+        default=".",
+        help="Path to the repository to analyze",
     )
     parser.add_argument(
         "--output",
@@ -1954,7 +2001,10 @@ def main():
         help="Output file for analysis results",
     )
     parser.add_argument(
-        "--quiet", "-q", action="store_true", help="Suppress progress output"
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Suppress progress output",
     )
 
     args = parser.parse_args()
@@ -1993,7 +2043,7 @@ def main():
 
     if not args.quiet:
         print(
-            f"✅ Analysis complete: {result.total_passed}/{result.total_criteria} criteria passed ({result.pass_rate}%)"
+            f"✅ Analysis complete: {result.total_passed}/{result.total_criteria} criteria passed ({result.pass_rate}%)",
         )
         print(f"📊 Achieved Level: L{result.achieved_level}")
         print(f"📄 Results saved to: {args.output}")

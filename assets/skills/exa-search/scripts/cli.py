@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
 # dependencies = []
@@ -58,7 +57,7 @@ def load_env() -> None:
     candidates.append(skill_dir / ".env")
     if os.environ.get("SKILLS_DIR"):
         candidates.append(
-            Path(os.environ["SKILLS_DIR"]).expanduser() / "exa-search" / ".env"
+            Path(os.environ["SKILLS_DIR"]).expanduser() / "exa-search" / ".env",
         )
     candidates.append(ancestor_env("exa-search"))
     for candidate in candidates:
@@ -127,7 +126,8 @@ def main(argv: list[str]) -> int:
     if cmd == "search":
         if not args:
             print(
-                "usage: exa-search search <query> [numResults] [type]", file=sys.stderr
+                "usage: exa-search search <query> [numResults] [type]",
+                file=sys.stderr,
             )
             return 2
         try:
@@ -170,7 +170,7 @@ def main(argv: list[str]) -> int:
                 {
                     "instructions": args[0],
                     "model": args[1] if len(args) > 1 else "exa-research",
-                }
+                },
             ),
         )
 

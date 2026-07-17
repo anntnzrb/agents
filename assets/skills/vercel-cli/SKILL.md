@@ -13,11 +13,8 @@ The Vercel CLI (`vercel` or `vc`) deploys, manages, and develops projects on the
 
 ## Critical: Project Linking
 
-Define `vercel` once per shell:
-
-`vercel() { bun x vercel "$@"; }`
-
-Then use `vercel <command>` everywhere below.
+Set `<VERCEL_CMD>` to installed `vercel`, or to `bun x vercel` for ephemeral
+execution. Examples use `vercel` for readability.
 
 Commands must be run from the directory containing the `.vercel` folder (or a subdirectory of it). How `.vercel` gets set up depends on your project structure:
 
@@ -41,35 +38,34 @@ vercel deploy     # preview deployment
 vercel --prod     # production deployment
 ```
 
-## Decision Tree
+## Required follow-up reads
 
-Use this to route to the correct reference file:
-
-- **Deploy** → `references/deployment.md`
-- **Local development** → `references/local-development.md`
-- **Environment variables** → `references/environment-variables.md`
-- **CI/CD automation** → `references/ci-automation.md`
-- **Domains or DNS** → `references/domains-and-dns.md`
-- **Projects or teams** → `references/projects-and-teams.md`
-- **Logs, debugging, or accessing preview deploys** → `references/monitoring-and-debugging.md`
-- **Blob storage** → `references/storage.md`
-- **Integrations (databases, storage, etc.)** → `references/integrations.md`
-- **Access a preview deployment** → use `vercel curl` (see `references/monitoring-and-debugging.md`)
-- **CLI doesn't have a command for it** → use `vercel api` as a fallback (see `references/advanced.md`)
-- **Node.js backends (Express, Hono, etc.)** → `references/node-backends.md`
-- **Monorepos (Turborepo, Nx, workspaces)** → `references/monorepos.md`
-- **Bun runtime** → `references/bun.md`
-- **Feature flags** → `references/flags.md`
-- **Advanced (API, webhooks)** → `references/advanced.md`
-- **Global flags** → `references/global-options.md`
-- **First-time setup** → `references/getting-started.md`
+| Need | Read | When |
+| --- | --- | --- |
+| Deployment | `references/deployment.md` | Deploying or promoting |
+| Local development | `references/local-development.md` | Running locally |
+| Environment variables | `references/environment-variables.md` | Reading or changing env |
+| CI/CD | `references/ci-automation.md` | Automating deployment |
+| Domains/DNS | `references/domains-and-dns.md` | Changing domain state |
+| Projects/teams | `references/projects-and-teams.md` | Linking or scoping |
+| Logs, debugging, protected previews | `references/monitoring-and-debugging.md` | Diagnosing or using `vercel curl` |
+| Blob storage | `references/storage.md` | Managing blobs |
+| Integrations | `references/integrations.md` | Managing connected services |
+| Missing CLI surface, API, webhooks | `references/advanced.md` | Falling back to `vercel api` |
+| Node backends | `references/node-backends.md` | Deploying Express/Hono/etc. |
+| Monorepos | `references/monorepos.md` | Repo has workspaces or multiple projects |
+| Bun runtime | `references/bun.md` | Deploying with Bun |
+| Feature flags | `references/flags.md` | Managing flags |
+| Global flags | `references/global-options.md` | Exact global options are needed |
+| First setup | `references/getting-started.md` | Login/link is incomplete |
+| Command workflow | `command/vercel.md` | Running the packaged command surface |
 
 ## Environment
 
 - Tracked template: `.env.example`
 - Primary non-interactive auth var: `VERCEL_TOKEN`
 - Do not infer missing auth from `VERCEL_TOKEN` being unset in the parent shell; existing `vercel login` state may already be valid. Use `vercel whoami` to verify real auth state. `VERCEL_TOKEN` is mainly for unattended/CI flows.
-- The CLI does not auto-load `.env`; source it yourself or use direnv when you need unattended auth.
+- The CLI does not auto-load `.env`; use direnv or CI secret injection for unattended auth.
 
 ## Anti-Patterns
 

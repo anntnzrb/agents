@@ -27,23 +27,29 @@ nix run github:numtide/llm-agents.nix#mcporter --
 
 ## Workflow
 
-1. MUST discover live contracts first:
+1. MUST discover the live inventory first:
 
    ```text
-   mcporter --config assets/mcporter.jsonc list deepwiki --schema
+   mcporter --config assets/mcporter.jsonc list deepwiki --brief
    ```
 
-2. Live success MUST override the snapshot.
+2. MUST inspect the selected tool's live schema:
+
+   ```text
+   mcporter --config assets/mcporter.jsonc list deepwiki.<tool> --schema
+   ```
+
+3. Live success MUST override the snapshot.
    - NEVER infer absent response fields.
    - NEVER load snapshots except for broad comparison.
-3. Live failure MUST label snapshot use as fallback.
-4. Matching inventory uses these routing rules:
+4. Live failure MUST label snapshot use as fallback.
+5. Matching inventory uses these routing rules:
    - Repositories MUST use `owner/repo`.
    - `ask_question` accepts one or up to 10 repositories.
    - Other tools accept exactly one repository.
    - Broad exploration SHOULD inspect structure before contents.
    - Narrow questions SHOULD use `ask_question`.
    - Multi-repository calls MUST use exact `--args` JSON.
-5. Insufficient DeepWiki MAY switch to public-web research; MUST disclose.
+6. Insufficient DeepWiki MAY switch to public-web research; MUST disclose.
 
 `read_wiki_contents` can be large; MUST narrow first unless full docs are needed.

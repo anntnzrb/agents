@@ -63,7 +63,7 @@ def handle_rpc_line(line: str) -> RpcResponse:
             message="JSON request must be an object.",
         )
 
-    request = cast(Mapping[str, object], payload)
+    request = cast("Mapping[str, object]", payload)
     request_id = _read_request_id(request.get("id"))
 
     try:
@@ -146,13 +146,13 @@ def _parse_search_request(request: Mapping[str, object]) -> SearchRequest:
         destination=destination,
         depart_start=depart_start,
         depart_end=depart_end,
-        trip_type=cast(Literal["oneway", "roundtrip"], trip_type),
+        trip_type=cast("Literal['oneway', 'roundtrip']", trip_type),
         stay_min=_read_int(request, "stayMin", "stay_min", default=None, minimum=0),
         stay_max=_read_int(request, "stayMax", "stay_max", default=None, minimum=0),
         adults=_read_int(request, "adults", "adults", default=1, minimum=1),
         children=_read_int(request, "children", "children", default=0, minimum=0),
         infants=_read_int(request, "infants", "infants", default=0, minimum=0),
-        cabin=cast(Literal["economy", "premium_economy", "business", "first"], cabin),
+        cabin=cast("Literal['economy', 'premium_economy', 'business', 'first']", cabin),
         currency=_read_str(request, "currency", "currency", default="USD"),
         locale=_read_str(request, "locale", "locale", default="en"),
         market=_read_str(request, "market", "market", default="us"),
@@ -242,7 +242,7 @@ def _read_str(
     if not isinstance(value, str):
         raise ValueError(f"{key} must be a string")
     clean = value.strip()
-    return clean if clean else default
+    return clean or default
 
 
 def _read_bool(

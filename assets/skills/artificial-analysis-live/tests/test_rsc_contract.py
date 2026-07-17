@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from pathlib import Path
-from types import SimpleNamespace
 import tempfile
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import _path  # noqa: F401
 from artificial_analysis import cli
 from artificial_analysis.rsc import (
-    FetchResult,
     ExtractionError,
+    FetchResult,
     build_snapshot_payload,
     extract_lists,
     normalize_official_models,
@@ -25,17 +25,21 @@ class TestRscExtraction(unittest.TestCase):
                 "x",
                 {
                     "model_rows": [
-                        {"slug": "m1", "name": "M1", "model_creator_id": "c1"}
+                        {"slug": "m1", "name": "M1", "model_creator_id": "c1"},
                     ],
                     "providers": [
-                        {"slug": "p1", "name": "Provider 1", "website_url": "https://x"}
+                        {
+                            "slug": "p1",
+                            "name": "Provider 1",
+                            "website_url": "https://x",
+                        },
                     ],
                     "host_models": [
                         {"slug": "p1_model-1", "host_id": "h1", "model_id": "m1"},
                         {"slug": "p1_model-2", "host_id": "h1", "model_id": "m2"},
                     ],
                 },
-            )
+            ),
         ]
 
         models, hosts, hosts_models = extract_lists(frames)
@@ -78,7 +82,7 @@ class TestRscExtraction(unittest.TestCase):
                         },
                     ],
                 },
-            )
+            ),
         ]
 
         models, hosts, hosts_models = extract_lists(frames)
@@ -164,7 +168,7 @@ class TestRscExtraction(unittest.TestCase):
                         },
                     ],
                 },
-            )
+            ),
         ]
 
         models, hosts, hosts_models = extract_lists(frames)
@@ -199,13 +203,15 @@ class TestRscExtraction(unittest.TestCase):
             "endpoints": [
                 {"slug": "provider-1_model-1", "host_id": "h1", "model_id": "m1"},
                 {"slug": "provider-1_model-2", "host_id": "h1", "model_id": "m2"},
-            ]
+            ],
         }
         slugs = snapshot_slugs(snapshot)
         self.assertEqual(slugs, ["provider-1_model-1", "provider-1_model-2"])
 
     def _coding_payload(
-        self, frames: list[tuple[str, object]], **options: object
+        self,
+        frames: list[tuple[str, object]],
+        **options: object,
     ) -> dict[str, object]:
         with tempfile.TemporaryDirectory() as temp_dir:
             options = {
@@ -235,7 +241,10 @@ class TestRscExtraction(unittest.TestCase):
         row: dict[str, object] = {
             "slug": slug,
             "headlineValue": score,
-            "modelCreator": {"name": creator, "slug": creator.lower().replace(" ", "-")},
+            "modelCreator": {
+                "name": creator,
+                "slug": creator.lower().replace(" ", "-"),
+            },
             "shortName": slug.replace("-", " ").title(),
             "isReasoning": True,
             "releaseDate": "2026-07-01",
@@ -260,7 +269,7 @@ class TestRscExtraction(unittest.TestCase):
                         "answer": 0.50,
                     },
                     "timePerTaskSeconds": 12.5,
-                }
+                },
             )
         return row
 
@@ -304,9 +313,9 @@ class TestRscExtraction(unittest.TestCase):
                                 "reasoningCost": 0.12,
                             },
                         },
-                    ]
+                    ],
                 },
-            )
+            ),
         ]
 
         payload = self._coding_payload(frames)
@@ -328,9 +337,9 @@ class TestRscExtraction(unittest.TestCase):
                     "models": [
                         self._current_row("current-alpha", 88.4, "OpenAI"),
                         self._current_row("current-beta", 79.1, "OpenAI"),
-                    ]
+                    ],
                 },
-            )
+            ),
         ]
 
         payload = self._coding_payload(frames)
@@ -360,9 +369,7 @@ class TestRscExtraction(unittest.TestCase):
                 "answer_cost": 0.50,
             },
         )
-        self.assertEqual(
-            row["coding_task_metrics"]["time_per_task_seconds"], 12.5
-        )
+        self.assertEqual(row["coding_task_metrics"]["time_per_task_seconds"], 12.5)
 
     def test_coding_payload_retains_current_score_without_task_metrics(self) -> None:
         frames = [
@@ -371,14 +378,20 @@ class TestRscExtraction(unittest.TestCase):
                 {
                     "models": [
                         self._current_row(
-                            "score-only", 77.7, "OpenAI", with_metrics=False
+                            "score-only",
+                            77.7,
+                            "OpenAI",
+                            with_metrics=False,
                         ),
                         self._current_row(
-                            "score-only-peer", 70.0, "OpenAI", with_metrics=False
+                            "score-only-peer",
+                            70.0,
+                            "OpenAI",
+                            with_metrics=False,
                         ),
-                    ]
+                    ],
                 },
-            )
+            ),
         ]
 
         payload = self._coding_payload(frames)
@@ -427,15 +440,17 @@ class TestRscExtraction(unittest.TestCase):
                             "name": "Provider Two / Model B",
                             "price1mInputTokens": 0.10,
                         },
-                    ]
+                    ],
                 },
-            )
+            ),
         ]
 
         with self.assertRaises(cli.ExtractionError):
             self._coding_payload(frames)
 
-    def test_coding_payload_filters_and_sorts_current_rows_deterministically(self) -> None:
+    def test_coding_payload_filters_and_sorts_current_rows_deterministically(
+        self,
+    ) -> None:
         frames = [
             (
                 "current",
@@ -444,9 +459,9 @@ class TestRscExtraction(unittest.TestCase):
                         self._current_row("lab-alpha", 75.0, "Target Lab"),
                         self._current_row("lab-beta", 91.0, "Target Lab"),
                         self._current_row("other", 99.0, "Other Lab"),
-                    ]
+                    ],
                 },
-            )
+            ),
         ]
 
         payload = self._coding_payload(
@@ -472,7 +487,7 @@ class TestRscExtraction(unittest.TestCase):
             "model_creators": {"name": "RSC"},
         }
         api = normalize_official_models(
-            '{"status":200,"prompt_options":{},"data":[{"id":"api-id","slug":"shared","name":"API name","release_date":"2026-01-01","model_creator":{"name":"API"},"evaluations":{"artificial_analysis_coding_index":42,"artificial_analysis_intelligence_index":null},"pricing":{"price_1m_blended_3_to_1":3},"median_output_tokens_per_second":9,"median_time_to_first_token_seconds":1,"median_time_to_first_answer_token":2},{"id":"api-only","slug":"api-only","name":"API only","model_creator":{},"evaluations":{},"pricing":{}}]}'
+            '{"status":200,"prompt_options":{},"data":[{"id":"api-id","slug":"shared","name":"API name","release_date":"2026-01-01","model_creator":{"name":"API"},"evaluations":{"artificial_analysis_coding_index":42,"artificial_analysis_intelligence_index":null},"pricing":{"price_1m_blended_3_to_1":3},"median_output_tokens_per_second":9,"median_time_to_first_token_seconds":1,"median_time_to_first_answer_token":2},{"id":"api-only","slug":"api-only","name":"API only","model_creator":{},"evaluations":{},"pricing":{}}]}',
         )
         rsc_result = FetchResult("", 200, {"etag": "rsc"}, "2026-01-01T00:00:00+00:00")
         api_result = FetchResult("", 200, {}, "2026-01-01T00:00:01+00:00")
@@ -480,7 +495,12 @@ class TestRscExtraction(unittest.TestCase):
             models=[rsc_model],
             hosts=[],
             hosts_models=[
-                {"slug": "host_shared", "host": {"slug": "host"}, "model": rsc_model, "price_1m_blended_7_to_2_to_1": 4}
+                {
+                    "slug": "host_shared",
+                    "host": {"slug": "host"},
+                    "model": rsc_model,
+                    "price_1m_blended_7_to_2_to_1": 4,
+                },
             ],
             frame_count=1,
             rsc_result=rsc_result,
@@ -512,7 +532,7 @@ class TestRscExtraction(unittest.TestCase):
             normalize_official_models('{"status":"200","prompt_options":{},"data":[]}')
         with self.assertRaisesRegex(ExtractionError, "require non-empty slug"):
             normalize_official_models(
-                '{"status":200,"prompt_options":{},"data":[{"slug":"","name":"x","model_creator":{},"evaluations":{},"pricing":{}}]}'
+                '{"status":200,"prompt_options":{},"data":[{"slug":"","name":"x","model_creator":{},"evaluations":{},"pricing":{}}]}',
             )
 
 

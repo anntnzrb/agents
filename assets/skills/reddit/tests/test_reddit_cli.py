@@ -30,7 +30,12 @@ SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "cli.py"
 class FakeResponse:
     """Minimal urllib response stand-in (context-manager + .read())."""
 
-    def __init__(self, body: bytes = b"", status: int = 200, headers: dict | None = None):
+    def __init__(
+        self,
+        body: bytes = b"",
+        status: int = 200,
+        headers: dict | None = None,
+    ):
         self._body = body
         self.status = status
         self.headers = headers or {}
@@ -48,7 +53,11 @@ class FakeResponse:
 class CallRecorder:
     """Fake urlopen that records every call and returns/raises a fixed value."""
 
-    def __init__(self, return_value: FakeResponse | None = None, side_effect: BaseException | None = None):
+    def __init__(
+        self,
+        return_value: FakeResponse | None = None,
+        side_effect: BaseException | None = None,
+    ):
         self.calls: list[dict] = []
         self.return_value = return_value
         self.side_effect = side_effect
@@ -68,7 +77,7 @@ class CallRecorder:
                 "headers": headers,
                 "args": args,
                 "kwargs": kwargs,
-            }
+            },
         )
         if self.side_effect is not None:
             raise self.side_effect
@@ -281,11 +290,13 @@ def test_compact_listing_keeps_useful_fields(reddit_cli, capsys, monkeypatch):
                         "link_flair_text_color": "dark",
                         "url_overridden_by_dest": "https://example.com/post",
                     },
-                }
-            ]
-        }
+                },
+            ],
+        },
     }
-    recorder = CallRecorder(return_value=FakeResponse(body=json.dumps(payload).encode()))
+    recorder = CallRecorder(
+        return_value=FakeResponse(body=json.dumps(payload).encode()),
+    )
     monkeypatch.setattr(urllib.request, "urlopen", recorder)
 
     rc = reddit_cli.main(["browse", "python"])
@@ -333,4 +344,6 @@ def test_compact_listing_keeps_useful_fields(reddit_cli, capsys, monkeypatch):
         "link_flair_text_color",
         "url_overridden_by_dest",
     ):
-        assert dropped not in first, f"{dropped!r} must be dropped; got keys: {sorted(first)}"
+        assert dropped not in first, (
+            f"{dropped!r} must be dropped; got keys: {sorted(first)}"
+        )

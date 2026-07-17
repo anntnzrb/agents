@@ -16,7 +16,7 @@ def validate_audio_path(path: Path) -> Path:
     if resolved.suffix.lower() not in SUPPORTED_EXTENSIONS:
         suffixes = ", ".join(sorted(SUPPORTED_EXTENSIONS))
         raise ValueError(
-            f"unsupported audio format '{resolved.suffix}'. expected one of: {suffixes}"
+            f"unsupported audio format '{resolved.suffix}'. expected one of: {suffixes}",
         )
     return resolved
 
@@ -28,7 +28,9 @@ def ensure_out_dir(path: Path) -> Path:
 
 
 def cache_key_for(
-    audio_path: Path, segment_start_s: float, segment_duration_s: float | None
+    audio_path: Path,
+    segment_start_s: float,
+    segment_duration_s: float | None,
 ) -> str:
     stat = audio_path.stat()
     duration_bit = "full" if segment_duration_s is None else f"{segment_duration_s:.6f}"
@@ -54,7 +56,8 @@ def save_analysis(path: Path, analysis: AnalysisResult) -> None:
     payload = analysis.to_dict()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
     )
 
 

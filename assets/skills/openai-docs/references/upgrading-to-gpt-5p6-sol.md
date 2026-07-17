@@ -1,5 +1,25 @@
 # Upgrading to GPT-5.6 Sol
 
+## Contents
+
+- [Core principle](#core-principle)
+- [Migration posture](#migration-posture)
+- [Inventory before editing](#inventory-before-editing)
+- [Choose the target model by role](#choose-the-target-model-by-role)
+- [Preserve effective reasoning before tuning](#preserve-effective-reasoning-before-tuning)
+- [Chat Completions and function tools](#chat-completions-and-function-tools)
+- [Responses API and conversation state](#responses-api-and-conversation-state)
+- [Prompt caching](#prompt-caching)
+- [Images, PDFs, files, and long context](#images-pdfs-files-and-long-context)
+- [Structured outputs, parsers, and tool contracts](#structured-outputs-parsers-and-tool-contracts)
+- [Optional: Pro mode](#optional-pro-mode)
+- [Optional: Programmatic Tool Calling](#optional-programmatic-tool-calling)
+- [Optional: multi-agent beta](#optional-multi-agent-beta)
+- [Prompt migration judgment](#prompt-migration-judgment)
+- [Upgrade workflow](#upgrade-workflow)
+- [Validation matrix](#validation-matrix)
+- [Required final report](#required-final-report)
+
 Use this guide when the user asks to migrate an existing OpenAI API integration, repository, prompt stack, agent, model router, or model picker to GPT-5.6 Sol or the GPT-5.6 family.
 
 The default explicit target is `gpt-5.6-sol`. The alias `gpt-5.6` routes to Sol; use it only when the repository intentionally prefers family aliases. Do not treat every old model usage as a Sol candidate: GPT-5.6 is a family with different cost, latency, context, and quality roles.

@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.10"
 # ///
@@ -9,6 +8,7 @@ from __future__ import annotations
 import argparse
 import ast
 import configparser
+import contextlib
 import csv
 import io
 import json
@@ -18,16 +18,19 @@ import shutil
 import subprocess
 import sys
 import textwrap
-from dataclasses import dataclass
-from pathlib import Path, PureWindowsPath
-from typing import Any, Iterable
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SQL_DIR = SCRIPT_DIR / "sql"
 ROOT_MARKERS = ("odoo.conf", "odoo-bin", "addons", "docker-compose.yml")
-DEFAULT_COMPOSE_RUNTIME = Path("/Users/Shared/odoo17")
+KNOWN_COMPOSE_RUNTIME = Path("/Users/Shared/odoo17")
 RUNTIME_DIR_ENV = "ODOO17_RUNTIME_DIR"
-LOCAL_DEFAULT_DB = "etech"
+DEFAULT_DB_ENV = "ODOO17_DEFAULT_DB"
 SECRET_TOKENS = ("passwd", "password", "token", "secret", "key")
 WRITE_HINTS = {
     "create",
@@ -145,7 +148,11 @@ def _emit_text(value: Any, indent: int = 0) -> None:
 def emit_result(args: argparse.Namespace, payload: Any) -> int:
     if getattr(args, "json", False):
         json.dump(
-            payload, sys.stdout, indent=2, ensure_ascii=False, default=_json_default
+            payload,
+            sys.stdout,
+            indent=2,
+            ensure_ascii=False,
+            default=_json_default,
         )
         sys.stdout.write("\n")
     else:
@@ -154,7 +161,10 @@ def emit_result(args: argparse.Namespace, payload: Any) -> int:
 
 
 def _fail(
-    args: argparse.Namespace | None, message: str, *, checked: list[str] | None = None
+    args: argparse.Namespace | None,
+    message: str,
+    *,
+    checked: list[str] | None = None,
 ) -> int:
     payload: dict[str, Any] = {"error": message}
     if checked:
@@ -247,11 +257,11 @@ def _discover_root(start: Path) -> Path:
                 continue
             seen.add(key)
             if _looks_like_host_workspace(candidate) or _looks_like_compose_runtime(
-                candidate
+                candidate,
             ):
                 return candidate
     raise CliError(
-        f"could not discover Odoo workspace from {start}; run from inside the Odoo install tree/runtime or pass --root"
+        f"could not discover Odoo workspace from {start}; run from inside the Odoo install tree/runtime or pass --root",
     )
 
 
@@ -264,7 +274,7 @@ def _read_config(config_path: Path) -> dict[str, str]:
         raise CliError(f"failed to parse {config_path}: {exc}") from exc
     if not loaded or "options" not in parser:
         raise CliError(f"missing [options] section in {config_path}")
-    return {key: value for key, value in parser["options"].items()}
+    return dict(parser["options"].items())
 
 
 def _read_env_file(path: Path) -> dict[str, str]:
@@ -310,8 +320,7 @@ def _compose_candidates(start: Path) -> list[Path]:
         candidates.append(anchor)
         candidates.append(anchor / "odoo17")
         candidates.append(anchor.parent / "odoo17")
-    candidates.append(DEFAULT_COMPOSE_RUNTIME)
-
+    candidates.append(KNOWN_COMPOSE_RUNTIME)
     seen: set[str] = set()
     unique: list[Path] = []
     for candidate in candidates:
@@ -332,7 +341,7 @@ def _run_subprocess(
     cwd: Path | None = None,
     env: dict[str, str] | None = None,
     input_text: str | None = None,
-    timeout: int | float | None = None,
+    timeout: float | None = None,
     quiet: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     kwargs: dict[str, Any] = {
@@ -362,20 +371,16 @@ def _run_subprocess(
         if os.name == "nt":
             process.kill()
         else:
-            try:
+            with contextlib.suppress(ProcessLookupError):
                 os.killpg(process.pid, 15)
-            except ProcessLookupError:
-                pass
             try:
                 process.wait(timeout=2)
             except subprocess.TimeoutExpired:
-                try:
+                with contextlib.suppress(ProcessLookupError):
                     os.killpg(process.pid, 9)
-                except ProcessLookupError:
-                    pass
         stdout, stderr = process.communicate()
         raise CliError(
-            f"command timed out after {exc.timeout} seconds: {' '.join(command[:4])}"
+            f"command timed out after {exc.timeout} seconds: {' '.join(command[:4])}",
         ) from exc
     return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
@@ -386,7 +391,7 @@ def _discover_compose_runtime(start: Path, explicit: str | None) -> Path | None:
         if _looks_like_compose_runtime(runtime):
             return runtime
         raise CliError(
-            f"runtime directory does not look like an Odoo Compose runtime: {runtime}"
+            f"runtime directory does not look like an Odoo Compose runtime: {runtime}",
         )
     for candidate in _compose_candidates(start):
         if _looks_like_compose_runtime(candidate):
@@ -417,10 +422,16 @@ def _compose_runtime(start: Path, explicit: str | None) -> RuntimeContext | None
         raise CliError(f"Compose runtime config file not found: {config_path}")
     config = _read_config(config_path)
     source_dir = _env_path(
-        runtime_root, env, "ODOO17_SOURCE_DIR", "./source/odoo-17.0+e.20260527"
+        runtime_root,
+        env,
+        "ODOO17_SOURCE_DIR",
+        "./source/odoo-17.0+e.20260527",
     )
     custom_addons = _env_path(
-        runtime_root, env, "ODOO17_CUSTOM_ADDONS_DIR", "../etech/odoo/addons"
+        runtime_root,
+        env,
+        "ODOO17_CUSTOM_ADDONS_DIR",
+        "../etech/odoo/addons",
     )
     addons_paths = [
         path
@@ -430,7 +441,7 @@ def _compose_runtime(start: Path, explicit: str | None) -> RuntimeContext | None
     compose_command = _resolve_compose_command()
     if compose_command is None:
         raise CliError(
-            "Docker Compose not found; install Docker/OrbStack with `docker compose` or `docker-compose`"
+            "Docker Compose not found; install Docker/OrbStack with `docker compose` or `docker-compose`",
         )
     return RuntimeContext(
         backend="compose",
@@ -471,7 +482,8 @@ def _resolve_addons_paths(root: Path, config: dict[str, str]) -> list[Path]:
 
 
 def _resolve_effective_db_name(
-    args: argparse.Namespace, runtime: RuntimeContext
+    args: argparse.Namespace,
+    runtime: RuntimeContext,
 ) -> str | None:
     explicit = _normalize_config_value(getattr(args, "db", None))
     if explicit:
@@ -479,8 +491,8 @@ def _resolve_effective_db_name(
     configured = _normalize_config_value(runtime.config.get("db_name"))
     if configured:
         return configured
-    if runtime.backend == "compose" and runtime.root == DEFAULT_COMPOSE_RUNTIME:
-        return LOCAL_DEFAULT_DB
+    if runtime.backend == "compose" and runtime.env is not None:
+        return _normalize_config_value(runtime.env.get(DEFAULT_DB_ENV))
     return None
 
 
@@ -521,7 +533,8 @@ def _read_manifest(module_dir: Path) -> dict[str, Any]:
     manifest_path = module_dir / "__manifest__.py"
     try:
         tree = ast.parse(
-            manifest_path.read_text(encoding="utf-8"), filename=str(manifest_path)
+            manifest_path.read_text(encoding="utf-8"),
+            filename=str(manifest_path),
         )
     except OSError as exc:
         raise CliError(f"failed to read {manifest_path}: {exc}") from exc
@@ -529,13 +542,13 @@ def _read_manifest(module_dir: Path) -> dict[str, Any]:
         raise CliError(f"invalid Python in {manifest_path}: {exc}") from exc
     if not tree.body or not isinstance(tree.body[0], ast.Expr):
         raise CliError(
-            f"manifest {manifest_path} does not contain a top-level dict literal"
+            f"manifest {manifest_path} does not contain a top-level dict literal",
         )
     try:
         value = ast.literal_eval(tree.body[0].value)
     except Exception as exc:
         raise CliError(
-            f"manifest {manifest_path} is not a pure literal dict: {exc}"
+            f"manifest {manifest_path} is not a pure literal dict: {exc}",
         ) from exc
     if not isinstance(value, dict):
         raise CliError(f"manifest {manifest_path} is not a dict")
@@ -558,7 +571,8 @@ def _iter_nearby_psql_candidates(start: Path) -> Iterable[Path]:
 
 
 def _discover_psql(
-    args: argparse.Namespace, ctx: WorkspaceContext
+    args: argparse.Namespace,
+    ctx: WorkspaceContext,
 ) -> tuple[str, list[str]]:
     checked: list[str] = []
     explicit = getattr(args, "psql", None)
@@ -585,7 +599,11 @@ def _discover_psql(
     if where_exe:
         checked.append("PATH lookup via where.exe psql.exe")
         result = subprocess.run(
-            [where_exe, "psql.exe"], capture_output=True, text=True, shell=False
+            [where_exe, "psql.exe"],
+            capture_output=True,
+            check=False,
+            text=True,
+            shell=False,
         )
         if result.returncode == 0:
             for line in result.stdout.splitlines():
@@ -627,7 +645,7 @@ def _load_sql_recipe(name: str, *, params: dict[str, Any], fallback: str) -> str
     except KeyError as exc:
         source = recipe_path if has_file else name
         raise CliError(
-            f"SQL recipe {source} references unknown placeholder {exc}"
+            f"SQL recipe {source} references unknown placeholder {exc}",
         ) from exc
 
 
@@ -636,8 +654,7 @@ def _strip_sql_comments_and_literals(sql: str) -> str:
     sql = re.sub(r"/\*.*?\*/", "", sql, flags=re.DOTALL)
     sql = re.sub(r"\$[^$]*\$.*?\$[^$]*\$", "''", sql, flags=re.DOTALL)
     sql = re.sub(r"'(?:''|[^'])*'", "''", sql)
-    sql = re.sub(r'"(?:""|[^"])*"', '""', sql)
-    return sql
+    return re.sub(r'"(?:""|[^"])*"', '""', sql)
 
 
 def _guard_read_only_sql(sql: str) -> None:
@@ -647,12 +664,11 @@ def _guard_read_only_sql(sql: str) -> None:
     match = MUTATING_SQL_RE.search(stripped)
     if match:
         raise CliError(
-            f"read-only query rejected due to mutating SQL token: {match.group(1)}"
+            f"read-only query rejected due to mutating SQL token: {match.group(1)}",
         )
 
 
 def _compose_run_psql(
-    args: argparse.Namespace,
     ctx: WorkspaceContext,
     *,
     sql: str,
@@ -665,7 +681,7 @@ def _compose_run_psql(
     db_name = ctx.effective_db_name
     if not db_name:
         raise CliError(
-            "no database resolved; pass --db or configure the Compose runtime database"
+            "no database resolved; pass --db or configure the Compose runtime database",
         )
     if read_only:
         _guard_read_only_sql(sql)
@@ -701,7 +717,7 @@ def _compose_run_psql(
             db_name,
             "-f",
             "-",
-        ]
+        ],
     )
 
     result = _run_subprocess(
@@ -815,7 +831,10 @@ def _run_psql(
 ) -> dict[str, Any]:
     if ctx.runtime.backend == "compose":
         return _compose_run_psql(
-            args, ctx, sql=sql, read_only=read_only, row_limit=row_limit
+            ctx,
+            sql=sql,
+            read_only=read_only,
+            row_limit=row_limit,
         )
     return _host_run_psql(args, ctx, sql=sql, read_only=read_only, row_limit=row_limit)
 
@@ -829,7 +848,7 @@ def _module_filter_clause(module: str) -> str:
             FROM regexp_split_to_table(replace(COALESCE(modules, ''), ' ', ''), ',') AS module_name
             WHERE module_name = {literal}
         )
-        """
+        """,
     ).strip()
 
 
@@ -973,7 +992,7 @@ class _RouteCollector(ast.NodeVisitor):
                     source=str(self.path),
                     line=node.lineno,
                     write_signals=sorted(signals),
-                )
+                ),
             )
 
 
@@ -1052,7 +1071,7 @@ def cmd_env_inspect(args: argparse.Namespace) -> int:
                 "db_user": _normalize_config_value(ctx.config.get("db_user")),
                 "db_name": _normalize_config_value(ctx.config.get("db_name")),
                 "pg_path": _normalize_config_value(ctx.config.get("pg_path")),
-            }
+            },
         ),
         "addons_paths": [str(path) for path in ctx.addons_paths],
         "effective_db_name": ctx.effective_db_name,
@@ -1074,7 +1093,7 @@ def cmd_addons_list(args: argparse.Namespace) -> int:
                     "module": module_dir.name,
                     "path": str(module_dir),
                     "addons_dir": str(addons_dir),
-                }
+                },
             )
     modules.sort(key=lambda item: item["module"])
     return emit_result(args, {"count": len(modules), "modules": modules})
@@ -1301,7 +1320,7 @@ def cmd_db_query(args: argparse.Namespace) -> int:
     ctx = load_workspace(args)
     if not args.read_only:
         raise CliError(
-            "db query requires --read-only; write mode is intentionally not implemented"
+            "db query requires --read-only; write mode is intentionally not implemented",
         )
     if bool(args.sql_file) == bool(args.sql_stdin):
         raise CliError("provide exactly one of --sql-file or --sql-stdin")
@@ -1357,7 +1376,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--db", help="Optional database override")
     parser.add_argument("--psql", help="Optional psql executable override")
     parser.add_argument(
-        "--runtime-dir", help="Optional Docker Compose runtime directory override"
+        "--runtime-dir",
+        help="Optional Docker Compose runtime directory override",
     )
 
     top = parser.add_subparsers(dest="topic", required=True)

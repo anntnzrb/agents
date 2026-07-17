@@ -2,6 +2,8 @@
 
 Recipes for common AoC algorithm patterns.
 
+Read this when choosing or implementing a nontrivial puzzle algorithm.
+
 ---
 
 ## BFS: Shortest Path (Unweighted)

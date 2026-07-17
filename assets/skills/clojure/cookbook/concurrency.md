@@ -2,6 +2,16 @@
 
 A guide to Clojure's concurrency primitives and state management patterns.
 
+Read this when state ownership, coordination, asynchronous work, or concurrency primitives matter.
+
+## Section index
+
+- Atoms, validation, watches, and caches
+- Refs, STM, and transaction boundaries
+- Agents and dynamic vars
+- `core.async` channels, pipelines, fan-in/out, and pub/sub
+- Futures, promises, and delays
+
 ## Reference Types Overview
 
 | Type  | Use Case          | Coordination | Sync/Async |

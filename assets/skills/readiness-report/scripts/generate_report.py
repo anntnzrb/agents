@@ -1,6 +1,5 @@
 #!/usr/bin/env -S uv run --script
-"""
-Report Generator for Agent Readiness
+"""Report Generator for Agent Readiness
 
 Generates formatted markdown reports from analysis JSON.
 
@@ -75,7 +74,7 @@ def get_top_opportunities(data: dict, n: int = 5) -> list[tuple[str, str, str]]:
                         criterion["level"],
                         criterion["reason"],
                         pillar_name,
-                    )
+                    ),
                 )
 
     # Sort by level (ascending) to prioritize foundational issues
@@ -105,7 +104,7 @@ def generate_markdown_report(data: dict) -> str:
     if achieved > 0:
         lines.append(f"**Achieved Level**: **L{achieved}**")
     else:
-        lines.append(f"**Achieved Level**: **Not yet L1** (need 80% at L1)")
+        lines.append("**Achieved Level**: **Not yet L1** (need 80% at L1)")
     lines.append("")
 
     # Level Progress
@@ -208,7 +207,7 @@ def generate_markdown_report(data: dict) -> str:
 
     lines.append("")
     lines.append("---")
-    lines.append(f"*Report generated from repository analysis*")
+    lines.append("*Report generated from repository analysis*")
 
     return "\n".join(lines)
 
@@ -249,7 +248,7 @@ def generate_brief_report(data: dict) -> str:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate Agent Readiness report from analysis"
+        description="Generate Agent Readiness report from analysis",
     )
     parser.add_argument(
         "--analysis-file",
@@ -273,7 +272,7 @@ def main():
     if not analysis_path.exists():
         print(f"❌ Analysis file not found: {args.analysis_file}")
         print(
-            "Run `uv run --script scripts/cli.py analyze` first to generate the analysis."
+            "Run `uv run --script scripts/cli.py analyze` first to generate the analysis.",
         )
         return 1
 

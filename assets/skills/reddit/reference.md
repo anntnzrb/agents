@@ -7,7 +7,7 @@
 
 ## Environment
 
-Keep `.env` beside this skill and source it if you want persistent local defaults.
+Keep `.env` beside this skill for persistent local defaults; the CLI loads it.
 
 Supported helper lookup order:
 

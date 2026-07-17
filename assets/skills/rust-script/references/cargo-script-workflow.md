@@ -30,7 +30,6 @@ Non-run commands:
 ## Script File Skeleton
 
 ```rust
-#!/usr/bin/env -S cargo -Zscript
 ---cargo
 [package]
 name = "tool"

@@ -2,7 +2,7 @@
 
 All examples use the bundled CLI and assume read-only intent.
 
-Use `uv run scripts/odooctl.py ...` as the public front door. Do not fall back to raw `psql`, Docker Compose `exec`, or ad-hoc shell quoting unless debugging the skill itself.
+Use `uv run --script <skill-dir>/scripts/cli.py ...` as the public front door. Do not fall back to raw `psql`, Docker Compose `exec`, or ad-hoc shell quoting unless debugging the skill itself.
 
 ## Runtime backends
 
@@ -24,8 +24,8 @@ Fast health snapshot of the active local database:
 - connection target metadata
 - runtime backend metadata
 
-```bash
-uv run scripts/odooctl.py db summary --db etech --json
+```text
+uv run --script <skill-dir>/scripts/cli.py db summary --db <database> --json
 ```
 
 Prefer this first when you need to confirm the effective local DB.
@@ -34,24 +34,24 @@ Prefer this first when you need to confirm the effective local DB.
 
 Use for table size pressure, storage hotspots, or large relation suspects.
 
-```bash
-uv run scripts/odooctl.py db top-tables --db etech --limit 25 --json
+```text
+uv run --script <skill-dir>/scripts/cli.py db top-tables --db <database> --limit 25 --json
 ```
 
 ### `db top-rows --limit N`
 
 Use when row volume matters more than bytes.
 
-```bash
-uv run scripts/odooctl.py db top-rows --db etech --limit 25 --json
+```text
+uv run --script <skill-dir>/scripts/cli.py db top-rows --db <database> --limit 25 --json
 ```
 
 ### `db orphan-tables --limit N`
 
 Find physical tables that do not map cleanly to active `ir_model` rows.
 
-```bash
-uv run scripts/odooctl.py db orphan-tables --db etech --limit 50 --json
+```text
+uv run --script <skill-dir>/scripts/cli.py db orphan-tables --db <database> --limit 50 --json
 ```
 
 Treat the result as an investigation queue, not as a deletion list.
@@ -60,14 +60,14 @@ Treat the result as an investigation queue, not as a deletion list.
 
 Use for ad-hoc inspection too specific for a canned probe.
 
-```bash
-uv run scripts/odooctl.py db query --db etech --read-only --sql-file ./tmp/custom_probe.sql --json
+```text
+uv run --script <skill-dir>/scripts/cli.py db query --db <database> --read-only --sql-file <sql-file> --json
 ```
 
 or:
 
-```bash
-uv run scripts/odooctl.py db query --db etech --read-only --sql-stdin --json
+```text
+uv run --script <skill-dir>/scripts/cli.py db query --db <database> --read-only --sql-stdin --json
 ```
 
 Rules:
@@ -83,12 +83,12 @@ If DB execution cannot be resolved, the command should fail clearly and report w
 
 Use module-scoped commands before ad-hoc SQL when possible.
 
-```bash
-uv run scripts/odooctl.py module status crm_espol --db etech --json
-uv run scripts/odooctl.py module models crm_espol --db etech --json
-uv run scripts/odooctl.py module tables crm_espol --db etech --json
-uv run scripts/odooctl.py module m2m crm_espol --db etech --json
-uv run scripts/odooctl.py module fks crm_espol --db etech --json
+```text
+uv run --script <skill-dir>/scripts/cli.py module status <module> --db <database> --json
+uv run --script <skill-dir>/scripts/cli.py module models <module> --db <database> --json
+uv run --script <skill-dir>/scripts/cli.py module tables <module> --db <database> --json
+uv run --script <skill-dir>/scripts/cli.py module m2m <module> --db <database> --json
+uv run --script <skill-dir>/scripts/cli.py module fks <module> --db <database> --json
 ```
 
 ## Two local truth rules

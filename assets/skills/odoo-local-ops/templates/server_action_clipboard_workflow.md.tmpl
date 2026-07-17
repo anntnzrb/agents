@@ -1,19 +1,23 @@
 # Server Action clipboard workflow
 
 ```bash
-# write/edit action under tmp, then:
-pbcopy < /tmp/{{ action_file }}.py
+# write/edit action under the selected temporary directory, then:
+pbcopy < "{{ temp_dir }}/{{ action_file }}.py"
 
 # after Odoo modal/notification output is copied:
-pbpaste > /tmp/{{ action_file }}_output.txt
+pbpaste > "{{ temp_dir }}/{{ action_file }}_output.txt"
 
 # parse JSON with uv-managed Python:
 uv run python - <<'PY'
 import json
 from pathlib import Path
-text = Path('/tmp/{{ action_file }}_output.txt').read_text().strip()
+temp_dir = Path('{{ temp_dir }}')
+text = (temp_dir / '{{ action_file }}_output.txt').read_text(encoding='utf-8').strip()
 payload = json.loads(text)
-Path('/tmp/{{ action_file }}_output.json').write_text(json.dumps(payload, ensure_ascii=False, indent=2))
+(temp_dir / '{{ action_file }}_output.json').write_text(
+    json.dumps(payload, ensure_ascii=False, indent=2),
+    encoding='utf-8',
+)
 print(json.dumps(payload, ensure_ascii=False, indent=2))
 PY
 ```

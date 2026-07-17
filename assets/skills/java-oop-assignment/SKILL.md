@@ -41,9 +41,10 @@ For each task:
 
 ### Phase 4: Verify
 
-1. Build with Gradle: `./gradlew compileJava`
-2. Run main if playground exists: `./gradlew run`
-3. Check output matches PDF examples
+1. Resolve `<gradle-wrapper>` for the current platform.
+2. Build: `<gradle-wrapper> compileJava`.
+3. Run a provided playground: `<gradle-wrapper> run`.
+4. Check output matches PDF examples.
 
 ## Implementation Rules
 
@@ -75,7 +76,7 @@ Use the following for code conciseness, elegance and brevity.
 
 ### Gradle Notes
 
-- If build fails with version error, try: `JAVA_HOME=/path/to/jdk21 ./gradlew build`
+- If the build reports a Java-version error, select JDK 21 for the current shell and run `<gradle-wrapper> build`.
 - `@StudentImplementationRequired("H6.X")` marks methods to implement
 - Remove `crash("H6.X")` calls when implementing
 

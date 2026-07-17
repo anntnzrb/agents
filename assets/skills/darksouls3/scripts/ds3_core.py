@@ -5,11 +5,9 @@ Leaf module — no internal imports from sibling modules.
 
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
 import os
-import re
 import time
 import urllib.request
 from dataclasses import dataclass
@@ -22,7 +20,7 @@ DATA_SOURCE = (
 UPDATED = "2026-06-28"
 CACHE_ENV = "DS3_CACHE_DIR"
 CACHE_DIR = Path(
-    os.environ.get(CACHE_ENV, "~/.cache/darksouls3-companion")
+    os.environ.get(CACHE_ENV, "~/.cache/darksouls3-companion"),
 ).expanduser()
 
 # ── Source Registry ──────────────────────────────────────────────
@@ -169,7 +167,7 @@ def cache_get(key: str) -> str | None:
 def cache_put(key: str, content: str, meta: dict | None = None) -> None:
     p = cache_dir() / f"{key}.json"
     p.write_text(
-        json.dumps({"ts": time.time(), "content": content, "meta": meta or {}})
+        json.dumps({"ts": time.time(), "content": content, "meta": meta or {}}),
     )
 
 
@@ -392,8 +390,7 @@ _VIGOR_HP_POINTS = [
 def vigor_hp(vig: int) -> int:
     if vig < 10:
         return 300
-    if vig > 99:
-        vig = 99
+    vig = min(vig, 99)
     for i in range(len(_VIGOR_HP_POINTS) - 1):
         lo_lvl, lo_hp = _VIGOR_HP_POINTS[i]
         hi_lvl, hi_hp = _VIGOR_HP_POINTS[i + 1]
@@ -423,8 +420,7 @@ _ATT_FP_POINTS = [
 def attunement_fp(att: int) -> int:
     if att < 10:
         return 50
-    if att > 99:
-        att = 99
+    att = min(att, 99)
     for i in range(len(_ATT_FP_POINTS) - 1):
         lo_lvl, lo_fp = _ATT_FP_POINTS[i]
         hi_lvl, hi_fp = _ATT_FP_POINTS[i + 1]
@@ -529,9 +525,9 @@ def equip_load_max(vit: int, havels: bool = False, favor: bool = False) -> float
 def roll_type(weight_ratio: float) -> str:
     if weight_ratio < 30:
         return "fast roll (13 iframes)"
-    elif weight_ratio < 70:
+    if weight_ratio < 70:
         return "medium roll (13 iframes, slower recovery)"
-    elif weight_ratio < 100:
+    if weight_ratio < 100:
         return "fat roll (12 iframes)"
     return "overencumbered (cannot roll)"
 

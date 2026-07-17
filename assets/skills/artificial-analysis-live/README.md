@@ -1,5 +1,7 @@
 # artificial-analysis
 
+Read this when the `SKILL.md` fast path omits a required command or flag.
+
 AI-only extractor for the Artificial Analysis model catalog and provider-endpoint
 matrix.
 
@@ -55,9 +57,9 @@ uv run --script <skill-dir>/scripts/cli.py fetch
 
 Returns one JSON envelope on stdout and writes:
 
-- `/tmp/artifacts/artificial-analysis/full-data.json`
-- `/tmp/artifacts/artificial-analysis/endpoints.txt`
-- `/tmp/artifacts/artificial-analysis/full-url.txt`
+- `<temp-dir>/artifacts/artificial-analysis/full-data.json`
+- `<temp-dir>/artifacts/artificial-analysis/endpoints.txt`
+- `<temp-dir>/artifacts/artificial-analysis/full-url.txt`
 
 ### Fetch flags
 
@@ -79,7 +81,7 @@ Cache/ETag behavior:
 - sends `If-None-Match` when ETag exists
 - on `304`, reuses cached payload
 - if fresh parse fails sanity and not `--strict`, falls back to last-good snapshot
-- default `/tmp/artifacts/artificial-analysis/full-data.json` readers reject snapshots older than 24h; run `fetch` again or pass an explicit historical snapshot path
+- default `<temp-dir>/artifacts/artificial-analysis/full-data.json` readers reject snapshots older than 24h; run `fetch` again or pass an explicit historical snapshot path
 
 ### Snapshot schema v2
 
@@ -98,7 +100,7 @@ provider-endpoint-scoped.
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py stats
-uv run --script <skill-dir>/scripts/cli.py stats /tmp/artifacts/artificial-analysis/full-data.json --top 20
+uv run --script <skill-dir>/scripts/cli.py stats <temp-dir>/artifacts/artificial-analysis/full-data.json --top 20
 ```
 
 Returns counts + top providers by endpoint count.

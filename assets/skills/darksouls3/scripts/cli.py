@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["pycryptodome"]
@@ -66,7 +65,7 @@ GUIDE_SEARCH_STOPWORDS = frozenset(
         "this",
         "to",
         "with",
-    }
+    },
 )
 SOURCE_USAGE = "Use: sources list | status | policy | explain <key> | refresh [keys...]"
 SOURCE_POLICY_LINES: tuple[str, ...] = (
@@ -186,7 +185,8 @@ def _load_guide_manifest() -> dict[str, object]:
     data = json.loads(GUIDE_MANIFEST_PATH.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         print(
-            "Invalid DS3 platinum guide manifest: expected JSON object", file=sys.stderr
+            "Invalid DS3 platinum guide manifest: expected JSON object",
+            file=sys.stderr,
         )
         raise SystemExit(2)
     return data
@@ -228,7 +228,10 @@ def _load_guide_chunks() -> list[GuideChunk]:
 
 
 def _guide_snippet(
-    text: str, terms: list[str] | None = None, *, width: int = 240
+    text: str,
+    terms: list[str] | None = None,
+    *,
+    width: int = 240,
 ) -> str:
     compact = " ".join(text.split())
     if len(compact) <= width:
@@ -264,7 +267,9 @@ def _guide_fts_query(tokens: list[str]) -> str:
 
 
 def _guide_matches_filters(
-    chunk: GuideChunk, kind: str | None, heading: str | None
+    chunk: GuideChunk,
+    kind: str | None,
+    heading: str | None,
 ) -> bool:
     if kind and chunk.k.lower() != kind.lower():
         return False
@@ -362,11 +367,19 @@ def _search_guide_chunks(
         return []
     try:
         return _search_guide_fts(
-            chunks, tokens, kind=kind, heading=heading, limit=limit
+            chunks,
+            tokens,
+            kind=kind,
+            heading=heading,
+            limit=limit,
         )
     except sqlite3.Error:
         return _search_guide_python(
-            chunks, tokens, kind=kind, heading=heading, limit=limit
+            chunks,
+            tokens,
+            kind=kind,
+            heading=heading,
+            limit=limit,
         )
 
 
@@ -448,12 +461,12 @@ def _audit_source_registry() -> list[str]:
             marker in license_text for marker in NO_COPY_LICENSE_MARKERS
         ):
             issues.append(
-                f"source_registry.json {key}: unlicensed source marked copyable"
+                f"source_registry.json {key}: unlicensed source marked copyable",
             )
         source_type = str(entry.get("source_type", ""))
         if source_type != "save-tool" and _metadata_claims_save_truth(entry):
             issues.append(
-                f"source_registry.json {key}: non-save source overclaims save truth"
+                f"source_registry.json {key}: non-save source overclaims save truth",
             )
     return issues
 
@@ -512,7 +525,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     up = sp.add_parser(
-        "upgrade", help="Show materials needed for a weapon upgrade level"
+        "upgrade",
+        help="Show materials needed for a weapon upgrade level",
     )
     up.add_argument("level", type=int, help="Target upgrade level (1-10)")
     up.add_argument(
@@ -531,7 +545,11 @@ def build_parser() -> argparse.ArgumentParser:
     ca.add_argument("str", type=int, help="Strength")
     ca.add_argument("dex", type=int, help="Dexterity")
     ca.add_argument(
-        "int", type=int, nargs="?", default=10, help="Intelligence (default 10)"
+        "int",
+        type=int,
+        nargs="?",
+        default=10,
+        help="Intelligence (default 10)",
     )
     ca.add_argument("fth", type=int, nargs="?", default=10, help="Faith (default 10)")
 
@@ -541,12 +559,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     es = sp.add_parser("estus", help="Estus Flask information")
     es.add_argument(
-        "sub", nargs="?", choices=["shards", "bones", "allotment", "max"], default="max"
+        "sub",
+        nargs="?",
+        choices=["shards", "bones", "allotment", "max"],
+        default="max",
     )
 
     inf = sp.add_parser("infusions", help="Infusion guide")
     inf.add_argument(
-        "weapon", nargs="?", help="Weapon name for specific recommendations"
+        "weapon",
+        nargs="?",
+        help="Weapon name for specific recommendations",
     )
     inf.add_argument(
         "--build",
@@ -564,7 +587,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     el = sp.add_parser("equip-load", help="Calculate equip load")
     el.add_argument(
-        "--vitality", type=int, default=15, help="Vitality stat level (default 15)"
+        "--vitality",
+        type=int,
+        default=15,
+        help="Vitality stat level (default 15)",
     )
     el.add_argument("--havels", action="store_true", help="Include Havel's Ring")
     el.add_argument("--favor", action="store_true", help="Include Ring of Favor")
@@ -580,15 +606,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     np = sp.add_parser("npcs", help="NPC questline guide")
     np.add_argument(
-        "name", nargs="?", help="NPC name or key (e.g. greirat, siegward, anri, sirris)"
+        "name",
+        nargs="?",
+        help="NPC name or key (e.g. greirat, siegward, anri, sirris)",
     )
     np.add_argument("--all", action="store_true", help="Show all NPC questlines")
     np.add_argument(
-        "--missable", action="store_true", help="Show only missable questlines"
+        "--missable",
+        action="store_true",
+        help="Show only missable questlines",
     )
 
     fm = sp.add_parser(
-        "farm", help="Farming guide for souls, materials, and covenant items"
+        "farm",
+        help="Farming guide for souls, materials, and covenant items",
     )
     fm.add_argument(
         "item",
@@ -612,7 +643,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Build type",
     )
     bd.add_argument(
-        "--level", type=int, default=120, help="Target soul level (default 120)"
+        "--level",
+        type=int,
+        default=120,
+        help="Target soul level (default 120)",
     )
 
     cp = sp.add_parser("compare", help="Compare two weapons")
@@ -634,15 +668,21 @@ def build_parser() -> argparse.ArgumentParser:
     ro = sp.add_parser("route", help="Route planning")
     ro.add_argument("--defeated", help="Comma-separated list of defeated boss IDs")
     ro.add_argument(
-        "--spoilers", action="store_true", help="Show full route with boss names"
+        "--spoilers",
+        action="store_true",
+        help="Show full route with boss names",
     )
 
     ach = sp.add_parser("achievements", help="Achievement guide")
     ach.add_argument(
-        "--missable", action="store_true", help="Show only missable achievements"
+        "--missable",
+        action="store_true",
+        help="Show only missable achievements",
     )
     ach.add_argument(
-        "--plat-route", action="store_true", help="Show optimal platinum route overview"
+        "--plat-route",
+        action="store_true",
+        help="Show optimal platinum route overview",
     )
 
     md = sp.add_parser("mods", help="Mod recommendations")
@@ -688,14 +728,19 @@ def build_parser() -> argparse.ArgumentParser:
     src_ex.add_argument("key", help="Source key to explain")
     src_rf = src_sub.add_parser("refresh", help="Refresh cached sources")
     src_rf.add_argument(
-        "keys", nargs="*", help="Source keys to refresh (all if omitted)"
+        "keys",
+        nargs="*",
+        help="Source keys to refresh (all if omitted)",
     )
     src_rf.add_argument(
-        "--force", action="store_true", help="Force refresh even if not stale"
+        "--force",
+        action="store_true",
+        help="Force refresh even if not stale",
     )
 
     guide = sp.add_parser(
-        "guide", help="Look up the spoiler-heavy generated platinum guide corpus"
+        "guide",
+        help="Look up the spoiler-heavy generated platinum guide corpus",
     )
     guide_sub = guide.add_subparsers(dest="guide_action")
     guide_sub.add_parser("info", help="Show guide corpus metadata")
@@ -709,14 +754,20 @@ def build_parser() -> argparse.ArgumentParser:
     guide_search.add_argument("--kind", help="Filter by exact chunk kind")
     guide_search.add_argument("--heading", help="Filter by heading path substring")
     guide_search.add_argument(
-        "--limit", type=int, default=8, help="Maximum rows to print"
+        "--limit",
+        type=int,
+        default=8,
+        help="Maximum rows to print",
     )
     guide_search.add_argument("--json", action="store_true", help="Print JSON array")
     ri = sp.add_parser(
-        "rings", help="Rings catalog: browse, search, or filter by build"
+        "rings",
+        help="Rings catalog: browse, search, or filter by build",
     )
     ri.add_argument(
-        "name", nargs="?", help="Ring name to search (case-insensitive substring match)"
+        "name",
+        nargs="?",
+        help="Ring name to search (case-insensitive substring match)",
     )
     ri.add_argument(
         "--build",
@@ -813,7 +864,7 @@ def cmd_guide(args) -> None:
         print(f"Updated: {manifest.get('updated', 'Unknown')}")
         print(f"Chunks: {len(chunks)}")
         print(
-            "Caveat: spoiler-heavy local lookup; verify against primary sources when citing."
+            "Caveat: spoiler-heavy local lookup; verify against primary sources when citing.",
         )
         return
 
@@ -870,7 +921,7 @@ def cmd_guide(args) -> None:
                         for chunk, snippet in matches
                     ],
                     ensure_ascii=False,
-                )
+                ),
             )
         else:
             _print_guide_matches(matches)
@@ -899,7 +950,7 @@ def cmd_fresh(args) -> None:
         "  ds3 softcaps  — stat breakpoints to plan your build\n"
         "  ds3 origins   — view starting classes and their stats\n"
         "  ds3 weapons   — weapon lookup and comparison\n"
-        "  ds3 estus     — flask shard and bone shard details"
+        "  ds3 estus     — flask shard and bone shard details",
     )
 
 
@@ -930,19 +981,19 @@ def cmd_origins(args) -> None:
     }
     target_class = build_to_class.get(filt, "")
     print(
-        f"{'Class':<14} {'LV':>3} {'VGR':>4} {'ATT':>4} {'END':>4} {'VIT':>4} {'STR':>4} {'DEX':>4} {'INT':>4} {'FTH':>4} {'LCK':>4}"
+        f"{'Class':<14} {'LV':>3} {'VGR':>4} {'ATT':>4} {'END':>4} {'VIT':>4} {'STR':>4} {'DEX':>4} {'INT':>4} {'FTH':>4} {'LCK':>4}",
     )
     print("-" * 64)
     for name, o in ORIGINS.items():
         if filt == "" or name == target_class or filt in name:
             print(
-                f"{name.title():<14} {o['level']:>3} {o['vig']:>4} {o['att']:>4} {o['end']:>4} {o['vit']:>4} {o['str']:>4} {o['dex']:>4} {o['int']:>4} {o['fth']:>4} {o['lck']:>4}"
+                f"{name.title():<14} {o['level']:>3} {o['vig']:>4} {o['att']:>4} {o['end']:>4} {o['vit']:>4} {o['str']:>4} {o['dex']:>4} {o['int']:>4} {o['fth']:>4} {o['lck']:>4}",
             )
     if filt:
         matching = [n for n in ORIGINS if n == target_class or filt in n]
         if not matching:
             print(
-                f"\nNo class matches '{args.filter}'. Available filters: quality, str, dex, int, fth, pyro, luck"
+                f"\nNo class matches '{args.filter}'. Available filters: quality, str, dex, int, fth, pyro, luck",
             )
 
 
@@ -957,7 +1008,7 @@ def cmd_upgrade(args) -> None:
     print(f"=== Upgrade path: {args.type} ===")
     if args.level > max_lvl:
         print(
-            f"  Warning: Max upgrade for {args.type} is +{max_lvl}. Showing cost to max."
+            f"  Warning: Max upgrade for {args.type} is +{max_lvl}. Showing cost to max.",
         )
     cumulative: dict[str, int] = {}
     for from_lvl, to_lvl, mats in path:
@@ -979,7 +1030,7 @@ def cmd_soul_cost(args) -> None:
         or args.target < 0
     ):
         print(
-            "Invalid: current level must be 1 or higher, target must be greater than current."
+            "Invalid: current level must be 1 or higher, target must be greater than current.",
         )
         return
     cost = max(0, soul_cost(args.current, args.target))
@@ -994,32 +1045,32 @@ def cmd_estus(args) -> None:
     print("=== Estus Flask ===")
     if sub == "shards":
         print(
-            f"  Estus Shards: {ESTUS_SHARDS_MAX} total. Each shard adds one flask use, up to 15 total flasks."
+            f"  Estus Shards: {ESTUS_SHARDS_MAX} total. Each shard adds one flask use, up to 15 total flasks.",
         )
         print(
-            "  Early checklist: Firelink rafters, High Wall anvil room, Undead Settlement burning tree, Road/woods ruins, Farron swamp fallen tower."
+            "  Early checklist: Firelink rafters, High Wall anvil room, Undead Settlement burning tree, Road/woods ruins, Farron swamp fallen tower.",
         )
         print(
-            "  Use save auto summary for current flask count; exact shard pickup flags are not save-backed."
+            "  Use save auto summary for current flask count; exact shard pickup flags are not save-backed.",
         )
         return
     if sub == "bones":
         print(
-            f"  Undead Bone Shards: {BONE_SHARDS_MAX} total. Burn at Firelink bonfire to improve healing, up to Estus +10."
+            f"  Undead Bone Shards: {BONE_SHARDS_MAX} total. Burn at Firelink bonfire to improve healing, up to Estus +10.",
         )
         print(
-            "  Early checklist: Undead Settlement white birch tree, Farron Keep slug tower, Cathedral graveyard route."
+            "  Early checklist: Undead Settlement white birch tree, Farron Keep slug tower, Cathedral graveyard route.",
         )
         print(
-            "  Use save auto missed for current-area checklist hints; exact bone pickup flags are not save-backed."
+            "  Use save auto missed for current-area checklist hints; exact bone pickup flags are not save-backed.",
         )
         return
     if sub == "allotment":
         print(
-            "  Allotment: talk to the blacksmith to split total flasks between HP Estus and FP/Ashen Estus."
+            "  Allotment: talk to the blacksmith to split total flasks between HP Estus and FP/Ashen Estus.",
         )
         print(
-            "  Pure melee usually wants mostly/all HP Estus; casters and weapon-art-heavy builds may reserve FP flasks."
+            "  Pure melee usually wants mostly/all HP Estus; casters and weapon-art-heavy builds may reserve FP flasks.",
         )
         return
     print("  Max uses: 15 (start with 3 HP + 1 FP = 4)")
@@ -1120,7 +1171,7 @@ def cmd_covenants(args) -> None:
                 print("See also: farm, achievements")
                 return
         print(
-            f"Covenant '{args.id}' not found. IDs: {', '.join(c['id'] for c in COVENANTS)}"
+            f"Covenant '{args.id}' not found. IDs: {', '.join(c['id'] for c in COVENANTS)}",
         )
         return
     title = (
@@ -1210,7 +1261,7 @@ def cmd_farm(args) -> None:
         for key, (name, guide) in farming.items():
             print(f"  {name} ({key}): {guide.split('.')[0]}.")
         print(
-            f"\n  Use 'ds3 farm <item>' for details. Items: {', '.join(sorted(farming.keys()))}"
+            f"\n  Use 'ds3 farm <item>' for details. Items: {', '.join(sorted(farming.keys()))}",
         )
         return
     item = args.item.lower()
@@ -1220,7 +1271,7 @@ def cmd_farm(args) -> None:
         print(f"  {guide}")
         if item == "proofs":
             print(
-                "  Best optional boost if DLC is available: Gold Serpent Ring +3. DLC gear is not required for platinum."
+                "  Best optional boost if DLC is available: Gold Serpent Ring +3. DLC gear is not required for platinum.",
             )
     else:
         print(f"Unknown item: {args.item}")
@@ -1232,11 +1283,11 @@ def cmd_build(args) -> None:
         print(
             "=== Build Archetype Examples ===\n\n"
             "  These are planning templates, not defaults; pick or adapt one to "
-            "match your weapon, spell, status, or utility plan.\n"
+            "match your weapon, spell, status, or utility plan.\n",
         )
         for name, b in BUILDS.items():
             print(
-                f"  {name.title()}: example start {b['class'].title()} -> {b['note']}"
+                f"  {name.title()}: example start {b['class'].title()} -> {b['note']}",
             )
         print("\n  Use `build <type>` for that template's stat targets.")
         print()
@@ -1250,7 +1301,7 @@ def cmd_build(args) -> None:
     print(f"  Starting class: {b['class'].title()}")
     print(f"  Core stats: VGR {b['vig']} / ATT {b.get('att', 10)} / END {b['end']}")
     print(
-        f"  Damage: STR {b.get('str', 10)} / DEX {b.get('dex', 10)} / INT {b.get('int', 10)} / FTH {b.get('fth', 10)}"
+        f"  Damage: STR {b.get('str', 10)} / DEX {b.get('dex', 10)} / INT {b.get('int', 10)} / FTH {b.get('fth', 10)}",
     )
     print(f"  Infusion: {b['infusion']}")
     print(f"  Weapons: {b['weapons']}")
@@ -1272,16 +1323,16 @@ def cmd_compare(args) -> None:
     ar_b = weapon_ar(b, stats)
     print(f"=== {wa.title()} vs {wb.title()} ===")
     print(
-        f"  Stats: STR {stats['str']} / DEX {stats['dex']} / INT {stats['int']} / FTH {stats['fth']}"
+        f"  Stats: STR {stats['str']} / DEX {stats['dex']} / INT {stats['int']} / FTH {stats['fth']}",
     )
     print(
-        f"  {wa.title()}: {a['base_damage']} base, {a['str_scale']}/{a['dex_scale']}, ~{ar_a} AR, {a['weight']} wt"
+        f"  {wa.title()}: {a['base_damage']} base, {a['str_scale']}/{a['dex_scale']}, ~{ar_a} AR, {a['weight']} wt",
     )
     print(
-        f"  {wb.title()}: {b['base_damage']} base, {b['str_scale']}/{b['dex_scale']}, ~{ar_b} AR, {b['weight']} wt"
+        f"  {wb.title()}: {b['base_damage']} base, {b['str_scale']}/{b['dex_scale']}, ~{ar_b} AR, {b['weight']} wt",
     )
     print(
-        f"  Winner: {wa.title() if ar_a >= ar_b else wb.title()} ({abs(ar_a - ar_b)} AR difference)"
+        f"  Winner: {wa.title() if ar_a >= ar_b else wb.title()} ({abs(ar_a - ar_b)} AR difference)",
     )
 
 
@@ -1312,7 +1363,7 @@ def cmd_mods(args) -> None:
         "  Camera Fix (#2028): disable auto camera rotation (requires ME2/ME3)\n"
         "  PS4 Controller Icons (#278): replace Xbox glyphs with PlayStation glyphs\n"
         "\n"
-        "  All mod data from Nexus Mods + GitHub. Use live research for latest versions."
+        "  All mod data from Nexus Mods + GitHub. Use live research for latest versions.",
     )
 
 
@@ -1338,7 +1389,7 @@ def cmd_audit(args) -> None:
     }
     if set(SOFTCAPS.keys()) != expected_stats:
         issues.append(
-            f"SOFTCAPS keys mismatch: {set(SOFTCAPS.keys()) ^ expected_stats}"
+            f"SOFTCAPS keys mismatch: {set(SOFTCAPS.keys()) ^ expected_stats}",
         )
     if len(INFUSIONS) != 15:
         issues.append(f"INFUSIONS: expected 15, got {len(INFUSIONS)}")
@@ -1361,7 +1412,7 @@ def cmd_audit(args) -> None:
         for item_name, item_id in data.items():
             if not isinstance(item_name, str) or not isinstance(item_id, str):
                 issues.append(
-                    f"{name}: thin catalog must map string names to string hex IDs"
+                    f"{name}: thin catalog must map string names to string hex IDs",
                 )
                 break
             if not _is_hex_byte_string(item_id):
@@ -1379,7 +1430,7 @@ def cmd_audit(args) -> None:
     print(
         f"  Spells: {sum(len(v) for v in SPELLS.values())} total "
         f"({len(SPELLS['sorceries'])} sorceries, {len(SPELLS['miracles'])} miracles, "
-        f"{len(SPELLS['pyromancies'])} pyromancies)"
+        f"{len(SPELLS['pyromancies'])} pyromancies)",
     )
     print(f"  Rings: {len(RINGS)} total")
 
@@ -1407,7 +1458,7 @@ def cmd_sources(args) -> None:
                     raise ValueError("missing numeric ts")
                 age_h = (time.time() - ts) / 3600
                 print(
-                    f"  {f.stem}: {age_h:.1f}h old ({'stale' if age_h > CACHE_TTL_HOURS else 'fresh'})"
+                    f"  {f.stem}: {age_h:.1f}h old ({'stale' if age_h > CACHE_TTL_HOURS else 'fresh'})",
                 )
             except (json.JSONDecodeError, OSError, ValueError) as exc:
                 print(f"  {f.stem}: invalid cache entry ({exc})")
@@ -1442,16 +1493,16 @@ def cmd_track(args) -> None:
         print(f"  Soul Level: {data.get('soul_level', '?')}")
         s = data.get("stats", {})
         print(
-            f"  Stats: VGR {s.get('vig', '?')} / ATT {s.get('att', '?')} / END {s.get('end', '?')}"
+            f"  Stats: VGR {s.get('vig', '?')} / ATT {s.get('att', '?')} / END {s.get('end', '?')}",
         )
         print(
-            f"         VIT {s.get('vit', '?')} / STR {s.get('str', '?')} / DEX {s.get('dex', '?')}"
+            f"         VIT {s.get('vit', '?')} / STR {s.get('str', '?')} / DEX {s.get('dex', '?')}",
         )
         print(
-            f"         INT {s.get('int', '?')} / FTH {s.get('fth', '?')} / LCK {s.get('lck', '?')}"
+            f"         INT {s.get('int', '?')} / FTH {s.get('fth', '?')} / LCK {s.get('lck', '?')}",
         )
         print(
-            f"  Estus: {data.get('estus_shards', 0)}/11 shards, {data.get('bone_shards', 0)}/10 bones"
+            f"  Estus: {data.get('estus_shards', 0)}/11 shards, {data.get('bone_shards', 0)}/10 bones",
         )
         print(f"  Defeated: {len(data.get('defeated_bosses', []))} bosses")
     elif section == "stats":
@@ -1467,7 +1518,7 @@ def cmd_track(args) -> None:
     elif section == "next":
         defeated = set(data.get("defeated_bosses", []))
         print(
-            "Route suggestions based on tracking file... (needs boss ID cross-reference)"
+            "Route suggestions based on tracking file... (needs boss ID cross-reference)",
         )
 
 
@@ -1482,7 +1533,7 @@ def cmd_recommend(args) -> None:
     print(f"=== Recommendations (SL{sl}) ===")
     if stats.get("vig", 0) < 27:
         print(
-            f"  Priority: Level VGR to 27 (currently {stats.get('vig', 0)}). That's the first softcap."
+            f"  Priority: Level VGR to 27 (currently {stats.get('vig', 0)}). That's the first softcap.",
         )
     if stats.get("end", 0) < 20 and sl > 30:
         print(f"  Consider leveling END to 20+ (currently {stats.get('end', 0)}).")
@@ -1593,7 +1644,10 @@ def _owned_name_set(save_path: str) -> set[str]:
 
 
 def _print_owned_items(
-    save_path: str, *, show_all: bool = False, find: str | None = None
+    save_path: str,
+    *,
+    show_all: bool = False,
+    find: str | None = None,
 ) -> None:
     names = owned_item_names(save_path)
     print("=== Owned Items ===")
@@ -1634,7 +1688,11 @@ def _completion_checklist() -> dict[str, list[str]]:
 
 
 def _print_name_sample(
-    items: list[dict], limit: int = 12, *, show_all: bool = False, find: str | None = None
+    items: list[dict],
+    limit: int = 12,
+    *,
+    show_all: bool = False,
+    find: str | None = None,
 ) -> None:
     names = sorted(str(item.get("name", "Unknown")) for item in items)
     if find:
@@ -1647,7 +1705,10 @@ def _print_name_sample(
 
 
 def _print_inventory(
-    save_path: str, *, show_all: bool = False, find: str | None = None
+    save_path: str,
+    *,
+    show_all: bool = False,
+    find: str | None = None,
 ) -> None:
     inv = read_inventory(save_path)
     print(f"=== Inventory: {inv['total_items']} resolved items ===")
@@ -1678,7 +1739,10 @@ def _tracked_bonfire_names() -> list[str]:
 
 
 def _print_unsupported_event_flags(
-    kind: str, names: list[str], *, spoilers: bool = False
+    kind: str,
+    names: list[str],
+    *,
+    spoilers: bool = False,
 ) -> None:
     print(f"  {kind}: save-backed event flag region unsupported")
     if names and spoilers:
@@ -1687,16 +1751,16 @@ def _print_unsupported_event_flags(
             print(f"    - {name}")
     elif names:
         print(
-            f"  {len(names)} tracked names hidden. Use --spoilers to show unknown/future names."
+            f"  {len(names)} tracked names hidden. Use --spoilers to show unknown/future names.",
         )
 
 
 def _print_save_flag_caveat() -> None:
     print(
-        "  Note: read-only save parse; boss/bonfire status uses known event flags only."
+        "  Note: read-only save parse; boss/bonfire status uses known event flags only.",
     )
     print(
-        "  Remaining/locked means not observed in tracked flags, not a miss/lockout proof."
+        "  Remaining/locked means not observed in tracked flags, not a miss/lockout proof.",
     )
 
 
@@ -1714,10 +1778,10 @@ def _print_save_overview(save_path: str, stats: dict, *, include_stats: bool) ->
     journey = read_ng_plus(save_path)
     journey_label = "NG" if journey == 0 else f"NG+{journey}"
     print(
-        f"  Class: {CLASS_NAMES.get(stats['class_'], 'Unknown')}  |  SL: {stats['soulLevel']}  |  Journey: {journey_label}  |  Souls: {stats['souls']:,}"
+        f"  Class: {CLASS_NAMES.get(stats['class_'], 'Unknown')}  |  SL: {stats['soulLevel']}  |  Journey: {journey_label}  |  Souls: {stats['souls']:,}",
     )
     print(
-        f"  Estus: {stats['estusAllocation']} HP / {stats['ashenEstusAllocation']} FP  |  Max weapon: {_max_weapon_label(stats)}"
+        f"  Estus: {stats['estusAllocation']} HP / {stats['ashenEstusAllocation']} FP  |  Max weapon: {_max_weapon_label(stats)}",
     )
     if boss_flags_supported:
         bosses = read_bosses(save_path)
@@ -1748,13 +1812,13 @@ def _print_save_overview(save_path: str, stats: dict, *, include_stats: bool) ->
     if include_stats:
         print(
             "  Stats: "
-            + "  ".join(f"{label} {stats[key]}" for label, key in stat_names)
+            + "  ".join(f"{label} {stats[key]}" for label, key in stat_names),
         )
         print(
-            f"  HP: {stats['health']}/{stats['maxHealth']}  |  FP: {stats['mana']}/{stats['maxMana']}  |  Stamina: {stats['stamina']}/{stats['maxStamina']}"
+            f"  HP: {stats['health']}/{stats['maxHealth']}  |  FP: {stats['mana']}/{stats['maxMana']}  |  Stamina: {stats['stamina']}/{stats['maxStamina']}",
         )
         print(
-            f"  Hollowing: {stats['hollow']}  |  Base item discovery: {100 + stats['luck']}"
+            f"  Hollowing: {stats['hollow']}  |  Base item discovery: {100 + stats['luck']}",
         )
     else:
         first = stat_names[:5]
@@ -1811,7 +1875,7 @@ def _print_missed_result(missed: dict[str, object]) -> None:
         print(f"  Estus shards: {estus_found}/{estus_total} found (save-backed)")
     elif isinstance(estus_total, int) and estus_total > 0:
         print(
-            f"  Estus shards: {estus_total} checklist entries (save-backed count unsupported)"
+            f"  Estus shards: {estus_total} checklist entries (save-backed count unsupported)",
         )
     else:
         print("  Estus shards: save-backed count unsupported")
@@ -1825,7 +1889,7 @@ def _print_missed_result(missed: dict[str, object]) -> None:
         print(f"  Undead bone shards: {bones_found}/{bones_total} found (save-backed)")
     elif isinstance(bones_total, int) and bones_total > 0:
         print(
-            f"  Undead bone shards: {bones_total} checklist entries (save-backed count unsupported)"
+            f"  Undead bone shards: {bones_total} checklist entries (save-backed count unsupported)",
         )
     else:
         print("  Undead bone shards: save-backed count unsupported")
@@ -1839,7 +1903,7 @@ def _print_save_achievements(save_path: str) -> None:
     print(
         "=== Completion Checklist ==="
         if not has_status
-        else "\n=== Completion Checklist ==="
+        else "\n=== Completion Checklist ===",
     )
     if _boss_flags_supported():
         bosses = read_bosses(save_path)
@@ -1848,7 +1912,7 @@ def _print_save_achievements(save_path: str) -> None:
         print(
             "    " + ", ".join(boss["name"] for boss in defeated[:8])
             if defeated
-            else "    None recorded yet"
+            else "    None recorded yet",
         )
     else:
         print("  Bosses: unsupported (event flag region not verified)")
@@ -1860,7 +1924,7 @@ def _print_save_achievements(save_path: str) -> None:
         print(
             "    " + ", ".join(sorted(unlocked)[:8])
             if unlocked
-            else "    None recorded yet"
+            else "    None recorded yet",
         )
     else:
         print("  Bonfires: unsupported (event flag region not verified)")
@@ -1893,7 +1957,7 @@ def _print_save_checklist(save_path: str, stats: dict) -> None:
     print(f"=== Current Area: {area_name or 'Unknown'} ===")
     if not area_data:
         print(
-            "  Area checklist: unavailable; current area is unknown because bonfire event flags are unsupported."
+            "  Area checklist: unavailable; current area is unknown because bonfire event flags are unsupported.",
         )
         return
 
@@ -1913,7 +1977,7 @@ def _print_save_checklist(save_path: str, stats: dict) -> None:
     print(f"  Estus shards: {len(area_data.get('estus_shards', []))}")
     print(f"  Undead bone shards: {len(area_data.get('bone_shards', []))}")
     print(
-        f"  Current flask split: {stats['estusAllocation']} HP / {stats['ashenEstusAllocation']} FP"
+        f"  Current flask split: {stats['estusAllocation']} HP / {stats['ashenEstusAllocation']} FP",
     )
 
 
@@ -1940,7 +2004,9 @@ def cmd_save(args) -> None:
         print("=== BOSSES ===")
         if not _boss_flags_supported():
             _print_unsupported_event_flags(
-                "Bosses", _tracked_boss_names(), spoilers=args.spoilers
+                "Bosses",
+                _tracked_boss_names(),
+                spoilers=args.spoilers,
             )
             return
         bosses = read_bosses(save_path)
@@ -1966,7 +2032,9 @@ def cmd_save(args) -> None:
         print("=== TRACKED BONFIRES ===")
         if not _bonfire_flags_supported():
             _print_unsupported_event_flags(
-                "Tracked bonfires", _tracked_bonfire_names(), spoilers=args.spoilers
+                "Tracked bonfires",
+                _tracked_bonfire_names(),
+                spoilers=args.spoilers,
             )
             return
         bonfires = read_bonfires(save_path)

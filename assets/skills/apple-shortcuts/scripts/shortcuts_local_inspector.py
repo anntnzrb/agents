@@ -72,7 +72,12 @@ def clean_text(text: str) -> str:
 
 
 def redact_text(text: str) -> str:
-    redacted = re.sub(r"(Bearer\s+)([^\s\"']+)", r"\1<REDACTED>", text, flags=re.IGNORECASE)
+    redacted = re.sub(
+        r"(Bearer\s+)([^\s\"']+)",
+        r"\1<REDACTED>",
+        text,
+        flags=re.IGNORECASE,
+    )
     redacted = re.sub(r"\b(cpk_[A-Za-z0-9._-]{12,})\b", "<REDACTED>", redacted)
     redacted = re.sub(r"\b(sk-[A-Za-z0-9._-]{12,})\b", "<REDACTED>", redacted)
     redacted = re.sub(r"\b(sk-proj-[A-Za-z0-9._-]{12,})\b", "<REDACTED>", redacted)
@@ -206,7 +211,11 @@ def summarize_action(action: JsonObject) -> str:
         if origin or destination:
             return f"{identifier} | from={origin} to={destination}"
     if identifier == "is.workflow.actions.lowpowermode.set":
-        return f"{identifier} | state=off" if params.get("OnValue") == 0 else f"{identifier} | state=on"
+        return (
+            f"{identifier} | state=off"
+            if params.get("OnValue") == 0
+            else f"{identifier} | state=on"
+        )
     if identifier == "is.workflow.actions.setbrightness":
         level = params.get("WFBrightness")
         if isinstance(level, (int, float)):
@@ -261,10 +270,15 @@ def load_rows(db_path: Path) -> list[ShortcutRow]:
                 name=_text(_row_value(row, "ZNAME")),
                 workflow_id=_text(_row_value(row, "ZWORKFLOWID")),
                 action_count=_integer(_row_value(row, "ACTION_COUNT")),
-                associated_bundle=_text(_row_value(row, "ZASSOCIATEDAPPBUNDLEIDENTIFIER")) or None,
-                hidden_from_library=bool(_integer(_row_value(row, "HIDDEN_FROM_LIBRARY"))),
+                associated_bundle=_text(
+                    _row_value(row, "ZASSOCIATEDAPPBUNDLEIDENTIFIER"),
+                )
+                or None,
+                hidden_from_library=bool(
+                    _integer(_row_value(row, "HIDDEN_FROM_LIBRARY")),
+                ),
                 action_blob=_bytes_or_none(_row_value(row, "ZDATA")),
-            )
+            ),
         )
     return out
 
@@ -283,7 +297,11 @@ def _decode_smart_prompt(blob: bytes) -> dict[str, str]:
     if not _is_object_dict(decoded):
         return {}
     content_destination = decoded.get("ContentDestination", {})
-    app_descriptor = content_destination.get("appDescriptor") if _is_object_dict(content_destination) else None
+    app_descriptor = (
+        content_destination.get("appDescriptor")
+        if _is_object_dict(content_destination)
+        else None
+    )
     source_attr = decoded.get("SourceContentAttribution", {})
     origin = source_attr.get("origin") if _is_object_dict(source_attr) else None
     destination_bundle = ""
@@ -334,7 +352,7 @@ def load_smart_prompts(db_path: Path) -> dict[int, list[SmartPromptPermission]]:
                 destination_bundle=decoded.get("destination_bundle", ""),
                 destination_name=decoded.get("destination_name", ""),
                 source_origin=decoded.get("source_origin", ""),
-            )
+            ),
         )
     return grouped
 
@@ -354,13 +372,13 @@ def load_run_stats(db_path: Path) -> dict[int, dict[str, object]]:
     conn = _db_connect(db_path)
     try:
         outcome_rows = conn.execute(
-            "SELECT ZSHORTCUT, ZOUTCOME, COUNT(*) AS C FROM ZSHORTCUTRUNEVENT GROUP BY ZSHORTCUT, ZOUTCOME"
+            "SELECT ZSHORTCUT, ZOUTCOME, COUNT(*) AS C FROM ZSHORTCUTRUNEVENT GROUP BY ZSHORTCUT, ZOUTCOME",
         ).fetchall()
         source_rows = conn.execute(
-            "SELECT ZSHORTCUT, COALESCE(ZSOURCE, '') AS SRC, COUNT(*) AS C FROM ZSHORTCUTRUNEVENT GROUP BY ZSHORTCUT, SRC"
+            "SELECT ZSHORTCUT, COALESCE(ZSOURCE, '') AS SRC, COUNT(*) AS C FROM ZSHORTCUTRUNEVENT GROUP BY ZSHORTCUT, SRC",
         ).fetchall()
         last_rows = conn.execute(
-            "SELECT ZSHORTCUT, MAX(ZDATE) AS LAST_DATE FROM ZSHORTCUTRUNEVENT GROUP BY ZSHORTCUT"
+            "SELECT ZSHORTCUT, MAX(ZDATE) AS LAST_DATE FROM ZSHORTCUTRUNEVENT GROUP BY ZSHORTCUT",
         ).fetchall()
     finally:
         conn.close()
@@ -393,12 +411,19 @@ def load_run_stats(db_path: Path) -> dict[int, dict[str, object]]:
             shortcut_pk,
             {"total_runs": 0, "outcomes": {}, "sources": {}, "last_run_local": ""},
         )
-        entry["last_run_local"] = _apple_timestamp_to_local_str(_row_value(row, "LAST_DATE"))
+        entry["last_run_local"] = _apple_timestamp_to_local_str(
+            _row_value(row, "LAST_DATE"),
+        )
     return stats
 
 
 def _run_shortcuts_cli(args: list[str]) -> str:
-    proc = subprocess.run(["shortcuts", *args], check=True, capture_output=True, text=True)
+    proc = subprocess.run(
+        ["shortcuts", *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     return proc.stdout
 
 
@@ -421,7 +446,9 @@ def load_folder_map() -> dict[str, str]:
     folders = [line.strip() for line in folder_output.splitlines() if line.strip()]
     for folder in folders:
         try:
-            out = _run_shortcuts_cli(["list", "--folder-name", folder, "--show-identifiers"])
+            out = _run_shortcuts_cli(
+                ["list", "--folder-name", folder, "--show-identifiers"],
+            )
         except subprocess.CalledProcessError:
             continue
         for line in out.splitlines():
@@ -429,7 +456,9 @@ def load_folder_map() -> dict[str, str]:
             if parsed:
                 mapping[parsed[1]] = folder
     try:
-        out_none = _run_shortcuts_cli(["list", "--folder-name", "none", "--show-identifiers"])
+        out_none = _run_shortcuts_cli(
+            ["list", "--folder-name", "none", "--show-identifiers"],
+        )
     except subprocess.CalledProcessError:
         out_none = ""
     for line in out_none.splitlines():
@@ -439,7 +468,12 @@ def load_folder_map() -> dict[str, str]:
     return mapping
 
 
-def matches(row: ShortcutRow, exact: set[str], contains: str | None, visible_only: bool) -> bool:
+def matches(
+    row: ShortcutRow,
+    exact: set[str],
+    contains: str | None,
+    visible_only: bool,
+) -> bool:
     if visible_only and row.hidden_from_library:
         return False
     if exact and row.name not in exact:

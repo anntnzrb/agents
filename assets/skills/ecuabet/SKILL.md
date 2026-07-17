@@ -101,9 +101,8 @@ uv run --script <skill-dir>/scripts/cli.py feed understat --league La_Liga --sea
 
 ### Quality gate
 
-```bash
-cd <skill-dir>/scripts
-uv run --with pytest pytest tests -q
+```text
+uv run --with pytest pytest <skill-dir>/scripts/tests -q
 ```
 
 ## Output Focus
@@ -119,13 +118,15 @@ Primary fields to report from `uv run --script <skill-dir>/scripts/cli.py run` o
 - `decisionSummary.ecuabetMarkets`
 - `feedErrors`
 
-## Reference Loading Rules
+## Required follow-up reads
 
-- Start with `references/recipes.md` for exact runnable commands.
-- Load `references/shortcuts.md` when user uses compact prompts like `<id> minmax`.
-- Load `references/workflows.md` when the user asks for pre-match, in-play, or watch-loop strategy.
-- Load `references/output-contract.md` when you need strict output-field interpretation.
-- Load `references/troubleshooting.md` when any feed fails or data conflicts.
+| Need | Read | When |
+| --- | --- | --- |
+| Exact runnable commands | `references/recipes.md` | Selecting flags or feed commands |
+| Compact prompt semantics | `references/shortcuts.md` | User supplies prompts like `<id> minmax` |
+| Scenario strategy | `references/workflows.md` | Pre-match, in-play, conflict, or watch-loop work |
+| Output-field interpretation | `references/output-contract.md` | Extracting or explaining result fields |
+| Failure recovery | `references/troubleshooting.md` | Any feed fails or data conflicts |
 
 ## Resource Policy
 

@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
 # dependencies = []
@@ -120,7 +119,9 @@ EXISTENCE_CONDITION_CODES = {
 }
 
 # All codes the validator recognizes. Anything outside this set is rejected.
-ALL_CONDITION_CODES = STRING_CONDITION_CODES | NUMBER_CONDITION_CODES | EXISTENCE_CONDITION_CODES
+ALL_CONDITION_CODES = (
+    STRING_CONDITION_CODES | NUMBER_CONDITION_CODES | EXISTENCE_CONDITION_CODES
+)
 
 LIST_PRODUCING_ACTIONS = {
     "is.workflow.actions.list",
@@ -552,7 +553,9 @@ def _load_healthkit_reference_sets() -> dict[str, set[str]]:
         "workouts": set(),
         "units": set(),
     }
-    ref_path = Path(__file__).resolve().parents[1] / "data/healthkit-ios26.2-reference.json"
+    ref_path = (
+        Path(__file__).resolve().parents[1] / "data/healthkit-ios26.2-reference.json"
+    )
     if not ref_path.exists():
         return out
     try:
@@ -573,7 +576,9 @@ def _load_healthkit_reference_sets() -> dict[str, set[str]]:
                     labels.add(value)
             observed = row.get("observed_shortcuts_labels")
             if isinstance(observed, list):
-                labels.update(item for item in observed if isinstance(item, str) and item)
+                labels.update(
+                    item for item in observed if isinstance(item, str) and item
+                )
         return labels
 
     def find_sample_labels_from_rows(rows) -> set[str]:
@@ -585,7 +590,9 @@ def _load_healthkit_reference_sets() -> dict[str, set[str]]:
                 continue
             observed_find = row.get("observed_find_samples_labels")
             if isinstance(observed_find, list) and observed_find:
-                labels.update(item for item in observed_find if isinstance(item, str) and item)
+                labels.update(
+                    item for item in observed_find if isinstance(item, str) and item
+                )
                 continue
             for key in ("shortcut_label_guess", "sdk_suffix"):
                 value = row.get(key)
@@ -593,13 +600,19 @@ def _load_healthkit_reference_sets() -> dict[str, set[str]]:
                     labels.add(value)
             observed = row.get("observed_shortcuts_labels")
             if isinstance(observed, list):
-                labels.update(item for item in observed if isinstance(item, str) and item)
+                labels.update(
+                    item for item in observed if isinstance(item, str) and item
+                )
         return labels
 
     quantity_labels = labels_from_rows(payload.get("quantity_types"))
     category_labels = labels_from_rows(payload.get("category_types"))
-    out["find_sample_types"].update(find_sample_labels_from_rows(payload.get("quantity_types")))
-    out["find_sample_types"].update(find_sample_labels_from_rows(payload.get("category_types")))
+    out["find_sample_types"].update(
+        find_sample_labels_from_rows(payload.get("quantity_types")),
+    )
+    out["find_sample_types"].update(
+        find_sample_labels_from_rows(payload.get("category_types")),
+    )
     out["quantity_types"].update(quantity_labels)
     out["sample_types"].update(quantity_labels | category_labels)
     out["workouts"].update(labels_from_rows(payload.get("workout_activity_types")))
@@ -658,36 +671,36 @@ ACTION_ALIAS_HINTS: dict[str, str] = {
 }
 
 UNIT_KEYWORD_PATTERNS: list[re.Pattern] = [
-    re.compile(r"\bmiles?\b", re.I),
-    re.compile(r"\bkilometers?\b", re.I),
-    re.compile(r"\bkilometres?\b", re.I),
-    re.compile(r"\bkm\b", re.I),
-    re.compile(r"\bmeters?\b", re.I),
-    re.compile(r"\bmetres?\b", re.I),
-    re.compile(r"\bcm\b", re.I),
-    re.compile(r"\bmm\b", re.I),
-    re.compile(r"\bfeet\b", re.I),
-    re.compile(r"\bfoot\b", re.I),
-    re.compile(r"\bft\b", re.I),
-    re.compile(r"\byards?\b", re.I),
-    re.compile(r"\binches?\b", re.I),
-    re.compile(r"\bpounds?\b", re.I),
-    re.compile(r"\blbs?\b", re.I),
-    re.compile(r"\blb\b", re.I),
-    re.compile(r"\bkilograms?\b", re.I),
-    re.compile(r"\bkg\b", re.I),
-    re.compile(r"\boz\b", re.I),
-    re.compile(r"\bounces?\b", re.I),
-    re.compile(r"\bgallons?\b", re.I),
-    re.compile(r"\bliters?\b", re.I),
-    re.compile(r"\blitres?\b", re.I),
-    re.compile(r"\bmilliliters?\b", re.I),
-    re.compile(r"\bmillilitres?\b", re.I),
-    re.compile(r"\bml\b", re.I),
-    re.compile(r"°f", re.I),
-    re.compile(r"°c", re.I),
-    re.compile(r"\bfahrenheit\b", re.I),
-    re.compile(r"\bcelsius\b", re.I),
+    re.compile(r"\bmiles?\b", re.IGNORECASE),
+    re.compile(r"\bkilometers?\b", re.IGNORECASE),
+    re.compile(r"\bkilometres?\b", re.IGNORECASE),
+    re.compile(r"\bkm\b", re.IGNORECASE),
+    re.compile(r"\bmeters?\b", re.IGNORECASE),
+    re.compile(r"\bmetres?\b", re.IGNORECASE),
+    re.compile(r"\bcm\b", re.IGNORECASE),
+    re.compile(r"\bmm\b", re.IGNORECASE),
+    re.compile(r"\bfeet\b", re.IGNORECASE),
+    re.compile(r"\bfoot\b", re.IGNORECASE),
+    re.compile(r"\bft\b", re.IGNORECASE),
+    re.compile(r"\byards?\b", re.IGNORECASE),
+    re.compile(r"\binches?\b", re.IGNORECASE),
+    re.compile(r"\bpounds?\b", re.IGNORECASE),
+    re.compile(r"\blbs?\b", re.IGNORECASE),
+    re.compile(r"\blb\b", re.IGNORECASE),
+    re.compile(r"\bkilograms?\b", re.IGNORECASE),
+    re.compile(r"\bkg\b", re.IGNORECASE),
+    re.compile(r"\boz\b", re.IGNORECASE),
+    re.compile(r"\bounces?\b", re.IGNORECASE),
+    re.compile(r"\bgallons?\b", re.IGNORECASE),
+    re.compile(r"\bliters?\b", re.IGNORECASE),
+    re.compile(r"\blitres?\b", re.IGNORECASE),
+    re.compile(r"\bmilliliters?\b", re.IGNORECASE),
+    re.compile(r"\bmillilitres?\b", re.IGNORECASE),
+    re.compile(r"\bml\b", re.IGNORECASE),
+    re.compile(r"°f", re.IGNORECASE),
+    re.compile(r"°c", re.IGNORECASE),
+    re.compile(r"\bfahrenheit\b", re.IGNORECASE),
+    re.compile(r"\bcelsius\b", re.IGNORECASE),
 ]
 
 UNIT_KEYWORD_IGNORED_KEYS = {
@@ -717,7 +730,10 @@ def _coerce_control_flow_mode(params: dict) -> int | None:
 def _collect_variable_append_counts(actions: list[dict]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for act in actions:
-        if act.get("WFWorkflowActionIdentifier") != "is.workflow.actions.appendvariable":
+        if (
+            act.get("WFWorkflowActionIdentifier")
+            != "is.workflow.actions.appendvariable"
+        ):
             continue
         params = act.get("WFWorkflowActionParameters") or {}
         name = params.get("WFVariableName")
@@ -739,7 +755,6 @@ def parse_actions_md(text: str) -> set[str]:
     backticked cells do not pollute the allowlist — a prior version wrongly
     injected entries like `is.workflow.actions.UUID` / `is.workflow.actions.Album`.
     """
-
     actions: set[str] = set()
     in_identifier_table = False
 
@@ -807,7 +822,6 @@ def parse_third_party_md(text: str) -> set[str]:
 
 def detect_host_macos_major() -> int | None:
     """Return the running macOS major version, or None outside macOS."""
-
     try:
         proc = subprocess.run(
             ["sw_vers", "-productVersion"],
@@ -836,7 +850,6 @@ def resolve_target_macos_major(raw: str | None = None) -> int | None:
     packaged snapshot. "auto" uses the host macOS version and falls back to the
     conservative macOS 26 target when the host version cannot be detected.
     """
-
     value = raw
     if value is None:
         for env_name in TARGET_MACOS_ENV_VARS:
@@ -868,7 +881,6 @@ def resolve_target_platform(raw: str | None = None) -> str | None:
     The default is macOS because this plugin signs on macOS and most generated
     shortcuts are Mac-imported unless the user explicitly targets iOS/iPadOS.
     """
-
     value = raw
     if value is None:
         for env_name in TARGET_PLATFORM_ENV_VARS:
@@ -915,7 +927,10 @@ def _target_platform_label(target_platform: str | None) -> str:
     return "all platforms"
 
 
-def _snapshot_matches_target_platform(platform_label: str, target_platform: str | None) -> bool:
+def _snapshot_matches_target_platform(
+    platform_label: str,
+    target_platform: str | None,
+) -> bool:
     if target_platform is None:
         return True
     if platform_label == "iOS":
@@ -923,9 +938,10 @@ def _snapshot_matches_target_platform(platform_label: str, target_platform: str 
     return target_platform == "macos"
 
 
-def _load_packaged_toolkit_snapshots(skill_dir: Path) -> list[tuple[str, int, str, set[str]]]:
+def _load_packaged_toolkit_snapshots(
+    skill_dir: Path,
+) -> list[tuple[str, int, str, set[str]]]:
     """Load bundled ToolKit snapshots as (version, minimum OS, platform, ids)."""
-
     data_dir = skill_dir / "data"
     candidates = sorted(data_dir.glob("toolkit-v*-tool-ids.json"))
     snapshots: list[tuple[str, int, str, set[str]]] = []
@@ -948,7 +964,9 @@ def _load_packaged_toolkit_snapshots(skill_dir: Path) -> list[tuple[str, int, st
                 if isinstance(item, str) and item:
                     ids_for_snapshot.add(item)
         exceptions = (
-            payload.get("control_flow_exceptions_missing_from_tools_table") if isinstance(payload, dict) else None
+            payload.get("control_flow_exceptions_missing_from_tools_table")
+            if isinstance(payload, dict)
+            else None
         )
         if isinstance(exceptions, list):
             for item in exceptions:
@@ -960,7 +978,7 @@ def _load_packaged_toolkit_snapshots(skill_dir: Path) -> list[tuple[str, int, st
                 _toolkit_snapshot_min_macos_major(payload, path),
                 _toolkit_snapshot_platform_label(payload, version),
                 ids_for_snapshot,
-            )
+            ),
         )
     return snapshots
 
@@ -976,9 +994,10 @@ def load_packaged_toolkit_ids(
     metadata. The validator intentionally reads packaged JSON only; it should
     not depend on the user's live Shortcuts database during normal validation.
     """
-
     allowed: set[str] = set()
-    for _, min_macos_major, platform_label, ids in _load_packaged_toolkit_snapshots(skill_dir):
+    for _, min_macos_major, platform_label, ids in _load_packaged_toolkit_snapshots(
+        skill_dir,
+    ):
         if target_macos_major is not None and min_macos_major > target_macos_major:
             continue
         if not _snapshot_matches_target_platform(platform_label, target_platform):
@@ -995,7 +1014,6 @@ def load_future_toolkit_id_reasons(
     target_platform: str | None = "macos",
 ) -> dict[str, str]:
     """Return IDs excluded by target OS/platform, with a human-readable reason."""
-
     if target_macos_major is None and target_platform is None:
         return {}
     snapshots = _load_packaged_toolkit_snapshots(skill_dir)
@@ -1019,18 +1037,22 @@ def load_future_toolkit_id_reasons(
     return future
 
 
-def load_future_parameter_key_reasons(target_macos_major: int | None) -> dict[str, dict[str, str]]:
+def load_future_parameter_key_reasons(
+    target_macos_major: int | None,
+) -> dict[str, dict[str, str]]:
     """Return OS 27-only parameter keys excluded by the target macOS."""
-
     if target_macos_major is None or target_macos_major >= 27:
         return {}
     return {
-        identifier: {key: OS27_PARAMETER_REASON for key in keys}
+        identifier: dict.fromkeys(keys, OS27_PARAMETER_REASON)
         for identifier, keys in OS27_PARAMETER_KEYS_BY_ACTION.items()
     }
 
 
-def _catalog_platforms_match_target(platforms: list[str], target_platform: str | None) -> bool:
+def _catalog_platforms_match_target(
+    platforms: list[str],
+    target_platform: str | None,
+) -> bool:
     if target_platform is None:
         return True
     for platform_name in platforms:
@@ -1039,7 +1061,10 @@ def _catalog_platforms_match_target(platforms: list[str], target_platform: str |
     return False
 
 
-def _catalog_platform_name_matches_target(platform_name: str, target_platform: str | None) -> bool:
+def _catalog_platform_name_matches_target(
+    platform_name: str,
+    target_platform: str | None,
+) -> bool:
     if target_platform is None:
         return True
     if target_platform == "ios" and platform_name.startswith("iOS"):
@@ -1074,8 +1099,10 @@ def load_toolkit_parameter_schemas(
     complete enough for every legacy WF action because those can include UI
     state keys that are valid in plists but absent from ToolKit metadata.
     """
-
-    if target_macos_major is not None and target_macos_major < TOOLKIT_PARAMETER_CATALOG_MIN_MACOS_MAJOR:
+    if (
+        target_macos_major is not None
+        and target_macos_major < TOOLKIT_PARAMETER_CATALOG_MIN_MACOS_MAJOR
+    ):
         return {}
     path = skill_dir / "data/toolkit-v78-first-party-parameter-keys.json"
     if not path.exists():
@@ -1111,13 +1138,18 @@ def _parameter_type_python_names(
         if isinstance(by_platform, dict):
             names_by_target: list[str] = []
             for platform_name, type_names in by_platform.items():
-                if not isinstance(platform_name, str) or not _catalog_platform_name_matches_target(
+                if not isinstance(
+                    platform_name,
+                    str,
+                ) or not _catalog_platform_name_matches_target(
                     platform_name,
                     target_platform,
                 ):
                     continue
                 if isinstance(type_names, list):
-                    names_by_target.extend(name for name in type_names if isinstance(name, str) and name)
+                    names_by_target.extend(
+                        name for name in type_names if isinstance(name, str) and name
+                    )
             if names_by_target:
                 return sorted(set(names_by_target))
     names: list[str] = []
@@ -1145,8 +1177,10 @@ def load_toolkit_parameter_enum_cases(
     only run when a known enum key is present; unlike AppIntent schemas, they do
     not reject extra top-level keys on classic WF actions.
     """
-
-    if target_macos_major is not None and target_macos_major < TOOLKIT_PARAMETER_CATALOG_MIN_MACOS_MAJOR:
+    if (
+        target_macos_major is not None
+        and target_macos_major < TOOLKIT_PARAMETER_CATALOG_MIN_MACOS_MAJOR
+    ):
         return {}
     parameter_path = skill_dir / "data/toolkit-v78-first-party-parameter-keys.json"
     enum_path = skill_dir / "data/toolkit-v78-first-party-enum-cases.json"
@@ -1161,7 +1195,8 @@ def load_toolkit_parameter_enum_cases(
     schemas: dict[str, dict[str, set[str]]] = {}
     for identifier, entry in (parameter_payload.get("tools") or {}).items():
         if not isinstance(identifier, str) or not (
-            identifier.startswith("com.apple.") or identifier.startswith("is.workflow.actions.")
+            identifier.startswith("com.apple.")
+            or identifier.startswith("is.workflow.actions.")
         ):
             continue
         if not isinstance(entry, dict):
@@ -1202,8 +1237,10 @@ def load_toolkit_parameter_boolean_keys(
     target_platform: str | None = "macos",
 ) -> dict[str, set[str]]:
     """Load target-gated boolean parameter keys for first-party actions."""
-
-    if target_macos_major is not None and target_macos_major < TOOLKIT_PARAMETER_CATALOG_MIN_MACOS_MAJOR:
+    if (
+        target_macos_major is not None
+        and target_macos_major < TOOLKIT_PARAMETER_CATALOG_MIN_MACOS_MAJOR
+    ):
         return {}
     path = skill_dir / "data/toolkit-v78-first-party-parameter-keys.json"
     if not path.exists():
@@ -1213,7 +1250,8 @@ def load_toolkit_parameter_boolean_keys(
     schemas: dict[str, set[str]] = {}
     for identifier, entry in (payload.get("tools") or {}).items():
         if not isinstance(identifier, str) or not (
-            identifier.startswith("com.apple.") or identifier.startswith("is.workflow.actions.")
+            identifier.startswith("com.apple.")
+            or identifier.startswith("is.workflow.actions.")
         ):
             continue
         if not isinstance(entry, dict):
@@ -1243,8 +1281,10 @@ def load_workflow_trigger_catalog(
     target_platform: str | None = "macos",
 ) -> dict[str, object]:
     """Load exported OS 27 WFWorkflowTriggers samples for structural validation."""
-
-    if target_macos_major is not None and target_macos_major < WORKFLOW_TRIGGER_CATALOG_MIN_MACOS_MAJOR:
+    if (
+        target_macos_major is not None
+        and target_macos_major < WORKFLOW_TRIGGER_CATALOG_MIN_MACOS_MAJOR
+    ):
         return {
             "workflow_identifiers": set(),
             "serialized_keys_by_identifier": {},
@@ -1307,7 +1347,11 @@ def load_allowed_ids(
 
     allowed |= CONTROL_FLOW_TOOLKIT_EXCEPTIONS
     allowed |= HEALTH_IOS_ONLY_ACTIONS
-    future_ids = load_future_toolkit_id_reasons(skill_dir, target_macos_major, target_platform)
+    future_ids = load_future_toolkit_id_reasons(
+        skill_dir,
+        target_macos_major,
+        target_platform,
+    )
     allowed -= set(future_ids)
     return allowed
 
@@ -1420,9 +1464,13 @@ def _validate_shortcuts_url_literal(url: str, idx: int) -> list[str]:
         if input_values:
             input_value = input_values[0]
             if input_value not in {"text", "clipboard"}:
-                errors.append(f"{context} input must be 'text' or 'clipboard', got '{input_value}' at index {idx}")
+                errors.append(
+                    f"{context} input must be 'text' or 'clipboard', got '{input_value}' at index {idx}",
+                )
             if input_value == "text" and not has_nonempty("text"):
-                errors.append(f"{context} uses input=text but has no text parameter at index {idx}")
+                errors.append(
+                    f"{context} uses input=text but has no text parameter at index {idx}",
+                )
 
     host = parsed.netloc
     path = parsed.path
@@ -1431,11 +1479,15 @@ def _validate_shortcuts_url_literal(url: str, idx: int) -> list[str]:
         return errors
     if host == "create-shortcut" and path in {"", "/"}:
         if parsed.query:
-            errors.append(f"shortcuts://create-shortcut does not take query parameters at index {idx}")
+            errors.append(
+                f"shortcuts://create-shortcut does not take query parameters at index {idx}",
+            )
         return errors
     if host == "open-shortcut" and path in {"", "/"}:
         if not has_nonempty("name"):
-            errors.append(f"shortcuts://open-shortcut missing required name parameter at index {idx}")
+            errors.append(
+                f"shortcuts://open-shortcut missing required name parameter at index {idx}",
+            )
         return errors
     if host == "run-shortcut" and path in {"", "/"}:
         validate_run_params("shortcuts://run-shortcut")
@@ -1443,28 +1495,36 @@ def _validate_shortcuts_url_literal(url: str, idx: int) -> list[str]:
     if host == "gallery":
         if path in {"", "/"}:
             if parsed.query:
-                errors.append(f"shortcuts://gallery does not take query parameters at index {idx}")
+                errors.append(
+                    f"shortcuts://gallery does not take query parameters at index {idx}",
+                )
             return errors
         if path == "/search":
             if not has_nonempty("query"):
-                errors.append(f"shortcuts://gallery/search missing required query parameter at index {idx}")
+                errors.append(
+                    f"shortcuts://gallery/search missing required query parameter at index {idx}",
+                )
             return errors
     if host == "x-callback-url" and path == "/run-shortcut":
         validate_run_params("shortcuts://x-callback-url/run-shortcut")
         callbacks = ["x-success", "x-cancel", "x-error"]
         if not any(has_nonempty(name) for name in callbacks):
             errors.append(
-                f"shortcuts://x-callback-url/run-shortcut should include at least one callback URL at index {idx}"
+                f"shortcuts://x-callback-url/run-shortcut should include at least one callback URL at index {idx}",
             )
         for name in callbacks:
             if has_nonempty(name):
                 callback = query[name][0]
                 callback_parsed = urllib.parse.urlparse(callback)
                 if not callback_parsed.scheme:
-                    errors.append(f"{name} callback is not an absolute URL at index {idx}")
+                    errors.append(
+                        f"{name} callback is not an absolute URL at index {idx}",
+                    )
         return errors
 
-    errors.append(f"Unsupported Apple-documented Shortcuts URL route '{host}{path}' at index {idx}")
+    errors.append(
+        f"Unsupported Apple-documented Shortcuts URL route '{host}{path}' at index {idx}",
+    )
     return errors
 
 
@@ -1474,7 +1534,11 @@ def _utf16_units(s: str) -> list[int]:
 
 
 def _placeholder_position_hint(string: str) -> str:
-    positions = [f"{{{idx}, 1}}" for idx, unit in enumerate(_utf16_units(string)) if unit == 0xFFFC]
+    positions = [
+        f"{{{idx}, 1}}"
+        for idx, unit in enumerate(_utf16_units(string))
+        if unit == 0xFFFC
+    ]
     if not positions:
         return "expected no placeholder positions"
     return "expected placeholder position(s): " + ", ".join(positions)
@@ -1616,8 +1680,17 @@ def _format_allowed_values(values: set[str], limit: int = 20) -> str:
     return preview
 
 
-def _is_allowed_toolkit_enum_alias(ident: str, key: str, value: str, allowed_values: set[str]) -> bool:
-    if ident == "is.workflow.actions.filter.vpns" and key == "WFCompoundType" and {"0", "1"}.issubset(allowed_values):
+def _is_allowed_toolkit_enum_alias(
+    ident: str,
+    key: str,
+    value: str,
+    allowed_values: set[str],
+) -> bool:
+    if (
+        ident == "is.workflow.actions.filter.vpns"
+        and key == "WFCompoundType"
+        and {"0", "1"}.issubset(allowed_values)
+    ):
         return value in {"Any", "All"}
     return False
 
@@ -1627,7 +1700,10 @@ def _input_is_attached(value) -> bool:
         return False
     if value.get("Type") == "Variable" and isinstance(value.get("Variable"), dict):
         return _input_is_attached(value.get("Variable"))
-    if value.get("WFSerializationType") in {"WFTextTokenAttachment", "WFTextTokenString"}:
+    if value.get("WFSerializationType") in {
+        "WFTextTokenAttachment",
+        "WFTextTokenString",
+    }:
         return True
     return False
 
@@ -1650,7 +1726,11 @@ def _parameter_is_dynamic_attachment(value) -> bool:
 
 
 def _conditional_input_is_wrapped(value) -> bool:
-    return isinstance(value, dict) and value.get("Type") == "Variable" and isinstance(value.get("Variable"), dict)
+    return (
+        isinstance(value, dict)
+        and value.get("Type") == "Variable"
+        and isinstance(value.get("Variable"), dict)
+    )
 
 
 def _wrapped_variable_contains_action_output(value) -> bool:
@@ -1744,7 +1824,9 @@ def _validate_health_quantity_field(
         errors.append(f"Health quantity field {key} must be a dict at index {idx}")
         return
     if value.get("WFSerializationType") != "WFQuantityFieldValue":
-        errors.append(f"Health quantity field {key} must use WFQuantityFieldValue serialization at index {idx}")
+        errors.append(
+            f"Health quantity field {key} must use WFQuantityFieldValue serialization at index {idx}",
+        )
         return
     inner = value.get("Value")
     if not isinstance(inner, dict):
@@ -1758,7 +1840,9 @@ def _validate_health_quantity_field(
     if not isinstance(unit, str) or unit.strip() == "":
         errors.append(f"Health quantity field {key} missing Unit at index {idx}")
     elif HEALTH_REFERENCE_SETS["units"] and unit not in HEALTH_REFERENCE_SETS["units"]:
-        errors.append(f"Health quantity field {key} uses unknown Unit '{unit}' at index {idx}")
+        errors.append(
+            f"Health quantity field {key} uses unknown Unit '{unit}' at index {idx}",
+        )
 
 
 def _validate_health_date_like(value, *, key: str, idx: int, errors: list[str]) -> None:
@@ -1777,29 +1861,45 @@ def _validate_health_filter_template(
         errors.append(f"{action_label} missing WFContentItemFilter at index {idx}")
         return
     if filter_value.get("WFSerializationType") != "WFContentPredicateTableTemplate":
-        errors.append(f"{action_label} WFContentItemFilter must use WFContentPredicateTableTemplate at index {idx}")
+        errors.append(
+            f"{action_label} WFContentItemFilter must use WFContentPredicateTableTemplate at index {idx}",
+        )
         return
     inner = filter_value.get("Value")
     if not isinstance(inner, dict):
-        errors.append(f"{action_label} WFContentItemFilter missing Value dict at index {idx}")
+        errors.append(
+            f"{action_label} WFContentItemFilter missing Value dict at index {idx}",
+        )
         return
     prefix = inner.get("WFActionParameterFilterPrefix")
     if prefix not in (0, 1):
-        errors.append(f"{action_label} WFContentItemFilter prefix must be 0 (Any) or 1 (All) at index {idx}")
+        errors.append(
+            f"{action_label} WFContentItemFilter prefix must be 0 (Any) or 1 (All) at index {idx}",
+        )
     templates = inner.get("WFActionParameterFilterTemplates")
     if not isinstance(templates, list) or not templates:
-        errors.append(f"{action_label} WFContentItemFilter has no templates at index {idx}")
+        errors.append(
+            f"{action_label} WFContentItemFilter has no templates at index {idx}",
+        )
         return
     for tidx, template in enumerate(templates):
         if not isinstance(template, dict):
-            errors.append(f"{action_label} filter template {tidx} is not a dict at index {idx}")
+            errors.append(
+                f"{action_label} filter template {tidx} is not a dict at index {idx}",
+            )
             continue
         if _token_param_is_empty(template.get("Property")):
-            errors.append(f"{action_label} filter template {tidx} missing Property at index {idx}")
+            errors.append(
+                f"{action_label} filter template {tidx} missing Property at index {idx}",
+            )
         if "Operator" not in template:
-            errors.append(f"{action_label} filter template {tidx} missing Operator at index {idx}")
+            errors.append(
+                f"{action_label} filter template {tidx} missing Operator at index {idx}",
+            )
         if "Values" in template and not isinstance(template.get("Values"), dict):
-            errors.append(f"{action_label} filter template {tidx} Values must be a dict at index {idx}")
+            errors.append(
+                f"{action_label} filter template {tidx} Values must be a dict at index {idx}",
+            )
 
 
 def _health_filter_type_value(filter_value) -> tuple[str | None, int | None, bool]:
@@ -1825,7 +1925,10 @@ def _health_filter_type_value(filter_value) -> tuple[str | None, int | None, boo
         if prop != "Type":
             continue
         type_operator = template.get("Operator")
-        if template.get("Bounded") is not True or template.get("Removable") is not False:
+        if (
+            template.get("Bounded") is not True
+            or template.get("Removable") is not False
+        ):
             return None, type_operator, True
         values = template.get("Values")
         if not isinstance(values, dict):
@@ -1846,7 +1949,10 @@ def _health_filter_type_value(filter_value) -> tuple[str | None, int | None, boo
 def _lang_value_is_code(value) -> bool:
     if isinstance(value, str):
         return bool(LANG_CODE_RE.match(value)) and " " not in value
-    if isinstance(value, dict) and value.get("WFSerializationType") == "WFTextTokenString":
+    if (
+        isinstance(value, dict)
+        and value.get("WFSerializationType") == "WFTextTokenString"
+    ):
         inner = value.get("Value")
         if isinstance(inner, dict):
             s = inner.get("string")
@@ -1883,10 +1989,18 @@ def _extract_input_variable_name(value) -> str | None:
 
 
 def _extract_input_variable_names(value) -> set[str]:
-    return {name for name in iter_variable_names(value) if isinstance(name, str) and name.strip()}
+    return {
+        name
+        for name in iter_variable_names(value)
+        if isinstance(name, str) and name.strip()
+    }
 
 
-def _reassigned_list_variable_name(value, set_counts: dict[str, int], list_set_counts: dict[str, int]) -> str | None:
+def _reassigned_list_variable_name(
+    value,
+    set_counts: dict[str, int],
+    list_set_counts: dict[str, int],
+) -> str | None:
     name = _extract_input_variable_name(value)
     if name and set_counts.get(name, 0) > 1 and list_set_counts.get(name, 0) > 1:
         return name
@@ -1931,7 +2045,10 @@ def _input_has_current_date_token(value) -> bool:
         val = value.get("Value") if isinstance(value.get("Value"), dict) else {}
         attachments = val.get("attachmentsByRange")
         if isinstance(attachments, dict):
-            return any(isinstance(att, dict) and att.get("Type") == "CurrentDate" for att in attachments.values())
+            return any(
+                isinstance(att, dict) and att.get("Type") == "CurrentDate"
+                for att in attachments.values()
+            )
     return False
 
 
@@ -1957,7 +2074,10 @@ def _collect_send_message_empty_text_spacer_uuids(actions: list[dict]) -> set[st
 
     spacer_uuids: set[str] = set()
     for act in actions:
-        if act.get("WFWorkflowActionIdentifier") != "is.workflow.actions.appendvariable":
+        if (
+            act.get("WFWorkflowActionIdentifier")
+            != "is.workflow.actions.appendvariable"
+        ):
             continue
         params = act.get("WFWorkflowActionParameters") or {}
         if params.get("WFVariableName") not in send_message_vars:
@@ -1999,14 +2119,20 @@ def _math_operand_has_reference(value) -> bool:
     if isinstance(value, str) and value.strip() != "":
         return True
     if isinstance(value, dict):
-        if value.get("WFSerializationType") in {"WFTextTokenAttachment", "WFTextTokenString"}:
+        if value.get("WFSerializationType") in {
+            "WFTextTokenAttachment",
+            "WFTextTokenString",
+        }:
             val = value.get("Value")
             if isinstance(val, dict):
                 if val.get("Type") == "Variable" and val.get("VariableName"):
                     return True
                 if val.get("Type") == "ActionOutput" and val.get("OutputUUID"):
                     return True
-                if isinstance(val.get("string"), str) and val.get("string").strip() != "":
+                if (
+                    isinstance(val.get("string"), str)
+                    and val.get("string").strip() != ""
+                ):
                     return True
     return False
 
@@ -2076,10 +2202,13 @@ def _validate_workflow_triggers(
 ) -> None:
     if "WFWorkflowTriggers" not in plist:
         return
-    if target_macos_major is not None and target_macos_major < WORKFLOW_TRIGGER_CATALOG_MIN_MACOS_MAJOR:
+    if (
+        target_macos_major is not None
+        and target_macos_major < WORKFLOW_TRIGGER_CATALOG_MIN_MACOS_MAJOR
+    ):
         errors.append(
             "WFWorkflowTriggers requires macOS/iOS 27+. "
-            f"Target macOS is {target_macos_major}; remove the trigger header or validate with --target-macos 27."
+            f"Target macOS is {target_macos_major}; remove the trigger header or validate with --target-macos 27.",
         )
     triggers = plist.get("WFWorkflowTriggers")
     if not isinstance(triggers, list):
@@ -2088,7 +2217,9 @@ def _validate_workflow_triggers(
     workflow_identifiers = workflow_trigger_catalog.get("workflow_identifiers")
     if not isinstance(workflow_identifiers, set):
         workflow_identifiers = set()
-    serialized_keys_by_identifier = workflow_trigger_catalog.get("serialized_keys_by_identifier")
+    serialized_keys_by_identifier = workflow_trigger_catalog.get(
+        "serialized_keys_by_identifier",
+    )
     if not isinstance(serialized_keys_by_identifier, dict):
         serialized_keys_by_identifier = {}
 
@@ -2108,32 +2239,43 @@ def _validate_workflow_triggers(
         if not isinstance(wf_identifier, str) or not wf_identifier.strip():
             errors.append(f"{prefix}.WFTriggerIdentifier must be a non-empty string")
         elif workflow_identifiers and wf_identifier not in workflow_identifiers:
-            errors.append(f"{prefix}.WFTriggerIdentifier is not in the exported OS 27 trigger catalog: {wf_identifier}")
+            errors.append(
+                f"{prefix}.WFTriggerIdentifier is not in the exported OS 27 trigger catalog: {wf_identifier}",
+            )
 
         trigger_uuid = trigger.get("WFTriggerUUID")
         if not isinstance(trigger_uuid, str) or not trigger_uuid.strip():
             errors.append(f"{prefix}.WFTriggerUUID must be a non-empty UUID string")
         elif not UUID_RE.match(trigger_uuid):
-            errors.append(f"{prefix}.WFTriggerUUID must be an uppercase UUID generated with uuidgen: {trigger_uuid!r}")
+            errors.append(
+                f"{prefix}.WFTriggerUUID must be an uppercase UUID generated with uuidgen: {trigger_uuid!r}",
+            )
         elif REPEATING_UUID_RE.search(trigger_uuid):
-            errors.append(f"{prefix}.WFTriggerUUID is a repeating placeholder UUID: {trigger_uuid}")
+            errors.append(
+                f"{prefix}.WFTriggerUUID is a repeating placeholder UUID: {trigger_uuid}",
+            )
 
         serialized = trigger.get("WFTriggerSerializedParameters")
         if not isinstance(serialized, dict):
-            errors.append(f"{prefix}.WFTriggerSerializedParameters must be a dictionary")
+            errors.append(
+                f"{prefix}.WFTriggerSerializedParameters must be a dictionary",
+            )
             continue
         if _contains_catalog_placeholder(serialized):
             errors.append(
                 f"{prefix}.WFTriggerSerializedParameters still contains catalog placeholder values; "
-                "replace local picker payloads with user-provided/exported values before signing."
+                "replace local picker payloads with user-provided/exported values before signing.",
             )
         if isinstance(wf_identifier, str):
-            if wf_identifier in WORKFLOW_TRIGGER_IDENTIFIERS_REQUIRING_EDITOR_CONFIGURATION:
+            if (
+                wf_identifier
+                in WORKFLOW_TRIGGER_IDENTIFIERS_REQUIRING_EDITOR_CONFIGURATION
+            ):
                 errors.append(
                     f"{prefix}.{wf_identifier} cannot currently be generated as portable "
                     "WFWorkflowTriggers XML. macOS 27 exports a lossy empty trigger dictionary, "
                     "but Shortcuts stores the required picker state outside that dictionary and "
-                    "imports the bare header as an invalid automation."
+                    "imports the bare header as an invalid automation.",
                 )
             expected_keys = serialized_keys_by_identifier.get(wf_identifier, set())
             if isinstance(expected_keys, set) and expected_keys:
@@ -2142,7 +2284,7 @@ def _validate_workflow_triggers(
                     expected = ", ".join(sorted(expected_keys))
                     errors.append(
                         f"{prefix}.WFTriggerSerializedParameters has unknown key(s) for "
-                        f"{wf_identifier}: {', '.join(unknown)}. Exported/ToolKit keys: {expected}."
+                        f"{wf_identifier}: {', '.join(unknown)}. Exported/ToolKit keys: {expected}.",
                     )
 
 
@@ -2172,7 +2314,9 @@ def validate(
     uuid_to_ident: dict[str, str] = {}
     uuid_to_params: dict[str, dict] = {}
     append_counts = _collect_variable_append_counts(actions)
-    send_message_empty_text_spacer_uuids = _collect_send_message_empty_text_spacer_uuids(actions)
+    send_message_empty_text_spacer_uuids = (
+        _collect_send_message_empty_text_spacer_uuids(actions)
+    )
     used_output_uuids: set[str] = set()
     repeat_stack: list[dict] = []
     repeat_end_uuids: dict[str, str] = {}
@@ -2212,10 +2356,13 @@ def validate(
                 comments.append(text)
                 wf_terms = _comment_internal_wf_terms(text)
                 if wf_terms:
-                    hints = ", ".join(f"{token}->{_friendly_comment_field_name(token)}" for token in wf_terms)
+                    hints = ", ".join(
+                        f"{token}->{_friendly_comment_field_name(token)}"
+                        for token in wf_terms
+                    )
                     errors.append(
                         f"Comment uses internal WF parameter names at index {idx}: {hints}. "
-                        "Use Shortcuts UI wording (for example: Input, Date, Provided Input, Repeat Item)."
+                        "Use Shortcuts UI wording (for example: Input, Date, Provided Input, Repeat Item).",
                     )
                 if not unit_text_found and _text_has_unit_keywords(text):
                     unit_text_found = True
@@ -2229,55 +2376,75 @@ def validate(
                     errors.append(
                         f"Parameter '{key}' on {ident} requires {parameter_reasons[key]} "
                         f"at index {idx}. Set --target-macos 27 or "
-                        "SHORTCUTS_PLAYGROUND_TARGET_MACOS=27 only when building for Golden Gate."
+                        "SHORTCUTS_PLAYGROUND_TARGET_MACOS=27 only when building for Golden Gate.",
                     )
         if isinstance(ident, str) and ident.startswith("com.apple."):
             descriptor = params.get("AppIntentDescriptor")
             if not isinstance(descriptor, dict):
-                errors.append(f"AppIntent action missing AppIntentDescriptor at index {idx}: {ident}")
+                errors.append(
+                    f"AppIntent action missing AppIntentDescriptor at index {idx}: {ident}",
+                )
             elif not descriptor.get("AppIntentIdentifier"):
-                errors.append(f"AppIntentDescriptor missing AppIntentIdentifier at index {idx}: {ident}")
+                errors.append(
+                    f"AppIntentDescriptor missing AppIntentIdentifier at index {idx}: {ident}",
+                )
         expected_toolkit_keys = toolkit_parameter_schemas.get(ident) if ident else None
         if expected_toolkit_keys is not None:
             unknown_keys = sorted(
                 key
                 for key in params
-                if key not in expected_toolkit_keys and key not in TOOLKIT_PARAMETER_STRUCTURAL_KEYS
+                if key not in expected_toolkit_keys
+                and key not in TOOLKIT_PARAMETER_STRUCTURAL_KEYS
             )
             if unknown_keys:
-                expected = ", ".join(sorted(expected_toolkit_keys)) or "no action parameters"
+                expected = (
+                    ", ".join(sorted(expected_toolkit_keys)) or "no action parameters"
+                )
                 errors.append(
                     f"Unknown AppIntent parameter key(s) for {ident} at index {idx}: "
-                    f"{', '.join(unknown_keys)}. ToolKit v78 expects: {expected}."
+                    f"{', '.join(unknown_keys)}. ToolKit v78 expects: {expected}.",
                 )
         expected_enum_cases = toolkit_parameter_enum_cases.get(ident) if ident else None
         if expected_enum_cases:
-            enum_error_kind = "AppIntent" if str(ident).startswith("com.apple.") else "ToolKit"
+            enum_error_kind = (
+                "AppIntent" if str(ident).startswith("com.apple.") else "ToolKit"
+            )
             for key, allowed_values in sorted(expected_enum_cases.items()):
                 if key not in params:
                     continue
                 literal_values = _literal_enum_values(params.get(key))
                 for literal_value in literal_values:
-                    if literal_value not in allowed_values and not _is_allowed_toolkit_enum_alias(
-                        ident,
-                        key,
-                        literal_value,
-                        allowed_values,
+                    if (
+                        literal_value not in allowed_values
+                        and not _is_allowed_toolkit_enum_alias(
+                            ident,
+                            key,
+                            literal_value,
+                            allowed_values,
+                        )
                     ):
                         errors.append(
                             f"Invalid {enum_error_kind} enum value for {ident}.{key} at index {idx}: "
                             f"{literal_value!r}. ToolKit v78 allows: "
-                            f"{_format_allowed_values(allowed_values)}."
+                            f"{_format_allowed_values(allowed_values)}.",
                         )
-        expected_boolean_keys = toolkit_parameter_boolean_keys.get(ident) if ident else None
+        expected_boolean_keys = (
+            toolkit_parameter_boolean_keys.get(ident) if ident else None
+        )
         if expected_boolean_keys:
-            boolean_error_kind = "AppIntent" if str(ident).startswith("com.apple.") else "ToolKit"
+            boolean_error_kind = (
+                "AppIntent" if str(ident).startswith("com.apple.") else "ToolKit"
+            )
             for key in sorted(expected_boolean_keys):
                 value = params.get(key)
-                if key in params and not isinstance(value, bool) and not _parameter_is_dynamic_attachment(value):
+                if (
+                    key in params
+                    and not isinstance(value, bool)
+                    and not _parameter_is_dynamic_attachment(value)
+                ):
                     errors.append(
                         f"Invalid {boolean_error_kind} boolean value for {ident}.{key} at index {idx}: "
-                        "expected a plist boolean."
+                        "expected a plist boolean.",
                     )
         used_output_uuids.update(iter_action_output_refs(params))
         if not unit_text_found:
@@ -2294,8 +2461,12 @@ def validate(
 
     allow_vcard = any(VCARD_MARKER in text.upper() for text in comments)
     allow_token_file = any(TOKEN_FILE_MARKER in text.upper() for text in comments)
-    allow_datetime_format = any(ALLOW_DATETIME_FORMAT_MARKER in text.upper() for text in comments)
-    allow_manual_unit_conversion = any(ALLOW_MANUAL_UNIT_CONVERSION_MARKER in text.upper() for text in comments)
+    allow_datetime_format = any(
+        ALLOW_DATETIME_FORMAT_MARKER in text.upper() for text in comments
+    )
+    allow_manual_unit_conversion = any(
+        ALLOW_MANUAL_UNIT_CONVERSION_MARKER in text.upper() for text in comments
+    )
 
     # --- GroupingIdentifier consistency check ---
     grouping_start: dict[str, tuple[int, str]] = {}  # grouping_id -> (idx, ident)
@@ -2316,35 +2487,40 @@ def validate(
             if grouping in grouping_start:
                 errors.append(
                     f"Duplicate GroupingIdentifier '{grouping[:12]}...' for start action at index {idx}; "
-                    f"first seen at index {grouping_start[grouping][0]}"
+                    f"first seen at index {grouping_start[grouping][0]}",
                 )
             else:
                 grouping_start[grouping] = (idx, ident or "")
         elif mode in (1, 2):
             if grouping not in grouping_start:
                 errors.append(
-                    f"Control-flow middle/end at index {idx} has GroupingIdentifier with no matching start (mode 0)"
+                    f"Control-flow middle/end at index {idx} has GroupingIdentifier with no matching start (mode 0)",
                 )
             else:
                 start_ident = grouping_start[grouping][1]
                 if ident != start_ident:
                     errors.append(
                         f"GroupingIdentifier mismatch at index {idx}: action '{ident}' "
-                        f"does not match start action '{start_ident}'"
+                        f"does not match start action '{start_ident}'",
                     )
             if mode == 2:
                 grouping_seen_end.add(grouping)
 
     for grouping, (start_idx, start_ident) in grouping_start.items():
         if grouping not in grouping_seen_end:
-            errors.append(f"Control-flow start '{start_ident}' at index {start_idx} has no matching end (mode 2)")
+            errors.append(
+                f"Control-flow start '{start_ident}' at index {start_idx} has no matching end (mode 2)",
+            )
 
     # --- Menu case count and title matching check ---
     menu_items_by_grouping: dict[str, list[str]] = {}
     menu_cases_by_grouping: dict[str, list[tuple[int, str]]] = {}
 
     for idx, act in enumerate(actions):
-        if act.get("WFWorkflowActionIdentifier") != "is.workflow.actions.choosefrommenu":
+        if (
+            act.get("WFWorkflowActionIdentifier")
+            != "is.workflow.actions.choosefrommenu"
+        ):
             continue
         params = act.get("WFWorkflowActionParameters") or {}
         mode = _coerce_control_flow_mode(params)
@@ -2372,13 +2548,16 @@ def validate(
         cases = menu_cases_by_grouping.get(grouping, [])
         if len(cases) != len(items):
             errors.append(
-                f"Choose from Menu: {len(items)} item(s) in WFMenuItems but {len(cases)} case action(s) found"
+                f"Choose from Menu: {len(items)} item(s) in WFMenuItems but {len(cases)} case action(s) found",
             )
         else:
             # Only validate title matching when items are plain strings
             original_list = None
             for act2 in actions:
-                if act2.get("WFWorkflowActionIdentifier") == "is.workflow.actions.choosefrommenu":
+                if (
+                    act2.get("WFWorkflowActionIdentifier")
+                    == "is.workflow.actions.choosefrommenu"
+                ):
                     p2 = act2.get("WFWorkflowActionParameters") or {}
                     if p2.get("GroupingIdentifier") == grouping:
                         m2 = p2.get("WFControlFlowMode")
@@ -2387,18 +2566,24 @@ def validate(
                         if m2 is None or m2 == 0:
                             original_list = p2.get("WFMenuItems", [])
                             break
-            all_strings = original_list and all(isinstance(i, str) for i in original_list)
+            all_strings = original_list and all(
+                isinstance(i, str) for i in original_list
+            )
             if all_strings:
-                for order_idx, ((case_act_idx, case_title), expected) in enumerate(zip(cases, items, strict=False)):
+                for order_idx, ((case_act_idx, case_title), expected) in enumerate(
+                    zip(cases, items, strict=False),
+                ):
                     if case_title != expected:
                         errors.append(
                             f"Choose from Menu case {order_idx} at index {case_act_idx}: "
-                            f"WFMenuItemTitle '{case_title}' does not match WFMenuItems[{order_idx}] '{expected}'"
+                            f"WFMenuItemTitle '{case_title}' does not match WFMenuItems[{order_idx}] '{expected}'",
                         )
 
     input_classes = plist.get("WFWorkflowInputContentItemClasses") or []
     uses_javascript_webpage = any(
-        act.get("WFWorkflowActionIdentifier") == "is.workflow.actions.runjavascriptonwebpage" for act in actions
+        act.get("WFWorkflowActionIdentifier")
+        == "is.workflow.actions.runjavascriptonwebpage"
+        for act in actions
     )
     uses_input = False
     for act in actions:
@@ -2424,28 +2609,30 @@ def validate(
             break
     if not input_classes and uses_input:
         errors.append(
-            "Shortcut uses Shortcut Input but WFWorkflowInputContentItemClasses is empty (causes Stop and Respond)."
+            "Shortcut uses Shortcut Input but WFWorkflowInputContentItemClasses is empty (causes Stop and Respond).",
         )
     if input_classes and not uses_input and not uses_javascript_webpage:
         errors.append(
-            "WFWorkflowInputContentItemClasses is set but Shortcut Input is unused; remove input types or use Shortcut Input."
+            "WFWorkflowInputContentItemClasses is set but Shortcut Input is unused; remove input types or use Shortcut Input.",
         )
 
     workflow_types = plist.get("WFWorkflowTypes") or []
     if uses_javascript_webpage:
         if "ActionExtension" not in workflow_types:
             errors.append(
-                "Run JavaScript on Webpage requires ActionExtension in WFWorkflowTypes so it can run from Safari share sheet."
+                "Run JavaScript on Webpage requires ActionExtension in WFWorkflowTypes so it can run from Safari share sheet.",
             )
         if "WFSafariWebPageContentItem" not in input_classes:
             errors.append(
-                "Run JavaScript on Webpage requires WFSafariWebPageContentItem in WFWorkflowInputContentItemClasses."
+                "Run JavaScript on Webpage requires WFSafariWebPageContentItem in WFWorkflowInputContentItemClasses.",
             )
-        extra_classes = [cls for cls in input_classes if cls != "WFSafariWebPageContentItem"]
+        extra_classes = [
+            cls for cls in input_classes if cls != "WFSafariWebPageContentItem"
+        ]
         if extra_classes:
             errors.append(
                 "Run JavaScript on Webpage shortcuts should scope share-sheet input to Safari webpages only; "
-                f"remove extra input classes: {', '.join(extra_classes)}."
+                f"remove extra input classes: {', '.join(extra_classes)}.",
             )
 
     icon_dict = plist.get("WFWorkflowIcon")
@@ -2464,7 +2651,9 @@ def validate(
                 errors.append("WFWorkflowIconGlyphNumber must be an integer")
             else:
                 if allowed_glyph_ids and glyph_int not in allowed_glyph_ids:
-                    errors.append(f"WFWorkflowIconGlyphNumber {glyph_int} is not in the official 507 glyph mapping")
+                    errors.append(
+                        f"WFWorkflowIconGlyphNumber {glyph_int} is not in the official 507 glyph mapping",
+                    )
 
         if start_color is None:
             errors.append("WFWorkflowIcon missing WFWorkflowIconStartColor")
@@ -2475,7 +2664,9 @@ def validate(
                 errors.append("WFWorkflowIconStartColor must be an integer")
             else:
                 if allowed_icon_colors and color_int not in allowed_icon_colors:
-                    errors.append(f"WFWorkflowIconStartColor {color_int} is not in the known Shortcuts color palette")
+                    errors.append(
+                        f"WFWorkflowIconStartColor {color_int} is not in the known Shortcuts color palette",
+                    )
 
     if actions:
         if len(actions) < 2:
@@ -2486,15 +2677,25 @@ def validate(
             if first.get("WFWorkflowActionIdentifier") != "is.workflow.actions.comment":
                 errors.append("First action must be a Comment describing the shortcut")
             else:
-                first_text = (first.get("WFWorkflowActionParameters") or {}).get("WFCommentActionText")
+                first_text = (first.get("WFWorkflowActionParameters") or {}).get(
+                    "WFCommentActionText",
+                )
                 if not first_text:
                     errors.append("First Comment is empty")
-            if second.get("WFWorkflowActionIdentifier") != "is.workflow.actions.comment":
+            if (
+                second.get("WFWorkflowActionIdentifier")
+                != "is.workflow.actions.comment"
+            ):
                 errors.append("Second action must be the prompt Comment block")
             else:
-                second_text = (second.get("WFWorkflowActionParameters") or {}).get("WFCommentActionText", "")
+                second_text = (second.get("WFWorkflowActionParameters") or {}).get(
+                    "WFCommentActionText",
+                    "",
+                )
                 if "Shortcuts generated by Shortcuts Playground." not in second_text:
-                    errors.append("Second Comment missing required Shortcuts Playground prompt text")
+                    errors.append(
+                        "Second Comment missing required Shortcuts Playground prompt text",
+                    )
 
     # Comment density requirements
     comment_count = len(comments)
@@ -2507,18 +2708,26 @@ def validate(
         min_comments = 3
     if comment_count < min_comments:
         errors.append(
-            f"Insufficient Comment blocks: {comment_count} found, require {min_comments} for {len(actions)} actions"
+            f"Insufficient Comment blocks: {comment_count} found, require {min_comments} for {len(actions)} actions",
         )
 
-    if unit_text_found and not has_measurement_convert and not allow_manual_unit_conversion:
+    if (
+        unit_text_found
+        and not has_measurement_convert
+        and not allow_manual_unit_conversion
+    ):
         errors.append(
-            "Unit conversion detected but no measurement.convert action; use measurement.create + measurement.convert or add ALLOW_MANUAL_UNIT_CONVERSION comment."
+            "Unit conversion detected but no measurement.convert action; use measurement.create + measurement.convert or add ALLOW_MANUAL_UNIT_CONVERSION comment.",
         )
 
     if errors and actions and first_error is None:
         first_action = actions[0]
         first_params = first_action.get("WFWorkflowActionParameters") or {}
-        first_error = (0, first_action.get("WFWorkflowActionIdentifier") or "UNKNOWN", _snippet(first_params))
+        first_error = (
+            0,
+            first_action.get("WFWorkflowActionIdentifier") or "UNKNOWN",
+            _snippet(first_params),
+        )
 
     for idx, act in enumerate(actions):
         ident = act.get("WFWorkflowActionIdentifier")
@@ -2530,16 +2739,20 @@ def validate(
             raw_mode = params.get("WFControlFlowMode")
             if isinstance(raw_mode, str):
                 errors.append(
-                    f"WFControlFlowMode must be <integer> not <string> at index {idx}: {ident} (found: {raw_mode!r})"
+                    f"WFControlFlowMode must be <integer> not <string> at index {idx}: {ident} (found: {raw_mode!r})",
                 )
 
         # Aggrandizement type validation
         for agg in iter_aggrandizements(params):
             agg_type = agg.get("Type")
             if agg_type is None:
-                errors.append(f"Aggrandizement missing Type field at index {idx}: {ident}")
+                errors.append(
+                    f"Aggrandizement missing Type field at index {idx}: {ident}",
+                )
             elif agg_type not in KNOWN_AGGRANDIZEMENT_TYPES:
-                errors.append(f"Unknown aggrandizement Type '{agg_type}' at index {idx}: {ident}")
+                errors.append(
+                    f"Unknown aggrandizement Type '{agg_type}' at index {idx}: {ident}",
+                )
 
         # Enforce descriptive Comment immediately before control-flow starts
         if ident in {
@@ -2550,13 +2763,23 @@ def validate(
         }:
             mode = _coerce_control_flow_mode(params)
             if mode == 0:
-                if idx == 0 or actions[idx - 1].get("WFWorkflowActionIdentifier") != "is.workflow.actions.comment":
-                    errors.append(f"Missing descriptive Comment immediately before control-flow start at index {idx}")
+                if (
+                    idx == 0
+                    or actions[idx - 1].get("WFWorkflowActionIdentifier")
+                    != "is.workflow.actions.comment"
+                ):
+                    errors.append(
+                        f"Missing descriptive Comment immediately before control-flow start at index {idx}",
+                    )
                 else:
-                    prev_params = actions[idx - 1].get("WFWorkflowActionParameters") or {}
+                    prev_params = (
+                        actions[idx - 1].get("WFWorkflowActionParameters") or {}
+                    )
                     prev_text = prev_params.get("WFCommentActionText", "")
                     if not _comment_has_bullets(prev_text):
-                        errors.append(f"Control-flow Comment must include a bulleted wiring list at index {idx - 1}")
+                        errors.append(
+                            f"Control-flow Comment must include a bulleted wiring list at index {idx - 1}",
+                        )
 
         if ident == "is.workflow.actions.comment":
             text = params.get("WFCommentActionText")
@@ -2564,7 +2787,10 @@ def validate(
                 cents_context_steps = 10
 
         # Track repeat nesting (repeat.each and repeat.count)
-        if ident in {"is.workflow.actions.repeat.each", "is.workflow.actions.repeat.count"}:
+        if ident in {
+            "is.workflow.actions.repeat.each",
+            "is.workflow.actions.repeat.count",
+        }:
             mode = _coerce_control_flow_mode(params)
             if mode is None:
                 mode = 0
@@ -2581,36 +2807,57 @@ def validate(
             innermost = repeat_stack[-1]
             innermost_uuid = innermost.get("uuid")
             loop_label = (
-                "Repeat with Each" if innermost.get("kind") == "is.workflow.actions.repeat.each" else "Repeat (count)"
+                "Repeat with Each"
+                if innermost.get("kind") == "is.workflow.actions.repeat.each"
+                else "Repeat (count)"
             )
-            repeat_uuids = {item.get("uuid") for item in repeat_stack if item.get("uuid")}
-            active_groups = {item.get("group") for item in repeat_stack if item.get("group")}
-            active_end_uuids = {repeat_end_uuids.get(g) for g in active_groups if repeat_end_uuids.get(g)}
+            repeat_uuids = {
+                item.get("uuid") for item in repeat_stack if item.get("uuid")
+            }
+            active_groups = {
+                item.get("group") for item in repeat_stack if item.get("group")
+            }
+            active_end_uuids = {
+                repeat_end_uuids.get(g)
+                for g in active_groups
+                if repeat_end_uuids.get(g)
+            }
             for out_uuid, out_name in iter_action_output_refs_with_name(params):
                 if out_name and out_name.startswith("Repeat Results"):
-                    errors.append(f"Repeat Results referenced inside {loop_label} at index {idx}")
+                    errors.append(
+                        f"Repeat Results referenced inside {loop_label} at index {idx}",
+                    )
                 if out_uuid in repeat_uuids:
                     if out_name == "Repeat Results":
-                        errors.append(f"Repeat Results referenced inside {loop_label} at index {idx}")
-                    elif out_name in {"Repeat Item", "Repeat Index"} and out_uuid != innermost_uuid:
                         errors.append(
-                            f"Nested repeat uses outer {out_name} at index {idx}; use innermost Repeat Item/Index"
+                            f"Repeat Results referenced inside {loop_label} at index {idx}",
+                        )
+                    elif (
+                        out_name in {"Repeat Item", "Repeat Index"}
+                        and out_uuid != innermost_uuid
+                    ):
+                        errors.append(
+                            f"Nested repeat uses outer {out_name} at index {idx}; use innermost Repeat Item/Index",
                         )
                     # Even for innermost, prefer Variable references (not ActionOutput) to avoid UI showing Repeat Results
                     if out_name in {"Repeat Item", "Repeat Index"}:
                         errors.append(
-                            f"Repeat Item/Index should be referenced as a Variable (not ActionOutput) inside {loop_label} at index {idx}"
+                            f"Repeat Item/Index should be referenced as a Variable (not ActionOutput) inside {loop_label} at index {idx}",
                         )
                 if out_uuid in active_end_uuids:
                     if out_name in {"Repeat Item", "Repeat Index"}:
                         errors.append(
-                            f"{out_name} should be referenced as a Variable (not ActionOutput) inside {loop_label} at index {idx}"
+                            f"{out_name} should be referenced as a Variable (not ActionOutput) inside {loop_label} at index {idx}",
                         )
                     else:
-                        errors.append(f"Repeat Results (end output) used inside {loop_label} at index {idx}")
+                        errors.append(
+                            f"Repeat Results (end output) used inside {loop_label} at index {idx}",
+                        )
             for name in iter_variable_names(params):
                 if name.startswith("Repeat Results"):
-                    errors.append(f"Repeat Results variable used inside {loop_label} at index {idx}")
+                    errors.append(
+                        f"Repeat Results variable used inside {loop_label} at index {idx}",
+                    )
 
         # Track variable definitions
         if ident == "is.workflow.actions.setvariable":
@@ -2624,9 +2871,15 @@ def validate(
                 out_uuids = _input_action_output_uuids(wfinput)
                 source_var_name = _extract_input_variable_name(wfinput)
                 list_source = False
-                weather_source = bool(source_var_name and source_var_name in weather_source_vars)
-                location_source = bool(source_var_name and source_var_name in location_source_vars)
-                health_sample_source = bool(source_var_name and source_var_name in health_sample_source_vars)
+                weather_source = bool(
+                    source_var_name and source_var_name in weather_source_vars,
+                )
+                location_source = bool(
+                    source_var_name and source_var_name in location_source_vars,
+                )
+                health_sample_source = bool(
+                    source_var_name and source_var_name in health_sample_source_vars,
+                )
                 for source_uuid in out_uuids:
                     source_ident = uuid_to_ident.get(source_uuid)
                     if source_ident in LIST_PRODUCING_ACTIONS:
@@ -2646,7 +2899,9 @@ def validate(
                 if health_sample_source:
                     health_sample_source_vars.add(name)
                 if list_source:
-                    list_variable_set_counts[name] = list_variable_set_counts.get(name, 0) + 1
+                    list_variable_set_counts[name] = (
+                        list_variable_set_counts.get(name, 0) + 1
+                    )
                 if "hour" in name.lower() and any(
                     source_uuid in sleep_duration_divide_by_60_uuids
                     or source_uuid in sleep_duration_divide_by_60_round_uuids
@@ -2654,7 +2909,7 @@ def validate(
                 ):
                     errors.append(
                         f"Sleep duration math divides by 60 but stores hours in '{name}' at index {idx}; "
-                        "Health Duration math is seconds, so divide by 3600 for decimal hours or label the result as minutes"
+                        "Health Duration math is seconds, so divide by 3600 for decimal hours or label the result as minutes",
                     )
 
         if ident == "is.workflow.actions.getvariable":
@@ -2675,14 +2930,18 @@ def validate(
                         errors.append(
                             f"Action identifier requires {unavailable_reason} at index {idx}: {ident}. "
                             "Set --target-macos 27 only for Golden Gate-only IDs, or "
-                            "--target-platform ios/all only when intentionally targeting iOS/iPadOS metadata."
+                            "--target-platform ios/all only when intentionally targeting iOS/iPadOS metadata.",
                         )
                     else:
                         hint = ACTION_ALIAS_HINTS.get(ident)
                         if hint:
-                            errors.append(f"Unknown action identifier at index {idx}: {ident} (use {hint})")
+                            errors.append(
+                                f"Unknown action identifier at index {idx}: {ident} (use {hint})",
+                            )
                         else:
-                            errors.append(f"Unknown action identifier at index {idx}: {ident}")
+                            errors.append(
+                                f"Unknown action identifier at index {idx}: {ident}",
+                            )
             elif ident.startswith("com.apple."):
                 if ident not in allowed_ids:
                     unavailable_reason = unavailable_ids.get(ident)
@@ -2690,15 +2949,18 @@ def validate(
                         errors.append(
                             f"AppIntent identifier requires {unavailable_reason} at index {idx}: {ident}. "
                             "Set --target-macos 27 only for Golden Gate-only IDs, or "
-                            "--target-platform ios/all only when intentionally targeting iOS/iPadOS metadata."
+                            "--target-platform ios/all only when intentionally targeting iOS/iPadOS metadata.",
                         )
                     else:
-                        errors.append(f"Unknown AppIntent identifier at index {idx}: {ident}")
-            else:
-                # Accept unknown vendor-prefixed third-party identifiers so shared
-                # skills remain usable without local ToolKit extraction.
-                if ident not in allowed_ids and not THIRD_PARTY_IDENTIFIER_RE.match(ident):
-                    errors.append(f"Unknown third-party identifier at index {idx}: {ident}")
+                        errors.append(
+                            f"Unknown AppIntent identifier at index {idx}: {ident}",
+                        )
+            # Accept unknown vendor-prefixed third-party identifiers so shared
+            # skills remain usable without local ToolKit extraction.
+            elif ident not in allowed_ids and not THIRD_PARTY_IDENTIFIER_RE.match(
+                ident,
+            ):
+                errors.append(f"Unknown third-party identifier at index {idx}: {ident}")
 
         if ident in NOTES_CREATE_ACTIONS:
             title_val = None
@@ -2709,13 +2971,19 @@ def validate(
                 if key.lower() in NOTES_CONTENT_KEYS and content_val is None:
                     content_val = value
             if title_val is None:
-                errors.append(f"Notes create action missing title/name parameter at index {idx}")
+                errors.append(
+                    f"Notes create action missing title/name parameter at index {idx}",
+                )
             elif _token_param_is_empty(title_val):
                 errors.append(f"Notes create action title/name is empty at index {idx}")
             if content_val is None:
-                errors.append(f"Notes create action missing content/markdown parameter at index {idx}")
+                errors.append(
+                    f"Notes create action missing content/markdown parameter at index {idx}",
+                )
             elif _token_param_is_empty(content_val):
-                errors.append(f"Notes create action content/markdown is empty at index {idx}")
+                errors.append(
+                    f"Notes create action content/markdown is empty at index {idx}",
+                )
 
         # Empty strings in parameters
         for path in iter_empty_strings(params):
@@ -2725,7 +2993,9 @@ def validate(
                 and params.get("UUID") in send_message_empty_text_spacer_uuids
             ):
                 continue
-            errors.append(f"Empty parameter at index {idx}: {ident} -> {'/'.join(path)}")
+            errors.append(
+                f"Empty parameter at index {idx}: {ident} -> {'/'.join(path)}",
+            )
 
         # Validate WFTextTokenString placeholders (Shortcuts uses UTF-16 indices)
         for token in iter_text_token_strings(params):
@@ -2740,17 +3010,23 @@ def validate(
                 continue
             if attachments is None:
                 if "￼" in string:
-                    errors.append(f"WFTextTokenString missing attachmentsByRange at index {idx}")
+                    errors.append(
+                        f"WFTextTokenString missing attachmentsByRange at index {idx}",
+                    )
                 continue
             if not isinstance(attachments, dict):
-                errors.append(f"WFTextTokenString attachmentsByRange not a dict at index {idx}")
+                errors.append(
+                    f"WFTextTokenString attachmentsByRange not a dict at index {idx}",
+                )
                 continue
             units = _utf16_units(string)
             total_len = 0
             for key in attachments.keys():
                 m = re.match(r"^\{(\d+),\s*(\d+)\}$", str(key))
                 if not m:
-                    errors.append(f"Invalid attachmentsByRange key at index {idx}: {key}")
+                    errors.append(
+                        f"Invalid attachmentsByRange key at index {idx}: {key}",
+                    )
                     continue
                 start = int(m.group(1))
                 length = int(m.group(2))
@@ -2758,18 +3034,18 @@ def validate(
                 if start < 0 or start + length > len(units):
                     errors.append(
                         f"attachmentsByRange out of bounds at index {idx}: got {key}; "
-                        f"UTF-16 length is {len(units)}; {_placeholder_position_hint(string)}"
+                        f"UTF-16 length is {len(units)}; {_placeholder_position_hint(string)}",
                     )
                     continue
                 if any(units[start + j] != 0xFFFC for j in range(length)):
                     errors.append(
                         f"attachmentsByRange does not match placeholder at index {idx}: got {key}; "
-                        f"{_placeholder_position_hint(string)}"
+                        f"{_placeholder_position_hint(string)}",
                     )
             if string.count("￼") != total_len:
                 errors.append(
                     f"Placeholder count mismatch at index {idx}: string has {string.count('￼')} "
-                    f"placeholder(s), attachments cover {total_len}; {_placeholder_position_hint(string)}"
+                    f"placeholder(s), attachments cover {total_len}; {_placeholder_position_hint(string)}",
                 )
 
         # vCard/VCF usage should be explicit
@@ -2782,7 +3058,9 @@ def validate(
 
         # Token file usage should be explicit
         if not allow_token_file and ident:
-            if ident in FILE_ACTION_IDS or any(ident.startswith(p) for p in FILE_ACTION_PREFIXES):
+            if ident in FILE_ACTION_IDS or any(
+                ident.startswith(p) for p in FILE_ACTION_PREFIXES
+            ):
                 for path, value in iter_strings(params):
                     if "WFSerializationType" in path:
                         continue
@@ -2793,7 +3071,9 @@ def validate(
                     }:
                         continue
                     if TOKEN_HINT_RE.search(value or ""):
-                        errors.append(f"API token loaded from file at index {idx}: {ident}")
+                        errors.append(
+                            f"API token loaded from file at index {idx}: {ident}",
+                        )
                         break
 
         # TODOIST update URL should include task ID placeholder
@@ -2802,7 +3082,9 @@ def validate(
                 if TODOIST_TASKS_PREFIX in value:
                     suffix = value.split(TODOIST_TASKS_PREFIX, 1)[1]
                     if "￼" not in suffix:
-                        errors.append(f"Todoist task update URL missing task ID placeholder at index {idx}")
+                        errors.append(
+                            f"Todoist task update URL missing task ID placeholder at index {idx}",
+                        )
                     break
 
         # Conditional tests must be fully specified for If starts and macOS 27's
@@ -2847,13 +3129,15 @@ def validate(
             # this is set, the action does NOT have top-level WFCondition/WFInput.
             if wfconds is not None:
                 if not isinstance(wfconds, dict):
-                    errors.append(f"Conditional WFConditions must be a dict at index {idx}")
+                    errors.append(
+                        f"Conditional WFConditions must be a dict at index {idx}",
+                    )
                 else:
                     serialization = wfconds.get("WFSerializationType")
                     if serialization != "WFContentPredicateTableTemplate":
                         errors.append(
                             f"Conditional WFConditions WFSerializationType must be "
-                            f"WFContentPredicateTableTemplate at index {idx}"
+                            f"WFContentPredicateTableTemplate at index {idx}",
                         )
                     value = wfconds.get("Value")
                     templates = None
@@ -2862,43 +3146,55 @@ def validate(
                         templates = value.get("WFActionParameterFilterTemplates")
                         prefix = value.get("WFActionParameterFilterPrefix")
                     if not templates:
-                        errors.append(f"Conditional WFConditions has empty filter templates at index {idx}")
+                        errors.append(
+                            f"Conditional WFConditions has empty filter templates at index {idx}",
+                        )
                     elif not isinstance(templates, list):
-                        errors.append(f"Conditional WFConditions templates must be a list at index {idx}")
+                        errors.append(
+                            f"Conditional WFConditions templates must be a list at index {idx}",
+                        )
                     else:
                         if prefix not in (0, 1):
                             errors.append(
                                 f"Conditional WFConditions WFActionParameterFilterPrefix must be "
-                                f"0 (Any are true) or 1 (All are true) at index {idx}"
+                                f"0 (Any are true) or 1 (All are true) at index {idx}",
                             )
                         for tidx, template in enumerate(templates):
                             if not isinstance(template, dict):
-                                errors.append(f"Conditional template {tidx} is not a dict at index {idx}")
+                                errors.append(
+                                    f"Conditional template {tidx} is not a dict at index {idx}",
+                                )
                                 continue
                             tcond = template.get("WFCondition")
                             tinp = template.get("WFInput")
                             if tcond is None or tinp is None:
                                 errors.append(
-                                    f"Conditional template {tidx} missing WFCondition or WFInput at index {idx}"
+                                    f"Conditional template {tidx} missing WFCondition or WFInput at index {idx}",
                                 )
                                 continue
                             if not isinstance(tcond, int):
-                                errors.append(f"Conditional template {tidx} WFCondition must be integer at index {idx}")
+                                errors.append(
+                                    f"Conditional template {tidx} WFCondition must be integer at index {idx}",
+                                )
                                 continue
                             if tcond not in ALL_CONDITION_CODES:
                                 errors.append(
-                                    f"Conditional template {tidx} uses unknown WFCondition {tcond} at index {idx}"
+                                    f"Conditional template {tidx} uses unknown WFCondition {tcond} at index {idx}",
                                 )
                                 continue
-                            if not _input_is_attached(tinp) or not _conditional_input_is_wrapped(tinp):
+                            if not _input_is_attached(
+                                tinp,
+                            ) or not _conditional_input_is_wrapped(tinp):
                                 errors.append(
                                     f"Conditional template {tidx} WFInput must be a Type=Variable "
-                                    f"wrapper at index {idx}"
+                                    f"wrapper at index {idx}",
                                 )
-                            if tcond in STRING_CONDITION_CODES and not template.get("WFConditionalActionString"):
+                            if tcond in STRING_CONDITION_CODES and not template.get(
+                                "WFConditionalActionString",
+                            ):
                                 errors.append(
                                     f"Conditional template {tidx} (string code {tcond}) missing "
-                                    f"WFConditionalActionString at index {idx}"
+                                    f"WFConditionalActionString at index {idx}",
                                 )
                             if tcond == 99:
                                 reassigned_name = _reassigned_list_variable_name(
@@ -2912,23 +3208,29 @@ def validate(
                                         f"'{reassigned_name}' after it was set multiple times at index {idx}; "
                                         "macOS 27 imports this list-contains pattern with a blank comparison value. "
                                         "Reference the final List/Add to List action output directly, or assign it "
-                                        "once to a fresh final variable name before the If."
+                                        "once to a fresh final variable name before the If.",
                                     )
-                            if tcond in NUMBER_CONDITION_CODES and template.get("WFNumberValue") is None:
+                            if (
+                                tcond in NUMBER_CONDITION_CODES
+                                and template.get("WFNumberValue") is None
+                            ):
                                 errors.append(
                                     f"Conditional template {tidx} (numeric code {tcond}) missing "
-                                    f"WFNumberValue at index {idx}"
+                                    f"WFNumberValue at index {idx}",
                                 )
-                            if tcond == 1003 and template.get("WFAnotherNumber") is None:
+                            if (
+                                tcond == 1003
+                                and template.get("WFAnotherNumber") is None
+                            ):
                                 errors.append(
                                     f"Conditional template {tidx} (between, code 1003) missing "
-                                    f"WFAnotherNumber upper bound at index {idx}"
+                                    f"WFAnotherNumber upper bound at index {idx}",
                                 )
                 # Multi-condition is mutually exclusive with top-level WFCondition/WFInput.
                 if cond is not None or inp is not None:
                     errors.append(
                         f"Conditional has both WFConditions multi-condition block and "
-                        f"top-level WFCondition/WFInput at index {idx}; remove the top-level fields"
+                        f"top-level WFCondition/WFInput at index {idx}; remove the top-level fields",
                     )
                 continue
 
@@ -2938,29 +3240,37 @@ def validate(
                 errors.append(f"Conditional missing WFInput/WFCondition at index {idx}")
                 continue
             if not isinstance(cond, int):
-                errors.append(f"Conditional WFCondition should use integer code for runtime stability at index {idx}")
+                errors.append(
+                    f"Conditional WFCondition should use integer code for runtime stability at index {idx}",
+                )
                 continue
             if cond not in ALL_CONDITION_CODES:
-                errors.append(f"Conditional uses unknown WFCondition code {cond} at index {idx}; see CONTROL_FLOW.md")
+                errors.append(
+                    f"Conditional uses unknown WFCondition code {cond} at index {idx}; see CONTROL_FLOW.md",
+                )
                 continue
             if not _input_is_attached(inp):
-                errors.append(f"Conditional WFInput is not a token attachment at index {idx}")
+                errors.append(
+                    f"Conditional WFInput is not a token attachment at index {idx}",
+                )
                 continue
             is_wrapped = _conditional_input_is_wrapped(inp)
             if not is_wrapped:
                 errors.append(
-                    f"Conditional WFInput must use Type=Variable wrapper for editor visibility at index {idx}"
+                    f"Conditional WFInput must use Type=Variable wrapper for editor visibility at index {idx}",
                 )
             # Per-code field requirements.
             if cond in STRING_CONDITION_CODES:
                 if not params.get("WFConditionalActionString"):
-                    errors.append(f"Conditional (string code {cond}) missing WFConditionalActionString at index {idx}")
+                    errors.append(
+                        f"Conditional (string code {cond}) missing WFConditionalActionString at index {idx}",
+                    )
                 else:
                     for out_uuid in _input_action_output_uuids(inp):
                         ident_inp = uuid_to_ident.get(out_uuid)
                         if ident_inp == "is.workflow.actions.getvalueforkey":
                             errors.append(
-                                f"Conditional compares Dictionary Value directly at index {idx}; wrap in Text first"
+                                f"Conditional compares Dictionary Value directly at index {idx}; wrap in Text first",
                             )
                     if cond == 99:
                         reassigned_name = _reassigned_list_variable_name(
@@ -2974,23 +3284,27 @@ def validate(
                                 f"{setvariable_counts.get(reassigned_name, 0)} times at index {idx}; "
                                 "macOS 27 imports this list-contains pattern with a blank comparison value. "
                                 "Reference the final List/Add to List action output directly, or assign it "
-                                "once to a fresh final variable name before the If."
+                                "once to a fresh final variable name before the If.",
                             )
             elif cond in NUMBER_CONDITION_CODES:
                 if params.get("WFNumberValue") is None:
-                    errors.append(f"Conditional (numeric code {cond}) missing WFNumberValue at index {idx}")
+                    errors.append(
+                        f"Conditional (numeric code {cond}) missing WFNumberValue at index {idx}",
+                    )
                 if cond == 1003 and params.get("WFAnotherNumber") is None:
                     errors.append(
-                        f"Conditional (between, code 1003) missing WFAnotherNumber upper bound at index {idx}"
+                        f"Conditional (between, code 1003) missing WFAnotherNumber upper bound at index {idx}",
                     )
             elif cond in EXISTENCE_CONDITION_CODES:
                 # Existence checks (100/101) take no literal — only WFInput.
                 if params.get("WFConditionalActionString") is not None:
                     errors.append(
-                        f"Conditional (existence code {cond}) must not set WFConditionalActionString at index {idx}"
+                        f"Conditional (existence code {cond}) must not set WFConditionalActionString at index {idx}",
                     )
                 if params.get("WFNumberValue") is not None:
-                    errors.append(f"Conditional (existence code {cond}) must not set WFNumberValue at index {idx}")
+                    errors.append(
+                        f"Conditional (existence code {cond}) must not set WFNumberValue at index {idx}",
+                    )
 
         # Choose from Menu start requires items
         if ident == "is.workflow.actions.choosefrommenu":
@@ -3014,7 +3328,7 @@ def validate(
 
         if ident == "is.workflow.actions.input":
             errors.append(
-                f"Shortcut Input action is not runtime-safe on iOS at index {idx}; use ExtensionInput attachment instead"
+                f"Shortcut Input action is not runtime-safe on iOS at index {idx}; use ExtensionInput attachment instead",
             )
 
         if ident == "is.workflow.actions.additemtolist":
@@ -3023,23 +3337,36 @@ def validate(
             if _token_param_is_empty(params.get("WFListVariable")):
                 errors.append(f"Add Item to List missing WFListVariable at index {idx}")
             insert_position = params.get("WFInsertPosition")
-            if not _token_param_is_empty(insert_position) and insert_position not in ADD_ITEM_TO_LIST_POSITIONS:
-                errors.append(f"Add Item to List has unknown WFInsertPosition at index {idx}: {insert_position!r}")
+            if (
+                not _token_param_is_empty(insert_position)
+                and insert_position not in ADD_ITEM_TO_LIST_POSITIONS
+            ):
+                errors.append(
+                    f"Add Item to List has unknown WFInsertPosition at index {idx}: {insert_position!r}",
+                )
             if insert_position == "Index":
                 item_index = params.get("WFItemIndex")
                 if _token_param_is_empty(item_index):
-                    errors.append(f"Add Item to List position Index missing WFItemIndex at index {idx}")
+                    errors.append(
+                        f"Add Item to List position Index missing WFItemIndex at index {idx}",
+                    )
                 else:
                     try:
                         numeric_index = int(item_index)
                     except (TypeError, ValueError):
-                        errors.append(f"Add Item to List WFItemIndex must be an integer at index {idx}: {item_index!r}")
+                        errors.append(
+                            f"Add Item to List WFItemIndex must be an integer at index {idx}: {item_index!r}",
+                        )
                     else:
                         if numeric_index < 1:
-                            errors.append(f"Add Item to List WFItemIndex must be 1 or greater at index {idx}")
-            elif "WFItemIndex" in params and not _token_param_is_empty(params.get("WFItemIndex")):
+                            errors.append(
+                                f"Add Item to List WFItemIndex must be 1 or greater at index {idx}",
+                            )
+            elif "WFItemIndex" in params and not _token_param_is_empty(
+                params.get("WFItemIndex"),
+            ):
                 errors.append(
-                    f"Add Item to List WFItemIndex is only valid when WFInsertPosition is Index at index {idx}"
+                    f"Add Item to List WFItemIndex is only valid when WFInsertPosition is Index at index {idx}",
                 )
 
         if ident == "is.workflow.actions.choosefromlist":
@@ -3052,7 +3379,7 @@ def validate(
                 and params.get("WFChooseFromListActionSelectMultiple") is not True
             ):
                 errors.append(
-                    f"WFChooseFromListActionSelectAll requires WFChooseFromListActionSelectMultiple at index {idx}"
+                    f"WFChooseFromListActionSelectAll requires WFChooseFromListActionSelectMultiple at index {idx}",
                 )
 
         if ident in SHORTCUTS_URL_ACTIONS:
@@ -3062,20 +3389,28 @@ def validate(
 
         if ident == "is.workflow.actions.runjavascriptonwebpage":
             script_values = [
-                value for path, value in iter_strings(params) if path and path[-1] != "UUID" and value.strip()
+                value
+                for path, value in iter_strings(params)
+                if path and path[-1] != "UUID" and value.strip()
             ]
             combined_script = "\n".join(script_values)
             if "completion(" not in combined_script:
                 errors.append(
-                    f"Run JavaScript on Webpage script must call completion(...) or completion() at index {idx}"
+                    f"Run JavaScript on Webpage script must call completion(...) or completion() at index {idx}",
                 )
-            if re.search(r"\b(?:window\.)?(?:alert|prompt|confirm)\s*\(", combined_script):
+            if re.search(
+                r"\b(?:window\.)?(?:alert|prompt|confirm)\s*\(",
+                combined_script,
+            ):
                 errors.append(
-                    f"Run JavaScript on Webpage script uses blocking dialog APIs at index {idx}; avoid alert/prompt/confirm"
+                    f"Run JavaScript on Webpage script uses blocking dialog APIs at index {idx}; avoid alert/prompt/confirm",
                 )
-            if re.search(r"setTimeout\s*\([^,]+,\s*(?:[5-9]\d{3,}|\d{5,})", combined_script):
+            if re.search(
+                r"setTimeout\s*\([^,]+,\s*(?:[5-9]\d{3,}|\d{5,})",
+                combined_script,
+            ):
                 errors.append(
-                    f"Run JavaScript on Webpage script uses a long timeout at index {idx}; keep execution short"
+                    f"Run JavaScript on Webpage script uses a long timeout at index {idx}; keep execution short",
                 )
 
         # Text action should not be blank
@@ -3084,13 +3419,18 @@ def validate(
                 errors.append(f"Text action missing text at index {idx}")
             else:
                 text = params.get("WFTextActionText")
-                if text == "" and params.get("UUID") not in send_message_empty_text_spacer_uuids:
+                if (
+                    text == ""
+                    and params.get("UUID") not in send_message_empty_text_spacer_uuids
+                ):
                     errors.append(f"Text action has empty text at index {idx}")
 
         if ident == "is.workflow.actions.number":
             number = params.get("WFNumberActionNumber")
             if number is None or number == "" or number == {}:
-                errors.append(f"Number action missing WFNumberActionNumber at index {idx}")
+                errors.append(
+                    f"Number action missing WFNumberActionNumber at index {idx}",
+                )
 
         # URL action should have URL
         if ident in REQUIRED_URL_ACTIONS:
@@ -3103,24 +3443,36 @@ def validate(
             if not wfinput:
                 errors.append(f"Missing WFInput at index {idx}: {ident}")
             elif not _input_is_attached(wfinput):
-                errors.append(f"WFInput is not a token attachment at index {idx}: {ident}")
+                errors.append(
+                    f"WFInput is not a token attachment at index {idx}: {ident}",
+                )
             elif not _input_has_reference(wfinput):
-                errors.append(f"WFInput has no variable/output reference at index {idx}: {ident}")
+                errors.append(
+                    f"WFInput has no variable/output reference at index {idx}: {ident}",
+                )
             else:
                 for out_uuid in _input_action_output_uuids(wfinput):
                     if out_uuid not in uuid_to_ident:
-                        errors.append(f"WFInput references unknown OutputUUID at index {idx}: {ident}")
-            if ident in EDITOR_VISIBLE_INPUT_ACTIONS and not _input_is_editor_visible(wfinput):
+                        errors.append(
+                            f"WFInput references unknown OutputUUID at index {idx}: {ident}",
+                        )
+            if ident in EDITOR_VISIBLE_INPUT_ACTIONS and not _input_is_editor_visible(
+                wfinput,
+            ):
                 errors.append(
-                    f"WFInput should use WFTextTokenString (placeholder) or wrapped Variable for editor visibility at index {idx}: {ident}"
+                    f"WFInput should use WFTextTokenString (placeholder) or wrapped Variable for editor visibility at index {idx}: {ident}",
                 )
 
         if ident in STORED_CONTENT_ACTIONS:
             if _token_param_is_empty(params.get("WFStoredContentKey")):
-                errors.append(f"Stored Content action missing WFStoredContentKey at index {idx}: {ident}")
+                errors.append(
+                    f"Stored Content action missing WFStoredContentKey at index {idx}: {ident}",
+                )
             global_value = params.get("WFStoredContentGlobalValue")
             if global_value is not None and not isinstance(global_value, bool):
-                errors.append(f"WFStoredContentGlobalValue must be boolean at index {idx}: {ident}")
+                errors.append(
+                    f"WFStoredContentGlobalValue must be boolean at index {idx}: {ident}",
+                )
             if ident == "is.workflow.actions.setstoredcontent":
                 wfinput = params.get("WFInput")
                 if not wfinput:
@@ -3128,36 +3480,51 @@ def validate(
                 elif not _input_is_single_placeholder_token_string(wfinput):
                     errors.append(
                         f"Store Content WFInput must be a WFTextTokenString with exactly one object placeholder "
-                        f"at index {idx}; bare or wrapped token attachments import as an empty Content parameter"
+                        f"at index {idx}; bare or wrapped token attachments import as an empty Content parameter",
                     )
                 elif not _input_has_reference(wfinput):
-                    errors.append(f"Store Content WFInput has no variable/output reference at index {idx}")
+                    errors.append(
+                        f"Store Content WFInput has no variable/output reference at index {idx}",
+                    )
                 else:
                     for out_uuid in _input_action_output_uuids(wfinput):
                         if out_uuid not in uuid_to_ident:
-                            errors.append(f"Store Content WFInput references unknown OutputUUID at index {idx}")
+                            errors.append(
+                                f"Store Content WFInput references unknown OutputUUID at index {idx}",
+                            )
 
         if ident == "is.workflow.actions.getonscreencontext":
             scope = params.get("WFOnScreenContextScope")
-            if not _token_param_is_empty(scope) and scope not in ON_SCREEN_CONTEXT_SCOPES:
-                errors.append(f"Get What's On Screen has unknown WFOnScreenContextScope at index {idx}: {scope!r}")
+            if (
+                not _token_param_is_empty(scope)
+                and scope not in ON_SCREEN_CONTEXT_SCOPES
+            ):
+                errors.append(
+                    f"Get What's On Screen has unknown WFOnScreenContextScope at index {idx}: {scope!r}",
+                )
             limit_enabled = params.get("WFOnScreenContextLimitEnabled")
             if limit_enabled is not None and not isinstance(limit_enabled, bool):
-                errors.append(f"WFOnScreenContextLimitEnabled must be boolean at index {idx}")
+                errors.append(
+                    f"WFOnScreenContextLimitEnabled must be boolean at index {idx}",
+                )
             limit_value = params.get("WFOnScreenContextLimit")
             if limit_enabled is True:
                 if _token_param_is_empty(limit_value):
                     errors.append(
-                        f"Get What's On Screen limit is enabled but missing WFOnScreenContextLimit at index {idx}"
+                        f"Get What's On Screen limit is enabled but missing WFOnScreenContextLimit at index {idx}",
                     )
                 else:
                     try:
                         numeric_limit = float(limit_value)
                     except (TypeError, ValueError):
-                        errors.append(f"WFOnScreenContextLimit must be numeric at index {idx}: {limit_value!r}")
+                        errors.append(
+                            f"WFOnScreenContextLimit must be numeric at index {idx}: {limit_value!r}",
+                        )
                     else:
                         if numeric_limit <= 0:
-                            errors.append(f"WFOnScreenContextLimit must be greater than 0 at index {idx}")
+                            errors.append(
+                                f"WFOnScreenContextLimit must be greater than 0 at index {idx}",
+                            )
 
         for key in OS27_BOOLEAN_PARAMETER_KEYS_BY_ACTION.get(ident, set()):
             value = params.get(key)
@@ -3166,57 +3533,101 @@ def validate(
 
         if ident == "is.workflow.actions.appendnote":
             operation = params.get("operation")
-            if not _token_param_is_empty(operation) and operation not in APPEND_NOTE_OPERATIONS:
-                errors.append(f"Append to Note has unknown operation at index {idx}: {operation!r}")
+            if (
+                not _token_param_is_empty(operation)
+                and operation not in APPEND_NOTE_OPERATIONS
+            ):
+                errors.append(
+                    f"Append to Note has unknown operation at index {idx}: {operation!r}",
+                )
 
-        if ident in {"is.workflow.actions.getdistance", "is.workflow.actions.gettraveltime"}:
+        if ident in {
+            "is.workflow.actions.getdistance",
+            "is.workflow.actions.gettraveltime",
+        }:
             route_mode = params.get("WFGetDirectionsActionMode")
             valid_modes = (
-                GET_DISTANCE_ROUTE_MODES if ident == "is.workflow.actions.getdistance" else GET_TRAVEL_TIME_ROUTE_MODES
+                GET_DISTANCE_ROUTE_MODES
+                if ident == "is.workflow.actions.getdistance"
+                else GET_TRAVEL_TIME_ROUTE_MODES
             )
             if not _token_param_is_empty(route_mode) and route_mode not in valid_modes:
-                errors.append(f"{ident} has unknown WFGetDirectionsActionMode at index {idx}: {route_mode!r}")
+                errors.append(
+                    f"{ident} has unknown WFGetDirectionsActionMode at index {idx}: {route_mode!r}",
+                )
             if ident == "is.workflow.actions.getdistance":
                 distance_unit = params.get("WFDistanceUnit")
-                if not _token_param_is_empty(distance_unit) and distance_unit not in GET_DISTANCE_UNITS:
-                    errors.append(f"Get Distance has unknown WFDistanceUnit at index {idx}: {distance_unit!r}")
+                if (
+                    not _token_param_is_empty(distance_unit)
+                    and distance_unit not in GET_DISTANCE_UNITS
+                ):
+                    errors.append(
+                        f"Get Distance has unknown WFDistanceUnit at index {idx}: {distance_unit!r}",
+                    )
                 accuracy = params.get("Accuracy")
-                if not _token_param_is_empty(accuracy) and accuracy not in GET_DISTANCE_ACCURACY_VALUES:
-                    errors.append(f"Get Distance has unknown Accuracy at index {idx}: {accuracy!r}")
+                if (
+                    not _token_param_is_empty(accuracy)
+                    and accuracy not in GET_DISTANCE_ACCURACY_VALUES
+                ):
+                    errors.append(
+                        f"Get Distance has unknown Accuracy at index {idx}: {accuracy!r}",
+                    )
 
         if ident == "is.workflow.actions.searchlocalbusinesses":
             sort_order = params.get("WFSearchSortOrder")
-            if not _token_param_is_empty(sort_order) and sort_order not in FIND_PLACES_SORT_ORDERS:
-                errors.append(f"Find Places has unknown WFSearchSortOrder at index {idx}: {sort_order!r}")
+            if (
+                not _token_param_is_empty(sort_order)
+                and sort_order not in FIND_PLACES_SORT_ORDERS
+            ):
+                errors.append(
+                    f"Find Places has unknown WFSearchSortOrder at index {idx}: {sort_order!r}",
+                )
 
         if ident == "com.apple.ShortcutsActions.SetMultitaskingModeAction":
             mode = params.get("mode")
-            if not _token_param_is_empty(mode) and not _parameter_is_dynamic_attachment(mode):
+            if not _token_param_is_empty(mode) and not _parameter_is_dynamic_attachment(
+                mode,
+            ):
                 mode_values = _literal_enum_values(mode)
                 if not mode_values:
-                    errors.append(f"Set Multitasking Mode has unsupported mode shape at index {idx}: {mode!r}")
+                    errors.append(
+                        f"Set Multitasking Mode has unsupported mode shape at index {idx}: {mode!r}",
+                    )
                 else:
                     for mode_value in mode_values:
                         if mode_value not in MULTITASKING_MODES:
-                            errors.append(f"Set Multitasking Mode has unknown mode at index {idx}: {mode_value!r}")
+                            errors.append(
+                                f"Set Multitasking Mode has unknown mode at index {idx}: {mode_value!r}",
+                            )
 
         if ident == "is.workflow.actions.openapp":
             windowing_format = params.get("WFWindowingFormat")
-            if not _token_param_is_empty(windowing_format) and windowing_format not in OPEN_APP_WINDOWING_FORMATS:
-                errors.append(f"Open App has unknown WFWindowingFormat at index {idx}: {windowing_format!r}")
+            if (
+                not _token_param_is_empty(windowing_format)
+                and windowing_format not in OPEN_APP_WINDOWING_FORMATS
+            ):
+                errors.append(
+                    f"Open App has unknown WFWindowingFormat at index {idx}: {windowing_format!r}",
+                )
 
         if ident == "is.workflow.actions.scanbarcode":
             image_file = params.get("imageFile")
             if _token_param_is_empty(image_file):
                 errors.append(f"Scan QR or Barcode missing imageFile at index {idx}")
             elif not _input_is_attached(image_file):
-                errors.append(f"Scan QR or Barcode imageFile is not a token attachment at index {idx}")
+                errors.append(
+                    f"Scan QR or Barcode imageFile is not a token attachment at index {idx}",
+                )
             elif not _input_has_reference(image_file):
-                errors.append(f"Scan QR or Barcode imageFile has no variable/output reference at index {idx}")
+                errors.append(
+                    f"Scan QR or Barcode imageFile has no variable/output reference at index {idx}",
+                )
             else:
                 for out_uuid in _input_action_output_uuids(image_file):
                     if out_uuid not in uuid_to_ident:
-                        errors.append(f"Scan QR or Barcode imageFile references unknown OutputUUID at index {idx}")
+                        errors.append(
+                            f"Scan QR or Barcode imageFile references unknown OutputUUID at index {idx}",
+                        )
 
         if (
             ident
@@ -3227,63 +3638,99 @@ def validate(
             and "contents" in params
         ):
             if _token_param_is_empty(params.get("contents")):
-                errors.append(f"Create Tab Group has empty contents at index {idx}; omit contents or provide URLs/tabs")
+                errors.append(
+                    f"Create Tab Group has empty contents at index {idx}; omit contents or provide URLs/tabs",
+                )
 
         if ident in {"is.workflow.actions.hide.app", "is.workflow.actions.quit.app"}:
-            mode_key = "WFHideAppMode" if ident == "is.workflow.actions.hide.app" else "WFQuitAppMode"
+            mode_key = (
+                "WFHideAppMode"
+                if ident == "is.workflow.actions.hide.app"
+                else "WFQuitAppMode"
+            )
             mode = params.get(mode_key)
             if not _token_param_is_empty(mode) and mode not in APP_ACTION_MODES:
-                errors.append(f"{ident} has unknown {mode_key} at index {idx}: {mode!r}")
+                errors.append(
+                    f"{ident} has unknown {mode_key} at index {idx}: {mode!r}",
+                )
             if mode == "App" and _token_param_is_empty(params.get("WFApp")):
                 errors.append(f"{ident} mode App missing WFApp at index {idx}")
             apps_except = params.get("WFAppsExcept")
             if "WFAppsExcept" in params and _token_param_is_empty(apps_except):
-                errors.append(f"{ident} has empty WFAppsExcept at index {idx}; omit it or provide apps to keep open")
+                errors.append(
+                    f"{ident} has empty WFAppsExcept at index {idx}; omit it or provide apps to keep open",
+                )
             ask_to_save = params.get("WFAskToSaveChanges")
             if ask_to_save is not None and not isinstance(ask_to_save, bool):
-                errors.append(f"WFAskToSaveChanges must be boolean at index {idx}: {ident}")
+                errors.append(
+                    f"WFAskToSaveChanges must be boolean at index {idx}: {ident}",
+                )
 
         if ident == "is.workflow.actions.filter.vpns":
             input_parameter = params.get("WFContentItemInputParameter")
-            if not _token_param_is_empty(input_parameter) and input_parameter not in CONTENT_ITEM_INPUT_PARAMETERS:
-                errors.append(f"Find VPNs has unknown WFContentItemInputParameter at index {idx}: {input_parameter!r}")
+            if (
+                not _token_param_is_empty(input_parameter)
+                and input_parameter not in CONTENT_ITEM_INPUT_PARAMETERS
+            ):
+                errors.append(
+                    f"Find VPNs has unknown WFContentItemInputParameter at index {idx}: {input_parameter!r}",
+                )
             sort_property = params.get("WFContentItemSortProperty")
-            if not _token_param_is_empty(sort_property) and sort_property not in VPN_SORT_PROPERTIES:
-                errors.append(f"Find VPNs has unknown WFContentItemSortProperty at index {idx}: {sort_property!r}")
+            if (
+                not _token_param_is_empty(sort_property)
+                and sort_property not in VPN_SORT_PROPERTIES
+            ):
+                errors.append(
+                    f"Find VPNs has unknown WFContentItemSortProperty at index {idx}: {sort_property!r}",
+                )
             compound_type = params.get("WFCompoundType")
             if compound_type is not None and compound_type not in VPN_COMPOUND_TYPES:
-                errors.append(f"Find VPNs has unknown WFCompoundType at index {idx}: {compound_type!r}")
+                errors.append(
+                    f"Find VPNs has unknown WFCompoundType at index {idx}: {compound_type!r}",
+                )
             limit_enabled = params.get("WFContentItemLimitEnabled")
             if limit_enabled is not None and not isinstance(limit_enabled, bool):
-                errors.append(f"Find VPNs WFContentItemLimitEnabled must be boolean at index {idx}")
+                errors.append(
+                    f"Find VPNs WFContentItemLimitEnabled must be boolean at index {idx}",
+                )
             limit_number = params.get("WFContentItemLimitNumber")
             if limit_enabled is True:
                 if _token_param_is_empty(limit_number):
-                    errors.append(f"Find VPNs limit is enabled but missing WFContentItemLimitNumber at index {idx}")
+                    errors.append(
+                        f"Find VPNs limit is enabled but missing WFContentItemLimitNumber at index {idx}",
+                    )
                 else:
                     try:
                         numeric_limit = float(limit_number)
                     except (TypeError, ValueError):
                         errors.append(
-                            f"Find VPNs WFContentItemLimitNumber must be numeric at index {idx}: {limit_number!r}"
+                            f"Find VPNs WFContentItemLimitNumber must be numeric at index {idx}: {limit_number!r}",
                         )
                     else:
                         if numeric_limit <= 0:
-                            errors.append(f"Find VPNs WFContentItemLimitNumber must be greater than 0 at index {idx}")
+                            errors.append(
+                                f"Find VPNs WFContentItemLimitNumber must be greater than 0 at index {idx}",
+                            )
 
         if ident == "is.workflow.actions.vpn.set":
             operation = params.get("WFVPNOperation")
             if _token_param_is_empty(operation):
                 errors.append(f"Set VPN missing WFVPNOperation at index {idx}")
             elif operation not in VPN_OPERATIONS:
-                errors.append(f"Set VPN has unknown WFVPNOperation at index {idx}: {operation!r}")
+                errors.append(
+                    f"Set VPN has unknown WFVPNOperation at index {idx}: {operation!r}",
+                )
             if _token_param_is_empty(params.get("WFVPN")):
                 errors.append(f"Set VPN missing WFVPN at index {idx}")
             on_demand_value = params.get("WFOnDemandValue")
             if on_demand_value is not None and not isinstance(on_demand_value, bool):
-                errors.append(f"WFOnDemandValue must be boolean at index {idx}: {ident}")
+                errors.append(
+                    f"WFOnDemandValue must be boolean at index {idx}: {ident}",
+                )
             if operation == "Set On Demand" and on_demand_value is None:
-                errors.append(f"Set VPN operation Set On Demand missing WFOnDemandValue at index {idx}")
+                errors.append(
+                    f"Set VPN operation Set On Demand missing WFOnDemandValue at index {idx}",
+                )
 
         if ident == "is.workflow.actions.location" and "WFLocation" not in params:
             errors.append(f"Location action missing WFLocation at index {idx}")
@@ -3293,61 +3740,79 @@ def validate(
                 continue
             location_value = params.get(location_key)
             if _token_param_is_empty(location_value):
-                errors.append(f"Location parameter {location_key} is empty at index {idx}: {ident}")
+                errors.append(
+                    f"Location parameter {location_key} is empty at index {idx}: {ident}",
+                )
                 continue
             if not _input_is_attached(location_value):
-                errors.append(f"Location parameter {location_key} is not a token attachment at index {idx}: {ident}")
+                errors.append(
+                    f"Location parameter {location_key} is not a token attachment at index {idx}: {ident}",
+                )
                 continue
             if (
                 isinstance(location_value, dict)
                 and location_value.get("WFSerializationType") != "WFTextTokenAttachment"
             ):
                 errors.append(
-                    f"Location parameter {location_key} should use WFTextTokenAttachment (token strings can import as empty) at index {idx}: {ident}"
+                    f"Location parameter {location_key} should use WFTextTokenAttachment (token strings can import as empty) at index {idx}: {ident}",
                 )
                 continue
             if not _input_has_reference(location_value):
                 errors.append(
-                    f"Location parameter {location_key} has no variable/output reference at index {idx}: {ident}"
+                    f"Location parameter {location_key} has no variable/output reference at index {idx}: {ident}",
                 )
                 continue
             input_var_name = _extract_input_variable_name(location_value)
             if input_var_name:
                 if input_var_name not in location_source_vars:
                     errors.append(
-                        f"Location parameter {location_key} variable '{input_var_name}' does not resolve to a location source variable at index {idx}: {ident}"
+                        f"Location parameter {location_key} variable '{input_var_name}' does not resolve to a location source variable at index {idx}: {ident}",
                     )
                 continue
             for out_uuid in _input_action_output_uuids(location_value):
                 source_ident = uuid_to_ident.get(out_uuid)
                 if source_ident is None:
                     errors.append(
-                        f"Location parameter {location_key} references unknown OutputUUID at index {idx}: {ident}"
+                        f"Location parameter {location_key} references unknown OutputUUID at index {idx}: {ident}",
                     )
                 elif source_ident not in LOCATION_SOURCE_ACTIONS:
                     errors.append(
-                        f"Location parameter {location_key} should reference output from Get Current Location/Location action at index {idx}: {ident}"
+                        f"Location parameter {location_key} should reference output from Get Current Location/Location action at index {idx}: {ident}",
                     )
 
         wfinput = params.get("WFInput")
-        if wfinput and ident != "is.workflow.actions.conditional" and _wrapped_variable_contains_action_output(wfinput):
-            errors.append(f"WFInput wraps ActionOutput in Type=Variable wrapper at index {idx}: {ident}")
+        if (
+            wfinput
+            and ident != "is.workflow.actions.conditional"
+            and _wrapped_variable_contains_action_output(wfinput)
+        ):
+            errors.append(
+                f"WFInput wraps ActionOutput in Type=Variable wrapper at index {idx}: {ident}",
+            )
 
         # Data-producing actions should have their outputs referenced later
         if ident in UNUSED_OUTPUT_ACTIONS and uuid and uuid not in used_output_uuids:
             if idx != len(actions) - 1:
-                errors.append(f"Output from {ident} at index {idx} is unused; likely missing variable wiring")
+                errors.append(
+                    f"Output from {ident} at index {idx} is unused; likely missing variable wiring",
+                )
 
         # Download URL should have WFURL or WFInput
         if ident in REQUIRED_URL_INPUT_ACTIONS:
             if not params.get("WFURL") and not params.get("WFInput"):
-                errors.append(f"Get Contents of URL missing WFURL/WFInput at index {idx}")
+                errors.append(
+                    f"Get Contents of URL missing WFURL/WFInput at index {idx}",
+                )
 
         if ident == "is.workflow.actions.count":
             if "Input" not in params:
-                errors.append(f"Count action should include Input mirror of WFInput at index {idx}")
+                errors.append(
+                    f"Count action should include Input mirror of WFInput at index {idx}",
+                )
             elif params.get("WFInput") and params.get("Input") != params.get("WFInput"):
-                errors.append(f"Count action Input must match WFInput reference at index {idx}")
+                errors.append(
+                    f"Count action Input must match WFInput reference at index {idx}",
+                )
 
         # Action-specific required fields
         if ident == "is.workflow.actions.getvalueforkey":
@@ -3355,13 +3820,19 @@ def validate(
             if not wfinput:
                 errors.append(f"Get Dictionary Value missing input at index {idx}")
             elif not _input_is_attached(wfinput):
-                errors.append(f"Get Dictionary Value WFInput is not a token attachment at index {idx}")
+                errors.append(
+                    f"Get Dictionary Value WFInput is not a token attachment at index {idx}",
+                )
             elif not _input_has_reference(wfinput):
-                errors.append(f"Get Dictionary Value WFInput has no variable/output reference at index {idx}")
+                errors.append(
+                    f"Get Dictionary Value WFInput has no variable/output reference at index {idx}",
+                )
             else:
                 for out_uuid in _input_action_output_uuids(wfinput):
                     if out_uuid not in uuid_to_ident:
-                        errors.append(f"Get Dictionary Value references unknown OutputUUID at index {idx}")
+                        errors.append(
+                            f"Get Dictionary Value references unknown OutputUUID at index {idx}",
+                        )
 
             value_type = params.get("WFGetDictionaryValueType")
             if value_type in (None, "", "Value"):
@@ -3371,7 +3842,7 @@ def validate(
                 elif isinstance(key_param, str):
                     if UNSAFE_ERROR_DOT_PATH_RE.match(key_param.strip()):
                         errors.append(
-                            f"Get Dictionary Value uses unsafe direct key path '{key_param}' at index {idx}; extract 'error' first, then read nested keys inside a guarded If block"
+                            f"Get Dictionary Value uses unsafe direct key path '{key_param}' at index {idx}; extract 'error' first, then read nested keys inside a guarded If block",
                         )
 
         if ident == "is.workflow.actions.image.convert":
@@ -3381,35 +3852,47 @@ def validate(
         if ident == "is.workflow.actions.properties.weather.conditions":
             prop_name = params.get("WFContentItemPropertyName")
             if _token_param_is_empty(prop_name):
-                errors.append(f"Get Detail of Weather Conditions missing WFContentItemPropertyName at index {idx}")
-            elif isinstance(prop_name, str) and prop_name.strip().lower() in WEATHER_DETAIL_PLACEHOLDER_VALUES:
                 errors.append(
-                    f"Get Detail of Weather Conditions uses placeholder detail name at index {idx}: {prop_name!r}"
+                    f"Get Detail of Weather Conditions missing WFContentItemPropertyName at index {idx}",
                 )
-            elif isinstance(prop_name, str) and prop_name not in WEATHER_DETAIL_SUPPORTED_VALUES:
+            elif (
+                isinstance(prop_name, str)
+                and prop_name.strip().lower() in WEATHER_DETAIL_PLACEHOLDER_VALUES
+            ):
                 errors.append(
-                    f"Get Detail of Weather Conditions uses unsupported detail name at index {idx}: {prop_name!r}; use one of {', '.join(sorted(WEATHER_DETAIL_SUPPORTED_VALUES))}"
+                    f"Get Detail of Weather Conditions uses placeholder detail name at index {idx}: {prop_name!r}",
+                )
+            elif (
+                isinstance(prop_name, str)
+                and prop_name not in WEATHER_DETAIL_SUPPORTED_VALUES
+            ):
+                errors.append(
+                    f"Get Detail of Weather Conditions uses unsupported detail name at index {idx}: {prop_name!r}; use one of {', '.join(sorted(WEATHER_DETAIL_SUPPORTED_VALUES))}",
                 )
             weather_input = params.get("WFInput")
             if _token_param_is_empty(weather_input):
-                errors.append(f"Get Detail of Weather Conditions missing WFInput at index {idx}")
+                errors.append(
+                    f"Get Detail of Weather Conditions missing WFInput at index {idx}",
+                )
             elif not _input_is_attached(weather_input):
-                errors.append(f"Get Detail of Weather Conditions WFInput is not a token attachment at index {idx}")
+                errors.append(
+                    f"Get Detail of Weather Conditions WFInput is not a token attachment at index {idx}",
+                )
             elif not _input_has_reference(weather_input):
                 errors.append(
-                    f"Get Detail of Weather Conditions WFInput has no variable/output reference at index {idx}"
+                    f"Get Detail of Weather Conditions WFInput has no variable/output reference at index {idx}",
                 )
             else:
                 input_var_name = _extract_input_variable_name(weather_input)
                 if input_var_name:
                     errors.append(
-                        f"Get Detail of Weather Conditions WFInput should reference weather action output directly (variable '{input_var_name}' can import as generic Detail) at index {idx}"
+                        f"Get Detail of Weather Conditions WFInput should reference weather action output directly (variable '{input_var_name}' can import as generic Detail) at index {idx}",
                     )
 
                 out_uuids = _input_action_output_uuids(weather_input)
                 if not out_uuids:
                     errors.append(
-                        f"Get Detail of Weather Conditions WFInput should reference output from Get Weather/Forecast directly at index {idx}"
+                        f"Get Detail of Weather Conditions WFInput should reference output from Get Weather/Forecast directly at index {idx}",
                     )
                 else:
                     has_weather_source = False
@@ -3417,13 +3900,13 @@ def validate(
                         source_ident = uuid_to_ident.get(out_uuid)
                         if source_ident is None:
                             errors.append(
-                                f"Get Detail of Weather Conditions references unknown OutputUUID at index {idx}"
+                                f"Get Detail of Weather Conditions references unknown OutputUUID at index {idx}",
                             )
                         elif source_ident in WEATHER_SOURCE_ACTIONS:
                             has_weather_source = True
                     if not has_weather_source:
                         errors.append(
-                            f"Get Detail of Weather Conditions WFInput should reference output from Get Weather/Forecast at index {idx}"
+                            f"Get Detail of Weather Conditions WFInput should reference output from Get Weather/Forecast at index {idx}",
                         )
 
         if ident == "is.workflow.actions.getitemfromlist":
@@ -3437,13 +3920,17 @@ def validate(
                     and source_prop in WEATHER_DETAIL_LIST_VALUES
                 ):
                     specifier = params.get("WFItemSpecifier")
-                    if source_prop == "Sunrise Time" and specifier not in (None, "", "First Item"):
+                    if source_prop == "Sunrise Time" and specifier not in (
+                        None,
+                        "",
+                        "First Item",
+                    ):
                         errors.append(
-                            f"Sunrise Time returns a list; Get Item from List should use First Item at index {idx}"
+                            f"Sunrise Time returns a list; Get Item from List should use First Item at index {idx}",
                         )
                     if source_prop == "Sunset Time" and specifier != "Last Item":
                         errors.append(
-                            f"Sunset Time returns a list; Get Item from List should use Last Item at index {idx}"
+                            f"Sunset Time returns a list; Get Item from List should use Last Item at index {idx}",
                         )
 
         if ident == "is.workflow.actions.gettimebetweendates":
@@ -3454,50 +3941,58 @@ def validate(
                     continue
                 value = params.get(key)
                 if _token_param_is_empty(value):
-                    errors.append(f"Get Time Between Dates has empty {key} at index {idx}; omit unused date keys")
+                    errors.append(
+                        f"Get Time Between Dates has empty {key} at index {idx}; omit unused date keys",
+                    )
                 else:
                     non_empty_date_refs.append((key, value))
 
             if not non_empty_date_refs:
                 errors.append(
-                    f"Get Time Between Dates missing WFDate/WFTimeUntilCustomDate/WFTimeUntilFromDate at index {idx}"
+                    f"Get Time Between Dates missing WFDate/WFTimeUntilCustomDate/WFTimeUntilFromDate at index {idx}",
                 )
             elif len(non_empty_date_refs) > 1:
                 used = ", ".join(key for key, _ in non_empty_date_refs)
                 errors.append(
-                    f"Get Time Between Dates should set exactly one non-empty date operand (found: {used}) at index {idx}"
+                    f"Get Time Between Dates should set exactly one non-empty date operand (found: {used}) at index {idx}",
                 )
 
             for key, reference in non_empty_date_refs:
                 if not _input_is_attached(reference):
-                    errors.append(f"Get Time Between Dates {key} is not a token attachment at index {idx}")
+                    errors.append(
+                        f"Get Time Between Dates {key} is not a token attachment at index {idx}",
+                    )
                     continue
                 if _input_has_current_date_token(reference):
                     errors.append(
                         f"Get Time Between Dates {key} cannot use CurrentDate magic token directly at index {idx}; "
-                        "insert a Date action set to Current Date and reference that action output"
+                        "insert a Date action set to Current Date and reference that action output",
                     )
                     continue
                 if not _input_is_token_string(reference):
                     errors.append(
-                        f"Get Time Between Dates {key} should use WFTextTokenString with a placeholder at index {idx}"
+                        f"Get Time Between Dates {key} should use WFTextTokenString with a placeholder at index {idx}",
                     )
                 if not _input_has_reference(reference):
-                    errors.append(f"Get Time Between Dates {key} has no variable/output reference at index {idx}")
+                    errors.append(
+                        f"Get Time Between Dates {key} has no variable/output reference at index {idx}",
+                    )
                     continue
                 for out_uuid in _input_action_output_uuids(reference):
                     if out_uuid not in uuid_to_ident:
-                        errors.append(f"Get Time Between Dates {key} references unknown OutputUUID at index {idx}")
+                        errors.append(
+                            f"Get Time Between Dates {key} references unknown OutputUUID at index {idx}",
+                        )
 
             wfinput = params.get("WFInput")
             if _input_has_current_date_token(wfinput):
                 errors.append(
                     f"Get Time Between Dates WFInput cannot use CurrentDate magic token directly at index {idx}; "
-                    "insert a Date action set to Current Date and reference that action output"
+                    "insert a Date action set to Current Date and reference that action output",
                 )
             elif wfinput and not _input_is_token_string(wfinput):
                 errors.append(
-                    f"Get Time Between Dates WFInput should use WFTextTokenString with a placeholder at index {idx}"
+                    f"Get Time Between Dates WFInput should use WFTextTokenString with a placeholder at index {idx}",
                 )
 
             unit = params.get("WFTimeUntilUnit")
@@ -3506,7 +4001,9 @@ def validate(
                 and isinstance(unit, str)
                 and unit.strip().lower() not in DATE_DELTA_UNITS
             ):
-                errors.append(f"Get Time Between Dates has unsupported WFTimeUntilUnit '{unit}' at index {idx}")
+                errors.append(
+                    f"Get Time Between Dates has unsupported WFTimeUntilUnit '{unit}' at index {idx}",
+                )
 
         if ident == "is.workflow.actions.extracttextfromimage":
             image_keys = ("imageFile", "WFImage", "WFInput")
@@ -3517,37 +4014,49 @@ def validate(
                 value = params.get(key)
                 if _token_param_is_empty(value):
                     errors.append(
-                        f"Extract Text from Image has empty {key} at index {idx}; omit unused image-input keys"
+                        f"Extract Text from Image has empty {key} at index {idx}; omit unused image-input keys",
                     )
                 else:
                     non_empty_image_inputs.append((key, value))
 
             if not non_empty_image_inputs:
-                errors.append(f"Extract Text from Image missing imageFile/WFImage/WFInput at index {idx}")
+                errors.append(
+                    f"Extract Text from Image missing imageFile/WFImage/WFInput at index {idx}",
+                )
             elif len(non_empty_image_inputs) > 1:
                 used = ", ".join(key for key, _ in non_empty_image_inputs)
                 errors.append(
-                    f"Extract Text from Image should set exactly one non-empty image input key (found: {used}) at index {idx}"
+                    f"Extract Text from Image should set exactly one non-empty image input key (found: {used}) at index {idx}",
                 )
 
             for key, value in non_empty_image_inputs:
                 if not _input_is_attached(value):
-                    errors.append(f"Extract Text from Image {key} is not a token attachment at index {idx}")
+                    errors.append(
+                        f"Extract Text from Image {key} is not a token attachment at index {idx}",
+                    )
                     continue
                 if not _input_has_reference(value):
-                    errors.append(f"Extract Text from Image {key} has no variable/output reference at index {idx}")
+                    errors.append(
+                        f"Extract Text from Image {key} has no variable/output reference at index {idx}",
+                    )
                     continue
                 for out_uuid in _input_action_output_uuids(value):
                     if out_uuid not in uuid_to_ident:
-                        errors.append(f"Extract Text from Image {key} references unknown OutputUUID at index {idx}")
+                        errors.append(
+                            f"Extract Text from Image {key} references unknown OutputUUID at index {idx}",
+                        )
 
         if ident == "is.workflow.actions.setvalueforkey":
             if not params.get("WFDictionary"):
-                errors.append(f"Set Dictionary Value missing WFDictionary at index {idx}")
+                errors.append(
+                    f"Set Dictionary Value missing WFDictionary at index {idx}",
+                )
 
         if ident == "is.workflow.actions.text.match":
             if "WFInput" in params:
-                errors.append(f"Match Text should use 'text' parameter (not WFInput) at index {idx}")
+                errors.append(
+                    f"Match Text should use 'text' parameter (not WFInput) at index {idx}",
+                )
             text_param = params.get("text")
             if text_param is None:
                 errors.append(f"Match Text missing 'text' parameter at index {idx}")
@@ -3555,37 +4064,55 @@ def validate(
                 errors.append(f"Match Text has empty 'text' parameter at index {idx}")
 
         if ident in TEXT_INPUT_KEY_ACTIONS:
-            action_name = "Change Case" if ident == "is.workflow.actions.text.changecase" else "Split Text"
+            action_name = (
+                "Change Case"
+                if ident == "is.workflow.actions.text.changecase"
+                else "Split Text"
+            )
             text_param = params.get("text")
             if text_param is None:
                 if "WFInput" in params:
-                    errors.append(f"{action_name} should use 'text' parameter (not WFInput) at index {idx}")
+                    errors.append(
+                        f"{action_name} should use 'text' parameter (not WFInput) at index {idx}",
+                    )
                 else:
-                    errors.append(f"{action_name} missing 'text' parameter at index {idx}")
-            else:
-                if _token_param_is_empty(text_param):
-                    errors.append(f"{action_name} has empty 'text' parameter at index {idx}")
-                elif isinstance(text_param, dict) and not _input_is_attached(text_param):
-                    errors.append(f"{action_name} 'text' parameter is not a token attachment at index {idx}")
+                    errors.append(
+                        f"{action_name} missing 'text' parameter at index {idx}",
+                    )
+            elif _token_param_is_empty(text_param):
+                errors.append(
+                    f"{action_name} has empty 'text' parameter at index {idx}",
+                )
+            elif isinstance(text_param, dict) and not _input_is_attached(text_param):
+                errors.append(
+                    f"{action_name} 'text' parameter is not a token attachment at index {idx}",
+                )
             if "WFInput" in params:
                 errors.append(
-                    f"{action_name} should not include WFInput; wire input via 'text' parameter at index {idx}"
+                    f"{action_name} should not include WFInput; wire input via 'text' parameter at index {idx}",
                 )
             if ident == "is.workflow.actions.text.split":
                 sep = params.get("WFTextSeparator")
                 if sep == "Custom":
                     custom_sep = params.get("WFTextCustomSeparator")
                     # A single space is a valid custom separator; only reject missing/empty-string.
-                    if custom_sep is None:
-                        errors.append(f"Split Text missing WFTextCustomSeparator for Custom separator at index {idx}")
-                    elif isinstance(custom_sep, str) and custom_sep == "":
-                        errors.append(f"Split Text missing WFTextCustomSeparator for Custom separator at index {idx}")
-                    elif isinstance(custom_sep, dict) and _token_param_is_empty(custom_sep):
-                        errors.append(f"Split Text missing WFTextCustomSeparator for Custom separator at index {idx}")
+                    if (
+                        custom_sep is None
+                        or (isinstance(custom_sep, str) and custom_sep == "")
+                        or (
+                            isinstance(custom_sep, dict)
+                            and _token_param_is_empty(custom_sep)
+                        )
+                    ):
+                        errors.append(
+                            f"Split Text missing WFTextCustomSeparator for Custom separator at index {idx}",
+                        )
 
         if ident == "is.workflow.actions.text.replace":
             if "text" in params and "WFInput" not in params:
-                errors.append(f"Replace Text should use WFInput (not 'text') at index {idx}")
+                errors.append(
+                    f"Replace Text should use WFInput (not 'text') at index {idx}",
+                )
 
         if ident == "is.workflow.actions.filter.notes":
             filt = params.get("WFContentItemFilter")
@@ -3594,95 +4121,123 @@ def validate(
             else:
                 if filt.get("WFSerializationType") != "WFContentPredicateTableTemplate":
                     errors.append(
-                        f"Find Notes WFContentItemFilter must use WFContentPredicateTableTemplate at index {idx}"
+                        f"Find Notes WFContentItemFilter must use WFContentPredicateTableTemplate at index {idx}",
                     )
                 fval = filt.get("Value")
                 if not isinstance(fval, dict):
-                    errors.append(f"Find Notes WFContentItemFilter missing Value dict at index {idx}")
+                    errors.append(
+                        f"Find Notes WFContentItemFilter missing Value dict at index {idx}",
+                    )
                 else:
                     templates = fval.get("WFActionParameterFilterTemplates")
                     if not isinstance(templates, list) or not templates:
-                        errors.append(f"Find Notes filter has no templates at index {idx}")
+                        errors.append(
+                            f"Find Notes filter has no templates at index {idx}",
+                        )
                     else:
                         for tidx, template in enumerate(templates):
                             if not isinstance(template, dict):
-                                errors.append(f"Find Notes filter template {tidx} is not a dict at index {idx}")
+                                errors.append(
+                                    f"Find Notes filter template {tidx} is not a dict at index {idx}",
+                                )
                                 continue
                             prop = template.get("Property")
                             values = template.get("Values")
                             if not isinstance(values, dict):
-                                errors.append(f"Find Notes filter template '{prop}' missing Values dict at index {idx}")
+                                errors.append(
+                                    f"Find Notes filter template '{prop}' missing Values dict at index {idx}",
+                                )
                                 continue
                             if prop == "Name":
                                 string_state = values.get("String")
                                 if _token_param_is_empty(string_state):
-                                    errors.append(f"Find Notes Name filter has empty String value at index {idx}")
+                                    errors.append(
+                                        f"Find Notes Name filter has empty String value at index {idx}",
+                                    )
                                 elif (
                                     isinstance(string_state, dict)
-                                    and string_state.get("WFSerializationType") != "WFTextTokenString"
+                                    and string_state.get("WFSerializationType")
+                                    != "WFTextTokenString"
                                 ):
                                     errors.append(
-                                        f"Find Notes Name filter should use WFTextTokenString for String value at index {idx}"
+                                        f"Find Notes Name filter should use WFTextTokenString for String value at index {idx}",
                                     )
                             if prop == "Folder":
                                 enum_state = values.get("Enumeration")
                                 if not isinstance(enum_state, dict):
-                                    errors.append(f"Find Notes Folder filter missing Enumeration value at index {idx}")
+                                    errors.append(
+                                        f"Find Notes Folder filter missing Enumeration value at index {idx}",
+                                    )
                                 else:
-                                    if enum_state.get("WFSerializationType") != "WFLinkDynamicOptionSubstitutableState":
+                                    if (
+                                        enum_state.get("WFSerializationType")
+                                        != "WFLinkDynamicOptionSubstitutableState"
+                                    ):
                                         errors.append(
-                                            f"Find Notes Folder filter should use WFLinkDynamicOptionSubstitutableState at index {idx}"
+                                            f"Find Notes Folder filter should use WFLinkDynamicOptionSubstitutableState at index {idx}",
                                         )
                                     enum_value = enum_state.get("Value")
                                     if _token_param_is_empty(enum_value):
                                         errors.append(
-                                            f"Find Notes Folder filter Enumeration value is empty at index {idx}"
+                                            f"Find Notes Folder filter Enumeration value is empty at index {idx}",
                                         )
 
         if ident == "is.workflow.actions.filter.calendarevents":
             filt = params.get("WFContentItemFilter")
             if not isinstance(filt, dict):
-                errors.append(f"Find Calendar Events missing WFContentItemFilter at index {idx}")
+                errors.append(
+                    f"Find Calendar Events missing WFContentItemFilter at index {idx}",
+                )
             elif filt.get("WFSerializationType") != "WFContentPredicateTableTemplate":
                 errors.append(
-                    f"Find Calendar Events WFContentItemFilter must use WFContentPredicateTableTemplate at index {idx}"
+                    f"Find Calendar Events WFContentItemFilter must use WFContentPredicateTableTemplate at index {idx}",
                 )
             else:
                 inner = filt.get("Value")
-                templates = inner.get("WFActionParameterFilterTemplates") if isinstance(inner, dict) else None
+                templates = (
+                    inner.get("WFActionParameterFilterTemplates")
+                    if isinstance(inner, dict)
+                    else None
+                )
                 if not isinstance(templates, list) or not templates:
-                    errors.append(f"Find Calendar Events WFContentItemFilter has no templates at index {idx}")
+                    errors.append(
+                        f"Find Calendar Events WFContentItemFilter has no templates at index {idx}",
+                    )
                 else:
                     for tidx, template in enumerate(templates):
                         if not isinstance(template, dict):
-                            errors.append(f"Find Calendar Events filter template {tidx} is not a dict at index {idx}")
+                            errors.append(
+                                f"Find Calendar Events filter template {tidx} is not a dict at index {idx}",
+                            )
                             continue
                         prop = template.get("Property")
                         op = template.get("Operator")
                         if prop in {"Start Date", "End Date"} and op == 3:
                             errors.append(
                                 f"Find Calendar Events {prop} filter uses numeric operator 3 at index {idx}; "
-                                "use date operator 2 for 'is after', 1002 for 'is today', or 1003 for 'is between'"
+                                "use date operator 2 for 'is after', 1002 for 'is today', or 1003 for 'is between'",
                             )
                         if prop in {"Start Date", "End Date"} and op in {2, 1003}:
                             values = template.get("Values")
                             if not isinstance(values, dict):
                                 errors.append(
-                                    f"Find Calendar Events {prop} date filter missing Values dict at index {idx}"
+                                    f"Find Calendar Events {prop} date filter missing Values dict at index {idx}",
                                 )
                             elif op == 2 and "Date" not in values:
                                 errors.append(
-                                    f"Find Calendar Events {prop} 'is after' filter missing Values.Date at index {idx}"
+                                    f"Find Calendar Events {prop} 'is after' filter missing Values.Date at index {idx}",
                                 )
-                            elif op == 1003 and ("Date" not in values or "AnotherDate" not in values):
+                            elif op == 1003 and (
+                                "Date" not in values or "AnotherDate" not in values
+                            ):
                                 errors.append(
-                                    f"Find Calendar Events {prop} 'is between' filter needs Values.Date and Values.AnotherDate at index {idx}"
+                                    f"Find Calendar Events {prop} 'is between' filter needs Values.Date and Values.AnotherDate at index {idx}",
                                 )
 
         if ident == HEALTH_FIND_SAMPLES_ACTION:
             if "WFHealthQuantityType" in params:
                 errors.append(
-                    f"Find Health Samples uses obsolete WFHealthQuantityType at index {idx}; put the sample kind in a non-removable Type filter row"
+                    f"Find Health Samples uses obsolete WFHealthQuantityType at index {idx}; put the sample kind in a non-removable Type filter row",
                 )
             _validate_health_filter_template(
                 params.get("WFContentItemFilter"),
@@ -3690,74 +4245,107 @@ def validate(
                 idx=idx,
                 errors=errors,
             )
-            health_type, type_operator, malformed_type = _health_filter_type_value(params.get("WFContentItemFilter"))
+            health_type, type_operator, malformed_type = _health_filter_type_value(
+                params.get("WFContentItemFilter"),
+            )
             if malformed_type or _token_param_is_empty(health_type):
-                errors.append(f"Find Health Samples missing or malformed Type filter at index {idx}")
+                errors.append(
+                    f"Find Health Samples missing or malformed Type filter at index {idx}",
+                )
             elif type_operator != 4:
-                errors.append(f"Find Health Samples Type filter must use operator 4 at index {idx}")
+                errors.append(
+                    f"Find Health Samples Type filter must use operator 4 at index {idx}",
+                )
             elif (
                 isinstance(health_type, str)
                 and HEALTH_REFERENCE_SETS["find_sample_types"]
                 and health_type not in HEALTH_REFERENCE_SETS["find_sample_types"]
             ):
-                errors.append(f"Find Health Samples uses unknown Type filter value '{health_type}' at index {idx}")
-            if "WFContentItemLimitEnabled" in params and not isinstance(params.get("WFContentItemLimitEnabled"), bool):
-                errors.append(f"Find Health Samples WFContentItemLimitEnabled must be boolean at index {idx}")
+                errors.append(
+                    f"Find Health Samples uses unknown Type filter value '{health_type}' at index {idx}",
+                )
+            if "WFContentItemLimitEnabled" in params and not isinstance(
+                params.get("WFContentItemLimitEnabled"),
+                bool,
+            ):
+                errors.append(
+                    f"Find Health Samples WFContentItemLimitEnabled must be boolean at index {idx}",
+                )
             if params.get("WFContentItemLimitEnabled") is True:
                 limit_number = params.get("WFContentItemLimitNumber")
                 if limit_number is None or limit_number == "":
                     errors.append(
-                        f"Find Health Samples limit is enabled but WFContentItemLimitNumber is missing at index {idx}"
+                        f"Find Health Samples limit is enabled but WFContentItemLimitNumber is missing at index {idx}",
                     )
 
         if ident == HEALTH_SAMPLE_DETAIL_ACTION:
             prop_name = params.get("WFContentItemPropertyName")
             if _token_param_is_empty(prop_name):
-                errors.append(f"Get Details of Health Sample missing WFContentItemPropertyName at index {idx}")
-            elif isinstance(prop_name, str) and prop_name not in HEALTH_SAMPLE_DETAIL_PROPERTIES:
-                errors.append(f"Get Details of Health Sample uses unknown detail '{prop_name}' at index {idx}")
+                errors.append(
+                    f"Get Details of Health Sample missing WFContentItemPropertyName at index {idx}",
+                )
+            elif (
+                isinstance(prop_name, str)
+                and prop_name not in HEALTH_SAMPLE_DETAIL_PROPERTIES
+            ):
+                errors.append(
+                    f"Get Details of Health Sample uses unknown detail '{prop_name}' at index {idx}",
+                )
 
             health_input = params.get("WFInput")
             if _token_param_is_empty(health_input):
-                errors.append(f"Get Details of Health Sample missing WFInput at index {idx}")
+                errors.append(
+                    f"Get Details of Health Sample missing WFInput at index {idx}",
+                )
             elif not _input_is_attached(health_input):
-                errors.append(f"Get Details of Health Sample WFInput is not a token attachment at index {idx}")
+                errors.append(
+                    f"Get Details of Health Sample WFInput is not a token attachment at index {idx}",
+                )
             elif not _input_has_reference(health_input):
-                errors.append(f"Get Details of Health Sample WFInput has no variable/output reference at index {idx}")
+                errors.append(
+                    f"Get Details of Health Sample WFInput has no variable/output reference at index {idx}",
+                )
             else:
                 input_var_name = _extract_input_variable_name(health_input)
                 if input_var_name:
                     if input_var_name not in health_sample_source_vars:
                         errors.append(
-                            f"Get Details of Health Sample variable '{input_var_name}' does not resolve to Health Samples at index {idx}"
+                            f"Get Details of Health Sample variable '{input_var_name}' does not resolve to Health Samples at index {idx}",
                         )
                 for out_uuid in _input_action_output_uuids(health_input):
                     source_ident = uuid_to_ident.get(out_uuid)
                     if source_ident is None:
-                        errors.append(f"Get Details of Health Sample references unknown OutputUUID at index {idx}")
+                        errors.append(
+                            f"Get Details of Health Sample references unknown OutputUUID at index {idx}",
+                        )
                     elif source_ident not in HEALTH_SAMPLE_SOURCE_ACTIONS:
                         errors.append(
-                            f"Get Details of Health Sample should reference Find Health Samples/Log Health Sample output at index {idx}"
+                            f"Get Details of Health Sample should reference Find Health Samples/Log Health Sample output at index {idx}",
                         )
 
         if ident == HEALTH_LOG_SAMPLE_ACTION:
             sample_type = params.get("WFQuantitySampleType")
             if _token_param_is_empty(sample_type):
-                errors.append(f"Log Health Sample missing WFQuantitySampleType at index {idx}")
+                errors.append(
+                    f"Log Health Sample missing WFQuantitySampleType at index {idx}",
+                )
             elif (
                 isinstance(sample_type, str)
                 and HEALTH_REFERENCE_SETS["sample_types"]
                 and sample_type not in HEALTH_REFERENCE_SETS["sample_types"]
             ):
-                errors.append(f"Log Health Sample uses unknown WFQuantitySampleType '{sample_type}' at index {idx}")
+                errors.append(
+                    f"Log Health Sample uses unknown WFQuantitySampleType '{sample_type}' at index {idx}",
+                )
 
             has_quantity = "WFQuantitySampleQuantity" in params
             has_category = (
-                "WFCategorySampleEnumeration" in params or "WFCategorySampleAdditionalEnumerationKey" in params
+                "WFCategorySampleEnumeration" in params
+                or "WFCategorySampleAdditionalEnumerationKey" in params
             )
             if not has_quantity and not has_category:
                 errors.append(
-                    f"Log Health Sample missing sample value: use WFQuantitySampleQuantity or WFCategorySampleEnumeration at index {idx}"
+                    f"Log Health Sample missing sample value: use WFQuantitySampleQuantity or WFCategorySampleEnumeration at index {idx}",
                 )
 
             for key in HEALTH_QUANTITY_FIELD_KEYS:
@@ -3790,27 +4378,45 @@ def validate(
                     and params.get(key) not in HEALTH_REFERENCE_SETS["category_values"]
                 ):
                     errors.append(
-                        f"Log Health Sample {key} uses unknown category value '{params.get(key)}' at index {idx}"
+                        f"Log Health Sample {key} uses unknown category value '{params.get(key)}' at index {idx}",
                     )
 
             for key in ("WFQuantitySampleDate", "WFSampleEndDate"):
                 if key in params:
-                    _validate_health_date_like(params.get(key), key=key, idx=idx, errors=errors)
+                    _validate_health_date_like(
+                        params.get(key),
+                        key=key,
+                        idx=idx,
+                        errors=errors,
+                    )
 
         if ident == HEALTH_LOG_WORKOUT_ACTION:
             workout_type = params.get("WFWorkoutReadableActivityType")
             if _token_param_is_empty(workout_type):
-                errors.append(f"Log Workout missing WFWorkoutReadableActivityType at index {idx}")
+                errors.append(
+                    f"Log Workout missing WFWorkoutReadableActivityType at index {idx}",
+                )
             elif (
                 isinstance(workout_type, str)
                 and HEALTH_REFERENCE_SETS["workouts"]
                 and workout_type not in HEALTH_REFERENCE_SETS["workouts"]
             ):
-                errors.append(f"Log Workout uses unknown WFWorkoutReadableActivityType '{workout_type}' at index {idx}")
+                errors.append(
+                    f"Log Workout uses unknown WFWorkoutReadableActivityType '{workout_type}' at index {idx}",
+                )
             for key in ("WFWorkoutDate",):
                 if key in params:
-                    _validate_health_date_like(params.get(key), key=key, idx=idx, errors=errors)
-            for key in ("WFWorkoutDuration", "WFWorkoutCaloriesQuantity", "WFWorkoutDistanceQuantity"):
+                    _validate_health_date_like(
+                        params.get(key),
+                        key=key,
+                        idx=idx,
+                        errors=errors,
+                    )
+            for key in (
+                "WFWorkoutDuration",
+                "WFWorkoutCaloriesQuantity",
+                "WFWorkoutDistanceQuantity",
+            ):
                 if key in params:
                     _validate_health_quantity_field(
                         params.get(key),
@@ -3823,21 +4429,29 @@ def validate(
         if ident == "is.workflow.actions.text.translate":
             if "WFInputText" not in params:
                 if "WFInput" in params:
-                    errors.append(f"Translate Text should use WFInputText (not WFInput) at index {idx}")
+                    errors.append(
+                        f"Translate Text should use WFInputText (not WFInput) at index {idx}",
+                    )
                 else:
                     errors.append(f"Translate Text missing WFInputText at index {idx}")
             lang = params.get("WFSelectedLanguage")
             if lang is None or lang == "":
-                errors.append(f"Translate Text missing WFSelectedLanguage at index {idx}")
+                errors.append(
+                    f"Translate Text missing WFSelectedLanguage at index {idx}",
+                )
             elif _lang_value_is_code(lang):
-                errors.append(f"Translate Text WFSelectedLanguage should use display name (not code) at index {idx}")
+                errors.append(
+                    f"Translate Text WFSelectedLanguage should use display name (not code) at index {idx}",
+                )
 
         if ident == "is.workflow.actions.ask":
             if "WFAskActionDefaultAnswer" in params:
                 default = params.get("WFAskActionDefaultAnswer")
-                if default is None or (isinstance(default, str) and default.strip() == ""):
+                if default is None or (
+                    isinstance(default, str) and default.strip() == ""
+                ):
                     errors.append(
-                        f"Ask for Input has empty default answer at index {idx}; omit WFAskActionDefaultAnswer"
+                        f"Ask for Input has empty default answer at index {idx}; omit WFAskActionDefaultAnswer",
                     )
 
         if ident == "is.workflow.actions.setvariable":
@@ -3845,7 +4459,9 @@ def validate(
             if not wfinput:
                 errors.append(f"Set Variable missing WFInput at index {idx}")
             elif not _input_is_attached(wfinput):
-                errors.append(f"Set Variable WFInput is not a token attachment at index {idx}")
+                errors.append(
+                    f"Set Variable WFInput is not a token attachment at index {idx}",
+                )
 
         if ident == "is.workflow.actions.sendmessage":
             # Send Message content should be sent via an appended variable list,
@@ -3853,34 +4469,36 @@ def validate(
             content = params.get("WFSendMessageContent")
             attachments = params.get("WFSendMessageAttachments")
             if not content and not attachments and not params.get("WFInput"):
-                errors.append(f"Send Message missing content/attachments at index {idx}")
+                errors.append(
+                    f"Send Message missing content/attachments at index {idx}",
+                )
             if content and attachments:
                 errors.append(
-                    f"Send Message mixes content + attachments; use Append Variable list and pass single variable at index {idx}"
+                    f"Send Message mixes content + attachments; use Append Variable list and pass single variable at index {idx}",
                 )
             if isinstance(content, dict):
                 name = _extract_input_variable_name(content)
                 if name and append_counts.get(name, 0) < 2:
                     errors.append(
-                        f"Send Message content variable '{name}' should be built with Append Variable (2+ appends, even for single-type content) at index {idx}"
+                        f"Send Message content variable '{name}' should be built with Append Variable (2+ appends, even for single-type content) at index {idx}",
                     )
                 # Disallow ActionOutput attachments for Send Message content
                 out_uuids = _input_action_output_uuids(content)
                 if out_uuids:
                     errors.append(
-                        f"Send Message content should reference a named variable (not ActionOutput) at index {idx}"
+                        f"Send Message content should reference a named variable (not ActionOutput) at index {idx}",
                     )
                 # Require WFTextTokenString for variable content to avoid blank UI
                 if content.get("WFSerializationType") == "WFTextTokenAttachment":
                     errors.append(
-                        f"Send Message content should use WFTextTokenString with variable placeholder at index {idx}"
+                        f"Send Message content should use WFTextTokenString with variable placeholder at index {idx}",
                     )
 
         if ident == "is.workflow.actions.sendemail":
             for key in (params or {}).keys():
                 if key.startswith("WFSendMailAction"):
                     errors.append(
-                        f"Send Email uses legacy SendMail parameter keys; use WFSendEmailAction* at index {idx}"
+                        f"Send Email uses legacy SendMail parameter keys; use WFSendEmailAction* at index {idx}",
                     )
 
         if ident == "is.workflow.actions.setitemname":
@@ -3888,13 +4506,19 @@ def validate(
             if _token_param_is_empty(wf_input):
                 errors.append(f"Set Name missing WFInput at index {idx}")
             elif not _input_is_attached(wf_input):
-                errors.append(f"Set Name WFInput is not a token attachment at index {idx}")
+                errors.append(
+                    f"Set Name WFInput is not a token attachment at index {idx}",
+                )
             elif not _input_has_reference(wf_input):
-                errors.append(f"Set Name WFInput has no variable/output reference at index {idx}")
+                errors.append(
+                    f"Set Name WFInput has no variable/output reference at index {idx}",
+                )
             else:
                 for out_uuid in _input_action_output_uuids(wf_input):
                     if out_uuid not in uuid_to_ident:
-                        errors.append(f"Set Name WFInput references unknown OutputUUID at index {idx}")
+                        errors.append(
+                            f"Set Name WFInput references unknown OutputUUID at index {idx}",
+                        )
 
             if _token_param_is_empty(params.get("WFName")):
                 errors.append(f"Set Name missing WFName at index {idx}")
@@ -3904,13 +4528,19 @@ def validate(
             if _token_param_is_empty(wf_file):
                 errors.append(f"Rename File missing WFFile at index {idx}")
             elif not _input_is_attached(wf_file):
-                errors.append(f"Rename File WFFile is not a token attachment at index {idx}")
+                errors.append(
+                    f"Rename File WFFile is not a token attachment at index {idx}",
+                )
             elif not _input_has_reference(wf_file):
-                errors.append(f"Rename File WFFile has no variable/output reference at index {idx}")
+                errors.append(
+                    f"Rename File WFFile has no variable/output reference at index {idx}",
+                )
             else:
                 for out_uuid in _input_action_output_uuids(wf_file):
                     if out_uuid not in uuid_to_ident:
-                        errors.append(f"Rename File WFFile references unknown OutputUUID at index {idx}")
+                        errors.append(
+                            f"Rename File WFFile references unknown OutputUUID at index {idx}",
+                        )
                     else:
                         rename_file_source_uuids[out_uuid] = idx
                 for var_name in _extract_input_variable_names(wf_file):
@@ -3929,42 +4559,63 @@ def validate(
             else:
                 wfdate = params.get("WFDate")
                 if not _input_is_editor_visible(wfdate):
-                    errors.append(f"Format Date WFDate should use WFTextTokenString with placeholder at index {idx}")
+                    errors.append(
+                        f"Format Date WFDate should use WFTextTokenString with placeholder at index {idx}",
+                    )
                 for out_uuid in _input_action_output_uuids(wfdate):
                     source_ident = uuid_to_ident.get(out_uuid)
                     source_params = uuid_to_params.get(out_uuid, {})
                     source_prop = source_params.get("WFContentItemPropertyName")
                     if (
-                        source_ident == "is.workflow.actions.properties.weather.conditions"
+                        source_ident
+                        == "is.workflow.actions.properties.weather.conditions"
                         and source_prop in WEATHER_DETAIL_LIST_VALUES
                     ):
-                        expected = "First Item" if source_prop == "Sunrise Time" else "Last Item"
-                        errors.append(
-                            f"{source_prop} returns a list; use Get Item from List ({expected}) before Format Date at index {idx}"
+                        expected = (
+                            "First Item"
+                            if source_prop == "Sunrise Time"
+                            else "Last Item"
                         )
-            if params.get("WFDateFormat") == "Custom" and not params.get("WFDateFormatString"):
+                        errors.append(
+                            f"{source_prop} returns a list; use Get Item from List ({expected}) before Format Date at index {idx}",
+                        )
+            if params.get("WFDateFormat") == "Custom" and not params.get(
+                "WFDateFormatString",
+            ):
                 errors.append(f"Format Date custom format is empty at index {idx}")
-            if params.get("WFDateFormat") == "Custom" and params.get("WFDateFormatString"):
+            if params.get("WFDateFormat") == "Custom" and params.get(
+                "WFDateFormatString",
+            ):
                 if params.get("WFDateFormatStyle") != "Custom":
-                    errors.append(f"Format Date custom style must be set to Custom at index {idx}")
+                    errors.append(
+                        f"Format Date custom style must be set to Custom at index {idx}",
+                    )
             custom_name = params.get("CustomOutputName")
             enforce_custom_style = custom_name in {"Start Date", "End Date"}
             if params.get("WFDateFormat") == "Custom":
                 fmt = params.get("WFDateFormatString", "")
                 if enforce_custom_style:
-                    if fmt and not allow_datetime_format and re.search(r"[HhmsZ]|'T'", fmt):
+                    if (
+                        fmt
+                        and not allow_datetime_format
+                        and re.search(r"[HhmsZ]|'T'", fmt)
+                    ):
                         errors.append(
-                            f"Custom date format includes time; use date-only or add ALLOW_DATETIME_FORMAT at index {idx}"
+                            f"Custom date format includes time; use date-only or add ALLOW_DATETIME_FORMAT at index {idx}",
                         )
                     if "00:00:00" in fmt or "23:59:59" in fmt:
                         errors.append(
-                            f"Custom date format hardcodes start/end of day; use date-only yyyy-MM-dd at index {idx}"
+                            f"Custom date format hardcodes start/end of day; use date-only yyyy-MM-dd at index {idx}",
                         )
 
         # Heuristic: Start/End Date variables should use Custom format (API-friendly)
         if ident == "is.workflow.actions.setvariable":
             name = params.get("WFVariableName")
-            if isinstance(name, str) and name.strip() and name in {"Start Date", "End Date"}:
+            if (
+                isinstance(name, str)
+                and name.strip()
+                and name in {"Start Date", "End Date"}
+            ):
                 fmt_params = var_format_dates.get(name)
                 if fmt_params is not None:
                     fmt_key = fmt_params.get("WFDateFormat")
@@ -3976,7 +4627,9 @@ def validate(
                         and isinstance(effective, str)
                         and re.search(r"[HhmsZ]|'T'", effective)
                     ):
-                        errors.append(f"{name} should use date-only format (yyyy-MM-dd)")
+                        errors.append(
+                            f"{name} should use date-only format (yyyy-MM-dd)",
+                        )
 
         if ident in DESTRUCTIVE_FILE_ACTIONS:
             wfinput = params.get("WFInput")
@@ -3985,13 +4638,13 @@ def validate(
                 rename_idx = rename_file_source_vars.get(var_name)
                 if rename_idx is not None:
                     errors.append(
-                        f"{destructive_name} reuses variable '{var_name}' after Rename File at index {rename_idx}; Rename File changes the original file in place, so use Set Name (is.workflow.actions.setitemname) for renamed-copy workflows at index {idx}"
+                        f"{destructive_name} reuses variable '{var_name}' after Rename File at index {rename_idx}; Rename File changes the original file in place, so use Set Name (is.workflow.actions.setitemname) for renamed-copy workflows at index {idx}",
                     )
             for out_uuid in _input_action_output_uuids(wfinput):
                 rename_idx = rename_file_source_uuids.get(out_uuid)
                 if rename_idx is not None:
                     errors.append(
-                        f"{destructive_name} reuses the same file output after Rename File at index {rename_idx}; Rename File changes the original file in place, so use Set Name (is.workflow.actions.setitemname) for renamed-copy workflows at index {idx}"
+                        f"{destructive_name} reuses the same file output after Rename File at index {rename_idx}; Rename File changes the original file in place, so use Set Name (is.workflow.actions.setitemname) for renamed-copy workflows at index {idx}",
                     )
 
         if ident in RENAMED_COPY_OUTPUT_ACTIONS:
@@ -4001,7 +4654,7 @@ def validate(
                 rename_idx = rename_file_output_uuids.get(out_uuid)
                 if rename_idx is not None:
                     errors.append(
-                        f"{consumer_name} consumes Rename File output from index {rename_idx}; Rename File mutates the original file in place. Use Set Name (is.workflow.actions.setitemname with WFInput and WFName) to create a renamed file object for saving or sharing at index {idx}"
+                        f"{consumer_name} consumes Rename File output from index {rename_idx}; Rename File mutates the original file in place. Use Set Name (is.workflow.actions.setitemname with WFInput and WFName) to create a renamed file object for saving or sharing at index {idx}",
                     )
 
         if ident == "is.workflow.actions.math":
@@ -4012,8 +4665,14 @@ def validate(
             # If the math input is a variable, ensure it exists
             wfinput = params.get("WFInput")
             var_name = _extract_input_variable_name(wfinput)
-            if var_name and var_name not in defined_vars and var_name not in BUILTIN_VARIABLES:
-                errors.append(f"Math input references undefined variable '{var_name}' at index {idx}")
+            if (
+                var_name
+                and var_name not in defined_vars
+                and var_name not in BUILTIN_VARIABLES
+            ):
+                errors.append(
+                    f"Math input references undefined variable '{var_name}' at index {idx}",
+                )
             input_name = var_name
             if input_name is None and isinstance(wfinput, dict):
                 val = wfinput.get("Value")
@@ -4027,21 +4686,40 @@ def validate(
                             input_name = output_name
             op = params.get("WFMathOperation")
             if op == "+":
-                errors.append(f"Math action uses WFMathOperation '+' at index {idx}; omit WFMathOperation for addition")
+                errors.append(
+                    f"Math action uses WFMathOperation '+' at index {idx}; omit WFMathOperation for addition",
+                )
             elif op == "*":
-                errors.append(f"Math action uses ASCII '*' at index {idx}; use '×' (U+00D7) for multiplication")
+                errors.append(
+                    f"Math action uses ASCII '*' at index {idx}; use '×' (U+00D7) for multiplication",
+                )
             elif op == "/":
-                errors.append(f"Math action uses ASCII '/' at index {idx}; use '÷' (U+00F7) for division")
+                errors.append(
+                    f"Math action uses ASCII '/' at index {idx}; use '÷' (U+00F7) for division",
+                )
             elif op is not None and op not in MATH_OPERATIONS:
-                errors.append(f"Math action has unknown WFMathOperation at index {idx}: {op!r}")
+                errors.append(
+                    f"Math action has unknown WFMathOperation at index {idx}: {op!r}",
+                )
             operand = params.get("WFMathOperand")
             literal_operand = _math_operand_literal_string(operand)
-            if op in {"/", "÷"} and literal_operand == "60" and input_name and "sleep" in input_name.lower() and uuid:
+            if (
+                op in {"/", "÷"}
+                and literal_operand == "60"
+                and input_name
+                and "sleep" in input_name.lower()
+                and uuid
+            ):
                 sleep_duration_divide_by_60_uuids.add(uuid)
-            if op in {"/", "÷"} and literal_operand == "1000" and input_name and "distance" in input_name.lower():
+            if (
+                op in {"/", "÷"}
+                and literal_operand == "1000"
+                and input_name
+                and "distance" in input_name.lower()
+            ):
                 errors.append(
                     f"Health distance math divides '{input_name}' by 1000 at index {idx}; "
-                    "do not assume Walking + Running Distance values are meters. Sum the Health Value directly or use Convert Measurement with an explicit source unit"
+                    "do not assume Walking + Running Distance values are meters. Sum the Health Value directly or use Convert Measurement with an explicit source unit",
                 )
             is_100 = False
             if isinstance(operand, int) and operand == 100:
@@ -4049,17 +4727,29 @@ def validate(
             elif isinstance(operand, dict):
                 val = operand.get("Value")
                 if isinstance(val, dict):
-                    if isinstance(val.get("string"), str) and val.get("string").strip() == "100":
+                    if (
+                        isinstance(val.get("string"), str)
+                        and val.get("string").strip() == "100"
+                    ):
                         is_100 = True
             if op == "/" and is_100:
                 divide_by_100_uuids.add(uuid)
                 if input_name:
                     divide_by_100_vars.add(input_name)
             # If operating on cents with literal 100, must use divide
-            if is_100 and input_name and "cents" in input_name.lower() and op not in {"/", "÷"}:
-                errors.append(f"Math uses {op} with 100 on cents; must divide by 100 at index {idx}")
+            if (
+                is_100
+                and input_name
+                and "cents" in input_name.lower()
+                and op not in {"/", "÷"}
+            ):
+                errors.append(
+                    f"Math uses {op} with 100 on cents; must divide by 100 at index {idx}",
+                )
             if is_100 and cents_context_steps > 0 and op not in {"/", "÷"}:
-                errors.append(f"Math uses {op} with 100 in cents context; must divide by 100 at index {idx}")
+                errors.append(
+                    f"Math uses {op} with 100 in cents context; must divide by 100 at index {idx}",
+                )
 
         if ident == "is.workflow.actions.round":
             wfinput = params.get("WFInput")
@@ -4077,7 +4767,9 @@ def validate(
                 if not used_divide:
                     var_name = _extract_input_variable_name(wfinput)
                     if var_name and "cents" in var_name.lower():
-                        errors.append(f"Round used on cents without divide-by-100 at index {idx}")
+                        errors.append(
+                            f"Round used on cents without divide-by-100 at index {idx}",
+                        )
 
         if ident == "is.workflow.actions.adjustdate":
             date_keys = ("WFDate", "WFInput")
@@ -4096,14 +4788,20 @@ def validate(
             else:
                 for key, reference in non_empty_date_refs:
                     if not _input_is_attached(reference):
-                        errors.append(f"Adjust Date {key} is not a token attachment at index {idx}")
+                        errors.append(
+                            f"Adjust Date {key} is not a token attachment at index {idx}",
+                        )
                         continue
                     if not _input_has_reference(reference):
-                        errors.append(f"Adjust Date {key} has no variable/output reference at index {idx}")
+                        errors.append(
+                            f"Adjust Date {key} has no variable/output reference at index {idx}",
+                        )
                         continue
                     for out_uuid in _input_action_output_uuids(reference):
                         if out_uuid not in uuid_to_ident:
-                            errors.append(f"Adjust Date {key} references unknown OutputUUID at index {idx}")
+                            errors.append(
+                                f"Adjust Date {key} references unknown OutputUUID at index {idx}",
+                            )
 
             has_offset_picker = "WFAdjustOffsetPicker" in params
             has_legacy_op = "WFAdjustOperation" in params
@@ -4111,43 +4809,64 @@ def validate(
             if not has_legacy_duration:
                 if has_offset_picker:
                     errors.append(
-                        f"Adjust Date offset-picker-only payload is unreliable on iOS import; include WFDuration at index {idx}"
+                        f"Adjust Date offset-picker-only payload is unreliable on iOS import; include WFDuration at index {idx}",
                     )
                 else:
                     errors.append(f"Adjust Date missing WFDuration at index {idx}")
             if has_offset_picker:
                 offset = params.get("WFAdjustOffsetPicker")
-                if not isinstance(offset, dict) or offset.get("WFSerializationType") != "WFTimeOffsetValue":
-                    errors.append(f"Adjust Date WFAdjustOffsetPicker must be WFTimeOffsetValue at index {idx}")
+                if (
+                    not isinstance(offset, dict)
+                    or offset.get("WFSerializationType") != "WFTimeOffsetValue"
+                ):
+                    errors.append(
+                        f"Adjust Date WFAdjustOffsetPicker must be WFTimeOffsetValue at index {idx}",
+                    )
             if has_legacy_op:
                 op = params.get("WFAdjustOperation")
                 if _token_param_is_empty(op):
-                    errors.append(f"Adjust Date has empty WFAdjustOperation at index {idx}")
+                    errors.append(
+                        f"Adjust Date has empty WFAdjustOperation at index {idx}",
+                    )
                 elif isinstance(op, str) and op not in {"Add", "Subtract"}:
-                    errors.append(f"Adjust Date WFAdjustOperation should be Add or Subtract at index {idx}")
+                    errors.append(
+                        f"Adjust Date WFAdjustOperation should be Add or Subtract at index {idx}",
+                    )
             if has_legacy_duration:
                 duration = params.get("WFDuration")
                 if duration is None:
                     errors.append(f"Adjust Date missing WFDuration at index {idx}")
                 elif not isinstance(duration, dict):
-                    errors.append(f"Adjust Date WFDuration must be a dict at index {idx}")
+                    errors.append(
+                        f"Adjust Date WFDuration must be a dict at index {idx}",
+                    )
                 else:
                     if duration.get("WFSerializationType") != "WFQuantityFieldValue":
                         errors.append(
-                            f"Adjust Date WFDuration must use WFQuantityFieldValue serialization at index {idx}"
+                            f"Adjust Date WFDuration must use WFQuantityFieldValue serialization at index {idx}",
                         )
                     dur_val = duration.get("Value")
                     if not isinstance(dur_val, dict):
-                        errors.append(f"Adjust Date WFDuration missing Value dict at index {idx}")
+                        errors.append(
+                            f"Adjust Date WFDuration missing Value dict at index {idx}",
+                        )
                     else:
                         magnitude = dur_val.get("Magnitude")
                         unit = dur_val.get("Unit")
-                        if magnitude is None or (isinstance(magnitude, str) and magnitude.strip() == ""):
-                            errors.append(f"Adjust Date WFDuration missing Magnitude at index {idx}")
+                        if magnitude is None or (
+                            isinstance(magnitude, str) and magnitude.strip() == ""
+                        ):
+                            errors.append(
+                                f"Adjust Date WFDuration missing Magnitude at index {idx}",
+                            )
                         if not isinstance(unit, str) or unit.strip() == "":
-                            errors.append(f"Adjust Date WFDuration missing Unit at index {idx}")
+                            errors.append(
+                                f"Adjust Date WFDuration missing Unit at index {idx}",
+                            )
                         elif unit.strip().lower() not in DATE_DELTA_UNITS:
-                            errors.append(f"Adjust Date WFDuration has unsupported Unit '{unit}' at index {idx}")
+                            errors.append(
+                                f"Adjust Date WFDuration has unsupported Unit '{unit}' at index {idx}",
+                            )
 
         if errors and first_error is None:
             first_error = (idx, ident or "UNKNOWN", _snippet(params))
@@ -4158,7 +4877,9 @@ def validate(
     # If cents variables exist but no divide-by-100 conversion is present, flag it
     for name in sorted(cents_vars):
         if name not in divide_by_100_vars:
-            errors.append(f"Cents variable '{name}' is never divided by 100 (missing cents→dollars conversion)")
+            errors.append(
+                f"Cents variable '{name}' is never divided by 100 (missing cents→dollars conversion)",
+            )
             if first_error is None:
                 first_error = (0, "VALIDATION", "Missing cents→dollars conversion")
 
@@ -4166,7 +4887,9 @@ def validate(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Validate Shortcuts output for empty params and unknown actions")
+    parser = argparse.ArgumentParser(
+        description="Validate Shortcuts output for empty params and unknown actions",
+    )
     parser.add_argument("shortcut", help="Path to .xml or .shortcut file")
     parser.add_argument(
         "--target-macos",
@@ -4252,15 +4975,19 @@ def main() -> int:
         raw_text = shortcut_path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         raw_text = ""
-    repeating_uuids = sorted({match.group(0) for match in REPEATING_UUID_RE.finditer(raw_text)})
+    repeating_uuids = sorted(
+        {match.group(0) for match in REPEATING_UUID_RE.finditer(raw_text)},
+    )
     if repeating_uuids:
         examples = ", ".join(repeating_uuids[:3])
-        more = f" (+{len(repeating_uuids) - 3} more)" if len(repeating_uuids) > 3 else ""
+        more = (
+            f" (+{len(repeating_uuids) - 3} more)" if len(repeating_uuids) > 3 else ""
+        )
         errors.append(
             f"Found {len(repeating_uuids)} repeating-hex placeholder UUID(s): {examples}{more}. "
             f"Every action UUID must be generated via `uuidgen | tr '[:lower:]' '[:upper:]'`, "
             f"not hand-picked sequences. Re-mint ALL offending UUIDs and update every "
-            f"OutputUUID / GroupingIdentifier reference to match."
+            f"OutputUUID / GroupingIdentifier reference to match.",
         )
 
     if errors:

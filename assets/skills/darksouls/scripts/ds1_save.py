@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Conservative, read-only Dark Souls Remastered PC save reader.
 
 This module deliberately does not share DS3 offsets, container code, or keys.
@@ -134,7 +133,8 @@ CLASS_NAMES = {
 
 
 def _unsupported(
-    reason: str, evidence: str = "No validated DSR layout for this category."
+    reason: str,
+    evidence: str = "No validated DSR layout for this category.",
 ) -> UnsupportedResult:
     return {"supported": False, "reason": reason, "evidence": evidence}
 
@@ -146,7 +146,6 @@ def _default_candidates() -> list[Path]:
     DS1/DS3 fallback locations are performed.  File metadata can change while
     scanning, so candidates that disappear or cannot be stat'ed are ignored.
     """
-
     home = Path.home()
     root = home / DEFAULT_SAVE_RELATIVE
     try:
@@ -172,7 +171,6 @@ def _default_candidates() -> list[Path]:
 
 def _candidate_is_defensible(candidate: Path) -> bool:
     """Return whether a candidate contains at least one validated character."""
-
     try:
         save = read_save(candidate)
     except SaveUnsupportedError:
@@ -196,7 +194,6 @@ def _candidate_is_defensible(candidate: Path) -> bool:
 
 def _find_valid_default_path(candidates: list[Path]) -> Path | None:
     """Select the newest candidate that survives structural validation."""
-
     for candidate in candidates:
         if _candidate_is_defensible(candidate):
             return candidate
@@ -209,14 +206,12 @@ def find_save_path() -> str | None:
     Auto-detection intentionally considers only the documented Windows DSR
     path.  Use an explicit path for backups or non-default installations.
     """
-
     selected = _find_valid_default_path(_default_candidates())
     return str(selected) if selected is not None else None
 
 
 def resolve_save_path(path: str | os.PathLike[str] | None = None) -> Path:
     """Resolve an explicit ``.sl2`` path or the one verified default path."""
-
     if path is None:
         candidates = _default_candidates()
         found = _find_valid_default_path(candidates)
@@ -225,18 +220,18 @@ def resolve_save_path(path: str | os.PathLike[str] | None = None) -> Path:
                 raise SaveReadError(
                     "No valid DSR save found at Documents/NBGI/DARK SOULS REMASTERED/"
                     "<SteamID>/DRAKS0005.sl2; discovered candidates were malformed, "
-                    "empty, or lacked validated character data. Provide an explicit .sl2 path."
+                    "empty, or lacked validated character data. Provide an explicit .sl2 path.",
                 )
             raise SaveReadError(
                 "No DSR save found at Documents/NBGI/DARK SOULS REMASTERED/<SteamID>/DRAKS0005.sl2; "
-                "provide an explicit .sl2 path."
+                "provide an explicit .sl2 path.",
             )
         selected = found
     else:
         selected = Path(path).expanduser()
         if selected.suffix.lower() != ".sl2":
             raise SaveReadError(
-                "DSR saves must have a .sl2 extension; refusing the supplied path."
+                "DSR saves must have a .sl2 extension; refusing the supplied path.",
             )
     try:
         selected = selected.resolve(strict=True)
@@ -253,22 +248,21 @@ def _decrypt_aes_cbc(ciphertext: bytes, iv: bytes) -> bytes:
     Decryption is read-only.  If the optional dependency is unavailable, the
     caller receives an explicit unsupported error instead of plaintext guesses.
     """
-
     try:
-        aes = cast(_AESModule, importlib.import_module("Crypto.Cipher.AES"))
+        aes = cast("_AESModule", importlib.import_module("Crypto.Cipher.AES"))
     except ImportError as exc:
         raise SaveUnsupportedError(
-            "DSR slot decryption requires the optional PyCryptodome package; no fields were read."
+            "DSR slot decryption requires the optional PyCryptodome package; no fields were read.",
         ) from exc
     if len(ciphertext) % 16 or len(iv) != 16:
         raise SaveReadError(
-            "DSR slot is not AES-CBC block aligned; refusing to parse it."
+            "DSR slot is not AES-CBC block aligned; refusing to parse it.",
         )
     try:
         return aes.new(DSR_AES_KEY, aes.MODE_CBC, iv=iv).decrypt(ciphertext)
     except Exception as exc:  # library-specific errors must not leak or fabricate data
         raise SaveReadError(
-            "DSR slot decryption failed; the save may be corrupt or unsupported."
+            "DSR slot decryption failed; the save may be corrupt or unsupported.",
         ) from exc
 
 
@@ -293,12 +287,11 @@ def _decode_name(data: bytes, offset: int) -> str | None:
 
 def _json_object(value: object) -> dict[str, object] | None:
     """Narrow a decoded JSON value to an object with string keys."""
-
     if not isinstance(value, dict):
         return None
     if not all(isinstance(key, str) for key in value):
         return None
-    return cast(dict[str, object], value)
+    return cast("dict[str, object]", value)
 
 
 def _validate_stats(data: bytes) -> CharacterStats | None:
@@ -351,7 +344,7 @@ def _parse_slot(raw: bytes, index: int) -> Slot:
         return Slot(index=index, data=b"", digest_valid=True)
     if hashlib.md5(encrypted).digest() != digest:
         raise SaveReadError(
-            f"DSR slot {index} checksum mismatch; refusing to report character data from a malformed save."
+            f"DSR slot {index} checksum mismatch; refusing to report character data from a malformed save.",
         )
     plain = _decrypt_aes_cbc(encrypted, digest)
     if len(plain) != USER_DATA_SIZE:
@@ -361,7 +354,6 @@ def _parse_slot(raw: bytes, index: int) -> Slot:
 
 def read_save(path: str | os.PathLike[str] | None = None) -> SaveFile:
     """Read and validate a DSR save without modifying it."""
-
     selected = resolve_save_path(path)
     try:
         raw = selected.read_bytes()
@@ -369,7 +361,7 @@ def read_save(path: str | os.PathLike[str] | None = None) -> SaveFile:
         raise SaveReadError(f"Unable to read DSR save: {selected}") from exc
     if len(raw) != SAVE_FILE_SIZE:
         raise SaveReadError(
-            f"Unsupported DSR save size {len(raw):#x}; expected the validated {SAVE_FILE_SIZE:#x}-byte container."
+            f"Unsupported DSR save size {len(raw):#x}; expected the validated {SAVE_FILE_SIZE:#x}-byte container.",
         )
     slots: list[Slot] = []
     for index in range(SLOT_COUNT):
@@ -393,20 +385,20 @@ def _select_slot(save: SaveFile, slot: int = 0) -> Slot:
 
 
 def read_stats(
-    path: str | os.PathLike[str] | None = None, slot: int = 0
+    path: str | os.PathLike[str] | None = None,
+    slot: int = 0,
 ) -> dict[str, object]:
     """Return validated character identity and stats for one slot."""
-
     selected = _select_slot(read_save(path), slot)
     name_a, name_b = (_decode_name(selected.data, offset) for offset in NAME_OFFSETS)
     if name_a is None or name_b is None or name_a != name_b:
         raise SaveReadError(
-            "DSR character name copies are absent or disagree; refusing to report identity."
+            "DSR character name copies are absent or disagree; refusing to report identity.",
         )
     stats = _validate_stats(selected.data)
     if stats is None:
         raise SaveReadError(
-            "DSR stat fields failed range/class validation; refusing to report guessed values."
+            "DSR stat fields failed range/class validation; refusing to report guessed values.",
         )
     return {"name": name_a, "slot": slot, **stats}
 
@@ -415,86 +407,90 @@ def _validated_name(data: bytes) -> str:
     name_a, name_b = (_decode_name(data, offset) for offset in NAME_OFFSETS)
     if name_a is None or name_b is None or name_a != name_b:
         raise SaveReadError(
-            "DSR character name copies are absent or disagree; refusing to report identity."
+            "DSR character name copies are absent or disagree; refusing to report identity.",
         )
     return name_a
 
 
 def read_name(path: str | os.PathLike[str] | None = None, slot: int = 0) -> str | None:
     """Read the duplicated UTF-16 name after identity validation."""
-
     return _validated_name(_select_slot(read_save(path), slot).data)
 
 
 def read_level(path: str | os.PathLike[str] | None = None, slot: int = 0) -> int:
     """Read the level field after its independent range validation."""
-
     data = _select_slot(read_save(path), slot).data
     level = struct.unpack_from("<H", data, LEVEL_OFFSET)[0]
     if not 1 <= level <= 713:
         raise SaveReadError(
-            "DSR level field failed range validation; refusing to report a guessed value."
+            "DSR level field failed range validation; refusing to report a guessed value.",
         )
     return level
 
 
 def read_currency(
-    path: str | os.PathLike[str] | None = None, slot: int = 0
+    path: str | os.PathLike[str] | None = None,
+    slot: int = 0,
 ) -> UnsupportedResult:
     del path, slot
     return _unsupported(
-        "Current souls/currency offset is not validated for DSR Remastered."
+        "Current souls/currency offset is not validated for DSR Remastered.",
     )
 
 
 def read_inventory(
-    path: str | os.PathLike[str] | None = None, slot: int = 0
+    path: str | os.PathLike[str] | None = None,
+    slot: int = 0,
 ) -> UnsupportedResult:
     del path, slot
     return _unsupported(
-        "Inventory record boundaries and item-handle semantics are not validated for DSR Remastered."
+        "Inventory record boundaries and item-handle semantics are not validated for DSR Remastered.",
     )
 
 
 def owned_item_names(
-    path: str | os.PathLike[str] | None = None, slot: int = 0
+    path: str | os.PathLike[str] | None = None,
+    slot: int = 0,
 ) -> UnsupportedResult:
     del path, slot
     return _unsupported(
-        "Inventory ownership cannot be established without a validated DSR inventory layout."
+        "Inventory ownership cannot be established without a validated DSR inventory layout.",
     )
 
 
 def read_bosses(
-    path: str | os.PathLike[str] | None = None, slot: int = 0
+    path: str | os.PathLike[str] | None = None,
+    slot: int = 0,
 ) -> UnsupportedResult:
     del path, slot
     return _unsupported("Boss/event-flag offsets are not validated for DSR Remastered.")
 
 
 def read_bonfires(
-    path: str | os.PathLike[str] | None = None, slot: int = 0
+    path: str | os.PathLike[str] | None = None,
+    slot: int = 0,
 ) -> UnsupportedResult:
     del path, slot
     return _unsupported(
-        "Bonfire/event-flag offsets are not validated for DSR Remastered."
+        "Bonfire/event-flag offsets are not validated for DSR Remastered.",
     )
 
 
 def read_completion_status(
-    path: str | os.PathLike[str] | None = None, slot: int = 0
+    path: str | os.PathLike[str] | None = None,
+    slot: int = 0,
 ) -> UnsupportedResult:
     del path, slot
     return _unsupported(
-        "Completion status requires validated inventory and event-flag layouts."
+        "Completion status requires validated inventory and event-flag layouts.",
     )
 
 
 def read_achievements(
-    path: str | os.PathLike[str] | None = None, slot: int = 0
+    path: str | os.PathLike[str] | None = None,
+    slot: int = 0,
 ) -> dict[str, object]:
     """Return the static checklist and an explicit unknown save-backed state."""
-
     del path, slot
     resource = (
         Path(__file__).resolve().parent.parent
@@ -502,34 +498,35 @@ def read_achievements(
         / "achievement_checklist.json"
     )
     try:
-        decoded = cast(object, json.loads(resource.read_text(encoding="utf-8")))
+        decoded = cast("object", json.loads(resource.read_text(encoding="utf-8")))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise SaveReadError(
-            "Achievement checklist resource is unavailable or malformed."
+            "Achievement checklist resource is unavailable or malformed.",
         ) from exc
     raw = _json_object(decoded)
     if raw is None:
         raise SaveReadError(
-            "Achievement checklist resource has an invalid top-level shape."
+            "Achievement checklist resource has an invalid top-level shape.",
         )
     entries = raw.get("achievements")
     if not isinstance(entries, list):
         raise SaveReadError(
-            "Achievement checklist resource has no valid achievements list."
+            "Achievement checklist resource has no valid achievements list.",
         )
-    entries = cast(list[object], entries)
+    entries = cast("list[object]", entries)
     checklist: list[dict[str, object]] = []
     for entry in entries:
         parsed_entry = _json_object(entry)
         if parsed_entry is None:
             raise SaveReadError(
-                "Achievement checklist contains an invalid entry; refusing to report it."
+                "Achievement checklist contains an invalid entry; refusing to report it.",
             )
         if not isinstance(parsed_entry.get("id"), str) or not isinstance(
-            parsed_entry.get("title"), str
+            parsed_entry.get("title"),
+            str,
         ):
             raise SaveReadError(
-                "Achievement checklist contains an invalid entry; refusing to report it."
+                "Achievement checklist contains an invalid entry; refusing to report it.",
             )
         checklist.append(parsed_entry)
     return {
@@ -538,16 +535,16 @@ def read_achievements(
         "save_backed": False,
         "achievements": checklist,
         "save_state": _unsupported(
-            "Achievement unlock state is platform-account data, not validated in DSR saves."
+            "Achievement unlock state is platform-account data, not validated in DSR saves.",
         ),
     }
 
 
 def read_summary(
-    path: str | os.PathLike[str] | None = None, slot: int = 0
+    path: str | os.PathLike[str] | None = None,
+    slot: int = 0,
 ) -> dict[str, object]:
     """Stable summary API: validated stats plus explicit unsupported categories."""
-
     stats = read_stats(path, slot)
     return {
         "supported": True,
@@ -572,18 +569,18 @@ __all__ = [
     "SaveReadError",
     "SaveUnsupportedError",
     "find_save_path",
-    "resolve_save_path",
-    "read_save",
-    "read_summary",
-    "read_stats",
-    "read_name",
-    "read_level",
+    "owned_item_names",
+    "read_achievements",
+    "read_bonfires",
+    "read_bosses",
+    "read_completion_status",
     "read_currency",
     "read_inventory",
-    "owned_item_names",
-    "read_bosses",
-    "read_bonfires",
+    "read_level",
+    "read_name",
     "read_progress",
-    "read_completion_status",
-    "read_achievements",
+    "read_save",
+    "read_stats",
+    "read_summary",
+    "resolve_save_path",
 ]

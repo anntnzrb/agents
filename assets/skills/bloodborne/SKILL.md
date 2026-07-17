@@ -123,6 +123,12 @@ The CLI has a curated source registry from live research:
 
 The cache is user-local at `~/.cache/bloodborne-companion` unless `BLOODBORNE_CACHE_DIR` is set. Cached source pages include URL, license, fetch time, byte count, SHA-256, and a 24-hour TTL. Page revision metadata remains in cached HTML unless a future parser extracts it into metadata. Runtime remains stateless with respect to playthrough progress.
 
+## Required follow-up reads
+
+| Need | Read | When |
+| --- | --- | --- |
+| Save-resource provenance | `scripts/resources/bloodborne_save/SOURCES.md` | Before replacing parser data or changing supported save claims |
+
 ## Live research fallback
 
 Use web/Brave/Reddit when the CLI lacks coverage or the user asks for source-backed corroboration. Keep queries spoiler-safe by avoiding future proper nouns unless the user already named them.

@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11,<3.15"
 # dependencies = []
@@ -31,7 +30,6 @@ def _load_simple_env(path: Path) -> None:
 _load_simple_env(SKILL_DIR / ".env")
 
 from flight_live.cli import main
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

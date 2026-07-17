@@ -122,6 +122,7 @@ class InventoryEntry:
     slot_index: int
     reinforcement: int | None = None
 
+
 @dataclass(frozen=True)
 class UpgradeEntry:
     upgrade_id: int
@@ -139,7 +140,6 @@ class UpgradeEntry:
 class SlotBlock:
     article_key: int
     slots: tuple[tuple[str, int | None], ...]
-
 
 
 @dataclass(frozen=True)
@@ -175,12 +175,16 @@ def _find_layout(data: memoryview) -> SaveLayout:
             face_offset = offset
             break
     if face_offset < 0:
-        raise ValueError("not a recognized Bloodborne userdata file: FACE marker not found")
+        raise ValueError(
+            "not a recognized Bloodborne userdata file: FACE marker not found",
+        )
     appearance_offset = face_offset + 4
     inventory_offset = face_offset - 34028
     username_offset = inventory_offset - USERNAME_TO_INV_OFFSET
     if username_offset < 0 or inventory_offset < 0:
-        raise ValueError("not a recognized Bloodborne userdata file: derived offsets are invalid")
+        raise ValueError(
+            "not a recognized Bloodborne userdata file: derived offsets are invalid",
+        )
     return SaveLayout(
         face_offset=face_offset,
         appearance_offset=appearance_offset,
@@ -205,13 +209,19 @@ def read_stats(path: str | Path) -> dict[str, int]:
     view = memoryview(data)
     stats: dict[str, int] = {}
     for spec in OFFSETS:
-        stats[spec["name"]] = _u_le(view, layout.username_offset + spec["rel_offset"], spec["length"])
+        stats[spec["name"]] = _u_le(
+            view,
+            layout.username_offset + spec["rel_offset"],
+            spec["length"],
+        )
     return stats
 
 
 def read_username(path: str | Path) -> str:
     data, layout = read_save(path)
-    raw = memoryview(data)[layout.username_offset : layout.username_offset + 64].tobytes()
+    raw = memoryview(data)[
+        layout.username_offset : layout.username_offset + 64
+    ].tobytes()
     nul = raw.find(b"\x00")
     if nul < 0:
         nul = len(raw)
@@ -250,7 +260,11 @@ def _lookup_effect(effect_id: int) -> tuple[str, str, int]:
     for section in ("runeEffects", "gemEffects"):
         row = UPGRADES.get(section, {}).get(key)
         if row:
-            return str(row.get("name", key)), str(row.get("effect", "")), int(row.get("rating", 0))
+            return (
+                str(row.get("name", key)),
+                str(row.get("effect", "")),
+                int(row.get("rating", 0)),
+            )
     return f"Unknown effect {effect_id}", "", 0
 
 
@@ -273,8 +287,14 @@ def _parse_upgrades(data: memoryview, start: int, end: int) -> dict[int, Upgrade
         type_id = data[offset + 8]
         shape_id = data[offset + 12]
         kind = "gem" if type_id == 1 else "rune"
-        shape = SLOT_SHAPE.get(shape_id, "-") if kind == "gem" else ("oath" if shape_id == 2 else "-")
-        effect_ids = tuple(_u_le(data, offset + 16 + index * 4, 4) for index in range(6))
+        shape = (
+            SLOT_SHAPE.get(shape_id, "-")
+            if kind == "gem"
+            else ("oath" if shape_id == 2 else "-")
+        )
+        effect_ids = tuple(
+            _u_le(data, offset + 16 + index * 4, 4) for index in range(6)
+        )
         name, effect_desc, rating = _lookup_effect(effect_ids[0])
         upgrade_id = _u_le(data, offset, 4)
         out[upgrade_id] = UpgradeEntry(
@@ -292,7 +312,11 @@ def _parse_upgrades(data: memoryview, start: int, end: int) -> dict[int, Upgrade
     return out
 
 
-def _parse_slot_blocks(data: memoryview, upgrades_end: int, username_offset: int) -> dict[int, list[tuple[str, int | None]]]:
+def _parse_slot_blocks(
+    data: memoryview,
+    upgrades_end: int,
+    username_offset: int,
+) -> dict[int, list[tuple[str, int | None]]]:
     out: dict[int, list[tuple[str, int | None]]] = {}
     offset = upgrades_end
     limit = min(username_offset - 147, len(data))
@@ -309,7 +333,14 @@ def _parse_slot_blocks(data: memoryview, upgrades_end: int, username_offset: int
             if shape is None:
                 break
             upgrade_id = _u_le(data, slot_offset + 4, 4)
-            slots.append((shape, upgrade_id if shape != "closed" and upgrade_id not in (0, 0xFFFFFFFF) else None))
+            slots.append(
+                (
+                    shape,
+                    upgrade_id
+                    if shape != "closed" and upgrade_id not in (0, 0xFFFFFFFF)
+                    else None,
+                ),
+            )
         if len(slots) != 5:
             break
         out[_u_le(data, offset, 8)] = slots
@@ -321,8 +352,17 @@ def _read_upgrades(path: str | Path) -> dict[int, UpgradeEntry]:
     data, layout = read_save(path)
     view = memoryview(data)
     upgrades = _parse_upgrades(view, UPGRADE_START, layout.username_offset)
-    blocks = _parse_slot_blocks(view, _upgrades_end(view, UPGRADE_START, layout.username_offset), layout.username_offset)
-    equipped = {upgrade_id for slots in blocks.values() for _, upgrade_id in slots if upgrade_id is not None}
+    blocks = _parse_slot_blocks(
+        view,
+        _upgrades_end(view, UPGRADE_START, layout.username_offset),
+        layout.username_offset,
+    )
+    equipped = {
+        upgrade_id
+        for slots in blocks.values()
+        for _, upgrade_id in slots
+        if upgrade_id is not None
+    }
     for upgrade_id in equipped:
         entry = upgrades.get(upgrade_id)
         if entry is not None:
@@ -338,7 +378,12 @@ def read_gems(path: str | Path) -> list[UpgradeEntry]:
     return [entry for entry in _read_upgrades(path).values() if entry.kind == "gem"]
 
 
-def _parse_slots(data: memoryview, start: int, location: Literal["inventory", "key_inventory", "storage"], max_slots: int) -> list[InventoryEntry]:
+def _parse_slots(
+    data: memoryview,
+    start: int,
+    location: Literal["inventory", "key_inventory", "storage"],
+    max_slots: int,
+) -> list[InventoryEntry]:
     out: list[InventoryEntry] = []
     end = min(start + max_slots * 16, len(data) - 16)
     for slot_index, offset in enumerate(range(start, end, 16)):
@@ -349,24 +394,63 @@ def _parse_slots(data: memoryview, start: int, location: Literal["inventory", "k
         if amount == 0:
             continue
         if slot[7] == 0xB0 and slot[11] == 0x40:
-            item_id = int.from_bytes(slot[8:11].tobytes() + b"\x00", "little", signed=False)
+            item_id = int.from_bytes(
+                slot[8:11].tobytes() + b"\x00",
+                "little",
+                signed=False,
+            )
             found = _lookup_item(item_id)
             if found:
                 name, category = found
-                out.append(InventoryEntry(location, "item", category, name, amount, item_id, slot_index))
+                out.append(
+                    InventoryEntry(
+                        location,
+                        "item",
+                        category,
+                        name,
+                        amount,
+                        item_id,
+                        slot_index,
+                    ),
+                )
         elif slot[11] == 0x10:
-            item_id = int.from_bytes(slot[8:11].tobytes() + b"\x00", "little", signed=False)
+            item_id = int.from_bytes(
+                slot[8:11].tobytes() + b"\x00",
+                "little",
+                signed=False,
+            )
             found = _lookup_armor(item_id)
             if found:
                 name, category = found
-                out.append(InventoryEntry(location, "armor", category, name, amount, item_id, slot_index))
+                out.append(
+                    InventoryEntry(
+                        location,
+                        "armor",
+                        category,
+                        name,
+                        amount,
+                        item_id,
+                        slot_index,
+                    ),
+                )
         else:
             item_id = int.from_bytes(slot[8:12], "little", signed=False)
             found = _lookup_weapon(item_id)
             if found:
                 name, category = found
                 reinforcement = (item_id % 10000) // 100
-                out.append(InventoryEntry(location, "weapon", category, name, amount, item_id, slot_index, reinforcement=reinforcement))
+                out.append(
+                    InventoryEntry(
+                        location,
+                        "weapon",
+                        category,
+                        name,
+                        amount,
+                        item_id,
+                        slot_index,
+                        reinforcement=reinforcement,
+                    ),
+                )
     return out
 
 
@@ -387,12 +471,16 @@ def read_bosses(path: str | Path) -> list[BossState]:
     for boss in BOSSES:
         defeated = True
         for flag in boss["flags"]:
-            current = view[layout.username_offset + USERNAME_TO_AOB + flag["rel_offset"]]
+            current = view[
+                layout.username_offset + USERNAME_TO_AOB + flag["rel_offset"]
+            ]
             if (current & flag["dead_value"]) != flag["dead_value"]:
                 defeated = False
                 break
         name = boss["name"]
-        states.append(BossState(name=name, defeated=defeated, known=name in KNOWN_BOSSES))
+        states.append(
+            BossState(name=name, defeated=defeated, known=name in KNOWN_BOSSES),
+        )
     return states
 
 
@@ -401,16 +489,35 @@ def safe_boss_name(name: str) -> str:
 
 
 def materials(entries: list[InventoryEntry]) -> list[InventoryEntry]:
-    return [entry for entry in entries if entry.kind == "item" and entry.name in MATERIAL_NAMES]
+    return [
+        entry
+        for entry in entries
+        if entry.kind == "item" and entry.name in MATERIAL_NAMES
+    ]
 
 
 def important_key_items(entries: list[InventoryEntry]) -> list[InventoryEntry]:
-    return [entry for entry in entries if entry.location == "key_inventory" and entry.name in IMPORTANT_KEY_ITEMS]
+    return [
+        entry
+        for entry in entries
+        if entry.location == "key_inventory" and entry.name in IMPORTANT_KEY_ITEMS
+    ]
 
 
 def weapons(entries: list[InventoryEntry]) -> list[InventoryEntry]:
-    return [entry for entry in entries if entry.kind == "weapon" and entry.location == "inventory"]
+    return [
+        entry
+        for entry in entries
+        if entry.kind == "weapon" and entry.location == "inventory"
+    ]
+
 
 def weapon_reinforcement(entries: list[InventoryEntry]) -> dict[str, int]:
     """Return dict of weapon name -> reinforcement level (+0 to +10)."""
-    return {e.name: e.reinforcement for e in entries if e.kind == "weapon" and e.location == "inventory" and e.reinforcement is not None}
+    return {
+        e.name: e.reinforcement
+        for e in entries
+        if e.kind == "weapon"
+        and e.location == "inventory"
+        and e.reinforcement is not None
+    }

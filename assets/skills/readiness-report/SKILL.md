@@ -11,10 +11,6 @@ allowed-tools: ""
 
 Evaluate how well a repository supports autonomous AI development by analyzing it across eight technical pillars and five maturity levels.
 
-## Overview
-
-Agent Readiness measures how prepared a codebase is for AI-assisted development. Poor feedback loops, missing documentation, or lack of tooling cause agents to waste cycles on preventable errors. This skill identifies those gaps and prioritizes fixes.
-
 ## Quick Start
 
 Run `/readiness-report` to evaluate the current repository. The analysis:
@@ -131,13 +127,14 @@ Fix gaps in this order:
 3. **Add PR/issue templates**: Structure task discovery
 4. **Document single-command setup**: Enable fast environment provisioning
 
-## Resources
+## Required follow-up reads
 
-- `scripts/cli.py` - Public dispatcher (`analyze`, `report`, `run`)
-- `scripts/analyze_repo.py` - Internal repository analysis script
-- `scripts/generate_report.py` - Internal report generation and formatting
-- `references/criteria.md` - Complete criteria definitions by pillar
-- `references/maturity-levels.md` - Detailed level requirements
+| Need | Read | When |
+| --- | --- | --- |
+| Complete criterion definitions | `references/criteria.md` | Explaining a criterion or auditing scorer behavior |
+| Level thresholds and interpretation | `references/maturity-levels.md` | Explaining maturity or prioritizing gaps |
+| Analyzer implementation | `scripts/analyze_repo.py` | Debugging signal detection |
+| Report formatting | `scripts/generate_report.py` | Debugging rendered output |
 
 ## Automated Remediation
 

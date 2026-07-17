@@ -84,9 +84,11 @@ Per result:
 
 Use RPC for strict JSONL envelopes (`ping`, `get_schema`, `search`).
 
-Reference docs:
+## Required follow-up reads
 
-- `references/cheatsheet.md`
-- `references/workflows.md`
-- `references/rpc.md`
-- `references/troubleshooting.md`
+| Need | Read | When |
+| --- | --- | --- |
+| Search commands and trusted fields | `references/cheatsheet.md` | Constructing or interpreting a search |
+| Decision workflow | `references/workflows.md` | Comparing options or presenting recommendations |
+| JSONL request and response contract | `references/rpc.md` | Using `--mode rpc` |
+| Failure diagnosis | `references/troubleshooting.md` | Any provider, filter, or RPC failure |

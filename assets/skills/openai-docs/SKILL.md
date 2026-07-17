@@ -73,7 +73,7 @@ Complex arguments SHOULD use `--args '<JSON object>'`.
 Unspecified migration or prompt upgrade: MUST run the resolver:
 
 ```text
-node <skill-dir>/scripts/resolve-latest-model-info.cjs
+uv run --script <skill-dir>/scripts/cli.py latest-model
 ```
 
 - Resolver output MUST include all three fields:
@@ -83,7 +83,7 @@ node <skill-dir>/scripts/resolve-latest-model-info.cjs
 Broad Codex self-knowledge: MUST run the helper in a writable session:
 
 ```text
-node <skill-dir>/scripts/fetch-codex-manual.mjs
+uv run --script <skill-dir>/scripts/cli.py codex-manual
 ```
 
 - MUST read only relevant outline/manual sections.

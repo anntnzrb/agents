@@ -24,7 +24,7 @@ import sys
 import time
 import webbrowser
 from functools import partial
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 # Files to exclude from output listings
@@ -190,7 +190,7 @@ def embed_file(path: Path) -> dict:
             "type": "text",
             "content": content,
         }
-    elif ext in IMAGE_EXTENSIONS:
+    if ext in IMAGE_EXTENSIONS:
         try:
             raw = path.read_bytes()
             b64 = base64.b64encode(raw).decode("ascii")
@@ -206,7 +206,7 @@ def embed_file(path: Path) -> dict:
             "mime": mime,
             "data_uri": f"data:{mime};base64,{b64}",
         }
-    elif ext == ".pdf":
+    if ext == ".pdf":
         try:
             raw = path.read_bytes()
             b64 = base64.b64encode(raw).decode("ascii")
@@ -221,7 +221,7 @@ def embed_file(path: Path) -> dict:
             "type": "pdf",
             "data_uri": f"data:{mime};base64,{b64}",
         }
-    elif ext == ".xlsx":
+    if ext == ".xlsx":
         try:
             raw = path.read_bytes()
             b64 = base64.b64encode(raw).decode("ascii")
@@ -236,23 +236,22 @@ def embed_file(path: Path) -> dict:
             "type": "xlsx",
             "data_b64": b64,
         }
-    else:
-        # Binary / unknown — base64 download link
-        try:
-            raw = path.read_bytes()
-            b64 = base64.b64encode(raw).decode("ascii")
-        except OSError:
-            return {
-                "name": path.name,
-                "type": "error",
-                "content": "(Error reading file)",
-            }
+    # Binary / unknown — base64 download link
+    try:
+        raw = path.read_bytes()
+        b64 = base64.b64encode(raw).decode("ascii")
+    except OSError:
         return {
             "name": path.name,
-            "type": "binary",
-            "mime": mime,
-            "data_uri": f"data:{mime};base64,{b64}",
+            "type": "error",
+            "content": "(Error reading file)",
         }
+    return {
+        "name": path.name,
+        "type": "binary",
+        "mime": mime,
+        "data_uri": f"data:{mime};base64,{b64}",
+    }
 
 
 def load_previous_iteration(workspace: Path) -> dict[str, dict]:
@@ -324,7 +323,8 @@ def generate_html(
     data_json = json.dumps(embedded)
 
     return template.replace(
-        "/*__EMBEDDED_DATA__*/", f"const EMBEDDED_DATA = {data_json};"
+        "/*__EMBEDDED_DATA__*/",
+        f"const EMBEDDED_DATA = {data_json};",
     )
 
 
@@ -439,10 +439,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate and serve eval review")
     parser.add_argument("workspace", type=Path, help="Path to workspace directory")
     parser.add_argument(
-        "--port", "-p", type=int, default=3117, help="Server port (default: 3117)"
+        "--port",
+        "-p",
+        type=int,
+        default=3117,
+        help="Server port (default: 3117)",
     )
     parser.add_argument(
-        "--skill-name", "-n", type=str, default=None, help="Skill name for header"
+        "--skill-name",
+        "-n",
+        type=str,
+        default=None,
+        help="Skill name for header",
     )
     parser.add_argument(
         "--previous-workspace",
@@ -501,7 +509,12 @@ def main() -> None:
     port = args.port
     _kill_port(port)
     handler = partial(
-        ReviewHandler, workspace, skill_name, feedback_path, previous, benchmark_path
+        ReviewHandler,
+        workspace,
+        skill_name,
+        feedback_path,
+        previous,
+        benchmark_path,
     )
     try:
         server = HTTPServer(("127.0.0.1", port), handler)
@@ -511,8 +524,8 @@ def main() -> None:
         port = server.server_address[1]
 
     url = f"http://localhost:{port}"
-    print(f"\n  Eval Viewer")
-    print(f"  ─────────────────────────────────")
+    print("\n  Eval Viewer")
+    print("  ─────────────────────────────────")
     print(f"  URL:       {url}")
     print(f"  Workspace: {workspace}")
     print(f"  Feedback:  {feedback_path}")
@@ -520,7 +533,7 @@ def main() -> None:
         print(f"  Previous:  {args.previous_workspace} ({len(previous)} runs)")
     if benchmark_path:
         print(f"  Benchmark: {benchmark_path}")
-    print(f"\n  Press Ctrl+C to stop.\n")
+    print("\n  Press Ctrl+C to stop.\n")
 
     webbrowser.open(url)
 
