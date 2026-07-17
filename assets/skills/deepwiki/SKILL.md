@@ -9,15 +9,41 @@ allowed-tools: ""
 
 # DeepWiki
 
-Use the configured MCPorter `deepwiki` server for public GitHub repository documentation and targeted codebase Q&A. Do not assume native DeepWiki tools are mounted.
+Use MCPorter `deepwiki` for public GitHub repository docs and codebase Q&A.
+- NEVER assume native DeepWiki tools are mounted.
+- MUST run from the agent-config root.
+- MUST pass `--config assets/mcporter.jsonc`.
+- Missing `mcporter`: MUST use the Nix fallback.
 
-If `mcporter` is not on PATH, replace the leading `mcporter` in each command below with `nix run github:numtide/llm-agents.nix#mcporter --`.
+```text
+nix run github:numtide/llm-agents.nix#mcporter --
+```
+
+## Required follow-up reads
+
+| Need | Read | When |
+| --- | --- | --- |
+| Fallback contracts or broad tool/schema comparison | `references/tools-schema.md` | MUST read only after live discovery fails or broad comparison needs exact contracts |
+
 ## Workflow
 
-1. Start with `mcporter list deepwiki --brief` only when available tools are unknown or may have changed.
-2. Require `repoName=owner/repo`.
-3. Map an unfamiliar repository with `mcporter call deepwiki.read_wiki_structure repoName=facebook/react`; fetch contents only after narrowing: `mcporter call deepwiki.read_wiki_contents repoName=facebook/react`.
-4. Ask narrow questions with `mcporter call deepwiki.ask_question repoName=facebook/react question='Where is concurrent rendering implemented?'`; inspect only its schema with `mcporter list deepwiki.ask_question --schema` when argument details matter.
-5. If DeepWiki is insufficient, use an appropriate public-web research source and say so.
+1. MUST discover live contracts first:
 
-`read_wiki_contents` can be large; do not fetch it before narrowing the topic.
+   ```text
+   mcporter --config assets/mcporter.jsonc list deepwiki --schema
+   ```
+
+2. Live success MUST override the snapshot.
+   - NEVER infer absent response fields.
+   - NEVER load snapshots except for broad comparison.
+3. Live failure MUST label snapshot use as fallback.
+4. Matching inventory uses these routing rules:
+   - Repositories MUST use `owner/repo`.
+   - `ask_question` accepts one or up to 10 repositories.
+   - Other tools accept exactly one repository.
+   - Broad exploration SHOULD inspect structure before contents.
+   - Narrow questions SHOULD use `ask_question`.
+   - Multi-repository calls MUST use exact `--args` JSON.
+5. Insufficient DeepWiki MAY switch to public-web research; MUST disclose.
+
+`read_wiki_contents` can be large; MUST narrow first unless full docs are needed.

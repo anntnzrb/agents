@@ -1,0 +1,214 @@
+# DeepWiki MCP tool schema snapshot
+
+NEVER load this snapshot before live discovery. Load it only after discovery
+fails or for broad comparison; live contracts MUST override it.
+
+## Snapshot metadata
+
+- Captured: 2026-07-17
+- MCPorter: 0.12.3
+- Server: `deepwiki` (`DeepWiki MCP`)
+- Transport: HTTP
+- Endpoint reported by MCPorter: `https://mcp.deepwiki.com/mcp`
+- Inventory at capture: 3 tools; names/input schemas matched 3/3
+- Source command:
+
+```text
+nix run github:numtide/llm-agents.nix#mcporter -- --config assets/mcporter.jsonc list deepwiki --schema --json
+```
+
+MUST attempt that command before relying on this snapshot. NEVER invent
+structured response fields: all tools publish only the common string envelope
+below, not a schema for the string's semantic content.
+
+## Inventory
+
+| Tool | Purpose | Required input |
+| --- | --- | --- |
+| `read_wiki_structure` | List documentation topics for one GitHub repository | `repoName` string |
+| `read_wiki_contents` | View documentation for one GitHub repository | `repoName` string |
+| `ask_question` | Ask a context-grounded question about one or more GitHub repositories | `repoName` string or string array; `question` string |
+
+## Common output envelope
+
+All three tools publish this exact output schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "result": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "result"
+  ],
+  "x-fastmcp-wrap-result": true
+}
+```
+
+Only the `result` string wrapper is known. NEVER infer JSON fields or a stable
+internal format without observing and labeling a live result.
+
+## `read_wiki_structure`
+
+Exact live description:
+
+```text
+Get a list of documentation topics for a GitHub repository.
+Args:
+repoName: GitHub repository in owner/repo format (e.g. "facebook/react")
+```
+
+Rendered declaration:
+
+```text
+function read_wiki_structure(repoName: string): object;
+```
+
+Exact input schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "repoName": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "repoName"
+  ]
+}
+```
+
+Example:
+
+```text
+mcporter --config assets/mcporter.jsonc call deepwiki.read_wiki_structure repoName=facebook/react
+```
+
+## `read_wiki_contents`
+
+Exact live description:
+
+```text
+View documentation about a GitHub repository.
+Args:
+repoName: GitHub repository in owner/repo format (e.g. "facebook/react")
+```
+
+Rendered declaration:
+
+```text
+function read_wiki_contents(repoName: string): object;
+```
+
+Exact input schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "repoName": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "repoName"
+  ]
+}
+```
+
+Example:
+
+```text
+mcporter --config assets/mcporter.jsonc call deepwiki.read_wiki_contents repoName=facebook/react
+```
+
+`read_wiki_contents` may be large. SHOULD use structure or a narrow question
+first unless full docs are required.
+
+## `ask_question`
+
+Exact live description:
+
+```text
+Ask any question about a GitHub repository and get an AI-powered, context-grounded response.
+Args:
+repoName: GitHub repository or list of repositories (max 10) in owner/repo format
+question: The question to ask about the repository
+```
+
+Rendered declaration:
+
+```text
+function ask_question(repoName: unknown, question: string): object;
+```
+
+Exact input schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "repoName": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ]
+    },
+    "question": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "repoName",
+    "question"
+  ]
+}
+```
+
+Single-repository example:
+
+```text
+mcporter --config assets/mcporter.jsonc call deepwiki.ask_question repoName=facebook/react question='Where is concurrent rendering implemented?'
+```
+
+Multiple-repository example:
+
+```text
+mcporter --config assets/mcporter.jsonc call deepwiki.ask_question --args '{"repoName":["facebook/react","vuejs/core"],"question":"How do their reactivity models differ?"}'
+```
+
+The description limits repository lists to 10, but JSON Schema omits `maxItems`.
+MUST respect the limit without claiming schema enforcement. MCPorter renders
+`repoName` as `unknown` because `anyOf` accepts a string or string array.
+
+## Discovery and drift
+
+- MUST discover the complete live schema first:
+
+  ```text
+  mcporter --config assets/mcporter.jsonc list deepwiki --schema
+  ```
+
+- MAY narrow discovery after the complete inventory is known:
+
+  ```text
+  mcporter --config assets/mcporter.jsonc list deepwiki.ask_question --schema
+  ```
+
+- MUST run from the agent-config root so the config path resolves.
+- If `mcporter` is absent, replace it with
+  `nix run github:numtide/llm-agents.nix#mcporter --`; keep all arguments.
+- Live success MUST override this snapshot. On failure, MUST use only recorded
+  tools/fields and report drift uncertainty.
