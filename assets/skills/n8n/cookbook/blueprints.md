@@ -1,6 +1,7 @@
 # n8n Blueprint Cookbook
 
-End-to-end flow: natural language → workflow JSON → apply → enable MCP → run.
+End-to-end flow: natural language → workflow JSON → apply → enable MCP →
+discover the live catalog → run a discovered tool.
 
 ---
 
@@ -23,11 +24,18 @@ uv run --script <skill-dir>/scripts/cli.py update <WORKFLOW_ID> <WORKFLOW.json>
 uv run --script <skill-dir>/scripts/cli.py mcp-enable <WORKFLOW_ID>
 uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
 
-# 4) Run via MCP client (example: chat trigger)
-# Call n8n.execute_workflow with inputs {"type":"chat","chatInput":"hello"}
+# 4) Confirm MCP health without printing transport details
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --status --quiet --no-oauth
+
+# 5) Discover the current tool names and schemas
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --schema --all-parameters
+
+# 6) Call only a tool returned by discovery
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
 ```
 
-**Tip**: Use `n8n.get_workflow_details` to confirm the trigger type before executing.
+**Tip**: MUST read `../references/mcporter.md` before step 4. Workflow enablement
+MUST NOT imply any tool name or schema.
 
 ---
 
@@ -45,4 +53,4 @@ uv run --script <skill-dir>/scripts/cli.py mcp-enable <WORKFLOW_ID>
 uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
 ```
 
-**Tip**: Always re-apply `mcp-enable` after major edits to ensure `availableInMCP` stays true.
+**Tip**: MUST re-apply `mcp-enable` after major edits to preserve `availableInMCP`.

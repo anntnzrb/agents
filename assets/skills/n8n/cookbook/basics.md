@@ -33,18 +33,20 @@ uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
 
 ---
 
-## Run a Chat Workflow via MCP
+## Run a Workflow via MCP
 
-**Problem**: Execute a chat-triggered workflow.
+**Problem**: Execute a workflow exposed by the current n8n MCP endpoint.
 
 **Solution**:
 
-```bash
-# Call n8n.execute_workflow via your MCP client
-# inputs: {"type":"chat","chatInput":"hello"}
+```text
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --status --quiet --no-oauth
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --schema --all-parameters
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
 ```
 
-**Tip**: Use `n8n.get_workflow_details` first to confirm the trigger type.
+**Tip**: MUST read `../references/mcporter.md` first and use only live tool names
+and schemas.
 
 ---
 

@@ -9,14 +9,20 @@ allowed-tools: ""
 
 # n8n
 
-Choose one explicit route. Do not start either route automatically.
+Choose one route. NEVER start either automatically.
 
-- **Bundled REST CLI:** authoring and administration through the n8n REST API.
-- **Optional MCPorter route:** discover and call tools from a configured n8n MCP endpoint.
+- **Bundled REST CLI:** author and administer through n8n REST.
+- **Optional MCPorter:** discover current endpoint tools and schemas.
+
+The MCP catalog is instance state.
+
+- NEVER infer tools, arguments, or response fields.
+- Live discovery MUST define tools and input schemas.
+- Published schemas or observed calls MUST define response fields.
 
 ## Bundled REST CLI
 
-Use the bundled CLI for listing, reading, creating, updating, exporting, activating, deactivating, and validating workflows:
+REST workflow operations SHOULD use the bundled CLI:
 
 ```text
 uv run --script <skill-dir>/scripts/cli.py list --limit 5
@@ -30,28 +36,44 @@ uv run --script <skill-dir>/scripts/cli.py mcp-enable <WORKFLOW_ID>
 uv run --script <skill-dir>/scripts/cli.py validate <WORKFLOW.json>
 ```
 
-MCP-exposed workflows must also be active.
+MCP-exposed workflows MUST also be active.
 
-It requires `N8N_BASE_URL` and `N8N_API_KEY`. Read `reference.md` before REST work or credential troubleshooting; it defines the CLI's environment-file lookup.
+- REST requires `N8N_BASE_URL` and `N8N_API_KEY`.
+- MUST read `reference.md` before REST work or credential troubleshooting.
 
 ## Optional MCPorter route
 
-Use MCPorter only when `N8N_MCP_URL` and `N8N_MCP_TOKEN` are configured in the selected registry:
-
-If `mcporter` is not on `PATH`, replace the leading `mcporter` in each command below with `nix run github:numtide/llm-agents.nix#mcporter --`.
+- MUST read `references/mcporter.md` first.
+- MUST use the configured registry explicitly.
+- Missing `mcporter`: MUST use the Nix fallback.
+- MUST run the quiet health gate first.
+- Nonzero status MUST stop discovery.
 
 ```text
-mcporter list n8n --brief
-mcporter list n8n.<tool> --schema
-mcporter call n8n.<tool> --args '<JSON object>'
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --status --quiet --no-oauth
 ```
 
-Read `assets/mcporter.jsonc` before this route. Missing substitutions, authentication failures, and an unavailable endpoint are prerequisites to report; do not fabricate configuration or silently change routes.
+After success:
+
+- MUST discover live schemas.
+- MUST call only a discovered tool.
+
+```text
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --schema --all-parameters
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
+```
+
+- MUST copy exact live tool/input schemas.
+- MUST copy only published output schemas.
+- Unavailable catalog: MUST report unobserved response shape.
+- NEVER invent tools or silently switch to REST.
 
 ## Required follow-up reads
 
 | Need | Read | When |
 |---|---|---|
 | REST auth, endpoints, and environment lookup | `reference.md` | Before REST work |
-| MCP transport and substitutions | `assets/mcporter.jsonc` | Before MCPorter work |
-| MCP tool arguments/output | `mcporter list n8n.<tool> --schema` | After selecting a tool |
+| MCP prerequisites, safe status, discovery, and failures | `references/mcporter.md` | MUST read before MCPorter work |
+| MCP transport definition | `<agent-config-root>/assets/mcporter.jsonc` | Diagnose transport; MUST NOT print resolved secrets |
+| Workflow authoring recipes | `cookbook/basics.md` | When a REST or MCP task matches |
+| End-to-end authoring sequence | `cookbook/blueprints.md` | When creating or iterating a workflow |

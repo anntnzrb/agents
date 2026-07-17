@@ -1,15 +1,6 @@
 {
-  "createWorkflow": {
+  "restCreateOrUpdatePayload": {
     "name": "<workflow name>",
-    "nodes": [],
-    "connections": {},
-    "settings": {}
-  },
-  "activateWorkflow": {
-    "active": true
-  },
-  "updateWorkflow": {
-    "name": "<new name>",
     "nodes": [],
     "connections": {},
     "settings": {}

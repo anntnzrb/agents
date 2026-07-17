@@ -1,5 +1,9 @@
 # n8n Reference
 
+This reference covers the bundled REST route. For the optional MCP route, read
+`references/mcporter.md`; its credentials, transport, and live schemas are
+independent of the REST API.
+
 ## Bundled REST CLI
 
 The CLI calls the n8n REST API at `<N8N_BASE_URL>/api/v1` with `X-N8N-API-KEY`.
@@ -20,14 +24,5 @@ uv run --script <skill-dir>/scripts/cli.py export <WORKFLOW_ID> <OUT.json>
 uv run --script <skill-dir>/scripts/cli.py validate <WORKFLOW.json>
 ```
 
-## Optional MCPorter route
-
-The configured `n8n` MCPorter entry passes `N8N_MCP_URL` to `supergateway` and sends `N8N_MCP_TOKEN` as a bearer token. Both variables must be set.
-
-```text
-mcporter list n8n --brief
-mcporter list n8n.<tool> --schema
-mcporter call n8n.<tool> --args '<JSON object>'
-```
-
-Check `assets/mcporter.jsonc` for the selected registry's transport. Endpoint availability and exposed tools are instance-specific.
+MUST NOT infer MCP availability from REST success; routes have independent URLs,
+credentials, transports, and discovery.
