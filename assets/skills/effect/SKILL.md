@@ -9,40 +9,56 @@ allowed-tools: ""
 
 # Effect
 
-Use live Effect documentation for questions about `effect` and imported `@effect/*` packages.
+Effect API questions MUST use live Effect documentation.
 
-If `mcporter` is not on PATH, replace the leading `mcporter` in each command below with `nix run github:numtide/llm-agents.nix#mcporter --`.
+Missing `mcporter`: MUST use this Nix prefix:
+
+```text
+nix run github:numtide/llm-agents.nix#mcporter --
+```
+
 ## Workflow
 
-1. Confirm the server and discover its current tools:
+1. MUST discover live inventory first:
 
 ```text
-mcporter list effect --brief
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list effect --brief
 ```
 
-2. Inspect only the tool needed for an unfamiliar or constraint-sensitive request:
+2. Unfamiliar or constrained arguments: MUST inspect targeted live schema:
 
 ```text
-mcporter list effect.<tool> --schema
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list effect.<tool> --schema
 ```
 
-3. For a requested library, use `effect-doc-links` to find focused resources. Use
-`effect-documentation` only when the answer needs the documentation content:
+3. Package coverage: MUST inspect live resources first:
 
 ```text
-mcporter call 'effect.effect-doc-links(libraries: ["effect"])'
-mcporter call 'effect.effect-documentation(libraries: ["effect"])'
+mcporter --config <agent-config-root>/assets/mcporter.jsonc resource effect
 ```
 
-Use the literal server and tool names above. Do not maintain or rely on a static package or tool
-catalog; the live schema is authoritative.
+- MCP-resource client: SHOULD use `effect-doc-links`.
+- Direct documentation text: MUST use `effect-documentation`.
 
-Do not pass package names through blindly: if the live response does not cover the requested package,
-use `context7`, `gh`, or `research` instead of presenting adjacent docs as direct coverage.
-Inspect returned content, not just the exit status; if MCP reports an error or broken resource despite exit 0, use `context7`, `gh`, or `research` and disclose the failure.
+```text
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call 'effect.effect-doc-links(libraries: ["effect"])'
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call 'effect.effect-documentation(libraries: ["effect"])'
+```
+
+- Live schema and resources MUST remain authoritative.
+- NEVER treat generated links as coverage or health evidence.
+- MUST inspect content despite MCPorter exit `0`.
+- MUST disclose embedded errors or broken resources.
+- Absent/unhealthy coverage: MUST use `context7`, `gh`, or `research`.
+
+## Required follow-up reads
+
+| Need | Read | When |
+| --- | --- | --- |
+| Dated broad tool/package inventory or exact-schema fallback | `references/mcporter-tools.md` | ONLY for broad comparison/package coverage, or when live discovery fails; NEVER before a targeted live schema |
 
 ## Version safety
 
-Check the project's manifest, lockfile, and imports before recommending version-sensitive APIs. Treat
-returned documentation as current upstream material; when it conflicts with the installed version,
-follow the project and state the mismatch rather than guessing.
+- Version-sensitive guidance: MUST inspect manifests, lockfiles, imports.
+- Project version MUST override conflicting upstream documentation.
+- MUST state mismatches. NEVER guess.
