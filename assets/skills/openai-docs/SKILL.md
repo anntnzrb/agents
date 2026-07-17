@@ -5,23 +5,34 @@ description: Use current official OpenAI and Codex docs through MCPorter for API
 
 # OpenAI Docs
 
-Use the configured MCPorter server `openai-docs` for current official OpenAI documentation. It is public: do not authenticate. Use fetched documentation as evidence; do not invent undocumented behavior.
+- MUST use MCPorter `openai-docs` for official documentation.
+- Public server: NEVER authenticate.
+- MUST ground answers in fetched documentation.
+- NEVER invent undocumented behavior.
 
-If `mcporter` is not on `PATH`, replace the leading `mcporter` in each command below with `nix run github:numtide/llm-agents.nix#mcporter --`.
+Missing `mcporter`: MUST use this Nix prefix:
+
+```text
+nix run github:numtide/llm-agents.nix#mcporter --
+```
 
 ## Discover and call
 
-The live server schema is authoritative. Run discovery only when the available tools are unknown or may have changed:
+- Live server schema MUST remain authoritative.
+- MUST discover live inventory first:
 
 ```text
 mcporter list openai-docs --brief
 ```
 
-Inspect only the tool needed when an argument or output shape matters:
+Argument constraints: MUST inspect only targeted live schema:
 
 ```text
 mcporter list openai-docs.<tool> --schema
 ```
+
+- Output fields: MUST inspect actual results.
+- Tool declarations MAY omit output schemas.
 
 Use these live tools:
 
@@ -33,46 +44,57 @@ mcporter call openai-docs.list_api_endpoints
 mcporter call openai-docs.get_openapi_spec url='https://developers.openai.com/...'
 ```
 
-Use `--args '<JSON object>'` for optional, array, or multiline arguments. Do not maintain static schemas.
+Complex arguments SHOULD use `--args '<JSON object>'`.
 
 ## Routes
 
 ### Documentation
 
-1. Search with a compact 2–6-term query: `search_openai_docs`.
-2. Fetch the best returned URL with `fetch_openai_doc`; pass `anchor` only for a known needed section.
-3. Answer from that narrow page or section and cite it. Narrow and repeat search before broadening.
+1. Compact query (2–6 terms): MUST use `search_openai_docs`.
+2. MUST fetch the best URL; `anchor` requires a known section.
+3. MUST cite the narrow source before broadening search.
 
-Use `list_openai_docs` only to browse when there is no clear query. If this public MCP route is unavailable or unhelpful, search or fetch only official OpenAI domains and cite the page.
+- Clear query absent: MAY browse with `list_openai_docs`.
+- MCP unavailable/unhelpful: MUST use official OpenAI domains.
+- MUST cite the fetched page.
 
 ### API reference
 
-For endpoint discovery, call `list_api_endpoints`. For API schema, required fields, or parameter details, call `get_openapi_spec` for the relevant API URL and pair it with the relevant guide/reference fetch. Inspect that tool's live schema first when optional output controls matter.
+- Endpoint discovery MUST use `list_api_endpoints`.
+- Endpoint schemas MUST use `get_openapi_spec`.
+- MUST pair schemas with relevant guides or references.
+- Optional output controls: MUST inspect targeted live schema first.
 
 ### Models and Codex
 
-For latest/current/default model selection, first fetch `https://developers.openai.com/api/docs/guides/latest-model.md`. An explicit model target wins; do not silently migrate it.
+- Latest/current/default model: MUST fetch `https://developers.openai.com/api/docs/guides/latest-model.md` first.
+- Explicit model targets MUST win. NEVER migrate silently.
 
-For an unspecified latest/current/default migration or prompt upgrade, run the cross-platform resolver before applying guidance:
+Unspecified migration or prompt upgrade: MUST run the resolver:
 
 ```text
 node <skill-dir>/scripts/resolve-latest-model-info.cjs
 ```
 
-Require `model`, `migrationGuideUrl`, and `promptingGuideUrl`, then fetch the returned guide URLs through `fetch_openai_doc`.
+- Resolver output MUST include all three fields:
+  `model`, `migrationGuideUrl`, `promptingGuideUrl`.
+- MUST fetch returned guides through `fetch_openai_doc`.
 
-For broad Codex self-knowledge, run the existing helper in a writable session, then read only relevant sections from its emitted outline and manual:
+Broad Codex self-knowledge: MUST run the helper in a writable session:
 
 ```text
 node <skill-dir>/scripts/fetch-codex-manual.mjs
 ```
 
-If it cannot run or lacks the needed current fact, use the documentation route above. Keep uncertainty bounded when official sources do not establish a claim.
+- MUST read only relevant outline/manual sections.
+- Helper unavailable/insufficient: MUST use the documentation route.
+- Official evidence absent: MUST state bounded uncertainty.
 
 ## Required follow-up reads
 
 | Need | Read | When |
 | --- | --- | --- |
+| Dated broad tool inventory or exact-schema fallback | `references/tool-schema-snapshot.md` | ONLY for broad tool comparison, or when live discovery fails; NEVER before a targeted live schema |
 | Latest-model fallback | `references/latest-model.md` | The live latest-model page is unavailable |
 | Upgrade fallback | `references/upgrade-guide.md` | Live migration guidance is unavailable |
 | Prompting fallback | `references/prompting-guide.md` | Live prompting guidance is unavailable |
