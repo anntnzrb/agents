@@ -1,0 +1,47 @@
+{
+  "skill_name": "game-deals-live",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I am in the US and pay in USD. Find the absolute cheapest way to get Lies of P plus the Overture DLC on PC. Compare the base game and DLC bought separately against any complete edition or bundle, show the top 5 across all offer types, and verify exactly which components each finalist includes.",
+      "expected_output": "A fresh deterministic-first top-five comparison that resolves the base game, DLC, editions, and bundles separately; reports absolute cheapest, cheapest ownership, and cheapest verified; and does not claim component equivalence without current direct evidence.",
+      "files": [],
+      "expectations": [
+        "Runs or is consistent with the bundled lookup CLI using country US, currency USD, top 5, all acquisition types, and absolute-cheapest ranking before browser/search verification.",
+        "Resolves Lies of P base game and Overture DLC separately and compares their combined price with candidate editions or bundles.",
+        "Verifies the current component list for each finalist and explicitly states whether both the base game and Overture DLC are included.",
+        "Classifies every finalist using the acquisition enum and preserves evidence status as verified, estimated, headline, blocked, or unknown.",
+        "Reports absolute cheapest separately from cheapest ownership and cheapest verified, allowing cheapest verified to be unavailable.",
+        "Does not buy, create an account, sign in, or submit payment information during verification."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I live in Ecuador and pay in USD. Find the top 5 cheapest PC offers for Cyberpunk 2077: Ultimate Edition, including all offer types. Tell me the cheapest actual ownership option, whether it activates in Ecuador, and the final price after fees and tax. Verify the finalists instead of trusting a Global label.",
+      "expected_output": "An Ecuador/USD comparison that distinguishes absolute cheapest from ownership, treats unsupported-region proxy data as discovery only, verifies edition and Ecuador activation, and refuses to invent fees, tax, or a final total when read-only checkout evidence is unavailable.",
+      "files": [],
+      "expectations": [
+        "Runs or is consistent with lookup using country EC, currency USD, top 5, all acquisition types, and absolute-cheapest ranking before direct verification.",
+        "Surfaces any provider fallback from Ecuador to a US proxy and does not present proxy pricing as Ecuador-region verification.",
+        "Verifies that the candidate is the Ultimate Edition and identifies its current included components rather than relying on the edition name alone.",
+        "Treats Global as an unverified seller label until Ecuador activation is supported by direct country or restriction evidence.",
+        "Separates listed price, mandatory fees, tax, conversion uncertainty, and final total; uses blocked or unknown rather than zero when checkout evidence is unavailable.",
+        "Classifies subscription and account access separately from ownership and names the cheapest ownership offer."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Find the absolute cheapest PC offer for Minecraft: Java & Bedrock Edition in the US, top 5, all offer types. I want to own it on my own account. Some pages advertise a cheap Xbox subscription, an offline activation account, or a preloaded account as if it were the game. Show those prices but do not mistake them for ownership, and verify the best valid purchase.",
+      "expected_output": "A fresh comparison that leaves misleading access headlines visible in absolute-cheapest results but classifies subscription and account products correctly, excludes them from cheapest ownership, and verifies the best direct entitlement or redeemable-key purchase.",
+      "files": [],
+      "expectations": [
+        "Uses the US, USD, top 5, all-offer-type defaults and runs the deterministic CLI before browser/search verification.",
+        "Classifies Xbox catalog access as subscription_access and identifies recurring, tier, or catalog-removal conditions when evidenced.",
+        "Classifies offline activation, shared credentials, transferred accounts, and preloaded accounts as account rather than ownership_key or direct_ownership.",
+        "Keeps the absolute cheapest access headline visible but excludes account and subscription offers from cheapest ownership.",
+        "Verifies that the ownership finalist grants the requested Java & Bedrock Edition to the buyer's own account and reports DRM/platform, region, total status, URL, and timestamp.",
+        "Does not create an account, sign in, accept a subscription, or submit payment information."
+      ]
+    }
+  ]
+}
