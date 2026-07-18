@@ -18,7 +18,7 @@ modelRoles:
 # =============================================================================
 advisor:
   enabled: true
-  syncBacklog: off
+  syncBacklog: "3"
   immuneTurns: 3
   subagents: false
 # =============================================================================
@@ -89,9 +89,9 @@ eval:
 # Task (Subagents)
 # =============================================================================
 task:
-  eager: "always"
-  prewalk: true
-  maxConcurrency: 16
+  eager: preferred
+  prewalk: false
+  maxConcurrency: 4
   maxRecursionDepth: 1
   maxRuntimeMs: 3600000
   isolation:
@@ -100,6 +100,9 @@ task:
     commits: generic
 async:
   enabled: true
+
+features:
+  unexpectedStopDetection: true
 
 # =============================================================================
 # Code Intelligence
