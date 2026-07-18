@@ -24,7 +24,8 @@ MUST use the bundled CLI; MUST NOT invoke internal Python files directly.
 
 ## Workflow
 
-1. Inspect the product type, audience, desired tone, platform, and project stack.
+1. Inspect the product type, audience, desired tone, platform, project stack, and
+   existing interface and design-system state.
 2. Start with a design-system search:
 
    ```text
@@ -36,8 +37,11 @@ MUST use the bundled CLI; MUST NOT invoke internal Python files directly.
    with `--design-system`.
 4. Add `--persist` only when the user wants `design-system/MASTER.md`; add
    `--page <name>` for an override.
-5. Implement the smallest coherent system, then verify accessibility, touch,
+5. You MUST reuse established tokens and components before hardcoding values or adding
+   variants.
+6. Implement the smallest coherent increment, then validate accessibility, touch,
    responsive layout, performance, contrast, reduced motion, and error states.
+7. Validation failure? You MUST inspect, fix, and retry before continuing.
 
 ## Core constraints
 
