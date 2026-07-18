@@ -65,6 +65,15 @@ Complex arguments SHOULD use `--args '<JSON object>'`.
 - MUST pair schemas with relevant guides or references.
 - Optional output controls: MUST inspect targeted live schema first.
 
+### API troubleshooting
+
+- You MUST first distinguish pre-response DNS, TLS, or network failures from API responses.
+- You MUST classify `401` from the actual error payload and headers as authentication.
+- You MUST classify `403` from the actual error payload and headers as project, model, or permission access.
+- For `429`, you MUST use the actual error payload and headers to distinguish `insufficient_quota` from rate limiting.
+- You MUST use current official documentation via the documentation route for remediation.
+- NEVER guess about configuration errors or blindly retry them.
+
 ### Models and Codex
 
 - Latest/current/default model: MUST fetch `https://developers.openai.com/api/docs/guides/latest-model.md` first.
