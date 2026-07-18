@@ -1,0 +1,18 @@
+[
+  {
+    "id": "018d937f-012f-73b8-ab2c-898516969e6a",
+    "historyLow": {"all": {"amount": 0.99, "currency": "USD"}},
+    "deals": [
+      {
+        "shop": {"id": 61, "name": "Steam"},
+        "price": {"amount": 1.99, "currency": "USD"},
+        "regular": {"amount": 9.99, "currency": "USD"},
+        "cut": 80,
+        "voucher": "SAVE10",
+        "drm": [{"id": 1, "name": "Steam"}],
+        "timestamp": "2026-07-18T10:00:00+00:00",
+        "url": "https://itad.link/example"
+      }
+    ]
+  }
+]

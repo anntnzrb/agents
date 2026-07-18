@@ -1,0 +1,14 @@
+{
+  "220": {
+    "success": true,
+    "data": {
+      "name": "Half-Life 2",
+      "price_overview": {
+        "currency": "USD",
+        "initial": 999,
+        "final": 199,
+        "discount_percent": 80
+      }
+    }
+  }
+}

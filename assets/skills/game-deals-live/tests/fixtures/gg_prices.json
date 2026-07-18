@@ -1,0 +1,16 @@
+{
+  "success": true,
+  "data": {
+    "220": {
+      "title": "Half-Life 2",
+      "url": "https://gg.deals/game/half-life-2/",
+      "prices": {
+        "currency": "USD",
+        "currentRetail": 9.99,
+        "currentKeyshops": 2.49,
+        "historicalRetail": 0.99,
+        "historicalKeyshops": 1.25
+      }
+    }
+  }
+}

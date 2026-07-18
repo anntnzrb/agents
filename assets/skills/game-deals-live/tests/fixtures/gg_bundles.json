@@ -1,0 +1,27 @@
+{
+  "success": true,
+  "data": {
+    "220": {
+      "bundles": [
+        {
+          "id": "humble-valve-2024",
+          "title": "Valve History Bundle",
+          "url": "https://example.invalid/bundle",
+          "dateFrom": "2024-01-01T00:00:00+00:00",
+          "dateTo": "2024-01-31T00:00:00+00:00",
+          "tiers": [
+            {
+              "price": 5.0,
+              "currency": "USD",
+              "gamesCount": 2,
+              "games": [
+                {"title": "Half-Life 2", "steamAppId": 220},
+                {"title": "Portal", "steamAppId": 400}
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

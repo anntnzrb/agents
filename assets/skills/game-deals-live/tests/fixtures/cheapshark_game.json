@@ -1,0 +1,13 @@
+{
+  "info": {"title": "Half-Life 2", "steamAppID": "220"},
+  "cheapestPriceEver": {"price": "0.99", "date": 1700000000},
+  "deals": [
+    {
+      "storeID": "1",
+      "dealID": "safe-deal-id",
+      "price": "1.99",
+      "retailPrice": "9.99",
+      "savings": "80.08"
+    }
+  ]
+}
