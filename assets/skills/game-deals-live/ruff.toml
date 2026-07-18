@@ -1,0 +1,22 @@
+target-version = "py311"
+line-length = 100
+
+[lint]
+select = ["ALL"]
+ignore = [
+  "ANN401", # Provider JSON is intentionally dynamic.
+  "C901",   # The orchestration method mirrors provider stages.
+  "COM812", # Formatter owns trailing commas.
+  "D203", "D213", # Use the mutually compatible D211/D212 docstring style.
+  "D101", "D102", "D103", "D105", "D107",
+  "E501",
+  "EM101", "EM102", "TRY003", # CLI-safe errors carry runtime context.
+  "PERF203",
+  "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR2004",
+  "S310", # Request URLs are fixed HTTPS provider constants.
+  "TC001", "TC003",
+]
+
+[lint.per-file-ignores]
+"**/scripts/*.py" = ["T201"]
+"**/tests/*.py" = ["INP001", "PT009", "PT027"]
