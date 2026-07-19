@@ -1,12 +1,9 @@
 """Contract tests for the Lies of P companion CLI."""
 
-from __future__ import annotations
-
 import json
 import subprocess
 import sys
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import pytest
 
@@ -42,20 +39,19 @@ def run_cli(
     )
 
 
-def test_audit_and_fresh_work_from_any_cwd() -> None:
+def test_audit_and_fresh_work_from_any_cwd(tmp_path: Path) -> None:
     """Resources resolve relative to the script, not the caller's directory."""
-    with TemporaryDirectory() as unrelated:
-        for cwd in (REPO_ROOT, Path(unrelated)):
-            audit = run_cli("audit", cwd=cwd)
-            expect(audit.returncode == 0, audit.stderr)
-            expect('"ok": true' in audit.stdout)
+    for cwd in (REPO_ROOT, tmp_path):
+        audit = run_cli("audit", cwd=cwd)
+        expect(audit.returncode == 0, audit.stderr)
+        expect('"ok": true' in audit.stdout)
 
-            fresh = run_cli("fresh", "--json", cwd=cwd)
-            payload = json.loads(fresh.stdout)
-            expect(payload["version"] == "1.12.0.0 + Overture")
-            expect(payload["difficulty"].startswith("Legendary Stalker"))
-            expect(payload["build"]["early_weapon"].startswith("Path of the Bastard"))
-            expect("optional_pivot" in payload["build"])
+        fresh = run_cli("fresh", "--json", cwd=cwd)
+        payload = json.loads(fresh.stdout)
+        expect(payload["version"] == "1.12.0.0 + Overture")
+        expect(payload["difficulty"].startswith("Legendary Stalker"))
+        expect(payload["build"]["early_weapon"].startswith("Path of the Bastard"))
+        expect("optional_pivot" in payload["build"])
 
 
 def test_invalid_arguments_are_rc2() -> None:
@@ -118,7 +114,18 @@ def test_routes_cover_base_dlc_counts_and_endings() -> None:
     expect("sophia/gepetto" in ending_text)
 
     ending_trophies = json.loads(run_cli("trophies", "--spoilers", "--json").stdout)
+
     expect(ending_trophies and any("requirements" in row for row in ending_trophies))
+
+
+def test_farm_query_filters_records() -> None:
+    """Farm queries return only records matching the requested location."""
+    result = run_cli("farm", "Krat", "--json")
+    expect(result.returncode == 0, result.stderr)
+    payload = json.loads(result.stdout)
+    expect(payload)
+    expect(all("krat" in json.dumps(row).casefold() for row in payload))
+    expect(len(payload) < len(json.loads(run_cli("farm", "--json").stdout)))
 
 
 def test_bosses_hide_dlc_by_default_and_allow_explicit_spoilers() -> None:

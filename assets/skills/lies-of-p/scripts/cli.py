@@ -1,36 +1,97 @@
 # /// script
-# requires-python = ">=3.11"
+# requires-python = ">=3.14"
 # dependencies = []
 # ///
 """Deterministic, dependency-free Lies of P companion CLI."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Any
+
+type JSONScalar = None | bool | int | float | str
+type JSONObject = Mapping[str, JSONValue]
+type JSONArray = Sequence[JSONValue]
+type JSONValue = JSONScalar | JSONArray | JSONObject
+type CommandHandler = Callable[[argparse.Namespace], JSONValue]
 
 ROOT = Path(__file__).resolve().parents[1]
 RESOURCES = ROOT / "resources"
-JsonValue = Any
+EXPECTED_JSON_OBJECT = "expected a JSON object"
+EXPECTED_JSON_ARRAY = "expected a JSON array"
+INVALID_JSON_RESOURCE = "resource is not valid JSON"
 
 
-def load(name: str) -> JsonValue:
-    """Load a named resource, converting filesystem errors to CLI errors."""
+def _dict(value: JSONValue) -> JSONObject:
+    """Narrow a JSON value to an object."""
+    if not isinstance(value, dict):
+        raise TypeError(EXPECTED_JSON_OBJECT)
+    return value
+
+
+def _list(value: JSONValue) -> JSONArray:
+    """Narrow a JSON value to an array."""
+    if not isinstance(value, list):
+        raise TypeError(EXPECTED_JSON_ARRAY)
+    return value
+
+
+def load(name: str) -> JSONValue:
+    """Load and validate one UTF-8 JSON resource."""
     path = RESOURCES / name
     try:
-        with path.open(encoding="utf-8") as resource:
-            return json.load(resource)
+        value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         message = f"resource {name}: {error}"
         raise RuntimeError(message) from error
+    if not isinstance(value, (type(None), bool, int, float, str, list, dict)):
+        raise TypeError(INVALID_JSON_RESOURCE)
+    return value
 
 
-def emit(value: JsonValue, *, as_json: bool = False) -> None:
-    """Write a command result to stdout using the public JSON formatting contract."""
+def rows(data: JSONValue, query: str = "") -> JSONArray:
+    """Return resource values matching a case-insensitive query."""
+    values: JSONArray
+    if isinstance(data, list):
+        values = data
+    elif isinstance(data, dict):
+        values = list(data.values())
+    else:
+        values = []
+    folded = query.casefold()
+    return [
+        value
+        for value in values
+        if not folded
+        or folded in json.dumps(value, ensure_ascii=False, sort_keys=True).casefold()
+    ]
+
+
+def _records(value: JSONValue) -> list[JSONObject]:
+    values: Sequence[JSONValue]
+    if isinstance(value, list):
+        values = value
+    elif isinstance(value, dict):
+        values = list(value.values())
+    else:
+        values = []
+    return [_dict(row) for row in values]
+
+
+def named_rows(data: JSONValue, query: str) -> list[JSONObject]:
+    """Prefer an exact item-name match before broad record search."""
+    values = _records(data)
+    exact = [
+        value
+        for value in values
+        if str(value.get("name", "")).casefold() == query.casefold()
+    ]
+    return exact or [_dict(value) for value in rows(data, query)]
+
+
+def emit(value: JSONValue, *, as_json: bool = False) -> None:
+    """Render a command result to stdout."""
     if as_json:
         rendered = json.dumps(
             value,
@@ -45,41 +106,11 @@ def emit(value: JsonValue, *, as_json: bool = False) -> None:
     sys.stdout.write(f"{rendered}\n")
 
 
-def rows(data: JsonValue, query: str = "") -> list[JsonValue]:
-    """Return list or mapping values matching a case-insensitive query."""
-    values = (
-        data
-        if isinstance(data, list)
-        else list(data.values())
-        if isinstance(data, dict)
-        else []
-    )
-    folded = query.casefold()
-    return [
-        value
-        for value in values
-        if not folded
-        or folded in json.dumps(value, ensure_ascii=False, sort_keys=True).casefold()
-    ]
-
-
-def named_rows(data: JsonValue, query: str) -> list[JsonValue]:
-    """Prefer an exact item-name match before broad full-record search."""
-    values = rows(data)
-    exact = [
-        value
-        for value in values
-        if str(value.get("name", "")).casefold() == query.casefold()
-    ]
-    return exact or rows(data, query)
-
-
 def parser() -> argparse.ArgumentParser:
-    """Build the command-line parser."""
+    """Build the public CLI argument parser."""
     command_parser = argparse.ArgumentParser(prog="lies-of-p")
     command_parser.add_argument("--json", action="store_true", dest="as_json")
-    subcommands = command_parser.add_subparsers(dest="command", required=True)
-    for name in (
+    names = (
         "fresh",
         "build",
         "weaknesses",
@@ -90,50 +121,52 @@ def parser() -> argparse.ArgumentParser:
         "farm",
         "sources",
         "audit",
-    ):
-        subcommand = subcommands.add_parser(name)
-        subcommand.add_argument("query", nargs="?", default="")
-        subcommand.add_argument(
+    )
+    subcommands = command_parser.add_subparsers(dest="command", required=True)
+    for name in names:
+        sub = subcommands.add_parser(name)
+        if name not in ("sources", "audit"):
+            sub.add_argument("query", nargs="?", default="")
+        sub.add_argument(
             "--json",
             action="store_true",
             dest="as_json",
             default=argparse.SUPPRESS,
         )
         if name == "build":
-            subcommand.add_argument("--level", type=int)
+            sub.add_argument("--level", type=int)
         if name in ("bosses", "trophies", "route", "checklist"):
-            subcommand.add_argument("--spoilers", action="store_true")
+            sub.add_argument("--spoilers", action="store_true")
         if name in ("route", "checklist"):
-            subcommand.add_argument("--chapter", type=int, required=True)
-            subcommand.add_argument("--dlc", action="store_true")
+            sub.add_argument("--chapter", type=int, required=True)
+            sub.add_argument("--dlc", action="store_true")
         if name == "trophies":
-            subcommand.add_argument("--dlc", action="store_true")
+            sub.add_argument("--dlc", action="store_true")
         if name == "sources":
-            subcommand.add_argument(
+            sub.add_argument(
                 "mode",
                 choices=("list", "status", "explain"),
                 nargs="?",
                 default="list",
             )
-        if name == "farm":
-            subcommand.add_argument("stage", nargs="?", default="")
     return command_parser
 
 
-def without_spoilers(value: JsonValue, keys: tuple[str, ...]) -> list[JsonValue]:
-    """Remove spoiler fields from matching mapping rows."""
+def without_spoilers(value: Sequence[JSONValue], keys: tuple[str, ...]) -> JSONArray:
+    """Remove selected spoiler fields from result objects."""
     return [
-        {key: item for key, item in row.items() if key not in keys} for row in value
+        {key: item for key, item in _dict(row).items() if key not in keys}
+        for row in value
     ]
 
 
-def safe_bosses(data: JsonValue, query: str) -> JsonValue:
-    """Expose only spoiler-safe base-game boss guidance."""
-    all_rows = rows(data)
-    base_rows = [row for row in all_rows if not row.get("dlc")]
+def safe_bosses(data: JSONValue, query: str) -> JSONValue:
+    """Expose spoiler-safe boss information until explicitly opted in."""
+    all_rows = _records(data)
+    base = [row for row in all_rows if not row.get("dlc")]
     if not query:
         return {
-            "count": len(base_rows),
+            "count": len(base),
             "guidance": (
                 "Base-game bosses: learn attack timing, guard, and stagger; "
                 "no-summon guidance."
@@ -141,9 +174,7 @@ def safe_bosses(data: JsonValue, query: str) -> JsonValue:
             "types": ["puppet", "human", "monster"],
         }
     matches = [
-        row
-        for row in base_rows
-        if query.casefold() in str(row.get("name", "")).casefold()
+        row for row in base if query.casefold() in str(row.get("name", "")).casefold()
     ]
     if not matches and any(
         query.casefold() in str(row.get("name", "")).casefold()
@@ -166,28 +197,29 @@ def safe_bosses(data: JsonValue, query: str) -> JsonValue:
     ]
 
 
-def _fresh(_args: argparse.Namespace) -> JsonValue:
-    game = load("game_data.json")
+def _fresh(_: argparse.Namespace) -> JSONValue:
+    game = _dict(load("game_data.json"))
     return {key: game.get(key) for key in ("version", "difficulty", "build")}
 
 
-def _build(args: argparse.Namespace) -> JsonValue:
-    build = load("game_data.json").get("build", {})
+def _build(args: argparse.Namespace) -> JSONValue:
+    build = _dict(_dict(load("game_data.json")).get("build", {}))
     return {**build, **({"level": args.level} if args.level is not None else {})}
 
 
-def _weaknesses(args: argparse.Namespace) -> JsonValue:
-    return rows(load("game_data.json").get("enemy_classes", []), args.query)
+def _weaknesses(args: argparse.Namespace) -> JSONValue:
+    return rows(_dict(load("game_data.json")).get("enemy_classes", []), args.query)
 
 
-def _bosses(args: argparse.Namespace) -> JsonValue:
-    bosses = load("game_data.json").get("bosses", [])
-    result = rows(bosses, args.query)
-    return result if args.spoilers else safe_bosses(bosses, args.query)
+def _bosses(args: argparse.Namespace) -> JSONValue:
+    bosses = _dict(load("game_data.json")).get("bosses", [])
+    return (
+        rows(bosses, args.query) if args.spoilers else safe_bosses(bosses, args.query)
+    )
 
 
-def _route_or_checklist(args: argparse.Namespace) -> JsonValue:
-    platinum = load("platinum.json")
+def _route_or_checklist(args: argparse.Namespace) -> JSONValue:
+    platinum = _dict(load("platinum.json"))
     source = (
         platinum.get("chapters", [])
         if not args.dlc
@@ -196,7 +228,7 @@ def _route_or_checklist(args: argparse.Namespace) -> JsonValue:
     result = [
         item
         for item in rows(source, args.query)
-        if item.get("chapter", item.get("number")) == args.chapter
+        if _dict(item).get("chapter", _dict(item).get("number")) == args.chapter
     ]
     return (
         result
@@ -205,10 +237,10 @@ def _route_or_checklist(args: argparse.Namespace) -> JsonValue:
     )
 
 
-def _trophies(args: argparse.Namespace) -> JsonValue:
-    platinum = load("platinum.json")
+def _trophies(args: argparse.Namespace) -> JSONValue:
+    platinum = _dict(load("platinum.json"))
     result = named_rows(
-        platinum.get("dlc") if args.dlc else platinum.get("base", []),
+        platinum.get("dlc", []) if args.dlc else platinum.get("base", []),
         args.query,
     )
     return (
@@ -216,20 +248,20 @@ def _trophies(args: argparse.Namespace) -> JsonValue:
     )
 
 
-def _farm(args: argparse.Namespace) -> JsonValue:
-    return rows(load("game_data.json").get("farms", []), args.stage)
+def _farm(args: argparse.Namespace) -> JSONValue:
+    return rows(_dict(load("game_data.json")).get("farms", []), args.query)
 
 
-def _sources(args: argparse.Namespace) -> JsonValue:
-    registry = load("source_registry.json")
+def _sources(args: argparse.Namespace) -> JSONValue:
+    registry = _dict(load("source_registry.json"))
     if args.mode == "explain":
         return registry
-    if args.mode == "list":
-        return sorted(registry, key=str)
-    return {key: value.get("checked") for key, value in registry.items()}
+    if args.mode == "status":
+        return {key: _dict(value).get("checked") for key, value in registry.items()}
+    return sorted(registry)
 
 
-def _audit(_args: argparse.Namespace) -> JsonValue:
+def _audit(_: argparse.Namespace) -> JSONValue:
     expected = {
         "game_data.json": {
             "version",
@@ -250,9 +282,10 @@ def _audit(_args: argparse.Namespace) -> JsonValue:
             "collectibles",
         },
     }
-    registry = load("source_registry.json")
-    missing = {
-        name: sorted(fields - set(load(name))) for name, fields in expected.items()
+    registry = _dict(load("source_registry.json"))
+    missing: dict[str, JSONValue] = {
+        name: sorted(fields - set(_dict(load(name))))
+        for name, fields in expected.items()
     }
     source_fields = (
         "url",
@@ -264,27 +297,29 @@ def _audit(_args: argparse.Namespace) -> JsonValue:
         "license_or_terms",
         "notes",
     )
-    source_missing = {
-        key: sorted(set(source_fields) - set(value))
-        for key, value in registry.items()
-        if not isinstance(value, dict) or set(source_fields) - set(value)
-    }
-    platinum = load("platinum.json")
+    source_missing: dict[str, JSONValue] = {}
+    for key, value in registry.items():
+        if not isinstance(value, dict):
+            source_missing[key] = list(source_fields)
+            continue
+        absent = sorted(set(source_fields) - set(value))
+        if absent:
+            source_missing[key] = absent
+    platinum = _dict(load("platinum.json"))
     trophy_counts = {
-        "base": len(platinum.get("base", [])),
-        "dlc": len(platinum.get("dlc", [])),
+        "base": len(_list(platinum.get("base", []))),
+        "dlc": len(_list(platinum.get("dlc", []))),
     }
     missing["source_registry"] = source_missing
     return {
         "ok": not any(missing.values()) and trophy_counts == {"base": 43, "dlc": 11},
-        "counts": {name: len(rows(load(name))) for name in expected},
+        "counts": {name: len(_dict(load(name))) for name in expected},
         "trophy_counts": trophy_counts,
         "missing": missing,
         "sources": len(registry),
     }
 
 
-CommandHandler = Callable[[argparse.Namespace], JsonValue]
 COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "fresh": _fresh,
     "build": _build,
@@ -299,21 +334,16 @@ COMMAND_HANDLERS: dict[str, CommandHandler] = {
 }
 
 
-def execute(args: argparse.Namespace) -> JsonValue:
-    """Execute a parsed command and return its result."""
-    return COMMAND_HANDLERS[args.command](args)
-
-
 def main(argv: list[str] | None = None) -> int:
     """Run the CLI and return its process status."""
-    args = parser().parse_args(argv)
     try:
-        emit(execute(args), as_json=args.as_json)
-    except (RuntimeError, AttributeError, TypeError, ValueError) as error:
+        args = parser().parse_args(argv)
+        emit(COMMAND_HANDLERS[args.command](args), as_json=args.as_json)
+    except (RuntimeError, TypeError, KeyError, ValueError) as error:
         sys.stderr.write(f"error: {error}\n")
         return 2
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())
