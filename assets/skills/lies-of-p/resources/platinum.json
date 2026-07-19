@@ -1,0 +1,1015 @@
+{
+  "version": "1.12.0.0 + Overture",
+  "base": [
+    {
+      "id": "B-01",
+      "name": "Lies of P",
+      "type": "base",
+      "chapter": 11,
+      "missable": false,
+      "requirements": "Earn every other base-game trophy; the platinum unlocks when the final missing base trophy is awarded.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-02",
+      "name": "Real boy : They all lived happily ever after",
+      "type": "base",
+      "chapter": 11,
+      "missable": true,
+      "requirements": "At the ending choice, give Geppetto your heart; this ends the story without the Nameless Puppet fight.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-03",
+      "name": "Free from the puppet string",
+      "type": "base",
+      "chapter": 11,
+      "missable": true,
+      "requirements": "Refuse Geppetto and defeat the Nameless Puppet while lacking the Humanity route needed for Rise of P (or leave Sophia alive).",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-04",
+      "name": "Rise of P",
+      "type": "base",
+      "chapter": 11,
+      "missable": true,
+      "requirements": "Accumulate high Humanity, grant Sophia peace, refuse Geppetto, then defeat the Nameless Puppet.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-05",
+      "name": "The First Puppet",
+      "type": "base",
+      "chapter": 11,
+      "missable": false,
+      "requirements": "Defeat the Nameless Puppet in the Under the Abyss finale after refusing Geppetto.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-06",
+      "name": "Strongest Normal Weapon",
+      "type": "base",
+      "chapter": 7,
+      "missable": false,
+      "requirements": "Fully upgrade any normal weapon to its maximum level at Hotel Krat using Weapon Assembly materials.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-07",
+      "name": "Strongest Special Weapon",
+      "type": "base",
+      "chapter": 7,
+      "missable": false,
+      "requirements": "Fully upgrade a special boss-Ergo weapon to its maximum level with Dark Moon Moonstone of the Covenant.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-08",
+      "name": "Strongest Legion Arm",
+      "type": "base",
+      "chapter": 7,
+      "missable": false,
+      "requirements": "Upgrade one Legion Arm to its maximum enhancement level at the Venigni machine.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-09",
+      "name": "Extreme Potential",
+      "type": "base",
+      "chapter": 7,
+      "missable": false,
+      "requirements": "Unlock every P-Organ phase by spending Quartz at Geppetto's chair in Hotel Krat.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-10",
+      "name": "Pianist of Krat",
+      "type": "base",
+      "chapter": 11,
+      "missable": true,
+      "requirements": "After an ending, interact with Hotel Krat's piano and play it; the perfect-performance prompt awards this trophy.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-11",
+      "name": "Legion Arm Collector",
+      "type": "base",
+      "chapter": 6,
+      "missable": false,
+      "requirements": "Craft all eight base-game Legion Arms at Venigni's machine, including the three requiring hidden Cryptic Vessel discoveries.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-12",
+      "name": "Special Weapon Collector",
+      "type": "base",
+      "chapter": 11,
+      "missable": false,
+      "requirements": "Exchange every base-game rare Ergo with Alidoro/Hugo for each special weapon; do not consume the Ergo first.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-13",
+      "name": "Normal Weapon Collector",
+      "type": "base",
+      "chapter": 11,
+      "missable": false,
+      "requirements": "Acquire every base-game normal weapon, including all shop and found blades, handles, blunt weapons, and the two starting weapons.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-14",
+      "name": "Golden Melody",
+      "type": "base",
+      "chapter": 11,
+      "missable": true,
+      "requirements": "Collect and listen to every base-game record (16 total) at Hotel Krat; NG+ is required for Golden Records and the alternate Eugénie record, and missable NPC/shop records must be secured before their cutoffs.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-15",
+      "name": "Learning about Emotions",
+      "type": "base",
+      "chapter": 11,
+      "missable": true,
+      "requirements": "Learn every base-game gesture from notes, books, NPC quests, and story events; perform the required interactions before their quest cutoffs.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-16",
+      "name": "Veteran Explorer",
+      "type": "base",
+      "chapter": 11,
+      "missable": false,
+      "requirements": "Open every base-game Cryptic Vessel and finish each cipher's clue at its marked location, collecting the resulting rewards.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-17",
+      "name": "End of Riddles",
+      "type": "base",
+      "chapter": 10,
+      "missable": true,
+      "requirements": "Answer all five Arlecchino telephone riddles correctly and open every Trinity Sanctum with the keys obtained in chapter order.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-18",
+      "name": "First Lie",
+      "type": "base",
+      "chapter": 1,
+      "missable": true,
+      "requirements": "Choose Lie at the Hotel Krat entrance portrait prompt after the opening, rather than answering Truth.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-19",
+      "name": "Stargazer’s Guide",
+      "type": "base",
+      "chapter": 1,
+      "missable": false,
+      "requirements": "Activate every base-game Stargazer, including those in optional side areas, so each location registers as discovered.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-20",
+      "name": "Exploring Possibilities",
+      "type": "base",
+      "chapter": 3,
+      "missable": false,
+      "requirements": "Use Venigni's machine to assemble a weapon once, combining a blade and handle with compatible slots.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-21",
+      "name": "The Ultimate Defense Technique",
+      "type": "base",
+      "chapter": 3,
+      "missable": false,
+      "requirements": "Destroy an enemy's weapon with repeated perfect guards until the weapon breaks and the trophy notification appears.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-22",
+      "name": "Fatal Blow",
+      "type": "base",
+      "chapter": 1,
+      "missable": false,
+      "requirements": "Stagger an enemy, then stand in the indicated position and perform a Fatal Attack on its exposed core.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-23",
+      "name": "The Bastards and the Sweepers",
+      "type": "base",
+      "chapter": 2,
+      "missable": false,
+      "requirements": "Defeat one human Stalker of the Bastard or Sweeper faction during the early Krat route.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-24",
+      "name": "Parade Master",
+      "type": "base",
+      "chapter": 1,
+      "missable": false,
+      "requirements": "Defeat the Parade Master boss at Krat Central Station.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-25",
+      "name": "Scrapped Watchman",
+      "type": "base",
+      "chapter": 2,
+      "missable": false,
+      "requirements": "Defeat the Scrapped Watchman at Krat City Hall.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-26",
+      "name": "King’s Flame",
+      "type": "base",
+      "chapter": 3,
+      "missable": false,
+      "requirements": "Defeat King’s Flame, Fuoco, at the Venigni Works furnace.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-27",
+      "name": "Fallen Archbishop",
+      "type": "base",
+      "chapter": 4,
+      "missable": false,
+      "requirements": "Defeat the Fallen Archbishop Andreus in St. Frangelico Cathedral.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-28",
+      "name": "The Delayed Match",
+      "type": "base",
+      "chapter": 5,
+      "missable": false,
+      "requirements": "Defeat the Eldest of the Black Rabbit Brotherhood in Malum District.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-29",
+      "name": "King of Puppets",
+      "type": "base",
+      "chapter": 6,
+      "missable": false,
+      "requirements": "Defeat Romeo, King of Puppets, in Estella Opera House.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-30",
+      "name": "The Champion of Evolution",
+      "type": "base",
+      "chapter": 7,
+      "missable": false,
+      "requirements": "Defeat Champion Victor at the Grand Exhibition.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-31",
+      "name": "Puppet-Devouring Green Monster",
+      "type": "base",
+      "chapter": 8,
+      "missable": false,
+      "requirements": "Defeat the Puppet-Devouring Green Monster in the Barren Swamp.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-32",
+      "name": "Corrupted Parade Master",
+      "type": "base",
+      "chapter": 9,
+      "missable": false,
+      "requirements": "Defeat the Corrupted Parade Master during the Krat Central Station Redux route.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-33",
+      "name": "Revenge of Black",
+      "type": "base",
+      "chapter": 10,
+      "missable": false,
+      "requirements": "Defeat Laxasia the Complete at the Isle of Alchemists.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-34",
+      "name": "The Complete One",
+      "type": "base",
+      "chapter": 10,
+      "missable": false,
+      "requirements": "Defeat Simon Manus, Awakened God, in Arche Abbey after the Laxasia encounter.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-35",
+      "name": "The Awakened God",
+      "type": "base",
+      "chapter": 11,
+      "missable": false,
+      "requirements": "Defeat Simon Manus, Awakened God, at the end of Arche Abbey; the boss victory awards this trophy.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-36",
+      "name": "Bear Gold Coin Fruit",
+      "type": "base",
+      "chapter": 4,
+      "missable": false,
+      "requirements": "Harvest a Gold Coin Fruit from the Gold Coin Tree after awakening it in Chapter 4.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-37",
+      "name": "From Across the Rift",
+      "type": "base",
+      "chapter": 8,
+      "missable": false,
+      "requirements": "Kill one Dimensional Butterfly and collect the dimensional material it drops.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-38",
+      "name": "The Story of the Prince",
+      "type": "base",
+      "chapter": 3,
+      "missable": true,
+      "requirements": "Complete Venigni's Chapter 3 quest: rescue him, exhaust his dialogue, and return after the required boss/event for his final reward.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-39",
+      "name": "The Story of the Refined Old Lady",
+      "type": "base",
+      "chapter": 4,
+      "missable": true,
+      "requirements": "Find the sick woman in Elysion Boulevard, return the matching Broken Baby Puppet, and claim her reward before leaving the chapter.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-40",
+      "name": "The Story of the One Who Dreamed",
+      "type": "base",
+      "chapter": 2,
+      "missable": true,
+      "requirements": "Complete the Weeping Woman's side quest by giving her the correct puppet and speaking to her again before the area advances.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-41",
+      "name": "The Story of One Father",
+      "type": "base",
+      "chapter": 10,
+      "missable": true,
+      "requirements": "Finish Geppetto's story through the final choice: refuse his heart request for the Nameless Puppet route; giving it ends this branch.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-42",
+      "name": "The Story of a Stranger Girl",
+      "type": "base",
+      "chapter": 4,
+      "missable": true,
+      "requirements": "Complete Eugenie's quest and choose the correct Alidoro identity answer, then deliver the resulting record/reward before the finale.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "B-43",
+      "name": "The Story of the Blue Butterfly",
+      "type": "base",
+      "chapter": 11,
+      "missable": true,
+      "requirements": "Complete Sophia's final storyline by reaching her room, choosing to give her peace, and continuing to the ending branch before the point of no return.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF pp. 11-28"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    }
+  ],
+  "dlc": [
+    {
+      "id": "DLC-01",
+      "name": "Rose's Memory",
+      "type": "dlc",
+      "chapter": "Overture",
+      "missable": false,
+      "requirements": "Defeat the Blood Artist and reach the Overture ending.",
+      "reward": "Silver trophy",
+      "sources": [
+        "powerpyx_overture"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "DLC-02",
+      "name": "Enduring Resolve",
+      "type": "dlc",
+      "chapter": "Overture",
+      "missable": false,
+      "requirements": "After defeating the Blood Artist, use the Secret Room Key in the Rose Garden and listen to the Legend's last recording.",
+      "reward": "Silver trophy",
+      "sources": [
+        "powerpyx_overture"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "DLC-03",
+      "name": "True Combat Gear Collector",
+      "type": "dlc",
+      "chapter": "Overture",
+      "missable": true,
+      "requirements": "Collect all 10 Overture weapons and craft both Legion Arms: Icarus and Cataclysm.",
+      "reward": "Bronze trophy; 10 weapons and 2 Legion Arms",
+      "sources": [
+        "powerpyx_overture"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "DLC-04",
+      "name": "Beyond Limitless Potential",
+      "type": "dlc",
+      "chapter": "Overture",
+      "missable": false,
+      "requirements": "Apply at least one upgrade in the new Upgrade P-Organ tab.",
+      "reward": "Bronze trophy",
+      "sources": [
+        "powerpyx_overture"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "DLC-05",
+      "name": "Memory's Melody",
+      "type": "dlc",
+      "chapter": "Overture",
+      "missable": true,
+      "requirements": "Collect and listen to all 8 Overture records (including the 3 Gold Records available only in New Game+).",
+      "reward": "Bronze trophy; 8 records",
+      "sources": [
+        "powerpyx_overture"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "DLC-06",
+      "name": "To Be Human",
+      "type": "dlc",
+      "chapter": "Overture",
+      "missable": true,
+      "requirements": "Learn all 8 Overture gestures.",
+      "reward": "Bronze trophy; 8 gestures",
+      "sources": [
+        "powerpyx_overture"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "DLC-07",
+      "name": "Tracker of Dark Secrets",
+      "type": "dlc",
+      "chapter": "Overture",
+      "missable": true,
+      "requirements": "Decrypt every clue in the cipher machines, complete the Tracker's quest before the Rose Garden finale, and choose \"They will be, and Krat will be saved\".",
+      "reward": "Bronze trophy; cipher quest rewards",
+      "sources": [
+        "powerpyx_overture"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "DLC-08",
+      "name": "Puppeteer of Death",
+      "type": "dlc",
+      "chapter": "Overture",
+      "missable": false,
+      "requirements": "Defeat Markiona, the Puppeteer of Death.",
+      "reward": "Bronze trophy",
+      "sources": [
+        "powerpyx_overture"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "DLC-09",
+      "name": "Anguished Guardian",
+      "type": "dlc",
+      "chapter": "Overture",
+      "missable": false,
+      "requirements": "Defeat the Anguished Guardian of the Ruins.",
+      "reward": "Bronze trophy",
+      "sources": [
+        "powerpyx_overture"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "DLC-10",
+      "name": "Blood Artist",
+      "type": "dlc",
+      "chapter": "Overture",
+      "missable": false,
+      "requirements": "Defeat the Blood Artist.",
+      "reward": "Bronze trophy",
+      "sources": [
+        "powerpyx_overture"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    },
+    {
+      "id": "DLC-11",
+      "name": "Honor and Revenge",
+      "type": "dlc",
+      "chapter": "Overture",
+      "missable": false,
+      "requirements": "Defeat the Leader of the Bastards and the Leader of the Sweepers.",
+      "reward": "Bronze trophy",
+      "sources": [
+        "powerpyx_overture"
+      ],
+      "version_scope": "1.12.0.0",
+      "confidence": "high"
+    }
+  ],
+  "overture_sections": [
+    {
+      "chapter": 1,
+      "name": "Overture access: Star's Chrysalis and Path of Pilgrim",
+      "checklist": [
+        "After defeating Corrupted Parade Master in base Chapter 9, use the Star's Chrysalis at the Path of Pilgrim to enter Overture."
+      ],
+      "source": "https://www.powerpyx.com/lies-of-p-overture-dlc-trophy-guide-roadmap/"
+    },
+    {
+      "chapter": 2,
+      "name": "Overture: Forgotten Time",
+      "checklist": [
+        "Clear Overture areas in route order; collect 10 weapons, 2 Legion Arms, 8 records, 8 gestures, and decrypt every cipher.",
+        "Complete every NPC quest and defeat Tyrannical Predator, Markiona, Veronique, Two-faced Overseer, Premetamorphic Green Hunter, Anguished Guardian, Lumacchio, Arlecchino, the Leaders of the Bastards and Sweepers, and Blood Artist before the Rose Garden finale.",
+        "At Rose Garden Entrance, activate the Stargazer and make a save before the Rose Garden Point of No Return."
+      ],
+      "source": "https://www.powerpyx.com/lies-of-p-overture-dlc-trophy-guide-roadmap/"
+    },
+    {
+      "chapter": 3,
+      "name": "Rose Garden Entrance PNR and post-DLC cleanup",
+      "checklist": [
+        "Before entering the Rose Garden Point of No Return, finish Tracker clues and all missable collectibles; choose the required Tracker dialogue.",
+        "Defeat Blood Artist, return through Eventide Hotel Krat, listen to the Legend's recording, and collect the ending weapon and record."
+      ],
+      "source": "https://www.powerpyx.com/lies-of-p-overture-dlc-trophy-guide-roadmap/"
+    }
+  ],
+  "chapters": [
+    {
+      "chapter": 1,
+      "name": "Krat Central Station",
+      "checklist": [
+        "Activate the Stargazer and track lie/truth choices.",
+        "Defeat Parade Master; reserve his Ergo and complete all station NPC actions before leaving."
+      ],
+      "source": "https://psnprofiles.com/guide/22489-lies-of-p-trophy-guide"
+    },
+    {
+      "chapter": 2,
+      "name": "Krat City Hall and Elysion Boulevard",
+      "checklist": [
+        "Complete the Weeping Woman, merchant, and riddle steps.",
+        "Defeat Scrapped Watchman; reserve his Ergo and finish Hotel Krat rewards."
+      ],
+      "source": "https://psnprofiles.com/guide/22489-lies-of-p-trophy-guide"
+    },
+    {
+      "chapter": 3,
+      "name": "Venigni Works",
+      "checklist": [
+        "Rescue Venigni and obtain Puppet String; complete factory records and sanctum.",
+        "Defeat King's Flame, Fuoco; reserve his Ergo for its weapon trade."
+      ],
+      "source": "https://psnprofiles.com/guide/22489-lies-of-p-trophy-guide"
+    },
+    {
+      "chapter": 4,
+      "name": "St. Frangelico Cathedral",
+      "checklist": [
+        "Complete Sister Cecile's request, record, and Pray gesture before Archbishop Andreus.",
+        "Open the Cathedral Trinity Sanctum and reserve Andreus's Ergo."
+      ],
+      "source": "https://psnprofiles.com/guide/22489-lies-of-p-trophy-guide"
+    },
+    {
+      "chapter": 5,
+      "name": "Malum District",
+      "checklist": [
+        "Complete Red Fox, Black Cat, Polendina, supply-box, and Trinity Sanctum actions.",
+        "Collect the Bone-Cutting Sawblade before leaving and defeat the Eldest Brotherhood."
+      ],
+      "source": "https://psnprofiles.com/guide/22489-lies-of-p-trophy-guide"
+    },
+    {
+      "chapter": 6,
+      "name": "Rosa Isabelle Street and Estella Opera House",
+      "checklist": [
+        "Resolve Julian and the baby-puppet requests with their required answers.",
+        "Complete Opera records and sanctum; defeat Romeo and finish Antonia's Hotel actions."
+      ],
+      "source": "https://psnprofiles.com/guide/22489-lies-of-p-trophy-guide"
+    },
+    {
+      "chapter": 7,
+      "name": "Grand Exhibition",
+      "checklist": [
+        "Collect Exhibition records, supply box, riddle, sanctum, and cryptic-vessel steps.",
+        "Defeat Champion Victor and reserve his Ergo for Frozen Feast."
+      ],
+      "source": "https://psnprofiles.com/guide/22489-lies-of-p-trophy-guide"
+    },
+    {
+      "chapter": 8,
+      "name": "Barren Swamp",
+      "checklist": [
+        "Complete Broken Puppet training, swamp records, and merchant actions.",
+        "Defeat Green Monster and reserve its Ergo; finish the Swamp Trinity Sanctum."
+      ],
+      "source": "https://psnprofiles.com/guide/22489-lies-of-p-trophy-guide"
+    },
+    {
+      "chapter": 9,
+      "name": "Krat Central Station Redux",
+      "checklist": [
+        "Complete Collapsed Krat, Test Subject 326, Eugenie, and Alidoro identity actions.",
+        "Defeat Corrupted Parade Master, then unlock Overture at the Stargazer before entering Relic."
+      ],
+      "source": "https://psnprofiles.com/guide/22489-lies-of-p-trophy-guide"
+    },
+    {
+      "chapter": 10,
+      "name": "Relic of Trismegistus",
+      "checklist": [
+        "Complete Brotherhood, Hugo, and remaining sanctum and cryptic-vessel actions.",
+        "Defeat the Relic boss and reserve its Ergo before proceeding to the Isle."
+      ],
+      "source": "https://psnprofiles.com/guide/22489-lies-of-p-trophy-guide"
+    },
+    {
+      "chapter": 11,
+      "name": "Isle of the Alchemists and Arche Abbey",
+      "checklist": [
+        "Finish Arche Abbey records, weapons, arms, letters, and final sanctum actions.",
+        "Cloud-save before Sophia/Gepetto choices; defeat Simon and Nameless Puppet, then complete post-DLC Hotel cleanup."
+      ],
+      "source": "https://psnprofiles.com/guide/22489-lies-of-p-trophy-guide"
+    }
+  ],
+  "endings": [
+    {
+      "name": "Rise of P",
+      "branch": "Build high Humanity through lie/compassion choices; the heart-pounding/white-hair signal confirms sufficient Humanity. Give Sophia peace, refuse Geppetto's request, then defeat the Nameless Puppet.",
+      "prerequisites": [
+        "High Humanity (heart-pounding/white-hair signal)",
+        "Give Sophia peace",
+        "Refuse Geppetto"
+      ],
+      "final_boss": "Defeat Nameless Puppet",
+      "cloud_save": "Back up before Sophia; keep the save through the Geppetto/Nameless Puppet sequence and reload only after post-ending cleanup",
+      "post_ending": "Return to Hotel Krat for post-ending letters and piano interaction before starting NG+",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF p. 10"
+      ],
+      "version_scope": "1.12.0.0",
+      "missable": true
+    },
+    {
+      "name": "Free from the Puppet String",
+      "branch": "Have insufficient Rise of P Humanity and/or let Sophia live, refuse Geppetto's request, then defeat the Nameless Puppet.",
+      "prerequisites": [
+        "Insufficient Rise of P Humanity and/or let Sophia live",
+        "Refuse Geppetto"
+      ],
+      "final_boss": "Defeat Nameless Puppet",
+      "cloud_save": "Reload the pre-Sophia cloud save after completing post-ending letters and piano interaction",
+      "post_ending": "Return to Hotel Krat for post-ending letters and piano interaction before starting NG+",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF p. 10"
+      ],
+      "version_scope": "1.12.0.0",
+      "missable": true
+    },
+    {
+      "name": "Real Boy: They All Lived Happily Ever After",
+      "branch": "Give your heart to Geppetto when requested; this ends the route without the Nameless Puppet fight.",
+      "prerequisites": [
+        "Reach Geppetto's request",
+        "Give heart to Geppetto"
+      ],
+      "final_boss": "Do not refuse Geppetto; Nameless Puppet is not fought",
+      "cloud_save": "Back up before Geppetto's request so the refusal/Nameless Puppet branches remain available",
+      "post_ending": "Return to Hotel Krat for post-ending letters and piano interaction before starting NG+",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF p. 10"
+      ],
+      "version_scope": "1.12.0.0",
+      "missable": true
+    },
+    {
+      "name": "Blood Artist / Rose's Memory outcome",
+      "branch": "Defeat Blood Artist to earn the Rose's Memory outcome; this is the verified Overture finale outcome.",
+      "cloud_save": "At Rose Garden Entrance, before the Point of No Return, complete missable cleanup first",
+      "sources": [
+        "powerpyx_overture"
+      ],
+      "version_scope": "Overture",
+      "missable": true,
+      "requirements": [
+        "Reach the Overture finale",
+        "Defeat Blood Artist"
+      ],
+      "final_boss": "Blood Artist",
+      "post_ending": "Return to Eventide Hotel Krat for post-DLC cleanup."
+    },
+    {
+      "name": "Lea / Legend recording outcome",
+      "branch": "Complete Lea's Overture route and listen to the Legend's last recording in the post-DLC Hotel Krat cleanup.",
+      "cloud_save": "Before the Rose Garden Point of No Return, finish Lea's route and all missable Overture tasks",
+      "sources": [
+        "powerpyx_overture"
+      ],
+      "version_scope": "Overture",
+      "missable": true,
+      "requirements": [
+        "Complete Lea's route",
+        "Listen to the Legend's last recording"
+      ],
+      "final_boss": "Blood Artist",
+      "post_ending": "Return through Eventide Hotel Krat and listen to the Legend's recording."
+    }
+  ],
+  "collectibles": [
+    {
+      "category": "weapons",
+      "count": 41,
+      "notes": "Collect all 41; no single-run lockout because the collection carries into NG+.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF p. 7"
+      ],
+      "version_scope": "1.12.0.0",
+      "missable": false
+    },
+    {
+      "category": "special weapons",
+      "count": 11,
+      "notes": "Trade boss Ergo and collect all 11; preserve Ergo, but missed trades remain available in NG+.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF p. 7"
+      ],
+      "version_scope": "1.12.0.0",
+      "missable": false
+    },
+    {
+      "category": "legion arms",
+      "count": 8,
+      "notes": "Collect all 8; no single-run lockout.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF p. 7"
+      ],
+      "version_scope": "1.12.0.0",
+      "missable": false
+    },
+    {
+      "category": "records",
+      "count": 16,
+      "notes": "Collect and play all 16; several NPC, merchant, and ending rewards are missable before progression locks.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF p. 7"
+      ],
+      "version_scope": "1.12.0.0",
+      "missable": true
+    },
+    {
+      "category": "gestures",
+      "count": 17,
+      "notes": "Learn all 17; NPC answers and quest timing can permanently lock rewards in a run.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF p. 7"
+      ],
+      "version_scope": "1.12.0.0",
+      "missable": true
+    },
+    {
+      "category": "cryptic vessels",
+      "count": 6,
+      "notes": "Complete all 6 clue chains before their area or quest progression can close.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF p. 7"
+      ],
+      "version_scope": "1.12.0.0",
+      "missable": true
+    },
+    {
+      "category": "sanctums",
+      "count": 4,
+      "notes": "Open all 4 Trinity Sanctums; they remain available during progression.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF p. 7"
+      ],
+      "version_scope": "1.12.0.0",
+      "missable": false
+    },
+    {
+      "category": "boss Ergo",
+      "count": 11,
+      "notes": "Reserve and trade all 11 boss Ergo; missed trades remain available in NG+.",
+      "sources": [
+        "PSNProfiles Lies of P Trophy Guide PDF p. 7"
+      ],
+      "version_scope": "1.12.0.0",
+      "missable": false
+    }
+  ]
+}

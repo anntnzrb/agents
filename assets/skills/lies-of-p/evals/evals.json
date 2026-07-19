@@ -1,0 +1,1060 @@
+{
+  "skill_name": "lies-of-p",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "trophy Lies of P: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Lies of P. Invoke exactly: scripts/cli.py trophies. Requirement: Earn every other base-game trophy; the platinum unlocks when the final missing base trophy is awarded. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Lies of P.",
+        "It states the exact requirement: Earn every other base-game trophy; the platinum unlocks when the final missing base trophy is awarded.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "trophy Real boy : They all lived happily ever after: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Real boy : They all lived happily ever after. Invoke exactly: scripts/cli.py trophies. Requirement: At the ending choice, give Geppetto your heart; this ends the story without the Nameless Puppet fight. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Real boy : They all lived happily ever after.",
+        "It states the exact requirement: At the ending choice, give Geppetto your heart; this ends the story without the Nameless Puppet fight.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "trophy Free from the puppet string: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Free from the puppet string. Invoke exactly: scripts/cli.py trophies. Requirement: Refuse Geppetto and defeat the Nameless Puppet while lacking the Humanity route needed for Rise of P (or leave Sophia alive). Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Free from the puppet string.",
+        "It states the exact requirement: Refuse Geppetto and defeat the Nameless Puppet while lacking the Humanity route needed for Rise of P (or leave Sophia alive).",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "trophy Rise of P: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Rise of P. Invoke exactly: scripts/cli.py trophies. Requirement: Accumulate high Humanity, grant Sophia peace, refuse Geppetto, then defeat the Nameless Puppet. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Rise of P.",
+        "It states the exact requirement: Accumulate high Humanity, grant Sophia peace, refuse Geppetto, then defeat the Nameless Puppet.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "trophy The First Puppet: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario The First Puppet. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat the Nameless Puppet in the Under the Abyss finale after refusing Geppetto. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on The First Puppet.",
+        "It states the exact requirement: Defeat the Nameless Puppet in the Under the Abyss finale after refusing Geppetto.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "trophy Strongest Normal Weapon: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Strongest Normal Weapon. Invoke exactly: scripts/cli.py trophies. Requirement: Fully upgrade any normal weapon to its maximum level at Hotel Krat using Weapon Assembly materials. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Strongest Normal Weapon.",
+        "It states the exact requirement: Fully upgrade any normal weapon to its maximum level at Hotel Krat using Weapon Assembly materials.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "trophy Strongest Special Weapon: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Strongest Special Weapon. Invoke exactly: scripts/cli.py trophies. Requirement: Fully upgrade a special boss-Ergo weapon to its maximum level with Dark Moon Moonstone of the Covenant. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Strongest Special Weapon.",
+        "It states the exact requirement: Fully upgrade a special boss-Ergo weapon to its maximum level with Dark Moon Moonstone of the Covenant.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "trophy Strongest Legion Arm: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Strongest Legion Arm. Invoke exactly: scripts/cli.py trophies. Requirement: Upgrade one Legion Arm to its maximum enhancement level at the Venigni machine. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Strongest Legion Arm.",
+        "It states the exact requirement: Upgrade one Legion Arm to its maximum enhancement level at the Venigni machine.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "trophy Extreme Potential: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Extreme Potential. Invoke exactly: scripts/cli.py trophies. Requirement: Unlock every P-Organ phase by spending Quartz at Geppetto's chair in Hotel Krat. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Extreme Potential.",
+        "It states the exact requirement: Unlock every P-Organ phase by spending Quartz at Geppetto's chair in Hotel Krat.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "trophy Pianist of Krat: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Pianist of Krat. Invoke exactly: scripts/cli.py trophies. Requirement: After an ending, interact with Hotel Krat's piano and play it; the perfect-performance prompt awards this trophy. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Pianist of Krat.",
+        "It states the exact requirement: After an ending, interact with Hotel Krat's piano and play it; the perfect-performance prompt awards this trophy.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "trophy Legion Arm Collector: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Legion Arm Collector. Invoke exactly: scripts/cli.py trophies. Requirement: Craft all eight base-game Legion Arms at Venigni's machine, including the three requiring hidden Cryptic Vessel discoveries. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Legion Arm Collector.",
+        "It states the exact requirement: Craft all eight base-game Legion Arms at Venigni's machine, including the three requiring hidden Cryptic Vessel discoveries.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "trophy Special Weapon Collector: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Special Weapon Collector. Invoke exactly: scripts/cli.py trophies. Requirement: Exchange every base-game rare Ergo with Alidoro/Hugo for each special weapon; do not consume the Ergo first. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Special Weapon Collector.",
+        "It states the exact requirement: Exchange every base-game rare Ergo with Alidoro/Hugo for each special weapon; do not consume the Ergo first.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "trophy Normal Weapon Collector: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Normal Weapon Collector. Invoke exactly: scripts/cli.py trophies. Requirement: Acquire every base-game normal weapon, including all shop and found blades, handles, blunt weapons, and the two starting weapons. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Normal Weapon Collector.",
+        "It states the exact requirement: Acquire every base-game normal weapon, including all shop and found blades, handles, blunt weapons, and the two starting weapons.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "trophy Golden Melody: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Golden Melody. Invoke exactly: scripts/cli.py trophies. Requirement: Collect and listen to every base-game record at Hotel Krat; buy missable records and complete their NPC quest rewards before advancing past their chapters. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Golden Melody.",
+        "It states the exact requirement: Collect and listen to every base-game record at Hotel Krat; buy missable records and complete their NPC quest rewards before advancing past their chapters.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "trophy Learning about Emotions: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Learning about Emotions. Invoke exactly: scripts/cli.py trophies. Requirement: Learn every base-game gesture from notes, books, NPC quests, and story events; perform the required interactions before their quest cutoffs. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Learning about Emotions.",
+        "It states the exact requirement: Learn every base-game gesture from notes, books, NPC quests, and story events; perform the required interactions before their quest cutoffs.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "trophy Veteran Explorer: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Veteran Explorer. Invoke exactly: scripts/cli.py trophies. Requirement: Open every base-game Cryptic Vessel and finish each cipher's clue at its marked location, collecting the resulting rewards. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Veteran Explorer.",
+        "It states the exact requirement: Open every base-game Cryptic Vessel and finish each cipher's clue at its marked location, collecting the resulting rewards.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 17,
+      "prompt": "trophy End of Riddles: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario End of Riddles. Invoke exactly: scripts/cli.py trophies. Requirement: Answer all five Arlecchino telephone riddles correctly and open every Trinity Sanctum with the keys obtained in chapter order. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on End of Riddles.",
+        "It states the exact requirement: Answer all five Arlecchino telephone riddles correctly and open every Trinity Sanctum with the keys obtained in chapter order.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 18,
+      "prompt": "trophy First Lie: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario First Lie. Invoke exactly: scripts/cli.py trophies. Requirement: Choose Lie at the Hotel Krat entrance portrait prompt after the opening, rather than answering Truth. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on First Lie.",
+        "It states the exact requirement: Choose Lie at the Hotel Krat entrance portrait prompt after the opening, rather than answering Truth.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 19,
+      "prompt": "trophy Stargazer’s Guide: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Stargazer’s Guide. Invoke exactly: scripts/cli.py trophies. Requirement: Activate every base-game Stargazer, including those in optional side areas, so each location registers as discovered. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Stargazer’s Guide.",
+        "It states the exact requirement: Activate every base-game Stargazer, including those in optional side areas, so each location registers as discovered.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 20,
+      "prompt": "trophy Exploring Possibilities: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Exploring Possibilities. Invoke exactly: scripts/cli.py trophies. Requirement: Use Venigni's machine to assemble a weapon once, combining a blade and handle with compatible slots. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Exploring Possibilities.",
+        "It states the exact requirement: Use Venigni's machine to assemble a weapon once, combining a blade and handle with compatible slots.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 21,
+      "prompt": "trophy The Ultimate Defense Technique: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario The Ultimate Defense Technique. Invoke exactly: scripts/cli.py trophies. Requirement: Destroy an enemy's weapon with repeated perfect guards until the weapon breaks and the trophy notification appears. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on The Ultimate Defense Technique.",
+        "It states the exact requirement: Destroy an enemy's weapon with repeated perfect guards until the weapon breaks and the trophy notification appears.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 22,
+      "prompt": "trophy Fatal Blow: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Fatal Blow. Invoke exactly: scripts/cli.py trophies. Requirement: Stagger an enemy, then stand in the indicated position and perform a Fatal Attack on its exposed core. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Fatal Blow.",
+        "It states the exact requirement: Stagger an enemy, then stand in the indicated position and perform a Fatal Attack on its exposed core.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 23,
+      "prompt": "trophy The Bastards and the Sweepers: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario The Bastards and the Sweepers. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat one human Stalker of the Bastard or Sweeper faction during the early Krat route. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on The Bastards and the Sweepers.",
+        "It states the exact requirement: Defeat one human Stalker of the Bastard or Sweeper faction during the early Krat route.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 24,
+      "prompt": "trophy Parade Master: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Parade Master. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat the Parade Master boss at Krat Central Station. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Parade Master.",
+        "It states the exact requirement: Defeat the Parade Master boss at Krat Central Station.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 25,
+      "prompt": "trophy Scrapped Watchman: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Scrapped Watchman. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat the Scrapped Watchman at Krat City Hall. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Scrapped Watchman.",
+        "It states the exact requirement: Defeat the Scrapped Watchman at Krat City Hall.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 26,
+      "prompt": "trophy King’s Flame: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario King’s Flame. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat King’s Flame, Fuoco, at the Venigni Works furnace. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on King’s Flame.",
+        "It states the exact requirement: Defeat King’s Flame, Fuoco, at the Venigni Works furnace.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 27,
+      "prompt": "trophy Fallen Archbishop: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Fallen Archbishop. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat the Fallen Archbishop Andreus in St. Frangelico Cathedral. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Fallen Archbishop.",
+        "It states the exact requirement: Defeat the Fallen Archbishop Andreus in St. Frangelico Cathedral.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 28,
+      "prompt": "trophy The Delayed Match: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario The Delayed Match. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat the Eldest of the Black Rabbit Brotherhood in Malum District. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on The Delayed Match.",
+        "It states the exact requirement: Defeat the Eldest of the Black Rabbit Brotherhood in Malum District.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 29,
+      "prompt": "trophy King of Puppets: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario King of Puppets. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat Romeo, King of Puppets, in Estella Opera House. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on King of Puppets.",
+        "It states the exact requirement: Defeat Romeo, King of Puppets, in Estella Opera House.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 30,
+      "prompt": "trophy The Champion of Evolution: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario The Champion of Evolution. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat Champion Victor at the Grand Exhibition. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on The Champion of Evolution.",
+        "It states the exact requirement: Defeat Champion Victor at the Grand Exhibition.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 31,
+      "prompt": "trophy Puppet-Devouring Green Monster: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Puppet-Devouring Green Monster. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat the Puppet-Devouring Green Monster in the Barren Swamp. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Puppet-Devouring Green Monster.",
+        "It states the exact requirement: Defeat the Puppet-Devouring Green Monster in the Barren Swamp.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 32,
+      "prompt": "trophy Corrupted Parade Master: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Corrupted Parade Master. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat the Corrupted Parade Master during the Krat Central Station Redux route. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Corrupted Parade Master.",
+        "It states the exact requirement: Defeat the Corrupted Parade Master during the Krat Central Station Redux route.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 33,
+      "prompt": "trophy Revenge of Black: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Revenge of Black. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat Laxasia the Complete at the Isle of Alchemists. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Revenge of Black.",
+        "It states the exact requirement: Defeat Laxasia the Complete at the Isle of Alchemists.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 34,
+      "prompt": "trophy The Complete One: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario The Complete One. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat Simon Manus, Awakened God, in Arche Abbey after the Laxasia encounter. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on The Complete One.",
+        "It states the exact requirement: Defeat Simon Manus, Awakened God, in Arche Abbey after the Laxasia encounter.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 35,
+      "prompt": "trophy The Awakened God: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario The Awakened God. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat Simon Manus, Awakened God, at the end of Arche Abbey; the boss victory awards this trophy. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on The Awakened God.",
+        "It states the exact requirement: Defeat Simon Manus, Awakened God, at the end of Arche Abbey; the boss victory awards this trophy.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 36,
+      "prompt": "trophy Bear Gold Coin Fruit: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario Bear Gold Coin Fruit. Invoke exactly: scripts/cli.py trophies. Requirement: Harvest a Gold Coin Fruit from the Gold Coin Tree after awakening it in Chapter 4. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Bear Gold Coin Fruit.",
+        "It states the exact requirement: Harvest a Gold Coin Fruit from the Gold Coin Tree after awakening it in Chapter 4.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 37,
+      "prompt": "trophy From Across the Rift: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario From Across the Rift. Invoke exactly: scripts/cli.py trophies. Requirement: Kill one Dimensional Butterfly and collect the dimensional material it drops. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on From Across the Rift.",
+        "It states the exact requirement: Kill one Dimensional Butterfly and collect the dimensional material it drops.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 38,
+      "prompt": "trophy The Story of the Prince: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario The Story of the Prince. Invoke exactly: scripts/cli.py trophies. Requirement: Complete Venigni's Chapter 3 quest: rescue him, exhaust his dialogue, and return after the required boss/event for his final reward. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on The Story of the Prince.",
+        "It states the exact requirement: Complete Venigni's Chapter 3 quest: rescue him, exhaust his dialogue, and return after the required boss/event for his final reward.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 39,
+      "prompt": "trophy The Story of the Refined Old Lady: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario The Story of the Refined Old Lady. Invoke exactly: scripts/cli.py trophies. Requirement: Find the sick woman in Elysion Boulevard, return the matching Broken Baby Puppet, and claim her reward before leaving the chapter. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on The Story of the Refined Old Lady.",
+        "It states the exact requirement: Find the sick woman in Elysion Boulevard, return the matching Broken Baby Puppet, and claim her reward before leaving the chapter.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 40,
+      "prompt": "trophy The Story of the One Who Dreamed: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario The Story of the One Who Dreamed. Invoke exactly: scripts/cli.py trophies. Requirement: Complete the Weeping Woman's side quest by giving her the correct puppet and speaking to her again before the area advances. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on The Story of the One Who Dreamed.",
+        "It states the exact requirement: Complete the Weeping Woman's side quest by giving her the correct puppet and speaking to her again before the area advances.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 41,
+      "prompt": "trophy The Story of One Father: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario The Story of One Father. Invoke exactly: scripts/cli.py trophies. Requirement: Finish Geppetto's story through the final choice: refuse his heart request for the Nameless Puppet route; giving it ends this branch. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on The Story of One Father.",
+        "It states the exact requirement: Finish Geppetto's story through the final choice: refuse his heart request for the Nameless Puppet route; giving it ends this branch.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 42,
+      "prompt": "trophy The Story of a Stranger Girl: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario The Story of a Stranger Girl. Invoke exactly: scripts/cli.py trophies. Requirement: Complete Eugenie's quest and choose the correct Alidoro identity answer, then deliver the resulting record/reward before the finale. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on The Story of a Stranger Girl.",
+        "It states the exact requirement: Complete Eugenie's quest and choose the correct Alidoro identity answer, then deliver the resulting record/reward before the finale.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 43,
+      "prompt": "trophy The Story of the Blue Butterfly: Verify this exact base-game trophy and its requirement.",
+      "expected_output": "Scenario The Story of the Blue Butterfly. Invoke exactly: scripts/cli.py trophies. Requirement: Complete Sophia's final storyline by reaching her room, choosing to give her peace, and continuing to the ending branch before the point of no return. Apply --spoilers as needed. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on The Story of the Blue Butterfly.",
+        "It states the exact requirement: Complete Sophia's final storyline by reaching her room, choosing to give her peace, and continuing to the ending branch before the point of no return.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 44,
+      "prompt": "dlc Rose's Memory: Verify this exact Overture DLC trophy and its requirement.",
+      "expected_output": "Scenario Rose's Memory. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat the Blood Artist and reach the Overture ending. Require --dlc and --spoilers. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Rose's Memory.",
+        "It states the exact requirement: Defeat the Blood Artist and reach the Overture ending.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 45,
+      "prompt": "dlc Enduring Resolve: Verify this exact Overture DLC trophy and its requirement.",
+      "expected_output": "Scenario Enduring Resolve. Invoke exactly: scripts/cli.py trophies. Requirement: After defeating the Blood Artist, use the Secret Room Key in the Rose Garden and listen to the Legend's last recording. Require --dlc and --spoilers. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Enduring Resolve.",
+        "It states the exact requirement: After defeating the Blood Artist, use the Secret Room Key in the Rose Garden and listen to the Legend's last recording.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 46,
+      "prompt": "dlc True Combat Gear Collector: Verify this exact Overture DLC trophy and its requirement.",
+      "expected_output": "Scenario True Combat Gear Collector. Invoke exactly: scripts/cli.py trophies. Requirement: Collect all 10 Overture weapons and craft both Legion Arms: Icarus and Cataclysm. Require --dlc and --spoilers. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on True Combat Gear Collector.",
+        "It states the exact requirement: Collect all 10 Overture weapons and craft both Legion Arms: Icarus and Cataclysm.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 47,
+      "prompt": "dlc Beyond Limitless Potential: Verify this exact Overture DLC trophy and its requirement.",
+      "expected_output": "Scenario Beyond Limitless Potential. Invoke exactly: scripts/cli.py trophies. Requirement: Apply at least one upgrade in the new Upgrade P-Organ tab. Require --dlc and --spoilers. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Beyond Limitless Potential.",
+        "It states the exact requirement: Apply at least one upgrade in the new Upgrade P-Organ tab.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 48,
+      "prompt": "dlc Memory's Melody: Verify this exact Overture DLC trophy and its requirement.",
+      "expected_output": "Scenario Memory's Melody. Invoke exactly: scripts/cli.py trophies. Requirement: Collect and listen to all 8 Overture records (including the 3 Gold Records available only in New Game+). Require --dlc and --spoilers. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Memory's Melody.",
+        "It states the exact requirement: Collect and listen to all 8 Overture records (including the 3 Gold Records available only in New Game+).",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 49,
+      "prompt": "dlc To Be Human: Verify this exact Overture DLC trophy and its requirement.",
+      "expected_output": "Scenario To Be Human. Invoke exactly: scripts/cli.py trophies. Requirement: Learn all 8 Overture gestures. Require --dlc and --spoilers. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on To Be Human.",
+        "It states the exact requirement: Learn all 8 Overture gestures.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 50,
+      "prompt": "dlc Tracker of Dark Secrets: Verify this exact Overture DLC trophy and its requirement.",
+      "expected_output": "Scenario Tracker of Dark Secrets. Invoke exactly: scripts/cli.py trophies. Requirement: Decrypt every clue in the cipher machines, complete the Tracker's quest before the Rose Garden finale, and choose \"They will be, and Krat will be saved\". Require --dlc and --spoilers. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Tracker of Dark Secrets.",
+        "It states the exact requirement: Decrypt every clue in the cipher machines, complete the Tracker's quest before the Rose Garden finale, and choose \"They will be, and Krat will be saved\".",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 51,
+      "prompt": "dlc Puppeteer of Death: Verify this exact Overture DLC trophy and its requirement.",
+      "expected_output": "Scenario Puppeteer of Death. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat Markiona, the Puppeteer of Death. Require --dlc and --spoilers. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Puppeteer of Death.",
+        "It states the exact requirement: Defeat Markiona, the Puppeteer of Death.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 52,
+      "prompt": "dlc Anguished Guardian: Verify this exact Overture DLC trophy and its requirement.",
+      "expected_output": "Scenario Anguished Guardian. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat the Anguished Guardian of the Ruins. Require --dlc and --spoilers. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Anguished Guardian.",
+        "It states the exact requirement: Defeat the Anguished Guardian of the Ruins.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 53,
+      "prompt": "dlc Blood Artist: Verify this exact Overture DLC trophy and its requirement.",
+      "expected_output": "Scenario Blood Artist. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat the Blood Artist. Require --dlc and --spoilers. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Blood Artist.",
+        "It states the exact requirement: Defeat the Blood Artist.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 54,
+      "prompt": "dlc Honor and Revenge: Verify this exact Overture DLC trophy and its requirement.",
+      "expected_output": "Scenario Honor and Revenge. Invoke exactly: scripts/cli.py trophies. Requirement: Defeat the Leader of the Bastards and the Leader of the Sweepers. Require --dlc and --spoilers. State 1.12.0.0 + Overture scope, deterministic evidence, and uncertainty about save state.",
+      "expectations": [
+        "The answer stays focused on Honor and Revenge.",
+        "It states the exact requirement: Defeat the Leader of the Bastards and the Leader of the Sweepers.",
+        "It uses scripts/cli.py trophies as the sole command invocation.",
+        "It distinguishes observable evidence from checklist advice and does not invent completion state."
+      ]
+    },
+    {
+      "id": 55,
+      "prompt": "build beginner Technique build: Explain Path of the Bastard and Wintry Rapier with deterministic mechanics and a practical decision rule.",
+      "expected_output": "Scenario Technique build. Invoke exactly: scripts/cli.py build. Cover only Path of the Bastard and Wintry Rapier, distinguish verified mechanics from advice, and never infer save state.",
+      "expectations": [
+        "The answer stays focused on Technique build.",
+        "It uses scripts/cli.py build as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 56,
+      "prompt": "build Scrapped Watchman matchup: Explain Scrapped Watchman with deterministic mechanics and a practical decision rule.",
+      "expected_output": "Scenario Scrapped Watchman matchup. Invoke exactly: scripts/cli.py weaknesses. Cover only Scrapped Watchman, distinguish verified mechanics from advice, and never infer save state.",
+      "expectations": [
+        "The answer stays focused on Scrapped Watchman matchup.",
+        "It uses scripts/cli.py weaknesses as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 57,
+      "prompt": "build no-Specter combat: Explain no-Specter low-consumable play with deterministic mechanics and a practical decision rule.",
+      "expected_output": "Scenario no-Specter combat. Invoke exactly: scripts/cli.py build. Cover only no-Specter low-consumable play, distinguish verified mechanics from advice, and never infer save state.",
+      "expectations": [
+        "It uses scripts/cli.py build as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 58,
+      "prompt": "build Advance status mechanics: Explain Advance scaling and status with deterministic mechanics and a practical decision rule.",
+      "expected_output": "Scenario Advance status mechanics. Invoke exactly: scripts/cli.py build. Cover only Advance scaling and status, distinguish verified mechanics from advice, and never infer save state.",
+      "expectations": [
+        "The answer stays focused on Advance status mechanics.",
+        "It uses scripts/cli.py build as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 59,
+      "prompt": "build Laxasia matchup: Explain Laxasia with deterministic mechanics and a practical decision rule.",
+      "expected_output": "Scenario Laxasia matchup. Invoke exactly: scripts/cli.py weaknesses. Cover only Laxasia, distinguish verified mechanics from advice, and never infer save state.",
+      "expectations": [
+        "The answer stays focused on Laxasia matchup.",
+        "It uses scripts/cli.py weaknesses as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 60,
+      "prompt": "build parry timing: Explain perfect guard timing with deterministic mechanics and a practical decision rule.",
+      "expected_output": "Scenario parry timing. Invoke exactly: scripts/cli.py build. Cover only perfect guard timing, distinguish verified mechanics from advice, and never infer save state.",
+      "expectations": [
+        "The answer stays focused on parry timing.",
+        "It uses scripts/cli.py build as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 61,
+      "prompt": "build Legion Arm mechanics: Explain Legion Arm capacity with deterministic mechanics and a practical decision rule.",
+      "expected_output": "Scenario Legion Arm mechanics. Invoke exactly: scripts/cli.py build. Cover only Legion Arm capacity, distinguish verified mechanics from advice, and never infer save state.",
+      "expectations": [
+        "The answer stays focused on Legion Arm mechanics.",
+        "It uses scripts/cli.py build as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 62,
+      "prompt": "build The Nameless Puppet matchup: Explain The Nameless Puppet with deterministic mechanics and a practical decision rule.",
+      "expected_output": "Scenario The Nameless Puppet matchup. Invoke exactly: scripts/cli.py weaknesses. Cover only The Nameless Puppet, distinguish verified mechanics from advice, and never infer save state.",
+      "expectations": [
+        "The answer stays focused on The Nameless Puppet matchup.",
+        "It uses scripts/cli.py weaknesses as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 63,
+      "prompt": "build stagger mechanics: Explain stagger window with deterministic mechanics and a practical decision rule.",
+      "expected_output": "Scenario stagger mechanics. Invoke exactly: scripts/cli.py build. Cover only stagger window, distinguish verified mechanics from advice, and never infer save state.",
+      "expectations": [
+        "The answer stays focused on stagger mechanics.",
+        "It uses scripts/cli.py build as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 64,
+      "prompt": "build weapon assembly: Explain weapon handles and blades with deterministic mechanics and a practical decision rule.",
+      "expected_output": "Scenario weapon assembly. Invoke exactly: scripts/cli.py build. Cover only weapon handles and blades, distinguish verified mechanics from advice, and never infer save state.",
+      "expectations": [
+        "The answer stays focused on weapon assembly.",
+        "It uses scripts/cli.py build as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 65,
+      "prompt": "fresh beginner start: Explain a deterministic first-session plan for choosing a starting build and weapon.",
+      "expected_output": "Scenario fresh beginner start. Invoke exactly: scripts/cli.py fresh. Cover only first-session build and weapon choices, distinguish verified mechanics from advice, and never infer save state.",
+      "expectations": [
+        "The answer stays focused on a fresh beginner start.",
+        "It uses scripts/cli.py fresh as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 66,
+      "prompt": "chapter Krat Central Station: Give a spoiler-safe route checklist for 1; reveal names only with --spoilers.",
+      "expected_output": "Scenario 1. Invoke exactly: scripts/cli.py checklist. Cover only 1, gate names behind --spoilers, and identify chapter completion signals.",
+      "expectations": [
+        "The answer stays focused on 1.",
+        "It uses scripts/cli.py checklist as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 67,
+      "prompt": "chapter Krat City Hall and Elysion Boulevard: Give a spoiler-safe route checklist for 2; reveal names only with --spoilers.",
+      "expected_output": "Scenario 2. Invoke exactly: scripts/cli.py route. Cover only 2, gate names behind --spoilers, and identify chapter completion signals.",
+      "expectations": [
+        "The answer stays focused on 2.",
+        "It uses scripts/cli.py route as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 68,
+      "prompt": "chapter Venigni Works: Give a spoiler-safe route checklist for 3; reveal names only with --spoilers.",
+      "expected_output": "Scenario 3. Invoke exactly: scripts/cli.py route. Cover only 3, gate names behind --spoilers, and identify chapter completion signals.",
+      "expectations": [
+        "The answer stays focused on 3.",
+        "It uses scripts/cli.py route as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 69,
+      "prompt": "chapter St. Frangelico Cathedral: Give a spoiler-safe route checklist for 4; reveal names only with --spoilers.",
+      "expected_output": "Scenario 4. Invoke exactly: scripts/cli.py route. Cover only 4, gate names behind --spoilers, and identify chapter completion signals.",
+      "expectations": [
+        "The answer stays focused on 4.",
+        "It uses scripts/cli.py route as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 70,
+      "prompt": "chapter Malum District: Give a spoiler-safe route checklist for 5; reveal names only with --spoilers.",
+      "expected_output": "Scenario 5. Invoke exactly: scripts/cli.py route. Cover only 5, gate names behind --spoilers, and identify chapter completion signals.",
+      "expectations": [
+        "The answer stays focused on 5.",
+        "It uses scripts/cli.py route as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 71,
+      "prompt": "chapter Rosa Isabelle Street and Estella Opera House: Give a spoiler-safe route checklist for 6; reveal names only with --spoilers.",
+      "expected_output": "Scenario 6. Invoke exactly: scripts/cli.py route. Cover only 6, gate names behind --spoilers, and identify chapter completion signals.",
+      "expectations": [
+        "The answer stays focused on 6.",
+        "It uses scripts/cli.py route as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 72,
+      "prompt": "chapter Grand Exhibition: Give a spoiler-safe route checklist for 7; reveal names only with --spoilers.",
+      "expected_output": "Scenario 7. Invoke exactly: scripts/cli.py route. Cover only 7, gate names behind --spoilers, and identify chapter completion signals.",
+      "expectations": [
+        "The answer stays focused on 7.",
+        "It uses scripts/cli.py route as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 73,
+      "prompt": "chapter Barren Swamp: Give a spoiler-safe route checklist for 8; reveal names only with --spoilers.",
+      "expected_output": "Scenario 8. Invoke exactly: scripts/cli.py route. Cover only 8, gate names behind --spoilers, and identify chapter completion signals.",
+      "expectations": [
+        "The answer stays focused on 8.",
+        "It uses scripts/cli.py route as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 74,
+      "prompt": "chapter Krat Central Station Redux: Give a spoiler-safe route checklist for 9; reveal names only with --spoilers.",
+      "expected_output": "Scenario 9. Invoke exactly: scripts/cli.py route. Cover only 9, gate names behind --spoilers, and identify chapter completion signals.",
+      "expectations": [
+        "The answer stays focused on 9.",
+        "It uses scripts/cli.py route as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 75,
+      "prompt": "chapter Relic of Trismegistus: Give a spoiler-safe route checklist for 10; reveal names only with --spoilers.",
+      "expected_output": "Scenario 10. Invoke exactly: scripts/cli.py route. Cover only 10, gate names behind --spoilers, and identify chapter completion signals.",
+      "expectations": [
+        "The answer stays focused on 10.",
+        "It uses scripts/cli.py route as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 76,
+      "prompt": "chapter Isle of the Alchemists and Arche Abbey: Give a spoiler-safe route checklist for 11; reveal names only with --spoilers.",
+      "expected_output": "Scenario 11. Invoke exactly: scripts/cli.py route. Cover only 11, gate names behind --spoilers, and identify chapter completion signals.",
+      "expectations": [
+        "The answer stays focused on 11.",
+        "It uses scripts/cli.py route as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 77,
+      "prompt": "boss Tyrannical Predator: Give an Overture boss matchup for Tyrannical Predator, gated behind --dlc and --spoilers.",
+      "expected_output": "Scenario Tyrannical Predator. Invoke exactly: scripts/cli.py bosses. Cover only Tyrannical Predator: class, weakness/resistance distinction, and observable victory signal.",
+      "expectations": [
+        "The answer stays focused on Tyrannical Predator.",
+        "It uses scripts/cli.py bosses as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 78,
+      "prompt": "boss Arlecchino: Give an Overture boss matchup for Arlecchino, gated behind --dlc and --spoilers.",
+      "expected_output": "Scenario Arlecchino. Invoke exactly: scripts/cli.py bosses. Cover only Arlecchino: class, weakness/resistance distinction, and observable victory signal.",
+      "expectations": [
+        "The answer stays focused on Arlecchino.",
+        "It uses scripts/cli.py bosses as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 79,
+      "prompt": "boss Anguished Guardian: Give an Overture boss matchup for Anguished Guardian, gated behind --dlc and --spoilers.",
+      "expected_output": "Scenario Anguished Guardian. Invoke exactly: scripts/cli.py bosses. Cover only Anguished Guardian: class, weakness/resistance distinction, and observable victory signal.",
+      "expectations": [
+        "The answer stays focused on Anguished Guardian.",
+        "It uses scripts/cli.py bosses as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 80,
+      "prompt": "boss Markiona: Give an Overture boss matchup for Markiona, gated behind --dlc and --spoilers.",
+      "expected_output": "Scenario Markiona. Invoke exactly: scripts/cli.py bosses. Cover only Markiona: class, weakness/resistance distinction, and observable victory signal.",
+      "expectations": [
+        "The answer stays focused on Markiona.",
+        "It uses scripts/cli.py bosses as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 81,
+      "prompt": "boss Veronique: Give an Overture boss matchup for Veronique, gated behind --dlc and --spoilers.",
+      "expected_output": "Scenario Veronique. Invoke exactly: scripts/cli.py bosses. Cover only Veronique: class, weakness/resistance distinction, and observable victory signal.",
+      "expectations": [
+        "The answer stays focused on Veronique.",
+        "It uses scripts/cli.py bosses as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 82,
+      "prompt": "boss Two-faced Overseer: Give an Overture boss matchup for Two-faced Overseer, gated behind --dlc and --spoilers.",
+      "expected_output": "Scenario Two-faced Overseer. Invoke exactly: scripts/cli.py bosses. Cover only Two-faced Overseer: class, weakness/resistance distinction, and observable victory signal.",
+      "expectations": [
+        "The answer stays focused on Two-faced Overseer.",
+        "It uses scripts/cli.py bosses as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 83,
+      "prompt": "boss Premetamorphic Green Hunter: Give an Overture boss matchup for Premetamorphic Green Hunter, gated behind --dlc and --spoilers.",
+      "expected_output": "Scenario Premetamorphic Green Hunter. Invoke exactly: scripts/cli.py bosses. Cover only Premetamorphic Green Hunter: class, weakness/resistance distinction, and observable victory signal.",
+      "expectations": [
+        "The answer stays focused on Premetamorphic Green Hunter.",
+        "It uses scripts/cli.py bosses as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 84,
+      "prompt": "boss Lumacchio: Give an Overture boss matchup for Lumacchio, gated behind --dlc and --spoilers.",
+      "expected_output": "Scenario Lumacchio. Invoke exactly: scripts/cli.py bosses. Cover only Lumacchio: class, weakness/resistance distinction, and observable victory signal.",
+      "expectations": [
+        "The answer stays focused on Lumacchio.",
+        "It uses scripts/cli.py bosses as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 85,
+      "prompt": "json spoiler policy: Demonstrate spoiler policy handling for one Lies of P query.",
+      "expected_output": "Scenario spoiler policy. Invoke exactly: scripts/cli.py audit. Report the exact structured/error behavior for spoiler policy, including rc2 where applicable, without fabricating results.",
+      "expectations": [
+        "The answer stays focused on spoiler policy.",
+        "It uses scripts/cli.py audit as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 86,
+      "prompt": "json JSON output: Demonstrate JSON output handling for one Lies of P query.",
+      "expected_output": "Scenario JSON output. Invoke exactly: scripts/cli.py audit. Report the exact structured/error behavior for JSON output, including rc2 where applicable, without fabricating results.",
+      "expectations": [
+        "The answer stays focused on JSON output.",
+        "It uses scripts/cli.py audit as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 87,
+      "prompt": "json invalid-arguments error: Demonstrate invalid-argument error handling for one Lies of P CLI query.",
+      "expected_output": "Scenario invalid arguments. Invoke exactly: scripts/cli.py audit. Report the exact structured/error behavior for invalid arguments, including rc2 where applicable, without fabricating results.",
+      "expectations": [
+        "The answer stays focused on invalid-argument error behavior and rc2.",
+        "It uses scripts/cli.py audit as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 88,
+      "prompt": "source status: Use Reddit, GitHub, and Context7 as leads with provenance and verification limits.",
+      "expected_output": "Scenario source status. Invoke exactly: scripts/cli.py sources. Cover only source provenance leads and verification limits, without fabricating results.",
+      "expectations": [
+        "The answer stays focused on source status, provenance, and verification limits with explicit confidence labels.",
+        "It uses scripts/cli.py sources as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 89,
+      "prompt": "json source status: Demonstrate source status handling for one Lies of P query.",
+      "expected_output": "Scenario source status. Invoke exactly: scripts/cli.py sources. Report the exact structured/error behavior for source status, including rc2 where applicable, without fabricating results.",
+      "expectations": [
+        "The answer stays focused on source status.",
+        "It uses scripts/cli.py sources as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 90,
+      "prompt": "json version scope: Demonstrate version scope handling for one Lies of P query.",
+      "expected_output": "Scenario version scope. Invoke exactly: scripts/cli.py sources. Report the exact structured/error behavior for version scope, including rc2 where applicable, without fabricating results.",
+      "expectations": [
+        "The answer stays focused on version scope.",
+        "It uses scripts/cli.py sources as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 91,
+      "prompt": "json licensing terms: Demonstrate licensing terms handling for one Lies of P query.",
+      "expected_output": "Scenario licensing terms. Invoke exactly: scripts/cli.py sources. Report the exact structured/error behavior for licensing terms, including rc2 where applicable, without fabricating results.",
+      "expectations": [
+        "The answer stays focused on licensing terms.",
+        "It uses scripts/cli.py sources as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 92,
+      "prompt": "json unsupported field: Demonstrate unsupported field handling for one Lies of P query.",
+      "expected_output": "Scenario unsupported field. Invoke exactly: scripts/cli.py audit. Report the exact structured/error behavior for unsupported field, including rc2 where applicable, without fabricating results.",
+      "expectations": [
+        "The answer stays focused on unsupported field.",
+        "It uses scripts/cli.py audit as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 93,
+      "prompt": "farm JSON output: Demonstrate JSON output handling for one Lies of P query.",
+      "expected_output": "Scenario farm JSON output. Invoke exactly: scripts/cli.py farm. Demonstrate JSON output handling for one query and mark advisory uncertainty.",
+      "expectations": [
+        "The answer stays focused on farm JSON output handling.",
+        "It uses scripts/cli.py farm as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 94,
+      "prompt": "farm Ergo farming: Give one deterministic farm or troubleshooting procedure for Ergo farming.",
+      "expected_output": "Scenario Ergo farming. Invoke exactly: scripts/cli.py farm. Cover only Ergo farming; state loop, drops or diagnostic signal, and mark advisory uncertainty.",
+      "expectations": [
+        "The answer stays focused on Ergo farming.",
+        "It uses scripts/cli.py farm as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 95,
+      "prompt": "farm stuck route troubleshooting: Give one deterministic farm or troubleshooting procedure for stuck route troubleshooting.",
+      "expected_output": "Scenario stuck route troubleshooting. Invoke exactly: scripts/cli.py farm. Cover only stuck route troubleshooting; state loop, drops or diagnostic signal, and mark advisory uncertainty.",
+      "expectations": [
+        "The answer stays focused on stuck route troubleshooting.",
+        "It uses scripts/cli.py farm as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    },
+    {
+      "id": 96,
+      "prompt": "farm missing collectible troubleshooting: Give one deterministic farm or troubleshooting procedure for missing collectible troubleshooting.",
+      "expected_output": "Scenario missing collectible troubleshooting. Invoke exactly: scripts/cli.py farm. Cover only missing collectible troubleshooting; state loop, drops or diagnostic signal, and mark advisory uncertainty.",
+      "expectations": [
+        "The answer stays focused on missing collectible troubleshooting.",
+        "It uses scripts/cli.py farm as the sole command invocation.",
+        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
+        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+      ]
+    }
+  ]
+}

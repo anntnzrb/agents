@@ -1,0 +1,54 @@
+{
+  "version": "1.12.0.0 + Overture",
+  "difficulty": "Legendary Stalker (default); difficulty does not alter trophies",
+  "build": {
+    "archetype": "Technique lane",
+    "early_weapon": "Path of the Bastard (Technique) or Wintry Rapier (Technique): choose either as the Technique-lane starting weapon",
+    "weapon_sequence": "Path of the Bastard or Wintry Rapier start; Booster Glaive handle Chapter 3; Bone-Cutting Sawblade becomes available only after acquiring it in Chapter 5 Malum District; then assemble Sawblade + Booster Glaive",
+    "optional_pivot": "Trident of the Covenant, then Proof of Humanity when obtained",
+    "principles": ["No Specters or summons", "Avoid consumable/throwable-dependent plans", "Guard, perfect guard, stagger, fatal attack"],
+    "stats": "Raise Vitality and Vigor to comfortable survival, Capacity for weight/defense, and Technique for the chosen handle; do not spend in Motivity unless deliberately testing a Motivity handle.",
+    "p_organ": ["Prioritize guard regain, stagger window, pulse-cell capacity, healing efficiency, and perfect-guard utility; unlock quartz slots by completing chapter objectives."],
+    "legion": "Falcon Eyes for ranged punish windows or Aegis for safe guard practice; refill at Stargazers and do not make boss plans depend on Legion consumables.",
+    "defense": "Use the highest physical-defense frame/liner/sleeve that stays under the desired weight tier; match elemental resistance when known. Exact absorption values are intentionally unknown unless sourced.",
+    "patch_delta": {"source": "official_patch_1_12", "summary": "Fixes the achievement/trophy issue where Extreme Potential could fail to unlock after P-Organ Recalibration; no combat-balance claim is made."}
+  },
+  "enemy_classes": [
+    {"id":"puppet","weakness":"electric blitz (generally)","plan":"Use electric weapon/abrasive when available; guard and punish recoveries."},
+    {"id":"carcass","weakness":"fire (generally)","plan":"Fire abrasive or flame weapon; avoid assuming every variant shares the same resistance."},
+    {"id":"stalker","weakness":"situational","plan":"Learn weapon timing, perfect guard, and fatal-attack openings."},
+    {"id":"human","weakness":"situational","plan":"Guard/parry; use stagger and back attacks rather than throwables."},
+    {"id":"mutant","weakness":"situational","plan":"Keep distance from grabs and use charged heavies after whiffs."},
+    {"id":"scrapped_watchman_exception","weakness":"acid (sourced exception); electric resistant","plan":"Do not apply the generic puppet rule: use acid for damage and avoid electric blitz. Physical weapon, guard, perfect guard, and burst punish remain reliable non-consumable options."}
+  ],
+  "bosses": [
+    {"name":"Parade Master","area":"Krat Central Station","plan":"Stay close to side/rear, guard the club sequence, punish after recovery.","specter":"none","confidence":"high"},
+    {"name":"Scrapped Watchman","area":"Krat City Hall","plan":"Exception to simple puppet taxonomy; learn delayed lightning and punish after combos.","specter":"none","confidence":"high"},
+    {"name":"Survivor","area":"Venigni Works","plan":"Circle and backstab; avoid greed.","specter":"none","confidence":"medium"},
+    {"name":"Fuoco, King's Flame","area":"Venigni Works","plan":"Physical guard and fire resistance; punish vent/recovery.","specter":"none","confidence":"high"},
+    {"name":"Archbishop Andreus","area":"St. Frangelico Cathedral","plan":"Guard front attacks, rotate for rear phase, use fire if confirmed.","specter":"none","confidence":"high"},
+    {"name":"Black Rabbit Brotherhood","area":"Malum District","plan":"Control adds, isolate target, punish long recoveries.","specter":"none","confidence":"high"},
+    {"name":"King of Puppets / Romeo","area":"Estella Opera House","plan":"Guard first phase; learn Romeo's fast strings and phase transition.","specter":"none","confidence":"high"},
+    {"name":"Champion Victor","area":"Grand Exhibition","plan":"Keep midrange, perfect guard rushes, punish whiffs.","specter":"none","confidence":"high","source":"fextra_bosses"},
+    {"name":"Green Monster of the Swamp","area":"Barren Swamp","plan":"Fire where confirmed; watch burrow/grab and delay attacks.","specter":"none","confidence":"medium"},
+    {"name":"Laxasia the Complete","area":"Arche Abbey","plan":"Perfect guard lightning and rushes; survive phase transition before damage greed.","specter":"none","confidence":"high"},
+    {"name":"Simon Manus, Arm of God","area":"Arche Abbey","plan":"Stay mobile, guard delayed holy attacks, punish end-lag.","specter":"none","confidence":"high"},
+    {"name":"Nameless Puppet","area":"Arche Abbey","plan":"Optional ending boss; perfect guard, guard regain, and disciplined healing.","specter":"none","confidence":"high"},
+    {"name":"Tyrannical Predator","area":"Savanna Experience Center","plan":"Keep moving around the arena, guard the lunges, and punish recovery without consumables.","specter":"none","source":"powerpyx_overture","confidence":"high","dlc":true},
+    {"name":"Markiona","area":"Greenhouse Interior","plan":"Maintain midrange, guard the strings, and punish confirmed recovery with physical damage.","specter":"none","source":"powerpyx_overture","confidence":"high","dlc":true},
+    {"name":"Veronique","area":"Carnival Garden","plan":"Read delayed attacks, perfect-guard the committed strings, and use fatal attacks after stagger.","specter":"none","source":"powerpyx_overture","confidence":"high","dlc":true},
+    {"name":"Two-faced Overseer","area":"Zelator Underground Facility","plan":"Stay at safe midrange, guard the paired patterns, and punish the recovery window.","specter":"none","source":"powerpyx_overture","confidence":"high","dlc":true},
+    {"name":"Premetamorphic Green Hunter","area":"The Mines","plan":"Avoid burrow/grab lanes, guard the rush, and punish the end of its combo physically.","specter":"none","source":"powerpyx_overture","confidence":"high","dlc":true},
+    {"name":"Anguished Guardian","area":"Ancient Ruins Excavation Site","plan":"Hold position outside the grab, perfect-guard committed attacks, and take safe stagger punishments.","specter":"none","source":"powerpyx_overture","confidence":"high","dlc":true},
+    {"name":"Lumacchio","area":"Elixir Research Zone","plan":"Use patient guard and spacing, then punish recovery; do not rely on throwables.","specter":"none","source":"powerpyx_overture","confidence":"high","dlc":true},
+    {"name":"Arlecchino","area":"Eventide Hotel Krat","plan":"Control spacing, perfect-guard the strings, and finish with physical stagger and fatal attacks.","specter":"none","source":"powerpyx_overture","confidence":"high","dlc":true}
+  ],
+  "farms": [
+    {"stage":"Krat Central Station / Hotel approach","purpose":"early ergo and upgrade materials","method":"clear repeatable puppets, reset at Stargazer; no throwables required"},
+    {"stage":"Malum District Red Lobster Inn route","purpose":"midgame ergo/materials","method":"short loop to Stargazer; use guard and fatal attacks"},
+    {"stage":"Arche Abbey outer/inner loops","purpose":"late-game ergo and upgrade materials","method":"clear dense humanoid/puppet packs safely; reset frequently"},
+    {"stage":"Overture DLC","purpose":"DLC leveling/materials","method":"No verified deterministic DLC farm loop is established in the cited sources; use the verified Arche Abbey outer/inner loops for repeatable base-game ergo/materials instead.","dlc":true}
+  ],
+  "areas": ["Krat Central Station","Krat City Hall","Elysion Boulevard","Venigni Works","St. Frangelico Cathedral","Malum District","Estella Opera House","Barren Swamp","Relic of Trismegistus","Arche Abbey","Strange Forest","Hall of Adventure","Jungle Zoo Walkway","Savanna Experience Center","Greenhouse Outdoor Garden","Greenhouse Interior","Carnival Garden","Zoo Tram Station","Eventide Hotel Krat","Zelator Underground Facility","Security Area","Coolant Control Room","Elixir Research Zone","The Mines","Ancient Ruins Excavation Site"],
+  "area_sources": {"base":{"source":"fextra_bosses","confidence":"medium"},"overture":{"source":"powerpyx_overture","confidence":"high","dlc":true}}
+}
