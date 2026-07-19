@@ -12,6 +12,10 @@ CLI_RC_INVALID_ARGS = 2
 BASE_TROPHY_COUNT = 43
 DLC_TROPHY_COUNT = 11
 RIGHT_SINGLE_QUOTE = "\N{RIGHT SINGLE QUOTATION MARK}"
+DISPLAYED_AR_SPLIT = 130
+ADJUSTED_HIT_CRIT = 135
+EXPECTED_HIT_CRIT = 175.5
+COMMUNITY_TOP_LEVEL_COUNT = 6
 
 
 def expect(condition: object, message: object = "") -> None:
@@ -225,3 +229,116 @@ def test_trophy_query_is_case_insensitive_with_exact_unicode_punctuation() -> No
     payload = json.loads(result.stdout)
     expect(len(payload) == 1)
     expect(payload[0]["name"] == f"Stargazer{RIGHT_SINGLE_QUOTE}s Guide")
+
+
+def test_compare_ranks_displayed_inputs_without_inventing_hidden_ar() -> None:
+    """The default ranking uses only retained displayed attack values."""
+    result = run_cli(
+        "compare",
+        "--candidate",
+        "Physical,120,0,0,10",
+        "--candidate",
+        "Split,80,50,0,8",
+        "--json",
+    )
+    expect(result.returncode == 0, result.stderr)
+    payload = json.loads(result.stdout)
+    expect(payload["candidates"][0]["name"] == "Split")
+    expect(payload["candidates"][0]["displayed_ar"] == DISPLAYED_AR_SPLIT)
+    expect(payload["candidates"][0]["expected_hit"] is None)
+    expect("hidden scaling/saturation" in payload["excluded"])
+
+
+def test_compare_applies_retention_motion_and_optional_critical_expectation() -> None:
+    """User-supplied modifiers have explicit, reproducible arithmetic."""
+    result = run_cli(
+        "compare",
+        "--candidate",
+        "Crit,100,20,30,12",
+        "--candidate",
+        "Raw,125,0,0,11",
+        "--physical-retained",
+        "0.8",
+        "--elemental-retained",
+        "0.5",
+        "--motion",
+        "1.5",
+        "--critical-multiplier",
+        "2",
+        "--json",
+    )
+    expect(result.returncode == 0, result.stderr)
+    payload = json.loads(result.stdout)
+    crit = next(row for row in payload["candidates"] if row["name"] == "Crit")
+    expect(crit["adjusted_hit"] == ADJUSTED_HIT_CRIT)
+    expect(crit["expected_hit"] == EXPECTED_HIT_CRIT)
+    expect(payload["candidates"][0]["name"] == "Crit")
+
+
+@pytest.mark.parametrize(
+    ("candidate", "extra", "message"),
+    [
+        ("missing,1,2", (), "candidate must be"),
+        ("bad,-1,0,0,1", (), "physical must be nonnegative"),
+        ("bad,1,0,101,1", (), "crit_percent must be between"),
+        ("bad,1,0,nan,1", (), "crit_percent must be between"),
+        ("bad,1,0,0,inf", (), "weight must be nonnegative"),
+        ("ok,1,0,0,1", ("--physical-retained", "1.1"), "physical_retained"),
+        (
+            "ok,1,0,100,1",
+            ("--critical-multiplier", "0.5"),
+            "critical_multiplier must be at least 1",
+        ),
+    ],
+)
+def test_compare_rejects_malformed_or_unbounded_inputs(
+    candidate: str,
+    extra: tuple[str, ...],
+    message: str,
+) -> None:
+    """Invalid calculator inputs fail with rc2 and a specific diagnostic."""
+    result = run_cli("compare", "--candidate", candidate, *extra)
+    expect(result.returncode == CLI_RC_INVALID_ARGS)
+    expect(message in result.stderr)
+
+
+def test_community_query_returns_consensus_dissent_and_sources() -> None:
+    """Equipment sentiment remains visibly qualified and sourced."""
+    result = run_cli("community", "Trident of the Covenant", "--json")
+    expect(result.returncode == 0, result.stderr)
+    payload = json.loads(result.stdout)
+    expect(len(payload["weapons"]) == 1)
+    trident = payload["weapons"][0]
+    expect(trident["name"] == "Trident of the Covenant")
+    expect(trident["sentiment"])
+    expect(trident["dissent"])
+    expect(trident["sources"])
+
+
+def test_community_hides_spoiler_and_dlc_records_until_opted_in() -> None:
+    """Community sentiment obeys the same explicit spoiler boundary."""
+    hidden = run_cli("community", "--json")
+    expect(hidden.returncode == 0, hidden.stderr)
+    hidden_text = json.dumps(json.loads(hidden.stdout))
+    for name in ("Nameless Puppet", "Arlecchino", "Tyrannical Predator"):
+        expect(name not in hidden_text)
+
+    shown = run_cli(
+        "community",
+        "Arlecchino",
+        "--spoilers",
+        "--json",
+    )
+    expect(shown.returncode == 0, shown.stderr)
+    payload = json.loads(shown.stdout)
+    expect([row["name"] for row in payload["boss_walls"]] == ["Arlecchino"])
+
+
+def test_audit_includes_community_resource_contract() -> None:
+    """The source audit covers the newly bundled evidence corpus."""
+    result = run_cli("audit", "--json")
+    expect(result.returncode == 0, result.stderr)
+    payload = json.loads(result.stdout)
+    expect(payload["ok"] is True)
+    expect(payload["counts"]["community.json"] == COMMUNITY_TOP_LEVEL_COUNT)
+    expect(payload["missing"]["community.json"] == [])

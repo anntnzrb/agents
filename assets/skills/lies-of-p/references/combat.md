@@ -23,3 +23,8 @@ Puppets are generally susceptible to Electric Blitz and carcasses generally to f
 All base and Overture encounters use the same no-summon discipline: identify punishable recovery, preserve stamina, and avoid greed during phase changes. Names, route order, and spoiler-sensitive counters belong in the CLI's spoiler-gated output. Confidence is recorded per corpus entry; unknown exact absorptions remain unknown.
 
 Sources: `official_patch_1_12`, `fextra_bosses`, `fextra_weapons`, `powerpyx_base`, `powerpyx_overture` in `resources/source_registry.json`.
+
+## Source-layer policy
+The community corpus records sentiment and dissent, not mechanics. Treat official patch notes and cross-checked wiki facts as identity/availability layers; treat Reddit, Steam, and calculator repositories as anecdotal research. Never convert a preference into an exact AR, scaling, absorption, or DPS claim. Recommendations remain cautious and preserve spoiler gates, especially for Nameless Puppet, Laxasia, King of Puppets/Romeo, and Overture bosses Arlecchino and Tyrannical Predator.
+
+The displayed comparator may add physical and elemental displayed AR, then apply explicitly supplied retention and motion assumptions. It excludes enemy defense, hidden scaling or saturation, animation DPS, status buildup, and Fable effects; no licensed validated exact formula was found. Community claims such as Trident or Proof of Humanity's sourced 30% critical chance must remain attributed context, not a universal performance guarantee.
