@@ -2,14 +2,14 @@
 # Models
 # =============================================================================
 modelRoles:
-  default: openai-codex/gpt-5.6-sol:high
-  task: openai-codex/gpt-5.6-sol:high
+  default: openai-codex/gpt-5.6-sol:low
+  task: openai-codex/gpt-5.6-sol:low
 
   commit: openai-codex/gpt-5.6-luna:low
   smol: openai-codex/gpt-5.6-luna:low
   tiny: openai-codex/gpt-5.6-luna:off
 
-  plan: openai-codex/gpt-5.6-sol:slow
+  plan: openai-codex/gpt-5.6-sol:low
   advisor: openai-codex/gpt-5.6-terra:low
   slow: openai-codex/gpt-5.6-sol:high
 
