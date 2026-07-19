@@ -3,6 +3,24 @@
 import json
 import re
 from pathlib import Path
+from typing import Never, TypedDict
+
+
+class EvalRecord(TypedDict):
+    """One validated evaluation scenario."""
+
+    id: int
+    prompt: str
+    expected_output: str
+    expectations: list[str]
+
+
+class EvalDocument(TypedDict):
+    """Top-level evaluation corpus structure."""
+
+    skill_name: str
+    evals: list[EvalRecord]
+
 
 EXPECTED_CASE_COUNT = 96
 MIN_EXPECTATIONS = 3
@@ -15,16 +33,67 @@ def expect(condition: object, message: object = "") -> None:
         raise AssertionError(message)
 
 
+def fail(message: str) -> Never:
+    """Fail a boundary validation with a concise diagnostic."""
+    raise AssertionError(message)
+
+
 ROOT = Path(__file__).parents[1]
 EVALS = ROOT / "evals" / "evals.json"
 PLATINUM = ROOT / "resources" / "platinum.json"
 
 
-def load() -> list[dict[str, object]]:
+def _load_platinum_records(group: str) -> list[dict[str, object]]:
+    """Load one platinum group after narrowing the decoded JSON shape."""
+    decoded: object = json.loads(PLATINUM.read_text(encoding="utf-8"))
+    if not isinstance(decoded, dict):
+        fail("invalid platinum document")
+    records = decoded.get(group)
+    if not isinstance(records, list) or not all(
+        isinstance(record, dict) for record in records
+    ):
+        fail("invalid platinum records")
+    return records
+
+
+def load() -> list[EvalRecord]:
     """Load and validate the evaluation corpus metadata."""
-    data = json.loads(EVALS.read_text())
-    expect(data["skill_name"] == "lies-of-p")
-    return data["evals"]
+    decoded: object = json.loads(EVALS.read_text(encoding="utf-8"))
+    if not isinstance(decoded, dict) or decoded.get("skill_name") != "lies-of-p":
+        fail("invalid evaluation document")
+    raw_evals = decoded.get("evals")
+    if not isinstance(raw_evals, list):
+        fail("invalid evaluation records")
+    records: list[EvalRecord] = []
+    for raw in raw_evals:
+        expect(isinstance(raw, dict))
+        record = {
+            "id": raw.get("id"),
+            "prompt": raw.get("prompt"),
+            "expected_output": raw.get("expected_output"),
+            "expectations": raw.get("expectations"),
+        }
+        id_value = record["id"]
+        prompt_value = record["prompt"]
+        output_value = record["expected_output"]
+        expectations_value = record["expectations"]
+        if not (
+            isinstance(id_value, int)
+            and isinstance(prompt_value, str)
+            and isinstance(output_value, str)
+            and isinstance(expectations_value, list)
+            and all(isinstance(item, str) for item in expectations_value)
+        ):
+            fail("invalid evaluation record")
+        records.append(
+            {
+                "id": id_value,
+                "prompt": prompt_value,
+                "expected_output": output_value,
+                "expectations": expectations_value,
+            },
+        )
+    return records
 
 
 def test_schema_and_unique_sequential_cases() -> None:
@@ -86,8 +155,8 @@ def test_marker_families_and_actual_cli_vocabulary() -> None:
 
 def test_expected_output_is_one_scenario_and_command_matches_category() -> None:
     """Ensure each expected output names one permitted scenario."""
-    rows = load()
     unrelated = ("the ultimate mystery", "the bastards and sweepers", "rose's memory")
+    rows = load()
     permitted = {
         "build": {"fresh", "build"},
         "boss": {"bosses", "weaknesses"},
@@ -125,9 +194,8 @@ def test_expected_output_is_one_scenario_and_command_matches_category() -> None:
             expect(sum(name in expected for name in unrelated) <= 1)
 
     rows_text = json.dumps(load(), ensure_ascii=False).lower()
-    data = json.loads(PLATINUM.read_text())
     for group in ("base", "dlc", "chapters"):
-        for record in data[group]:
+        for record in _load_platinum_records(group):
             name = str(
                 record.get("name") or record.get("title") or record.get("chapter"),
             )
@@ -150,9 +218,8 @@ def test_expected_output_is_one_scenario_and_command_matches_category() -> None:
 def test_all_records_and_policy_markers_are_represented() -> None:
     """Ensure every platinum record and policy marker appears."""
     rows_text = json.dumps(load(), ensure_ascii=False).lower()
-    data = json.loads(PLATINUM.read_text())
     for group in ("dlc", "chapters"):
-        for record in data[group]:
+        for record in _load_platinum_records(group):
             name = str(
                 record.get("name") or record.get("title") or record.get("chapter"),
             )
