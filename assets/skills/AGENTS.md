@@ -70,8 +70,8 @@
 ## Full Gate
 
 ```
-uvx ruff format <path> # fmt
-uvx ruff check --select ALL <path> # aggressive lint (try to fix most)
+uvx ruff format <path>
+uvx ruff check --select ALL --ignore COM812,D203,D213 <path>
 ```
 
 ## Validation
