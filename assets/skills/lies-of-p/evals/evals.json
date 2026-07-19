@@ -916,45 +916,41 @@
     {
       "id": 84,
       "prompt": "boss Lumacchio: Give an Overture boss matchup for Lumacchio, gated behind --dlc and --spoilers.",
-      "expected_output": "Scenario Lumacchio. Invoke exactly: scripts/cli.py bosses. Cover only Lumacchio: class, weakness/resistance distinction, and observable victory signal.",
+      "expected_output": "Scenario Lumacchio. Invoke exactly: scripts/cli.py bosses Lumacchio --spoilers --json. Cover only Lumacchio, version 1.12.0.0, Legendary Stalker default, no Specter, deterministic versus advisory facts, and observable victory signal.",
       "expectations": [
         "The answer stays focused on Lumacchio.",
-        "It uses scripts/cli.py bosses as the sole command invocation.",
-        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
-        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+        "It uses the bosses command with explicit spoiler consent.",
+        "It states version and no-Specter constraints."
       ]
     },
     {
       "id": 85,
-      "prompt": "json spoiler policy: Demonstrate spoiler policy handling for one Lies of P query.",
-      "expected_output": "Scenario spoiler policy. Invoke exactly: scripts/cli.py audit. Report the exact structured/error behavior for spoiler policy, including rc2 where applicable, without fabricating results.",
+      "prompt": "community Trident sentiment and dissent: Explain why players recommend Trident of the Covenant while preserving disagreement.",
+      "expected_output": "Scenario community Trident sentiment. Invoke exactly: scripts/cli.py community \"Trident of the Covenant\" --json. Report recommendation, dissent, contexts, confidence, and source keys; call displayed 30% critical chance a sourced fact but supremacy sentiment.",
       "expectations": [
-        "The answer stays focused on spoiler policy.",
-        "It uses scripts/cli.py audit as the sole command invocation.",
-        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
-        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+        "The answer labels best-weapon language as sentiment.",
+        "It includes both the safe-play recommendation and dissent.",
+        "It does not invent AR, DPS, or scaling coefficients. Invocation family: scripts/cli.py community."
       ]
     },
     {
       "id": 86,
-      "prompt": "json JSON output: Demonstrate JSON output handling for one Lies of P query.",
-      "expected_output": "Scenario JSON output. Invoke exactly: scripts/cli.py audit. Report the exact structured/error behavior for JSON output, including rc2 where applicable, without fabricating results.",
+      "prompt": "community Proof of Humanity spoiler dissent: Assess its late-game or NG+ role only with explicit spoilers.",
+      "expected_output": "Scenario community Proof dissent. Invoke exactly: scripts/cli.py community \"Proof of Humanity\" --spoilers --json. Explain late availability, NG+ context, critical fact, dissent, and why it is not an early-route requirement.",
       "expectations": [
-        "The answer stays focused on JSON output.",
-        "It uses scripts/cli.py audit as the sole command invocation.",
-        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
-        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+        "The invocation explicitly opts into spoilers.",
+        "The answer reports both praise and commitment/weight dissent.",
+        "It avoids a hidden-AR or universal quality-build claim."
       ]
     },
     {
       "id": 87,
       "prompt": "json invalid-arguments error: Demonstrate invalid-argument error handling for one Lies of P CLI query.",
-      "expected_output": "Scenario invalid arguments. Invoke exactly: scripts/cli.py audit. Report the exact structured/error behavior for invalid arguments, including rc2 where applicable, without fabricating results.",
+      "expected_output": "Scenario invalid arguments. Invoke exactly: scripts/cli.py audit unexpected. Report argparse status 2 and stderr behavior without fabricating audit output.",
       "expectations": [
-        "The answer stays focused on invalid-argument error behavior and rc2.",
-        "It uses scripts/cli.py audit as the sole command invocation.",
-        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
-        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+        "The answer reports the observed rc2 error.",
+        "It does not claim that audit ran.",
+        "It distinguishes parser failure from resource failure. Invocation family: scripts/cli.py audit."
       ]
     },
     {
@@ -970,90 +966,82 @@
     },
     {
       "id": 89,
-      "prompt": "json source status: Demonstrate source status handling for one Lies of P query.",
-      "expected_output": "Scenario source status. Invoke exactly: scripts/cli.py sources. Report the exact structured/error behavior for source status, including rc2 where applicable, without fabricating results.",
+      "prompt": "community amulet sentiment: Select amulets for critical, perfect-guard, stamina, and defensive use without unsupported percentages.",
+      "expected_output": "Scenario community amulet sentiment. Invoke exactly: scripts/cli.py community \"amulet sentiment\" --json. Separate Assassin, Conquering, Patience, Iron Wall, Extreme Modification, and Carrier use cases, dissent, and source confidence.",
       "expectations": [
-        "The answer stays focused on source status.",
-        "It uses scripts/cli.py sources as the sole command invocation.",
-        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
-        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+        "The answer uses effect semantics rather than invented percentages.",
+        "It treats Carrier as a threshold tool, not a default.",
+        "It preserves offensive-versus-defensive opportunity costs."
       ]
     },
     {
       "id": 90,
-      "prompt": "json version scope: Demonstrate version scope handling for one Lies of P query.",
-      "expected_output": "Scenario version scope. Invoke exactly: scripts/cli.py sources. Report the exact structured/error behavior for version scope, including rc2 where applicable, without fabricating results.",
+      "prompt": "community boss-Ergo amulet dissent: Explain the special weapon reward tradeoff before spending boss Ergo.",
+      "expected_output": "Scenario community boss-Ergo dissent. Invoke exactly: scripts/cli.py community \"Boss-Ergo amulets\" --spoilers --json. Surface the collection-versus-immediate-power tradeoff and cite the record's sources and confidence.",
       "expectations": [
-        "The answer stays focused on version scope.",
-        "It uses scripts/cli.py sources as the sole command invocation.",
-        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
-        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+        "The answer warns before recommending an irreversible reward choice.",
+        "It labels route preference as sentiment.",
+        "It does not invent the available rewards."
       ]
     },
     {
       "id": 91,
-      "prompt": "json licensing terms: Demonstrate licensing terms handling for one Lies of P query.",
-      "expected_output": "Scenario licensing terms. Invoke exactly: scripts/cli.py sources. Report the exact structured/error behavior for licensing terms, including rc2 where applicable, without fabricating results.",
+      "prompt": "compare displayed_ar ranking: Rank two inventory snapshots by displayed physical plus elemental AR.",
+      "expected_output": "Scenario displayed_ar comparison. Invoke exactly: scripts/cli.py compare --candidate \"Physical,120,0,0,10\" --candidate \"Split,80,50,0,8\" --json. Report displayed_ar, adjusted_hit, rank, and excluded mechanics exactly from output.",
       "expectations": [
-        "The answer stays focused on licensing terms.",
-        "It uses scripts/cli.py sources as the sole command invocation.",
-        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
-        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+        "Split ranks first at displayed_ar 130 versus 120.",
+        "No expected_hit is claimed without a critical multiplier.",
+        "The answer preserves the excluded hidden-scaling and DPS caveat. Invocation family: scripts/cli.py compare."
       ]
     },
     {
       "id": 92,
-      "prompt": "json unsupported field: Demonstrate unsupported field handling for one Lies of P query.",
-      "expected_output": "Scenario unsupported field. Invoke exactly: scripts/cli.py audit. Report the exact structured/error behavior for unsupported field, including rc2 where applicable, without fabricating results.",
+      "prompt": "critical compare expectation: Compare a 30 percent critical candidate using a user-supplied critical multiplier.",
+      "expected_output": "Scenario critical comparison. Invoke exactly: scripts/cli.py compare --candidate \"Crit,100,0,30,10\" --candidate \"Raw,120,0,0,10\" --critical-multiplier 2 --json. Explain expected-hit arithmetic as a user-input model, not game truth.",
       "expectations": [
-        "The answer stays focused on unsupported field.",
-        "It uses scripts/cli.py audit as the sole command invocation.",
-        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
-        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+        "Crit expected_hit is 130 and ranks above Raw at 120.",
+        "Displayed AR remains separate from expected hit and retained-lane assumptions.",
+        "The answer does not claim the multiplier is an in-game constant."
       ]
     },
     {
       "id": 93,
-      "prompt": "farm JSON output: Demonstrate JSON output handling for one Lies of P query.",
-      "expected_output": "Scenario farm JSON output. Invoke exactly: scripts/cli.py farm. Demonstrate JSON output handling for one query and mark advisory uncertainty.",
+      "prompt": "farm Ergo farming: Give one deterministic late-game Ergo farming procedure.",
+      "expected_output": "Scenario Ergo farming. Invoke exactly: scripts/cli.py farm Arche --json. Report only matching repeatable loop records, the reset method, and advisory yield uncertainty.",
       "expectations": [
-        "The answer stays focused on farm JSON output handling.",
-        "It uses scripts/cli.py farm as the sole command invocation.",
-        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
-        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+        "The answer uses a filtered farm command.",
+        "It avoids throwables and consumable-dependent assumptions.",
+        "It does not invent an exact Ergo yield. Invocation family: scripts/cli.py farm."
       ]
     },
     {
       "id": 94,
-      "prompt": "farm Ergo farming: Give one deterministic farm or troubleshooting procedure for Ergo farming.",
-      "expected_output": "Scenario Ergo farming. Invoke exactly: scripts/cli.py farm. Cover only Ergo farming; state loop, drops or diagnostic signal, and mark advisory uncertainty.",
+      "prompt": "compare malformed candidate error: Demonstrate the calculator's strict five-field input contract.",
+      "expected_output": "Scenario compare malformed input. Invoke exactly: scripts/cli.py compare --candidate \"Broken,100,0\" --json. Report rc2 and the NAME,PHYSICAL,ELEMENTAL,CRIT_PERCENT,WEIGHT diagnostic without fabricating results.",
       "expectations": [
-        "The answer stays focused on Ergo farming.",
-        "It uses scripts/cli.py farm as the sole command invocation.",
-        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
-        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+        "The answer reports command failure rather than a ranking.",
+        "It includes the exact five-field shape.",
+        "It does not repair or guess omitted values."
       ]
     },
     {
       "id": 95,
-      "prompt": "farm stuck route troubleshooting: Give one deterministic farm or troubleshooting procedure for stuck route troubleshooting.",
-      "expected_output": "Scenario stuck route troubleshooting. Invoke exactly: scripts/cli.py farm. Cover only stuck route troubleshooting; state loop, drops or diagnostic signal, and mark advisory uncertainty.",
+      "prompt": "unsupported exact AR formula: Explain why the skill refuses hidden scaling and saturation calculations.",
+      "expected_output": "Scenario unsupported exact AR formula. Invoke exactly: scripts/cli.py community \"No validated exact formula\" --json. Report calculator research, rejected authority claims, confidence, and the displayed-input comparator recommendation.",
       "expectations": [
-        "The answer stays focused on stuck route troubleshooting.",
-        "It uses scripts/cli.py farm as the sole command invocation.",
-        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
-        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+        "The answer says no licensed independently validated exact formula was found.",
+        "It distinguishes research leads from authoritative game truth.",
+        "It excludes hidden scaling, saturation, animation DPS, status, and Fable effects."
       ]
     },
     {
       "id": 96,
-      "prompt": "farm missing collectible troubleshooting: Give one deterministic farm or troubleshooting procedure for missing collectible troubleshooting.",
-      "expected_output": "Scenario missing collectible troubleshooting. Invoke exactly: scripts/cli.py farm. Cover only missing collectible troubleshooting; state loop, drops or diagnostic signal, and mark advisory uncertainty.",
+      "prompt": "source calculator provenance: Audit the calculator and Reddit research leads with licensing and access limits.",
+      "expected_output": "Scenario source calculator provenance. Invoke exactly: scripts/cli.py sources explain --json. Report LoPStats/calculator repository licensing limits, indexed Reddit confidence, Steam sentiment status, and checked dates without fabricating validation.",
       "expectations": [
-        "The answer stays focused on missing collectible troubleshooting.",
-        "It uses scripts/cli.py farm as the sole command invocation.",
-        "It states 1.12.0.0 scope, Legendary Stalker default, and deterministic versus advisory facts.",
-        "It applies --spoilers/--dlc policy and reports uncertainty rather than inventing state."
+        "The answer identifies unlicensed calculator leads as unusable for exact formulas.",
+        "It reports Reddit 403/indexing limits.",
+        "It separates source metadata from community recommendation."
       ]
     }
   ]
