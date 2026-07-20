@@ -9,3 +9,4 @@ assets/skills/*/.env.local
 assets/skills/darksouls3/resources/guides/**/*.pdf
 artifacts/
 .env
+*.skill
