@@ -10,14 +10,18 @@ import ast
 import configparser
 import contextlib
 import csv
+import hashlib
 import io
 import json
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
+import tempfile
 import textwrap
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -27,6 +31,7 @@ if TYPE_CHECKING:
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SQL_DIR = SCRIPT_DIR / "sql"
+PROFILE_DIR = SCRIPT_DIR.parent / "profiles"
 ROOT_MARKERS = ("odoo.conf", "odoo-bin", "addons", "docker-compose.yml")
 KNOWN_COMPOSE_RUNTIME = Path("/Users/Shared/odoo17")
 RUNTIME_DIR_ENV = "ODOO17_RUNTIME_DIR"
@@ -82,6 +87,17 @@ class WorkspaceContext:
     addons_paths: list[Path]
     effective_db_name: str | None
     runtime: RuntimeContext
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowProfile:
+    """Declarative Odoo workflow policy loaded from a named profile."""
+
+    profile: str
+    workflow: str
+    database: str
+    modules: tuple[str, ...]
+    test_modules: tuple[str, ...]
 
 
 def _strip_quotes(value: str | None) -> str | None:
@@ -519,6 +535,306 @@ def load_workspace(args: argparse.Namespace) -> WorkspaceContext:
         effective_db_name=effective_db_name,
         runtime=runtime,
     )
+
+
+def _profile_values(
+    value: object,
+    *,
+    profile_path: Path,
+    workflow: str,
+    field: str,
+) -> tuple[str, ...]:
+    if not isinstance(value, list) or not value:
+        raise CliError(
+            f"invalid {field!r} for workflow {workflow!r} in {profile_path}: "
+            "expected a non-empty list of strings",
+        )
+    values = tuple(
+        item.strip() for item in value if isinstance(item, str) and item.strip()
+    )
+    if len(values) != len(value):
+        raise CliError(
+            f"invalid {field!r} for workflow {workflow!r} in {profile_path}: "
+            "expected a non-empty list of strings",
+        )
+    return values
+
+
+def _profile_test_modules(
+    value: object,
+    *,
+    profile_path: Path,
+    workflow: str,
+) -> tuple[str, ...]:
+    modules = _profile_values(
+        value,
+        profile_path=profile_path,
+        workflow=workflow,
+        field="test_modules",
+    )
+    if any(
+        module.startswith("-") or "/" in module or ":" in module for module in modules
+    ):
+        raise CliError(
+            f"invalid 'test_modules' for workflow {workflow!r} in {profile_path}: "
+            "use bare module names without selector syntax",
+        )
+    return modules
+
+
+def _profile_mapping(
+    value: object, *, profile_path: Path, field: str
+) -> dict[str, object]:
+    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+        raise CliError(
+            f"invalid {field!r} in workflow profile {profile_path}: expected an object"
+        )
+    return {key: item for key, item in value.items()}
+
+
+def _load_workflow_profile(profile: str, workflow: str) -> WorkflowProfile:
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", profile):
+        raise CliError(f"invalid workflow profile name: {profile!r}")
+    profile_path = PROFILE_DIR / f"{profile}.json"
+    try:
+        raw = json.loads(profile_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise CliError(f"workflow profile not found: {profile_path}") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CliError(
+            f"failed to load workflow profile {profile_path}: {exc}"
+        ) from exc
+    top_level = _profile_mapping(raw, profile_path=profile_path, field="root")
+    workflows = _profile_mapping(
+        top_level.get("workflows"),
+        profile_path=profile_path,
+        field="workflows",
+    )
+    config = _profile_mapping(
+        workflows.get(workflow),
+        profile_path=profile_path,
+        field=f"workflows.{workflow}",
+    )
+    database = config.get("database")
+    if not isinstance(database, str) or not database.strip():
+        raise CliError(
+            f"invalid 'database' for workflow {workflow!r} in {profile_path}: "
+            "expected a non-empty string",
+        )
+    return WorkflowProfile(
+        profile=profile,
+        workflow=workflow,
+        database=database.strip(),
+        modules=_profile_values(
+            config.get("modules"),
+            profile_path=profile_path,
+            workflow=workflow,
+            field="modules",
+        ),
+        test_modules=_profile_test_modules(
+            config.get("test_modules"),
+            profile_path=profile_path,
+            workflow=workflow,
+        ),
+    )
+
+
+def _run_foreground(command: list[str], *, cwd: Path) -> int:
+    try:
+        return subprocess.run(command, cwd=cwd, check=False).returncode
+    except OSError as exc:
+        raise CliError(f"failed to start {' '.join(command[:3])}: {exc}") from exc
+
+
+def _compose_foreground(ctx: WorkspaceContext, *args: str) -> int:
+    compose_command = ctx.runtime.compose_command
+    if ctx.runtime.backend != "compose" or compose_command is None:
+        raise CliError("workflow execution requires a Docker Compose Odoo runtime")
+    return _run_foreground([*compose_command, *args], cwd=ctx.runtime.root)
+
+
+@contextlib.contextmanager
+def _workflow_database_lock(ctx: WorkspaceContext, database: str) -> Iterator[None]:
+    lock_id = hashlib.sha256(
+        f"{ctx.runtime.root.resolve()}\0{database}".encode()
+    ).hexdigest()
+    lock_dir = Path(tempfile.gettempdir()) / "odooctl" / "workflow-locks"
+    lock_path = lock_dir / f"{lock_id}.lock"
+    try:
+        lock_dir.mkdir(parents=True, exist_ok=True)
+        lock_file = lock_path.open("a+b")
+    except OSError as exc:
+        raise CliError(
+            f"failed to create workflow lock for {database!r}: {exc}"
+        ) from exc
+
+    locked = False
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            if lock_file.tell() == 0:
+                lock_file.write(b"\0")
+                lock_file.flush()
+            lock_file.seek(0)
+            try:
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+            except OSError as exc:
+                raise CliError(
+                    f"workflow database {database!r} is already in use; "
+                    "wait for the active workflow to finish"
+                ) from exc
+        else:
+            import fcntl
+
+            try:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                raise CliError(
+                    f"workflow database {database!r} is already in use; "
+                    "wait for the active workflow to finish"
+                ) from exc
+        locked = True
+        yield
+    finally:
+        if locked:
+            if os.name == "nt":
+                import msvcrt
+
+                lock_file.seek(0)
+                with contextlib.suppress(OSError):
+                    msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                with contextlib.suppress(OSError):
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        lock_file.close()
+
+
+def _workflow_container_prefix(ctx: WorkspaceContext, database: str) -> str:
+    scope = f"{ctx.runtime.root.resolve()}\0{database}"
+    scope_hash = hashlib.sha256(scope.encode()).hexdigest()[:12]
+    return f"odooctl-{scope_hash}-"
+
+
+def _workflow_container_name(ctx: WorkspaceContext, profile: WorkflowProfile) -> str:
+    return f"{_workflow_container_prefix(ctx, profile.database)}{secrets.token_hex(6)}"
+
+
+def _docker_executable(ctx: WorkspaceContext) -> str:
+    compose_command = ctx.runtime.compose_command
+    if compose_command and compose_command[0] == "docker":
+        return compose_command[0]
+    if docker := shutil.which("docker"):
+        return docker
+    raise CliError("Docker executable not found; workflow recovery requires Docker")
+
+
+def _remove_workflow_container(ctx: WorkspaceContext, container_name: str) -> int:
+    completed = _run_subprocess(
+        [_docker_executable(ctx), "container", "rm", "--force", container_name],
+        cwd=ctx.runtime.root,
+    )
+    if completed.returncode == 0:
+        print(f"Removed workflow container {container_name}", flush=True)
+        return 0
+    if "No such container" in completed.stderr:
+        return 0
+    print(
+        completed.stderr.strip()
+        or f"unable to remove workflow container {container_name}",
+        file=sys.stderr,
+    )
+    return completed.returncode
+
+
+def _remove_stale_workflow_containers(ctx: WorkspaceContext, database: str) -> int:
+    prefix = _workflow_container_prefix(ctx, database)
+    listed = _run_subprocess(
+        [
+            _docker_executable(ctx),
+            "container",
+            "ls",
+            "--all",
+            "--quiet",
+            "--filter",
+            f"name=^/{prefix}",
+        ],
+        cwd=ctx.runtime.root,
+    )
+    if listed.returncode != 0:
+        print(
+            listed.stderr.strip() or "unable to list workflow containers",
+            file=sys.stderr,
+        )
+        return listed.returncode
+    container_ids = [line for line in listed.stdout.splitlines() if line]
+    if not container_ids:
+        return 0
+    print(f"Removing stale workflow container(s) for {database}", flush=True)
+    removed = _run_subprocess(
+        [
+            _docker_executable(ctx),
+            "container",
+            "rm",
+            "--force",
+            *container_ids,
+        ],
+        cwd=ctx.runtime.root,
+    )
+    if removed.returncode == 0:
+        return 0
+    print(
+        removed.stderr.strip() or "unable to remove stale workflow containers",
+        file=sys.stderr,
+    )
+    return removed.returncode
+
+
+def _workflow_odoo_args(profile: WorkflowProfile) -> list[str]:
+    return [
+        "python3",
+        "-m",
+        "odoo",
+        "-c",
+        "/etc/odoo/odoo.conf",
+        "-d",
+        profile.database,
+        "--no-database-list",
+        "-u",
+        ",".join(profile.modules),
+        "-i",
+        ",".join(profile.modules),
+    ]
+
+
+def _workflow_test_args(profile: WorkflowProfile) -> list[str]:
+    return [
+        *_workflow_odoo_args(profile),
+        "--stop-after-init",
+        "--test-tags",
+        ",".join(f"/{module}" for module in profile.test_modules),
+    ]
+
+
+def _run_workflow_odoo(
+    ctx: WorkspaceContext,
+    odoo_args: list[str],
+    *,
+    container_name: str,
+    service_ports: bool = False,
+) -> int:
+    compose_args = ["run", "--rm", "--no-deps", "--name", container_name]
+    if service_ports:
+        compose_args.append("--service-ports")
+    try:
+        workflow_exit = _compose_foreground(ctx, *compose_args, "odoo", *odoo_args)
+    except BaseException:
+        _remove_workflow_container(ctx, container_name)
+        raise
+    cleanup_exit = _remove_workflow_container(ctx, container_name)
+    return workflow_exit if workflow_exit != 0 else cleanup_exit
 
 
 def _find_module_dir(ctx: WorkspaceContext, module: str) -> Path:
@@ -1025,6 +1341,51 @@ def _scan_routes(
     return records, errors
 
 
+def cmd_workflow_run(args: argparse.Namespace) -> int:
+    profile = _load_workflow_profile(args.profile, args.workflow)
+    if not args.allow_write:
+        raise CliError(
+            "workflow execution can initialize or update modules; pass --allow-write "
+            "after confirming the target database",
+        )
+    if args.db and args.db != profile.database:
+        raise CliError(
+            f"workflow {profile.workflow!r} targets {profile.database!r}; "
+            f"--db {args.db!r} is not allowed",
+        )
+    ctx = load_workspace(args)
+
+    container_name = _workflow_container_name(ctx, profile)
+    with _workflow_database_lock(ctx, profile.database):
+        print(f"Using Odoo runtime at {ctx.runtime.root}", flush=True)
+        if (
+            cleanup_exit := _remove_stale_workflow_containers(ctx, profile.database)
+        ) != 0:
+            return cleanup_exit
+        print("Ensuring PostgreSQL service is running", flush=True)
+        if (db_exit := _compose_foreground(ctx, "up", "-d", "db")) != 0:
+            return db_exit
+
+        test_exit = _run_workflow_odoo(
+            ctx,
+            _workflow_test_args(profile),
+            container_name=container_name,
+        )
+        if args.mode == "test" or test_exit != 0:
+            return test_exit
+
+        print(
+            f"Tests passed. Starting Odoo {profile.workflow} dev server on {profile.database}",
+            flush=True,
+        )
+        return _run_workflow_odoo(
+            ctx,
+            [*_workflow_odoo_args(profile), "--dev", "all"],
+            container_name=container_name,
+            service_ports=True,
+        )
+
+
 def cmd_env_inspect(args: argparse.Namespace) -> int:
     ctx = load_workspace(args)
     psql_payload: dict[str, Any]
@@ -1381,6 +1742,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     top = parser.add_subparsers(dest="topic", required=True)
+    workflow_parser = top.add_parser("workflow")
+    workflow_sub = workflow_parser.add_subparsers(dest="action", required=True)
+    workflow_run = workflow_sub.add_parser("run")
+    workflow_run.add_argument("--profile", required=True)
+    workflow_run.add_argument("--workflow", required=True)
+    workflow_run.add_argument("--mode", choices=("test", "test-dev"), required=True)
+    workflow_run.add_argument("--allow-write", action="store_true")
+    workflow_run.set_defaults(func=cmd_workflow_run)
     env_parser = top.add_parser("env")
     env_sub = env_parser.add_subparsers(dest="action", required=True)
     env_inspect = env_sub.add_parser("inspect")
