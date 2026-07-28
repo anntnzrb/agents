@@ -11,7 +11,9 @@ The same commands work against:
 - host runtimes, where the CLI resolves `psql.exe`/`psql`
 - Compose runtimes, where the CLI runs `psql` inside the `db` service
 
-Use `--db <name>` when the active DB is ambiguous. For the current macOS runtime, `etech` is the restored neutralized database.
+Use `--db <database>` whenever the active DB is ambiguous or the operation must
+target a specific database. Do not infer a workflow profile's database from the
+runtime default.
 
 ## Command selection
 
@@ -146,9 +148,9 @@ Compose runtime: report Docker Compose availability and `db` service execution f
 For most investigations:
 
 1. `env inspect --json`
-2. `db summary --db etech --json`
-3. `module status <module> --db etech --json`
-4. `module tables <module> --db etech --json` or `db top-tables --db etech --limit 25 --json`
-5. `db query --db etech --read-only ... --json` only when canned probes are not enough
+2. `db summary --db <database> --json`
+3. `module status <module> --db <database> --json`
+4. `module tables <module> --db <database> --json` or `db top-tables --db <database> --limit 25 --json`
+5. `db query --db <database> --read-only ... --json` only when canned probes are not enough
 
 Keep examples and normal usage read-only. Any future write-capable DB verb must require explicit user approval plus `--allow-write` and should never be the default path.

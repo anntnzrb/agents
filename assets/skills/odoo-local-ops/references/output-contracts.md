@@ -176,6 +176,26 @@ Rules:
 - exactly one of `--sql-file` or `--sql-stdin` is required
 - raw SQL text is not echoed back by default
 
+### `workflow run`
+
+Workflow execution is foreground text output, not a JSON command. It requires
+`--profile`, `--workflow`, `--mode test|test-dev`, and `--allow-write`.
+
+- The named profile owns the target database; a mismatching `--db` is rejected.
+- The controller reports the resolved runtime, ensures the Compose `db` service
+  is running, then runs Odoo in a disposable named container.
+- A runtime/database-scoped lock makes a second invocation for the same
+  database fail fast. Workflows with different profile databases may run
+  concurrently.
+- Recovery removes only stale containers owned by that same runtime/database
+  scope. Normal execution uses `--rm` and additionally removes its exact
+  container before returning.
+- `test-dev` runs the test phase first, then keeps the dev server and database
+  lock in the foreground with service ports exposed.
+
+Container isolation does not reset the profile database: module
+initialization/upgrade and Odoo tests may mutate it.
+
 ### `route list` and `route scan-writes`
 
 Top-level keys:

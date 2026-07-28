@@ -55,18 +55,18 @@ Do not replace it with raw `psql`, Docker Compose `exec`, shell pipelines, or in
 
 ## Safe commands
 
-From the current macOS Compose runtime or the custom addons repo:
+From a discoverable Compose runtime or the custom addons repo:
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py env inspect --json
-uv run --script <skill-dir>/scripts/cli.py db summary --db etech --json
-uv run --script <skill-dir>/scripts/cli.py db top-tables --db etech --limit 20 --json
+uv run --script <skill-dir>/scripts/cli.py db summary --db <database> --json
+uv run --script <skill-dir>/scripts/cli.py db top-tables --db <database> --limit 20 --json
 uv run --script <skill-dir>/scripts/cli.py addons list --json
-uv run --script <skill-dir>/scripts/cli.py module status crm_espol --db etech --json
-uv run --script <skill-dir>/scripts/cli.py module models crm_espol --db etech --json
-uv run --script <skill-dir>/scripts/cli.py module tables crm_espol --db etech --json
-uv run --script <skill-dir>/scripts/cli.py module m2m crm_espol --db etech --json
-uv run --script <skill-dir>/scripts/cli.py module fks crm_espol --db etech --json
+uv run --script <skill-dir>/scripts/cli.py module status crm_espol --db <database> --json
+uv run --script <skill-dir>/scripts/cli.py module models crm_espol --db <database> --json
+uv run --script <skill-dir>/scripts/cli.py module tables crm_espol --db <database> --json
+uv run --script <skill-dir>/scripts/cli.py module m2m crm_espol --db <database> --json
+uv run --script <skill-dir>/scripts/cli.py module fks crm_espol --db <database> --json
 uv run --script <skill-dir>/scripts/cli.py route list --json
 uv run --script <skill-dir>/scripts/cli.py route scan-writes --json
 ```
@@ -93,6 +93,32 @@ Write-oriented flows are exceptional.
 - Require an explicit write gate such as `--allow-write` in addition to the write command.
 - Summarize the target DB and effect before running a write.
 - Do not use write examples as defaults in the skill body.
+
+### Profiled local workflows
+
+The `workflow run` controller owns a profile's database, modules, test tags,
+Compose lifecycle, and foreground test/dev execution. It is write-gated because
+module initialization and upgrade mutate the selected database.
+Workflow runs use disposable, uniquely named containers with a deterministic
+runtime/database-scoped prefix. Profiles with different databases can run
+concurrently; the same database is fail-fast serialized for the complete
+test/test-dev lifecycle.
+
+Container isolation is not database-state isolation: profiles still own and
+mutate their databases. Recovery removes only `odooctl` containers scoped to the
+same runtime and database, never unrelated Odoo containers; `--rm` leaves no
+per-run Docker artifact.
+
+Etech profiles must run from the custom addons checkout, with an explicit
+`--allow-write` gate after the operator confirms the profile-owned database and
+the intended module initialization or upgrade.
+
+```bash
+uv run --script <skill-dir>/scripts/cli.py workflow run --profile etech --workflow crm --mode test --allow-write
+```
+
+Use `--mode test-dev` only after confirming that its foreground server should
+hold that database lock and expose service ports.
 
 ## Guardrails
 

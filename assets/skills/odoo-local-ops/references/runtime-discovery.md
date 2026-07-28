@@ -83,17 +83,18 @@ Parse it as the base runtime configuration, including at minimum:
 
 Do not assume `db_name` is set. If unresolved, report that. A Compose runtime may provide `ODOO17_DEFAULT_DB` as an explicit local fallback.
 
-## Effective value precedence
+## Effective database precedence
 
-Use this model when reporting runtime:
+Resolve the effective database name in this order:
 
-1. explicit public CLI flags
-2. Compose runtime env
-3. `odoo.conf`
-4. `ODOO17_DEFAULT_DB` for an explicitly configured Compose runtime
-5. unresolved
+1. explicit public `--db`
+2. concrete `odoo.conf` `db_name`
+3. `ODOO17_DEFAULT_DB` for an explicitly configured Compose runtime
+4. unresolved
 
-For inspection output, include provenance for each resolved value when practical, such as `source: compose-env` or `source: odoo-conf`.
+For inspection output, include provenance for each resolved value when practical,
+such as `source: odoo-conf` or `source: compose-env`.
+
 
 ## Addon discovery
 
