@@ -1,0 +1,44 @@
+{
+  "workflows": {
+    "crm": {
+      "database": "etech-crm",
+      "modules": [
+        "budget",
+        "budget_hr",
+        "crm_espol",
+        "whatsapp_utils",
+        "whatsapp_bot",
+        "web_espol",
+        "url_shortener"
+      ],
+      "test_modules": [
+        "crm_espol",
+        "whatsapp_utils",
+        "whatsapp_bot",
+        "web_espol",
+        "url_shortener"
+      ]
+    },
+    "b2b": {
+      "database": "etech-b2b",
+      "modules": [
+        "budget",
+        "budget_hr",
+        "crm_espol",
+        "whatsapp_utils",
+        "whatsapp_bot",
+        "web_espol",
+        "b2b",
+        "url_shortener"
+      ],
+      "test_modules": [
+        "crm_espol",
+        "whatsapp_utils",
+        "whatsapp_bot",
+        "web_espol",
+        "b2b",
+        "url_shortener"
+      ]
+    }
+  }
+}
