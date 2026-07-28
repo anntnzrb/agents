@@ -71,7 +71,7 @@ def _positive_integer(value: str) -> int:
     return number
 
 
-def build_parser() -> ProtocolArgumentParser:
+def build_parser() -> tuple[ProtocolArgumentParser, frozenset[str]]:
     parser = ProtocolArgumentParser(
         prog="git-worktrees",
         description="Local raw-Git worktree lifecycle controller.",
@@ -130,7 +130,7 @@ def build_parser() -> ProtocolArgumentParser:
     release.add_argument("--lease-id", required=True, metavar="ID")
     release.add_argument("--owner-token", required=True, metavar="TOKEN")
     release.add_argument("--quiescent", action="store_true", required=True)
-    return parser
+    return parser, frozenset(commands.choices)
 
 
 def _require_nonblank(value: str, argument: str) -> None:
@@ -407,16 +407,12 @@ def _error(command: str, error: CliError) -> dict[str, object]:
     }
 
 
-def _requested_command(argv: Sequence[str]) -> str:
-    commands = {
-        "schema",
-        "inspect",
-        "acquire",
-        "status",
-        "handoff",
-        "complete-handoff",
-        "release",
-    }
+def _emit_error_and_exit(command: str, error: CliError) -> int:
+    _emit(_error(command, error))
+    return error.exit_code
+
+
+def _requested_command(argv: Sequence[str], commands: frozenset[str]) -> str:
     for value in argv:
         if value in commands:
             return value
@@ -425,9 +421,10 @@ def _requested_command(argv: Sequence[str]) -> str:
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
-    command = _requested_command(arguments)
+    parser, commands = build_parser()
+    command = _requested_command(arguments, commands)
     try:
-        args = build_parser().parse_args(arguments)
+        args = parser.parse_args(arguments)
         command = args.command
         _validate_arguments(args)
         result = _dispatch(args)
@@ -435,19 +432,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         if error.code == 0:
             return 0
         protocol_error = CliError("usage_error", "invalid command line")
-        _emit(_error(command, protocol_error))
-        return protocol_error.exit_code
+        return _emit_error_and_exit(command, protocol_error)
     except argparse.ArgumentError as error:
         protocol_error = CliError("usage_error", str(error))
-        _emit(_error(command, protocol_error))
-        return protocol_error.exit_code
+        return _emit_error_and_exit(command, protocol_error)
     except CliError as error:
-        _emit(_error(command, error))
-        return error.exit_code
+        return _emit_error_and_exit(command, error)
     except FileNotFoundError:
         error = CliError("git_missing", "Git executable was not found", exit_code=127)
-        _emit(_error(command, error))
-        return error.exit_code
+        return _emit_error_and_exit(command, error)
     except Exception as error:
         domain_error_type: type[BaseException] | None = None
         try:
@@ -467,7 +460,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             protocol_error = CliError(
                 "runtime_error", "The worktree controller failed unexpectedly", exit_code=4
             )
-        _emit(_error(command, protocol_error))
-        return protocol_error.exit_code
+        return _emit_error_and_exit(command, protocol_error)
     _emit(_success(command, result))
     return 0

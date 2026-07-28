@@ -12,7 +12,7 @@ import secrets
 import sqlite3
 import subprocess
 from threading import Lock, Thread
-from typing import BinaryIO, Iterator
+from typing import BinaryIO, Iterator, NoReturn
 from uuid import uuid4
 
 from .controller import Controller, row_to_handoff, row_to_lease, utc_now
@@ -187,6 +187,16 @@ def _mark_failure(controller: Controller, lease_id: str, state: str, error: Doma
         )
 
 
+def _raise_acquire_failure(controller: Controller, lease_id: str, state: str, error: DomainError) -> NoReturn:
+    _mark_failure(controller, lease_id, state, error)
+    details = dict(error.details) | {"lease_id": lease_id, "state": state}
+    if error.exit_code == 127:
+        raise error
+    if isinstance(error, RefusalError):
+        raise RefusalError(error.code, error.message, details) from error
+    raise GitError(error.code, error.message, details) from error
+
+
 def _assert_fresh_identity(initial: Repository, refreshed: Repository) -> None:
     if initial.common_git_dir != refreshed.common_git_dir or initial.primary_path != refreshed.primary_path:
         raise RefusalError(
@@ -197,6 +207,19 @@ def _assert_fresh_identity(initial: Repository, refreshed: Repository) -> None:
                 "actual_common_git_dir": str(refreshed.common_git_dir),
             },
         )
+
+
+@contextmanager
+def _locked_lease_repository(controller: Controller, lease_id: str) -> Iterator[Repository]:
+    with controller.connect(write=False) as connection:
+        initial_lease = _lease(connection, lease_id)
+    initial_repository = git_inspect_repository(initial_lease.primary_path)
+    if initial_repository.common_git_dir != initial_lease.common_git_dir or initial_repository.primary_path != initial_lease.primary_path:
+        raise RefusalError("repository_identity_changed", "Repository identity no longer matches the lease", {})
+    with controller.repository_lock(initial_repository.common_git_dir):
+        repository = git_inspect_repository(initial_lease.primary_path)
+        _assert_fresh_identity(initial_repository, repository)
+        yield repository
 
 
 def _expected_ref(lease: Lease) -> str | None:
@@ -345,13 +368,7 @@ def acquire(controller: Controller, request: AcquireRequest) -> dict[str, object
             _assert_fresh_identity(repository, after_add)
             _assert_managed_target(after_add, lease)
         except DomainError as error:
-            _mark_failure(controller, lease_id, "create_failed", error)
-            details = dict(error.details) | {"lease_id": lease_id, "state": "create_failed"}
-            if error.exit_code == 127:
-                raise
-            if isinstance(error, RefusalError):
-                raise RefusalError(error.code, error.message, details) from error
-            raise GitError(error.code, error.message, details) from error
+            _raise_acquire_failure(controller, lease_id, "create_failed", error)
         try:
             for command in request.setup:
                 _setup_command(command, destination, request.setup_timeout_seconds)
@@ -359,13 +376,7 @@ def acquire(controller: Controller, request: AcquireRequest) -> dict[str, object
             _assert_fresh_identity(repository, after_setup)
             _assert_managed_target(after_setup, lease)
         except DomainError as error:
-            _mark_failure(controller, lease_id, "setup_failed", error)
-            details = dict(error.details) | {"lease_id": lease_id, "state": "setup_failed"}
-            if error.exit_code == 127:
-                raise
-            if isinstance(error, RefusalError):
-                raise RefusalError(error.code, error.message, details) from error
-            raise GitError(error.code, error.message, details) from error
+            _raise_acquire_failure(controller, lease_id, "setup_failed", error)
         token = secrets.token_urlsafe(32)
         now = utc_now()
         with _write_transaction(controller) as connection:
@@ -438,14 +449,7 @@ def handoff(controller: Controller, lease_id: str, owner_token: str, actor: str,
     _require_text(lease_id, "lease_id")
     _require_text(actor, "actor")
     _require_text(session_actor, "session_actor")
-    with controller.connect(write=False) as connection:
-        initial_lease = _lease(connection, lease_id)
-    initial_repository = git_inspect_repository(initial_lease.primary_path)
-    if initial_repository.common_git_dir != initial_lease.common_git_dir or initial_repository.primary_path != initial_lease.primary_path:
-        raise RefusalError("repository_identity_changed", "Repository identity no longer matches the lease", {})
-    with controller.repository_lock(initial_repository.common_git_dir):
-        repository = git_inspect_repository(initial_lease.primary_path)
-        _assert_fresh_identity(initial_repository, repository)
+    with _locked_lease_repository(controller, lease_id) as repository:
         with _write_transaction(controller) as connection:
             lease = _lease(connection, lease_id)
             _validate_owner(lease, owner_token)
@@ -494,14 +498,7 @@ def release(controller: Controller, lease_id: str, owner_token: str, quiescent: 
     _require_text(lease_id, "lease_id")
     if quiescent is not True:
         raise RefusalError("quiescence_required", "Release requires a quiescence attestation", {})
-    with controller.connect(write=False) as connection:
-        initial_lease = _lease(connection, lease_id)
-    initial_repository = git_inspect_repository(initial_lease.primary_path)
-    if initial_repository.common_git_dir != initial_lease.common_git_dir or initial_repository.primary_path != initial_lease.primary_path:
-        raise RefusalError("repository_identity_changed", "Repository identity no longer matches the lease", {})
-    with controller.repository_lock(initial_repository.common_git_dir):
-        repository = git_inspect_repository(initial_lease.primary_path)
-        _assert_fresh_identity(initial_repository, repository)
+    with _locked_lease_repository(controller, lease_id) as repository:
         with _write_transaction(controller) as connection:
             lease = _lease(connection, lease_id)
             _validate_owner(lease, owner_token)
