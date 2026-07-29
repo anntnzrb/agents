@@ -38,18 +38,47 @@ inherit = "core"
 # -----------------------------------------------------------------------------
 
 [features]
-memories = true
-prevent_idle_sleep = true
+chronicle = false
 default_mode_request_user_input = true
+memories = false
+prevent_idle_sleep = true
 
-[tools.web_search]
-context_size = "medium"
+[memories]
+generate_memories = false
+use_memories = false
+
+# -----------------------------------------------------------------------------
+# TUI
+# -----------------------------------------------------------------------------
 
 [tui]
 alternate_screen = "never"
 vim_mode_default = true
 status_line = ["model-with-reasoning", "current-dir", "git-branch", "run-state", "context-used", "codex-version", "task-progress"]
 status_line_use_colors = true
+
+# -----------------------------------------------------------------------------
+# DESKTOP
+# -----------------------------------------------------------------------------
+
+[desktop]
+show-context-window-usage = true
+
+# -----------------------------------------------------------------------------
+# MISC
+# -----------------------------------------------------------------------------
+
+[history]
+persistence = "save-all"
+
+[analytics]
+enabled = false
+
+[feedback]
+enabled = false
+
+[notice]
+hide_rate_limit_model_nudge = true
 
 # -----------------------------------------------------------------------------
 # AGENTS
@@ -107,19 +136,3 @@ config_file = "agents/momus.toml"
 [agents.plan]
 description = "Strategic planning consultant for work with unresolved design uncertainty after discovery. Produces one executable plan; never implements. Writes the plan to ~/.codex/plans/<slug>/plan.md."
 config_file = "agents/plan.toml"
-
-# -----------------------------------------------------------------------------
-# MISC
-# -----------------------------------------------------------------------------
-
-[history]
-persistence = "save-all"
-
-[analytics]
-enabled = false
-
-[feedback]
-enabled = false
-
-[notice]
-hide_rate_limit_model_nudge = true
