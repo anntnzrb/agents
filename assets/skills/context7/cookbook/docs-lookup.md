@@ -1,37 +1,35 @@
 # Documentation Lookup Cookbook
 
-Use this for efficient Context7 lookup strategy. Keep examples illustrative; do not turn this into framework-specific docs.
+Use this for efficient Context7 lookup strategy. MCPorter is the primary transport; examples use its configured `context7` server.
 
-## Spend the three-command budget
+## Spend the three-call budget
 
-Default budget per user question:
+Default retrieval budget per user question:
 
-1. Resolve: `bun x ctx7@latest library <name> "<task-shaped query>" --json`
-2. Fetch: `bun x ctx7@latest docs <selectedId> "<same task-shaped query>"`
-3. Optional retry/follow-up: only if the first ID or query is clearly off.
+1. Resolve with `context7.resolve-library-id`.
+2. Fetch with `context7.query-docs`.
+3. Retry only if the first ID or query is clearly wrong.
 
-Skip step 1 when the user gives an exact Context7 ID:
+Skip resolution when the user gives an exact Context7 ID:
 
 ```text
-bun x ctx7@latest docs /fastapi/fastapi "dependency overrides lifespan testing"
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"/fastapi/fastapi","query":"dependency overrides lifespan testing"}'
 ```
 
-Spend the retry on a better name, not random fishing:
+Spend the retry on a better official name or discriminator, not random fishing:
 
 ```text
-bun x ctx7@latest library "Next.js" "app router middleware redirect unauthenticated users" --json
-bun x ctx7@latest library "@opentelemetry/sdk-trace-base" "span processor exporter resource attributes" --json
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"libraryName":"Next.js","query":"app router middleware redirect unauthenticated users"}'
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"libraryName":"@opentelemetry/sdk-trace-base","query":"span processor exporter resource attributes"}'
 ```
 
 ## Shape the query
 
-Good queries include three things:
+Good queries include:
 
-- **API surface**: function/type/module/config name.
-- **Task/failure mode**: what the user is trying to do or fix.
+- **API surface**: function, type, module, or configuration name.
+- **Task or failure mode**: what the user is trying to do or fix.
 - **Context discriminator**: language, version, package, runtime, or framework.
-
-Examples:
 
 | Strong                                             | Weak           |
 | -------------------------------------------------- | -------------- |
@@ -45,102 +43,66 @@ Do not send secrets, credentials, personal data, proprietary code, or large sour
 
 ## Choose among results
 
-Selection is not “first row wins.” Use the result fields together:
+Selection is not “first row wins”:
 
-1. **Exact project/package match** beats generic ecosystem hits.
-2. **Description relevance** beats raw popularity.
-3. **Official docs/manual mirrors** often beat source repos for API surface because they have more snippets and higher benchmark scores.
-4. **Repo IDs** can be better for implementation-specific behavior, changelog-ish details, or project internals.
-5. **Version-specific IDs** only matter when returned by `library` and relevant to the user’s version.
-6. **Zero benchmark** does not make a niche result bad if it is the exact project and alternatives are irrelevant.
+1. Exact project/package match beats generic ecosystem hits.
+2. Description relevance beats raw popularity.
+3. Official docs/manual mirrors often beat source repositories for API questions.
+4. Repository IDs can be better for implementation behavior and project internals.
+5. Version-specific IDs matter only when returned by resolution and relevant to the request.
+6. Zero benchmark score does not invalidate an exact niche result.
 
-Observed ambiguity patterns:
+Names can collide across ecosystems. Add language, runtime, or package qualifiers:
 
 ```text
-# Same display name, different ecosystems: Go zap, Zig zap, OWASP ZAP.
-bun x ctx7@latest library zap "sampling logger cores fields" --json
-bun x ctx7@latest library zap "zig http server routes websocket" --json
-
-# Website/manual mirrors can outrank repo IDs for API docs.
-bun x ctx7@latest library tokio "select cancellation pinning timeout" --json
-bun x ctx7@latest library axum "extractor state rejection custom response" --json
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"libraryName":"zap","query":"Go sampling logger cores fields"}'
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"libraryName":"zap","query":"Zig HTTP server routes websocket"}'
 ```
 
-If two plausible IDs remain after one retry, ask a targeted clarification instead of guessing.
+If two materially different IDs remain plausible after one retry, ask a targeted clarification.
 
 ## Use direct IDs and versions
 
-Use direct IDs when another skill/reference already knows the correct package:
+Use known IDs directly:
 
 ```text
-bun x ctx7@latest docs /gin-gonic/gin "middleware chaining context abort"
-bun x ctx7@latest docs /haskell-servant/servant "type-level API handlers hoist server"
-bun x ctx7@latest docs /kubernetes-sigs/controller-runtime "reconcile owner references predicates cache"
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"/gin-gonic/gin","query":"middleware chaining context abort"}'
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"/haskell-servant/servant","query":"type-level API handlers hoist server"}'
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"/kubernetes-sigs/controller-runtime","query":"reconcile owner references predicates cache"}'
 ```
 
 For versions:
 
-1. Run `library --json`.
-2. Inspect `versions`.
-3. Use `/org/project/version` only if Context7 returned that version.
-4. If exact version is absent, use the closest relevant ID and say the exact version was not indexed.
+1. Resolve the library.
+2. Inspect returned versions.
+3. Use `/org/project/version` only when Context7 returned that version.
+4. If the exact version is absent, use the closest relevant ID and state that the exact version was not indexed.
 
 ## Handle sparse or niche docs
 
-Sparse/niche docs are normal. Do not launder thin evidence into certainty.
+Do not launder thin evidence into certainty:
 
-Good behavior:
+- Retry once with the upstream repository/package or exact module name.
+- Prefer an exact niche project over a broad ecosystem result.
+- If coverage remains thin, say so and route to repository docs or code search.
+- If results cross languages, add the language/runtime discriminator.
 
-- Retry once with the upstream repo/package name or exact module name.
-- Prefer exact niche project over broad ecosystem docs when the user asks about that project.
-- If docs are thin, say Context7 coverage is thin and route to repo docs/code search.
-- If results are cross-language, add the language/runtime to the query.
 
-Examples:
+## Inspect provenance deliberately
 
-```text
-bun x ctx7@latest library polysemy "haskell interpreters effects final tagless" --json
-bun x ctx7@latest library opentelemetry "python span processor exporter resource attributes" --json
-bun x ctx7@latest library opentelemetry "dotnet span processor exporter resource attributes" --json
-```
+MCP output is optimized for direct synthesis and commonly includes source URLs. Treat its observed Markdown shape as data, not a stable schema.
 
-## Use JSON vs text deliberately
-
-Use `library --json` when selecting IDs because it exposes ranking fields:
-
-```text
-bun x ctx7@latest library pydantic "v2 TypeAdapter field validator model validator" --json
-```
-
-Use `docs --json` when you need:
-
-- snippet provenance (`codeId`, `pageId`)
-- code vs prose split (`codeSnippets`, `infoSnippets`)
-- exact language labels
-- enough structure to compare multiple snippets
-
-Use plain `docs` when the next step is simply to answer the user in prose.
-
-## Read result quality signals
-
-Docs output may mix:
-
-- generated APIDOC blocks from Context7
-- source docs snippets from GitHub/docs sites
-- prose `infoSnippets` with breadcrumbs
-
-Treat generated APIDOC as useful but verify against source snippets when precision matters. Prefer snippets with clear provenance and matching language over generic examples.
+Use source URLs, code language, and surrounding documentation context to compare snippets. Generated APIDOC blocks are useful but weaker than matching source snippets with clear provenance.
 
 ## Fast templates
 
 ```text
-# Resolve then fetch
-bun x ctx7@latest library <library> "<api surface> <task/failure> <version/runtime>" --json
-bun x ctx7@latest docs <selectedId> "<api surface> <task/failure> <version/runtime>"
+# Resolve
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"libraryName":"<library>","query":"<api surface> <task/failure> <version/runtime>"}'
+
+# Fetch
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"<selectedId>","query":"<api surface> <task/failure> <version/runtime>"}'
 
 # Known ID
-bun x ctx7@latest docs /org/project "<api surface> <task/failure> <version/runtime>"
-
-# Structured docs inspection
-bun x ctx7@latest docs /org/project "<api surface> <task/failure>" --json
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"/org/project","query":"<api surface> <task/failure> <version/runtime>"}'
 ```

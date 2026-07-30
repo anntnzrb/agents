@@ -1,6 +1,6 @@
 ---
 name: context7
-description: Retrieve current library, framework, SDK, API, CLI, and cloud-service documentation via ctx7.
+description: Fetch current library and API documentation through Context7 with MCPorter.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
@@ -9,50 +9,54 @@ allowed-tools: ""
 
 # Context7
 
-Use the official `ctx7` CLI for current documentation and code examples. This skill is CLI-only and read-only: no MCP, no setup, no installs, no generated skills, no persistent login flows.
+Use Context7 through the configured `context7` MCP server with MCPorter. This skill is read-only: no setup, installs, generated skills, persistent login flows, or configuration mutations.
 
-## Entry point
+- MUST resolve `<agent-config-root>` and pass `--config <agent-config-root>/assets/mcporter.jsonc`; commands MUST work from any current directory.
+
+## Entry points
+
+Primary:
 
 ```text
-bun x ctx7@latest library <name> "<user question>"
-bun x ctx7@latest docs <libraryId> "<user question>"
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"query":"<user question>","libraryName":"<name>"}'
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"<libraryId>","query":"<user question>"}'
 ```
 
-There is no installation step. Do not run `npm install -g`, `ctx7 setup`, `ctx7 skills install`, `ctx7 skills generate`, `ctx7 skills remove`, or `ctx7 login` from this skill.
+Before the first call in a session, discover the focused server with `mcporter --config <agent-config-root>/assets/mcporter.jsonc list context7 --brief`. Before the first call to each selected tool, inspect its live schema:
+
+```text
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list context7.resolve-library-id --schema
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list context7.query-docs --schema
+```
+
+Inspect only the tool needed for the next operation. Do not repeat successful discovery or schema inspection in the same session.
+
 
 ## Workflow
 
-1. If the user provides a Context7 library ID (`/org/project`, `/org/project/version`, or `/websites/...`), skip lookup.
-2. Otherwise resolve the library with `bun x ctx7@latest library <name> "<full user question>"`.
+1. If the user provides a Context7 library ID (`/org/project`, `/org/project/version`, or `/websites/...`), skip resolution.
+2. Otherwise resolve the library with `context7.resolve-library-id`.
 3. Pick the best ID by exact name, description relevance, snippet count, source reputation, benchmark score, and requested version.
-4. Fetch docs with `bun x ctx7@latest docs <libraryId> "<full user question>"`.
+4. Fetch docs with `context7.query-docs`.
 5. Answer from the fetched docs. If Context7 fails, state the failure and do not silently pretend the answer is current.
 
-Do not run more than three Context7 commands for one user question unless the user explicitly asks for broader exploration.
+Keep Context7 retrieval calls to three per user question unless the user explicitly asks for broader exploration. MCPorter discovery does not consume that retrieval budget.
 
 ## Query discipline
 
 - Use the user's full intent as the query; specific questions rank better than keywords.
 - Do not send API keys, passwords, personal data, proprietary code, or secrets to Context7.
-- Use `--json` only when structured parsing is materially useful.
-- Missing `CONTEXT7_API_KEY` is not a problem by itself. Public docs queries work without auth at lower rate limits.
-
-## Optional read-only skill registry lookup
-
-Only if the user explicitly asks about Context7 skills/registry, you MAY use read-only text/JSON commands such as skill search/info/list-style lookups. Do not install, generate, remove, configure, authenticate persistently, or modify agent state.
 
 ## Required follow-up reads
 
 | Need                                         | Read                      | When                                                                  |
 | -------------------------------------------- | ------------------------- | --------------------------------------------------------------------- |
-| CLI command details, auth, errors, telemetry | `references/cli.md`       | Before debugging command failures or using JSON/auth-related behavior |
+| MCPorter discovery, calls, auth, output, errors | `references/mcporter.md` | Before debugging MCPorter or Context7 behavior |
 | Worked docs lookup examples                  | `cookbook/docs-lookup.md` | When choosing IDs, versions, or query wording                         |
 
 ## Quick examples
 
 ```text
-bun x ctx7@latest library react "hooks useState"
-bun x ctx7@latest docs /reactjs/react.dev "useState hook behavior"
-bun x ctx7@latest library nextjs "app router server actions" --json
-bun x ctx7@latest docs /vercel/next.js "app router server actions" --json
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"query":"hooks useState","libraryName":"React"}'
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"/reactjs/react.dev","query":"useState hook behavior"}'
 ```
