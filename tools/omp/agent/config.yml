@@ -48,14 +48,11 @@ display:
 mcp:
   enableProjectConfig: false
   notifications: false
-# memory:
-#   backend: local
-# memories:
-#   enabled: true
-#   maxRolloutsPerStartup: 64
-#   maxRolloutAgeDays: 30
-#   minRolloutIdleHours: 12
-#   summaryInjectionTokenLimit: 5000
+memory:
+  backend: mnemopi
+mnemopi:
+  autoRetain: false
+  llmMode: none
 
 # =============================================================================
 # Context / Branching
@@ -76,14 +73,22 @@ compaction:
 # =============================================================================
 edit.mode: hashline
 
+checkpoint:
+  enabled: true
+
 # =============================================================================
 # Eval kernels
 # =============================================================================
-eval:
-  py: true
-  js: false
-  rb: false
-  jl: false
+# eval:
+#   py: true
+#   js: false
+#   rb: false
+#   jl: false
+
+browser:
+  enabled: true
+  headless: true
+  cmux: false
 
 # =============================================================================
 # Task (Subagents)
@@ -92,6 +97,7 @@ task:
   eager: preferred
   prewalk: false
   maxConcurrency: 4
+  enableLsp: false
   maxRecursionDepth: 1
   maxRuntimeMs: 3600000
   isolation:
@@ -100,6 +106,7 @@ task:
     commits: generic
 async:
   enabled: true
+  maxJobs: 4
 
 features:
   unexpectedStopDetection: true
@@ -108,11 +115,20 @@ features:
 # Code Intelligence
 # =============================================================================
 lsp:
-  enabled: false
+  enabled: true
+  lazy: true
+  formatOnWrite: false
+  diagnosticsOnWrite: true
+  diagnosticsOnEdit: false
+  diagnosticsDeduplicate: true
 
 # =============================================================================
 # Bash Guardrails
 # =============================================================================
+bash:
+  autoBackground:
+    enabled: false
+
 bashInterceptor:
   enabled: true
   patterns:
