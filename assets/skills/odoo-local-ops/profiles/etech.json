@@ -1,7 +1,7 @@
 {
   "workflows": {
     "crm": {
-      "database": "etech-crm",
+      "database": "erptech_0730-crm",
       "modules": [
         "budget",
         "budget_hr",
@@ -20,7 +20,7 @@
       ]
     },
     "b2b": {
-      "database": "etech-b2b",
+      "database": "erptech_0730-b2b",
       "modules": [
         "budget",
         "budget_hr",
