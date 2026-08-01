@@ -41,11 +41,19 @@ inherit = "core"
 chronicle = false
 default_mode_request_user_input = true
 memories = false
+plugins = true
 prevent_idle_sleep = true
 
 [memories]
 generate_memories = false
 use_memories = false
+
+# -----------------------------------------------------------------------------
+# PLUGINS
+# -----------------------------------------------------------------------------
+
+[plugins."chrome@openai-bundled"]
+enabled = true
 
 # -----------------------------------------------------------------------------
 # TUI
