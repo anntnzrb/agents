@@ -1,3 +1,6 @@
+"""RSC and official API contract tests."""
+
+# ruff: noqa: CPY001, D101, D102, E501, INP001, PLR2004, S101, SLF001
 from __future__ import annotations
 
 import tempfile
@@ -7,6 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import _path  # noqa: F401
+import pytest
 from artificial_analysis import cli
 from artificial_analysis.rsc import (
     ExtractionError,
@@ -44,9 +48,9 @@ class TestRscExtraction(unittest.TestCase):
 
         models, hosts, hosts_models = extract_lists(frames)
 
-        self.assertEqual(len(models), 1)
-        self.assertEqual(len(hosts), 1)
-        self.assertEqual(len(hosts_models), 2)
+        assert len(models) == 1
+        assert len(hosts) == 1
+        assert len(hosts_models) == 2
 
     def test_extract_lists_uses_structural_heuristics(self) -> None:
         frames = [
@@ -87,9 +91,9 @@ class TestRscExtraction(unittest.TestCase):
 
         models, hosts, hosts_models = extract_lists(frames)
 
-        self.assertEqual(len(models), 2)
-        self.assertEqual(len(hosts), 2)
-        self.assertEqual(len(hosts_models), 2)
+        assert len(models) == 2
+        assert len(hosts) == 2
+        assert len(hosts_models) == 2
 
     def test_extract_lists_normalizes_current_rows_schema(self) -> None:
         frames = [
@@ -173,30 +177,27 @@ class TestRscExtraction(unittest.TestCase):
 
         models, hosts, hosts_models = extract_lists(frames)
 
-        self.assertEqual(len(models), 2)
-        self.assertEqual(len(hosts), 2)
-        self.assertEqual(len(hosts_models), 2)
+        assert len(models) == 2
+        assert len(hosts) == 2
+        assert len(hosts_models) == 2
 
         first = hosts_models[0]
-        self.assertEqual(first["slug"], "provider-one_model-a")
-        self.assertEqual(first["name"], "Provider One / Model A")
-        self.assertEqual(first["host_api_id"], "provider-one-api")
-        self.assertEqual(first["model"]["model_creator_id"], "creator-a")
-        self.assertEqual(first["host"]["website_url"], "https://provider-one.example")
-        self.assertEqual(first["context_window_tokens"], 128000)
-        self.assertIs(first["supports_function_calling"], True)
-        self.assertEqual(first["price_1m_input_tokens"], 0.25)
-        self.assertEqual(first["price_1m_output_tokens"], 1.25)
-        self.assertEqual(first["price_1m_blended_3_to_1"], 0.50)
-        self.assertEqual(first["timescaleData"]["median_output_speed"], 82.4)
-        self.assertEqual(first["timescaleData"]["median_time_to_first_chunk"], 0.37)
-        self.assertEqual(
-            first["end_to_end_response_time_metrics"]["total_time"],
-            2.8,
-        )
+        assert first["slug"] == "provider-one_model-a"
+        assert first["name"] == "Provider One / Model A"
+        assert first["host_api_id"] == "provider-one-api"
+        assert first["model"]["model_creator_id"] == "creator-a"
+        assert first["host"]["website_url"] == "https://provider-one.example"
+        assert first["context_window_tokens"] == 128000
+        assert first["supports_function_calling"] is True
+        assert first["price_1m_input_tokens"] == 0.25
+        assert first["price_1m_output_tokens"] == 1.25
+        assert first["price_1m_blended_3_to_1"] == 0.5
+        assert first["timescaleData"]["median_output_speed"] == 82.4
+        assert first["timescaleData"]["median_time_to_first_chunk"] == 0.37
+        assert first["end_to_end_response_time_metrics"]["total_time"] == 2.8
 
-        self.assertEqual(hosts_models[1]["slug"], "provider-two_model-b")
-        self.assertEqual(hosts_models[1]["model"]["model_creator_id"], "creator-b")
+        assert hosts_models[1]["slug"] == "provider-two_model-b"
+        assert hosts_models[1]["model"]["model_creator_id"] == "creator-b"
 
     def test_snapshot_slugs_accepts_aliases(self) -> None:
         snapshot = {
@@ -206,7 +207,7 @@ class TestRscExtraction(unittest.TestCase):
             ],
         }
         slugs = snapshot_slugs(snapshot)
-        self.assertEqual(slugs, ["provider-1_model-1", "provider-1_model-2"])
+        assert slugs == ["provider-1_model-1", "provider-1_model-2"]
 
     def _coding_payload(
         self,
@@ -320,14 +321,14 @@ class TestRscExtraction(unittest.TestCase):
 
         payload = self._coding_payload(frames)
 
-        self.assertEqual(payload["counts"]["matched_models"], 2)
+        assert payload["counts"]["matched_models"] == 2
         row = payload["rows"][0]
-        self.assertEqual(row["model_slug"], "legacy-alpha")
-        self.assertEqual(row["coding"], 81.2)
-        self.assertEqual(row["coding_token_counts"]["input_tokens"], 500)
-        self.assertEqual(row["coding_token_counts"]["output_tokens"], 300)
-        self.assertEqual(row["coding_eval_cost"]["total_cost"], 1.25)
-        self.assertEqual(row["coding_eval_cost"]["answer_cost"], 0.50)
+        assert row["model_slug"] == "legacy-alpha"
+        assert row["coding"] == 81.2
+        assert row["coding_token_counts"]["input_tokens"] == 500
+        assert row["coding_token_counts"]["output_tokens"] == 300
+        assert row["coding_eval_cost"]["total_cost"] == 1.25
+        assert row["coding_eval_cost"]["answer_cost"] == 0.5
 
     def test_coding_payload_normalizes_current_models_task_metrics(self) -> None:
         frames = [
@@ -344,32 +345,30 @@ class TestRscExtraction(unittest.TestCase):
 
         payload = self._coding_payload(frames)
 
-        self.assertEqual(payload["counts"]["matched_models"], 2)
+        assert payload["counts"]["matched_models"] == 2
         row = payload["rows"][0]
-        self.assertEqual(row["model_slug"], "current-alpha")
-        self.assertEqual(row["short_name"], "Current Alpha")
-        self.assertEqual(row["creator"], "OpenAI")
-        self.assertEqual(row["coding"], 88.4)
-        self.assertEqual(row["is_reasoning"], True)
-        self.assertEqual(row["release_date"], "2026-07-01")
-        self.assertEqual(
-            row["coding_task_metrics"]["output_tokens_per_task"],
-            {"output_tokens": 300, "answer_tokens": 200, "reasoning_tokens": 100},
-        )
-        self.assertEqual(
-            row["coding_task_metrics"]["cost_per_task_usd"],
-            {
-                "total_cost": 1.25,
-                "input_cost": 0.10,
-                "non_cache_input_cost": 0.08,
-                "cache_read_cost": 0.01,
-                "cache_write_cost": 0.01,
-                "output_cost": 0.75,
-                "reasoning_cost": 0.25,
-                "answer_cost": 0.50,
-            },
-        )
-        self.assertEqual(row["coding_task_metrics"]["time_per_task_seconds"], 12.5)
+        assert row["model_slug"] == "current-alpha"
+        assert row["short_name"] == "Current Alpha"
+        assert row["creator"] == "OpenAI"
+        assert row["coding"] == 88.4
+        assert row["is_reasoning"]
+        assert row["release_date"] == "2026-07-01"
+        assert row["coding_task_metrics"]["output_tokens_per_task"] == {
+            "output_tokens": 300,
+            "answer_tokens": 200,
+            "reasoning_tokens": 100,
+        }
+        assert row["coding_task_metrics"]["cost_per_task_usd"] == {
+            "total_cost": 1.25,
+            "input_cost": 0.1,
+            "non_cache_input_cost": 0.08,
+            "cache_read_cost": 0.01,
+            "cache_write_cost": 0.01,
+            "output_cost": 0.75,
+            "reasoning_cost": 0.25,
+            "answer_cost": 0.5,
+        }
+        assert row["coding_task_metrics"]["time_per_task_seconds"] == 12.5
 
     def test_coding_payload_retains_current_score_without_task_metrics(self) -> None:
         frames = [
@@ -395,34 +394,28 @@ class TestRscExtraction(unittest.TestCase):
         ]
 
         payload = self._coding_payload(frames)
-        self.assertEqual(payload["counts"]["matched_models"], 2)
+        assert payload["counts"]["matched_models"] == 2
 
         row = payload["rows"][0]
-        self.assertEqual(row["model_slug"], "score-only")
-        self.assertEqual(row["coding"], 77.7)
+        assert row["model_slug"] == "score-only"
+        assert row["coding"] == 77.7
         metrics = row["coding_task_metrics"]
-        self.assertEqual(
-            metrics["output_tokens_per_task"],
-            {
-                "output_tokens": None,
-                "answer_tokens": None,
-                "reasoning_tokens": None,
-            },
-        )
-        self.assertEqual(
-            metrics["cost_per_task_usd"],
-            {
-                "total_cost": None,
-                "input_cost": None,
-                "non_cache_input_cost": None,
-                "cache_read_cost": None,
-                "cache_write_cost": None,
-                "output_cost": None,
-                "reasoning_cost": None,
-                "answer_cost": None,
-            },
-        )
-        self.assertIsNone(metrics["time_per_task_seconds"])
+        assert metrics["output_tokens_per_task"] == {
+            "output_tokens": None,
+            "answer_tokens": None,
+            "reasoning_tokens": None,
+        }
+        assert metrics["cost_per_task_usd"] == {
+            "total_cost": None,
+            "input_cost": None,
+            "non_cache_input_cost": None,
+            "cache_read_cost": None,
+            "cache_write_cost": None,
+            "output_cost": None,
+            "reasoning_cost": None,
+            "answer_cost": None,
+        }
+        assert metrics["time_per_task_seconds"] is None
 
     def test_coding_payload_rejects_unrelated_provider_snapshot(self) -> None:
         frames = [
@@ -445,7 +438,7 @@ class TestRscExtraction(unittest.TestCase):
             ),
         ]
 
-        with self.assertRaises(cli.ExtractionError):
+        with pytest.raises(cli.ExtractionError):
             self._coding_payload(frames)
 
     def test_coding_payload_filters_and_sorts_current_rows_deterministically(
@@ -472,10 +465,10 @@ class TestRscExtraction(unittest.TestCase):
             limit=10,
         )
 
-        self.assertEqual(
-            [row["model_slug"] for row in payload["rows"]],
-            ["lab-beta", "lab-alpha"],
-        )
+        assert [row["model_slug"] for row in payload["rows"]] == [
+            "lab-beta",
+            "lab-alpha",
+        ]
 
     def test_official_models_merge_into_unique_slim_schema_v2_snapshot(self) -> None:
         rsc_model = {
@@ -510,27 +503,26 @@ class TestRscExtraction(unittest.TestCase):
             official_models=api,
         )
         models = {model["slug"]: model for model in payload["models"]}
-        self.assertEqual(payload["meta"]["schema_version"], 2)
-        self.assertEqual(set(models), {"api-only", "shared"})
-        self.assertEqual(models["shared"]["name"], "API name")
-        self.assertEqual(models["shared"]["coding_index"], 42)
-        self.assertEqual(models["shared"]["intelligence_index"], 11)
+        assert payload["meta"]["schema_version"] == 2
+        assert set(models) == {"api-only", "shared"}
+        assert models["shared"]["name"] == "API name"
+        assert models["shared"]["coding_index"] == 42
+        assert models["shared"]["intelligence_index"] == 11
         endpoint = payload["hosts_models"][0]
-        self.assertEqual(endpoint["model_slug"], "shared")
-        self.assertNotIn("model", endpoint)
-        self.assertEqual(
-            payload["meta"]["sources"]["official_api"]["unmatched_rsc_model_slugs"],
-            [],
+        assert endpoint["model_slug"] == "shared"
+        assert "model" not in endpoint
+        assert (
+            payload["meta"]["sources"]["official_api"]["unmatched_rsc_model_slugs"]
+            == []
         )
-        self.assertEqual(
-            payload["meta"]["sources"]["rsc"]["unmatched_api_model_slugs"],
-            ["api-only"],
-        )
+        assert payload["meta"]["sources"]["rsc"]["unmatched_api_model_slugs"] == [
+            "api-only"
+        ]
 
     def test_official_model_envelope_validation_rejects_malformed_rows(self) -> None:
-        with self.assertRaisesRegex(ExtractionError, "requires integer status"):
+        with pytest.raises(ExtractionError, match="requires integer status"):
             normalize_official_models('{"status":"200","prompt_options":{},"data":[]}')
-        with self.assertRaisesRegex(ExtractionError, "require non-empty slug"):
+        with pytest.raises(ExtractionError, match="require non-empty slug"):
             normalize_official_models(
                 '{"status":200,"prompt_options":{},"data":[{"slug":"","name":"x","model_creator":{},"evaluations":{},"pricing":{}}]}',
             )

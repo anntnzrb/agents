@@ -1,3 +1,6 @@
+"""CLI default-path regression tests."""
+
+# ruff: noqa: CPY001, D101, D102, E501, INP001, PLR2004, S101, SLF001
 from __future__ import annotations
 
 import os
@@ -9,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import _path  # noqa: F401
+import pytest
 from artificial_analysis import cli
 
 TMP_ARTIFACT_DIR = Path(tempfile.gettempdir()) / "artifacts" / "artificial-analysis"
@@ -22,49 +26,49 @@ class TestCliDefaultPaths(unittest.TestCase):
     def test_fetch_parser_uses_tmp_artifacts_defaults(self) -> None:
         args = cli.build_parser().parse_args(["fetch"])
 
-        self.assertEqual(args.output_json, TMP_SNAPSHOT)
-        self.assertEqual(args.output_endpoints, TMP_ENDPOINTS)
-        self.assertEqual(args.output_url, TMP_URL)
+        assert args.output_json == TMP_SNAPSHOT
+        assert args.output_endpoints == TMP_ENDPOINTS
+        assert args.output_url == TMP_URL
 
     def test_reader_commands_default_to_tmp_snapshot(self) -> None:
         parser = cli.build_parser()
         for command in (["stats"], ["harness"], ["reasoning"], ["query"]):
             with self.subTest(command=command[0]):
                 args = parser.parse_args(command)
-                self.assertEqual(args.snapshot, TMP_SNAPSHOT)
+                assert args.snapshot == TMP_SNAPSHOT
 
         args = parser.parse_args(["qa", "best provider"])
-        self.assertEqual(args.snapshot, TMP_SNAPSHOT)
+        assert args.snapshot == TMP_SNAPSHOT
 
     def test_coding_parser_uses_tmp_output_default(self) -> None:
         args = cli.build_parser().parse_args(["coding"])
 
-        self.assertEqual(args.output_json, TMP_CODING)
+        assert args.output_json == TMP_CODING
 
     def test_rpc_namespace_defaults_use_tmp_artifacts(self) -> None:
         fetch_args = cli._fetch_namespace({})
 
-        self.assertEqual(fetch_args.output_json, TMP_SNAPSHOT)
-        self.assertEqual(fetch_args.output_endpoints, TMP_ENDPOINTS)
-        self.assertEqual(fetch_args.output_url, TMP_URL)
-        self.assertEqual(cli._stats_namespace({}).snapshot, TMP_SNAPSHOT)
-        self.assertEqual(cli._coding_namespace({}).output_json, TMP_CODING)
+        assert fetch_args.output_json == TMP_SNAPSHOT
+        assert fetch_args.output_endpoints == TMP_ENDPOINTS
+        assert fetch_args.output_url == TMP_URL
+        assert cli._stats_namespace({}).snapshot == TMP_SNAPSHOT
+        assert cli._coding_namespace({}).output_json == TMP_CODING
 
     def test_capability_schema_reports_tmp_fetch_defaults(self) -> None:
         schema = cli._capability_schema()
         flags = schema["commands"]["fetch"]["flags"]
 
-        self.assertEqual(
-            flags["output_json"],
-            "Path (default <temp-dir>/artifacts/artificial-analysis/full-data.json)",
+        assert (
+            flags["output_json"]
+            == "Path (default <temp-dir>/artifacts/artificial-analysis/full-data.json)"
         )
-        self.assertEqual(
-            flags["output_endpoints"],
-            "Path (default <temp-dir>/artifacts/artificial-analysis/endpoints.txt)",
+        assert (
+            flags["output_endpoints"]
+            == "Path (default <temp-dir>/artifacts/artificial-analysis/endpoints.txt)"
         )
-        self.assertEqual(
-            flags["output_url"],
-            "Path (default <temp-dir>/artifacts/artificial-analysis/full-url.txt)",
+        assert (
+            flags["output_url"]
+            == "Path (default <temp-dir>/artifacts/artificial-analysis/full-url.txt)"
         )
 
     def test_default_snapshot_guard_rejects_stale_tmp_snapshot(self) -> None:
@@ -72,7 +76,7 @@ class TestCliDefaultPaths(unittest.TestCase):
             "meta": {"fetched_at": (datetime.now(UTC) - timedelta(days=2)).isoformat()},
         }
 
-        with self.assertRaisesRegex(cli.ExtractionError, "Default snapshot is stale"):
+        with pytest.raises(cli.ExtractionError, match="Default snapshot is stale"):
             cli._ensure_default_snapshot_fresh(TMP_SNAPSHOT, stale_snapshot)
 
     def test_default_snapshot_guard_allows_explicit_stale_snapshot(self) -> None:
@@ -87,9 +91,9 @@ class TestCliDefaultPaths(unittest.TestCase):
         with (
             patch.dict(os.environ, {}, clear=True),
             patch.object(cli, "_dotenv_candidates", return_value=[]),
-            self.assertRaisesRegex(
+            pytest.raises(
                 cli.CliUsageError,
-                r"^ARTIFICIAL_ANALYSIS_API_KEY required; copy \.env\.example to \.env and set the key\.$",
+                match=r"^ARTIFICIAL_ANALYSIS_API_KEY required; copy \.env\.example to \.env and set the key\.$",
             ),
         ):
             cli._required_api_key()
@@ -113,11 +117,8 @@ class TestCliDefaultPaths(unittest.TestCase):
                 patch.object(cli, "_dotenv_candidates", return_value=[env_file]),
             ):
                 cli._load_dotenv()
-                self.assertEqual(
-                    os.environ["ARTIFICIAL_ANALYSIS_API_KEY"],
-                    "process-key",
-                )
-                self.assertEqual(os.environ["UNRELATED"], "process-value")
+                assert os.environ["ARTIFICIAL_ANALYSIS_API_KEY"] == "process-key"
+                assert os.environ["UNRELATED"] == "process-value"
 
     def test_schema_v2_readers_join_slim_endpoints_to_canonical_models(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -146,9 +147,9 @@ class TestCliDefaultPaths(unittest.TestCase):
                     limit=10,
                 ),
             )
-        self.assertEqual(query["rows"][0]["model_name"], "Model A")
-        self.assertEqual(query["rows"][0]["price_blended"], 4)
-        self.assertEqual(harness["rows"][0]["creator"], "Lab")
+        assert query["rows"][0]["model_name"] == "Model A"
+        assert query["rows"][0]["price_blended"] == 4
+        assert harness["rows"][0]["creator"] == "Lab"
 
     def test_fetch_uses_last_good_snapshot_when_required_source_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -173,8 +174,8 @@ class TestCliDefaultPaths(unittest.TestCase):
                 patch.object(cli, "fetch_rsc", side_effect=OSError("HTTP 503")),
             ):
                 payload = cli._fetch_payload(args)
-        self.assertTrue(payload["fallback"]["used"])
-        self.assertIsNone(payload["sources"]["rsc"]["status_code"])
+        assert payload["fallback"]["used"]
+        assert payload["sources"]["rsc"]["status_code"] is None
 
     def test_fetch_falls_back_when_official_api_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -204,8 +205,8 @@ class TestCliDefaultPaths(unittest.TestCase):
                 patch.object(cli, "fetch_models", side_effect=OSError("HTTP 503")),
             ):
                 payload = cli._fetch_payload(args)
-        self.assertTrue(payload["fallback"]["used"])
-        self.assertIsNone(payload["sources"]["official_api"]["status_code"])
+        assert payload["fallback"]["used"]
+        assert payload["sources"]["official_api"]["status_code"] is None
 
 
 if __name__ == "__main__":
