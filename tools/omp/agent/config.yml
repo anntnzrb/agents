@@ -17,7 +17,7 @@ modelRoles:
 # Advisor
 # =============================================================================
 advisor:
-  enabled: true
+  enabled: false
   syncBacklog: "3"
   immuneTurns: 3
   subagents: false
