@@ -1,6 +1,7 @@
 # /// script
 # requires-python = ">=3.12"
 # ///
+# ruff: noqa: CPY001, FBT001, S607
 """Filter Artificial Analysis model snapshot for agent/dev model selection.
 
 Default filter saved from chat:
@@ -13,7 +14,8 @@ Run:
   uv run --script assets/skills/artificial-analysis-live/scripts/filter_agent_models.py
 
 Fresh data first:
-  uv run --script assets/skills/artificial-analysis-live/scripts/filter_agent_models.py --fetch
+  uv run --script assets/skills/artificial-analysis-live/scripts/filter_agent_models.py
+  --fetch
 """
 
 from __future__ import annotations
@@ -34,6 +36,8 @@ OutputFormat = Literal["markdown", "tsv", "json"]
 
 
 class Row(TypedDict):
+    """Normalized model fields used by filtering and output."""
+
     slug: str
     name: str
     open_weights: bool | None
@@ -50,7 +54,8 @@ DEFAULT_SKILL_CLI = Path(__file__).resolve().parent / "cli.py"
 DEFAULT_SNAPSHOT_MAX_AGE = timedelta(hours=24)
 
 
-def number(value: Any) -> float | None:
+def number(value: object) -> float | None:
+    """Convert numeric JSON values to float, excluding booleans."""
     if isinstance(value, bool):
         return None
     if isinstance(value, int | float):
@@ -59,6 +64,7 @@ def number(value: Any) -> float | None:
 
 
 def model_omni(model: Json) -> float:
+    """Return a model's omniscience score or the missing-value sentinel."""
     direct = number(model.get("omniscience"))
     if direct is not None:
         return direct
@@ -73,6 +79,7 @@ def model_omni(model: Json) -> float:
 
 
 def model_row(model: Json) -> Row:
+    """Convert a model payload to the filter row shape."""
     return {
         "slug": str(model.get("slug") or ""),
         "name": str(model.get("name") or ""),
@@ -89,38 +96,47 @@ def model_row(model: Json) -> Row:
 
 
 def ensure_default_snapshot_fresh(snapshot: Path, raw: Json) -> None:
+    """Reject stale or malformed default snapshots."""
     if snapshot != DEFAULT_SNAPSHOT:
         return
 
     meta = raw.get("meta")
     fetched_at = meta.get("fetched_at") if isinstance(meta, dict) else None
     if not isinstance(fetched_at, str) or not fetched_at:
-        raise ValueError(
-            f"default snapshot missing meta.fetched_at: {snapshot}. Run with --fetch first or pass --snapshot.",
+        message = (
+            f"default snapshot missing meta.fetched_at: {snapshot}. "
+            "Run with --fetch first or pass --snapshot."
         )
+        raise ValueError(message)
 
     try:
         fetched_at_dt = datetime.fromisoformat(fetched_at)
     except ValueError as exc:
-        raise ValueError(
-            f"default snapshot has invalid meta.fetched_at: {snapshot}. Run with --fetch first or pass --snapshot.",
-        ) from exc
+        message = (
+            f"default snapshot has invalid meta.fetched_at: {snapshot}. "
+            "Run with --fetch first or pass --snapshot."
+        )
+        raise ValueError(message) from exc
 
     if fetched_at_dt.tzinfo is None:
         fetched_at_dt = fetched_at_dt.replace(tzinfo=UTC)
     age = datetime.now(UTC) - fetched_at_dt.astimezone(UTC)
     if age > DEFAULT_SNAPSHOT_MAX_AGE:
-        raise ValueError(
-            f"default snapshot is stale ({fetched_at}, older than 24h): {snapshot}. Run with --fetch first or pass --snapshot.",
+        message = (
+            f"default snapshot is stale ({fetched_at}, older than 24h): "
+            f"{snapshot}. Run with --fetch first or pass --snapshot."
         )
+        raise ValueError(message)
 
 
 def load_rows(snapshot: Path) -> list[Row]:
+    """Load and deduplicate model rows from a snapshot."""
     raw: Json = json.loads(snapshot.read_text())
     ensure_default_snapshot_fresh(snapshot, raw)
     hosts_models = raw.get("hosts_models")
     if not isinstance(hosts_models, list):
-        raise ValueError(f"snapshot missing hosts_models list: {snapshot}")
+        message = f"snapshot missing hosts_models list: {snapshot}"
+        raise ValueError(message)  # noqa: TRY004
 
     by_slug: dict[str, Row] = {}
     for endpoint in hosts_models:
@@ -137,7 +153,8 @@ def load_rows(snapshot: Path) -> list[Row]:
         if old is None:
             by_slug[slug] = row
             continue
-        # Same model repeats per provider endpoint. Keep max benchmark values and stable metadata.
+        # Same model repeats per provider endpoint. Keep max benchmark
+        # values and stable metadata.
         old["omni"] = max(old["omni"], row["omni"])
         old["tbench"] = max_nullable(old["tbench"], row["tbench"])
         old["ifbench"] = max_nullable(old["ifbench"], row["ifbench"])
@@ -151,6 +168,7 @@ def load_rows(snapshot: Path) -> list[Row]:
 
 
 def max_nullable(a: float | None, b: float | None) -> float | None:
+    """Return the greater non-null value."""
     if a is None:
         return b
     if b is None:
@@ -159,6 +177,7 @@ def max_nullable(a: float | None, b: float | None) -> float | None:
 
 
 def passes_open(row: Row, open_weight: OpenWeight) -> bool:
+    """Check an open-weights filter against a row."""
     if open_weight == "all":
         return True
     expected = open_weight == "true"
@@ -173,6 +192,7 @@ def apply_filter(
     min_tbench: float,
     min_ifbench: float,
 ) -> list[Row]:
+    """Apply all configured threshold filters."""
     return [
         row
         for row in rows
@@ -183,7 +203,12 @@ def apply_filter(
     ]
 
 
-def sort_rows(rows: list[Row], sort_by: SortKey, descending: bool) -> list[Row]:
+def sort_rows(
+    rows: list[Row],
+    sort_by: SortKey,
+    descending: bool,
+) -> list[Row]:
+    """Sort rows by the requested metric."""
     if sort_by == "name":
         return sorted(rows, key=lambda row: row["name"].lower(), reverse=descending)
 
@@ -197,7 +222,8 @@ def sort_rows(rows: list[Row], sort_by: SortKey, descending: bool) -> list[Row]:
     return sorted(rows, key=metric, reverse=descending)
 
 
-def fmt(value: Any) -> str:
+def fmt(value: object) -> str:
+    """Format a value for tabular output."""
     if value is None:
         return "-"
     if isinstance(value, bool):
@@ -208,39 +234,44 @@ def fmt(value: Any) -> str:
 
 
 def emit_markdown(rows: list[Row]) -> None:
-    print("| Rank | Model | Open | Omni | TBench | IFBench | License |")
-    print("|---:|---|---|---:|---:|---:|---|")
+    """Write rows as a Markdown table."""
+    sys.stdout.write("| Rank | Model | Open | Omni | TBench | IFBench | License |\n")
+    sys.stdout.write("|---:|---|---|---:|---:|---:|---|\n")
     for idx, row in enumerate(rows, start=1):
-        print(
+        line = (
             f"| {idx} | {row['name']} | {fmt(row['open_weights'])} | "
-            f"{fmt(row['omni'])} | {fmt(row['tbench'])} | {fmt(row['ifbench'])} | {row['license'] or '-'} |",
+            f"{fmt(row['omni'])} | {fmt(row['tbench'])} | "
+            f"{fmt(row['ifbench'])} | {row['license'] or '-'} |\n"
         )
+        sys.stdout.write(line)
 
 
 def emit_tsv(rows: list[Row]) -> None:
-    print("Rank\tModel\tOpen\tOmni\tTBench\tIFBench\tLicense")
+    """Write rows as tab-separated values."""
+    sys.stdout.write("Rank\tModel\tOpen\tOmni\tTBench\tIFBench\tLicense\n")
     for idx, row in enumerate(rows, start=1):
-        print(
-            "\t".join(
-                [
-                    str(idx),
-                    row["name"],
-                    fmt(row["open_weights"]),
-                    fmt(row["omni"]),
-                    fmt(row["tbench"]),
-                    fmt(row["ifbench"]),
-                    row["license"] or "-",
-                ],
-            ),
+        line = "\t".join(
+            [
+                str(idx),
+                row["name"],
+                fmt(row["open_weights"]),
+                fmt(row["omni"]),
+                fmt(row["tbench"]),
+                fmt(row["ifbench"]),
+                row["license"] or "-",
+            ],
         )
+        sys.stdout.write(f"{line}\n")
 
 
 def emit_json(rows: list[Row]) -> None:
-    print(json.dumps(rows, indent=2, sort_keys=True))
+    """Write rows as formatted JSON."""
+    sys.stdout.write(json.dumps(rows, indent=2, sort_keys=True) + "\n")
 
 
 def fetch_snapshot(skill_cli: Path) -> None:
-    subprocess.run(
+    """Fetch a fresh snapshot through the skill CLI."""
+    subprocess.run(  # noqa: S603 (trusted local skill CLI)
         ["uv", "run", "--script", str(skill_cli), "fetch"],
         check=True,
         stdout=subprocess.DEVNULL,
@@ -248,6 +279,7 @@ def fetch_snapshot(skill_cli: Path) -> None:
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line options."""
     parser = argparse.ArgumentParser(
         description="Filter Artificial Analysis models for coding-agent use.",
     )
@@ -282,13 +314,13 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """Run filtering and return the process exit status."""
     args = parse_args()
     if args.fetch:
         fetch_snapshot(args.skill_cli)
     if not args.snapshot.exists():
-        print(
-            f"snapshot not found: {args.snapshot}. Run with --fetch first.",
-            file=sys.stderr,
+        sys.stderr.write(
+            f"snapshot not found: {args.snapshot}. Run with --fetch first.\n",
         )
         return 2
 
