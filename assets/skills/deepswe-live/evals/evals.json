@@ -1,0 +1,57 @@
+{
+  "skill_name": "deepswe-live",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Prepare a current DeepSWE model-efficiency report. Compare every published model configuration on pass@1, mean output tokens, mean cost in USD, and mean agent steps. Show counts and confidence-interval width, identify the best trade-offs, and keep raw extrema separate from recommendations.",
+      "expected_output": "A fresh, JSON-grounded metrics report that preserves configuration identity, labels published versus derived values, reports uncertainty as CI width, and presents Pareto-efficient choices without inventing a composite score.",
+      "files": [],
+      "expectations": [
+        "Resolves one benchmark version deterministically and runs the report route (fetching the published leaderboard first when currentness matters).",
+        "Keeps model, reasoning_effort, harness, and config as one configuration identity and never merges tiers that share a model name.",
+        "Includes n_attempted and n_tasks_attempted when supplied, pass/score fields, ci_lo, ci_hi, ci_half, and derived ci_width for ranked rows.",
+        "Separates raw extrema from filtered recommendations and keeps source fields unchanged under a derived label.",
+        "Computes Pareto using maximize pass_at_1 and minimize mean_output_tokens, mean_cost_usd, and mean_agent_steps; excludes nulls and does not use an arbitrary composite score.",
+        "Cites benchmark_version, source URL, fetched_at, generated_at when supplied, and validator metadata when available."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Give me the DeepSWE efficiency recommendation twice: first with the default quality policy, then excluding configurations with fewer than 100 attempted rollouts. Explain exactly what changed and do not silently hide low-sample rows.",
+      "expected_output": "Two comparable JSON-derived recommendation views with explicit filters, counts, CI widths, and a clear statement that the second view applies an opt-in sample threshold while raw extrema remain separate.",
+      "files": [],
+      "expectations": [
+        "Uses report or rank with no quality/sample exclusion in the first view and --min-attempted 100 only in the second.",
+        "Exposes filters_applied and recommendation counts for both views; does not imply that default recommendations are statistically screened.",
+        "Preserves each full configuration identity and published score/pass fields in both outputs.",
+        "Marks calculations such as ci_width and threshold-dependent rankings as derived rather than publishing them as source values.",
+        "States provenance and freshness for the selected benchmark version and reports an error instead of substituting an unrequested stale artifact."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "For a metrics audit, summarize the raw DeepSWE trials included in the published score. Use the default source, full evaluation scope, and included-only filter, then tell me how visibility changes if I explicitly request all trial rows. Do not describe task contents.",
+      "expected_output": "A metrics-only JSON response that distinguishes published_raw trial values from derived counts, states both filter sets, and makes the broader raw scope visible without calling every trials.json row full DeepSWE.",
+      "files": [],
+      "expectations": [
+        "Uses trials with source=deep-swe, eval_scope=full, and included_in_score=true by default and reports filters_applied.",
+        "Uses an explicit inclusion override for the broader view and reports the resulting count/visibility change rather than silently widening defaults.",
+        "Labels raw trial values published_raw and any counts or summaries derived; never overwrites source fields.",
+        "Keeps the response metrics/results-only: no task, exercise, release, trajectory, or trial-artifact downloads or details.",
+        "Includes benchmark_version and provenance URL/fetched_at and does not require live network access when an explicit snapshot is supplied."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Compare two local DeepSWE leaderboard snapshots for model-efficiency changes. Use pass_at_1 as the primary delta, retain configuration identity and provenance, and reject the comparison if the snapshots are from different benchmark versions.",
+      "expected_output": "A deterministic JSON comparison with before/after values and deltas for the same benchmark version, or a structured mixed-version error; no guessed release or cross-version ranking.",
+      "files": ["<left-snapshot>", "<right-snapshot>"],
+      "expectations": [
+        "Uses compare with explicit snapshots and confirms both benchmark_version values before computing deltas.",
+        "Reports before, after, and delta as derived values while retaining published source values and complete configuration identity.",
+        "Carries snapshot freshness and source provenance in the response; never presents local historical data as current.",
+        "Returns the JSON error envelope with a mixed-version code when versions differ and does not fall back to latest or v1."
+      ]
+    }
+  ]
+}
