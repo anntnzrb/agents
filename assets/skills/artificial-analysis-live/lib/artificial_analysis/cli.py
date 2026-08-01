@@ -1,3 +1,6 @@
+# ruff: noqa: ANN401, C901, CPY001, D103, FBT003, PERF401, PLR0911, PLR0912, PLR0915
+"""Command-line and RPC interfaces for Artificial Analysis snapshots."""
+
 from __future__ import annotations
 
 import argparse
@@ -6,10 +9,13 @@ import os
 import re
 import sys
 import tempfile
-from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, TextIO
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from typing import NoReturn, TextIO
 
 from .rsc import (
     BASE_URL,
@@ -44,10 +50,26 @@ DEFAULT_OUTPUT_ENDPOINTS = DEFAULT_ARTIFACT_DIR / "endpoints.txt"
 DEFAULT_OUTPUT_URL = DEFAULT_ARTIFACT_DIR / "full-url.txt"
 DEFAULT_CODING_OUTPUT_JSON = DEFAULT_ARTIFACT_DIR / "coding-data.json"
 DEFAULT_SNAPSHOT_MAX_AGE = timedelta(hours=24)
+MIN_QUOTED_VALUE_LENGTH = 2
+SCHEMA_V2 = 2
+NOT_MODIFIED = 304
 
 
 class CliUsageError(RuntimeError):
     """Raised when agent-provided command inputs are invalid."""
+
+
+def _raise_cli_usage_error(message: str) -> NoReturn:
+    raise CliUsageError(message)
+
+
+def _raise_extraction_error(
+    message: str,
+    cause: BaseException | None = None,
+) -> NoReturn:
+    if cause is None:
+        raise ExtractionError(message)
+    raise ExtractionError(message) from cause
 
 
 def _default_cache_dir() -> Path:
@@ -72,7 +94,11 @@ def _parse_env_file(path: Path) -> dict[str, str]:
         value = value.strip()
         if not key:
             continue
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        if (
+            len(value) >= MIN_QUOTED_VALUE_LENGTH
+            and value[0] == value[-1]
+            and value[0] in {"'", '"'}
+        ):
             value = value[1:-1]
         values[key] = value
     return values
@@ -112,16 +138,21 @@ def _required_api_key() -> str:
     _load_dotenv()
     api_key = os.environ.get(MODEL_API_KEY_ENV)
     if not api_key:
-        raise CliUsageError(
-            "ARTIFICIAL_ANALYSIS_API_KEY required; copy .env.example to .env and set the key.",
+        message = (
+            "ARTIFICIAL_ANALYSIS_API_KEY required; copy .env.example to .env and set "
+            "the key."
         )
+        _raise_cli_usage_error(message)
     return api_key
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the command-line parser for CLI mode."""
     parser = argparse.ArgumentParser(
         prog="artificial-analysis",
-        description="AI-first extractor for Artificial Analysis provider endpoint data.",
+        description=(
+            "AI-first extractor for Artificial Analysis provider endpoint data."
+        ),
     )
     parser.add_argument(
         "--mode",
@@ -129,12 +160,26 @@ def build_parser() -> argparse.ArgumentParser:
         default="cli",
         help="cli: one-shot JSON output. rpc: JSONL request/response loop.",
     )
-
     subparsers = parser.add_subparsers(dest="command")
+    _add_fetch_parser(subparsers)
+    _add_stats_parser(subparsers)
+    _add_diff_parser(subparsers)
+    _add_harness_parser(subparsers)
+    _add_coding_parser(subparsers)
+    _add_reasoning_parser(subparsers)
+    _add_query_parser(subparsers)
+    _add_qa_parser(subparsers)
+    _add_schema_parser(subparsers)
+    return parser
 
+
+def _add_fetch_parser(subparsers: argparse._SubParsersAction) -> None:
     fetch_parser = subparsers.add_parser(
         "fetch",
-        help="Fetch live RSC and authenticated official model data, then write a snapshot.",
+        help=(
+            "Fetch live RSC and authenticated official model data, then write "
+            "a snapshot."
+        ),
     )
     fetch_parser.add_argument("--output-json", type=Path, default=DEFAULT_OUTPUT_JSON)
     fetch_parser.add_argument(
@@ -154,6 +199,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     fetch_parser.set_defaults(handler=_handle_fetch)
 
+
+def _add_stats_parser(subparsers: argparse._SubParsersAction) -> None:
     stats_parser = subparsers.add_parser(
         "stats",
         help="Show snapshot counts and top providers.",
@@ -167,6 +214,8 @@ def build_parser() -> argparse.ArgumentParser:
     stats_parser.add_argument("--top", type=int, default=10)
     stats_parser.set_defaults(handler=_handle_stats)
 
+
+def _add_diff_parser(subparsers: argparse._SubParsersAction) -> None:
     diff_parser = subparsers.add_parser(
         "diff",
         help="Diff endpoint and provider changes between snapshots.",
@@ -175,6 +224,28 @@ def build_parser() -> argparse.ArgumentParser:
     diff_parser.add_argument("new_snapshot", type=Path)
     diff_parser.set_defaults(handler=_handle_diff)
 
+
+def _add_model_filters(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Model slug/name contains filter.",
+    )
+    parser.add_argument(
+        "--creator",
+        type=str,
+        default=None,
+        help="Creator/lab name contains filter.",
+    )
+    parser.add_argument(
+        "--open-weights-only",
+        action="store_true",
+        help="Return only open-weights models.",
+    )
+
+
+def _add_harness_parser(subparsers: argparse._SubParsersAction) -> None:
     harness_parser = subparsers.add_parser(
         "harness",
         help="Rank unique models by Harness = 50%% Agentic Index + 50%% Coding Index.",
@@ -185,29 +256,27 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=DEFAULT_OUTPUT_JSON,
     )
-    harness_parser.add_argument(
-        "--model",
-        type=str,
-        default=None,
-        help="Model slug/name contains filter.",
-    )
-    harness_parser.add_argument(
-        "--creator",
-        type=str,
-        default=None,
-        help="Creator/lab name contains filter.",
-    )
-    harness_parser.add_argument(
-        "--open-weights-only",
-        action="store_true",
-        help="Return only open-weights models.",
-    )
+    _add_model_filters(harness_parser)
     harness_parser.add_argument("--limit", type=int, default=50)
     harness_parser.set_defaults(handler=_handle_harness)
 
+
+def _add_order(parser: argparse.ArgumentParser, *, default: str) -> None:
+    parser.add_argument(
+        "--order",
+        type=str,
+        default=default,
+        choices=("auto", "asc", "desc"),
+    )
+
+
+def _add_coding_parser(subparsers: argparse._SubParsersAction) -> None:
     coding_parser = subparsers.add_parser(
         "coding",
-        help="Fetch/query Coding Index capability rows, including coding-only output token composition.",
+        help=(
+            "Fetch/query Coding Index capability rows, including coding-only "
+            "output token composition."
+        ),
     )
     coding_parser.add_argument(
         "--output-json",
@@ -215,23 +284,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_CODING_OUTPUT_JSON,
     )
     coding_parser.add_argument("--timeout-seconds", type=float, default=60.0)
-    coding_parser.add_argument(
-        "--model",
-        type=str,
-        default=None,
-        help="Model slug/name contains filter.",
-    )
-    coding_parser.add_argument(
-        "--creator",
-        type=str,
-        default=None,
-        help="Creator/lab name contains filter.",
-    )
-    coding_parser.add_argument(
-        "--open-weights-only",
-        action="store_true",
-        help="Return only open-weights models.",
-    )
+    _add_model_filters(coding_parser)
     coding_parser.add_argument(
         "--sort-by",
         type=str,
@@ -245,12 +298,7 @@ def build_parser() -> argparse.ArgumentParser:
             "cost",
         ),
     )
-    coding_parser.add_argument(
-        "--order",
-        type=str,
-        default="auto",
-        choices=("auto", "asc", "desc"),
-    )
+    _add_order(coding_parser, default="auto")
     coding_parser.add_argument("--limit", type=int, default=50)
     coding_parser.add_argument(
         "--include-benchmark-counts",
@@ -259,9 +307,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     coding_parser.set_defaults(handler=_handle_coding)
 
+
+def _add_reasoning_parser(subparsers: argparse._SubParsersAction) -> None:
     reasoning_parser = subparsers.add_parser(
         "reasoning",
-        help="Profile models by reasoning selectivity (per-benchmark answer vs thinking token split).",
+        help=(
+            "Profile models by reasoning selectivity (per-benchmark answer vs "
+            "thinking token split)."
+        ),
     )
     reasoning_parser.add_argument(
         "snapshot",
@@ -269,23 +322,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=DEFAULT_OUTPUT_JSON,
     )
-    reasoning_parser.add_argument(
-        "--model",
-        type=str,
-        default=None,
-        help="Model slug/name contains filter.",
-    )
-    reasoning_parser.add_argument(
-        "--creator",
-        type=str,
-        default=None,
-        help="Creator/lab name contains filter.",
-    )
-    reasoning_parser.add_argument(
-        "--open-weights-only",
-        action="store_true",
-        help="Return only open-weights models.",
-    )
+    _add_model_filters(reasoning_parser)
     reasoning_parser.add_argument(
         "--class",
         type=str,
@@ -319,12 +356,7 @@ def build_parser() -> argparse.ArgumentParser:
             "coding",
         ),
     )
-    reasoning_parser.add_argument(
-        "--order",
-        type=str,
-        default="auto",
-        choices=("auto", "asc", "desc"),
-    )
+    _add_order(reasoning_parser, default="auto")
     reasoning_parser.add_argument("--limit", type=int, default=50)
     reasoning_parser.add_argument(
         "--benchmarks",
@@ -333,6 +365,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     reasoning_parser.set_defaults(handler=_handle_reasoning)
 
+
+def _add_query_parser(subparsers: argparse._SubParsersAction) -> None:
     query_parser = subparsers.add_parser(
         "query",
         help="Query model/provider benchmark rows from a snapshot.",
@@ -377,15 +411,12 @@ def build_parser() -> argparse.ArgumentParser:
             "e2e",
         ),
     )
-    query_parser.add_argument(
-        "--order",
-        type=str,
-        default="auto",
-        choices=("auto", "asc", "desc"),
-    )
+    _add_order(query_parser, default="auto")
     query_parser.add_argument("--limit", type=int, default=20)
     query_parser.set_defaults(handler=_handle_query)
 
+
+def _add_qa_parser(subparsers: argparse._SubParsersAction) -> None:
     qa_parser = subparsers.add_parser(
         "qa",
         help="Minimal NL question command that maps intent to query filters/sort.",
@@ -445,16 +476,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     qa_parser.set_defaults(handler=_handle_qa)
 
+
+def _add_schema_parser(subparsers: argparse._SubParsersAction) -> None:
     schema_parser = subparsers.add_parser(
         "schema",
         help="Print machine-readable capability schema.",
     )
     schema_parser.set_defaults(handler=_handle_schema)
 
-    return parser
-
 
 def _normalize_argv(argv: Sequence[str] | None) -> list[str]:
+    """Normalize optional global mode and default fetch arguments."""
     values = list(argv) if argv is not None else sys.argv[1:]
     if not values:
         return ["fetch"]
@@ -478,13 +510,13 @@ def _normalize_argv(argv: Sequence[str] | None) -> list[str]:
     global_prefix: list[str] = []
     index = 0
     while index < len(values):
-        token = values[index]
-        if token == "--mode" and index + 1 < len(values):
+        argument = values[index]
+        if argument == "--mode" and index + 1 < len(values):
             global_prefix.extend(values[index : index + 2])
             index += 2
             continue
-        if token.startswith("--mode="):
-            global_prefix.append(token)
+        if argument.startswith("--mode="):
+            global_prefix.append(argument)
             index += 1
             continue
         break
@@ -493,7 +525,9 @@ def _normalize_argv(argv: Sequence[str] | None) -> list[str]:
 
 
 def _emit_json(payload: dict[str, Any], *, stdout: TextIO) -> None:
-    print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), file=stdout)
+    stdout.write(
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n",
+    )
 
 
 def _envelope(command: str, data: dict[str, Any]) -> dict[str, Any]:
@@ -512,24 +546,30 @@ def _ensure_default_snapshot_fresh(path: Path, snapshot: dict[str, Any]) -> None
     meta = snapshot.get("meta")
     fetched_at = meta.get("fetched_at") if isinstance(meta, dict) else None
     if not isinstance(fetched_at, str) or not fetched_at:
-        raise ExtractionError(
-            f"Default snapshot missing meta.fetched_at: {path}. Run fetch first or pass an explicit snapshot path.",
+        message = (
+            f"Default snapshot missing meta.fetched_at: {path}. "
+            "Run fetch first or pass an explicit snapshot path."
         )
+        _raise_extraction_error(message)
 
     try:
         fetched_at_dt = datetime.fromisoformat(fetched_at)
     except ValueError as exc:
-        raise ExtractionError(
-            f"Default snapshot has invalid meta.fetched_at: {path}. Run fetch first or pass an explicit snapshot path.",
-        ) from exc
+        message = (
+            f"Default snapshot has invalid meta.fetched_at: {path}. "
+            "Run fetch first or pass an explicit snapshot path."
+        )
+        _raise_extraction_error(message, exc)
 
     if fetched_at_dt.tzinfo is None:
         fetched_at_dt = fetched_at_dt.replace(tzinfo=UTC)
     age = datetime.now(UTC) - fetched_at_dt.astimezone(UTC)
     if age > DEFAULT_SNAPSHOT_MAX_AGE:
-        raise ExtractionError(
-            f"Default snapshot is stale ({fetched_at}, older than 24h): {path}. Run fetch first or pass an explicit snapshot path.",
+        message = (
+            f"Default snapshot is stale ({fetched_at}, older than 24h): {path}. "
+            "Run fetch first or pass an explicit snapshot path."
         )
+        _raise_extraction_error(message)
 
 
 def _load_reader_snapshot(path: Path) -> dict[str, Any]:
@@ -548,11 +588,11 @@ def _schema_version(snapshot: dict[str, Any]) -> int:
 
 
 def _canonical_models(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    if _schema_version(snapshot) < 2:
+    if _schema_version(snapshot) < SCHEMA_V2:
         return {}
     models = snapshot.get("models")
     if not isinstance(models, list):
-        raise ExtractionError("Schema-v2 snapshot missing models list")
+        _raise_extraction_error("Schema-v2 snapshot missing models list")
     return {
         slug: item
         for item in models
@@ -566,7 +606,7 @@ def _model_rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
         return list(canonical.values())
     hosts_models = snapshot.get("hosts_models")
     if not isinstance(hosts_models, list):
-        raise ExtractionError("Snapshot missing hosts_models list")
+        _raise_extraction_error("Snapshot missing hosts_models list")
     return [
         model
         for item in hosts_models
@@ -603,10 +643,10 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
         )
         official_result = fetch_models(api_key, timeout_seconds=args.timeout_seconds)
         response_etag = result.headers.get("etag") or sent_etag
-        if result.status_code == 304:
+        if result.status_code == NOT_MODIFIED:
             body = load_cached_body(args.cache_dir, cache_meta)
             if body is None:
-                raise ExtractionError(
+                _raise_extraction_error(
                     "Upstream returned 304 but no cached payload is available.",
                 )
             reused_cached_body = True
@@ -643,9 +683,8 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
             fallback_payload = _load_reader_snapshot(args.output_json)
             fallback_source = f"file:{args.output_json}"
         if fallback_payload is None:
-            raise ExtractionError(
-                f"Fresh fetch failed and no last-good snapshot exists ({exc}).",
-            ) from exc
+            message = f"Fresh fetch failed and no last-good snapshot exists ({exc})."
+            _raise_extraction_error(message, exc)
         slugs = snapshot_slugs(fallback_payload)
         sanity_check(
             slugs=slugs,
@@ -671,7 +710,7 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
             fetched_at=result.fetched_at,
             status_code=result.status_code,
             etag=response_etag,
-            body=None if result.status_code == 304 else result.body,
+            body=None if result.status_code == NOT_MODIFIED else result.body,
         )
         save_last_good_snapshot(args.cache_dir, payload)
 
@@ -878,7 +917,8 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
             "scope": "coding_index_evaluation_api",
             "currency": "USD",
             "definition": (
-                "Coding Index evaluation/API spend; not a plan quota or subscription price."
+                "Coding Index evaluation/API spend; not a plan quota or "
+                "subscription price."
             ),
             "total_cost": _number_alias(eval_cost, "totalCost", "total"),
             "input_cost": _number_alias(eval_cost, "inputCost", "input"),
@@ -889,7 +929,8 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
             "scope": "coding_index_task",
             "currency": "USD",
             "definition": (
-                "Per-benchmark-task Coding Index output, API cost, and weighted decode time."
+                "Per-benchmark-task Coding Index output, API cost, and weighted "
+                "decode time."
             ),
             "output_tokens_per_task": {
                 "output_tokens": _number_alias(task_output, "output", "outputTokens"),
@@ -1024,7 +1065,7 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
 def _extract_default_data_models(frames: list[tuple[str, Any]]) -> list[Any]:
     candidates: list[list[Any]] = []
 
-    def scan(node: Any) -> None:
+    def scan(node: object) -> None:
         if isinstance(node, dict):
             default_data = node.get("defaultData")
             if _looks_like_coding_capability_rows(default_data):
@@ -1041,13 +1082,13 @@ def _extract_default_data_models(frames: list[tuple[str, Any]]) -> list[Any]:
         scan(frame)
 
     if not candidates:
-        raise ExtractionError(
+        _raise_extraction_error(
             "Coding capability payload missing recognizable coding rows.",
         )
     return max(candidates, key=len)
 
 
-def _looks_like_coding_capability_rows(value: Any) -> bool:
+def _looks_like_coding_capability_rows(value: object) -> bool:
     if not isinstance(value, list):
         return False
     sample = [item for item in value[:25] if isinstance(item, dict)]
@@ -1101,7 +1142,7 @@ def _number_alias(mapping: dict[str, Any], *keys: str) -> int | float | None:
     return _first_number(mapping, *keys)
 
 
-def _number_or_none(value: Any) -> int | float | None:
+def _number_or_none(value: object) -> int | float | None:
     return value if isinstance(value, int | float) else None
 
 
@@ -1220,7 +1261,10 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
         "definition": {
             "name": "Harness",
             "formula": "0.5 * Agentic Index + 0.5 * Coding Index",
-            "execution_gap": "Agentic Index - Coding Index; high positive values indicate executable-precision risk.",
+            "execution_gap": (
+                "Agentic Index - Coding Index; high positive values indicate "
+                "executable-precision risk."
+            ),
         },
         "applied_filters": {
             "model": args.model,
@@ -1237,82 +1281,120 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def _compute_reasoning_profile(model: dict[str, Any]) -> dict[str, Any] | None:
-    """Compute reasoning selectivity profile from canonical_eval_token_counts.
+REASONING_EXTREME_FLOOR = 0.10
+REASONING_EXTREME_SELECTIVITY = 0.75
+REASONING_SELECTIVE_FLOOR = 0.25
+REASONING_SELECTIVE_SELECTIVITY = 0.60
+REASONING_MODERATE_FLOOR = 0.50
+REASONING_HARD_UNIFORM_FLOOR = 0.60
+REASONING_HARD_UNIFORM_SHARE = 0.85
+REASONING_UNIFORM_SHARE = 0.80
 
-    Returns None if no token-count data is available for this model.
-    """
-    canonical = model.get("canonical_eval_token_counts")
-    if not isinstance(canonical, dict) or not canonical:
-        iitc = model.get("intelligence_index_token_counts")
-        if isinstance(iitc, dict):
-            answer = _number_or_none(iitc.get("answer"))
-            reasoning = _number_or_none(iitc.get("reasoning"))
-            output = _number_or_none(iitc.get("output_tokens"))
-            if (
-                isinstance(answer, int | float)
-                and isinstance(reasoning, int | float)
-                and isinstance(output, int | float)
-                and output > 0
-            ):
-                wrs = reasoning / output
-                return {
-                    "reasoning_floor": None,
-                    "reasoning_floor_benchmark": None,
-                    "reasoning_ceiling": None,
-                    "reasoning_ceiling_benchmark": None,
-                    "selectivity_score": None,
-                    "weighted_reasoning_share": round(wrs, 4),
-                    "classification": None,
-                    "benchmark_count": 0,
-                    "warning": "Aggregate only; per-benchmark canonical_eval_token_counts unavailable.",
-                }
+
+def _aggregate_only_reasoning_profile(
+    model: dict[str, Any],
+) -> dict[str, Any] | None:
+    iitc = model.get("intelligence_index_token_counts")
+    if not isinstance(iitc, dict):
         return None
+    answer = _number_or_none(iitc.get("answer"))
+    reasoning = _number_or_none(iitc.get("reasoning"))
+    output = _number_or_none(iitc.get("output_tokens"))
+    if (
+        not isinstance(answer, int | float)
+        or not isinstance(reasoning, int | float)
+        or not isinstance(output, int | float)
+        or output <= 0
+    ):
+        return None
+    return {
+        "reasoning_floor": None,
+        "reasoning_floor_benchmark": None,
+        "reasoning_ceiling": None,
+        "reasoning_ceiling_benchmark": None,
+        "selectivity_score": None,
+        "weighted_reasoning_share": round(reasoning / output, 4),
+        "classification": None,
+        "benchmark_count": 0,
+        "warning": (
+            "Aggregate only; per-benchmark canonical_eval_token_counts unavailable."
+        ),
+    }
 
+
+def _reasoning_shares(
+    canonical: dict[str, Any],
+) -> tuple[list[tuple[float, str]], int, int]:
     shares: list[tuple[float, str]] = []
     total_answer = 0
     total_reasoning = 0
     for bench_name, vals in canonical.items():
         if not isinstance(vals, dict):
             continue
-        a = vals.get("answer") or vals.get("answer_tokens", 0)
-        r = vals.get("reasoning") or vals.get("reasoning_tokens", 0)
-        if isinstance(a, int | float) and isinstance(r, int | float) and (a + r) > 0:
-            share = r / (a + r)
-            shares.append((share, bench_name))
-            total_answer += a
-            total_reasoning += r
+        answer = vals.get("answer") or vals.get("answer_tokens", 0)
+        reasoning = vals.get("reasoning") or vals.get("reasoning_tokens", 0)
+        if (
+            isinstance(answer, int | float)
+            and isinstance(reasoning, int | float)
+            and answer + reasoning > 0
+        ):
+            shares.append((reasoning / (answer + reasoning), bench_name))
+            total_answer += answer
+            total_reasoning += reasoning
+    return shares, total_answer, total_reasoning
 
+
+def _reasoning_classification(
+    floor: float,
+    selectivity: float,
+    weighted_share: float,
+) -> str:
+    if floor < REASONING_EXTREME_FLOOR and selectivity > REASONING_EXTREME_SELECTIVITY:
+        return "selective_extreme"
+    if (
+        floor < REASONING_SELECTIVE_FLOOR
+        and selectivity > REASONING_SELECTIVE_SELECTIVITY
+    ):
+        return "selective"
+    if floor < REASONING_MODERATE_FLOOR:
+        return "moderate"
+    if (
+        floor >= REASONING_HARD_UNIFORM_FLOOR
+        and weighted_share >= REASONING_HARD_UNIFORM_SHARE
+    ):
+        return "hard_uniform_heavy"
+    if floor >= REASONING_MODERATE_FLOOR and weighted_share >= REASONING_UNIFORM_SHARE:
+        return "uniform_heavy"
+    return "unclassified"
+
+
+def _compute_reasoning_profile(model: dict[str, Any]) -> dict[str, Any] | None:
+    """Compute reasoning selectivity profile from canonical evaluation counts."""
+    canonical = model.get("canonical_eval_token_counts")
+    if not isinstance(canonical, dict) or not canonical:
+        return _aggregate_only_reasoning_profile(model)
+
+    shares, total_answer, total_reasoning = _reasoning_shares(canonical)
     if not shares:
         return None
 
     total_output = total_answer + total_reasoning
-    floor = min(shares, key=lambda s: s[0])
-    ceiling = max(shares, key=lambda s: s[0])
-    wrs = total_reasoning / total_output if total_output else 0
+    floor = min(shares, key=lambda share: share[0])
+    ceiling = max(shares, key=lambda share: share[0])
+    weighted_share = total_reasoning / total_output if total_output else 0
     selectivity = ceiling[0] - floor[0]
-
-    if floor[0] < 0.10 and selectivity > 0.75:
-        classification = "selective_extreme"
-    elif floor[0] < 0.25 and selectivity > 0.60:
-        classification = "selective"
-    elif floor[0] < 0.50:
-        classification = "moderate"
-    elif floor[0] >= 0.60 and wrs >= 0.85:
-        classification = "hard_uniform_heavy"
-    elif floor[0] >= 0.50 and wrs >= 0.80:
-        classification = "uniform_heavy"
-    else:
-        classification = "unclassified"
-
     return {
         "reasoning_floor": round(floor[0], 4),
         "reasoning_floor_benchmark": floor[1],
         "reasoning_ceiling": round(ceiling[0], 4),
         "reasoning_ceiling_benchmark": ceiling[1],
         "selectivity_score": round(selectivity, 4),
-        "weighted_reasoning_share": round(wrs, 4),
-        "classification": classification,
+        "weighted_reasoning_share": round(weighted_share, 4),
+        "classification": _reasoning_classification(
+            floor[0],
+            selectivity,
+            weighted_share,
+        ),
         "benchmark_count": len(shares),
     }
 
@@ -1346,6 +1428,64 @@ def _reasoning_benchmarks(model: dict[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
+def _reasoning_row(
+    model: dict[str, Any],
+    args: argparse.Namespace,
+    model_filter: str | None,
+    creator_filter: str | None,
+) -> tuple[dict[str, Any] | None, bool]:
+    model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
+    if not model_slug or model.get("deleted") or model.get("deprecated"):
+        return None, False
+
+    model_name = model.get("name") if isinstance(model.get("name"), str) else None
+    creator = _creator(model)
+    creator_name = creator.get("name") if isinstance(creator.get("name"), str) else None
+    if model_filter and not _matches_any(model_filter, [model_slug, model_name]):
+        return None, False
+    if creator_filter and not _matches_any(
+        creator_filter,
+        [creator_name, creator.get("slug")],
+    ):
+        return None, False
+    if args.open_weights_only and model.get("is_open_weights") is not True:
+        return None, False
+
+    profile = _compute_reasoning_profile(model)
+    if profile is None:
+        return None, True
+    classification = profile.get("classification")
+    if args.classification and classification != args.classification:
+        return None, False
+    if args.selective_only and not classification.startswith("selective"):
+        return None, False
+
+    agentic = model.get("agentic_index")
+    coding = model.get("coding_index")
+    harness = (
+        (float(agentic) + float(coding)) / 2.0
+        if isinstance(agentic, int | float) and isinstance(coding, int | float)
+        else None
+    )
+    row: dict[str, Any] = {
+        "model_slug": model_slug,
+        "model_name": model_name,
+        "creator": creator_name,
+        "reasoning_model": model.get("reasoning_model"),
+        "is_open_weights": model.get("is_open_weights"),
+        "release_date": model.get("release_date"),
+        "context_window_tokens": model.get("context_window_tokens"),
+        "intelligence": model.get("intelligence_index"),
+        "agentic": agentic,
+        "coding": coding,
+        "harness": round(harness, 4) if harness is not None else None,
+        "reasoning_profile": profile,
+    }
+    if args.benchmarks:
+        row["per_benchmark"] = _reasoning_benchmarks(model)
+    return row, False
+
+
 def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
     snapshot = _load_reader_snapshot(args.snapshot)
     models = _model_rows(snapshot)
@@ -1361,64 +1501,16 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
     skipped_missing = 0
 
     for model in models:
-        model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
-        if not model_slug:
-            continue
-        if model.get("deleted") or model.get("deprecated"):
-            continue
-
-        model_name = model.get("name") if isinstance(model.get("name"), str) else None
-        creator = _creator(model)
-        creator_name = (
-            creator.get("name") if isinstance(creator.get("name"), str) else None
-        )
-
-        if model_filter and not _matches_any(model_filter, [model_slug, model_name]):
-            continue
-        if creator_filter and not _matches_any(
+        row, missing_profile = _reasoning_row(
+            model,
+            args,
+            model_filter,
             creator_filter,
-            [creator_name, creator.get("slug")],
-        ):
-            continue
-        if args.open_weights_only and model.get("is_open_weights") is not True:
-            continue
-
-        profile = _compute_reasoning_profile(model)
-        if profile is None:
-            skipped_missing += 1
-            continue
-
-        classification = profile.get("classification")
-        if args.classification and classification != args.classification:
-            continue
-        if args.selective_only and not classification.startswith("selective"):
-            continue
-
-        agentic = model.get("agentic_index")
-        coding = model.get("coding_index")
-        harness = (
-            (float(agentic) + float(coding)) / 2.0
-            if isinstance(agentic, int | float) and isinstance(coding, int | float)
-            else None
         )
-
-        row: dict[str, Any] = {
-            "model_slug": model_slug,
-            "model_name": model_name,
-            "creator": creator_name,
-            "reasoning_model": model.get("reasoning_model"),
-            "is_open_weights": model.get("is_open_weights"),
-            "release_date": model.get("release_date"),
-            "context_window_tokens": model.get("context_window_tokens"),
-            "intelligence": model.get("intelligence_index"),
-            "agentic": agentic,
-            "coding": coding,
-            "harness": round(harness, 4) if harness is not None else None,
-            "reasoning_profile": profile,
-        }
-        if args.benchmarks:
-            row["per_benchmark"] = _reasoning_benchmarks(model)
-        rows.append(row)
+        if missing_profile:
+            skipped_missing += 1
+        if row is not None:
+            rows.append(row)
 
     sort_key_map = {
         "harness": ("harness", True),
@@ -1462,9 +1554,13 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
         "snapshot": str(args.snapshot),
         "definition": {
             "name": "Reasoning Selectivity",
-            "scope": "max-effort Intelligence Index evaluation (canonical_eval_token_counts)",
+            "scope": (
+                "max-effort Intelligence Index evaluation (canonical_eval_token_counts)"
+            ),
             "metrics": {
-                "reasoning_floor": "min(reasoning_share) across benchmarks — lower = more selective",
+                "reasoning_floor": (
+                    "min(reasoning_share) across benchmarks — lower = more selective"
+                ),
                 "reasoning_ceiling": "max(reasoning_share) across benchmarks",
                 "weighted_reasoning_share": "Σ reasoning_tokens / Σ (answer+reasoning)",
                 "selectivity_score": "reasoning_ceiling - reasoning_floor",
@@ -1474,7 +1570,9 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "selective": "floor < 0.25 and selectivity_score > 0.60",
                 "moderate": "0.25 <= floor < 0.50",
                 "uniform_heavy": "floor >= 0.50 and weighted_reasoning_share >= 0.80",
-                "hard_uniform_heavy": "floor >= 0.60 and weighted_reasoning_share >= 0.85",
+                "hard_uniform_heavy": (
+                    "floor >= 0.60 and weighted_reasoning_share >= 0.85"
+                ),
             },
         },
         "applied_filters": {
@@ -1496,11 +1594,94 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def _query_row(
+    item: object,
+    canonical_models: dict[str, dict[str, Any]],
+    model_filter: str | None,
+    provider_filter: str | None,
+    endpoint_filter: str | None,
+) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        return None
+    endpoint_slug = item.get("slug")
+    if not isinstance(endpoint_slug, str) or "_" not in endpoint_slug:
+        return None
+    host = item.get("host") if isinstance(item.get("host"), dict) else {}
+    if canonical_models:
+        endpoint_model_slug = item.get("model_slug")
+        model = (
+            canonical_models.get(endpoint_model_slug)
+            if isinstance(endpoint_model_slug, str)
+            else None
+        )
+        if model is None:
+            return None
+    else:
+        model = item.get("model") if isinstance(item.get("model"), dict) else {}
+
+    model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
+    model_name = model.get("name") if isinstance(model.get("name"), str) else None
+    provider_slug = host.get("slug") if isinstance(host.get("slug"), str) else None
+    provider_name = host.get("name") if isinstance(host.get("name"), str) else None
+    if model_filter and not _matches_any(model_filter, [model_slug, model_name]):
+        return None
+    if provider_filter and not _matches_any(
+        provider_filter,
+        [provider_slug, provider_name],
+    ):
+        return None
+    if endpoint_filter and endpoint_filter not in endpoint_slug.lower():
+        return None
+
+    timescale = (
+        item.get("timescaleData") if isinstance(item.get("timescaleData"), dict) else {}
+    )
+    e2e = (
+        item.get("end_to_end_response_time_metrics")
+        if isinstance(item.get("end_to_end_response_time_metrics"), dict)
+        else {}
+    )
+    return {
+        "endpoint_slug": endpoint_slug,
+        "endpoint_name": item.get("name"),
+        "model_slug": model_slug,
+        "model_name": model_name,
+        "provider_slug": provider_slug,
+        "provider_name": provider_name,
+        "harness": _harness_score(model),
+        "intelligence": model.get("intelligence_index"),
+        "agentic": model.get("agentic_index"),
+        "coding": model.get("coding_index"),
+        "math": model.get("math_index"),
+        "gpqa": model.get("gpqa"),
+        "mmlu_pro": model.get("mmlu_pro"),
+        "livecodebench": model.get("livecodebench"),
+        "ifbench": model.get("ifbench"),
+        "scicode": model.get("scicode"),
+        "tau2": model.get("tau_2", model.get("tau2")),
+        "terminalbench_hard": model.get("terminalbench_hard"),
+        "release_date": model.get("release_date"),
+        "reasoning_model": model.get("reasoning_model"),
+        "is_open_weights": model.get("is_open_weights"),
+        "price_input": item.get("price_1m_input_tokens"),
+        "price_output": item.get("price_1m_output_tokens"),
+        "price_blended": item.get(
+            "price_1m_blended_7_to_2_to_1",
+            item.get("price_1m_blended_3_to_1"),
+        ),
+        "speed": timescale.get("median_output_speed"),
+        "ttfc": timescale.get("median_time_to_first_chunk"),
+        "e2e": e2e.get("total_time"),
+        "context_window_tokens": item.get("context_window_tokens"),
+        "host_api_id": item.get("host_api_id"),
+    }
+
+
 def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
     snapshot = _load_reader_snapshot(args.snapshot)
     hosts_models = snapshot.get("hosts_models")
     if not isinstance(hosts_models, list):
-        raise ExtractionError("Snapshot missing hosts_models list")
+        _raise_extraction_error("Snapshot missing hosts_models list")
     canonical_models = _canonical_models(snapshot)
 
     model_filter = (
@@ -1519,84 +1700,14 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
 
     rows: list[dict[str, Any]] = []
     for item in hosts_models:
-        if not isinstance(item, dict):
-            continue
-        endpoint_slug = item.get("slug")
-        if not isinstance(endpoint_slug, str) or "_" not in endpoint_slug:
-            continue
-        host = item.get("host") if isinstance(item.get("host"), dict) else {}
-        if canonical_models:
-            endpoint_model_slug = item.get("model_slug")
-            model = (
-                canonical_models.get(endpoint_model_slug)
-                if isinstance(endpoint_model_slug, str)
-                else None
-            )
-            if model is None:
-                continue
-        else:
-            model = item.get("model") if isinstance(item.get("model"), dict) else {}
-
-        model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
-        model_name = model.get("name") if isinstance(model.get("name"), str) else None
-        provider_slug = host.get("slug") if isinstance(host.get("slug"), str) else None
-        provider_name = host.get("name") if isinstance(host.get("name"), str) else None
-        if model_filter and not _matches_any(model_filter, [model_slug, model_name]):
-            continue
-        if provider_filter and not _matches_any(
+        if row := _query_row(
+            item,
+            canonical_models,
+            model_filter,
             provider_filter,
-            [provider_slug, provider_name],
+            endpoint_filter,
         ):
-            continue
-        if endpoint_filter and endpoint_filter not in endpoint_slug.lower():
-            continue
-
-        timescale = (
-            item.get("timescaleData")
-            if isinstance(item.get("timescaleData"), dict)
-            else {}
-        )
-        e2e = (
-            item.get("end_to_end_response_time_metrics")
-            if isinstance(item.get("end_to_end_response_time_metrics"), dict)
-            else {}
-        )
-        rows.append(
-            {
-                "endpoint_slug": endpoint_slug,
-                "endpoint_name": item.get("name"),
-                "model_slug": model_slug,
-                "model_name": model_name,
-                "provider_slug": provider_slug,
-                "provider_name": provider_name,
-                "harness": _harness_score(model),
-                "intelligence": model.get("intelligence_index"),
-                "agentic": model.get("agentic_index"),
-                "coding": model.get("coding_index"),
-                "math": model.get("math_index"),
-                "gpqa": model.get("gpqa"),
-                "mmlu_pro": model.get("mmlu_pro"),
-                "livecodebench": model.get("livecodebench"),
-                "ifbench": model.get("ifbench"),
-                "scicode": model.get("scicode"),
-                "tau2": model.get("tau_2", model.get("tau2")),
-                "terminalbench_hard": model.get("terminalbench_hard"),
-                "release_date": model.get("release_date"),
-                "reasoning_model": model.get("reasoning_model"),
-                "is_open_weights": model.get("is_open_weights"),
-                "price_input": item.get("price_1m_input_tokens"),
-                "price_output": item.get("price_1m_output_tokens"),
-                "price_blended": item.get(
-                    "price_1m_blended_7_to_2_to_1",
-                    item.get("price_1m_blended_3_to_1"),
-                ),
-                "speed": timescale.get("median_output_speed"),
-                "ttfc": timescale.get("median_time_to_first_chunk"),
-                "e2e": e2e.get("total_time"),
-                "context_window_tokens": item.get("context_window_tokens"),
-                "host_api_id": item.get("host_api_id"),
-            },
-        )
+            rows.append(row)
 
     sort_key = args.sort_by
     reverse = _resolve_reverse(sort_key=sort_key, order=args.order)
@@ -1652,10 +1763,7 @@ def _harness_score(model: dict[str, Any]) -> float | None:
 
 
 def _matches_any(needle: str, values: list[str | None]) -> bool:
-    for value in values:
-        if isinstance(value, str) and needle in value.lower():
-            return True
-    return False
+    return any(isinstance(value, str) and needle in value.lower() for value in values)
 
 
 def _resolve_reverse(*, sort_key: str, order: str) -> bool:
@@ -1663,9 +1771,7 @@ def _resolve_reverse(*, sort_key: str, order: str) -> bool:
         return False
     if order == "desc":
         return True
-    if sort_key in {"price_blended", "ttfc", "e2e"}:
-        return False
-    return True
+    return sort_key not in {"price_blended", "ttfc", "e2e"}
 
 
 def _sort_metric(
@@ -1697,7 +1803,7 @@ def _provider_counts_from_rows(rows: list[dict[str, Any]]) -> dict[str, int]:
 def _provider_counts_from_snapshot(snapshot: dict[str, Any]) -> dict[str, int]:
     hosts_models = snapshot.get("hosts_models")
     if not isinstance(hosts_models, list):
-        raise ExtractionError("Snapshot missing hosts_models list")
+        _raise_extraction_error("Snapshot missing hosts_models list")
 
     counts: dict[str, int] = {}
     for item in hosts_models:
@@ -1718,12 +1824,12 @@ def _provider_counts_from_snapshot(snapshot: dict[str, Any]) -> dict[str, int]:
 def _qa_payload(args: argparse.Namespace) -> dict[str, Any]:
     question = args.question.strip()
     if not question:
-        raise CliUsageError("qa requires a non-empty question")
+        _raise_cli_usage_error("qa requires a non-empty question")
 
     snapshot = _load_reader_snapshot(args.snapshot)
     hosts_models = snapshot.get("hosts_models")
     if not isinstance(hosts_models, list):
-        raise ExtractionError("Snapshot missing hosts_models list")
+        _raise_extraction_error("Snapshot missing hosts_models list")
 
     inferred_model = args.model or _infer_model(question, _model_rows(snapshot))
     inferred_provider = args.provider or _infer_provider(question, hosts_models)
@@ -1806,57 +1912,48 @@ def _infer_provider(question: str, hosts_models: list[Any]) -> str | None:
 
 def _infer_sort(question: str) -> tuple[str, str]:
     q = question.lower()
-    if any(
-        word in q
-        for word in (
-            "cheap",
-            "cheapest",
-            "lowest price",
-            "low price",
-            "precio",
-            "barato",
-        )
-    ):
-        return ("price_blended", "asc")
-    if any(
-        word in q
-        for word in (
-            "latency",
-            "first token",
-            "ttfc",
-            "response time",
-            "rápido en",
-            "latencia",
-        )
-    ):
-        return ("ttfc", "asc")
-    if any(
-        word in q
-        for word in (
-            "speed",
-            "throughput",
-            "tokens per second",
-            "fastest",
-            "rápido",
-            "velocidad",
-        )
-    ):
-        return ("speed", "desc")
-    if any(
-        word in q
-        for word in ("harness", "agent harness", "coding agent", "agentic coding")
-    ):
-        return ("harness", "desc")
-    if any(word in q for word in ("agentic", "agent", "autonomous")):
-        return ("agentic", "desc")
-    if any(word in q for word in ("coding", "code", "programming", "codificación")):
-        return ("coding", "desc")
-    if any(word in q for word in ("math", "matemática", "matematica")):
-        return ("math", "desc")
-    if any(
-        word in q for word in ("quality", "best", "intelligence", "benchmark", "mejor")
-    ):
-        return ("intelligence", "desc")
+    rules = (
+        (
+            ("cheap", "cheapest", "lowest price", "low price", "precio", "barato"),
+            ("price_blended", "asc"),
+        ),
+        (
+            (
+                "latency",
+                "first token",
+                "ttfc",
+                "response time",
+                "rápido en",
+                "latencia",
+            ),
+            ("ttfc", "asc"),
+        ),
+        (
+            (
+                "speed",
+                "throughput",
+                "tokens per second",
+                "fastest",
+                "rápido",
+                "velocidad",
+            ),
+            ("speed", "desc"),
+        ),
+        (
+            ("harness", "agent harness", "coding agent", "agentic coding"),
+            ("harness", "desc"),
+        ),
+        (("agentic", "agent", "autonomous"), ("agentic", "desc")),
+        (("coding", "code", "programming", "codificación"), ("coding", "desc")),
+        (("math", "matemática", "matematica"), ("math", "desc")),
+        (
+            ("quality", "best", "intelligence", "benchmark", "mejor"),
+            ("intelligence", "desc"),
+        ),
+    )
+    for words, result in rules:
+        if any(word in q for word in words):
+            return result
     return ("intelligence", "desc")
 
 
@@ -1915,7 +2012,10 @@ def _handle_schema(_: argparse.Namespace) -> int:
 def _capability_schema() -> dict[str, Any]:
     return {
         "name": "artificial-analysis",
-        "description": "AI-only fetch/analyze tool for canonical Artificial Analysis models and provider endpoints.",
+        "description": (
+            "AI-only fetch/analyze tool for canonical Artificial Analysis models "
+            "and provider endpoints."
+        ),
         "protocol_version": PROTOCOL_VERSION,
         "default_command": "fetch",
         "sources": {
@@ -1928,12 +2028,25 @@ def _capability_schema() -> dict[str, Any]:
         },
         "commands": {
             "fetch": {
-                "description": "Fetch required RSC and authenticated official-model sources, merge schema-v2 data, validate sanity thresholds, cache RSC by ETag, and write outputs.",
+                "description": (
+                    "Fetch required RSC and authenticated official-model sources, "
+                    "merge schema-v2 data, validate sanity thresholds, cache RSC "
+                    "by ETag, and write outputs."
+                ),
                 "outputs": ["full-data.json", "endpoints.txt", "full-url.txt"],
                 "flags": {
-                    "output_json": "Path (default <temp-dir>/artifacts/artificial-analysis/full-data.json)",
-                    "output_endpoints": "Path (default <temp-dir>/artifacts/artificial-analysis/endpoints.txt)",
-                    "output_url": "Path (default <temp-dir>/artifacts/artificial-analysis/full-url.txt)",
+                    "output_json": (
+                        "Path (default <temp-dir>/artifacts/"
+                        "artificial-analysis/full-data.json)"
+                    ),
+                    "output_endpoints": (
+                        "Path (default <temp-dir>/artifacts/"
+                        "artificial-analysis/endpoints.txt)"
+                    ),
+                    "output_url": (
+                        "Path (default <temp-dir>/artifacts/"
+                        "artificial-analysis/full-url.txt)"
+                    ),
                     "cache_dir": "Path to ETag/payload cache",
                     "timeout_seconds": "float network timeout",
                     "min_endpoints": "int sanity threshold (default 700)",
@@ -1952,7 +2065,10 @@ def _capability_schema() -> dict[str, Any]:
                 "flags": {},
             },
             "harness": {
-                "description": "Rank unique models by Harness = 50% Agentic Index + 50% Coding Index.",
+                "description": (
+                    "Rank unique models by Harness = 50% Agentic Index + 50% "
+                    "Coding Index."
+                ),
                 "args": ["snapshot(optional)"],
                 "flags": {
                     "model": "str contains filter on model slug/name",
@@ -1962,48 +2078,77 @@ def _capability_schema() -> dict[str, Any]:
                 },
             },
             "coding": {
-                "description": "Fetch/query Coding Index capability rows with coding-only output token composition.",
+                "description": (
+                    "Fetch/query Coding Index capability rows with coding-only "
+                    "output token composition."
+                ),
                 "source_url": CODING_CAPABILITY_URL,
                 "flags": {
                     "model": "str contains filter on model slug/name",
                     "creator": "str contains filter on creator/lab name",
                     "open_weights_only": "bool only include open-weights models",
-                    "sort_by": "coding|output_tokens|answer_tokens|reasoning_tokens|input_tokens|cost",
+                    "sort_by": (
+                        "coding|output_tokens|answer_tokens|reasoning_tokens|"
+                        "input_tokens|cost"
+                    ),
                     "order": "auto|asc|desc",
                     "limit": "int max rows (default 50)",
-                    "include_benchmark_counts": "bool include Terminal-Bench Hard and SciCode token counts",
+                    "include_benchmark_counts": (
+                        "bool include Terminal-Bench Hard and SciCode token counts"
+                    ),
                 },
-                "token_scope": "coding_index_only; not global Intelligence Index token counts",
+                "token_scope": (
+                    "coding_index_only; not global Intelligence Index token counts"
+                ),
             },
             "reasoning": {
-                "description": "Profile models by reasoning selectivity using per-benchmark canonical eval token counts.",
+                "description": (
+                    "Profile models by reasoning selectivity using per-benchmark "
+                    "canonical eval token counts."
+                ),
                 "args": ["snapshot(optional)"],
                 "flags": {
                     "model": "str contains filter on model slug/name",
                     "creator": "str contains filter on creator/lab name",
                     "open_weights_only": "bool only include open-weights models",
-                    "class": "classification filter: selective_extreme|selective|moderate|uniform_heavy|hard_uniform_heavy",
+                    "class": (
+                        "classification filter: selective_extreme|selective|"
+                        "moderate|uniform_heavy|hard_uniform_heavy"
+                    ),
                     "selective_only": "bool only include selective thinkers",
-                    "sort_by": "harness|selectivity|reasoning_floor|weighted_reasoning_share|intelligence|agentic|coding",
+                    "sort_by": (
+                        "harness|selectivity|reasoning_floor|"
+                        "weighted_reasoning_share|intelligence|agentic|coding"
+                    ),
                     "order": "auto|asc|desc",
                     "limit": "int max rows (default 50)",
-                    "benchmarks": "bool include per-benchmark reasoning share breakdown",
+                    "benchmarks": (
+                        "bool include per-benchmark reasoning share breakdown"
+                    ),
                 },
             },
             "query": {
-                "description": "Filter/sort endpoint benchmark rows by model/provider/endpoint.",
+                "description": (
+                    "Filter/sort endpoint benchmark rows by model/provider/endpoint."
+                ),
                 "args": ["snapshot(optional)"],
                 "flags": {
                     "model": "str contains filter on model slug/name",
                     "provider": "str contains filter on provider slug/name",
                     "endpoint": "str contains filter on endpoint slug",
-                    "sort_by": "harness|intelligence|agentic|coding|math|price_blended|speed|ttfc|e2e",
+                    "sort_by": (
+                        "harness|intelligence|agentic|coding|math|"
+                        "price_blended|speed|ttfc|e2e"
+                    ),
                     "order": "auto|asc|desc",
                     "limit": "int max rows (default 20)",
                 },
             },
             "qa": {
-                "description": "Minimal NL intent parser that maps a question to query filters/sort and returns query output.",
+                "description": (
+                    "Minimal NL intent parser that maps a question to query "
+                    "filters/sort and returns query output."
+                ),
                 "args": ["question", "snapshot(optional)"],
                 "flags": {
                     "model": "override inferred model",
@@ -2156,7 +2301,7 @@ def _diff_namespace(args: dict[str, Any]) -> argparse.Namespace:
     old_snapshot = _arg_value(args, "old_snapshot", None)
     new_snapshot = _arg_value(args, "new_snapshot", None)
     if not old_snapshot or not new_snapshot:
-        raise CliUsageError("diff requires old_snapshot and new_snapshot")
+        _raise_cli_usage_error("diff requires old_snapshot and new_snapshot")
     return argparse.Namespace(
         old_snapshot=Path(str(old_snapshot)),
         new_snapshot=Path(str(new_snapshot)),
@@ -2178,7 +2323,7 @@ def _query_namespace(args: dict[str, Any]) -> argparse.Namespace:
 def _qa_namespace(args: dict[str, Any]) -> argparse.Namespace:
     question = _arg_value(args, "question", None)
     if not isinstance(question, str) or not question.strip():
-        raise CliUsageError("qa requires question")
+        _raise_cli_usage_error("qa requires question")
 
     return argparse.Namespace(
         question=question,
@@ -2337,15 +2482,16 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
 def _mode_from_argv(values: list[str]) -> str:
     if not values:
         return "cli"
-    for index, token in enumerate(values):
-        if token == "--mode" and index + 1 < len(values):
+    for index, argument in enumerate(values):
+        if argument == "--mode" and index + 1 < len(values):
             return values[index + 1]
-        if token.startswith("--mode="):
-            return token.split("=", 1)[1]
+        if argument.startswith("--mode="):
+            return argument.split("=", 1)[1]
     return "cli"
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run the command-line interface and return its exit status."""
     values = list(argv) if argv is not None else sys.argv[1:]
     if _mode_from_argv(values) == "rpc":
         return run_rpc()
@@ -2361,19 +2507,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     handler = getattr(args, "handler", None)
     if handler is None:
         parser.print_usage(sys.stderr)
-        print(f"{parser.prog}: error: missing command", file=sys.stderr)
+        sys.stderr.write(f"{parser.prog}: error: missing command\n")
         return 2
 
     try:
         return int(handler(args))
     except CliUsageError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        sys.stderr.write(f"error: {exc}\n")
         return 2
     except ExtractionError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        sys.stderr.write(f"error: {exc}\n")
         return 2
     except OSError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        sys.stderr.write(f"error: {exc}\n")
         return 1
 
 

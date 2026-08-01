@@ -1,15 +1,24 @@
+# ruff: noqa: CPY001
+# ruff: noqa: S310
+"""Fetch, normalize, and persist Artificial Analysis data snapshots."""
+
 from __future__ import annotations
 
 import json
 import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
+if TYPE_CHECKING:
+    from pathlib import Path
+    from typing import Any, NoReturn
+
+NOT_MODIFIED = 304
+MIN_SAMPLE_SIZE = 2
 BASE_URL = "https://artificialanalysis.ai/leaderboards/providers"
 MODEL_API_URL = "https://artificialanalysis.ai/api/v2/data/llms/models"
 MODEL_API_KEY_ENV = "ARTIFICIAL_ANALYSIS_API_KEY"
@@ -25,8 +34,23 @@ class ExtractionError(RuntimeError):
     """Raised when expected Artificial Analysis payload sections are missing."""
 
 
+def _raise_extraction_error(
+    message: str,
+    cause: BaseException | None = None,
+) -> NoReturn:
+    if cause is None:
+        raise ExtractionError(message)
+    raise ExtractionError(message) from cause
+
+
+def _raise_os_error(message: str, cause: BaseException) -> NoReturn:
+    raise OSError(message) from cause
+
+
 @dataclass(frozen=True)
 class FetchResult:
+    """HTTP response data captured while fetching a source."""
+
     body: str
     status_code: int
     headers: dict[str, str]
@@ -35,6 +59,8 @@ class FetchResult:
 
 @dataclass(frozen=True)
 class CacheMetadata:
+    """Metadata describing the cached provider response."""
+
     etag: str | None
     fetched_at: str | None
     status_code: int | None
@@ -47,6 +73,7 @@ def fetch_rsc(
     timeout_seconds: float = 60.0,
     if_none_match: str | None = None,
 ) -> FetchResult:
+    """Fetch the provider endpoint payload using the RSC request protocol."""
     headers = {
         "RSC": "1",
         "Accept": "text/x-component, */*;q=0.8",
@@ -59,7 +86,10 @@ def fetch_rsc(
     fetched_at = datetime.now(UTC).isoformat()
 
     try:
-        with urlopen(request, timeout=timeout_seconds) as response:  # noqa: S310 (trusted URL)
+        with urlopen(
+            request,
+            timeout=timeout_seconds,
+        ) as response:
             body = response.read().decode("utf-8", errors="replace")
             return FetchResult(
                 body=body,
@@ -68,14 +98,15 @@ def fetch_rsc(
                 fetched_at=fetched_at,
             )
     except HTTPError as exc:
-        if exc.code == 304:
+        if exc.code == NOT_MODIFIED:
             return FetchResult(
                 body="",
-                status_code=304,
+                status_code=NOT_MODIFIED,
                 headers={k.lower(): v for k, v in exc.headers.items()},
                 fetched_at=fetched_at,
             )
-        raise OSError(f"Upstream request failed: HTTP {exc.code}") from exc
+        message = f"Upstream request failed: HTTP {exc.code}"
+        _raise_os_error(message, exc)
 
 
 def fetch_models(
@@ -97,7 +128,10 @@ def fetch_models(
     fetched_at = datetime.now(UTC).isoformat()
 
     try:
-        with urlopen(request, timeout=timeout_seconds) as response:  # noqa: S310 (documented upstream URL)
+        with urlopen(
+            request,
+            timeout=timeout_seconds,
+        ) as response:
             return FetchResult(
                 body=response.read().decode("utf-8", errors="replace"),
                 status_code=response.status,
@@ -105,7 +139,8 @@ def fetch_models(
                 fetched_at=fetched_at,
             )
     except HTTPError as exc:
-        raise OSError(f"Official model API request failed: HTTP {exc.code}") from exc
+        message = f"Official model API request failed: HTTP {exc.code}"
+        _raise_os_error(message, exc)
 
 
 def normalize_official_models(api_payload: str) -> list[dict[str, object]]:
@@ -113,9 +148,9 @@ def normalize_official_models(api_payload: str) -> list[dict[str, object]]:
     try:
         parsed: object = json.loads(api_payload)
     except json.JSONDecodeError as exc:
-        raise ExtractionError("Official model API returned invalid JSON.") from exc
+        _raise_extraction_error("Official model API returned invalid JSON.", exc)
     if not isinstance(parsed, dict):
-        raise ExtractionError("Official model API envelope must be an object.")
+        _raise_extraction_error("Official model API envelope must be an object.")
 
     status = parsed.get("status")
     prompt_options = parsed.get("prompt_options")
@@ -125,8 +160,9 @@ def normalize_official_models(api_payload: str) -> list[dict[str, object]]:
         or not isinstance(prompt_options, dict)
         or not isinstance(rows, list)
     ):
-        raise ExtractionError(
-            "Official model API envelope requires integer status, object prompt_options, and list data.",
+        _raise_extraction_error(
+            "Official model API envelope requires integer status, object "
+            "prompt_options, and list data.",
         )
 
     return [_normalize_official_model(row) for row in rows]
@@ -134,7 +170,7 @@ def normalize_official_models(api_payload: str) -> list[dict[str, object]]:
 
 def _normalize_official_model(row: object) -> dict[str, object]:
     if not isinstance(row, dict):
-        raise ExtractionError("Official model API data rows must be objects.")
+        _raise_extraction_error("Official model API data rows must be objects.")
 
     slug = row.get("slug")
     name = row.get("name")
@@ -150,8 +186,9 @@ def _normalize_official_model(row: object) -> dict[str, object]:
         or not isinstance(evaluations, dict)
         or not isinstance(pricing, dict)
     ):
-        raise ExtractionError(
-            "Official model API rows require non-empty slug/name and object model_creator/evaluations/pricing.",
+        _raise_extraction_error(
+            "Official model API rows require non-empty slug/name and object "
+            "model_creator/evaluations/pricing.",
         )
 
     normalized_evaluations = {
@@ -187,6 +224,7 @@ _OFFICIAL_EVALUATION_NAMES = {
 
 
 def parse_json_frames(rsc_payload: str) -> list[tuple[str, Any]]:
+    """Parse JSON-bearing React Server Component frames."""
     parsed_frames: list[tuple[str, Any]] = []
     for line in rsc_payload.splitlines():
         if ":" not in line:
@@ -202,60 +240,70 @@ def parse_json_frames(rsc_payload: str) -> list[tuple[str, Any]]:
     return parsed_frames
 
 
+def _add_candidate(
+    candidates: dict[str, list[list[Any]]],
+    kind: str,
+    value: list[Any],
+) -> None:
+    if value:
+        candidates[kind].append(value)
+
+
+def _record_list_candidates(
+    key: str,
+    value: list[Any],
+    candidates: dict[str, list[list[Any]]],
+    alias_map: dict[str, tuple[str, ...]],
+) -> None:
+    normalized = key.replace("-", "_").lower()
+    for kind in ("models", "hosts", "hostsModels"):
+        if normalized in alias_map[kind]:
+            _add_candidate(candidates, kind, value)
+
+    # Structural fallback heuristics for breaking schema changes.
+    if normalized == "rows" and _looks_like_current_endpoint_rows(value):
+        _add_candidate(candidates, "rows", value)
+    if _looks_like_endpoint_list(value):
+        _add_candidate(candidates, "hostsModels", value)
+    if _looks_like_host_list(value):
+        _add_candidate(candidates, "hosts", value)
+    if _looks_like_model_list(value):
+        _add_candidate(candidates, "models", value)
+
+
+def _scan_node(
+    node: object,
+    candidates: dict[str, list[list[Any]]],
+    alias_map: dict[str, tuple[str, ...]],
+) -> None:
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if isinstance(value, list) and isinstance(key, str):
+                _record_list_candidates(key, value, candidates, alias_map)
+            _scan_node(value, candidates, alias_map)
+    elif isinstance(node, list):
+        for item in node:
+            _scan_node(item, candidates, alias_map)
+
+
 def extract_lists(
     parsed_frames: list[tuple[str, Any]],
 ) -> tuple[list[Any], list[Any], list[Any]]:
+    """Extract model, host, and endpoint lists from parsed frames."""
     candidates: dict[str, list[list[Any]]] = {
         "models": [],
         "hosts": [],
         "hostsModels": [],
         "rows": [],
     }
-
     alias_map: dict[str, tuple[str, ...]] = {
         "models": ("models", "model_rows", "modelrows"),
         "hosts": ("hosts", "providers", "provider_rows", "host_rows"),
         "hostsModels": ("hostsmodels", "host_models", "endpoints", "hostmodels"),
     }
 
-    def add_candidate(kind: str, value: list[Any]) -> None:
-        if value:
-            candidates[kind].append(value)
-
-    def scan(node: Any) -> None:
-        if isinstance(node, dict):
-            for key, value in node.items():
-                if isinstance(value, list):
-                    normalized = key.replace("-", "_").lower()
-
-                    if normalized in alias_map["models"]:
-                        add_candidate("models", value)
-                    if normalized in alias_map["hosts"]:
-                        add_candidate("hosts", value)
-                    if normalized in alias_map["hostsModels"]:
-                        add_candidate("hostsModels", value)
-
-                    # Structural fallback heuristics for breaking schema changes.
-                    if normalized == "rows" and _looks_like_current_endpoint_rows(
-                        value,
-                    ):
-                        add_candidate("rows", value)
-                    if _looks_like_endpoint_list(value):
-                        add_candidate("hostsModels", value)
-                    if _looks_like_host_list(value):
-                        add_candidate("hosts", value)
-                    if _looks_like_model_list(value):
-                        add_candidate("models", value)
-
-                scan(value)
-            return
-
-        if isinstance(node, list):
-            for item in node:
-                scan(item)
-
     for _, frame in parsed_frames:
-        scan(frame)
+        _scan_node(frame, candidates, alias_map)
 
     selected = {
         key: _pick_best(candidates[key]) for key in ("models", "hosts", "hostsModels")
@@ -272,9 +320,11 @@ def extract_lists(
             for key, values in candidates.items()
             if values
         }
-        raise ExtractionError(
-            f"Missing sections in RSC payload: {', '.join(missing)}; candidate_sizes={diagnostics}",
+        message = (
+            f"Missing sections in RSC payload: {', '.join(missing)}; "
+            f"candidate_sizes={diagnostics}"
         )
+        _raise_extraction_error(message)
 
     return (
         selected["models"] or [],
@@ -297,7 +347,7 @@ def _normalize_current_rows(rows: list[Any] | None) -> list[dict[str, Any]] | No
     return endpoints
 
 
-def _normalize_current_row(row: Any) -> dict[str, Any] | None:
+def _normalize_current_row(row: object) -> dict[str, Any] | None:
     if not isinstance(row, dict):
         return None
 
@@ -346,7 +396,7 @@ def _normalize_current_row(row: Any) -> dict[str, Any] | None:
     return endpoint
 
 
-def _normalize_camel_keys(value: Any) -> Any:
+def _normalize_camel_keys(value: object) -> object:
     if isinstance(value, dict):
         return {
             _camel_to_snake(key): _normalize_camel_keys(item)
@@ -357,7 +407,7 @@ def _normalize_camel_keys(value: Any) -> Any:
     return value
 
 
-def _camel_to_snake(value: Any) -> Any:
+def _camel_to_snake(value: object) -> object:
     if not isinstance(value, str):
         return value
 
@@ -389,11 +439,12 @@ def _looks_like_current_endpoint_rows(value: list[Any]) -> bool:
     for item in sample:
         host = item.get("host")
         model = item.get("model")
-        if not isinstance(host, dict) or not isinstance(model, dict):
-            continue
-        if isinstance(host.get("slug"), str) and isinstance(model.get("slug"), str):
-            if any(key in item for key in ("features", "pricing", "performance")):
-                hits += 1
+        if (
+            isinstance(host.get("slug"), str)
+            and isinstance(model.get("slug"), str)
+            and any(key in item for key in ("features", "pricing", "performance"))
+        ):
+            hits += 1
     return hits >= max(1, len(sample) // 2)
 
 
@@ -406,7 +457,7 @@ def _pick_best(options: list[list[Any]]) -> list[Any] | None:
 
 def _looks_like_endpoint_list(value: list[Any]) -> bool:
     sample = [item for item in value[:25] if isinstance(item, dict)]
-    if len(sample) < 2:
+    if len(sample) < MIN_SAMPLE_SIZE:
         return False
 
     score = 0
@@ -423,37 +474,44 @@ def _looks_like_endpoint_list(value: list[Any]) -> bool:
 
 def _looks_like_host_list(value: list[Any]) -> bool:
     sample = [item for item in value[:20] if isinstance(item, dict)]
-    if len(sample) < 2:
+    if len(sample) < MIN_SAMPLE_SIZE:
         return False
 
     hit = 0
     for item in sample:
-        if isinstance(item.get("slug"), str) and isinstance(item.get("name"), str):
-            if any(
+        if (
+            isinstance(item.get("slug"), str)
+            and isinstance(item.get("name"), str)
+            and any(
                 k in item
                 for k in ("website_url", "openai_compatible", "logo", "host_url")
-            ):
-                hit += 1
-    return hit >= max(2, len(sample) // 2)
+            )
+        ):
+            hit += 1
+    return hit >= max(MIN_SAMPLE_SIZE, len(sample) // 2)
 
 
 def _looks_like_model_list(value: list[Any]) -> bool:
     sample = [item for item in value[:20] if isinstance(item, dict)]
-    if len(sample) < 2:
+    if len(sample) < MIN_SAMPLE_SIZE:
         return False
 
     hit = 0
     for item in sample:
-        if isinstance(item.get("slug"), str) and isinstance(item.get("name"), str):
-            if any(
+        if (
+            isinstance(item.get("slug"), str)
+            and isinstance(item.get("name"), str)
+            and any(
                 k in item
                 for k in ("intelligence_index", "model_creator_id", "reasoning_model")
-            ):
-                hit += 1
-    return hit >= max(2, len(sample) // 2)
+            )
+        ):
+            hit += 1
+    return hit >= max(MIN_SAMPLE_SIZE, len(sample) // 2)
 
 
 def endpoint_slugs(hosts_models: list[Any]) -> list[str]:
+    """Return sorted endpoint slugs from provider/model rows."""
     slugs = {
         item["slug"]
         for item in hosts_models
@@ -466,6 +524,7 @@ def endpoint_slugs(hosts_models: list[Any]) -> list[str]:
 
 
 def provider_from_slug(slug: str) -> str:
+    """Extract the provider slug prefix from an endpoint slug."""
     return slug.split("_", 1)[0]
 
 
@@ -479,12 +538,13 @@ def _is_non_endpoint_slug(slug: str) -> bool:
 
 
 def build_full_url(slugs: list[str]) -> str:
+    """Build a shareable Artificial Analysis URL for endpoint slugs."""
     joined = ",".join(slugs)
     encoded = quote(joined, safe="_-")
     return f"https://artificialanalysis.ai/?models=&endpoints={encoded}"
 
 
-def build_snapshot_payload(
+def build_snapshot_payload(  # noqa: PLR0913
     *,
     models: list[Any],
     hosts: list[Any],
@@ -496,6 +556,7 @@ def build_snapshot_payload(
     official_result: FetchResult,
     official_models: list[dict[str, object]],
 ) -> dict[str, Any]:
+    """Merge source rows into the persisted schema-v2 snapshot."""
     slim_endpoints = _slim_endpoints(hosts_models)
     canonical_models, unmatched_rsc, unmatched_api = _merge_canonical_models(
         rsc_models=models,
@@ -632,9 +693,9 @@ def _merge_canonical_model(
         merged[key] = official_model[key]
     evaluations = official_model["evaluations"]
     if isinstance(evaluations, dict):
-        for name, value in evaluations.items():
-            if value is not None:
-                merged[name] = value
+        merged.update(
+            {name: value for name, value in evaluations.items() if value is not None}
+        )
     return merged
 
 
@@ -653,19 +714,29 @@ def _provider_slugs_from_hosts_models(hosts_models: list[Any]) -> set[str]:
     return values
 
 
-def sanity_check(*, slugs: list[str], min_endpoints: int, min_providers: int) -> None:
+def sanity_check(
+    *,
+    slugs: list[str],
+    min_endpoints: int,
+    min_providers: int,
+) -> None:
+    """Validate endpoint and provider counts against configured thresholds."""
     provider_count = len({provider_from_slug(slug) for slug in slugs})
     if len(slugs) < min_endpoints:
-        raise ExtractionError(
-            f"Too few endpoints extracted ({len(slugs)} < {min_endpoints}). Payload format likely changed.",
+        message = (
+            f"Too few endpoints extracted ({len(slugs)} < {min_endpoints}). "
+            "Payload format likely changed."
         )
+        _raise_extraction_error(message)
     if provider_count < min_providers:
-        raise ExtractionError(
-            f"Too few providers extracted ({provider_count} < {min_providers}). Payload format likely changed.",
+        message = (
+            f"Too few providers extracted ({provider_count} < {min_providers}). "
+            "Payload format likely changed."
         )
+        _raise_extraction_error(message)
 
 
-def write_outputs(
+def write_outputs(  # noqa: PLR0913
     *,
     output_json: Path,
     output_endpoints: Path,
@@ -674,6 +745,7 @@ def write_outputs(
     slugs: list[str],
     full_url: str,
 ) -> None:
+    """Write the snapshot and its endpoint/url companion files."""
     output_json.parent.mkdir(parents=True, exist_ok=True)
     output_endpoints.parent.mkdir(parents=True, exist_ok=True)
     output_url.parent.mkdir(parents=True, exist_ok=True)
@@ -684,27 +756,30 @@ def write_outputs(
 
 
 def load_snapshot(path: Path) -> dict[str, Any]:
+    """Load and validate a JSON snapshot object."""
     try:
         parsed = json.loads(path.read_text(encoding="utf-8"))
     except OSError as exc:
-        raise ExtractionError(f"Cannot read snapshot: {path}") from exc
+        _raise_extraction_error(f"Cannot read snapshot: {path}", exc)
     except json.JSONDecodeError as exc:
-        raise ExtractionError(f"Invalid JSON snapshot: {path}") from exc
+        _raise_extraction_error(f"Invalid JSON snapshot: {path}", exc)
 
     if not isinstance(parsed, dict):
-        raise ExtractionError(f"Snapshot root must be an object: {path}")
+        _raise_extraction_error(f"Snapshot root must be an object: {path}")
     return parsed
 
 
 def snapshot_slugs(snapshot: dict[str, Any]) -> list[str]:
+    """Return endpoint slugs from any supported snapshot key."""
     for key in ("hosts_models", "hostsModels", "host_models", "endpoints"):
         value = snapshot.get(key)
         if isinstance(value, list):
             return endpoint_slugs(value)
-    raise ExtractionError("Snapshot missing hosts_models-compatible list")
+    _raise_extraction_error("Snapshot missing hosts_models-compatible list")
 
 
 def load_cache_metadata(cache_dir: Path) -> CacheMetadata | None:
+    """Read cache metadata, returning None for absent or malformed files."""
     meta_path = cache_dir / CACHE_META_FILE
     if not meta_path.exists():
         return None
@@ -729,6 +804,7 @@ def load_cache_metadata(cache_dir: Path) -> CacheMetadata | None:
 
 
 def load_cached_body(cache_dir: Path, metadata: CacheMetadata | None) -> str | None:
+    """Read a cached provider response body if available."""
     body_file = metadata.body_file if metadata is not None else CACHE_BODY_FILE
     body_path = cache_dir / body_file
     try:
@@ -747,6 +823,7 @@ def save_cache(
     etag: str | None,
     body: str | None,
 ) -> None:
+    """Persist provider response metadata and body in the cache directory."""
     cache_dir.mkdir(parents=True, exist_ok=True)
     if body is not None:
         (cache_dir / CACHE_BODY_FILE).write_text(body, encoding="utf-8")
@@ -763,6 +840,7 @@ def save_cache(
 
 
 def save_last_good_snapshot(cache_dir: Path, payload: dict[str, Any]) -> Path:
+    """Persist a last-good snapshot for fetch fallback."""
     cache_dir.mkdir(parents=True, exist_ok=True)
     path = cache_dir / CACHE_LAST_GOOD_FILE
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -770,6 +848,7 @@ def save_last_good_snapshot(cache_dir: Path, payload: dict[str, Any]) -> Path:
 
 
 def load_last_good_snapshot(cache_dir: Path) -> dict[str, Any] | None:
+    """Load a last-good snapshot, returning None when unavailable."""
     path = cache_dir / CACHE_LAST_GOOD_FILE
     if not path.exists():
         return None
