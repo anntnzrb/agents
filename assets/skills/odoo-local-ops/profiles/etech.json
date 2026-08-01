@@ -39,6 +39,15 @@
         "b2b",
         "url_shortener"
       ]
+    },
+    "b2b-fast": {
+      "database": "erptech_0730-b2b",
+      "modules": [
+        "b2b"
+      ],
+      "test_modules": [
+        "b2b"
+      ]
     }
   }
 }
