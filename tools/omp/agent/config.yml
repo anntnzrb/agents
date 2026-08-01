@@ -5,7 +5,7 @@ modelRoles:
   default: openai-codex/gpt-5.6-luna:xhigh
   task: openai-codex/gpt-5.6-luna:xhigh
 
-  commit: openai-codex/gpt-5.6-luna:medium
+  commit: google-antigravity/gemini-3.6-flash:high
   smol: openai-codex/gpt-5.6-luna:medium
   tiny: openai-codex/gpt-5.6-luna:off
 
