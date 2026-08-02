@@ -46,8 +46,8 @@ The CLI returns `ok`, `schema_version`, `command`, and either `data` or `error`.
 - Preserve config identity as `model + reasoning_effort + harness + config`; never merge tiers or configurations.
 - Keep raw extrema separate from recommendations. Recommendations have no quality/sample exclusion by default; apply `--min-attempted`, `--min-tasks`, or `--min-pass-at-1` only when the user requests a threshold.
 - Every ranked row carries available attempted/task counts, score/pass fields, `ci_lo`, `ci_hi`, `ci_half`, and derived `ci_width = ci_hi - ci_lo`. “Confidence” means CI width, not a probability of correctness.
-- Pareto uses maximize `pass_at_1` and minimize `mean_output_tokens`, `mean_cost_usd`, and `mean_agent_steps`; exclude null metric values and do not invent a composite score.
-- Default included-trial filter is `source='deep-swe'`, `eval_scope='full'`, `included_in_score=true`. Always report `filters_applied`, including explicit overrides. Raw trials have broader scope; never call them “only full DeepSWE.”
+- Pareto defaults to maximize `pass_at_1` and minimize `mean_output_tokens`, `mean_cost_usd`, and `mean_agent_steps`; `report --pareto-axis metric:order` enables an explicit alternate frontier without inventing a composite score.
+- `report --efficiency name=numerator/denominator` adds a derived ratio; zero denominators and missing/non-finite inputs stay null with a reason.
 
 ## Required follow-up reads
 

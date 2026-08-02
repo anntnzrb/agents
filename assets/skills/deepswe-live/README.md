@@ -36,7 +36,7 @@ For same-version reruns and new-release rollout steps, read `references/release-
 | `schema` | Inspect supported payload shape | Use this to adapt future releases without guessing fields. |
 | `compare` | Compare local snapshots | Both snapshots MUST identify the same benchmark version. Use `--snapshot` to opt into historical local data. |
 
-Read the command's `--help` for exact flag spelling. Common controls include `--version`, `--snapshot`, `--trials`, `--timeout`, `--allow-stale`, output/cache directory options, `--limit`, and explicit quality thresholds (`--min-attempted`, `--min-tasks`, `--min-pass-at-1`).
+Read the command's `--help` for exact flag spelling. Common controls include `--version`, `--snapshot`, `--trials`, `--timeout`, `--allow-stale`, output/cache directory options, `--limit`, explicit quality thresholds (`--min-attempted`, `--min-tasks`, `--min-pass-at-1`), repeatable `--pareto-axis METRIC:ORDER`, and repeatable `--efficiency NAME=NUMERATOR/DENOMINATOR`.
 
 ## Freshness and failure behavior
 
@@ -49,7 +49,8 @@ A fresh fetch sends conditional validators when a cache entry has ETag or Last-M
 - Every ranked item should expose available `n_attempted`, `n_tasks_attempted`, score/pass fields, `ci_lo`, `ci_hi`, `ci_half`, and derived `ci_width` (`ci_hi - ci_lo`). “Confidence” means CI width only.
 - Default recommendations do not drop low-n or incomplete rows. Quality/sample exclusion occurs only with explicit `--min-attempted`, `--min-tasks`, or `--min-pass-at-1`.
 - Raw extrema are reported separately from recommendations. Derived metrics live under `derived` and never overwrite published fields.
-- Pareto means maximize `pass_at_1` while minimizing `mean_output_tokens`, `mean_cost_usd`, and `mean_agent_steps`. Rows with null comparison values are excluded; no arbitrary composite score is substituted.
+- Default Pareto means maximize `pass_at_1` while minimizing `mean_output_tokens`, `mean_cost_usd`, and `mean_agent_steps`. Repeatable `--pareto-axis METRIC:ORDER` enables an explicit alternate frontier; null axis values are excluded.
+- Repeatable `--efficiency NAME=NUMERATOR/DENOMINATOR` adds a derived ratio under each row. Zero denominators and invalid inputs remain null with a reason; no composite score is substituted.
 
 For raw trials, the default filter is `source='deep-swe'`, `eval_scope='full'`, and `included_in_score=true`. Every response exposes `filters_applied`, including override values. Never describe all `trials.json` rows as full DeepSWE.
 

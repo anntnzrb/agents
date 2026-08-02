@@ -72,9 +72,11 @@ The skill may add `derived.ci_width`, defined exactly as `ci_hi - ci_lo`. “Con
 
 - recommendations/ranked rows: decision candidates and their counts/CIs;
 - raw extrema: independently best/worst observed values, not silently filtered recommendations;
-- Pareto rows: maximize `pass_at_1` and minimize `mean_output_tokens`, `mean_cost_usd`, and `mean_agent_steps`.
+- Pareto rows: default maximizes `pass_at_1` and minimizes `mean_output_tokens`, `mean_cost_usd`, and `mean_agent_steps`;
+- optional `pareto_axes`: explicit `{metric, order}` metadata when `--pareto-axis` is supplied;
+- optional `efficiency`: explicit numerator/denominator ratios under each copied row's `derived` object.
 
-Pareto dominance excludes any row with a null comparison metric. Do not impute nulls or create an arbitrary composite score. Low-n/incomplete rows remain visible by default; only explicit `--min-attempted`, `--min-tasks`, or `--min-pass-at-1` may exclude them.
+Pareto dominance excludes any row with a null comparison metric. Custom axes use `min`/`asc` or `max`/`desc`; do not impute nulls or create an arbitrary composite score. Low-n/incomplete rows remain visible by default; only explicit `--min-attempted`, `--min-tasks`, or `--min-pass-at-1` may exclude them. Efficiency division never emits infinity: zero denominators and invalid inputs remain null with a reason.
 
 ## Trial filters
 

@@ -16,6 +16,7 @@ from deepswe import cli
 
 EXPECTED_CHANGE_COUNT = 2
 USAGE_EXIT_STATUS = 2
+VALID_COST_PER_ATTEMPT = 0.5
 
 LEADERBOARD = {
     "generated_at": "2026-07-25T03:13:49Z",
@@ -127,6 +128,40 @@ def test_report_success_is_one_json_envelope_with_scope_and_provenance(
     provenance = envelope["data"]["provenance"]
     assert provenance["url"] == "fixture://deepswe/v1.1"
     assert provenance["fetched_at"] == "2026-07-25T04:00:00Z"
+
+
+def test_report_supports_custom_pareto_axes_and_efficiency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ensure CLI reports honor custom Pareto axes and efficiency specs."""
+    code, envelope, diagnostics = invoke(
+        monkeypatch,
+        [
+            "report",
+            "--version",
+            "v1.1",
+            "--pareto-axis",
+            "pass_at_1:max",
+            "--pareto-axis",
+            "mean_cost_usd:min",
+            "--efficiency",
+            "cost_per_attempt=mean_cost_usd/n_attempted",
+        ],
+        source_fixture(),
+    )
+    assert code == 0
+    assert diagnostics == ""
+    data = envelope["data"]
+    assert data["pareto_axes"] == [
+        {"metric": "pass_at_1", "order": "desc"},
+        {"metric": "mean_cost_usd", "order": "asc"},
+    ]
+    assert (
+        data["efficiency"]["rows"][0]["derived"]["efficiency"]["cost_per_attempt"][
+            "value"
+        ]
+        == VALID_COST_PER_ATTEMPT
+    )
 
 
 def test_stats_prefers_artifact_provenance_over_wrapper(

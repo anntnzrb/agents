@@ -7,10 +7,17 @@ from typing import Any
 
 import _path  # noqa: F401
 import pytest
-from deepswe.analysis import build_report, filter_trials, rank_rows
+from deepswe.analysis import (
+    build_report,
+    derive_efficiency,
+    filter_trials,
+    pareto_rows,
+    rank_rows,
+)
 
 TASK_COUNT = 4
 ROW_COUNT = 5
+VALID_COST_PER_ATTEMPT = 0.5
 FILTERED_COUNT = 4
 MIN_ATTEMPTED = 2
 HIGH_PASS_RATE = 0.95
@@ -182,12 +189,66 @@ def test_quality_thresholds_are_opt_in_and_visible() -> None:
     """Ensure quality thresholds alter eligibility only when explicitly supplied."""
     unfiltered = build_report(ROWS, min_attempted=None, limit=None)
     filtered = build_report(ROWS, min_attempted=MIN_ATTEMPTED, limit=None)
-
     assert unfiltered["counts"]["eligible"] == ROW_COUNT
     assert filtered["counts"]["eligible"] == FILTERED_COUNT
     filtered_configs = {row["config"] for row in filtered["recommendations"]["rows"]}
     assert "config-low-n" not in filtered_configs
     assert filtered["filters_applied"]["min_attempted"] == MIN_ATTEMPTED
+
+
+def test_custom_pareto_axes_preserve_null_exclusion_and_identity() -> None:
+    """Ensure custom Pareto axes preserve null exclusion and identity."""
+    frontier = pareto_rows(
+        [
+            {"config": "quality", "pass_at_1": 0.9, "mean_cost_usd": 2.0},
+            {"config": "cheap", "pass_at_1": 0.8, "mean_cost_usd": 1.0},
+            {"config": "dominated", "pass_at_1": 0.7, "mean_cost_usd": 3.0},
+            {"config": "missing", "pass_at_1": 0.9, "mean_cost_usd": None},
+        ],
+        ["pass_at_1:max", "mean_cost_usd:min"],
+    )
+    assert {row["config"] for row in frontier} == {"quality", "cheap"}
+    assert all(row["value_status"] == "published" for row in frontier)
+
+
+def test_efficiency_utility_handles_zero_and_missing_denominators() -> None:
+    """Ensure efficiency derivation reports valid, zero, and missing inputs."""
+    result = derive_efficiency(
+        [
+            {"config": "valid", "mean_cost_usd": 2.0, "n_attempted": 4},
+            {"config": "zero", "mean_cost_usd": 2.0, "n_attempted": 0},
+            {"config": "missing", "mean_cost_usd": None, "n_attempted": 4},
+        ],
+        ["cost_per_attempt=mean_cost_usd/n_attempted"],
+    )
+    rows = {row["config"]: row for row in result["rows"]}
+    assert (
+        rows["valid"]["derived"]["efficiency"]["cost_per_attempt"]["value"]
+        == VALID_COST_PER_ATTEMPT
+    )
+    assert (
+        rows["zero"]["derived"]["efficiency"]["cost_per_attempt"]["reason"]
+        == "zero_denominator"
+    )
+    assert (
+        rows["missing"]["derived"]["efficiency"]["cost_per_attempt"]["reason"]
+        == "missing_or_invalid_input"
+    )
+
+
+def test_report_adds_opt_in_analysis_sections() -> None:
+    """Ensure reports include requested Pareto and efficiency sections."""
+    report = build_report(
+        ROWS,
+        limit=None,
+        pareto_axes=["pass_at_1:max", "mean_cost_usd:min"],
+        efficiency_specs=["cost_per_attempt=mean_cost_usd/n_attempted"],
+    )
+    assert report["pareto_axes"] == [
+        {"metric": "pass_at_1", "order": "desc"},
+        {"metric": "mean_cost_usd", "order": "asc"},
+    ]
+    assert report["efficiency"]["specs"][0]["name"] == "cost_per_attempt"
 
 
 @pytest.mark.parametrize(

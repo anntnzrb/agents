@@ -253,6 +253,20 @@ def build_parser() -> argparse.ArgumentParser:
     _add_fetch_options(report, snapshot=True)
     _add_quality_options(report)
 
+    report.add_argument(
+        "--pareto-axis",
+        action="append",
+        default=None,
+        metavar="METRIC:ORDER",
+        help="add a Pareto axis; ORDER is min/asc or max/desc (repeatable)",
+    )
+    report.add_argument(
+        "--efficiency",
+        action="append",
+        default=None,
+        metavar="NAME=NUMERATOR/DENOMINATOR",
+        help="derive an explicit ratio under each row (repeatable)",
+    )
     rank = commands.add_parser("rank", help="rank published leaderboard rows")
     _add_fetch_options(rank, snapshot=True)
     rank.add_argument(
@@ -770,6 +784,14 @@ def _quality_filters(args: argparse.Namespace) -> dict[str, Any]:
             filters[key] = value
     if len(filters) > 1:
         filters["quality_exclusion"] = "explicit_thresholds"
+    pareto_axes = getattr(args, "pareto_axis", None)
+    efficiencies = getattr(args, "efficiency", None)
+    if pareto_axes is not None:
+        filters["pareto_axes"] = pareto_axes
+    if efficiencies is not None:
+        filters["efficiency"] = efficiencies
+    if pareto_axes is not None or efficiencies is not None:
+        filters["analysis_options"] = "explicit"
     return filters
 
 
@@ -823,6 +845,8 @@ def _handle_report(args: argparse.Namespace) -> dict[str, Any]:
             min_attempted=args.min_attempted,
             min_tasks=args.min_tasks,
             limit=args.limit,
+            pareto_axes=args.pareto_axis,
+            efficiency_specs=args.efficiency,
         )
     except Exception as exc:
         raise CliError(_exception_code(exc), str(exc)) from exc
@@ -1053,6 +1077,10 @@ def _schema_data(version: str) -> dict[str, Any]:
         },
         "artifact_base": ARTIFACT_BASE,
         "benchmark_version": version,
+        "report_options": {
+            "pareto_axis": "repeatable METRIC:ORDER; omitted uses default axes",
+            "efficiency": "repeatable NAME=NUMERATOR/DENOMINATOR; derived only",
+        },
     }
 
 

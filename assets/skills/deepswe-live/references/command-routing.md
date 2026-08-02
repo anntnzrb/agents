@@ -33,6 +33,8 @@ Use this page to choose one deterministic JSON command. The CLI is a metrics/res
 ## Analysis routing
 
 - `report` is the primary route for “which model/configuration is most efficient?” It must retain scores, counts, CIs, raw extrema, Pareto choices, and provenance.
+- `report --pareto-axis metric:order` is the opt-in route for a different multi-objective frontier. Omit it to retain the default four-axis frontier.
+- `report --efficiency name=numerator/denominator` is the opt-in route for an explicit derived ratio. Keep the formula and null/zero-denominator reason with the result.
 - `rank` is for one-dimensional ordering. Use explicit quality/sample flags only when requested; defaults do not hide low-n or incomplete rows.
 - `trials` uses `source='deep-swe'`, `eval_scope='full'`, and `included_in_score=true` by default. Use explicit `--source`, `--eval-scope`, or `--all`/inclusion controls to widen visibility, and inspect `filters_applied`.
 - `stats` summarizes available metrics; `schema` is the compatibility/introspection route for future payload versions.
