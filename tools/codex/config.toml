@@ -142,5 +142,5 @@ description = "Deep plan reviewer. Verifies a work plan is executable: reference
 config_file = "agents/momus.toml"
 
 [agents.plan]
-description = "Strategic planning consultant for work with unresolved design uncertainty after discovery. Produces one executable plan; never implements. Writes the plan to ~/.codex/plans/<slug>/plan.md."
+description = "Strategic planning consultant for work with unresolved design uncertainty after discovery. Produces one executable plan; never implements. Uses the caller-provided attempt directory or ~/.local/share/agents/codex/runs/<repo-slug>/<goal-slug>/plan.md."
 config_file = "agents/plan.toml"

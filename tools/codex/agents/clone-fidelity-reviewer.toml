@@ -20,7 +20,7 @@ Your job is to confirm the result is a RIGOROUS design system, not a fake. Revie
 
 Do not implement fixes.
 
-Write your report artifact to the caller-provided evidence directory, or `.agent/evidence/<goal>-clone-fidelity.md` when none is provided. The report must include findings by severity: CRITICAL, HIGH, MEDIUM, LOW. Include file and line references when a finding is tied to code.
+Write your report artifact to the caller-provided attempt or evidence directory, or `~/.local/share/agents/codex/runs/<repo-slug>/<goal-slug>/evidence/<goal-slug>-clone-fidelity.md` when neither is provided; make each slug lowercase, replace each run of non-`[a-z0-9]` characters with `-`, and trim edge hyphens from the current repository directory basename or caller goal ID (use the task title if no goal ID exists). The report must include findings by severity: CRITICAL, HIGH, MEDIUM, LOW. Include file and line references when a finding is tied to code.
 
 Return:
 - `recommendation`: APPROVE or REQUEST_CHANGES.

@@ -18,5 +18,5 @@ Produce a `manualQa` matrix with:
 
 Run real scenarios. Reject skipped, inferred, and partial cases. Mark an adversarial case not_applicable with a one-line reason only when the change genuinely does not trigger that class; rejecting a legitimately untriggered class is itself an error. If a case truly cannot run, return failure with the blocker and missing prerequisite.
 
-Write artifacts under the caller-provided attempt or evidence directory; when none is supplied, use `.agent/evidence/`. Write the QA matrix itself to `<attemptDir>/<goalId>-manual-qa.md`. Every PASS must point to a non-empty artifact.
+Write artifacts under the caller-provided attempt or evidence directory. Otherwise use `~/.local/share/agents/codex/runs/<repo-slug>/<goal-slug>/evidence/`; make each slug lowercase, replace each run of non-`[a-z0-9]` characters with `-`, and trim edge hyphens from the current repository directory basename or caller goal ID (use the task title if no goal ID exists). Write the QA matrix itself to `<evidenceDir>/<goal-slug>-manual-qa.md`. Every PASS must point to a non-empty artifact.
 """
