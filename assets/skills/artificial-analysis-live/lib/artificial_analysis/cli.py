@@ -26,8 +26,10 @@ from .rsc import (
     build_full_url,
     build_snapshot_payload,
     endpoint_slugs,
+    extract_evaluation_rows,
     extract_lists,
     fetch_models,
+    fetch_page,
     fetch_rsc,
     load_cache_metadata,
     load_cached_body,
@@ -35,6 +37,7 @@ from .rsc import (
     load_snapshot,
     normalize_official_models,
     parse_json_frames,
+    parse_next_payload,
     sanity_check,
     save_cache,
     save_last_good_snapshot,
@@ -166,6 +169,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_diff_parser(subparsers)
     _add_harness_parser(subparsers)
     _add_coding_parser(subparsers)
+    _add_evaluation_parser(subparsers)
     _add_reasoning_parser(subparsers)
     _add_query_parser(subparsers)
     _add_qa_parser(subparsers)
@@ -306,6 +310,30 @@ def _add_coding_parser(subparsers: argparse._SubParsersAction) -> None:
         help="Include per-benchmark token counts for Coding Index components.",
     )
     coding_parser.set_defaults(handler=_handle_coding)
+
+
+def _add_evaluation_parser(subparsers: argparse._SubParsersAction) -> None:
+    evaluation_parser = subparsers.add_parser(
+        "evaluation",
+        help="Extract model rows from a dedicated Artificial Analysis evaluation page.",
+    )
+    evaluation_parser.add_argument("url", nargs="?", help="public evaluation page URL")
+    evaluation_parser.add_argument(
+        "--input",
+        type=Path,
+        help="read a saved HTML/RSC response instead of fetching a URL",
+    )
+    evaluation_parser.add_argument("--output-json", type=Path)
+    evaluation_parser.add_argument("--timeout-seconds", type=float, default=60.0)
+    evaluation_parser.add_argument("--min-rows", type=int, default=1)
+    evaluation_parser.add_argument("--sort-by", type=str)
+    evaluation_parser.add_argument(
+        "--order",
+        choices=("auto", "asc", "desc"),
+        default="auto",
+    )
+    evaluation_parser.add_argument("--limit", type=int)
+    evaluation_parser.set_defaults(handler=_handle_evaluation)
 
 
 def _add_reasoning_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -497,6 +525,7 @@ def _normalize_argv(argv: Sequence[str] | None) -> list[str]:
         "diff",
         "harness",
         "coding",
+        "evaluation",
         "reasoning",
         "query",
         "qa",
@@ -1058,6 +1087,83 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
             "skipped_missing_token_counts": 0,
             "frames": len(frames),
         },
+        "rows": limited,
+    }
+
+
+def _evaluation_payload(args: argparse.Namespace) -> dict[str, Any]:
+    if args.input is not None and args.url is not None:
+        _raise_cli_usage_error("evaluation accepts either url or --input, not both")
+    if args.input is None and not isinstance(args.url, str):
+        _raise_cli_usage_error("evaluation requires a URL or --input")
+    if args.min_rows < 1:
+        _raise_cli_usage_error("min_rows must be positive")
+    if args.limit is not None and args.limit < 0:
+        _raise_cli_usage_error("limit must be non-negative")
+
+    if args.input is not None:
+        try:
+            body = args.input.read_text(encoding="utf-8")
+        except OSError as exc:
+            message = f"Cannot read evaluation input: {args.input}"
+            raise CliUsageError(message) from exc
+        source_url = args.input.resolve().as_uri()
+        source_status = 200
+        fetched_at = datetime.now(UTC).isoformat()
+        content_type = "local"
+    else:
+        result = fetch_page(args.url, timeout_seconds=args.timeout_seconds)
+        body = result.body
+        source_url = args.url
+        source_status = result.status_code
+        fetched_at = result.fetched_at
+        content_type = result.headers.get("content-type")
+
+    frames = parse_next_payload(body)
+    rows = extract_evaluation_rows(frames, min_rows=args.min_rows)
+    if args.sort_by:
+        reverse = args.order in {"auto", "desc"}
+        rows.sort(
+            key=lambda row: _nested_sort_metric(
+                row,
+                args.sort_by,
+                reverse=reverse,
+            ),
+        )
+    limited = rows if args.limit is None else rows[: args.limit]
+    source = {
+        "url": source_url,
+        "status_code": source_status,
+        "fetched_at": fetched_at,
+        "content_type": content_type,
+    }
+    filters = {
+        "min_rows": args.min_rows,
+        "sort_by": args.sort_by,
+        "order": args.order,
+        "limit": args.limit,
+    }
+    payload: dict[str, Any] = {
+        "meta": {"source": source, "filters_applied": filters},
+        "rows": rows,
+    }
+    if args.output_json is not None:
+        args.output_json.parent.mkdir(parents=True, exist_ok=True)
+        args.output_json.write_text(
+            json.dumps(payload, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    return {
+        "value_status": "published",
+        "source": source,
+        "filters_applied": filters,
+        "counts": {
+            "frames": len(frames),
+            "matched_rows": len(rows),
+            "returned_rows": len(limited),
+        },
+        "output_json": str(args.output_json) if args.output_json else None,
         "rows": limited,
     }
 
@@ -1989,6 +2095,11 @@ def _handle_coding(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_evaluation(args: argparse.Namespace) -> int:
+    _emit_json(_envelope("evaluation", _evaluation_payload(args)), stdout=sys.stdout)
+    return 0
+
+
 def _handle_reasoning(args: argparse.Namespace) -> int:
     _emit_json(_envelope("reasoning", _reasoning_payload(args)), stdout=sys.stdout)
     return 0
@@ -2100,6 +2211,23 @@ def _capability_schema() -> dict[str, Any]:
                 "token_scope": (
                     "coding_index_only; not global Intelligence Index token counts"
                 ),
+            },
+            "evaluation": {
+                "description": (
+                    "Extract generic model rows from a dedicated Artificial "
+                    "Analysis evaluation page or saved HTML/RSC response."
+                ),
+                "args": ["url(optional when input is supplied)"],
+                "flags": {
+                    "input": "Path to saved HTML/RSC response",
+                    "output_json": "Optional path for the full extracted row set",
+                    "timeout_seconds": "float network timeout",
+                    "min_rows": "minimum recognizable rows (default 1)",
+                    "sort_by": "optional dotted numeric field path",
+                    "order": "auto|asc|desc",
+                    "limit": "optional maximum returned rows",
+                },
+                "value_status": "published rows; filters/counts are derived",
             },
             "reasoning": {
                 "description": (
@@ -2282,6 +2410,28 @@ def _coding_namespace(args: dict[str, Any]) -> argparse.Namespace:
     )
 
 
+def _evaluation_namespace(args: dict[str, Any]) -> argparse.Namespace:
+    input_value = _arg_value(args, "input", None)
+    return argparse.Namespace(
+        url=_arg_value(args, "url", None),
+        input=Path(input_value) if input_value is not None else None,
+        output_json=(
+            Path(_arg_value(args, "output_json", ""))
+            if _arg_value(args, "output_json", None) is not None
+            else None
+        ),
+        timeout_seconds=float(_arg_value(args, "timeout_seconds", 60.0)),
+        min_rows=int(_arg_value(args, "min_rows", 1)),
+        sort_by=_arg_value(args, "sort_by", None),
+        order=str(_arg_value(args, "order", "auto")),
+        limit=(
+            int(_arg_value(args, "limit", 0))
+            if _arg_value(args, "limit", None) is not None
+            else None
+        ),
+    )
+
+
 def _reasoning_namespace(args: dict[str, Any]) -> argparse.Namespace:
     return argparse.Namespace(
         snapshot=Path(_arg_value(args, "snapshot", str(DEFAULT_OUTPUT_JSON))),
@@ -2436,6 +2586,12 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                     request_id,
                     command,
                     _coding_payload(_coding_namespace(args_payload)),
+                )
+            elif command == "evaluation":
+                response = _success_response(
+                    request_id,
+                    command,
+                    _evaluation_payload(_evaluation_namespace(args_payload)),
                 )
             elif command == "reasoning":
                 response = _success_response(

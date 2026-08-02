@@ -16,8 +16,10 @@ from artificial_analysis.rsc import (
     ExtractionError,
     FetchResult,
     build_snapshot_payload,
+    extract_evaluation_rows,
     extract_lists,
     normalize_official_models,
+    parse_next_payload,
     snapshot_slugs,
 )
 
@@ -198,6 +200,38 @@ class TestRscExtraction(unittest.TestCase):
 
         assert hosts_models[1]["slug"] == "provider-two_model-b"
         assert hosts_models[1]["model"]["model_creator_id"] == "creator-b"
+
+    def test_parse_next_payload_extracts_embedded_flight_frames(self) -> None:
+        document = (
+            "<script>self.__next_f.push([1,"
+            '"0:{\\"rows\\":[{\\"name\\":\\"Model A\\",\\"score\\":72.5}]}'
+            '"])</script>'
+        )
+        frames = parse_next_payload(document)
+        rows = extract_evaluation_rows(frames)
+        assert rows == [{"name": "Model A", "score": 72.5}]
+
+    def test_extract_evaluation_rows_selects_largest_recognizable_list(self) -> None:
+        frames = [
+            (
+                "0",
+                {
+                    "small": [{"name": "A", "score": 1}],
+                    "large": [
+                        {"name": "A", "score": 1},
+                        {"name": "B", "score": 2},
+                    ],
+                },
+            ),
+        ]
+        assert extract_evaluation_rows(frames) == [
+            {"name": "A", "score": 1},
+            {"name": "B", "score": 2},
+        ]
+
+    def test_extract_evaluation_rows_rejects_unrelated_lists(self) -> None:
+        with pytest.raises(ExtractionError, match="recognizable model rows"):
+            extract_evaluation_rows([("0", {"rows": [{"value": 1}]})])
 
     def test_snapshot_slugs_accepts_aliases(self) -> None:
         snapshot = {

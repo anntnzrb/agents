@@ -45,6 +45,24 @@ class TestCliDefaultPaths(unittest.TestCase):
 
         assert args.output_json == TMP_CODING
 
+    def test_evaluation_parser_accepts_url_and_generic_controls(self) -> None:
+        args = cli.build_parser().parse_args(
+            [
+                "evaluation",
+                "https://example.test/evaluations/demo",
+                "--sort-by",
+                "score",
+                "--order",
+                "desc",
+                "--limit",
+                "3",
+            ],
+        )
+        assert args.url == "https://example.test/evaluations/demo"
+        assert args.sort_by == "score"
+        assert args.order == "desc"
+        assert args.limit == 3
+
     def test_rpc_namespace_defaults_use_tmp_artifacts(self) -> None:
         fetch_args = cli._fetch_namespace({})
 
@@ -207,6 +225,24 @@ class TestCliDefaultPaths(unittest.TestCase):
                 payload = cli._fetch_payload(args)
         assert payload["fallback"]["used"]
         assert payload["sources"]["official_api"]["status_code"] is None
+
+    def test_evaluation_payload_reads_saved_next_response(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "evaluation.html"
+            input_path.write_text(
+                "<script>self.__next_f.push([1,"
+                '"0:{\\"rows\\":[{\\"name\\":\\"A\\",\\"score\\":70},'
+                '{\\"name\\":\\"B\\",\\"score\\":80}]}'
+                '"])</script>',
+                encoding="utf-8",
+            )
+            args = cli._evaluation_namespace(
+                {"input": str(input_path), "sort_by": "score", "order": "desc"},
+            )
+            payload = cli._evaluation_payload(args)
+
+        assert payload["counts"]["matched_rows"] == 2
+        assert [row["name"] for row in payload["rows"]] == ["B", "A"]
 
 
 if __name__ == "__main__":

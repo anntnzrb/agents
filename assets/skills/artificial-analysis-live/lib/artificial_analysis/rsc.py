@@ -14,8 +14,10 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
     from typing import Any, NoReturn
+
 
 NOT_MODIFIED = 304
 MIN_SAMPLE_SIZE = 2
@@ -28,6 +30,8 @@ CACHE_META_FILE = "providers-cache.json"
 CACHE_BODY_FILE = "providers.rsc"
 CACHE_LAST_GOOD_FILE = "last-good.json"
 SNAPSHOT_SCHEMA_VERSION = 2
+MIN_NEXT_PUSH_ITEMS = 2
+DEFAULT_MIN_EVALUATION_ROWS = 1
 
 
 class ExtractionError(RuntimeError):
@@ -106,6 +110,34 @@ def fetch_rsc(
                 fetched_at=fetched_at,
             )
         message = f"Upstream request failed: HTTP {exc.code}"
+        _raise_os_error(message, exc)
+
+
+def fetch_page(
+    url: str,
+    *,
+    timeout_seconds: float = 60.0,
+) -> FetchResult:
+    """Fetch a public Artificial Analysis page containing embedded RSC data."""
+    request = Request(
+        url,
+        headers={
+            "Accept": "text/html,application/xhtml+xml",
+            "User-Agent": "artificial-analysis/0.3",
+        },
+    )
+    fetched_at = datetime.now(UTC).isoformat()
+
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            return FetchResult(
+                body=response.read().decode("utf-8", errors="replace"),
+                status_code=response.status,
+                headers={key.lower(): value for key, value in response.headers.items()},
+                fetched_at=fetched_at,
+            )
+    except HTTPError as exc:
+        message = f"Upstream page request failed: HTTP {exc.code}"
         _raise_os_error(message, exc)
 
 
@@ -238,6 +270,120 @@ def parse_json_frames(rsc_payload: str) -> list[tuple[str, Any]]:
             continue
         parsed_frames.append((frame_id, parsed))
     return parsed_frames
+
+
+def parse_next_payload(document: str) -> list[tuple[str, object]]:
+    """Extract embedded Next.js Flight pushes and parse their RSC frames."""
+    marker = "self.__next_f.push("
+    decoder = json.JSONDecoder()
+    frames: list[tuple[str, object]] = []
+    cursor = 0
+    while True:
+        marker_start = document.find(marker, cursor)
+        if marker_start < 0:
+            break
+        payload_start = marker_start + len(marker)
+        try:
+            payload, cursor = decoder.raw_decode(document, payload_start)
+        except json.JSONDecodeError:
+            cursor = payload_start
+            continue
+        if not isinstance(payload, list) or len(payload) < MIN_NEXT_PUSH_ITEMS:
+            continue
+        frame_id = payload[0]
+        value = payload[1]
+        if isinstance(value, str):
+            frames.extend(parse_json_frames(value))
+        elif isinstance(frame_id, (str, int, float)):
+            frames.append((str(frame_id), value))
+
+    if frames:
+        return frames
+    return [(frame_id, value) for frame_id, value in parse_json_frames(document)]
+
+
+def _default_evaluation_row(row: dict[str, object]) -> bool:
+    identity_keys = ("slug", "model", "model_slug", "model_name", "name")
+    score_keys = (
+        "score",
+        "value",
+        "overall",
+        "headlineValue",
+        "pass_at_1",
+        "coding",
+    )
+    has_identity = any(isinstance(row.get(key), str) for key in identity_keys)
+    has_score = any(
+        isinstance(row.get(key), (int, float)) and not isinstance(row.get(key), bool)
+        for key in score_keys
+    )
+    return has_identity and has_score
+
+
+def _scan_evaluation_node(
+    node: object,
+    *,
+    predicate: Callable[[dict[str, object]], bool],
+    min_rows: int,
+    candidates: list[list[dict[str, object]]],
+    seen_lists: set[int],
+) -> None:
+    if isinstance(node, list):
+        node_id = id(node)
+        if node_id not in seen_lists:
+            seen_lists.add(node_id)
+            matched = [
+                dict(item)
+                for item in node
+                if isinstance(item, dict) and predicate(item)
+            ]
+            if len(matched) >= min_rows:
+                candidates.append(matched)
+        for item in node:
+            _scan_evaluation_node(
+                item,
+                predicate=predicate,
+                min_rows=min_rows,
+                candidates=candidates,
+                seen_lists=seen_lists,
+            )
+    elif isinstance(node, dict):
+        for value in node.values():
+            _scan_evaluation_node(
+                value,
+                predicate=predicate,
+                min_rows=min_rows,
+                candidates=candidates,
+                seen_lists=seen_lists,
+            )
+
+
+def extract_evaluation_rows(
+    parsed_frames: list[tuple[str, object]],
+    *,
+    row_predicate: Callable[[dict[str, object]], bool] | None = None,
+    min_rows: int = DEFAULT_MIN_EVALUATION_ROWS,
+) -> list[dict[str, object]]:
+    """Select the largest recognizable model-evaluation row list."""
+    if min_rows < DEFAULT_MIN_EVALUATION_ROWS:
+        message = "min_rows must be positive"
+        raise ValueError(message)
+    predicate = row_predicate or _default_evaluation_row
+    candidates: list[list[dict[str, object]]] = []
+    seen_lists: set[int] = set()
+    for _, frame in parsed_frames:
+        _scan_evaluation_node(
+            frame,
+            predicate=predicate,
+            min_rows=min_rows,
+            candidates=candidates,
+            seen_lists=seen_lists,
+        )
+    if not candidates:
+        _raise_extraction_error(
+            "Evaluation payload missing recognizable model rows.",
+        )
+    return max(candidates, key=len)
 
 
 def _add_candidate(

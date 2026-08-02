@@ -7,7 +7,7 @@ Read this before consuming CLI/RPC envelopes, snapshot fields, coding evidence, 
 ## CLI envelope
 
 ```json
-{"ok":true,"version":"1","command":"fetch|stats|diff|query|qa|coding|schema","data":{...}}
+{"ok":true,"version":"1","command":"fetch|stats|diff|query|qa|coding|evaluation|schema","data":{...}}
 ```
 
 ## RPC envelope
@@ -135,6 +135,21 @@ observed evidence:
 These costs are Coding evaluation/API USD measurements, not ChatGPT or Codex
 subscription-plan quota, allowance, or billing values; no plan-quota
 equivalence or conversion is implied.
+
+## Dedicated evaluation rows
+
+`evaluation` reads a public dedicated evaluation page or a saved HTML/RSC
+response. It returns:
+
+- `source`: URL/path, HTTP status, fetch timestamp, and content type;
+- `filters_applied`: minimum rows, optional sort path/order, and limit;
+- `counts`: parsed frames, matched rows, and returned rows;
+- `rows`: the largest recognizable list of model identity + numeric score rows.
+
+Rows preserve source fields and have `value_status=published`. Sorting, limiting,
+and arithmetic performed after extraction are derived operations. Unknown fields
+are retained; benchmark-specific normalization belongs outside this generic
+extractor.
 
 ## Reasoning rows
 

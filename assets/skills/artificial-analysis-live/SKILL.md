@@ -44,11 +44,10 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 
 ## Output policy
 
-- Tool output is JSON only.
-- Prefer `coding` for Coding Index token composition/cost breakdown questions.
-- Prefer `reasoning` for model reasoning selectivity and per-benchmark token split questions.
-- Prefer `query` for provider endpoint ranking answers.
-- Prefer `qa` only when user asks in plain language and speed matters.
+- Prefer `evaluation` for a dedicated public benchmark page; use `--input` to replay a saved HTML/RSC response.
+- Keep dedicated evaluation scores separate from Coding Index, Coding Agent Index, and provider-matrix data.
+- Mark page rows as published and sorting/limiting/arithmetic as derived; preserve source URL and scope.
+- Read `references/evaluation-pages.md` before selecting a dedicated evaluation URL or comparing benchmark populations.
 - If freshness is critical, run `fetch` immediately before `query`/`qa`. Default `<temp-dir>/artifacts/artificial-analysis/full-data.json` readers reject snapshots older than 24h; explicit paths are intentional historical data.
 
 ## Required follow-up reads
@@ -59,4 +58,5 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 | Full command and flag usage | `README.md` | When the fast-path commands are insufficient |
 | JSON envelopes, fields, and reasoning metrics | `references/output-contract.md` | Before consuming structured output or reasoning classifications |
 | Capability-page schema repair | `references/capability-schema-drift.md` | When `coding` fails after upstream drift |
+| Dedicated evaluation pages | `references/evaluation-pages.md` | When using `evaluation` or separating standalone pages from composite indexes |
 | Recovery | `references/troubleshooting.md` | For fetch, extraction, cache, freshness, or credential failures |

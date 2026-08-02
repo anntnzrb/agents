@@ -156,6 +156,32 @@ Returns unique model rows with `coding_token_counts`:
 
 Important: these counts are tied to the Coding Index capability evaluation, not global `intelligence_index_token_counts`. The current Coding Index components are Terminal-Bench Hard and SciCode; pass `--include-benchmark-counts` to include each component's token counts.
 
+## Dedicated evaluation pages
+
+Use `evaluation` for a standalone public benchmark page. It parses standard RSC
+responses and embedded Next.js Flight payloads without assuming a benchmark-specific
+row schema:
+
+```bash
+uv run --script <skill-dir>/scripts/cli.py evaluation \
+  https://artificialanalysis.ai/evaluations/terminalbench-v2-1 \
+  --sort-by score --order desc --limit 25 \
+  --output-json <temp-dir>/terminalbench.json
+```
+
+Replay a saved page response:
+
+```bash
+uv run --script <skill-dir>/scripts/cli.py evaluation \
+  --input <temp-dir>/evaluation.html
+```
+
+The result preserves source metadata and unknown row fields. Page rows are
+published values; sorting, limiting, and arithmetic are derived. Do not merge a
+dedicated evaluation score with the Coding Index or Coding Agent Index without
+checking benchmark population, task count, repeats, harness, and metric scope.
+See `references/evaluation-pages.md` for routing and comparability rules.
+
 ## Query (model/provider benchmark questions)
 
 ```bash
@@ -187,8 +213,6 @@ It returns parsed intent + delegated `query` result in one JSON object.
 uv run --script <skill-dir>/scripts/cli.py schema
 ```
 
-Returns machine-readable capability schema JSON.
-
 ## RPC mode (JSONL)
 
 Start loop:
@@ -212,6 +236,7 @@ uv run --script <skill-dir>/scripts/cli.py --mode rpc
 - `diff`
 - `harness`
 - `coding`
+- `evaluation`
 - `query`
 - `qa`
 
