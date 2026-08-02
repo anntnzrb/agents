@@ -17,9 +17,10 @@ from urllib.parse import quote
 
 from .errors import InputError, RefusalError
 from .models import Handoff, Lease, LeaseState, Mode
+from .paths import default_root
 
 
-DEFAULT_ROOT = Path.home().resolve() / ".agents" / "worktrees"
+DEFAULT_ROOT = default_root().resolve()
 
 
 class Controller:

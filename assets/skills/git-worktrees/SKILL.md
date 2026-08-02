@@ -66,7 +66,7 @@ Every normal command returns one JSON line on stdout. Parse it; do not infer suc
 8. Check `status` when release eligibility or repository state is uncertain.
 9. `release --quiescent` only with the owner token, no active handoffs, and an explicitly requested cleanup.
 
-`acquire` allocates below `~/.agents/worktrees`; callers never choose a destination. New branches use `work/<allocated-name>`.
+`acquire` allocates below `${XDG_DATA_HOME:-~/.local/share}/agents/worktrees`; callers never choose a destination. New branches use `work/<allocated-name>`.
 
 ## Hard no-go actions
 

@@ -12,8 +12,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Never
 
+from git_worktrees.paths import default_root
+
 SCHEMA = "git-worktrees/v1"
-ROOT = Path.home() / ".agents" / "worktrees"
+ROOT = default_root().resolve()
 DEFAULT_SETUP_TIMEOUT_SECONDS = 600
 NAME_PATTERN = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
 

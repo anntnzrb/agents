@@ -29,6 +29,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         self.temp_path = Path(self.temporary_directory.name)
         self.home = self.temp_path / "home"
         self.home.mkdir()
+        self.data_home = self.temp_path / "data-home"
         self.repo = self.temp_path / "repo"
         self.repo.mkdir()
         self.git("init")
@@ -57,20 +58,27 @@ class GitWorktreesCliContractTests(unittest.TestCase):
             },
         )
 
-    def cli(self, *args: str) -> tuple[subprocess.CompletedProcess[str], dict[str, Any]]:
+    def cli(
+        self, *args: str, use_xdg_default: bool = False
+    ) -> tuple[subprocess.CompletedProcess[str], dict[str, Any]]:
+        environment = {
+            **os.environ,
+            "HOME": str(self.home),
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_TERMINAL_PROMPT": "0",
+            "LC_ALL": "C",
+        }
+        if use_xdg_default:
+            environment.pop("XDG_DATA_HOME", None)
+        else:
+            environment["XDG_DATA_HOME"] = str(self.data_home)
         completed = subprocess.run(
             ["uv", "run", "--script", str(CLI), *args],
             cwd=SKILL_ROOT,
             capture_output=True,
             text=True,
             timeout=30,
-            env={
-                **os.environ,
-                "HOME": str(self.home),
-                "GIT_CONFIG_NOSYSTEM": "1",
-                "GIT_TERMINAL_PROMPT": "0",
-                "LC_ALL": "C",
-            },
+            env=environment,
         )
         lines = completed.stdout.splitlines()
         self.assertEqual(
@@ -159,7 +167,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         path = self.lease_path(lease)
         self.assertEqual(
             path,
-            (self.home / ".agents" / "worktrees" / self.repo.name / name).resolve(),
+            (self.data_home / "agents" / "worktrees" / self.repo.name / name).resolve(),
         )
         self.assertTrue(path.is_dir())
         self.assertTrue((path / ".git").is_file())
@@ -186,7 +194,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         )
 
     def test_inspect_is_read_only(self) -> None:
-        control_root = self.home / ".agents" / "worktrees"
+        control_root = self.data_home / "agents" / "worktrees"
         self.assertFalse(control_root.exists())
 
         result = self.success("inspect", "--repo", str(self.repo))
@@ -212,6 +220,23 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         self.assertIn("blockers", result)
         self.assertIn("safe_to_release", result)
         self.assertNotIn("observations", result)
+
+    def test_schema_uses_xdg_data_home_and_default(self) -> None:
+        configured = self.success("schema")
+        self.assertEqual(
+            configured.get("root"),
+            str((self.data_home / "agents" / "worktrees").resolve()),
+        )
+
+        completed, payload = self.cli("schema", use_xdg_default=True)
+        self.assertEqual(completed.returncode, 0, payload)
+        self.assertTrue(payload.get("ok"), payload)
+        result = payload.get("result")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(
+            result.get("root"),
+            str((self.home / ".local" / "share" / "agents" / "worktrees").resolve()),
+        )
 
     def test_acquire_returns_ready_linked_worktree_and_one_time_capability(self) -> None:
         lease, owner_token = self.acquire("feature")
@@ -422,7 +447,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
 
         common_git_dir = str((other_repo / ".git").resolve())
         slug = f"repo-{sha256(common_git_dir.encode('utf-8')).hexdigest()[:6]}"
-        unsafe_parent = (self.home / ".agents" / "worktrees" / slug).resolve(strict=False)
+        unsafe_parent = (self.data_home / "agents" / "worktrees" / slug).resolve(strict=False)
         unsafe_parent.write_text("not a directory", encoding="utf-8")
 
         inspection = self.success("inspect", "--repo", str(other_repo))

@@ -8,7 +8,7 @@ Read this before invoking the raw-Git CLI or consuming its JSON. It is a local, 
 uv run --script <skill-dir>/scripts/cli.py <command> [arguments]
 ```
 
-The root is fixed at `~/.agents/worktrees`; no root, destination, config, or environment override exists. Normal commands write exactly one JSON object plus newline to stdout. They never write Git/setup output or tracebacks there. `--help` may print argparse help instead.
+The root is fixed at `${XDG_DATA_HOME:-~/.local/share}/agents/worktrees`; `XDG_DATA_HOME` selects the standard data-home base, but there is no CLI root, destination, or config override. Normal commands write exactly one JSON object plus newline to stdout. They never write Git/setup output or tracebacks there. `--help` may print argparse help instead.
 
 Success envelope:
 
@@ -88,7 +88,7 @@ Mode requirements:
 | `existing-branch` | `--branch BRANCH` | `--base` | Attaches an existing unattached branch. |
 | `detached-ephemeral` | `--base REV` | `--branch` | Creates a detached worktree at the base. |
 
-The controller chooses a visible path below `~/.agents/worktrees/<repo-slug>/`. It allocates `name`, then `name-2`, and so on; a candidate must have no path collision and no attached-branch collision. The caller cannot supply a destination. Repository-slug collisions are disambiguated with a stable six-character SHA-256 prefix.
+The controller chooses a visible path below `${XDG_DATA_HOME:-~/.local/share}/agents/worktrees/<repo-slug>/`. It allocates `name`, then `name-2`, and so on; a candidate must have no path collision and no attached-branch collision. The caller cannot supply a destination. Repository-slug collisions are disambiguated with a stable six-character SHA-256 prefix.
 
 `--setup-argv` is repeatable. Each value is a JSON nonempty array of nonempty strings, for example `["uv","sync"]`. Arrays run sequentially in the new worktree with no shell. The default `--setup-timeout-seconds` is `600`. Output capture is capped at 64 KiB per stream for each setup command. No setup command runs unless explicitly supplied.
 
