@@ -1,0 +1,41 @@
+{
+  "skill_name": "x-research",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Show me the latest three public posts from OpenAI on X. I only need one bounded page, not an exhaustive archive; use the direct x-research user-posts command with --summary and include each post's URL, timestamp, and full returned text.",
+      "expected_output": "A concise, source-backed latest-posts sample from one bounded user-posts request using the deterministic --summary projection, with normalized citation evidence, provenance, returned/requested counts, cursor state, and an explicit completeness limitation.",
+      "files": [],
+      "expectations": [
+        "Routes an explicit X/Twitter timeline request directly to x-research and invokes user-posts for OpenAI with --summary and a count no greater than 100; does not auto-page, use browser/HTML scraping, jq, or a shell pipeline.",
+        "Preserves each returned post's full text, ID or URL, and timestamp for citation; does not claim that summary projection is model-generated analysis or silently require omitted metrics/media.",
+        "Reports the requested and returned counts, cursor/has_more when usable, complete, complete_reason, provider, source_url, fetched_at, and unofficial anonymous provenance.",
+        "Calls the result a bounded sample or page and never claims it is OpenAI's complete timeline; a missing result is not treated as deletion or suspension evidence."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Estimate the tone of recent public X discussion about the 2026-08-01 OpenAI release using the fixed query `OpenAI release since:2026-08-01`. Use at most 20 returned posts through one direct x-research search command with --summary, label each positive, negative, neutral, mixed, or unclear from its full returned text, and summarize the sample without claiming to measure all public opinion.",
+      "expected_output": "A sample-scoped sentiment summary whose classifications are traceable to individual returned post URLs/IDs and full text, whose aggregate counts are reproducible, and whose query, page bounds, completeness, and provenance are explicit. The CLI projection itself is deterministic field selection, not model-generated sentiment.",
+      "files": [],
+      "expectations": [
+        "Routes discovery directly to x-research search with --summary, the exact whitespace-normalized query, a bounded count at most 20, and one explicit feed; it does not silently fetch additional pages or use jq or shell pipelines.",
+        "Classifies only returned full post text into positive, negative, neutral, mixed, or unclear, cites every classified post by URL or ID, and keeps the aggregate counts reproducible.",
+        "Labels the conclusion as applying to the returned sample rather than public opinion, explains ambiguity or low confidence, and reports requested/returned counts plus cursor/has_more, complete, and complete_reason.",
+        "Keeps provider provenance and timestamps visible, does not present an unofficial anonymous result as an official X statistic, and does not describe --summary as model-generated analysis."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Investigate whether a widely shared X claim that a major AI company announced a new consumer product today is substantiated. Use one direct, bounded x-research search command with --summary for X discovery, then corroborate the material claim with independent primary or credible web sources. Preserve the full returned post text and citations, separate leads from verified facts, and explain disagreement or uncertainty.",
+      "expected_output": "An X-plus-web evidence report that identifies the bounded X query and returned posts with full text and citation URLs/IDs, cites independent source URLs and timestamps, distinguishes source roles, records explicit completeness/provenance, and gives a cautious conclusion with unresolved gaps. The --summary output is a deterministic projection, not model-generated news analysis.",
+      "files": [],
+      "expectations": [
+        "Uses x-research search once with --summary for bounded X discovery/evidence, records query, requested/returned counts, cursor/has_more, complete/complete_reason, post IDs/URLs, full returned text, and provenance; does not call a page-complete news corpus or use jq or a shell pipeline.",
+        "Then uses web_search for independent discovery and read for known primary or credible source URLs; does not treat X posts alone as confirmation.",
+        "Separates X evidence, first-party announcements, and independent reporting; cites every material claim with its source URL and observed/fetched time when available.",
+        "States agreement, conflict, source freshness, and remaining uncertainty; never infers deletion, suspension, or truth from an absent X result, never invents a missing announcement, and never claims the CLI projection is model-generated analysis."
+      ]
+    }
+  ]
+}
