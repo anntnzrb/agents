@@ -54,6 +54,10 @@ For each task:
 - No extra validation unless specified
 - No helper methods unless reused 3+ times
 - Match exact signatures from PDF (visibility, types, names)
+- Parse external input once at its boundary; use the assignment’s domain types instead of strings or loose flags when confusion would be a bug.
+- Make specified failure behavior explicit and preserve useful context; do not swallow exceptions or add unrequested recovery paths.
+- Keep ownership and mutation clear: initialize required state in constructors and avoid sharing mutable state without an assignment requirement.
+- Test observable examples and meaningful edge or failure cases; do not pin private helper structure.
 
 ### PDF Reading Tips
 
