@@ -13,6 +13,15 @@ import {
     writeReceipt,
     type Receipt,
 } from "./transaction";
+import {
+    ATOMICITY_CRITIC_SYSTEM_PROMPT,
+    buildAtomicityCriticPrompt,
+    normalizeAtomicityDecision,
+    shouldReviewAtomicity,
+    type AtomicityDecision,
+    type AtomicityProposalInput,
+} from "./atomicity";
+
 import type {
     CommitAgentState,
     FileChange,
@@ -24,7 +33,8 @@ import type { CommitType, ConventionalAnalysis, ConventionalDetail, FileDiff, Fi
 import type * as CommitUtils from "@oh-my-pi/pi-coding-agent/commit/utils";
 import type { createCommitTools } from "@oh-my-pi/pi-coding-agent/commit/agentic/tools";
 import type { parseFileDiffs, parseFileHunks } from "@oh-my-pi/pi-coding-agent/commit/git/diff";
-import type { resolveRoleSelection } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
+import type { resolveRoleSelection, ScopedModel } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
+import type { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { assignLockFilesToPlan } from "@oh-my-pi/pi-coding-agent/commit/agentic/lock-files";
 import type { computeDependencyOrder } from "@oh-my-pi/pi-coding-agent/commit/agentic/topo-sort";
 import type * as Git from "@oh-my-pi/pi-coding-agent/utils/git";
@@ -218,6 +228,51 @@ const composeContext = (options: CommitOptions): string =>
 
 const proposalExists = (state: CommitAgentState): boolean =>
     Boolean(state.proposal || state.splitProposal);
+type CommitPhase = "propose" | "forced-split" | "finalized";
+type ProposalSlot = "proposal" | "splitProposal";
+
+interface CommitPhaseState {
+    value: CommitPhase;
+    proposalSlot?: ProposalSlot;
+}
+
+const proposalAlreadyRecorded = (internals: CommitInternals) => responseResult({
+    valid: false,
+    errors: ["A commit proposal has already been recorded; proposal tools are mutually exclusive."],
+    warnings: [],
+}, internals.maxDetailItems);
+
+const reserveProposalSlot = (
+    state: CommitAgentState,
+    phase: CommitPhaseState,
+    slot: ProposalSlot,
+): boolean => {
+    if (
+        phase.value === "finalized" ||
+        phase.proposalSlot !== undefined ||
+        state.proposal !== undefined ||
+        state.splitProposal !== undefined
+    ) {
+        return false;
+    }
+    phase.proposalSlot = slot;
+    return true;
+};
+
+const releaseProposalSlot = (
+    state: CommitAgentState,
+    phase: CommitPhaseState,
+    slot: ProposalSlot,
+): void => {
+    if (
+        phase.proposalSlot === slot &&
+        state.proposal === undefined &&
+        state.splitProposal === undefined
+    ) {
+        phase.proposalSlot = undefined;
+    }
+};
+
 
 const formatCommitMessage = (
     summary: string,
@@ -555,12 +610,33 @@ const mkRepoProposalTool = (
     cwd: string,
     state: CommitAgentState,
     internals: CommitInternals,
+    phase: CommitPhaseState,
 ): CommitTool => ({
     ...nativeTool,
     execute: async (_toolCallId, params, _onUpdate, ctx) => {
-        const result = await execRepoProposal(cwd, state, internals, params as ProposeCommitParams);
-        if (state.proposal) queueMicrotask(() => ctx.abort());
-        return result;
+        if (phase.value === "forced-split") {
+            return responseResult({
+                valid: false,
+                errors: ["Atomicity review requires a split_commit proposal; propose_commit is not allowed."],
+                warnings: [],
+            }, internals.maxDetailItems);
+        }
+        if (!reserveProposalSlot(state, phase, "proposal")) {
+            return proposalAlreadyRecorded(internals);
+        }
+        try {
+            const result = await execRepoProposal(cwd, state, internals, params as ProposeCommitParams);
+            if (state.proposal) {
+                phase.value = "finalized";
+                queueMicrotask(() => ctx.abort());
+            } else {
+                releaseProposalSlot(state, phase, "proposal");
+            }
+            return result;
+        } catch (error) {
+            releaseProposalSlot(state, phase, "proposal");
+            throw error;
+        }
     },
 });
 
@@ -570,14 +646,162 @@ const mkRepoSplitTool = (
     state: CommitAgentState,
     internals: CommitInternals,
     changelogTargets: readonly string[],
+    phase: CommitPhaseState,
 ): CommitTool => ({
     ...nativeTool,
     execute: async (_toolCallId, params, _onUpdate, ctx) => {
-        const result = await execRepoSplit(cwd, state, internals, params as SplitCommitParams, changelogTargets);
-        if (state.splitProposal) queueMicrotask(() => ctx.abort());
-        return result;
+        const splitParams = params as SplitCommitParams;
+        if (phase.value === "finalized") {
+            return proposalAlreadyRecorded(internals);
+        }
+        if (phase.value === "forced-split" && splitParams.commits.length < 2) {
+            return responseResult({
+                valid: false,
+                errors: ["Atomicity review requires a split plan with at least two commits."],
+                warnings: [],
+            }, internals.maxDetailItems);
+        }
+        if (!reserveProposalSlot(state, phase, "splitProposal")) {
+            return proposalAlreadyRecorded(internals);
+        }
+        try {
+            const result = await execRepoSplit(cwd, state, internals, splitParams, changelogTargets);
+            if (state.splitProposal) {
+                phase.value = "finalized";
+                queueMicrotask(() => ctx.abort());
+            } else {
+                releaseProposalSlot(state, phase, "splitProposal");
+            }
+            return result;
+        } catch (error) {
+            releaseProposalSlot(state, phase, "splitProposal");
+            throw error;
+        }
     },
 });
+
+const buildAtomicityProposalInput = (
+    proposal: NonNullable<CommitAgentState["proposal"]>,
+    stagedFileCount: number,
+    diffText: string,
+    internals: CommitInternals,
+): AtomicityProposalInput => ({
+    summary: proposal.summary,
+    details: proposal.analysis.details.map(detail => detail.text),
+    stagedFileCount,
+    changedHunkCount: internals
+        .parseFileDiffs(diffText)
+        .reduce((count, file) => count + internals.parseFileHunks(file).hunks.length, 0),
+});
+
+const runAtomicityCritic = async (
+    api: CommandAPI,
+    cwd: string,
+    modelRegistry: ModelRegistry,
+    settings: Settings,
+    selected: Pick<ScopedModel, "model" | "thinkingLevel">,
+    proposalInput: AtomicityProposalInput,
+    diffText: string,
+): Promise<AtomicityDecision> => {
+    let decision: AtomicityDecision | undefined;
+    const verdictParameterSchema = api.arktype
+        .type({
+            decision: "'accept' | 'split'",
+            concerns: api.arktype.type("string").matching(/\S/).atMostLength(512).array().atMostLength(8),
+            rationale: api.arktype.type("string").matching(/\S/).atMostLength(2_000),
+        })
+        .onUndeclaredKey("reject")
+        .narrow(value =>
+            (value.decision === "accept" && value.concerns.length === 0) ||
+            (value.decision === "split" &&
+                value.concerns.length >= 2 &&
+                new Set(value.concerns.map(concern => concern.trim())).size === value.concerns.length),
+        );
+    const verdictTool = {
+        name: "atomicity_verdict",
+        label: "Atomicity verdict",
+        description: "Record exactly one normalized atomicity verdict for the provisional commit proposal.",
+        strict: true,
+        parameters: verdictParameterSchema,
+        execute: async (_toolCallId: string, params: unknown, _onUpdate: unknown, ctx: { abort(): void }) => {
+            if (decision) {
+                return {
+                    content: [{ type: "text" as const, text: "A verdict has already been recorded." }],
+                    details: { valid: false },
+                };
+            }
+            let normalized: AtomicityDecision;
+            try {
+                normalized = normalizeAtomicityDecision(params);
+            } catch (error) {
+                return {
+                    content: [{
+                        type: "text" as const,
+                        text: `Invalid atomicity verdict: ${error instanceof Error ? error.message : String(error)}`,
+                    }],
+                    details: { valid: false },
+                };
+            }
+            decision = normalized;
+            queueMicrotask(() => ctx.abort());
+            return {
+                content: [{ type: "text" as const, text: JSON.stringify(normalized) }],
+                details: normalized,
+            };
+        },
+    } as unknown as CommitTool;
+
+    const { session } = await api.pi.createAgentSession({
+        cwd,
+        authStorage: modelRegistry.authStorage,
+        modelRegistry,
+        settings,
+        model: selected.model,
+        thinkingLevel: selected.thinkingLevel,
+        systemPrompt: defaultPrompt => [...defaultPrompt, ATOMICITY_CRITIC_SYSTEM_PROMPT],
+        customTools: [verdictTool],
+        toolNames: [verdictTool.name],
+        restrictToolNames: true,
+        allowRestrictedCustomTools: true,
+        enableLsp: false,
+        enableMCP: false,
+        hasUI: false,
+        autoApprove: true,
+        contextFiles: [],
+        skills: [],
+        promptTemplates: [],
+        slashCommands: [],
+        extensions: [],
+        disableExtensionDiscovery: true,
+    });
+
+    const criticPrompt = buildAtomicityCriticPrompt(proposalInput, diffText);
+    try {
+        for (let attempt = 0; attempt < 2 && !decision; attempt += 1) {
+            try {
+                await session.prompt(
+                    attempt === 0
+                        ? criticPrompt
+                        : "Return exactly one valid atomicity_verdict tool call now. Prose is not a verdict; ambiguity must be reported as split.",
+                    {
+                        attribution: "agent",
+                        expandPromptTemplates: false,
+                        ...(attempt === 0 ? {} : { synthetic: true }),
+                    },
+                );
+            } catch (error) {
+                if (decision) break;
+                throw error;
+            }
+        }
+        if (!decision) throw new Error("Atomicity critic did not provide a valid verdict.");
+        return decision;
+    } finally {
+        await session.dispose();
+    }
+};
+
+
 
 
 const runCommitAgent = async (
@@ -600,6 +824,7 @@ const runCommitAgent = async (
     if (stagedFiles.length === 0) throw new Error("No local changes to commit.");
     const diffText = await api.pi.diff(cwd, { cached: true });
     const contextFiles = await api.pi.discoverContextFiles(cwd);
+    const phase: CommitPhaseState = { value: "propose" };
     const state: CommitAgentState = { diffText };
     const nativeTools = internals.createCommitTools({
         cwd,
@@ -619,8 +844,8 @@ const runCommitAgent = async (
     const tools = nativeTools
         .filter(tool => !["propose_changelog", "propose_commit", "split_commit"].includes(tool.name))
         .concat([
-            mkRepoProposalTool(nativeProposalTool, cwd, state, internals),
-            mkRepoSplitTool(nativeSplitTool, cwd, state, internals, []),
+            mkRepoProposalTool(nativeProposalTool, cwd, state, internals, phase),
+            mkRepoSplitTool(nativeSplitTool, cwd, state, internals, [], phase),
         ]);
 
     const { session } = await api.pi.createAgentSession({
@@ -665,10 +890,55 @@ const runCommitAgent = async (
         }
         await promptAgent(attempt + 1);
     };
-
     try {
         await promptAgent(0);
+        if (!state.proposal) return state;
+
+        const proposalInput = buildAtomicityProposalInput(state.proposal, stagedFiles.length, diffText, internals);
+        if (!shouldReviewAtomicity(proposalInput)) return state;
+
+        const decision = await runAtomicityCritic(
+            api,
+            cwd,
+            modelRegistry,
+            settings,
+            selected,
+            proposalInput,
+            diffText,
+        );
+        if (decision.decision === "accept") return state;
+
+        const hadStaleSplitProposal = state.splitProposal !== undefined;
+        state.proposal = undefined;
+        state.splitProposal = undefined;
+        phase.proposalSlot = undefined;
+        if (hadStaleSplitProposal) {
+            throw new Error("Atomicity critic retry started with a stale split proposal.");
+        }
+        phase.value = "forced-split";
+        const concerns = decision.concerns.map((concern, index) => `${index + 1}. ${concern}`).join("\n");
+        const splitPrompt = [
+            "The independent atomicity critic rejected the provisional single-commit proposal.",
+            "Concrete critic concerns:",
+            concerns,
+            `Critic rationale: ${decision.rationale}`,
+            "Re-evaluate the full cached snapshot and submit exactly one valid split_commit proposal with at least two commits addressing these concerns.",
+        ].join("\n");
+        try {
+            await session.prompt(splitPrompt, {
+                attribution: "agent",
+                expandPromptTemplates: false,
+                synthetic: true,
+            });
+        } catch (error) {
+            if (!state.splitProposal) throw error;
+        }
+        if (!state.splitProposal || state.splitProposal.commits.length < 2) {
+            state.splitProposal = undefined;
+            throw new Error("Atomicity critic required a split_commit proposal with at least two commits.");
+        }
         return state;
+
     } finally {
         await session.dispose();
     }
@@ -981,6 +1251,9 @@ const applyState = async (
     state: CommitAgentState,
     internals: CommitInternals,
 ): Promise<AppliedCommitResult> => {
+    if (state.proposal && state.splitProposal) {
+        throw new Error("Commit agent produced both single and split proposals; refusing to publish either.");
+    }
     if (state.proposal) {
         const stagedFiles = await api.pi.diff.changedFiles(cwd, { cached: true });
         if (stagedFiles.length === 0) throw new Error("No staged changes to commit.");
