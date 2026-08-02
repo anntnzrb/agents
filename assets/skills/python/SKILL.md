@@ -23,11 +23,11 @@ Python: uv-first, Pyright strict, typed JSON/data shapes, boundary validation, p
 
 ```text
 1. DETECT    -> package manager, runtime target, scripts, type/test gates
-2. ROUTE     -> read the required follow-up docs for async, typing, tests, syntax, patterns, packaging
-3. MODEL     -> typed payloads, invariants, boundaries, public API types
-4. COMPOSE   -> functional core, imperative shell, small modules
-5. VALIDATE  -> parse untrusted input once at the edge; convert inward
-6. VERIFY    -> Pyright/Ruff/pytest gates appropriate to the repo
+2. ROUTE     -> read the required follow-up docs for async, typing, engineering, tests, syntax, patterns, packaging
+3. MODEL     -> typed payloads, invariants, boundaries, distinct domain concepts, public API types
+4. COMPOSE   -> functional core, imperative shell, small modules; reuse the first adequate existing tool or helper
+5. VALIDATE  -> parse untrusted input once at the edge; convert inward; make resource ownership, cancellation, timeouts, and errors explicit
+6. VERIFY    -> Pyright/Ruff/pytest gates appropriate to the repo; test observable behavior and failure paths
 ```
 
 ## Core Principles
@@ -38,6 +38,10 @@ Python: uv-first, Pyright strict, typed JSON/data shapes, boundary validation, p
 - Model dict-shaped data with `TypedDict`, `Literal`, and discriminated unions while it remains dict-shaped.
 - Prefer pure transformations, immutable values, copy-on-write updates, protocols, dataclasses, comprehensions/generators, and small modules when they clarify code.
 - Keep I/O, logging, retries, timeouts, mutation, and process exits in the imperative shell.
+- Give concepts that must not mix distinct types; use `NewType`, tagged unions, or domain records only when a mix-up would be a real bug.
+- Own resources with context managers and concurrency with explicit cancellation, timeout, and cleanup scopes.
+- Keep errors specific and actionable. Catch or translate them only where that layer can make a decision.
+- Do not add a dependency, abstraction, parser, normalization step, or defensive branch without a concrete caller, boundary, or failure mode.
 - Use mypy only for inherited repos that already use it.
 
 ## uv Essentials
@@ -79,6 +83,8 @@ Use inline script metadata for standalone scripts that need dependencies:
   - `uv run pytest`
 - Boundary-heavy code needs contract tests for JSON/API/RPC/CLI ingress and failure paths.
 - Parser/transform-heavy code should use Hypothesis only for invariants, round-trips, idempotence, and lossless conversion properties.
+- Tests should be deterministic, isolated, and behavior-focused. Prefer real values, in-memory fakes, or wire-level fakes; mock only an unavailable external edge.
+- Do not pin private constants, incidental formatting, prose, or one implementation path when the user-visible contract is what matters.
 - Ruff baseline: `E`, `F`, `I`, `UP`, `B`, `SIM`; expand deliberately after the baseline is clean.
 
 ## Build Note
@@ -101,6 +107,9 @@ Only task-relevant references MUST be loaded.
 | --- | --- | --- |
 | Async I/O, concurrency, cancellation | `cookbook/async.md` | Async behavior is central |
 | Typing and data boundaries | `reference.md`, `cookbook/correctness.md` | JSON, API, RPC, CLI, or validation boundaries matter |
+| Design, ownership, error, or test-quality decisions | `references/engineering.md` | Choosing models, error paths, resource lifecycles, abstractions, or behavioral tests |
+| Opinionated stack recipes and deep implementation patterns | `references/advanced/README.md`, then its matching reference | A task needs a detailed framework, library, strict-tooling, or data-processing recipe; repository policy and existing tooling take precedence |
+| Cross-language code-smell or logging review | `references/advanced/engineering/code-smells.md`, `references/advanced/engineering/logging.md` | Reviewing structure or observability beyond Python-specific mechanics |
 | Testing and property-based invariants | `cookbook/testing.md`, then matching `cookbook/testing-*.md` | Designing or debugging tests |
 | Modern syntax and runtime compatibility | `cookbook/modern.md`, then matching version guide | Target-version behavior matters |
 | Functional, iterator, or design patterns | `cookbook/patterns.md`, then matching pattern guide | Choosing an implementation pattern |
