@@ -130,7 +130,7 @@ description = "Medium-difficulty implementation worker, sized for MID-SIZED chan
 config_file = "agents/worker-medium.toml"
 
 [agents.librarian]
-description = "External open-source codebase and documentation researcher. Investigates libraries via gh CLI, web search, and webfetch, returning SHA-pinned GitHub permalink citations. Read-only."
+description = "External open-source codebase and documentation researcher. Investigates libraries with GitHub, live web research, and direct-page retrieval, returning SHA-pinned GitHub permalink citations. Read-only."
 config_file = "agents/librarian.toml"
 
 [agents.metis]
