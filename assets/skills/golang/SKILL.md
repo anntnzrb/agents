@@ -41,6 +41,13 @@ Go: Go 1.26 stable, golangci-lint v2, slog, typed errors, idiomatic concurrency,
 - Prefer explicit error paths: `fmt.Errorf("context: %w", err)` wrapping, `errors.Is`, `errors.Join`, `errors.AsType` (Go 1.26+).
 - Context is control flow, not data storage. Pass as first argument. Never store in structs.
 
+## Engineering Discipline
+
+- Model values whose accidental interchange is a real bug with distinct named types; keep external raw data at the boundary.
+- Make invalid states hard to construct when an invariant matters; do not add constructors, type states, or abstraction layers without a concrete failure mode.
+- Make ownership explicit at I/O and concurrency boundaries: cancellation, timeout, close/cleanup, and error propagation each need one clear owner.
+- Test observable behavior deterministically. Prefer real values, in-memory fakes, and `httptest` before a mock; inject clocks, randomness, or I/O only when the behavior needs control.
+
 ## Quality Gate Essentials
 
 - **New projects:** golangci-lint v2 (`linters.default: standard` + `modernize`, `gosec`, `bodyclose`), go vet, go test (`-race -count=1 -shuffle=on ./...`).
@@ -69,6 +76,9 @@ You MUST load only the references needed by the task:
 | Iterators, range-over-func | `cookbook/iterators.md` | iter.Seq/Seq2, stdlib iterator consumers, custom iterators |
 | Generics best practices | `cookbook/generics.md` | Generic types, constraints, when to avoid |
 | JSON/API/CLI boundaries | `cookbook/correctness.md` | Validation, typed boundaries, invariants, nil-safety |
+| Design or review of types, states, ownership, or tests | `references/design-review.md` | Avoiding semantic mix-ups, invalid states, over-abstraction, cleanup ambiguity, brittle tests |
+| Opinionated stack recipes and deep implementation patterns | `references/advanced/README.md`, then its matching reference | A task needs a detailed backend, RPC, database, CLI, TUI, concurrency, or strict-tooling recipe; repository policy and existing tooling take precedence |
+| Cross-language code-smell or logging review | `references/advanced/engineering/code-smells.md`, `references/advanced/engineering/logging.md` | Reviewing structure or observability beyond Go-specific mechanics |
 | HTTP services, routing, middleware | `cookbook/http-services.md` | ServeMux, chi, middleware chains, graceful shutdown |
 | Testing, table-driven, testify, benchmarks | `cookbook/testing.md` | Unit tests, benchmarks, fuzzing, integration test setup |
 | Patterns: DI, options, interfaces | `cookbook/patterns.md` | Constructor injection, functional options, repository |
