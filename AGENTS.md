@@ -15,6 +15,10 @@
 - NEVER edit generated synced homes unless the user asks and the SSOT impact is clear
 </critical>
 
+## Skills
+
+Skills are modified here, in the SSOT. Always run against skill gate: `./assets/skills/AGENTS.md`
+
 ## Sync Contract
 
 - Public sync entrypoint: `sync/src/cli.ts`
