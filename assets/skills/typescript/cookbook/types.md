@@ -11,7 +11,11 @@ High-signal patterns for real TypeScript work. Use these when they simplify code
 **Solution**:
 
 ```ts
-type Brand<T, Name extends string> = T & { readonly __brand: Name };
+declare const brand: unique symbol;
+
+type Brand<T, Name extends string> = T & {
+  readonly [brand]: Name;
+};
 
 type UserId = Brand<string, "UserId">;
 type OrderId = Brand<string, "OrderId">;
@@ -22,6 +26,27 @@ function loadOrder(userId: UserId, orderId: OrderId) {
 ```
 
 **Tip**: Use brands at domain boundaries, not everywhere.
+
+---
+
+## Readonly Contracts Where Mutation Is Not Part of the API
+
+**Problem**: Consumers should observe a value, not mutate the owner's state.
+
+**Solution**:
+
+```ts
+type User = {
+  readonly id: UserId;
+  readonly email: string;
+};
+
+function listUsers(): readonly User[] {
+  return [];
+}
+```
+
+**Tip**: Use `readonly` for new public or boundary contracts when it reflects ownership. Do not tighten existing mutable APIs without a migration plan.
 
 ---
 
@@ -65,6 +90,33 @@ function parsePort(raw: string): Result<number, "invalid-port"> {
 ```
 
 **Tip**: Discriminated unions beat `T | undefined` once callers need error detail.
+
+---
+
+## Exhaustive Tagged-State Handling
+
+**Problem**: A new state can be added without updating every consumer.
+
+**Solution**:
+
+```ts
+function assertNever(value: never): never {
+  throw new Error(`Unexpected state: ${JSON.stringify(value)}`);
+}
+
+function describe(result: Result<number, "invalid-port">): string {
+  switch (result.ok) {
+    case true:
+      return String(result.value);
+    case false:
+      return result.error;
+    default:
+      return assertNever(result);
+  }
+}
+```
+
+**Tip**: Apply this to closed domain unions you control. It is not a reason to invent a union around every boolean.
 
 ---
 

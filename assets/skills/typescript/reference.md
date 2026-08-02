@@ -36,6 +36,8 @@ Useful defaults:
 - `useUnknownInCatchVariables`
 - `verbatimModuleSyntax`
 - `isolatedModules`
+- `noFallthroughCasesInSwitch`
+- `forceConsistentCasingInFileNames`
 
 Usually safe for large repos:
 
@@ -43,6 +45,15 @@ Usually safe for large repos:
 - `incremental`
 
 Avoid broad tsconfig churn when the task is local.
+
+## Boundary and Failure Design
+
+- Parse untrusted input once at the API, file, queue, CLI, or environment boundary with the repository's existing validator. Pass the parsed domain value inward; do not spread ad-hoc checks through business logic.
+- Use distinct branded or opaque types where interchangeable primitives would cause a real bug. Use a tagged union when callers need to distinguish outcomes, and keep impossible states out of the representation where practical.
+- Return a result union for expected failures a nearby caller must handle. Throw an `Error` with context (and `cause` when wrapping) when the failure should propagate across layers.
+- Catch only at a recovery or translation boundary. Narrow errors before handling them, and rethrow failures the boundary does not own.
+- Put timeout, cancellation, cleanup, retry policy, logging, and process exit behavior at I/O boundaries. Do not hide them in pure helpers.
+- Add dependencies and abstractions only for a demonstrated caller or failure mode. A local wrapper is not automatically cleaner than a direct platform API.
 
 ## Common Failure Patterns
 
