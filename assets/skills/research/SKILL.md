@@ -44,6 +44,12 @@ Route research requests to the right source class, then return source-backed ans
 
 `reddit` is direct HTTP via Reddit JSON endpoints.
 
+### X/Twitter research
+
+- Use `x-research` for explicit X/Twitter post URLs or IDs, bounded user timelines, post search, and conversations.
+- For X-plus-web news work, use `x-research` for bounded X discovery/evidence, then `web_search` and `read` for independent sources.
+- Treat X results as bounded, unofficial evidence; never infer public-opinion truth, deletion, or suspension from a missing result.
+
 ### Knowledge-base research
 
 - Use `notebooklm` for user-owned notebook sources and internal knowledge corpora.
