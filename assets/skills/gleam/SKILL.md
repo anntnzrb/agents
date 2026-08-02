@@ -25,6 +25,14 @@ Idiomatic Gleam with **type-driven design** and **TDD**.
 
 Use `context7 docs` first, then `gh` as fallback.
 
+## Engineering checks
+
+- Decode external data at the boundary into domain types; model distinct concepts separately when mixing them is a bug.
+- Represent expected failures with explicit `Result` error types and exhaustively handle variants; do not use `panic` as normal control flow.
+- Keep effects at module boundaries and resource lifetimes explicit; keep domain logic pure where practical.
+- Test observable success and error behavior with deterministic values, not private function structure.
+- Add a type, helper, dependency, or abstraction only for a concrete caller or failure mode.
+
 ## Required follow-up reads
 
 | Need | Read | When |
