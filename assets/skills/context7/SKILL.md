@@ -11,25 +11,37 @@ allowed-tools: ""
 
 Use Context7 through the configured `context7` MCP server with MCPorter. This skill is read-only: no setup, installs, generated skills, persistent login flows, or configuration mutations.
 
-- MUST resolve `<agent-config-root>` and pass `--config <agent-config-root>/assets/mcporter.jsonc`; commands MUST work from any current directory.
+- MUST resolve `<agent-config-root>` and `<skill-dir>` dynamically; commands MUST work from any current directory.
+- MUST invoke MCPorter through `uv run --script <skill-dir>/scripts/cli.py` so the launcher can load authenticated Context7 credentials.
 
 ## Entry points
 
 Primary:
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"query":"<user question>","libraryName":"<name>"}'
-mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"<libraryId>","query":"<user question>"}'
+uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"query":"<user question>","libraryName":"<name>"}'
+uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"<libraryId>","query":"<user question>"}'
 ```
 
-Before the first call in a session, discover the focused server with `mcporter --config <agent-config-root>/assets/mcporter.jsonc list context7 --brief`. Before the first call to each selected tool, inspect its live schema:
+Before the first call in a session, discover the focused server with `uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc list context7 --brief`. Before the first call to each selected tool, inspect its live schema:
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list context7.resolve-library-id --schema
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list context7.query-docs --schema
+uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc list context7.resolve-library-id --schema
+uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc list context7.query-docs --schema
 ```
 
 Inspect only the tool needed for the next operation. Do not repeat successful discovery or schema inspection in the same session.
+
+## Credentials
+
+- Keep `.env` beside this skill and populate it from `.env.example`.
+- Existing `CONTEXT7_API_KEY` values take precedence.
+- Launcher lookup order:
+  - `CONTEXT7_ENV_FILE`
+  - skill `.env`
+  - `$SKILLS_DIR/context7/.env`
+  - nearest ancestor `skills/context7/.env`
+- The launcher forwards all arguments to MCPorter and falls back to `nix run github:numtide/llm-agents.nix#mcporter --` when `mcporter` is unavailable.
 
 
 ## Workflow
@@ -57,6 +69,6 @@ Keep Context7 retrieval calls to three per user question unless the user explici
 ## Quick examples
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"query":"hooks useState","libraryName":"React"}'
-mcporter --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"/reactjs/react.dev","query":"useState hook behavior"}'
+uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"query":"hooks useState","libraryName":"React"}'
+uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"/reactjs/react.dev","query":"useState hook behavior"}'
 ```
