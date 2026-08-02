@@ -75,6 +75,15 @@ Avoid defaulting to watch mode, dev servers, or broad end-to-end runs when the c
 - Fake timers only when the code is actually timer-driven.
 - Use snapshots for stable structured output, not giant trees you will rubber-stamp forever.
 
+## Boundary and Design Checks
+
+- Parse and normalize untrusted input once at an API, file, queue, CLI, or environment boundary. Pass the normalized value inward instead of repeating loose checks throughout the call chain.
+- Keep retries, timeouts, cancellation, cleanup, logging, and process exits at I/O boundaries. Pure transforms and private helpers should not own process-wide policy.
+- Model meaningful outcomes explicitly—tagged objects beat truthy sentinels and a forest of optional fields when callers must distinguish states.
+- Catch only where code can recover, translate for a caller, or add context. Preserve `cause` when wrapping and rethrow failures the boundary does not own.
+- Add dependencies, abstractions, parsers, normalization layers, and defensive branches only for a demonstrated caller or failure mode.
+- Review large files, parameter bundles, negative-name mazes, redundant post-action checks, and broad catches before extending them. Keep a local change local unless the task asks for a redesign.
+
 ## Performance rules of thumb
 
 - Prefer streaming or chunked processing over `await readFile()` on massive payloads.

@@ -37,17 +37,25 @@ Modern JS. Runtime-aware. Semantics first. No cargo-cult sludge.
 ## Core Rules
 
 - Choose patterns from **runtime + toolchain**, not aesthetics.
+- Inspect the nearest working implementation before designing; reuse an adequate existing helper, platform API, or installed dependency.
 - Prefer **const**, local immutability, and pure transforms by default. Mutate locally when it is simpler or measurably faster.
+- Parse and normalize untrusted input at the API, file, queue, CLI, or environment boundary. Keep raw transport data, retries, logging, and process exits at I/O boundaries.
+- Give distinct domain values clear names and represent meaningful outcomes explicitly. Do not hide a state machine in truthy values or a pile of optional fields.
 - Use `async` / `await` for orchestration. Use Promise combinators for concurrency. Expose **cancellation** on long-lived or user-driven work.
 - For independent async work, check for accidental serialization in loops before optimizing anything else.
 - Debug weird behavior from **language semantics first**: coercion, equality, `this`, closures, prototype chain, task queues.
+- Catch only to recover, translate, or add context; preserve the original cause when wrapping and never silence a failure.
 - Keep one **module story** per package. Treat module mode as a package-level contract first, file-level syntax choice second.
 - Prefer **native platform features** before adding dependencies.
+- Do not add a dependency, abstraction, parser, normalization layer, or defensive branch without a concrete caller, boundary, or failure mode.
 - Test behavior at the right layer:
   - pure transforms -> unit
   - I/O boundaries -> integration
   - UI behavior -> Testing Library and user-observable queries
 - Mock **external edges**, not your own core logic.
+- Prefer real values, in-memory fakes, or wire-level fakes before mocks when they keep the test deterministic and isolated.
+- Treat a large file, parameter bundle, negative-name maze, redundant post-action check, or broad catch as a review trigger—not an automatic rewrite order.
+- Use `rg` for repository discovery and `ast-grep` for structural search when it makes the question cheaper to answer.
 - Use the repo's existing runner. If no runner exists, choose the lowest-friction runner that matches the repo's toolchain instead of introducing a second stack.
 - Do not cargo-cult coverage numbers; add tests where failure risk lives.
 
