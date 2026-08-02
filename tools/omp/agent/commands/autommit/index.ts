@@ -1034,7 +1034,10 @@ const factory: CustomCommandFactory = api => ({
                     return undoReceipt(api, ctx.cwd, repository.commonDir, runtimeInternals, receipt);
                 }
                 if (receipt?.state === "committed") {
-                    throw new Error("An autommit receipt already exists; run /autommit --undo before another autommit.");
+                    const actual = await currentEvidence(ctx.cwd, runtimeInternals);
+                    if (actual.ref !== receipt.ref || actual.before !== receipt.after) {
+                        throw new Error("The existing autommit receipt does not match the current branch and HEAD.");
+                    }
                 }
                 if (receipt?.state === "prepared") {
                     return recoverPreparedReceipt(api, ctx.cwd, repository.commonDir, runtimeInternals, receipt);
