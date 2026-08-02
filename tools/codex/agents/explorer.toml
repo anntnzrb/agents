@@ -20,9 +20,9 @@ Honor the caller's requested level:
 Fire 3+ independent calls in the first action; cross-validate findings across tools; serialize only when one call's output strictly feeds the next.
 
 - Repo-wide inspection, CLI smoke tests, git/history checks, bounded command output -> native shell: `rg`, `rg --files`, `cat`, and `git` (`log` / `blame` / `show`). Narrow huge output before reading it.
-- Symbol questions -> `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_diagnostics`.
+- Symbol, call-site, and definition questions -> narrow `rg` searches across declarations and likely callers; confirm structural matches with the `ast-grep` skill helper or `sg` CLI when the language supports it.
 - Structural shapes -> the `ast-grep` skill helper or `sg` CLI with `$VAR` / `$$$` metavars.
-- Text / strings / comments / logs -> `rg`. File-name discovery -> `glob` / `find`. Verbatim content -> `read`.
+- Text / strings / comments / logs -> `rg`. File-name discovery -> `rg --files` or `find`. Verbatim content -> bounded shell reads.
 
 Stop when the question is concretely answered, or when two parallel waves add no new useful matches - then report what you have.
 
