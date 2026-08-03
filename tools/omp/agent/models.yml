@@ -1,5 +1,6 @@
 providers:
-  openai-codex:
+  opencode-go:
     modelOverrides:
-      gpt-5.5:
-        contextWindow: 1050000
+      gpt-5.6-luna:
+        # keep Luna below >272K context window higher-price tier
+        contextWindow: 272000
