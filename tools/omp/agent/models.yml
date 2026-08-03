@@ -4,3 +4,27 @@ providers:
       gpt-5.6-luna:
         # keep Luna below >272K context window higher-price tier
         contextWindow: 272000
+  cline-api:
+    baseUrl: https://api.cline.bot/api/v1
+    apiKey: CLINE_API_KEY
+    api: openai-completions
+    models:
+      - id: deepseek/deepseek-v4-flash
+        name: DeepSeek V4 Flash (Cline Free)
+        maxTokens: 384000
+        cost:
+          input: 0.14
+          output: 0.28
+          cacheRead: 0.0028
+          cacheWrite: 0
+        compat:
+          supportsDeveloperRole: false
+          supportsReasoningEffort: true
+          maxTokensField: max_tokens
+          supportsToolChoice: false
+          extraBody:
+            thinking:
+              type: enabled
+          reasoningContentField: reasoning_content
+          requiresReasoningContentForToolCalls: true
+          requiresAssistantContentForToolCalls: true
