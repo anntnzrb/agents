@@ -6,6 +6,7 @@
 hide_agent_reasoning = true
 
 web_search = "live"
+followUpQueueMode = "queue"
 
 # -----------------------------------------------------------------------------
 # MODEL
@@ -14,9 +15,47 @@ web_search = "live"
 model = "gpt-5.6-luna"
 review_model = "gpt-5.6-luna"
 model_reasoning_effort = "max"
+enabled-reasoning-efforts = ["low", "medium", "high", "xhigh", "ultra", "max"]
 model_verbosity = "low"
 model_reasoning_summary = "detailed"
 personality = "pragmatic"
+
+# -----------------------------------------------------------------------------
+# APPEARANCE
+# -----------------------------------------------------------------------------
+
+appearanceLightCodeThemeId = "rose-pine"
+appearanceTheme = "system"
+appearanceDarkCodeThemeId = "matrix"
+
+# light theme
+[desktop.appearanceLightChromeTheme]
+accent = "#d7827e"
+contrast = 45
+ink = "#575279"
+opaqueWindows = false
+surface = "#faf4ed"
+
+[desktop.appearanceLightChromeTheme.semanticColors]
+diffAdded = "#56949f"
+diffRemoved = "#797593"
+skill = "#907aa9"
+
+# dark theme
+[desktop.appearanceDarkChromeTheme]
+accent = "#1eff5a"
+contrast = 60
+ink = "#b8ffca"
+opaqueWindows = true
+surface = "#040805"
+
+[desktop.appearanceDarkChromeTheme.fonts]
+ui = 'ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace'
+
+[desktop.appearanceDarkChromeTheme.semanticColors]
+diffAdded = "#1eff5a"
+diffRemoved = "#fa423e"
+skill = "#1eff5a"
 
 # -----------------------------------------------------------------------------
 # PERMISSIONS
@@ -53,6 +92,18 @@ use_memories = false
 # -----------------------------------------------------------------------------
 
 [plugins."chrome@openai-bundled"]
+enabled = true
+
+[plugins."sites@openai-bundled"]
+enabled = true
+
+[plugins."browser@openai-bundled"]
+enabled = true
+
+[plugins."computer-use@openai-bundled"]
+enabled = true
+
+[plugins."visualize@openai-bundled"]
 enabled = true
 
 # -----------------------------------------------------------------------------
