@@ -10,7 +10,7 @@ const MAX_LOCK_BYTES = 4 * 1024;
 
 const RECEIPT_KEYS = ["version", "state", "ref", "before", "after", "indexTree"] as const;
 const LOCK_KEYS = ["pid", "token"] as const;
-const RECEIPT_STATES = ["prepared", "committed", "undo-pending"] as const;
+const RECEIPT_STATES = ["prepared", "committed"] as const;
 
 type ReceiptState = (typeof RECEIPT_STATES)[number];
 
@@ -199,7 +199,7 @@ const validateReceiptValue = (value: unknown): Receipt => {
     }
     if (value.version !== 1) throw new Error("Invalid Autommit receipt: version must be 1.");
     if (typeof value.state !== "string" || !(RECEIPT_STATES as readonly string[]).includes(value.state)) {
-        throw new Error("Invalid Autommit receipt: state must be prepared, committed, or undo-pending.");
+        throw new Error("Invalid Autommit receipt: state must be prepared or committed.");
     }
     return {
         version: 1,
@@ -299,26 +299,6 @@ export const writeReceipt = async (commonDir: string, receipt: Receipt): Promise
     } finally {
         if (handle) await handle.close().catch(() => {});
         await unlink(tempPath).catch(() => {});
-    }
-};
-
-export const removeReceipt = async (commonDir: string): Promise<void> => {
-    const paths = makePaths(commonDir);
-    if (!(await existingAutommitDirectory(paths))) return;
-    if (!(await existingRegularFile(paths.receipt, "receipt", paths.commonDir))) return;
-    let removed = false;
-    try {
-        await unlink(paths.receipt);
-        removed = true;
-    } catch (error) {
-        if (!isErrorCode(error, "ENOENT")) throw pathError("Unable to remove Autommit receipt", paths.receipt, error);
-    }
-    if (removed) {
-        try {
-            await syncDirectory(paths.directory);
-        } catch (error) {
-            throw pathError("Unable to remove Autommit receipt", paths.receipt, error);
-        }
     }
 };
 

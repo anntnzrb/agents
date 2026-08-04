@@ -8,7 +8,6 @@ import type {
 } from "@oh-my-pi/pi-coding-agent";
 import {
     readReceipt,
-    removeReceipt,
     withOperationLock,
     writeReceipt,
     type Receipt,
@@ -141,7 +140,6 @@ const MAX_RETRIES = 3;
 
 interface CommitOptions {
     readonly context: readonly string[];
-    readonly undo: boolean;
 }
 
 interface ParseState {
@@ -163,18 +161,12 @@ interface AppliedCommitResult {
 }
 
 const initialParseState: ParseState = {
-    options: { context: [], undo: false },
+    options: { context: [] },
     awaitingContext: false,
     passthrough: false,
 };
 
 const appendContext = (state: ParseState, value: string): ParseState => {
-    if (state.options.undo) {
-        return {
-            ...state,
-            error: "--undo cannot be combined with context values or positional arguments",
-        };
-    }
     return {
         ...state,
         options: {
@@ -194,16 +186,7 @@ const reduceArgument = (state: ParseState, argument: string): ParseState => {
     }
     if (state.passthrough) return appendContext(state, argument);
     if (argument === "--") {
-        return state.options.undo
-            ? { ...state, error: "--undo cannot be combined with passthrough --" }
-            : { ...state, passthrough: true };
-    }
-    if (argument === "--undo") {
-        if (state.options.undo) return { ...state, error: "--undo may only be specified once" };
-        if (state.options.context.length > 0) {
-            return { ...state, error: "--undo cannot be combined with context values or positional arguments" };
-        }
-        return { ...state, options: { ...state.options, undo: true } };
+        return { ...state, passthrough: true };
     }
     if (argument === "--context") return { ...state, awaitingContext: true };
     if (argument.startsWith("--context=")) {
@@ -1094,59 +1077,6 @@ const recoverPreparedReceipt = async (
     return { messages: ["Recovered prepared autommit transaction."] };
 };
 
-const recoverUndoPendingReceipt = async (
-    api: CommandAPI,
-    cwd: string,
-    commonDir: string,
-    internals: RuntimeInternals,
-    receipt: Receipt,
-): Promise<AppliedCommitResult> => {
-    const actual = await currentEvidence(cwd, internals);
-    if (actual.ref !== receipt.ref) throw new Error("Undo-pending autommit receipt has an unexpected branch.");
-    if (actual.indexTree !== receipt.indexTree) throw new Error("Undo-pending autommit receipt has an unexpected index.");
-    if (actual.before === receipt.after) {
-        await casRef(api, cwd, receipt.ref, receipt.before, receipt.after);
-        await assertReceiptEvidence(cwd, internals, receipt, receipt.before);
-    } else if (actual.before !== receipt.before) {
-        throw new Error("Undo-pending autommit receipt does not match the current HEAD.");
-    }
-    await removeReceipt(commonDir);
-    return { messages: ["Recovered pending autommit undo."] };
-};
-
-const undoReceipt = async (
-    api: CommandAPI,
-    cwd: string,
-    commonDir: string,
-    internals: RuntimeInternals,
-    receipt: Receipt,
-): Promise<AppliedCommitResult> => {
-    if (receipt.state === "prepared") {
-        await recoverPreparedReceipt(api, cwd, commonDir, internals, receipt);
-        const recovered = await readReceipt(commonDir);
-        if (!recovered || recovered.state !== "committed") {
-            throw new Error("Prepared autommit receipt could not be recovered for undo.");
-        }
-        receipt = recovered;
-    }
-    if (receipt.state === "undo-pending") {
-        return recoverUndoPendingReceipt(api, cwd, commonDir, internals, receipt);
-    }
-    const actual = await currentEvidence(cwd, internals);
-    if (actual.ref !== receipt.ref) throw new Error("Autommit receipt has an unexpected branch.");
-    if (actual.before !== receipt.after) throw new Error("Autommit receipt does not match the current HEAD.");
-    if (actual.indexTree !== receipt.indexTree) throw new Error("Autommit receipt has an unexpected index.");
-    await writeReceipt(commonDir, { ...receipt, state: "undo-pending" });
-    const pendingEvidence = await currentEvidence(cwd, internals);
-    if (pendingEvidence.ref !== receipt.ref) throw new Error("Autommit branch changed during undo.");
-    if (pendingEvidence.before !== receipt.after) throw new Error("Autommit HEAD changed during undo.");
-    if (pendingEvidence.indexTree !== receipt.indexTree) throw new Error("Autommit index changed during undo.");
-    await casRef(api, cwd, receipt.ref, receipt.before, receipt.after);
-    await assertReceiptEvidence(cwd, internals, receipt, receipt.before);
-    await removeReceipt(commonDir);
-    return { messages: ["Undid the latest autommit commit; generated changes remain staged."] };
-};
-
 const applySplitProposal = async (
     api: CommandAPI,
     cwd: string,
@@ -1283,7 +1213,7 @@ const report = (ctx: { readonly hasUI: boolean; readonly ui: { notify(message: s
 
 const factory: CustomCommandFactory = api => ({
     name: "autommit",
-    description: "Run the direct unattended local commit workflow, or undo its latest commit with --undo",
+    description: "Run the direct unattended local commit workflow",
     async execute(args, ctx) {
         const parsed = parseArgs(args);
         if ("error" in parsed) {
@@ -1302,10 +1232,6 @@ const factory: CustomCommandFactory = api => ({
             const result = await withOperationLock(repository.commonDir, async () => {
                 const receipt = await readReceipt(repository.commonDir);
                 const runtimeInternals: RuntimeInternals = { git };
-                if (parsed.undo) {
-                    if (!receipt) throw new Error("No autommit receipt is available to undo.");
-                    return undoReceipt(api, ctx.cwd, repository.commonDir, runtimeInternals, receipt);
-                }
                 if (receipt?.state === "committed") {
                     const actual = await currentEvidence(ctx.cwd, runtimeInternals);
                     if (actual.ref !== receipt.ref || actual.before !== receipt.after) {
@@ -1314,9 +1240,6 @@ const factory: CustomCommandFactory = api => ({
                 }
                 if (receipt?.state === "prepared") {
                     return recoverPreparedReceipt(api, ctx.cwd, repository.commonDir, runtimeInternals, receipt);
-                }
-                if (receipt?.state === "undo-pending") {
-                    throw new Error("An autommit undo is pending; run /autommit --undo to recover it.");
                 }
                 const internals = await loadCommitInternals(git);
                 const state = await runCommitAgent(api, ctx.cwd, ctx.modelRegistry, parsed, internals);

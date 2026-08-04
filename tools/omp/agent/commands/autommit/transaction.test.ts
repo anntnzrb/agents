@@ -14,7 +14,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   readReceipt,
-  removeReceipt,
   withOperationLock,
   writeReceipt,
 } from "./transaction";
@@ -50,7 +49,7 @@ describe("Autommit transaction receipts", () => {
   test("round trips every version-one receipt state atomically", async () => {
     const commonDir = await makeCommonDir();
     try {
-      for (const state of ["prepared", "committed", "undo-pending"] as const) {
+      for (const state of ["prepared", "committed"] as const) {
         const expected = { ...receipt, state };
         await writeReceipt(commonDir, expected);
         await expect(readReceipt(commonDir)).resolves.toEqual(expected);
@@ -72,8 +71,6 @@ describe("Autommit transaction receipts", () => {
     try {
       await writeReceipt(commonDir, receipt);
       await expect(readReceipt(commonDir)).resolves.toEqual(receipt);
-      await removeReceipt(commonDir);
-      await expect(readReceipt(commonDir)).resolves.toBeNull();
     } finally {
       await rm(parentDir, { recursive: true, force: true });
     }
@@ -152,27 +149,11 @@ describe("Autommit transaction receipts", () => {
 
       await expect(readReceipt(commonDir)).rejects.toThrow(/symlink|receipt/i);
       await expect(writeReceipt(commonDir, receipt)).rejects.toThrow(/symlink|receipt/i);
-      await expect(removeReceipt(commonDir)).rejects.toThrow(/symlink|receipt/i);
       expect(await readlink(receiptPath(commonDir))).toBe(outsideReceipt);
       expect(await readFile(outsideReceipt, "utf8")).toBe(JSON.stringify(receipt));
     } finally {
       await rm(commonDir, { recursive: true, force: true });
       await rm(outsideDir, { recursive: true, force: true });
-    }
-  });
-
-  test("removal is idempotent and leaves no receipt", async () => {
-    const commonDir = await makeCommonDir();
-    try {
-      await removeReceipt(commonDir);
-      await writeReceipt(commonDir, receipt);
-      await removeReceipt(commonDir);
-      await removeReceipt(commonDir);
-
-      await expect(readReceipt(commonDir)).resolves.toBeNull();
-      expect(await isPresent(receiptPath(commonDir))).toBe(false);
-    } finally {
-      await rm(commonDir, { recursive: true, force: true });
     }
   });
 });
