@@ -5,56 +5,24 @@
    * MODELS
    * ************************************************************************ */
 
-  "small_model": "github-copilot/gemini-3-flash-preview",
-
-  /* **************************************************************************
-   * AGENTS
-   * ************************************************************************ */
-
-  "agent": {
-    "plan": {
-      "disable": true,
-    },
-    "build": {
-      "disable": true,
-    },
-    "default": {
-      "mode": "primary",
-      "model": "openai/gpt-5.5",
-      "variant": "medium",
-    },
-    "deep": {
-      "mode": "primary",
-      "model": "openai/gpt-5.5",
-      "variant": "medium",
-    },
-    "fast": {
-      "mode": "primary",
-      "model": "opencode-go/minimax-m2.7",
-    },
-    "general": {
-      "mode": "subagent",
-      "model": "opencode-go/minimax-m2.7",
-    },
-    "explore": {
-      "mode": "subagent",
-      "model": "opencode-go/minimax-m2.7",
-    },
-  },
+  // "small_model": "github-copilot/gemini-3-flash-preview",
 
   /* **************************************************************************
    * PLUGINS
    * ************************************************************************ */
+
   // "plugin": [],
 
   /* **************************************************************************
    * PROVIDERS
    * ************************************************************************ */
+
   // "provider": {},
 
   /* **************************************************************************
    * BINDS
    * ************************************************************************ */
+
   "keybinds": {
     "leader": "ctrl+x",
     "session_compact": "none",
@@ -64,9 +32,12 @@
   /* **************************************************************************
    * PERMISSIONS
    * ************************************************************************ */
+
   "permission": {
     "edit": "allow",
-    "webfetch": "deny",
+    "external_directory": {
+      "*": "allow",
+    },
     "bash": {
       // python
       "python *": "deny",
@@ -77,29 +48,13 @@
       "git merge *": "ask",
       "git pull *": "ask",
       "git push *": "ask",
-
-      // `gh`
-      "gh issue close *": "ask",
-      "gh issue comment *": "ask",
-      "gh issue create *": "ask",
-      "gh issue delete *": "ask",
-      "gh issue edit *": "ask",
-      "gh pr close *": "ask",
-      "gh pr comment *": "ask",
-      "gh pr create *": "ask",
-      "gh pr edit *": "ask",
-      "gh pr merge *": "ask",
-      "gh pr review *": "ask",
-      "gh repo delete *": "ask",
-    },
-    "external_directory": {
-      "*": "allow",
     },
   },
 
   /* **************************************************************************
    * SERVER
    * ************************************************************************ */
+
   // "server": {
   //   "hostname": "0.0.0.0",
   //   "port": 4096,
@@ -109,14 +64,9 @@
   /* **************************************************************************
    * MISC
    * ************************************************************************ */
-  "instructions": [],
-  "default_agent": "default",
+
   "autoupdate": false,
   "share": "manual",
-  "experimental": {
-    "disable_paste_summary": true,
-    "continue_loop_on_deny": true,
-  },
   "formatter": false,
   "lsp": false,
 }
