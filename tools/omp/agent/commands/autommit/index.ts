@@ -690,8 +690,8 @@ const runAtomicityCritic = async (
     const verdictParameterSchema = api.arktype
         .type({
             decision: "'accept' | 'split'",
-            concerns: api.arktype.type("string").matching(/\S/).atMostLength(512).array().atMostLength(8),
-            rationale: api.arktype.type("string").matching(/\S/).atMostLength(2_000),
+            concerns: api.arktype.type("string").atMostLength(512).matching(/\S/).array().atMostLength(8),
+            rationale: api.arktype.type("string").atMostLength(2_000).matching(/\S/),
         })
         .onUndeclaredKey("reject")
         .narrow(value =>
