@@ -1,4 +1,4 @@
-# AGENTS.md
+# джаг's Agent Directives
 
 <communication>
 - Address the user as **джаг**; write English
@@ -53,5 +53,7 @@ Do not use for: refactoring, writing scripts from scratch, debugging business lo
 
 ## Important Locations
 
+<important-locations>
 - Rice: `~/repos/rice/`
-- LLM agent configs SSOT: `~/.config/agents/`
+- LLM agent/harness SSoT cfgs + sync: `~/.config/agents/`
+</important-locations>
