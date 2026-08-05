@@ -30,6 +30,7 @@ Do not replace it with raw `psql`, Docker Compose `exec`, shell pipelines, or in
 - "which database is this using?"
 - addon/module metadata, models, tables, m2m tables, foreign keys
 - safe PostgreSQL read queries for Odoo data
+- local database clone/reset/recreate from an explicit ancestor database
 - local route listing or controller write-risk review
 
 - Server Actions / ir.actions.server / Execute Python Code
@@ -60,6 +61,8 @@ From a discoverable Compose runtime or the custom addons repo:
 ```bash
 uv run --script <skill-dir>/scripts/cli.py env inspect --json
 uv run --script <skill-dir>/scripts/cli.py db summary --db <database> --json
+uv run --script <skill-dir>/scripts/cli.py db clone --source <ancestor-db> --target <target-db> --json
+uv run --script <skill-dir>/scripts/cli.py db clone --source <ancestor-db> --target <target-db> --replace --allow-write --confirm-target <target-db> --json
 uv run --script <skill-dir>/scripts/cli.py db top-tables --db <database> --limit 20 --json
 uv run --script <skill-dir>/scripts/cli.py addons list --json
 uv run --script <skill-dir>/scripts/cli.py module status crm_espol --db <database> --json
@@ -93,6 +96,24 @@ Write-oriented flows are exceptional.
 - Require an explicit write gate such as `--allow-write` in addition to the write command.
 - Summarize the target DB and effect before running a write.
 - Do not use write examples as defaults in the skill body.
+- `db clone` is destructive and remains dry-run by default; its output exposes
+  `source_database`, `target_database`, and replacement status.
+
+### Local database clone/reset
+
+`db clone` is the supported local reset path. It copies an explicit source
+database into an explicit target with PostgreSQL `TEMPLATE`; the source is never
+modified. Without `--allow-write`, it performs only a preflight and reports the
+source/target names and required write flags. A write requires all of:
+
+- `--allow-write`;
+- `--confirm-target <exact-target-name>`;
+- `--replace` when the target already exists;
+- no active connections to source or target.
+
+Stop Odoo before a replacement. The command never terminates connections or
+guesses a database. It is for local runtimes only; it does not install, upgrade,
+or test Odoo modules.
 
 ### Profiled local workflows
 

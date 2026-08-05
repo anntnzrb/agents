@@ -153,6 +153,25 @@ These commands return the DB payload shape:
 
 Treat `rows` as authoritative.
 
+### `db clone`
+
+The command is dry-run by default. Its success payload includes:
+
+- `operation`: `db.clone`
+- `status`: `dry-run` or `cloned`
+- `source_database`
+- `target_database`
+- `admin_database`
+- `destructive`
+- `target_exists`
+- `replace_requested`
+- `preflight`
+
+Successful writes additionally include `replaced`, `postflight`, and `checked`.
+`preflight` and `postflight` report existence and active connection counts for
+both source and target. The command never returns a success status without a
+postflight target-exists check.
+
 ### `db query --read-only`
 
 Current success shape:

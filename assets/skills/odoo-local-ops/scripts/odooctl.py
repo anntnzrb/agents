@@ -62,6 +62,8 @@ MUTATING_SQL_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 PROJECT_TOKEN_RE = re.compile(r"\$PROJECT_DIR\$")
+DATABASE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]{0,62}$")
+PROTECTED_DATABASE_NAMES = frozenset({"postgres", "template0", "template1"})
 
 
 class CliError(RuntimeError):
@@ -942,6 +944,78 @@ def _sql_literal(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
+def _sql_identifier(value: str) -> str:
+    """Quote a validated PostgreSQL identifier."""
+    return '"' + value.replace('"', '""') + '"'
+
+
+def _validate_clone_database_names(source: str, target: str, admin_db: str) -> None:
+    """Validate clone names before constructing administrative SQL."""
+    for role, name in (("source", source), ("target", target), ("admin", admin_db)):
+        if not DATABASE_NAME_RE.fullmatch(name):
+            raise CliError(
+                f"invalid {role} database name {name!r}; use 1-63 letters, "
+                "digits, underscores, or hyphens, starting with a letter or underscore",
+            )
+        if role != "admin" and name.lower() in PROTECTED_DATABASE_NAMES:
+            raise CliError(f"{role} database {name!r} is protected")
+    if source == target:
+        raise CliError("source and target database names must differ")
+    if admin_db in {source, target}:
+        raise CliError("admin database must differ from source and target")
+
+
+def _database_clone_probe_sql(source: str, target: str) -> str:
+    """Build a read-only probe for clone preconditions."""
+    return textwrap.dedent(
+        f"""
+        WITH requested(role, name) AS (
+            VALUES
+                ('source', {_sql_literal(source)}),
+                ('target', {_sql_literal(target)})
+        ), active_connections AS (
+            SELECT datname, COUNT(*)::bigint AS connection_count
+            FROM pg_stat_activity
+            WHERE datname IN ({_sql_literal(source)}, {_sql_literal(target)})
+            GROUP BY datname
+        )
+        SELECT
+            requested.role,
+            requested.name,
+            CASE WHEN database.datname IS NULL THEN 'false' ELSE 'true' END AS exists,
+            COALESCE(active_connections.connection_count, 0)::text AS active_connections
+        FROM requested
+        LEFT JOIN pg_database database ON database.datname = requested.name
+        LEFT JOIN active_connections
+            ON active_connections.datname = requested.name
+        ORDER BY requested.role
+        """,
+    ).strip()
+
+
+def _database_clone_state(rows: list[dict[str, str]]) -> dict[str, dict[str, Any]]:
+    """Normalize clone probe rows and require both requested databases."""
+    state = {row.get("role", ""): row for row in rows}
+    missing = {"source", "target"} - state.keys()
+    if missing:
+        missing_text = ", ".join(sorted(missing))
+        raise CliError(f"database probe omitted: {missing_text}")
+    normalized: dict[str, dict[str, Any]] = {}
+    for role, row in state.items():
+        try:
+            active_connections = int(row.get("active_connections", "0"))
+        except ValueError as exc:
+            raise CliError(
+                f"database probe returned invalid connection count for {role}",
+            ) from exc
+        normalized[role] = {
+            "name": row.get("name"),
+            "exists": row.get("exists", "").lower() == "true",
+            "active_connections": active_connections,
+        }
+    return normalized
+
+
 def _load_sql_recipe(name: str, *, params: dict[str, Any], fallback: str) -> str:
     recipe_path = SQL_DIR / name
     has_file = recipe_path.is_file()
@@ -990,11 +1064,13 @@ def _compose_run_psql(
     sql: str,
     read_only: bool,
     row_limit: int | None = None,
+    database: str | None = None,
+    timeout: float = 30,
 ) -> dict[str, Any]:
     runtime = ctx.runtime
     if runtime.compose_command is None:
         raise CliError("Compose runtime has no Docker Compose command")
-    db_name = ctx.effective_db_name
+    db_name = database or ctx.effective_db_name
     if not db_name:
         raise CliError(
             "no database resolved; pass --db or configure the Compose runtime database",
@@ -1040,7 +1116,7 @@ def _compose_run_psql(
         command,
         input_text=sql,
         cwd=runtime.root,
-        timeout=30,
+        timeout=timeout,
     )
     if result.returncode != 0:
         stderr = (result.stderr or result.stdout).strip()
@@ -1071,8 +1147,10 @@ def _host_run_psql(
     sql: str,
     read_only: bool,
     row_limit: int | None = None,
+    database: str | None = None,
+    timeout: float = 30,
 ) -> dict[str, Any]:
-    db_name = ctx.effective_db_name
+    db_name = database or ctx.effective_db_name
     if not db_name:
         raise CliError("no database resolved; pass --db or set db_name in odoo.conf")
     psql, checked = _discover_psql(args, ctx)
@@ -1113,7 +1191,7 @@ def _host_run_psql(
         command,
         input_text=sql,
         env=env,
-        timeout=30,
+        timeout=timeout,
     )
     if result.returncode != 0:
         stderr = (result.stderr or result.stdout).strip()
@@ -1144,6 +1222,8 @@ def _run_psql(
     sql: str,
     read_only: bool,
     row_limit: int | None = None,
+    database: str | None = None,
+    timeout: float = 30,
 ) -> dict[str, Any]:
     if ctx.runtime.backend == "compose":
         return _compose_run_psql(
@@ -1151,8 +1231,18 @@ def _run_psql(
             sql=sql,
             read_only=read_only,
             row_limit=row_limit,
+            database=database,
+            timeout=timeout,
         )
-    return _host_run_psql(args, ctx, sql=sql, read_only=read_only, row_limit=row_limit)
+    return _host_run_psql(
+        args,
+        ctx,
+        sql=sql,
+        read_only=read_only,
+        row_limit=row_limit,
+        database=database,
+        timeout=timeout,
+    )
 
 
 def _module_filter_clause(module: str) -> str:
@@ -1608,6 +1698,127 @@ def cmd_db_summary(args: argparse.Namespace) -> int:
     return emit_result(args, db)
 
 
+def cmd_db_clone(args: argparse.Namespace) -> int:
+    """Clone a local PostgreSQL database from an explicit ancestor database."""
+    ctx = load_workspace(args)
+    source = args.source
+    target = args.target
+    admin_db = args.admin_db
+    _validate_clone_database_names(source, target, admin_db)
+
+    preflight = _run_psql(
+        args,
+        ctx,
+        sql=_database_clone_probe_sql(source, target),
+        read_only=True,
+        database=admin_db,
+    )
+    state = _database_clone_state(preflight["rows"])
+    source_state = state["source"]
+    target_state = state["target"]
+    if not source_state["exists"]:
+        raise CliError(f"source database does not exist: {source}")
+
+    plan: dict[str, Any] = {
+        "operation": "db.clone",
+        "source_database": source,
+        "target_database": target,
+        "admin_database": admin_db,
+        "runtime": {
+            "backend": ctx.runtime.backend,
+            "root": str(ctx.runtime.root),
+        },
+        "destructive": True,
+        "target_exists": target_state["exists"],
+        "replace_requested": bool(args.replace),
+        "preflight": {
+            "source_exists": source_state["exists"],
+            "target_exists": target_state["exists"],
+            "source_active_connections": source_state["active_connections"],
+            "target_active_connections": target_state["active_connections"],
+        },
+    }
+
+    if not args.allow_write:
+        plan.update(
+            {
+                "status": "dry-run",
+                "write_requires": [
+                    "--allow-write",
+                    f"--confirm-target {target}",
+                ],
+            },
+        )
+        if target_state["exists"]:
+            plan["write_requires"].append("--replace")
+        return emit_result(args, plan)
+
+    if args.confirm_target != target:
+        raise CliError(
+            "--confirm-target must exactly match the target database name when "
+            "--allow-write is used",
+        )
+    if target_state["exists"] and not args.replace:
+        raise CliError(
+            f"target database already exists: {target}; pass --replace to recreate it",
+        )
+    if source_state["active_connections"] or target_state["active_connections"]:
+        raise CliError(
+            "source and target must have no active connections; stop Odoo and retry",
+        )
+
+    if target_state["exists"]:
+        _run_psql(
+            args,
+            ctx,
+            sql=f"DROP DATABASE {_sql_identifier(target)};",
+            read_only=False,
+            database=admin_db,
+            timeout=args.timeout,
+        )
+    _run_psql(
+        args,
+        ctx,
+        sql=(
+            f"CREATE DATABASE {_sql_identifier(target)} "
+            f"TEMPLATE {_sql_identifier(source)};"
+        ),
+        read_only=False,
+        database=admin_db,
+        timeout=args.timeout,
+    )
+
+    postflight = _run_psql(
+        args,
+        ctx,
+        sql=_database_clone_probe_sql(source, target),
+        read_only=True,
+        database=admin_db,
+    )
+    post_state = _database_clone_state(postflight["rows"])
+    if not post_state["target"]["exists"]:
+        raise CliError(f"clone completed without a target database: {target}")
+
+    plan.update(
+        {
+            "status": "cloned",
+            "replaced": target_state["exists"],
+            "postflight": {
+                "source_exists": post_state["source"]["exists"],
+                "target_exists": post_state["target"]["exists"],
+                "source_active_connections": post_state["source"]["active_connections"],
+                "target_active_connections": post_state["target"]["active_connections"],
+            },
+            "checked": [
+                "source database exists",
+                "target database recreated from source TEMPLATE",
+                "source and target had no active connections",
+            ],
+        },
+    )
+    return emit_result(args, plan)
+
+
 def cmd_db_top_tables(args: argparse.Namespace) -> int:
     ctx = load_workspace(args)
     limit = max(1, args.limit)
@@ -1785,6 +1996,39 @@ def build_parser() -> argparse.ArgumentParser:
     db_summary = db_sub.add_parser("summary")
     db_summary.add_argument("--json", action="store_true")
     db_summary.set_defaults(func=cmd_db_summary)
+    db_clone = db_sub.add_parser(
+        "clone",
+        help="recreate a local database from an explicit source database",
+    )
+    db_clone.add_argument("--source", required=True)
+    db_clone.add_argument("--target", required=True)
+    db_clone.add_argument(
+        "--admin-db",
+        default="postgres",
+        help="administrative database used to inspect and create databases",
+    )
+    db_clone.add_argument(
+        "--replace",
+        action="store_true",
+        help="drop an existing target before cloning",
+    )
+    db_clone.add_argument(
+        "--allow-write",
+        action="store_true",
+        help="authorize the destructive drop/create operation",
+    )
+    db_clone.add_argument(
+        "--confirm-target",
+        help="must exactly equal --target for a write operation",
+    )
+    db_clone.add_argument(
+        "--timeout",
+        type=float,
+        default=1800.0,
+        help="maximum seconds for each administrative SQL operation",
+    )
+    db_clone.add_argument("--json", action="store_true")
+    db_clone.set_defaults(func=cmd_db_clone)
     for name, func in {
         "top-tables": cmd_db_top_tables,
         "top-rows": cmd_db_top_rows,

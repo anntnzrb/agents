@@ -255,6 +255,19 @@
       "expected_output": "Applies only constructs verified against Python 3.10 and Odoo's opcode allowlist, allowing simple walrus/dict merge/f-strings while rejecting with and walrus comprehensions.",
       "files": [],
       "expectations": ["Allows simple walrus only when clearer.", "Allows small copy-on-write dict merge.", "Rejects with statements.", "Rejects walrus inside module-scope comprehensions."]
+    },
+    {
+      "id": 31,
+      "prompt": "Quiero recrear mi base local `erptech_0730-crm` desde su ancestro `erptech_0730`. Dame el comando seguro y no ejecutes módulos ni pruebas.",
+      "expected_output": "Uses `db clone` with explicit source and target, shows a dry-run first, and requires `--replace --allow-write --confirm-target` for an existing local target while stating that the source is untouched and Odoo is not run.",
+      "files": [],
+      "expectations": [
+        "Uses the bundled `scripts/cli.py` via `uv run --script`.",
+        "Uses `--source erptech_0730` and `--target erptech_0730-crm` explicitly.",
+        "Keeps the default invocation dry-run/read-only.",
+        "Requires `--allow-write`, exact `--confirm-target`, and `--replace` for an existing target.",
+        "States that the source is not modified and Odoo modules/tests are not executed."
+      ]
     }
   ]
 }

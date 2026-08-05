@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import contextlib
 import importlib.util
+import io
+import json
 import re
 import subprocess
 import sys
@@ -218,6 +220,158 @@ class TestWorkflowDatabaseLock(unittest.TestCase):
                     self.fail("the second lock acquisition must not succeed")
                 with module._workflow_database_lock(ctx, "crm_b2b_other"):
                     pass
+
+
+class TestDatabaseCloneCommand(unittest.TestCase):
+    @staticmethod
+    def clone_args(module: ModuleType, **overrides: object) -> object:
+        values = {
+            "source": "erptech_0730",
+            "target": "erptech_0730-crm",
+            "admin_db": "postgres",
+            "allow_write": False,
+            "replace": False,
+            "confirm_target": None,
+            "timeout": 1800.0,
+            "json": True,
+        }
+        values.update(overrides)
+        return module.argparse.Namespace(**values)
+
+    @staticmethod
+    def preflight(
+        *, target_exists: bool, active_connections: int = 0
+    ) -> dict[str, object]:
+        return {
+            "rows": [
+                {
+                    "role": "source",
+                    "name": "erptech_0730",
+                    "exists": "true",
+                    "active_connections": "0",
+                },
+                {
+                    "role": "target",
+                    "name": "erptech_0730-crm",
+                    "exists": "true" if target_exists else "false",
+                    "active_connections": str(active_connections),
+                },
+            ],
+        }
+
+    def test_dry_run_reports_source_and_target_without_writing(self) -> None:
+        module = load_odooctl()
+        args = self.clone_args(module)
+        ctx = make_context(module, Path(tempfile.mkdtemp()))
+        with (
+            patch.object(module, "load_workspace", return_value=ctx),
+            patch.object(
+                module,
+                "_run_psql",
+                return_value=self.preflight(target_exists=True),
+            ) as run_psql,
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            result = module.cmd_db_clone(args)
+
+        self.assertEqual(result, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["status"], "dry-run")
+        self.assertEqual(payload["source_database"], "erptech_0730")
+        self.assertEqual(payload["target_database"], "erptech_0730-crm")
+        run_psql.assert_called_once()
+        self.assertTrue(run_psql.call_args.kwargs["read_only"])
+        self.assertEqual(run_psql.call_args.kwargs["database"], "postgres")
+
+    def test_write_requires_exact_target_confirmation(self) -> None:
+        module = load_odooctl()
+        args = self.clone_args(
+            module,
+            allow_write=True,
+            replace=True,
+            confirm_target="wrong-target",
+        )
+        ctx = make_context(module, Path(tempfile.mkdtemp()))
+        with (
+            patch.object(module, "load_workspace", return_value=ctx),
+            patch.object(
+                module,
+                "_run_psql",
+                return_value=self.preflight(target_exists=True),
+            ) as run_psql,
+            self.assertRaisesRegex(
+                module.CliError,
+                "--confirm-target must exactly match",
+            ),
+        ):
+            module.cmd_db_clone(args)
+
+        run_psql.assert_called_once()
+
+    def test_replace_runs_drop_and_template_create_after_gate(self) -> None:
+        module = load_odooctl()
+        args = self.clone_args(
+            module,
+            allow_write=True,
+            replace=True,
+            confirm_target="erptech_0730-crm",
+        )
+        ctx = make_context(module, Path(tempfile.mkdtemp()))
+        preflight = self.preflight(target_exists=True)
+        with (
+            patch.object(module, "load_workspace", return_value=ctx),
+            patch.object(
+                module,
+                "_run_psql",
+                side_effect=[preflight, {}, {}, preflight],
+            ) as run_psql,
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            result = module.cmd_db_clone(args)
+
+        self.assertEqual(result, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["status"], "cloned")
+        self.assertTrue(payload["replaced"])
+        self.assertEqual(run_psql.call_count, 4)
+        drop_sql = run_psql.call_args_list[1].kwargs["sql"]
+        create_sql = run_psql.call_args_list[2].kwargs["sql"]
+        self.assertIn('DROP DATABASE "erptech_0730-crm"', drop_sql)
+        self.assertIn(
+            'CREATE DATABASE "erptech_0730-crm" TEMPLATE "erptech_0730"',
+            create_sql,
+        )
+        self.assertFalse(run_psql.call_args_list[1].kwargs["read_only"])
+        self.assertFalse(run_psql.call_args_list[2].kwargs["read_only"])
+
+    def test_active_connections_block_replace_before_writing(self) -> None:
+        module = load_odooctl()
+        args = self.clone_args(
+            module,
+            allow_write=True,
+            replace=True,
+            confirm_target="erptech_0730-crm",
+        )
+        ctx = make_context(module, Path(tempfile.mkdtemp()))
+        with (
+            patch.object(module, "load_workspace", return_value=ctx),
+            patch.object(
+                module,
+                "_run_psql",
+                return_value=self.preflight(target_exists=True, active_connections=1),
+            ) as run_psql,
+            self.assertRaisesRegex(module.CliError, "active connection"),
+        ):
+            module.cmd_db_clone(args)
+
+        run_psql.assert_called_once()
+
+    def test_database_names_cannot_be_equal_or_system_databases(self) -> None:
+        module = load_odooctl()
+        with self.assertRaisesRegex(module.CliError, "must differ"):
+            module._validate_clone_database_names("same", "same", "postgres")
+        with self.assertRaisesRegex(module.CliError, "protected"):
+            module._validate_clone_database_names("postgres", "copy", "postgres")
 
 
 if __name__ == "__main__":

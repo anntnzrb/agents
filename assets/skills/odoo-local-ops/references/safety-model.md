@@ -68,6 +68,24 @@ Write-oriented actions are allowed only when all of the following are true:
 
 The skill should not normalize writes into routine maintenance. Avoid examples that make destructive flows look standard.
 
+### Database clone/reset gate
+
+`db clone` is the only supported destructive database recreation command. It
+must remain dry-run unless the caller supplies `--allow-write`. A write also
+requires `--confirm-target` to exactly match the target name and `--replace` if
+the target already exists. The command must:
+
+- use an explicit source and target;
+- connect through the discovered runtime/admin database;
+- refuse source/target equality and protected system databases;
+- refuse active connections instead of terminating them;
+- copy with PostgreSQL `TEMPLATE` without modifying the source;
+- report source, target, replacement, and postflight state;
+- never install, upgrade, test, or start Odoo as part of the clone.
+
+The operator must stop Odoo before replacing a target. Production databases are
+outside this skill's local reset scope.
+
 ## Secret handling and redaction
 
 Never print secrets in normal output, logs, or examples.

@@ -32,6 +32,38 @@ uv run --script <skill-dir>/scripts/cli.py db summary --db <database> --json
 
 Prefer this first when you need to confirm the effective local DB.
 
+### `db clone` (dry-run and local reset)
+
+Use this command to recreate a local target database from an explicit ancestor.
+The source is never modified. The default is a read-only preflight:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py db clone \
+  --source <ancestor-db> \
+  --target <target-db> \
+  --json
+```
+
+To replace an existing local target, stop Odoo and pass every write gate:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py db clone \
+  --source <ancestor-db> \
+  --target <target-db> \
+  --replace \
+  --allow-write \
+  --confirm-target <target-db> \
+  --json
+```
+
+The command connects to the administrative database (`postgres` by default),
+checks that source and target are explicit and distinct, rejects protected
+system databases, refuses active connections, drops the target only with
+`--replace`, and recreates it with `CREATE DATABASE ... TEMPLATE ...`. It does
+not terminate connections, mutate the source, install modules, or run Odoo.
+The success payload identifies `source_database`, `target_database`,
+`replaced`, and postflight state.
+
 ### `db top-tables --limit N`
 
 Use for table size pressure, storage hotspots, or large relation suspects.
