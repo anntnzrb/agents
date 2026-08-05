@@ -958,7 +958,7 @@ const validateSplitPlan = async (
     };
 };
 
-const selectPatch = (
+export const selectPatch = (
     file: FileDiff,
     selector: HunkSelector,
     internals: CommitInternals,
@@ -976,7 +976,10 @@ const selectPatch = (
                 const end = hunk.newLines === 0 ? start : start + hunk.newLines - 1;
                 return start <= selector.end && selector.start <= end;
             });
-    if (hunks.length === 0) throw new Error(`No changes selected for ${file.filename}.`);
+    if (hunks.length === 0) {
+        if (selector.type === "all") return file.content;
+        throw new Error(`No changes selected for ${file.filename}.`);
+    }
     const firstHunk = file.content.indexOf("\n@@");
     const header = firstHunk < 0 ? file.content : file.content.slice(0, firstHunk);
     return [header, ...hunks.map(hunk => hunk.content)].join("\n");
