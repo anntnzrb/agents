@@ -393,6 +393,46 @@ if (runtime) {
     });
   });
 
+  test("run_jobs_with_preserve_invalidates_cache_after_source_rewrite", async () => {
+    await withTempDir(async (root) => {
+      const sourceOne = join(root, "source-one");
+      const firstDestination = join(root, "first-destination");
+      const sourceTwo = join(root, "source-two");
+      const finalDestination = join(root, "final-destination");
+
+      writeFile(join(sourceOne, "shared.txt"), "old\n");
+      writeFile(join(firstDestination, "shared.txt"), "xxx\n");
+      writeFile(join(sourceTwo, "shared.txt"), "new\n");
+
+      const result = await call<boolean>(
+        runJobsWithPreserve,
+        [
+          {
+            src: sourceOne,
+            dst: firstDestination,
+            kind: "Dir",
+            scope: "Tree",
+          },
+          {
+            src: sourceTwo,
+            dst: sourceOne,
+            kind: "Dir",
+            scope: "Children",
+          },
+          {
+            src: sourceOne,
+            dst: finalDestination,
+            kind: "Dir",
+            scope: "Tree",
+          },
+        ],
+      );
+
+      assert.equal(result, true);
+      assert.equal(readText(join(finalDestination, "shared.txt")), "new\n");
+    });
+  });
+
   test("iter_extension_packages_skips_node_modules", async () => {
     await withTempDir(async (root) => {
       writeFile(join(root, "a", "package.json"), "{}");

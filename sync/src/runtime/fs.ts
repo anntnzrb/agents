@@ -2,6 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { isErrno } from "./errors.ts";
 
+type SourceContentCache = Map<
+  string,
+  { readonly metadata: fs.Stats; readonly content: Buffer }
+>;
+
 export function isSymlink(targetPath: string): boolean {
   try {
     return fs.lstatSync(targetPath).isSymbolicLink();
@@ -43,26 +48,38 @@ export function syncManagedTree(
   src: string,
   dst: string,
   preservePaths: readonly string[] = [],
+  sourceContentCache?: SourceContentCache,
 ): void {
   const metadata = fs.statSync(src);
   if (!metadata.isDirectory()) {
-    syncManagedFile(src, dst);
+    syncManagedFile(src, dst, metadata, sourceContentCache);
     return;
   }
-  syncManagedTreeRecursive(src, dst, normalizePreservePaths(preservePaths));
+  syncManagedTreeRecursive(
+    src,
+    dst,
+    normalizePreservePaths(preservePaths),
+    sourceContentCache,
+  );
 }
 
 export function syncManagedChildren(
   src: string,
   dst: string,
   preservePaths: readonly string[] = [],
+  sourceContentCache?: SourceContentCache,
 ): void {
   const metadata = fs.statSync(src);
   if (!metadata.isDirectory()) {
-    syncManagedFile(src, dst);
+    syncManagedFile(src, dst, metadata, sourceContentCache);
     return;
   }
-  syncManagedChildrenRecursive(src, dst, normalizePreservePaths(preservePaths));
+  syncManagedChildrenRecursive(
+    src,
+    dst,
+    normalizePreservePaths(preservePaths),
+    sourceContentCache,
+  );
 }
 
 function copyTreeRecursive(src: string, dst: string): void {
@@ -91,10 +108,11 @@ function syncManagedTreeRecursive(
   src: string,
   dst: string,
   preservePaths: readonly string[],
+  sourceContentCache?: SourceContentCache,
 ): void {
   const metadata = fs.statSync(src);
   if (!metadata.isDirectory()) {
-    syncManagedFile(src, dst);
+    syncManagedFile(src, dst, metadata, sourceContentCache);
     return;
   }
 
@@ -119,10 +137,15 @@ function syncManagedTreeRecursive(
     const childPreservePaths = childPreserve(preservePaths, srcEntry.name);
     const childMetadata = fs.statSync(childSrc);
     if (childMetadata.isDirectory()) {
-      syncManagedTreeRecursive(childSrc, childDst, childPreservePaths);
+      syncManagedTreeRecursive(
+        childSrc,
+        childDst,
+        childPreservePaths,
+        sourceContentCache,
+      );
       continue;
     }
-    syncManagedFile(childSrc, childDst);
+    syncManagedFile(childSrc, childDst, childMetadata, sourceContentCache);
   }
 }
 
@@ -130,10 +153,11 @@ function syncManagedChildrenRecursive(
   src: string,
   dst: string,
   preservePaths: readonly string[],
+  sourceContentCache?: SourceContentCache,
 ): void {
   const metadata = fs.statSync(src);
   if (!metadata.isDirectory()) {
-    syncManagedFile(src, dst);
+    syncManagedFile(src, dst, metadata, sourceContentCache);
     return;
   }
 
@@ -145,16 +169,25 @@ function syncManagedChildrenRecursive(
     const childPreservePaths = childPreserve(preservePaths, srcEntry.name);
     const childMetadata = fs.statSync(childSrc);
     if (childMetadata.isDirectory()) {
-      syncManagedTreeRecursive(childSrc, childDst, childPreservePaths);
+      syncManagedTreeRecursive(
+        childSrc,
+        childDst,
+        childPreservePaths,
+        sourceContentCache,
+      );
       continue;
     }
-    syncManagedFile(childSrc, childDst);
+    syncManagedFile(childSrc, childDst, childMetadata, sourceContentCache);
   }
 }
 
-function syncManagedFile(src: string, dst: string): void {
-  const srcMetadata = fs.statSync(src);
-  if (isIdenticalFile(src, srcMetadata, dst)) {
+function syncManagedFile(
+  src: string,
+  dst: string,
+  srcMetadata: fs.Stats,
+  sourceContentCache?: SourceContentCache,
+): void {
+  if (isIdenticalFile(src, srcMetadata, dst, sourceContentCache)) {
     return;
   }
 
@@ -167,6 +200,7 @@ function isIdenticalFile(
   src: string,
   srcMetadata: fs.Stats,
   dst: string,
+  sourceContentCache?: SourceContentCache,
 ): boolean {
   if (srcMetadata.isDirectory()) {
     return false;
@@ -195,7 +229,18 @@ function isIdenticalFile(
     return true;
   }
 
-  const srcContent = fs.readFileSync(src);
+  const cached = sourceContentCache?.get(src);
+  const srcContent =
+    cached &&
+    cached.metadata.size === srcMetadata.size &&
+    cached.metadata.mode === srcMetadata.mode &&
+    cached.metadata.mtimeMs === srcMetadata.mtimeMs &&
+    cached.metadata.ctimeMs === srcMetadata.ctimeMs
+      ? cached.content
+      : fs.readFileSync(src);
+  if (sourceContentCache && srcContent !== cached?.content) {
+    sourceContentCache.set(src, { metadata: srcMetadata, content: srcContent });
+  }
   const dstContent = fs.readFileSync(dst);
   return srcContent.equals(dstContent);
 }

@@ -11,6 +11,11 @@ import {
   syncManagedTree,
 } from "@runtime/fs.ts";
 
+type SourceContentCache = Map<
+  string,
+  { readonly metadata: fs.Stats; readonly content: Buffer }
+>;
+
 export type { JobKind } from "./plan.ts";
 export type { Job } from "./plan.ts";
 
@@ -57,21 +62,31 @@ export function runJobsWithPreserve(
   jobs: readonly Job[],
   preservePathsByDst: ReadonlyMap<string, readonly string[]> = new Map(),
 ): boolean {
-  return jobs.every((job) => runJob(job, preservePathsByDst));
+  const sourceContentCache: SourceContentCache = new Map();
+  return jobs.every((job) =>
+    runJob(job, preservePathsByDst, sourceContentCache),
+  );
 }
 
 function runJob(
   job: Job,
   preservePathsByDst: ReadonlyMap<string, readonly string[]>,
+  sourceContentCache: SourceContentCache,
 ): boolean {
   try {
     if (job.kind === "Dir") {
       return job.scope === "Children"
-        ? syncDirInto(job.src, job.dst, preservePathsByDst.get(job.dst) ?? [])
+        ? syncDirInto(
+            job.src,
+            job.dst,
+            preservePathsByDst.get(job.dst) ?? [],
+            sourceContentCache,
+          )
         : syncManagedDir(
             job.src,
             job.dst,
             preservePathsByDst.get(job.dst) ?? [],
+            sourceContentCache,
           );
     }
     return syncItem(job.src, job.dst);
@@ -87,6 +102,7 @@ function syncDirInto(
   srcDir: string,
   dstDir: string,
   preservePaths: readonly string[],
+  sourceContentCache: SourceContentCache,
 ): boolean {
   try {
     if (!isDirectoryLike(srcDir)) {
@@ -95,7 +111,7 @@ function syncDirInto(
     }
 
     fs.mkdirSync(dstDir, { recursive: true });
-    syncManagedChildren(srcDir, dstDir, preservePaths);
+    syncManagedChildren(srcDir, dstDir, preservePaths, sourceContentCache);
     return true;
   } catch (error) {
     err(`copy failed: ${srcDir} -> ${dstDir} (${panicMessage(error)})`);
@@ -107,6 +123,7 @@ function syncManagedDir(
   srcDir: string,
   dstDir: string,
   preservePaths: readonly string[],
+  sourceContentCache: SourceContentCache,
 ): boolean {
   try {
     if (!isDirectoryLike(srcDir)) {
@@ -115,7 +132,7 @@ function syncManagedDir(
     }
 
     fs.mkdirSync(dirname(dstDir), { recursive: true });
-    syncManagedTree(srcDir, dstDir, preservePaths);
+    syncManagedTree(srcDir, dstDir, preservePaths, sourceContentCache);
     return true;
   } catch (error) {
     err(`copy failed: ${srcDir} -> ${dstDir} (${panicMessage(error)})`);
