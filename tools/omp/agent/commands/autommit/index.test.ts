@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { selectPatch } from "./index";
+import { access, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { consumeCompletedReceipt, selectPatch } from "./index";
+import { readReceipt, writeReceipt } from "./transaction";
 
 const renamePatch = [
   "diff --git a/old/path.txt b/new/path.txt",
@@ -24,6 +28,34 @@ const internals = {
     hunks: [],
   }),
 } as Parameters<typeof selectPatch>[2];
+
+describe("consumeCompletedReceipt", () => {
+  test("consumes completed receipts across branch and rewritten-tip changes", async () => {
+    const commonDir = await mkdtemp(join(tmpdir(), "autommit-index-"));
+    const receiptPath = join(commonDir, "autommit", "receipt.json");
+    const committedReceipt = {
+      version: 1 as const,
+      state: "committed" as const,
+      ref: "refs/heads/re-written",
+      before: "1111111111111111111111111111111111111111",
+      after: "9999999999999999999999999999999999999999",
+      indexTree: "3333333333333333333333333333333333333333",
+    };
+    const preparedReceipt = { ...committedReceipt, state: "prepared" as const };
+    try {
+      await writeReceipt(commonDir, committedReceipt);
+      expect(await consumeCompletedReceipt(commonDir, committedReceipt)).toBeNull();
+      expect(await readReceipt(commonDir)).toBeNull();
+      await expect(access(receiptPath)).rejects.toThrow();
+
+      await writeReceipt(commonDir, preparedReceipt);
+      expect(await consumeCompletedReceipt(commonDir, preparedReceipt)).toBe(preparedReceipt);
+      expect(await readReceipt(commonDir)).toEqual(preparedReceipt);
+    } finally {
+      await rm(commonDir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("selectPatch", () => {
   test("preserves metadata-only rename patches for whole-file selection", () => {

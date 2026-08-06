@@ -301,6 +301,18 @@ export const writeReceipt = async (commonDir: string, receipt: Receipt): Promise
         await unlink(tempPath).catch(() => {});
     }
 };
+export const removeReceipt = async (commonDir: string): Promise<void> => {
+    const paths = makePaths(commonDir);
+    if (!(await existingAutommitDirectory(paths))) return;
+    if (!(await existingRegularFile(paths.receipt, "receipt", paths.commonDir))) return;
+    try {
+        await unlink(paths.receipt);
+    } catch (error) {
+        if (isErrorCode(error, "ENOENT")) return;
+        throw pathError("Unable to remove Autommit receipt", paths.receipt, error);
+    }
+    await syncDirectory(paths.directory);
+};
 
 const makeToken = (): string => {
     operationCounter += 1;

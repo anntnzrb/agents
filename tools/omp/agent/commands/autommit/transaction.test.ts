@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   readReceipt,
+  removeReceipt,
   withOperationLock,
   writeReceipt,
 } from "./transaction";
@@ -63,6 +64,22 @@ describe("Autommit transaction receipts", () => {
       await rm(commonDir, { recursive: true, force: true });
     }
   });
+
+  test("removes absent and present receipts idempotently", async () => {
+    const commonDir = await makeCommonDir();
+    try {
+      await removeReceipt(commonDir);
+      await writeReceipt(commonDir, receipt);
+      await removeReceipt(commonDir);
+      expect(await readReceipt(commonDir)).toBeNull();
+      expect(await isPresent(receiptPath(commonDir))).toBe(false);
+      await removeReceipt(commonDir);
+      expect(await isPresent(receiptPath(commonDir))).toBe(false);
+    } finally {
+      await rm(commonDir, { recursive: true, force: true });
+    }
+  });
+
 
   test("preserves receipt behavior for common directories with spaces", async () => {
     const parentDir = await makeCommonDir();
@@ -149,6 +166,7 @@ describe("Autommit transaction receipts", () => {
 
       await expect(readReceipt(commonDir)).rejects.toThrow(/symlink|receipt/i);
       await expect(writeReceipt(commonDir, receipt)).rejects.toThrow(/symlink|receipt/i);
+      await expect(removeReceipt(commonDir)).rejects.toThrow(/symlink|receipt/i);
       expect(await readlink(receiptPath(commonDir))).toBe(outsideReceipt);
       expect(await readFile(outsideReceipt, "utf8")).toBe(JSON.stringify(receipt));
     } finally {

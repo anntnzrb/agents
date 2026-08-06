@@ -8,6 +8,7 @@ import type {
 } from "@oh-my-pi/pi-coding-agent";
 import {
     readReceipt,
+    removeReceipt,
     withOperationLock,
     writeReceipt,
     type Receipt,
@@ -1059,6 +1060,14 @@ const assertReceiptEvidence = async (
     if (actual.before !== expectedHead) throw new Error("Autommit HEAD changed during receipt recovery.");
     if (actual.indexTree !== receipt.indexTree) throw new Error("Autommit index changed during receipt recovery.");
 };
+export const consumeCompletedReceipt = async (
+    commonDir: string,
+    receipt: Receipt | null,
+): Promise<Receipt | null> => {
+    if (receipt?.state !== "committed") return receipt;
+    await removeReceipt(commonDir);
+    return null;
+};
 
 const recoverPreparedReceipt = async (
     api: CommandAPI,
@@ -1076,7 +1085,7 @@ const recoverPreparedReceipt = async (
     } else if (actual.before !== receipt.after) {
         throw new Error("Prepared autommit receipt does not match the current HEAD.");
     }
-    await writeReceipt(commonDir, { ...receipt, state: "committed" });
+    await removeReceipt(commonDir);
     return { messages: ["Recovered prepared autommit transaction."] };
 };
 
@@ -1126,7 +1135,7 @@ const applySplitProposal = async (
         await assertEvidence(cwd, internals, expected);
         await casRef(api, cwd, expected.ref, finalHead, expected.before);
         await assertReceiptEvidence(cwd, internals, prepared, finalHead);
-        await writeReceipt(commonDir, { ...prepared, state: "committed" });
+        await removeReceipt(commonDir);
         return { messages: [`Created ${order.length} commit${order.length === 1 ? "" : "s"} atomically.`] };
     } catch (error) {
         primaryError = error;
@@ -1233,14 +1242,11 @@ const factory: CustomCommandFactory = api => ({
                 throw new Error("No Git repository found for the current directory.");
             }
             const result = await withOperationLock(repository.commonDir, async () => {
-                const receipt = await readReceipt(repository.commonDir);
+                const receipt = await consumeCompletedReceipt(
+                    repository.commonDir,
+                    await readReceipt(repository.commonDir),
+                );
                 const runtimeInternals: RuntimeInternals = { git };
-                if (receipt?.state === "committed") {
-                    const actual = await currentEvidence(ctx.cwd, runtimeInternals);
-                    if (actual.ref !== receipt.ref || actual.before !== receipt.after) {
-                        throw new Error("The existing autommit receipt does not match the current branch and HEAD.");
-                    }
-                }
                 if (receipt?.state === "prepared") {
                     return recoverPreparedReceipt(api, ctx.cwd, repository.commonDir, runtimeInternals, receipt);
                 }
