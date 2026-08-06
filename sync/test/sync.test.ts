@@ -3,10 +3,12 @@ import { spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { basename, join, resolve } from "node:path";
@@ -1538,6 +1540,42 @@ setInterval(() => {}, 1_000);
       const path = join(root, "state", "codex.json");
       await call<void>(writeRecordedEntryNames, path, ["alpha", "beta"]);
       assert.equal(readText(path), '[\n  "alpha",\n  "beta"\n]\n');
+    });
+  });
+
+  test("managed_state_identical_json_skips_replacement", async () => {
+    await withTempDir(async (root) => {
+      const path = join(root, "state", "codex.json");
+      const expected = '[\n  "alpha",\n  "beta"\n]\n';
+
+      await call<void>(writeRecordedEntryNames, path, ["alpha", "beta"]);
+      const before = lstatSync(path);
+      await call<void>(writeRecordedEntryNames, path, ["alpha", "beta"]);
+      const after = lstatSync(path);
+
+      assert.equal(readText(path), expected);
+      assert.equal(after.ino, before.ino);
+      assert.equal(after.mtimeMs, before.mtimeMs);
+    });
+  });
+
+  test("managed_state_replaces_identical_symlink", async () => {
+    if (!isPosix()) return;
+
+    await withTempDir(async (root) => {
+      const path = join(root, "state", "codex.json");
+      const target = join(root, "target.json");
+      const expected = '[\n  "alpha",\n  "beta"\n]\n';
+
+      writeFile(target, expected);
+      mkdirSync(join(root, "state"), { recursive: true });
+      symlinkSync(target, path);
+
+      await call<void>(writeRecordedEntryNames, path, ["alpha", "beta"]);
+
+      assert.equal(lstatSync(path).isSymbolicLink(), false);
+      assert.equal(readText(path), expected);
+      assert.equal(readText(target), expected);
     });
   });
 

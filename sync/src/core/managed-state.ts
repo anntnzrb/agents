@@ -138,6 +138,16 @@ export function writeRecordedEntryNames(
   } catch (error) {
     throw new Error(`serialize ${path} (${panicMessage(error)})`);
   }
+  try {
+    const existing = fs.lstatSync(path);
+    if (existing.isFile() && fs.readFileSync(path, "utf8") === content) {
+      return;
+    }
+  } catch (error) {
+    if (!isErrno(error, "ENOENT")) {
+      throw new Error(`read ${path} (${panicMessage(error)})`);
+    }
+  }
   const { tempPath, fd } = createTempStateFile(path);
   try {
     try {
