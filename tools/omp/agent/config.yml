@@ -97,7 +97,7 @@ task:
   eager: preferred
   batch: true
   prewalk: false
-  maxConcurrency: 4
+  maxConcurrency: 8
   enableLsp: false
   maxRecursionDepth: 1
   maxRuntimeMs: 3600000
