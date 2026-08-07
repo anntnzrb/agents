@@ -108,7 +108,7 @@ task:
     commits: ai
 async:
   enabled: true
-  maxJobs: 4
+  maxJobs: 8
 
 features:
   unexpectedStopDetection: true
