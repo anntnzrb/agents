@@ -95,6 +95,7 @@ browser:
 # =============================================================================
 task:
   eager: preferred
+  batch: true
   prewalk: false
   maxConcurrency: 4
   enableLsp: false
