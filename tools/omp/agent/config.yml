@@ -103,8 +103,9 @@ task:
   maxRuntimeMs: 3600000
   isolation:
     mode: auto
-    merge: patch
-    commits: generic
+    apply: false
+    merge: branch
+    commits: ai
 async:
   enabled: true
   maxJobs: 4
