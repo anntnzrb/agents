@@ -9,14 +9,16 @@
         "whatsapp_utils",
         "whatsapp_bot",
         "web_espol",
-        "url_shortener"
+        "url_shortener",
+        "template_editor"
       ],
       "test_modules": [
         "crm_espol",
         "whatsapp_utils",
         "whatsapp_bot",
         "web_espol",
-        "url_shortener"
+        "url_shortener",
+        "template_editor"
       ]
     },
     "b2b": {
