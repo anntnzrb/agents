@@ -49,6 +49,7 @@ stacked pull requests. Route to the smallest reference that owns the command fam
 | REST, GraphQL, pagination, custom endpoint | `references/api.md` | Use `gh api` only with explicit target/method |
 | Extension, agent task, skill, Copilot, preview | `references/agent-platform.md` | Check installed capability before invoking |
 | Dependent stacked PR chain design | `references/stack-design.md` | Worktree/staging/contribution handoffs apply |
+| Branch/PR-to-stack handoff | `references/stacked-pr-workflow.md` | Publishing a branch, creating a PR, or linking a PR to a stack |
 | `gh stack` execution or integration | `references/stack-commands.md` | Use installed help and current docs |
 | Stack failure, divergence, lock, recovery | `references/stack-troubleshooting.md` | Preserve state; never auto-repair |
 
@@ -76,6 +77,7 @@ GitHub CLI routing and stack-specific remote state only.
 | Releases, attestations, rulesets, keys, and licenses | `references/release-security.md` | Release, artifact-attestation, repository-rules, key, or license work |
 | REST, GraphQL, pagination, previews, and custom endpoints | `references/api.md` | `gh api` or an API surface not covered by a command |
 | Stack invariants, layer design, and ownership | `references/stack-design.md` | Planning a dependent-PR chain or deciding whether work belongs in one stack |
+| Branch/PR-to-stack handoff | `references/stacked-pr-workflow.md` | Publishing a branch, creating a PR, or linking a PR to a stack |
 | `gh stack` commands, capability gates, merge/API semantics, and CI state | `references/stack-commands.md` | Executing or planning any stack command or stack-aware integration |
 | Stack conflicts, divergence, locks, interop, and recovery | `references/stack-troubleshooting.md` | A stack operation fails, partially lands, diverges, or uses another local manager |
 | Extensions, agent tasks, skills, Copilot, and preview surfaces | `references/agent-platform.md` | `gh extension`, `gh agent-task`, `gh skill`, `gh copilot`, or preview-only tooling |
