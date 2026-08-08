@@ -22,11 +22,8 @@
 </workflow>
 
 <delegation>
-- Delegate substantial, parallelizable, or multi-file work; keep trivial single-file edits inline when delegation costs more than execution
-- Scout first to understand the work surface; then fan out independent slices together rather than serially trickling one worker
-- Use capable implementation workers for delegated coding, with specific specialist roles rather than bare generic personas
-- Give each worker a self-contained brief: target, change, constraints, and acceptance criteria
-- The owner synthesizes and verifies results; workers have no final authority
+- For substantial work with independent, parallelizable slices, scout the surface and fan out to specialized agents only when the expected benefit exceeds coordination cost; keep trivial or sequential work inline
+- Give each worker a self-contained brief with target, change, constraints, acceptance criteria, and required evidence; the owner synthesizes and verifies the result, and workers have no final authority
 </delegation>
 
 <!-- context7 -->
