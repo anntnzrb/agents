@@ -4,7 +4,7 @@ description: Query NotebookLM notebooks and knowledge bases through the nlm CLI.
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # NotebookLM CLI

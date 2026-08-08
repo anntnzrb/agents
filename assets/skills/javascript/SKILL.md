@@ -4,7 +4,7 @@ description: "Implement and debug JavaScript in Node or browsers: modules, async
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # JavaScript Development

@@ -4,7 +4,7 @@ description: "Develop and debug Go: .go modules, concurrency, HTTP, CLI, databas
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Go Development

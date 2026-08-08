@@ -5,7 +5,7 @@ license: GPL-3.0-or-later
 compatibility: Requires `uv`. Runtime introspection requires Hammerspoon running with `require("hs.ipc")` and the `hs` CLI installed. Docs/source lookup requires network unless cached.
 metadata:
   author: anntnzrb
-  allowed-tools: ""
+
 ---
 
 # Hammerspoon

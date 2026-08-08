@@ -4,7 +4,7 @@ description: Inspect and operate n8n workflows through its bundled REST CLI or t
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # n8n

@@ -4,7 +4,7 @@ description: Use GitHub CLI (`gh`) for repositories, issues, pull requests, Acti
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # GitHub CLI

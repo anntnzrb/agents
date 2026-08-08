@@ -4,7 +4,7 @@ description: Spoiler-safe Bloodborne help for builds, mechanics, weapons, routin
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: "Read, Bash, WebSearch"
+
 ---
 
 # Bloodborne Companion

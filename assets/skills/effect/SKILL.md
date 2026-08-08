@@ -4,7 +4,7 @@ description: "Use Effect TypeScript APIs and docs: effect-ts, @effect/*, fibers,
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Effect

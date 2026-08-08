@@ -4,7 +4,7 @@ description: Find and answer unanswered GitHub Discussions for open-source contr
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # GitHub Discussions Answerer

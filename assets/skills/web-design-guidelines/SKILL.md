@@ -4,7 +4,7 @@ description: Audit UI code for web design, UX, and accessibility guideline compl
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Web Interface Guidelines

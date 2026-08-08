@@ -4,7 +4,7 @@ description: "Automate websites: browse, log in, fill forms, click, scrape, scre
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Browser Automation with agent-browser

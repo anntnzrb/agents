@@ -5,7 +5,7 @@ license: GPL-3.0-or-later
 compatibility: Requires `uv` and network access. Browser or web search is required for retailer and checkout verification.
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # game-deals-live

@@ -4,7 +4,7 @@ description: Read and surgically edit XML with XPath, minimal formatting changes
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Xml Surgeon

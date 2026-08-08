@@ -5,7 +5,7 @@ license: GPL-3.0-or-later
 compatibility: Requires `uv`. Uses bundled skill-local `scripts/cli.py`. Network access required for live mode.
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # amz-live

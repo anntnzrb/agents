@@ -4,7 +4,7 @@ description: Execute an existing plan with subagents when asked for /go, orchest
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Go

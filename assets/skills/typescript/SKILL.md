@@ -4,7 +4,7 @@ description: "Develop and debug TypeScript: TS 5.x, tsconfig, modules, toolchain
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # TypeScript Development

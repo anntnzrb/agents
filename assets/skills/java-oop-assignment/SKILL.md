@@ -4,7 +4,7 @@ description: Complete Java OOP/FOP assignments from PDF specifications with mini
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Java OOP Assignment Solver

@@ -4,7 +4,7 @@ description: Write, review, or optimize React and Next.js performance, data fetc
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Vercel React Best Practices

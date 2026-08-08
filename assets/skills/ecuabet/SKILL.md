@@ -4,7 +4,7 @@ description: Analyze an Ecuabet match URL or ID for live odds, EV, incidents, an
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Ecuabet

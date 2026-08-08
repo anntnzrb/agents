@@ -4,7 +4,7 @@ description: Search public GitHub code with Grep.app for real-world API and conf
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Grep.app

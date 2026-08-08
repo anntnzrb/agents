@@ -4,7 +4,7 @@ description: Query public GitHub repository documentation and codebase questions
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # DeepWiki

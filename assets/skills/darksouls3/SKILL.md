@@ -4,7 +4,7 @@ description: Spoiler-safe Dark Souls 3 help for builds, mechanics, routes, achie
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: "Read, Bash, WebSearch"
+
 ---
 
 # Dark Souls 3 Companion

@@ -4,7 +4,7 @@ description: Update nixpkgs packages with nix-update/nixpkgs-review or contribut
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Nixpkgs Package Update

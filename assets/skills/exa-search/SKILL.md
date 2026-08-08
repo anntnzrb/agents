@@ -4,7 +4,7 @@ description: Use Exa for deep web research, full-page retrieval, and source-back
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Exa Search

@@ -4,7 +4,7 @@ description: "Work with YouTube or media links: inspect, download, convert, extr
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # yt-dlp Video Downloader Skill

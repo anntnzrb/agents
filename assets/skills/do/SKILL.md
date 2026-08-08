@@ -4,7 +4,7 @@ description: Delegate a task to a subagent when the user says /do or asks for de
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Do Skill

@@ -4,7 +4,7 @@ description: Manage, authenticate, inspect, and call configured MCP servers with
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # MCPorter

@@ -4,7 +4,7 @@ description: Perform read-only AST-aware code search with ast-grep/sg, including
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # ast-grep

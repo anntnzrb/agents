@@ -4,7 +4,7 @@ description: Build, inspect, debug, validate, sign, and remix Apple Shortcuts an
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Apple Shortcuts

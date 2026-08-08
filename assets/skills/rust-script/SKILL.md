@@ -4,7 +4,7 @@ description: Create and debug Cargo single-file Rust scripts, rust-script fallba
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # rust-script

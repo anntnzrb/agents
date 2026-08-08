@@ -4,7 +4,7 @@ description: Assess a codebase's readiness for autonomous AI development and ide
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Agent Readiness Report

@@ -4,7 +4,7 @@ description: Develop and debug Nix, nixpkgs, flakes, NixOS, derivations, shells,
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Nix Development

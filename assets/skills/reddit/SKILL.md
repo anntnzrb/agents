@@ -4,7 +4,7 @@ description: Browse, search, and retrieve Reddit posts, comments, subreddits, an
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Reddit

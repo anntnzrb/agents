@@ -4,7 +4,7 @@ description: Develop and debug Gleam, gleam.toml, BEAM/Erlang projects, TDD, and
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Gleam Development

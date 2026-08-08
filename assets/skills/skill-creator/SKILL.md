@@ -6,7 +6,7 @@ metadata:
   author: Anthropic
   local-maintainer: anntnzrb
   upstream: https://github.com/anthropics/skills/tree/main/skills/skill-creator
-allowed-tools: ""
+
 ---
 
 # Skill Creator

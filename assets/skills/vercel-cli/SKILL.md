@@ -4,7 +4,7 @@ description: Deploy, manage, and debug Vercel projects, environments, domains, l
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Vercel CLI Skill

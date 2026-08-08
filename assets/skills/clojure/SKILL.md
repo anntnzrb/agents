@@ -4,7 +4,7 @@ description: Develop and debug Clojure, ClojureScript, deps.edn, REPL, spec, and
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Clojure Development

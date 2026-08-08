@@ -5,7 +5,7 @@ license: GPL-3.0-or-later
 compatibility: Requires uv; network is needed only for fetch.
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # deepswe-live

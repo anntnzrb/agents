@@ -4,7 +4,7 @@ description: "Develop and debug Python: uv, typing, validation, APIs, async, tes
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Python Development

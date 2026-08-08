@@ -4,7 +4,7 @@ description: Spoiler-safe Dark Souls Remastered help for builds, mechanics, rout
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: "Read, Bash, WebSearch"
+
 ---
 
 # Dark Souls Remastered Companion

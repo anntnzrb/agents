@@ -4,7 +4,7 @@ description: Use Brave Search for quick, current web, image, video, or local-res
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Brave Search

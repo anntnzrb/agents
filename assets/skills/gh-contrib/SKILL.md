@@ -4,7 +4,7 @@ description: Create upstream GitHub issues and pull requests following repositor
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # GitHub Contribution Workflow

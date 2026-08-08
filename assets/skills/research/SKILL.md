@@ -4,7 +4,7 @@ description: Route research, fact-checking, comparisons, and evidence gathering 
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Research Router

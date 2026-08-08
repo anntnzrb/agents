@@ -4,7 +4,7 @@ description: Create, split, stage, unstage, or polish precise Git commits and co
 license: GPL-3.0-or-later
 metadata:
   author: anntnzrb
-allowed-tools: ""
+
 ---
 
 # Commit Skill

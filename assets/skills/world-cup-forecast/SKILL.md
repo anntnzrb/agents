@@ -5,7 +5,7 @@ license: GPL-3.0-or-later
 compatibility: Requires uv and network access. Uses bundled skill-local scripts/cli.py. Outputs JSON only.
 metadata:
   author: anntnzrb
-  allowed-tools: ""
+
 ---
 
 # world-cup-forecast
