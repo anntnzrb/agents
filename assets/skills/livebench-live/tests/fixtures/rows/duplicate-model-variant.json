@@ -1,0 +1,10 @@
+{
+  "release": "fixture-release-duplicates",
+  "categories": {"Coding": ["task"]},
+  "score_rows": [
+    {"model": "same-model", "provider": "Provider", "variant": "base", "task": "10"},
+    {"model": "same-model", "provider": "Provider", "variant": "base", "task": "10"},
+    {"model": "conflict-model", "provider": "Provider", "variant": "base", "task": "20"},
+    {"model": "conflict-model", "provider": "Provider", "variant": "base", "task": "21"}
+  ]
+}

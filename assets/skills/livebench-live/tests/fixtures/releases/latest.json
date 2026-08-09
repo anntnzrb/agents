@@ -1,0 +1,11 @@
+{
+  "fixture_id": "livebench-release-discovery",
+  "source": "livebench",
+  "authority_url": "fixture://livebench-release-discovery",
+  "releases": [
+    {"id": "fixture-release-1", "date": "2026-01-01", "assets": {"table": "fixture://table_fixture_release_1.csv", "category": "fixture://categories_fixture_release_1.json"}},
+    {"id": "fixture-release-2", "date": "2026-06-25", "generated_at": null, "assets": {"table": "fixture://table_fixture_release_2.csv", "category": "fixture://categories_fixture_release_2.json", "cost": "fixture://cost_fixture_release_2.csv"}, "new_field": "retained"}
+  ],
+  "latest": "fixture-release-2",
+  "raw_metadata": {"discovery_rule": "last advertised release entry"}
+}

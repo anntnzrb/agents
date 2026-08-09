@@ -1,0 +1,11 @@
+{
+  "fixture_id": "livebench-mixed-release",
+  "source": "livebench",
+  "release": "fixture-release-a",
+  "categories": {"Coding": ["task"]},
+  "score_rows": [{"model": "model-a", "task": "10"}],
+  "artifacts": {
+    "score_table": {"release_id": "fixture-release-a", "body": "model,task\nmodel-a,10\n"},
+    "category_map": {"release_id": "fixture-release-b", "body": "{\"Coding\":[\"task\"]}"}
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "skill_name": "livebench-live",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Resolve the latest LiveBench release and list its discovered categories and subtasks.",
+      "expected_output": "One compact JSON response resolving latest to an explicit release ID/date and listing dynamically discovered categories and subtasks with source provenance.",
+      "files": [
+        "tests/fixtures/releases/latest.json",
+        "tests/fixtures/catalog/current.json",
+        "tests/fixtures/records/subtask-breakdown.json"
+      ],
+      "expectations": [
+        "The response cites the official app/data source URL, discovered-from URL, fetched_at, release ID/date, parser/version, and hashes when supplied.",
+        "The resolved latest release is explicit on every model/category/subtask row; release mixing is rejected.",
+        "Model/provider/variant identity is preserved for category and subtask rows, including explicit null variants.",
+        "Overall/category/subtask semantics and aggregation formulas remain source-defined; the overall score is not renamed pass_at_1.",
+        "Placeholder values are null/missing with diagnostics and do not become category or subtask scores.",
+        "The command never silently falls back to an older release after a failed latest asset; stale data requires an explicit option and is labeled.",
+        "Unknown release/category/subtask fields remain under raw_fields/raw_metadata with original labels.",
+        "Categories and subtasks are discovered dynamically and the output does not assume a permanent category count/list."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Compare three model variants on Coding and Agentic Coding while preserving release metadata and cost per successful task.",
+      "expected_output": "A compact three-variant comparison with separate Coding and Agentic Coding scores, explicit release metadata, published aggregation, and LiveBench cost per successful task.",
+      "files": [
+        "tests/fixtures/records/coding-compare.json",
+        "tests/fixtures/models/new-variant.json"
+      ],
+      "expectations": [
+        "Every row preserves official source/discovery URLs, fetched_at, explicit release ID/date/generated_at, parser/version, and source paths.",
+        "All three model/provider/variant identities remain distinct and are not merged by display name.",
+        "Coding, Agentic Coding, overall, subtask, and cost_per_successful_task semantics stay separate; overall is never called pass_at_1 and cost is never derived from AA/DeepSWE/token prices.",
+        "No placeholder score or cost is presented as published; absent values have missing/unparsed status and reasons.",
+        "No older release or stale cache is silently substituted; explicit stale mode is visible in scope/provenance.",
+        "New provider/model/category fields remain under raw_fields and preserve raw labels.",
+        "Both categories are selected from dynamic source categories and a future added category would be accepted without schema-code changes.",
+        "Any derived ordering/delta is labeled derived and cannot overwrite published category, overall, or cost values."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Retrieve a model’s subtask breakdown without calling the overall score pass@1.",
+      "expected_output": "A compact model/subtask response with release and category scope, source-defined subtask scores, and no pass_at_1 terminology for LiveBench overall.",
+      "files": [
+        "tests/fixtures/records/subtask-breakdown.json",
+        "tests/fixtures/records/missing-optional.json"
+      ],
+      "expectations": [
+        "Each subtask cites source URL/path, fetched_at, explicit release/version, extraction method, and parser/version.",
+        "Model/provider/variant identity is carried through every subtask row.",
+        "Subtask score definitions/units are preserved separately from category and overall aggregation; overall is not labeled pass_at_1.",
+        "Missing or placeholder subtasks are absent/null with reasons, never synthetic zero values.",
+        "A failed refresh cannot silently replace the selected release with stale/older data.",
+        "Unknown subtask metadata and labels remain under raw_fields/raw_metadata.",
+        "Subtask names are dynamic source data rather than a fixed enum, and a new name is emitted without code changes.",
+        "The one-object stdout response keeps operational warnings on stderr and exposes partial extraction explicitly."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Simulate a broken release asset and prove that the skill does not silently fall back to an older release.",
+      "expected_output": "A structured non-success JSON envelope containing the attempted release asset URL/status and no rows from another release unless explicit stale mode was requested.",
+      "files": [
+        "tests/fixtures/releases/broken-asset.json",
+        "tests/fixtures/transport/release-404.json",
+        "tests/fixtures/releases/mixed.json"
+      ],
+      "expectations": [
+        "The error preserves official source/discovery URL, attempted asset URL, fetched_at, selected release/version, HTTP status, parser/version, and relevant hash metadata.",
+        "Any retained model/provider/variant identity is clearly scoped to the failed release and no older-release identity is emitted as current.",
+        "The failure does not reinterpret the broken asset as a pass_at_1/overall success or fabricate category scores.",
+        "404, malformed, and mixed-release fixtures produce structured RELEASE_NOT_FOUND/SOURCE_UNAVAILABLE/MALFORMED_PAYLOAD/MIXED_RELEASE diagnostics.",
+        "No stale fallback occurs by default; explicit stale mode is marked stale and keeps the requested snapshot/release visible.",
+        "Unknown error payload fields and response headers remain in safe raw diagnostics without credentials.",
+        "The release/catalog resolver remains dynamic and reports the failed release rather than assuming a permanent release list.",
+        "Stdout is exactly one compact ok:false object and stderr contains only operational diagnostics, with no source data masquerading as success."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Simulate a new category and prove it appears dynamically.",
+      "expected_output": "A compact catalog/leaderboard response containing the new category's canonical key, original label, score scope, raw metadata, and an unknown-category warning when taxonomy is unfamiliar.",
+      "files": [
+        "tests/fixtures/catalog/new-category.json",
+        "tests/fixtures/pages/unknown-category.json"
+      ],
+      "expectations": [
+        "The new category row cites source/discovery URLs, fetched_at, explicit release/version, extraction method, parser/version, and source path.",
+        "Model/provider/variant identity remains intact in the new category row.",
+        "Its score remains category_score/unknown according to source semantics and is not called overall or pass_at_1 without source proof.",
+        "Placeholder values in the new category are missing/null with a diagnostic, not zero.",
+        "The category is sourced from the selected release and is not silently loaded from stale or older release data.",
+        "Original category label and unknown metadata are preserved under raw_fields/raw_metadata.",
+        "The category appears through dynamic discovery without adding an enum/schema branch; `UNKNOWN_CATEGORY` is emitted only as a diagnostic, not as a reason to drop it.",
+        "The CLI emits one compact JSON object with category/release scope and keeps diagnostics on stderr."
+      ]
+    }
+  ]
+}

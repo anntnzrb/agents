@@ -1,0 +1,22 @@
+{
+  "fixture_id": "livebench-coding-compare",
+  "source": "livebench",
+  "source_url": "https://livebench.ai/table_fixture_release.csv",
+  "release": "fixture-release-1",
+  "fetched_at": "2026-08-09T00:00:00Z",
+  "categories": {
+    "Coding": ["code_generation", "code_completion"],
+    "Agentic Coding": ["javascript", "python"],
+    "Novel Category": ["new_task"]
+  },
+  "score_rows": [
+    {"model": "model-a", "provider": "Provider A", "variant": "base", "code_generation": "72.4", "code_completion": "68.0", "javascript": "61.0", "python": "59.0", "new_task": "77.0", "new_score": "0.724", "organization": "Display A"},
+    {"model": "model-b", "provider": "Provider B", "variant": "reasoning", "code_generation": "81.0", "code_completion": "79.0", "javascript": "70.0", "python": "71.0", "new_task": "80.0", "new_score": "0.810", "organization": "Display B"},
+    {"model": "model-c", "provider": "Provider C", "variant": "base", "code_generation": "64.0", "code_completion": "66.0", "javascript": "52.0", "python": "55.0", "new_task": "60.0", "new_score": "0.640", "organization": "Display C"}
+  ],
+  "cost_rows": [
+    {"model": "model-a", "cost_per_question": "0.010", "cost_per_successful_task": "0.020", "code_generation": "0.012", "code_completion": "0.008", "javascript": "0.011", "python": "0.009", "new_task": "0.013", "nq_code_generation": "10", "nq_code_completion": "10", "nq_javascript": "8", "nq_python": "8", "nq_new_task": "5", "avg_input_tokens": "1000", "avg_output_tokens": "100"},
+    {"model": "model-b", "cost_per_question": "0.012", "cost_per_successful_task": "0.018", "code_generation": "0.014", "code_completion": "0.010", "javascript": "0.012", "python": "0.011", "new_task": "0.015", "nq_code_generation": "10", "nq_code_completion": "10", "nq_javascript": "8", "nq_python": "8", "nq_new_task": "5"},
+    {"model": "model-c", "cost_per_question": "0.008", "cost_per_successful_task": "0.030", "code_generation": "0.009", "code_completion": "0.007", "javascript": "0.008", "python": "0.008", "new_task": "0.010", "nq_code_generation": "10", "nq_code_completion": "10", "nq_javascript": "8", "nq_python": "8", "nq_new_task": "5"}
+  ]
+}

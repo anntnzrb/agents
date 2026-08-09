@@ -1,0 +1,8 @@
+{
+  "fixture_id": "livebench-rename-after",
+  "source": "livebench",
+  "release": "fixture-release-after",
+  "categories": {"New Label": ["task_same"]},
+  "score_rows": [{"model": "model-x", "task_same": "11"}],
+  "catalog": {"categories": {"stable-category": {"category_id": "livebench:category:stable-category", "raw_label": "New Label", "source_id": "stable-category"}}}
+}

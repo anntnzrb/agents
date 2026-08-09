@@ -1,0 +1,9 @@
+{
+  "schema_version": "1",
+  "source": "livebench",
+  "snapshot_id": "snapshot:sha256:fixture-current",
+  "release": {"id": "fixture-release-1", "date": "2026-06-25"},
+  "freshness": {"mode": "snapshot", "historical": true, "stale": false},
+  "artifacts": {},
+  "catalog": {"categories": {}, "models": [], "columns": {}}
+}

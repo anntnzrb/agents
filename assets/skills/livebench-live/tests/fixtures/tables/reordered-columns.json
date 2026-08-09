@@ -1,0 +1,10 @@
+{
+  "fixture_id": "livebench-reordered-columns",
+  "release": "fixture-release-columns",
+  "categories": {"Coding": ["task_one", "task_two"]},
+  "headers": ["task_two", "model", "task_one"],
+  "score_rows": [
+    {"task_two": "20", "model": "model-a", "task_one": "10"},
+    {"task_two": "40", "model": "model-b", "task_one": "30"}
+  ]
+}

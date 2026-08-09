@@ -1,0 +1,6 @@
+{
+  "url": "https://livebench.ai/table_offline.csv",
+  "error": "offline",
+  "release": "fixture-release-transport",
+  "allow_stale": false
+}

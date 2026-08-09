@@ -1,0 +1,11 @@
+{
+  "fixture_id": "livebench-catalog-current",
+  "source": "livebench",
+  "source_url": "https://livebench.ai/",
+  "release": "fixture-release-1",
+  "generated_at": null,
+  "categories": {"Reasoning": ["logic_alpha"], "Coding": ["code_alpha"], "IF": ["instruction_alpha"]},
+  "score_rows": [{"model": "catalog-model", "code_alpha": "72.4", "logic_alpha": "0.724", "instruction_alpha": "65.0", "unknown_column": "published-but-unknown", "organization": "Display Only"}],
+  "cost_rows": [],
+  "raw_metadata": {"task_count_note": "derived from category map", "new_metadata": {"future": true}}
+}

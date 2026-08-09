@@ -1,0 +1,8 @@
+{
+  "fixture_id": "livebench-missing-optional",
+  "source": "livebench",
+  "release": "fixture-release-missing",
+  "categories": {"Only Category": ["task_one", "task_missing"]},
+  "score_rows": [{"model": "model-missing", "task_one": "50", "task_missing": ""}],
+  "cost_rows": []
+}

@@ -1,0 +1,7 @@
+{
+  "url": "https://livebench.ai/table_fixture.csv",
+  "status": 200,
+  "headers": {"ETag": "\"fixture-etag-1\"", "Last-Modified": "Sun, 09 Aug 2026 00:00:00 GMT", "Content-Type": "text/csv"},
+  "body": "model,task\nmodel-a,72.4\n",
+  "release": "fixture-release-transport"
+}

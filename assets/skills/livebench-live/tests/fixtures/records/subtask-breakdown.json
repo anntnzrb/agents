@@ -1,0 +1,8 @@
+{
+  "fixture_id": "livebench-subtask-breakdown",
+  "source": "livebench",
+  "release": "fixture-release-breakdown",
+  "categories": {"Coding": ["task_one", "task_two"], "Agentic Coding": ["task_three"]},
+  "score_rows": [{"model": "model-a", "provider": "Provider A", "variant": "max", "task_one": "88", "task_two": "77", "task_three": "66"}],
+  "cost_rows": [{"model": "model-a", "cost_per_question": "0.01", "cost_per_successful_task": "0.02", "task_one": "0.01", "task_two": "0.01", "task_three": "0.01", "nq_task_one": "4", "nq_task_two": "4", "nq_task_three": "4"}]
+}

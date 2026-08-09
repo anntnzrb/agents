@@ -1,0 +1,8 @@
+{
+  "fixture_id": "livebench-new-score-column",
+  "release": "fixture-release-columns",
+  "categories": {"Coding": ["known_task"]},
+  "headers": ["model", "known_task", "new_unknown_metric"],
+  "score_rows": [{"model": "model-a", "known_task": "72.4%", "new_unknown_metric": "42"}],
+  "raw_fields": {"new_unknown_metric": {"definition": null, "metric_semantics_status": "unknown"}}
+}

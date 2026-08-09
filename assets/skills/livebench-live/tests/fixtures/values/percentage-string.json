@@ -1,0 +1,6 @@
+{
+  "release": "fixture-release-values",
+  "categories": {"Coding": ["task"]},
+  "score_rows": [{"model": "model-percent", "task": "72.4%"}],
+  "expected": {"raw_value": "72.4%", "normalized_value": 72.4, "unit": "percent", "normalization": "removed_percent_sign"}
+}

@@ -1,0 +1,5 @@
+{
+  "release": "fixture-release-values",
+  "categories": {"Coding": ["good_task", "bad_task"]},
+  "score_rows": [{"model": "model-malformed", "good_task": "72.4", "bad_task": "not-a-number"}]
+}

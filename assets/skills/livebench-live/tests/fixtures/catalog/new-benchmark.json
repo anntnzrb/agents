@@ -1,0 +1,10 @@
+{
+  "fixture_id": "livebench-new-release-entry",
+  "source": "livebench",
+  "release": "fixture-release-new",
+  "releases": [{"id": "fixture-release-1", "date": "2026-01-01"}, {"id": "fixture-release-new", "date": "2026-08-01", "new_metadata": {"announced": true}}],
+  "categories": {"Coding": ["code_alpha"], "New Benchmark Category": ["novel_task"]},
+  "score_rows": [{"model": "new-model", "code_alpha": "71.0", "novel_task": "83.0", "new_metric": "42"}],
+  "cost_rows": [],
+  "raw_metadata": {"novel_release_field": "retained"}
+}

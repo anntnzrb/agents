@@ -1,0 +1,12 @@
+{
+  "fixture_id": "livebench-new-variant",
+  "source": "livebench",
+  "release": "fixture-release-variant",
+  "categories": {"Coding": ["task"]},
+  "score_rows": [
+    {"model": "same-display-model", "provider": "Provider A", "variant": "base", "task": "70"},
+    {"model": "same-display-model", "provider": "Provider A", "variant": "reasoning-max", "task": "75"},
+    {"model": "same-display-model", "provider": "Provider B", "variant": "base", "task": "74"}
+  ],
+  "cost_rows": []
+}

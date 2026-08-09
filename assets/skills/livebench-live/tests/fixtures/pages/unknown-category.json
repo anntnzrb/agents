@@ -1,0 +1,6 @@
+{
+  "release": "fixture-release-unknown-category",
+  "categories": {"Coding": ["known_task"], "Arbitrary Future Category": ["future_task"]},
+  "score_rows": [{"model": "model-category", "known_task": "70", "future_task": "80"}],
+  "raw_metadata": {"category_source_path": "fixture://category-map#Arbitrary Future Category"}
+}

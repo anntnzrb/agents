@@ -1,0 +1,7 @@
+{
+  "url": "https://livebench.ai/table_missing_release.csv",
+  "status": 404,
+  "headers": {"Content-Type": "text/html"},
+  "body": "<html><body>404</body></html>",
+  "release": "missing-release"
+}

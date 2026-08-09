@@ -1,0 +1,10 @@
+{
+  "fixture_id": "livebench-archived-release",
+  "source": "livebench",
+  "release": "fixture-release-archived",
+  "status": "archived",
+  "archive_reason": "historical source entry",
+  "categories": {"Historical Category": ["historical_task"]},
+  "score_rows": [{"model": "archived-model", "historical_task": "44"}],
+  "cost_rows": []
+}

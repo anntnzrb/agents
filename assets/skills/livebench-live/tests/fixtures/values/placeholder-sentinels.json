@@ -1,0 +1,5 @@
+{
+  "release": "fixture-release-values",
+  "categories": {"Coding": ["na_task", "dash_task", "empty_task", "loading_task"]},
+  "score_rows": [{"model": "model-sentinels", "na_task": "N/A", "dash_task": "—", "empty_task": "", "loading_task": "loading"}]
+}

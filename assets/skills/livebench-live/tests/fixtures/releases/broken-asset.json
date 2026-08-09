@@ -1,0 +1,7 @@
+{
+  "fixture_id": "livebench-broken-asset",
+  "source": "livebench",
+  "release": "broken-release",
+  "releases": [{"id": "broken-release", "date": "2026-07-01", "assets": {"table": "fixture://missing-table.csv", "category": "fixture://missing-category.json"}}],
+  "assets": {"score_table": {"path": "missing-table.csv"}, "category_map": {"path": "missing-category.json"}}
+}

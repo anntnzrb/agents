@@ -1,0 +1,14 @@
+{
+  "source": "livebench",
+  "release": "fixture-release-1",
+  "fetched_at": "2026-08-09T00:00:00Z",
+  "catalog": {
+    "release": "fixture-release-1",
+    "categories": {
+      "stable": {"category_id": "livebench:category:stable", "raw_label": "Stable", "subtask_keys": ["task_a"]},
+      "removed": {"category_id": "livebench:category:removed", "raw_label": "Removed", "subtask_keys": ["task_r"]}
+    },
+    "models": [{"model_id": "livebench:model:model-a", "model": "Model A"}],
+    "columns": {"score_table": ["model", "task_a"]}
+  }
+}

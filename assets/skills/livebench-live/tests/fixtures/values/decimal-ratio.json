@@ -1,0 +1,6 @@
+{
+  "release": "fixture-release-values",
+  "categories": {"Coding": ["explicit_ratio", "bare_ratio", "bare_percent"]},
+  "score_rows": [{"model": "model-ratio", "explicit_ratio": "0.724", "bare_ratio": "0.724", "bare_percent": "72.4"}],
+  "definitions": {"explicit_ratio": {"unit": "ratio", "definition": "source declares a fraction"}, "bare_ratio": null, "bare_percent": null}
+}

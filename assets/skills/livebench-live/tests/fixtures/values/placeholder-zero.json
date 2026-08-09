@@ -1,0 +1,6 @@
+{
+  "release": "fixture-release-values",
+  "categories": {"Coding": ["task"]},
+  "score_rows": [{"model": "model-placeholder", "task": "0.0%"}],
+  "source_metadata": {"task": "chart loading placeholder"}
+}

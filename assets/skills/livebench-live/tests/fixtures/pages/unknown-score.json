@@ -1,0 +1,6 @@
+{
+  "release": "fixture-release-unknown",
+  "categories": {"Coding": ["known_task"]},
+  "score_rows": [{"model": "model-unknown", "known_task": "72.4", "mystery_metric": "999"}],
+  "raw_fields": {"mystery_metric": {"value": "999", "definition": null}}
+}

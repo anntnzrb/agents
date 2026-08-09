@@ -1,0 +1,9 @@
+{
+  "fixture_id": "livebench-code-quality-separate",
+  "source": "livebench",
+  "release": "fixture-release-quality",
+  "categories": {"Coding": ["correctness_task"]},
+  "score_rows": [{"model": "model-quality", "correctness_task": "72.4", "code_quality": "0.91"}],
+  "cost_rows": [],
+  "raw_metadata": {"code_quality_definition": "source-defined quality field; not a correctness alias"}
+}

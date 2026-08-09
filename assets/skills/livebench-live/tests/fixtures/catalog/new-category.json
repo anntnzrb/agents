@@ -1,0 +1,9 @@
+{
+  "fixture_id": "livebench-new-category",
+  "source": "livebench",
+  "release": "fixture-release-category",
+  "categories": {"Existing": ["task_old"], "Arbitrary Unicode Category / v2": ["task_new", "task_new_two"]},
+  "score_rows": [{"model": "model-x", "task_old": "10", "task_new": "20", "task_new_two": "30"}],
+  "cost_rows": [],
+  "raw_metadata": {"category_origin": "controlled fixture"}
+}
