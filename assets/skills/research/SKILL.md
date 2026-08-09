@@ -13,6 +13,8 @@ Route research requests to the right source class, then return source-backed ans
 
 ## Routing policy
 
+- Prefer active tools for common search, URL retrieval, repository inspection, and browsing.
+- Use a specialized skill when its source or behavior matches the request better.
 - Prefer live data for open-web questions.
 - Pick the smallest route set that can answer the question.
 - If evidence is thin, add a second source class for corroboration.
@@ -22,33 +24,28 @@ Route research requests to the right source class, then return source-backed ans
 
 ### Code/docs research
 
-- Use `gh` for GitHub repository inspection and code search.
+- Use available GitHub or repository tools, or `gh`, for repository inspection and code search.
 - Use `deepwiki` for repository docs/Q&A over `owner/repo`.
-- Use `context7` for up-to-date library/API docs and examples.
+- Use `context7` for current library/API docs and examples.
 - Use `grep-app` for public OSS code usage patterns.
-
-`context7` uses the official read-only `ctx7` CLI for library docs. `grep-app` is direct HTTP. `deepwiki` may still be MCP-backed until its direct equivalent reaches Q&A parity.
 
 ### Web/live research
 
-- Use native `web_search` for ordinary live discovery inside OMP; use `browser` only for interactive or JavaScript-rendered pages.
-- Use `omp-search` when research needs OMP's automatic provider chain, an explicit configured provider, or structured JSON for headless/subagent execution.
-- Use `read` to retrieve a known static URL; it is a general retrieval tool, not a dedicated web-search route.
-- Use `brave-search` for direct Brave-backed scoping and recency checks when native `web_search` and `omp-search` are insufficient.
-
-`omp-search` wraps the installed OMP CLI and may select a provider automatically; do not pair it with `brave-search` merely to duplicate the same search. `brave-search` is a direct HTTP skill.
+- Use built-in web search for ordinary live discovery.
+- Use `omp-search` when the OMP CLI's automatic provider chain, explicit provider selection, or structured headless output is useful.
+- Use URL retrieval tool for known static pages; use its browser tool only for interaction, authentication, or JavaScript-rendered pages.
+- Use `brave-search` for direct Brave-backed scoping and recency checks.
+- Do not run multiple routes that merely duplicate the same provider and evidence.
 
 ### Sentiment/discussion research
 
 - Use `reddit` for community sentiment, discussion trends, and user/topic signals.
 - Corroborate high-impact claims with one non-Reddit source class when feasible.
 
-`reddit` is direct HTTP via Reddit JSON endpoints.
-
 ### X/Twitter research
 
-- Use `x-research` for explicit X/Twitter post URLs or IDs, bounded user timelines, post search, and conversations.
-- For X-plus-web news work, use `x-research` for bounded X discovery/evidence, then `web_search` and `read` for independent sources.
+- Use `x-research` for explicit X/Twitter post URLs or IDs, bounded timelines, post search, and conversations.
+- For X-plus-web news work, use `x-research` for bounded X evidence, then an independent web route.
 - Treat X results as bounded, unofficial evidence; never infer public-opinion truth, deletion, or suspension from a missing result.
 
 ### Knowledge-base research
@@ -57,27 +54,28 @@ Route research requests to the right source class, then return source-backed ans
 
 ### Exclusions
 
-- Do not route to `summarize` from this skill.
+- Do not substitute generic summarization for evidence retrieval.
 
 ## Router workflow
 
-1. Classify request: code/docs, web/live, sentiment, X/Twitter, or notebook KB.
-2. Select the primary route from the map above. For web/live work, use native `web_search` by default; choose `omp-search` when automatic provider fallback, explicit provider selection, or structured headless output is required.
-3. Execute route tools and collect source evidence.
-4. Add corroboration route when confidence is low, sources conflict, or claim impact is high.
-5. Return answer with provenance, confidence, and explicit gaps.
+1. Classify the request: code/docs, web/live, sentiment, X/Twitter, or notebook KB.
+2. Start with active route for common operations.
+3. Select a specialized skill when the route map gives it a better source or behavior match.
+4. Execute the route and collect source evidence.
+5. Add a different source class when confidence is low, sources conflict, or claim impact is high.
+6. Return the answer with provenance, confidence, and explicit gaps.
 
 ## Output contract
 
 - Answer: concise result.
-- Sources used: tool + why it was selected.
+- Sources used: route + why it was selected.
 - Confidence: high/medium/low with reason.
 - Gaps: unresolved uncertainty or missing evidence.
 - Next query: best follow-up when blocked.
 
 ## Escalation rules
 
-- If library/API details are unclear, force `context7`.
-- If repo-specific behavior is unclear, force `deepwiki` and/or `gh`.
-- If web evidence is stale or shallow, use `omp-search` with its automatic provider chain; select `brave-search` only when direct Brave-backed evidence is specifically useful.
-- If sentiment claim drives decisions, include `reddit` plus one non-Reddit corroboration source.
+- If library/API details are unclear, use `context7`; fall back to official docs.
+- If repository behavior is unclear, use repository inspection plus `deepwiki` when useful.
+- If web evidence is stale or shallow, try another search provider; use `omp-search` when its provider chain is available.
+- If a sentiment claim drives decisions, include `reddit` plus one non-Reddit source.
