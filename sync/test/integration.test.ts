@@ -39,8 +39,6 @@ test("integration_happy_path_matches_expected_outputs", () => {
 
     assert.equal(result.exitCode, 0, result.stderr || result.stdout);
     assert.equal(existsSync(join(home, ".codex", "AGENTS.md")), true);
-    assert.equal(existsSync(join(home, ".claude", "CLAUDE.md")), true);
-    assert.equal(existsSync(join(home, ".claude", "AGENTS.md")), false);
     assert.equal(
       existsSync(join(home, ".config", "opencode", "AGENTS.md")),
       true,
@@ -160,7 +158,6 @@ function makeFixture(root: string): string {
   mkdirSync(join(home, ".omp", "agent"), { recursive: true });
   mkdirSync(join(home, ".omp", "agent", "logs"), { recursive: true });
   mkdirSync(join(home, ".codex"), { recursive: true });
-  mkdirSync(join(home, ".claude"), { recursive: true });
   mkdirSync(join(home, ".config", "opencode"), { recursive: true });
   mkdirSync(join(home, ".mcporter"), { recursive: true });
 
@@ -273,7 +270,6 @@ function runSyncProcess(home: string): RunResult {
 
 function snapshotHome(home: string): SnapshotEntry[] {
   const roots = [
-    ".claude",
     ".codex",
     ".config/opencode",
     ".pi",

@@ -2,7 +2,6 @@ import os from "node:os";
 import path from "node:path";
 
 export const SOURCE_AGENT_FILE = "AGENTS.md";
-const CLAUDE_AGENT_FILE = "CLAUDE.md";
 const INSTALL_TIMEOUT_SECONDS = 120;
 export const MANAGED_STATE_SUBDIR = ".local/share/agents/sync-managed";
 const DEFAULT_PACKAGE_CACHE_SUBDIR = ".local/share/agents/pi-packages";
@@ -36,7 +35,6 @@ export type HarnessHook =
     };
 
 export const HarnessId = {
-  Claude: "Claude",
   Codex: "Codex",
   Opencode: "Opencode",
   Pi: "Pi",
@@ -138,12 +136,6 @@ export function buildHarness(spec: HarnessSpec): Harness {
 
 export function defaultHarnesses(home: string): readonly Harness[] {
   const harnessSpecs: HarnessSpec[] = [
-    {
-      id: HarnessId.Claude,
-      sourceName: "claude",
-      home: path.join(home, ".claude"),
-      instructionFile: CLAUDE_AGENT_FILE,
-    },
     {
       id: HarnessId.Codex,
       sourceName: "codex",

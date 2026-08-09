@@ -631,13 +631,6 @@ setInterval(() => {}, 1_000);
         harnessInstructionTarget(pi!),
         join(root, ".pi", "agent", "AGENTS.md"),
       );
-
-      const claude = syncEnv.harness(enumMember(HarnessId, "Claude"));
-      assert.ok(claude);
-      assert.equal(
-        harnessInstructionTarget(claude!),
-        join(root, ".claude", "CLAUDE.md"),
-      );
     });
   });
 
@@ -749,8 +742,6 @@ setInterval(() => {}, 1_000);
 
       assert.equal(await call<boolean>(runSync, syncEnv), true);
       assert.equal(exists(join(root, ".codex", "AGENTS.md")), true);
-      assert.equal(exists(join(root, ".claude", "CLAUDE.md")), true);
-      assert.equal(exists(join(root, ".claude", "AGENTS.md")), false);
       assert.equal(
         exists(join(root, ".config", "opencode", "AGENTS.md")),
         true,
@@ -783,28 +774,6 @@ setInterval(() => {}, 1_000);
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
       assert.equal(await call<boolean>(runSync, syncEnv), true);
-    });
-  });
-
-  test("run_sync_claude_uses_claude_md", async () => {
-    await withTempDir(async (root) => {
-      const syncEnv = makeSyncEnv(root);
-      const sourceAgentFile = join(
-        root,
-        ".config",
-        "agents",
-        "assets",
-        "AGENTS.md",
-      );
-      writeFile(sourceAgentFile, "agent-instructions");
-
-      assert.equal(await call<boolean>(runSync, syncEnv), true);
-      assert.equal(
-        readText(join(root, ".claude", "CLAUDE.md")),
-        "agent-instructions",
-      );
-      assert.equal(exists(join(root, ".claude", "AGENTS.md")), false);
-      assert.equal(readText(sourceAgentFile), "agent-instructions");
     });
   });
 
