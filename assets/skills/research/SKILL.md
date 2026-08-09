@@ -61,8 +61,8 @@ Route research requests to the right source class, then return source-backed ans
 
 ## Router workflow
 
-1. Classify request: code/docs, web/live, sentiment, or notebook KB.
-2. Select the primary route from the map above; for web/live work, start with the applicable OMP built-in.
+1. Classify request: code/docs, web/live, sentiment, X/Twitter, or notebook KB.
+2. Select the primary route from the map above. For web/live work, use native `web_search` by default; choose `omp-search` when automatic provider fallback, explicit provider selection, or structured headless output is required.
 3. Execute route tools and collect source evidence.
 4. Add corroboration route when confidence is low, sources conflict, or claim impact is high.
 5. Return answer with provenance, confidence, and explicit gaps.
