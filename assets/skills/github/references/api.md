@@ -27,7 +27,7 @@ gh api <endpoint> [flags]
   repository context. Prefer an explicit `--repo OWNER/REPO` where supported, and
   use `--hostname <host>` for the target host. If context is not verified, replace
   placeholders with an explicit target rather than guessing.
-- The default request is GET **only when no parameters/body are supplied**.
+- The default request is GET **only when no parameters/body are supplied**
   `--field`, `--raw-field`, and `--input` can switch the request to POST. Whenever
   fields, input, or mutation intent is present, pass an explicit `--method GET` for a
   read or the exact mutation method for a write.
@@ -86,7 +86,7 @@ intended; a string that looks like `true`, a number, or `null` can change type.
   outer array. Document the resulting shape before writing jq filters.
 - Use `--jq` for narrow extraction and avoid shell parsing of pretty JSON. Use
   `--template` when the consumer needs a text record per object.
-- `--cache <duration>` may return cached data; disclose it when freshness matters.
+- `--cache <duration>` may return cached data; disclose it when freshness matters
   Caching a read does not authorize a write.
 
 ## GraphQL

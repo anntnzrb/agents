@@ -21,19 +21,19 @@ Use the directory containing this file. NEVER rely on an executable bit, shell a
 
 ## Core workflow
 
-1. If current character state matters, run `save auto summary` unless the user supplied a `.sl2` path.
-2. Run the narrowest deterministic CLI command first.
-3. Run `sources status` before external/current claims. Refresh only the needed source.
-4. Treat catalogs and guide chunks as lookup scaffolds, not authoritative prose or save truth.
-5. Apply the spoiler gate before returning names.
-6. Answer with the action, observed evidence, then uncertainty.
+1. If current character state matters, run `save auto summary` unless the user supplied a `.sl2` path
+2. Run the narrowest deterministic CLI command first
+3. Run `sources status` before external/current claims. Refresh only the needed source
+4. Treat catalogs and guide chunks as lookup scaffolds, not authoritative prose or save truth
+5. Apply the spoiler gate before returning names
+6. Answer with the action, observed evidence, then uncertainty
 
 ## Recommendation policy
 
-- NEVER infer class, build, weapon, damage stat, casting lane, or status plan from silence.
-- Use save-backed facts only when observed from an explicit/current save or tracking file.
-- Present unobserved options as conditional tradeoffs.
-- For unspecified players, layer survival, equip load, requirements, upgrade priority, then user-chosen damage/casting lanes.
+- NEVER infer class, build, weapon, damage stat, casting lane, or status plan from silence
+- Use save-backed facts only when observed from an explicit/current save or tracking file
+- Present unobserved options as conditional tradeoffs
+- For unspecified players, layer survival, equip load, requirements, upgrade priority, then user-chosen damage/casting lanes
 
 ## Intent routing
 
@@ -51,32 +51,32 @@ Use the directory containing this file. NEVER rely on an executable bit, shell a
 
 ## Save truthfulness
 
-- Save access is read-only. NEVER mutate `.sl2`.
-- Boss and bonfire claims require known mapped flags.
-- Inventory ownership requires conservative ID resolution.
-- Gestures and infusion-achievement completion are not save-backed.
-- Max reinforcement is observable; reinforcement-achievement completion remains unsupported.
-- Missing area checklist means unknown, not clear.
-- Compact inventory truncates. Use `--all` or `--find` before claiming absence.
-- A save may be stale, transferred, edited, another character, or another NG cycle/build.
+- Save access is read-only. NEVER mutate `.sl2`
+- Boss and bonfire claims require known mapped flags
+- Inventory ownership requires conservative ID resolution
+- Gestures and infusion-achievement completion are not save-backed
+- Max reinforcement is observable; reinforcement-achievement completion remains unsupported
+- Missing area checklist means unknown, not clear
+- Compact inventory truncates. Use `--all` or `--find` before claiming absence
+- A save may be stale, transferred, edited, another character, or another NG cycle/build
 
 ## Spoiler policy
 
 Allowed without special permission:
 
-- Mechanics: stats, softcaps, scaling, upgrades, durability, infusions, equip load, poise/hyperarmor, combat systems, FP, Estus, and controls.
-- Names already supplied by the user or observed in an explicit save/tracking file.
+- Mechanics: stats, softcaps, scaling, upgrades, durability, infusions, equip load, poise/hyperarmor, combat systems, FP, Estus, and controls
+- Names already supplied by the user or observed in an explicit save/tracking file
 
 Unless introduced or permitted, NEVER reveal future boss/area/NPC/item names, locations, quest outcomes, story/lore, endings, or DLC identities. Use generic placeholders. `--spoilers` is CLI opt-in; it NEVER overrides an explicit no-spoiler request.
 
 ## Source and mod boundaries
 
-- Deterministic CLI output supports only its implemented mechanics/catalog rows.
-- Exact routes, locations, NPC steps, contested facts, and current mod compatibility require fresh evidence.
-- Cache files are transport receipts, not canonical truth or citations.
-- NEVER promise online or anti-cheat safety.
-- NEVER provide DRM, anti-cheat, platform-protection, or license-check bypass instructions.
-- Cite final URLs and separate observed facts, source claims, inference, and recommendation.
+- Deterministic CLI output supports only its implemented mechanics/catalog rows
+- Exact routes, locations, NPC steps, contested facts, and current mod compatibility require fresh evidence
+- Cache files are transport receipts, not canonical truth or citations
+- NEVER promise online or anti-cheat safety
+- NEVER provide DRM, anti-cheat, platform-protection, or license-check bypass instructions
+- Cite final URLs and separate observed facts, source claims, inference, and recommendation
 
 ## Required follow-up reads
 

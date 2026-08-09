@@ -18,8 +18,8 @@ execution. Examples use `vercel` for readability.
 
 Commands must be run from the directory containing the `.vercel` folder (or a subdirectory of it). How `.vercel` gets set up depends on your project structure:
 
-- **`.vercel/project.json`**: Created by `vercel link`. Links a single project. Fine for single-project repos, and can work in monorepos if there's only one project.
-- **`.vercel/repo.json`**: Created by `vercel link --repo`. Links a repo that may contain multiple projects. Always a good idea when any project has a non-root directory (e.g., `apps/web`).
+- **`.vercel/project.json`**: Created by `vercel link`. Links a single project. Fine for single-project repos, and can work in monorepos if there's only one project
+- **`.vercel/repo.json`**: Created by `vercel link --repo`. Links a repo that may contain multiple projects. Always a good idea when any project has a non-root directory (e.g., `apps/web`)
 
 Running from a project subdirectory (e.g., `apps/web/`) skips the "which project?" prompt since it's unambiguous.
 
@@ -64,15 +64,15 @@ vercel --prod     # production deployment
 
 - Tracked template: `.env.example`
 - Primary non-interactive auth var: `VERCEL_TOKEN`
-- Do not infer missing auth from `VERCEL_TOKEN` being unset in the parent shell; existing `vercel login` state may already be valid. Use `vercel whoami` to verify real auth state. `VERCEL_TOKEN` is mainly for unattended/CI flows.
-- The CLI does not auto-load `.env`; use direnv or CI secret injection for unattended auth.
+- Do not infer missing auth from `VERCEL_TOKEN` being unset in the parent shell; existing `vercel login` state may already be valid. Use `vercel whoami` to verify real auth state. `VERCEL_TOKEN` is mainly for unattended/CI flows
+- The CLI does not auto-load `.env`; use direnv or CI secret injection for unattended auth
 
 ## Anti-Patterns
 
-- **Wrong link type in monorepos with multiple projects**: `vercel link` creates `project.json`, which only tracks one project. Use `vercel link --repo` instead. When things break, check `.vercel/` first.
-- **Letting commands auto-link in monorepos**: Many commands implicitly run `vercel link` if `.vercel/` doesn't exist. This creates `project.json`, which may be wrong. Run `vercel link` (or `--repo`) explicitly first.
-- **Linking while on the wrong team**: Use `vercel whoami` to check, `vercel teams switch` to change.
-- **Forgetting `--yes` in CI**: Required to skip interactive prompts.
-- **Using `vercel deploy` after `vercel build` without `--prebuilt`**: The build output is ignored.
-- **Hardcoding tokens in flags**: Use `VERCEL_TOKEN` env var instead of `--token`.
-- **Disabling deployment protection**: Use `vercel curl` instead to access preview deploys.
+- **Wrong link type in monorepos with multiple projects**: `vercel link` creates `project.json`, which only tracks one project. Use `vercel link --repo` instead. When things break, check `.vercel/` first
+- **Letting commands auto-link in monorepos**: Many commands implicitly run `vercel link` if `.vercel/` doesn't exist. This creates `project.json`, which may be wrong. Run `vercel link` (or `--repo`) explicitly first
+- **Linking while on the wrong team**: Use `vercel whoami` to check, `vercel teams switch` to change
+- **Forgetting `--yes` in CI**: Required to skip interactive prompts
+- **Using `vercel deploy` after `vercel build` without `--prebuilt`**: The build output is ignored
+- **Hardcoding tokens in flags**: Use `VERCEL_TOKEN` env var instead of `--token`
+- **Disabling deployment protection**: Use `vercel curl` instead to access preview deploys

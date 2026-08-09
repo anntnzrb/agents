@@ -35,7 +35,7 @@ may change the current branch. If uncommitted changes exist:
 
 - Do not clean, reset, stash, commit, or move them without an explicit plan and the
   owning `commit`/`git-worktrees` authority.
-- Verify whether the checkout is assigned, consumer/foreign, or native-manager-owned.
+- Verify whether the checkout is assigned, consumer/foreign, or native-manager-owned
   A current directory is not permission to rewrite it.
 - Report the dirty paths and stop the stack mutation. Do not hide the state with a
   new branch or force option.
@@ -67,7 +67,7 @@ not a license to choose a source of truth. In noninteractive mode, documented be
 is an abort/no-op without pushing or updating PRs; a successful exit can therefore
 mean "nothing changed," not "synced."
 
-- Re-read local and remote stack composition, branch tips, and uncommitted state.
+- Re-read local and remote stack composition, branch tips, and uncommitted state
 - Present the competing layer maps and ask the owning user/manager to choose remote,
   local recreation, or cancellation. Do not delete the remote stack automatically.
 - If a rebase conflict occurs during sync, expect restoration of branches to their
@@ -120,8 +120,8 @@ Remote operations are not uniformly atomic:
 
 - `submit` pushes, creates/updates PRs, then links the stack; an intermediate failure
   can leave branches/PRs without a complete stack.
-- `push` can update earlier branches while a later force-with-lease fails.
-- `link` can push and create/retarget multiple PRs before a later validation failure.
+- `push` can update earlier branches while a later force-with-lease fails
+- `link` can push and create/retarget multiple PRs before a later validation failure
 - `merge --yes` is all-or-nothing for direct stack merging, but a merge queue is
   asynchronous and may process selected PRs in groups.
 

@@ -135,9 +135,9 @@ func setupLogger() error {
 
 Notes:
 
-- `RunE` / `PersistentPreRunE` (the `E` variants) return errors. Use these; never use `Run` (no error return, encourages `log.Fatal`).
-- `SilenceUsage: true` + `SilenceErrors: true` together: cobra stops printing the full `--help` on every command failure (the default behavior is rude in production scripts).
-- `ExecuteContext` (cobra 1.8+) plumbs the ctx into every subcommand's `cmd.Context()`.
+- `RunE` / `PersistentPreRunE` (the `E` variants) return errors. Use these; never use `Run` (no error return, encourages `log.Fatal`)
+- `SilenceUsage: true` + `SilenceErrors: true` together: cobra stops printing the full `--help` on every command failure (the default behavior is rude in production scripts)
+- `ExecuteContext` (cobra 1.8+) plumbs the ctx into every subcommand's `cmd.Context()`
 
 ---
 
@@ -426,8 +426,8 @@ The `text` format uses `lipgloss` tables or `aquasecurity/table` for nicely-alig
 
 ## Error semantics
 
-- Return errors from `RunE`. Cobra catches them and the `Execute` wrapper logs + exits non-zero.
-- `os.Exit(1)` should appear **only in `main.go`**. Anywhere else means a subcommand cannot be tested.
+- Return errors from `RunE`. Cobra catches them and the `Execute` wrapper logs + exits non-zero
+- `os.Exit(1)` should appear **only in `main.go`**. Anywhere else means a subcommand cannot be tested
 - For graceful early termination ("user cancelled"), return a sentinel and check it in `Execute`:
   ```go
   var ErrCancelled = errors.New("cancelled by user")

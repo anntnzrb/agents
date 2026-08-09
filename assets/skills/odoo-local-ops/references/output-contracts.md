@@ -200,7 +200,7 @@ Rules:
 Workflow execution is foreground text output, not a JSON command. It requires
 `--profile`, `--workflow`, `--mode test|test-dev`, and `--allow-write`.
 
-- The named profile owns the target database; a mismatching `--db` is rejected.
+- The named profile owns the target database; a mismatching `--db` is rejected
 - The controller reports the resolved runtime, ensures the Compose `db` service
   is running, then runs Odoo in a disposable named container.
 - A runtime/database-scoped lock makes a second invocation for the same

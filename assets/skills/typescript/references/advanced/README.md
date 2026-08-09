@@ -28,20 +28,20 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 
 ### The iron list
 
-1. **Readonly by default** — all `type`/`interface` properties are `readonly`. Arrays are `readonly T[]`. Mutable only when mutation is the documented purpose.
-2. **Branded types for distinct IDs** — `type UserId = Brand<string, "UserId">`. Never pass raw `string` where a branded type exists.
-3. **Exhaustive switch** — every `switch` on a discriminated union ends with `default: assertNever(x)`. No fall-through.
-4. **No any** — `any` is banned in annotations, returns, and parameters. Use `unknown` and narrow.
-5. **No type assertions** — `as any`, `as unknown` banned. `as const` and `satisfies` are fine.
-6. **No non-null assertion** — `x!` is banned. Use narrowing or optional chaining (`x?.y`).
-7. **No @ts-ignore / @ts-expect-error** — fix the type.
-8. **No enum** — use `as const` objects + literal union types.
-9. **Zod at boundaries** — external input (API, user, file) → Zod schema. Internal → plain types.
-10. **Typed errors** — Error subclasses with typed fields. No `throw new Error("bare string")` for domain errors. Use Result for expected failures within 1-2 call levels; throw for propagation across many layers.
-11. **as const for constants** — module-level constant objects and arrays use `as const`.
-12. **import type** — type-only imports use `import type`. Enforced by `verbatimModuleSyntax`.
-13. **Named exports only** — no `export default`. Exception: framework requirement (Next.js pages, etc.).
-14. **No empty catch, no catch-and-swallow** — every `catch` block must either (a) narrow the error with `instanceof` and handle each case, or (b) re-throw. Empty catch blocks and `catch (e) { console.error(e) }` without narrowing or re-throw are banned — they hide bugs. At top-level boundaries (CLI entry, HTTP handler), opt out with `// no-excuse-ok: catch`.
+1. **Readonly by default** — all `type`/`interface` properties are `readonly`. Arrays are `readonly T[]`. Mutable only when mutation is the documented purpose
+2. **Branded types for distinct IDs** — `type UserId = Brand<string, "UserId">`. Never pass raw `string` where a branded type exists
+3. **Exhaustive switch** — every `switch` on a discriminated union ends with `default: assertNever(x)`. No fall-through
+4. **No any** — `any` is banned in annotations, returns, and parameters. Use `unknown` and narrow
+5. **No type assertions** — `as any`, `as unknown` banned. `as const` and `satisfies` are fine
+6. **No non-null assertion** — `x!` is banned. Use narrowing or optional chaining (`x?.y`)
+7. **No @ts-ignore / @ts-expect-error** — fix the type
+8. **No enum** — use `as const` objects + literal union types
+9. **Zod at boundaries** — external input (API, user, file) → Zod schema. Internal → plain types
+10. **Typed errors** — Error subclasses with typed fields. No `throw new Error("bare string")` for domain errors. Use Result for expected failures within 1-2 call levels; throw for propagation across many layers
+11. **as const for constants** — module-level constant objects and arrays use `as const`
+12. **import type** — type-only imports use `import type`. Enforced by `verbatimModuleSyntax`
+13. **Named exports only** — no `export default`. Exception: framework requirement (Next.js pages, etc.)
+14. **No empty catch, no catch-and-swallow** — every `catch` block must either (a) narrow the error with `instanceof` and handle each case, or (b) re-throw. Empty catch blocks and `catch (e) { console.error(e) }` without narrowing or re-throw are banned — they hide bugs. At top-level boundaries (CLI entry, HTTP handler), opt out with `// no-excuse-ok: catch`
 
 ### Data modeling — which construct, when
 
@@ -61,9 +61,9 @@ Load `data-modeling.md` for the full decision flowchart and comparison.
 
 ### When readonly does not apply
 
-- **Framework state** (React `useState`, signals) — managed by framework.
-- **Builder / accumulator** — object exists to be mutated (buffer, cache). Document why.
-- **ORM mutations** — Drizzle insert/update objects.
+- **Framework state** (React `useState`, signals) — managed by framework
+- **Builder / accumulator** — object exists to be mutated (buffer, cache). Document why
+- **ORM mutations** — Drizzle insert/update objects
 
 ### Why empty/unhandled catch is banned
 

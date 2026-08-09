@@ -26,7 +26,7 @@ Normalize without losing the original evidence:
 - component, endpoint, feature, and project area only when stated or returned;
 - environment, version, region, browser/device, and deployment context;
 - symptoms, timing, reproduction steps, and correlated signals;
-- impact, severity/priority evidence, duration, and operational consequence.
+- impact, severity/priority evidence, duration, and operational consequence
 
 Distinguish observed facts from unknowns. Never infer ownership, root cause, resolution, or a
 status from a title alone.

@@ -8,21 +8,21 @@ NEVER buy, create an account, sign in, accept a subscription, enter payment data
 
 ## Candidate order
 
-1. Start with CLI `verification_queue`, which contains the strict-cheapest candidates.
-2. Open the direct retailer URL; avoid search snippets and redirectors when possible.
-3. Verify product identity before price: exact title, edition, platform, base/DLC status, and included components.
-4. Verify acquisition: key, direct entitlement, gift, subscription, account, bundle, or unknown.
-5. Verify country availability and activation language for the requested country.
-6. Verify displayed currency, subtotal, mandatory fees, discount conditions, tax treatment, and total.
-7. Record URL and observation time. Return to the next candidate only after the current one is classified.
+1. Start with CLI `verification_queue`, which contains the strict-cheapest candidates
+2. Open the direct retailer URL; avoid search snippets and redirectors when possible
+3. Verify product identity before price: exact title, edition, platform, base/DLC status, and included components
+4. Verify acquisition: key, direct entitlement, gift, subscription, account, bundle, or unknown
+5. Verify country availability and activation language for the requested country
+6. Verify displayed currency, subtotal, mandatory fees, discount conditions, tax treatment, and total
+7. Record URL and observation time. Return to the next candidate only after the current one is classified
 
 ## Safe browser behavior
 
-- Public product, terms, region, FAQ, and cart-preview pages are allowed.
-- Use a public cart or checkout estimator only when it requires no account, personal data, or payment data and creates no order.
-- Do not use VPNs or spoof location to manufacture regional availability.
-- Do not bypass CAPTCHA, rate limits, age gates requiring false information, or anti-bot controls.
-- Do not infer hidden checkout terms from a browser’s locale or IP alone.
+- Public product, terms, region, FAQ, and cart-preview pages are allowed
+- Use a public cart or checkout estimator only when it requires no account, personal data, or payment data and creates no order
+- Do not use VPNs or spoof location to manufacture regional availability
+- Do not bypass CAPTCHA, rate limits, age gates requiring false information, or anti-bot controls
+- Do not infer hidden checkout terms from a browser’s locale or IP alone
 
 ## Product and edition
 
@@ -40,11 +40,11 @@ Historical bundle pages and edition names are not sufficient. Use the current re
 
 ## Region and activation
 
-- Verify the requested country, not merely “ROW,” “Global,” or a broad continent.
-- “Global” is a seller claim until supported by an activation-country list or platform restriction evidence.
-- Distinguish store browsing availability, purchase eligibility, key activation, and post-activation playability.
-- Record exclusions, billing-country requirements, region locks, gifting restrictions, and required platform account region.
-- A US proxy price for an unsupported provider country is not Ecuador or other-country verification.
+- Verify the requested country, not merely “ROW,” “Global,” or a broad continent
+- “Global” is a seller claim until supported by an activation-country list or platform restriction evidence
+- Distinguish store browsing availability, purchase eligibility, key activation, and post-activation playability
+- Record exclusions, billing-country requirements, region locks, gifting restrictions, and required platform account region
+- A US proxy price for an unsupported provider country is not Ecuador or other-country verification
 
 ## Fees, tax, and currency
 
@@ -69,11 +69,11 @@ Verify whether VAT/sales tax is included, added at checkout, reverse-charged, or
 
 ## Evidence outcomes
 
-- `verified`: direct current page evidence supports the facts being reported.
-- `estimated`: provider/API data or a calculable subtotal without complete direct terms.
-- `headline`: visible promotional/listing price lacks sufficient product or checkout terms.
-- `blocked`: required evidence is behind account, location, CAPTCHA, unavailable checkout, or incompatible acquisition terms.
-- `unknown`: the fact was not found or cannot be resolved.
+- `verified`: direct current page evidence supports the facts being reported
+- `estimated`: provider/API data or a calculable subtotal without complete direct terms
+- `headline`: visible promotional/listing price lacks sufficient product or checkout terms
+- `blocked`: required evidence is behind account, location, CAPTCHA, unavailable checkout, or incompatible acquisition terms
+- `unknown`: the fact was not found or cannot be resolved
 
 Do not promote the whole offer because one field is verified. State field-level uncertainty in the answer.
 

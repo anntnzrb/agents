@@ -31,36 +31,36 @@ Go: Go 1.26 stable, golangci-lint v2, slog, typed errors, idiomatic concurrency,
 
 ## Core Principles
 
-- Respect the `go` directive in go.mod first. Target Go 1.26 for new applications; libraries pin the minimum version they need.
-- Use stdlib when it is sufficient: `net/http` (Go 1.22+), `log/slog`, `slices`, `maps`, `errors`, `testing`, `iter`.
-- Add third-party libraries only when they solve a concrete problem stdlib does not: chi for sub-routing composition, pgx for postgres-specific features, sqlc for type-safe SQL codegen, testcontainers for integration tests.
-- Accept interfaces, return structs. Define interfaces at the consumer, not the provider.
-- Compose small single-responsibility packages. Use `internal/` for private code, `cmd/` for binaries.
-- Keep JSON/API/env/CLI data at boundaries; validate once with typed structs; convert inward.
-- Never use `interface{}` — use `any`. Never use archived `golang/mock` — use `uber-go/mock` or hand-written fakes.
-- Prefer explicit error paths: `fmt.Errorf("context: %w", err)` wrapping, `errors.Is`, `errors.Join`, `errors.AsType` (Go 1.26+).
-- Context is control flow, not data storage. Pass as first argument. Never store in structs.
+- Respect the `go` directive in go.mod first. Target Go 1.26 for new applications; libraries pin the minimum version they need
+- Use stdlib when it is sufficient: `net/http` (Go 1.22+), `log/slog`, `slices`, `maps`, `errors`, `testing`, `iter`
+- Add third-party libraries only when they solve a concrete problem stdlib does not: chi for sub-routing composition, pgx for postgres-specific features, sqlc for type-safe SQL codegen, testcontainers for integration tests
+- Accept interfaces, return structs. Define interfaces at the consumer, not the provider
+- Compose small single-responsibility packages. Use `internal/` for private code, `cmd/` for binaries
+- Keep JSON/API/env/CLI data at boundaries; validate once with typed structs; convert inward
+- Never use `interface{}` — use `any`. Never use archived `golang/mock` — use `uber-go/mock` or hand-written fakes
+- Prefer explicit error paths: `fmt.Errorf("context: %w", err)` wrapping, `errors.Is`, `errors.Join`, `errors.AsType` (Go 1.26+)
+- Context is control flow, not data storage. Pass as first argument. Never store in structs
 
 ## Engineering Discipline
 
-- Model values whose accidental interchange is a real bug with distinct named types; keep external raw data at the boundary.
-- Make invalid states hard to construct when an invariant matters; do not add constructors, type states, or abstraction layers without a concrete failure mode.
-- Make ownership explicit at I/O and concurrency boundaries: cancellation, timeout, close/cleanup, and error propagation each need one clear owner.
-- Test observable behavior deterministically. Prefer real values, in-memory fakes, and `httptest` before a mock; inject clocks, randomness, or I/O only when the behavior needs control.
+- Model values whose accidental interchange is a real bug with distinct named types; keep external raw data at the boundary
+- Make invalid states hard to construct when an invariant matters; do not add constructors, type states, or abstraction layers without a concrete failure mode
+- Make ownership explicit at I/O and concurrency boundaries: cancellation, timeout, close/cleanup, and error propagation each need one clear owner
+- Test observable behavior deterministically. Prefer real values, in-memory fakes, and `httptest` before a mock; inject clocks, randomness, or I/O only when the behavior needs control
 
 ## Quality Gate Essentials
 
-- **New projects:** golangci-lint v2 (`linters.default: standard` + `modernize`, `gosec`, `bodyclose`), go vet, go test (`-race -count=1 -shuffle=on ./...`).
-- **Inherited projects:** preserve existing gates unless changing them is part of the task.
+- **New projects:** golangci-lint v2 (`linters.default: standard` + `modernize`, `gosec`, `bodyclose`), go vet, go test (`-race -count=1 -shuffle=on ./...`)
+- **Inherited projects:** preserve existing gates unless changing them is part of the task
 - **Baseline commands:**
   ```bash
   golangci-lint run ./...
   go vet ./...
   go test -race -count=1 -shuffle=on ./...
   ```
-- Concurrency-heavy code: add `testing/synctest` (Go 1.25+) for deterministic tests.
-- Integration-heavy code: testcontainers-go + build tags (`//go:build integration`).
-- Fuzz entry points: `go test -fuzz=FuzzXxx -fuzztime=30s ./...`.
+- Concurrency-heavy code: add `testing/synctest` (Go 1.25+) for deterministic tests
+- Integration-heavy code: testcontainers-go + build tags (`//go:build integration`)
+- Fuzz entry points: `go test -fuzz=FuzzXxx -fuzztime=30s ./...`
 
 ## Required follow-up reads
 
@@ -89,14 +89,14 @@ You MUST load only the references needed by the task:
 
 ## Must / Must Not
 
-- MUST use `slog` for structured logging in new code when `go >= 1.21` (not `log`).
-- MUST wrap errors with `fmt.Errorf("context: %w", err)` and check with `errors.Is`. Use `errors.AsType[T]` when `go >= 1.26`; use `errors.As` for older `go` directives.
-- MUST use `any` (not `interface{}`), `os.ReadFile` (not `ioutil.ReadFile`).
-- MUST use `go mod tidy` after any dependency change.
-- MUST pass `context.Context` as the first parameter; never store it in structs.
-- MUST define interfaces where they're consumed; keep them small (1-3 methods).
-- MUST NOT ignore returned errors (linter gate: errcheck).
-- MUST NOT use archived `golang/mock` — use `uber-go/mock` or hand-written fakes.
-- MUST NOT use `src/` layout — module root is the project root.
-- MUST NOT use experimental/GOEXPERIMENT-only features as default practice.
-- MUST NOT carry raw `map[string]any` or `json.RawMessage` through core logic.
+- MUST use `slog` for structured logging in new code when `go >= 1.21` (not `log`)
+- MUST wrap errors with `fmt.Errorf("context: %w", err)` and check with `errors.Is`. Use `errors.AsType[T]` when `go >= 1.26`; use `errors.As` for older `go` directives
+- MUST use `any` (not `interface{}`), `os.ReadFile` (not `ioutil.ReadFile`)
+- MUST use `go mod tidy` after any dependency change
+- MUST pass `context.Context` as the first parameter; never store it in structs
+- MUST define interfaces where they're consumed; keep them small (1-3 methods)
+- MUST NOT ignore returned errors (linter gate: errcheck)
+- MUST NOT use archived `golang/mock` — use `uber-go/mock` or hand-written fakes
+- MUST NOT use `src/` layout — module root is the project root
+- MUST NOT use experimental/GOEXPERIMENT-only features as default practice
+- MUST NOT carry raw `map[string]any` or `json.RawMessage` through core logic

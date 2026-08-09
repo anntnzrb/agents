@@ -16,10 +16,10 @@ At 250 pure LOC a file still fits in one screen on a 32-inch monitor with a 14pt
 
 A file past this line is telling you:
 
-- The module is doing more than one thing.
+- The module is doing more than one thing
 - Multiple cohesive units got merged "to save a file."
-- Re-exports, barrels, and orchestrators got fused into pure-logic units.
-- Every future reader pays a tax to find what they need.
+- Re-exports, barrels, and orchestrators got fused into pure-logic units
+- Every future reader pays a tax to find what they need
 
 ### Measuring pure LOC
 
@@ -42,18 +42,18 @@ cloc --by-file <file>   # the "code" column is the number
 ### Forbidden escapes
 
 - Counting comments and blank lines toward the budget. **Pure LOC means code lines.**
-- Splitting by token count (`foo_1.py`, `module_part_A.rs`, `service-2.ts`). Split by what each file DOES.
-- Catch-all dump files: `utils.py`, `helpers.ts`, `lib.rs` (as a logic dump), `common.py`, `shared.ts`.
-- "It's generated, so it's fine." Only true if the file lives in `dist/`, `target/`, `__generated__/`.
-- "It's a test file with many cases." Split by SUT or by behavior cluster.
-- "230 pure LOC, close enough." A 230-LOC file about to grow is already at the limit. Split now.
+- Splitting by token count (`foo_1.py`, `module_part_A.rs`, `service-2.ts`). Split by what each file DOES
+- Catch-all dump files: `utils.py`, `helpers.ts`, `lib.rs` (as a logic dump), `common.py`, `shared.ts`
+- "It's generated, so it's fine." Only true if the file lives in `dist/`, `target/`, `__generated__/`
+- "It's a test file with many cases." Split by SUT or by behavior cluster
+- "230 pure LOC, close enough." A 230-LOC file about to grow is already at the limit. Split now
 
 ### Acceptable exceptions (rare, require justification)
 
 A file may legitimately exceed 250 pure LOC if **and only if** it is:
 
-- A truly indivisible single-responsibility unit (e.g., a generated parser table, a state machine whose states share a single closure). Mark with `// allow: SIZE_OK — <reason>`.
-- A pure data table (translation strings, error code lookup, brand color palette).
+- A truly indivisible single-responsibility unit (e.g., a generated parser table, a state machine whose states share a single closure). Mark with `// allow: SIZE_OK — <reason>`
+- A pure data table (translation strings, error code lookup, brand color palette)
 
 `// allow: SIZE_OK` without a justifying comment is itself slop.
 
@@ -141,8 +141,8 @@ src/orders/
 
 A function's parameters are its contract with every caller. More than 3 independent inputs overwhelm the caller's working memory and signal one of two design problems:
 
-1. **The function does too much.** It should be two functions.
-2. **Related parameters belong together.** They should be a typed struct/object — a domain concept, not a parameter bag.
+1. **The function does too much.** It should be two functions
+2. **Related parameters belong together.** They should be a typed struct/object — a domain concept, not a parameter bag
 
 ### Workaround detection — THESE COUNT AS THE SAME SMELL
 
@@ -252,9 +252,9 @@ If 4+ truly independent inputs are required, justify it — the justification mu
 
 The contract of a destructive operation (delete, remove, clear, drop) IS the verification. If the operation returns without error, the thing is gone. Re-querying to "confirm" is:
 
-1. **Dead code.** The check can never fail unless the operation itself is broken — in which case fix the operation, not the caller.
-2. **Misleading.** It teaches the next reader (human or AI) that the operation is unreliable.
-3. **Performance waste.** An unnecessary round-trip to the database, filesystem, or data structure.
+1. **Dead code.** The check can never fail unless the operation itself is broken — in which case fix the operation, not the caller
+2. **Misleading.** It teaches the next reader (human or AI) that the operation is unreliable
+3. **Performance waste.** An unnecessary round-trip to the database, filesystem, or data structure
 
 This pattern is the hallmark of AI-generated defensive bloat. LLMs produce it because they optimize for "looking thorough" over "being correct." **Recognize it. Delete it.**
 
@@ -312,11 +312,11 @@ map.remove(&key);
 
 Any of these are the same defect:
 
-- Calling a **setter** then immediately calling the **getter** to "confirm" the value changed.
-- **Writing** a file then **reading** it back to "verify" the write.
-- **Inserting** a row then **SELECT-ing** it to "confirm" the insert.
-- **Pushing** to an array then checking `.length` increased by 1.
-- **Assigning** a variable then asserting the variable equals the assigned value.
+- Calling a **setter** then immediately calling the **getter** to "confirm" the value changed
+- **Writing** a file then **reading** it back to "verify" the write
+- **Inserting** a row then **SELECT-ing** it to "confirm" the insert
+- **Pushing** to an array then checking `.length` increased by 1
+- **Assigning** a variable then asserting the variable equals the assigned value
 
 **The contract of the operation IS the verification.** If you cannot trust the operation's return, the defect is in the operation — fix it there, not at the call site.
 
@@ -394,8 +394,8 @@ if should_validate {
 
 ### When negation IS appropriate
 
-- **Early returns / guard clauses:** `if !authorized { return Err(...) }` — the negative form IS the intent (reject the bad case).
-- **Filtering out:** `items.filter(|x| !x.is_expired())` — the negation describes the keep/discard decision directly.
-- **Error state names:** `Error`, `Failed`, `Timeout` are negative concepts by nature — do not force them into positive wrappers like `isSuccessAbsent`.
+- **Early returns / guard clauses:** `if !authorized { return Err(...) }` — the negative form IS the intent (reject the bad case)
+- **Filtering out:** `items.filter(|x| !x.is_expired())` — the negation describes the keep/discard decision directly
+- **Error state names:** `Error`, `Failed`, `Timeout` are negative concepts by nature — do not force them into positive wrappers like `isSuccessAbsent`
 
 The rule is not "never use negation." The rule is: **when you have a choice between naming the presence and naming the absence, name the presence.** The branch logic follows from the name, not the other way around.

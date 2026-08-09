@@ -75,10 +75,10 @@ Use Hono for any new HTTP service. It is:
 When Hono → ALWAYS pair with `hono-openapi` + `@scalar/hono-api-reference` + `@hono/swagger-ui`. Full setup with copy-pasteable `app.ts`: [backend-hono.md](backend-hono.md).
 
 NEVER:
-- Express for new services. Express is the COBOL of Node — works, but writes itself out of every benchmark.
-- Fastify for new services. Hono ships with better TypeScript ergonomics.
-- NestJS for new services. The Angular-flavoured DI/decorator stack is overkill for ~95% of services.
-- Bare `Bun.serve` or `node:http` unless you have a specific reason. Lose middleware, routing, validation. Reinvent everything.
+- Express for new services. Express is the COBOL of Node — works, but writes itself out of every benchmark
+- Fastify for new services. Hono ships with better TypeScript ergonomics
+- NestJS for new services. The Angular-flavoured DI/decorator stack is overkill for ~95% of services
+- Bare `Bun.serve` or `node:http` unless you have a specific reason. Lose middleware, routing, validation. Reinvent everything
 
 ## Frontend tooling — Vite
 

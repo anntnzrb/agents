@@ -13,9 +13,9 @@ LLMs reconstruct grammar from content words. Remove predictable glue; keep seman
 
 ## Aggressive Stance
 
-- Output can be noun/verb stacks, list fragments, or label:value phrases.
-- Default to deletion; keep function words only when loss changes meaning.
-- Prefer base verb forms; drop tense/aspect unless timeline is critical.
+- Output can be noun/verb stacks, list fragments, or label:value phrases
+- Default to deletion; keep function words only when loss changes meaning
+- Prefer base verb forms; drop tense/aspect unless timeline is critical
 
 ## Deletion Tiers
 

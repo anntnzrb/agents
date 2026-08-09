@@ -4,8 +4,8 @@ Use this reference for App Intents and App Shortcuts guidance without web fetche
 
 ## Rule
 
-- Use only content already present in `shortcuts-docs-corpus`.
-- Do not call external documentation URLs from this skill.
+- Use only content already present in `shortcuts-docs-corpus`
+- Do not call external documentation URLs from this skill
 
 ## Where to Search in Corpus
 
@@ -25,8 +25,8 @@ uv run --script <skill-dir>/scripts/cli.py search --group wwdc --query "Implemen
 
 ## Integration Checklist
 
-1. Confirm intent boundaries and parameters.
-2. Verify phrase/discoverability guidance for App Shortcuts.
-3. Check Spotlight + Shortcuts surface behavior notes.
-4. Identify migration implications if SiriKit is involved.
-5. Produce an implementation + validation plan.
+1. Confirm intent boundaries and parameters
+2. Verify phrase/discoverability guidance for App Shortcuts
+3. Check Spotlight + Shortcuts surface behavior notes
+4. Identify migration implications if SiriKit is involved
+5. Produce an implementation + validation plan

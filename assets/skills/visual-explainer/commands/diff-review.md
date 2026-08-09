@@ -20,19 +20,19 @@ Before generating, know and cite:
 - exact changed files and line-count scope;
 - each function/type/module name referenced;
 - before/after behavior for important changes;
-- likely coupling and test impact.
+- likely coupling and test impact
 
 Use file paths, command outputs, or file:line evidence. Do not invent rationale or code paths.
 
 ## Required page sections
 
-1. Executive summary: intuition, problem solved, factual scope.
-2. File map: full tree, color-coded new/modified/deleted; compact, `<details>` if long.
-3. Architecture impact: Mermaid or hybrid diagram when relationships matter.
-4. Before/after behavior: side-by-side visual comparison.
-5. Risk review: correctness, tests, API compatibility, security/privacy, performance, maintainability.
-6. Coupling map: dependencies, hidden coupling, migration/release concerns.
-7. Review recommendation: merge/readiness, blockers, follow-ups.
+1. Executive summary: intuition, problem solved, factual scope
+2. File map: full tree, color-coded new/modified/deleted; compact, `<details>` if long
+3. Architecture impact: Mermaid or hybrid diagram when relationships matter
+4. Before/after behavior: side-by-side visual comparison
+5. Risk review: correctness, tests, API compatibility, security/privacy, performance, maintainability
+6. Coupling map: dependencies, hidden coupling, migration/release concerns
+7. Review recommendation: merge/readiness, blockers, follow-ups
 
 Use diff color language consistently: red removed/before, green added/after, amber modified/risk, blue neutral context. Use responsive section navigation for 4+ sections. Follow the skill’s Mermaid and overflow rules.
 

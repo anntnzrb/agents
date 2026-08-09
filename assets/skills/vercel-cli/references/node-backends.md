@@ -111,6 +111,6 @@ Most apps need zero configuration. Optional `vercel.json` settings:
 
 ## Anti-Patterns
 
-- **Putting routes in `api/` folder**: Your framework IS the app. Define routes in your app code, not as separate files in `api/`.
-- **Adding `vercel.json` rewrites**: Routes are introspected automatically from your app. Rewrites are not needed.
-- **Adding a `build` script**: Vercel handles TypeScript compilation and bundling. Don't add a build script for transpilation — it's not needed and can cause issues.
+- **Putting routes in `api/` folder**: Your framework IS the app. Define routes in your app code, not as separate files in `api/`
+- **Adding `vercel.json` rewrites**: Routes are introspected automatically from your app. Rewrites are not needed
+- **Adding a `build` script**: Vercel handles TypeScript compilation and bundling. Don't add a build script for transpilation — it's not needed and can cause issues

@@ -71,8 +71,8 @@ data = orjson.loads(raw)
 
 Two things to internalize:
 
-1. **`orjson.dumps` returns `bytes`**, not `str`. Stdlib `json.dumps` returns `str`. This is by design — most JSON destinations (sockets, files in binary mode, HTTP bodies) want bytes anyway, and skipping the encode/decode round trip is part of the speedup.
-2. **No `indent` arg.** orjson supports `OPT_INDENT_2` (and only 2-space indent) via flags. If you need other indentation, use stdlib `json`.
+1. **`orjson.dumps` returns `bytes`**, not `str`. Stdlib `json.dumps` returns `str`. This is by design — most JSON destinations (sockets, files in binary mode, HTTP bodies) want bytes anyway, and skipping the encode/decode round trip is part of the speedup
+2. **No `indent` arg.** orjson supports `OPT_INDENT_2` (and only 2-space indent) via flags. If you need other indentation, use stdlib `json`
 
 ---
 
@@ -123,8 +123,8 @@ async def get_items() -> dict[str, list[dict[str, int]]]:
 
 With FastAPI 0.100+ on Pydantic v2:
 
-- If your response is annotated with a Pydantic model, FastAPI calls `model_dump_json()` directly. **orjson is bypassed** even with `default_response_class=ORJSONResponse`, because the Pydantic serializer is already Rust-backed.
-- If your response is a raw `dict` / `list` / Python object, `ORJSONResponse` does kick in and saves real time.
+- If your response is annotated with a Pydantic model, FastAPI calls `model_dump_json()` directly. **orjson is bypassed** even with `default_response_class=ORJSONResponse`, because the Pydantic serializer is already Rust-backed
+- If your response is a raw `dict` / `list` / Python object, `ORJSONResponse` does kick in and saves real time
 
 The benchmark in `tiangolo/fastapi#11728` (Apr 2024) showed `model_dump_json()` is ~10–15% faster than `ORJSONResponse + model_dump()` for Pydantic-shaped responses. The shape of the data matters; on mixed-shape APIs, keep `ORJSONResponse` as the default and trust Pydantic's path for typed responses.
 
@@ -374,9 +374,9 @@ The numbers below are 2024–2026 averages from `tiangolo/fastapi#11728` and orj
 
 The takeaways:
 
-- For raw dict/list/datetime, **orjson is dramatically faster**.
-- For Pydantic models, **`model_dump_json()` is already faster than orjson+bridge**.
-- For numpy, orjson is the only sane choice.
+- For raw dict/list/datetime, **orjson is dramatically faster**
+- For Pydantic models, **`model_dump_json()` is already faster than orjson+bridge**
+- For numpy, orjson is the only sane choice
 
 In production, the actual measured win on a FastAPI app with mixed payloads is typically 5–15% reduction in p99 latency. Worth the one-line `default_response_class=ORJSONResponse` switch.
 
@@ -384,10 +384,10 @@ In production, the actual measured win on a FastAPI app with mixed payloads is t
 
 ## 10. When NOT to adopt orjson
 
-- The codebase is small, JSON is not a bottleneck, and you have no measured perf concern.
-- You depend on stdlib `json`'s `cls=` arg or its lax tolerance for non-spec input (NaN, Infinity, comments).
-- You need pretty-printed JSON with custom indent — orjson only supports 2-space indent via the flag.
-- You need pure-Python portability (e.g., MicroPython, no-wheel platforms) — orjson is a compiled Rust extension.
+- The codebase is small, JSON is not a bottleneck, and you have no measured perf concern
+- You depend on stdlib `json`'s `cls=` arg or its lax tolerance for non-spec input (NaN, Infinity, comments)
+- You need pretty-printed JSON with custom indent — orjson only supports 2-space indent via the flag
+- You need pure-Python portability (e.g., MicroPython, no-wheel platforms) — orjson is a compiled Rust extension
 
 If the choice is "add a dependency that does 5–10× the speed on serialization for free", the answer is almost always yes. The "almost" is in the bullets above.
 

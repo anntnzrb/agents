@@ -19,9 +19,9 @@ async fn main() -> anyhow::Result<()> {
 ```
 
 Avoid:
-- `async-std` — unmaintained, last release ages ago. crates.io download counts are misleading because of historical inertia.
-- `smol` — fine for embedded-ish niches; outside that, the ecosystem is on tokio.
-- Mixing runtimes in one binary. Pick one and stay.
+- `async-std` — unmaintained, last release ages ago. crates.io download counts are misleading because of historical inertia
+- `smol` — fine for embedded-ish niches; outside that, the ecosystem is on tokio
+- Mixing runtimes in one binary. Pick one and stay
 
 ## Errors — `anyhow` (apps) + `thiserror` (libs)
 
@@ -290,10 +290,10 @@ The Rust API mirrors the Python one. Use the lazy API by default; materialize wi
 
 ## Channels
 
-- Single-producer single-consumer or bounded MPSC → `tokio::sync::mpsc` (async) or `flume` (sync + async).
-- Broadcast → `tokio::sync::broadcast`.
-- Watch (latest-value pubsub) → `tokio::sync::watch`.
-- Oneshot → `tokio::sync::oneshot`.
+- Single-producer single-consumer or bounded MPSC → `tokio::sync::mpsc` (async) or `flume` (sync + async)
+- Broadcast → `tokio::sync::broadcast`
+- Watch (latest-value pubsub) → `tokio::sync::watch`
+- Oneshot → `tokio::sync::oneshot`
 
 Avoid raw `std::sync::mpsc` (sync only, fewer features), `crossbeam-channel` (good but heavier; use only if you need rendezvous semantics).
 

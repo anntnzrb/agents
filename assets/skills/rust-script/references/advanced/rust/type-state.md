@@ -8,8 +8,8 @@ The single highest-leverage thing Rust gives a coding agent: encode invariants i
 
 ## The Two Core Patterns
 
-1. **Newtype wrappers for distinct semantic units.** Money, IDs, byte offsets, coordinate spaces - each gets its own tuple struct. The agent cannot pass meters where feet are expected, even though both are `f64` under the hood. This is the `euclid::Point<Screen>` vs `euclid::Point<World>` example Chris Allen called out.
-2. **Type-state for state machines.** Instead of a struct with a `status: enum { Draft, Validated, Persisted }` field and methods that check `if self.status == ...`, model each state as its own type. Transitions are method calls that consume `self` and return a new type. Illegal transitions become unrepresentable.
+1. **Newtype wrappers for distinct semantic units.** Money, IDs, byte offsets, coordinate spaces - each gets its own tuple struct. The agent cannot pass meters where feet are expected, even though both are `f64` under the hood. This is the `euclid::Point<Screen>` vs `euclid::Point<World>` example Chris Allen called out
+2. **Type-state for state machines.** Instead of a struct with a `status: enum { Draft, Validated, Persisted }` field and methods that check `if self.status == ...`, model each state as its own type. Transitions are method calls that consume `self` and return a new type. Illegal transitions become unrepresentable
 
 ## Newtype Wrapper Cookbook
 
@@ -343,16 +343,16 @@ Functions taking `NonEmptyVec<T>` cannot receive an empty vector. The `first()` 
 
 ## When NOT to Newtype
 
-- For one-off internal computations where the unit lives in a single function and never crosses a boundary.
-- When the wrapper does not change behavior or invariants vs. the underlying type (e.g., a `struct Count(u32)` that is only ever used in one struct).
-- When `From`/`Into` conversions would be ergonomic but would defeat the purpose (if you find yourself wanting `impl From<UserId> for Uuid`, you do not want a newtype - you want a type alias).
+- For one-off internal computations where the unit lives in a single function and never crosses a boundary
+- When the wrapper does not change behavior or invariants vs. the underlying type (e.g., a `struct Count(u32)` that is only ever used in one struct)
+- When `From`/`Into` conversions would be ergonomic but would defeat the purpose (if you find yourself wanting `impl From<UserId> for Uuid`, you do not want a newtype - you want a type alias)
 
 The cost of a newtype is one tuple struct + the impls you need. The break-even is around three uses across different functions, or any use that crosses an API boundary.
 
 ## When NOT to Use Type-State
 
-- When the state space is small and transitions are simple (`Option<T>` and `Result<T, E>` are state machines already).
-- When the type-state would force runtime branching upward (e.g., reading "should this run as Open or Locked?" from config means you store `Box<dyn FileLike>` anyway).
-- When the API is consumed by code that does not know the state at compile time (heterogeneous collections, dynamic dispatch boundaries).
+- When the state space is small and transitions are simple (`Option<T>` and `Result<T, E>` are state machines already)
+- When the type-state would force runtime branching upward (e.g., reading "should this run as Open or Locked?" from config means you store `Box<dyn FileLike>` anyway)
+- When the API is consumed by code that does not know the state at compile time (heterogeneous collections, dynamic dispatch boundaries)
 
 In those cases, regular enum-tagged states are correct. The line is: **can the call site know the state statically?** If yes, type-state. If no, enum-with-tag.

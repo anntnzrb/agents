@@ -6,23 +6,23 @@ Server Actions created from the Odoo UI under Settings/Technical/Actions/Server 
 
 ## Hard rules
 
-- Write every snippet to `<temp-dir>/<descriptive>.py` before copying it; copy with `pbcopy < <temp-dir>/<descriptive>.py` on macOS.
-- Capture outputs with `pbpaste > <temp-dir>/<descriptive>_output.txt` on macOS, then parse JSON into `<temp-dir>/<descriptive>_output.json`.
-- Read-only audits may end with raise UserError(payload_json); write success must never raise UserError.
-- A write action succeeds by assigning action = {'type': 'ir.actions.client', 'tag': 'display_notification', ...}.
-- A write action fails by raising UserError(...), intentionally rolling back the transaction.
-- Do not use imports in safe_eval snippets unless the local Odoo source proves the opcode is allowed; default templates use zero imports.
-- No env.cr.commit(), no rollback(), no sudo() unless the user explicitly requested bypassing normal access rules and the plan states why.
-- Use IDs verified by audit, not display-name strings, for users/stages/programs/periods.
+- Write every snippet to `<temp-dir>/<descriptive>.py` before copying it; copy with `pbcopy < <temp-dir>/<descriptive>.py` on macOS
+- Capture outputs with `pbpaste > <temp-dir>/<descriptive>_output.txt` on macOS, then parse JSON into `<temp-dir>/<descriptive>_output.json`
+- Read-only audits may end with raise UserError(payload_json); write success must never raise UserError
+- A write action succeeds by assigning action = {'type': 'ir.actions.client', 'tag': 'display_notification', ...}
+- A write action fails by raising UserError(...), intentionally rolling back the transaction
+- Do not use imports in safe_eval snippets unless the local Odoo source proves the opcode is allowed; default templates use zero imports
+- No env.cr.commit(), no rollback(), no sudo() unless the user explicitly requested bypassing normal access rules and the plan states why
+- Use IDs verified by audit, not display-name strings, for users/stages/programs/periods
 
 ## Required workflow
 
-1. `Source evidence`: read local code/report to identify the real fields used, e.g. report uses `lead.periodo_id` versus subfield `postgrado_id.periodo_ids`.
-2. `Read-only audit`: use `search_count`, `read_group`, first/last ids, samples only when needed.
-3. `Dry run`: expected counts, target distribution, references, exact failure shape.
-4. `Execute`: ORM for small/business-logic writes; SQL set-based only for simple column updates that would freeze/timeout in UI.
-5. `Postcheck`: rowcount, candidates touched, invariants.
-6. `Final audit`: independent read-only audit plus DB hygiene checks for persistent temporary/staging leftovers.
+1. `Source evidence`: read local code/report to identify the real fields used, e.g. report uses `lead.periodo_id` versus subfield `postgrado_id.periodo_ids`
+2. `Read-only audit`: use `search_count`, `read_group`, first/last ids, samples only when needed
+3. `Dry run`: expected counts, target distribution, references, exact failure shape
+4. `Execute`: ORM for small/business-logic writes; SQL set-based only for simple column updates that would freeze/timeout in UI
+5. `Postcheck`: rowcount, candidates touched, invariants
+6. `Final audit`: independent read-only audit plus DB hygiene checks for persistent temporary/staging leftovers
 
 ## JSON helper
 
@@ -75,8 +75,8 @@ On any count mismatch, return JSON with `error`, `expected`, `actual`, `write_ex
 
 ## Known failure lessons
 
-- UserError after write rolls back, even when the modal says updated.
-- SQL without active IS TRUE can update archived rows because UI/ORM active_test=True was omitted.
-- ORM loops over thousands can freeze/reconnect the browser; use set-based SQL only after dry-run and only for simple column writes.
-- active_domain from the current view can belong to another model; global export actions must use explicit domain = [].
-- Large clipboard output is a design bug; compact output.
+- UserError after write rolls back, even when the modal says updated
+- SQL without active IS TRUE can update archived rows because UI/ORM active_test=True was omitted
+- ORM loops over thousands can freeze/reconnect the browser; use set-based SQL only after dry-run and only for simple column writes
+- active_domain from the current view can belong to another model; global export actions must use explicit domain = []
+- Large clipboard output is a design bug; compact output

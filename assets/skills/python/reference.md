@@ -31,10 +31,10 @@ Event = UserCreated | UserUpdated
 
 Boundary rule:
 
-1. Decode or receive untrusted data at the edge.
-2. Validate/narrow once with typed code, Pydantic `TypeAdapter`, or msgspec.
-3. Convert inward to `TypedDict`s or domain objects.
-4. Keep `dict[str, Any]` and validator objects out of core logic unless the project intentionally uses them as domain models.
+1. Decode or receive untrusted data at the edge
+2. Validate/narrow once with typed code, Pydantic `TypeAdapter`, or msgspec
+3. Convert inward to `TypedDict`s or domain objects
+4. Keep `dict[str, Any]` and validator objects out of core logic unless the project intentionally uses them as domain models
 
 ### Pydantic standalone validation
 
@@ -65,12 +65,12 @@ payload = msgspec.json.decode(raw_bytes, type=CreateUser)
 
 ## Type System Defaults
 
-- Public functions and methods should have explicit parameter and return types.
-- For inputs, prefer abstract/read-only protocols when mutation is not required: `Iterable[T]`, `Sequence[T]`, `Mapping[K, V]`.
-- For concrete implementation returns, prefer concrete types: `list[T]`, `dict[K, V]`, domain objects.
-- Use `object` instead of `Any` when accepting any value but treating it generically.
-- Prefer `T | None`, `A | B`, `Protocol`, `typing.Self`, and `@override` when supported by the project target.
-- Avoid `cast(...)`, `# type: ignore`, and `pyright: ignore`; improve the model first.
+- Public functions and methods should have explicit parameter and return types
+- For inputs, prefer abstract/read-only protocols when mutation is not required: `Iterable[T]`, `Sequence[T]`, `Mapping[K, V]`
+- For concrete implementation returns, prefer concrete types: `list[T]`, `dict[K, V]`, domain objects
+- Use `object` instead of `Any` when accepting any value but treating it generically
+- Prefer `T | None`, `A | B`, `Protocol`, `typing.Self`, and `@override` when supported by the project target
+- Avoid `cast(...)`, `# type: ignore`, and `pyright: ignore`; improve the model first
 
 ## Error Handling and Result Types
 

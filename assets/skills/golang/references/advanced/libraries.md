@@ -14,9 +14,9 @@ The biggest difference from Python/Rust/TypeScript: **Go has fewer "best" choice
 
 The reality of 2026 Go: **`gin` runs ~48% of new Go API projects** (Go Developer Survey 2024 + crawls of new repos), with `gorilla/mux` (~17%, in maintenance), `echo` (~16%), and `fiber` (~11%) the remaining quarter. The skill picks gin not because it is technically superior — it is not — but because:
 
-1. The ecosystem (middleware, examples, SO answers) is largest.
-2. The CLIProxyAPI codebase, which this skill's `backend-stack.md` is distilled from, uses gin in production for OpenAI/Gemini/Claude proxying including SSE streaming and WebSocket upgrades. That is real reference code, not a toy.
-3. Gin's `Context` API is the closest thing Go has to a framework-blessed "request-scoped object", which makes middleware composition straightforward.
+1. The ecosystem (middleware, examples, SO answers) is largest
+2. The CLIProxyAPI codebase, which this skill's `backend-stack.md` is distilled from, uses gin in production for OpenAI/Gemini/Claude proxying including SSE streaming and WebSocket upgrades. That is real reference code, not a toy
+3. Gin's `Context` API is the closest thing Go has to a framework-blessed "request-scoped object", which makes middleware composition straightforward
 
 ```go
 import "github.com/gin-gonic/gin"
@@ -30,11 +30,11 @@ func main() {
 ```
 
 **Pick `chi` instead** when:
-- You want `net/http`-compatible handlers (you do, eventually — chi is closer to stdlib).
-- The service is small and you do not need gin's binding helpers.
+- You want `net/http`-compatible handlers (you do, eventually — chi is closer to stdlib)
+- The service is small and you do not need gin's binding helpers
 
 **Pick `net/http` (stdlib) directly** when:
-- The service has fewer than 10 routes and zero auth complexity. Go 1.22's enhanced `ServeMux` (method+path patterns) eliminated 80% of the historical reason to use a framework.
+- The service has fewer than 10 routes and zero auth complexity. Go 1.22's enhanced `ServeMux` (method+path patterns) eliminated 80% of the historical reason to use a framework
 
 **Never use** `gorilla/mux` (effectively in maintenance), `fiber` (uses `fasthttp` which is **not stdlib-compatible**, so middleware ecosystem is split), or `echo` (smaller eco than gin, no real advantage today).
 
@@ -46,10 +46,10 @@ See `backend-stack.md` for the gin canonical layout, middleware ordering, SSE, g
 
 The default RPC layer. **Use Connect, not raw grpc-go**, unless you have a measured reason.
 
-- Connect is wire-compatible with gRPC AND speaks HTTP/1.1 + HTTP/2 + Connect protocol. One server, three clients (gRPC, gRPC-Web, Connect-Web from browsers).
-- No `grpcurl` needed for debugging — `curl -H "Content-Type: application/json" -d ...` works.
-- Streaming, interceptors, deadlines, errors are first-class.
-- Buf toolchain (`buf generate`, `buf lint`, `buf breaking`) for codegen is dramatically nicer than `protoc`.
+- Connect is wire-compatible with gRPC AND speaks HTTP/1.1 + HTTP/2 + Connect protocol. One server, three clients (gRPC, gRPC-Web, Connect-Web from browsers)
+- No `grpcurl` needed for debugging — `curl -H "Content-Type: application/json" -d ...` works
+- Streaming, interceptors, deadlines, errors are first-class
+- Buf toolchain (`buf generate`, `buf lint`, `buf breaking`) for codegen is dramatically nicer than `protoc`
 
 ```go
 // Server
@@ -66,8 +66,8 @@ res, err := client.Say(ctx, connect.NewRequest(&elizav1.SayRequest{Sentence: "hi
 ```
 
 **Use raw `grpc-go`** only when:
-- You need server-streaming-from-multiple-services with a single gRPC mux.
-- You are integrating with a strict gRPC-only environment (Envoy proxy with gRPC reflection, Istio strict-gRPC).
+- You need server-streaming-from-multiple-services with a single gRPC mux
+- You are integrating with a strict gRPC-only environment (Envoy proxy with gRPC reflection, Istio strict-gRPC)
 
 See `grpc-connect.md`.
 
@@ -81,9 +81,9 @@ go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 go install github.com/pressly/goose/v3/cmd/goose@latest
 ```
 
-- **`pgx/v5`** is faster, more type-safe, and has better PostgreSQL feature coverage than `database/sql + lib/pq`. Use the `pgxpool` package for connection pooling. Avoid `database/sql` driver mode — it loses pgx's batch, COPY, listen/notify.
-- **`sqlc`** generates type-safe Go from `.sql` files. Hand-written SQL with hand-written struct mapping is the #1 source of subtle DB bugs. sqlc eliminates the class.
-- **`goose`** for migrations — small, command-line first, no global state.
+- **`pgx/v5`** is faster, more type-safe, and has better PostgreSQL feature coverage than `database/sql + lib/pq`. Use the `pgxpool` package for connection pooling. Avoid `database/sql` driver mode — it loses pgx's batch, COPY, listen/notify
+- **`sqlc`** generates type-safe Go from `.sql` files. Hand-written SQL with hand-written struct mapping is the #1 source of subtle DB bugs. sqlc eliminates the class
+- **`goose`** for migrations — small, command-line first, no global state
 
 **Never use** `gorm` (active record, slow, brings runtime reflection into hot paths, encourages N+1 queries). **Never use** `ent` (heavy, opinionated graph layer) unless you specifically want a graph-shaped data model.
 
@@ -141,9 +141,9 @@ slog.InfoContext(ctx, "request handled",
 )
 ```
 
-- **stdlib since 1.21**, stable since 1.23. Performance is on par with zerolog for structured output, and faster than logrus by a wide margin.
-- The `slog.Handler` interface is implemented by all major exporters (OpenTelemetry, Datadog, Honeycomb).
-- The skill bans `logrus`, `zap`, `zerolog` for new code. They are not bad — they are simply superseded. Existing projects on those keep them; new files use slog.
+- **stdlib since 1.21**, stable since 1.23. Performance is on par with zerolog for structured output, and faster than logrus by a wide margin
+- The `slog.Handler` interface is implemented by all major exporters (OpenTelemetry, Datadog, Honeycomb)
+- The skill bans `logrus`, `zap`, `zerolog` for new code. They are not bad — they are simply superseded. Existing projects on those keep them; new files use slog
 
 Use the `sloglint` linter from `golangci-strict.md` to enforce attr style (`slog.String(...)` instead of `slog.Any(...)`).
 
@@ -167,9 +167,9 @@ See `cobra-stack.md`.
 
 Use **v2 RC** (`charm.land/bubbletea/v2`), not v1. The v2 model adds:
 
-- `tea.View{Cursor: *tea.Cursor, ...}` for real-cursor positioning.
-- `SetVirtualCursor(false)` on textareas — lets the terminal own the cursor, which is **required** for CJK IME (Korean Hangul composition, Japanese kana→kanji conversion, Chinese pinyin lookup).
-- Granular mouse events (`MouseClickMsg`, `MouseMotionMsg`, `MouseReleaseMsg`) instead of v1's coarse `MouseMsg`.
+- `tea.View{Cursor: *tea.Cursor, ...}` for real-cursor positioning
+- `SetVirtualCursor(false)` on textareas — lets the terminal own the cursor, which is **required** for CJK IME (Korean Hangul composition, Japanese kana→kanji conversion, Chinese pinyin lookup)
+- Granular mouse events (`MouseClickMsg`, `MouseMotionMsg`, `MouseReleaseMsg`) instead of v1's coarse `MouseMsg`
 
 This is not a preference. v1 has no way to position the IME candidate window correctly — Korean input shows up two cells to the left of where you typed, every time. **If your TUI accepts text input AND your users include CJK speakers, v1 is broken.**
 
@@ -323,11 +323,11 @@ Pure 12-factor. Defaults via struct tag, required marker, parsing for `time.Dura
 Before `go get`-ing anything new:
 
 1. Is it maintained? Latest tag within 12 months? Owner active?
-2. Does it expose stdlib-compatible types (`io.Reader`, `context.Context`, `http.Handler`)? If it invents its own `Connection` or `Request` type, that's a yellow flag.
-3. Does it use `init()` for side effects? **REJECT.** `init()` ruins testability.
+2. Does it expose stdlib-compatible types (`io.Reader`, `context.Context`, `http.Handler`)? If it invents its own `Connection` or `Request` type, that's a yellow flag
+3. Does it use `init()` for side effects? **REJECT.** `init()` ruins testability
 4. Does it call `log.Fatal` / `panic` outside of true programmer-error paths? **REJECT.**
-5. Does it have a `context.Context` first-arg convention? If not, **REJECT** — cancellation is non-negotiable.
-6. Does adding it overlap with something already in your `go.mod`? Pick one.
+5. Does it have a `context.Context` first-arg convention? If not, **REJECT** — cancellation is non-negotiable
+6. Does adding it overlap with something already in your `go.mod`? Pick one
 
 ---
 

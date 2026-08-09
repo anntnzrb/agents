@@ -44,24 +44,24 @@ A fresh fetch sends conditional validators when a cache entry has ETag or Last-M
 
 ## Analysis contract
 
-- Leaderboard rows are published; do not re-aggregate them.
-- A configuration is identified by the tuple `model`, `reasoning_effort`, `harness`, and `config`. Never merge rows merely because their model names match.
-- Every ranked item should expose available `n_attempted`, `n_tasks_attempted`, score/pass fields, `ci_lo`, `ci_hi`, `ci_half`, and derived `ci_width` (`ci_hi - ci_lo`). “Confidence” means CI width only.
-- Default recommendations do not drop low-n or incomplete rows. Quality/sample exclusion occurs only with explicit `--min-attempted`, `--min-tasks`, or `--min-pass-at-1`.
-- Raw extrema are reported separately from recommendations. Derived metrics live under `derived` and never overwrite published fields.
-- Default Pareto means maximize `pass_at_1` while minimizing `mean_output_tokens`, `mean_cost_usd`, and `mean_agent_steps`. Repeatable `--pareto-axis METRIC:ORDER` enables an explicit alternate frontier; null axis values are excluded.
-- Repeatable `--efficiency NAME=NUMERATOR/DENOMINATOR` adds a derived ratio under each row. Zero denominators and invalid inputs remain null with a reason; no composite score is substituted.
+- Leaderboard rows are published; do not re-aggregate them
+- A configuration is identified by the tuple `model`, `reasoning_effort`, `harness`, and `config`. Never merge rows merely because their model names match
+- Every ranked item should expose available `n_attempted`, `n_tasks_attempted`, score/pass fields, `ci_lo`, `ci_hi`, `ci_half`, and derived `ci_width` (`ci_hi - ci_lo`). “Confidence” means CI width only
+- Default recommendations do not drop low-n or incomplete rows. Quality/sample exclusion occurs only with explicit `--min-attempted`, `--min-tasks`, or `--min-pass-at-1`
+- Raw extrema are reported separately from recommendations. Derived metrics live under `derived` and never overwrite published fields
+- Default Pareto means maximize `pass_at_1` while minimizing `mean_output_tokens`, `mean_cost_usd`, and `mean_agent_steps`. Repeatable `--pareto-axis METRIC:ORDER` enables an explicit alternate frontier; null axis values are excluded
+- Repeatable `--efficiency NAME=NUMERATOR/DENOMINATOR` adds a derived ratio under each row. Zero denominators and invalid inputs remain null with a reason; no composite score is substituted
 
 For raw trials, the default filter is `source='deep-swe'`, `eval_scope='full'`, and `included_in_score=true`. Every response exposes `filters_applied`, including override values. Never describe all `trials.json` rows as full DeepSWE.
 
 ## User-facing report recipe
 
-1. Resolve one benchmark version and fetch `leaderboard-live.json`.
-2. Run `report`; preserve the JSON envelope and provenance.
-3. State whether each value is published, published raw, or derived.
-4. Compare configurations, not just model names; include counts and CI width.
-5. Present Pareto-efficient choices and raw extrema separately.
-6. State filters, freshness, source URL, and any explicit thresholds.
-7. If a fetch fails, report the error; do not fill gaps from stale data unless the user explicitly requested `--allow-stale` or `--snapshot`.
+1. Resolve one benchmark version and fetch `leaderboard-live.json`
+2. Run `report`; preserve the JSON envelope and provenance
+3. State whether each value is published, published raw, or derived
+4. Compare configurations, not just model names; include counts and CI width
+5. Present Pareto-efficient choices and raw extrema separately
+6. State filters, freshness, source URL, and any explicit thresholds
+7. If a fetch fails, report the error; do not fill gaps from stale data unless the user explicitly requested `--allow-stale` or `--snapshot`
 
 The full field and provenance contract is in `references/output-contract.md` and `references/provenance.md`.

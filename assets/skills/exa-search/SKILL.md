@@ -41,7 +41,7 @@ uv run --script <skill-dir>/scripts/cli.py research "Summarize the current state
 
 ## Credentials
 
-- Keep `.env` beside this skill.
+- Keep `.env` beside this skill
 - CLI lookup order:
   - `EXA_SEARCH_ENV_FILE`
   - skill `.env`
@@ -51,20 +51,20 @@ uv run --script <skill-dir>/scripts/cli.py research "Summarize the current state
 
 ## Failure handling
 
-- If a CLI run says `EXA_API_KEY required`, retry once with the documented `uv run --script` command; do not assume the parent shell env is authoritative.
-- If env loading still fails, set `EXA_SEARCH_ENV_FILE` to the skill-local `.env` dynamically from the skill path rather than hard-coding a home directory.
+- If a CLI run says `EXA_API_KEY required`, retry once with the documented `uv run --script` command; do not assume the parent shell env is authoritative
+- If env loading still fails, set `EXA_SEARCH_ENV_FILE` to the skill-local `.env` dynamically from the skill path rather than hard-coding a home directory
 - Distinguish env lookup failures from provider failures:
-  - `EXA_API_KEY required` means local env discovery failed.
-  - HTTP `401`, `402`, `403`, or similar means the API responded and the key/account/quota is the issue.
-- When the API responds with an auth/billing/quota error, report that explicitly instead of claiming the skill lacks credentials.
+  - `EXA_API_KEY required` means local env discovery failed
+  - HTTP `401`, `402`, `403`, or similar means the API responded and the key/account/quota is the issue
+- When the API responds with an auth/billing/quota error, report that explicitly instead of claiming the skill lacks credentials
 
 ## Notes
 
 - Auth header: `x-api-key: $EXA_API_KEY`
-- `search` is the best default entrypoint.
-- Use `contents` when you already know the target URL(s).
-- Use `post` for advanced payloads not covered by convenience wrappers.
-- For code-specific public usage patterns, prefer `grep-app`, `gh`, and `context7` before forcing Exa.
+- `search` is the best default entrypoint
+- Use `contents` when you already know the target URL(s)
+- Use `post` for advanced payloads not covered by convenience wrappers
+- For code-specific public usage patterns, prefer `grep-app`, `gh`, and `context7` before forcing Exa
 
 ## Raw examples
 

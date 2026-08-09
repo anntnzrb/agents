@@ -4,10 +4,10 @@ How to use Go's *limited* type system to catch bugs at compile time. Go gives yo
 
 The four patterns:
 
-1. **Named types** for branding primitives (the Go answer to `NewType` / branded TS).
-2. **Smart constructors with unexported fields** for parse-don't-validate.
-3. **Sealed interfaces** for sum types, with `type switch` + `exhaustive` linter.
-4. **Generics with constraints** for bounded polymorphism (1.18+).
+1. **Named types** for branding primitives (the Go answer to `NewType` / branded TS)
+2. **Smart constructors with unexported fields** for parse-don't-validate
+3. **Sealed interfaces** for sum types, with `type switch` + `exhaustive` linter
+4. **Generics with constraints** for bounded polymorphism (1.18+)
 
 ---
 
@@ -108,10 +108,10 @@ func (e *Email) UnmarshalJSON(data []byte) error {
 
 **Why this works**:
 
-- `Email{raw: "anything"}` from outside the `domain` package is a compile error — `raw` is unexported.
-- The only way to obtain a non-zero `Email` is `NewEmail(...)`, which validates.
-- `UnmarshalJSON` routes wire input through the same constructor — boundary parsing is automatic.
-- Once a function signature has `email Email`, the caller has *proven* it is valid. No internal `if email == ""` checks.
+- `Email{raw: "anything"}` from outside the `domain` package is a compile error — `raw` is unexported
+- The only way to obtain a non-zero `Email` is `NewEmail(...)`, which validates
+- `UnmarshalJSON` routes wire input through the same constructor — boundary parsing is automatic
+- Once a function signature has `email Email`, the caller has *proven* it is valid. No internal `if email == ""` checks
 
 **Use for every domain value that has invariants**: emails, URLs, phone numbers, currency amounts, percentages, semver versions, IDs with format constraints, time ranges, anything you currently validate in three places.
 
@@ -203,9 +203,9 @@ Now adding `event.Suspended` without updating `Render` is a **lint error**. This
 
 ### Sealed interface gotchas
 
-- The method MUST be unexported (`sealed()`, not `Sealed()`). Otherwise other packages can implement it.
+- The method MUST be unexported (`sealed()`, not `Sealed()`). Otherwise other packages can implement it
 - `type switch` with `*Created` vs `Created` matters — pick value receivers and value cases, or pointer receivers and pointer cases. **Mixing them causes silent miss.**
-- `interface{}` is not a sealed type. Anything implementing zero methods satisfies it. Sealed interfaces have at least the `sealed()` method.
+- `interface{}` is not a sealed type. Anything implementing zero methods satisfies it. Sealed interfaces have at least the `sealed()` method
 
 ---
 
@@ -240,8 +240,8 @@ The `cmp.Ordered` (Go 1.21+), `cmp.Compare`, and `slices`/`maps` packages cover 
 
 ### When NOT to use generics
 
-- "I want to accept multiple types, so I'll make it generic." Use an **interface** instead. Generics are for parametric polymorphism (same code, different types). Interfaces are for behavioral polymorphism (different code behind a contract).
-- "I want to return `any`." Use a sealed interface and a `type switch`. `any` returns are anti-patterns past public APIs.
+- "I want to accept multiple types, so I'll make it generic." Use an **interface** instead. Generics are for parametric polymorphism (same code, different types). Interfaces are for behavioral polymorphism (different code behind a contract)
+- "I want to return `any`." Use a sealed interface and a `type switch`. `any` returns are anti-patterns past public APIs
 
 ---
 
@@ -271,10 +271,10 @@ if errors.As(err, &pgErr) {
 
 You will see endless debates. The rule that holds up:
 
-- **If a type has a mutex, never copy it.** Use `*T` everywhere.
-- **If a type is large (> 64 bytes) and read-only, pass by value or pointer is a measured choice.** Default to pointer for "large" things.
-- **Receivers must be consistent.** All methods on `T` either take `T` or `*T`. Don't mix. The `staticcheck` linter catches mixed-receiver bugs.
-- **`nil` pointer = absence. Zero value = "not set yet".** Choose ONE convention per type. Document it.
+- **If a type has a mutex, never copy it.** Use `*T` everywhere
+- **If a type is large (> 64 bytes) and read-only, pass by value or pointer is a measured choice.** Default to pointer for "large" things
+- **Receivers must be consistent.** All methods on `T` either take `T` or `*T`. Don't mix. The `staticcheck` linter catches mixed-receiver bugs
+- **`nil` pointer = absence. Zero value = "not set yet".** Choose ONE convention per type. Document it
 
 ---
 
@@ -282,9 +282,9 @@ You will see endless debates. The rule that holds up:
 
 Almost never in domain code. Acceptable cases:
 
-- JSON parsing of genuinely heterogeneous payloads (and even then, prefer `json.RawMessage` + targeted parsing).
-- `fmt.Sprintf` arguments (variadic `any` is unavoidable here).
-- Generic container internals before the user-facing API.
+- JSON parsing of genuinely heterogeneous payloads (and even then, prefer `json.RawMessage` + targeted parsing)
+- `fmt.Sprintf` arguments (variadic `any` is unavoidable here)
+- Generic container internals before the user-facing API
 
 The skill rejects `any` in handler signatures, service signatures, store signatures. If you find yourself writing `func Handle(payload any) error`, you have a sealed-interface waiting to happen.
 

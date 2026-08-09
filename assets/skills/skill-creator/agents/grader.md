@@ -27,7 +27,7 @@ You receive these parameters in your prompt:
 ### Step 2: Examine Output Files
 
 1. List files in outputs_dir
-2. Read/examine each file relevant to the expectations. If outputs aren't plain text, use the inspection tools provided in your prompt — don't rely solely on what the transcript says the executor produced.
+2. Read/examine each file relevant to the expectations. If outputs aren't plain text, use the inspection tools provided in your prompt — don't rely solely on what the transcript says the executor produced
 3. Note contents, structure, and quality
 
 ### Step 3: Evaluate Each Assertion

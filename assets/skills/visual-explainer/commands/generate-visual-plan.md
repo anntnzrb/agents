@@ -11,15 +11,15 @@ Read relevant repo files before planning. Identify entry points, existing patter
 
 ## Required page sections
 
-1. Goal and scope: what will change and what is intentionally out.
-2. Current state: short diagram/table of existing architecture.
-3. Proposed design: architecture/data/control flow, preferably Mermaid or hybrid cards.
-4. Implementation sequence: ordered phases with dependencies.
-5. File map: files to create/edit/delete and why.
-6. Interface/contracts: types, APIs, schemas, CLI flags, config, events.
-7. Risk and decision matrix: correctness, tests, migration, release, UX, security/privacy, performance.
-8. Test plan: unit/integration/e2e/edge cases mapped to files.
-9. Acceptance checklist: observable done criteria.
+1. Goal and scope: what will change and what is intentionally out
+2. Current state: short diagram/table of existing architecture
+3. Proposed design: architecture/data/control flow, preferably Mermaid or hybrid cards
+4. Implementation sequence: ordered phases with dependencies
+5. File map: files to create/edit/delete and why
+6. Interface/contracts: types, APIs, schemas, CLI flags, config, events
+7. Risk and decision matrix: correctness, tests, migration, release, UX, security/privacy, performance
+8. Test plan: unit/integration/e2e/edge cases mapped to files
+9. Acceptance checklist: observable done criteria
 
 Use hierarchy: overview and architecture dominate; detailed file/test/reference sections stay compact or collapsible. Follow the skill’s Mermaid, table, overflow, and delivery rules.
 

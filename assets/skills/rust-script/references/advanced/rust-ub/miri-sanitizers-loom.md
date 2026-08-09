@@ -16,11 +16,11 @@ Miri is an interpreter for Rust's MIR (Mid-level IR). It executes your test suit
 
 ### Why Miri Is Non-Negotiable
 
-- Detects 12 of 14 UB categories (see `ub-taxonomy.md`).
-- Catches aliasing violations that compile and run correctly on every platform today but are UB that future compiler optimizations will exploit.
-- Catches data races under a configurable scheduling model.
-- Catches provenance violations that are impossible to observe on real hardware.
-- **Zero false positives** — if Miri says it is UB, it is UB. Period.
+- Detects 12 of 14 UB categories (see `ub-taxonomy.md`)
+- Catches aliasing violations that compile and run correctly on every platform today but are UB that future compiler optimizations will exploit
+- Catches data races under a configurable scheduling model
+- Catches provenance violations that are impossible to observe on real hardware
+- **Zero false positives** — if Miri says it is UB, it is UB. Period
 
 ### Installation
 
@@ -235,11 +235,11 @@ RUSTFLAGS="-Zsanitizer=undefined" cargo +nightly test -Zbuild-std --target x86_6
 
 ### Sanitizer Limitations
 
-- Require nightly + `-Zbuild-std` (rebuilds the standard library with instrumentation).
-- MSAN requires ALL dependencies (including C libs) to be instrumented — practically hard.
-- Cannot catch aliasing violations (that is Miri's domain).
-- Significant runtime overhead (2-15x slower).
-- Linux has the best support; macOS works for ASAN; Windows support is minimal.
+- Require nightly + `-Zbuild-std` (rebuilds the standard library with instrumentation)
+- MSAN requires ALL dependencies (including C libs) to be instrumented — practically hard
+- Cannot catch aliasing violations (that is Miri's domain)
+- Significant runtime overhead (2-15x slower)
+- Linux has the best support; macOS works for ASAN; Windows support is minimal
 
 ---
 
@@ -249,15 +249,15 @@ Loom explores all possible thread interleavings of a bounded concurrent program.
 
 ### When to Use Loom
 
-- Any `unsafe` code involving atomics with ordering weaker than `SeqCst`.
-- Custom lock implementations.
-- Lock-free queues, stacks, or other concurrent data structures.
-- Any code where you chose `Relaxed`, `Acquire`, or `Release` ordering.
+- Any `unsafe` code involving atomics with ordering weaker than `SeqCst`
+- Custom lock implementations
+- Lock-free queues, stacks, or other concurrent data structures
+- Any code where you chose `Relaxed`, `Acquire`, or `Release` ordering
 
 ### When NOT to Use Loom
 
-- Code using only `Mutex`/`RwLock` from std or `parking_lot` — the locks are sound, your usage is the question, and Miri + TSAN cover that.
-- Async code (loom does not model async runtimes — use `tokio::test` + Miri instead).
+- Code using only `Mutex`/`RwLock` from std or `parking_lot` — the locks are sound, your usage is the question, and Miri + TSAN cover that
+- Async code (loom does not model async runtimes — use `tokio::test` + Miri instead)
 
 ### Setup
 
@@ -319,8 +319,8 @@ RUSTFLAGS="--cfg loom" cargo test --lib --release -- loom_tests
 ### Loom + Miri Interaction
 
 Loom and Miri solve different problems:
-- **Miri** checks a single execution for UB (aliasing, validity, provenance).
-- **Loom** checks all interleavings for correctness (ordering, atomicity).
+- **Miri** checks a single execution for UB (aliasing, validity, provenance)
+- **Loom** checks all interleavings for correctness (ordering, atomicity)
 
 Run BOTH on lock-free code:
 ```bash
@@ -374,9 +374,9 @@ cargo +nightly fuzz tmin parse_input artifacts/parse_input/crash-xxxxx
 ### Fuzz + Miri Pipeline
 
 When the fuzzer finds a crashing input:
-1. Minimize it with `cargo fuzz tmin`.
-2. Add it as a regression test.
-3. Run the regression test under Miri to classify whether it is a panic (safe) or UB (must fix).
+1. Minimize it with `cargo fuzz tmin`
+2. Add it as a regression test
+3. Run the regression test under Miri to classify whether it is a panic (safe) or UB (must fix)
 
 ```bash
 # After adding the input as a test case:

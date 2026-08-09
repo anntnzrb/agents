@@ -4,9 +4,9 @@ Use this reference only when the user explicitly wants raw `.shortcut` generatio
 
 ## Rule
 
-- Prefer the normal blueprint/action-graph workflow unless raw serialization is the point.
-- Keep output minimal: root plist, action array, variable wiring, control-flow links, signing/import steps.
-- Do not mirror giant action catalogs here; pull only the exact action identifiers needed for the requested shortcut.
+- Prefer the normal blueprint/action-graph workflow unless raw serialization is the point
+- Keep output minimal: root plist, action array, variable wiring, control-flow links, signing/import steps
+- Do not mirror giant action catalogs here; pull only the exact action identifiers needed for the requested shortcut
 
 ## Root Shape
 
@@ -58,10 +58,10 @@ Use this reference only when the user explicitly wants raw `.shortcut` generatio
 
 ## Variable Tokens
 
-- UUIDs should be uppercase.
-- Use `WFTextTokenAttachment` when the parameter is only a variable reference.
-- Use `WFTextTokenString` when text wraps one or more variables.
-- Variable placement is driven by `attachmentsByRange`.
+- UUIDs should be uppercase
+- Use `WFTextTokenAttachment` when the parameter is only a variable reference
+- Use `WFTextTokenString` when text wraps one or more variables
+- Variable placement is driven by `attachmentsByRange`
 
 ```xml
 <key>Text</key>
@@ -90,9 +90,9 @@ Use this reference only when the user explicitly wants raw `.shortcut` generatio
 
 ## Control Flow Wiring
 
-- `GroupingIdentifier` links the start, middle, and end actions in a block.
-- `WFControlFlowMode` must be an integer.
-- Modes: `0` start, `1` middle (`Otherwise` / menu case), `2` end.
+- `GroupingIdentifier` links the start, middle, and end actions in a block
+- `WFControlFlowMode` must be an integer
+- Modes: `0` start, `1` middle (`Otherwise` / menu case), `2` end
 
 ```xml
 <dict>
@@ -128,17 +128,17 @@ Use this reference only when the user explicitly wants raw `.shortcut` generatio
 
 ## Signing And Import
 
-1. Write the plist as XML to `MyShortcut.shortcut`.
+1. Write the plist as XML to `MyShortcut.shortcut`
 2. Sign it:
 
 ```bash
 shortcuts sign --mode anyone --input MyShortcut.shortcut --output MyShortcut-signed.shortcut
 ```
 
-3. Open the signed file in Shortcuts.app to import it.
+3. Open the signed file in Shortcuts.app to import it
 
 ## Guardrails
 
-- Prefer exact action identifiers over guessed names.
-- Keep the snippet set small and task-specific.
-- If a parameter shape is uncertain, say so and provide the nearest verified structure instead of inventing one.
+- Prefer exact action identifiers over guessed names
+- Keep the snippet set small and task-specific
+- If a parameter shape is uncertain, say so and provide the nearest verified structure instead of inventing one

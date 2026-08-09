@@ -46,9 +46,9 @@ By default HTTP commands return a compact agent-shaped JSON envelope. The shape 
 - `post` / `post-url`:
   `{"type": "post", "post": {...compact listing fields...}, "comments": [{"id", "author", "score", "body", "created_utc", "permalink", "depth"}, ...]}`.
   `more` placeholder comments are dropped. Comment bodies are collapsed to single-spaced text.
-- `user`: `{"type": "user", "user": "...", "profile": {"name", "created_utc", "link_karma", "comment_karma", "total_karma", "verified", "is_gold", "is_mod"}}`.
-- `user-analysis`: structured summary, see `reference.md`.
-- `explain`: `{"term": "<normalized>", "definition": "..."}`.
+- `user`: `{"type": "user", "user": "...", "profile": {"name", "created_utc", "link_karma", "comment_karma", "total_karma", "verified", "is_gold", "is_mod"}}`
+- `user-analysis`: structured summary, see `reference.md`
+- `explain`: `{"term": "<normalized>", "definition": "..."}`
 
 Pass `raw=1` to receive the full upstream JSON unchanged. `raw=1` works with `browse`, `search`, `post`, `post-url`, `user`, `user-posts`, `user-comments`. `explain` and `user-analysis` are always structured.
 
@@ -74,7 +74,7 @@ HTTP errors return exit code `22`. Network errors return `1`. Validation errors 
 
 ## Environment
 
-- Keep `.env` beside this skill if you want a stable local User-Agent.
+- Keep `.env` beside this skill if you want a stable local User-Agent
 - CLI lookup order:
   - `REDDIT_ENV_FILE`
   - skill `.env`
@@ -87,11 +87,11 @@ HTTP errors return exit code `22`. Network errors return `1`. Validation errors 
 
 ## Failure handling
 
-- Do not treat the parent shell as the source of truth for `REDDIT_USER_AGENT`; always run the CLI so it can load its own `.env`.
-- If env loading still fails, set `REDDIT_ENV_FILE` dynamically from the skill path rather than hard-coding a machine-specific directory.
-- Missing `REDDIT_USER_AGENT` after CLI lookup is not a hard blocker because the CLI has a built-in default.
-- Distinguish env lookup behavior from HTTP failures or Reddit-side blocking; report the actual request failure instead of claiming the skill lacks credentials.
-- A `network_security_block` error means Reddit (or an upstream proxy) refused the request, not a local config issue. Switch `REDDIT_USER_AGENT` or change egress before retrying.
+- Do not treat the parent shell as the source of truth for `REDDIT_USER_AGENT`; always run the CLI so it can load its own `.env`
+- If env loading still fails, set `REDDIT_ENV_FILE` dynamically from the skill path rather than hard-coding a machine-specific directory
+- Missing `REDDIT_USER_AGENT` after CLI lookup is not a hard blocker because the CLI has a built-in default
+- Distinguish env lookup behavior from HTTP failures or Reddit-side blocking; report the actual request failure instead of claiming the skill lacks credentials
+- A `network_security_block` error means Reddit (or an upstream proxy) refused the request, not a local config issue. Switch `REDDIT_USER_AGENT` or change egress before retrying
 
 ## Aliases
 
@@ -107,10 +107,10 @@ HTTP errors return exit code `22`. Network errors return `1`. Validation errors 
 
 ## Validation rules
 
-- `browse` requires a subreddit; sort must be `hot|new|top|rising|controversial` and appear before any `key=value` arg. A stray positional token after `key=value` is rc=2.
-- `post-url` requires an `http://` or `https://` URL. Anything else is rc=2.
-- `user-analysis` numeric args must be non-negative integers; `time_range` must be `day|week|month|year|all`. Invalid values return rc=2 (no silent "all" fallback).
-- `explain` lower-cases and trims whitespace; hyphens are treated as spaces for glossary lookup. Empty / whitespace-only input is rc=2.
+- `browse` requires a subreddit; sort must be `hot|new|top|rising|controversial` and appear before any `key=value` arg. A stray positional token after `key=value` is rc=2
+- `post-url` requires an `http://` or `https://` URL. Anything else is rc=2
+- `user-analysis` numeric args must be non-negative integers; `time_range` must be `day|week|month|year|all`. Invalid values return rc=2 (no silent "all" fallback)
+- `explain` lower-cases and trims whitespace; hyphens are treated as spaces for glossary lookup. Empty / whitespace-only input is rc=2
 
 ## Required follow-up reads
 
@@ -125,10 +125,10 @@ HTTP errors return exit code `22`. Network errors return `1`. Validation errors 
 
 ## Notes
 
-- Public JSON endpoints work anonymously for basic read-only use.
-- Set a custom `REDDIT_USER_AGENT` for better hygiene and fewer blocks.
-- Reddit also has OAuth-backed APIs, but this skill intentionally stays on public JSON endpoints for low-friction read-only access.
-- If you need authenticated/private/high-throughput access later, treat that as a separate OAuth feature instead of overloading this helper.
+- Public JSON endpoints work anonymously for basic read-only use
+- Set a custom `REDDIT_USER_AGENT` for better hygiene and fewer blocks
+- Reddit also has OAuth-backed APIs, but this skill intentionally stays on public JSON endpoints for low-friction read-only access
+- If you need authenticated/private/high-throughput access later, treat that as a separate OAuth feature instead of overloading this helper
 
 ## Query templates
 

@@ -34,6 +34,6 @@ gh issue view 20558 --repo rust-lang/rust-analyzer --json number,title,state,upd
 
 ## Guidance for agent output
 
-- Never claim stabilization date unless issue/PR explicitly sets one.
-- Phrase as: "available on nightly behind `-Zscript`".
-- Include constraints in same answer (publish/package/install-path/dependency limits).
+- Never claim stabilization date unless issue/PR explicitly sets one
+- Phrase as: "available on nightly behind `-Zscript`"
+- Include constraints in same answer (publish/package/install-path/dependency limits)

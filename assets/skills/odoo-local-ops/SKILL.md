@@ -9,8 +9,8 @@ Local operational skill for Odoo workspaces.
 
 Supported runtime backends:
 
-- **host**: legacy Windows/local install with host PostgreSQL and `psql.exe`/`psql`.
-- **compose**: Docker Compose runtime with `db` and `odoo` services.
+- **host**: legacy Windows/local install with host PostgreSQL and `psql.exe`/`psql`
+- **compose**: Docker Compose runtime with `db` and `odoo` services
 
 Use the bundled CLI as the public entrypoint:
 
@@ -40,19 +40,19 @@ Do not replace it with raw `psql`, Docker Compose `exec`, shell pipelines, or in
 - mass update from Odoo UI without freezing the browser
 ## Workflow
 
-1. Discover workspace/runtime from `cwd`.
-   - Compose discovery checks `--runtime-dir`, `ODOO17_RUNTIME_DIR`, then nearby `odoo17` runtimes.
-   - Host discovery walks upward and also inspects immediate child directories.
-2. Inspect `odoo.conf` and, when relevant, `.env`.
-3. Resolve the active database and DB execution backend.
-   - Compose backend uses `docker compose exec -T db psql ...`.
-   - Host backend resolves `psql.exe`/`psql` from explicit flag, nearby install tree, `pg_path`, or PATH.
-4. Prefer JSON output.
-   - For Server Actions, always stage the Python snippet under `<temp-dir>` first, then copy it and parse returned JSON from clipboard/output files. Never compose long snippets inline in chat.
-   - Default to read-only audit and dry-run snippets. Write snippets require explicit user intent plus precheck/postcheck and rollback-on-failure.
-   - Prefer ORM for small writes and business-logic-sensitive operations; use SQL set-based writes only when the UI/ORM path is likely to freeze, spam tracking, or time out, and only with a frozen candidate table and exact postcheck.
-5. Keep DB access read-only unless the user explicitly requests a gated write flow.
-6. For route review, list routes first, then scan for likely mutating handlers.
+1. Discover workspace/runtime from `cwd`
+   - Compose discovery checks `--runtime-dir`, `ODOO17_RUNTIME_DIR`, then nearby `odoo17` runtimes
+   - Host discovery walks upward and also inspects immediate child directories
+2. Inspect `odoo.conf` and, when relevant, `.env`
+3. Resolve the active database and DB execution backend
+   - Compose backend uses `docker compose exec -T db psql ...`
+   - Host backend resolves `psql.exe`/`psql` from explicit flag, nearby install tree, `pg_path`, or PATH
+4. Prefer JSON output
+   - For Server Actions, always stage the Python snippet under `<temp-dir>` first, then copy it and parse returned JSON from clipboard/output files. Never compose long snippets inline in chat
+   - Default to read-only audit and dry-run snippets. Write snippets require explicit user intent plus precheck/postcheck and rollback-on-failure
+   - Prefer ORM for small writes and business-logic-sensitive operations; use SQL set-based writes only when the UI/ORM path is likely to freeze, spam tracking, or time out, and only with a frozen candidate table and exact postcheck
+5. Keep DB access read-only unless the user explicitly requests a gated write flow
+6. For route review, list routes first, then scan for likely mutating handlers
 
 ## Safe commands
 
@@ -83,19 +83,19 @@ uv run --script <skill-dir>/scripts/cli.py db query --read-only --sql-file <sql-
 
 ## Query guidance
 
-- Prefer `--sql-file` or `--sql-stdin`; do not embed long SQL inside shell strings.
-- Default to `--read-only` for ad-hoc queries.
-- In local Odoo databases, cast `jsonb` to `::text` before `ILIKE`.
-- `ir_model` does not expose `_table`; derive table names with `replace(model,'.','_')` when needed.
+- Prefer `--sql-file` or `--sql-stdin`; do not embed long SQL inside shell strings
+- Default to `--read-only` for ad-hoc queries
+- In local Odoo databases, cast `jsonb` to `::text` before `ILIKE`
+- `ir_model` does not expose `_table`; derive table names with `replace(model,'.','_')` when needed
 
 ## Gated actions
 
 Write-oriented flows are exceptional.
 
-- Only use them after explicit user intent.
-- Require an explicit write gate such as `--allow-write` in addition to the write command.
-- Summarize the target DB and effect before running a write.
-- Do not use write examples as defaults in the skill body.
+- Only use them after explicit user intent
+- Require an explicit write gate such as `--allow-write` in addition to the write command
+- Summarize the target DB and effect before running a write
+- Do not use write examples as defaults in the skill body
 - `db clone` is destructive and remains dry-run by default; its output exposes
   `source_database`, `target_database`, and replacement status.
 
@@ -109,7 +109,7 @@ source/target names and required write flags. A write requires all of:
 - `--allow-write`;
 - `--confirm-target <exact-target-name>`;
 - `--replace` when the target already exists;
-- no active connections to source or target.
+- no active connections to source or target
 
 Stop Odoo before a replacement. The command never terminates connections or
 guesses a database. It is for local runtimes only; it does not install, upgrade,
@@ -143,11 +143,11 @@ hold that database lock and expose service ports.
 
 ## Guardrails
 
-- Discover root, config, runtime, database, addons paths, and DB execution dynamically; do not assume fixed install paths.
-- Compose runtimes must use the configured `.env`/`.env.example` and never print secrets.
-- Output JSON-first with brief text fallback.
-- Never print secrets.
-- Route scans are heuristic risk indicators, not proof of a write.
+- Discover root, config, runtime, database, addons paths, and DB execution dynamically; do not assume fixed install paths
+- Compose runtimes must use the configured `.env`/`.env.example` and never print secrets
+- Output JSON-first with brief text fallback
+- Never print secrets
+- Route scans are heuristic risk indicators, not proof of a write
 
 ## Required follow-up reads
 

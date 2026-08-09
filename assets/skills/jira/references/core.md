@@ -35,7 +35,7 @@ administration, unsupported Atlassian products, and Confluence work are outside 
 
 ## Bounded reads
 
-- Search with `acli jira workitem search --jql <JQL> --fields <csv> --limit <N> --json`.
+- Search with `acli jira workitem search --jql <JQL> --fields <csv> --limit <N> --json`
 - Read with `acli jira workitem view <KEY> --fields <csv> --json`; request comments only when
   comments are needed and the installed help documents the field.
 - Use a finite explicit limit, capped at 100 when the user supplies none. Use `--paginate` only
@@ -56,7 +56,7 @@ Every create or comment follows all rules below:
 2. **Preview immediately before writing.** Show the exact site/account, project, issue key or
    creation target, type, assignee, parent, every field, rendered body, source context, item count,
    and notification effect. State `unavailable` when the CLI does not expose a value.
-3. **Confirm the exact payload.** Require explicit user confirmation for that unchanged preview.
+3. **Confirm the exact payload.** Require explicit user confirmation for that unchanged preview
    Any changed target, lookup, source, or payload invalidates approval. One confirmation authorizes
    one write only.
 4. **Write once, then verify.** Use documented single-item CLI syntax. Re-read the fresh issue or

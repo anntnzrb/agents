@@ -2,16 +2,16 @@
 
 Snapshot: MCPorter 0.12.3, captured 2026-07-16 from live `--help` output.
 
-- Agents MUST read this reference before administrative commands.
-- Live help MUST override this snapshot when different.
+- Agents MUST read this reference before administrative commands
+- Live help MUST override this snapshot when different
 
 ```text
 mcporter <command> --help
 mcporter config <subcommand> --help
 ```
 
-- Agents MUST NOT probe `daemon <action> --help` in 0.12.3.
-- Agents MUST use `mcporter daemon --help` instead.
+- Agents MUST NOT probe `daemon <action> --help` in 0.12.3
+- Agents MUST use `mcporter daemon --help` instead
 
 ## Select a command
 
@@ -57,8 +57,8 @@ Flags:
 | `--exclude-tools a,b` | Omit the comma-separated tools. |
 | `--dry-run` | With `--from`, print the regeneration command. |
 
-- Agents MUST select exactly one target form.
-- Included or excluded tools MUST originate from discovery.
+- Agents MUST select exactly one target form
+- Included or excluded tools MUST originate from discovery
 
 `--output`, `--bundle`, and `--compile` write artifacts. `--dry-run` only prints a regeneration command when used with `--from`.
 
@@ -110,9 +110,9 @@ mcporter config <command> [options]
 | Delete cached OAuth credentials | `logout` |
 | Validate config and token-cache prerequisites | `doctor` |
 
-- Agents MUST inspect with `list`, `get`, and `doctor` first.
-- Config additions MUST use `add --dry-run` before writing.
-- Config mutations MUST have explicit task authorization.
+- Agents MUST inspect with `list`, `get`, and `doctor` first
+- Config additions MUST use `add --dry-run` before writing
+- Config mutations MUST have explicit task authorization
 
 ### `config list`
 
@@ -177,8 +177,8 @@ Persistence flags:
 | `--scope home\|project` | Select home or project config; default `project`. |
 | `--dry-run` | Print the proposed entry without writing. |
 
-- Secrets SHOULD use environment-variable references.
-- Secret values MUST NOT enter arguments or committed config.
+- Secrets SHOULD use environment-variable references
+- Secret values MUST NOT enter arguments or committed config
 
 ### `config remove`
 
@@ -205,8 +205,8 @@ Supported imports include Cursor, Claude, Codex, and other import kinds recogniz
 | `--copy` | Write filtered entries into local config. |
 | `--json` | Emit JSON instead of text. |
 
-- Read-only inspections MUST omit `--copy`.
-- Import kinds MUST come from CLI or existing config.
+- Read-only inspections MUST omit `--copy`
+- Import kinds MUST come from CLI or existing config
 
 ### `config login` and `logout`
 
@@ -274,5 +274,5 @@ This exposes daemon-managed keep-alive servers as one MCP server.
 
 `--stdio` and `--http` are alternatives. Binding to a non-loopback host changes network exposure.
 
-- Non-loopback binding MUST have explicit task authorization.
-- Agents MUST assess authentication before non-loopback exposure.
+- Non-loopback binding MUST have explicit task authorization
+- Agents MUST assess authentication before non-loopback exposure

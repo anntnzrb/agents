@@ -54,20 +54,20 @@ Pass Grep.app filters as query params:
 
 ## Failure handling
 
-- `grep-app` does not use a skill-local API key in this helper flow, so there is no `.env` credential-loading step to debug by default.
+- `grep-app` does not use a skill-local API key in this helper flow, so there is no `.env` credential-loading step to debug by default
 - Distinguish invocation issues from service issues:
   - usage errors mean local invocation is wrong
   - HTTP `429` means Grep.app rate-limited the request
   - other HTTP failures mean the service or endpoint responded with an error, not that the helper failed to initialize
-- If `429` appears, report it as rate limiting and either retry later or fall back to another research route such as `context7`, `gh`, or `exa-search`.
+- If `429` appears, report it as rate limiting and either retry later or fall back to another research route such as `context7`, `gh`, or `exa-search`
 
 ## Notes
 
-- Public GitHub repos only.
-- `search` is literal by default.
-- `regex` sets `regexp=true` automatically.
-- Grep.app returns HTML snippets inside JSON; extract metadata like repo/path first.
-- Check licenses before reusing copied code.
+- Public GitHub repos only
+- `search` is literal by default
+- `regex` sets `regexp=true` automatically
+- Grep.app returns HTML snippets inside JSON; extract metadata like repo/path first
+- Check licenses before reusing copied code
 
 ## Validation
 

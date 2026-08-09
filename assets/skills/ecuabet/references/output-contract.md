@@ -63,6 +63,6 @@ Market coverage and key lines:
 
 ## Conflict handling
 
-- If `feedErrors` non-empty, report exactly which feeds failed.
-- If `scoreConsensus.consistent` is `false`, mark recommendations as higher risk in narrative.
-- If `oneShot.globalConfidence < 0.55`, avoid claiming high certainty.
+- If `feedErrors` non-empty, report exactly which feeds failed
+- If `scoreConsensus.consistent` is `false`, mark recommendations as higher risk in narrative
+- If `oneShot.globalConfidence < 0.55`, avoid claiming high certainty

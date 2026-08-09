@@ -63,7 +63,7 @@ uv run --script <skill-dir>/scripts/cli.py summarize <summary-key> inline_refere
 
 ## Credentials
 
-- Keep `.env` beside this skill.
+- Keep `.env` beside this skill
 - CLI lookup order:
   - `BRAVE_SEARCH_ENV_FILE`
   - skill `.env`
@@ -73,21 +73,21 @@ uv run --script <skill-dir>/scripts/cli.py summarize <summary-key> inline_refere
 
 ## Failure handling
 
-- If a CLI run says `BRAVE_API_KEY required`, retry once with the documented `uv run --script` command; do not assume the parent shell env is authoritative.
-- If env loading still fails, set `BRAVE_SEARCH_ENV_FILE` dynamically from the skill path rather than hard-coding a machine-specific directory.
+- If a CLI run says `BRAVE_API_KEY required`, retry once with the documented `uv run --script` command; do not assume the parent shell env is authoritative
+- If env loading still fails, set `BRAVE_SEARCH_ENV_FILE` dynamically from the skill path rather than hard-coding a machine-specific directory
 - Distinguish env lookup failures from provider failures:
-  - `BRAVE_API_KEY required` means local env discovery failed (rc=2).
-  - HTTP `401`, `402`, `403`, `429`, or similar means the API responded and the key/account/quota/rate limit is the issue.
-- HTTP errors and network failures emit a one-line compact JSON envelope on stderr with `error.provider`, `error.status`, `error.message`, `error.body_bytes`, `error.body_preview` (HTML bodies are summarized to plain text, capped at ~500 chars), `error.body_truncated`. Network/parse errors return rc=1; HTTP errors return rc=22.
-- Usage errors (missing args, bad count, missing API key) return rc=2 with a concise plain-text stderr message — not the compact error envelope.
-- Report the actual HTTP failure mode instead of collapsing everything into "missing credentials".
+  - `BRAVE_API_KEY required` means local env discovery failed (rc=2)
+  - HTTP `401`, `402`, `403`, `429`, or similar means the API responded and the key/account/quota/rate limit is the issue
+- HTTP errors and network failures emit a one-line compact JSON envelope on stderr with `error.provider`, `error.status`, `error.message`, `error.body_bytes`, `error.body_preview` (HTML bodies are summarized to plain text, capped at ~500 chars), `error.body_truncated`. Network/parse errors return rc=1; HTTP errors return rc=22
+- Usage errors (missing args, bad count, missing API key) return rc=2 with a concise plain-text stderr message — not the compact error envelope
+- Report the actual HTTP failure mode instead of collapsing everything into "missing credentials"
 
 ## Notes
 
 - Auth header: `X-Subscription-Token: $BRAVE_API_KEY`
-- Pass optional query params as `key=value` pairs after the main argument. `raw=1` skips defaults and the compact projection; `raw=0` and any other value are ignored.
+- Pass optional query params as `key=value` pairs after the main argument. `raw=1` skips defaults and the compact projection; `raw=0` and any other value are ignored
 - Useful params: `count=`, `freshness=`, `country=`, `search_lang=`, `ui_lang=`, `safesearch=`, `result_filter=` (web only)
-- Prefer Exa for deeper multi-source synthesis.
+- Prefer Exa for deeper multi-source synthesis
 
 ## Need | Read | When
 

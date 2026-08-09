@@ -10,8 +10,8 @@ benchmark under an existing version, or when the default release must move.
 A benchmark version is a release/schema namespace, not an immutable data
 snapshot. If DeepSWE reruns models and republishes `v1.1` with new values:
 
-1. Do **not** change the version in the skill.
-2. Run a live command such as `report` or `fetch` with `--version v1.1`.
+1. Do **not** change the version in the skill
+2. Run a live command such as `report` or `fetch` with `--version v1.1`
 3. The client requests the same canonical artifact URL and sends cached `ETag`
    and/or `Last-Modified` validators when available.
 4. A `200` response replaces the cached payload. A `304` response reuses the

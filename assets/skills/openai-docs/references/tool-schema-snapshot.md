@@ -1,12 +1,12 @@
 # OpenAI Docs MCP Tool Schema Snapshot
 
-- Snapshot: **2026-07-16**, **MCPorter 0.12.3**.
-- Server: `openai-docs` at `https://developers.openai.com/mcp`.
-- Inventory: **5 tools**.
-- Live schema is authoritative.
-- ONLY load this snapshot for broad tool comparison or live discovery failure.
-- NEVER load it before a targeted live schema.
-- Declarations expose input schemas only. NEVER invent output fields or schemas.
+- Snapshot: **2026-07-16**, **MCPorter 0.12.3**
+- Server: `openai-docs` at `https://developers.openai.com/mcp`
+- Inventory: **5 tools**
+- Live schema is authoritative
+- ONLY load this snapshot for broad tool comparison or live discovery failure
+- NEVER load it before a targeted live schema
+- Declarations expose input schemas only. NEVER invent output fields or schemas
 
 Refresh when drift matters:
 

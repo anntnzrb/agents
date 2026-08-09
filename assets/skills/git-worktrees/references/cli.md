@@ -56,7 +56,7 @@ inspect --repo PATH
 - the full `git worktree list --porcelain -z` snapshot: path, HEAD, ref or detached state, and lock/prunable annotations;
 - visible allocation-parent safety;
 - durable controller-managed leases for the repository; and
-- findings.
+- findings
 
 A non-Git, bare, or otherwise unusable repository is a typed successful finding when identity can be determined; otherwise it is an error response. Inspect does not grant lifecycle authority over a discovered worktree.
 
@@ -140,9 +140,9 @@ It never force-removes, directly deletes directories, breaks locks, resets, clea
 
 ## Recovery
 
-1. Read `ok`, `error`, and exit code; a nonzero result is not permission to repair.
-2. Preserve the response, worktree, lease, and durable state; redact owner and handoff tokens.
-3. Use `inspect` for repository-wide read-only discovery or `status` for a known lease.
-4. Resolve the reported blocker with the original lifecycle authority.
-5. Native-manager state remains native-managed; never fall back to this CLI after native failure.
-6. Missing ownership, identity, quiescence, or authority means no lifecycle mutation.
+1. Read `ok`, `error`, and exit code; a nonzero result is not permission to repair
+2. Preserve the response, worktree, lease, and durable state; redact owner and handoff tokens
+3. Use `inspect` for repository-wide read-only discovery or `status` for a known lease
+4. Resolve the reported blocker with the original lifecycle authority
+5. Native-manager state remains native-managed; never fall back to this CLI after native failure
+6. Missing ownership, identity, quiescence, or authority means no lifecycle mutation

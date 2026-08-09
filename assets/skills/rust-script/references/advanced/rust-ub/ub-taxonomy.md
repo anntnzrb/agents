@@ -7,11 +7,11 @@ Every category of UB the Rust compiler, Miri, and the language specification rec
 **Root cause:** Two pointers access the same memory in ways that violate Rust's borrowing model — even through raw pointers inside `unsafe`.
 
 **Canonical triggers:**
-- Creating a `&mut T` while another `&T` or `&mut T` to the same location exists.
-- Dereferencing a raw pointer derived from a reference after that reference was invalidated (e.g., `&mut` was retaken).
-- Calling `slice::from_raw_parts_mut` on overlapping regions.
-- Interior mutability through `UnsafeCell` without going through the `UnsafeCell` API.
-- Casting `&T` to `*mut T` and writing through it (even via FFI).
+- Creating a `&mut T` while another `&T` or `&mut T` to the same location exists
+- Dereferencing a raw pointer derived from a reference after that reference was invalidated (e.g., `&mut` was retaken)
+- Calling `slice::from_raw_parts_mut` on overlapping regions
+- Interior mutability through `UnsafeCell` without going through the `UnsafeCell` API
+- Casting `&T` to `*mut T` and writing through it (even via FFI)
 
 **Miri detection:** YES — Stacked Borrows is the default model. Tree Borrows (`-Zmiri-tree-borrows`) is the newer, more permissive model. Run both:
 ```bash
@@ -29,10 +29,10 @@ If code passes Tree Borrows but fails Stacked Borrows, it is *likely* sound but 
 **Root cause:** Two threads access the same non-atomic memory location, at least one is a write, and there is no happens-before ordering between them.
 
 **Canonical triggers:**
-- `unsafe impl Send for T` on a type containing `*mut U` without synchronization.
-- `unsafe impl Sync for T` on a type containing `Cell<T>` or `UnsafeCell<T>` without a lock.
-- Using `std::ptr::write` from multiple threads to the same allocation.
-- Shared `&T` where `T` has interior mutability but no atomic/lock guard.
+- `unsafe impl Send for T` on a type containing `*mut U` without synchronization
+- `unsafe impl Sync for T` on a type containing `Cell<T>` or `UnsafeCell<T>` without a lock
+- Using `std::ptr::write` from multiple threads to the same allocation
+- Shared `&T` where `T` has interior mutability but no atomic/lock guard
 
 **Miri detection:** YES — Miri's data-race detector is on by default. It detects races on non-atomic accesses. For **preemptive scheduling** stress, use:
 ```bash
@@ -50,10 +50,10 @@ MIRIFLAGS="-Zmiri-preemption-rate=0.1" cargo +nightly miri test
 **Root cause:** A pointer or reference outlives the allocation it points to.
 
 **Canonical triggers:**
-- Returning a reference to a local variable (compiler catches most, but raw pointers escape).
-- `Box::into_raw` → manual `Box::from_raw` with wrong lifetime.
-- `Vec` reallocation invalidating raw pointers obtained from `as_ptr()` / `as_mut_ptr()`.
-- `Pin<Box<T>>` unpinned and moved after self-referential pointers were set up.
+- Returning a reference to a local variable (compiler catches most, but raw pointers escape)
+- `Box::into_raw` → manual `Box::from_raw` with wrong lifetime
+- `Vec` reallocation invalidating raw pointers obtained from `as_ptr()` / `as_mut_ptr()`
+- `Pin<Box<T>>` unpinned and moved after self-referential pointers were set up
 
 **Miri detection:** YES — allocation tracking catches use-after-free on the exact operation.
 
@@ -66,11 +66,11 @@ MIRIFLAGS="-Zmiri-preemption-rate=0.1" cargo +nightly miri test
 **Root cause:** Reading a value from memory that was never written to.
 
 **Canonical triggers:**
-- `MaybeUninit::assume_init()` before all bytes are written.
-- `mem::uninitialized()` (deprecated, still compiles).
-- `alloc::alloc(layout)` returns uninitialized memory — reading it before writing is UB.
-- Padding bytes in structs read via `transmute` or raw pointer casts.
-- `read_unaligned` on uninitialized memory.
+- `MaybeUninit::assume_init()` before all bytes are written
+- `mem::uninitialized()` (deprecated, still compiles)
+- `alloc::alloc(layout)` returns uninitialized memory — reading it before writing is UB
+- Padding bytes in structs read via `transmute` or raw pointer casts
+- `read_unaligned` on uninitialized memory
 
 **Miri detection:** YES — tracks initialization state per byte. Catches partial-init structs, padding reads, and premature `assume_init`.
 
@@ -83,13 +83,13 @@ MIRIFLAGS="-Zmiri-preemption-rate=0.1" cargo +nightly miri test
 **Root cause:** Producing a value that violates the type's validity invariant.
 
 **Canonical triggers:**
-- `bool` not 0 or 1.
-- `char` outside Unicode scalar range.
-- Enum discriminant not matching any variant.
-- `NonZeroU32` containing 0.
-- `&T` or `&mut T` that is null or dangling.
-- `str` containing non-UTF-8 bytes.
-- `fn` pointer that is null.
+- `bool` not 0 or 1
+- `char` outside Unicode scalar range
+- Enum discriminant not matching any variant
+- `NonZeroU32` containing 0
+- `&T` or `&mut T` that is null or dangling
+- `str` containing non-UTF-8 bytes
+- `fn` pointer that is null
 
 **Miri detection:** YES — validity checks are on by default. Extra strictness:
 ```bash
@@ -105,9 +105,9 @@ MIRIFLAGS="-Zmiri-strict-provenance" cargo +nightly miri test
 **Root cause:** Dereferencing a pointer that is not aligned to the type's required alignment.
 
 **Canonical triggers:**
-- Casting `*const u8` to `*const u64` and dereferencing (alignment goes from 1 to 8).
-- `#[repr(packed)]` struct field references (the compiler warns, but raw pointers bypass the warning).
-- Network buffer parsing where offsets are arbitrary.
+- Casting `*const u8` to `*const u64` and dereferencing (alignment goes from 1 to 8)
+- `#[repr(packed)]` struct field references (the compiler warns, but raw pointers bypass the warning)
+- Network buffer parsing where offsets are arbitrary
 
 **Miri detection:** YES — immediate trap on misaligned read/write.
 
@@ -120,9 +120,9 @@ MIRIFLAGS="-Zmiri-strict-provenance" cargo +nightly miri test
 **Root cause:** Moving a value that was pinned and relied on its address stability (self-referential types, intrusive linked lists).
 
 **Canonical triggers:**
-- `mem::swap` on a `Pin<&mut T>` after `unsafe` deref.
-- Implementing `Unpin` for a type that contains self-referential pointers.
-- Manually calling `Pin::new_unchecked` on a movable allocation.
+- `mem::swap` on a `Pin<&mut T>` after `unsafe` deref
+- Implementing `Unpin` for a type that contains self-referential pointers
+- Manually calling `Pin::new_unchecked` on a movable allocation
 
 **Miri detection:** PARTIAL — Miri detects the resulting aliasing/use-after-free if the self-referential pointer is actually used. It does not detect "Pin contract violated but pointer was never dereferenced."
 
@@ -135,13 +135,13 @@ MIRIFLAGS="-Zmiri-strict-provenance" cargo +nightly miri test
 **Root cause:** Mismatch between Rust's ABI expectations and the foreign code's actual behavior.
 
 **Canonical triggers:**
-- C function returning uninitialized memory into a Rust `&T`.
-- Wrong `#[repr(C)]` layout (padding differs between platforms).
-- Passing a Rust `enum` to C without `#[repr(C)]` or `#[repr(i32)]`.
-- Null pointer passed where C expects non-null (and Rust wraps it in `&T`).
-- C code writing to Rust-owned memory through a pointer Rust considers immutable.
-- Forgetting to mark FFI functions as `unsafe extern "C"`.
-- longjmp/setjmp across Rust frames (unwinding UB).
+- C function returning uninitialized memory into a Rust `&T`
+- Wrong `#[repr(C)]` layout (padding differs between platforms)
+- Passing a Rust `enum` to C without `#[repr(C)]` or `#[repr(i32)]`
+- Null pointer passed where C expects non-null (and Rust wraps it in `&T`)
+- C code writing to Rust-owned memory through a pointer Rust considers immutable
+- Forgetting to mark FFI functions as `unsafe extern "C"`
+- longjmp/setjmp across Rust frames (unwinding UB)
 
 **Miri detection:** LIMITED — Miri cannot execute foreign code. It detects UB in the Rust-side handling of FFI return values.
 
@@ -156,9 +156,9 @@ MIRIFLAGS="-Zmiri-strict-provenance" cargo +nightly miri test
 **Root cause:** Manually implementing `Send` or `Sync` for a type that does not actually uphold the required invariant.
 
 **Canonical triggers:**
-- `unsafe impl Send for Wrapper(*mut T)` when `T` is not `Send`.
-- `unsafe impl Sync for Wrapper(UnsafeCell<T>)` without a lock, atomic, or other synchronization.
-- Types containing `Rc<T>` with a manual `Send` impl (Rc is explicitly !Send).
+- `unsafe impl Send for Wrapper(*mut T)` when `T` is not `Send`
+- `unsafe impl Sync for Wrapper(UnsafeCell<T>)` without a lock, atomic, or other synchronization
+- Types containing `Rc<T>` with a manual `Send` impl (Rc is explicitly !Send)
 
 **Miri detection:** YES for the *resulting* data race if exercised. Miri's data-race detector will fire when two threads access the same location unsynchronized.
 
@@ -171,10 +171,10 @@ MIRIFLAGS="-Zmiri-strict-provenance" cargo +nightly miri test
 **Root cause:** Pointer arithmetic or indexing that escapes the allocation.
 
 **Canonical triggers:**
-- `ptr.offset(n)` where `n` exceeds the allocation size.
-- `slice::from_raw_parts(ptr, len)` where `len` is too large.
-- Off-by-one in manual buffer management.
-- Integer overflow in size calculations leading to undersized allocation.
+- `ptr.offset(n)` where `n` exceeds the allocation size
+- `slice::from_raw_parts(ptr, len)` where `len` is too large
+- Off-by-one in manual buffer management
+- Integer overflow in size calculations leading to undersized allocation
 
 **Miri detection:** YES — allocation-precise bounds checking.
 
@@ -187,9 +187,9 @@ MIRIFLAGS="-Zmiri-strict-provenance" cargo +nightly miri test
 **Root cause:** Using a pointer whose provenance does not grant access to the target memory, even if the address is numerically correct.
 
 **Canonical triggers:**
-- Casting an integer to a pointer and dereferencing it (`addr as *const T`).
-- Roundtripping a pointer through `usize` and back (`ptr as usize as *const T`) — the provenance is lost.
-- Using `ptr::from_exposed_addr` without a corresponding `ptr.expose_provenance()`.
+- Casting an integer to a pointer and dereferencing it (`addr as *const T`)
+- Roundtripping a pointer through `usize` and back (`ptr as usize as *const T`) — the provenance is lost
+- Using `ptr::from_exposed_addr` without a corresponding `ptr.expose_provenance()`
 
 **Miri detection:** YES with strict provenance:
 ```bash
@@ -205,9 +205,9 @@ MIRIFLAGS="-Zmiri-strict-provenance" cargo +nightly miri test
 **Root cause:** Freeing the same allocation twice, or freeing memory not obtained from the allocator.
 
 **Canonical triggers:**
-- `Box::from_raw` called twice on the same pointer.
-- Manual `dealloc` on a pointer already freed.
-- `ManuallyDrop` dropped explicitly then the outer type also drops it.
+- `Box::from_raw` called twice on the same pointer
+- Manual `dealloc` on a pointer already freed
+- `ManuallyDrop` dropped explicitly then the outer type also drops it
 
 **Miri detection:** YES — immediate trap.
 
@@ -220,10 +220,10 @@ MIRIFLAGS="-Zmiri-strict-provenance" cargo +nightly miri test
 **Root cause:** Violating the documented safety invariant of a safe or unsafe API, where the library author relied on the invariant for soundness.
 
 **Canonical triggers:**
-- `Vec::set_len(n)` where the first `n` elements are not initialized.
-- `String::from_utf8_unchecked` on non-UTF-8 bytes.
-- `HashMap` key mutated after insertion (violates hash invariant — not UB per se, but unsound and Miri may detect downstream effects).
-- `BTreeMap` key with broken `Ord` impl (the standard library assumes a total order).
+- `Vec::set_len(n)` where the first `n` elements are not initialized
+- `String::from_utf8_unchecked` on non-UTF-8 bytes
+- `HashMap` key mutated after insertion (violates hash invariant — not UB per se, but unsound and Miri may detect downstream effects)
+- `BTreeMap` key with broken `Ord` impl (the standard library assumes a total order)
 
 **Miri detection:** DEPENDS — Miri catches the downstream UB (e.g., reading uninitialized bytes from a `Vec` with inflated len). It does not catch "you violated the documented contract" if no memory-level UB results.
 
@@ -236,8 +236,8 @@ MIRIFLAGS="-Zmiri-strict-provenance" cargo +nightly miri test
 **Root cause:** A Rust panic unwinding through a frame that uses the C calling convention.
 
 **Canonical triggers:**
-- `panic!()` inside a `#[no_mangle] extern "C" fn` callback passed to C code.
-- `unwrap()` inside FFI callbacks.
+- `panic!()` inside a `#[no_mangle] extern "C" fn` callback passed to C code
+- `unwrap()` inside FFI callbacks
 
 **Miri detection:** PARTIAL — Miri does not model foreign unwinding, but it can detect the immediate UB if the panic reaches the FFI boundary.
 

@@ -106,10 +106,10 @@ uv run --script <skill-dir>/scripts/cli.py db query --db <database> --read-only 
 
 Rules:
 
-- `--read-only` is the normal mode.
-- Pass SQL via `--sql-file` or `--sql-stdin`, not inline shell blobs.
-- The backend applies read-only safeguards.
-- Obviously mutating SQL is rejected before execution.
+- `--read-only` is the normal mode
+- Pass SQL via `--sql-file` or `--sql-stdin`, not inline shell blobs
+- The backend applies read-only safeguards
+- Obviously mutating SQL is rejected before execution
 
 If DB execution cannot be resolved, the command should fail clearly and report which backend/path was attempted.
 

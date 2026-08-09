@@ -6,11 +6,11 @@ Read this reference when creating or materially refactoring a skill.
 
 Adapt to the user's technical level. Many users can follow concise coding jargon; some cannot. Use context cues.
 
-- "evaluation" and "benchmark" are borderline but usually OK.
-- Explain "JSON" or "assertion" unless the user signals familiarity.
-- Define terms briefly when in doubt.
-- Reduce burden: extract intent from conversation history before asking.
-- Ask for confirmation before moving past ambiguous requirements.
+- "evaluation" and "benchmark" are borderline but usually OK
+- Explain "JSON" or "assertion" unless the user signals familiarity
+- Define terms briefly when in doubt
+- Reduce burden: extract intent from conversation history before asking
+- Ask for confirmation before moving past ambiguous requirements
 
 ## Core Authoring Rules
 
@@ -23,7 +23,7 @@ Ask only what remains unknown:
 1. What should this skill enable?
 2. When should this skill trigger? (what user phrases/contexts)
 3. What's the expected output format?
-4. Should we set up test cases to verify the skill works? Skills with objectively verifiable outputs benefit from test cases. Skills with subjective outputs often skip them. Suggest the appropriate default based on skill type, but let the user decide.
+4. Should we set up test cases to verify the skill works? Skills with objectively verifiable outputs benefit from test cases. Skills with subjective outputs often skip them. Suggest the appropriate default based on skill type, but let the user decide
 
 ### Research before writing
 
@@ -33,10 +33,10 @@ Ask about edge cases, input/output formats, example files, success criteria, and
 
 Compose:
 
-- **name**: Skill identifier.
-- **description**: Trigger contract + capability. This is the primary trigger. Put all "when to use" guidance here, not in the body. Skills tend to undertrigger, so write a pushy description with explicit contexts and nearby user phrasing.
-- **compatibility**: Required tools or dependencies. OPTIONAL; rarely needed.
-- **body**: Imperative instructions, examples, references, workflows, and resource pointers.
+- **name**: Skill identifier
+- **description**: Trigger contract + capability. This is the primary trigger. Put all "when to use" guidance here, not in the body. Skills tend to undertrigger, so write a pushy description with explicit contexts and nearby user phrasing
+- **compatibility**: Required tools or dependencies. OPTIONAL; rarely needed
+- **body**: Imperative instructions, examples, references, workflows, and resource pointers
 
 Skill anatomy:
 

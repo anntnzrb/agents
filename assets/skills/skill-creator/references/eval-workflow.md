@@ -30,8 +30,8 @@ Execute this task:
 
 **Baseline run** uses the same prompt and changes by context:
 
-- **Creating a new skill**: no skill. Use no skill path. Save to `without_skill/outputs/`.
-- **Improving an existing skill**: old version. Before editing, snapshot it with `cp -r <skill-path> <workspace>/skill-snapshot/`, point the baseline subagent at the snapshot, and save to `old_skill/outputs/`.
+- **Creating a new skill**: no skill. Use no skill path. Save to `without_skill/outputs/`
+- **Improving an existing skill**: old version. Before editing, snapshot it with `cp -r <skill-path> <workspace>/skill-snapshot/`, point the baseline subagent at the snapshot, and save to `old_skill/outputs/`
 
 Write an `eval_metadata.json` for each test case in each iteration. Assertions can be empty at first. Give each eval a descriptive name based on what it tests; use the same name for the directory. If prompts are new or modified, create fresh metadata files for the new eval directories. NEVER assume metadata carries over.
 
@@ -70,7 +70,7 @@ This is the only opportunity to capture timing data. It comes through the task n
 
 After all runs finish:
 
-1. **Grade each run** — spawn a grader subagent or grade inline. The grader reads `agents/grader.md` and evaluates each assertion against outputs. Save results to `grading.json` in each run directory. The `grading.json` expectations array MUST use exactly the fields `text`, `passed`, and `evidence`; the viewer depends on those exact names. For programmatically checkable assertions, write and run a script instead of eyeballing.
+1. **Grade each run** — spawn a grader subagent or grade inline. The grader reads `agents/grader.md` and evaluates each assertion against outputs. Save results to `grading.json` in each run directory. The `grading.json` expectations array MUST use exactly the fields `text`, `passed`, and `evidence`; the viewer depends on those exact names. For programmatically checkable assertions, write and run a script instead of eyeballing
 
 2. **Aggregate into benchmark** — run the aggregation script from the skill-creator directory:
 
@@ -80,7 +80,7 @@ After all runs finish:
 
    This produces `benchmark.json` and `benchmark.md` with pass_rate, time, and tokens for each configuration, including mean ± stddev and delta. If generating `benchmark.json` manually, see `references/schemas.md` for the exact viewer schema. Put each `with_skill` version before its baseline counterpart.
 
-3. **Do an analyst pass** — read the benchmark data before launching the viewer. Surface patterns aggregate stats can hide: non-discriminating assertions, high-variance evals, flaky tests, and time/token tradeoffs. See `agents/analyzer.md`, especially "Analyzing Benchmark Results".
+3. **Do an analyst pass** — read the benchmark data before launching the viewer. Surface patterns aggregate stats can hide: non-discriminating assertions, high-variance evals, flaky tests, and time/token tradeoffs. See `agents/analyzer.md`, especially "Analyzing Benchmark Results"
 
 4. **Launch the viewer** with qualitative outputs and quantitative data:
 
@@ -105,12 +105,12 @@ Tell the user: "I've opened the results in your browser. There are two tabs — 
 
 The "Outputs" tab shows one test case at a time:
 
-- **Prompt**: task prompt.
-- **Output**: generated files, rendered inline where possible.
-- **Previous Output** (iteration 2+): collapsed previous iteration output.
-- **Formal Grades** (if grading was run): collapsed assertion pass/fail.
-- **Feedback**: auto-saving textbox.
-- **Previous Feedback** (iteration 2+): prior comments below the textbox.
+- **Prompt**: task prompt
+- **Output**: generated files, rendered inline where possible
+- **Previous Output** (iteration 2+): collapsed previous iteration output
+- **Formal Grades** (if grading was run): collapsed assertion pass/fail
+- **Feedback**: auto-saving textbox
+- **Previous Feedback** (iteration 2+): prior comments below the textbox
 
 The "Benchmark" tab shows pass rates, timing, token usage, per-eval breakdowns, and analyst observations. Put `with_skill` before baseline in the viewer.
 
@@ -153,13 +153,13 @@ This is the heart of the loop: use transcripts, user feedback, and benchmark dat
 
 ### How to think about improvements
 
-1. **Generalize from feedback.** The user and evals cover only a few examples. The skill must work across many prompts. Avoid overfitted patches and brittle rules; when an issue persists, change the framing, workflow, or examples so the model understands the underlying task.
+1. **Generalize from feedback.** The user and evals cover only a few examples. The skill must work across many prompts. Avoid overfitted patches and brittle rules; when an issue persists, change the framing, workflow, or examples so the model understands the underlying task
 
-2. **Keep the prompt lean.** Remove instructions that NEVER change behavior. Read transcripts, not just final outputs. If the skill causes unproductive work, cut or rewrite the prompt that caused it.
+2. **Keep the prompt lean.** Remove instructions that NEVER change behavior. Read transcripts, not just final outputs. If the skill causes unproductive work, cut or rewrite the prompt that caused it
 
-3. **Explain the why.** Even terse feedback usually points to a real user need. Understand the task, the user's words, and the missed expectation; transmit that understanding into the skill. If you reach for rigid ALWAYS/NEVER language, first ask whether an explanation would generalize better.
+3. **Explain the why.** Even terse feedback usually points to a real user need. Understand the task, the user's words, and the missed expectation; transmit that understanding into the skill. If you reach for rigid ALWAYS/NEVER language, first ask whether an explanation would generalize better
 
-4. **Bundle repeated work.** If multiple test runs independently create the same helper script or repeat the same multi-step procedure, bundle that script in `scripts/` and point the skill to it. Save future invocations from reinventing it.
+4. **Bundle repeated work.** If multiple test runs independently create the same helper script or repeat the same multi-step procedure, bundle that script in `scripts/` and point the skill to it. Save future invocations from reinventing it
 
 Draft the revision, reread it cold, and improve it before retesting.
 
@@ -167,11 +167,11 @@ Draft the revision, reread it cold, and improve it before retesting.
 
 After improving the skill:
 
-1. Apply improvements.
-2. Rerun all test cases into a new `iteration-<N+1>/` directory, including baseline runs. For new skills, baseline remains `without_skill`. For existing skills, choose the original version or previous iteration as the baseline based on what comparison the user needs.
-3. Launch the reviewer with `--previous-workspace` pointing at the previous iteration.
-4. Wait for the user to review and say they are done.
-5. Read new feedback, improve again, repeat.
+1. Apply improvements
+2. Rerun all test cases into a new `iteration-<N+1>/` directory, including baseline runs. For new skills, baseline remains `without_skill`. For existing skills, choose the original version or previous iteration as the baseline based on what comparison the user needs
+3. Launch the reviewer with `--previous-workspace` pointing at the previous iteration
+4. Wait for the user to review and say they are done
+5. Read new feedback, improve again, repeat
 
 Continue until:
 
@@ -181,7 +181,7 @@ Continue until:
 
 ## Related agent references
 
-- `agents/grader.md` — evaluate assertions against outputs.
-- `agents/analyzer.md` — analyze benchmark and comparison results.
-- `agents/comparator.md` — run blind A/B comparison when needed.
-- `references/schemas.md` — exact JSON structures for `evals.json`, `eval_metadata.json`, `grading.json`, `benchmark.json`, and feedback payloads.
+- `agents/grader.md` — evaluate assertions against outputs
+- `agents/analyzer.md` — analyze benchmark and comparison results
+- `agents/comparator.md` — run blind A/B comparison when needed
+- `references/schemas.md` — exact JSON structures for `evals.json`, `eval_metadata.json`, `grading.json`, `benchmark.json`, and feedback payloads

@@ -6,9 +6,9 @@ Use this reference to locate and query the local Shortcuts corpus.
 
 The helper scripts resolve corpus root in this order:
 
-1. `--corpus-root <path>` argument.
-2. `APPLE_SHORTCUTS_CORPUS` environment variable.
-3. Nearest `shortcuts-docs-corpus/` found from current directory upward.
+1. `--corpus-root <path>` argument
+2. `APPLE_SHORTCUTS_CORPUS` environment variable
+3. Nearest `shortcuts-docs-corpus/` found from current directory upward
 
 Check detection quickly:
 
@@ -50,8 +50,8 @@ awk -F'\t' 'NR>1{print $2 "\t" $4}' \
 
 ## Source Group Semantics
 
-- `support`: Apple Support user guides and topic pages.
-- `developer`: Apple Developer docs and data JSON extraction.
-- `wwdc`: WWDC session pages/transcripts.
-- `community`: Non-Apple sources with quality risk.
-- `cli`: Local `shortcuts` CLI docs and manpage.
+- `support`: Apple Support user guides and topic pages
+- `developer`: Apple Developer docs and data JSON extraction
+- `wwdc`: WWDC session pages/transcripts
+- `community`: Non-Apple sources with quality risk
+- `cli`: Local `shortcuts` CLI docs and manpage

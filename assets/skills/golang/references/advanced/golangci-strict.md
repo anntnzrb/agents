@@ -210,8 +210,8 @@ formatters:
 
 `//nolint:linter1,linter2 // <reason>` is permitted with **two hard rules**:
 
-1. **One linter at a time per directive.** No `//nolint:all`. No omitting the linter name.
-2. **A reason after `//` is mandatory.** "Generated code", "false positive — protobuf imports", "OpenAPI field order" are acceptable. "Ignore" is not.
+1. **One linter at a time per directive.** No `//nolint:all`. No omitting the linter name
+2. **A reason after `//` is mandatory.** "Generated code", "false positive — protobuf imports", "OpenAPI field order" are acceptable. "Ignore" is not
 
 The skill auto-rejects `//nolint` without a reason. So does `revive` if you enable its `nolint` rule.
 

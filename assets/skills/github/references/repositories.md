@@ -62,17 +62,17 @@ gh search prs <query> --repo OWNER/REPO --limit <n> --json number,title,state,ur
   Enterprise host. Report incomplete results and pagination/limit choices.
 - `--match`, qualifiers, and state/type filters change the result set; preserve the
   exact query and filters in a report.
-- Use `--jq` only after selecting fields; do not parse human search tables.
+- Use `--jq` only after selecting fields; do not parse human search tables
 
 ## Organizations, gists, and Codespaces
 
 - `gh org list` and `gh org view ORG` are reads. Organization creation, membership,
   team, repository, or settings operations are remote writes; inspect permissions
   and use the installed subcommand help before acting.
-- `gh gist list`, `gh gist view ID`, and `gh gist rename ID` read or change gists.
+- `gh gist list`, `gh gist view ID`, and `gh gist rename ID` read or change gists
   `gh gist create` publishes local content; inspect the exact files and visibility.
   `gh gist edit/delete` are writes, and delete is irreversible from this workflow.
-- `gh codespace list --repo OWNER/REPO` and `gh codespace view` inspect Codespaces.
+- `gh codespace list --repo OWNER/REPO` and `gh codespace view` inspect Codespaces
   `gh codespace create` provisions remote compute; `gh codespace ssh`, `code`, or
   `logs` may open an interactive client. `gh codespace stop`, `delete`, and `edit`
   change or destroy remote state; require explicit target and authorization.

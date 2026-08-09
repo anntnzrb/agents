@@ -11,10 +11,10 @@ metadata:
 
 ## Prerequisites
 
-- Changes committed in a feature branch.
-- Repository contribution rules inspected read-only.
-- Duplicate issues and pull requests checked read-only.
-- External writes require explicit user authorization.
+- Changes committed in a feature branch
+- Repository contribution rules inspected read-only
+- Duplicate issues and pull requests checked read-only
+- External writes require explicit user authorization
 
 ## Workflow
 
@@ -65,20 +65,20 @@ gh issue comment <issue-number> --repo <owner>/<repo> --body "PR: #<pr-number>"
 
 ### 6. Triage PR CI
 
-- You MUST inspect PR checks read-only and distinguish GitHub Actions from external providers.
-- For GitHub Actions, you MUST read failing job and step logs.
-- Before any CI-driven code change, you MUST identify the root cause and have an existing request or explicit authorization.
-- For external providers, you MUST report check status, name, and details URL.
-- NEVER claim unavailable external-provider logs were inspected.
+- You MUST inspect PR checks read-only and distinguish GitHub Actions from external providers
+- For GitHub Actions, you MUST read failing job and step logs
+- Before any CI-driven code change, you MUST identify the root cause and have an existing request or explicit authorization
+- For external providers, you MUST report check status, name, and details URL
+- NEVER claim unavailable external-provider logs were inspected
 
 ### 7. Handle Review Threads
 
-- You MUST inspect reviews read-only and fetch thread-aware state before any mutation.
-- You MUST preserve every comment's file and line anchor.
-- You MUST ignore resolved or outdated threads unless relevant to current work.
-- You MUST cluster related actionable comments by underlying request.
-- Before replying, resolving threads, or making unrequested code changes, you MUST apply the Prerequisites authorization rule.
-- Missing authorization? You MUST request it once before mutation.
+- You MUST inspect reviews read-only and fetch thread-aware state before any mutation
+- You MUST preserve every comment's file and line anchor
+- You MUST ignore resolved or outdated threads unless relevant to current work
+- You MUST cluster related actionable comments by underlying request
+- Before replying, resolving threads, or making unrequested code changes, you MUST apply the Prerequisites authorization rule
+- Missing authorization? You MUST request it once before mutation
 
 ### 8. Verify
 

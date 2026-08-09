@@ -144,7 +144,7 @@ response. It returns:
 - `source`: URL/path, HTTP status, fetch timestamp, and content type;
 - `filters_applied`: minimum rows, optional sort path/order, and limit;
 - `counts`: parsed frames, matched rows, and returned rows;
-- `rows`: the largest recognizable list of model identity + numeric score rows.
+- `rows`: the largest recognizable list of model identity + numeric score rows
 
 Rows preserve source fields and have `value_status=published`. Sorting, limiting,
 and arithmetic performed after extraction are derived operations. Unknown fields

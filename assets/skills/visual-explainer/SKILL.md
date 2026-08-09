@@ -14,11 +14,11 @@ Generate self-contained HTML pages that explain systems, code changes, plans, da
 
 ## Trigger and delivery rules
 
-- Prefer an HTML page over terminal ASCII when the output is inherently visual.
-- If a table would have 4+ rows or 3+ columns, render it as HTML and give only a short chat summary.
-- Write files to `~/.local/share/agents/visual-explainer/diagrams/` or the explicit eval output path. Use descriptive filenames.
-- Open generated pages in the browser when running normally. In Pi package installs, use `visual_explainer` with `prepare` for planning/context and `render` only after the complete HTML document exists.
-- The final page must be a complete self-contained HTML document, including embedded CSS and any needed JS.
+- Prefer an HTML page over terminal ASCII when the output is inherently visual
+- If a table would have 4+ rows or 3+ columns, render it as HTML and give only a short chat summary
+- Write files to `~/.local/share/agents/visual-explainer/diagrams/` or the explicit eval output path. Use descriptive filenames
+- Open generated pages in the browser when running normally. In Pi package installs, use `visual_explainer` with `prepare` for planning/context and `render` only after the complete HTML document exists
+- The final page must be a complete self-contained HTML document, including embedded CSS and any needed JS
 
 ## Required follow-up reads
 
@@ -50,39 +50,39 @@ Read only the references needed for the current output:
 
 ## Mermaid invariants
 
-- Use `theme: 'base'` with custom `themeVariables` matching the page palette.
-- For complex diagrams use ELK layout when available.
-- Never use bare `<pre class="mermaid">`.
-- Use the canonical `diagram-shell` pattern from `templates/mermaid-flowchart.html`: `.diagram-shell` > `.mermaid-wrap` > `.zoom-controls` + `.mermaid-viewport` > `.mermaid-canvas`.
-- Every Mermaid diagram needs zoom in/out/reset/expand controls, Ctrl/Cmd+scroll zoom, drag panning, and click-to-expand.
-- Prefer `flowchart TD` for complex diagrams. Use `LR` only for simple 3–4 node linear flows.
-- Use `<br/>` in quoted flowchart labels. Do not use escaped `\n` labels.
-- Never define page-level `.node`; Mermaid uses it internally. Use namespaced page classes such as `.ve-card`.
-- For 15+ elements, do not cram everything into one Mermaid diagram. Use the hybrid overview + cards pattern.
+- Use `theme: 'base'` with custom `themeVariables` matching the page palette
+- For complex diagrams use ELK layout when available
+- Never use bare `<pre class="mermaid">`
+- Use the canonical `diagram-shell` pattern from `templates/mermaid-flowchart.html`: `.diagram-shell` > `.mermaid-wrap` > `.zoom-controls` + `.mermaid-viewport` > `.mermaid-canvas`
+- Every Mermaid diagram needs zoom in/out/reset/expand controls, Ctrl/Cmd+scroll zoom, drag panning, and click-to-expand
+- Prefer `flowchart TD` for complex diagrams. Use `LR` only for simple 3–4 node linear flows
+- Use `<br/>` in quoted flowchart labels. Do not use escaped `\n` labels
+- Never define page-level `.node`; Mermaid uses it internally. Use namespaced page classes such as `.ve-card`
+- For 15+ elements, do not cram everything into one Mermaid diagram. Use the hybrid overview + cards pattern
 
 ## Layout and style invariants
 
-- Use semantic HTML where it helps accessibility and copy/paste: `<table>`, headings, lists, `<details>`, captions.
-- Use CSS custom properties for palette: `--bg`, `--surface`, `--border`, `--text`, `--text-dim`, and 3–5 accents.
-- Pick a clear aesthetic direction before writing: blueprint, editorial, paper/ink, terminal, IDE-inspired, or data-dense.
-- Avoid generic defaults: no body font that is only Inter, Roboto, Arial, Helvetica, or system-ui; no violet/fuchsia Tailwind-default accents as the main palette (`#8b5cf6`, `#7c3aed`, `#a78bfa`, `#d946ef`); no cyan+magenta+purple neon dashboard; no gradient-mesh blobs.
-- Good font pair families: DM Sans + Fira Code; Instrument Serif + JetBrains Mono; IBM Plex Sans + IBM Plex Mono; Bricolage Grotesque + Fragment Mono; Plus Jakarta Sans + Azeret Mono.
-- Good accent directions: terracotta+sage, teal+slate, rose+cranberry, amber+emerald, deep blue+gold.
-- Prevent overflow: `min-width: 0` on grid/flex children, `overflow-wrap: break-word` for long text, and scroll containers for wide tables/code.
-- Do not set `display: flex` directly on `<li>` when list markers matter.
-- Use depth sparingly: hero/elevated only for primary sections; flat/recessed for reference material.
-- Use entrance/hover animation only when it clarifies hierarchy. Respect `prefers-reduced-motion`. Do not use continuous glow, pulse, or breathing effects on static content.
+- Use semantic HTML where it helps accessibility and copy/paste: `<table>`, headings, lists, `<details>`, captions
+- Use CSS custom properties for palette: `--bg`, `--surface`, `--border`, `--text`, `--text-dim`, and 3–5 accents
+- Pick a clear aesthetic direction before writing: blueprint, editorial, paper/ink, terminal, IDE-inspired, or data-dense
+- Avoid generic defaults: no body font that is only Inter, Roboto, Arial, Helvetica, or system-ui; no violet/fuchsia Tailwind-default accents as the main palette (`#8b5cf6`, `#7c3aed`, `#a78bfa`, `#d946ef`); no cyan+magenta+purple neon dashboard; no gradient-mesh blobs
+- Good font pair families: DM Sans + Fira Code; Instrument Serif + JetBrains Mono; IBM Plex Sans + IBM Plex Mono; Bricolage Grotesque + Fragment Mono; Plus Jakarta Sans + Azeret Mono
+- Good accent directions: terracotta+sage, teal+slate, rose+cranberry, amber+emerald, deep blue+gold
+- Prevent overflow: `min-width: 0` on grid/flex children, `overflow-wrap: break-word` for long text, and scroll containers for wide tables/code
+- Do not set `display: flex` directly on `<li>` when list markers matter
+- Use depth sparingly: hero/elevated only for primary sections; flat/recessed for reference material
+- Use entrance/hover animation only when it clarifies hierarchy. Respect `prefers-reduced-motion`. Do not use continuous glow, pulse, or breathing effects on static content
 
 ## Slide deck mode
 
 Use slides only when explicitly requested or when a command asks for slides. Slides are a different medium, not a paginated article:
 
-- Each slide is one viewport (`100dvh`) with no page-level scrolling.
-- Use larger type, fewer objects per slide, varied compositions, and visible navigation.
-- Include slide nav chrome from `slide-deck.html`: prev/next controls, slide count, keyboard navigation, and carousel dots/indicators.
-- Before writing HTML, inventory the source and map every source item to slides.
-- Do not drop content to fit a fixed slide count. Add slides instead.
-- Use the 10 slide types from `slide-patterns.md`: Title, Section Divider, Content, Split, Diagram, Dashboard, Table, Code, Quote, Full-Bleed.
+- Each slide is one viewport (`100dvh`) with no page-level scrolling
+- Use larger type, fewer objects per slide, varied compositions, and visible navigation
+- Include slide nav chrome from `slide-deck.html`: prev/next controls, slide count, keyboard navigation, and carousel dots/indicators
+- Before writing HTML, inventory the source and map every source item to slides
+- Do not drop content to fit a fixed slide count. Add slides instead
+- Use the 10 slide types from `slide-patterns.md`: Title, Section Divider, Content, Split, Diagram, Dashboard, Table, Code, Quote, Full-Bleed
 
 ## Optional generated images
 
@@ -101,4 +101,4 @@ Before delivery, verify:
 - Mermaid diagrams use `diagram-shell` with zoom/pan/expand;
 - slides fit one viewport, include carousel dots, and preserve source coverage;
 - visual hierarchy makes the main idea obvious in the first viewport;
-- styling would still be recognizable if compared against a generic dark/violet template.
+- styling would still be recognizable if compared against a generic dark/violet template

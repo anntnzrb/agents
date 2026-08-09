@@ -20,12 +20,12 @@ uv run --script <skill-dir>/scripts/cli.py ...
 
 ## Core rules
 
-- Use `match` for one fixture and `today` for a date slate.
-- Treat stdout as machine JSON only; no table/prose mode exists.
-- Trust `freshness` before every forecast: stale or failed source rows reduce confidence.
-- Recent form is primary: group-stage points, GD, GF/GA, player leader output, optional xG/odds snippets.
-- Elo-only models are not primary and are not emitted by v0.
-- xG and odds are opportunistic: pass `--source-url` or `--odds-url` when an agent already has a live page URL.
+- Use `match` for one fixture and `today` for a date slate
+- Treat stdout as machine JSON only; no table/prose mode exists
+- Trust `freshness` before every forecast: stale or failed source rows reduce confidence
+- Recent form is primary: group-stage points, GD, GF/GA, player leader output, optional xG/odds snippets
+- Elo-only models are not primary and are not emitted by v0
+- xG and odds are opportunistic: pass `--source-url` or `--odds-url` when an agent already has a live page URL
 
 ## Commands
 

@@ -44,11 +44,11 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 
 ## Output policy
 
-- Prefer `evaluation` for a dedicated public benchmark page; use `--input` to replay a saved HTML/RSC response.
-- Keep dedicated evaluation scores separate from Coding Index, Coding Agent Index, and provider-matrix data.
-- Mark page rows as published and sorting/limiting/arithmetic as derived; preserve source URL and scope.
-- Read `references/evaluation-pages.md` before selecting a dedicated evaluation URL or comparing benchmark populations.
-- If freshness is critical, run `fetch` immediately before `query`/`qa`. Default `<temp-dir>/artifacts/artificial-analysis/full-data.json` readers reject snapshots older than 24h; explicit paths are intentional historical data.
+- Prefer `evaluation` for a dedicated public benchmark page; use `--input` to replay a saved HTML/RSC response
+- Keep dedicated evaluation scores separate from Coding Index, Coding Agent Index, and provider-matrix data
+- Mark page rows as published and sorting/limiting/arithmetic as derived; preserve source URL and scope
+- Read `references/evaluation-pages.md` before selecting a dedicated evaluation URL or comparing benchmark populations
+- If freshness is critical, run `fetch` immediately before `query`/`qa`. Default `<temp-dir>/artifacts/artificial-analysis/full-data.json` readers reject snapshots older than 24h; explicit paths are intentional historical data
 
 ## Required follow-up reads
 

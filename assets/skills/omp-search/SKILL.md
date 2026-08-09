@@ -23,11 +23,11 @@ The wrapper locates `omp` on `PATH` or uses `OMP_BIN`, preserves the caller's wo
 
 ## Workflow
 
-1. Pass the complete search question as positional query words.
-2. Omit `--provider` for OMP's automatic provider chain. Pass `--provider <name>` only when the user requests a specific configured provider.
-3. Use `--recency day|week|month|year` for freshness and `--limit N` to bound sources.
-4. Accept the default compact answer for agent context efficiency; pass `--full` when the complete answer matters.
-5. Preserve `ok`, `provider`, `sources`, `exit_code`, and `error` in the caller's result. Do not expose environment values.
+1. Pass the complete search question as positional query words
+2. Omit `--provider` for OMP's automatic provider chain. Pass `--provider <name>` only when the user requests a specific configured provider
+3. Use `--recency day|week|month|year` for freshness and `--limit N` to bound sources
+4. Accept the default compact answer for agent context efficiency; pass `--full` when the complete answer matters
+5. Preserve `ok`, `provider`, `sources`, `exit_code`, and `error` in the caller's result. Do not expose environment values
 
 OMP loads its own dotenv/auth configuration. Never read, copy, print, or synthesize provider secrets in this skill. Query directives such as `site:`, `after:`, and `before:` may be included in the query.
 
@@ -63,10 +63,10 @@ uv run --script <skill-dir>/scripts/cli.py "current TypeScript release" --provid
 
 ## Runtime notes
 
-- The wrapper is non-interactive and uses argument arrays; never interpolate a query into shell syntax.
-- The default timeout is 300 seconds because automatic provider fallback can outlive one provider request.
-- OMP may print dependency-sync noise before its panel; the wrapper removes that from structured fields.
-- If automatic search fails, retry once with a configured explicit provider and report the actual provider error.
+- The wrapper is non-interactive and uses argument arrays; never interpolate a query into shell syntax
+- The default timeout is 300 seconds because automatic provider fallback can outlive one provider request
+- OMP may print dependency-sync noise before its panel; the wrapper removes that from structured fields
+- If automatic search fails, retry once with a configured explicit provider and report the actual provider error
 
 ## Validation
 

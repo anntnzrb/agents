@@ -2,11 +2,11 @@
 
 > Snapshot: Linear MCP, MCPorter 0.12.3, 2026-07-16, 47 tools.
 
-- Live discovery MUST remain authoritative.
-- Agents MUST NOT load this outside broad selection or discovery failure.
-- Discovery failure MUST include snapshot drift disclosure.
-- Input schemas do not define response fields.
-- NEVER invent unobserved response fields.
+- Live discovery MUST remain authoritative
+- Agents MUST NOT load this outside broad selection or discovery failure
+- Discovery failure MUST include snapshot drift disclosure
+- Input schemas do not define response fields
+- NEVER invent unobserved response fields
 
 Exact tool descriptions and input schemas came from:
 

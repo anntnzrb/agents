@@ -24,11 +24,11 @@ Local tracking files are workspace state, not skill state. The CLI may read a ca
 
 ## Workflow
 
-1. If the active workspace has a local tracking file and the question depends on current build/progress/gear/location, read it before answering.
-2. Use the CLI for deterministic mechanics, math, summaries, savefile reads, source status/cache refreshes, and first-pass recommendations.
-3. Use live web research only when CLI/save/static data cannot answer, cached source data is stale/missing, or the user explicitly asks for corroboration.
-4. Filter spoilers before replying. Do not paste raw web/CLI output that contains unintroduced names.
-5. Answer with the actionable result first, then the reason.
+1. If the active workspace has a local tracking file and the question depends on current build/progress/gear/location, read it before answering
+2. Use the CLI for deterministic mechanics, math, summaries, savefile reads, source status/cache refreshes, and first-pass recommendations
+3. Use live web research only when CLI/save/static data cannot answer, cached source data is stale/missing, or the user explicitly asks for corroboration
+4. Filter spoilers before replying. Do not paste raw web/CLI output that contains unintroduced names
+5. Answer with the actionable result first, then the reason
 
 
 ## Natural-language routing

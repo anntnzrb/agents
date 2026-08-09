@@ -13,12 +13,12 @@ Find code-verifiable answers. Keep discovery and analysis read-only.
 
 ## Constraints
 
-- Target 10 posted answers; discover roughly 15 candidates.
-- Answers MUST be verified against repository code or docs.
-- Discard uncertain candidates. Keep every verified candidate.
-- External posting requires explicit user authorization.
-- NEVER post during discovery or analysis.
-- Use the runtime's actual agent tools; NEVER invent wrappers.
+- Target 10 posted answers; discover roughly 15 candidates
+- Answers MUST be verified against repository code or docs
+- Discard uncertain candidates. Keep every verified candidate
+- External posting requires explicit user authorization
+- NEVER post during discovery or analysis
+- Use the runtime's actual agent tools; NEVER invent wrappers
 
 ## Phase 1: Discover
 
@@ -117,7 +117,7 @@ Re-read each posted comment. Return posted URLs and every failed or skipped muta
 
 ## Answer format
 
-- One or two sentences.
-- Include file and line evidence when relevant.
-- Give a concrete action.
-- Remove fluff and AI-speak.
+- One or two sentences
+- Include file and line evidence when relevant
+- Give a concrete action
+- Remove fluff and AI-speak

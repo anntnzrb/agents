@@ -13,21 +13,21 @@ Use this skill when building, reviewing, or repairing an analytical chart, dashb
 
 ## Core workflow
 
-1. State the task: comparison, trend, distribution, composition, relationship, location, flow, or a precise lookup.
-2. State the claim the view is allowed to make, its population, measure, time window, unit, and transformation. If any are unknown, expose that uncertainty rather than implying certainty.
-3. Choose the least-complex encoding that lets the intended audience verify the claim. Keep scales, baselines, binning, sorting, filters, and annotations inspectable.
-4. Define the rendering and state contract before implementation: data shape, domains, interaction state, loading/error/empty states, ownership, URL representation, and exportable data.
-5. Build the accessible mobile path alongside the graphic: semantic heading and summary, keyboard-equivalent interactions, non-color cues, a responsive layout, and an accessible text, table, or data-download fallback suited to the task.
-6. Test the data, visual encoding, interactions, export, and assistive path as separate layers.
-7. Evaluate recorded evidence against the stated claim and delivery contract; iterate on data, encoding, interaction, or assistive defects before shipping.
+1. State the task: comparison, trend, distribution, composition, relationship, location, flow, or a precise lookup
+2. State the claim the view is allowed to make, its population, measure, time window, unit, and transformation. If any are unknown, expose that uncertainty rather than implying certainty
+3. Choose the least-complex encoding that lets the intended audience verify the claim. Keep scales, baselines, binning, sorting, filters, and annotations inspectable
+4. Define the rendering and state contract before implementation: data shape, domains, interaction state, loading/error/empty states, ownership, URL representation, and exportable data
+5. Build the accessible mobile path alongside the graphic: semantic heading and summary, keyboard-equivalent interactions, non-color cues, a responsive layout, and an accessible text, table, or data-download fallback suited to the task
+6. Test the data, visual encoding, interactions, export, and assistive path as separate layers
+7. Evaluate recorded evidence against the stated claim and delivery contract; iterate on data, encoding, interaction, or assistive defects before shipping
 
 ## Non-negotiable truthfulness
 
-- Do not use a truncated quantitative axis unless the design makes the truncation unmistakable and the chart type still supports comparison. Bar lengths normally require a zero baseline.
-- Label units, denominators, dates, aggregation, adjustments, exclusions, and source. Distinguish observed values, estimates, forecasts, and targets.
-- Show uncertainty where it materially changes the conclusion: intervals, ranges, sample size, missingness, or an explicit note that uncertainty is unavailable. Never turn a model output into a measured fact.
-- Do not encode a ranked claim with unsorted data, a time claim with an unordered axis, or a part-to-whole claim with categories that do not share a whole.
-- Preserve the raw values used by the visualization so users can inspect or export them.
+- Do not use a truncated quantitative axis unless the design makes the truncation unmistakable and the chart type still supports comparison. Bar lengths normally require a zero baseline
+- Label units, denominators, dates, aggregation, adjustments, exclusions, and source. Distinguish observed values, estimates, forecasts, and targets
+- Show uncertainty where it materially changes the conclusion: intervals, ranges, sample size, missingness, or an explicit note that uncertainty is unavailable. Never turn a model output into a measured fact
+- Do not encode a ranked claim with unsorted data, a time claim with an unordered axis, or a part-to-whole claim with categories that do not share a whole
+- Preserve the raw values used by the visualization so users can inspect or export them
 
 ## Follow-up reads
 

@@ -46,7 +46,7 @@ Reference these guidelines when:
 
 ## Use
 
-1. Start from the user-visible outcome or observed bottleneck.
-2. Load `rules/_sections.md` to choose the relevant category.
-3. Load only the matching rule files needed for the change.
-4. Use `references/vercel-guide.md` only when a rule file is insufficient or a broad review requires the full compiled guide.
+1. Start from the user-visible outcome or observed bottleneck
+2. Load `rules/_sections.md` to choose the relevant category
+3. Load only the matching rule files needed for the change
+4. Use `references/vercel-guide.md` only when a rule file is insufficient or a broad review requires the full compiled guide

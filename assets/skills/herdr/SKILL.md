@@ -47,9 +47,9 @@ Most control commands return JSON. Read identifiers and state from those respons
 
 Choose the primitive that matches the job:
 
-- Workspace, tab, and pane topology organize terminal locations.
-- Pane commands control raw terminals, shells, tests, servers, input, and output.
-- Agent commands control the recognized coding agent currently occupying a pane.
+- Workspace, tab, and pane topology organize terminal locations
+- Pane commands control raw terminals, shells, tests, servers, input, and output
+- Agent commands control the recognized coding agent currently occupying a pane
 
 A pane exists whether or not it contains an agent. `agent start` requires an existing available shell pane and never creates, splits, or moves layout. Use pane commands for ordinary processes. Use agent commands when Herdr must validate agent identity or interpret `idle`, `working`, `blocked`, `done`, and `unknown` lifecycle states.
 
@@ -173,10 +173,10 @@ herdr pane read <returned-pane-id> --source recent-unwrapped --lines 120
 
 Use the read source that matches the task:
 
-- `visible`: the currently rendered viewport.
-- `recent`: recent rendered output, including soft wraps.
-- `recent-unwrapped`: recent output with soft wraps joined; prefer it for logs and transcripts.
-- `detection`: the plain-text bottom-buffer snapshot used for agent detection.
+- `visible`: the currently rendered viewport
+- `recent`: recent rendered output, including soft wraps
+- `recent-unwrapped`: recent output with soft wraps joined; prefer it for logs and transcripts
+- `detection`: the plain-text bottom-buffer snapshot used for agent detection
 
 Use `--format ansi` when colors and terminal styling are evidence. Otherwise use text.
 
@@ -186,10 +186,10 @@ After that failed read, ask the agent to write its complete response as Markdown
 
 ## Safety and coordination rules
 
-- Use `--no-focus` for background work unless the user asked to switch context.
-- Use `--current`, an explicit pane ID, or a unique agent name. Do not rely on another client's focused pane.
-- Parse IDs from JSON responses. Do not derive them from sidebar order or examples.
-- Do not close workspaces, tabs, panes, or sessions you did not create unless the user explicitly asked.
-- Never run `herdr server stop` from an active session unless the user explicitly intends to stop the server and its pane processes.
-- Never kill the main Herdr process. Use named test sessions for experiments that need an isolated server.
-- CLI server errors are JSON on stderr with exit status 1. CLI syntax errors exit with status 2.
+- Use `--no-focus` for background work unless the user asked to switch context
+- Use `--current`, an explicit pane ID, or a unique agent name. Do not rely on another client's focused pane
+- Parse IDs from JSON responses. Do not derive them from sidebar order or examples
+- Do not close workspaces, tabs, panes, or sessions you did not create unless the user explicitly asked
+- Never run `herdr server stop` from an active session unless the user explicitly intends to stop the server and its pane processes
+- Never kill the main Herdr process. Use named test sessions for experiments that need an isolated server
+- CLI server errors are JSON on stderr with exit status 1. CLI syntax errors exit with status 2

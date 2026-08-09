@@ -98,10 +98,10 @@ func Test_Email_NewEmail(t *testing.T) {
 
 Rules:
 
-- One **scenario** per row, not one **assertion** per row.
-- Subtest names are sentences in lowercase; `t.Run(tt.name, ...)` makes them filterable: `go test -run Test_Email_NewEmail/rejects_missing_@`.
-- The loop body itself is Given/When/Then in shape.
-- For Go 1.22+, the loop var capture works correctly without the `tt := tt` shadow line — the `copyloopvar` linter enforces the new style.
+- One **scenario** per row, not one **assertion** per row
+- Subtest names are sentences in lowercase; `t.Run(tt.name, ...)` makes them filterable: `go test -run Test_Email_NewEmail/rejects_missing_@`
+- The loop body itself is Given/When/Then in shape
+- For Go 1.22+, the loop var capture works correctly without the `tt := tt` shadow line — the `copyloopvar` linter enforces the new style
 
 ---
 
@@ -109,11 +109,11 @@ Rules:
 
 In Go specifically:
 
-1. **Real implementation.** Domain types, pure functions, value objects — instantiate them. They are fast.
-2. **In-memory fake** that satisfies the interface. Has its own test suite proving behavioral parity with the real impl.
-3. **`httptest.Server`** for HTTP collaborators (real wire, no internet).
-4. **`testcontainers`** for stateful collaborators (Postgres, Redis, S3-compatible, Kafka).
-5. **gomock** ONLY for: clocks, randomness, third-party SaaS with no sandbox.
+1. **Real implementation.** Domain types, pure functions, value objects — instantiate them. They are fast
+2. **In-memory fake** that satisfies the interface. Has its own test suite proving behavioral parity with the real impl
+3. **`httptest.Server`** for HTTP collaborators (real wire, no internet)
+4. **`testcontainers`** for stateful collaborators (Postgres, Redis, S3-compatible, Kafka)
+5. **gomock** ONLY for: clocks, randomness, third-party SaaS with no sandbox
 
 ### Example: an in-memory fake
 
@@ -218,10 +218,10 @@ func Test_E2E_user_can_signup_then_login(t *testing.T) {
 
 Patterns:
 
-- `//go:build e2e` build tag separates slow E2E from fast unit tests. Run with `go test -tags=e2e ./...`.
-- One narrative per test: "user can sign up then log in". One `Test_E2E_*` per user-visible outcome.
-- Real DB via testcontainers, real gin engine, real HTTP. **No mocks.** The point is to catch integration bugs.
-- Bounded context — every E2E gets a `context.WithTimeout` so failures don't hang CI.
+- `//go:build e2e` build tag separates slow E2E from fast unit tests. Run with `go test -tags=e2e ./...`
+- One narrative per test: "user can sign up then log in". One `Test_E2E_*` per user-visible outcome
+- Real DB via testcontainers, real gin engine, real HTTP. **No mocks.** The point is to catch integration bugs
+- Bounded context — every E2E gets a `context.WithTimeout` so failures don't hang CI
 
 ---
 
@@ -302,9 +302,9 @@ func Test_Email_NewEmail_then_String_roundtrips(t *testing.T) {
 
 `rapid` shrinks failing cases to minimal counterexamples. Use for:
 
-- Round-trips (parse → serialize → parse).
-- Algebraic properties (sort produces ordered, dedup is idempotent, JSON marshal/unmarshal is involutive).
-- Invariants under random input (validator never panics, serializer never produces invalid UTF-8).
+- Round-trips (parse → serialize → parse)
+- Algebraic properties (sort produces ordered, dedup is idempotent, JSON marshal/unmarshal is involutive)
+- Invariants under random input (validator never panics, serializer never produces invalid UTF-8)
 
 ---
 
@@ -368,11 +368,11 @@ func Test_Client_retries_on_500(t *testing.T) {
 
 ## Determinism — the cardinal rules
 
-- **No `time.Sleep` in tests.** If you need delay, you need a Clock injection.
-- **`go test -shuffle=on`** in every CI run.
-- **`go test -count=1`** to defeat the cache.
-- **Subscribe to the event, do not poll for it.** Channels, callbacks, `t.Cleanup` over polling.
-- **`t.Parallel()`** for tests that share no state. Speeds up large suites by 4-8x.
+- **No `time.Sleep` in tests.** If you need delay, you need a Clock injection
+- **`go test -shuffle=on`** in every CI run
+- **`go test -count=1`** to defeat the cache
+- **Subscribe to the event, do not poll for it.** Channels, callbacks, `t.Cleanup` over polling
+- **`t.Parallel()`** for tests that share no state. Speeds up large suites by 4-8x
 
 A test that fails 1-in-10 runs is a bug, not flake. The race detector + `-shuffle=on` + ordering hygiene catches >95% of "flake".
 

@@ -60,7 +60,7 @@ Return:
 - any exposed continuation value, otherwise `not exposed`;
 - `complete=true` only when the CLI explicitly signals exhaustion; otherwise `complete=false`
   with the cap, error, timeout, or missing signal;
-- every error or incomplete boundary.
+- every error or incomplete boundary
 
 Keep the result within the requested limit and distinguish “none found” from an incomplete or
 unknown read.

@@ -25,11 +25,11 @@ Serialization contracts (reserved field names, argument order, the key an Error 
 
 A new service earns exactly this much logging infrastructure, and no more:
 
-1. **One init module.** Callers import a ready logger; only the init module knows the stage. No call site ever checks `NODE_ENV`-style vars to decide how to log.
-2. **Stage split by environment.** Dev = human-readable (pretty, colorized). Prod = structured, machine-parseable (JSON to stdout). Same logger API on both — the stage changes the sink and format, never the call sites.
-3. **Level threshold per stage.** Dev = `debug`, prod = `info`, overridable with a `LOG_LEVEL`-style env var.
-4. **The stack's standard structured logger** (use the repository's configured choice, or the destination skill's guidance for greenfield work)—never a hand-rolled one.
-5. **Error-serialization proof.** Before trusting error logging, pass a real Error/exception through the PROD formatter once and assert the output preserves type, message, and stack. Every structured-logging stack has a reserved-key contract, and violating it typically produces an empty `{}` where the stack trace should have been — discovered during the incident. This is a one-line test; write it at setup time and the whole bug class is dead permanently.
+1. **One init module.** Callers import a ready logger; only the init module knows the stage. No call site ever checks `NODE_ENV`-style vars to decide how to log
+2. **Stage split by environment.** Dev = human-readable (pretty, colorized). Prod = structured, machine-parseable (JSON to stdout). Same logger API on both — the stage changes the sink and format, never the call sites
+3. **Level threshold per stage.** Dev = `debug`, prod = `info`, overridable with a `LOG_LEVEL`-style env var
+4. **The stack's standard structured logger** (use the repository's configured choice, or the destination skill's guidance for greenfield work)—never a hand-rolled one
+5. **Error-serialization proof.** Before trusting error logging, pass a real Error/exception through the PROD formatter once and assert the output preserves type, message, and stack. Every structured-logging stack has a reserved-key contract, and violating it typically produces an empty `{}` where the stack trace should have been — discovered during the incident. This is a one-line test; write it at setup time and the whole bug class is dead permanently
 
 ## Choosing the level — consumer, not severity
 
@@ -44,35 +44,35 @@ A new service earns exactly this much logging infrastructure, and no more:
 
 Two corollaries that get violated constantly:
 
-- **`error` means the SERVICE failed, not the request.** A 4xx is the client's mistake handled correctly — that is `warn` at most, `info` for routine misses. Reserve `error` for 5xx-class outcomes: the service could not do its job. Log 4xx as `error` and the alert channel drowns in noise from every crawler probing `/wp-admin`; a drowned alert channel is equivalent to no alerting.
-- **A failure logged at `info` is invisible.** If the message says "failed", the level is `warn` or `error` — never `info`.
+- **`error` means the SERVICE failed, not the request.** A 4xx is the client's mistake handled correctly — that is `warn` at most, `info` for routine misses. Reserve `error` for 5xx-class outcomes: the service could not do its job. Log 4xx as `error` and the alert channel drowns in noise from every crawler probing `/wp-admin`; a drowned alert channel is equivalent to no alerting
+- **A failure logged at `info` is invisible.** If the message says "failed", the level is `warn` or `error` — never `info`
 
 ## Placement — log decisions, not work
 
 Log where the system decides something, not where it does something:
 
-- **Boundaries** — request in / response out, calls to external systems (and their failures).
-- **State transitions** — create / complete / destroy of sessions, jobs, connections.
-- **Decision points** — retry chosen, fallback engaged, cache bypassed, degraded mode entered.
+- **Boundaries** — request in / response out, calls to external systems (and their failures)
+- **State transitions** — create / complete / destroy of sessions, jobs, connections
+- **Decision points** — retry chosen, fallback engaged, cache bypassed, degraded mode entered
 - **The one place an error is finally handled.**
 
 Never log inside pure functions, utilities, or private helpers — callers with context log outcomes; internals stay silent. The mechanical rules:
 
-- **One event, one line.** Log-and-rethrow at every layer turns one incident into five look-alike incidents. Log where the error is handled; layers that only propagate stay silent.
-- **Answering the caller is not logging.** Converting a failure into a response — an HTTP 5xx body, an SSE error event, an error string returned to an LLM as a tool result, a non-zero exit code — satisfies the caller and leaves operations blind. This is the dominant finding when error paths are audited: the caller got an answer, the on-call got nothing. Every path that converts a failure into a caller-facing signal logs that failure exactly once, at the layer that handles it. When conversion layers stack, mark the error as logged at the handling layer (a symbol/flag on the error object) so outer catch-all handlers skip it — one incident, one line.
-- **Expected feedback returned to the caller is not an event.** Validation results delivered as a normal response — including tool output an LLM agent consumes ("string not found", lint findings, a sandbox-boundary notice) — are response content, not anomalies. Log only the genuine I/O and subprocess failures behind them, and security rejections.
-- **Mechanical logging belongs to middleware.** Request/response logging is wired once at the framework layer, never hand-assembled per handler. High-volume zero-signal paths (health probes, metrics scrapes) are excluded there as data — an exclusion set — not as scattered `if` statements.
+- **One event, one line.** Log-and-rethrow at every layer turns one incident into five look-alike incidents. Log where the error is handled; layers that only propagate stay silent
+- **Answering the caller is not logging.** Converting a failure into a response — an HTTP 5xx body, an SSE error event, an error string returned to an LLM as a tool result, a non-zero exit code — satisfies the caller and leaves operations blind. This is the dominant finding when error paths are audited: the caller got an answer, the on-call got nothing. Every path that converts a failure into a caller-facing signal logs that failure exactly once, at the layer that handles it. When conversion layers stack, mark the error as logged at the handling layer (a symbol/flag on the error object) so outer catch-all handlers skip it — one incident, one line
+- **Expected feedback returned to the caller is not an event.** Validation results delivered as a normal response — including tool output an LLM agent consumes ("string not found", lint findings, a sandbox-boundary notice) — are response content, not anomalies. Log only the genuine I/O and subprocess failures behind them, and security rejections
+- **Mechanical logging belongs to middleware.** Request/response logging is wired once at the framework layer, never hand-assembled per handler. High-volume zero-signal paths (health probes, metrics scrapes) are excluded there as data — an exclusion set — not as scattered `if` statements
 
 **No speculative logs.** "Might need it later" is not a consumer. A log line earns its place through evidence: a debugging session that burned rounds because this state was invisible (see the debugging bridge below), an incident postmortem, an alert that needs the field.
 
 ## The line contract
 
-- **The message is a stable, grep-able constant; data goes in fields.** `logger.warn({orderId, attempt}, "payment retry")` — never `` `retrying payment for ${orderId}` ``. An interpolated message cannot be counted, aggregated, or alerted on.
-- **Correlation or it did not happen.** Request-scoped lines carry the trace/request id; entity-scoped lines carry the entity id. A line you cannot join to its request is noise during the only moments logs matter.
-- **Name events semantically** (`session.destroy`, `payment.fallback`), never positionally ("Step 3"). Step numbers couple the log stream to today's call structure; the first refactor makes them lie.
-- **No secrets.** Tokens, credentials, session cookies, and PII never enter a log line; URLs are sanitized (strip or redact query params like `token`, `key`) before logging. A leaked log is a leaked credential.
-- **Payload content belongs to the tracing channel, not the log stream.** In LLM/agent systems, user messages, model responses, and tool outputs are captured by the tracing product (turn recorder, trace exporter); a log line carries a hash, a length, and at most a short excerpt for correlation. Dumping conversation content into logs bloats the store and leaks data the log pipeline was never hardened for.
-- **The logging path may not break the program.** If a log call can itself fail (serializing exotic state, a wrapper that touches I/O), that failure is caught, downgraded to a `warn` through a channel that cannot fail, and the operation continues. An empty catch around logging is still an empty catch.
+- **The message is a stable, grep-able constant; data goes in fields.** `logger.warn({orderId, attempt}, "payment retry")` — never `` `retrying payment for ${orderId}` ``. An interpolated message cannot be counted, aggregated, or alerted on
+- **Correlation or it did not happen.** Request-scoped lines carry the trace/request id; entity-scoped lines carry the entity id. A line you cannot join to its request is noise during the only moments logs matter
+- **Name events semantically** (`session.destroy`, `payment.fallback`), never positionally ("Step 3"). Step numbers couple the log stream to today's call structure; the first refactor makes them lie
+- **No secrets.** Tokens, credentials, session cookies, and PII never enter a log line; URLs are sanitized (strip or redact query params like `token`, `key`) before logging. A leaked log is a leaked credential
+- **Payload content belongs to the tracing channel, not the log stream.** In LLM/agent systems, user messages, model responses, and tool outputs are captured by the tracing product (turn recorder, trace exporter); a log line carries a hash, a length, and at most a short excerpt for correlation. Dumping conversation content into logs bloats the store and leaks data the log pipeline was never hardened for
+- **The logging path may not break the program.** If a log call can itself fail (serializing exotic state, a wrapper that touches I/O), that failure is caught, downgraded to a `warn` through a channel that cannot fail, and the operation continues. An empty catch around logging is still an empty catch
 
 ## Anti-patterns
 

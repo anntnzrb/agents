@@ -27,12 +27,12 @@ Every successful metrics response includes `data.scope` and `data.provenance`.
 - `benchmark`: exactly `DeepSWE`;
 - `benchmark_version`: the resolved semantic version (never an unqualified `latest`);
 - `filters_applied`: an object or list describing every default and explicit filter;
-- `value_status`: exactly `published`, `published_raw`, or `derived`.
+- `value_status`: exactly `published`, `published_raw`, or `derived`
 
 `provenance` MUST include:
 
 - `url`: the artifact URL used;
-- `fetched_at`: when the client obtained or revalidated the artifact.
+- `fetched_at`: when the client obtained or revalidated the artifact
 
 When present in the source, preserve `generated_at`. Preserve `etag`/`ETag` and `last_modified`/`Last-Modified` when available; do not manufacture validators. Snapshot and stale reads MUST expose their local/freshness status and original source metadata rather than appearing current.
 
@@ -40,9 +40,9 @@ Do not cite a value without carrying its status and provenance. A result that co
 
 ## Published versus derived values
 
-- `published`: a value copied from the canonical `leaderboard-live.json` aggregate. Published leaderboard rows are authoritative and MUST NOT be re-aggregated.
-- `published_raw`: a value copied from raw `trials.json` or an unaggregated source row after the documented filter. Raw scope is broader than full DeepSWE.
-- `derived`: a calculation made by the skill from published or raw values. Put it under `derived`; never overwrite a published field.
+- `published`: a value copied from the canonical `leaderboard-live.json` aggregate. Published leaderboard rows are authoritative and MUST NOT be re-aggregated
+- `published_raw`: a value copied from raw `trials.json` or an unaggregated source row after the documented filter. Raw scope is broader than full DeepSWE
+- `derived`: a calculation made by the skill from published or raw values. Put it under `derived`; never overwrite a published field
 
 A response can contain rows with published fields and a `derived` object. Label each row/value at the nearest useful scope. Do not call a derived confidence interval a published benchmark result.
 
@@ -62,7 +62,7 @@ Ranked/report rows should carry, when supplied by the source:
 - score/pass fields, including `pass_at_1` when available;
 - `n_attempted` and `n_tasks_attempted` when available;
 - `ci_lo`, `ci_hi`, `ci_half`;
-- efficiency fields such as `mean_output_tokens`, `mean_cost_usd`, and `mean_agent_steps`.
+- efficiency fields such as `mean_output_tokens`, `mean_cost_usd`, and `mean_agent_steps`
 
 The skill may add `derived.ci_width`, defined exactly as `ci_hi - ci_lo`. “Confidence” in prose means CI width only; it is not a correctness probability.
 
@@ -74,7 +74,7 @@ The skill may add `derived.ci_width`, defined exactly as `ci_hi - ci_lo`. “Con
 - raw extrema: independently best/worst observed values, not silently filtered recommendations;
 - Pareto rows: default maximizes `pass_at_1` and minimizes `mean_output_tokens`, `mean_cost_usd`, and `mean_agent_steps`;
 - optional `pareto_axes`: explicit `{metric, order}` metadata when `--pareto-axis` is supplied;
-- optional `efficiency`: explicit numerator/denominator ratios under each copied row's `derived` object.
+- optional `efficiency`: explicit numerator/denominator ratios under each copied row's `derived` object
 
 Pareto dominance excludes any row with a null comparison metric. Custom axes use `min`/`asc` or `max`/`desc`; do not impute nulls or create an arbitrary composite score. Low-n/incomplete rows remain visible by default; only explicit `--min-attempted`, `--min-tasks`, or `--min-pass-at-1` may exclude them. Efficiency division never emits infinity: zero denominators and invalid inputs remain null with a reason.
 

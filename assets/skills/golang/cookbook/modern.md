@@ -12,6 +12,6 @@ Key language and runtime features by Go version. Load the appropriate version-sc
 
 ## Minimum version recommendation
 
-- New applications: `go 1.26` in `go.mod`.
-- Libraries: pin `go` to the oldest version supporting your API; use `toolchain go1.26.3` for builds.
-- Avoid GOEXPERIMENT-only features as default practice.
+- New applications: `go 1.26` in `go.mod`
+- Libraries: pin `go` to the oldest version supporting your API; use `toolchain go1.26.3` for builds
+- Avoid GOEXPERIMENT-only features as default practice

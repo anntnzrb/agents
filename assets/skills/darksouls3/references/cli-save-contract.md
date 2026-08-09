@@ -20,9 +20,9 @@ build [quality|strength|dexterity|sorcerer|pyromancer|cleric|luck] [--level N]
 soul-cost <current-level> <target-level>
 ```
 
-- `fresh` is spoiler-safe.
-- `origins` compares classes; it does not choose one for an unspecified user.
-- `build` prints target stats, class, infusion, weapons, and notes.
+- `fresh` is spoiler-safe
+- `origins` compares classes; it does not choose one for an unspecified user
+- `build` prints target stats, class, infusion, weapons, and notes
 
 ## Weapons, upgrades, and equip load
 
@@ -35,9 +35,9 @@ upgrade <1-10> [--type normal|twinkling|scale]
 equip-load [--vitality N] [--havels] [--favor]
 ```
 
-- `weapons` defaults to the starter-safe catalog; `--all` exposes the bundled catalog.
-- `calc` and `compare` are approximate for known rows. NEVER invent missing AR.
-- DS3 roll thresholds are `<30%` fast, `30-70%` medium, `70-100%` fat, and `>100%` overburdened.
+- `weapons` defaults to the starter-safe catalog; `--all` exposes the bundled catalog
+- `calc` and `compare` are approximate for known rows. NEVER invent missing AR
+- DS3 roll thresholds are `<30%` fast, `30-70%` medium, `70-100%` fat, and `>100%` overburdened
 
 ## Progression and items
 
@@ -53,10 +53,10 @@ farm [shards|large-shards|chunks|slabs|twinkling|scales|proofs|shackles|medals|g
 estus [shards|bones|allotment|max]
 ```
 
-- Default route/area/boss output is spoiler-safe.
-- Use `--spoilers` only with permission; it NEVER overrides an explicit no-spoiler request.
-- Exact routes, locations, quest steps, and contested details require fresh source evidence.
-- DS3 has 11 Estus Shards, 10 Undead Bone Shards, and at most 15 flask uses.
+- Default route/area/boss output is spoiler-safe
+- Use `--spoilers` only with permission; it NEVER overrides an explicit no-spoiler request
+- Exact routes, locations, quest steps, and contested details require fresh source evidence
+- DS3 has 11 Estus Shards, 10 Undead Bone Shards, and at most 15 flask uses
 
 ## Achievements, guide, audit, tracking, and sources
 
@@ -78,11 +78,11 @@ sources explain <source-key>
 sources refresh [source-key ...] [--force]
 ```
 
-- The 43 platinum achievements are base-game achievements; DLC is not required.
-- `track` and `recommend` read an explicit file. The skill never owns or persists tracking state.
-- `guide` searches the transformed, user-provided PSNProfiles platinum-walkthrough corpus.
-- Guide output is spoiler-heavy, non-authoritative, not parser/save truth, and not permission to republish the PDF or its text.
-- Summarize only the minimum guide text needed. `--json` changes representation, not evidence quality.
+- The 43 platinum achievements are base-game achievements; DLC is not required
+- `track` and `recommend` read an explicit file. The skill never owns or persists tracking state
+- `guide` searches the transformed, user-provided PSNProfiles platinum-walkthrough corpus
+- Guide output is spoiler-heavy, non-authoritative, not parser/save truth, and not permission to republish the PDF or its text
+- Summarize only the minimum guide text needed. `--json` changes representation, not evidence quality
 
 ## Read-only save support
 
@@ -110,14 +110,14 @@ Supported facts include validated character identity, class, level, souls, stats
 
 Boundaries:
 
-- Save reading is read-only. NEVER mutate `.sl2`.
-- Unknown raw IDs remain unknown.
-- Missing area checklist means unknown, not clear.
-- Gestures and infusion-achievement completion are static/unsupported; NEVER present them as save-backed.
-- Reinforcement level is observable; reinforcement-achievement completion remains unsupported.
-- Compact inventory truncates. Use `--all` or `--find` before claiming absence.
-- A save may be stale, transferred, edited, a different character, or a different NG cycle/build.
-- If auto-detection fails, request an explicit `.sl2` path.
+- Save reading is read-only. NEVER mutate `.sl2`
+- Unknown raw IDs remain unknown
+- Missing area checklist means unknown, not clear
+- Gestures and infusion-achievement completion are static/unsupported; NEVER present them as save-backed
+- Reinforcement level is observable; reinforcement-achievement completion remains unsupported
+- Compact inventory truncates. Use `--all` or `--find` before claiming absence
+- A save may be stale, transferred, edited, a different character, or a different NG cycle/build
+- If auto-detection fails, request an explicit `.sl2` path
 
 ## Intent routing
 

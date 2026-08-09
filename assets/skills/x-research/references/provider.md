@@ -36,12 +36,12 @@ A conversation response contains `status`, `thread`, and `replies`, with an opti
 
 Every normalized post has exactly the useful contract fields below; unknown or unusable values are omitted instead of invented:
 
-- `id`, `url`, `text`, and `created_at` are required.
-- `author` contains `id`, `handle` (from `screen_name`), `name`, `url`, and `verified` when the raw author supplies them. Provider verification flags are evidence about the provider response, not an official X guarantee.
-- `metrics` is included only when at least one recognized numeric value exists. Mapping is `replies` → `replies`, `reposts` → `reposts`, `likes` → `likes`, `quotes` → `quotes`, `bookmarks` → `bookmarks`, and `views` → `views`.
-- `lang` is retained when it is a non-empty string.
-- `media` is retained only in the provider's recognized JSON-compatible media shape.
-- `quote_id` is taken from a recognized quoted-post ID; `reply_to_id` is taken from a recognized replying-to post ID.
+- `id`, `url`, `text`, and `created_at` are required
+- `author` contains `id`, `handle` (from `screen_name`), `name`, `url`, and `verified` when the raw author supplies them. Provider verification flags are evidence about the provider response, not an official X guarantee
+- `metrics` is included only when at least one recognized numeric value exists. Mapping is `replies` → `replies`, `reposts` → `reposts`, `likes` → `likes`, `quotes` → `quotes`, `bookmarks` → `bookmarks`, and `views` → `views`
+- `lang` is retained when it is a non-empty string
+- `media` is retained only in the provider's recognized JSON-compatible media shape
+- `quote_id` is taken from a recognized quoted-post ID; `reply_to_id` is taken from a recognized replying-to post ID
 
 A page may additionally include a normalized `profile` with `id`, `handle`, `name`, `url`, and `verified` where available. Raw avatars, banners, descriptions, follower counts, polls, sensitive flags, and other provider-only fields are not part of this contract unless represented by one of the fields above.
 
@@ -59,7 +59,7 @@ Success data objects expose:
 
 - `provider: "fxtwitter"`, `official: false`, and `auth_mode: "none"`;
 - `source_url` (the exact provider request URL), `endpoint`, and UTC RFC3339 `fetched_at`;
-- `provider_status` (the provider's numeric code when present, otherwise the HTTP status).
+- `provider_status` (the provider's numeric code when present, otherwise the HTTP status)
 
 `provider_status` is not an HTTP guarantee. A response with HTTP 200 can still carry a provider failure code or malformed payload; that response is an error, not a successful empty result. Error details preserve the endpoint/source URL and available HTTP/provider statuses without leaking raw HTML or unbounded provider bodies.
 
@@ -67,9 +67,9 @@ Success data objects expose:
 
 Page and conversation output expose `cursor` and `has_more` only when `cursor.bottom` is a non-empty string. `top`, empty strings, nulls, and arbitrary cursor objects are not usable bottom cursors. `returned_count` is the number of posts that survived normalization, while `requested_count` is the caller's bounded page size.
 
-- `complete: false, complete_reason: "bounded_page"` means this command intentionally returned one page and no population-level completeness claim is allowed.
-- `complete: true, complete_reason: "provider_exhausted"` is reserved for an accepted provider page with an explicit exhausted cursor signal (such as `cursor: null`).
-- `complete: false, complete_reason: "provider_incomplete"` records an accepted but non-exhaustive provider response, including a missing or invalid cursor; malformed required roots instead produce a provider-payload error.
+- `complete: false, complete_reason: "bounded_page"` means this command intentionally returned one page and no population-level completeness claim is allowed
+- `complete: true, complete_reason: "provider_exhausted"` is reserved for an accepted provider page with an explicit exhausted cursor signal (such as `cursor: null`)
+- `complete: false, complete_reason: "provider_incomplete"` records an accepted but non-exhaustive provider response, including a missing or invalid cursor; malformed required roots instead produce a provider-payload error
 
 A cursor is a continuation token, not proof that a page contains all matches. Report requested and returned counts, the exact query/handle/target, cursor presence, and completeness reason in any agent answer. Do not turn one timeline/search page into “all posts,” “all public opinion,” or a complete thread.
 

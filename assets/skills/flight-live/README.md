@@ -71,9 +71,9 @@ Prefer `--llm-json` for agents.
 
 ## Notes
 
-- Oneway window search is first-class.
-- Roundtrip uses scraped date-pair buttons from Kiwi web results.
-- Provider hard-fails with actionable errors when `nix` / `agent-browser` is unavailable.
+- Oneway window search is first-class
+- Roundtrip uses scraped date-pair buttons from Kiwi web results
+- Provider hard-fails with actionable errors when `nix` / `agent-browser` is unavailable
 
 ## RPC
 

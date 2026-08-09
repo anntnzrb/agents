@@ -91,11 +91,11 @@ myservice/
 
 **Rules**:
 
-- `cmd/<binary>/main.go` is ≤ 50 LOC. Anything more lives in `internal/cmd/`.
-- `internal/` is **the** business code. Other modules cannot import it (Go compiler-enforced).
-- `pkg/` is for things you genuinely want third parties to import. Empty until proven otherwise.
-- No `utils/`, `helpers/`, `common/`, `shared/`. **REJECT.** Files are named after the concept they own.
-- One package per directory. One responsibility per package.
+- `cmd/<binary>/main.go` is ≤ 50 LOC. Anything more lives in `internal/cmd/`
+- `internal/` is **the** business code. Other modules cannot import it (Go compiler-enforced)
+- `pkg/` is for things you genuinely want third parties to import. Empty until proven otherwise
+- No `utils/`, `helpers/`, `common/`, `shared/`. **REJECT.** Files are named after the concept they own
+- One package per directory. One responsibility per package
 
 ## `Taskfile.yml` — the entry point for every action
 

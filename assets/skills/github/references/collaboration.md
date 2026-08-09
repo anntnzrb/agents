@@ -51,7 +51,7 @@ do not reuse an issue or PR number across repositories or hosts.
   fields available in the installed CLI) exposes review/check state. If thread-level
   anchors or unresolved conversations matter, use the GitHub API reference and
   preserve file/line identity.
-- `gh pr diff --patch` is still a read; use `hunk` only for a live Hunk review.
+- `gh pr diff --patch` is still a read; use `hunk` only for a live Hunk review
 - `gh pr checkout` changes local branch/worktree state. Route lifecycle decisions to
   `git-worktrees` and inspect current worktree ownership first.
 - `gh pr create`, `edit`, `close`, `reopen`, `comment`, `review`, `ready`, `lock`,

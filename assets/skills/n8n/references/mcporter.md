@@ -12,7 +12,7 @@ Live `list n8n --schema --all-parameters` is the sole authority for:
 - required and optional arguments;
 - argument types and accepted values;
 - tool descriptions;
-- output fields only when the tool publishes an output schema.
+- output fields only when the tool publishes an output schema
 
 Catalogs are instance-, endpoint-, and workflow-dependent. MUST rediscover after
 workflow/endpoint changes; MUST NOT preserve a catalog as timeless.
@@ -24,9 +24,9 @@ stdio to `N8N_MCP_URL`, and sends `N8N_MCP_TOKEN` as a bearer token.
 
 Before discovery:
 
-- MUST confirm nonempty variable presence without printing values.
-- MUST confirm the URL is the intended reachable MCP endpoint, not REST.
-- MUST confirm `bun` availability and token validity.
+- MUST confirm nonempty variable presence without printing values
+- MUST confirm the URL is the intended reachable MCP endpoint, not REST
+- MUST confirm `bun` availability and token validity
 
 MUST NOT run `mcporter config get n8n`, print env values, or report resolved
 arguments: the registry substitutes the bearer into a subprocess argument.
@@ -91,15 +91,15 @@ MUST NOT guess fields.
 
 Snapshot only; MUST refresh before use.
 
-- Date: 2026-07-16 (America/Guayaquil).
+- Date: 2026-07-16 (America/Guayaquil)
 - MCPorter version: 0.12.3 from
   `github:numtide/llm-agents.nix#mcporter`.
-- Registry: SSOT `assets/mcporter.jsonc`, `n8n` stdio-to-streamable-HTTP bridge.
-- Probe environment: `N8N_MCP_URL` and `N8N_MCP_TOKEN` were unset.
+- Registry: SSOT `assets/mcporter.jsonc`, `n8n` stdio-to-streamable-HTTP bridge
+- Probe environment: `N8N_MCP_URL` and `N8N_MCP_TOKEN` were unset
 - `list n8n --schema` result: tools unavailable; the bridge had no HTTP target
   and closed the MCP connection.
-- Quiet status result: unhealthy (exit 1).
-- Captured tool names, input schemas, or output schemas: none.
+- Quiet status result: unhealthy (exit 1)
+- Captured tool names, input schemas, or output schemas: none
 
 The non-quiet schema command exited zero while tools were unavailable; MUST use
 the quiet status gate for health.

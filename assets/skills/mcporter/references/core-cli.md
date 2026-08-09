@@ -2,12 +2,12 @@
 
 Snapshot: MCPorter 0.12.3, captured 2026-07-16 from live `--help` output.
 
-- Agents SHOULD use this reference when live help is unavailable.
-- Live `mcporter <command> --help` MUST override this snapshot.
+- Agents SHOULD use this reference when live help is unavailable
+- Live `mcporter <command> --help` MUST override this snapshot
 
 ## Invocation and globals
 
-- Agents SHOULD invoke `mcporter` directly when available.
+- Agents SHOULD invoke `mcporter` directly when available
 - Agents MUST use this Nix prefix otherwise:
 
 ```text
@@ -29,8 +29,8 @@ Global flags:
 | `--log-level <debug\|info\|warn\|error>` | CLI logging level; default `warn`. |
 | `--oauth-timeout <ms>` | Browser OAuth wait; default `300000`. |
 
-- Agents SHOULD verify versions with `mcporter --version`.
-- Reusable instructions MUST use portable placeholders.
+- Agents SHOULD verify versions with `mcporter --version`
+- Reusable instructions MUST use portable placeholders
 
 ## Select a command
 
@@ -99,8 +99,8 @@ mcporter list --http-url <https-url> --schema
 
 `--schema` primarily documents tool inputs published by the server. It is not evidence that a response contains any particular field.
 
-- Agents MUST trust only explicit published output schemas.
-- Unspecified outputs MUST be parsed defensively.
+- Agents MUST trust only explicit published output schemas
+- Unspecified outputs MUST be parsed defensively
 
 ## `call`
 
@@ -150,8 +150,8 @@ mcporter call <server>.<tool> key=value
 mcporter call <server>.<tool> --args '{"items":["value"]}' --output json
 ```
 
-- Inputs MUST conform to published schemas.
-- `--output json` MUST NOT imply a response contract.
+- Inputs MUST conform to published schemas
+- `--output json` MUST NOT imply a response contract
 
 ## `resource`
 
@@ -194,8 +194,8 @@ This starts authentication without listing tools.
 
 Authentication and `--reset` change credential state.
 
-- Auth mutations MUST have explicit task authorization.
-- Agents SHOULD prefer `list <server> --status --no-oauth` for checks.
+- Auth mutations MUST have explicit task authorization
+- Agents SHOULD prefer `list <server> --status --no-oauth` for checks
 
 ## `vault`
 
@@ -229,5 +229,5 @@ mcporter replay <session-name> [--server <name>] [-- <command-to-run>]
 
 MCPorter reports recordings under `<home>/.mcporter/recordings/<session-name>.ndjson`. `record` writes sensitive JSON-RPC traffic. `replay` reads that recording and can run a command against deterministic traffic.
 
-- Recording MUST have explicit task authorization.
-- Session names MUST NOT contain secrets.
+- Recording MUST have explicit task authorization
+- Session names MUST NOT contain secrets

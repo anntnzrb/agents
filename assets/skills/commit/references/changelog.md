@@ -18,19 +18,19 @@ Common patterns:
 
 ## Manual changelog rules
 
-- Read the current draft section first, usually `[Unreleased]`.
-- Add only user-visible changes.
-- Reuse the file's existing headings. If it follows Keep a Changelog, common sections are `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
-- Keep the changelog hunk in the same logical commit as the change it describes.
-- Deduplicate or update draft entries instead of appending duplicates.
-- Never rewrite released sections unless the user explicitly asked for history surgery.
+- Read the current draft section first, usually `[Unreleased]`
+- Add only user-visible changes
+- Reuse the file's existing headings. If it follows Keep a Changelog, common sections are `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
+- Keep the changelog hunk in the same logical commit as the change it describes
+- Deduplicate or update draft entries instead of appending duplicates
+- Never rewrite released sections unless the user explicitly asked for history surgery
 
 ## Fragment-system rules
 
-- Create or edit the fragment in the same commit as the code change.
-- Do not hand-edit generated `CHANGELOG.md` output if automation owns it.
-- One logical user-visible change usually means one fragment.
-- Internal-only refactors, formatting-only changes, and test-only changes usually do not get fragments unless repo policy says otherwise.
+- Create or edit the fragment in the same commit as the code change
+- Do not hand-edit generated `CHANGELOG.md` output if automation owns it
+- One logical user-visible change usually means one fragment
+- Internal-only refactors, formatting-only changes, and test-only changes usually do not get fragments unless repo policy says otherwise
 
 ## Examples
 

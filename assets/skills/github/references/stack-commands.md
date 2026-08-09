@@ -111,7 +111,7 @@ GH_PROMPT_DISABLED=1 gh stack push --remote <remote>
 GH_PROMPT_DISABLED=1 gh stack link --remote <remote> <bottom> <middle> <top>
 ```
 
-- `submit` pushes branches, creates/updates PRs, and creates/updates the remote stack.
+- `submit` pushes branches, creates/updates PRs, and creates/updates the remote stack
   With `--auto`, new PRs are drafts unless `--open` is authorized. It can partially
   land before a later failure; re-read each branch/PR/stack instead of retrying.
 - `sync` fetches, reconciles, fast-forwards trunk when possible, cascades rebases,

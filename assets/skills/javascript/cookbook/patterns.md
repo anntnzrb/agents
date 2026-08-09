@@ -184,8 +184,8 @@ Use these for user-driven bursty events. Do not apply them blindly to hide slow 
 
 ## Pitfalls worth remembering
 
-- `Array.prototype.sort()` mutates; `toSorted()` does not.
-- Object spread is shallow.
-- Repeated `await` inside loops can serialize independent work.
-- Repeated `JSON.parse(JSON.stringify(x))` is a correctness and performance smell.
-- Clever point-free chains are often harder to debug than small named functions.
+- `Array.prototype.sort()` mutates; `toSorted()` does not
+- Object spread is shallow
+- Repeated `await` inside loops can serialize independent work
+- Repeated `JSON.parse(JSON.stringify(x))` is a correctness and performance smell
+- Clever point-free chains are often harder to debug than small named functions

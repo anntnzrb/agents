@@ -33,16 +33,16 @@ The command returns source metadata, frame/row counts, applied filters, and rows
 
 ## Extraction rules
 
-- Parse Next.js `self.__next_f.push(...)` payloads and standard colon-delimited RSC frames.
-- Select the largest list containing recognizable model identity and numeric score fields.
-- Preserve unknown fields; do not reduce a dedicated page to a fixed benchmark-specific schema.
-- Use `--input` for a cached source when a page changes frequently or a result must be replayed.
-- If no recognizable rows are found, report the extraction error; do not guess a nested list.
+- Parse Next.js `self.__next_f.push(...)` payloads and standard colon-delimited RSC frames
+- Select the largest list containing recognizable model identity and numeric score fields
+- Preserve unknown fields; do not reduce a dedicated page to a fixed benchmark-specific schema
+- Use `--input` for a cached source when a page changes frequently or a result must be replayed
+- If no recognizable rows are found, report the extraction error; do not guess a nested list
 
 ## Comparability guardrails
 
-- A dedicated benchmark score is not automatically the Coding Index or Coding Agent Index.
-- Keep benchmark version, task count, repeats, harness, sandbox, and score definition with the rows whenever the source exposes them.
-- Costs and token counts must retain their scope: API evaluation spend, subscription quota, per-task cost, and per-attempt cost are different quantities.
-- A value derived by dividing a page total by a task count is derived, even when both inputs are published.
-- Do not average scores from different benchmark populations into one quality number without an explicit normalization and workload definition.
+- A dedicated benchmark score is not automatically the Coding Index or Coding Agent Index
+- Keep benchmark version, task count, repeats, harness, sandbox, and score definition with the rows whenever the source exposes them
+- Costs and token counts must retain their scope: API evaluation spend, subscription quota, per-task cost, and per-attempt cost are different quantities
+- A value derived by dividing a page total by a task count is derived, even when both inputs are published
+- Do not average scores from different benchmark populations into one quality number without an explicit normalization and workload definition

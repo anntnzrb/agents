@@ -116,27 +116,27 @@ proptest! {
 
 ## Properties to write for every parser
 
-1. **Round-trip:** `parse(render(x)) == x` for all valid `x`.
-2. **No-panic:** `parse(arbitrary_string)` never panics, always returns `Result`.
-3. **Idempotent:** `parse(parse(x).unwrap().render()) == parse(x).unwrap()`.
-4. **Whitespace insensitivity:** `parse(x) == parse(strip_whitespace(x))` (if applicable).
+1. **Round-trip:** `parse(render(x)) == x` for all valid `x`
+2. **No-panic:** `parse(arbitrary_string)` never panics, always returns `Result`
+3. **Idempotent:** `parse(parse(x).unwrap().render()) == parse(x).unwrap()`
+4. **Whitespace insensitivity:** `parse(x) == parse(strip_whitespace(x))` (if applicable)
 
 For every serializer:
 
-1. **Length bound:** `render(x).len() <= bound(x)`.
-2. **Charset:** `render(x).chars().all(|c| ALLOWED.contains(&c))`.
+1. **Length bound:** `render(x).len() <= bound(x)`
+2. **Charset:** `render(x).chars().all(|c| ALLOWED.contains(&c))`
 
 For every collection operation:
 
-1. **Identity:** `op_identity(x) == x` (sort an already-sorted, dedupe a unique).
-2. **Idempotence:** `op(op(x)) == op(x)`.
-3. **Commutativity:** `op(a, b) == op(b, a)` (set union, etc).
-4. **Length:** `op(a, b).len() == known_relation(a.len(), b.len())`.
+1. **Identity:** `op_identity(x) == x` (sort an already-sorted, dedupe a unique)
+2. **Idempotence:** `op(op(x)) == op(x)`
+3. **Commutativity:** `op(a, b) == op(b, a)` (set union, etc)
+4. **Length:** `op(a, b).len() == known_relation(a.len(), b.len())`
 
 For every numeric op:
 
-1. **Monotonicity:** `a <= b => f(a) <= f(b)`.
-2. **Identity element:** `f(x, identity) == x`.
+1. **Monotonicity:** `a <= b => f(a) <= f(b)`
+2. **Identity element:** `f(x, identity) == x`
 
 Write these mechanically. The agent should reach for proptest the moment any of these properties is checkable.
 
@@ -300,10 +300,10 @@ fn debug_repr() {
 ```
 
 Choose:
-- `assert_snapshot!` for `String`/`Display` output (CLI help, error messages, generated code).
-- `assert_debug_snapshot!` for `{:?}` (Rust-internal data).
-- `assert_json_snapshot!` for structured data crossing process boundaries.
-- `assert_yaml_snapshot!` when YAML is easier to read in diffs.
+- `assert_snapshot!` for `String`/`Display` output (CLI help, error messages, generated code)
+- `assert_debug_snapshot!` for `{:?}` (Rust-internal data)
+- `assert_json_snapshot!` for structured data crossing process boundaries
+- `assert_yaml_snapshot!` when YAML is easier to read in diffs
 
 ## Insta — redactions and filters
 
@@ -343,11 +343,11 @@ fn with_filters() {
 
 ## Insta workflow
 
-1. Write the test, run it. First run creates `.snap.new`.
-2. `cargo insta review` → interactive UI. Show diff, accept/reject.
-3. Accepted snapshots commit to the repo.
-4. Refactor code. Tests run; mismatches show as diffs.
-5. If the new output is correct, `cargo insta accept` (or selective `review`). If wrong, fix the code.
+1. Write the test, run it. First run creates `.snap.new`
+2. `cargo insta review` → interactive UI. Show diff, accept/reject
+3. Accepted snapshots commit to the repo
+4. Refactor code. Tests run; mismatches show as diffs
+5. If the new output is correct, `cargo insta accept` (or selective `review`). If wrong, fix the code
 
 Pair with CI to fail builds when uncommitted `.snap.new` files exist:
 
@@ -387,10 +387,10 @@ fn json_inline() {
 
 ## Anti-patterns
 
-1. **Snapshots of unstable output.** If `HashMap` iteration order changes per run, snapshots will fail. Switch to `BTreeMap` or sort before snapshotting.
-2. **Massive snapshots.** A 10KB JSON dump where you really care about 3 fields. Either narrow to the fields, or accept that any refactor will require re-reviewing 10KB.
-3. **Snapshots that bake in implementation details.** "function called 3 times" is not a snapshot - it's a behavior assertion. Use a real assertion.
-4. **Skipping `cargo insta review`.** Accepting blind via `cargo insta accept --all` defeats the purpose. Always review.
+1. **Snapshots of unstable output.** If `HashMap` iteration order changes per run, snapshots will fail. Switch to `BTreeMap` or sort before snapshotting
+2. **Massive snapshots.** A 10KB JSON dump where you really care about 3 fields. Either narrow to the fields, or accept that any refactor will require re-reviewing 10KB
+3. **Snapshots that bake in implementation details.** "function called 3 times" is not a snapshot - it's a behavior assertion. Use a real assertion
+4. **Skipping `cargo insta review`.** Accepting blind via `cargo insta accept --all` defeats the purpose. Always review
 
 ## Combining proptest + insta
 
@@ -426,8 +426,8 @@ When a proptest finds a new failure, the regression file appears as a git diff -
 
 ## What proptest cannot do
 
-- Find bugs that require multi-process / multi-network coordination → integration tests + fault injection.
-- Find concurrency bugs → use `loom` (see `concurrency.md`).
-- Find performance regressions → use `criterion`.
+- Find bugs that require multi-process / multi-network coordination → integration tests + fault injection
+- Find concurrency bugs → use `loom` (see `concurrency.md`)
+- Find performance regressions → use `criterion`
 
 But for any function with a domain (inputs to outputs), proptest can find more bugs than your unit tests. **Write the property first, derive the unit test second.**

@@ -93,10 +93,10 @@ Resolve each `offer_index` against `offers`. Absolute cheapest may be account, s
 
 ## Verification work
 
-- `verification_queue` contains up to five strict-cheapest checkout candidates with merchant, URL, and fields to verify.
-- `critical_verification_items` contains non-offer blockers such as identity, region, activation, edition, component, or tax uncertainty.
-- `warnings[]` and verification items use `code`, `severity`, `message`, `provider`, and `details` when applicable.
-- All country lookups may warn that activation/region is unverified. US lookups may warn that tax is unknown.
+- `verification_queue` contains up to five strict-cheapest checkout candidates with merchant, URL, and fields to verify
+- `critical_verification_items` contains non-offer blockers such as identity, region, activation, edition, component, or tax uncertainty
+- `warnings[]` and verification items use `code`, `severity`, `message`, `provider`, and `details` when applicable
+- All country lookups may warn that activation/region is unverified. US lookups may warn that tax is unknown
 
 ## User-facing answer
 

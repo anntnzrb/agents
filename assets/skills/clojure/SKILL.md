@@ -57,11 +57,11 @@ Project layout, deps.edn templates, core patterns, naming conventions, and anti-
 
 ## Engineering checks
 
-- Normalize untrusted input once at the boundary; use `clojure.spec` only where its validation or generation pays for itself.
-- Preserve error context with `ex-info` and structured `ex-data`; do not catch-and-forget failures.
-- Keep side effects, resource ownership, cancellation, and cleanup at the edge; keep core transformations pure.
-- Test observable behavior and failure paths with deterministic values; avoid tests that pin private implementation shape.
-- Introduce helpers, protocols, or abstraction only for a concrete reuse or boundary.
+- Normalize untrusted input once at the boundary; use `clojure.spec` only where its validation or generation pays for itself
+- Preserve error context with `ex-info` and structured `ex-data`; do not catch-and-forget failures
+- Keep side effects, resource ownership, cancellation, and cleanup at the edge; keep core transformations pure
+- Test observable behavior and failure paths with deterministic values; avoid tests that pin private implementation shape
+- Introduce helpers, protocols, or abstraction only for a concrete reuse or boundary
 
 ## Research Tools
 

@@ -448,24 +448,24 @@ let app = router.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json
 
 ## Production checklist
 
-- Bind to `0.0.0.0` in containers, `127.0.0.1` for local-only services.
-- Set `RUST_LOG=info,sqlx=warn` (or use `EnvFilter` defaults as shown).
-- Send logs to stdout in JSON. Ingest via Vector / Fluent Bit / Loki.
-- Run migrations on startup (`sqlx::migrate!` block). Fail fast on schema mismatch.
-- Health endpoint **must hit the DB** (so load balancers know if the pool is dead).
-- Add `tower::limit::RateLimitLayer` or token-bucket middleware for public endpoints.
-- Set `tower_http::limit::RequestBodyLimitLayer` to bound request size.
-- Compress with brotli + gzip via `CompressionLayer`.
-- Tighten CORS, do not ship `CorsLayer::permissive()` to production.
-- Strip sensitive headers from traces via `SetSensitiveHeadersLayer`.
-- Set up SIGTERM-driven `with_graceful_shutdown` so deploys roll without dropping requests.
-- Containerize with `cargo chef` for incremental Docker builds.
+- Bind to `0.0.0.0` in containers, `127.0.0.1` for local-only services
+- Set `RUST_LOG=info,sqlx=warn` (or use `EnvFilter` defaults as shown)
+- Send logs to stdout in JSON. Ingest via Vector / Fluent Bit / Loki
+- Run migrations on startup (`sqlx::migrate!` block). Fail fast on schema mismatch
+- Health endpoint **must hit the DB** (so load balancers know if the pool is dead)
+- Add `tower::limit::RateLimitLayer` or token-bucket middleware for public endpoints
+- Set `tower_http::limit::RequestBodyLimitLayer` to bound request size
+- Compress with brotli + gzip via `CompressionLayer`
+- Tighten CORS, do not ship `CorsLayer::permissive()` to production
+- Strip sensitive headers from traces via `SetSensitiveHeadersLayer`
+- Set up SIGTERM-driven `with_graceful_shutdown` so deploys roll without dropping requests
+- Containerize with `cargo chef` for incremental Docker builds
 
 ## Common mistakes
 
-1. **Forgetting `error_for_status()?` on outbound `reqwest`** — 4xx silently succeeds.
-2. **Returning `Result<T, sqlx::Error>` from handlers** — leak DB details to clients. Always go through `AppError`.
-3. **`Json<T>` extractor before validation** — invalid JSON returns axum's default 422 with no body shape. Wrap in a `ValidatedJson<T>` extractor that runs `validator` and returns `AppError`.
-4. **Holding DB connections across `.await` on slow external calls** — exhausts the pool. Acquire late, release early.
-5. **Skipping `tracing::instrument`** on handlers — losing per-request span correlation.
-6. **No `RequestBodyLimitLayer`** — DoS surface. Default axum has no limit.
+1. **Forgetting `error_for_status()?` on outbound `reqwest`** — 4xx silently succeeds
+2. **Returning `Result<T, sqlx::Error>` from handlers** — leak DB details to clients. Always go through `AppError`
+3. **`Json<T>` extractor before validation** — invalid JSON returns axum's default 422 with no body shape. Wrap in a `ValidatedJson<T>` extractor that runs `validator` and returns `AppError`
+4. **Holding DB connections across `.await` on slow external calls** — exhausts the pool. Acquire late, release early
+5. **Skipping `tracing::instrument`** on handlers — losing per-request span correlation
+6. **No `RequestBodyLimitLayer`** — DoS surface. Default axum has no limit

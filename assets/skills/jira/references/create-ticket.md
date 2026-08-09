@@ -41,7 +41,7 @@ Immediately before the create call, show one exact preview containing:
 - assignee, parent, labels, and notification effect, or `unavailable`;
 - unchanged rendered description and source context, marked as data;
 - bounded duplicate-search queries, returned evidence, and unresolved ambiguity;
-- the stable issue key/link that will be verified after the write, not an invented value.
+- the stable issue key/link that will be verified after the write, not an invented value
 
 Require explicit confirmation for that unchanged preview. A prior request or vague “yes” is not
 approval. Any changed lookup, target, source, or payload invalidates approval. One confirmation

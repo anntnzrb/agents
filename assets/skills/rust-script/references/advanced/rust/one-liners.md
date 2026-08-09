@@ -180,10 +180,10 @@ RUSTFLAGS="-D warnings" rust-script ./script.rs
 
 ## When NOT to use a script
 
-- It is going to live longer than a week → make it a real crate with `cargo new --bin`.
-- It needs custom build scripts (`build.rs`) → real crate.
-- It needs binary distribution to other machines → real crate with `cargo dist`.
-- It needs to be tested → real crate (scripts can technically run `#[test]`s under `cargo test`, but the workflow is awkward).
+- It is going to live longer than a week → make it a real crate with `cargo new --bin`
+- It needs custom build scripts (`build.rs`) → real crate
+- It needs binary distribution to other machines → real crate with `cargo dist`
+- It needs to be tested → real crate (scripts can technically run `#[test]`s under `cargo test`, but the workflow is awkward)
 
 A reasonable migration path: start as a script, when complexity grows past ~200 lines or you reach for a second `.rs` file, run `rust-script --emit ./script.rs` to dump a regular Cargo project skeleton and continue from there.
 

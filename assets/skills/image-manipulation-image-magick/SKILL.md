@@ -52,10 +52,10 @@ Use this skill when you need to:
 
 ## Operating Workflow
 
-1. Resolve `magick` before using it.
-   - PowerShell: store the executable in `$magick` and invoke with `& $magick`.
-   - Bash: require `command -v magick` before processing.
-2. Inspect first: use `magick identify -format "%wx%h" "path/to/image.jpg"` for dimensions or `magick identify -verbose "path/to/image.jpg"` for full metadata.
+1. Resolve `magick` before using it
+   - PowerShell: store the executable in `$magick` and invoke with `& $magick`
+   - Bash: require `command -v magick` before processing
+2. Inspect first: use `magick identify -format "%wx%h" "path/to/image.jpg"` for dimensions or `magick identify -verbose "path/to/image.jpg"` for full metadata
 3. Transform with quoted paths and explicit outputs:
    - Resize: `magick "input.jpg" -resize 427x240 "output.jpg"`
    - Thumbnail: `magick "$img" -resize 427x240 "thumbnails/thumb_$filename"`
@@ -78,20 +78,20 @@ Detailed command examples and reusable snippets live in `references/command-exam
 
 ## Safety Constraints
 
-1. **Always quote file paths** that may contain spaces.
-2. **Do not overwrite originals by accident**: write to an output directory or distinct filename unless the user explicitly requests in-place edits.
-3. **Use PowerShell call syntax**: invoke a stored executable path with `& $magick`.
-4. **Verify dimensions before expensive or conditional batch work** to avoid unnecessary processing.
-5. **Choose resize semantics deliberately**: plain `WxH` preserves aspect ratio within the box, `WxH!` distorts to exact dimensions, and `WxH^` fills at least the target dimensions.
-6. **Expect memory pressure on large batches**; process files iteratively and avoid loading unrelated images.
+1. **Always quote file paths** that may contain spaces
+2. **Do not overwrite originals by accident**: write to an output directory or distinct filename unless the user explicitly requests in-place edits
+3. **Use PowerShell call syntax**: invoke a stored executable path with `& $magick`
+4. **Verify dimensions before expensive or conditional batch work** to avoid unnecessary processing
+5. **Choose resize semantics deliberately**: plain `WxH` preserves aspect ratio within the box, `WxH!` distorts to exact dimensions, and `WxH^` fills at least the target dimensions
+6. **Expect memory pressure on large batches**; process files iteratively and avoid loading unrelated images
 
 ## Validation Guidance
 
-- Confirm ImageMagick is available before generating commands.
-- Run `identify` on representative input before and after transformations when dimensions, format, color space, or metadata matter.
-- For batch commands, validate on one file first, then apply the same command shape in the loop.
-- Check output files exist and dimensions match the requested behavior.
-- On older Linux systems with ImageMagick 6.x, `convert` may be needed instead of `magick`; prefer `magick` when available.
+- Confirm ImageMagick is available before generating commands
+- Run `identify` on representative input before and after transformations when dimensions, format, color space, or metadata matter
+- For batch commands, validate on one file first, then apply the same command shape in the loop
+- Check output files exist and dimensions match the requested behavior
+- On older Linux systems with ImageMagick 6.x, `convert` may be needed instead of `magick`; prefer `magick` when available
 
 ## Limitations
 

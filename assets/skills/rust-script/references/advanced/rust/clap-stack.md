@@ -116,12 +116,12 @@ pub enum Mode { Debug, Release }
 
 Key clap derive patterns:
 
-- `env = "VAR"` — falls back to env var if flag not given.
-- `global = true` — flag inherits to subcommands.
-- `arg_required_else_help = true` — running with no args prints help instead of erroring.
-- `value_enum` on an enum — case-insensitive parsing + auto-completion.
+- `env = "VAR"` — falls back to env var if flag not given
+- `global = true` — flag inherits to subcommands
+- `arg_required_else_help = true` — running with no args prints help instead of erroring
+- `value_enum` on an enum — case-insensitive parsing + auto-completion
 - `action = clap::ArgAction::Count` — `-v` is 1, `-vv` is 2, etc.
-- `conflicts_with` — incompatible flags.
+- `conflicts_with` — incompatible flags
 
 ## Main + tracing init
 
@@ -178,8 +178,8 @@ fn init_tracing(cli: &Cli) {
 ```
 
 Tracing on a CLI:
-- **Write to stderr.** stdout is for the tool's actual output (which the user might pipe). Logs and progress bars go to stderr.
-- **Verbosity from `-v`, not from `RUST_LOG`.** Users expect `-v` on a CLI; `RUST_LOG` is a developer escape hatch (kept, but secondary).
+- **Write to stderr.** stdout is for the tool's actual output (which the user might pipe). Logs and progress bars go to stderr
+- **Verbosity from `-v`, not from `RUST_LOG`.** Users expect `-v` on a CLI; `RUST_LOG` is a developer escape hatch (kept, but secondary)
 
 ## Progress bars — `indicatif`
 
@@ -368,21 +368,21 @@ Errors with `.wrap_err("...")` from `eyre::WrapErr` (compatible with anyhow's `.
 
 ## Distribution
 
-- Add `cargo dist init` for prebuilt binary release pipeline (cross-platform tarballs + installers).
-- Publish to Homebrew tap, AUR, scoop, Chocolatey via dist.
-- Sign Linux binaries with `cosign` if your audience is enterprise.
-- Build single static binary on Linux with `--target x86_64-unknown-linux-musl` (or `aarch64-unknown-linux-musl`).
-- For wasm-runnable CLIs (`wasi-cli`), add `--target wasm32-wasip1`.
+- Add `cargo dist init` for prebuilt binary release pipeline (cross-platform tarballs + installers)
+- Publish to Homebrew tap, AUR, scoop, Chocolatey via dist
+- Sign Linux binaries with `cosign` if your audience is enterprise
+- Build single static binary on Linux with `--target x86_64-unknown-linux-musl` (or `aarch64-unknown-linux-musl`)
+- For wasm-runnable CLIs (`wasi-cli`), add `--target wasm32-wasip1`
 
 ## Common mistakes
 
-1. **Mixing stdout and stderr.** Tool output goes to stdout; logs and progress go to stderr.
-2. **No `--non-interactive` flag.** Interactive prompts block automation.
-3. **Printing colored output unconditionally.** Honor `NO_COLOR` env var, detect TTY with `console::user_attended()`.
-4. **`println!` for errors.** Use `tracing::error!` so logs go to stderr automatically and respect verbosity.
-5. **`unwrap()` on `Cli::parse()`.** clap returns clean errors with `--help` text; `parse()` exits on its own.
-6. **Long subcommand handlers in `main.rs`.** Split into `src/commands/<name>.rs` per command.
-7. **Missing exit code semantics.** Use `std::process::exit(1)` (general error), `2` (usage), `130` (SIGINT) appropriately. Or return `Result` and let main map.
+1. **Mixing stdout and stderr.** Tool output goes to stdout; logs and progress go to stderr
+2. **No `--non-interactive` flag.** Interactive prompts block automation
+3. **Printing colored output unconditionally.** Honor `NO_COLOR` env var, detect TTY with `console::user_attended()`
+4. **`println!` for errors.** Use `tracing::error!` so logs go to stderr automatically and respect verbosity
+5. **`unwrap()` on `Cli::parse()`.** clap returns clean errors with `--help` text; `parse()` exits on its own
+6. **Long subcommand handlers in `main.rs`.** Split into `src/commands/<name>.rs` per command
+7. **Missing exit code semantics.** Use `std::process::exit(1)` (general error), `2` (usage), `130` (SIGINT) appropriately. Or return `Result` and let main map
 
 ## Testing CLIs
 

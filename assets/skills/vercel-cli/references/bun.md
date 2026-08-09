@@ -68,4 +68,4 @@ export default app;
 
 ## Anti-Patterns
 
-- **Forgetting `bunVersion` in `vercel.json`**: Without it, your project runs on Node.js. Bun-specific APIs (like `Bun.file()`) will fail at runtime.
+- **Forgetting `bunVersion` in `vercel.json`**: Without it, your project runs on Node.js. Bun-specific APIs (like `Bun.file()`) will fail at runtime

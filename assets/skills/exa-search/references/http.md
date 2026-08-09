@@ -90,10 +90,10 @@ uv run --script <skill-dir>/scripts/cli.py post /answer '{"query":"What is Bun?"
 
 ## Notes
 
-- `search` is usually enough for primary discovery.
-- `contents` is the direct replacement for a known-URL fetch workflow.
-- `research/v1` is the direct HTTP path for Exa's deeper synthesis mode.
-- For public OSS code-pattern lookup, `grep-app` is usually a better first tool than Exa.
+- `search` is usually enough for primary discovery
+- `contents` is the direct replacement for a known-URL fetch workflow
+- `research/v1` is the direct HTTP path for Exa's deeper synthesis mode
+- For public OSS code-pattern lookup, `grep-app` is usually a better first tool than Exa
 
 ## Validation
 

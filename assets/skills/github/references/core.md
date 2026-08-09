@@ -21,7 +21,7 @@ The general shape is:
 gh <command> [<subcommand> ...] [flags]
 ```
 
-- Use an explicit `[HOST/]OWNER/REPO` with `--repo` whenever the command supports it.
+- Use an explicit `[HOST/]OWNER/REPO` with `--repo` whenever the command supports it
 - A verified local checkout may supply repository context, but confirm its remote and
   host first; a directory name is not a repository identity.
 - Use `--hostname <host>` for commands that expose host selection. For `gh api`, the
@@ -29,7 +29,7 @@ gh <command> [<subcommand> ...] [flags]
 - `GH_HOST` sets the default GitHub Enterprise host. `GH_REPO` supplies a default
   repository in `HOST/OWNER/REPO` form. Set either only when the value is known and
   safe for this operation; explicit flags are easier to audit.
-- For multiple remotes, inspect them and select the intended remote/host explicitly.
+- For multiple remotes, inspect them and select the intended remote/host explicitly
   Never infer the write target from whichever remote appears first.
 
 Read-only preflight for a live request:
@@ -63,7 +63,7 @@ Treat these as side effects, not ordinary reads:
 - `--web`, `gh browse`, and flags that open a browser;
 - editor prompts and interactive issue/PR forms;
 - pagers and colorized/TUI output;
-- commands that wait for user input or attach to a live terminal.
+- commands that wait for user input or attach to a live terminal
 
 Prefer command flags for complete noninteractive input. Set `GH_EDITOR`, `GIT_EDITOR`,
 `VISUAL`, or `EDITOR` only when the user explicitly wants an editor; use `GH_BROWSER`
@@ -77,7 +77,7 @@ Prefer structured output in this order:
 
 1. `--json <fields>` on commands that support it;
 2. `--jq '<filter>'` to select or reshape JSON;
-3. `--template '<go-template>'` for a stable text rendering.
+3. `--template '<go-template>'` for a stable text rendering
 
 Discover fields with `--json` without a field list, then request only the fields the
 task needs. Parse stdout as data and stderr as diagnostics. Do not use human tables,

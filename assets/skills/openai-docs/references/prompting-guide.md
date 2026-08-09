@@ -26,7 +26,7 @@ Trim:
 - generic “be thorough,” “be concise,” or “think step by step” language;
 - examples that do not change behavior;
 - process instructions for behavior the model already performs reliably;
-- tools and tool descriptions unrelated to the task.
+- tools and tool descriptions unrelated to the task
 
 Keep:
 
@@ -34,7 +34,7 @@ Keep:
 - success criteria and stopping conditions;
 - safety, business, evidence, and permission constraints;
 - tool-routing rules when the correct route is not obvious;
-- required output shape and validation requirements.
+- required output shape and validation requirements
 
 Review the remaining instructions for contradictions. GPT-5-class models follow prompt contracts closely, so conflicting rules can create more instability than missing detail.
 
@@ -70,8 +70,8 @@ Add stopping conditions:
 
 GPT-5.6 is efficient, direct, and more compressed than recent models. For customer-facing assistants and collaborative products, define both personality and collaboration style.
 
-- Personality controls tone, warmth, directness, formality, humor, empathy, and polish.
-- Collaboration style controls when the model asks questions, makes assumptions, takes initiative, explains tradeoffs, checks work, and handles uncertainty.
+- Personality controls tone, warmth, directness, formality, humor, empathy, and polish
+- Collaboration style controls when the model asks questions, makes assumptions, takes initiative, explains tradeoffs, checks work, and handles uncertainty
 
 Keep both short. Personality should shape the user experience; collaboration instructions should shape task behavior. Neither should replace clear goals, success criteria, tool rules, or stopping conditions.
 
@@ -140,7 +140,7 @@ Use it for:
 - filtering, joining, sorting, ranking, deduplication, and aggregation;
 - batching across many similar records;
 - repeated deterministic validation;
-- large structured results that can be reduced to a compact schema.
+- large structured results that can be reduced to a compact schema
 
 Prefer direct tool calls when:
 
@@ -149,7 +149,7 @@ Prefer direct tool calls when:
 - each result may change the next decision;
 - an action requires approval;
 - the final answer must preserve citations or native artifacts;
-- the workflow requires semantic judgment between calls.
+- the workflow requires semantic judgment between calls
 
 Do not rely on generic instructions such as “use Programmatic Tool Calling efficiently.” State the bounded stage, eligible tools, output schema, retry limit, stop condition, and handoff back to direct model judgment.
 
@@ -183,7 +183,7 @@ For research and synthesis:
 - attach citations to the claims they support;
 - label inference separately from directly supported facts;
 - state conflicts between sources;
-- narrow the answer or report missing evidence instead of guessing.
+- narrow the answer or report missing evidence instead of guessing
 
 For creative drafting, distinguish source-backed facts from creative wording. Do not invent names, metrics, dates, roadmap status, customer outcomes, or product capabilities to make a draft sound stronger.
 
@@ -208,12 +208,12 @@ Prompt caching also affects prompt construction. Keep reusable prefixes stable a
 
 Treat reasoning effort as a last-mile tuning knob, not the first response to a weak result.
 
-- Preserve the current GPT-5.5 or GPT-5.4 reasoning effort as the baseline.
-- Test the same setting and one level lower on representative tasks.
-- Use low for latency-sensitive work when it preserves quality.
-- Use medium as a balanced starting point.
-- Use high or xhigh only when evals show a meaningful gain.
-- Reserve max for the hardest quality-first workloads; do not recommend it globally.
+- Preserve the current GPT-5.5 or GPT-5.4 reasoning effort as the baseline
+- Test the same setting and one level lower on representative tasks
+- Use low for latency-sensitive work when it preserves quality
+- Use medium as a balanced starting point
+- Use high or xhigh only when evals show a meaningful gain
+- Reserve max for the hardest quality-first workloads; do not recommend it globally
 
 Before increasing reasoning effort, check whether the prompt is missing a success criterion, dependency rule, tool-routing rule, or verification loop.
 
@@ -226,7 +226,7 @@ For incremental frontend changes:
 - inspect and preserve existing design tokens, components, and patterns;
 - do not add extra features or decorative UI unless requested;
 - preserve responsive behavior and expected states;
-- render and inspect the result before finalizing.
+- render and inspect the result before finalizing
 
 For vision, computer use, localization, or OCR tasks where spatial precision matters, choose image detail intentionally. Use original detail for large, dense, or coordinate-sensitive images when the extra input cost and latency are justified.
 
@@ -276,11 +276,11 @@ Use this structure as a starting point for complex prompts. Keep each section sh
 
 When moving an existing application to GPT-5.6:
 
-1. Switch the model and preserve the current reasoning effort.
-2. Run representative evals before changing the prompt.
-3. Remove obsolete scaffolding, repeated instructions, and irrelevant tools.
-4. Add only the smallest targeted instruction that fixes a measured regression.
-5. Re-run evals after each prompt or reasoning change.
+1. Switch the model and preserve the current reasoning effort
+2. Run representative evals before changing the prompt
+3. Remove obsolete scaffolding, repeated instructions, and irrelevant tools
+4. Add only the smallest targeted instruction that fixes a measured regression
+5. Re-run evals after each prompt or reasoning change
 
 Do not rewrite a working prompt stack all at once. Otherwise you cannot tell whether a behavior change came from the model, reasoning setting, prompt, tool set, or runtime.
 

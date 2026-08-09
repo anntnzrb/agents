@@ -90,8 +90,8 @@ Observed:
 
 ## 5) Residual risks
 
-- Key and section outputs are heuristic, not symbolic-music ground truth.
-- Intent routing is deterministic keyword matching; multilingual recall is limited until token set is expanded.
+- Key and section outputs are heuristic, not symbolic-music ground truth
+- Intent routing is deterministic keyword matching; multilingual recall is limited until token set is expanded
 
 ## 6) Conclusion
 

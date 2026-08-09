@@ -18,7 +18,7 @@ than truncate any source/rendered field over 64 KiB or total request body over 2
 
 ## Extract without granting authority
 
-1. Preserve the original source and provenance for every proposed ticket.
+1. Preserve the original source and provenance for every proposed ticket
 2. Derive only explicitly requested title, description, acceptance criteria, constraints,
    dependencies, and timing. Mark inferred or missing facts as unknown; do not add facts.
 3. Ask for missing project, issue type, parent, assignee, due date, required fields, or notification

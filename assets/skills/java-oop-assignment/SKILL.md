@@ -41,10 +41,10 @@ For each task:
 
 ### Phase 4: Verify
 
-1. Resolve `<gradle-wrapper>` for the current platform.
-2. Build: `<gradle-wrapper> compileJava`.
-3. Run a provided playground: `<gradle-wrapper> run`.
-4. Check output matches PDF examples.
+1. Resolve `<gradle-wrapper>` for the current platform
+2. Build: `<gradle-wrapper> compileJava`
+3. Run a provided playground: `<gradle-wrapper> run`
+4. Check output matches PDF examples
 
 ## Implementation Rules
 
@@ -54,10 +54,10 @@ For each task:
 - No extra validation unless specified
 - No helper methods unless reused 3+ times
 - Match exact signatures from PDF (visibility, types, names)
-- Parse external input once at its boundary; use the assignment’s domain types instead of strings or loose flags when confusion would be a bug.
-- Make specified failure behavior explicit and preserve useful context; do not swallow exceptions or add unrequested recovery paths.
-- Keep ownership and mutation clear: initialize required state in constructors and avoid sharing mutable state without an assignment requirement.
-- Test observable examples and meaningful edge or failure cases; do not pin private helper structure.
+- Parse external input once at its boundary; use the assignment’s domain types instead of strings or loose flags when confusion would be a bug
+- Make specified failure behavior explicit and preserve useful context; do not swallow exceptions or add unrequested recovery paths
+- Keep ownership and mutation clear: initialize required state in constructors and avoid sharing mutable state without an assignment requirement
+- Test observable examples and meaningful edge or failure cases; do not pin private helper structure
 
 ### PDF Reading Tips
 
@@ -80,7 +80,7 @@ Use the following for code conciseness, elegance and brevity.
 
 ### Gradle Notes
 
-- If the build reports a Java-version error, select JDK 21 for the current shell and run `<gradle-wrapper> build`.
+- If the build reports a Java-version error, select JDK 21 for the current shell and run `<gradle-wrapper> build`
 - `@StudentImplementationRequired("H6.X")` marks methods to implement
 - Remove `crash("H6.X")` calls when implementing
 

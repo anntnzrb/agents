@@ -44,9 +44,9 @@ while let Some(joined) = set.join_next().await {
 ```
 
 `JoinSet`:
-- Knows when all spawned tasks finish.
-- Dropping the set aborts every still-running task.
-- Lets you handle failures one by one rather than all-or-nothing.
+- Knows when all spawned tasks finish
+- Dropping the set aborts every still-running task
+- Lets you handle failures one by one rather than all-or-nothing
 
 For wait-for-all semantics with one type, `join!`:
 
@@ -233,10 +233,10 @@ Pattern: catch signal → cancel a token shared with the server → server's `se
 
 ## Concurrency primitives
 
-- `tokio::sync::Mutex` — async mutex. Use for state shared between async tasks. **Do not hold across `.await` without thinking** (you'll serialize the whole system).
-- `tokio::sync::RwLock` — async read-write lock. Same caveat.
-- `parking_lot::Mutex` — sync mutex, faster than `std::sync::Mutex`, no poisoning. Use when the lock is held briefly and you do not need to `.await` while holding it.
-- `tokio::sync::Semaphore` — bound concurrent operations. Perfect for "max 10 in-flight HTTP requests" or "max 3 DB writers".
+- `tokio::sync::Mutex` — async mutex. Use for state shared between async tasks. **Do not hold across `.await` without thinking** (you'll serialize the whole system)
+- `tokio::sync::RwLock` — async read-write lock. Same caveat
+- `parking_lot::Mutex` — sync mutex, faster than `std::sync::Mutex`, no poisoning. Use when the lock is held briefly and you do not need to `.await` while holding it
+- `tokio::sync::Semaphore` — bound concurrent operations. Perfect for "max 10 in-flight HTTP requests" or "max 3 DB writers"
 
 ```rust
 let sem = Arc::new(tokio::sync::Semaphore::new(10));
@@ -251,13 +251,13 @@ for url in urls {
 
 ## Common mistakes
 
-1. **Holding a sync mutex across `.await`.** Compiles and runs, deadlocks at scale. Solution: refactor to release before await, or use `tokio::sync::Mutex`.
-2. **Forgetting `?` on `JoinHandle`.** A panicked task returns `Err(JoinError)`; if you `.await` and ignore, panics are silently swallowed.
-3. **`tokio::spawn` instead of `JoinSet`.** Detached tasks survive past their parent, causing leaks. Default to `JoinSet` for structured concurrency.
-4. **Unbounded channels.** Always set a capacity.
-5. **`block_on` inside an async context.** Causes deadlock under `current_thread` runtime, performance cliff under `multi_thread`.
-6. **CPU-heavy work in async fn.** Move to `spawn_blocking` or `rayon`.
-7. **No timeout on external I/O.** Every `await` that touches the network or filesystem needs `tokio::time::timeout` wrapping.
+1. **Holding a sync mutex across `.await`.** Compiles and runs, deadlocks at scale. Solution: refactor to release before await, or use `tokio::sync::Mutex`
+2. **Forgetting `?` on `JoinHandle`.** A panicked task returns `Err(JoinError)`; if you `.await` and ignore, panics are silently swallowed
+3. **`tokio::spawn` instead of `JoinSet`.** Detached tasks survive past their parent, causing leaks. Default to `JoinSet` for structured concurrency
+4. **Unbounded channels.** Always set a capacity
+5. **`block_on` inside an async context.** Causes deadlock under `current_thread` runtime, performance cliff under `multi_thread`
+6. **CPU-heavy work in async fn.** Move to `spawn_blocking` or `rayon`
+7. **No timeout on external I/O.** Every `await` that touches the network or filesystem needs `tokio::time::timeout` wrapping
 
 ## Testing async code
 
@@ -292,8 +292,8 @@ async fn time_travel() {
 
 ## When NOT to use async
 
-- Single-threaded CPU-heavy code that does no I/O — plain `fn` + `rayon` is simpler and often faster.
-- Trivial scripts that do one HTTP call — `ureq` (sync) is simpler.
-- FFI heavy code where the FFI side is sync.
+- Single-threaded CPU-heavy code that does no I/O — plain `fn` + `rayon` is simpler and often faster
+- Trivial scripts that do one HTTP call — `ureq` (sync) is simpler
+- FFI heavy code where the FFI side is sync
 
 Async pays off when you have many concurrent I/O operations or need cancellation as a first-class primitive.

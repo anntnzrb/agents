@@ -11,9 +11,9 @@ Goroutines, context, errgroup, channels, locks, and the discipline that keeps th
 ## The four non-negotiables
 
 1. **`ctx context.Context` is the first parameter of every public function that does I/O or can be cancelled.**
-2. **No goroutine without a shutdown path.** Every `go` keyword must answer "how does this stop?".
-3. **`-race` on every test run.** The `Taskfile.yml` and CI both enforce it.
-4. **`goleak` in `TestMain`** for every package that spawns goroutines. Catches leaks the race detector cannot.
+2. **No goroutine without a shutdown path.** Every `go` keyword must answer "how does this stop?"
+3. **`-race` on every test run.** The `Taskfile.yml` and CI both enforce it
+4. **`goleak` in `TestMain`** for every package that spawns goroutines. Catches leaks the race detector cannot
 
 ---
 
@@ -59,9 +59,9 @@ func RequestID(ctx context.Context) string {
 ```
 
 **Rules**:
-- Keys are unexported struct types, not strings. Prevents collisions across packages.
-- `context.Value` is for *request-scoped metadata* (request ID, auth subject, trace span), NEVER for application-scoped dependencies.
-- Dependencies (loggers, DB pools, config) go in your service struct, not in `context.Value`.
+- Keys are unexported struct types, not strings. Prevents collisions across packages
+- `context.Value` is for *request-scoped metadata* (request ID, auth subject, trace span), NEVER for application-scoped dependencies
+- Dependencies (loggers, DB pools, config) go in your service struct, not in `context.Value`
 
 ### `WithTimeout` / `WithCancel` — always pair with `defer cancel()`
 
@@ -107,8 +107,8 @@ func FetchAll(ctx context.Context, urls []string) ([][]byte, error) {
 
 Properties:
 
-- `WithContext(parent)` returns a child ctx that gets cancelled on **first non-nil error**. All in-flight goroutines see `ctx.Done()` and bail.
-- `SetLimit(n)` blocks `g.Go(...)` when the in-flight count hits `n`. **Always set this.** Unbounded fan-out is how services die.
+- `WithContext(parent)` returns a child ctx that gets cancelled on **first non-nil error**. All in-flight goroutines see `ctx.Done()` and bail
+- `SetLimit(n)` blocks `g.Go(...)` when the in-flight count hits `n`. **Always set this.** Unbounded fan-out is how services die
 - `g.Wait()` returns the **first** non-nil error. Others are dropped. If you need all errors, accumulate them manually:
   ```go
   var mu sync.Mutex
@@ -164,9 +164,9 @@ Direction restricts misuse. A consumer cannot close the producer's channel.
 
 ### Closing
 
-- **The sender closes.** Always. Never the receiver, never multiple senders.
+- **The sender closes.** Always. Never the receiver, never multiple senders
 - **Multiple senders → use a `sync.WaitGroup` + one closer.**
-- **Closing a closed channel panics.** Closing a `nil` channel panics. Sending on a closed channel panics. Receiving from a closed channel returns zero value with `ok = false`.
+- **Closing a closed channel panics.** Closing a `nil` channel panics. Sending on a closed channel panics. Receiving from a closed channel returns zero value with `ok = false`
 
 ```go
 // Canonical fan-in: multiple producers, one closer
@@ -204,13 +204,13 @@ case <-time.After(5 * time.Second):
 }
 ```
 
-- `time.After` allocates a timer each call — fine for occasional selects, **NOT for hot loops**. Use `time.NewTimer` + `timer.Reset` for repeat selects.
-- A `default:` case makes `select` non-blocking. Use deliberately, not by accident.
+- `time.After` allocates a timer each call — fine for occasional selects, **NOT for hot loops**. Use `time.NewTimer` + `timer.Reset` for repeat selects
+- A `default:` case makes `select` non-blocking. Use deliberately, not by accident
 
 ### Buffered vs unbuffered
 
-- **Unbuffered** (`make(chan T)`) = synchronous handoff. Sender blocks until receiver is ready. Use for *coordination*.
-- **Buffered** (`make(chan T, n)`) = asynchronous up to `n`. Use for *decoupling producer rate from consumer rate*.
+- **Unbuffered** (`make(chan T)`) = synchronous handoff. Sender blocks until receiver is ready. Use for *coordination*
+- **Buffered** (`make(chan T, n)`) = asynchronous up to `n`. Use for *decoupling producer rate from consumer rate*
 
 A buffered channel of size 1 acts as a **non-blocking signal**:
 
@@ -265,9 +265,9 @@ func (c *Cache) Set(key string, e Entry) {
 }
 ```
 
-- `sync.Mutex` is **not** copyable. The `copylocks` vet check catches `var c2 = c1` where `c1` has a mutex.
-- Always `defer mu.Unlock()` immediately after `Lock()`. Forgetting is the #1 deadlock cause.
-- Never call user code (callbacks, listener notifications) while holding the lock. Drop the lock, snapshot the data, release, then call out.
+- `sync.Mutex` is **not** copyable. The `copylocks` vet check catches `var c2 = c1` where `c1` has a mutex
+- Always `defer mu.Unlock()` immediately after `Lock()`. Forgetting is the #1 deadlock cause
+- Never call user code (callbacks, listener notifications) while holding the lock. Drop the lock, snapshot the data, release, then call out
 
 ### `sync.OnceValue` / `sync.OnceFunc` (Go 1.21+)
 
@@ -323,9 +323,9 @@ svc := &Service{clock: fake}
 **Never call `time.Now()` in domain or service code.** The `time` package becomes a hidden dependency — tests become flaky, retries become time-of-day-dependent, expirations cannot be tested.
 
 `time.Sleep` in production code is a code smell. Use:
-- `time.NewTicker` for periodic work (and a `<-ctx.Done()` exit).
-- `time.NewTimer` for one-shot delays.
-- `time.After` ONLY in select statements, ONLY in non-hot paths.
+- `time.NewTicker` for periodic work (and a `<-ctx.Done()` exit)
+- `time.NewTimer` for one-shot delays
+- `time.After` ONLY in select statements, ONLY in non-hot paths
 
 ---
 
@@ -335,9 +335,9 @@ svc := &Service{clock: fake}
 go test -race -shuffle=on -count=1 ./...
 ```
 
-- `-race` instruments memory accesses; catches data races at runtime. ~10x slow-down — acceptable for tests, not production.
-- `-shuffle=on` randomizes test order; catches hidden ordering dependencies.
-- `-count=1` defeats the test cache. Without it, "passing" might mean "ran 3 weeks ago".
+- `-race` instruments memory accesses; catches data races at runtime. ~10x slow-down — acceptable for tests, not production
+- `-shuffle=on` randomizes test order; catches hidden ordering dependencies
+- `-count=1` defeats the test cache. Without it, "passing" might mean "ran 3 weeks ago"
 
 If a test ONLY fails under `-race`, the bug is real. Don't disable the test; fix the race.
 

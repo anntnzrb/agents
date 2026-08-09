@@ -21,13 +21,13 @@ Read-only Amazon catalog search through the bundled skill-local CLI. Use it for 
 
 ## Core rules
 
-- Prefer `--llm-json` unless the user explicitly wants human text.
-- Start cheap; avoid `--details` on a broad first pass unless the shortlist is already tiny.
-- Add `--zip` early when delivery locality matters.
-- Add `--details --detail-limit 2` only for finalists.
-- Add `--scoring` when the user wants “best”, “good enough”, “not trash”, “value”, or ranking help.
-- Answer from envelope fields, not vibes.
-- Do not dump raw JSON unless asked.
+- Prefer `--llm-json` unless the user explicitly wants human text
+- Start cheap; avoid `--details` on a broad first pass unless the shortlist is already tiny
+- Add `--zip` early when delivery locality matters
+- Add `--details --detail-limit 2` only for finalists
+- Add `--scoring` when the user wants “best”, “good enough”, “not trash”, “value”, or ranking help
+- Answer from envelope fields, not vibes
+- Do not dump raw JSON unless asked
 
 ## Required follow-up reads
 
@@ -49,10 +49,10 @@ Read-only Amazon catalog search through the bundled skill-local CLI. Use it for 
    - programmatic integration
    - blocked fetch debugging
    - location-sensitive reruns
-2. Run an `--llm-json` discovery pass with `--limit 10`; add `--zip` if locality matters.
-3. Tighten with `--max-price`, `--min-rating`, `--include`, `--exclude`, `--title-contains`, `--badge`, `--zip`, `--page`, `--pages`, or `--amazon-sort`.
-4. For finalists, rerun with `--details --detail-limit 2 --scoring --limit 5`.
-5. Inspect top 3-5 results, then summarize price, rating, review count, brand, merchant trust when available, delivery-locality caveat when using `--zip`, and mismatch/risk.
+2. Run an `--llm-json` discovery pass with `--limit 10`; add `--zip` if locality matters
+3. Tighten with `--max-price`, `--min-rating`, `--include`, `--exclude`, `--title-contains`, `--badge`, `--zip`, `--page`, `--pages`, or `--amazon-sort`
+4. For finalists, rerun with `--details --detail-limit 2 --scoring --limit 5`
+5. Inspect top 3-5 results, then summarize price, rating, review count, brand, merchant trust when available, delivery-locality caveat when using `--zip`, and mismatch/risk
 
 ## Reference routing
 

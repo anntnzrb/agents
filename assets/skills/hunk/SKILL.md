@@ -47,8 +47,8 @@ hunk session context (--repo . | <id>) [--json]
 hunk session review (--repo . | <id>) [--json] [--include-patch]
 ```
 
-- `get` reports `Path`, `Repo`, and `Source`. `--repo` matches `Repo`; `--session-path` matches `Path`.
-- Start with `review --json`, which returns file and hunk structure. Add `--include-patch` only when raw unified diff text is necessary.
+- `get` reports `Path`, `Repo`, and `Source`. `--repo` matches `Repo`; `--session-path` matches `Path`
+- Start with `review --json`, which returns file and hunk structure. Add `--include-patch` only when raw unified diff text is necessary
 
 ## Navigate
 
@@ -67,8 +67,8 @@ hunk session navigate --repo . --next-comment
 hunk session navigate --repo . --prev-comment
 ```
 
-- Hunk numbers and line numbers are 1-based.
-- Use exactly one of `--next-comment` and `--prev-comment`.
+- Hunk numbers and line numbers are 1-based
+- Use exactly one of `--next-comment` and `--prev-comment`
 
 ## Reload
 
@@ -83,10 +83,10 @@ hunk session reload --repo <worktree> -- diff
 hunk session reload --session-path <live-window> --source <other-checkout> -- diff
 ```
 
-- Always include `--` before the nested Hunk command.
-- Select sessions with `--repo` or an exact session ID.
-- `--source` changes where the replacement command runs; it does not select a session.
-- Use `--session-path` only when session selection and reload source must differ.
+- Always include `--` before the nested Hunk command
+- Select sessions with `--repo` or an exact session ID
+- `--source` changes where the replacement command runs; it does not select a session
+- Use `--session-path` only when session selection and reload source must differ
 
 ## Comments
 
@@ -98,22 +98,22 @@ hunk session comment rm --repo . <comment-id>
 hunk session comment clear --repo . --yes [--file README.md]
 ```
 
-- Use `comment add` for one note and `comment apply` for a prepared batch.
-- `comment add` requires `--file`, `--summary`, and exactly one of `--old-line` or `--new-line`.
-- Every batch item requires `filePath`, `summary`, and exactly one target: `hunk`, `hunkNumber`, `oldLine`, or `newLine`.
-- `comment apply` reads JSON from stdin and validates the full batch before mutation.
-- Use `--focus` only when the new note should steer the user's view.
-- Quote summaries and rationales defensively.
+- Use `comment add` for one note and `comment apply` for a prepared batch
+- `comment add` requires `--file`, `--summary`, and exactly one of `--old-line` or `--new-line`
+- Every batch item requires `filePath`, `summary`, and exactly one target: `hunk`, `hunkNumber`, `oldLine`, or `newLine`
+- `comment apply` reads JSON from stdin and validates the full batch before mutation
+- Use `--focus` only when the new note should steer the user's view
+- Quote summaries and rationales defensively
 
 ## Guide a review
 
 When asked to walk through a changeset, inspect structure with `review --json` before requesting patch text. Then:
 
-1. Reload the right content if needed.
-2. Navigate to the first important file or hunk.
-3. Explain intent, structure, risk, or a non-obvious follow-up in a focused comment.
-4. Apply prepared notes as one batch.
-5. Summarize the review.
+1. Reload the right content if needed
+2. Navigate to the first important file or hunk
+3. Explain intent, structure, risk, or a non-obvious follow-up in a focused comment
+4. Apply prepared notes as one batch
+5. Summarize the review
 
 Tell the clearest story rather than following file order. Do not comment on every hunk; highlight what the user would not readily spot.
 
@@ -125,11 +125,11 @@ hunk session reload --repo . -- diff --exclude-untracked
 
 ## Recover from errors
 
-- **No visible diff file matches** — inspect `context`; reload the expected review if needed.
-- **No active Hunk sessions** — if Hunk is visibly running, localhost may be sandboxed; retry with network or sandbox escalation. Otherwise ask the user to open Hunk.
-- **Multiple active sessions match** — pass the exact session ID.
-- **No active Hunk session matches session path** — inspect `Path` with `get` or `list`, then correct `--session-path`.
-- **Pass the replacement Hunk command after `--`** — insert `--` before the nested `diff` or `show` command.
-- **Pass --stdin to read batch comments from stdin JSON** — add `--stdin` to `comment apply`.
-- **Specify exactly one navigation target** — choose one of `--hunk`, `--old-line`, or `--new-line`.
-- **Specify either --next-comment or --prev-comment, not both** — choose one direction.
+- **No visible diff file matches** — inspect `context`; reload the expected review if needed
+- **No active Hunk sessions** — if Hunk is visibly running, localhost may be sandboxed; retry with network or sandbox escalation. Otherwise ask the user to open Hunk
+- **Multiple active sessions match** — pass the exact session ID
+- **No active Hunk session matches session path** — inspect `Path` with `get` or `list`, then correct `--session-path`
+- **Pass the replacement Hunk command after `--`** — insert `--` before the nested `diff` or `show` command
+- **Pass --stdin to read batch comments from stdin JSON** — add `--stdin` to `comment apply`
+- **Specify exactly one navigation target** — choose one of `--hunk`, `--old-line`, or `--new-line`
+- **Specify either --next-comment or --prev-comment, not both** — choose one direction

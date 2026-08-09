@@ -189,7 +189,7 @@ When debugging, separate:
 
 ## Minimal debugging moves
 
-- Log the **actual value and type**, not just the property you hoped existed.
-- Reduce the bug to a 10-line repro. JS semantics become obvious fast when stripped of framework noise.
-- Replace clever chains with named intermediate values while debugging.
-- Check call sites first. Most `this` bugs are introduced where the function is passed, not where it is defined.
+- Log the **actual value and type**, not just the property you hoped existed
+- Reduce the bug to a 10-line repro. JS semantics become obvious fast when stripped of framework noise
+- Replace clever chains with named intermediate values while debugging
+- Check call sites first. Most `this` bugs are introduced where the function is passed, not where it is defined

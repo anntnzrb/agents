@@ -6,12 +6,12 @@ Read this when the chart type or confidence story is undecided.
 
 Write one sentence: “An audience should decide **X** about **population Y**, measured as **M**, over **time/window T**.” Then choose the simplest view:
 
-- Comparison: sorted bars or dot plot; use aligned baselines and direct labels for few values.
-- Trend: line or step chart; show cadence, gaps, and meaningful zeroes.
-- Distribution: histogram, density, box/interval plot; disclose binning and sample size.
-- Relationship: scatterplot or small multiples; distinguish correlation from causation.
-- Composition: stacked bars or area only when the whole is stable and parts remain legible; otherwise use grouped/small multiples.
-- Lookup: table, matrix, or labeled dot plot; do not force a chart where exact retrieval is the task.
+- Comparison: sorted bars or dot plot; use aligned baselines and direct labels for few values
+- Trend: line or step chart; show cadence, gaps, and meaningful zeroes
+- Distribution: histogram, density, box/interval plot; disclose binning and sample size
+- Relationship: scatterplot or small multiples; distinguish correlation from causation
+- Composition: stacked bars or area only when the whole is stable and parts remain legible; otherwise use grouped/small multiples
+- Lookup: table, matrix, or labeled dot plot; do not force a chart where exact retrieval is the task
 
 Avoid pie/donut for many categories, dual axes that invite false equivalence, decorative 3-D, and smoothing that hides observations. Sort only when rank is the claim; preserve meaningful order for time, geography, or process.
 

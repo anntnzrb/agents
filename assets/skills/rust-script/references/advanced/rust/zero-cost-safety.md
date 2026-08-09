@@ -522,10 +522,10 @@ All achievable within Rust's single toolchain. You get Zig's explicitness **plus
 
 ## When NOT to Use These Patterns
 
-- **Arena allocation** overkill for simple CLI tools that allocate once and exit.
-- **Zero-alloc APIs** hurt readability when the function naturally produces owned data. Don't force `&mut [u8]` output buffers on a function that logically returns `String`.
-- **`#[repr(packed)]`** only for wire formats and FFI. Never for regular domain types.
-- **Scope guards** unnecessary when `Drop` on the value itself handles cleanup (e.g., `tempfile::NamedTempFile` already does this).
-- **`const fn`** everything? No — only when the value is genuinely needed at compile time or the function is trivially const-eligible. Don't contort logic just to be const.
+- **Arena allocation** overkill for simple CLI tools that allocate once and exit
+- **Zero-alloc APIs** hurt readability when the function naturally produces owned data. Don't force `&mut [u8]` output buffers on a function that logically returns `String`
+- **`#[repr(packed)]`** only for wire formats and FFI. Never for regular domain types
+- **Scope guards** unnecessary when `Drop` on the value itself handles cleanup (e.g., `tempfile::NamedTempFile` already does this)
+- **`const fn`** everything? No — only when the value is genuinely needed at compile time or the function is trivially const-eligible. Don't contort logic just to be const
 
 The goal is **visible costs and explicit control**, not asceticism. Use `String` and `Vec` freely when they're the right tool. Reach for these patterns when allocation behavior matters for correctness or performance.

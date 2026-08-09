@@ -16,17 +16,17 @@ January 2026
 
 Use this file as a performance review/reference corpus, not as a mandate to apply every rule at once.
 
-- Start from the user-visible outcome: faster React/Next.js behavior without changing product behavior.
-- Apply the smallest relevant rule set for the observed bottleneck.
-- Prefer measurable wins: waterfalls, bundle size, server work, rendering churn, and hydration issues before low-impact micro-optimizations.
-- Preserve existing APIs, UX, accessibility, and design-system intent unless the task explicitly asks to change them.
-- When evidence is missing, identify the likely bottleneck and the smallest measurement or inspection needed.
+- Start from the user-visible outcome: faster React/Next.js behavior without changing product behavior
+- Apply the smallest relevant rule set for the observed bottleneck
+- Prefer measurable wins: waterfalls, bundle size, server work, rendering churn, and hydration issues before low-impact micro-optimizations
+- Preserve existing APIs, UX, accessibility, and design-system intent unless the task explicitly asks to change them
+- When evidence is missing, identify the likely bottleneck and the smallest measurement or inspection needed
 
 ## Stop Rules
 
-- Do not rewrite working React code only to satisfy a pattern when no relevant bottleneck or task goal exists.
-- Do not stack multiple optimization categories in one patch unless they are tightly coupled.
-- Stop after the requested review/refactor is complete and validation or measurement is reported.
+- Do not rewrite working React code only to satisfy a pattern when no relevant bottleneck or task goal exists
+- Do not stack multiple optimization categories in one patch unless they are tightly coupled
+- Stop after the requested review/refactor is complete and validation or measurement is reported
 
 ---
 

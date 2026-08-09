@@ -47,7 +47,7 @@ Direct env vars still win:
 - `GET /web/search`
 - Required param: `q`
 - Common params: `count`, `offset`, `freshness`, `country`, `search_lang`, `ui_lang`, `safesearch`, `result_filter`
-- Projected fields per result: `title`, `url`, `description`, `age`, `page_age`, `source` (from `profile.name`), plus `cluster` projected to `[{title,url,description}]` when present.
+- Projected fields per result: `title`, `url`, `description`, `age`, `page_age`, `source` (from `profile.name`), plus `cluster` projected to `[{title,url,description}]` when present
 
 Example:
 
@@ -60,7 +60,7 @@ brave-search web "machine learning tutorials" result_filter=web freshness=pw
 - `GET /news/search`
 - Required param: `q`
 - Common params: `count`, `freshness`, `country`, `search_lang`, `safesearch`
-- Projected fields per result: `title`, `url`, `description`, `age`, `page_age`, `source`.
+- Projected fields per result: `title`, `url`, `description`, `age`, `page_age`, `source`
 
 Example:
 
@@ -73,7 +73,7 @@ brave-search news "bun runtime" freshness=pd
 - `GET /local/search`
 - Required param: `q`
 - Common params: `count`, `country`, `search_lang`
-- Projected fields per result: `title`, `url`, `description`, `age`, `page_age`, `source`.
+- Projected fields per result: `title`, `url`, `description`, `age`, `page_age`, `source`
 
 Example:
 
@@ -86,7 +86,7 @@ brave-search local "greek restaurants in san francisco"
 - `GET /images/search`
 - Required param: `q`
 - Common params: `count`, `country`, `search_lang`, `safesearch`
-- Projected fields per result: `title`, `url`, `source`, `thumbnail_url`, `image_url`, `width`, `height`, `page_fetched`, `confidence`.
+- Projected fields per result: `title`, `url`, `source`, `thumbnail_url`, `image_url`, `width`, `height`, `page_fetched`, `confidence`
 
 Example:
 
@@ -99,7 +99,7 @@ brave-search image "apollo 11"
 - `GET /videos/search`
 - Required param: `q`
 - Common params: `count`, `freshness`, `country`, `search_lang`
-- Projected fields per result: `title`, `url`, `description`, `age`, `page_age`, `duration`, `creator`, `publisher`, `thumbnail_url`.
+- Projected fields per result: `title`, `url`, `description`, `age`, `page_age`, `duration`, `creator`, `publisher`, `thumbnail_url`
 
 Example:
 
@@ -122,8 +122,8 @@ Use `raw=1` on an endpoint command to get the same upstream bytes for just that 
 
 Brave's legacy summarizer is a two-step flow that is no longer the recommended path — prefer the default compact endpoints for new work. The flow is kept reachable for backward raw access:
 
-1. Get a key from web search (with `summary=1`).
-2. Fetch the summary from `/summarizer/search`.
+1. Get a key from web search (with `summary=1`)
+2. Fetch the summary from `/summarizer/search`
 
 ```bash
 key="$(brave-search summarizer-key "what is the second highest mountain")"
@@ -159,19 +159,19 @@ HTTP errors and network failures emit a one-line compact JSON envelope on stderr
 }
 ```
 
-- `error.status` is `null` for network/parse errors.
-- HTML bodies are detected and stripped to a plain-text summary before being placed in `error.body_preview`.
-- `error.body_preview` is capped at ~500 chars.
-- `error.body_truncated` is `true` when the upstream body was larger than the preview window.
-- HTTP errors return rc=22; network/parse errors return rc=1.
+- `error.status` is `null` for network/parse errors
+- HTML bodies are detected and stripped to a plain-text summary before being placed in `error.body_preview`
+- `error.body_preview` is capped at ~500 chars
+- `error.body_truncated` is `true` when the upstream body was larger than the preview window
+- HTTP errors return rc=22; network/parse errors return rc=1
 
 Usage errors (missing args, bad count, missing API key) return rc=2 with a concise plain-text stderr message — not the compact error envelope.
 
 ## Notes
 
-- Web search is the best default path.
-- `result_filter=web` is the right default for typical web search; override to `news`, `images`, or `videos` to scope the response to a single type.
-- Keep queries URL-safe by using `scripts/cli.py`, which encodes query parameters.
+- Web search is the best default path
+- `result_filter=web` is the right default for typical web search; override to `news`, `images`, or `videos` to scope the response to a single type
+- Keep queries URL-safe by using `scripts/cli.py`, which encodes query parameters
 
 ## Validation
 

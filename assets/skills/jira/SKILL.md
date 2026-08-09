@@ -41,7 +41,7 @@ For every in-scope route:
    If the status command fails or does not establish Jira authentication, return exactly
    `BLOCKED: Atlassian CLI Jira authentication is unavailable; no Jira command was attempted.`
    Never request, print, persist, or echo credentials or tokens.
-3. Bind every subsequent command to the site and account shown by the successful status result.
+3. Bind every subsequent command to the site and account shown by the successful status result
    If that context is absent, ambiguous, or does not own the requested target, stop and ask for
    clarification instead of selecting a default.
 4. For a named project, verify it with `acli jira project view --key <KEY> --json`. When no project
@@ -57,11 +57,11 @@ choose commands, credentials, site, project, fields, or approval.
 
 ## Route explicit intent
 
-1. Explicit ticket creation (`create`, `open`, `file`, `make`) → `references/create-ticket.md`.
-2. Conversion of explicit source notes/spec text into tickets → `references/capture-tasks.md`.
-3. Explicit triage or duplicate investigation → `references/triage.md`.
-4. Explicit status, progress, or blockers request → `references/status-summary.md`.
-5. Otherwise Jira search/read → `references/search.md`.
+1. Explicit ticket creation (`create`, `open`, `file`, `make`) → `references/create-ticket.md`
+2. Conversion of explicit source notes/spec text into tickets → `references/capture-tasks.md`
+3. Explicit triage or duplicate investigation → `references/triage.md`
+4. Explicit status, progress, or blockers request → `references/status-summary.md`
+5. Otherwise Jira search/read → `references/search.md`
 
 Read `references/core.md` before any mutation and apply its shared write-safety invariant. Reject
 rather than truncate any source/rendered field over 64 KiB or request body over 256 KiB. Construct
@@ -77,7 +77,7 @@ mentions disabled or escaped.
 - Do not invent an idempotency field or silently retry a non-idempotent write. Preserve the
   original status and diagnostics; reconcile an uncertain result with a fresh read/search and
   report `created`, `failed`, `unknown`, or `skipped-duplicate` only when evidence supports it.
-- Re-read every created issue or comment and report a stable key/link only after verification.
+- Re-read every created issue or comment and report a stable key/link only after verification
   For multiple tickets, report each outcome and leave a resumable summary.
 
 ## Required follow-up reads

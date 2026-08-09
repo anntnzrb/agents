@@ -67,7 +67,7 @@ not an invalid ruleset. Preview/API availability varies by host.
 `gh ssh-key list` and `gh gpg-key list` expose public metadata only. Key add/delete
 operations change account authentication/signing configuration:
 
-- Confirm account and host, key fingerprint, title, and intended use.
+- Confirm account and host, key fingerprint, title, and intended use
 - Never paste private keys, passphrases, recovery codes, or full credential blobs into
   commands or reports.
 - Require authorization immediately before `add` or `delete`; re-read the public

@@ -165,11 +165,11 @@ func (u Username) String() string { return u.raw }
 
 **Rule**: every domain type that has invariants has:
 
-1. An unexported field holding the raw form.
-2. A `New<Type>(raw) (<Type>, error)` constructor as the sole entry point.
-3. A `String() string` for printing.
-4. `MarshalJSON` / `UnmarshalJSON` if it crosses a JSON boundary outside HTTP handlers (e.g., logging payloads, queue messages).
-5. Optionally: `Scan` and `Value` for `database/sql` interop (rare with sqlc).
+1. An unexported field holding the raw form
+2. A `New<Type>(raw) (<Type>, error)` constructor as the sole entry point
+3. A `String() string` for printing
+4. `MarshalJSON` / `UnmarshalJSON` if it crosses a JSON boundary outside HTTP handlers (e.g., logging payloads, queue messages)
+5. Optionally: `Scan` and `Value` for `database/sql` interop (rare with sqlc)
 
 ---
 
@@ -296,9 +296,9 @@ Use the validator tag `binding:"oneof=pending active closed"` to enforce at the 
 
 Three choices, in order of preference:
 
-1. **Sentinel zero value**: `Age int` with `0` meaning "unknown". Works when zero is genuinely unreachable as a valid value.
-2. **`sql.Null<T>`** for DB columns: `sql.NullString`, `sql.NullInt64`, `sql.NullTime`. sqlc generates these for nullable columns.
-3. **`*T`**: only when you need to distinguish "not provided" from "set to zero" in a JSON payload (PATCH semantics).
+1. **Sentinel zero value**: `Age int` with `0` meaning "unknown". Works when zero is genuinely unreachable as a valid value
+2. **`sql.Null<T>`** for DB columns: `sql.NullString`, `sql.NullInt64`, `sql.NullTime`. sqlc generates these for nullable columns
+3. **`*T`**: only when you need to distinguish "not provided" from "set to zero" in a JSON payload (PATCH semantics)
 
 ```go
 // PATCH payload — `*string` discriminates absent vs empty

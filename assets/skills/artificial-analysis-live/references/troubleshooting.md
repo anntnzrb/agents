@@ -21,7 +21,7 @@ Actions:
 2. inspect `schema` output for the public contract;
 3. for `coding`, follow `capability-schema-drift.md` before changing extraction;
 4. inspect the current public RSC payload and add the smallest alias/structural repair;
-5. add offline legacy/current/negative fixtures and validate one live command.
+5. add offline legacy/current/negative fixtures and validate one live command
 
 ## 2) 304 but no cached payload
 

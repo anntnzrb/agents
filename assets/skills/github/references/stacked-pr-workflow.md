@@ -18,23 +18,23 @@ gh repo view <host/owner/repo> --json nameWithOwner,url,defaultBranchRef,viewerP
 
 Establish the exact target and state:
 
-- Confirm the current branch, clean tree, commit ancestry, intended remote, and explicit repository.
+- Confirm the current branch, clean tree, commit ancestry, intended remote, and explicit repository
 - Check for an existing remote branch and pull request:
   `git ls-remote --heads <remote> <branch>` and
   `gh pr list --repo <repo> --head <qualified-head> --state all --json number,title,state,url,headRefName,baseRefName`.
-- If a parent pull request exists, read its state, head/base refs and OIDs, mergeability, checks, and reviews. A new stacked PR MUST target the immediate parent branch, not the repository trunk.
-- Resolve the remote stack and its actual stack number. Use `GH_PROMPT_DISABLED=1 gh stack view --json` when local tracking exists; otherwise use the supported remote stack read in `stack-commands.md` and `api.md`.
-- Run `GH_PROMPT_DISABLED=1 gh stack link --help` before relying on version-sensitive flags. A local `gh stack view` exit 2 means local membership is absent; it does not prove the remote stack is absent.
-- If code changed, run the relevant focused validation before external writes.
+- If a parent pull request exists, read its state, head/base refs and OIDs, mergeability, checks, and reviews. A new stacked PR MUST target the immediate parent branch, not the repository trunk
+- Resolve the remote stack and its actual stack number. Use `GH_PROMPT_DISABLED=1 gh stack view --json` when local tracking exists; otherwise use the supported remote stack read in `stack-commands.md` and `api.md`
+- Run `GH_PROMPT_DISABLED=1 gh stack link --help` before relying on version-sensitive flags. A local `gh stack view` exit 2 means local membership is absent; it does not prove the remote stack is absent
+- If code changed, run the relevant focused validation before external writes
 
 Stop before any mutation when the tree is dirty, a rebase/merge is in progress, the parent diverges, the stack is ambiguous or locked, or a duplicate pull request exists.
 
 ## Idempotent path selection
 
-- **Branch without an open PR:** publish it, create exactly one PR, re-read that PR, then link it to the stack.
-- **Branch with an open PR:** do not create a duplicate; re-read it, publish only if the local branch is ahead and the user authorized the push, then link it only if it is not already stacked.
-- **Branch already in the target stack:** do not link again; re-read and report its position.
-- **No existing stack:** do not silently create one. Confirm the intended trunk and complete the bottom-to-top stack before using `gh stack link --base`.
+- **Branch without an open PR:** publish it, create exactly one PR, re-read that PR, then link it to the stack
+- **Branch with an open PR:** do not create a duplicate; re-read it, publish only if the local branch is ahead and the user authorized the push, then link it only if it is not already stacked
+- **Branch already in the target stack:** do not link again; re-read and report its position
+- **No existing stack:** do not silently create one. Confirm the intended trunk and complete the bottom-to-top stack before using `gh stack link --base`
 
 ## Default write sequence: create first, link second
 

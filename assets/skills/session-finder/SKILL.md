@@ -11,10 +11,10 @@ Use the bundled CLI to search saved sessions across all supported harnesses:
 uv run --script <skill-dir>/scripts/cli.py QUERY [--limit N] [--harness HARNESS]... [--root HARNESS=PATH]...
 ```
 
-- `QUERY`: One or more arguments. Quoted arguments are still split on whitespace; they are not phrase searches.
-- `--limit N`: Limit results after ranking.
-- `--harness {omp,pi,codex,t3code,opencode}`: Repeat to select harnesses. Omit to search all five.
-- `--root HARNESS=PATH`: Repeat to replace that harness's defaults. Qualify every root with its harness.
+- `QUERY`: One or more arguments. Quoted arguments are still split on whitespace; they are not phrase searches
+- `--limit N`: Limit results after ranking
+- `--harness {omp,pi,codex,t3code,opencode}`: Repeat to select harnesses. Omit to search all five
+- `--root HARNESS=PATH`: Repeat to replace that harness's defaults. Qualify every root with its harness
 
 Query terms use case-insensitive substring matching with AND semantics. Every term MUST occur within one searchable
 category: title, aggregated user messages, aggregated transcript text, or cwd.
@@ -35,12 +35,12 @@ match, then recency, then deterministic identity fields.
 | T3 Code | `<T3CODE_HOME or ~/.t3>/{userdata,dev}/state.sqlite` | Database file | Yes; deleted threads excluded | `null` |
 | OpenCode | `OPENCODE_DB`, or `opencode.db` and `opencode-*.db` under `${XDG_DATA_HOME:-~/.local/share}/opencode` | Database file | Yes | `["opencode",<cwd>,"--session",<session-id>]`, omitting `<cwd>` when empty |
 
-1. Run a broad query without `--harness` to search all five stores.
-2. For `[]`, broaden or replace whitespace terms, then rerun.
-3. For noisy results, tighten terms or add repeatable `--harness` filters, then rerun.
-4. Report ranked candidates with harness, title, cwd, timestamp, session ID, archive state, and storage path.
-5. Wait for the user to explicitly choose a candidate before resuming it.
-6. Execute a non-null `resume_argv` only as the provided argv array.
-7. For `resume_argv: null`, report the harness, session ID, and storage path.
+1. Run a broad query without `--harness` to search all five stores
+2. For `[]`, broaden or replace whitespace terms, then rerun
+3. For noisy results, tighten terms or add repeatable `--harness` filters, then rerun
+4. Report ranked candidates with harness, title, cwd, timestamp, session ID, archive state, and storage path
+5. Wait for the user to explicitly choose a candidate before resuming it
+6. Execute a non-null `resume_argv` only as the provided argv array
+7. For `resume_argv: null`, report the harness, session ID, and storage path
 
 NEVER reconstruct, display, or execute a shell-formatted resume command.

@@ -15,13 +15,13 @@ WORKING DIRECTORY: optional argument, default current directory.
 
 ## Goals
 
-- Create one logical unit per commit.
-- Keep early work out of later catch-all commits.
-- Stage exact files or hunks; use hunk-level staging for mixed files.
-- Use message-file commits every time.
-- Follow repo conventions before fallback conventions.
-- Commit changelog or release fragments with the code they describe.
-- End with a complete accounting of committed and remaining work.
+- Create one logical unit per commit
+- Keep early work out of later catch-all commits
+- Stage exact files or hunks; use hunk-level staging for mixed files
+- Use message-file commits every time
+- Follow repo conventions before fallback conventions
+- Commit changelog or release fragments with the code they describe
+- End with a complete accounting of committed and remaining work
 
 ## Required follow-up reads
 
@@ -41,20 +41,20 @@ WORKING DIRECTORY: optional argument, default current directory.
    - changelog/release systems: `CHANGELOG.md`, `.changeset/`, `newsfragments/`, `changelog.d/`, release automation
    - recent commit subjects when style is still unclear
      Extract message format, trailers/signoff/DCO, required validation, changelog expectations, issue refs, and push policy.
-2. Use **But mode** when the repo is GitButler-managed and `but status --json` is the natural write path.
-3. Otherwise use **Git mode**.
-4. In But mode, NEVER use raw `git add`, `git commit`, `git rebase`, or equivalent write commands. Read-only Git inspection MAY be used.
+2. Use **But mode** when the repo is GitButler-managed and `but status --json` is the natural write path
+3. Otherwise use **Git mode**
+4. In But mode, NEVER use raw `git add`, `git commit`, `git rebase`, or equivalent write commands. Read-only Git inspection MAY be used
 
 ## Safety checks
 
-- NEVER commit before seeing the whole change set.
-- If nothing is staged, stage only the intended files/hunks unless the user explicitly said staged-only.
-- NEVER leave staged files/hunks unaccounted for. Every staged change MUST be committed now or intentionally left untouched because the user asked.
-- NEVER trust staging blindly; verify with cached diff or returned JSON state.
-- If split-plan dependencies become circular or unclear, stop and re-plan.
-- NEVER push unless the user explicitly asked for it.
-- If a repo has custom commit rules, follow them over the fallback format.
-- If the user asks for only part of the work to be committed, leave the rest untouched.
+- NEVER commit before seeing the whole change set
+- If nothing is staged, stage only the intended files/hunks unless the user explicitly said staged-only
+- NEVER leave staged files/hunks unaccounted for. Every staged change MUST be committed now or intentionally left untouched because the user asked
+- NEVER trust staging blindly; verify with cached diff or returned JSON state
+- If split-plan dependencies become circular or unclear, stop and re-plan
+- NEVER push unless the user explicitly asked for it
+- If a repo has custom commit rules, follow them over the fallback format
+- If the user asks for only part of the work to be committed, leave the rest untouched
 
 Reference examples live in `references/git.md` and `references/but.md`; safety checks above are binding.
 

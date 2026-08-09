@@ -77,10 +77,10 @@ sql:
 
 Key choices:
 
-- `sql_package: "pgx/v5"` — generated code uses pgx directly, not `database/sql`. Faster, type-safer.
-- `emit_interface: true` — generates a `Querier` interface. Lets stores accept either `*pgxpool.Pool` or `pgx.Tx` for transaction support.
-- `emit_pointers_for_null_types: true` — nullable columns become `*T`, not `sql.NullString`. Cleaner mapping to domain types.
-- `overrides` for `uuid` → `google/uuid.UUID` and `timestamptz` → `time.Time`.
+- `sql_package: "pgx/v5"` — generated code uses pgx directly, not `database/sql`. Faster, type-safer
+- `emit_interface: true` — generates a `Querier` interface. Lets stores accept either `*pgxpool.Pool` or `pgx.Tx` for transaction support
+- `emit_pointers_for_null_types: true` — nullable columns become `*T`, not `sql.NullString`. Cleaner mapping to domain types
+- `overrides` for `uuid` → `google/uuid.UUID` and `timestamptz` → `time.Time`
 
 ---
 
@@ -133,11 +133,11 @@ DELETE FROM users WHERE id = $1;
 
 sqlc directives:
 
-- `:one` — exactly one row; returns `(T, error)`. Returns `pgx.ErrNoRows` on miss.
-- `:many` — zero or more rows; returns `([]T, error)`.
-- `:exec` — no rows returned; returns `error`.
-- `:execrows` — returns `(int64, error)` with affected row count.
-- `:batchone` / `:batchmany` / `:batchexec` — pgx batch mode for bulk operations.
+- `:one` — exactly one row; returns `(T, error)`. Returns `pgx.ErrNoRows` on miss
+- `:many` — zero or more rows; returns `([]T, error)`
+- `:exec` — no rows returned; returns `error`
+- `:execrows` — returns `(int64, error)` with affected row count
+- `:batchone` / `:batchmany` / `:batchexec` — pgx batch mode for bulk operations
 
 Run `task gen:sqlc` (or `sqlc generate`). The generated file is committed; CI checks it is up-to-date.
 
@@ -307,9 +307,9 @@ func (s *UserStore) CreateWithProfile(
 
 Pattern:
 
-- `defer tx.Rollback(ctx)` immediately after `Begin` — safe even after Commit (returns "tx closed", which we ignore via the unhandled return).
-- `q.WithTx(tx)` returns a `*Queries` bound to the tx.
-- Last line: `tx.Commit(ctx)`.
+- `defer tx.Rollback(ctx)` immediately after `Begin` — safe even after Commit (returns "tx closed", which we ignore via the unhandled return)
+- `q.WithTx(tx)` returns a `*Queries` bound to the tx
+- Last line: `tx.Commit(ctx)`
 
 For nested transactions across multiple stores, accept a `Querier` parameter:
 
@@ -351,9 +351,9 @@ goose -dir internal/store/migrations postgres "$DATABASE_URL" down
 
 Rules:
 
-- One DDL change per migration. Never combine schema + data migrations in one file.
-- `Down` is real, not a stub. CI runs `up` → `down` → `up` on a fresh container to prove reversibility.
-- Migrations are append-only. Never edit a merged migration; add a new one.
+- One DDL change per migration. Never combine schema + data migrations in one file
+- `Down` is real, not a stub. CI runs `up` → `down` → `up` on a fresh container to prove reversibility
+- Migrations are append-only. Never edit a merged migration; add a new one
 
 `goose` can run programmatically as well:
 

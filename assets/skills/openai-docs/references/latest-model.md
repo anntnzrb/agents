@@ -35,6 +35,6 @@ This file is a curated helper. Every recommendation here must be verified agains
 
 ## Maintenance notes
 
-- GPT-5.6 Pro is a Responses reasoning mode on the base model, not a separate `gpt-5.6-pro` slug. Verify the live model guide before recommending its request shape.
-- This file will drift unless it is periodically re-verified against current OpenAI docs.
-- If this file conflicts with current docs, the docs win.
+- GPT-5.6 Pro is a Responses reasoning mode on the base model, not a separate `gpt-5.6-pro` slug. Verify the live model guide before recommending its request shape
+- This file will drift unless it is periodically re-verified against current OpenAI docs
+- If this file conflicts with current docs, the docs win

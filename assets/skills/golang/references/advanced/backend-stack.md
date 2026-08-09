@@ -242,10 +242,10 @@ func (s *Server) Run(ctx context.Context) error {
 
 Notes:
 
-- `gin.New()` not `gin.Default()` — `Default()` adds `Logger()` (text format, not slog) and `Recovery()` (no logger injection). We replace both.
-- `gin.SetMode(gin.ReleaseMode)` silences debug output. Production assumed.
-- `http.Server` with explicit timeouts. The default `nil` timeouts are a DoS waiting to happen.
-- Graceful shutdown: SIGINT/SIGTERM cancels the ctx → `Shutdown(shutdownCtx)` gives in-flight requests up to `ShutdownTimeout` to finish.
+- `gin.New()` not `gin.Default()` — `Default()` adds `Logger()` (text format, not slog) and `Recovery()` (no logger injection). We replace both
+- `gin.SetMode(gin.ReleaseMode)` silences debug output. Production assumed
+- `http.Server` with explicit timeouts. The default `nil` timeouts are a DoS waiting to happen
+- Graceful shutdown: SIGINT/SIGTERM cancels the ctx → `Shutdown(shutdownCtx)` gives in-flight requests up to `ShutdownTimeout` to finish
 
 ---
 
@@ -256,11 +256,11 @@ RequestID    →   Recovery    →   Logger    →   CORS    →   Auth    →  
    (1)            (2)              (3)            (4)         (5)
 ```
 
-1. **RequestID** is first so every subsequent middleware sees it.
-2. **Recovery** wraps everything after it. Order: a panic in CORS still gets caught.
-3. **Logger** sees the request_id and the recovered panic.
-4. **CORS** before Auth — OPTIONS preflight must return without auth.
-5. **Auth** is the last cross-cutting middleware. Per-route auth (admin-only) is mounted on a sub-router with extra middleware.
+1. **RequestID** is first so every subsequent middleware sees it
+2. **Recovery** wraps everything after it. Order: a panic in CORS still gets caught
+3. **Logger** sees the request_id and the recovered panic
+4. **CORS** before Auth — OPTIONS preflight must return without auth
+5. **Auth** is the last cross-cutting middleware. Per-route auth (admin-only) is mounted on a sub-router with extra middleware
 
 ```go
 // Public routes — no auth
@@ -513,10 +513,10 @@ func (h *Handler) StreamChat(c *gin.Context) {
 
 Key facts:
 
-- **Headers MUST be set before the first `Write`.** Otherwise gin auto-sets `Content-Type: text/plain`.
-- **`c.Writer.(http.Flusher)` is the streaming primitive.** Without `flusher.Flush()`, the response is buffered and arrives as one blob at the end.
-- **Always respond to `<-ctx.Done()`.** A disconnected client must stop upstream work — otherwise you generate tokens for nothing.
-- **The trailing `\n\n` per event is wire-mandatory** for SSE parsing. Missing it = the client never sees the event.
+- **Headers MUST be set before the first `Write`.** Otherwise gin auto-sets `Content-Type: text/plain`
+- **`c.Writer.(http.Flusher)` is the streaming primitive.** Without `flusher.Flush()`, the response is buffered and arrives as one blob at the end
+- **Always respond to `<-ctx.Done()`.** A disconnected client must stop upstream work — otherwise you generate tokens for nothing
+- **The trailing `\n\n` per event is wire-mandatory** for SSE parsing. Missing it = the client never sees the event
 
 ---
 

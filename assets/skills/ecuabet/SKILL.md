@@ -15,10 +15,10 @@ This skill uses `scripts/cli.py` as the public cross-platform entrypoint and loc
 
 ## Activation Triggers
 
-- User mentions `$ecuabet`.
-- User gives an Ecuabet match id/url and asks for predictions.
-- User asks for live refresh with cards/fouls/offsides/corners/weather/form context.
-- User asks for lower-risk vs higher-return tradeoff using current market state.
+- User mentions `$ecuabet`
+- User gives an Ecuabet match id/url and asks for predictions
+- User asks for live refresh with cards/fouls/offsides/corners/weather/form context
+- User asks for lower-risk vs higher-return tradeoff using current market state
 
 ## Entry point
 
@@ -32,20 +32,20 @@ Set `<skill-dir>` to this skill directory. Do not rely on shell sourcing, execut
 
 ## Layout
 
-- `scripts/cli.py`: public dispatcher (`run` and `feed`).
-- `scripts/main.py`: integrated internal entrypoint (all feeds + recommendations).
-- `scripts/ecuabet.py`: Ecuabet markets/tracker.
-- `scripts/sofascore.py`: live match incidents/stats.
-- `scripts/espn.py`: ESPN summary/team stats/key events.
-- `scripts/open_meteo.py`: weather context.
-- `scripts/understat.py`: form/xG/season modeling.
-- `scripts/recommendations.py`: scoring/ranking engine.
-- `scripts/tests/`: regression tests.
-- `references/recipes.md`: command cookbook.
-- `references/shortcuts.md`: trigger-word prompt shortcuts.
-- `references/workflows.md`: advanced scenario workflows.
-- `references/output-contract.md`: JSON field map and extraction priorities.
-- `references/troubleshooting.md`: feed failure diagnosis + recovery.
+- `scripts/cli.py`: public dispatcher (`run` and `feed`)
+- `scripts/main.py`: integrated internal entrypoint (all feeds + recommendations)
+- `scripts/ecuabet.py`: Ecuabet markets/tracker
+- `scripts/sofascore.py`: live match incidents/stats
+- `scripts/espn.py`: ESPN summary/team stats/key events
+- `scripts/open_meteo.py`: weather context
+- `scripts/understat.py`: form/xG/season modeling
+- `scripts/recommendations.py`: scoring/ranking engine
+- `scripts/tests/`: regression tests
+- `references/recipes.md`: command cookbook
+- `references/shortcuts.md`: trigger-word prompt shortcuts
+- `references/workflows.md`: advanced scenario workflows
+- `references/output-contract.md`: JSON field map and extraction priorities
+- `references/troubleshooting.md`: feed failure diagnosis + recovery
 
 ## Runbook
 
@@ -130,6 +130,6 @@ Primary fields to report from `uv run --script <skill-dir>/scripts/cli.py run` o
 
 ## Resource Policy
 
-- Use `scripts/cli.py` for public execution; other `scripts/` files are internals.
-- Use `references/` for advanced guidance and structured interpretation.
-- No `assets/` are required for this skill at this time.
+- Use `scripts/cli.py` for public execution; other `scripts/` files are internals
+- Use `references/` for advanced guidance and structured interpretation
+- No `assets/` are required for this skill at this time

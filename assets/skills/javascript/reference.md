@@ -58,39 +58,39 @@ Avoid defaulting to watch mode, dev servers, or broad end-to-end runs when the c
 
 ## Interop rules that prevent pain
 
-- `"type": "module"` changes what `.js` means inside that package.
-- Use `.cjs` for files that must stay CommonJS in an ESM package.
-- Use `.mjs` only when you need file-level ESM in an otherwise CJS package.
-- `package.json#exports` hides deep imports by default. Define subpath exports intentionally.
-- Use `createRequire(import.meta.url)` only at an interop edge. Do not spray it through a codebase.
-- Dynamic `import()` is for optional, environment-specific, or heavy code paths. It is not a band-aid for unclear module boundaries.
-- Circular imports usually mean execution-order bugs, not syntax bugs. Break the cycle with smaller modules or dependency inversion.
+- `"type": "module"` changes what `.js` means inside that package
+- Use `.cjs` for files that must stay CommonJS in an ESM package
+- Use `.mjs` only when you need file-level ESM in an otherwise CJS package
+- `package.json#exports` hides deep imports by default. Define subpath exports intentionally
+- Use `createRequire(import.meta.url)` only at an interop edge. Do not spray it through a codebase
+- Dynamic `import()` is for optional, environment-specific, or heavy code paths. It is not a band-aid for unclear module boundaries
+- Circular imports usually mean execution-order bugs, not syntax bugs. Break the cycle with smaller modules or dependency inversion
 
 ## Testing rules that keep signal high
 
-- Unit-test pure transforms and business rules.
-- Integration-test filesystem, HTTP, DB, queue, and browser boundary code.
-- UI-test rendered behavior, not implementation details.
-- Prefer factories / fixtures over giant inline objects.
-- Fake timers only when the code is actually timer-driven.
-- Use snapshots for stable structured output, not giant trees you will rubber-stamp forever.
+- Unit-test pure transforms and business rules
+- Integration-test filesystem, HTTP, DB, queue, and browser boundary code
+- UI-test rendered behavior, not implementation details
+- Prefer factories / fixtures over giant inline objects
+- Fake timers only when the code is actually timer-driven
+- Use snapshots for stable structured output, not giant trees you will rubber-stamp forever
 
 ## Boundary and Design Checks
 
-- Parse and normalize untrusted input once at an API, file, queue, CLI, or environment boundary. Pass the normalized value inward instead of repeating loose checks throughout the call chain.
-- Keep retries, timeouts, cancellation, cleanup, logging, and process exits at I/O boundaries. Pure transforms and private helpers should not own process-wide policy.
-- Model meaningful outcomes explicitly—tagged objects beat truthy sentinels and a forest of optional fields when callers must distinguish states.
-- Catch only where code can recover, translate for a caller, or add context. Preserve `cause` when wrapping and rethrow failures the boundary does not own.
-- Add dependencies, abstractions, parsers, normalization layers, and defensive branches only for a demonstrated caller or failure mode.
-- Review large files, parameter bundles, negative-name mazes, redundant post-action checks, and broad catches before extending them. Keep a local change local unless the task asks for a redesign.
+- Parse and normalize untrusted input once at an API, file, queue, CLI, or environment boundary. Pass the normalized value inward instead of repeating loose checks throughout the call chain
+- Keep retries, timeouts, cancellation, cleanup, logging, and process exits at I/O boundaries. Pure transforms and private helpers should not own process-wide policy
+- Model meaningful outcomes explicitly—tagged objects beat truthy sentinels and a forest of optional fields when callers must distinguish states
+- Catch only where code can recover, translate for a caller, or add context. Preserve `cause` when wrapping and rethrow failures the boundary does not own
+- Add dependencies, abstractions, parsers, normalization layers, and defensive branches only for a demonstrated caller or failure mode
+- Review large files, parameter bundles, negative-name mazes, redundant post-action checks, and broad catches before extending them. Keep a local change local unless the task asks for a redesign
 
 ## Performance rules of thumb
 
-- Prefer streaming or chunked processing over `await readFile()` on massive payloads.
-- Prefer `Promise.all` for independent work; avoid accidental serial loops.
-- Yield off the main thread for CPU-heavy browser work; use workers when the work is real.
-- Measure before rewriting hot paths. The bug is often event/listener churn, not syntax choice.
-- Avoid hidden quadratic work from nested loops, repeated spreads in hot paths, or cloning giant objects each iteration.
+- Prefer streaming or chunked processing over `await readFile()` on massive payloads
+- Prefer `Promise.all` for independent work; avoid accidental serial loops
+- Yield off the main thread for CPU-heavy browser work; use workers when the work is real
+- Measure before rewriting hot paths. The bug is often event/listener churn, not syntax choice
+- Avoid hidden quadratic work from nested loops, repeated spreads in hot paths, or cloning giant objects each iteration
 
 ## Neighbor skills
 

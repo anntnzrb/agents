@@ -50,9 +50,9 @@ Default pattern: inspect → preview → apply → verify.
 
 ## Output discipline
 
-- If the user asked for a report, note, patch file, or any other artifact at a specific path, create it before finalizing.
-- Do not stop at an acknowledgement, plan, or partial progress update when the task asked for a concrete deliverable.
-- After writing the requested artifact, summarize the result briefly.
+- If the user asked for a report, note, patch file, or any other artifact at a specific path, create it before finalizing
+- Do not stop at an acknowledgement, plan, or partial progress update when the task asked for a concrete deliverable
+- After writing the requested artifact, summarize the result briefly
 
 ## Runtime introspection
 
@@ -117,32 +117,32 @@ uv run --script <skill-dir>/scripts/cli.py lsp-config print
 
 These discover tools on PATH (`luacheck`, `stylua`, `busted`, `lua-language-server`). Missing tools return clear error messages with install guidance; they never silently succeed.
 
-- `lint` — runs `luacheck` with Hammerspoon globals (`hs`, `spoon`).
-- `fmt` — runs `stylua`, never formats implicitly.
-- `test` — runs `busted` for pure Lua tests.
-- `annotations` — reports whether Hammerspoon EmmyLua annotations appear generated.
-- `lsp-config` — prints a suggested `.luarc.json` for Lua language server.
+- `lint` — runs `luacheck` with Hammerspoon globals (`hs`, `spoon`)
+- `fmt` — runs `stylua`, never formats implicitly
+- `test` — runs `busted` for pure Lua tests
+- `annotations` — reports whether Hammerspoon EmmyLua annotations appear generated
+- `lsp-config` — prints a suggested `.luarc.json` for Lua language server
 
 ## Safe live-change pattern
 
-- Make the intended file change first for persistent behavior.
-- Then apply live only to preview or verify the persistent change.
+- Make the intended file change first for persistent behavior
+- Then apply live only to preview or verify the persistent change
 - Prefer precise reloads:
   - `uv run --script <skill-dir>/scripts/cli.py reload`
   - `uv run --script <skill-dir>/scripts/cli.py eval-file <temp>.lua`
-- Call out whether a change requires Accessibility permission grants, an `MJConfigFile` update, or a full Hammerspoon restart.
-- If you test an ephemeral tweak before writing it, label it clearly as a preview and persist it before finishing.
+- Call out whether a change requires Accessibility permission grants, an `MJConfigFile` update, or a full Hammerspoon restart
+- If you test an ephemeral tweak before writing it, label it clearly as a preview and persist it before finishing
 
 ## Guardrails
 
-- Do not trust memory alone for Hammerspoon APIs; inspect runtime/docs/source.
-- Do not assume a specific config layout, Spoon set, hotkey scheme, or config location; inspect first.
-- Do not auto-install the `hs` CLI or Hammerspoon itself without explicit user request.
-- Do not reload Hammerspoon after read-only inspection commands.
-- Do not mutate the user's `init.lua` unless the task explicitly asks for persistent config changes.
-- Do not format, lint, or fix config files unless the task asks.
-- Prefer `uv run --script <skill-dir>/scripts/cli.py` over raw `hs` calls.
-- Be explicit about risk when evaluating Lua in a running Hammerspoon.
+- Do not trust memory alone for Hammerspoon APIs; inspect runtime/docs/source
+- Do not assume a specific config layout, Spoon set, hotkey scheme, or config location; inspect first
+- Do not auto-install the `hs` CLI or Hammerspoon itself without explicit user request
+- Do not reload Hammerspoon after read-only inspection commands
+- Do not mutate the user's `init.lua` unless the task explicitly asks for persistent config changes
+- Do not format, lint, or fix config files unless the task asks
+- Prefer `uv run --script <skill-dir>/scripts/cli.py` over raw `hs` calls
+- Be explicit about risk when evaluating Lua in a running Hammerspoon
 
 ## Resources
 

@@ -35,9 +35,9 @@ anyio.run(main)
 ```
 
 **Signature**: `tg.start_soon(func, *args, name=None)`
-- `func` must be a **coroutine function** (not a coroutine object).
-- `name` is optional, for introspection/debugging.
-- No return value; exceptions propagate as `ExceptionGroup` on exit.
+- `func` must be a **coroutine function** (not a coroutine object)
+- `name` is optional, for introspection/debugging
+- No return value; exceptions propagate as `ExceptionGroup` on exit
 
 ### `start` — wait for ready signal
 
@@ -68,8 +68,8 @@ run(main)
 ```
 
 **Rule of thumb**:
-- Use `start_soon` when you don't need to know when the task is ready.
-- Use `start` when the task must signal readiness before you continue.
+- Use `start_soon` when you don't need to know when the task is ready
+- Use `start` when the task must signal readiness before you continue
 
 ### `create_task` — retrieving return values (AnyIO 4.14+)
 
@@ -89,9 +89,9 @@ anyio.run(main)
 ```
 
 **Signature**: `tg.create_task(coro, *, name=None, context=None) -> TaskHandle[T]`
-- Returns a `TaskHandle` you can `await` for the result.
-- If the task raises, awaiting raises `TaskFailed` (or `TaskCancelled`).
-- This is the canonical replacement for `asyncio.gather` when you need results.
+- Returns a `TaskHandle` you can `await` for the result
+- If the task raises, awaiting raises `TaskFailed` (or `TaskCancelled`)
+- This is the canonical replacement for `asyncio.gather` when you need results
 
 ---
 
@@ -122,8 +122,8 @@ anyio.run(main)
 
 AnyIO uses **level cancellation** (inspired by Trio), not asyncio's **edge cancellation**.
 
-- **Edge cancellation** (asyncio): A `CancelledError` is injected once. If caught and not re-raised, the task keeps running.
-- **Level cancellation** (anyio): As long as a task is inside an effectively cancelled scope, every yield point raises a new cancellation exception.
+- **Edge cancellation** (asyncio): A `CancelledError` is injected once. If caught and not re-raised, the task keeps running
+- **Level cancellation** (anyio): As long as a task is inside an effectively cancelled scope, every yield point raises a new cancellation exception
 
 ### Basic CancelScope
 
@@ -187,10 +187,10 @@ async def do_something(resource) -> None:
 ### Structured Concurrency Guarantee
 
 A task group contains its own `CancelScope`. If any child task raises an exception:
-1. The task group's cancel scope is cancelled.
-2. All other child tasks receive cancellation.
-3. The task group waits for all children to finish.
-4. The original exception (wrapped in `ExceptionGroup` if multiple) is re-raised.
+1. The task group's cancel scope is cancelled
+2. All other child tasks receive cancellation
+3. The task group waits for all children to finish
+4. The original exception (wrapped in `ExceptionGroup` if multiple) is re-raised
 
 ---
 
@@ -276,11 +276,11 @@ run(main)
 ```
 
 **Key differences from `asyncio.Queue`**:
-- **Bounded by default**: `max_buffer_size=0` means send blocks until a receiver is ready.
-- **Cloneable**: Each producer/consumer can close its own clone. The stream only ends when **all** clones of one end are closed.
-- **Async iterable**: `async for item in receive_stream:` works out of the box.
-- **Type-safe**: Generic `create_memory_object_stream[T]()`.
-- **Synchronous close**: Both `close()` and `async with` work.
+- **Bounded by default**: `max_buffer_size=0` means send blocks until a receiver is ready
+- **Cloneable**: Each producer/consumer can close its own clone. The stream only ends when **all** clones of one end are closed
+- **Async iterable**: `async for item in receive_stream:` works out of the box
+- **Type-safe**: Generic `create_memory_object_stream[T]()`
+- **Synchronous close**: Both `close()` and `async with` work
 
 ---
 

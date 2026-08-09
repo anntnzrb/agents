@@ -41,13 +41,13 @@ MUST use the bundled CLI; MUST NOT invoke internal Python files directly.
    variants.
 6. Implement the smallest coherent increment, then validate accessibility, touch,
    responsive layout, performance, contrast, reduced motion, and error states.
-7. Validation failure? You MUST inspect, fix, and retry before continuing.
+7. Validation failure? You MUST inspect, fix, and retry before continuing
 
 ## Core constraints
 
-- MUST preserve visible focus, keyboard access, semantic labels, and zoom.
-- MUST NOT use color alone for meaning or emoji as structural icons.
-- MUST meet WCAG contrast and platform touch-target minimums.
+- MUST preserve visible focus, keyboard access, semantic labels, and zoom
+- MUST NOT use color alone for meaning or emoji as structural icons
+- MUST meet WCAG contrast and platform touch-target minimums
 - MUST reserve async/media space, avoid horizontal overflow, and respect
   `prefers-reduced-motion`.
 - SHOULD use one icon family, semantic tokens, a consistent spacing/type scale,

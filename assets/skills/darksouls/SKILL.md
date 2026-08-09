@@ -21,11 +21,11 @@ uv run --script <skill-dir>/scripts/cli.py ...
 
 Use the directory containing this file (normally `C:/Users/Nil/.config/agents/assets/skills/darksouls`). Do not require a PATH alias, executable bit, shell profile, or ask the user to install a second CLI.
 
-1. Classify the request: deterministic mechanic/catalog, current/save state, route/guide, achievement, source-backed/current, or mod support.
-2. Run the narrowest applicable CLI command first. `ds1_core.py` owns mechanics, spoiler gates, source/cache, and guide-search interfaces; `ds1_catalog.py` owns item lookup and deterministic AR/compare helpers; `ds1_save.py` is read-only and must report unsupported categories explicitly; `cli.py` composes these APIs.
-3. Use `sources status` before source-backed/current claims. Refresh only the needed key when the cache is absent or stale, then use live research when the claim is not covered.
-4. Treat bundled catalogs and transformed guide chunks as operational lookup aids, not copied encyclopedia prose or proof of save state.
-5. Apply the spoiler policy before showing names. Answer with the actionable result, then command/source evidence and uncertainty.
+1. Classify the request: deterministic mechanic/catalog, current/save state, route/guide, achievement, source-backed/current, or mod support
+2. Run the narrowest applicable CLI command first. `ds1_core.py` owns mechanics, spoiler gates, source/cache, and guide-search interfaces; `ds1_catalog.py` owns item lookup and deterministic AR/compare helpers; `ds1_save.py` is read-only and must report unsupported categories explicitly; `cli.py` composes these APIs
+3. Use `sources status` before source-backed/current claims. Refresh only the needed key when the cache is absent or stale, then use live research when the claim is not covered
+4. Treat bundled catalogs and transformed guide chunks as operational lookup aids, not copied encyclopedia prose or proof of save state
+5. Apply the spoiler policy before showing names. Answer with the actionable result, then command/source evidence and uncertainty
 
 ## Natural-language routing
 
@@ -50,12 +50,12 @@ Mechanics that are normally safe include stats, softcaps, scaling, reinforcement
 
 ## Evidence and source hierarchy
 
-1. **Observed deterministic output** from the current CLI/kernel for supported mechanics or catalog rows.
-2. **Validated read-only parser output** for fields whose DSR offsets/IDs are explicitly sourced and tested by the save implementation.
-3. **Official/primary sources** for product/platform facts and published requirements.
-4. **Fresh cached/live community sources** for routes, locations, NPC steps, farming, calculators, and current mod status.
-5. **Local transformed guide chunks** only for targeted walkthrough lookup, with provenance and spoiler warning.
-6. **Local Dadbod transcript chunks** only for narrowly requested transcript lookup, with provenance and the transcript warning; they are never mechanics/save/parser/route truth.
+1. **Observed deterministic output** from the current CLI/kernel for supported mechanics or catalog rows
+2. **Validated read-only parser output** for fields whose DSR offsets/IDs are explicitly sourced and tested by the save implementation
+3. **Official/primary sources** for product/platform facts and published requirements
+4. **Fresh cached/live community sources** for routes, locations, NPC steps, farming, calculators, and current mod status
+5. **Local transformed guide chunks** only for targeted walkthrough lookup, with provenance and spoiler warning
+6. **Local Dadbod transcript chunks** only for narrowly requested transcript lookup, with provenance and the transcript warning; they are never mechanics/save/parser/route truth
 
 Label claims as observed, source-backed, calculated, or recommendation. If sources disagree, show the disagreement and avoid false precision. Cache metadata is a fetch receipt, not a citation; cite the source URL/source key.
 

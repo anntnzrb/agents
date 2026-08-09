@@ -263,10 +263,10 @@ DuckDB is the SQL engine for analytical workloads. Query CSV/Parquet/JSON files 
 
 Plain `unittest` is fine for stdlib; everything else uses pytest. Conventions:
 
-- File names `test_*.py`, function names `test_*`.
-- Fixtures via `@pytest.fixture`. Async fixtures are anyio-aware (`@pytest.fixture` on an async function works under `pytest-anyio` which is bundled with anyio).
-- Parametrise with `@pytest.mark.parametrize`.
-- Mark async tests with `@pytest.mark.anyio` (provided by anyio's pytest plugin).
+- File names `test_*.py`, function names `test_*`
+- Fixtures via `@pytest.fixture`. Async fixtures are anyio-aware (`@pytest.fixture` on an async function works under `pytest-anyio` which is bundled with anyio)
+- Parametrise with `@pytest.mark.parametrize`
+- Mark async tests with `@pytest.mark.anyio` (provided by anyio's pytest plugin)
 
 ```python
 import pytest

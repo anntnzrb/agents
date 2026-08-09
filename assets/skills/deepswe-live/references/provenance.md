@@ -13,7 +13,7 @@ https://deepswe.datacurve.ai/artifacts/{benchmark_version}/
 Allowed files:
 
 - `leaderboard-live.json`: canonical published aggregate and the default `fetch` target;
-- `trials.json`: optional raw trial input, fetched only with explicit `--trials`.
+- `trials.json`: optional raw trial input, fetched only with explicit `--trials`
 
 Do not download task, exercise, release, or trial-artifact files. Do not infer a version from a homepage or combine files from different version paths.
 
@@ -49,7 +49,7 @@ Use exactly one label at the relevant scope:
 
 - `published`: copied from `leaderboard-live.json`; never recomputed;
 - `published_raw`: copied from `trials.json` or another unaggregated published row after explicit filtering;
-- `derived`: calculated by the skill from source values.
+- `derived`: calculated by the skill from source values
 
 Derived values belong below `derived` and never replace source fields. In particular, `ci_width = ci_hi - ci_lo` is derived even when both bounds are published. Raw extrema and recommendations are separate sections; an extremum is not automatically a recommendation.
 
@@ -66,4 +66,4 @@ Before presenting a metric, verify:
 3. `provenance.url` and `provenance.fetched_at` are present;
 4. `generated_at` and validators are retained when supplied;
 5. filters, stale/snapshot state, and explicit thresholds are stated;
-6. configuration identity is complete and null metrics were not imputed.
+6. configuration identity is complete and null metrics were not imputed

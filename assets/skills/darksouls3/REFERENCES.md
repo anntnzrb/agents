@@ -35,16 +35,16 @@ Read this before replacing embedded resources or making provenance-sensitive par
 
 ## Replacement policy
 
-- Prefer **licensed, machine-readable, save/parser-specific sources** for embedded facts.
-- Keep unlicensed reverse-engineering sources as **reference-only** unless the embedded rows are transformed, attributed, and independently validated.
-- Keep Fextralife/PCGamingWiki as **live/cited** references for prose and current guidance; avoid increasing embedded dependency on noncommercial wiki text.
-- Do not replace working local resources with broader but lower-quality tables just because they are larger.
-- Do not claim save-backed status for categories without sourced offsets. Current unsupported categories include gestures and infusions.
-- Prefer live retrieval or fresh cache for exact locations, route steps, NPC quest details, current PC/mod compatibility, and contested gameplay facts.
-- Local resource growth is allowed only when the data is required for parser correctness, deterministic CLI computation, spoiler safety, source provenance, or eval repeatability.
-- Do not add copied wiki prose, full walkthroughs, full questlines, boss strategy pages, lore descriptions, or bulk item-location text to bundled JSON resources.
-- Exception: `resources/guides/ds3_plat_guide/` may contain only the generated processed files `ds3-plat-guide.manifest.json` and `ds3-plat-guide.chunks.jsonl` for **PSNProfiles Dark Souls III - Platinum Walkthrough** because the user explicitly requested a tracked local corpus. The source PDF (`ds3-plat-guide.pdf`) must remain untracked and is ignored by `.gitignore`. The corpus remains non-authoritative, non-save-backed, spoiler-heavy, not relicensable, and not parser truth; consume it through `guide search` / `guide get` for local lookup and transformed/cited answers only, not general embedded source data.
-- Cache files are fetch receipts/transports, not canonical data sources; final answers should cite source URLs/source keys, not cache filenames.
+- Prefer **licensed, machine-readable, save/parser-specific sources** for embedded facts
+- Keep unlicensed reverse-engineering sources as **reference-only** unless the embedded rows are transformed, attributed, and independently validated
+- Keep Fextralife/PCGamingWiki as **live/cited** references for prose and current guidance; avoid increasing embedded dependency on noncommercial wiki text
+- Do not replace working local resources with broader but lower-quality tables just because they are larger
+- Do not claim save-backed status for categories without sourced offsets. Current unsupported categories include gestures and infusions
+- Prefer live retrieval or fresh cache for exact locations, route steps, NPC quest details, current PC/mod compatibility, and contested gameplay facts
+- Local resource growth is allowed only when the data is required for parser correctness, deterministic CLI computation, spoiler safety, source provenance, or eval repeatability
+- Do not add copied wiki prose, full walkthroughs, full questlines, boss strategy pages, lore descriptions, or bulk item-location text to bundled JSON resources
+- Exception: `resources/guides/ds3_plat_guide/` may contain only the generated processed files `ds3-plat-guide.manifest.json` and `ds3-plat-guide.chunks.jsonl` for **PSNProfiles Dark Souls III - Platinum Walkthrough** because the user explicitly requested a tracked local corpus. The source PDF (`ds3-plat-guide.pdf`) must remain untracked and is ignored by `.gitignore`. The corpus remains non-authoritative, non-save-backed, spoiler-heavy, not relicensable, and not parser truth; consume it through `guide search` / `guide get` for local lookup and transformed/cited answers only, not general embedded source data
+- Cache files are fetch receipts/transports, not canonical data sources; final answers should cite source URLs/source keys, not cache filenames
 
 ## Verification requirements after source/resource changes
 

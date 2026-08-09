@@ -14,9 +14,9 @@ Read-only PC game deal discovery and verification. Run the bundled deterministic
 
 ## Safety boundary
 
-- NEVER buy, create an account, sign in, accept a subscription, submit personal data, or submit payment.
-- Keep browser verification read-only. Stop before any irreversible or account-gated step.
-- Treat account sales and subscription access as access products, not game ownership.
+- NEVER buy, create an account, sign in, accept a subscription, submit personal data, or submit payment
+- Keep browser verification read-only. Stop before any irreversible or account-gated step
+- Treat account sales and subscription access as access products, not game ownership
 
 ## Defaults
 
@@ -57,13 +57,13 @@ Use `--include-itad` only when broader aggregation is useful. Use `provider gg -
 
 ## Workflow
 
-1. Normalize the request: title, platform, edition/components, country, currency, ranking goal, and any known Steam IDs.
-2. Run `lookup` with defaults or explicit user constraints. Do not filter out subscription, account, gift, or bundle offers before absolute-cheapest comparison.
-3. Inspect `identity`, `provider_failures`, `warnings`, `offers`, `bundle_history`, `rankings`, `verification_queue`, and `critical_verification_items`. Resolve ambiguous identity before comparing prices.
-4. Classify every contender by `acquisition_type`: `ownership_key`, `direct_ownership`, `gift`, `subscription_access`, `account`, `bundle`, or `unknown`.
-5. Preserve `evidence_status`: `verified`, `estimated`, `headline`, `blocked`, or `unknown`. Never promote aggregate data to `verified`.
-6. Verify the strict-cheapest candidates in `verification_queue` with retailer pages, search, and read-only checkout evidence. Verify bundle components and edition equivalence separately.
-7. Report the absolute cheapest first, then cheapest ownership and cheapest verified when available. Explain why they differ.
+1. Normalize the request: title, platform, edition/components, country, currency, ranking goal, and any known Steam IDs
+2. Run `lookup` with defaults or explicit user constraints. Do not filter out subscription, account, gift, or bundle offers before absolute-cheapest comparison
+3. Inspect `identity`, `provider_failures`, `warnings`, `offers`, `bundle_history`, `rankings`, `verification_queue`, and `critical_verification_items`. Resolve ambiguous identity before comparing prices
+4. Classify every contender by `acquisition_type`: `ownership_key`, `direct_ownership`, `gift`, `subscription_access`, `account`, `bundle`, or `unknown`
+5. Preserve `evidence_status`: `verified`, `estimated`, `headline`, `blocked`, or `unknown`. Never promote aggregate data to `verified`
+6. Verify the strict-cheapest candidates in `verification_queue` with retailer pages, search, and read-only checkout evidence. Verify bundle components and edition equivalence separately
+7. Report the absolute cheapest first, then cheapest ownership and cheapest verified when available. Explain why they differ
 
 ## Reporting contract
 

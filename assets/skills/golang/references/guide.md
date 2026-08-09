@@ -4,11 +4,11 @@ Keep this file for fast decisions while coding. Load cookbooks for tutorials and
 
 ## Version and toolchain policy
 
-- New applications: target `go 1.26` in go.mod.
-- Libraries: set `go` to the oldest version supporting your API; add `toolchain go1.26.3` for build reproducibility.
-- Go releases February and August. The two most recent major releases receive security patches.
-- Update to latest minor patch before any major tooling change.
-- Sources: `go.dev/doc/go1.26`, `endoflife.date/go`, `go.dev/doc/toolchain`.
+- New applications: target `go 1.26` in go.mod
+- Libraries: set `go` to the oldest version supporting your API; add `toolchain go1.26.3` for build reproducibility
+- Go releases February and August. The two most recent major releases receive security patches
+- Update to latest minor patch before any major tooling change
+- Sources: `go.dev/doc/go1.26`, `endoflife.date/go`, `go.dev/doc/toolchain`
 
 ## Stable Modern Go Feature Table (1.22 → 1.26)
 
@@ -129,11 +129,11 @@ project/
 
 Rules:
 
-- `cmd/` — one directory per binary, each a thin bootstrap.
-- `internal/` — compiler-enforced private packages. Business logic goes here.
-- `pkg/` — optional, only for intentionally public, importable library code.
-- `src/` — anti-pattern (GOPATH relic). Never use.
-- `go.work` — local multi-module development only. `.gitignore` it.
+- `cmd/` — one directory per binary, each a thin bootstrap
+- `internal/` — compiler-enforced private packages. Business logic goes here
+- `pkg/` — optional, only for intentionally public, importable library code
+- `src/` — anti-pattern (GOPATH relic). Never use
+- `go.work` — local multi-module development only. `.gitignore` it
 
 ## Tooling Defaults
 

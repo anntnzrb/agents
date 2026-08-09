@@ -24,15 +24,15 @@ Use `checklist --chapter N`; entries are ordered and spoiler-gated. Before leavi
 9. Krat Central Station Redux
 10. Relic of Trismegistus
 11. Isle of the Alchemists / Arche Abbey
-12. Overture: enter after Corrupted Parade Master via Star's Chrysalis at Path of Pilgrim; stop at Rose Garden Entrance PNR for cleanup, then finish the Rose Garden finale and post-DLC Eventide Hotel Krat cleanup.
+12. Overture: enter after Corrupted Parade Master via Star's Chrysalis at Path of Pilgrim; stop at Rose Garden Entrance PNR for cleanup, then finish the Rose Garden finale and post-DLC Eventide Hotel Krat cleanup
 
 The ending trophies are prerequisite routes, not just final-choice labels:
 
-- **Rise of P:** build high Humanity; the heart-pounding/white-hair signal is the observable confirmation. Give Sophia peace, refuse Geppetto, and defeat Nameless Puppet.
-- **Free from the Puppet String:** have insufficient Rise Humanity and/or let Sophia live, refuse Geppetto, and defeat Nameless Puppet.
-- **Real Boy: They All Lived Happily Ever After:** give your heart to Geppetto; Nameless Puppet is not fought.
-- **Blood Artist / Rose's Memory outcome (Overture):** reach the Rose Garden finale and defeat Blood Artist.
-- **Lea / Legend recording outcome (Overture):** complete Lea's route, then return through Eventide Hotel Krat and listen to the Legend's last recording.
+- **Rise of P:** build high Humanity; the heart-pounding/white-hair signal is the observable confirmation. Give Sophia peace, refuse Geppetto, and defeat Nameless Puppet
+- **Free from the Puppet String:** have insufficient Rise Humanity and/or let Sophia live, refuse Geppetto, and defeat Nameless Puppet
+- **Real Boy: They All Lived Happily Ever After:** give your heart to Geppetto; Nameless Puppet is not fought
+- **Blood Artist / Rose's Memory outcome (Overture):** reach the Rose Garden finale and defeat Blood Artist
+- **Lea / Legend recording outcome (Overture):** complete Lea's route, then return through Eventide Hotel Krat and listen to the Legend's last recording
 
 Cloud-save before Sophia and retain the save through the Geppetto/Nameless Puppet sequence. After each base ending, return to Hotel Krat for post-ending letters and the piano interaction, then reload the cloud save for the next branch; in Overture, stop at the Rose Garden Point of No Return and complete all missable cleanup first.
 
@@ -44,6 +44,6 @@ The base array contains exactly these 43 official titles: **Lies of P**; **Real 
 
 ## Sources
 
-- PSNProfiles, [Lies of P Trophy Guide](https://psnprofiles.com/guide/22489-lies-of-p-trophy-guide), pp. 11–28, checked 2026-07-19; chapter boundaries and base missable timing.
-- PowerPyx, [Lies of P: Overture DLC Trophy Guide & Roadmap](https://www.powerpyx.com/lies-of-p-overture-dlc-trophy-guide-roadmap/), checked 2026-07-19; exact 11 titles, counts, missables, Rose Garden PNR and cleanup.
-- NEOWIZ/P Round8, *Lies of P: Overture* official announcements and patch notes, checked 2026-07-19; DLC scope and version reconciliation.
+- PSNProfiles, [Lies of P Trophy Guide](https://psnprofiles.com/guide/22489-lies-of-p-trophy-guide), pp. 11–28, checked 2026-07-19; chapter boundaries and base missable timing
+- PowerPyx, [Lies of P: Overture DLC Trophy Guide & Roadmap](https://www.powerpyx.com/lies-of-p-overture-dlc-trophy-guide-roadmap/), checked 2026-07-19; exact 11 titles, counts, missables, Rose Garden PNR and cleanup
+- NEOWIZ/P Round8, *Lies of P: Overture* official announcements and patch notes, checked 2026-07-19; DLC scope and version reconciliation

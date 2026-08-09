@@ -146,12 +146,12 @@ HTTP and parse failures emit one-line compact JSON on stderr:
 }
 ```
 
-- `provider` is always `"reddit"`.
-- `status` is the HTTP status from Reddit, or `null` for transport-level errors.
-- `body_bytes` is the upstream body size.
-- `body_preview` is the first 500 chars of the body, decoded UTF-8.
-- `body_truncated` is `true` when the body is longer than 500 chars.
-- `kind` is `"network_security_block"` when the body text contains `blocked by network security` (case-insensitive), `"network_error"` for `URLError`, `"invalid_json"` for unparseable bodies, and is omitted otherwise.
+- `provider` is always `"reddit"`
+- `status` is the HTTP status from Reddit, or `null` for transport-level errors
+- `body_bytes` is the upstream body size
+- `body_preview` is the first 500 chars of the body, decoded UTF-8
+- `body_truncated` is `true` when the body is longer than 500 chars
+- `kind` is `"network_security_block"` when the body text contains `blocked by network security` (case-insensitive), `"network_error"` for `URLError`, `"invalid_json"` for unparseable bodies, and is omitted otherwise
 
 HTTP errors exit with `22`. Network errors exit with `1`. Validation / usage errors exit with `2` and a concise stderr line (no traceback).
 
@@ -162,7 +162,7 @@ HTTP errors exit with `22`. Network errors exit with `1`. Validation / usage err
 - `GET /r/<subreddit>/<sort>.json`
 - Sorts: `hot`, `new`, `top`, `rising`, `controversial`
 - Common params: `limit`, `t`
-- The sort positional arg must appear before any `key=value`; a stray positional token after `key=value` is a usage error.
+- The sort positional arg must appear before any `key=value`; a stray positional token after `key=value` is a usage error
 
 Example:
 
@@ -174,8 +174,8 @@ reddit browse technology top time=week limit=10
 
 - `GET /search.json`
 - Common params: `q`, `sort`, `t`, `limit`
-- The helper expands legacy args `subreddits=`, `author=`, `flair=` into Reddit search syntax.
-- `subreddits=` must parse as a JSON list of non-empty strings.
+- The helper expands legacy args `subreddits=`, `author=`, `flair=` into Reddit search syntax
+- `subreddits=` must parse as a JSON list of non-empty strings
 
 Example:
 
@@ -197,7 +197,7 @@ reddit post programming 1abcde comment_limit=20 comment_sort=top
 ### Post + comments by URL
 
 - Fetch `<reddit-url>.json`
-- URL must use `http://` or `https://`; otherwise rc=2.
+- URL must use `http://` or `https://`; otherwise rc=2
 - Same comment params as above
 
 Example:
@@ -234,9 +234,9 @@ reddit search "llm" raw=1
 
 ## Rate limits and auth
 
-- Anonymous read-only access works, but throughput is lower.
-- Reddit's broader API surface uses OAuth2, but this skill intentionally stays on direct public JSON endpoints.
-- If you need private endpoints, write actions, or higher-throughput authenticated access, build that as a separate OAuth-backed mode instead of bolting it onto this helper.
+- Anonymous read-only access works, but throughput is lower
+- Reddit's broader API surface uses OAuth2, but this skill intentionally stays on direct public JSON endpoints
+- If you need private endpoints, write actions, or higher-throughput authenticated access, build that as a separate OAuth-backed mode instead of bolting it onto this helper
 
 ## Glossary helper
 

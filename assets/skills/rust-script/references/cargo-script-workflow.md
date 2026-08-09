@@ -56,10 +56,10 @@ fn main() {
 
 ## Operational Notes
 
-- `cargo <path.rs>` works as manifest-command form; still requires `-Zscript`.
-- Manifest-command precedence beats external subcommands when path is recognized.
-- For extensionless files, use `./name`; bare `name` is treated as command lookup.
-- Arguments after script path are script args; pass global Cargo flags before script path.
+- `cargo <path.rs>` works as manifest-command form; still requires `-Zscript`
+- Manifest-command precedence beats external subcommands when path is recognized
+- For extensionless files, use `./name`; bare `name` is treated as command lookup
+- Arguments after script path are script args; pass global Cargo flags before script path
 
 ## Build/Lock Location Behavior
 

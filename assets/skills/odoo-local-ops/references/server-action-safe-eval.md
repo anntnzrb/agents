@@ -4,8 +4,8 @@ Sources:
 
 - Odoo docs `https://www.odoo.com/documentation/17.0/developer/reference/backend/actions.html`
 - Odoo docs `https://www.odoo.com/documentation/17.0/applications/studio/automated_actions.html`
-- Local source `<odoo-source>/odoo/addons/base/models/ir_actions.py`, anchors `_run_action_code_multi` and `_get_eval_context`.
-- Odoo 17 upstream `odoo/tools/safe_eval.py`, especially `_SAFE_OPCODES` and `_BUILTINS`.
+- Local source `<odoo-source>/odoo/addons/base/models/ir_actions.py`, anchors `_run_action_code_multi` and `_get_eval_context`
+- Odoo 17 upstream `odoo/tools/safe_eval.py`, especially `_SAFE_OPCODES` and `_BUILTINS`
 
 ## Known production runtime profile
 
@@ -23,7 +23,7 @@ deduplication, Odoo recordset operations, `search_count`, and `read_group`.
 
 Python syntax support has two gates:
 
-1. The construct must compile on Python 3.10.
+1. The construct must compile on Python 3.10
 2. Every generated opcode, including opcodes inside nested functions,
    comprehensions, lambdas, and generators, must be in Odoo's `_SAFE_OPCODES`.
 
@@ -117,6 +117,6 @@ Odoo captures result via the `action` variable. Local source `_run_action_code_m
 
 ## Success and failure semantics
 
-- Read-only audit can `raise UserError(payload_json)` because no writes should commit.
-- Write success must set `action = {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {'type': 'success', 'title': '...', 'message': payload, 'sticky': True}}`.
-- Write failure must `raise UserError(payload_json)` to abort and rollback.
+- Read-only audit can `raise UserError(payload_json)` because no writes should commit
+- Write success must set `action = {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {'type': 'success', 'title': '...', 'message': payload, 'sticky': True}}`
+- Write failure must `raise UserError(payload_json)` to abort and rollback

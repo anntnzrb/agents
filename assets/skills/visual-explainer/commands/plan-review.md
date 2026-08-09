@@ -19,14 +19,14 @@ For each proposed change, verify whether referenced files/functions/types exist,
 
 ## Required page sections
 
-1. Plan summary: problem, core idea, scope.
-2. Accuracy verdict: correct, stale, risky, unsupported, missing.
-3. Current architecture: diagram of affected subsystem only.
-4. Proposed architecture: matching visual diff against current state.
-5. Gap/risk matrix: correctness, tests, API, data model, UX, security/privacy, performance, maintainability, release.
-6. File-by-file review: proposed edits, current reality, recommendation.
-7. Better plan: concrete corrections or simplifications.
-8. Decision: approve, revise, or reject with rationale.
+1. Plan summary: problem, core idea, scope
+2. Accuracy verdict: correct, stale, risky, unsupported, missing
+3. Current architecture: diagram of affected subsystem only
+4. Proposed architecture: matching visual diff against current state
+5. Gap/risk matrix: correctness, tests, API, data model, UX, security/privacy, performance, maintainability, release
+6. File-by-file review: proposed edits, current reality, recommendation
+7. Better plan: concrete corrections or simplifications
+8. Decision: approve, revise, or reject with rationale
 
 Use current-vs-planned visual language. Include responsive nav. Follow the skill’s Mermaid, overflow, and evidence rules.
 

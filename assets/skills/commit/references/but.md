@@ -22,10 +22,10 @@ but diff --json
 but <mutation> --json --status-after
 ```
 
-- Save large JSON outputs to temp files and inspect them with `jq` instead of relying on rendered text.
-- Use CLI IDs from `but status --json` and `but diff --json`.
-- Refresh IDs after every mutation; they may change after `commit`, `move`, `squash`, `reword`, `amend`, or `uncommit`.
-- Once in But mode, avoid raw Git write commands.
+- Save large JSON outputs to temp files and inspect them with `jq` instead of relying on rendered text
+- Use CLI IDs from `but status --json` and `but diff --json`
+- Refresh IDs after every mutation; they may change after `commit`, `move`, `squash`, `reword`, `amend`, or `uncommit`
+- Once in But mode, avoid raw Git write commands
 
 ## JSON-first loop
 
@@ -49,9 +49,9 @@ but commit <branch> --message-file "$msgfile" --changes <id1>,<id2> --json --sta
 
 Notes:
 
-- `--changes` can target exact file or hunk IDs.
-- `but diff --json` may expose one ID per split hunk.
-- After the commit, treat the returned status JSON as the new source of truth.
+- `--changes` can target exact file or hunk IDs
+- `but diff --json` may expose one ID per split hunk
+- After the commit, treat the returned status JSON as the new source of truth
 
 ## Assignment-first flow
 
@@ -135,8 +135,8 @@ Use this if a move, squash, amend, or absorb plan goes sideways. After recovery,
 
 ## Caveats
 
-- Cross-stack move to a precise position is not always one-step; sometimes move to the branch first, then reorder within the stack.
-- Some binary or text-converted diffs disable hunk-level operations.
-- Prefer returned JSON state over assumptions.
-- `reword`, `move`, `squash`, and `uncommit` can invalidate saved IDs.
-- Do not stop after the first valid commit if more logical groups remain.
+- Cross-stack move to a precise position is not always one-step; sometimes move to the branch first, then reorder within the stack
+- Some binary or text-converted diffs disable hunk-level operations
+- Prefer returned JSON state over assumptions
+- `reword`, `move`, `squash`, and `uncommit` can invalidate saved IDs
+- Do not stop after the first valid commit if more logical groups remain

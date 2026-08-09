@@ -10,11 +10,11 @@ Typed errors, wrap chains, `errors.Is` / `errors.As`, no panic in libraries, res
 
 ## The five rules
 
-1. **Every error is wrapped on the way up, with `%w`, with context.** Never `return err` from a non-trivial site.
-2. **Compare with `errors.Is`, not `==`.** Wrap chains break `==`. The `errorlint` linter forbids `==` on errors.
-3. **Cast with `errors.As`, not type assertion.** Same reason.
-4. **`panic` is reserved for programmer errors.** Library code never panics on user input or environment failures. Use `(T, error)`.
-5. **Resources released via `defer` immediately after acquisition.** No "I'll add it later".
+1. **Every error is wrapped on the way up, with `%w`, with context.** Never `return err` from a non-trivial site
+2. **Compare with `errors.Is`, not `==`.** Wrap chains break `==`. The `errorlint` linter forbids `==` on errors
+3. **Cast with `errors.As`, not type assertion.** Same reason
+4. **`panic` is reserved for programmer errors.** Library code never panics on user input or environment failures. Use `(T, error)`
+5. **Resources released via `defer` immediately after acquisition.** No "I'll add it later"
 
 ---
 
@@ -139,13 +139,13 @@ if len(errs) > 0 {
 
 **Banned**:
 
-- Anywhere a `(T, error)` could be returned.
-- Inside HTTP handlers (gin's `Recovery` middleware catches them, but you've already lost the error context).
-- Inside any goroutine that survives request lifetime.
+- Anywhere a `(T, error)` could be returned
+- Inside HTTP handlers (gin's `Recovery` middleware catches them, but you've already lost the error context)
+- Inside any goroutine that survives request lifetime
 
 **Allowed** (with documentation):
 
-- Map literal init at package level: `var statusNames = map[Status]string{...}` followed by a `func init()` that panics if a const has no name. Catches the bug at startup, not runtime.
+- Map literal init at package level: `var statusNames = map[Status]string{...}` followed by a `func init()` that panics if a const has no name. Catches the bug at startup, not runtime
 - The `must*` convention for genuinely unrecoverable startup:
   ```go
   func MustParseURL(s string) *url.URL {
@@ -156,7 +156,7 @@ if len(errs) > 0 {
   // Use only with literals known at compile time:
   var defaultAPI = MustParseURL("https://api.example.com")
   ```
-- `default:` case of an exhaustive sealed-interface switch — see `type-patterns.md`.
+- `default:` case of an exhaustive sealed-interface switch — see `type-patterns.md`
 
 The `revive` linter rule `error-return` will flag suspect panic sites; treat them as bugs.
 
@@ -185,10 +185,10 @@ func writeReport(path string) (err error) {
 
 Key points:
 
-- `defer f.Close()` immediately after `os.Create` — never further down.
-- Named return `(err error)` so the deferred close can mutate it on close failure.
-- `bodyclose` linter catches missed `defer resp.Body.Close()` for HTTP responses.
-- `sqlclosecheck` linter catches missed `defer rows.Close()` for SQL.
+- `defer f.Close()` immediately after `os.Create` — never further down
+- Named return `(err error)` so the deferred close can mutate it on close failure
+- `bodyclose` linter catches missed `defer resp.Body.Close()` for HTTP responses
+- `sqlclosecheck` linter catches missed `defer rows.Close()` for SQL
 
 ### `errors.Join` for multi-stage cleanup
 
@@ -301,9 +301,9 @@ func fetchAll(ctx context.Context, urls []string) ([][]byte, error) {
 }
 ```
 
-- `errgroup.WithContext` cancels remaining tasks on first error.
-- `SetLimit` bounds concurrency.
-- First non-nil error is returned; others are discarded — by design.
+- `errgroup.WithContext` cancels remaining tasks on first error
+- `SetLimit` bounds concurrency
+- First non-nil error is returned; others are discarded — by design
 
 See `concurrency.md` for the full pattern.
 

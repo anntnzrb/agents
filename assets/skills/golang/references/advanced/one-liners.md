@@ -67,9 +67,9 @@ Each `scripts/<name>/main.go` is its own `main` package. Invoke as `go run ./scr
 
 This is the right pattern when:
 
-- You need module deps (sqlc, pgx, your own internal packages).
-- You want IDE support, type-checking, test coverage.
-- The script lives alongside the project, runs in CI.
+- You need module deps (sqlc, pgx, your own internal packages)
+- You want IDE support, type-checking, test coverage
+- The script lives alongside the project, runs in CI
 
 ---
 
@@ -92,7 +92,7 @@ Rare, but useful for one-shot terminal experiments. The `<(...)` is process subs
 
 Even a 30-line script follows the philosophy:
 
-1. **Typed flags via `flag` or `pflag`**, not `os.Args` string parsing past 2 args.
+1. **Typed flags via `flag` or `pflag`**, not `os.Args` string parsing past 2 args
    ```go
    var (
        url   = flag.String("url", "", "URL to fetch")
@@ -102,25 +102,25 @@ Even a 30-line script follows the philosophy:
    if *url == "" { log.Fatal("--url required") }
    ```
 
-2. **`context.Context` propagation** wherever I/O happens.
+2. **`context.Context` propagation** wherever I/O happens
    ```go
    ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
    defer cancel()
    req, _ := http.NewRequestWithContext(ctx, "GET", *url, nil)
    ```
 
-3. **`log.Fatal` is fine in `main()`** of a script (programmer error / fatal path), but **never inside any function the script imports.** Library code returns errors.
+3. **`log.Fatal` is fine in `main()`** of a script (programmer error / fatal path), but **never inside any function the script imports.** Library code returns errors
 
 4. **Errors get wrapped.** Same rule as production code:
    ```go
    if err != nil { return fmt.Errorf("fetch %s: %w", *url, err) }
    ```
 
-5. **Resources released via `defer`.** No "I'll fix it later".
+5. **Resources released via `defer`.** No "I'll fix it later"
 
-6. **slog for output if it must be parseable.** `fmt.Println` for one-shot terminal output is fine.
+6. **slog for output if it must be parseable.** `fmt.Println` for one-shot terminal output is fine
 
-7. **No more than 250 pure LOC.** If it grows, it stops being a script and becomes a subcommand of your CLI tool.
+7. **No more than 250 pure LOC.** If it grows, it stops being a script and becomes a subcommand of your CLI tool
 
 ---
 

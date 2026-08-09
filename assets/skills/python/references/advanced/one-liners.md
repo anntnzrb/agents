@@ -64,9 +64,9 @@ Every PEP 723 script MUST include these, in order:
 
 1. **Shebang**: `#!/usr/bin/env -S uv run --script`
 2. **PEP 723 metadata block**: `# /// script` ... `# ///` with `requires-python` and `dependencies`
-3. **Usage comment block**: How to install uv + how to run the script. Copy the template above verbatim.
-4. **`from __future__ import annotations`**: Always first import.
-5. **`if __name__ == "__main__": main()`**: Entry point guard.
+3. **Usage comment block**: How to install uv + how to run the script. Copy the template above verbatim
+4. **`from __future__ import annotations`**: Always first import
+5. **`if __name__ == "__main__": main()`**: Entry point guard
 
 ### The usage comment block (NON-NEGOTIABLE)
 

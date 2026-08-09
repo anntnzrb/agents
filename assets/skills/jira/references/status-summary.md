@@ -40,7 +40,7 @@ Return these sections in order:
 - `site/account`: verified identity evidence;
 - `project`: exact project and ownership evidence;
 - `period`: start/end, timezone, and inclusive/exclusive boundaries;
-- `audience`: requested audience and detail level.
+- `audience`: requested audience and detail level
 
 ### Coverage
 
@@ -48,7 +48,7 @@ Return these sections in order:
 - `mode`: finite limit or explicit pagination;
 - `complete`: `true` only on a documented exhaustion signal, otherwise `false` with the exact cap,
   remaining signal, error, or unknown boundary;
-- `errors`: every query, page, read, or link-read error, or `none reported` only when observed.
+- `errors`: every query, page, read, or link-read error, or `none reported` only when observed
 
 ### Metrics
 

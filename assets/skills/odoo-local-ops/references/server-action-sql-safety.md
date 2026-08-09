@@ -13,17 +13,17 @@ ORM first for small writes and any operation needing Odoo business logic, constr
 
 ## SQL direct-write checklist
 
-- Explicit user asked for a write.
-- Read-only audit passed.
-- Dry-run passed with expected counts.
-- SQL translates ORM domain fully, including `active IS TRUE` for UI/ORM active_test, M2M fields as `EXISTS`, nullable comparisons as `IS DISTINCT FROM`, and exact excluded ids.
-- Values use `env.cr.execute(sql, params)`; identifiers are hardcoded/whitelisted only.
-- `SET LOCAL lock_timeout = '5s'` and `SET LOCAL statement_timeout = '60s'` before mutating SQL unless the action is known tiny; if timeout fires, let exception rollback.
-- Candidate table is `CREATE TEMP TABLE ... ON COMMIT DROP AS ...`.
-- Candidate table has one row per target id; add `CREATE UNIQUE INDEX ... ON tmp_table(id)` or precheck `count(*) = count(DISTINCT id)` before `UPDATE ... FROM`.
-- Update uses `UPDATE target SET ... FROM tmp_candidates WHERE target.id = tmp_candidates.id`.
-- Postcheck validates exact rowcount, invariants, and zero wrong remaining rows for the frozen candidate set; final independent audits must also report live-domain deltas separately because new records may be created while the action is being prepared or executed.
-- Success returns `display_notification`; failure raises `UserError`.
+- Explicit user asked for a write
+- Read-only audit passed
+- Dry-run passed with expected counts
+- SQL translates ORM domain fully, including `active IS TRUE` for UI/ORM active_test, M2M fields as `EXISTS`, nullable comparisons as `IS DISTINCT FROM`, and exact excluded ids
+- Values use `env.cr.execute(sql, params)`; identifiers are hardcoded/whitelisted only
+- `SET LOCAL lock_timeout = '5s'` and `SET LOCAL statement_timeout = '60s'` before mutating SQL unless the action is known tiny; if timeout fires, let exception rollback
+- Candidate table is `CREATE TEMP TABLE ... ON COMMIT DROP AS ...`
+- Candidate table has one row per target id; add `CREATE UNIQUE INDEX ... ON tmp_table(id)` or precheck `count(*) = count(DISTINCT id)` before `UPDATE ... FROM`
+- Update uses `UPDATE target SET ... FROM tmp_candidates WHERE target.id = tmp_candidates.id`
+- Postcheck validates exact rowcount, invariants, and zero wrong remaining rows for the frozen candidate set; final independent audits must also report live-domain deltas separately because new records may be created while the action is being prepared or executed
+- Success returns `display_notification`; failure raises `UserError`
 
 PostgreSQL warning: `UPDATE ... FROM` joins must produce at most one output row per target row, otherwise which join row updates the target is not readily predictable.
 

@@ -12,9 +12,9 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" coding --m
 
 Then identify the source boundary:
 
-- `fetch`, `query`, `stats`, and `reasoning` use the provider-leaderboard snapshot.
-- `coding` fetches the distinct Coding capability page.
-- Never repair a capability-page failure by treating provider-snapshot model metadata as capability results. It lacks Coding Index task-token, task-cost, and task-time evidence.
+- `fetch`, `query`, `stats`, and `reasoning` use the provider-leaderboard snapshot
+- `coding` fetches the distinct Coding capability page
+- Never repair a capability-page failure by treating provider-snapshot model metadata as capability results. It lacks Coding Index task-token, task-cost, and task-time evidence
 
 ## 2. Capture the live source shape
 
@@ -26,11 +26,11 @@ https://artificialanalysis.ai/models/capabilities/coding
 
 Browser workflow:
 
-1. Close any stale browser session.
-2. Open the capability page and inspect its accessible table/metric labels.
-3. Reload while recording public RSC/client resources.
-4. Inspect the page's `self.__next_f` payload for the model array and record only the keys needed for normalized output.
-5. Close the browser session.
+1. Close any stale browser session
+2. Open the capability page and inspect its accessible table/metric labels
+3. Reload while recording public RSC/client resources
+4. Inspect the page's `self.__next_f` payload for the model array and record only the keys needed for normalized output
+5. Close the browser session
 
 Record the source URL, fetch time, observed row keys, and one redacted/public example row in the regression fixture or test comment. Do not require cookies, login, or paid API access for the primary path.
 
@@ -63,20 +63,20 @@ Normalize aliases at the boundary. Keep source-specific names out of the public 
 
 The Coding Index is its own evaluation scope. Its current headline score is the equal-weighted Coding capability index composed of Terminal-Bench v2.1 and SciCode.
 
-- `costPerTask` and `evalCost` are Coding-evaluation/API USD evidence.
-- `outputTokensPerTask` is Coding-evaluation task output, split into answer and reasoning tokens.
-- `timePerTaskSeconds` is weighted decode time; it excludes TTFT and other overhead.
-- These values MUST NOT be converted to ChatGPT/Codex subscription quota, messages, credits, or allowance.
-- Do not synthesize missing input tokens, component scores, benchmark costs, or tool-billing fields from a different page.
+- `costPerTask` and `evalCost` are Coding-evaluation/API USD evidence
+- `outputTokensPerTask` is Coding-evaluation task output, split into answer and reasoning tokens
+- `timePerTaskSeconds` is weighted decode time; it excludes TTFT and other overhead
+- These values MUST NOT be converted to ChatGPT/Codex subscription quota, messages, credits, or allowance
+- Do not synthesize missing input tokens, component scores, benchmark costs, or tool-billing fields from a different page
 
 ## 5. Repair narrowly
 
-1. Keep the previous recognized shape.
-2. Add a structural candidate predicate for the new shape rather than hard-coding one container name.
-3. Normalize aliases into existing output fields; add new fields only when they carry a distinct documented scope.
-4. Keep output envelopes and existing keys compatible.
-5. Make every new numeric field null-safe.
-6. Update `references/output-contract.md` in the same change.
+1. Keep the previous recognized shape
+2. Add a structural candidate predicate for the new shape rather than hard-coding one container name
+3. Normalize aliases into existing output fields; add new fields only when they carry a distinct documented scope
+4. Keep output envelopes and existing keys compatible
+5. Make every new numeric field null-safe
+6. Update `references/output-contract.md` in the same change
 
 Avoid adding a second transport, a broad fallback, or an inferred quota calculation unless the first-party source requires it.
 
@@ -88,7 +88,7 @@ Every schema repair needs these fixtures:
 2. current RSC rows with `headlineValue`, task metrics, and aliases;
 3. current score-only rows, proving they are retained with nullable evidence;
 4. unrelated provider-leaderboard rows, proving cross-page data is rejected;
-5. filtering and sorting on the normalized output.
+5. filtering and sorting on the normalized output
 
 The test must fail against the previous schema assumption and pass without network access.
 

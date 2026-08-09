@@ -91,24 +91,24 @@ jq '{tempo:.beats.tempo_bpm,key:(.key.key+" "+.key.mode),energy:.energy.dynamic_
 
 Recommended loop:
 
-1. Human gives file path + question.
-2. Agent runs `ask` for direct answer.
-3. If low confidence / broad query, agent runs `analyze --json`.
-4. Agent answers with metrics + caveats.
-5. For follow-up detail, agent switches to `chat`.
+1. Human gives file path + question
+2. Agent runs `ask` for direct answer
+3. If low confidence / broad query, agent runs `analyze --json`
+4. Agent answers with metrics + caveats
+5. For follow-up detail, agent switches to `chat`
 
 ## 10) What this tool is great at
 
-- Fast objective descriptors from audio signal.
-- Deterministic Q&A on fixed intents.
-- Segment-aware inspection.
-- Repeatable outputs suitable for automation.
+- Fast objective descriptors from audio signal
+- Deterministic Q&A on fixed intents
+- Segment-aware inspection
+- Repeatable outputs suitable for automation
 
 ## 11) What this tool is **not** (yet)
 
-- No lyric transcription.
-- No chord-by-chord progression output.
-- No source separation/stems.
-- No semantic mood classification model.
+- No lyric transcription
+- No chord-by-chord progression output
+- No source separation/stems
+- No semantic mood classification model
 
 Use `references/roadmap.md` for extension ideas.

@@ -15,14 +15,14 @@ Cite command output or file:line evidence for project state, module/function/typ
 
 ## Required page sections
 
-1. Project identity: what this repo is, stack, entry points.
-2. Architecture snapshot: Mermaid or hybrid diagram of current conceptual modules.
-3. Recent activity: grouped narrative, not raw log.
-4. Current state: uncommitted work, branches, TODOs, known blockers.
-5. Mental model map: key modules, data flow, command/test/deploy paths.
-6. Risks and cognitive debt: hotspots and gotchas.
-7. Useful commands and files.
-8. Likely next steps, based only on evidence.
+1. Project identity: what this repo is, stack, entry points
+2. Architecture snapshot: Mermaid or hybrid diagram of current conceptual modules
+3. Recent activity: grouped narrative, not raw log
+4. Current state: uncommitted work, branches, TODOs, known blockers
+5. Mental model map: key modules, data flow, command/test/deploy paths
+6. Risks and cognitive debt: hotspots and gotchas
+7. Useful commands and files
+8. Likely next steps, based only on evidence
 
 Use responsive nav. Use compact reference tables for file maps and commands. Follow the skill’s Mermaid, overflow, and delivery rules.
 

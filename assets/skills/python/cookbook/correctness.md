@@ -58,11 +58,11 @@ Choose one boundary tool per edge. Parse once, normalize once, then hand the app
 
 ## What not to do
 
-- Don't use `dict[str, Any]` for known payloads.
-- Don't keep `BaseModel` or `Struct` objects in core business logic.
-- Don't validate every function argument at runtime.
-- Don't silently coerce bad input with ad hoc `str()`, `int()`, or defaulting chains.
-- Don't stack multiple validation libraries on the same edge.
+- Don't use `dict[str, Any]` for known payloads
+- Don't keep `BaseModel` or `Struct` objects in core business logic
+- Don't validate every function argument at runtime
+- Don't silently coerce bad input with ad hoc `str()`, `int()`, or defaulting chains
+- Don't stack multiple validation libraries on the same edge
 
 ## Tiered quality gates
 

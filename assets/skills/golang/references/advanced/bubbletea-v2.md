@@ -18,16 +18,16 @@ This breaks every CJK input method. IME candidate windows (the popup showing Han
 
 Bubbletea v2 fixes this with two changes:
 
-1. **`tea.View{Cursor: *tea.Cursor}`** — your `View()` method returns a view that *includes* the desired cursor position. The framework moves the terminal's real cursor there.
-2. **`textarea.SetVirtualCursor(false)`** — textareas no longer draw their own `█`. They expose `.Cursor()` so you can read where they want the real cursor.
+1. **`tea.View{Cursor: *tea.Cursor}`** — your `View()` method returns a view that *includes* the desired cursor position. The framework moves the terminal's real cursor there
+2. **`textarea.SetVirtualCursor(false)`** — textareas no longer draw their own `█`. They expose `.Cursor()` so you can read where they want the real cursor
 
 Together: IME popups appear where the user is typing. As they should.
 
 ### Other v2 wins (incidental)
 
-- `tea.MouseClickMsg` / `MouseMotionMsg` / `MouseReleaseMsg` instead of one coarse `MouseMsg`.
-- Cleaner `View` struct with `AltScreen`, `MouseMode` fields instead of `tea.Cmd` setters.
-- Pluggable rendering pipeline; better performance under high message volume.
+- `tea.MouseClickMsg` / `MouseMotionMsg` / `MouseReleaseMsg` instead of one coarse `MouseMsg`
+- Cleaner `View` struct with `AltScreen`, `MouseMode` fields instead of `tea.Cmd` setters
+- Pluggable rendering pipeline; better performance under high message volume
 
 ---
 
@@ -116,8 +116,8 @@ func main() {
 
 The two lines that matter:
 
-1. `ta.SetVirtualCursor(false)` — disables the virtual `█`.
-2. `view.Cursor = cursor` (where `cursor = m.ta.Cursor()`) — exports the real cursor position to the framework.
+1. `ta.SetVirtualCursor(false)` — disables the virtual `█`
+2. `view.Cursor = cursor` (where `cursor = m.ta.Cursor()`) — exports the real cursor position to the framework
 
 Without **both**, IME breaks.
 
@@ -231,10 +231,10 @@ rendered := titleStyle.Render("\u4e2d\u6587")
 
 Rules:
 
-- **Model is a value type, not a pointer.** Bubbletea calls `Update` with a value receiver and expects a new value returned. Pointer receivers cause subtle bugs where state mutation leaks across draws.
-- **`Update` is pure.** No I/O. No goroutines started inline. Any I/O returns a `tea.Cmd` — Bubbletea runs it in a goroutine and feeds the result back as a message.
-- **`View` is read-only.** It returns a `tea.View` without modifying state.
-- **`tea.Cmd` is `func() tea.Msg`.** It runs once, returns a message, exits. For repeating work, use `tea.Tick` or a self-resending command.
+- **Model is a value type, not a pointer.** Bubbletea calls `Update` with a value receiver and expects a new value returned. Pointer receivers cause subtle bugs where state mutation leaks across draws
+- **`Update` is pure.** No I/O. No goroutines started inline. Any I/O returns a `tea.Cmd` — Bubbletea runs it in a goroutine and feeds the result back as a message
+- **`View` is read-only.** It returns a `tea.View` without modifying state
+- **`tea.Cmd` is `func() tea.Msg`.** It runs once, returns a message, exits. For repeating work, use `tea.Tick` or a self-resending command
 
 ```go
 // One-shot command
@@ -338,18 +338,18 @@ func TestModel_typing_cjk_keeps_cursor_in_position(t *testing.T) {
 
 ## Performance — when v2 starts to crawl
 
-- **Reduce View frequency.** If the model changes 60 times/sec but the rendered view changes once/sec, gate redraws on a "dirty" flag.
-- **`viewport.Model` for scrollable content.** Avoid re-rendering thousands of lines on every keystroke.
-- **`Batch` your commands.** A series of synchronous `tea.Cmd` returns serializes; `tea.Batch` parallelizes.
-- **Profile with `tea.WithFPS(N)`** to cap repaint rate during development.
+- **Reduce View frequency.** If the model changes 60 times/sec but the rendered view changes once/sec, gate redraws on a "dirty" flag
+- **`viewport.Model` for scrollable content.** Avoid re-rendering thousands of lines on every keystroke
+- **`Batch` your commands.** A series of synchronous `tea.Cmd` returns serializes; `tea.Batch` parallelizes
+- **Profile with `tea.WithFPS(N)`** to cap repaint rate during development
 
 ---
 
 ## When NOT to use Bubbletea
 
-- The app is one prompt + one answer. Use `huh` (also from Charm) — simpler, no Model–Update–View ceremony.
-- The app is a long-running daemon with occasional status output. Use `slog` to stderr and `tea.Program` only if interactivity becomes necessary.
-- The app must run as a non-tty subprocess (CI, redirected stdin). `tea.Program` requires a tty for input. Detect via `term.IsTerminal(int(os.Stdin.Fd()))` and fall back to a non-interactive path.
+- The app is one prompt + one answer. Use `huh` (also from Charm) — simpler, no Model–Update–View ceremony
+- The app is a long-running daemon with occasional status output. Use `slog` to stderr and `tea.Program` only if interactivity becomes necessary
+- The app must run as a non-tty subprocess (CI, redirected stdin). `tea.Program` requires a tty for input. Detect via `term.IsTerminal(int(os.Stdin.Fd()))` and fall back to a non-interactive path
 
 ---
 

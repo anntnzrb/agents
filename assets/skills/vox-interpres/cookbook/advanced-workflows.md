@@ -45,11 +45,11 @@ Use ±3 BPM windows, and prefer key confidence > 0.25 when matching.
 
 For each user question:
 
-1. If scope small: run `ask` directly.
-2. If scope broad/ambiguous: run `analyze --json` first.
-3. Answer with explicit evidence fields.
-4. If user asks "why?", quote raw metrics.
-5. If user asks "at specific time", run segment analysis.
+1. If scope small: run `ask` directly
+2. If scope broad/ambiguous: run `analyze --json` first
+3. Answer with explicit evidence fields
+4. If user asks "why?", quote raw metrics
+5. If user asks "at specific time", run segment analysis
 
 ## 5) Plot-driven review
 

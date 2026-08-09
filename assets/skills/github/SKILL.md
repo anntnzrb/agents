@@ -14,7 +14,7 @@ stacked pull requests. Route to the smallest reference that owns the command fam
 
 ## Preflight live operations
 
-1. Run `gh --version` before relying on installed command capabilities.
+1. Run `gh --version` before relying on installed command capabilities
 2. Establish the target with an explicit `[HOST/]OWNER/REPO` for `--repo`, or verify
    the local repository and its remote. Do not guess from the current directory.
 3. Check `gh auth status` for the selected host. Use `GH_HOST` or `GH_REPO` only when
@@ -30,8 +30,8 @@ stacked pull requests. Route to the smallest reference that owns the command fam
 - Require explicit user authorization immediately before external writes: issues,
   pull requests, projects, repositories, secrets, variables, releases, API
   mutations, pushes, merges, extension installs, and account changes.
-- Never print, persist, or echo tokens, credentials, key material, or auth headers.
-- After every authorized write, re-read the resulting resource and report failures.
+- Never print, persist, or echo tokens, credentials, key material, or auth headers
+- After every authorized write, re-read the resulting resource and report failures
 - Route `gh api` through `references/api.md`. Parameters can switch its default GET
   to POST; make method and mutation intent explicit.
 - Interpret documented exit codes and command-specific failures as evidence. Do not

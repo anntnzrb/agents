@@ -23,9 +23,9 @@ uv run --script <skill-dir>/scripts/cli.py <command> [args ...]
 
 ## Common flags
 
-- `count=<1..20>` — capped and pre-validated; bad values → rc=2, no network call.
-- `raw=1` (or bare `raw`) — skip defaults and compact projection; stream upstream bytes.
-- Endpoint-specific params (`freshness=`, `country=`, `search_lang=`, `ui_lang=`, `safesearch=`, `result_filter=`) pass straight through.
+- `count=<1..20>` — capped and pre-validated; bad values → rc=2, no network call
+- `raw=1` (or bare `raw`) — skip defaults and compact projection; stream upstream bytes
+- Endpoint-specific params (`freshness=`, `country=`, `search_lang=`, `ui_lang=`, `safesearch=`, `result_filter=`) pass straight through
 
 ## Error envelope
 

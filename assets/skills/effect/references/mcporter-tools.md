@@ -1,10 +1,10 @@
 # Effect MCPorter tool snapshot
 
-- Live schema and resources are authoritative.
+- Live schema and resources are authoritative
 - ONLY load this dated snapshot for broad tool comparison, package coverage, or live discovery
   failure.
-- NEVER load it before a targeted live schema.
-- MUST discard snapshot conflicts when live discovery recovers.
+- NEVER load it before a targeted live schema
+- MUST discard snapshot conflicts when live discovery recovers
 
 ## Snapshot metadata
 
@@ -27,10 +27,10 @@ mcporter --config <agent-config-root>/assets/mcporter.jsonc resource effect
 If `mcporter` is unavailable on PATH, replace the leading `mcporter` with
 `nix run github:numtide/llm-agents.nix#mcporter --`.
 
-- Both tools require one top-level `libraries` string array.
-- Input schemas declare no enum, minimum item count, uniqueness, or package validation.
-- The declarations expose no output schema.
-- NEVER invent response fields. MUST inspect the actual MCPorter result.
+- Both tools require one top-level `libraries` string array
+- Input schemas declare no enum, minimum item count, uniqueness, or package validation
+- The declarations expose no output schema
+- NEVER invent response fields. MUST inspect the actual MCPorter result
 
 ## Complete tool inventory
 
@@ -142,12 +142,12 @@ entries for the same nine libraries.
 
 Snapshot probes found:
 
-- `effect-doc-links` emitted a plausible URI for an invented package.
-- `effect-documentation` returned embedded fetch-error text for that package.
-- Covered `@effect/platform` returned embedded HTTP `404` text on the capture date.
+- `effect-doc-links` emitted a plausible URI for an invented package
+- `effect-documentation` returned embedded fetch-error text for that package
+- Covered `@effect/platform` returned embedded HTTP `404` text on the capture date
 
-- MUST validate package coverage against live resources when available.
-- MUST inspect content even when MCPorter exits `0`.
-- MUST fall back to `context7`, `gh`, or `research` for missing, stale, or broken resources.
-- NEVER silently substitute adjacent Effect docs.
-- If discovery fails, MUST use only the two recorded tools and exact arguments. NEVER invent fields.
+- MUST validate package coverage against live resources when available
+- MUST inspect content even when MCPorter exits `0`
+- MUST fall back to `context7`, `gh`, or `research` for missing, stale, or broken resources
+- NEVER silently substitute adjacent Effect docs
+- If discovery fails, MUST use only the two recorded tools and exact arguments. NEVER invent fields

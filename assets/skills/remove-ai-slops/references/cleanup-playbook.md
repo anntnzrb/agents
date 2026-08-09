@@ -31,10 +31,10 @@ seam: do not add phrase, word-count, or text-pinning tests unless a machine cons
 
 Evaluate each changed unit in this order:
 
-1. **Delete entirely** — the behavior is dead, speculative, or unnecessary.
-2. **Reuse** — existing repository code already does the work.
-3. **Use platform, standard library, or installed dependency** — replace a hand-rolled duplicate.
-4. **Simplify in place** — only if it must remain.
+1. **Delete entirely** — the behavior is dead, speculative, or unnecessary
+2. **Reuse** — existing repository code already does the work
+3. **Use platform, standard library, or installed dependency** — replace a hand-rolled duplicate
+4. **Simplify in place** — only if it must remain
 
 For a bug fix involving a shared function, inspect its callers. Prefer one root-cause repair at the
 shared seam over duplicated caller guards.

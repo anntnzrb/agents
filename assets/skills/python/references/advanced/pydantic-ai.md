@@ -209,9 +209,9 @@ with capture_run_messages() as messages:
         print("Messages:", messages)
 ```
 
-- **`ModelRetry`** — raise from a tool, output validator, or capability hook to ask the model to retry.
-- **`UnexpectedModelBehavior`** — raised when the retry limit is exceeded or the model API returns an unrecoverable error.
-- **`capture_run_messages()`** — context manager that records all messages exchanged during a run for debugging.
+- **`ModelRetry`** — raise from a tool, output validator, or capability hook to ask the model to retry
+- **`UnexpectedModelBehavior`** — raised when the retry limit is exceeded or the model API returns an unrecoverable error
+- **`capture_run_messages()`** — context manager that records all messages exchanged during a run for debugging
 
 ---
 
@@ -303,6 +303,6 @@ anyio.run(main)
 
 ## Version Notes
 
-- **V1** reached API stability in September 2025. Breaking changes are reserved for V2 (earliest April 2026).
-- **v1.88.0** renamed `result_type` → `output_type` and `result_tool_name` / `result_tool_description` were removed. Use `output_type`.
-- The canonical accessor for run results is `result.output` (not `result.data`).
+- **V1** reached API stability in September 2025. Breaking changes are reserved for V2 (earliest April 2026)
+- **v1.88.0** renamed `result_type` → `output_type` and `result_tool_name` / `result_tool_description` were removed. Use `output_type`
+- The canonical accessor for run results is `result.output` (not `result.data`)

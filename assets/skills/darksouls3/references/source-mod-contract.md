@@ -4,36 +4,36 @@ Read this for current claims, cache/source operations, mods, resource replacemen
 
 ## Source and evidence rules
 
-- Use deterministic CLI output for supported mechanics.
-- Use validated read-only parser output only for mapped save fields.
-- Use live research or a fresh targeted source cache for exact locations, route steps, NPC quests, contested facts, and mod compatibility.
-- Bundled catalogs are operational scaffolds, not authoritative guide prose.
-- Cache files are transport receipts, not canonical truth or citations.
-- Final source-backed answers cite URLs and separate observed facts from inference.
-- Keep live queries spoiler-safe unless the user permits spoilers.
+- Use deterministic CLI output for supported mechanics
+- Use validated read-only parser output only for mapped save fields
+- Use live research or a fresh targeted source cache for exact locations, route steps, NPC quests, contested facts, and mod compatibility
+- Bundled catalogs are operational scaffolds, not authoritative guide prose
+- Cache files are transport receipts, not canonical truth or citations
+- Final source-backed answers cite URLs and separate observed facts from inference
+- Keep live queries spoiler-safe unless the user permits spoilers
 
 Source ranking, licenses, copyability, and embedded-data provenance live in `../REFERENCES.md`. Read it before replacing resources.
 
 ## PC mod boundaries
 
-- Mod Engine 1: passive `dinput8.dll` proxy; works with cracked and legitimate copies; uses `mod/`.
-- Mod Engine 3 / ME3: injection launcher; legitimate Steam only; can collide with modified executables.
-- Proper PC Experience: passive `d3d11.dll` proxy for FPS, refresh, FoV, and intro fixes.
-- FromStutterFix: `dinput8` chain-loaded frame-pacing fix.
-- Blue Sentinel: online protection, overlay, and backups; legitimate Steam only.
-- Camera Fix: ME3-native camera auto-center fix.
+- Mod Engine 1: passive `dinput8.dll` proxy; works with cracked and legitimate copies; uses `mod/`
+- Mod Engine 3 / ME3: injection launcher; legitimate Steam only; can collide with modified executables
+- Proper PC Experience: passive `d3d11.dll` proxy for FPS, refresh, FoV, and intro fixes
+- FromStutterFix: `dinput8` chain-loaded frame-pacing fix
+- Blue Sentinel: online protection, overlay, and backups; legitimate Steam only
+- Camera Fix: ME3-native camera auto-center fix
 
 Run `mods --current` first. MUST live-check release/version and compatibility claims. NEVER promise online or anti-cheat safety. NEVER provide DRM, anti-cheat, platform-protection, or license-check bypass instructions.
 
 ## Resource roles
 
-- Parser-required: `resources/event_flags.json`, `resources/bonfire_flags.json`.
-- Mechanic-invariant: `resources/game_data.json`, `resources/achievement_checklist.json`, `resources/completion_categories.json`.
-- Thin catalogs: `resources/weapons.json`, `resources/armor.json`, `resources/rings.json`, `resources/goods_magic.json`.
-- Incomplete scaffold: `resources/area_checklists.json`; missing data means unknown.
-- Provenance/source policy: `resources/source_registry.json`.
-- Local guide corpus: `resources/guides/ds3_plat_guide/`; source PDF is not tracked.
-- Eval fixture: `evals/evals.json`.
+- Parser-required: `resources/event_flags.json`, `resources/bonfire_flags.json`
+- Mechanic-invariant: `resources/game_data.json`, `resources/achievement_checklist.json`, `resources/completion_categories.json`
+- Thin catalogs: `resources/weapons.json`, `resources/armor.json`, `resources/rings.json`, `resources/goods_magic.json`
+- Incomplete scaffold: `resources/area_checklists.json`; missing data means unknown
+- Provenance/source policy: `resources/source_registry.json`
+- Local guide corpus: `resources/guides/ds3_plat_guide/`; source PDF is not tracked
+- Eval fixture: `evals/evals.json`
 
 Thin catalogs resolve inventory IDs only. NEVER treat them as complete gameplay-stat, route, or location tables.
 

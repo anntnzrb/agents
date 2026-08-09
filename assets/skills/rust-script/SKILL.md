@@ -61,18 +61,18 @@ Detection hint:
 
 ## Core Rules
 
-- Always pass `-Zscript` before script path.
-- For extensionless executable scripts, call with path (`./tool`), not bare token (`tool`).
-- For script args that look like Cargo flags, use `--` separator when needed.
-- Prefer explicit edition in frontmatter to avoid default-edition warning churn.
-- Treat Cargo scripts as single-file bin packages, not workspace members.
+- Always pass `-Zscript` before script path
+- For extensionless executable scripts, call with path (`./tool`), not bare token (`tool`)
+- For script args that look like Cargo flags, use `--` separator when needed
+- Prefer explicit edition in frontmatter to avoid default-edition warning churn
+- Treat Cargo scripts as single-file bin packages, not workspace members
 
 ## Engineering Discipline
 
-- Keep scripts boring: parse external input once, return contextual errors, and add dependencies or abstractions only for a concrete script need.
-- Use the standard library for a small script; add `anyhow` for ergonomic contextual errors or `clap` when argument parsing outgrows a few flags.
-- Do not add async, a framework, or a production-service stack by default. Use async only for concurrent I/O that benefits from it.
-- Treat `unsafe`, FFI, manual `Send`/`Sync`, and custom lock-free code as an escalation out of script scope; move the risky core to a normal Cargo package and prove it there.
+- Keep scripts boring: parse external input once, return contextual errors, and add dependencies or abstractions only for a concrete script need
+- Use the standard library for a small script; add `anyhow` for ergonomic contextual errors or `clap` when argument parsing outgrows a few flags
+- Do not add async, a framework, or a production-service stack by default. Use async only for concurrent I/O that benefits from it
+- Treat `unsafe`, FFI, manual `Send`/`Sync`, and custom lock-free code as an escalation out of script scope; move the risky core to a normal Cargo package and prove it there
 
 ## Required follow-up reads
 
@@ -95,21 +95,21 @@ Detection hint:
 
 1. Detect user intent:
 
-- Cargo-native script mode or `rust-script` fallback.
+- Cargo-native script mode or `rust-script` fallback
 
 2. Validate command shape:
 
-- `-Zscript` position, path form, `--manifest-path` usage.
+- `-Zscript` position, path form, `--manifest-path` usage
 
 3. Apply known limits:
 
-- block unsupported flows early (`package`, `publish`, `install --path file.rs`, path dependency on script).
+- block unsupported flows early (`package`, `publish`, `install --path file.rs`, path dependency on script)
 
 4. Provide fix-ready command:
 
-- return exact corrected command, no vague advice.
+- return exact corrected command, no vague advice
 
 5. If behavior seems new/regressed:
 
 - check `references/upstream-status.md`
-- then confirm live state with `gh issue view`.
+- then confirm live state with `gh issue view`

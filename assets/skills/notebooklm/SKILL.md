@@ -54,7 +54,7 @@ nlm chat <notebook-id>
   - `NLM_COOKIES`
   - `NLM_BROWSER_PROFILE`
   - `NLM_USE_ORIGINAL_PROFILE=1`
-- If you already use `~/.nlm/env`, keep that as the active auth file; the template is mainly a portable key list.
+- If you already use `~/.nlm/env`, keep that as the active auth file; the template is mainly a portable key list
 
 ## Notes
 

@@ -11,15 +11,15 @@ metadata:
 
 Choose one route. NEVER start either automatically.
 
-- **Bundled REST CLI:** author and administer through n8n REST.
-- **Optional MCPorter:** discover current endpoint tools and schemas.
+- **Bundled REST CLI:** author and administer through n8n REST
+- **Optional MCPorter:** discover current endpoint tools and schemas
 
 The MCP catalog is instance state.
 
-- NEVER infer tools, arguments, or response fields.
-- Live discovery MUST define tools and input schemas.
-- Only published output schemas are contractual.
-- Observed calls MUST remain samples, not contracts.
+- NEVER infer tools, arguments, or response fields
+- Live discovery MUST define tools and input schemas
+- Only published output schemas are contractual
+- Observed calls MUST remain samples, not contracts
 
 ## Bundled REST CLI
 
@@ -39,16 +39,16 @@ uv run --script <skill-dir>/scripts/cli.py validate <WORKFLOW.json>
 
 MCP-exposed workflows MUST also be active.
 
-- REST requires `N8N_BASE_URL` and `N8N_API_KEY`.
-- MUST read `reference.md` before REST work or credential troubleshooting.
+- REST requires `N8N_BASE_URL` and `N8N_API_KEY`
+- MUST read `reference.md` before REST work or credential troubleshooting
 
 ## Optional MCPorter route
 
-- MUST read `references/mcporter.md` first.
-- MUST use the configured registry explicitly.
-- Missing `mcporter`: MUST use the Nix fallback.
-- MUST run the quiet health gate first.
-- Nonzero status MUST stop discovery.
+- MUST read `references/mcporter.md` first
+- MUST use the configured registry explicitly
+- Missing `mcporter`: MUST use the Nix fallback
+- MUST run the quiet health gate first
+- Nonzero status MUST stop discovery
 
 ```text
 mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --status --quiet --no-oauth
@@ -56,18 +56,18 @@ mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --status --
 
 After success:
 
-- MUST discover live schemas.
-- MUST call only a discovered tool.
+- MUST discover live schemas
+- MUST call only a discovered tool
 
 ```text
 mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --schema --all-parameters
 mcporter --config <agent-config-root>/assets/mcporter.jsonc call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
 ```
 
-- MUST copy exact live tool/input schemas.
-- MUST copy only published output schemas.
-- Unavailable catalog: MUST report unobserved response shape.
-- NEVER invent tools or silently switch to REST.
+- MUST copy exact live tool/input schemas
+- MUST copy only published output schemas
+- Unavailable catalog: MUST report unobserved response shape
+- NEVER invent tools or silently switch to REST
 
 ## Required follow-up reads
 

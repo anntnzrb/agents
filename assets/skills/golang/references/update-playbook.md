@@ -11,10 +11,10 @@ Do NOT load it for normal Go development tasks.
 
 ### 1. Verify the latest stable Go release
 
-- Check `go.dev/doc/` for the latest release notes.
-- Check `endoflife.date/go` for the support window.
-- Check `https://go.dev/doc/toolchain` for toolchain directive changes.
-- Confirm which versions are supported: the two most recent major releases.
+- Check `go.dev/doc/` for the latest release notes
+- Check `endoflife.date/go` for the support window
+- Check `https://go.dev/doc/toolchain` for toolchain directive changes
+- Confirm which versions are supported: the two most recent major releases
 
 **Query opens:**
 
@@ -27,36 +27,36 @@ Read: `references/sources.md` — update the "Go Releases & Language" section.
 
 ### 2. Prune experimental and deprecated material
 
-- Remove any GOEXPERIMENT-only features from baseline recommendations.
-- Remove features that moved from experimental to stable in the right version file.
-- Remove any library that has been archived or superseded.
-- Check `golangci-lint` version and config format: `golangci-lint linters` for available linters.
+- Remove any GOEXPERIMENT-only features from baseline recommendations
+- Remove features that moved from experimental to stable in the right version file
+- Remove any library that has been archived or superseded
+- Check `golangci-lint` version and config format: `golangci-lint linters` for available linters
 
 ### 3. Update version-scoped modern docs
 
-- If a new major Go release shipped, create a new `cookbook/modern-1.XX-1.YY.md` or revise the range files.
-- Follow the pattern in `cookbook/modern-1.24-1.26.md`: feature table, code examples with Problems/Solutions/Tips.
-- Update `cookbook/modern.md` (the index) with the new version row.
+- If a new major Go release shipped, create a new `cookbook/modern-1.XX-1.YY.md` or revise the range files
+- Follow the pattern in `cookbook/modern-1.24-1.26.md`: feature table, code examples with Problems/Solutions/Tips
+- Update `cookbook/modern.md` (the index) with the new version row
 
 ### 4. Update `references/guide.md`
 
-- Update the "Stable Modern Go Feature Table".
-- Update CLI quick reference for any new commands or flag changes.
-- Update tooling defaults if the ecosystem consensus shifted.
-- Update the library routing table if there are new recommended defaults.
-- Update anti-patterns if there are new idioms to prefer or old ones to avoid.
+- Update the "Stable Modern Go Feature Table"
+- Update CLI quick reference for any new commands or flag changes
+- Update tooling defaults if the ecosystem consensus shifted
+- Update the library routing table if there are new recommended defaults
+- Update anti-patterns if there are new idioms to prefer or old ones to avoid
 
 ### 5. Update `SKILL.md`
 
-- Update the one-line identity and activation triggers if domains expanded.
-- Update the required follow-up reads table with any new cookbook files.
-- Update the Must/Must Not list for new idioms or deprecated patterns.
+- Update the one-line identity and activation triggers if domains expanded
+- Update the required follow-up reads table with any new cookbook files
+- Update the Must/Must Not list for new idioms or deprecated patterns
 
 ### 6. Update cookbook files
 
-- For each updated topic, revise the relevant cookbook file: Problems/Solutions/Tips format.
-- If a file grows past ~300 lines, consider splitting it and updating the routing table.
-- Delete any recipe that is no longer correct or superseded.
+- For each updated topic, revise the relevant cookbook file: Problems/Solutions/Tips format
+- If a file grows past ~300 lines, consider splitting it and updating the routing table
+- Delete any recipe that is no longer correct or superseded
 
 ### 7. Validate
 
@@ -66,9 +66,9 @@ uv run --script assets/skills/skill-creator/scripts/cli.py quick-validate assets
 
 ### 8. Update sources ledger
 
-- Update `references/sources.md` `Last checked` date.
-- Add any new official or primary sources discovered during the refresh.
-- Remove dead links.
+- Update `references/sources.md` `Last checked` date
+- Add any new official or primary sources discovered during the refresh
+- Remove dead links
 
 ## Research starting points
 

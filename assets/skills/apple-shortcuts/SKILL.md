@@ -23,12 +23,12 @@ Produce a deterministic action graph first. Produce an importable artifact only 
 
 ## Core workflow
 
-1. Scope goal, devices, trigger, inputs, outputs, side effects, privacy constraints, and target OS.
-2. For normal workflows, create a blueprint before listing exact actions. Use explicit variable names and control-flow branches.
-3. For an artifact request, write the smallest complete XML plist. Never invent an action identifier, parameter key, enum value, UUID, or variable reference.
-4. Validate the XML before signing. Treat a validator pass as structural evidence, not proof that app permissions, third-party actions, or network calls will work.
-5. Sign only after validation and only when the user requested an importable `.shortcut`. Preserve the unsigned XML and archive it.
-6. Finish with happy-path, empty-input, denied-permission, and device-specific checks.
+1. Scope goal, devices, trigger, inputs, outputs, side effects, privacy constraints, and target OS
+2. For normal workflows, create a blueprint before listing exact actions. Use explicit variable names and control-flow branches
+3. For an artifact request, write the smallest complete XML plist. Never invent an action identifier, parameter key, enum value, UUID, or variable reference
+4. Validate the XML before signing. Treat a validator pass as structural evidence, not proof that app permissions, third-party actions, or network calls will work
+5. Sign only after validation and only when the user requested an importable `.shortcut`. Preserve the unsigned XML and archive it
+6. Finish with happy-path, empty-input, denied-permission, and device-specific checks
 
 ## Commands
 
@@ -58,11 +58,11 @@ uv run --script "$SKILL_DIR/scripts/cli.py" sign <shortcut.xml> \
 
 ## Artifact rules
 
-- Use `uuidgen | tr '[:lower:]' '[:upper:]'` for each action UUID. Never use placeholder or repeated UUIDs.
-- Start with the smallest working workflow. Validate, then polish icon/color/comments.
-- Prefer first-party actions and explicit inputs. Treat third-party actions, automation triggers, and OS-gated fields as compatibility risks.
-- Validate against the intended target only. Set `SHORTCUTS_PLAYGROUND_TARGET_MACOS=27` or `SHORTCUTS_PLAYGROUND_TARGET_PLATFORM=ios` only for deliberate target-specific work.
-- Do not enable a post-write hook by default. A hook runs code on every matching file write; it belongs in a separately audited, explicitly trusted Codex plugin—not this portable skill.
+- Use `uuidgen | tr '[:lower:]' '[:upper:]'` for each action UUID. Never use placeholder or repeated UUIDs
+- Start with the smallest working workflow. Validate, then polish icon/color/comments
+- Prefer first-party actions and explicit inputs. Treat third-party actions, automation triggers, and OS-gated fields as compatibility risks
+- Validate against the intended target only. Set `SHORTCUTS_PLAYGROUND_TARGET_MACOS=27` or `SHORTCUTS_PLAYGROUND_TARGET_PLATFORM=ios` only for deliberate target-specific work
+- Do not enable a post-write hook by default. A hook runs code on every matching file write; it belongs in a separately audited, explicitly trusted Codex plugin—not this portable skill
 
 ## Local inspection and documentation
 
@@ -94,7 +94,7 @@ For explicit file work, replace `Action Graph` with `Shortcut File Structure` an
 
 ## Constraints
 
-- Do not claim an artifact is complete before validation passes and the signed file exists with non-zero size.
-- Do not expose local secrets found during inspection.
-- Do not use raw plist/XML as the default response format.
-- Do not fetch web documentation for routine use; prefer the bundled validator, local corpus when available, and Apple-provided CLI behavior.
+- Do not claim an artifact is complete before validation passes and the signed file exists with non-zero size
+- Do not expose local secrets found during inspection
+- Do not use raw plist/XML as the default response format
+- Do not fetch web documentation for routine use; prefer the bundled validator, local corpus when available, and Apple-provided CLI behavior

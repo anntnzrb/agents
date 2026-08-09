@@ -58,9 +58,9 @@ Need to share state between tasks?
 ## Atomics — when and how
 
 Use atomics for:
-- Counters incremented from many threads (`AtomicU64`).
-- Single-shot flags (`AtomicBool`).
-- Pointer publication (`AtomicPtr<T>`).
+- Counters incremented from many threads (`AtomicU64`)
+- Single-shot flags (`AtomicBool`)
+- Pointer publication (`AtomicPtr<T>`)
 
 ### Memory orderings
 
@@ -119,10 +119,10 @@ This is the canonical Release/Acquire pattern. **Use `OnceLock<Config>` instead*
 
 **Rule of thumb:**
 
-- Hot, short critical section, no await inside → `parking_lot::Mutex`.
-- Shared state held across `.await` → `tokio::sync::Mutex`.
-- Static init / app config → `OnceLock` or `LazyLock`.
-- Avoid `std::sync::Mutex` for new code; the poisoning behavior is more annoying than useful and `parking_lot` is strictly faster.
+- Hot, short critical section, no await inside → `parking_lot::Mutex`
+- Shared state held across `.await` → `tokio::sync::Mutex`
+- Static init / app config → `OnceLock` or `LazyLock`
+- Avoid `std::sync::Mutex` for new code; the poisoning behavior is more annoying than useful and `parking_lot` is strictly faster
 
 ### Common deadlock — async + sync mutex
 
@@ -332,15 +332,15 @@ Loom explores every legal scheduling of the threads, including those a real sche
 
 ### Loom's limits
 
-- Slow. Each `loom::model` invocation explores many schedules; keep tests tiny (2-3 threads, a few operations each).
-- Single-machine only. Doesn't model distributed systems.
+- Slow. Each `loom::model` invocation explores many schedules; keep tests tiny (2-3 threads, a few operations each)
+- Single-machine only. Doesn't model distributed systems
 - Doesn't catch UB inside `unsafe` blocks the way miri does. **Run both: miri for memory safety, loom for thread schedules.**
-- Doesn't handle `tokio` directly. Loom replaces stdlib's sync primitives; tokio's are independent.
+- Doesn't handle `tokio` directly. Loom replaces stdlib's sync primitives; tokio's are independent
 
 ## Send and Sync — what they mean
 
-- `T: Send` — `T` can be moved between threads safely.
-- `T: Sync` — `&T` can be shared between threads safely.
+- `T: Send` — `T` can be moved between threads safely
+- `T: Sync` — `&T` can be shared between threads safely
 
 These are auto-derived for composite types if all components implement them. Manual `unsafe impl Send/Sync` is required only for raw pointer types and FFI handles.
 
@@ -358,22 +358,22 @@ When the compiler complains that "T: Send is not satisfied", the cause is usuall
 
 ## Common mistakes
 
-1. **Holding a `std::sync::Mutex` guard across `.await`.** Compiles, deadlocks at runtime under `current_thread`.
-2. **`Arc::clone` in a tight loop.** Refcount bump is cheap but not free; pass `&Arc<T>` when possible.
-3. **`Mutex<HashMap<K, V>>` for hot reads.** Switch to `RwLock` or `Arc<dashmap::DashMap>`.
-4. **Atomic operations with `Ordering::Relaxed` for happens-before publication.** You need `Release`/`Acquire`. Run under loom to be sure.
-5. **Unbounded channels.** Always set capacity. If you "know it won't backlog", you don't, and it will.
-6. **Spawning detached tokio tasks for fire-and-forget cleanup.** Use `JoinSet` so panics surface.
-7. **`std::mem::transmute` to fake `Send`/`Sync`.** Use `unsafe impl` with a SAFETY comment instead. Transmute breaks Stacked Borrows and miri.
-8. **Locking order inversion across two mutexes.** Always acquire in a globally consistent order. For more than three locks, switch to a single mutex around a struct.
+1. **Holding a `std::sync::Mutex` guard across `.await`.** Compiles, deadlocks at runtime under `current_thread`
+2. **`Arc::clone` in a tight loop.** Refcount bump is cheap but not free; pass `&Arc<T>` when possible
+3. **`Mutex<HashMap<K, V>>` for hot reads.** Switch to `RwLock` or `Arc<dashmap::DashMap>`
+4. **Atomic operations with `Ordering::Relaxed` for happens-before publication.** You need `Release`/`Acquire`. Run under loom to be sure
+5. **Unbounded channels.** Always set capacity. If you "know it won't backlog", you don't, and it will
+6. **Spawning detached tokio tasks for fire-and-forget cleanup.** Use `JoinSet` so panics surface
+7. **`std::mem::transmute` to fake `Send`/`Sync`.** Use `unsafe impl` with a SAFETY comment instead. Transmute breaks Stacked Borrows and miri
+8. **Locking order inversion across two mutexes.** Always acquire in a globally consistent order. For more than three locks, switch to a single mutex around a struct
 
 ## When to escape to lock-free
 
 You should reach for atomics + `UnsafeCell` only when:
-1. The hot path is **measured** to be bottlenecked on lock contention.
-2. There is no existing library (crossbeam, atomic-queue, hazardous) that solves your problem.
-3. You can write loom tests that pass.
-4. You can write miri tests that pass.
-5. You have at least one other engineer who can review the algorithm.
+1. The hot path is **measured** to be bottlenecked on lock contention
+2. There is no existing library (crossbeam, atomic-queue, hazardous) that solves your problem
+3. You can write loom tests that pass
+4. You can write miri tests that pass
+5. You have at least one other engineer who can review the algorithm
 
 Practically all "I want to write a lock-free queue" projects fail (3) or (4). When in doubt, take the lock and move on.

@@ -6,11 +6,11 @@ This file is loaded when a response needs provenance, currentness, guide-corpus 
 
 Use the narrowest source that can support the claim:
 
-1. **Observed deterministic kernel/catalog/frame-scanner output** — stable formulas, explicit catalog rows, and read-only local frame extraction. Treat unknowns as unknowns.
-2. **Validated DSR read-only save mapping** — only fields that `ds1_save.py` identifies as supported from a defensible source and validation record.
-3. **Official or primary sources** — product/platform facts, official manuals, published patch or support statements, and first-party release information.
-4. **Fresh community references** — mechanics cross-checks, exact route/location/NPC/farming prose, calculators, mod releases, and compatibility pages. Cite the URL and check currentness for time-sensitive claims.
-5. **Local transformed PSNProfiles guide corpus** — targeted platinum-walkthrough lookup only; spoiler-heavy, non-authoritative, non-save-backed, and not a substitute for source validation.
+1. **Observed deterministic kernel/catalog/frame-scanner output** — stable formulas, explicit catalog rows, and read-only local frame extraction. Treat unknowns as unknowns
+2. **Validated DSR read-only save mapping** — only fields that `ds1_save.py` identifies as supported from a defensible source and validation record
+3. **Official or primary sources** — product/platform facts, official manuals, published patch or support statements, and first-party release information
+4. **Fresh community references** — mechanics cross-checks, exact route/location/NPC/farming prose, calculators, mod releases, and compatibility pages. Cite the URL and check currentness for time-sensitive claims
+5. **Local transformed PSNProfiles guide corpus** — targeted platinum-walkthrough lookup only; spoiler-heavy, non-authoritative, non-save-backed, and not a substitute for source validation
 
 When sources disagree, state which source says what, prefer the higher-ranked source for its allowed purpose, and avoid a confident synthesis that the evidence does not justify.
 
@@ -18,10 +18,10 @@ When sources disagree, state which source says what, prefer the higher-ranked so
 
 `source_registry.json` is the allowlist and provenance receipt for source use. `sources status` is the first check for any “current”, “latest”, compatibility, or citation request. Use `sources refresh <source-key>` only for the needed remote HTTP(S) source; local `local://` entries are introspection-only and are never fetched. Cache records are keyed by source identity and URL, so changing a registered URL cannot reuse stale content under the same key. Use `--force` only when bypassing the normal freshness window is material. A cache is transport/fetch metadata, not canonical data. Final answers cite the registered URL/source key, not a cache filename.
 
-- Stable mechanics: prefer CLI output; live-check only when the local kernel is missing or contested.
-- Exact locations, routes, quest steps, farming routes, and checklist details: live-check or use a precisely scoped guide row after spoiler permission.
-- PC/mod versions, loaders, compatibility, online risk, and platform behavior: always current-check before asserting.
-- Source pages may contain late-game names even when the user asked for no spoilers. Search and summarize with the spoiler filter; never paste raw page text.
+- Stable mechanics: prefer CLI output; live-check only when the local kernel is missing or contested
+- Exact locations, routes, quest steps, farming routes, and checklist details: live-check or use a precisely scoped guide row after spoiler permission
+- PC/mod versions, loaders, compatibility, online risk, and platform behavior: always current-check before asserting
+- Source pages may contain late-game names even when the user asked for no spoilers. Search and summarize with the spoiler filter; never paste raw page text
 
 ## Allowed-use and copyability rules
 
@@ -32,7 +32,7 @@ Do not embed:
 - copied wiki prose, boss strategies, NPC questlines, lore, or broad location walkthroughs;
 - untransformed calculator tables, reverse-engineered save layouts, or mod binaries;
 - raw text from the user-provided PSNProfiles PDF;
-- save offsets or completion categories not validated for DSR.
+- save offsets or completion categories not validated for DSR
 
 The bundled deterministic resources are a narrow operational scaffold. Their presence is not evidence that every item/location or progression fact is covered.
 
@@ -101,12 +101,12 @@ Transcript output is spoiler-redacted by default. `--json` never bypasses redact
 
 `ds1_save.py` is read-only and its current evidence is the MIT `Piroshkiv/DSRSave` project, recorded in `resources/save_support.json`. It may report only verified container/slot integrity plus name, stats, level, and class when AES/MD5/name-copy/range checks pass. The `achievements` action may return the static checklist, but its `save_backed` unlock state is explicitly unsupported and platform-account based. Inventory, currency, progress, bosses, bonfires, completion, and achievement ownership remain unsupported until DSR mappings are independently validated. Do not assume DS3 save structures, event bytes, bonfire flags, inventory layouts, achievement offsets, or parser coverage transfer to DSR.
 
-- Unknown raw IDs are not owned items.
-- An absent mapping is not a defeated boss, missing item, or incomplete achievement.
-- Static checklist totals are not save-backed completion.
-- Auto-detection considers only the documented DSR Windows path and skips malformed, empty, unreadable, or invalid candidates before selecting the newest fully validated nonempty save.
-- Save state can be stale, transferred, edited, a different character, or a different executable/build.
-- Read operations must not write, repair, decrypt, re-encrypt, or offer mutation instructions.
+- Unknown raw IDs are not owned items
+- An absent mapping is not a defeated boss, missing item, or incomplete achievement
+- Static checklist totals are not save-backed completion
+- Auto-detection considers only the documented DSR Windows path and skips malformed, empty, unreadable, or invalid candidates before selecting the newest fully validated nonempty save
+- Save state can be stale, transferred, edited, a different character, or a different executable/build
+- Read operations must not write, repair, decrypt, re-encrypt, or offer mutation instructions
 
 The CLI applies its spoiler gate to default save output and keeps unsupported JSON actions machine-readable; `--spoilers` is explicit opt-in. When save output and user recollection conflict, report the observed file result, identify the parser’s supported scope, and ask for an explicit path or corroborating evidence rather than “fixing” the save.
 
@@ -118,10 +118,10 @@ Use official product/platform references for supported releases and published no
 
 For user-facing source-backed answers, identify the source key and link the registered URL. Distinguish:
 
-- **Observed:** directly returned by the deterministic CLI or validated save parser.
-- **Calculated:** derived from stated inputs and deterministic helper output.
-- **Source-backed:** supported by a cited official/community page or a specific local guide row.
-- **Recommendation:** judgment/tradeoff, not a fact.
+- **Observed:** directly returned by the deterministic CLI or validated save parser
+- **Calculated:** derived from stated inputs and deterministic helper output
+- **Source-backed:** supported by a cited official/community page or a specific local guide row
+- **Recommendation:** judgment/tradeoff, not a fact
 
 If a claim is an inference, label it `[INFERENCE]`. Include a checked date for current claims where practical. Keep citations proportional; do not expose internal cache paths or unintroduced spoiler names.
 

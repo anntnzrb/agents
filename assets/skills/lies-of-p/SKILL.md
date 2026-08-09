@@ -8,15 +8,15 @@ description: Deterministic Lies of P 1.12.0.0 and Overture platinum companion wi
 Use the CLI as the public entry point:
 `uv run --script <skill-dir>/scripts/cli.py COMMAND`
 
-- Build planning, leveling, or defaults: `fresh`, then `build`; ask level only when needed.
-- Enemy matchup: `weaknesses [query]`; read `game_data.json` when a result needs context.
-- Boss or area route: `bosses [query]`; add `--spoilers` only after explicit consent.
-- Chapter progression: `route --chapter N`; use `--dlc` for Overture and `--spoilers` explicitly.
-- Trophy completion: `trophies [query]`; use `checklist --chapter N` for actionable chapter work.
-- Farming: `farm [stage]`; avoid consumable/throwable-dependent strategies.
-- Meta, preferences, and community consensus: `community [query]`; add `--spoilers` only after explicit consent.
-- Displayed AR or inventory candidate comparison: `compare --candidate 'NAME,PHYSICAL,ELEMENTAL,CRIT_PERCENT,WEIGHT'` (repeat candidates).
-- Provenance: `sources list|status|explain`; `audit` for schema/source integrity.
+- Build planning, leveling, or defaults: `fresh`, then `build`; ask level only when needed
+- Enemy matchup: `weaknesses [query]`; read `game_data.json` when a result needs context
+- Boss or area route: `bosses [query]`; add `--spoilers` only after explicit consent
+- Chapter progression: `route --chapter N`; use `--dlc` for Overture and `--spoilers` explicitly
+- Trophy completion: `trophies [query]`; use `checklist --chapter N` for actionable chapter work
+- Farming: `farm [stage]`; avoid consumable/throwable-dependent strategies
+- Meta, preferences, and community consensus: `community [query]`; add `--spoilers` only after explicit consent
+- Displayed AR or inventory candidate comparison: `compare --candidate 'NAME,PHYSICAL,ELEMENTAL,CRIT_PERCENT,WEIGHT'` (repeat candidates)
+- Provenance: `sources list|status|explain`; `audit` for schema/source integrity
 
 Default to Legendary Stalker, no Specters or summons, and spoiler-safe output. Difficulty does not alter trophy requirements. Never infer missing data: report the CLI error and request the required follow-up read. Preserve version, source, and confidence fields when presenting records. `--json` changes formatting only and never disables spoiler filtering.
 

@@ -208,7 +208,7 @@ MUST respect the limit without claiming schema enforcement. MCPorter renders
   mcporter --config assets/mcporter.jsonc list deepwiki.ask_question --schema
   ```
 
-- MUST run from the agent-config root so the config path resolves.
+- MUST run from the agent-config root so the config path resolves
 - If `mcporter` is absent, replace it with
   `nix run github:numtide/llm-agents.nix#mcporter --`; keep all arguments.
 - Live success MUST override this snapshot. On failure, MUST use only recorded

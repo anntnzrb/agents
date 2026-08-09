@@ -19,7 +19,7 @@ Error:
 
 Fix:
 
-- Add `-Zscript` to command using `--manifest-path script.rs`.
+- Add `-Zscript` to command using `--manifest-path script.rs`
 
 ## Dispatch / Path Ambiguity
 

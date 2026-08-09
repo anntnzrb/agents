@@ -82,9 +82,9 @@ git diff --cached -- path/file path/new-file
 
 Notes:
 
-- `git add -N` keeps new files visible to patch-based staging.
-- `--unified=0` reduces context so the patch is easier to trim.
-- If `git apply --check` fails, regenerate the patch from a fresh diff.
+- `git add -N` keeps new files visible to patch-based staging
+- `--unified=0` reduces context so the patch is easier to trim
+- If `git apply --check` fails, regenerate the patch from a fresh diff
 
 ### Reverse-apply to unstage exact hunks
 
@@ -111,9 +111,9 @@ git commit -c HEAD@{1}
 
 Notes:
 
-- `-N` keeps new files visible to patch mode.
-- `-c HEAD@{1}` reuses the previous commit message as a starting point.
-- If you already prepared a clean message file, commit with `-F "$msgfile"` after verification.
+- `-N` keeps new files visible to patch mode
+- `-c HEAD@{1}` reuses the previous commit message as a starting point
+- If you already prepared a clean message file, commit with `-F "$msgfile"` after verification
 
 ## Fixup and autosquash flows
 
@@ -142,9 +142,9 @@ git commit --amend -F "$msgfile"
 
 Notes:
 
-- With staged changes, this amends content and message.
-- With no staged changes, this is effectively a reword.
-- Re-check `git diff --cached` before amending content into the last commit.
+- With staged changes, this amends content and message
+- With no staged changes, this is effectively a reword
+- Re-check `git diff --cached` before amending content into the last commit
 
 ## Merge / rebase / cherry-pick states
 
@@ -163,9 +163,9 @@ Use these only to resolve the in-progress operation the user already has, not as
 
 ## Hook failures
 
-- Read stderr; hooks often explain the exact policy they enforce.
-- If a hook rewrites files, refresh the diff and re-plan before committing again.
-- Do not use `--no-verify` unless the user explicitly approves and repo policy allows it.
+- Read stderr; hooks often explain the exact policy they enforce
+- If a hook rewrites files, refresh the diff and re-plan before committing again
+- Do not use `--no-verify` unless the user explicitly approves and repo policy allows it
 
 ## Message-file workflow
 
@@ -226,15 +226,15 @@ Prefer this for staging and unstaging. Commit from the verified index with `git 
 
 ## Scripting hygiene
 
-- Put options before positional args.
-- Use long options in scripts when clarity helps.
-- Use `--` when a path could be mistaken for a rev.
-- Verify every commit with `git diff --cached` before finalizing.
+- Put options before positional args
+- Use long options in scripts when clarity helps
+- Use `--` when a path could be mistaken for a rev
+- Verify every commit with `git diff --cached` before finalizing
 
 ## Caveats
 
-- `git add -e` can create a patch that does not apply.
-- `git apply --cached` requires a fresh diff; regenerate after worktree or index changes.
-- `diff.interHunkContext` can fuse nearby hunks; be careful if you need finer splits.
-- `git commit <pathspec>` stages from the working tree and can bypass a carefully prepared index. Prefer explicit staging + `git commit -F "$msgfile"`.
-- Do not stop after one commit if multiple logical groups remain.
+- `git add -e` can create a patch that does not apply
+- `git apply --cached` requires a fresh diff; regenerate after worktree or index changes
+- `diff.interHunkContext` can fuse nearby hunks; be careful if you need finer splits
+- `git commit <pathspec>` stages from the working tree and can bypass a carefully prepared index. Prefer explicit staging + `git commit -F "$msgfile"`
+- Do not stop after one commit if multiple logical groups remain

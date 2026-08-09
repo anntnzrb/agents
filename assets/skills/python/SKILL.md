@@ -32,17 +32,17 @@ Python: uv-first, Pyright strict, typed JSON/data shapes, boundary validation, p
 
 ## Core Principles
 
-- Respect the declared Python target first: `requires-python`, CI matrix, Docker image, Ruff `target-version`, Pyright config.
-- Prefer explicit types and error paths; Pyright strict is the default for new projects.
-- Keep raw JSON, env, CLI, API, and RPC data at boundaries; validate once with pydantic/msgspec or narrow typed code.
-- Model dict-shaped data with `TypedDict`, `Literal`, and discriminated unions while it remains dict-shaped.
-- Prefer pure transformations, immutable values, copy-on-write updates, protocols, dataclasses, comprehensions/generators, and small modules when they clarify code.
-- Keep I/O, logging, retries, timeouts, mutation, and process exits in the imperative shell.
-- Give concepts that must not mix distinct types; use `NewType`, tagged unions, or domain records only when a mix-up would be a real bug.
-- Own resources with context managers and concurrency with explicit cancellation, timeout, and cleanup scopes.
-- Keep errors specific and actionable. Catch or translate them only where that layer can make a decision.
-- Do not add a dependency, abstraction, parser, normalization step, or defensive branch without a concrete caller, boundary, or failure mode.
-- Use mypy only for inherited repos that already use it.
+- Respect the declared Python target first: `requires-python`, CI matrix, Docker image, Ruff `target-version`, Pyright config
+- Prefer explicit types and error paths; Pyright strict is the default for new projects
+- Keep raw JSON, env, CLI, API, and RPC data at boundaries; validate once with pydantic/msgspec or narrow typed code
+- Model dict-shaped data with `TypedDict`, `Literal`, and discriminated unions while it remains dict-shaped
+- Prefer pure transformations, immutable values, copy-on-write updates, protocols, dataclasses, comprehensions/generators, and small modules when they clarify code
+- Keep I/O, logging, retries, timeouts, mutation, and process exits in the imperative shell
+- Give concepts that must not mix distinct types; use `NewType`, tagged unions, or domain records only when a mix-up would be a real bug
+- Own resources with context managers and concurrency with explicit cancellation, timeout, and cleanup scopes
+- Keep errors specific and actionable. Catch or translate them only where that layer can make a decision
+- Do not add a dependency, abstraction, parser, normalization step, or defensive branch without a concrete caller, boundary, or failure mode
+- Use mypy only for inherited repos that already use it
 
 ## uv Essentials
 
@@ -74,18 +74,18 @@ Use inline script metadata for standalone scripts that need dependencies:
 
 ## Quality Gate Essentials
 
-- New projects: Pyright strict, Ruff lint/format, pytest.
-- Inherited projects: preserve the existing checker stack unless changing it is part of the task.
+- New projects: Pyright strict, Ruff lint/format, pytest
+- Inherited projects: preserve the existing checker stack unless changing it is part of the task
 - Baseline commands:
   - `uv run pyright`
   - `uv run ruff check .`
   - `uv run ruff format --check .`
   - `uv run pytest`
-- Boundary-heavy code needs contract tests for JSON/API/RPC/CLI ingress and failure paths.
-- Parser/transform-heavy code should use Hypothesis only for invariants, round-trips, idempotence, and lossless conversion properties.
-- Tests should be deterministic, isolated, and behavior-focused. Prefer real values, in-memory fakes, or wire-level fakes; mock only an unavailable external edge.
-- Do not pin private constants, incidental formatting, prose, or one implementation path when the user-visible contract is what matters.
-- Ruff baseline: `E`, `F`, `I`, `UP`, `B`, `SIM`; expand deliberately after the baseline is clean.
+- Boundary-heavy code needs contract tests for JSON/API/RPC/CLI ingress and failure paths
+- Parser/transform-heavy code should use Hypothesis only for invariants, round-trips, idempotence, and lossless conversion properties
+- Tests should be deterministic, isolated, and behavior-focused. Prefer real values, in-memory fakes, or wire-level fakes; mock only an unavailable external edge
+- Do not pin private constants, incidental formatting, prose, or one implementation path when the user-visible contract is what matters
+- Ruff baseline: `E`, `F`, `I`, `UP`, `B`, `SIM`; expand deliberately after the baseline is clean
 
 ## Build Note
 
@@ -117,8 +117,8 @@ Only task-relevant references MUST be loaded.
 
 ## Must / Must Not
 
-- MUST type public APIs, validate untrusted inputs at boundaries, prefer pathlib, and respect the project runtime target.
-- MUST use `uv` for running Python, adding deps, script metadata, and env setup when uv is intended.
-- MUST keep validators, raw payloads, mocks, retries, and I/O out of core logic unless they are the domain being modeled.
-- MUST NOT use mutable default args, bare `except`, untracked background tasks, blocking calls in async code, or broad fallbacks that hide bad input.
-- MUST NOT keep known payloads as `dict[str, Any]`, propagate raw JSON inward, or carry boundary validator objects through core logic by accident.
+- MUST type public APIs, validate untrusted inputs at boundaries, prefer pathlib, and respect the project runtime target
+- MUST use `uv` for running Python, adding deps, script metadata, and env setup when uv is intended
+- MUST keep validators, raw payloads, mocks, retries, and I/O out of core logic unless they are the domain being modeled
+- MUST NOT use mutable default args, bare `except`, untracked background tasks, blocking calls in async code, or broad fallbacks that hide bad input
+- MUST NOT keep known payloads as `dict[str, Any]`, propagate raw JSON inward, or carry boundary validator objects through core logic by accident

@@ -81,7 +81,7 @@ the target already exists. The command must:
 - refuse active connections instead of terminating them;
 - copy with PostgreSQL `TEMPLATE` without modifying the source;
 - report source, target, replacement, and postflight state;
-- never install, upgrade, test, or start Odoo as part of the clone.
+- never install, upgrade, test, or start Odoo as part of the clone
 
 The operator must stop Odoo before replacing a target. Production databases are
 outside this skill's local reset scope.

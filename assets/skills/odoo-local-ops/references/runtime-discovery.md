@@ -4,8 +4,8 @@ Read this reference when workspace or runtime discovery is ambiguous or fails.
 
 This skill supports two local Odoo runtime families:
 
-- **host runtime**: classic local install, especially Windows, with host PostgreSQL and `psql.exe`/`psql`.
-- **Compose runtime**: Docker Compose Odoo stack with a PostgreSQL `db` service.
+- **host runtime**: classic local install, especially Windows, with host PostgreSQL and `psql.exe`/`psql`
+- **Compose runtime**: Docker Compose Odoo stack with a PostgreSQL `db` service
 
 ## Discovery goals
 
@@ -131,9 +131,9 @@ Compose runtime:
 
 ## Path handling rules
 
-- Use path-aware APIs, not ad-hoc string concatenation.
-- Preserve original discovered paths in JSON output where useful.
-- Do not hardcode machine-specific absolute paths into logic unless the user explicitly supplies them or they are documented as a final local fallback.
+- Use path-aware APIs, not ad-hoc string concatenation
+- Preserve original discovered paths in JSON output where useful
+- Do not hardcode machine-specific absolute paths into logic unless the user explicitly supplies them or they are documented as a final local fallback
 
 ## Output expectations
 

@@ -16,11 +16,11 @@ uv run --with Pillow <temp-dir>/image-task.py
 
 ## Safety
 
-- Inspect source dimensions, mode, format, and animation first.
-- NEVER overwrite originals without explicit user intent.
-- Write transformed files to explicit output paths.
-- Preserve animation only when the requested format supports it.
-- Test batch logic on one representative file first.
+- Inspect source dimensions, mode, format, and animation first
+- NEVER overwrite originals without explicit user intent
+- Write transformed files to explicit output paths
+- Preserve animation only when the requested format supports it
+- Test batch logic on one representative file first
 
 ## Required follow-up reads
 
@@ -30,9 +30,9 @@ uv run --with Pillow <temp-dir>/image-task.py
 
 ## Workflow
 
-1. Resolve input and output paths with `pathlib.Path`.
-2. Inspect images with `Image.open()` before transformation.
-3. Select the smallest matching pattern from `references/pillow-patterns.md`.
-4. Write a task-specific script under `<temp-dir>`.
-5. Run it through the documented `uv` command.
-6. Re-open outputs and verify dimensions, mode, and format.
+1. Resolve input and output paths with `pathlib.Path`
+2. Inspect images with `Image.open()` before transformation
+3. Select the smallest matching pattern from `references/pillow-patterns.md`
+4. Write a task-specific script under `<temp-dir>`
+5. Run it through the documented `uv` command
+6. Re-open outputs and verify dimensions, mode, and format

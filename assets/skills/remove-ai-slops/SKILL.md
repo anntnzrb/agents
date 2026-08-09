@@ -10,19 +10,19 @@ public APIs, type hints, dependencies, and project conventions intact.
 
 ## Scope and safety
 
-1. Use the caller's explicit file list. Otherwise inspect the branch diff against its merge-base.
+1. Use the caller's explicit file list. Otherwise inspect the branch diff against its merge-base
    Exclude deleted, binary, generated, vendored, and lock files.
-2. Read `references/cleanup-playbook.md` before making a cleanup plan or judging a diff.
+2. Read `references/cleanup-playbook.md` before making a cleanup plan or judging a diff
 3. Lock observable behavior with existing or narrow regression tests before edits. A prose-only
    file has no behavioral seam: do not add wording-pinning tests.
 4. Establish a green relevant baseline. If it cannot be established, stop and report it;
    cleanup on unverified ground is reckless garbage.
-5. Prefer deletion, reuse, or a platform/standard-library capability before simplifying code.
+5. Prefer deletion, reuse, or a platform/standard-library capability before simplifying code
    Make only behavior-obvious changes. When uncertain, keep the code.
 
 ## Execution
 
-- Write a per-file plan: deletion-ladder result, applicable categories, order, and risk.
+- Write a per-file plan: deletion-ladder result, applicable categories, order, and risk
 - Work safest to riskiest: comments, dead code, defensive code, duplication, complexity,
   abstraction/boundaries, performance, coverage, then module size.
 - For a multi-file pass, delegate independent files only through the runtime's currently exposed

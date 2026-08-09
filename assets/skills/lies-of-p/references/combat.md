@@ -6,12 +6,12 @@ Use Legendary Stalker, a Technique lane, and no Specters. Start with either Path
 Optional progression is Trident of the Covenant for a safer, high-reach moveset, then Proof of Humanity after its availability. These are pivots, not requirements. Abrasives are optional: when one is unavailable, use a physical weapon and the guard/perfect-guard/stagger loop; never require consumables, throwables, or Legion ammunition.
 
 ## Loop
-1. Enter at full Pulse Cells and repair weapon durability.
-2. Read one attack string; guard rather than roll repeatedly.
-3. Perfect-guard multi-hit strings; use guard regain to recover lost health.
-4. Charge heavy attacks after a whiff or staggerable recovery.
-5. When white stagger cue appears, land a charged heavy, then fatal attack.
-6. Heal after a confirmed recovery, never during an untested string.
+1. Enter at full Pulse Cells and repair weapon durability
+2. Read one attack string; guard rather than roll repeatedly
+3. Perfect-guard multi-hit strings; use guard regain to recover lost health
+4. Charge heavy attacks after a whiff or staggerable recovery
+5. When white stagger cue appears, land a charged heavy, then fatal attack
+6. Heal after a confirmed recovery, never during an untested string
 
 ## Build priorities
 Vitality/Vigor first for survivability, Capacity for frame/liner/sleeve weight, then Technique for the chosen handle. P-Organ priorities: guard regain, stagger window, Pulse Cell capacity/healing, and perfect-guard utility. Aegis is a defensive practice option; Falcon Eyes is optional ranged punctuation, never required.

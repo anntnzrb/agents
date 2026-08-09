@@ -13,11 +13,11 @@ Use this skill for explicit public X/Twitter post URLs or IDs, bounded user time
 
 ## Hard limits
 
-- The default provider is anonymous public FxTwitter v2 (`fxtwitter`); set `X_RESEARCH_BASE_URL` only for an explicit compatible deployment.
-- Make one bounded request per command. Never retry, auto-page, scrape HTML, use browser automation, use credentials, cache results, or silently switch providers.
-- Treat every result as unofficial, possibly incomplete evidence. A missing result does not establish deletion, suspension, or nonexistence.
-- Keep sentiment sample-scoped. The consuming agent classifies returned text and cites post IDs/URLs; this CLI does not infer public opinion.
-- For news, X posts are leads/evidence. Corroborate material claims with independent `web_search`/`read` sources.
+- The default provider is anonymous public FxTwitter v2 (`fxtwitter`); set `X_RESEARCH_BASE_URL` only for an explicit compatible deployment
+- Make one bounded request per command. Never retry, auto-page, scrape HTML, use browser automation, use credentials, cache results, or silently switch providers
+- Treat every result as unofficial, possibly incomplete evidence. A missing result does not establish deletion, suspension, or nonexistence
+- Keep sentiment sample-scoped. The consuming agent classifies returned text and cites post IDs/URLs; this CLI does not infer public opinion
+- For news, X posts are leads/evidence. Corroborate material claims with independent `web_search`/`read` sources
 
 ## Commands
 
@@ -37,11 +37,11 @@ Use `--summary` for routine output. It is a deterministic projection that preser
 
 ## Output and completeness
 
-- By default, success is compact JSON on stdout: `{"ok":true,"schema_version":1,"command":"...","data":{...}}`; `--pretty` changes only its whitespace.
-- Failure is JSON on stderr with the same envelope and `error.code`, `error.message`, and `error.details`; it is compact by default. Exit `2` means usage/config/validation, and exit `1` means provider/network/HTTP/JSON/provider-payload failure.
-- Every successful data object carries `provider`, `official:false`, `auth_mode:"none"`, exact `source_url`, `endpoint`, UTC RFC3339 `fetched_at`, and `provider_status`.
-- Page data carries `requested_count`, `returned_count`, `complete`, and `complete_reason` (`bounded_page`, `provider_exhausted`, or `provider_incomplete`). It includes `cursor` and `has_more` only when a usable bottom cursor is supplied. Conversation data carries `target`, `thread`, `replies`, and the same cursor/completeness signals.
-- Report the requested query/handle/URL, returned count, cursor, and completeness reason when summarizing results. Never call a bounded page a complete timeline or population sample.
+- By default, success is compact JSON on stdout: `{"ok":true,"schema_version":1,"command":"...","data":{...}}`; `--pretty` changes only its whitespace
+- Failure is JSON on stderr with the same envelope and `error.code`, `error.message`, and `error.details`; it is compact by default. Exit `2` means usage/config/validation, and exit `1` means provider/network/HTTP/JSON/provider-payload failure
+- Every successful data object carries `provider`, `official:false`, `auth_mode:"none"`, exact `source_url`, `endpoint`, UTC RFC3339 `fetched_at`, and `provider_status`
+- Page data carries `requested_count`, `returned_count`, `complete`, and `complete_reason` (`bounded_page`, `provider_exhausted`, or `provider_incomplete`). It includes `cursor` and `has_more` only when a usable bottom cursor is supplied. Conversation data carries `target`, `thread`, `replies`, and the same cursor/completeness signals
+- Report the requested query/handle/URL, returned count, cursor, and completeness reason when summarizing results. Never call a bounded page a complete timeline or population sample
 
 ## Agent workflows
 

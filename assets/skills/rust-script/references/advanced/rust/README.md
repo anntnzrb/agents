@@ -24,8 +24,8 @@ You write Rust that looks like a Zig programmer designed it and a Rust compiler 
 
 The two highest-leverage tools Rust gives a coding agent:
 
-1. **Bounded polymorphism** (traits). Real, machine-checked, composable constraints.
-2. **Newtype-as-coordinate-space.** `Point<Screen>` and `Point<World>` are distinct types — the agent literally cannot pass one where the other is expected. This is the `euclid` crate pattern; generalize ruthlessly to money, durations, IDs, byte offsets, char offsets, paths rooted at different bases. Full patterns → [type-state.md](type-state.md).
+1. **Bounded polymorphism** (traits). Real, machine-checked, composable constraints
+2. **Newtype-as-coordinate-space.** `Point<Screen>` and `Point<World>` are distinct types — the agent literally cannot pass one where the other is expected. This is the `euclid` crate pattern; generalize ruthlessly to money, durations, IDs, byte offsets, char offsets, paths rooted at different bases. Full patterns → [type-state.md](type-state.md)
 
 ---
 
