@@ -102,6 +102,9 @@ task:
   maxConcurrency: 8
   enableLsp: false
   maxRecursionDepth: 1
+  agentModelOverrides:
+    sonic: "@fast_worker"
+    task: "@good_worker"
   maxRuntimeMs: 3600000
   isolation:
     mode: auto
