@@ -25,7 +25,6 @@ env_key = "OPENCODE_GO_API_KEY"
 model = "gpt-5.6-luna"
 review_model = "gpt-5.6-luna"
 model_reasoning_effort = "max"
-enabled-reasoning-efforts = ["low", "medium", "high", "xhigh", "ultra", "max"]
 model_verbosity = "low"
 model_reasoning_summary = "detailed"
 personality = "pragmatic"
@@ -132,6 +131,18 @@ status_line_use_colors = true
 
 [desktop]
 show-context-window-usage = true
+enabled-reasoning-efforts = ["low", "medium", "high", "xhigh", "max"]
+
+# -----------------------------------------------------------------------------
+# AGENTS
+# -----------------------------------------------------------------------------
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 32
+default_subagent_model = "gpt-5.6-luna"
+default_subagent_reasoning_effort = "max"
+interrupt_message = true
 
 # -----------------------------------------------------------------------------
 # MISC
@@ -148,62 +159,3 @@ enabled = false
 
 [notice]
 hide_rate_limit_model_nudge = true
-
-# -----------------------------------------------------------------------------
-# AGENTS
-# -----------------------------------------------------------------------------
-
-[agents]
-# Root plus twelve bounded specialist roles; keep the parent responsible for
-# orchestration and cap concurrent child threads to contain merge noise.
-max_concurrent_threads_per_session = 8
-default_subagent_model = "gpt-5.6-luna"
-default_subagent_reasoning_effort = "high"
-
-[agents.explorer]
-description = "Codebase search specialist for Codex sessions. Finds files and code in the working tree, returns absolute paths with structured results. Read-only."
-config_file = "agents/explorer.toml"
-
-[agents.clone-fidelity-reviewer]
-description = "Read-only clone / design-system fidelity reviewer. Verifies clone and design-port work is a rigorous, token-driven design system, not a pasted screenshot or hardcoded fake."
-config_file = "agents/clone-fidelity-reviewer.toml"
-
-[agents.code-reviewer]
-description = "Read-only code-quality reviewer. Audits diffs, tests, and risk with strict artifact-backed findings."
-config_file = "agents/code-reviewer.toml"
-
-[agents.gate-reviewer]
-description = "Read-only gate reviewer. Re-audits executor, code review, and QA artifacts before final approval."
-config_file = "agents/gate-reviewer.toml"
-
-[agents.qa-executor]
-description = "Manual QA executor. Runs real scenarios and records artifact-backed surface evidence."
-config_file = "agents/qa-executor.toml"
-
-[agents.worker-high]
-description = "High-difficulty implementation worker, sized for LARGE changes: a new module or abstraction, a cross-module refactor, concurrency/security/migration work, or any real, complex, big problem that has ONE clear goal. Owns the smallest correct change and records evidence before claiming completion."
-config_file = "agents/worker-high.toml"
-
-[agents.worker-low]
-description = "Low-difficulty implementation worker, sized for SMALL changes: single-spot fixes, boilerplate, config/copy changes, and pattern-following edits confined to one file. Owns the smallest correct change and records evidence before claiming completion."
-config_file = "agents/worker-low.toml"
-
-[agents.worker-medium]
-description = "Medium-difficulty implementation worker, sized for MID-SIZED changes: a standard feature inside existing layers, touching a few files along established patterns. Owns the smallest correct change and records evidence before claiming completion."
-config_file = "agents/worker-medium.toml"
-
-[agents.librarian]
-description = "External open-source codebase and documentation researcher. Investigates libraries with GitHub, live web research, and direct-page retrieval, returning SHA-pinned GitHub permalink citations. Read-only."
-config_file = "agents/librarian.toml"
-
-[agents.metis]
-description = "Pre-planning analyst. Detects contradictions, ambiguity, missing constraints, and execution risks in a draft plan or request before the planner commits. Read-only."
-config_file = "agents/metis.toml"
-
-[agents.momus]
-description = "Deep plan reviewer. Verifies a work plan is executable: references exist, tasks are startable, QA scenarios are concrete. Runs at High and may take a long time; callers must wait for its terminal result instead of cancelling or duplicating it. Issues OKAY, ITERATE, or REJECT. Read-only."
-config_file = "agents/momus.toml"
-
-[agents.plan]
-description = "Strategic planning consultant for work with unresolved design uncertainty after discovery. Produces one executable plan; never implements. Uses the caller-provided attempt directory or ~/.local/share/agents/codex/runs/<repo-slug>/<goal-slug>/plan.md."
-config_file = "agents/plan.toml"
