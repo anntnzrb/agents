@@ -31,11 +31,12 @@ Route research requests to the right source class, then return source-backed ans
 
 ### Web/live research
 
-- Prefer OMP built-ins first: use `web_search` for discovery and `browser` only for interactive or JavaScript-rendered pages.
+- Use native `web_search` for ordinary live discovery inside OMP; use `browser` only for interactive or JavaScript-rendered pages.
+- Use `omp-search` when research needs OMP's automatic provider chain, an explicit configured provider, or structured JSON for headless/subagent execution.
 - Use `read` to retrieve a known static URL; it is a general retrieval tool, not a dedicated web-search route.
-- Use `brave-search` for fast scoping and recency checks when the built-ins are insufficient.
+- Use `brave-search` for direct Brave-backed scoping and recency checks when native `web_search` and `omp-search` are insufficient.
 
-`brave-search` is a direct HTTP skill.
+`omp-search` wraps the installed OMP CLI and may select a provider automatically; do not pair it with `brave-search` merely to duplicate the same search. `brave-search` is a direct HTTP skill.
 
 ### Sentiment/discussion research
 
@@ -78,5 +79,5 @@ Route research requests to the right source class, then return source-backed ans
 
 - If library/API details are unclear, force `context7`.
 - If repo-specific behavior is unclear, force `deepwiki` and/or `gh`.
-- If web evidence is stale or shallow, use the available `brave-search` provider skill as a secondary route.
+- If web evidence is stale or shallow, use `omp-search` with its automatic provider chain; select `brave-search` only when direct Brave-backed evidence is specifically useful.
 - If sentiment claim drives decisions, include `reddit` plus one non-Reddit corroboration source.
