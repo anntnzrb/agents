@@ -1,0 +1,1 @@
+{"source":"vals","source_url":"https://www.vals.ai/benchmarks/numeric","release":"fixture-v1","catalog":[{"benchmark_id":"numeric","benchmark":"Numeric"}],"rows":[{"model":"Percent","model_id":"percent","benchmark_id":"numeric","accuracy":{"value":"72.4%","definition":"Source percent"}}]}

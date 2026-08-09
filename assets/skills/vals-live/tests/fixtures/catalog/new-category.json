@@ -1,0 +1,6 @@
+{
+  "source":"vals","source_url":"https://www.vals.ai/benchmarks","release":"fixture-v3",
+  "catalog":[{"benchmark_id":"dynamic-eval","slug":"dynamic-eval","benchmark":"Dynamic Eval","industry":"new-industry","category":"Novel Category","version":"1","updated":"2026-08-09","tasks":{"novel_task":"Novel Task"},"archived":false}],
+  "categories":{"Novel Category":{"raw_label":"Novel Category","tasks":["novel_task"]}},
+  "rows":[{"model":"Model A","model_id":"model-a","benchmark_id":"dynamic-eval","category":"Novel Category","novel_task":{"value":"72.4%","unit":"percent","definition":"Source-defined novel task"}}]
+}

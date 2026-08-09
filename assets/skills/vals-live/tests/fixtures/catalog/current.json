@@ -1,0 +1,20 @@
+{
+  "source": "vals",
+  "source_url": "https://www.vals.ai/benchmarks",
+  "discovered_from": "https://www.vals.ai/benchmarks",
+  "release": "fixture-v1",
+  "catalog": [
+    {"benchmark_id":"code_migration","slug":"code-migration","benchmark":"Code Migration","display_name":"Code Migration","industry":"coding","version":"1","updated":"2026-08-05","visible":true,"archived":false,"total_models":3,"score_definition":"Hidden-test correctness percentage","methodology_url":"https://www.vals.ai/benchmarks/code-migration"},
+    {"benchmark_id":"quality-new","slug":"quality-new","benchmark":"Quality New","industry":"coding","version":"2026-08-06","updated":"2026-08-06","visible":true,"archived":false,"new_metadata":{"owner":"fixture"}}
+  ],
+  "models": [
+    {"id":"model-a","model":"Model A","provider":"Provider A","variant":"default","release_date":"2026-01-01"},
+    {"id":"model-b","model":"Model B","provider":"Provider B","variant":"default","release_date":"2026-01-02"},
+    {"id":"model-c","model":"Model C","provider":"Provider C","variant":"default","release_date":"2026-01-03"}
+  ],
+  "rows": [
+    {"model":"Model A","model_id":"model-a","provider":"Provider A","variant":"default","benchmark_id":"code_migration","benchmark_version":"1","accuracy":{"value":"72.4%","unit":"percent","definition":"Hidden-test correctness percentage"},"code_quality":{"value":"4.2","unit":"count","definition":"Reviewer quality on a five-point scale"},"stderr":{"value":"1.2","unit":"percent","definition":"Standard error"},"cost_per_test":{"value":"0.12","unit":"usd","definition":"Operational cost per test"},"latency":{"value":"12.5","unit":"seconds","definition":"Complete-response latency"},"raw_extra":"keep-me"},
+    {"model":"Model B","model_id":"model-b","provider":"Provider B","variant":"default","benchmark_id":"code_migration","benchmark_version":"1","accuracy":{"value":"68.1%","unit":"percent","definition":"Hidden-test correctness percentage"},"code_quality":{"value":"4.7","unit":"count","definition":"Reviewer quality on a five-point scale"},"stderr":{"value":"1.1","unit":"percent","definition":"Standard error"}},
+    {"model":"Model C","model_id":"model-c","provider":"Provider C","variant":"default","benchmark_id":"code_migration","benchmark_version":"1","accuracy":{"value":"61.0%","unit":"percent","definition":"Hidden-test correctness percentage"},"code_quality":{"value":"3.9","unit":"count","definition":"Reviewer quality on a five-point scale"},"stderr":{"value":"2.0","unit":"percent","definition":"Standard error"}}
+  ]
+}

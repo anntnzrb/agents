@@ -1,0 +1,1 @@
+{"source":"vals","source_url":"https://www.vals.ai/benchmarks","snapshot_id":"snapshot:changed","catalog":[{"benchmark_id":"stable-id","display_name":"New Name","canonical_url":"https://www.vals.ai/benchmarks/new","version":"2","task_count":3,"new_metric":"observed"},{"benchmark_id":"added-id","display_name":"Added","canonical_url":"https://www.vals.ai/benchmarks/added"}]}

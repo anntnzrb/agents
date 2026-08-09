@@ -1,0 +1,1 @@
+{"source":"vals","source_url":"https://www.vals.ai/benchmarks/missing","release":"fixture-v1","catalog":[{"benchmark_id":"sparse","slug":"sparse","benchmark":"Sparse"}],"rows":[{"model":"Sparse Model","model_id":"sparse-model","benchmark_id":"sparse","accuracy":{"value":"72.4%","unit":"percent","definition":"Published score"}}]}

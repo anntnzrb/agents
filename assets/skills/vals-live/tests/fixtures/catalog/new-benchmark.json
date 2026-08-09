@@ -1,0 +1,6 @@
+{
+  "source":"vals","source_url":"https://www.vals.ai/benchmarks","release":"fixture-v2",
+  "catalog":[{"benchmark_id":"novel_eval_9","slug":"novel-eval-9","benchmark":"Novel Eval 9","industry":"quantum","version":"9","updated":"2026-08-09","visible":true,"archived":false,"future_field":{"nested":true}}],
+  "models":[{"id":"model-a","model":"Model A","provider":"Provider A","variant":"default"}],
+  "rows":[{"model":"Model A","model_id":"model-a","benchmark_id":"novel_eval_9","benchmark_version":"9","mystery_score":{"value":"0.724","definition":null},"new_metric_label":"retained"}]
+}

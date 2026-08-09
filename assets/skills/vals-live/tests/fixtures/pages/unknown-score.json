@@ -1,0 +1,1 @@
+{"source":"vals","source_url":"https://www.vals.ai/benchmarks/unknown","release":"fixture-v1","catalog":[{"benchmark_id":"unknown-score","benchmark":"Unknown Score"}],"rows":[{"model":"Unknown Metric Model","model_id":"unknown-metric","benchmark_id":"unknown-score","novel_quality_index":{"value":"17","unit":"count"}}]}

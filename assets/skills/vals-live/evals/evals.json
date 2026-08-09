@@ -1,0 +1,102 @@
+{
+  "skill_name": "vals-live",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "List the currently discovered Vals benchmarks and identify any with unknown score semantics.",
+      "expected_output": "One compact JSON catalog response listing source-discovered Vals benchmarks, explicit provenance, and warnings for benchmarks whose score type is not safely comparable.",
+      "files": [
+        "tests/fixtures/catalog/current.json",
+        "tests/fixtures/pages/unknown-score.json"
+      ],
+      "expectations": [
+        "The response has exactly one compact JSON object on stdout and uses the vals source provenance, source URL, discovered-from URL, fetched_at, parser, parser_version, and source hash when supplied.",
+        "Every listed benchmark preserves its explicit release/version, or reports null/missing rather than inventing one.",
+        "Every model row preserves model, provider, and variant identity, including explicit null for an absent variant.",
+        "Unknown score fields have metric_semantics_status unknown and UNKNOWN_SCORE_SEMANTICS; they are not labeled pass_at_1, accuracy, or another familiar family.",
+        "Placeholder values such as 0.0%, N/A, em dash, and empty strings are missing/null with a reason and never ranked as measurements.",
+        "The response does not silently use stale data or an older release after a refresh failure; stale data is visible only when explicitly requested.",
+        "Unknown catalog and metric fields remain under raw_metadata or raw_fields with original names and values.",
+        "A newly present benchmark is listed through dynamic discovery without requiring a current-catalog allow-list or production-code branch."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Compare three models on Vals’ currently available coding-related benchmarks, preserving benchmark versions, score definitions, cost, latency, and uncertainty.",
+      "expected_output": "A compact JSON comparison of three full model variants across discovered coding benchmarks, keeping correctness, quality, cost per test, latency per test, uncertainty, benchmark versions, and provenance as separate fields.",
+      "files": [
+        "tests/fixtures/records/coding-compare.json",
+        "tests/fixtures/models/new-variant.json"
+      ],
+      "expectations": [
+        "Each row cites the Vals source URL, discovered-from URL, fetched_at, parser/version, and selected benchmark release/version.",
+        "Rows retain model, provider, and variant as a complete identity and do not merge variants with the same display model name.",
+        "Each score retains its source definition/type; correctness, quality, cost_per_test, latency_per_test, and uncertainty are not collapsed into one incompatible score.",
+        "No row uses a placeholder as a published numeric value; missing or unparsed values are explicit with reasons.",
+        "The comparison never silently falls back to stale data or substitutes another benchmark/release; any explicit stale mode is labeled in scope/provenance.",
+        "New or unknown source fields remain visible under raw_fields without changing known fields.",
+        "The benchmark set is discovered from the fixture catalog and can include a new coding benchmark without a benchmark-name branch.",
+        "The output separates published values from derived ranking/delta values and includes warnings for non-comparable semantics."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Find a benchmark that reports code quality separately from correctness and report both without averaging them.",
+      "expected_output": "A source-backed JSON result with separate correctness and code-quality values, quality scale/evaluator metadata, model variants, benchmark version, and provenance; no composite average.",
+      "files": [
+        "tests/fixtures/records/code-quality.json",
+        "tests/fixtures/records/missing-optional.json"
+      ],
+      "expectations": [
+        "Provenance names the official Vals source URL, release/version, fetched_at, extraction method, parser/version, and source paths for both metrics.",
+        "Model/provider/variant identity is retained for every correctness and quality observation.",
+        "Correctness score semantics and quality score semantics/scales/evaluator are separate and no average or pass_at_1 relabeling is emitted.",
+        "A placeholder or absent quality value is null/missing with a reason, never a zero-quality measurement.",
+        "The command does not silently substitute stale quality/correctness data or a different benchmark version.",
+        "Quality evaluator and any newly supplied metadata remain in raw_fields when not understood.",
+        "The benchmark and its quality field are discovered from source records, not from a fixed benchmark allow-list.",
+        "Derived recommendations, if requested, label their inputs and never overwrite the two published source values."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Simulate or use a fixture with a newly added benchmark and prove it is discovered without code changes.",
+      "expected_output": "A compact fixture-backed catalog and comparison response showing a novel benchmark, its preserved raw metadata, and an unknown-semantics warning without an implementation branch for its name.",
+      "files": [
+        "tests/fixtures/catalog/baseline.json",
+        "tests/fixtures/catalog/new-benchmark.json",
+        "tests/fixtures/pages/unknown-score.json"
+      ],
+      "expectations": [
+        "The new benchmark record includes source/discovered-from URLs, fetched_at, source release/version, extraction method, parser/version, and hash provenance.",
+        "Any model rows for the new benchmark preserve model/provider/variant identity and do not collide with existing rows.",
+        "Its unfamiliar score is marked unknown and excluded from known-family ranking rather than being treated as pass_at_1 or accuracy.",
+        "Placeholder/malformed values in the new record remain missing/unparsed and are not used as numeric measurements.",
+        "The test uses the explicit fixture snapshot and never silently falls back to a prior catalog or stale artifact.",
+        "The new benchmark's display name, URL, and all unknown fields survive under raw_metadata/raw_fields.",
+        "Catalog output and catalog-diff report the addition dynamically; no hardcoded benchmark slug or production-code branch is required.",
+        "The response contains a structured UNKNOWN_SCORE_SEMANTICS warning explaining why comparison is blocked."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Report a source drift problem when a benchmark page contains placeholder scores.",
+      "expected_output": "A diagnostic JSON response identifying placeholder values and their source paths, excluding them from rankings while preserving usable rows and provenance.",
+      "files": [
+        "tests/fixtures/values/placeholder-zero.json",
+        "tests/fixtures/values/placeholder-sentinels.json",
+        "tests/fixtures/pages/partial.html"
+      ],
+      "expectations": [
+        "The diagnostic cites the official/fixture source URL, resolved release/version, fetched_at, extraction method, parser/version, and affected source paths.",
+        "Usable rows retain model/provider/variant identity; unusable rows remain inspectable with explicit identity when available.",
+        "0.0%, N/A, em dash, and empty placeholders produce PLACEHOLDER_VALUE/missing diagnostics and are never ranked as real scores.",
+        "The benchmark score definition remains distinct from quality/cost/latency and no placeholder becomes pass_at_1 or accuracy.",
+        "A refresh failure does not silently produce an older-release result; explicit stale mode is labeled and otherwise returns an error.",
+        "Unknown placeholder-related fields and original raw values remain under raw_fields/raw_metadata.",
+        "Partial usable output is ok:true only with separated warnings; an entirely unusable page is ok:false rather than an empty success.",
+        "The CLI emits one compact JSON object on stdout and keeps operational diagnostics on stderr without secrets."
+      ]
+    }
+  ]
+}
