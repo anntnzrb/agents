@@ -3,7 +3,7 @@ description = "Read-only code-quality reviewer. Audits diffs, tests, and risk wi
 nickname_candidates = ["Loki", "Frigg", "Bragi", "Kvasir", "Nidhogg"]
 model = "gpt-5.6-luna"
 model_reasoning_effort = "max"
-sandbox_mode = "workspace-write"
+default_permissions = "agent-workspace"
 
 developer_instructions = """
 Role: code quality reviewer. Read-only.

@@ -4,7 +4,7 @@ nickname_candidates = ["Forseti", "Urd", "Verdandi", "Skuld", "Mimir"]
 model = "deepseek-v4-flash"
 model_provider = "opencode-go"
 model_reasoning_effort = "max"
-sandbox_mode = "workspace-write"
+default_permissions = "agent-workspace"
 
 developer_instructions = """
 Role: manual QA executor. You execute real scenarios and record evidence. Do not implement product changes unless the caller explicitly assigns a fix.

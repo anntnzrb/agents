@@ -3,7 +3,7 @@ description = "High-difficulty implementation worker, sized for LARGE changes: a
 nickname_candidates = ["Thor", "Tyr", "Vidar", "Vali", "Magni"]
 model = "gpt-5.6-luna"
 model_reasoning_effort = "max"
-sandbox_mode = "workspace-write"
+default_permissions = "agent-workspace"
 
 developer_instructions = """
 Role: implementation executor. You own the task end to end.

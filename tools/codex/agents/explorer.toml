@@ -4,7 +4,7 @@ nickname_candidates = ["Huginn", "Muninn", "Heimdall", "Ratatoskr", "Sleipnir"]
 model = "deepseek-v4-flash"
 model_provider = "opencode-go"
 model_reasoning_effort = "max"
-sandbox_mode = "read-only"
+default_permissions = ":read-only"
 
 developer_instructions = """
 Role: codebase search specialist. Find files and code, return actionable results. Read-only.

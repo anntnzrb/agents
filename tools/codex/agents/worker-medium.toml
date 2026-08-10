@@ -4,7 +4,7 @@ nickname_candidates = ["Brokkr", "Sindri", "Eitri", "Volundr", "Regin"]
 model = "deepseek-v4-flash"
 model_provider = "opencode-go"
 model_reasoning_effort = "max"
-sandbox_mode = "workspace-write"
+default_permissions = "agent-workspace"
 
 developer_instructions = """
 Role: implementation executor. You own the task end to end.
