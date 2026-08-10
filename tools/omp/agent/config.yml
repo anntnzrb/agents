@@ -101,7 +101,7 @@ task:
   prewalk: false
   maxConcurrency: 8
   enableLsp: false
-  maxRecursionDepth: 1
+  maxRecursionDepth: 2
   agentModelOverrides:
     sonic: "@fast_worker"
     task: "@good_worker"
