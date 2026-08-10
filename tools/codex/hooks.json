@@ -17,7 +17,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "^(spawn_agent|collaborationspawn_agent|collaboration\\.spawn_agent)$",
+        "matcher": "^(Agent|spawn_agent|collaborationspawn_agent|collaboration\\.spawn_agent)$",
         "hooks": [
           {
             "type": "command",
