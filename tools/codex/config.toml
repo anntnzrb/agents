@@ -9,22 +9,12 @@ web_search = "live"
 followUpQueueMode = "queue"
 
 # -----------------------------------------------------------------------------
-# PROVIDERS
-# -----------------------------------------------------------------------------
-
-[model_providers.opencode-go]
-name = "OpenCode Go"
-base_url = "https://opencode.ai/zen/go/v1"
-wire_api = "responses"
-env_key = "OPENCODE_GO_API_KEY"
-
-# -----------------------------------------------------------------------------
 # MODEL
 # -----------------------------------------------------------------------------
 
-model = "gpt-5.6-luna"
+model = "gpt-5.6-sol"
 review_model = "gpt-5.6-luna"
-model_reasoning_effort = "max"
+model_reasoning_effort = "high"
 model_verbosity = "low"
 model_reasoning_summary = "detailed"
 personality = "pragmatic"
@@ -36,6 +26,23 @@ personality = "pragmatic"
 appearanceLightCodeThemeId = "rose-pine"
 appearanceTheme = "system"
 appearanceDarkCodeThemeId = "matrix"
+
+# -----------------------------------------------------------------------------
+# PERMISSIONS
+# -----------------------------------------------------------------------------
+
+approval_policy = "never"
+sandbox_mode = "read-only"
+
+# -----------------------------------------------------------------------------
+# PROVIDERS
+# -----------------------------------------------------------------------------
+
+[model_providers.opencode-go]
+name = "OpenCode Go"
+base_url = "https://opencode.ai/zen/go/v1"
+wire_api = "responses"
+env_key = "OPENCODE_GO_API_KEY"
 
 # light theme
 [desktop.appearanceLightChromeTheme]
@@ -66,16 +73,10 @@ diffAdded = "#1eff5a"
 diffRemoved = "#fa423e"
 skill = "#1eff5a"
 
-# -----------------------------------------------------------------------------
-# PERMISSIONS
-# -----------------------------------------------------------------------------
-
-approval_policy = "never"
-sandbox_mode = "danger-full-access"
-
 [sandbox_workspace_write]
 exclude_slash_tmp = false
 network_access = true
+writable_roots = ["~/.local/share/agents/codex/runs"]
 
 [shell_environment_policy]
 # "all", "core", "none"
@@ -88,6 +89,7 @@ inherit = "core"
 [features]
 chronicle = false
 default_mode_request_user_input = true
+hooks = true
 memories = false
 plugins = true
 prevent_idle_sleep = true
@@ -139,7 +141,11 @@ enabled-reasoning-efforts = ["low", "medium", "high", "xhigh", "max"]
 
 [agents]
 enabled = true
-max_concurrent_threads_per_session = 32
+# Active child threads at one time, excluding the primary agent. This is a
+# throughput/context budget, not the number of agent definitions or the total
+# number of workers a session may use over its lifetime. The hook's separate
+# lifetime spawn-attempt cap lives in hooks/orchestration.toml.
+max_concurrent_threads_per_session = 16
 default_subagent_model = "gpt-5.6-luna"
 default_subagent_reasoning_effort = "max"
 interrupt_message = true
