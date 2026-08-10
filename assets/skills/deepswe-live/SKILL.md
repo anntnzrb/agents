@@ -58,3 +58,52 @@ The CLI returns `ok`, `schema_version`, `command`, and either `data` or `error`.
 | URLs, freshness, validators, and labels | `references/provenance.md` | Before citing data or describing published/raw/derived values |
 | Provenance, same-version refreshes, or new releases | `references/release-maintenance.md` | When upstream reruns models, publishes v1.12/v2.0, or the default release must move |
 | Complete flags and examples | `README.md` | When fast routing does not answer the invocation question |
+
+## Hardened evidence and comparison controls
+
+The existing v1 envelope and raw row fields remain authoritative. Hardened
+responses add evidence under `metrics` (or the row's `derived` object):
+
+- `raw_value` and `normalized_value` (null when unavailable);
+- `unit`, `normalization`, `source_path`, `parser`, `parser_version`, and
+  artifact hash/raw-byte reference when available;
+- `value_status`: `published`, `published_raw`, or `derived`;
+- `metric_semantics_status` and `comparison_eligibility` (`eligible` or
+  `blocked`), with explicit `blocked_reasons`.
+
+Missing, placeholder, malformed, non-finite, out-of-range, unknown, or
+ambiguous values stay visible and are never silently converted to zero.
+Derived confidence-interval width and efficiency values never overwrite
+published fields.
+
+Use `--strict-semantics` to block values without known metric semantics.
+`compare --strict-compare` additionally proves compatible artifact schema,
+metric unit/scope/denominator semantics, and duplicate identities. Complete
+identity is the four-field tuple `model`, `reasoning_effort`, `harness`,
+`config`; identical duplicates warn and use the first source row
+deterministically, while conflicting duplicates warn in legacy mode and block
+strict compare/rank. Use `rank --strict-rank` (or `--strict-duplicates`) to
+block conflicting duplicate rows while preserving those raw rows in output.
+
+`diagnose` is the offline shape/provenance/diagnostics route. It never fetches
+and does not expose row or task content. Successful scopes also advertise
+`dependencies: []` and `independence_class: "unknown"` unless explicit
+source-observed claims exist; no overlap score adjustment is inferred.
+
+## Cache and release authority
+
+Cache bytes are immutable SHA-256-addressed artifacts with redacted sidecars
+and manifests containing source URL, concrete version, validators, parser
+identity, hash, and raw-byte reference. Legacy version-addressed files remain
+readable and may be promoted non-destructively; promotion never deletes or
+rewrites the caller's legacy file. A refresh failure is an error unless
+`--allow-stale` is explicit. `--snapshot` is an explicit historical local
+read and preserves stale/historical provenance.
+
+`latest` means only the configured `DEEPSWE_DEFAULT_VERSION`, or code default
+`v1.1`; there is no manifest/homepage/directory release discovery. A source
+manifest is authoritative only if explicitly configured and its exact
+version/path/hash agreement validates. Never guess a release or mix versions.
+Every operational error is one compact JSON object on stdout; human
+diagnostics belong on stderr. Keep this skill metrics/results-only: never
+fetch or emit task, exercise, release, trajectory, or trial-artifact content.

@@ -16,12 +16,28 @@ from typing import Any, TextIO
 from urllib.parse import quote as url_quote
 
 from .analysis import build_report, filter_trials, rank_rows
+from .contracts import (
+    COMPARISON_SEMANTIC_FIELDS,
+    DIAGNOSTIC_FIELDS,
+    EVIDENCE_FIELDS,
+    SEMANTIC_STATUSES,
+    VALUE_STATUSES,
+)
+from .contracts import SCHEMA_VERSION as CONTRACT_SCHEMA_VERSION
+from .diagnostics import merge_diagnostics, redact
+from .diff import compare_snapshots
+from .identity import canonical_identity, classify_duplicates, identity_json
+from .normalization import normalize_payload, normalize_rows
+from .overlap import dependency_summary
 from .sources import DEFAULT_VERSION as SOURCE_DEFAULT_VERSION
 from .sources import fetch_artifacts, load_artifact, resolve_version
+from .validation import diagnose_payload
 
 EXPECTED_SNAPSHOT_COUNT = 2
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = CONTRACT_SCHEMA_VERSION
+IDENTITY_COMPONENT_COUNT = 4
+LEGACY_IDENTITY_COMPONENT_COUNT = 3
 DEFAULT_VERSION = SOURCE_DEFAULT_VERSION
 BENCHMARK = "DeepSWE"
 ARTIFACT_BASE = "https://deepswe.datacurve.ai/artifacts"
@@ -209,6 +225,34 @@ def _add_quality_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--limit", type=_nonnegative_int, default=10)
 
 
+def _add_strict_semantics_option(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--strict-semantics",
+        action="store_true",
+        help="block values without known source semantics from comparisons",
+    )
+
+
+def _add_strict_duplicates_option(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--strict-rank",
+        "--strict-duplicates",
+        dest="strict_duplicates",
+        action="store_true",
+        help="block conflicting duplicate identities while ranking",
+    )
+
+
+def _add_strict_compare_option(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--strict-compare",
+        "--strict",
+        dest="strict_compare",
+        action="store_true",
+        help="block incompatible schemas, semantics, and duplicate identities",
+    )
+
+
 def _add_trial_filter_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--source", default="deep-swe")
     parser.add_argument("--eval-scope", default="full")
@@ -252,6 +296,7 @@ def build_parser() -> argparse.ArgumentParser:
     report = commands.add_parser("report", help="build the primary decision report")
     _add_fetch_options(report, snapshot=True)
     _add_quality_options(report)
+    _add_strict_semantics_option(report)
 
     report.add_argument(
         "--pareto-axis",
@@ -288,7 +333,8 @@ def build_parser() -> argparse.ArgumentParser:
         default="desc",
     )
     _add_quality_options(rank)
-
+    _add_strict_semantics_option(rank)
+    _add_strict_duplicates_option(rank)
     trials = commands.add_parser("trials", help="filter raw trial records")
     _add_fetch_options(trials, snapshot=True)
     _add_trial_filter_options(trials)
@@ -300,7 +346,19 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="summarize raw trials instead of the leaderboard",
     )
+    _add_strict_semantics_option(stats)
     _add_trial_filter_options(stats)
+
+    diagnose = commands.add_parser(
+        "diagnose",
+        help="inspect artifact shape and provenance without exposing rows",
+    )
+    _add_fetch_options(diagnose, snapshot=True)
+    diagnose.add_argument(
+        "--trials",
+        action="store_true",
+        help="inspect the optional raw trials artifact explicitly",
+    )
 
     schema = commands.add_parser("schema", help="describe the CLI response schema")
     _add_version_option(schema)
@@ -324,6 +382,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_version_option(compare)
     compare.add_argument("--metric", default="pass_at_1")
     compare.add_argument("--limit", type=_nonnegative_int, default=10)
+    _add_strict_semantics_option(compare)
+    _add_strict_compare_option(compare)
 
     return parser
 
@@ -334,6 +394,12 @@ def _now() -> str:
 
 def _compact_json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+
+
+def _safe_error_message(value: object) -> str:
+    redacted = redact(str(value))
+    text = redacted if isinstance(redacted, str) else str(redacted)
+    return text[:512]
 
 
 def _emit(value: Mapping[str, Any], *, stdout: TextIO) -> None:
@@ -354,7 +420,7 @@ def _error(command: str, code: str, message: str) -> dict[str, Any]:
         "ok": False,
         "schema_version": SCHEMA_VERSION,
         "command": command,
-        "error": {"code": code, "message": message},
+        "error": {"code": code, "message": _safe_error_message(message)},
     }
 
 
@@ -492,6 +558,16 @@ def _provenance(  # noqa: C901, PLR0912
         "freshness",
         "snapshot",
         "snapshot_path",
+        "sha256",
+        "artifact_sha256",
+        "length",
+        "raw_path",
+        "metadata_path",
+        "artifact_ref",
+        "manifest_sha256",
+        "manifest_path",
+        "manifest_ref",
+        "legacy_unverified",
     }
     for candidate in reversed(candidates):
         for key, value in candidate.items():
@@ -538,12 +614,14 @@ def _scope(
 ) -> dict[str, Any]:
     if value_status not in {"published", "published_raw", "derived"}:
         value_status = "derived"
-    return {
+    scope = {
         "benchmark": BENCHMARK,
         "benchmark_version": version or DEFAULT_VERSION,
         "filters_applied": dict(filters),
         "value_status": value_status,
     }
+    scope.update(dependency_summary())
+    return scope
 
 
 def _with_scope(  # noqa: PLR0913
@@ -582,6 +660,9 @@ def _with_scope(  # noqa: PLR0913
             artifact=artifact,
             snapshot=snapshot,
         )
+    dependency = dependency_summary()
+    mapping.setdefault("dependencies", dependency["dependencies"])
+    mapping.setdefault("independence_class", dependency["independence_class"])
     mapping["provenance"] = dict(provenance)
     return mapping
 
@@ -657,10 +738,14 @@ def _select_artifact(
     return source
 
 
-def _rows(value: object, *, trials: bool = False) -> list[dict[str, Any]]:
+def _rows(
+    value: object, *, trials: bool = False, normalize: bool | None = None
+) -> list[dict[str, Any]]:
+    should_normalize = not trials if normalize is None else normalize
     value = _unwrap(value)
     if isinstance(value, list):
-        return [row for row in value if isinstance(row, Mapping)]  # type: ignore[misc]
+        rows = [dict(row) for row in value if isinstance(row, Mapping)]
+        return normalize_rows(rows, source_path="$.rows") if should_normalize else rows
     mapping = _as_mapping(value)
     if mapping is None:
         return []
@@ -672,15 +757,27 @@ def _rows(value: object, *, trials: bool = False) -> list[dict[str, Any]]:
     for key in preferred:
         candidate = mapping.get(key)
         if isinstance(candidate, list):
-            return [row for row in candidate if isinstance(row, Mapping)]  # type: ignore[misc]
+            rows = [dict(row) for row in candidate if isinstance(row, Mapping)]
+            return (
+                normalize_rows(rows, source_path=f"$.{key}")
+                if should_normalize
+                else rows
+            )
         if isinstance(candidate, Mapping):
-            nested = _rows(candidate, trials=trials)
+            nested = _rows(candidate, trials=trials, normalize=should_normalize)
             if nested:
                 return nested
-    # A single row is useful for a mocked/minimal artifact.
     if any(key in mapping for key in ("model", "config", "pass_at_1", "trial_id")):
-        return [dict(mapping)]
+        rows = [dict(mapping)]
+        return normalize_rows(rows, source_path="$") if should_normalize else rows
     return []
+
+
+def _context_payload(payload: object, *, artifact: str) -> object:
+    """Normalize leaderboard payloads while preserving raw trial payloads."""
+    if artifact == "trials.json":
+        return payload
+    return normalize_payload(payload)
 
 
 def _fetch_context(
@@ -709,7 +806,7 @@ def _fetch_context(
     payload = _select_artifact(source, artifact=artifact, version=version)
     return {
         "source": source,
-        "payload": payload,
+        "payload": _context_payload(payload, artifact=artifact),
         "version": _version_from(source, version) or version,
         "resolved": resolved,
         "artifact": artifact,
@@ -754,9 +851,10 @@ def _snapshot_context(args: argparse.Namespace, *, artifact: str) -> dict[str, A
             )
             raise CliError(code, message)
         version = expected
+    selected = _select_artifact(payload, artifact=artifact, version=version)
     return {
         "source": raw,
-        "payload": _select_artifact(payload, artifact=artifact, version=version),
+        "payload": _context_payload(selected, artifact=artifact),
         "version": version,
         "resolved": {"benchmark_version": version, "snapshot": True},
         "artifact": artifact,
@@ -790,6 +888,10 @@ def _quality_filters(args: argparse.Namespace) -> dict[str, Any]:
         filters["pareto_axes"] = pareto_axes
     if efficiencies is not None:
         filters["efficiency"] = efficiencies
+    if getattr(args, "strict_semantics", False):
+        filters["strict_semantics"] = True
+    if getattr(args, "strict_duplicates", False):
+        filters["strict_duplicates"] = True
     if pareto_axes is not None or efficiencies is not None:
         filters["analysis_options"] = "explicit"
     return filters
@@ -847,6 +949,7 @@ def _handle_report(args: argparse.Namespace) -> dict[str, Any]:
             limit=args.limit,
             pareto_axes=args.pareto_axis,
             efficiency_specs=args.efficiency,
+            strict_semantics=getattr(args, "strict_semantics", False),
         )
     except Exception as exc:
         raise CliError(_exception_code(exc), str(exc)) from exc
@@ -877,13 +980,37 @@ def _fetch_output(source: object) -> dict[str, Any]:
                 projected[name] = {
                     key: item
                     for key, item in value.items()
-                    if key not in {"data", "payload"}
+                    if key
+                    not in {"data", "payload", "raw", "body", "raw_body", "raw_bytes"}
                 }
             else:
                 projected[name] = value
         data["artifacts"] = projected
     for key in ("payloads", "leaderboard", "trials"):
         data.pop(key, None)
+    known = {
+        "artifacts",
+        "provenance",
+        "scope",
+        "benchmark",
+        "benchmark_version",
+        "version",
+        "generated_at",
+        "fetched_at",
+        "metadata",
+    }
+    unknown = {
+        str(key): value
+        for key, value in data.items()
+        if str(key) not in known and key != "raw_metadata"
+    }
+    if unknown:
+        existing = data.get("raw_metadata")
+        merged = dict(existing) if isinstance(existing, Mapping) else {}
+        merged.update(unknown)
+        data["raw_metadata"] = merged
+        for key in unknown:
+            data.pop(key, None)
     return data
 
 
@@ -900,6 +1027,8 @@ def _handle_rank(args: argparse.Namespace) -> dict[str, Any]:
             min_attempted=args.min_attempted,
             min_tasks=args.min_tasks,
             limit=args.limit,
+            strict_semantics=getattr(args, "strict_semantics", False),
+            strict_duplicates=getattr(args, "strict_duplicates", False),
         )
     except Exception as exc:
         raise CliError(_exception_code(exc), str(exc)) from exc
@@ -964,23 +1093,53 @@ def _numeric(value: object) -> float | int | None:
     return value
 
 
-def _stats_for_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def _stats_for_rows(
+    rows: Sequence[Mapping[str, Any]], *, strict_semantics: bool = False
+) -> dict[str, Any]:
     fields = sorted({str(key) for row in rows for key in row})
     missing = {
         field: sum(1 for row in rows if row.get(field) is None) for field in fields
     }
     ranges: dict[str, dict[str, float | int]] = {}
+    blocked: dict[str, list[str]] = {}
     for field in fields:
-        values = [_numeric(row.get(field)) for row in rows]
-        values = [value for value in values if value is not None]
+        values: list[float | int] = []
+        for row in rows:
+            if strict_semantics:
+                metrics = row.get("metrics")
+                evidence = metrics.get(field) if isinstance(metrics, Mapping) else None
+                if isinstance(evidence, Mapping):
+                    value = evidence.get("normalized_value")
+                    if evidence.get("comparison_eligibility") != "eligible":
+                        reasons = evidence.get("blocked_reasons")
+                        if isinstance(reasons, Sequence) and not isinstance(
+                            reasons, (str, bytes, bytearray)
+                        ):
+                            blocked.setdefault(field, []).extend(
+                                str(reason) for reason in reasons
+                            )
+                        continue
+                    numeric = _numeric(value)
+                else:
+                    numeric = None
+            else:
+                numeric = _numeric(row.get(field))
+            if numeric is not None:
+                values.append(numeric)
         if values:
             ranges[field] = {"min": min(values), "max": max(values)}
-    return {
+    result: dict[str, Any] = {
         "row_count": len(rows),
         "fields": fields,
         "missing": missing,
         "numeric_ranges": ranges,
     }
+    if strict_semantics:
+        result["strict_semantics"] = True
+        result["blocked"] = {
+            field: sorted(set(reasons)) for field, reasons in blocked.items()
+        }
+    return result
 
 
 def _handle_stats(args: argparse.Namespace) -> dict[str, Any]:
@@ -991,11 +1150,16 @@ def _handle_stats(args: argparse.Namespace) -> dict[str, Any]:
         isinstance(payload, Mapping)
         and isinstance(payload.get("stats"), Mapping)
         and not args.trials
+        and not getattr(args, "strict_semantics", False)
     ):
         result = dict(payload["stats"])
         status = "published"
     elif args.trials:
-        rows = _rows(payload, trials=True)
+        rows = _rows(
+            payload,
+            trials=True,
+            normalize=bool(getattr(args, "strict_semantics", False)),
+        )
         try:
             filtered = filter_trials(
                 rows,
@@ -1006,15 +1170,19 @@ def _handle_stats(args: argparse.Namespace) -> dict[str, Any]:
             )
         except Exception as exc:
             raise CliError(_exception_code(exc), str(exc)) from exc
-        selected = _rows(filtered, trials=True)
-        result = _stats_for_rows(selected)
+        selected = _rows(filtered, trials=True, normalize=False)
+        result = _stats_for_rows(
+            selected, strict_semantics=getattr(args, "strict_semantics", False)
+        )
         if isinstance(filtered, Mapping):
             result["input_count"] = filtered.get("input_count", len(rows))
             result["matched_count"] = filtered.get("matched_count", len(selected))
         status = "published_raw"
     else:
         rows = _rows(payload)
-        result = _stats_for_rows(rows)
+        result = _stats_for_rows(
+            rows, strict_semantics=getattr(args, "strict_semantics", False)
+        )
         status = "derived"
     filters = {
         "artifact": artifact,
@@ -1022,6 +1190,8 @@ def _handle_stats(args: argparse.Namespace) -> dict[str, Any]:
         "eval_scope": args.eval_scope if args.trials else None,
         "included_in_score": args.included_only if args.trials else None,
     }
+    if getattr(args, "strict_semantics", False):
+        filters["strict_semantics"] = True
     filters = {key: value for key, value in filters.items() if value is not None}
     return _with_scope(
         result,
@@ -1031,6 +1201,130 @@ def _handle_stats(args: argparse.Namespace) -> dict[str, Any]:
         value_status=status,
         source=context["source"],
         payload=payload,
+        artifact=artifact,
+        snapshot=context["snapshot"],
+    )
+
+
+def _diagnose_metadata(
+    context: Mapping[str, Any], *, artifact: str
+) -> tuple[Mapping[str, object] | None, Path | None]:
+    source = context.get("source")
+    if isinstance(source, Mapping):
+        artifacts = source.get("artifacts")
+        if isinstance(artifacts, Mapping):
+            candidate = artifacts.get(artifact)
+            if isinstance(candidate, Mapping):
+                local_path = candidate.get("local_path")
+                path = (
+                    Path(local_path).expanduser()
+                    if isinstance(local_path, str)
+                    else None
+                )
+                return candidate, path
+        return source, None
+    return None, None
+
+
+def _diagnose_duplicates(
+    payload: object, *, trials: bool = False
+) -> tuple[dict[str, list[dict[str, object]]], list[dict[str, object]]]:
+    """Project duplicate facts without returning raw row or task fields."""
+    rows = _rows(payload, trials=trials, normalize=False)
+    report = classify_duplicates(rows)
+    projected: dict[str, list[dict[str, object]]] = {
+        "identical": [],
+        "conflicting": [],
+    }
+    diagnostics: list[dict[str, object]] = []
+    for bucket, bucket_groups in projected.items():
+        groups = report.get(bucket, bucket_groups)
+        if not isinstance(groups, Sequence):
+            continue
+        for group in groups:
+            if not isinstance(group, Mapping):
+                continue
+            indexes = group.get("row_indexes")
+            row_indexes = (
+                sorted(int(index) for index in indexes)
+                if isinstance(indexes, Sequence)
+                and not isinstance(indexes, (str, bytes, bytearray))
+                else []
+            )
+            identity = group.get("identity")
+            safe_identity = identity if isinstance(identity, str) else "<anonymous>"
+            if safe_identity.startswith('["published_id","row",'):
+                safe_identity = "<anonymous>"
+            bucket_groups.append(
+                {
+                    "identity": safe_identity,
+                    "row_indexes": row_indexes,
+                    "count": len(row_indexes),
+                }
+            )
+            diagnostics.append(
+                {
+                    "code": (
+                        "DUPLICATE_CONFLICT"
+                        if bucket == "conflicting"
+                        else "DUPLICATE_IDENTITY"
+                    ),
+                    "severity": "error" if bucket == "conflicting" else "warning",
+                    "stage": "diagnose",
+                    "message": (
+                        "Conflicting rows share a configuration identity."
+                        if bucket == "conflicting"
+                        else "Identical rows share a configuration identity."
+                    ),
+                    "details": {
+                        "identity": safe_identity,
+                        "row_indexes": row_indexes,
+                        "count": len(row_indexes),
+                    },
+                }
+            )
+    return projected, merge_diagnostics(diagnostics)
+
+
+def _handle_diagnose(args: argparse.Namespace) -> dict[str, Any]:
+    artifact = "trials.json" if args.trials else "leaderboard-live.json"
+    context = _context(args, artifact=artifact, include_trials=args.trials)
+    metadata, materialized_path = _diagnose_metadata(context, artifact=artifact)
+    snapshot = context.get("snapshot")
+    source_path = snapshot if isinstance(snapshot, Path) else materialized_path
+    version = context.get("version")
+    expected_version = version if isinstance(version, str) else None
+    try:
+        result = diagnose_payload(
+            context["payload"],
+            artifact_name=artifact,
+            expected_version=expected_version,
+            path=source_path,
+            metadata=metadata,
+        )
+    except Exception as exc:
+        raise CliError(_exception_code(exc), str(exc)) from exc
+    duplicate_report, duplicate_diagnostics = _diagnose_duplicates(
+        context["payload"], trials=bool(args.trials)
+    )
+    result["duplicate_report"] = duplicate_report
+    if duplicate_diagnostics:
+        result["diagnostics"] = merge_diagnostics(
+            result.get("diagnostics", []), duplicate_diagnostics
+        )
+    filters: dict[str, Any] = {
+        "artifact": artifact,
+        "operation": "diagnose",
+        "trials_explicit": bool(args.trials),
+    }
+    return _with_scope(
+        result,
+        command="diagnose",
+        version=context["version"],
+        filters=filters,
+        value_status="published_raw" if args.trials else "published",
+        source=context["source"],
+        payload=context["payload"],
         artifact=artifact,
         snapshot=context["snapshot"],
     )
@@ -1046,8 +1340,16 @@ def _schema_data(version: str) -> dict[str, Any]:
             "stats",
             "schema",
             "compare",
+            "diagnose",
         ],
         "schema_version": SCHEMA_VERSION,
+        "artifact_schema": {
+            "supported": [1],
+            "legacy_when_absent": 1,
+            "required": ["rows"],
+            "optional_counts": ["count", "row_count", "n_rows", "n_trials"],
+            "unknown_fields": "preserved",
+        },
         "envelope": {
             "success": {
                 "ok": True,
@@ -1070,6 +1372,39 @@ def _schema_data(version: str) -> dict[str, Any]:
                 "value_status",
             ],
             "value_status": ["published", "published_raw", "derived"],
+            "dependencies": "array; [] when no explicit claims are published",
+            "independence_class": "unknown when no explicit claims are published",
+        },
+        "diagnostics": {
+            "field": "diagnostics",
+            "fields": list(DIAGNOSTIC_FIELDS),
+            "ordering": "code,severity,stage,path,details",
+            "redaction": "credentials and secret query parameters are redacted",
+        },
+        "evidence": {
+            "value_status": list(VALUE_STATUSES),
+            "metric_semantics_status": list(SEMANTIC_STATUSES),
+            "comparison_eligibility": ["eligible", "blocked"],
+            "fields": list(EVIDENCE_FIELDS),
+        },
+        "comparison": {
+            "strict_semantics": "--strict-semantics",
+            "strict_compare": "--strict-compare",
+            "strict_rank": "--strict-rank",
+            "strict_duplicates": "--strict-duplicates",
+            "same_benchmark_version": True,
+            "identity": "JSON tuple [model, reasoning_effort, harness, config]",
+            "duplicate_policy": {
+                "identical": "warning; deterministic first",
+                "conflicting": "warning by default; blocked in strict mode",
+            },
+            "semantic_fields": list(COMPARISON_SEMANTIC_FIELDS),
+            "legacy_keys": ["config", "before", "after", "delta"],
+        },
+        "overlap": {
+            "dependencies": [],
+            "independence_class": "unknown",
+            "collision_policy": "exact canonical component and release only",
         },
         "provenance": {
             "required": ["url", "fetched_at"],
@@ -1115,22 +1450,353 @@ def _compare_paths(args: argparse.Namespace) -> tuple[Path, Path]:
     return Path(values[0]).expanduser(), Path(values[1]).expanduser()
 
 
-def _row_identity(row: Mapping[str, Any]) -> str:
-    identity = tuple(
-        row.get(key) for key in ("model", "reasoning_effort", "harness", "config")
-    )
-    if any(value is not None for value in identity):
-        return json.dumps(
-            identity, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+def _safe_compare_identity(value: object) -> str:
+    """Keep comparison diagnostics free of anonymous row bodies."""
+    if not isinstance(value, str):
+        return "<anonymous>"
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError):
+        return "<anonymous>"
+    if isinstance(parsed, list) and len(parsed) == IDENTITY_COMPONENT_COUNT:
+        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
+    if (
+        isinstance(parsed, list)
+        and len(parsed) == LEGACY_IDENTITY_COMPONENT_COUNT
+        and parsed[:2] != ["published_id", "row"]
+    ):
+        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
+    return "<anonymous>"
+
+
+def _safe_compare_diagnostics(
+    diagnostics: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    """Project kernel diagnostics without exposing duplicate row signatures."""
+    safe: list[dict[str, object]] = []
+    for item in diagnostics:
+        projected = dict(item)
+        details = item.get("details")
+        if isinstance(details, Mapping):
+            details_copy = dict(details)
+            if "identity" in details_copy:
+                details_copy["identity"] = _safe_compare_identity(
+                    details_copy["identity"]
+                )
+            details_copy.pop("signatures", None)
+            details_copy.pop("rows", None)
+            projected["details"] = details_copy
+        safe.append(projected)
+    return merge_diagnostics(safe)
+
+
+def _duplicate_facts_for_compare(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    identity_rows: Sequence[Mapping[str, Any]] | None = None,
+) -> tuple[
+    dict[str, Mapping[str, Any]],
+    dict[str, list[dict[str, object]]],
+    list[dict[str, object]],
+]:
+    """Select the first row per canonical identity and retain duplicate facts."""
+    identity_source = rows if identity_rows is None else identity_rows
+    report = classify_duplicates(identity_source)
+    selected: dict[str, Mapping[str, Any]] = {}
+    for row in rows:
+        identity = identity_json(canonical_identity(row))
+        selected.setdefault(identity, row)
+    projected: dict[str, list[dict[str, object]]] = {
+        "identical": [],
+        "conflicting": [],
+    }
+    diagnostics: list[dict[str, object]] = []
+    for bucket, bucket_groups in projected.items():
+        groups = report.get(bucket, bucket_groups)
+        if not isinstance(groups, Sequence):
+            continue
+        for group in groups:
+            if not isinstance(group, Mapping):
+                continue
+            indexes = group.get("row_indexes")
+            row_indexes = (
+                sorted(int(index) for index in indexes)
+                if isinstance(indexes, Sequence)
+                and not isinstance(indexes, (str, bytes, bytearray))
+                else []
+            )
+            identity = _safe_compare_identity(group.get("identity"))
+            bucket_groups.append(
+                {
+                    "identity": identity,
+                    "row_indexes": row_indexes,
+                    "count": len(row_indexes),
+                }
+            )
+            diagnostics.append(
+                {
+                    "code": (
+                        "DUPLICATE_CONFLICT"
+                        if bucket == "conflicting"
+                        else "DUPLICATE_IDENTITY"
+                    ),
+                    "severity": "warning",
+                    "stage": "comparison",
+                    "message": (
+                        "Conflicting rows share a configuration identity."
+                        if bucket == "conflicting"
+                        else "Identical rows share a configuration identity."
+                    ),
+                    "details": {
+                        "identity": identity,
+                        "row_indexes": row_indexes,
+                        "count": len(row_indexes),
+                    },
+                }
+            )
+    return selected, projected, merge_diagnostics(diagnostics)
+
+
+def _metadata_candidates(value: object) -> list[Mapping[str, object]]:
+    if not isinstance(value, Mapping):
+        return []
+    candidates: list[Mapping[str, object]] = [value]
+    for key in ("metadata", "scope", "provenance", "artifact", "data", "payload"):
+        nested = value.get(key)
+        if isinstance(nested, Mapping):
+            candidates.append(nested)
+    return candidates
+
+
+def _artifact_schema_declaration(value: object) -> object:
+    declarations: list[object] = []
+    for candidate in _metadata_candidates(value):
+        declarations.extend(
+            candidate[key]
+            for key in ("artifact_schema_version", "schema_version")
+            if key in candidate and candidate[key] is not None
         )
-    for key in ("id", "name", "model_name", "trial_id"):
-        value = row.get(key)
-        if value is not None:
-            return str(value)
-    return json.dumps(dict(row), sort_keys=True, separators=(",", ":"))
+        schema = candidate.get("artifact_schema")
+        if isinstance(schema, Mapping) and schema.get("version") is not None:
+            declarations.append(schema["version"])
+    unique = {
+        json.dumps(item, sort_keys=True, separators=(",", ":")): item
+        for item in declarations
+    }
+    if len(unique) == 1:
+        return next(iter(unique.values()))
+    if len(unique) > 1:
+        return "<conflicting>"
+    return None
 
 
-def _handle_compare(args: argparse.Namespace) -> dict[str, Any]:
+def _semantic_projection(value: object, metric: str) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        return {}
+    candidates: list[Mapping[str, object]] = [value]
+    for key in ("metric_semantics", "semantics", "metrics"):
+        nested = value.get(key)
+        if isinstance(nested, Mapping):
+            candidate = (
+                nested.get(metric) if key in {"metric_semantics", "metrics"} else nested
+            )
+            if isinstance(candidate, Mapping):
+                candidates.append(candidate)
+    projection: dict[str, object] = {}
+    for candidate in candidates:
+        for key in (
+            "family",
+            "comparator",
+            "unit",
+            "scope",
+            "denominator",
+            "metric_semantics_status",
+        ):
+            if key in candidate:
+                projection[key] = candidate[key]
+    return projection
+
+
+def _semantic_declarations(
+    value: object, metric: str
+) -> tuple[dict[str, object], dict[str, dict[str, object]]]:
+    top: dict[str, object] = {}
+    for candidate in _metadata_candidates(value):
+        top.update(_semantic_projection(candidate, metric))
+    rows = _rows(
+        _select_artifact(value, artifact="leaderboard-live.json"), normalize=False
+    )
+    per_row: dict[str, dict[str, object]] = {}
+    for row in rows:
+        projection = _semantic_projection(row, metric)
+        if projection:
+            per_row[identity_json(canonical_identity(row))] = projection
+    return top, per_row
+
+
+def _semantic_warnings(
+    left: object, right: object, metric: str
+) -> list[dict[str, object]]:
+    left_top, left_rows = _semantic_declarations(left, metric)
+    right_top, right_rows = _semantic_declarations(right, metric)
+    warnings: list[dict[str, object]] = []
+
+    def add(reason: str, identity: str | None = None) -> None:
+        details: dict[str, object] = {"metric": metric, "reason": reason}
+        if identity is not None:
+            details["identity"] = _safe_compare_identity(identity)
+        warnings.append(
+            {
+                "code": "COMPARISON_INCOMPARABLE",
+                "severity": "warning",
+                "stage": "comparison",
+                "message": "Metric semantic declarations differ between snapshots.",
+                "details": details,
+            }
+        )
+
+    if left_top != right_top:
+        reason = "semantics_mismatch"
+        for field in ("unit", "scope", "denominator"):
+            if left_top.get(field) != right_top.get(field):
+                reason = f"{field}_mismatch"
+                break
+        add(reason)
+    for identity in sorted(set(left_rows) & set(right_rows)):
+        before = left_rows[identity]
+        after = right_rows[identity]
+        if before != after:
+            reason = "semantics_mismatch"
+            for field in ("unit", "scope", "denominator"):
+                if before.get(field) != after.get(field):
+                    reason = f"{field}_mismatch"
+                    break
+            add(reason, identity)
+    return merge_diagnostics(warnings)
+
+
+def _schema_warnings(left: object, right: object) -> list[dict[str, object]]:
+    before = _artifact_schema_declaration(left)
+    after = _artifact_schema_declaration(right)
+    if before is None and after is None:
+        return []
+    if json.dumps(before, sort_keys=True) == json.dumps(after, sort_keys=True):
+        return []
+    return [
+        {
+            "code": "SCHEMA_DRIFT",
+            "severity": "warning",
+            "stage": "comparison",
+            "message": "Artifact schema declarations differ between snapshots.",
+            "details": {"before": before, "after": after},
+        }
+    ]
+
+
+def _comparison_numeric(
+    row: Mapping[str, Any] | None,
+    metric: str,
+    *,
+    strict_semantics: bool,
+) -> tuple[float | int | None, list[str]]:
+    if row is None:
+        return None, ["MISSING_ROW"]
+    if strict_semantics:
+        metrics = row.get("metrics")
+        evidence = metrics.get(metric) if isinstance(metrics, Mapping) else None
+        if isinstance(evidence, Mapping):
+            reasons = evidence.get("blocked_reasons")
+            blockers = (
+                [str(reason) for reason in reasons]
+                if isinstance(reasons, Sequence)
+                and not isinstance(reasons, (str, bytes, bytearray))
+                else []
+            )
+            if evidence.get("comparison_eligibility") != "eligible":
+                return None, blockers or ["COMPARISON_INCOMPARABLE"]
+            value = _numeric(evidence.get("normalized_value"))
+            return (value, []) if value is not None else (None, ["UNPARSED_VALUE"])
+        return None, ["MISSING_REQUIRED_INPUT"]
+    return _numeric(row.get(metric)), []
+
+
+def _legacy_compare(
+    left: object,
+    right: object,
+    *,
+    metric: str,
+    strict_semantics: bool,
+) -> tuple[dict[str, Any], list[dict[str, object]]]:
+    left_payload = _select_artifact(left, artifact="leaderboard-live.json")
+    right_payload = _select_artifact(right, artifact="leaderboard-live.json")
+    left_source_rows = _rows(left_payload, normalize=False)
+    right_source_rows = _rows(right_payload, normalize=False)
+    left_rows = _rows(left_payload, normalize=True)
+    right_rows = _rows(right_payload, normalize=True)
+    left_map, left_duplicates, left_diags = _duplicate_facts_for_compare(
+        left_rows, identity_rows=left_source_rows
+    )
+    right_map, right_duplicates, right_diags = _duplicate_facts_for_compare(
+        right_rows, identity_rows=right_source_rows
+    )
+    keys = sorted(set(left_map) | set(right_map))
+    changes: list[dict[str, Any]] = []
+    for key in keys:
+        before, before_reasons = _comparison_numeric(
+            left_map.get(key), metric, strict_semantics=strict_semantics
+        )
+        after, after_reasons = _comparison_numeric(
+            right_map.get(key), metric, strict_semantics=strict_semantics
+        )
+        delta = after - before if before is not None and after is not None else None
+        change: dict[str, Any] = {
+            "config": key,
+            "before": before,
+            "after": after,
+            "delta": delta,
+        }
+        if strict_semantics:
+            change["blocked_reasons"] = sorted(set(before_reasons + after_reasons))
+        changes.append(change)
+    changes.sort(
+        key=lambda row: (
+            row["delta"] is None,
+            -(abs(row["delta"]) if row["delta"] is not None else 0),
+            row["config"],
+        )
+    )
+    diagnostics = merge_diagnostics(
+        left_diags,
+        right_diags,
+        _schema_warnings(left, right),
+        _semantic_warnings(left, right, metric),
+    )
+    duplicate_report = {
+        "left": left_duplicates,
+        "right": right_duplicates,
+    }
+    result: dict[str, Any] = {
+        "changes": changes,
+        "duplicate_report": duplicate_report,
+        "left_count": len(left_rows),
+        "right_count": len(right_rows),
+    }
+    return result, diagnostics
+
+
+def _strict_snapshot(value: object) -> object:
+    """Add normalized rows while preserving every snapshot metadata field."""
+    if not isinstance(value, Mapping):
+        return value
+    projected = dict(value)
+    selected = _select_artifact(value, artifact="leaderboard-live.json")
+    projected["rows"] = _rows(selected, normalize=True)
+    return projected
+
+
+def _handle_compare(  # noqa: C901, PLR0912, PLR0915
+    args: argparse.Namespace,
+) -> dict[str, Any]:
     left_path, right_path = _compare_paths(args)
     try:
         left_raw = load_artifact(left_path)
@@ -1152,69 +1818,82 @@ def _handle_compare(args: argparse.Namespace) -> dict[str, Any]:
         path_match = _VERSION_IN_PATH_RE.search(str(right_path))
         right_version = path_match.group(1) if path_match else None
     if left_version is None or right_version is None:
-        code = "mixed_version"
-        message = (
-            "both snapshots must declare benchmark_version or include a "
-            "concrete version component in their paths"
+        msg = "mixed_version"
+        detail = (
+            "both snapshots must declare benchmark_version or include a concrete "
+            "version component in their paths"
         )
-        raise CliError(code, message)
+        raise CliError(msg, detail)
     if left_version != right_version:
-        code = "mixed_version"
-        message = (
+        msg = "mixed_version"
+        detail = (
             f"snapshots use different benchmark versions: {left_version!r} "
             f"and {right_version!r}"
         )
-        raise CliError(code, message)
+        raise CliError(msg, detail)
     requested = getattr(args, "version", "latest")
     if requested and requested != "latest":
         expected, _ = _resolve(requested)
         if expected != left_version:
-            code = "mixed_version"
-            message = (
+            detail = (
                 f"snapshot version {left_version!r} does not match "
                 f"requested {expected!r}"
             )
-            raise CliError(code, message)
-    left_rows = _rows(
-        _select_artifact(left, artifact="leaderboard-live.json", version=left_version)
-    )
-    right_rows = _rows(
-        _select_artifact(right, artifact="leaderboard-live.json", version=right_version)
-    )
-    left_map = {_row_identity(row): row for row in left_rows}
-    right_map = {_row_identity(row): row for row in right_rows}
-    keys = sorted(set(left_map) | set(right_map))
-    changes: list[dict[str, Any]] = []
-    for key in keys:
-        before = (
-            _numeric(left_map.get(key, {}).get(args.metric))
-            if key in left_map
-            else None
+            raise CliError(msg, detail)
+
+    strict_semantics = bool(getattr(args, "strict_semantics", False))
+    strict_compare = bool(getattr(args, "strict_compare", False))
+    strict_mode = strict_compare
+    if strict_mode:
+        diff = compare_snapshots(
+            _strict_snapshot(left),
+            _strict_snapshot(right),
+            args.metric,
         )
-        after = (
-            _numeric(right_map.get(key, {}).get(args.metric))
-            if key in right_map
-            else None
+        result: dict[str, Any] = dict(diff)
+        result.setdefault(
+            "left_count",
+            len(_rows(_select_artifact(left, artifact="leaderboard-live.json"))),
         )
-        delta = after - before if before is not None and after is not None else None
-        changes.append(
-            {"config": key, "before": before, "after": after, "delta": delta}
+        result.setdefault(
+            "right_count",
+            len(_rows(_select_artifact(right, artifact="leaderboard-live.json"))),
         )
-    changes.sort(
-        key=lambda row: (
-            row["delta"] is None,
-            -(abs(row["delta"]) if row["delta"] is not None else 0),
-            row["config"],
+        diagnostics_value = result.get("diagnostics", [])
+        if isinstance(diagnostics_value, Sequence) and not isinstance(
+            diagnostics_value, (str, bytes, bytearray)
+        ):
+            result["diagnostics"] = _safe_compare_diagnostics(
+                [item for item in diagnostics_value if isinstance(item, Mapping)]
+            )
+        if isinstance(result.get("changes"), list):
+            result["changes"] = sorted(
+                result["changes"],
+                key=lambda row: (
+                    row.get("delta") is None,
+                    -(abs(row["delta"]) if row.get("delta") is not None else 0),
+                    str(row.get("config")),
+                ),
+            )[: args.limit]
+        result["strict_compare"] = strict_compare
+        if strict_semantics:
+            result["strict_semantics"] = True
+    else:
+        result, diagnostics = _legacy_compare(
+            left,
+            right,
+            metric=args.metric,
+            strict_semantics=strict_semantics,
         )
-    )
-    result = {
-        "metric": args.metric,
-        "left_snapshot": str(left_path),
-        "right_snapshot": str(right_path),
-        "left_count": len(left_rows),
-        "right_count": len(right_rows),
-        "changes": changes[: args.limit],
-    }
+        if diagnostics:
+            result["diagnostics"] = diagnostics
+            result["warnings"] = [
+                item for item in diagnostics if item.get("severity") == "warning"
+            ]
+        if strict_semantics:
+            result["strict_semantics"] = True
+        result["changes"] = result["changes"][: args.limit]
+
     provenance = {
         "url": _uri_for(left_path),
         "fetched_at": _now(),
@@ -1232,15 +1911,25 @@ def _handle_compare(args: argparse.Namespace) -> dict[str, Any]:
         ),
         "freshness": "snapshot",
     }
+    filters: dict[str, Any] = {
+        "left_snapshot": str(left_path),
+        "right_snapshot": str(right_path),
+        "metric": args.metric,
+    }
+    if strict_semantics:
+        filters["strict_semantics"] = True
+    if strict_compare:
+        filters["strict_compare"] = True
     return _with_scope(
-        result,
-        command="compare",
-        version=left_version,
-        filters={
+        {
+            "metric": args.metric,
             "left_snapshot": str(left_path),
             "right_snapshot": str(right_path),
-            "metric": args.metric,
+            **result,
         },
+        command="compare",
+        version=left_version,
+        filters=filters,
         value_status="derived",
         provenance=provenance,
     )
@@ -1274,6 +1963,7 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
         "trials": _handle_trials,
         "stats": _handle_stats,
         "schema": _handle_schema,
+        "diagnose": _handle_diagnose,
         "compare": _handle_compare,
     }
     handler = handlers.get(args.command)
@@ -1304,9 +1994,10 @@ def main(
         "rank",
         "trials",
         "stats",
-        "schema",
+        "diagnose",
         "compare",
     }
+
     command = next((value for value in values if value in known_commands), "unknown")
     try:
         args = parser.parse_args(values)
@@ -1316,8 +2007,9 @@ def main(
         command = args.command
         data = _dispatch(args)
     except CliUsageError as exc:
-        _emit(_error(command, exc.code, exc.message), stdout=output)
-        print(f"deepswe-live: {exc.code}: {exc.message}", file=diagnostics)
+        message = _safe_error_message(exc.message)
+        _emit(_error(command, exc.code, message), stdout=output)
+        print(f"deepswe-live: {exc.code}: {message}", file=diagnostics)
         return 2
     except SystemExit as exc:
         # --help remains argparse-compatible. Invalid parser errors are
@@ -1325,7 +2017,7 @@ def main(
         return int(exc.code) if isinstance(exc.code, int) else 2
     except Exception as exc:  # noqa: BLE001
         code = _exception_code(exc)
-        message = str(exc) or type(exc).__name__
+        message = _safe_error_message(str(exc) or type(exc).__name__)
         _emit(_error(command, code, message), stdout=output)
         print(f"deepswe-live: {code}: {message}", file=diagnostics)
         return 1

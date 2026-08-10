@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, NoReturn, Self
 from urllib.error import HTTPError, URLError
 
 if TYPE_CHECKING:
@@ -137,12 +138,35 @@ def test_resolve_latest_uses_one_configured_default(
 ) -> None:
     """Resolve latest through the configured deterministic release source."""
     monkeypatch.delenv("DEEPSWE_DEFAULT_VERSION", raising=False)
-    assert sources.resolve_version(None)["version"] == "v1.1"
+    fallback = sources.resolve_version(None)
+    assert fallback["version"] == "v1.1"
+    assert fallback["resolved_from"] == "default"
 
     monkeypatch.setenv("DEEPSWE_DEFAULT_VERSION", "v1.2")
+    configured = sources.resolve_version(None)
+    assert configured["version"] == "v1.2"
+    assert configured["resolved_from"] == "env"
+    latest = sources.resolve_version("latest")
+    assert latest["version"] == "v1.2"
+    assert latest["source"] == "env"
+
+
+def test_latest_resolution_has_no_runtime_release_discovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep latest offline; releases come only from the configured fallback."""
+    calls: list[object] = []
+
+    def unexpected_network(*args: object, **kwargs: object) -> NoReturn:
+        calls.append((args, kwargs))
+        msg = "latest resolution must not discover releases"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(sources, "urlopen", unexpected_network)
+    monkeypatch.delenv("DEEPSWE_DEFAULT_VERSION", raising=False)
     resolved = sources.resolve_version("latest")
-    assert resolved["version"] == "v1.2"
-    assert resolved["source"] == "env"
+    assert resolved["benchmark_version"] == "v1.1"
+    assert calls == []
 
 
 def test_resolve_explicit_semver_and_reject_major_only_or_legacy() -> None:
@@ -187,6 +211,155 @@ def test_fetch_records_url_version_headers_and_writes_fixture(
     assert meta["row_count"] == 1
     assert Path(str(meta["local_path"])).read_bytes() == body
     assert meta["cache_reused"] is False
+
+
+def test_fetch_stores_immutable_hash_refs_and_manifest(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Persist exact bytes while retaining versioned materialized paths."""
+    body = json.dumps(LEADERBOARD, separators=(",", ":")).encode()
+    patch_urlopen(
+        monkeypatch,
+        QueueOpener(
+            Response(
+                body,
+                headers={"ETag": '"immutable"', "Last-Modified": "fixture-date"},
+            )
+        ),
+    )
+    cache_dir = tmp_path / "cache"
+    result = sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
+    metadata = artifact_meta(result, "leaderboard-live.json")
+    digest = hashlib.sha256(body).hexdigest()
+    assert metadata["sha256"] == digest
+    assert metadata["artifact_sha256"] == digest
+    assert metadata["length"] == len(body)
+    assert metadata["legacy_unverified"] is False
+    raw_path = cache_dir / str(metadata["raw_path"])
+    sidecar_path = cache_dir / str(metadata["metadata_path"])
+    manifest_path = cache_dir / str(metadata["manifest_path"])
+    assert raw_path.read_bytes() == body
+    assert sidecar_path.is_file()
+    assert manifest_path.is_file()
+    index = json.loads((cache_dir / "index.json").read_text(encoding="utf-8"))
+    source_key = str(metadata["url"])
+    assert index[source_key]["sha256"] == digest
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["sources"][source_key]["sha256"] == digest
+    assert Path(str(metadata["cache_path"])).read_bytes() == body
+    assert Path(str(metadata["local_path"])).read_bytes() == body
+
+
+def test_304_rejects_tampered_immutable_bytes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A not-modified response cannot reuse tampered content-addressed bytes."""
+    body = json.dumps(LEADERBOARD).encode()
+    patch_urlopen(monkeypatch, QueueOpener(Response(body, headers={"ETag": '"same"'})))
+    cache_dir = tmp_path / "cache"
+    first = sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
+    metadata = artifact_meta(first, "leaderboard-live.json")
+    (cache_dir / str(metadata["raw_path"])).write_bytes(body + b"tampered")
+    patch_urlopen(
+        monkeypatch,
+        QueueOpener(Response(b"", status=304, headers={"ETag": '"same"'})),
+    )
+    with pytest.raises(sources.SourceError) as exc_info:
+        sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
+    assert exc_info.value.code == "cache_invalid"
+
+
+def test_304_rejects_missing_immutable_index(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A missing source index is visible instead of falling back to legacy bytes."""
+    body = json.dumps(LEADERBOARD).encode()
+    patch_urlopen(monkeypatch, QueueOpener(Response(body, headers={"ETag": '"same"'})))
+    cache_dir = tmp_path / "cache"
+    sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
+    (cache_dir / "index.json").unlink()
+    patch_urlopen(
+        monkeypatch,
+        QueueOpener(Response(b"", status=304, headers={"ETag": '"same"'})),
+    )
+    with pytest.raises(sources.SourceError, match="index"):
+        sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
+
+
+def test_304_rejects_missing_validator_after_legacy_promotion(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Promotion does not make a validator-less legacy cache conditional-safe."""
+    body = json.dumps(LEADERBOARD).encode()
+    cache_dir = tmp_path / "cache"
+    legacy_path = cache_dir / "v1.1" / "leaderboard-live.json"
+    legacy_path.parent.mkdir(parents=True)
+    legacy_path.write_bytes(body)
+    legacy_metadata = {
+        "benchmark": "DeepSWE",
+        "benchmark_version": "v1.1",
+        "artifact": "leaderboard-live.json",
+        "url": "https://deepswe.datacurve.ai/artifacts/v1.1/leaderboard-live.json",
+    }
+    legacy_path.with_name(legacy_path.name + ".meta.json").write_text(
+        json.dumps(legacy_metadata), encoding="utf-8"
+    )
+    patch_urlopen(monkeypatch, QueueOpener(Response(b"", status=304, headers={})))
+    with pytest.raises(sources.SourceError, match="validator"):
+        sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
+
+
+def test_valid_legacy_cache_is_promoted_without_deleting_materialized_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Legacy version/artifact files survive immutable promotion."""
+    body = json.dumps(LEADERBOARD).encode()
+    cache_dir = tmp_path / "cache"
+    legacy_path = cache_dir / "v1.1" / "leaderboard-live.json"
+    legacy_path.parent.mkdir(parents=True)
+    legacy_path.write_bytes(body)
+    legacy_metadata = {
+        "benchmark": "DeepSWE",
+        "benchmark_version": "v1.1",
+        "artifact": "leaderboard-live.json",
+        "url": "https://deepswe.datacurve.ai/artifacts/v1.1/leaderboard-live.json",
+        "etag": '"legacy"',
+    }
+    legacy_meta_path = legacy_path.with_name(legacy_path.name + ".meta.json")
+    legacy_meta_path.write_text(json.dumps(legacy_metadata), encoding="utf-8")
+    patch_urlopen(
+        monkeypatch,
+        QueueOpener(Response(b"", status=304, headers={"ETag": '"legacy"'})),
+    )
+    result = sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
+    metadata = artifact_meta(result, "leaderboard-live.json")
+    assert metadata["legacy_unverified"] is True
+    assert legacy_path.read_bytes() == body
+    assert json.loads(legacy_meta_path.read_text(encoding="utf-8")) == legacy_metadata
+    assert (cache_dir / "index.json").is_file()
+    assert list((cache_dir / "manifests").glob("*.json"))
+
+
+def test_immutable_metadata_is_redacted_in_sidecar_index_and_manifest(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Credentials in a source identity never reach immutable projections."""
+    monkeypatch.setattr(
+        sources,
+        "ARTIFACT_BASE_URL",
+        "https://deepswe.datacurve.ai/artifacts?access_token=source-secret",
+    )
+    body = json.dumps(LEADERBOARD).encode()
+    patch_urlopen(monkeypatch, QueueOpener(Response(body)))
+    cache_dir = tmp_path / "cache"
+    result = sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
+    metadata = artifact_meta(result, "leaderboard-live.json")
+    persisted = [
+        (cache_dir / str(metadata["metadata_path"])).read_text(encoding="utf-8"),
+        (cache_dir / "index.json").read_text(encoding="utf-8"),
+        (cache_dir / str(metadata["manifest_path"])).read_text(encoding="utf-8"),
+    ]
+    assert all("source-secret" not in text for text in persisted)
 
 
 def test_response_url_path_mismatch_is_an_error(
@@ -463,6 +636,51 @@ def test_payload_version_mismatch_is_an_error(
             timeout=3,
             allow_stale=False,
         )
+
+
+def test_strict_payload_validation_preserves_unknown_fields_and_rejects_future_schema(
+    tmp_path: Path,
+) -> None:
+    """Validate shape/identity while retaining source-owned extension fields."""
+    path = tmp_path / "v1.1" / "leaderboard-live.json"
+    path.parent.mkdir()
+    payload = {
+        "benchmark": "DeepSWE",
+        "benchmark_version": "v1.1",
+        "artifact": "leaderboard-live.json",
+        "rows": [{"model": "fixture", "x_extension": {"keep": True}}],
+        "top_extension": ["keep"],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    assert sources.load_artifact(path) == payload
+
+    future = dict(payload)
+    future["schema_version"] = 2
+    path.write_text(json.dumps(future), encoding="utf-8")
+    with pytest.raises(sources.SourceError) as exc_info:
+        sources.load_artifact(path)
+    assert exc_info.value.code == "unsupported_schema"
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ([], "JSON object"),
+        ({"rows": [{"ok": True}], "count": 2}, "count"),
+        ({"rows": [{"ok": True}], "benchmark": "Other"}, "benchmark"),
+        ({"rows": [{"ok": True}], "artifact": "trials.json"}, "artifact"),
+        ({"rows": [{"ok": True}], "benchmark_version": "v1.2"}, "version"),
+    ],
+)
+def test_strict_payload_validation_reports_one_structural_error(
+    tmp_path: Path, payload: object, message: str
+) -> None:
+    """Malformed identity/shape payloads produce one stable source failure."""
+    path = tmp_path / "v1.1" / "leaderboard-live.json"
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(sources.SourceError, match=message):
+        sources.load_artifact(path)
 
 
 if __name__ == "__main__":

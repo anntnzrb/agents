@@ -52,6 +52,37 @@
         "Carries snapshot freshness and source provenance in the response; never presents local historical data as current.",
         "Returns the JSON error envelope with a mixed-version code when versions differ and does not fall back to latest or v1."
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "Using the deterministic evidence fixture, audit known and unsafe DeepSWE metric values. Explain raw versus normalized values, published versus derived status, semantic/eligibility blockers, and prove that no task content or fixed live counts are needed.",
+      "expected_output": "A fixture-backed metrics-only audit that preserves source fields, carries numeric evidence and statuses, leaves unsafe values visible but unranked, and reports stable redacted diagnostics.",
+      "files": [
+        "tests/fixtures/phase6/evidence.json"
+      ],
+      "expectations": [
+        "Every cited known value includes raw/normalized/unit/source-path/parser/hash evidence when available.",
+        "Missing, placeholder, malformed, non-finite, ambiguous, unknown, and out-of-range values remain visible with semantic or eligibility reasons and are not silently ranked.",
+        "Published, published_raw, and derived labels remain distinct; derived fields never overwrite source fields.",
+        "diagnose is offline, emits stable diagnostics, redacts credentials, and never emits task, exercise, release, trajectory, or trial-artifact content.",
+        "The fixture-backed evaluation makes no assertion about current live row counts."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Compare the two deterministic schema fixtures with strict DeepSWE semantics. Explain the same-version requirement, schema-diff blocking, complete duplicate identity behavior, immutable cache/release policy, and the configured latest rule without discovering releases.",
+      "expected_output": "A fixture-backed strict comparison that blocks incompatible schema before deltas, preserves legacy before/after/delta keys, and documents diagnostics, cache, stale/snapshot, and release-authority rules.",
+      "files": [
+        "tests/fixtures/phase6/schema-left.json",
+        "tests/fixtures/phase6/schema-right.json"
+      ],
+      "expectations": [
+        "Uses explicit local fixture paths and one concrete benchmark version; no release discovery or network is required.",
+        "strict-compare blocks schema/semantic incompatibility and never imputes before, after, or delta values.",
+        "Identity is the complete model/reasoning_effort/harness/config tuple; identical duplicates warn and conflicting duplicates warn by default but block strict compare/rank.",
+        "Immutable SHA-256 bytes/manifests and non-destructive legacy promotion are documented; refresh failures require explicit --allow-stale or --snapshot.",
+        "latest follows only DEEPSWE_DEFAULT_VERSION or the configured default, with dependencies []/unknown when no claims exist."
+      ]
     }
   ]
 }

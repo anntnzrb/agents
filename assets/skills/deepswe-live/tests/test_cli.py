@@ -1,5 +1,5 @@
 """CLI envelope tests use injected fixture payloads and never access the network."""
-# ruff: noqa: CPY001, E501, INP001, S101
+# ruff: noqa: CPY001, E501, INP001, PLR2004, S101
 
 from __future__ import annotations
 
@@ -17,6 +17,17 @@ from deepswe import cli
 EXPECTED_CHANGE_COUNT = 2
 USAGE_EXIT_STATUS = 2
 VALID_COST_PER_ATTEMPT = 0.5
+PUBLIC_COMMANDS = (
+    "fetch",
+    "report",
+    "rank",
+    "trials",
+    "stats",
+    "schema",
+    "compare",
+    "diagnose",
+)
+IDENTITY_FIELDS = ("model", "reasoning_effort", "harness", "config")
 
 LEADERBOARD = {
     "generated_at": "2026-07-25T03:13:49Z",
@@ -108,6 +119,65 @@ def invoke(
     return code, envelope, stderr.getvalue()
 
 
+def test_public_commands_keep_v1_compact_success_envelope(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Freeze one compact integer-v1 success object for every public command."""
+    snapshot_dir = tmp_path / "v1.1"
+    snapshot_dir.mkdir()
+    left_path = snapshot_dir / "left.json"
+    right_path = snapshot_dir / "right.json"
+    left_path.write_text(
+        json.dumps(
+            {
+                "benchmark": "DeepSWE",
+                "benchmark_version": "v1.1",
+                "rows": [{"model": "fixture-model", "pass_at_1": 1}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    right_path.write_text(
+        json.dumps(
+            {
+                "benchmark": "DeepSWE",
+                "benchmark_version": "v1.1",
+                "rows": [{"model": "fixture-model", "pass_at_1": 2}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    invocations: list[tuple[str, list[str], object]] = [
+        ("fetch", ["fetch", "--version", "v1.1"], source_fixture()),
+        ("report", ["report", "--version", "v1.1"], source_fixture()),
+        ("rank", ["rank", "--version", "v1.1"], source_fixture()),
+        ("trials", ["trials", "--version", "v1.1"], source_fixture()),
+        ("stats", ["stats", "--version", "v1.1"], source_fixture()),
+        ("schema", ["schema", "--version", "v1.1"], None),
+        (
+            "compare",
+            [
+                "compare",
+                str(left_path),
+                str(right_path),
+                "--version",
+                "v1.1",
+            ],
+            None,
+        ),
+    ]
+
+    for command, argv, source in invocations:
+        code, envelope, diagnostics = invoke(monkeypatch, argv, source)
+        assert code == 0
+        assert diagnostics == ""
+        assert envelope["ok"] is True
+        assert type(envelope["schema_version"]) is int
+        assert envelope["schema_version"] == 1
+        assert envelope["command"] == command
+        assert set(envelope) == {"ok", "schema_version", "command", "data"}
+
+
 def test_report_success_is_one_json_envelope_with_scope_and_provenance(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -128,6 +198,27 @@ def test_report_success_is_one_json_envelope_with_scope_and_provenance(
     provenance = envelope["data"]["provenance"]
     assert provenance["url"] == "fixture://deepswe/v1.1"
     assert provenance["fetched_at"] == "2026-07-25T04:00:00Z"
+
+
+def test_report_preserves_identity_tuple_and_sections(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep the published identity tuple and established report sections."""
+    code, envelope, diagnostics = invoke(
+        monkeypatch, ["report", "--version", "v1.1"], source_fixture()
+    )
+    assert code == 0
+    assert diagnostics == ""
+    data = envelope["data"]
+    assert {"recommendations", "raw_extrema", "pareto"} <= data.keys()
+    row = data["recommendations"]["rows"][0]
+    assert tuple(row[field] for field in IDENTITY_FIELDS) == (
+        "fixture-model",
+        "high",
+        "fixture-harness",
+        "fixture-config",
+    )
+    assert row["derived"]["value_status"] == "derived"
 
 
 def test_report_supports_custom_pareto_axes_and_efficiency(
@@ -265,6 +356,71 @@ def test_rank_accepts_zero_limit_with_empty_rows(
     assert envelope["data"]["rows"] == []
     assert envelope["data"]["count"] == 0
     assert envelope["data"]["filters_applied"]["limit"] == 0
+
+
+def test_allow_stale_is_forwarded_only_when_explicit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep stale refresh opt-in at the public CLI boundary."""
+    calls: list[dict[str, object]] = []
+
+    def capture_fetch(*_args: object, **kwargs: object) -> dict[str, Any]:
+        calls.append(kwargs)
+        return source_fixture()
+
+    monkeypatch.setattr(cli, "fetch_artifacts", capture_fetch)
+    for flag, expected in (("--allow-stale", True), (None, False)):
+        argv = ["fetch", "--version", "v1.1"]
+        if flag is not None:
+            argv.append(flag)
+        code, envelope, diagnostics = invoke(monkeypatch, argv)
+        assert code == 0
+        assert diagnostics == ""
+        assert envelope["ok"] is True
+        assert calls[-1]["allow_stale"] is expected
+
+
+def test_snapshot_is_explicit_and_historical_without_fetch(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Use a versioned snapshot only when explicitly selected."""
+    snapshot_dir = tmp_path / "v1.1"
+    snapshot_dir.mkdir()
+    snapshot = snapshot_dir / "leaderboard.json"
+    snapshot.write_text(
+        json.dumps(
+            {
+                "benchmark": "DeepSWE",
+                "benchmark_version": "v1.1",
+                "rows": [
+                    {
+                        "model": "fixture-model",
+                        "reasoning_effort": "high",
+                        "harness": "fixture-harness",
+                        "config": "fixture-config",
+                        "pass_at_1": 0.5,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fail_fetch(*_args: object, **_kwargs: object) -> NoReturn:
+        msg = "snapshot mode must not fetch"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(cli, "fetch_artifacts", fail_fetch)
+    code, envelope, diagnostics = invoke(
+        monkeypatch, ["report", "--snapshot", str(snapshot)]
+    )
+    assert code == 0
+    assert diagnostics == ""
+    assert envelope["ok"] is True
+    assert envelope["data"]["scope"]["benchmark_version"] == "v1.1"
+    provenance = envelope["data"]["provenance"]
+    assert provenance["freshness"] == "snapshot"
+    assert provenance["snapshot"] is True
 
 
 def test_unversioned_snapshot_is_rejected_without_version_proof(
@@ -435,17 +591,247 @@ def test_schema_is_json_only_and_declares_future_additive_contract(
     assert stderr.getvalue() == ""
     assert envelope["ok"] is True
     schema = envelope["data"]["schema"]
-    assert schema["commands"] == [
-        "fetch",
-        "report",
-        "rank",
-        "trials",
-        "stats",
-        "schema",
-        "compare",
-    ]
+    assert schema["commands"] == list(PUBLIC_COMMANDS)
     assert schema["scope"]["value_status"] == ["published", "published_raw", "derived"]
+    assert schema["comparison"]["strict_compare"] == "--strict-compare"
+    assert schema["comparison"]["strict_semantics"] == "--strict-semantics"
+    assert schema["diagnostics"]["field"] == "diagnostics"
+    assert "comparison_eligibility" in schema["evidence"]["fields"]
+    assert schema["overlap"]["dependencies"] == []
     assert envelope["data"]["scope"]["benchmark_version"] == "v1.1"
+
+
+def _write_compare_payload(path: Path, payload: dict[str, Any]) -> None:
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_compare_duplicate_conflict_warns_legacy_and_blocks_strict(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Legacy compare keeps first duplicate; strict compare exposes a blocker."""
+    left = {
+        "benchmark": "DeepSWE",
+        "benchmark_version": "v1.1",
+        "rows": [
+            {
+                "model": "m",
+                "reasoning_effort": "high",
+                "harness": "h",
+                "config": "c",
+                "pass_at_1": 0.2,
+            },
+            {
+                "model": "m",
+                "reasoning_effort": "high",
+                "harness": "h",
+                "config": "c",
+                "pass_at_1": 0.3,
+            },
+        ],
+    }
+    right = {
+        **left,
+        "rows": [
+            {
+                "model": "m",
+                "reasoning_effort": "high",
+                "harness": "h",
+                "config": "c",
+                "pass_at_1": 0.4,
+            }
+        ],
+    }
+    snapshot_dir = tmp_path / "v1.1"
+    snapshot_dir.mkdir()
+    left_path = snapshot_dir / "left.json"
+    right_path = snapshot_dir / "right.json"
+    _write_compare_payload(left_path, left)
+    _write_compare_payload(right_path, right)
+
+    code, envelope, diagnostics = invoke(
+        monkeypatch,
+        ["compare", str(left_path), str(right_path), "--version", "v1.1"],
+    )
+    assert code == 0
+    assert diagnostics == ""
+    data = envelope["data"]
+    assert data["changes"][0]["before"] == 0.2
+    assert data["changes"][0]["after"] == 0.4
+    assert any(item["code"] == "DUPLICATE_CONFLICT" for item in data["warnings"])
+
+    code, envelope, diagnostics = invoke(
+        monkeypatch,
+        ["compare", str(left_path), str(right_path), "--strict-compare"],
+    )
+    assert code == 0
+    assert diagnostics == ""
+    data = envelope["data"]
+    assert data["changes"] == []
+    assert data["blocked"][0]["reason"] == "duplicate_conflict"
+    assert any(item["code"] == "DUPLICATE_CONFLICT" for item in data["diagnostics"])
+
+
+def test_strict_compare_blocks_schema_and_denominator_mismatch(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Strict diff checks artifact schema and metric denominator declarations."""
+    base = {
+        "benchmark": "DeepSWE",
+        "benchmark_version": "v1.1",
+        "rows": [
+            {
+                "model": "m",
+                "reasoning_effort": "high",
+                "harness": "h",
+                "config": "c",
+                "pass_at_1": 0.2,
+            }
+        ],
+    }
+    left = {
+        **base,
+        "artifact_schema_version": 1,
+        "metric_semantics": {
+            "pass_at_1": {
+                "unit": "ratio",
+                "scope": "tasks",
+                "denominator": "tasks",
+            }
+        },
+    }
+    right = {
+        **base,
+        "artifact_schema_version": 2,
+        "metric_semantics": {
+            "pass_at_1": {
+                "unit": "ratio",
+                "scope": "tasks",
+                "denominator": "attempts",
+            }
+        },
+    }
+    left_path = tmp_path / "left.json"
+    right_path = tmp_path / "right.json"
+    _write_compare_payload(left_path, left)
+    _write_compare_payload(right_path, right)
+    monkeypatch.setattr(
+        cli,
+        "load_artifact",
+        lambda path: left if str(path) == str(left_path) else right,
+    )
+    code, envelope, diagnostics = invoke(
+        monkeypatch,
+        [
+            "compare",
+            str(left_path),
+            str(right_path),
+            "--version",
+            "v1.1",
+            "--strict-compare",
+        ],
+    )
+    assert code == 0
+    assert diagnostics == ""
+    data = envelope["data"]
+    assert data["changes"] == []
+    assert data["blocked"][0]["reason"] == "schema_mismatch"
+    assert data["diagnostics"][0]["code"] == "SCHEMA_DRIFT"
+    right_semantic = {**right, "artifact_schema_version": 1}
+    monkeypatch.setattr(
+        cli,
+        "load_artifact",
+        lambda path: left if str(path) == str(left_path) else right_semantic,
+    )
+    code, envelope, diagnostics = invoke(
+        monkeypatch,
+        [
+            "compare",
+            str(left_path),
+            str(right_path),
+            "--version",
+            "v1.1",
+            "--strict-compare",
+        ],
+    )
+    assert code == 0
+    assert diagnostics == ""
+    data = envelope["data"]
+    assert data["blocked"][0]["reason"] == "denominator_mismatch"
+
+
+def test_diagnose_snapshot_is_offline_and_metrics_only(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Diagnose snapshots without fetching or exposing row/task bodies."""
+    path = tmp_path / "v1.1" / "leaderboard-live.json"
+    path.parent.mkdir()
+    path.write_text(
+        json.dumps(
+            {
+                "benchmark": "DeepSWE",
+                "benchmark_version": "v1.1",
+                "artifact": "leaderboard-live.json",
+                "rows": [
+                    {
+                        "model": "secret-model",
+                        "pass_at_1": 0.5,
+                        "task_id": "task-body",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def unexpected_fetch(*_args: object, **_kwargs: object) -> NoReturn:
+        msg = "snapshot diagnose must remain offline"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(cli, "fetch_artifacts", unexpected_fetch)
+    code, envelope, diagnostics = invoke(
+        monkeypatch, ["diagnose", "--snapshot", str(path)]
+    )
+    assert code == 0
+    assert diagnostics == ""
+    data = envelope["data"]
+    assert "rows" not in data
+    assert data["summary"]["row_count"] == 1
+    assert data["summary"]["metrics"]["pass_at_1"]["max"] == 0.5
+    assert "task-body" not in json.dumps(envelope)
+
+
+def test_diagnose_trials_is_explicit_and_body_free(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Only --trials selects the raw trial artifact, still returning summaries."""
+    path = tmp_path / "v1.1" / "trials.json"
+    path.parent.mkdir()
+    path.write_text(
+        json.dumps(
+            {
+                "benchmark": "DeepSWE",
+                "benchmark_version": "v1.1",
+                "artifact": "trials.json",
+                "rows": [
+                    {
+                        "trial_id": "trial-body",
+                        "passed": True,
+                        "mean_output_tokens": 12,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    code, envelope, diagnostics = invoke(
+        monkeypatch,
+        ["diagnose", "--snapshot", str(path), "--trials"],
+    )
+    assert code == 0
+    assert diagnostics == ""
+    assert envelope["data"]["summary"]["artifact"] == "trials.json"
+    assert "rows" not in envelope["data"]
+    assert "trial-body" not in json.dumps(envelope)
 
 
 if __name__ == "__main__":

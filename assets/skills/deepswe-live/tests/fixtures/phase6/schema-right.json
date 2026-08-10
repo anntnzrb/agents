@@ -1,0 +1,21 @@
+{
+  "benchmark": "DeepSWE",
+  "benchmark_version": "v1.1",
+  "metric_semantics": {
+    "pass_at_1": {
+      "unit": "ratio",
+      "scope": "tasks",
+      "denominator": "n_tasks_attempted"
+    }
+  },
+  "rows": [
+    {
+      "model": "fixture-model",
+      "reasoning_effort": "high",
+      "harness": "fixture-harness",
+      "config": "known",
+      "pass_at_1": 0.6,
+      "n_tasks_attempted": 4
+    }
+  ]
+}

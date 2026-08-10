@@ -1,5 +1,5 @@
 """Pure, fixture-only analysis contract tests."""
-# ruff: noqa: CPY001, E501, INP001, S101
+# ruff: noqa: CPY001, E501, INP001, PLR2004, S101
 
 from __future__ import annotations
 
@@ -142,6 +142,31 @@ def test_rank_preserves_identity_counts_and_published_fields_with_derived_ci_wid
         "harness-a",
         "harness-b",
     }
+
+
+def test_rank_strict_duplicates_keep_raw_rows_but_block_conflicts() -> None:
+    """Strict ranking leaves conflicting source rows visible without ranks."""
+    rows = [
+        metric_row("same-config", pass_at_1=0.2, output_tokens=100, cost=1, steps=3),
+        metric_row("same-config", pass_at_1=0.3, output_tokens=100, cost=1, steps=3),
+    ]
+    result = rank_rows(
+        rows,
+        "pass_at_1",
+        "desc",
+        limit=None,
+        strict_duplicates=True,
+    )
+    assert result["strict_duplicates"] is True
+    assert result["eligible_count"] == 0
+    ranked = result["rows"]
+    assert isinstance(ranked, list)
+    assert [row["config"] for row in ranked] == ["same-config", "same-config"]
+    assert all(row["derived"]["rank"] is None for row in ranked)
+    assert all(
+        "DUPLICATE_CONFLICT" in row["derived"]["blocked_reasons"] for row in ranked
+    )
+    assert result["duplicate_report"]["conflicting"][0]["count"] == 2
 
 
 def test_report_separates_raw_extrema_recommendations_and_pareto_nulls() -> None:

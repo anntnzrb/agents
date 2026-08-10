@@ -92,3 +92,58 @@ If Ruff reports pre-existing violations outside a documentation-only change, rec
 
 A failed fetch, schema check, version check, or mixed-version check is a
 release-blocking error. Do not paper over it with stale data.
+
+## Immutable cache and legacy promotion policy
+
+The content-addressed cache is the source of artifact identity during
+maintenance:
+
+```text
+artifacts/<sha256>.raw
+artifacts/<sha256>.meta.json
+index.json
+manifests/<manifest-sha256>.json
+```
+
+The sidecar and manifest retain the canonical URL, concrete benchmark
+version, validator headers, parser/version, byte length, SHA-256, and raw-byte
+reference. Raw bytes and sidecars are first-writer-wins; a source index may
+move to a newer digest without modifying older bytes. Promoting a legacy
+version-addressed file is non-destructive, marks `legacy_unverified`, and
+never deletes, truncates, or rewrites the caller's file. Do not perform cache
+cleanup as part of a release rollout.
+
+## Release authority and omission boundary
+
+`latest` follows `DEEPSWE_DEFAULT_VERSION`, then the configured code default
+`v1.1`. DeepSWE currently has no authoritative release manifest in the source
+contract, so no homepage, directory listing, guessed path, or manifest
+discovery call is permitted. If an authoritative manifest is explicitly
+configured in a future deployment, require exact concrete version, canonical
+artifact path, and SHA-256 agreement before using it; otherwise preserve the
+configured default and return an error for unavailable explicit versions.
+Never mix artifacts because their shape matches, and never fetch task,
+exercise, release, trajectory, or trial-artifact content.
+
+## Opt-in smoke evidence
+
+`tests/test_live_smoke.py` is skipped unless `RUN_LIVE_SMOKE=1`. It uses a
+temporary cache/output directory and an explicit known version (`v1.1`), makes
+metrics-only shape assertions, and never asserts current row counts. When
+run intentionally, save evidence outside the package with:
+
+```json
+{
+  "command": "pytest -q tests/test_live_smoke.py",
+  "resolved_version": "v1.1",
+  "url": "<canonical leaderboard URL>",
+  "sha256": "<response hash>",
+  "status": "passed",
+  "timestamp": "<RFC-3339>",
+  "exit_code": 0
+}
+```
+
+Do not run this smoke as an offline gate. Deterministic tests deny URL/socket
+network access and should remain reproducible without current release
+availability.

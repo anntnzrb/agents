@@ -1,0 +1,26 @@
+{
+  "benchmark": "DeepSWE",
+  "benchmark_version": "v1.1",
+  "generated_at": "2026-07-25T03:13:49Z",
+  "rows": [
+    {
+      "model": "fixture-model",
+      "reasoning_effort": "high",
+      "harness": "fixture-harness",
+      "config": "known",
+      "pass_at_1": 0.75,
+      "n_attempted": 4,
+      "n_tasks_attempted": 4,
+      "mean_cost_usd": 1.25
+    },
+    {
+      "model": "fixture-model",
+      "reasoning_effort": "high",
+      "harness": "fixture-harness",
+      "config": "unsafe",
+      "pass_at_1": "N/A",
+      "mean_output_tokens": "not-a-number",
+      "future_metric": 7
+    }
+  ]
+}

@@ -21,6 +21,14 @@ from urllib import error as urllib_error
 from urllib import parse as urllib_parse
 from urllib import request as urllib_request
 
+from .cache import (
+    ArtifactError,
+    ArtifactIntegrityError,
+    ArtifactNotFoundError,
+    ArtifactStore,
+)
+from .validation import PayloadValidationError, inspect_payload
+
 
 # A module-level hook keeps the transport injectable while still following any
 # later monkeypatch of ``urllib.request.urlopen``.
@@ -231,10 +239,12 @@ def load_artifact(path: str | os.PathLike[str]) -> dict[str, object]:
         raise SourceError(message, code="artifact_read_failed") from exc
     payload = _decode_payload(raw, artifact_path)
     version = _version_from_path(artifact_path)
-    artifact_name = artifact_path.name
+    expected_artifact = (
+        artifact_path.name if artifact_path.name in ARTIFACT_NAMES else None
+    )
     _validate_payload(
         payload,
-        artifact_name if artifact_name in ARTIFACT_NAMES else None,
+        expected_artifact,
         version,
         artifact_path,
     )
@@ -253,11 +263,19 @@ def _fetch_one(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
     output_path = output_root / version / artifact_name
     cache_path = cache_root / version / artifact_name
     metadata_path = _metadata_path(cache_path)
-    cached = _read_cached(cache_path, metadata_path, version, artifact_name, url)
+    artifact_store = ArtifactStore(cache_root)
+    cached = _read_cached(
+        cache_path,
+        metadata_path,
+        version,
+        artifact_name,
+        url,
+        artifact_store,
+    )
     headers: dict[str, str] = {"Accept": "application/json"}
     if cached is not None:
-        etag = _nonempty_string(cached.metadata.get("etag"))
-        last_modified = _nonempty_string(cached.metadata.get("last_modified"))
+        etag = _metadata_validator(cached.metadata, "etag")
+        last_modified = _metadata_validator(cached.metadata, "last_modified")
         if etag:
             headers["If-None-Match"] = etag
         if last_modified:
@@ -275,27 +293,19 @@ def _fetch_one(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
             _validate_response_url(response, version, artifact_name)
             response_headers = _response_headers(response)
             if status == HTTP_NOT_MODIFIED:
-                if cached is None:
-                    message = f"304 for {artifact_name} without a valid cache entry"
-                    raise SourceError(
-                        message,
-                        code="cache_missing",
-                        status=HTTP_NOT_MODIFIED,
-                    )
-                if not conditional_request:
-                    message = f"304 for {artifact_name} without a cache validator"
-                    raise SourceError(
-                        message,
-                        code="cache_invalid",
-                        status=HTTP_NOT_MODIFIED,
-                    )
+                _validate_304(
+                    cached,
+                    response_headers,
+                    conditional_request=conditional_request,
+                    artifact_name=artifact_name,
+                )
                 return _materialize_cached(
                     cached,
                     output_path,
                     version,
                     artifact_name,
                     url,
-                    status=304,
+                    status=HTTP_NOT_MODIFIED,
                     response_headers=response_headers,
                     fetched_at=attempted_at,
                     stale=False,
@@ -306,6 +316,8 @@ def _fetch_one(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
             body = response.read()
             if isinstance(body, str):
                 body = body.encode("utf-8")
+            elif not isinstance(body, bytes):
+                body = bytes(body)
             payload = _decode_payload(body, cache_path)
             _validate_payload(payload, artifact_name, version, cache_path)
             etag = _header(response_headers, "ETag")
@@ -324,6 +336,14 @@ def _fetch_one(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
                 cache_reused=False,
                 stale=False,
             )
+            metadata.update(
+                _store_immutable(
+                    artifact_store,
+                    source_key=url,
+                    raw=body,
+                    metadata=metadata,
+                )
+            )
             _atomic_write(cache_path, body)
             _atomic_write_json(metadata_path, metadata)
             _atomic_write(output_path, body)
@@ -335,9 +355,16 @@ def _fetch_one(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
     except urllib_error.HTTPError as exc:
         status = int(exc.code)
         _validate_response_url(exc, version, artifact_name)
+        response_headers = _message_headers(exc.headers)
         # urllib may surface a conditional 304 as HTTPError rather than a normal
         # response.  Treat it exactly like a regular 304 response.
-        if status == HTTP_NOT_MODIFIED and cached is not None and conditional_request:
+        if status == HTTP_NOT_MODIFIED:
+            _validate_304(
+                cached,
+                response_headers,
+                conditional_request=conditional_request,
+                artifact_name=artifact_name,
+            )
             return _materialize_cached(
                 cached,
                 output_path,
@@ -345,7 +372,7 @@ def _fetch_one(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
                 artifact_name,
                 url,
                 status=HTTP_NOT_MODIFIED,
-                response_headers=_message_headers(exc.headers),
+                response_headers=response_headers,
                 fetched_at=attempted_at,
                 stale=False,
             )
@@ -385,6 +412,52 @@ def _fetch_one(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
         )
 
 
+def _validate_304(
+    cached: _CachedArtifact | None,
+    response_headers: Mapping[str, str],
+    *,
+    conditional_request: bool,
+    artifact_name: str,
+) -> None:
+    if cached is None:
+        message = f"304 for {artifact_name} without a valid cache entry"
+        raise SourceError(message, code="cache_missing", status=HTTP_NOT_MODIFIED)
+    if not conditional_request:
+        message = f"304 for {artifact_name} without a cache validator"
+        raise SourceError(message, code="cache_invalid", status=HTTP_NOT_MODIFIED)
+    cached_etag = _metadata_validator(cached.metadata, "etag")
+    cached_last_modified = _metadata_validator(cached.metadata, "last_modified")
+    if cached_etag is None and cached_last_modified is None:
+        message = f"304 for {artifact_name} without a cached validator"
+        raise SourceError(message, code="cache_invalid", status=HTTP_NOT_MODIFIED)
+    response_etag = _header(response_headers, "ETag")
+    response_last_modified = _header(response_headers, "Last-Modified")
+    if response_etag is None and response_last_modified is None:
+        message = f"304 for {artifact_name} without a response validator"
+        raise SourceError(message, code="cache_invalid", status=HTTP_NOT_MODIFIED)
+    if response_etag is not None and (
+        cached_etag is None or response_etag != cached_etag
+    ):
+        message = f"304 ETag did not match cached {artifact_name}"
+        raise SourceError(message, code="cache_invalid", status=HTTP_NOT_MODIFIED)
+    if response_last_modified is not None and (
+        cached_last_modified is None or response_last_modified != cached_last_modified
+    ):
+        message = f"304 Last-Modified did not match cached {artifact_name}"
+        raise SourceError(message, code="cache_invalid", status=HTTP_NOT_MODIFIED)
+
+
+def _metadata_validator(
+    metadata: Mapping[str, object],
+    name: str,
+) -> str | None:
+    return _nonempty_string(metadata.get(name)) or _nonempty_string(
+        metadata.get(
+            "ETag" if name == "etag" else "Last-Modified",
+        ),
+    )
+
+
 def _stale_or_raise(  # noqa: PLR0913, PLR0917
     cached: _CachedArtifact | None,
     output_path: Path,
@@ -395,7 +468,11 @@ def _stale_or_raise(  # noqa: PLR0913, PLR0917
     failure: SourceError,
     allow_stale: bool,
 ) -> dict[str, object]:
-    if allow_stale and cached is not None:
+    if (
+        allow_stale
+        and cached is not None
+        and failure.code not in {"cache_invalid", "cache_missing", "version_mismatch"}
+    ):
         return _materialize_cached(
             cached,
             output_path,
@@ -420,15 +497,64 @@ class _CachedArtifact:
         raw: bytes,
         metadata: Mapping[str, object],
         path: Path,
+        immutable: Mapping[str, object] | None = None,
     ) -> None:
         """Store the cached payload and its filesystem metadata."""
         self.payload = payload
         self.raw = raw
         self.metadata = metadata
         self.path = path
+        self.immutable = dict(immutable or {})
 
 
-def _read_cached(
+def _read_cached(  # noqa: PLR0913, PLR0917
+    cache_path: Path,
+    metadata_path: Path,
+    version: str,
+    artifact_name: str,
+    url: str,
+    artifact_store: ArtifactStore,
+) -> _CachedArtifact | None:
+    legacy = _read_legacy_cached(
+        cache_path,
+        metadata_path,
+        version,
+        artifact_name,
+        url,
+    )
+    immutable = _read_immutable_cached(
+        artifact_store,
+        cache_path=cache_path,
+        version=version,
+        artifact_name=artifact_name,
+        url=url,
+    )
+    if immutable is not None:
+        if legacy is not None:
+            metadata = dict(legacy.metadata)
+        else:
+            metadata = dict(immutable.metadata)
+        metadata.update(immutable.metadata)
+        return _CachedArtifact(
+            immutable.payload,
+            immutable.raw,
+            metadata,
+            cache_path,
+            immutable.immutable,
+        )
+    if legacy is None:
+        return None
+    return _promote_legacy(
+        artifact_store,
+        legacy,
+        version=version,
+        artifact_name=artifact_name,
+        url=url,
+        cache_path=cache_path,
+    )
+
+
+def _read_legacy_cached(
     cache_path: Path,
     metadata_path: Path,
     version: str,
@@ -461,6 +587,136 @@ def _read_cached(
     return _CachedArtifact(payload, raw, metadata, cache_path)
 
 
+def _read_immutable_cached(
+    artifact_store: ArtifactStore,
+    *,
+    cache_path: Path,
+    version: str,
+    artifact_name: str,
+    url: str,
+) -> _CachedArtifact | None:
+    if not artifact_store.index_path.exists():
+        if _has_entries(artifact_store.artifacts) or _has_entries(
+            artifact_store.manifests
+        ):
+            message = f"immutable cache index is missing for {url}"
+            raise SourceError(message, code="cache_invalid")
+        return None
+    try:
+        raw, record = artifact_store.load(source_key=url)
+        manifest = artifact_store.write_manifest()
+    except ArtifactNotFoundError:
+        return None
+    except (ArtifactError, OSError, ValueError) as exc:
+        message = f"immutable cache is invalid for {url}: {exc}"
+        raise SourceError(message, code="cache_invalid") from exc
+    try:
+        payload = _decode_payload(raw, cache_path)
+        _validate_payload(payload, artifact_name, version, cache_path)
+    except (SourceError, ValueError) as exc:
+        message = f"immutable cache payload is invalid for {url}: {exc}"
+        raise SourceError(message, code="cache_invalid") from exc
+    nested = record.get("metadata")
+    if not isinstance(nested, Mapping):
+        message = f"immutable cache metadata is invalid for {url}"
+        raise SourceError(message, code="cache_invalid")
+    metadata = dict(nested)
+    if (
+        metadata.get("benchmark_version") not in {None, version}
+        or metadata.get("artifact") not in {None, artifact_name}
+        or metadata.get("url") not in {None, url}
+    ):
+        message = f"immutable cache source identity mismatch for {url}"
+        raise SourceError(message, code="cache_invalid")
+    immutable = _immutable_fields(record, manifest)
+    metadata.update(immutable)
+    return _CachedArtifact(payload, raw, metadata, cache_path, immutable)
+
+
+def _promote_legacy(  # noqa: PLR0913
+    artifact_store: ArtifactStore,
+    legacy: _CachedArtifact,
+    *,
+    version: str,
+    artifact_name: str,
+    url: str,
+    cache_path: Path,
+) -> _CachedArtifact:
+    metadata = dict(legacy.metadata)
+    metadata["legacy_path"] = str(cache_path)
+    try:
+        record = artifact_store.promote_legacy(url, legacy.raw, metadata)
+        raw, persisted = artifact_store.load(source_key=url)
+        manifest = artifact_store.write_manifest()
+    except (ArtifactError, OSError, ValueError) as exc:
+        message = f"unable to promote legacy cache for {url}: {exc}"
+        raise SourceError(message, code="cache_invalid") from exc
+    try:
+        payload = _decode_payload(raw, cache_path)
+        _validate_payload(payload, artifact_name, version, cache_path)
+    except (SourceError, ValueError) as exc:
+        message = f"promoted cache payload is invalid for {url}: {exc}"
+        raise SourceError(message, code="cache_invalid") from exc
+    nested = persisted.get("metadata")
+    merged = dict(nested) if isinstance(nested, Mapping) else metadata
+    immutable = _immutable_fields(record, manifest)
+    merged.update(immutable)
+    return _CachedArtifact(payload, raw, merged, cache_path, immutable)
+
+
+def _store_immutable(
+    artifact_store: ArtifactStore,
+    *,
+    source_key: str,
+    raw: bytes,
+    metadata: Mapping[str, object],
+) -> dict[str, object]:
+    try:
+        record = artifact_store.store(source_key, raw, metadata)
+        manifest = artifact_store.write_manifest()
+    except ArtifactIntegrityError as exc:
+        message = f"immutable cache is invalid for {source_key}: {exc}"
+        raise SourceError(message, code="cache_invalid") from exc
+    except (ArtifactError, OSError, ValueError) as exc:
+        message = f"unable to write immutable cache for {source_key}: {exc}"
+        raise SourceError(message, code="cache_write_failed") from exc
+    return _immutable_fields(record, manifest)
+
+
+def _immutable_fields(
+    record: Mapping[str, object],
+    manifest: Mapping[str, object],
+) -> dict[str, object]:
+    digest = record.get("sha256")
+    raw_path = record.get("raw_path")
+    metadata_path = record.get("metadata_path")
+    manifest_path = manifest.get("path")
+    return {
+        "sha256": digest,
+        "artifact_sha256": digest,
+        "length": record.get("length"),
+        "raw_path": raw_path,
+        "metadata_path": metadata_path,
+        "artifact_ref": raw_path,
+        "manifest_sha256": manifest.get("manifest_sha256", manifest.get("sha256")),
+        "manifest_path": manifest_path,
+        "manifest_ref": manifest_path,
+        "legacy_unverified": record.get("legacy_unverified"),
+    }
+
+
+def _has_entries(path: Path) -> bool:
+    if not path.exists():
+        return False
+    if path.is_file():
+        return True
+    try:
+        return any(path.iterdir())
+    except OSError as exc:
+        message = f"unable to inspect immutable cache path {path}: {exc}"
+        raise SourceError(message, code="cache_invalid") from exc
+
+
 def _materialize_cached(  # noqa: PLR0913
     cached: _CachedArtifact,
     output_path: Path,
@@ -475,6 +731,8 @@ def _materialize_cached(  # noqa: PLR0913
     stale_reason: str | None = None,
 ) -> dict[str, object]:
     metadata = dict(cached.metadata)
+    if cached.immutable:
+        metadata.update(cached.immutable)
     original_fetched_at = _nonempty_string(metadata.get("fetched_at"))
     metadata.update(
         {
@@ -493,10 +751,14 @@ def _materialize_cached(  # noqa: PLR0913
             "stale": stale,
         },
     )
-    etag = _header(response_headers, "ETag") or _nonempty_string(metadata.get("etag"))
-    last_modified = _header(response_headers, "Last-Modified") or _nonempty_string(
-        metadata.get("last_modified"),
+    etag = _header(response_headers, "ETag") or _metadata_validator(
+        metadata,
+        "etag",
     )
+    last_modified = _header(
+        response_headers,
+        "Last-Modified",
+    ) or _metadata_validator(metadata, "last_modified")
     metadata["etag"] = etag
     metadata["last_modified"] = last_modified
     metadata["ETag"] = etag
@@ -505,9 +767,7 @@ def _materialize_cached(  # noqa: PLR0913
         metadata["stale_reason"] = stale_reason
     else:
         metadata.pop("stale_reason", None)
-    if stale:
-        metadata["stale_checked_at"] = fetched_at
-    if not stale:
+    if not stale and cached.immutable.get("legacy_unverified") is not True:
         _atomic_write_json(_metadata_path(cached.path), metadata)
     _atomic_write(output_path, cached.raw)
     return {**metadata, "data": cached.payload}
@@ -566,91 +826,22 @@ def _decode_payload(raw: bytes, path: Path) -> dict[str, object]:
     return payload
 
 
-def _validate_payload(  # noqa: C901, PLR0912
+def _validate_payload(
     payload: Mapping[str, object],
     artifact_name: str | None,
     expected_version: str | None,
     path: Path,
 ) -> None:
-    declared_benchmark = payload.get("benchmark")
-    if declared_benchmark is not None and declared_benchmark != "DeepSWE":
-        message = (
-            f"artifact {path} declares benchmark {declared_benchmark!r}, "
-            "expected 'DeepSWE'"
+    """Validate an artifact through the source-local strict boundary."""
+    try:
+        inspect_payload(
+            payload,
+            artifact_name=artifact_name,
+            expected_version=expected_version,
+            path=path,
         )
-        raise SourceError(message, code="benchmark_mismatch")
-    rows = payload.get("rows")
-    if not isinstance(rows, list):
-        message = f"artifact {path} must contain a rows array"
-        raise SourceError(message, code="invalid_artifact_shape")
-    if any(not isinstance(row, dict) for row in rows):
-        message = f"artifact {path} rows must be JSON objects"
-        raise SourceError(message, code="invalid_artifact_shape")
-    scope = payload.get("scope")
-    if scope is not None and not isinstance(scope, str):
-        message = f"artifact {path} scope must be a string"
-        raise SourceError(message, code="invalid_artifact_shape")
-    generated_at = payload.get("generated_at")
-    if generated_at is not None and not isinstance(generated_at, str):
-        message = f"artifact {path} generated_at must be a string"
-        raise SourceError(message, code="invalid_artifact_shape")
-
-    declared_trials = payload.get("n_trials")
-    if declared_trials is not None:
-        if not isinstance(declared_trials, int) or isinstance(declared_trials, bool):
-            message = f"artifact {path} n_trials must be an integer"
-            raise SourceError(message, code="invalid_artifact_shape")
-        if declared_trials != len(rows):
-            message = f"artifact {path} n_trials does not match rows length"
-            raise SourceError(message, code="invalid_artifact_shape")
-    for count_key in ("row_count", "n_rows"):
-        declared_count = payload.get(count_key)
-        if declared_count is None:
-            continue
-        if not isinstance(declared_count, int) or isinstance(declared_count, bool):
-            message = f"artifact {path} {count_key} must be an integer"
-            raise SourceError(message, code="invalid_artifact_shape")
-        if declared_count != len(rows):
-            message = f"artifact {path} {count_key} does not match rows length"
-            raise SourceError(message, code="invalid_artifact_shape")
-
-    payload_version = _payload_version(payload, path)
-    if (
-        expected_version is not None
-        and payload_version is not None
-        and payload_version != expected_version
-    ):
-        message = (
-            f"artifact {path} declares {payload_version}, expected {expected_version}"
-        )
-        raise SourceError(message, code="version_mismatch")
-    declared_artifact = payload.get("artifact")
-    if (
-        artifact_name is not None
-        and declared_artifact is not None
-        and declared_artifact != artifact_name
-    ):
-        message = (
-            f"artifact {path} declares artifact {declared_artifact!r}, "
-            f"expected {artifact_name!r}"
-        )
-        raise SourceError(message, code="artifact_mismatch")
-
-
-def _payload_version(payload: Mapping[str, object], path: Path) -> str | None:
-    for key in ("benchmark_version", "version"):
-        value = payload.get(key)
-        if value is None:
-            continue
-        if not isinstance(value, str):
-            message = f"artifact {path} {key} must be a string"
-            raise SourceError(message, code="invalid_artifact_shape")
-        try:
-            return _validate_version(value)
-        except VersionError as exc:
-            message = f"artifact {path} has invalid {key}: {value!r}"
-            raise SourceError(message, code="version_mismatch") from exc
-    return None
+    except PayloadValidationError as exc:
+        raise SourceError(str(exc), code=exc.code) from exc
 
 
 def _coerce_version(value: str | Mapping[str, object] | None) -> str:

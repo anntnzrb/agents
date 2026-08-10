@@ -34,6 +34,7 @@ For same-version reruns and new-release rollout steps, read `references/release-
 | `trials` | Inspect raw trial metrics | Applies the documented default inclusion filter; report overrides explicitly. Raw scope is broader than full DeepSWE. |
 | `stats` | Aggregate metric facts | Keep published values distinct from derived values. |
 | `schema` | Inspect supported payload shape | Use this to adapt future releases without guessing fields. |
+| `diagnose` | Inspect local artifact shape/provenance | Offline only; reports stable redacted diagnostics without rows or task content. |
 | `compare` | Compare local snapshots | Both snapshots MUST identify the same benchmark version. Use `--snapshot` to opt into historical local data. |
 
 Read the command's `--help` for exact flag spelling. Common controls include `--version`, `--snapshot`, `--trials`, `--timeout`, `--allow-stale`, output/cache directory options, `--limit`, explicit quality thresholds (`--min-attempted`, `--min-tasks`, `--min-pass-at-1`), repeatable `--pareto-axis METRIC:ORDER`, and repeatable `--efficiency NAME=NUMERATOR/DENOMINATOR`.
@@ -65,3 +66,50 @@ For raw trials, the default filter is `source='deep-swe'`, `eval_scope='full'`, 
 7. If a fetch fails, report the error; do not fill gaps from stale data unless the user explicitly requested `--allow-stale` or `--snapshot`
 
 The full field and provenance contract is in `references/output-contract.md` and `references/provenance.md`.
+
+## Evidence, statuses, and migration
+
+The v1 rows keep their raw source fields and complete identity tuple
+(`model`, `reasoning_effort`, `harness`, `config`). Additive `metrics` entries
+carry `raw_value`, `normalized_value`, `unit`, normalization name,
+`source_path`, parser/version, artifact hash/raw-byte reference,
+`value_status`, `metric_semantics_status`, `comparison_eligibility`, and
+`blocked_reasons`. Value status is `published`, `published_raw`, or
+`derived`; semantic and eligibility statuses explain why a value is or is not
+safe for comparison. Derived CI width and efficiency stay under `derived`.
+
+Consumers that parse `rows` directly do not need to move existing fields:
+unknown additive fields may be ignored, while consumers that rank arbitrary
+custom fields should opt into semantic gating with `--strict-semantics`.
+Use `compare --strict-compare` for schema-aware, unit/scope/denominator-aware
+comparisons. Identical duplicate identities warn and deterministically use the
+first row; conflicting duplicates warn in legacy compare/rank and block with
+`--strict-compare` or `rank --strict-rank`/`--strict-duplicates`.
+
+`diagnose` inspects local snapshots offline, reports stable redacted
+diagnostics, and never emits rows or task content. Successful scopes include
+`dependencies: []` and `independence_class: "unknown"` when no explicit
+source-observed dependency claims are available. Exact explicit
+component+release collisions warn only; similar names do not trigger fuzzy
+matching or score changes.
+
+## Cache, release, and error policy
+
+Cache artifacts are immutable SHA-256 byte files with redacted metadata
+sidecars and immutable manifests. Manifests retain URL, concrete version,
+validator, parser identity, hash, and raw-byte reference. Legacy
+version-addressed cache files remain readable and can be promoted without
+deleting or rewriting the original file. A failed refresh is an error unless
+`--allow-stale` is explicit; `--snapshot` is an explicit historical read and
+retains its provenance.
+
+`latest` uses only `DEEPSWE_DEFAULT_VERSION` or the configured code default
+`v1.1`; no homepage, directory, or unconfigured release-manifest discovery is
+performed. An explicitly configured authoritative manifest must agree on the
+exact version, path, and hash before it can influence resolution. Mixed
+benchmark versions always fail. Every success or operational failure is one
+compact stdout JSON object; human diagnostics are stderr-only.
+
+See `references/output-contract.md` for the compatibility table,
+`references/provenance.md` for evidence labels, and
+`references/release-maintenance.md` for non-destructive rollout steps.

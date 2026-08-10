@@ -8,10 +8,15 @@ ranking; values calculated by this module are kept in ``derived``.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
 from math import isfinite
 from numbers import Real
 from typing import TypeAlias
+
+from .diagnostics import merge_diagnostics
+from .identity import classify_duplicates
+from .normalization import normalize_rows
 
 JsonValue: TypeAlias = object
 JsonRow: TypeAlias = dict[str, JsonValue]
@@ -57,9 +62,11 @@ DEFAULT_PARETO_AXES: tuple[tuple[str, str], ...] = (
     ("mean_agent_steps", "asc"),
 )
 EXPECTED_PAIR_LENGTH = 2
+IDENTITY_COMPONENT_COUNT = 4
+LEGACY_IDENTITY_COMPONENT_COUNT = 3
 
 
-def _rows(value: object) -> list[JsonRow]:
+def _rows(value: object, *, normalize: bool = True) -> list[JsonRow]:
     """Return shallow row copies from either rows or a common artifact wrapper."""
     if isinstance(value, Mapping):
         if "rows" in value:
@@ -73,7 +80,44 @@ def _rows(value: object) -> list[JsonRow]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         return []
 
-    return [dict(row) for row in value if isinstance(row, Mapping)]
+    rows = [dict(row) for row in value if isinstance(row, Mapping)]
+    if not normalize:
+        return rows
+    return normalize_rows(rows, source_path="$.rows")
+
+
+def _evidence(
+    row: Mapping[str, JsonValue], metric: str
+) -> Mapping[str, JsonValue] | None:
+    metrics = row.get("metrics")
+    if not isinstance(metrics, Mapping):
+        return None
+    value = metrics.get(metric)
+    return value if isinstance(value, Mapping) else None
+
+
+def _metric_value(
+    row: Mapping[str, JsonValue], metric: str, *, strict_semantics: bool = False
+) -> Real | None:
+    evidence = _evidence(row, metric)
+    if strict_semantics:
+        if evidence is None or evidence.get("comparison_eligibility") != "eligible":
+            return None
+        return _number(evidence.get("normalized_value"))
+    return _number(row.get(metric))
+
+
+def _metric_blockers(row: Mapping[str, JsonValue], metric: str) -> list[JsonValue]:
+    evidence = _evidence(row, metric)
+    if evidence is None:
+        return ["MISSING_REQUIRED_INPUT"]
+    reasons = evidence.get("blocked_reasons")
+    if isinstance(reasons, Sequence) and not isinstance(
+        reasons, (str, bytes, bytearray)
+    ):
+        return list(reasons)
+    reason = evidence.get("comparison_eligibility")
+    return [reason or "COMPARISON_INCOMPARABLE"]
 
 
 def _number(value: object) -> Real | None:
@@ -218,23 +262,42 @@ def _normalize_efficiency_specs(
     return normalized
 
 
-def _ci_width(row: Mapping[str, JsonValue]) -> Real | None:
-    lo = _number(row.get("ci_lo"))
-    hi = _number(row.get("ci_hi"))
+def _ci_width(
+    row: Mapping[str, JsonValue], *, strict_semantics: bool = False
+) -> Real | None:
+    lo = (
+        _metric_value(row, "ci_lo", strict_semantics=strict_semantics)
+        if strict_semantics
+        else _number(row.get("ci_lo"))
+    )
+    hi = (
+        _metric_value(row, "ci_hi", strict_semantics=strict_semantics)
+        if strict_semantics
+        else _number(row.get("ci_hi"))
+    )
     if lo is None or hi is None:
         return None
     return hi - lo
 
 
-def _decorate(row: Mapping[str, JsonValue], *, rank: int | None = None) -> JsonRow:
+def _decorate(
+    row: Mapping[str, JsonValue],
+    *,
+    rank: int | None = None,
+    strict_semantics: bool = False,
+    blocked_reasons: Sequence[JsonValue] | None = None,
+) -> JsonRow:
     """Copy a published row and append only module-derived fields under ``derived``."""
     item = dict(row)
     existing = item.get("derived")
     derived: JsonRow = dict(existing) if isinstance(existing, Mapping) else {}
     derived["value_status"] = "derived"
-    derived["ci_width"] = _ci_width(row)
-    if rank is not None:
+    derived["ci_width"] = _ci_width(row, strict_semantics=strict_semantics)
+    if rank is not None or strict_semantics:
         derived["rank"] = rank
+    if blocked_reasons:
+        derived["comparison_eligibility"] = "blocked"
+        derived["blocked_reasons"] = list(blocked_reasons)
     item["derived"] = derived
     item["value_status"] = "published"
     return item
@@ -246,6 +309,7 @@ def _passes_thresholds(
     min_pass_at_1: Real | None,
     min_attempted: Real | None,
     min_tasks: Real | None,
+    strict_semantics: bool = False,
 ) -> bool:
     checks = (
         ("pass_at_1", min_pass_at_1),
@@ -255,7 +319,7 @@ def _passes_thresholds(
     for field, threshold in checks:
         if threshold is None:
             continue
-        value = _number(row.get(field))
+        value = _metric_value(row, field, strict_semantics=strict_semantics)
         if value is None or value < threshold:
             return False
     return True
@@ -276,7 +340,73 @@ def _filters(
     }
 
 
-def rank_rows(  # noqa: PLR0913
+def _safe_duplicate_identity(value: object) -> str:
+    """Keep duplicate diagnostics metrics-only when anonymous rows are used."""
+    if not isinstance(value, str):
+        return "<anonymous>"
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError):
+        return "<anonymous>"
+    if isinstance(parsed, list) and len(parsed) == IDENTITY_COMPONENT_COUNT:
+        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
+    if (
+        isinstance(parsed, list)
+        and len(parsed) == LEGACY_IDENTITY_COMPONENT_COUNT
+        and parsed[:2] != ["published_id", "row"]
+    ):
+        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
+    return "<anonymous>"
+
+
+def _duplicate_facts(
+    rows: Sequence[Mapping[str, JsonValue]],
+) -> tuple[set[int], list[dict[str, JsonValue]], list[dict[str, object]]]:
+    """Classify duplicate identities without exposing row bodies."""
+    report = classify_duplicates(rows)
+    conflicting_indexes: set[int] = set()
+    diagnostics: list[dict[str, object]] = []
+    for bucket in ("identical", "conflicting"):
+        groups = report.get(bucket, [])
+        if not isinstance(groups, Sequence):
+            continue
+        for group in groups:
+            if not isinstance(group, Mapping):
+                continue
+            indexes = group.get("row_indexes")
+            row_indexes = (
+                sorted(int(index) for index in indexes)
+                if isinstance(indexes, Sequence)
+                and not isinstance(indexes, (str, bytes, bytearray))
+                else []
+            )
+            if bucket == "conflicting":
+                conflicting_indexes.update(row_indexes)
+            diagnostics.append(
+                {
+                    "code": (
+                        "DUPLICATE_CONFLICT"
+                        if bucket == "conflicting"
+                        else "DUPLICATE_IDENTITY"
+                    ),
+                    "severity": "error" if bucket == "conflicting" else "warning",
+                    "stage": "rank",
+                    "message": (
+                        "Conflicting rows share a configuration identity."
+                        if bucket == "conflicting"
+                        else "Identical rows share a configuration identity."
+                    ),
+                    "details": {
+                        "identity": _safe_duplicate_identity(group.get("identity")),
+                        "row_indexes": row_indexes,
+                        "count": len(row_indexes),
+                    },
+                }
+            )
+    return conflicting_indexes, report, merge_diagnostics(diagnostics)
+
+
+def rank_rows(  # noqa: C901, PLR0912, PLR0913
     rows: RowsLike,
     metric: str,
     order: str,
@@ -285,43 +415,79 @@ def rank_rows(  # noqa: PLR0913
     min_attempted: Real | None = None,
     min_tasks: Real | None = None,
     limit: int | None = 10,
+    strict_semantics: bool = False,
+    strict_duplicates: bool = False,
 ) -> dict[str, JsonValue]:
-    """Rank published leaderboard rows without re-aggregating configurations.
-
-    Rows with a null ranking metric cannot be ordered and are omitted.  Quality
-    and sample thresholds are opt-in: ``None`` means no exclusion.  Input rows
-    are copied, so published fields remain unchanged and all calculated values
-    are nested beneath ``derived``.
-    """
+    """Rank published rows, optionally requiring semantic eligibility."""
     metric_name = _metric_name(metric)
     normalized_order = _order(order)
     pass_threshold = _threshold(min_pass_at_1)
     attempted_threshold = _threshold(min_attempted)
     tasks_threshold = _threshold(min_tasks)
     result_limit = _limit(limit)
+    if not isinstance(strict_semantics, bool):
+        raise TypeError("strict_semantics must be a boolean")
+    if not isinstance(strict_duplicates, bool):
+        raise TypeError("strict_duplicates must be a boolean")
+    strict_mode = strict_semantics or strict_duplicates
     source_rows = _rows(rows)
+    conflicting_indexes, duplicate_report, duplicate_diagnostics = _duplicate_facts(
+        source_rows
+    )
 
     eligible: list[JsonRow] = []
-    for row in source_rows:
+    blocked: list[tuple[JsonRow, list[JsonValue]]] = []
+    for index, row in enumerate(source_rows):
+        if strict_mode and index in conflicting_indexes:
+            blocked.append((row, ["DUPLICATE_CONFLICT"]))
+            continue
         if not _passes_thresholds(
             row,
             min_pass_at_1=pass_threshold,
             min_attempted=attempted_threshold,
             min_tasks=tasks_threshold,
+            strict_semantics=strict_semantics,
         ):
+            if strict_mode:
+                blocked.append((row, ["QUALITY_THRESHOLD"]))
             continue
-        if _number(row.get(metric_name)) is None:
+        value = _metric_value(row, metric_name, strict_semantics=strict_semantics)
+        if value is None:
+            if strict_mode:
+                blocked.append((row, _metric_blockers(row, metric_name)))
             continue
         eligible.append(row)
 
     reverse = normalized_order == "desc"
-    eligible.sort(key=lambda row: _number(row.get(metric_name)) or 0, reverse=reverse)
+    eligible.sort(
+        key=lambda row: (
+            _metric_value(row, metric_name, strict_semantics=strict_semantics) or 0
+        ),
+        reverse=reverse,
+    )
     eligible_count = len(eligible)
     if result_limit is not None:
         eligible = eligible[:result_limit]
 
-    ranked = [_decorate(row, rank=index) for index, row in enumerate(eligible, start=1)]
-    return {
+    ranked = [
+        _decorate(
+            row,
+            rank=index,
+            strict_semantics=strict_semantics,
+        )
+        for index, row in enumerate(eligible, start=1)
+    ]
+    if strict_mode:
+        ranked.extend(
+            _decorate(
+                row,
+                rank=None,
+                strict_semantics=True,
+                blocked_reasons=reasons,
+            )
+            for row, reasons in blocked
+        )
+    result: dict[str, JsonValue] = {
         "value_status": "derived",
         "metric": metric_name,
         "order": normalized_order,
@@ -336,6 +502,26 @@ def rank_rows(  # noqa: PLR0913
         "input_count": len(source_rows),
         "eligible_count": eligible_count,
     }
+    if duplicate_diagnostics:
+        result["diagnostics"] = duplicate_diagnostics
+        result["duplicate_report"] = {
+            bucket: [
+                {
+                    "identity": _safe_duplicate_identity(group.get("identity")),
+                    "row_indexes": list(group.get("row_indexes", [])),
+                    "count": len(group.get("row_indexes", [])),
+                }
+                for group in groups
+                if isinstance(group, Mapping)
+            ]
+            for bucket, groups in duplicate_report.items()
+            if bucket in {"identical", "conflicting"}
+        }
+    if strict_semantics:
+        result["strict_semantics"] = True
+    if strict_duplicates:
+        result["strict_duplicates"] = True
+    return result
 
 
 def filter_trials(
@@ -363,7 +549,7 @@ def filter_trials(
         message = "included_only must be a boolean"
         raise TypeError(message)
     result_limit = _limit(limit)
-    source_rows = _rows(rows)
+    source_rows = _rows(rows, normalize=False)
 
     selected: list[JsonRow] = []
     for row in source_rows:
@@ -402,6 +588,7 @@ def _eligible_rows(
     min_pass_at_1: Real | None,
     min_attempted: Real | None,
     min_tasks: Real | None,
+    strict_semantics: bool = False,
 ) -> list[JsonRow]:
     return [
         dict(row)
@@ -411,23 +598,40 @@ def _eligible_rows(
             min_pass_at_1=min_pass_at_1,
             min_attempted=min_attempted,
             min_tasks=min_tasks,
+            strict_semantics=strict_semantics,
         )
     ]
 
 
-def _raw_extrema(rows: Sequence[Mapping[str, JsonValue]]) -> dict[str, JsonValue]:
+def _raw_extrema(
+    rows: Sequence[Mapping[str, JsonValue]], *, strict_semantics: bool = False
+) -> dict[str, JsonValue]:
     """Select independent extrema from every published row, before filters."""
     extrema: dict[str, JsonValue] = {}
     for metric in _PARETO_METRICS:
-        valued = [row for row in rows if _number(row.get(metric)) is not None]
+        valued = [
+            row
+            for row in rows
+            if _metric_value(row, metric, strict_semantics=strict_semantics) is not None
+        ]
         if not valued:
             extrema[metric] = {"min": None, "max": None}
             continue
-        minimum = min(valued, key=lambda row: _number(row.get(metric)) or 0)
-        maximum = max(valued, key=lambda row: _number(row.get(metric)) or 0)
+        minimum = min(
+            valued,
+            key=lambda row: (
+                _metric_value(row, metric, strict_semantics=strict_semantics) or 0
+            ),
+        )
+        maximum = max(
+            valued,
+            key=lambda row: (
+                _metric_value(row, metric, strict_semantics=strict_semantics) or 0
+            ),
+        )
         extrema[metric] = {
-            "min": _decorate(minimum),
-            "max": _decorate(maximum),
+            "min": _decorate(minimum, strict_semantics=strict_semantics),
+            "max": _decorate(maximum, strict_semantics=strict_semantics),
         }
     return extrema
 
@@ -436,10 +640,18 @@ def _dominates(
     left: Mapping[str, JsonValue],
     right: Mapping[str, JsonValue],
     axes: Sequence[tuple[str, str]],
+    *,
+    strict_semantics: bool = False,
 ) -> bool:
     """Whether ``left`` is at least as good as ``right`` on every axis."""
-    left_values = [_number(left.get(metric)) for metric, _ in axes]
-    right_values = [_number(right.get(metric)) for metric, _ in axes]
+    left_values = [
+        _metric_value(left, metric, strict_semantics=strict_semantics)
+        for metric, _ in axes
+    ]
+    right_values = [
+        _metric_value(right, metric, strict_semantics=strict_semantics)
+        for metric, _ in axes
+    ]
     if any(value is None for value in (*left_values, *right_values)):
         return False
     comparisons = [
@@ -464,6 +676,8 @@ def _dominates(
 def pareto_rows(
     rows: RowsLike,
     axes: Sequence[str | Mapping[str, object]] | None = None,
+    *,
+    strict_semantics: bool = False,
 ) -> list[JsonRow]:
     """Return rows not dominated across explicitly configured metric axes."""
     normalized_axes = _normalize_pareto_axes(axes)
@@ -471,22 +685,33 @@ def pareto_rows(
     candidates = [
         dict(row)
         for row in source_rows
-        if all(_number(row.get(metric)) is not None for metric, _ in normalized_axes)
+        if all(
+            _metric_value(row, metric, strict_semantics=strict_semantics) is not None
+            for metric, _ in normalized_axes
+        )
     ]
     frontier = [
         row
         for row in candidates
         if not any(
-            other is not row and _dominates(other, row, normalized_axes)
+            other is not row
+            and _dominates(
+                other,
+                row,
+                normalized_axes,
+                strict_semantics=strict_semantics,
+            )
             for other in candidates
         )
     ]
-    return [_decorate(row) for row in frontier]
+    return [_decorate(row, strict_semantics=strict_semantics) for row in frontier]
 
 
 def derive_efficiency(
     rows: RowsLike,
     specs: Sequence[str | Mapping[str, object]],
+    *,
+    strict_semantics: bool = False,
 ) -> dict[str, JsonValue]:
     """Add explicit numerator/denominator efficiencies under ``derived``."""
     normalized_specs = _normalize_efficiency_specs(specs)
@@ -497,8 +722,16 @@ def derive_efficiency(
         derived: JsonRow = dict(existing) if isinstance(existing, Mapping) else {}
         efficiency: JsonRow = {}
         for name, numerator_field, denominator_field in normalized_specs:
-            numerator = _number(_value_at_path(row, numerator_field))
-            denominator = _number(_value_at_path(row, denominator_field))
+            numerator = (
+                _metric_value(row, numerator_field, strict_semantics=True)
+                if strict_semantics and "." not in numerator_field
+                else _number(_value_at_path(row, numerator_field))
+            )
+            denominator = (
+                _metric_value(row, denominator_field, strict_semantics=True)
+                if strict_semantics and "." not in denominator_field
+                else _number(_value_at_path(row, denominator_field))
+            )
             entry: JsonRow = {
                 "value_status": "derived",
                 "numerator_field": numerator_field,
@@ -508,7 +741,11 @@ def derive_efficiency(
             }
             if numerator is None or denominator is None:
                 entry["value"] = None
-                entry["reason"] = "missing_or_invalid_input"
+                entry["reason"] = (
+                    "comparison_blocked"
+                    if strict_semantics
+                    else "missing_or_invalid_input"
+                )
             elif denominator == 0:
                 entry["value"] = None
                 entry["reason"] = "zero_denominator"
@@ -550,16 +787,15 @@ def build_report(  # noqa: PLR0913
     limit: int | None = 10,
     pareto_axes: Sequence[str | Mapping[str, object]] | None = None,
     efficiency_specs: Sequence[str | Mapping[str, object]] | None = None,
+    strict_semantics: bool = False,
 ) -> dict[str, JsonValue]:
-    """Build a decision report without re-aggregating published rows.
-
-    Omitted analysis options preserve the historical four-axis Pareto report.
-    Custom axes and explicit efficiency formulas are opt-in derived views.
-    """
+    """Build a decision report without re-aggregating published rows."""
     pass_threshold = _threshold(min_pass_at_1)
     attempted_threshold = _threshold(min_attempted)
     tasks_threshold = _threshold(min_tasks)
     result_limit = _limit(limit)
+    if not isinstance(strict_semantics, bool):
+        raise TypeError("strict_semantics must be a boolean")
     source_rows = _rows(payload)
     normalized_axes = _normalize_pareto_axes(pareto_axes)
 
@@ -571,19 +807,25 @@ def build_report(  # noqa: PLR0913
         min_attempted=attempted_threshold,
         min_tasks=tasks_threshold,
         limit=result_limit,
+        strict_semantics=strict_semantics,
     )
     eligible = _eligible_rows(
         source_rows,
         min_pass_at_1=pass_threshold,
         min_attempted=attempted_threshold,
         min_tasks=tasks_threshold,
+        strict_semantics=strict_semantics,
     )
-    pareto = pareto_rows(eligible, normalized_axes)
+    pareto = pareto_rows(
+        eligible,
+        normalized_axes,
+        strict_semantics=strict_semantics,
+    )
 
     report: dict[str, JsonValue] = {
         "value_status": "derived",
         "recommendations": recommendations,
-        "raw_extrema": _raw_extrema(source_rows),
+        "raw_extrema": _raw_extrema(source_rows, strict_semantics=strict_semantics),
         "pareto": pareto,
         "pareto_count": len(pareto),
         "counts": {
@@ -599,14 +841,21 @@ def build_report(  # noqa: PLR0913
             limit=result_limit,
         ),
     }
+    if strict_semantics:
+        report["strict_semantics"] = True
+        report["filters_applied"]["strict_semantics"] = True
     if pareto_axes is not None:
         report["pareto_axes"] = _axis_metadata(normalized_axes)
         report["filters_applied"]["pareto_axes"] = _axis_metadata(normalized_axes)
     if efficiency_specs is not None:
-        report["efficiency"] = derive_efficiency(source_rows, efficiency_specs)
+        report["efficiency"] = derive_efficiency(
+            source_rows,
+            efficiency_specs,
+            strict_semantics=strict_semantics,
+        )
         report["filters_applied"]["efficiency"] = list(efficiency_specs)
     if isinstance(payload, Mapping):
-        for key in ("scope", "provenance", "generated_at"):
+        for key in ("scope", "provenance", "generated_at", "raw_metadata"):
             value = payload.get(key)
             if value is not None:
                 if isinstance(value, Mapping):

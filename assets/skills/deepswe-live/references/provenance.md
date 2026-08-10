@@ -67,3 +67,62 @@ Before presenting a metric, verify:
 4. `generated_at` and validators are retained when supplied;
 5. filters, stale/snapshot state, and explicit thresholds are stated;
 6. configuration identity is complete and null metrics were not imputed
+
+## Additive metric evidence
+
+For every emitted numeric value that has source support, retain an additive
+evidence projection with:
+
+```json
+{
+  "raw_value": "75%",
+  "normalized_value": 0.75,
+  "unit": "ratio",
+  "normalization": "percentage_to_ratio",
+  "source_path": "$.rows[0].pass_at_1",
+  "parser": "deepswe.normalization.parse_numeric",
+  "parser_version": "1",
+  "artifact_sha256": "<sha256>",
+  "raw_bytes_ref": "artifacts/<sha256>.raw",
+  "value_status": "published",
+  "metric_semantics_status": "known",
+  "comparison_eligibility": "eligible"
+}
+```
+
+`published`, `published_raw`, and `derived` are value-status labels, not
+confidence claims. Missing, placeholder, malformed, non-finite, out-of-range,
+unknown, and ambiguous values remain visible with null normalized values and
+explicit `blocked_reasons`; they are never silently treated as zero. Derived
+CI width and efficiency carry formulas/input paths under `derived` and never
+replace source fields.
+
+Consumers reading legacy rows directly can retain their existing field paths:
+evidence is additive. Consumers ranking arbitrary custom metrics should inspect
+`metric_semantics_status` and `comparison_eligibility` or opt into
+`--strict-semantics`. `compare --strict-compare` proves artifact schema and
+metric unit/scope/denominator compatibility before eligible deltas. Duplicate
+identities use all four fields; identical duplicates warn/use the first row,
+while conflicting duplicates warn in legacy mode and block strict compare/rank.
+
+## Cache, manifests, and release authority
+
+Cache provenance includes canonical URL, concrete benchmark version, validator
+headers, parser/version, SHA-256 of exact bytes, byte length, and an immutable
+raw-byte reference. Manifests are immutable snapshots of source-index
+provenance and do not replace the bytes. A legacy version-addressed file may
+be promoted into the content-addressed cache with `legacy_unverified: true`;
+promotion is non-destructive and leaves the caller's file untouched.
+
+`latest` uses only `DEEPSWE_DEFAULT_VERSION` or configured default `v1.1`.
+There is no release discovery from a homepage, directory, or unconfigured
+manifest. An explicitly configured authoritative manifest may be used only
+after exact version, canonical path, and hash agreement. Same-version proof
+is mandatory for compare. `--allow-stale` and `--snapshot` are explicit
+choices; stale or historical provenance must remain visible after either.
+
+When no source-observed dependency claims exist, report `dependencies: []` and
+`independence_class: "unknown"`. Exact explicit canonical component+release
+collisions may warn, but similar names do not trigger fuzzy overlap or score
+adjustment. Diagnostics are stable, deduplicated, and redacted; one-object
+errors remain on stdout while human diagnostics stay on stderr.
