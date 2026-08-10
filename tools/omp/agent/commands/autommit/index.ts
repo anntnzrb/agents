@@ -1060,6 +1060,11 @@ const assertReceiptEvidence = async (
     if (actual.before !== expectedHead) throw new Error("Autommit HEAD changed during receipt recovery.");
     if (actual.indexTree !== receipt.indexTree) throw new Error("Autommit index changed during receipt recovery.");
 };
+export const preparedCommitTreeMatchesIndex = (
+    preparedCommitTree: string,
+    expectedIndexTree: string,
+): boolean => preparedCommitTree === expectedIndexTree;
+
 export const consumeCompletedReceipt = async (
     commonDir: string,
     receipt: Receipt | null,
@@ -1117,11 +1122,15 @@ const applySplitProposal = async (
         }
         const currentDiff = await api.pi.diff(cwd, { cached: true, binary: true });
         if (currentDiff !== stagedDiff) throw new Error("Staged snapshot changed during atomic commit preparation.");
-        if (await internals.git.writeTree(worktree) !== expected.indexTree) {
-            throw new Error("Prepared commit tree does not match the staged index.");
-        }
         const finalHead = await internals.git.head.sha(worktree);
         if (!finalHead) throw new Error("Atomic split preparation did not create a commit.");
+        const preparedTree = await api.exec("git", ["rev-parse", `${finalHead}^{tree}`], { cwd: worktree });
+        if (preparedTree.code !== 0) {
+            throw new Error(preparedTree.stderr || "Unable to inspect prepared commit tree.");
+        }
+        if (!preparedCommitTreeMatchesIndex(preparedTree.stdout.trim(), expected.indexTree)) {
+            throw new Error("Prepared commit tree does not match the staged index.");
+        }
         await assertEvidence(cwd, internals, expected);
         const prepared: Receipt = {
             version: 1,

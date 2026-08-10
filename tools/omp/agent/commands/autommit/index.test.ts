@@ -2,8 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { consumeCompletedReceipt, selectPatch } from "./index";
+import { consumeCompletedReceipt, preparedCommitTreeMatchesIndex, selectPatch } from "./index";
 import { readReceipt, writeReceipt } from "./transaction";
+
 
 const renamePatch = [
   "diff --git a/old/path.txt b/new/path.txt",
@@ -66,5 +67,16 @@ describe("selectPatch", () => {
     expect(() => selectPatch(file, { type: "indices", indices: [1] }, internals)).toThrow(
       "No changes selected for new/path.txt.",
     );
+  });
+});
+
+describe("prepared commit tree verification", () => {
+  test("accepts the committed tree but rejects post-commit index drift", () => {
+    const expectedIndexTree = "staged-index-tree";
+    const preparedCommitTree = expectedIndexTree;
+    const postCommitIndexTree = "post-commit-index-tree";
+
+    expect(preparedCommitTreeMatchesIndex(preparedCommitTree, expectedIndexTree)).toBe(true);
+    expect(preparedCommitTreeMatchesIndex(postCommitIndexTree, expectedIndexTree)).toBe(false);
   });
 });
