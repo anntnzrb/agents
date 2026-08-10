@@ -1,0 +1,124 @@
+# Writing Custom Vars Generators
+
+Declare a vars generator, generate a hashed root password, deploy it to a machine, change as needed.
+
+This guide covers the full `clan vars` workflow:
+
+1. Declare a `generator` in the machine's NixOS configuration.
+2. Inspect the status of variables using the Clan CLI.
+3. Generate variables interactively.
+4. Observe the changes made to your repository.
+5. Update the machine configuration.
+6. Change the root password when needed.
+
+For a detailed API reference, see the [vars module documentation](https://clan.lol/docs/26.05/reference/clan.core/vars).
+
+## Declare the generator
+
+In this example, a `vars` `generator` is used to:
+
+- prompt the user for the password
+- run the required `mkpasswd` command to generate the hash
+- store the hash in a file
+- expose the file path to the NixOS configuration
+
+Create a new Nix file `root-password.nix` with the following content and import it into your `configuration.nix`
+
+```nix
+{ config, pkgs, ... }:
+{
+
+  clan.core.vars.generators.root-password = {
+    # prompt the user for a password
+    # (`password-input` being an arbitrary name)
+    prompts.password-input.description = "the root user's password";
+    prompts.password-input.type = "hidden";
+    # don't store the prompted password itself
+    prompts.password-input.persist = false;
+    # define an output file for storing the hash
+    files.password-hash.secret = false;
+    # define the logic for generating the hash
+    script = ''
+      cat $prompts/password-input | mkpasswd > $out/password-hash
+    '';
+    # the tools required by the script
+    runtimeInputs = [ pkgs.mkpasswd ];
+  };
+
+  # ensure users are immutable (otherwise the following config might be ignored)
+  users.mutableUsers = false;
+  # set the root password to the file containing the hash
+  users.users.root.hashedPasswordFile =
+    # clan will make sure, this path exists
+    config.clan.core.vars.generators.root-password.files.password-hash.path;
+}
+```
+
+## Inspect the status
+
+Executing `clan vars list`, you should see the following:
+
+```console
+$ clan vars list my-machine
+root-password/password-hash: <not set>
+```
+
+...indicating that the value `password-hash` for the generator `root-password` is not set yet.
+
+## Generate the values
+
+This step is not strictly necessary, as deploying the machine via `clan machines update` would trigger the generator as well.
+
+To run the generator, execute `clan vars generate` for your machine
+
+```console
+$ clan vars generate my-machine
+Enter the value for root-password/password-input (hidden):
+```
+
+After entering the value, the updated status is reported:
+
+```console
+Updated var root-password/password-hash
+  old: <not set>
+  new: $6$RMats/YMeypFtcYX$DUi...
+```
+
+## Observe the changes
+
+With the last step, a new file was created in your repository:
+`vars/per-machine/my-machine/root-password/password-hash/value`
+
+If the repository is a git repository, a commit was created automatically:
+
+```console
+$ git log -n1
+commit ... (HEAD -> main)
+Author: ...
+Date:   ...
+
+    vars: update via generator root-password (machine: my-machine)
+```
+
+## Update the machine
+
+```shell
+clan machines update my-machine
+```
+
+## Change the root password
+
+Changing the password can be done via this command.
+Replace `my-machine` with your machine.
+
+```console
+$ clan vars generate my-machine --generator root-password --regenerate
+...
+Enter the value for root-password/password-input (hidden):
+Input received. Processing...
+...
+Updated var root-password/password-hash
+  old: $6$tb27m6EOdff.X9TM$19N...
+
+  new: $6$OyoQtDVzeemgh8EQ$zRK...
+```
