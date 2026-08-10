@@ -46,6 +46,12 @@ enabled = true
 [permissions.agent-workspace.network.domains]
 "*" = "allow"
 
+[permissions.agent-review]
+extends = ":read-only"
+
+[permissions.agent-review.filesystem]
+"~/.local/share/agents/codex/runs" = "write"
+
 # -----------------------------------------------------------------------------
 # PROVIDERS
 # -----------------------------------------------------------------------------
