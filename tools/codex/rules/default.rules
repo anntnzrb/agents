@@ -1,0 +1,92 @@
+prefix_rule(
+    pattern = [[
+        "python", "python2", "python3", "pythonw", "py", "pypy3",
+    ]],
+    decision = "forbidden",
+    justification = "Direct Python is forbidden. Load the Python skill, then use `uv run ...`.",
+    match = [
+        "python script.py",
+        "python3 -m pytest",
+        "py -m pip install package",
+    ],
+    not_match = [
+        "uv run python script.py",
+        "uv run pytest",
+    ],
+)
+
+prefix_rule(
+    pattern = [["pip", "pip3", "pipx"]],
+    decision = "forbidden",
+    justification = "Direct Python package management is forbidden. Load the Python skill, then use UV commands.",
+    match = [
+        "pip install package",
+        "pip3 install package",
+        "pipx install tool",
+    ],
+    not_match = [
+        "uv add package",
+        "uv pip install package",
+        "uv tool install tool",
+    ],
+)
+
+prefix_rule(
+    pattern = [["pip-compile", "pip-sync", "pipdeptree"]],
+    decision = "forbidden",
+    justification = "pip-tools are forbidden. Load the Python skill, then use the UV-native dependency workflow.",
+)
+
+prefix_rule(
+    pattern = [[
+        "conda", "hatch", "mamba", "micromamba", "pdm", "pipenv",
+        "poetry", "rye", "virtualenv", "pyenv",
+    ]],
+    decision = "forbidden",
+    justification = "Alternative Python managers are forbidden. Load the Python skill, then use UV.",
+)
+
+prefix_rule(
+    pattern = [["twine", "flit"]],
+    decision = "forbidden",
+    justification = "Direct Python packaging tools are forbidden. Load the Python skill, then use `uv build` or `uv publish`.",
+)
+
+prefix_rule(
+    pattern = [[
+        "pytest", "py.test", "tox", "nox", "coverage", "mypy", "pyright",
+        "ruff", "black", "isort", "flake8", "pylint", "ipython", "jupyter",
+        "jupyter-lab", "jupyter-notebook", "notebook",
+    ]],
+    decision = "forbidden",
+    justification = "Direct Python tooling is forbidden. Load the Python skill, then use `uv run`, `uvx`, or `uv tool run`.",
+    match = [
+        "pytest",
+        "ruff check .",
+        "pyright",
+    ],
+    not_match = [
+        "uv run pytest",
+        "uv run ruff check .",
+        "uvx pyright",
+    ],
+)
+
+# High-confidence Windows command blocks. These are harmless on POSIX systems
+# unless the corresponding Windows command is explicitly invoked.
+prefix_rule(
+    pattern = [
+        ["pwsh", "pwsh.exe", "powershell", "powershell.exe"],
+        ["-EncodedCommand", "-encodedcommand", "-e", "-E"],
+    ],
+    decision = "forbidden",
+    justification = "Encoded PowerShell is disabled; use an explicit command or reviewed `.ps1` file.",
+)
+
+prefix_rule(
+    pattern = [
+        ["cmd", "cmd.exe"], ["/c", "/C"], ["start", "START"],
+    ],
+    decision = "forbidden",
+    justification = "GUI and URL launches from Bash are disabled.",
+)
