@@ -32,7 +32,19 @@ appearanceDarkCodeThemeId = "matrix"
 # -----------------------------------------------------------------------------
 
 approval_policy = "never"
-sandbox_mode = "read-only"
+default_permissions = ":read-only"
+
+[permissions.agent-workspace]
+extends = ":workspace"
+
+[permissions.agent-workspace.filesystem]
+"~/.local/share/agents/codex/runs" = "write"
+
+[permissions.agent-workspace.network]
+enabled = true
+
+[permissions.agent-workspace.network.domains]
+"*" = "allow"
 
 # -----------------------------------------------------------------------------
 # PROVIDERS
@@ -72,11 +84,6 @@ ui = 'ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mo
 diffAdded = "#1eff5a"
 diffRemoved = "#fa423e"
 skill = "#1eff5a"
-
-[sandbox_workspace_write]
-exclude_slash_tmp = false
-network_access = true
-writable_roots = ["~/.local/share/agents/codex/runs"]
 
 [shell_environment_policy]
 # "all", "core", "none"
