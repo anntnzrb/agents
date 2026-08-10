@@ -4,7 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import copy
+import hashlib
+import io
 import json
+import math
 import os
 import re
 import sys
@@ -12,17 +17,25 @@ import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from typing import NoReturn, TextIO
-
+from .contracts import compact_json
+from .diagnose import diagnose
+from .diagnostics import redact, redact_query
+from .diff import schema_aware_diff
+from .overlap import overlap_metadata
 from .rsc import (
     BASE_URL,
     CODING_CAPABILITY_URL,
     MODEL_API_KEY_ENV,
     MODEL_API_URL,
+    CacheError,
     ExtractionError,
+    FetchResult,
+    atomic_write,
     build_full_url,
     build_snapshot_payload,
     endpoint_slugs,
@@ -32,7 +45,7 @@ from .rsc import (
     fetch_page,
     fetch_rsc,
     load_cache_metadata,
-    load_cached_body,
+    load_cached_artifact,
     load_last_good_snapshot,
     load_snapshot,
     normalize_official_models,
@@ -44,6 +57,7 @@ from .rsc import (
     snapshot_slugs,
     write_outputs,
 )
+from .values import parse_numeric
 
 PROTOCOL_VERSION = "1"
 
@@ -56,6 +70,244 @@ DEFAULT_SNAPSHOT_MAX_AGE = timedelta(hours=24)
 MIN_QUOTED_VALUE_LENGTH = 2
 SCHEMA_V2 = 2
 NOT_MODIFIED = 304
+
+
+def _finite_number(value: object) -> bool:
+    """Return whether value is a rankable, non-boolean finite scalar."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return False
+    try:
+        return math.isfinite(float(value))
+    except (OverflowError, ValueError):
+        return False
+
+
+def _numeric_scalar(value: object) -> bool:
+    """Recognize numeric values including non-finite values for evidence."""
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+def _evidence_record(  # noqa: PLR0913
+    raw_value: object,
+    *,
+    source_path: str | None,
+    source_field: str | None,
+    artifact_hash: str | None = None,
+    value_status: str = "published",
+    semantics: str = "known",
+    unit: str | None = None,
+    normalization: str | None = None,
+    blocked_reasons: tuple[str, ...] = (),
+    formula: str | None = None,
+    input_paths: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    """Project ``values.parse_numeric`` into the additive CLI evidence shape."""
+    parsed = parse_numeric(
+        raw_value,
+        unit=unit,
+        normalization=normalization,
+        source_path=source_path,
+        source_field=source_field,
+        value_status=value_status,
+        metric_semantics_status=semantics,
+        blocked_reasons=blocked_reasons,
+        parser="artificial-analysis.cli",
+        parser_version="1",
+        sha256=artifact_hash,
+    )
+    evidence = parsed.to_dict()
+    if value_status == "derived" and evidence.get("normalized_value") is None:
+        # ``parse_numeric`` classifies a null/raw-unparseable value as missing
+        # or unparsed.  A declared derived path still describes provenance as
+        # derived; only its usability is unavailable.
+        reasons = [
+            reason
+            for reason in evidence.get("blocked_reasons", [])
+            if reason not in {"missing_value", "unparsed_value"}
+        ]
+        if "MISSING_REQUIRED_INPUT" not in reasons:
+            reasons.append("MISSING_REQUIRED_INPUT")
+        evidence["value_status"] = "derived"
+        evidence["comparison_eligibility"] = "blocked"
+        evidence["blocked_reasons"] = reasons
+    # Keep the values.py names and expose the concise contract aliases.  This
+    # lets old consumers use source_field/value_status while new consumers can
+    # inspect field/status without a translation table.
+    evidence.update(
+        {
+            "raw": evidence.get("raw_value"),
+            "normalized": evidence.get("normalized_value"),
+            "field": evidence.get("source_field"),
+            "version": evidence.get("parser_version"),
+            "artifact_hash": evidence.get("sha256"),
+            "status": evidence.get("value_status"),
+            "semantics": evidence.get("metric_semantics_status"),
+            "eligibility": evidence.get("comparison_eligibility"),
+            "blockers": list(evidence.get("blocked_reasons") or []),
+        },
+    )
+    if formula is not None:
+        evidence["formula"] = formula
+        evidence["input_paths"] = list(input_paths)
+    return evidence
+
+
+def _lookup_path(row: dict[str, Any], path: str) -> object:
+    current: object = row
+    for part in path.split("."):
+        if not isinstance(current, dict):
+            return None
+        current = current.get(part)
+    return current
+
+
+def _source_hash_from_payload(payload: dict[str, Any]) -> str | None:
+    for container_key in ("source", "meta"):
+        container = payload.get(container_key)
+        if not isinstance(container, dict):
+            continue
+        for key in ("sha256", "artifact_hash", "source_hash"):
+            value = container.get(key)
+            if isinstance(value, str) and value:
+                return value
+        nested = container.get("source")
+        if isinstance(nested, dict):
+            value = nested.get("sha256")
+            if isinstance(value, str) and value:
+                return value
+    return None
+
+
+def _attach_row_evidence(  # noqa: PLR0913
+    row: dict[str, Any],
+    *,
+    metric_paths: tuple[str, ...] = (),
+    source_prefix: str = "$",
+    artifact_hash: str | None = None,
+    derived_paths: dict[str, tuple[str, tuple[str, ...]]] | None = None,
+    raw_values: dict[str, object] | None = None,
+    unknown_paths: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    """Attach evidence for source and derived scalars without changing values."""
+    evidence = row.get("metric_evidence")
+    metric_evidence = dict(evidence) if isinstance(evidence, dict) else {}
+    derived_paths = derived_paths or {}
+    raw_values = raw_values or {}
+    unknown_set = set(unknown_paths)
+
+    def add(path: str, value: object, *, unknown: bool = False) -> None:
+        if path in metric_evidence:
+            return
+        formula_and_inputs = derived_paths.get(path)
+        if formula_and_inputs is not None:
+            formula, input_paths = formula_and_inputs
+            metric_evidence[path] = _evidence_record(
+                value,
+                source_path=f"{source_prefix}.{path}",
+                source_field=path.rsplit(".", 1)[-1],
+                artifact_hash=artifact_hash,
+                value_status="derived",
+                semantics="known",
+                formula=formula,
+                input_paths=input_paths,
+            )
+            return
+        metric_evidence[path] = _evidence_record(
+            raw_values.get(path, value),
+            source_path=f"{source_prefix}.{path}",
+            source_field=path.rsplit(".", 1)[-1],
+            artifact_hash=artifact_hash,
+            semantics="unknown" if (unknown or path in unknown_set) else "known",
+        )
+
+    for path in metric_paths:
+        add(
+            path,
+            _lookup_path(row, path),
+            unknown=path.startswith(("raw_fields.", "unknowns.")),
+        )
+
+    def walk(node: object, prefix: str) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in {"metric_evidence", "raw_metadata"}:
+                    continue
+                path = f"{prefix}.{key}" if prefix else key
+                if _numeric_scalar(value):
+                    add(
+                        path,
+                        value,
+                        unknown=prefix.startswith(("raw_fields", "unknowns")),
+                    )
+                elif isinstance(value, dict):
+                    walk(value, path)
+                elif isinstance(value, list):
+                    for index, item in enumerate(value):
+                        walk(item, f"{path}[{index}]")
+        elif isinstance(node, list):
+            for index, item in enumerate(node):
+                walk(item, f"{prefix}[{index}]")
+
+    walk(row, "")
+    row["metric_evidence"] = metric_evidence
+    return row
+
+
+def _attach_payload_evidence(
+    payload: dict[str, Any],
+    *,
+    artifact_hash: str | None = None,
+) -> dict[str, Any]:
+    """Attach evidence for payload-level derived scalar fields."""
+    existing = payload.get("metric_evidence")
+    metric_evidence = dict(existing) if isinstance(existing, dict) else {}
+
+    def walk(node: object, prefix: str) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in {"metric_evidence", "raw_metadata"}:
+                    continue
+                path = f"{prefix}.{key}" if prefix else key
+                if _numeric_scalar(value):
+                    if path not in metric_evidence:
+                        metric_evidence[path] = _evidence_record(
+                            value,
+                            source_path=f"$.{path}",
+                            source_field=key,
+                            artifact_hash=artifact_hash,
+                            value_status="derived",
+                        )
+                elif isinstance(value, (dict, list)):
+                    walk(value, path)
+        elif isinstance(node, list):
+            for index, item in enumerate(node):
+                walk(item, f"{prefix}[{index}]")
+
+    walk(payload, "")
+    payload["metric_evidence"] = metric_evidence
+    return payload
+
+
+def _snapshot_overlap(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Expose declarations without inventing overlap from source similarity."""
+    if not isinstance(snapshot, dict):
+        return overlap_metadata()
+    meta = snapshot.get("meta") if isinstance(snapshot.get("meta"), dict) else {}
+    source = snapshot.get("overlap")
+    if not isinstance(source, dict):
+        source = meta.get("overlap") if isinstance(meta.get("overlap"), dict) else {}
+    declarations = source.get("declared_joins", source.get("overlap_claims"))
+    left = source.get("left")
+    right = source.get("right")
+    dependencies = source.get("dependencies", meta.get("dependencies", []))
+    independence = source.get("independence", meta.get("independence", []))
+    return overlap_metadata(
+        left=left,
+        right=right,
+        declarations=declarations,
+        dependencies=dependencies if isinstance(dependencies, list) else [],
+        independence=independence if isinstance(independence, list) else [],
+    )
 
 
 class CliUsageError(RuntimeError):
@@ -142,11 +394,29 @@ def _required_api_key() -> str:
     api_key = os.environ.get(MODEL_API_KEY_ENV)
     if not api_key:
         message = (
-            "ARTIFICIAL_ANALYSIS_API_KEY required; copy .env.example to .env and set "
-            "the key."
+            "ARTIFICIAL_ANALYSIS_API_KEY required; inject it in the process or set "
+            "ARTIFICIAL_ANALYSIS_ENV_FILE to a permissions-restricted external file."
         )
         _raise_cli_usage_error(message)
     return api_key
+
+
+def _add_cli_error_flags(
+    parser: argparse.ArgumentParser, *, suppress_defaults: bool = False
+) -> None:
+    default = argparse.SUPPRESS if suppress_defaults else False
+    parser.add_argument(
+        "--json-errors",
+        action="store_true",
+        default=default,
+        help="Emit one compact JSON error object on stdout.",
+    )
+    parser.add_argument(
+        "--legacy-errors",
+        action="store_true",
+        default=default,
+        help="Keep human-readable stderr errors instead of JSON errors.",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -163,10 +433,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="cli",
         help="cli: one-shot JSON output. rpc: JSONL request/response loop.",
     )
+    _add_cli_error_flags(parser)
     subparsers = parser.add_subparsers(dest="command")
     _add_fetch_parser(subparsers)
     _add_stats_parser(subparsers)
     _add_diff_parser(subparsers)
+    _add_diagnose_parser(subparsers)
     _add_harness_parser(subparsers)
     _add_coding_parser(subparsers)
     _add_evaluation_parser(subparsers)
@@ -174,6 +446,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_query_parser(subparsers)
     _add_qa_parser(subparsers)
     _add_schema_parser(subparsers)
+    for command_parser in subparsers.choices.values():
+        _add_cli_error_flags(command_parser, suppress_defaults=True)
     return parser
 
 
@@ -197,9 +471,20 @@ def _add_fetch_parser(subparsers: argparse._SubParsersAction) -> None:
     fetch_parser.add_argument("--min-endpoints", type=int, default=700)
     fetch_parser.add_argument("--min-providers", type=int, default=40)
     fetch_parser.add_argument(
+        "--stale-policy",
+        choices=("error", "allow-last-good"),
+        default="error",
+        help="Refresh failure policy; stale fallback is opt-in.",
+    )
+    fetch_parser.add_argument(
+        "--allow-stale",
+        action="store_true",
+        help="Alias for --stale-policy allow-last-good.",
+    )
+    fetch_parser.add_argument(
         "--strict",
         action="store_true",
-        help="Disable last-good fallback.",
+        help="Alias for --stale-policy error.",
     )
     fetch_parser.set_defaults(handler=_handle_fetch)
 
@@ -226,7 +511,23 @@ def _add_diff_parser(subparsers: argparse._SubParsersAction) -> None:
     )
     diff_parser.add_argument("old_snapshot", type=Path)
     diff_parser.add_argument("new_snapshot", type=Path)
+    diff_parser.add_argument(
+        "--schema-aware",
+        action="store_true",
+        help="Include deterministic model, metric, schema, and diagnostic changes.",
+    )
     diff_parser.set_defaults(handler=_handle_diff)
+
+
+def _add_diagnose_parser(subparsers: argparse._SubParsersAction) -> None:
+    diagnose_parser = subparsers.add_parser(
+        "diagnose",
+        help="Inspect local snapshot/cache health without fetching.",
+    )
+    diagnose_parser.add_argument("snapshot", nargs="?", type=Path)
+    diagnose_parser.add_argument("--snapshot", dest="snapshot_path", type=Path)
+    diagnose_parser.add_argument("--cache-dir", type=Path, default=None)
+    diagnose_parser.set_defaults(handler=_handle_diagnose)
 
 
 def _add_model_filters(parser: argparse.ArgumentParser) -> None:
@@ -523,6 +824,7 @@ def _normalize_argv(argv: Sequence[str] | None) -> list[str]:
         "fetch",
         "stats",
         "diff",
+        "diagnose",
         "harness",
         "coding",
         "evaluation",
@@ -555,8 +857,48 @@ def _normalize_argv(argv: Sequence[str] | None) -> list[str]:
 
 def _emit_json(payload: dict[str, Any], *, stdout: TextIO) -> None:
     stdout.write(
-        json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n",
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+        )
+        + "\n",
     )
+
+
+def _safe_error_text(value: object) -> str:
+    redacted = redact(str(value))
+    text = redacted if isinstance(redacted, str) else str(redacted)
+    text = re.sub(
+        r"(?i)(?<![a-z0-9])[\w.-]*(?:api[-_ ]?key|secret|password|token)[\w.-]*",
+        "[REDACTED]",
+        text,
+    )
+    return text[:512]
+
+
+def _emit_cli_error(
+    *,
+    command: str,
+    code: str,
+    message: object,
+    stdout: TextIO,
+    details: object | None = None,
+) -> None:
+    error: dict[str, object] = {
+        "code": code,
+        "message": _safe_error_text(message),
+    }
+    if details is not None:
+        error["details"] = redact(details)
+    payload: dict[str, Any] = {
+        "ok": False,
+        "version": PROTOCOL_VERSION,
+        "command": command,
+        "error": error,
+    }
+    stdout.write(compact_json(payload) + "\n")
 
 
 def _envelope(command: str, data: dict[str, Any]) -> dict[str, Any]:
@@ -653,35 +995,269 @@ def _creator(model: dict[str, Any]) -> dict[str, Any]:
     return legacy_creator if isinstance(legacy_creator, dict) else {}
 
 
+def _artifact_record_metadata(record: dict[str, object]) -> dict[str, object]:
+    nested = record.get("metadata")
+    return nested if isinstance(nested, dict) else {}
+
+
+def _cached_source_info(cache_dir: Path) -> tuple[bytes, dict[str, object]] | None:
+    cached = load_cached_artifact(cache_dir, source_key=BASE_URL)
+    if cached is not None:
+        return cached
+    return None
+
+
+def _result_headers(result: object) -> dict[str, str]:
+    headers = getattr(result, "headers", None)
+    return headers if isinstance(headers, dict) else {}
+
+
+def _result_header(result: object, name: str) -> str | None:
+    headers = _result_headers(result)
+    value = headers.get(name)
+    if isinstance(value, str) and value:
+        return value
+    folded_name = name.casefold()
+    for key, candidate in headers.items():
+        if isinstance(key, str) and key.casefold() == folded_name:
+            return candidate if isinstance(candidate, str) and candidate else None
+    return None
+
+
+def _result_fetched_at(result: object) -> str:
+    value = getattr(result, "fetched_at", None)
+    return value if isinstance(value, str) else ""
+
+
+def _result_etag(result: object) -> str | None:
+    value = getattr(result, "etag", None)
+    if isinstance(value, str) and value:
+        return value
+    return _result_header(result, "etag")
+
+
+def _result_last_modified(result: object) -> str | None:
+    value = getattr(result, "last_modified", None)
+    if isinstance(value, str) and value:
+        return value
+    return _result_header(result, "last-modified")
+
+
+def _result_final_url(result: object, fallback: str | None = None) -> str | None:
+    value = getattr(result, "final_url", None)
+    return value if isinstance(value, str) and value else fallback
+
+
+def _result_sha256(result: object) -> str | None:
+    value = getattr(result, "sha256", None)
+    if isinstance(value, str) and value:
+        return value
+    body = getattr(result, "body", None)
+    if isinstance(body, str):
+        return hashlib.sha256(body.encode("utf-8")).hexdigest()
+    return None
+
+
+def _result_byte_length(result: object) -> int | None:
+    value = getattr(result, "byte_length", None)
+    if isinstance(value, int):
+        return value
+    body = getattr(result, "body", None)
+    if isinstance(body, str):
+        return len(body.encode("utf-8"))
+    return None
+
+
+def _result_artifact_ref(result: object) -> str | None:
+    value = getattr(result, "artifact_ref", None)
+    return value if isinstance(value, str) and value else None
+
+
+def _materialize_fetch_result(
+    result: object,
+    *,
+    fallback_url: str,
+) -> FetchResult:
+    if isinstance(result, FetchResult):
+        return result
+    body = getattr(result, "body", None)
+    status_code = getattr(result, "status_code", None)
+    fetched_at = _result_fetched_at(result)
+    if not isinstance(body, str) or not isinstance(status_code, int):
+        message = "FetchResult compatibility object is missing base fields"
+        raise TypeError(message)
+    return FetchResult(
+        body=body,
+        status_code=status_code,
+        headers=_result_headers(result),
+        fetched_at=fetched_at,
+        final_url=_result_final_url(result, fallback_url),
+        etag=_result_etag(result),
+        last_modified=_result_last_modified(result),
+        sha256=_result_sha256(result),
+        byte_length=_result_byte_length(result),
+        artifact_ref=_result_artifact_ref(result),
+    )
+
+
+def _validator_from(
+    cache_meta: object,
+    record: dict[str, object] | None,
+    name: str,
+) -> str | None:
+    value: object = None
+    if record is not None:
+        value = _artifact_record_metadata(record).get(name)
+    if not isinstance(value, str) and cache_meta is not None:
+        value = getattr(cache_meta, name, None)
+    return value if isinstance(value, str) and value else None
+
+
+def _validate_304(
+    result: FetchResult,
+    cached: tuple[bytes, dict[str, object]] | None,
+    *,
+    sent_etag: str | None,
+    sent_last_modified: str | None,
+) -> FetchResult:
+    if cached is None:
+        _raise_cache_failure(
+            "CACHE_MISSING",
+            "Upstream returned 304 but no matching cached artifact exists.",
+        )
+    raw, record = cached
+    cached_etag = _validator_from(None, record, "etag") or sent_etag
+    cached_last_modified = (
+        _validator_from(None, record, "last_modified") or sent_last_modified
+    )
+    response_etag = _result_etag(result)
+    response_last_modified = _result_last_modified(result)
+    if (
+        response_etag is not None
+        and cached_etag is not None
+        and response_etag != cached_etag
+    ) or (
+        response_last_modified is not None
+        and cached_last_modified is not None
+        and response_last_modified != cached_last_modified
+    ):
+        _raise_cache_failure(
+            "CACHE_VALIDATOR_INVALID",
+            "Upstream returned a validator that does not match cached bytes.",
+            {
+                "etag_sent": sent_etag,
+                "etag_received": response_etag,
+                "last_modified_sent": sent_last_modified,
+                "last_modified_received": response_last_modified,
+            },
+        )
+    if not any(
+        (
+            response_etag,
+            response_last_modified,
+            cached_etag,
+            cached_last_modified,
+        ),
+    ):
+        _raise_cache_failure(
+            "CACHE_VALIDATOR_INVALID",
+            "Upstream returned 304 without a returned or known validator.",
+        )
+    body = raw.decode("utf-8", errors="replace")
+    digest = hashlib.sha256(raw).hexdigest()
+    return FetchResult(
+        body=body,
+        status_code=NOT_MODIFIED,
+        headers=dict(_result_headers(result)),
+        fetched_at=_result_fetched_at(result),
+        final_url=_result_final_url(result),
+        last_modified=response_last_modified or cached_last_modified,
+        sha256=digest,
+        byte_length=len(raw),
+        artifact_ref=(
+            str(record.get("raw_path")) if record.get("raw_path") is not None else None
+        ),
+    )
+
+
+def _raise_cache_failure(
+    code: str,
+    message: str,
+    details: dict[str, object] | None = None,
+) -> NoReturn:
+    raise CacheError(code, message, details)
+
+
+def _stale_allowed(args: argparse.Namespace) -> bool:
+    if bool(getattr(args, "strict", False)):
+        return False
+    return bool(getattr(args, "allow_stale", False)) or (
+        getattr(args, "stale_policy", "error") == "allow-last-good"
+    )
+
+
+def _mark_stale_payload(
+    fallback_payload: dict[str, Any],
+    *,
+    reason: str,
+) -> dict[str, Any]:
+    payload = copy.deepcopy(fallback_payload)
+    meta = payload.setdefault("meta", {})
+    if not isinstance(meta, dict):
+        meta = {}
+        payload["meta"] = meta
+    meta["freshness"] = {
+        "mode": "stale-last-good",
+        "stale": True,
+        "fallback": True,
+        "reason": reason,
+    }
+    meta["freshness_mode"] = "stale-last-good"
+    return payload
+
+
 def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
     api_key = _required_api_key()
     cache_meta = load_cache_metadata(args.cache_dir)
-    sent_etag = cache_meta.etag if cache_meta is not None else None
-    result = None
-    official_result = None
+    cached = _cached_source_info(args.cache_dir)
+    cached_record = cached[1] if cached is not None else None
+    sent_etag = _validator_from(cache_meta, cached_record, "etag")
+    sent_last_modified = _validator_from(cache_meta, cached_record, "last_modified")
+    result: FetchResult | None = None
+    official_result: FetchResult | None = None
     response_etag: str | None = sent_etag
+    response_last_modified: str | None = sent_last_modified
     reused_cached_body = False
     fallback_used = False
     fallback_source: str | None = None
     fallback_reason: str | None = None
+    freshness = "fresh"
 
     try:
         result = fetch_rsc(
             timeout_seconds=args.timeout_seconds,
             if_none_match=sent_etag,
+            if_modified_since=sent_last_modified,
         )
-        official_result = fetch_models(api_key, timeout_seconds=args.timeout_seconds)
-        response_etag = result.headers.get("etag") or sent_etag
+        result = _materialize_fetch_result(result, fallback_url=BASE_URL)
         if result.status_code == NOT_MODIFIED:
-            body = load_cached_body(args.cache_dir, cache_meta)
-            if body is None:
-                _raise_extraction_error(
-                    "Upstream returned 304 but no cached payload is available.",
-                )
+            result = _validate_304(
+                result,
+                cached,
+                sent_etag=sent_etag,
+                sent_last_modified=sent_last_modified,
+            )
             reused_cached_body = True
-        else:
-            body = result.body
-
+            freshness = "cache-revalidated"
+        response_etag = _result_etag(result) or sent_etag
+        response_last_modified = _result_last_modified(result) or sent_last_modified
+        official_result = _materialize_fetch_result(
+            fetch_models(api_key, timeout_seconds=args.timeout_seconds),
+            fallback_url=(
+                os.environ.get("ARTIFICIAL_ANALYSIS_API_BASE_URL") or MODEL_API_URL
+            ),
+        )
+        body = result.body
         frames = parse_json_frames(body)
         models, hosts, hosts_models = extract_lists(frames)
         official_models = normalize_official_models(official_result.body)
@@ -701,16 +1277,21 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
             rsc_reused_cached_payload=reused_cached_body,
             official_result=official_result,
             official_models=official_models,
+            rsc_freshness=freshness,
         )
     except (ExtractionError, OSError) as exc:
-        if args.strict or args.output_json == DEFAULT_OUTPUT_JSON:
+        if not _stale_allowed(args):
             raise
         fallback_reason = str(exc)
         fallback_payload = load_last_good_snapshot(args.cache_dir)
         fallback_source = "cache:last-good"
         if fallback_payload is None and args.output_json.exists():
-            fallback_payload = _load_reader_snapshot(args.output_json)
-            fallback_source = f"file:{args.output_json}"
+            try:
+                fallback_payload = load_snapshot(args.output_json)
+            except ExtractionError:
+                fallback_payload = None
+            else:
+                fallback_source = f"file:{args.output_json}"
         if fallback_payload is None:
             message = f"Fresh fetch failed and no last-good snapshot exists ({exc})."
             _raise_extraction_error(message, exc)
@@ -720,7 +1301,8 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
             min_endpoints=args.min_endpoints,
             min_providers=args.min_providers,
         )
-        payload = fallback_payload
+        payload = _mark_stale_payload(fallback_payload, reason=fallback_reason)
+        freshness = "stale-last-good"
         fallback_used = True
 
     full_url = build_full_url(slugs)
@@ -736,37 +1318,86 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
     if not fallback_used and result is not None:
         save_cache(
             cache_dir=args.cache_dir,
-            fetched_at=result.fetched_at,
+            fetched_at=_result_fetched_at(result),
             status_code=result.status_code,
             etag=response_etag,
+            last_modified=response_last_modified,
             body=None if result.status_code == NOT_MODIFIED else result.body,
+            source_url=BASE_URL,
+            final_url=_result_final_url(result),
+            headers=_result_headers(result),
         )
         save_last_good_snapshot(args.cache_dir, payload)
 
+    rsc_source: dict[str, object] = {
+        "url": redact_query(BASE_URL),
+        "final_url": (
+            redact_query(_result_final_url(result, BASE_URL))
+            if result is not None
+            else None
+        ),
+        "status_code": result.status_code if result is not None else None,
+        "etag_sent": sent_etag,
+        "etag_received": response_etag,
+        "last_modified_sent": sent_last_modified,
+        "last_modified_received": response_last_modified,
+        "sha256": _result_sha256(result) if result is not None else None,
+        "byte_length": _result_byte_length(result) if result is not None else None,
+        "artifact_ref": _result_artifact_ref(result) if result is not None else None,
+        "reused_cached_payload": reused_cached_body,
+        "freshness": freshness,
+    }
+    api_url = redact_query(
+        os.environ.get("ARTIFICIAL_ANALYSIS_API_BASE_URL") or MODEL_API_URL,
+    )
+    official_source: dict[str, object] = {
+        "url": api_url,
+        "final_url": (
+            redact_query(
+                _result_final_url(
+                    official_result,
+                    os.environ.get("ARTIFICIAL_ANALYSIS_API_BASE_URL") or MODEL_API_URL,
+                ),
+            )
+            if official_result is not None
+            else None
+        ),
+        "status_code": official_result.status_code
+        if official_result is not None
+        else None,
+        "etag_received": (
+            _result_etag(official_result) if official_result is not None else None
+        ),
+        "last_modified_received": (
+            _result_last_modified(official_result)
+            if official_result is not None
+            else None
+        ),
+        "sha256": (
+            _result_sha256(official_result) if official_result is not None else None
+        ),
+        "byte_length": (
+            _result_byte_length(official_result)
+            if official_result is not None
+            else None
+        ),
+        "artifact_ref": (
+            _result_artifact_ref(official_result)
+            if official_result is not None
+            else None
+        ),
+        "reused_cached_payload": False,
+        "freshness": freshness if fallback_used else "fresh",
+    }
+
     return {
-        "sources": {
-            "rsc": {
-                "url": BASE_URL,
-                "status_code": result.status_code if result is not None else None,
-                "etag_sent": sent_etag,
-                "etag_received": response_etag,
-                "reused_cached_payload": reused_cached_body,
-            },
-            "official_api": {
-                "url": os.environ.get("ARTIFICIAL_ANALYSIS_API_BASE_URL")
-                or MODEL_API_URL,
-                "status_code": (
-                    official_result.status_code if official_result is not None else None
-                ),
-                "etag_received": (
-                    official_result.headers.get("etag")
-                    if official_result is not None
-                    else None
-                ),
-                "reused_cached_payload": False,
-            },
-        },
+        "sources": {"rsc": rsc_source, "official_api": official_source},
         "counts": payload.get("meta", {}).get("counts", {}),
+        "freshness": {
+            "mode": freshness,
+            "stale": freshness == "stale-last-good",
+            "fallback": fallback_used,
+        },
         "outputs": {
             "json": str(args.output_json),
             "endpoints": str(args.output_endpoints),
@@ -777,7 +1408,8 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
             "used": fallback_used,
             "source": fallback_source,
             "reason": fallback_reason,
-            "strict": bool(args.strict),
+            "strict": bool(getattr(args, "strict", False)),
+            "policy": ("allow-last-good" if _stale_allowed(args) else "error"),
         },
     }
 
@@ -790,7 +1422,7 @@ def _stats_payload(args: argparse.Namespace) -> dict[str, Any]:
         : max(args.top, 0)
     ]
 
-    return {
+    payload: dict[str, Any] = {
         "snapshot": str(args.snapshot),
         "counts": {
             "models": len(snapshot.get("models", []))
@@ -808,7 +1440,9 @@ def _stats_payload(args: argparse.Namespace) -> dict[str, Any]:
         "top_providers": [
             {"provider": name, "endpoints": count} for name, count in top
         ],
+        "overlap": _snapshot_overlap(snapshot),
     }
+    return _attach_payload_evidence(payload)
 
 
 def _diff_payload(args: argparse.Namespace) -> dict[str, Any]:
@@ -839,9 +1473,9 @@ def _diff_payload(args: argparse.Namespace) -> dict[str, Any]:
                 },
             )
 
-    return {
-        "old_snapshot": str(args.old_snapshot),
-        "new_snapshot": str(args.new_snapshot),
+    payload: dict[str, Any] = {
+        "old_snapshot": _safe_error_text(args.old_snapshot),
+        "new_snapshot": _safe_error_text(args.new_snapshot),
         "counts": {
             "old_endpoints": len(old_slugs),
             "new_endpoints": len(new_slugs),
@@ -852,11 +1486,26 @@ def _diff_payload(args: argparse.Namespace) -> dict[str, Any]:
         "added_endpoint_slugs": added,
         "removed_endpoint_slugs": removed,
         "provider_deltas": provider_deltas,
+        "overlap": _snapshot_overlap(new_snapshot),
     }
+    if bool(getattr(args, "schema_aware", False)):
+        payload["schema_diff"] = schema_aware_diff(old_snapshot, new_snapshot)
+    return _attach_payload_evidence(payload)
+
+
+def _diagnose_payload(args: argparse.Namespace) -> dict[str, Any]:
+    snapshot_path = getattr(args, "snapshot_path", None) or getattr(
+        args, "snapshot", None
+    )
+    cache_dir = getattr(args, "cache_dir", None)
+    return diagnose(snapshot_path=snapshot_path, cache_dir=cache_dir)
 
 
 def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
-    result = fetch_rsc(url=CODING_CAPABILITY_URL, timeout_seconds=args.timeout_seconds)
+    result = _materialize_fetch_result(
+        fetch_rsc(url=CODING_CAPABILITY_URL, timeout_seconds=args.timeout_seconds),
+        fallback_url=CODING_CAPABILITY_URL,
+    )
     frames = parse_json_frames(result.body)
     models = _extract_default_data_models(frames)
 
@@ -868,7 +1517,7 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     rows: list[dict[str, Any]] = []
-    for model in models:
+    for model_index, model in enumerate(models):
         if not isinstance(model, dict) or model.get("deleted"):
             continue
 
@@ -928,6 +1577,26 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
             output_tokens = _number_alias(task_output, "output")
             input_tokens = None
 
+        published_answer_share = _number_alias(
+            token_counts,
+            "answer_share_of_output",
+            "answerShareOfOutput",
+        )
+        published_reasoning_share = _number_alias(
+            token_counts,
+            "reasoning_share_of_output",
+            "reasoningShareOfOutput",
+        )
+        answer_share = (
+            published_answer_share
+            if _finite_number(published_answer_share)
+            else _share(answer_tokens, output_tokens)
+        )
+        reasoning_share = (
+            published_reasoning_share
+            if _finite_number(published_reasoning_share)
+            else _share(reasoning_tokens, output_tokens)
+        )
         coding_token_counts = {
             "scope": "coding_index_only",
             "definition": (
@@ -939,8 +1608,8 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
             "answer_tokens": answer_tokens,
             "reasoning_tokens": reasoning_tokens,
             "output_tokens": output_tokens,
-            "answer_share_of_output": _share(answer_tokens, output_tokens),
-            "reasoning_share_of_output": _share(reasoning_tokens, output_tokens),
+            "answer_share_of_output": answer_share,
+            "reasoning_share_of_output": reasoning_share,
         }
         coding_eval_cost = {
             "scope": "coding_index_evaluation_api",
@@ -1022,6 +1691,69 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
         }
         if args.include_benchmark_counts:
             row["coding_component_token_counts"] = _coding_component_token_counts(model)
+        for preserved_key in ("raw_fields", "unknowns"):
+            preserved = model.get(preserved_key)
+            if isinstance(preserved, (dict, list)):
+                row[preserved_key] = copy.deepcopy(preserved)
+        _attach_row_evidence(
+            row,
+            metric_paths=(
+                "coding",
+                "terminalbench_hard",
+                "scicode",
+                "context_window_tokens",
+                "coding_token_counts.input_tokens",
+                "coding_token_counts.answer_tokens",
+                "coding_token_counts.reasoning_tokens",
+                "coding_token_counts.output_tokens",
+                "coding_token_counts.answer_share_of_output",
+                "coding_token_counts.reasoning_share_of_output",
+                "coding_eval_cost.total_cost",
+                "coding_eval_cost.input_cost",
+                "coding_eval_cost.answer_cost",
+                "coding_eval_cost.reasoning_cost",
+                "coding_task_metrics.output_tokens_per_task.output_tokens",
+                "coding_task_metrics.output_tokens_per_task.answer_tokens",
+                "coding_task_metrics.output_tokens_per_task.reasoning_tokens",
+                "coding_task_metrics.cost_per_task_usd.total_cost",
+                "coding_task_metrics.cost_per_task_usd.input_cost",
+                "coding_task_metrics.cost_per_task_usd.non_cache_input_cost",
+                "coding_task_metrics.cost_per_task_usd.cache_read_cost",
+                "coding_task_metrics.cost_per_task_usd.cache_write_cost",
+                "coding_task_metrics.cost_per_task_usd.output_cost",
+                "coding_task_metrics.cost_per_task_usd.reasoning_cost",
+                "coding_task_metrics.cost_per_task_usd.answer_cost",
+                "coding_task_metrics.time_per_task_seconds",
+            ),
+            source_prefix=f"$.models[{model_index}]",
+            artifact_hash=_result_sha256(result),
+            raw_values={
+                "coding": model.get("headlineValue", model.get("coding_index")),
+                "terminalbench_hard": model.get("terminalbench_hard"),
+                "scicode": model.get("scicode"),
+                "context_window_tokens": model.get("context_window_tokens"),
+            },
+            derived_paths={
+                "coding_token_counts.answer_share_of_output": (
+                    "answer_tokens / output_tokens",
+                    (
+                        "$.coding_token_counts.answer_tokens",
+                        "$.coding_token_counts.output_tokens",
+                    ),
+                )
+                if not _finite_number(published_answer_share)
+                else None,
+                "coding_token_counts.reasoning_share_of_output": (
+                    "reasoning_tokens / output_tokens",
+                    (
+                        "$.coding_token_counts.reasoning_tokens",
+                        "$.coding_token_counts.output_tokens",
+                    ),
+                )
+                if not _finite_number(published_reasoning_share)
+                else None,
+            },
+        )
         rows.append(row)
 
     sort_key_map = {
@@ -1042,25 +1774,32 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
     )
     limited = rows[: max(args.limit, 0)]
 
-    args.output_json.parent.mkdir(parents=True, exist_ok=True)
-    args.output_json.write_text(
-        json.dumps(
-            {
-                "meta": {
-                    "source_url": CODING_CAPABILITY_URL,
-                    "fetched_at": result.fetched_at,
-                },
-                "rows": rows,
-            },
-            ensure_ascii=False,
-        ),
+    coding_payload = {
+        "meta": {
+            "source_url": CODING_CAPABILITY_URL,
+            "final_url": _result_final_url(result, CODING_CAPABILITY_URL),
+            "fetched_at": _result_fetched_at(result),
+            "etag": _result_etag(result),
+            "last_modified": _result_last_modified(result),
+            "sha256": _result_sha256(result),
+            "byte_length": _result_byte_length(result),
+            "freshness": {"mode": "fresh", "stale": False, "fallback": False},
+        },
+        "rows": rows,
+        "overlap": overlap_metadata(),
+    }
+    _attach_payload_evidence(coding_payload, artifact_hash=_result_sha256(result))
+    atomic_write(
+        args.output_json,
+        json.dumps(coding_payload, ensure_ascii=False).encode("utf-8"),
     )
 
-    return {
+    payload: dict[str, Any] = {
         "source": {
             "url": CODING_CAPABILITY_URL,
             "status_code": result.status_code,
-            "fetched_at": result.fetched_at,
+            "fetched_at": _result_fetched_at(result),
+            "sha256": _result_sha256(result),
         },
         "output_json": str(args.output_json),
         "definition": {
@@ -1088,7 +1827,9 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
             "frames": len(frames),
         },
         "rows": limited,
+        "overlap": overlap_metadata(),
     }
+    return _attach_payload_evidence(payload, artifact_hash=_result_sha256(result))
 
 
 def _evaluation_payload(args: argparse.Namespace) -> dict[str, Any]:
@@ -1101,6 +1842,7 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, Any]:
     if args.limit is not None and args.limit < 0:
         _raise_cli_usage_error("limit must be non-negative")
 
+    result: FetchResult | None = None
     if args.input is not None:
         try:
             body = args.input.read_text(encoding="utf-8")
@@ -1111,16 +1853,69 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, Any]:
         source_status = 200
         fetched_at = datetime.now(UTC).isoformat()
         content_type = "local"
+        freshness = "snapshot"
+        final_url = source_url
+        etag = None
+        last_modified = None
+        digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+        byte_length = len(body.encode("utf-8"))
     else:
-        result = fetch_page(args.url, timeout_seconds=args.timeout_seconds)
+        if not isinstance(args.url, str):
+            _raise_cli_usage_error("evaluation requires --url when --input is absent")
+        if urlsplit(args.url).scheme.casefold() != "https":
+            _raise_cli_usage_error("evaluation public URL must use HTTPS")
+        result = _materialize_fetch_result(
+            fetch_page(args.url, timeout_seconds=args.timeout_seconds),
+            fallback_url=args.url,
+        )
         body = result.body
-        source_url = args.url
+        source_url = redact_query(args.url)
         source_status = result.status_code
-        fetched_at = result.fetched_at
-        content_type = result.headers.get("content-type")
+        fetched_at = _result_fetched_at(result)
+        content_type = _result_header(result, "content-type")
+        freshness = "fresh"
+        final_url = redact_query(_result_final_url(result, args.url))
+        etag = _result_etag(result)
+        last_modified = _result_last_modified(result)
+        digest = _result_sha256(result)
+        byte_length = _result_byte_length(result)
 
     frames = parse_next_payload(body)
     rows = extract_evaluation_rows(frames, min_rows=args.min_rows)
+    for row_index, row in enumerate(rows):
+        row["value_status"] = "published"
+        metric_paths = tuple(
+            key
+            for key, value in row.items()
+            if key not in {"value_status", "raw_fields", "unknowns"}
+            and (
+                _numeric_scalar(value)
+                or value is None
+                or key.casefold() in {"score", "value", "metric", "rank", "rating"}
+            )
+        )
+        known_metric_fields = {
+            "score",
+            "value",
+            "metric",
+            "rating",
+            "rank",
+            "pass_at_1",
+            "accuracy",
+            "overall",
+            "mean",
+            "median",
+        }
+        _attach_row_evidence(
+            row,
+            metric_paths=metric_paths,
+            source_prefix=f"$.rows[{row_index}]",
+            artifact_hash=digest,
+            raw_values={key: row.get(key) for key in metric_paths},
+            unknown_paths=tuple(
+                key for key in metric_paths if key.casefold() not in known_metric_fields
+            ),
+        )
     if args.sort_by:
         reverse = args.order in {"auto", "desc"}
         rows.sort(
@@ -1133,9 +1928,15 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, Any]:
     limited = rows if args.limit is None else rows[: args.limit]
     source = {
         "url": source_url,
+        "final_url": final_url,
         "status_code": source_status,
         "fetched_at": fetched_at,
         "content_type": content_type,
+        "etag": etag,
+        "last_modified": last_modified,
+        "sha256": digest,
+        "byte_length": byte_length,
+        "freshness": freshness,
     }
     filters = {
         "min_rows": args.min_rows,
@@ -1144,20 +1945,36 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, Any]:
         "limit": args.limit,
     }
     payload: dict[str, Any] = {
-        "meta": {"source": source, "filters_applied": filters},
+        "meta": {
+            "source": source,
+            "filters_applied": filters,
+            "freshness": {"mode": freshness, "stale": False, "fallback": False},
+        },
         "rows": rows,
+        "overlap": overlap_metadata(),
+        "derived": {
+            "sort": {
+                "formula": f"sort by {args.sort_by}" if args.sort_by else None,
+                "input_paths": [f"$.rows[*].{args.sort_by}"] if args.sort_by else [],
+            },
+            "limit": {
+                "formula": "rows[:limit]",
+                "input_paths": ["$.rows"],
+            },
+        },
     }
+    _attach_payload_evidence(payload, artifact_hash=digest)
     if args.output_json is not None:
-        args.output_json.parent.mkdir(parents=True, exist_ok=True)
-        args.output_json.write_text(
-            json.dumps(payload, ensure_ascii=False),
-            encoding="utf-8",
+        atomic_write(
+            args.output_json,
+            json.dumps(payload, ensure_ascii=False).encode("utf-8"),
         )
 
-    return {
+    result_payload: dict[str, Any] = {
         "value_status": "published",
         "source": source,
         "filters_applied": filters,
+        "freshness": {"mode": freshness, "stale": False, "fallback": False},
         "counts": {
             "frames": len(frames),
             "matched_rows": len(rows),
@@ -1165,7 +1982,10 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, Any]:
         },
         "output_json": str(args.output_json) if args.output_json else None,
         "rows": limited,
+        "overlap": overlap_metadata(),
+        "derived": payload["derived"],
     }
+    return _attach_payload_evidence(result_payload, artifact_hash=digest)
 
 
 def _extract_default_data_models(frames: list[tuple[str, Any]]) -> list[Any]:
@@ -1223,7 +2043,7 @@ def _first_string(mapping: dict[str, Any], *keys: str) -> str | None:
 def _first_number(mapping: dict[str, Any], *keys: str) -> int | float | None:
     for key in keys:
         value = mapping.get(key)
-        if isinstance(value, int | float):
+        if _finite_number(value):
             return value
     return None
 
@@ -1249,15 +2069,11 @@ def _number_alias(mapping: dict[str, Any], *keys: str) -> int | float | None:
 
 
 def _number_or_none(value: object) -> int | float | None:
-    return value if isinstance(value, int | float) else None
+    return value if _finite_number(value) else None
 
 
 def _share(part: float | None, total: float | None) -> float | None:
-    if (
-        not isinstance(part, int | float)
-        or not isinstance(total, int | float)
-        or total == 0
-    ):
+    if not _finite_number(part) or not _finite_number(total) or float(total) == 0:
         return None
     return round(float(part) / float(total), 6)
 
@@ -1281,13 +2097,17 @@ def _nested_sort_metric(
     *,
     reverse: bool,
 ) -> tuple[int, float]:
-    current: Any = row
-    for part in path.split("."):
-        if not isinstance(current, dict):
-            current = None
-            break
-        current = current.get(part)
-    if isinstance(current, int | float):
+    current: object = _lookup_path(row, path)
+    metric_evidence = row.get("metric_evidence")
+    evidence = metric_evidence.get(path) if isinstance(metric_evidence, dict) else None
+    if isinstance(evidence, dict):
+        if (
+            evidence.get("comparison_eligibility", evidence.get("eligibility"))
+            != "eligible"
+        ):
+            return (1, 0.0)
+        current = evidence.get("normalized_value", evidence.get("normalized"))
+    if _finite_number(current):
         normalized = -float(current) if reverse else float(current)
         return (0, normalized)
     return (1, 0.0)
@@ -1332,37 +2152,110 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
 
         agentic = model.get("agentic_index")
         coding = model.get("coding_index")
-        if not isinstance(agentic, int | float) or not isinstance(coding, int | float):
+        if not _finite_number(agentic) or not _finite_number(coding):
             skipped_missing += 1
             continue
 
-        harness = (float(agentic) + float(coding)) / 2.0
-        rows.append(
-            {
-                "rank": 0,
-                "model_slug": model_slug,
-                "model_name": model_name,
-                "creator": creator_name,
-                "harness": round(harness, 4),
-                "agentic": agentic,
-                "coding": coding,
-                "execution_gap": round(float(agentic) - float(coding), 4),
+        computed_harness = round((float(agentic) + float(coding)) / 2.0, 4)
+        computed_gap = round(float(agentic) - float(coding), 4)
+        published_harness = model.get("harness")
+        published_gap = model.get("execution_gap")
+        row: dict[str, Any] = {
+            "rank": 0,
+            "model_slug": model_slug,
+            "model_name": model_name,
+            "creator": creator_name,
+            "harness": published_harness
+            if _finite_number(published_harness)
+            else computed_harness,
+            "agentic": agentic,
+            "coding": coding,
+            "execution_gap": published_gap
+            if _finite_number(published_gap)
+            else computed_gap,
+            "intelligence": model.get("intelligence_index"),
+            "release_date": model.get("release_date"),
+            "reasoning_model": model.get("reasoning_model"),
+            "is_open_weights": model.get("is_open_weights"),
+            "context_window_tokens": model.get("context_window_tokens"),
+            "derived": {
+                "harness": {
+                    "value": computed_harness,
+                    "formula": "0.5 * agentic + 0.5 * coding",
+                    "input_paths": ["$.agentic", "$.coding"],
+                },
+                "execution_gap": {
+                    "value": computed_gap,
+                    "formula": "agentic - coding",
+                    "input_paths": ["$.agentic", "$.coding"],
+                },
+            },
+        }
+        for preserved_key in ("raw_fields", "unknowns"):
+            preserved = model.get(preserved_key)
+            if isinstance(preserved, (dict, list)):
+                row[preserved_key] = copy.deepcopy(preserved)
+        _attach_row_evidence(
+            row,
+            metric_paths=(
+                "rank",
+                "harness",
+                "agentic",
+                "coding",
+                "execution_gap",
+                "intelligence",
+                "context_window_tokens",
+                "derived.harness.value",
+                "derived.execution_gap.value",
+            ),
+            source_prefix=f"$.models[{len(rows)}]",
+            derived_paths={
+                "harness": (
+                    "0.5 * agentic + 0.5 * coding",
+                    ("$.agentic", "$.coding"),
+                )
+                if not _finite_number(published_harness)
+                else None,
+                "execution_gap": (
+                    "agentic - coding",
+                    ("$.agentic", "$.coding"),
+                )
+                if not _finite_number(published_gap)
+                else None,
+                "derived.harness.value": (
+                    "0.5 * agentic + 0.5 * coding",
+                    ("$.agentic", "$.coding"),
+                ),
+                "derived.execution_gap.value": (
+                    "agentic - coding",
+                    ("$.agentic", "$.coding"),
+                ),
+            },
+            raw_values={
+                "agentic": model.get("agentic_index"),
+                "coding": model.get("coding_index"),
                 "intelligence": model.get("intelligence_index"),
-                "release_date": model.get("release_date"),
-                "reasoning_model": model.get("reasoning_model"),
-                "is_open_weights": model.get("is_open_weights"),
                 "context_window_tokens": model.get("context_window_tokens"),
             },
         )
+        rows.append(row)
 
     rows.sort(
         key=lambda row: (-float(row["harness"]), str(row.get("model_slug") or "")),
     )
     for index, row in enumerate(rows, start=1):
         row["rank"] = index
+        _attach_row_evidence(
+            row,
+            metric_paths=("rank",),
+            source_prefix=f"$.rows[{index - 1}]",
+            derived_paths={
+                "rank": ("deterministic descending sort rank", ("$.harness",)),
+            },
+        )
 
     limited = rows[: max(args.limit, 0)]
-    return {
+    payload: dict[str, Any] = {
         "snapshot": str(args.snapshot),
         "definition": {
             "name": "Harness",
@@ -1371,6 +2264,11 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "Agentic Index - Coding Index; high positive values indicate "
                 "executable-precision risk."
             ),
+            "dependencies": [
+                {"canonical_id": "agentic_index", "release": None},
+                {"canonical_id": "coding_index", "release": None},
+            ],
+            "independence": [],
         },
         "applied_filters": {
             "model": args.model,
@@ -1384,7 +2282,15 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
             "skipped_missing_agentic_or_coding": skipped_missing,
         },
         "rows": limited,
+        "overlap": overlap_metadata(
+            dependencies=[
+                {"canonical_id": "agentic_index", "release": None},
+                {"canonical_id": "coding_index", "release": None},
+            ],
+            independence=[],
+        ),
     }
+    return _attach_payload_evidence(payload)
 
 
 REASONING_EXTREME_FLOOR = 0.10
@@ -1407,10 +2313,10 @@ def _aggregate_only_reasoning_profile(
     reasoning = _number_or_none(iitc.get("reasoning"))
     output = _number_or_none(iitc.get("output_tokens"))
     if (
-        not isinstance(answer, int | float)
-        or not isinstance(reasoning, int | float)
-        or not isinstance(output, int | float)
-        or output <= 0
+        not _finite_number(answer)
+        or not _finite_number(reasoning)
+        or not _finite_number(output)
+        or float(output) <= 0
     ):
         return None
     return {
@@ -1437,17 +2343,22 @@ def _reasoning_shares(
     for bench_name, vals in canonical.items():
         if not isinstance(vals, dict):
             continue
-        answer = vals.get("answer") or vals.get("answer_tokens", 0)
-        reasoning = vals.get("reasoning") or vals.get("reasoning_tokens", 0)
+        answer = vals.get("answer")
+        if answer is None:
+            answer = vals.get("answer_tokens")
+        reasoning = vals.get("reasoning")
+        if reasoning is None:
+            reasoning = vals.get("reasoning_tokens")
         if (
-            isinstance(answer, int | float)
-            and isinstance(reasoning, int | float)
-            and answer + reasoning > 0
+            not _finite_number(answer)
+            or not _finite_number(reasoning)
+            or float(answer) + float(reasoning) <= 0
         ):
-            shares.append((reasoning / (answer + reasoning), bench_name))
-            total_answer += answer
-            total_reasoning += reasoning
-    return shares, total_answer, total_reasoning
+            continue
+        share = float(reasoning) / (float(answer) + float(reasoning))
+        shares.append((share, bench_name))
+        total_answer += answer
+        total_reasoning += reasoning
 
 
 def _reasoning_classification(
@@ -1514,20 +2425,22 @@ def _reasoning_benchmarks(model: dict[str, Any]) -> list[dict[str, Any]]:
     for bench_name, vals in canonical.items():
         if not isinstance(vals, dict):
             continue
-        a = vals.get("answer") or vals.get("answer_tokens", 0)
-        r = vals.get("reasoning") or vals.get("reasoning_tokens", 0)
-        if not isinstance(a, int | float) or not isinstance(r, int | float):
+        a = vals.get("answer")
+        if a is None:
+            a = vals.get("answer_tokens")
+        r = vals.get("reasoning")
+        if r is None:
+            r = vals.get("reasoning_tokens")
+        if not _finite_number(a) or not _finite_number(r) or float(a) + float(r) <= 0:
             continue
-        output = a + r
-        if output <= 0:
-            continue
+        output = float(a) + float(r)
         result.append(
             {
                 "benchmark": bench_name,
                 "answer_tokens": int(a),
                 "reasoning_tokens": int(r),
                 "output_tokens": int(output),
-                "reasoning_share": round(float(r) / float(output), 4),
+                "reasoning_share": round(float(r) / output, 4),
             },
         )
     result.sort(key=lambda b: b["reasoning_share"])
@@ -1568,11 +2481,23 @@ def _reasoning_row(
 
     agentic = model.get("agentic_index")
     coding = model.get("coding_index")
-    harness = (
-        (float(agentic) + float(coding)) / 2.0
-        if isinstance(agentic, int | float) and isinstance(coding, int | float)
+    computed_harness = (
+        round((float(agentic) + float(coding)) / 2.0, 4)
+        if _finite_number(agentic) and _finite_number(coding)
         else None
     )
+    published_harness = model.get("harness")
+    harness = (
+        published_harness if _finite_number(published_harness) else computed_harness
+    )
+    profile_numeric = {
+        key: value for key, value in profile.items() if _numeric_scalar(value)
+    }
+    derived_profile = {
+        "formula": "reasoning shares derived from canonical_eval_token_counts",
+        "input_paths": ["$.canonical_eval_token_counts"],
+        "values": profile,
+    }
     row: dict[str, Any] = {
         "model_slug": model_slug,
         "model_name": model_name,
@@ -1584,11 +2509,72 @@ def _reasoning_row(
         "intelligence": model.get("intelligence_index"),
         "agentic": agentic,
         "coding": coding,
-        "harness": round(harness, 4) if harness is not None else None,
+        "harness": harness,
         "reasoning_profile": profile,
+        "derived": {
+            "harness": {
+                "value": computed_harness,
+                "formula": "0.5 * agentic + 0.5 * coding",
+                "input_paths": ["$.agentic", "$.coding"],
+            },
+            "reasoning_profile": derived_profile,
+        },
     }
     if args.benchmarks:
         row["per_benchmark"] = _reasoning_benchmarks(model)
+    for preserved_key in ("raw_fields", "unknowns"):
+        preserved = model.get(preserved_key)
+        if isinstance(preserved, (dict, list)):
+            row[preserved_key] = copy.deepcopy(preserved)
+    derived_paths: dict[str, tuple[str, tuple[str, ...]] | None] = {
+        "harness": (
+            "0.5 * agentic + 0.5 * coding",
+            ("$.agentic", "$.coding"),
+        )
+        if not _finite_number(published_harness)
+        else None,
+        "derived.harness.value": (
+            "0.5 * agentic + 0.5 * coding",
+            ("$.agentic", "$.coding"),
+        ),
+    }
+    for key in profile_numeric:
+        derived_paths[f"reasoning_profile.{key}"] = (
+            "derived from canonical_eval_token_counts",
+            ("$.canonical_eval_token_counts",),
+        )
+        derived_paths[f"derived.reasoning_profile.values.{key}"] = (
+            "derived from canonical_eval_token_counts",
+            ("$.canonical_eval_token_counts",),
+        )
+    if args.benchmarks:
+        for index, benchmark in enumerate(row.get("per_benchmark", [])):
+            if isinstance(benchmark, dict):
+                for key, value in benchmark.items():
+                    if _numeric_scalar(value):
+                        derived_paths[f"per_benchmark[{index}].{key}"] = (
+                            "reasoning_tokens / (answer_tokens + reasoning_tokens)",
+                            ("$.canonical_eval_token_counts",),
+                        )
+    _attach_row_evidence(
+        row,
+        metric_paths=(
+            "harness",
+            "intelligence",
+            "agentic",
+            "coding",
+            "context_window_tokens",
+            *tuple(f"reasoning_profile.{key}" for key in profile_numeric),
+        ),
+        source_prefix=f"$.models[{model_slug}]",
+        raw_values={
+            "intelligence": model.get("intelligence_index"),
+            "agentic": agentic,
+            "coding": coding,
+            "context_window_tokens": model.get("context_window_tokens"),
+        },
+        derived_paths=derived_paths,
+    )
     return row, False
 
 
@@ -1637,26 +2623,29 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
     elif args.order == "desc":
         reverse = True
 
-    def _sort_key(row: dict[str, Any]) -> tuple[int, float]:
-        parts = sort_path.split(".")
-        current: Any = row
-        for part in parts:
-            if isinstance(current, dict):
-                current = current.get(part)
-            else:
-                current = None
-                break
-        if isinstance(current, int | float):
-            normalized = -float(current) if reverse else float(current)
-            return (0, normalized)
-        return (1, 0.0)
-
-    rows.sort(key=_sort_key)
+    rows.sort(
+        key=lambda row: _nested_sort_metric(
+            row,
+            sort_path,
+            reverse=reverse,
+        ),
+    )
     limited = rows[: max(args.limit, 0)]
     for index, row in enumerate(limited, start=1):
         row["rank"] = index
+        _attach_row_evidence(
+            row,
+            metric_paths=("rank",),
+            source_prefix=f"$.rows[{index - 1}]",
+            derived_paths={
+                "rank": (
+                    "deterministic sort rank",
+                    (f"$.{sort_path}",),
+                ),
+            },
+        )
 
-    return {
+    payload: dict[str, Any] = {
         "snapshot": str(args.snapshot),
         "definition": {
             "name": "Reasoning Selectivity",
@@ -1680,6 +2669,10 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
                     "floor >= 0.60 and weighted_reasoning_share >= 0.85"
                 ),
             },
+            "dependencies": [
+                {"canonical_id": "canonical_eval_token_counts", "release": None},
+            ],
+            "independence": [],
         },
         "applied_filters": {
             "model": args.model,
@@ -1697,7 +2690,9 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
             "skipped_missing_profile": skipped_missing,
         },
         "rows": limited,
+        "overlap": _snapshot_overlap(snapshot),
     }
+    return _attach_payload_evidence(payload)
 
 
 def _query_row(
@@ -1747,14 +2742,24 @@ def _query_row(
         if isinstance(item.get("end_to_end_response_time_metrics"), dict)
         else {}
     )
-    return {
+    computed_harness = _harness_score(model)
+    published_harness = model.get("harness")
+    harness = (
+        published_harness if _finite_number(published_harness) else computed_harness
+    )
+    blended_field = (
+        "price_1m_blended_7_to_2_to_1"
+        if "price_1m_blended_7_to_2_to_1" in item
+        else "price_1m_blended_3_to_1"
+    )
+    row: dict[str, Any] = {
         "endpoint_slug": endpoint_slug,
         "endpoint_name": item.get("name"),
         "model_slug": model_slug,
         "model_name": model_name,
         "provider_slug": provider_slug,
         "provider_name": provider_name,
-        "harness": _harness_score(model),
+        "harness": harness,
         "intelligence": model.get("intelligence_index"),
         "agentic": model.get("agentic_index"),
         "coding": model.get("coding_index"),
@@ -1771,16 +2776,84 @@ def _query_row(
         "is_open_weights": model.get("is_open_weights"),
         "price_input": item.get("price_1m_input_tokens"),
         "price_output": item.get("price_1m_output_tokens"),
-        "price_blended": item.get(
-            "price_1m_blended_7_to_2_to_1",
-            item.get("price_1m_blended_3_to_1"),
-        ),
+        "price_blended": item.get(blended_field),
         "speed": timescale.get("median_output_speed"),
         "ttfc": timescale.get("median_time_to_first_chunk"),
         "e2e": e2e.get("total_time"),
         "context_window_tokens": item.get("context_window_tokens"),
         "host_api_id": item.get("host_api_id"),
+        "derived": {
+            "harness": {
+                "value": computed_harness,
+                "formula": "0.5 * agentic + 0.5 * coding",
+                "input_paths": ["$.agentic", "$.coding"],
+            },
+        },
     }
+    for preserved_key in ("raw_fields", "unknowns"):
+        for source in (item, model):
+            preserved = source.get(preserved_key)
+            if isinstance(preserved, (dict, list)):
+                row[preserved_key] = copy.deepcopy(preserved)
+                break
+    _attach_row_evidence(
+        row,
+        metric_paths=(
+            "harness",
+            "intelligence",
+            "agentic",
+            "coding",
+            "math",
+            "gpqa",
+            "mmlu_pro",
+            "livecodebench",
+            "ifbench",
+            "scicode",
+            "tau2",
+            "terminalbench_hard",
+            "price_input",
+            "price_output",
+            "price_blended",
+            "speed",
+            "ttfc",
+            "e2e",
+            "context_window_tokens",
+        ),
+        source_prefix=f"$.hosts_models[{endpoint_slug}]",
+        raw_values={
+            "intelligence": model.get("intelligence_index"),
+            "agentic": model.get("agentic_index"),
+            "coding": model.get("coding_index"),
+            "math": model.get("math_index"),
+            "gpqa": model.get("gpqa"),
+            "mmlu_pro": model.get("mmlu_pro"),
+            "livecodebench": model.get("livecodebench"),
+            "ifbench": model.get("ifbench"),
+            "scicode": model.get("scicode"),
+            "tau2": model.get("tau_2", model.get("tau2")),
+            "terminalbench_hard": model.get("terminalbench_hard"),
+            "price_input": item.get("price_1m_input_tokens"),
+            "price_output": item.get("price_1m_output_tokens"),
+            "price_blended": item.get(blended_field),
+            "speed": timescale.get("median_output_speed"),
+            "ttfc": timescale.get("median_time_to_first_chunk"),
+            "e2e": e2e.get("total_time"),
+            "context_window_tokens": item.get("context_window_tokens"),
+        },
+        derived_paths={
+            "harness": (
+                "0.5 * agentic + 0.5 * coding",
+                ("$.agentic", "$.coding"),
+            )
+            if not _finite_number(published_harness)
+            else None,
+            "derived.harness.value": (
+                "0.5 * agentic + 0.5 * coding",
+                ("$.agentic", "$.coding"),
+            ),
+        },
+    )
+    return row
 
 
 def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
@@ -1826,7 +2899,7 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
         if isinstance(model_slug, str):
             model_counts[model_slug] = model_counts.get(model_slug, 0) + 1
 
-    return {
+    payload: dict[str, Any] = {
         "snapshot": str(args.snapshot),
         "applied_filters": {
             "model": args.model,
@@ -1857,13 +2930,15 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
             )[:10]
         ],
         "rows": limited,
+        "overlap": _snapshot_overlap(snapshot),
     }
+    return _attach_payload_evidence(payload)
 
 
 def _harness_score(model: dict[str, Any]) -> float | None:
     agentic = model.get("agentic_index")
     coding = model.get("coding_index")
-    if isinstance(agentic, int | float) and isinstance(coding, int | float):
+    if _finite_number(agentic) and _finite_number(coding):
         return round((float(agentic) + float(coding)) / 2.0, 4)
     return None
 
@@ -1886,8 +2961,19 @@ def _sort_metric(
     *,
     reverse: bool,
 ) -> tuple[int, float]:
-    value = row.get(metric)
-    if isinstance(value, int | float):
+    value: object = row.get(metric)
+    metric_evidence = row.get("metric_evidence")
+    evidence = (
+        metric_evidence.get(metric) if isinstance(metric_evidence, dict) else None
+    )
+    if isinstance(evidence, dict):
+        if (
+            evidence.get("comparison_eligibility", evidence.get("eligibility"))
+            != "eligible"
+        ):
+            return (1, 0.0)
+        value = evidence.get("normalized_value", evidence.get("normalized"))
+    if _finite_number(value):
         normalized = -float(value) if reverse else float(value)
         return (0, normalized)
     return (1, 0.0)
@@ -1956,7 +3042,8 @@ def _qa_payload(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     query_result = _query_payload(query_ns)
-    return {
+
+    payload: dict[str, Any] = {
         "question": question,
         "parsed_intent": {
             "model": inferred_model,
@@ -1966,7 +3053,15 @@ def _qa_payload(args: argparse.Namespace) -> dict[str, Any]:
             "limit": limit,
         },
         "query": query_result,
+        "overlap": _snapshot_overlap(snapshot),
+        "derived": {
+            "intent": {
+                "formula": "question -> model/provider/sort/order/limit",
+                "input_paths": ["$.question"],
+            },
+        },
     }
+    return _attach_payload_evidence(payload)
 
 
 def _normalize_for_match(value: str) -> str:
@@ -2085,6 +3180,11 @@ def _handle_diff(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_diagnose(args: argparse.Namespace) -> int:
+    _emit_json(_envelope("diagnose", _diagnose_payload(args)), stdout=sys.stdout)
+    return 0
+
+
 def _handle_harness(args: argparse.Namespace) -> int:
     _emit_json(_envelope("harness", _harness_payload(args)), stdout=sys.stdout)
     return 0
@@ -2158,11 +3258,13 @@ def _capability_schema() -> dict[str, Any]:
                         "Path (default <temp-dir>/artifacts/"
                         "artificial-analysis/full-url.txt)"
                     ),
-                    "cache_dir": "Path to ETag/payload cache",
+                    "cache_dir": "Path to ETag/Last-Modified/payload cache",
                     "timeout_seconds": "float network timeout",
                     "min_endpoints": "int sanity threshold (default 700)",
                     "min_providers": "int sanity threshold (default 40)",
-                    "strict": "bool disable last-good fallback",
+                    "stale_policy": "error|allow-last-good (default error)",
+                    "allow_stale": "bool alias for stale_policy allow-last-good",
+                    "strict": "bool alias for stale_policy error",
                 },
             },
             "stats": {
@@ -2171,9 +3273,26 @@ def _capability_schema() -> dict[str, Any]:
                 "flags": {"top": "int top N providers (default 10)"},
             },
             "diff": {
-                "description": "Diff two snapshots for endpoint/provider deltas.",
+                "description": (
+                    "Diff endpoint/provider deltas; optionally include schema-aware "
+                    "model, metric, evidence, and diagnostic changes."
+                ),
                 "args": ["old_snapshot", "new_snapshot"],
-                "flags": {},
+                "flags": {
+                    "schema_aware": "bool opt-in additive schema-aware diff",
+                },
+            },
+            "diagnose": {
+                "description": (
+                    "Inspect explicit local snapshot/cache paths without network "
+                    "access and return redacted health diagnostics."
+                ),
+                "args": ["snapshot(optional)"],
+                "flags": {
+                    "snapshot": "Path to a local snapshot",
+                    "cache_dir": "Path to a local cache",
+                },
+                "network": False,
             },
             "harness": {
                 "description": (
@@ -2320,20 +3439,24 @@ def _capability_schema() -> dict[str, Any]:
 
 
 def _error_response(
-    request_id: Any,
+    request_id: object,
     command: str,
     code: str,
-    message: str,
+    message: object,
+    details: object | None = None,
 ) -> dict[str, Any]:
+    error: dict[str, object] = {
+        "code": code,
+        "message": _safe_error_text(message),
+    }
+    if details:
+        error["details"] = redact(details)
     return {
-        "id": request_id,
+        "id": redact(request_id),
         "type": "response",
-        "command": command,
+        "command": _safe_error_text(command),
         "success": False,
-        "error": {
-            "code": code,
-            "message": message,
-        },
+        "error": error,
     }
 
 
@@ -2371,6 +3494,8 @@ def _fetch_namespace(args: dict[str, Any]) -> argparse.Namespace:
         timeout_seconds=float(_arg_value(args, "timeout_seconds", 60.0)),
         min_endpoints=int(_arg_value(args, "min_endpoints", 700)),
         min_providers=int(_arg_value(args, "min_providers", 40)),
+        stale_policy=str(_arg_value(args, "stale_policy", "error")),
+        allow_stale=bool(_arg_value(args, "allow_stale", False)),
         strict=bool(_arg_value(args, "strict", False)),
     )
 
@@ -2455,6 +3580,17 @@ def _diff_namespace(args: dict[str, Any]) -> argparse.Namespace:
     return argparse.Namespace(
         old_snapshot=Path(str(old_snapshot)),
         new_snapshot=Path(str(new_snapshot)),
+        schema_aware=bool(_arg_value(args, "schema_aware", False)),
+    )
+
+
+def _diagnose_namespace(args: dict[str, Any]) -> argparse.Namespace:
+    snapshot = _arg_value(args, "snapshot", _arg_value(args, "snapshot_path", None))
+    cache_dir = _arg_value(args, "cache_dir", _arg_value(args, "cache", None))
+    return argparse.Namespace(
+        snapshot=Path(str(snapshot)) if snapshot is not None else None,
+        snapshot_path=None,
+        cache_dir=Path(str(cache_dir)) if cache_dir is not None else None,
     )
 
 
@@ -2547,7 +3683,6 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                 stdout=output_stream,
             )
             continue
-
         try:
             if command == "ping":
                 response = _success_response(
@@ -2574,6 +3709,12 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                     request_id,
                     command,
                     _diff_payload(_diff_namespace(args_payload)),
+                )
+            elif command == "diagnose":
+                response = _success_response(
+                    request_id,
+                    command,
+                    _diagnose_payload(_diagnose_namespace(args_payload)),
                 )
             elif command == "harness":
                 response = _success_response(
@@ -2620,6 +3761,14 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                 )
         except CliUsageError as exc:
             response = _error_response(request_id, command, "usage_error", str(exc))
+        except CacheError as exc:
+            response = _error_response(
+                request_id,
+                command,
+                exc.code,
+                str(exc),
+                exc.details,
+            )
         except ExtractionError as exc:
             response = _error_response(
                 request_id,
@@ -2627,10 +3776,26 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                 "extraction_error",
                 str(exc),
             )
+        except (ValueError, TypeError) as exc:
+            response = _error_response(
+                request_id,
+                command,
+                "invalid_args",
+                str(exc),
+            )
         except OSError as exc:
             response = _error_response(request_id, command, "io_error", str(exc))
 
-        _emit_json(response, stdout=output_stream)
+        try:
+            _emit_json(response, stdout=output_stream)
+        except (TypeError, ValueError):
+            fallback = _error_response(
+                request_id,
+                command,
+                "internal_error",
+                "Response serialization failed.",
+            )
+            output_stream.write(compact_json(fallback) + "\n")
 
     return 0
 
@@ -2646,37 +3811,113 @@ def _mode_from_argv(values: list[str]) -> str:
     return "cli"
 
 
+def _command_from_argv(values: Sequence[str]) -> str:
+    known = {
+        "fetch",
+        "stats",
+        "diff",
+        "diagnose",
+        "harness",
+        "coding",
+        "evaluation",
+        "reasoning",
+        "query",
+        "qa",
+        "schema",
+    }
+    for index, value in enumerate(values):
+        if value == "--mode":
+            continue
+        if value.startswith("--"):
+            continue
+        if value in {"cli", "rpc"} and index > 0 and values[index - 1] == "--mode":
+            continue
+        if value in known:
+            return value
+        if index == 0 or (index > 0 and values[index - 1] in {"--mode", "--mode=cli"}):
+            return _safe_error_text(value)
+    return "fetch"
+
+
+def _json_errors_requested(values: Sequence[str]) -> bool:
+    return "--json-errors" in values and "--legacy-errors" not in values
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command-line interface and return its exit status."""
     values = list(argv) if argv is not None else sys.argv[1:]
     if _mode_from_argv(values) == "rpc":
         return run_rpc()
 
+    json_errors = _json_errors_requested(values)
     parser = build_parser()
     normalized_argv = _normalize_argv(values)
+    command = _command_from_argv(normalized_argv)
 
+    parse_context: contextlib.AbstractContextManager[object]
+    parse_context = (
+        contextlib.redirect_stderr(io.StringIO())
+        if json_errors
+        else contextlib.nullcontext()
+    )
     try:
-        args = parser.parse_args(normalized_argv)
+        with parse_context:
+            args = parser.parse_args(normalized_argv)
     except SystemExit as exc:
+        if json_errors:
+            _emit_cli_error(
+                command=command,
+                code="usage_error",
+                message="Invalid command arguments.",
+                stdout=sys.stdout,
+            )
         return _exit_code(exc.code)
 
+    json_errors = bool(getattr(args, "json_errors", False)) and not bool(
+        getattr(args, "legacy_errors", False),
+    )
+    command = str(getattr(args, "command", command) or command)
     handler = getattr(args, "handler", None)
     if handler is None:
-        parser.print_usage(sys.stderr)
-        sys.stderr.write(f"{parser.prog}: error: missing command\n")
+        if json_errors:
+            _emit_cli_error(
+                command=command,
+                code="usage_error",
+                message="Missing command.",
+                stdout=sys.stdout,
+            )
+        else:
+            parser.print_usage(sys.stderr)
+            sys.stderr.write(f"{parser.prog}: error: missing command\n")
         return 2
 
+    error_message: object
     try:
         return int(handler(args))
-    except CliUsageError as exc:
-        sys.stderr.write(f"error: {exc}\n")
-        return 2
-    except ExtractionError as exc:
-        sys.stderr.write(f"error: {exc}\n")
-        return 2
-    except OSError as exc:
-        sys.stderr.write(f"error: {exc}\n")
-        return 1
+    except CliUsageError as caught:
+        error_message = caught
+        code = "usage_error"
+        status = 2
+    except ExtractionError as caught:
+        error_message = caught
+        code = "extraction_error"
+        status = 2
+    except OSError as caught:
+        error_message = caught
+        code = "io_error"
+        status = 1
+    except (ValueError, TypeError) as caught:
+        error_message = caught
+        code = "invalid_args"
+        status = 2
+
+    if json_errors:
+        _emit_cli_error(
+            command=command, code=code, message=error_message, stdout=sys.stdout
+        )
+    else:
+        sys.stderr.write(f"error: {_safe_error_text(error_message)}\n")
+    return status
 
 
 def _exit_code(code: object) -> int:

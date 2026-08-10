@@ -46,3 +46,28 @@ The command returns source metadata, frame/row counts, applied filters, and rows
 - Costs and token counts must retain their scope: API evaluation spend, subscription quota, per-task cost, and per-attempt cost are different quantities
 - A value derived by dividing a page total by a task count is derived, even when both inputs are published
 - Do not average scores from different benchmark populations into one quality number without an explicit normalization and workload definition
+
+
+## Evidence and comparison gates
+
+Dedicated rows keep `value_status: "published"` for copied page values, while
+sorting, limiting, arithmetic, and derived classifications remain derived.
+When available, additive metric evidence records raw/normalized values, unit,
+source path/field, parser/version, artifact hash, semantics, and comparison
+eligibility. Missing, placeholder, malformed, non-finite, unknown-semantics,
+unit-mismatched, or mixed-scope values remain visible but blocked.
+
+Keep the lossless JSON/source artifact as the authority for unknown fields;
+Markdown/TSV exports are fixed named-column views. Do not merge a dedicated
+score with Coding Index, Coding Agent Index, or provider quality rows merely
+because model labels match. Record only source-published release/population
+evidence; otherwise leave release/population null and emit a
+`requirements_claim` overlap note.
+
+## URL and artifact safety
+
+Public URL input is HTTPS-only and query credentials are redacted. Use
+`--input <file>` for deterministic local HTML/RSC replay; it is marked
+`freshness.mode: "snapshot"`/historical rather than live. Source bytes are
+content-addressed with SHA-256 and immutable manifests; authorization/cookie
+headers and raw dotenv values are never persisted.

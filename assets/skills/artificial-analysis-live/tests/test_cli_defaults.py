@@ -3,6 +3,7 @@
 # ruff: noqa: CPY001, D101, D102, E501, INP001, PLR2004, S101, SLF001
 from __future__ import annotations
 
+import argparse
 import os
 import tempfile
 import unittest
@@ -23,12 +24,62 @@ TMP_CODING = TMP_ARTIFACT_DIR / "coding-data.json"
 
 
 class TestCliDefaultPaths(unittest.TestCase):
+    def test_omitted_command_defaults_to_fetch(self) -> None:
+        args = cli.build_parser().parse_args(cli._normalize_argv([]))
+
+        assert args.command == "fetch"
+        assert args.handler is cli._handle_fetch
+
+    def test_cli_command_set_remains_present(self) -> None:
+        parser = cli.build_parser()
+        subparsers = next(
+            action
+            for action in parser._actions
+            if isinstance(action, argparse._SubParsersAction)
+        )
+
+        assert set(subparsers.choices) == {
+            "fetch",
+            "stats",
+            "diff",
+            "diagnose",
+            "coding",
+            "harness",
+            "evaluation",
+            "reasoning",
+            "query",
+            "qa",
+            "schema",
+        }
+
+    def test_success_envelope_keeps_protocol_v1_shape(self) -> None:
+        data = {"counts": {"models": 1}}
+
+        assert cli._envelope("stats", data) == {
+            "ok": True,
+            "version": "1",
+            "command": "stats",
+            "data": data,
+        }
+
     def test_fetch_parser_uses_tmp_artifacts_defaults(self) -> None:
         args = cli.build_parser().parse_args(["fetch"])
 
         assert args.output_json == TMP_SNAPSHOT
         assert args.output_endpoints == TMP_ENDPOINTS
         assert args.output_url == TMP_URL
+        assert args.stale_policy == "error"
+        assert args.allow_stale is False
+        assert args.strict is False
+
+        strict_args = cli.build_parser().parse_args(["fetch", "--strict"])
+        assert strict_args.strict is True
+        stale_args = cli.build_parser().parse_args(["fetch", "--allow-stale"])
+        assert stale_args.allow_stale is True
+        policy_args = cli.build_parser().parse_args(
+            ["fetch", "--stale-policy", "allow-last-good"],
+        )
+        assert policy_args.stale_policy == "allow-last-good"
 
     def test_reader_commands_default_to_tmp_snapshot(self) -> None:
         parser = cli.build_parser()
@@ -111,7 +162,11 @@ class TestCliDefaultPaths(unittest.TestCase):
             patch.object(cli, "_dotenv_candidates", return_value=[]),
             pytest.raises(
                 cli.CliUsageError,
-                match=r"^ARTIFICIAL_ANALYSIS_API_KEY required; copy \.env\.example to \.env and set the key\.$",
+                match=(
+                    r"^ARTIFICIAL_ANALYSIS_API_KEY required; inject it in the process "
+                    r"or set ARTIFICIAL_ANALYSIS_ENV_FILE to a "
+                    r"permissions-restricted external file\.$"
+                ),
             ),
         ):
             cli._required_api_key()
@@ -182,6 +237,8 @@ class TestCliDefaultPaths(unittest.TestCase):
                 timeout_seconds=1.0,
                 min_endpoints=0,
                 min_providers=0,
+                stale_policy="allow-last-good",
+                allow_stale=True,
                 strict=False,
                 output_json=Path(temp_dir) / "snapshot.json",
                 output_endpoints=Path(temp_dir) / "endpoints.txt",
@@ -208,6 +265,8 @@ class TestCliDefaultPaths(unittest.TestCase):
                 timeout_seconds=1.0,
                 min_endpoints=0,
                 min_providers=0,
+                stale_policy="allow-last-good",
+                allow_stale=True,
                 strict=False,
                 output_json=Path(temp_dir) / "snapshot.json",
                 output_endpoints=Path(temp_dir) / "endpoints.txt",

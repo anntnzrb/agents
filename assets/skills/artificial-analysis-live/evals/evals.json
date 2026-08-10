@@ -4,20 +4,93 @@
     {
       "id": 1,
       "prompt": "Fetch fresh data and return the top 5 providers by endpoint count.",
-      "expected_output": "JSON result with providers ranked by endpoint count using fresh snapshot.",
-      "files": []
+      "expected_output": "JSON result with source statuses, freshness metadata, artifact hashes/manifests, and provider ranking; never require a fixed live count or expose secrets.",
+      "files": [],
+      "expectations": [
+        "The documented uv run --script entrypoint is used.",
+        "Success retains protocol version 1 and includes freshness and source evidence.",
+        "The response does not assert or invent a current provider count."
+      ]
     },
     {
       "id": 2,
       "prompt": "For model claude-opus-4-7, compare providers by speed and latency and include price_blended.",
-      "expected_output": "JSON rows sorted by speed with provider/model/price/speed/ttfc/e2e fields.",
-      "files": []
+      "expected_output": "JSON rows sorted by speed with provider/model/price/speed/ttfc/e2e fields, separate endpoint pricing and model quality evidence, and comparison eligibility.",
+      "files": [],
+      "expectations": [
+        "Endpoint pricing remains distinct from canonical model pricing.",
+        "Rows retain evidence paths, source scope, and comparison eligibility instead of treating nulls as zero."
+      ]
     },
     {
       "id": 3,
       "prompt": "Use a natural-language question to find cheapest deepinfra options and return top 3.",
-      "expected_output": "QA response with parsed_intent and query rows sorted by lowest price_blended.",
-      "files": []
+      "expected_output": "QA response with parsed_intent and query rows sorted by lowest price_blended, preserving metric evidence and scope.",
+      "files": [],
+      "expectations": [
+        "The response contains parsed_intent and a delegated query result.",
+        "The output keeps the machine-readable JSON success envelope unchanged."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Replay tests/fixtures/snapshots/stale.json and explain the stale-last-good, fresh, cache-revalidated, and snapshot freshness modes without calling the network.",
+      "expected_output": "Deterministic fixture-backed explanation that marks stale-last-good as stale fallback, distinguishes cache-revalidated from stale, and treats explicit snapshots as historical input.",
+      "files": ["tests/fixtures/snapshots/stale.json"],
+      "expectations": [
+        "stale-last-good is explicitly marked stale and fallback=true.",
+        "No network request or current live count is required."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Compare tests/fixtures/diff/old.json and tests/fixtures/diff/new.json and summarize schema drift while retaining unknown fields and parser/freshness changes.",
+      "expected_output": "Deterministic schema-aware diff with stable model IDs, field/metric/evidence/status changes, parser/freshness metadata, diagnostics, and possible renames that are never merged.",
+      "files": ["tests/fixtures/diff/old.json", "tests/fixtures/diff/new.json"],
+      "expectations": [
+        "Unknown fixture fields survive the comparison boundary.",
+        "Possible rename entries set merge=false and do not collapse identities."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Replay tests/fixtures/values/placeholders.json and classify placeholders, source-marked chart zero, and literal zero without synthesizing values; include the huge numeric source-marker regression.",
+      "expected_output": "Deterministic value evidence showing placeholders as missing, malformed or non-finite inputs as unparsed, source-marked zero as missing, and literal zero as an eligible published value.",
+      "files": ["tests/fixtures/values/placeholders.json", "tests/test_values.py"],
+      "expectations": [
+        "Placeholder and source-marker inputs never become fake zero.",
+        "Huge numeric conversion OverflowError is handled as a non-placeholder rather than escaping."
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Compare tests/fixtures/snapshots/duplicates.json with itself and report duplicate identity policy.",
+      "expected_output": "Deterministic duplicate diagnostic that preserves conflicting rows, blocks unsafe comparison, and never silently merges by maximum score.",
+      "files": ["tests/fixtures/snapshots/duplicates.json"],
+      "expectations": [
+        "The duplicate is visible with conflict=true.",
+        "Identity is stable and display-name similarity does not authorize a merge."
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Exercise malformed CLI/RPC input and diagnose a local snapshot/cache using only deterministic fixtures.",
+      "expected_output": "One compact redacted CLI error object when --json-errors is selected, one response per RPC request with stable legacy codes, and an offline diagnose report with schema/parser/freshness/cache health.",
+      "files": ["tests/fixtures/snapshots/stale.json", "tests/test_cli_errors.py", "tests/test_diagnose.py"],
+      "expectations": [
+        "Successful protocol version 1 and snapshot schema version 2 remain unchanged.",
+        "Diagnose never fetches and error details contain no credentials."
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Scan tests/fixtures/security/safe-metrics.json and serialized redaction/manifests for credential leakage while preserving safe metrics and HTTPS URLs.",
+      "expected_output": "Security result with no API key, bearer token, cookie, authorization header, or credential query value in fixture or serialized artifact output; safe metric values remain visible.",
+      "files": ["tests/fixtures/security/safe-metrics.json", "tests/test_security.py"],
+      "expectations": [
+        "The real skill .env is excluded from deterministic scans.",
+        "Credential-like values are redacted while safe scores, token metrics, and public URL structure remain observable."
+      ]
     }
   ]
 }

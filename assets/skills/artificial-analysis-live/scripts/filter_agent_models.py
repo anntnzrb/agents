@@ -4,6 +4,12 @@
 # ruff: noqa: CPY001, FBT001, S607
 """Filter Artificial Analysis model snapshot for agent/dev model selection.
 
+The v2 snapshot stores canonical model metrics in ``models`` and endpoint
+observations in ``hosts_models``.  Filtering joins observations to canonical
+models by ``model_slug``; it never expects an embedded endpoint ``model`` object.
+JSON preserves additive unknown fields/evidence/diagnostics.  Markdown and TSV
+remain fixed named-column views.
+
 Default filter saved from chat:
   open_weight = all
   Omni >= -20
@@ -22,12 +28,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import subprocess
 import sys
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict
 
 Json = dict[str, Any]
 OpenWeight = Literal["all", "true", "false"]
@@ -45,6 +52,10 @@ class Row(TypedDict):
     tbench: float | None
     ifbench: float | None
     license: str | None
+    raw_fields: NotRequired[object]
+    raw_metadata: NotRequired[object]
+    evidence: NotRequired[object]
+    diagnostics: NotRequired[list[Json]]
 
 
 DEFAULT_SNAPSHOT = (
@@ -52,15 +63,15 @@ DEFAULT_SNAPSHOT = (
 )
 DEFAULT_SKILL_CLI = Path(__file__).resolve().parent / "cli.py"
 DEFAULT_SNAPSHOT_MAX_AGE = timedelta(hours=24)
+SNAPSHOT_SCHEMA_V2 = 2
 
 
 def number(value: object) -> float | None:
-    """Convert numeric JSON values to float, excluding booleans."""
-    if isinstance(value, bool):
+    """Convert finite numeric JSON values to float, excluding booleans."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
         return None
-    if isinstance(value, int | float):
-        return float(value)
-    return None
+    converted = float(value)
+    return converted if math.isfinite(converted) else None
 
 
 def model_omni(model: Json) -> float:
@@ -79,8 +90,8 @@ def model_omni(model: Json) -> float:
 
 
 def model_row(model: Json) -> Row:
-    """Convert a model payload to the filter row shape."""
-    return {
+    """Convert a canonical model payload to the filter row shape."""
+    row: Row = {
         "slug": str(model.get("slug") or ""),
         "name": str(model.get("name") or ""),
         "open_weights": model.get("is_open_weights")
@@ -93,6 +104,10 @@ def model_row(model: Json) -> Row:
         if isinstance(model.get("license_name"), str)
         else None,
     }
+    for key in ("raw_fields", "raw_metadata", "evidence"):
+        if key in model:
+            row[key] = model[key]
+    return row
 
 
 def ensure_default_snapshot_fresh(snapshot: Path, raw: Json) -> None:
@@ -108,7 +123,6 @@ def ensure_default_snapshot_fresh(snapshot: Path, raw: Json) -> None:
             "Run with --fetch first or pass --snapshot."
         )
         raise ValueError(message)
-
     try:
         fetched_at_dt = datetime.fromisoformat(fetched_at)
     except ValueError as exc:
@@ -117,7 +131,6 @@ def ensure_default_snapshot_fresh(snapshot: Path, raw: Json) -> None:
             "Run with --fetch first or pass --snapshot."
         )
         raise ValueError(message) from exc
-
     if fetched_at_dt.tzinfo is None:
         fetched_at_dt = fetched_at_dt.replace(tzinfo=UTC)
     age = datetime.now(UTC) - fetched_at_dt.astimezone(UTC)
@@ -129,51 +142,116 @@ def ensure_default_snapshot_fresh(snapshot: Path, raw: Json) -> None:
         raise ValueError(message)
 
 
-def load_rows(snapshot: Path) -> list[Row]:
-    """Load and deduplicate model rows from a snapshot."""
-    raw: Json = json.loads(snapshot.read_text())
+LAST_LOAD_DIAGNOSTICS: list[Json] = []
+
+
+def load_rows(  # noqa: C901, PLR0912
+    snapshot: Path,
+    *,
+    diagnostics: list[Json] | None = None,
+) -> list[Row]:
+    """Load canonical model rows joined from v1 or schema-v2 endpoints."""
+    raw_value = json.loads(snapshot.read_text())
+    if not isinstance(raw_value, dict):
+        message = f"snapshot must be an object: {snapshot}"
+        raise TypeError(message)
+    raw: Json = raw_value
     ensure_default_snapshot_fresh(snapshot, raw)
     hosts_models = raw.get("hosts_models")
     if not isinstance(hosts_models, list):
         message = f"snapshot missing hosts_models list: {snapshot}"
         raise ValueError(message)  # noqa: TRY004
+    meta = raw.get("meta")
+    schema_version = meta.get("schema_version") if isinstance(meta, dict) else None
+    require_canonical_join = (
+        isinstance(schema_version, int)
+        and not isinstance(schema_version, bool)
+        and schema_version >= SNAPSHOT_SCHEMA_V2
+    )
+
+    local_diagnostics: list[Json] = []
+    canonical: dict[str, Json] = {}
+    models = raw.get("models")
+    if isinstance(models, list):
+        for model in models:
+            if isinstance(model, dict) and isinstance(model.get("slug"), str):
+                canonical[model["slug"]] = model
 
     by_slug: dict[str, Row] = {}
-    for endpoint in hosts_models:
+    for index, endpoint in enumerate(hosts_models):
         if not isinstance(endpoint, dict):
             continue
-        model = endpoint.get("model")
-        if not isinstance(model, dict):
+        model_slug = endpoint.get("model_slug")
+        nested_model = endpoint.get("model")
+        if not isinstance(model_slug, str) or not model_slug:
+            if require_canonical_join:
+                local_diagnostics.append(
+                    {
+                        "code": "MISSING_MODEL_JOIN",
+                        "severity": "error",
+                        "stage": "filter.load_rows",
+                        "message": "Endpoint has no canonical model join.",
+                        "details": {
+                            "endpoint_index": index,
+                            "model_slug": model_slug
+                            if isinstance(model_slug, str)
+                            else None,
+                        },
+                    },
+                )
+                continue
+            if isinstance(nested_model, dict) and isinstance(
+                nested_model.get("slug"), str
+            ):
+                model_slug = nested_model["slug"]
+            else:
+                continue
+        model = canonical.get(model_slug)
+        if model is None and not require_canonical_join:
+            model = nested_model if isinstance(nested_model, dict) else None
+        if model is None:
+            local_diagnostics.append(
+                {
+                    "code": "MISSING_MODEL_JOIN",
+                    "severity": "error",
+                    "stage": "filter.load_rows",
+                    "message": (
+                        f"Endpoint has no canonical model join for {model_slug!r}."
+                    ),
+                    "details": {"endpoint_index": index, "model_slug": model_slug},
+                },
+            )
             continue
         row = model_row(model)
         slug = row["slug"]
         if not slug:
             continue
-        old = by_slug.get(slug)
-        if old is None:
+        if slug not in by_slug:
             by_slug[slug] = row
-            continue
-        # Same model repeats per provider endpoint. Keep max benchmark
-        # values and stable metadata.
-        old["omni"] = max(old["omni"], row["omni"])
-        old["tbench"] = max_nullable(old["tbench"], row["tbench"])
-        old["ifbench"] = max_nullable(old["ifbench"], row["ifbench"])
-        old["open_weights"] = (
-            old["open_weights"]
-            if old["open_weights"] is not None
-            else row["open_weights"]
-        )
-        old["license"] = old["license"] or row["license"]
+
+    LAST_LOAD_DIAGNOSTICS.clear()
+    LAST_LOAD_DIAGNOSTICS.extend(local_diagnostics)
+    if diagnostics is not None:
+        diagnostics.extend(local_diagnostics)
     return list(by_slug.values())
 
 
+def load_rows_with_diagnostics(snapshot: Path) -> tuple[list[Row], list[Json]]:
+    """Load rows and return stable non-fatal join diagnostics."""
+    collected: list[Json] = []
+    rows = load_rows(snapshot, diagnostics=collected)
+    return rows, collected
+
+
 def max_nullable(a: float | None, b: float | None) -> float | None:
-    """Return the greater non-null value."""
-    if a is None:
-        return b
-    if b is None:
-        return a
-    return max(a, b)
+    """Return the greater finite non-null value."""
+    left = a if a is not None and math.isfinite(a) else None
+    right = b if b is not None and math.isfinite(b) else None
+    if left is None:
+        return right
+    if right is None:
+        return left
+    return max(left, right)
 
 
 def passes_open(row: Row, open_weight: OpenWeight) -> bool:
@@ -223,18 +301,21 @@ def sort_rows(
 
 
 def fmt(value: object) -> str:
-    """Format a value for tabular output."""
+    """Format a value for tabular output without emitting non-finite numbers."""
     if value is None:
         return "-"
     if isinstance(value, bool):
         return "yes" if value else "no"
     if isinstance(value, int | float):
-        return f"{value:.3f}".rstrip("0").rstrip(".")
+        converted = float(value)
+        if not math.isfinite(converted):
+            return "-"
+        return f"{converted:.3f}".rstrip("0").rstrip(".")
     return str(value)
 
 
 def emit_markdown(rows: list[Row]) -> None:
-    """Write rows as a Markdown table."""
+    """Write rows as a Markdown fixed-view table."""
     sys.stdout.write("| Rank | Model | Open | Omni | TBench | IFBench | License |\n")
     sys.stdout.write("|---:|---|---|---:|---:|---:|---|\n")
     for idx, row in enumerate(rows, start=1):
@@ -244,10 +325,14 @@ def emit_markdown(rows: list[Row]) -> None:
             f"{fmt(row['ifbench'])} | {row['license'] or '-'} |\n"
         )
         sys.stdout.write(line)
+    sys.stderr.write(
+        "Note: text output is a fixed view; use --format json for "
+        "raw/evidence fields.\n",
+    )
 
 
 def emit_tsv(rows: list[Row]) -> None:
-    """Write rows as tab-separated values."""
+    """Write rows as tab-separated fixed-view values."""
     sys.stdout.write("Rank\tModel\tOpen\tOmni\tTBench\tIFBench\tLicense\n")
     for idx, row in enumerate(rows, start=1):
         line = "\t".join(
@@ -262,11 +347,30 @@ def emit_tsv(rows: list[Row]) -> None:
             ],
         )
         sys.stdout.write(f"{line}\n")
+    sys.stderr.write(
+        "Note: text output is a fixed view; use --format json for "
+        "raw/evidence fields.\n",
+    )
+
+
+def _finite_json(value: object) -> object:
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {str(key): _finite_json(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_finite_json(item) for item in value]
+    if isinstance(value, tuple):
+        return [_finite_json(item) for item in value]
+    return value
 
 
 def emit_json(rows: list[Row]) -> None:
-    """Write rows as formatted JSON."""
-    sys.stdout.write(json.dumps(rows, indent=2, sort_keys=True) + "\n")
+    """Write rows as formatted finite JSON."""
+    sys.stdout.write(
+        json.dumps(_finite_json(rows), indent=2, sort_keys=True, allow_nan=False)
+        + "\n",
+    )
 
 
 def fetch_snapshot(skill_cli: Path) -> None:
@@ -324,7 +428,10 @@ def main() -> int:
         )
         return 2
 
-    rows = load_rows(args.snapshot)
+    diagnostics: list[Json] = []
+    rows = load_rows(args.snapshot, diagnostics=diagnostics)
+    for diagnostic in diagnostics:
+        sys.stderr.write(json.dumps(diagnostic, sort_keys=True) + "\n")
     filtered = apply_filter(
         rows,
         open_weight=args.open_weight,

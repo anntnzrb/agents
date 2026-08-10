@@ -72,13 +72,47 @@ Snapshot counts + top providers.
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" stats
 ```
 
-### diff
+## diff
 
-Compare two snapshots.
+Compare two snapshots while keeping the legacy endpoint/provider keys:
 
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" diff old.json new.json
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" diff old.json new.json --schema-aware
 ```
+
+Use `--schema-aware` only when model, field, metric, evidence/status,
+freshness/parser/schema, duplicate, or diagnostic changes are needed. Matching
+uses stable IDs first; possible renames are suggestions and never merges.
+
+## diagnose
+
+Inspect local health without fetching:
+
+```bash
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" diagnose \
+  --snapshot <temp-dir>/snapshot.json --cache-dir <temp-dir>/aa-cache
+```
+
+`diagnose` reports redacted snapshot/cache/schema/parser/freshness/artifact and
+diagnostic state. It never performs a live refresh. The RPC command is additive
+and returns one response per input line.
+
+
+### Error and credential routing
+
+- `--json-errors` stages one compact redacted CLI error object on stdout;
+  `--legacy-errors` preserves human-readable stderr errors.
+- RPC retains stable error codes and one response for every non-empty request.
+- Set `ARTIFICIAL_ANALYSIS_API_KEY` in the process, or use
+  `ARTIFICIAL_ANALYSIS_ENV_FILE` pointing to a permissions-restricted file
+  outside the skill tree. Never pass keys in arguments. Older installations may
+  discover a skill-root or ancestor `.env`, but that is transitional compatibility
+  only, not supported setup. The asset-sync owner MUST exclude `.env` and other
+  secret files from generated homes; `.gitignore` only controls Git tracking and
+  cannot enforce that exclusion.
+- `evaluation` accepts HTTPS URLs only. Use `--input` for local saved HTML/RSC;
+  credential query parameters are redacted.
 
 ### schema
 
@@ -98,7 +132,10 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" --mode rpc
 
 ## Reliability defaults
 
-- ETag cache + 304 reuse
-- last-good fallback unless `--strict`
+- ETag cache + 304 reuse (`freshness.mode: "cache-revalidated"`)
+- last-good fallback only when explicitly enabled with
+  `--stale-policy allow-last-good` or `--allow-stale`
+- `--strict` remains the `error` policy alias
 - sanity thresholds (`--min-endpoints`, `--min-providers`)
-- extraction heuristics tolerate upstream schema key changes
+- explicit local inputs use `freshness.mode: "snapshot"` and `historical:true`;
+  they are not outage-stale

@@ -1,0 +1,9 @@
+{
+  "meta": {"schema_version": 2},
+  "models": [
+    {"slug": "duplicate-model", "name": "Duplicate Model", "score": 1},
+    {"slug": "duplicate-model", "name": "Duplicate Model", "score": 2}
+  ],
+  "hosts": [],
+  "hosts_models": []
+}

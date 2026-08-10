@@ -7,8 +7,35 @@ Read this before consuming CLI/RPC envelopes, snapshot fields, coding evidence, 
 ## CLI envelope
 
 ```json
-{"ok":true,"version":"1","command":"fetch|stats|diff|query|qa|coding|evaluation|schema","data":{...}}
+{"ok":true,"version":"1","command":"fetch|stats|diff|diagnose|harness|coding|evaluation|reasoning|query|qa|schema","data":{...}}
 ```
+
+## Compatibility freeze
+
+| Surface | Frozen contract | Additive migration boundary |
+| --- | --- | --- |
+| Entry point | One documented CLI entry point; an omitted command resolves to `fetch` | Add flags or commands only; do not rename or remove the entry point |
+| CLI commands | `fetch`, `stats`, `diff`, `diagnose`, `harness`, `coding`, `evaluation`, `reasoning`, `query`, `qa`, `schema` | Keep every existing name; new commands are additive |
+| CLI success | `ok: true`, string `version: "1"`, `command`, and `data` | Preserve these keys and types; additions must not rename, remove, or retype them |
+| Artifact defaults | `<temp-dir>/artifacts/artificial-analysis/{full-data.json,endpoints.txt,full-url.txt}` | Preserve these paths; custom output paths remain opt-in |
+| Snapshot v2 | `meta.schema_version: 2` with top-level `models`, `hosts`, and slim `hosts_models` joined by `model_slug` | Add fields or projections only; keep v2 keys and the join stable |
+| Pricing scope | Model/API `price_1m_blended_3_to_1` and endpoint/RSC `price_1m_blended_7_to_2_to_1` remain distinct | Do not merge, rename, or reinterpret either scope |
+| Strict parsing | Malformed source envelopes/rows remain rejected; `fetch --strict` remains the no-fallback mode | Preserve rejection and fallback semantics; any reconciliation is versioned and additive |
+
+### Freshness modes
+
+Every refresh/reader result distinguishes these modes:
+
+- `fresh`: successful current source response (`stale:false`, `historical:false`);
+- `cache-revalidated`: validated 304/body reuse (`stale:false`), never outage-stale;
+- `stale-last-good`: explicit `--allow-stale` or
+  `--stale-policy allow-last-good` fallback (`stale:true`, `fallback:true`);
+- `snapshot`: explicit local input (`historical:true`, `stale:false`).
+
+The default refresh policy is `error`; `--strict` remains its compatibility alias.
+The default output snapshot still enforces its 24-hour reader guard. A stale
+fallback never overwrites current cache bytes. Explicitly named old paths are
+historical snapshots, not stale outage fallbacks.
 
 ## RPC envelope
 
@@ -32,14 +59,21 @@ Error:
 
 ## Fetch credentials
 
-Only `fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`. Set it in a skill-local
-`.env` copied from `.env.example`; it is never a CLI or RPC argument. An existing
-process value wins, otherwise dotenv lookup is: `ARTIFICIAL_ANALYSIS_ENV_FILE`,
-`<skill-root>/.env`, `$SKILLS_DIR/artificial-analysis-live/.env`, then the first
-ancestor containing `skills/artificial-analysis-live/.env`.
+Only `fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`. Prefer a process-injected
+key, or set `ARTIFICIAL_ANALYSIS_ENV_FILE` to a permissions-restricted dotenv
+file (for example, mode `0600`) outside the skill tree. It is never a CLI or RPC
+argument.
 
-Generic asset sync intentionally copies dotfiles into every generated tool home,
-so a skill-local `.env` is replicated to those managed targets by design.
+Do not copy `.env.example` into the skill tree or a generated tool home. It is a
+tracked template, not a secret store. Process values win, then the explicitly
+supplied external env file is read. Older installations may discover a skill-root
+or ancestor `.env`; that lookup is transitional compatibility only and is not
+supported for new setups. This release does not expose an `AA_LEGACY_DOTENV`
+switch, so do not rely on one.
+
+The asset-sync owner MUST exclude `.env` and other secret files from generated
+tool homes. `.gitignore` only controls Git tracking; it cannot enforce sync
+exclusion.
 
 ## Snapshot JSON structure (schema v2)
 
@@ -68,6 +102,46 @@ embed a `model` object.
 The model API's 3:1 pricing blend and RSC endpoint's 7:2:1 pricing blend are
 intentionally both present. They have model and provider-endpoint scope,
 respectively, and are not duplicate prices.
+
+## Evidence, statuses, and eligibility
+
+Named scalar fields remain stable; additive `metric_evidence.<metric>` records
+`raw_value`, `normalized_value`, `unit`, `normalization`, `source_path`,
+`source_field`, `value_status`, `metric_semantics_status`,
+`comparison_eligibility`, `blocked_reasons`, `parser`, `parser_version`, and
+`artifact_id`/`sha256` when available.
+
+- `value_status`: `published`, `derived`, `missing`, or `unparsed`;
+- `metric_semantics_status`: `known`, `unknown`, or `ambiguous`;
+- `comparison_eligibility`: `eligible` or `blocked`.
+
+Placeholders, booleans, non-finite/malformed/out-of-range values, unknown
+semantics, unit/scope/release mismatches, and conflicting duplicates remain
+visible with reasons and cannot become fake zeroes or eligible comparisons.
+Derived fields retain formulas and input paths; they never replace published
+source values. Unknown source keys survive under `raw_fields`/`raw_metadata`.
+
+## Diagnostics, diff, and error migration
+
+`diagnose` inspects explicit local snapshot/cache paths only; it never fetches.
+Its report includes redacted schema/parser/freshness/source/cache/artifact health
+and diagnostics. `diff --schema-aware` (or RPC `schema_aware:true`) adds
+`schema_diff` while preserving every legacy endpoint/provider key. Stable IDs
+match first; possible rename suggestions carry `merge:false`.
+
+CLI success remains protocol v1 and RPC emits one response per non-empty input
+line with existing error codes. During staged migration, `--json-errors` emits
+one compact redacted CLI error object on stdout; `--legacy-errors` keeps the
+human-readable stderr path. No credential appears in either form.
+
+## Immutable artifacts and URL policy
+
+Raw source bytes are content-addressed under `<cache>/artifacts/` with redacted
+metadata sidecars; immutable manifests are under `<cache>/manifests/` and are
+atomically written. Legacy mutable cache inputs are marked
+`legacy_unverified` when promoted. `evaluation <url>` permits HTTPS only and
+redacts credential query parameters; use `evaluation --input <file>` for local
+or deterministic replay.
 
 ## QA payload
 

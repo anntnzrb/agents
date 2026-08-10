@@ -23,20 +23,25 @@ Do not answer benchmark/provider questions from stale memory. Run the tool first
 
 ## Fast path
 
-Before fetching, copy the tracked template and set the official API key:
+Provide credentials before fetching through one of the supported injection paths:
 
-```bash
-cp "$SKILLS_DIR/artificial-analysis-live/.env.example" "$SKILLS_DIR/artificial-analysis-live/.env"
-```
+1. Set `ARTIFICIAL_ANALYSIS_API_KEY` in the process environment (preferred).
+2. Set `ARTIFICIAL_ANALYSIS_ENV_FILE` to a permissions-restricted dotenv file
+   outside the skill tree (for example, mode `0600`).
+
+Do not copy `.env.example` into the skill tree or a generated tool home. It is a
+tracked template, not a secret store. Do not pass keys through CLI or RPC.
 
 `fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`; snapshot readers (`query`, `qa`,
-`stats`, `diff`, `harness`, and `reasoning`) do not. The loader uses an existing
-process value first, then `ARTIFICIAL_ANALYSIS_ENV_FILE`, the skill-root `.env`,
-`$SKILLS_DIR/artificial-analysis-live/.env`, then the first ancestor containing
-`skills/artificial-analysis-live/.env`. Do not pass keys through CLI or RPC.
+`stats`, `diff`, `harness`, and `reasoning`) do not. Process-injected values win,
+then the explicitly supplied external env file is read.
 
-The skill-local `.env` is intentionally copied by generic asset sync into every
-generated tool home. Treat that replication as a secret-management risk.
+Older installations may still discover a skill-root or ancestor `.env`; that
+lookup is transitional compatibility only and is not supported for new setups.
+This release does not expose an `AA_LEGACY_DOTENV` switch, so do not rely on one.
+The asset-sync owner MUST exclude `.env` and other secret files from generated
+tool homes. `.gitignore` only controls Git tracking; it cannot enforce sync
+exclusion.
 
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
@@ -49,6 +54,31 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 - Mark page rows as published and sorting/limiting/arithmetic as derived; preserve source URL and scope
 - Read `references/evaluation-pages.md` before selecting a dedicated evaluation URL or comparing benchmark populations
 - If freshness is critical, run `fetch` immediately before `query`/`qa`. Default `<temp-dir>/artifacts/artificial-analysis/full-data.json` readers reject snapshots older than 24h; explicit paths are intentional historical data
+
+## Released hardening modes
+
+- Snapshot readers expose `fresh`, `cache-revalidated`, `stale-last-good`, or
+  explicit `snapshot` freshness.  Only explicit stale policy may return
+  `stale:true`; an explicit old input is `historical:true`, not outage-stale.
+- Machine-readable rows retain additive evidence (`raw_value`, normalized value,
+  unit, source path/field, parser/version, artifact hash), independent
+  `value_status`, `metric_semantics_status`, and `comparison_eligibility`.
+  Missing, placeholder, malformed, non-finite, or conflicting values are never
+  synthesized into zero.
+- `diagnose` is offline and inspects only explicit snapshot/cache paths.
+  `diff --schema-aware` is opt-in and additive; legacy diff keys remain.
+  `--json-errors` stages one compact redacted CLI error object; use
+  `--legacy-errors` during migration. RPC remains one response per input line
+  with its existing error codes.
+- Cache raw bytes and manifests are immutable, content-addressed, and redacted.
+  `filter_agent_models.py` joins v2 endpoint rows to canonical `models` by
+  `model_slug`; JSON preserves unknown fields while Markdown/TSV stay fixed views.
+- Fetch credentials come from the process environment or an explicitly supplied
+  external `ARTIFICIAL_ANALYSIS_ENV_FILE`, never CLI/RPC arguments. Public
+  evaluation URLs require HTTPS; use `--input` for local replay. The asset-sync
+  owner MUST exclude skill-local `.env` and other secret files from generated
+  homes; `.gitignore` only controls Git tracking and cannot enforce that
+  exclusion.
 
 ## Required follow-up reads
 

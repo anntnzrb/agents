@@ -520,7 +520,7 @@ class TestRscExtraction(unittest.TestCase):
         api_result = FetchResult("", 200, {}, "2026-01-01T00:00:01+00:00")
         payload = build_snapshot_payload(
             models=[rsc_model],
-            hosts=[],
+            hosts=[{"slug": "host", "name": "Host"}],
             hosts_models=[
                 {
                     "slug": "host_shared",
@@ -537,13 +537,17 @@ class TestRscExtraction(unittest.TestCase):
             official_models=api,
         )
         models = {model["slug"]: model for model in payload["models"]}
+        assert set(payload) == {"meta", "models", "hosts", "hosts_models"}
         assert payload["meta"]["schema_version"] == 2
+        assert payload["hosts"] == [{"slug": "host", "name": "Host"}]
         assert set(models) == {"api-only", "shared"}
         assert models["shared"]["name"] == "API name"
         assert models["shared"]["coding_index"] == 42
         assert models["shared"]["intelligence_index"] == 11
+        assert models["shared"]["pricing"]["price_1m_blended_3_to_1"] == 3
         endpoint = payload["hosts_models"][0]
         assert endpoint["model_slug"] == "shared"
+        assert endpoint["price_1m_blended_7_to_2_to_1"] == 4
         assert "model" not in endpoint
         assert (
             payload["meta"]["sources"]["official_api"]["unmatched_rsc_model_slugs"]
@@ -560,6 +564,27 @@ class TestRscExtraction(unittest.TestCase):
             normalize_official_models(
                 '{"status":200,"prompt_options":{},"data":[{"slug":"","name":"x","model_creator":{},"evaluations":{},"pricing":{}}]}',
             )
+
+    def test_unknown_source_fields_collisions_and_structured_identity(self) -> None:
+        diagnostics: list[object] = []
+        models = normalize_official_models(
+            (
+                '{"status":200,"prompt_options":{},"data":['
+                '{"slug":"model-a","name":"Model A","model_creator":{},'
+                '"evaluations":{},"pricing":{},"newField":1,"new_field":1}'
+                "]}"
+            ),
+            source_path="api.data",
+            diagnostics=diagnostics,
+        )
+        assert models[0]["raw_fields"]["newField"] == 1
+        assert models[0]["raw_fields"]["new_field"] == 1
+        assert models[0]["identity"]["model_slug"] == "model-a"
+        assert models[0]["raw_metadata"]["source_path"] == "api.data.data[0]"
+        assert any(
+            getattr(item, "code", None) == "DUPLICATE_SOURCE_FIELD"
+            for item in diagnostics
+        )
 
 
 if __name__ == "__main__":

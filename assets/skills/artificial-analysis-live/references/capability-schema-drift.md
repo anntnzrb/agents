@@ -71,40 +71,54 @@ The Coding Index is its own evaluation scope. Its current headline score is the 
 
 ## 5. Repair narrowly
 
-1. Keep the previous recognized shape
-2. Add a structural candidate predicate for the new shape rather than hard-coding one container name
-3. Normalize aliases into existing output fields; add new fields only when they carry a distinct documented scope
-4. Keep output envelopes and existing keys compatible
-5. Make every new numeric field null-safe
-6. Update `references/output-contract.md` in the same change
+1. Keep the previous recognized shape.
+2. Add a structural candidate predicate for the new shape rather than
+   hard-coding one container name.
+3. Normalize aliases into existing output fields; add new fields only when they
+   carry a distinct documented scope.
+4. Keep output envelopes and existing keys compatible.
+5. Make every new numeric field null-safe and finite; preserve its raw value,
+   source path/field, parser/version, artifact hash, status, semantics, and
+   comparison eligibility.
+6. Preserve unknown source fields under `raw_fields`/`raw_metadata` and emit a
+   duplicate-field diagnostic on normalization collisions.
 
-Avoid adding a second transport, a broad fallback, or an inferred quota calculation unless the first-party source requires it.
+Never add a second transport, broad fallback, inferred quota calculation, or
+silent duplicate maxing. Conflicting identities remain visible and blocked.
 
 ## 6. Add regression coverage
 
-Every schema repair needs these fixtures:
+Every schema repair needs only the fixtures required by the changed contract:
 
 1. legacy coding rows with token/cost evidence;
 2. current RSC rows with `headlineValue`, task metrics, and aliases;
-3. current score-only rows, proving they are retained with nullable evidence;
+3. current score-only rows, proving nullable evidence;
 4. unrelated provider-leaderboard rows, proving cross-page data is rejected;
-5. filtering and sorting on the normalized output
+5. filtering and sorting on normalized output;
+6. unknown fields, finite numeric evidence, duplicate identity diagnostics, and
+   explicit parser/source paths when those surfaces change.
 
-The test must fail against the previous schema assumption and pass without network access.
+All deterministic replays run without network access. The autouse test guard
+denies urllib/socket calls; only `tests/test_live_smoke.py` may opt out with
+`RUN_LIVE_SMOKE=1`. The test must fail against the previous schema assumption
+and pass without network access.
 
 ## 7. Verify end to end
 
-Run the narrow tests, the full skill test suite, and one fresh public live command:
+Run the narrow tests, full offline suite, policy lint, and quick validation:
 
 ```bash
 uv run --with pytest pytest -q tests/test_rsc_contract.py
 uv run --with pytest pytest -q tests
-uvx ruff check --select E9,F63,F7,F82 lib/artificial_analysis/cli.py
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" coding --model gpt-5-6 --sort-by cost --limit 5
+uvx ruff format --check .
+uvx ruff check --select ALL --ignore COM812,D203,D213 .
 uv run --script "$SKILLS_DIR/skill-creator/scripts/cli.py" quick-validate "$SKILLS_DIR/artificial-analysis-live"
 ```
 
-A successful live command is necessary but insufficient: confirm that it returns expected scored models, documents missing optional evidence as `null`, and keeps scope labels intact.
+Do not run live smoke unless `RUN_LIVE_SMOKE=1` and the rotated credential is
+in the process environment. A successful gated smoke records only redacted
+source status, validator presence, hashes, parser/version, freshness, schema,
+shape, and diagnostics; never fixed counts, headers, or raw bodies.
 
 ## Escalation rule
 

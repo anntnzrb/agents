@@ -1,0 +1,28 @@
+{
+  "meta": {
+    "schema_version": 2,
+    "freshness": {"mode": "fresh", "stale": false, "historical": false},
+    "parser": "fixture-parser",
+    "parser_version": "1"
+  },
+  "models": [
+    {
+      "slug": "stable-model",
+      "name": "Stable Model",
+      "score": 1,
+      "metric_evidence": {
+        "score": {
+          "raw_value": "1",
+          "normalized_value": 1,
+          "value_status": "published",
+          "metric_semantics_status": "known",
+          "comparison_eligibility": "eligible"
+        }
+      },
+      "raw_fields": {"fixture_unknown": "before"}
+    },
+    {"slug": "rename-before", "name": "Renamed Model", "score": 3}
+  ],
+  "hosts": [],
+  "hosts_models": []
+}

@@ -1,0 +1,7 @@
+{
+  "source_url": "https://example.test/public/fixture",
+  "metric": 42.5,
+  "value_status": "published",
+  "metric_semantics_status": "known",
+  "comparison_eligibility": "eligible"
+}

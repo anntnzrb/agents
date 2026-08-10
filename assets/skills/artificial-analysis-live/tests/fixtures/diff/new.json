@@ -1,0 +1,30 @@
+{
+  "meta": {
+    "schema_version": 2,
+    "freshness": {"mode": "cache-revalidated", "stale": false, "historical": false},
+    "parser": "fixture-parser",
+    "parser_version": "2"
+  },
+  "models": [
+    {
+      "slug": "stable-model",
+      "name": "Stable Model",
+      "score": 2,
+      "new_metric": 9,
+      "metric_evidence": {
+        "score": {
+          "raw_value": "2",
+          "normalized_value": 2,
+          "value_status": "published",
+          "metric_semantics_status": "known",
+          "comparison_eligibility": "eligible"
+        }
+      },
+      "raw_fields": {"fixture_unknown": "after", "new_unknown": true}
+    },
+    {"slug": "rename-after", "name": "Renamed Model", "score": 4}
+  ],
+  "hosts": [],
+  "hosts_models": [],
+  "diagnostics": [{"code": "SCHEMA_DRIFT", "severity": "warning", "stage": "fixture"}]
+}

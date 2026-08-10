@@ -16,26 +16,28 @@ Live `fetch` combines two required sources:
 ## Fetch credentials
 
 Only `fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`; commands that read an existing
-snapshot do not. Copy the tracked template at the skill root and fill the key:
+snapshot do not. Prefer a process-injected key, or set
+`ARTIFICIAL_ANALYSIS_ENV_FILE` to a permissions-restricted dotenv file (for
+example, mode `0600`) outside the skill tree. Do not pass keys as CLI or RPC
+arguments.
 
-```bash
-cp <skill-dir>/.env.example <skill-dir>/.env
-```
+Do not copy `.env.example` into the skill tree or a generated tool home. It is a
+tracked template, not a secret store. Process values win, then the explicitly
+supplied external env file is read. Older installations may discover a skill-root
+or ancestor `.env`; that lookup is transitional compatibility only and is not
+supported for new setups. This release does not expose an `AA_LEGACY_DOTENV`
+switch, so do not rely on one.
 
-The dotenv loader keeps an existing process value, otherwise checks, in order:
-`ARTIFICIAL_ANALYSIS_ENV_FILE`, `<skill-root>/.env`,
-`$SKILLS_DIR/artificial-analysis-live/.env`, then the first ancestor containing
-`skills/artificial-analysis-live/.env`. Keys are not CLI or RPC arguments.
-
-Generic asset sync intentionally copies dotfiles into every generated tool home.
-Consequently, a skill-local `.env` is replicated to those managed targets; manage
-the secret with that risk in mind.
+The asset-sync owner MUST exclude `.env` and other secret files from generated
+tool homes. `.gitignore` only controls Git tracking; it cannot enforce sync
+exclusion.
 
 Compatibility hardening:
 
 - key aliases + structural heuristics for upstream schema drift
 - ETag cache + 304 reuse
-- last-good fallback (unless `--strict`)
+- last-good fallback (opt-in with `--stale-policy allow-last-good` or
+  `--allow-stale`; `--strict` aliases `error`)
 - sanity thresholds (`min_endpoints`, `min_providers`)
 
 ## Entry point
@@ -80,7 +82,9 @@ Cache/ETag behavior:
 - stores metadata + payload in `~/.cache/artificial-analysis` (or `--cache-dir`)
 - sends `If-None-Match` when ETag exists
 - on `304`, reuses cached payload
-- if fresh parse fails sanity and not `--strict`, falls back to last-good snapshot
+- when fresh parsing or sanity checks fail, the default `error` policy fails;
+  `--stale-policy allow-last-good` or `--allow-stale` explicitly enables a
+  `stale-last-good` fallback, while `--strict` remains the `error` alias
 - default `<temp-dir>/artifacts/artificial-analysis/full-data.json` readers reject snapshots older than 24h; run `fetch` again or pass an explicit historical snapshot path
 
 ### Snapshot schema v2
@@ -109,13 +113,34 @@ Returns counts + top providers by endpoint count.
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py diff old.json new.json
+uv run --script <skill-dir>/scripts/cli.py diff old.json new.json --schema-aware
 ```
+
+The default keeps the legacy endpoint/provider keys. `--schema-aware` adds
+`schema_diff` with deterministic model and endpoint identities, field/metric
+changes, evidence/status/freshness/parser/schema changes, diagnostics, duplicate
+records, and possible renames. Stable IDs match first; a possible rename has
+`merge:false` and is never merged.
 
 Returns:
 
 - added endpoint slugs
 - removed endpoint slugs
 - provider endpoint deltas
+
+`type` supports:
+
+- `ping`
+- `get_schema` (alias: `schema`)
+- `fetch`
+- `stats`
+- `diff` (`schema_aware:true` is additive)
+- `diagnose` (offline snapshot/cache health)
+- `harness`
+- `coding`
+- `evaluation`
+- `query`
+- `qa`
 
 ## Harness
 
@@ -228,12 +253,12 @@ uv run --script <skill-dir>/scripts/cli.py --mode rpc
 ```
 
 `type` supports:
-
 - `ping`
 - `get_schema` (alias: `schema`)
 - `fetch`
 - `stats`
-- `diff`
+- `diff` (`schema_aware:true` is additive)
+- `diagnose` (offline snapshot/cache health)
 - `harness`
 - `coding`
 - `evaluation`
@@ -276,6 +301,50 @@ printf '%s\n' \
 
 - `references/output-contract.md`
 - `references/troubleshooting.md`
+
+## Released additive contracts
+
+### Freshness and evidence
+
+Fetch and reader payloads use explicit freshness modes:
+
+- `fresh`: successful 200 response;
+- `cache-revalidated`: validated 304/body reuse, not stale;
+- `stale-last-good`: explicit outage fallback with `stale:true`, `fallback:true`,
+  source/reason/hash metadata, and no cache overwrite;
+- `snapshot`: explicit local input with `historical:true`, not outage-stale.
+
+Machine-readable metrics may retain additive `metric_evidence` with raw and
+normalized values, unit/normalization, source path/field, parser/version,
+artifact hash, `value_status`, `metric_semantics_status`, and
+`comparison_eligibility`. Missing, placeholder, malformed, boolean, non-finite,
+out-of-range, unknown-semantics, or conflicting-duplicate values remain visible
+and blocked rather than synthesized.
+
+### Diagnostics, errors, and artifacts
+
+`diagnose [snapshot] --cache-dir <dir>` is offline and never fetches. It reports
+redacted snapshot/cache/schema/parser/freshness/artifact/diagnostic health.
+RPC diagnose returns one response per input line.
+
+CLI success remains protocol v1:
+`{"ok":true,"version":"1","command":...,"data":...}`. During error migration,
+`--json-errors` emits exactly one compact redacted object on stdout; omit it (or
+pass `--legacy-errors`) for human-readable stderr compatibility. RPC preserves
+one response per non-empty line and its existing error codes.
+
+Raw source bytes are content-addressed under `<cache>/artifacts/<sha256>.raw`
+with redacted metadata sidecars; immutable manifests live under
+`<cache>/manifests/<sha256>.json` and are atomically written. Legacy mutable
+cache files are compatibility inputs and are marked unverified when promoted.
+
+### Filter and URL boundaries
+
+`filter_agent_models.py` reads canonical v2 `models` first, joins endpoint
+observations through `model_slug`, and emits diagnostics for missing joins.
+JSON/source artifacts preserve unknown fields; Markdown and TSV are fixed named
+views. Public `evaluation` URLs require HTTPS and redact credential query
+parameters; use `--input` for deterministic local HTML/RSC replay.
 
 ## Lightweight tests
 
