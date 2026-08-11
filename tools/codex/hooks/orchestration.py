@@ -38,13 +38,9 @@ RECOVERY_MARKER = "<codex-orchestrator>"
 EVIDENCE_MARKER = "EVIDENCE_RECORDED:"
 RECOVERY_CONTEXT = f"""{RECOVERY_MARKER}
 You are the main coordinator after compaction.
-Stay read-only: do not edit files or run mutating commands.
-Delegate execution to the appropriate subagent, then inspect its evidence and integrate the result.
-Resume the current task; do not restart completed work.
+Resume the current task, preserve scope, and inspect existing evidence before continuing.
+Do not restart completed work.
 </codex-orchestrator>"""
-PARENT_GUARD_REASON = (
-    "The root coordinator must delegate execution to an implementation subagent."
-)
 
 SAFE_KEY_PATTERN = re.compile(r"[^a-zA-Z0-9._-]+")
 EDGE_HYPHEN_PATTERN = re.compile(r"^-+|-+$")
@@ -193,18 +189,6 @@ def emit(value: Mapping[str, object]) -> None:
     sys.stdout.write(json.dumps(value, separators=(",", ":")) + "\n")
 
 
-def emit_parent_guard_deny() -> None:
-    emit(
-        {
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": PARENT_GUARD_REASON,
-            }
-        }
-    )
-
-
 def string_value(value: object) -> str:
     return value if isinstance(value, str) else ""
 
@@ -335,15 +319,6 @@ def nonnegative_number(value: object) -> int:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
         return 0
     return int(value)
-
-
-def handle_parent_guard(input_data: HookInput) -> None:
-    if string_value(input_data.get("agent_id")) or string_value(
-        input_data.get("agent_type")
-    ):
-        return
-
-    emit_parent_guard_deny()
 
 
 def handle_spawn_guard(input_data: HookInput, settings: Settings) -> None:
@@ -571,18 +546,13 @@ def main() -> None:
             handle_session_start(input_data, settings)
         elif command == "pre-tool-use":
             handle_spawn_guard(input_data, settings)
-        elif command == "pre-tool-use-parent-guard":
-            handle_parent_guard(input_data)
         elif command == "subagent-stop":
             handle_subagent_stop(input_data, settings)
         elif command == "session-end":
             handle_session_end(input_data)
     except (OSError, TypeError, ValueError, RuntimeError):
-        if command == "pre-tool-use-parent-guard":
-            emit_parent_guard_deny()
-        else:
-            # Hooks are guardrails, not a reason to break Codex. Fail open on hook errors.
-            return
+        # Hooks are guardrails, not a reason to break Codex. Fail open on hook errors.
+        return
 
 
 if __name__ == "__main__":

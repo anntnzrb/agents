@@ -27,18 +27,6 @@
             "statusMessage": "Checking agent fan-out budget"
           }
         ]
-      },
-      {
-        "matcher": "^(Bash|apply_patch|Edit|Write)$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "uv run --script \"$HOME/.codex/hooks/orchestration.py\" pre-tool-use-parent-guard",
-            "commandWindows": "uv run --script \"%USERPROFILE%\\.codex\\hooks\\orchestration.py\" pre-tool-use-parent-guard",
-            "timeout": 3,
-            "statusMessage": "Guarding coordinator workspace mutations"
-          }
-        ]
       }
     ],
     "SubagentStop": [

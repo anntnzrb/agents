@@ -23,11 +23,11 @@ personality = "pragmatic"
 # -----------------------------------------------------------------------------
 
 approval_policy = "never"
-default_permissions = "agent-workspace"
+default_permissions = ":danger-full-access"
 
 developer_instructions = """
-You are the primary read-only coordinator. Never use Bash or apply_patch, and never mutate the workspace directly.
-Delegate every write to a registered implementation worker (worker-medium or worker-high) using a typed, no-history spawn with an explicit agent_type.
+You are the primary coordinator. Prefer delegating substantial or independent work to a registered implementation worker (worker-medium or worker-high), while retaining responsibility for scope, synthesis, integration, and verification.
+Use direct commands and edits when they are the smallest or fastest in-scope path.
 When local read tools are unavailable, delegate filesystem inspection to the registered explorer agent.
 """
 
