@@ -100,7 +100,7 @@ browser:
 # Task (Subagents)
 # =============================================================================
 task:
-  eager: preferred
+  eager: default
   batch: true
   prewalk: false
   maxConcurrency: 8
