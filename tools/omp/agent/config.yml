@@ -51,7 +51,7 @@ mcp:
   enableProjectConfig: false
   notifications: false
 memory:
-  backend: mnemopi
+  backend: off
 mnemopi:
   autoRetain: false
   llmMode: none
