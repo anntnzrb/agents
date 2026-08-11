@@ -74,6 +74,10 @@ compaction:
 # Tools
 # =============================================================================
 edit.mode: hashline
+tools:
+  xdev: true
+  xdevDocs: catalog
+  xdevInlineDevices: []
 
 checkpoint:
   enabled: true
