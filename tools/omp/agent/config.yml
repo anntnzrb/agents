@@ -126,7 +126,7 @@ features:
 # Code Intelligence
 # =============================================================================
 lsp:
-  enabled: true
+  enabled: false
   lazy: true
   formatOnWrite: false
   diagnosticsOnWrite: true
