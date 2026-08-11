@@ -132,6 +132,10 @@ lsp:
   diagnosticsOnWrite: true
   diagnosticsOnEdit: false
   diagnosticsDeduplicate: true
+astEdit:
+  enabled: false
+debug:
+  enabled: false
 
 # =============================================================================
 # Bash Guardrails
