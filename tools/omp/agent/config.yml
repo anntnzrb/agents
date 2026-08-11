@@ -80,7 +80,7 @@ tools:
   xdevInlineDevices: []
 
 checkpoint:
-  enabled: true
+  enabled: false
 
 # =============================================================================
 # Eval kernels
