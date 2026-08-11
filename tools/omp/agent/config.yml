@@ -238,7 +238,7 @@ bash.autoBackground.thresholdMs: 60000
 # Integrations / Providers
 # =============================================================================
 github:
-  enabled: true
+  enabled: false
 disabledProviders:
   - claude
   - claude-plugins
