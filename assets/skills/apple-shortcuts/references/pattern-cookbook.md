@@ -1,66 +1,35 @@
 # Pattern Cookbook
 
-Use these patterns to build robust shortcuts quickly.
+Reusable robust-shortcut patterns:
 
-Read this when the blueprint needs reusable input, control-flow, or failure-handling patterns.
+1. Input normalization
+- Input: `Ask for Input` or Share Sheet.
+- Convert to expected type early; type mismatch → clear error and exit.
 
-## Pattern 1: Input Normalization
+2. Guarded API call
+- Build request URL/headers; validate required token/key exists; call API.
+- Missing expected response field → fallback branch.
 
-- Use `Ask for Input` or Share Sheet input
-- Convert to expected type early
-- Exit with clear error message when type mismatch
+3. Menu-driven branch
+- `Choose from Menu` → explicit user path; one branch per task; uniform output format per branch.
 
-## Pattern 2: Guarded API Call
+4. Retry with cap
+- Repeat N times; success → stop early; after max attempts → final failure notice.
 
-1. Build request URL and headers
-2. Validate required token/key exists
-3. Call API
-4. If response missing expected field, branch to fallback
+5. List pipeline
+`Find`/`Filter` → `Sort` → `Repeat with Each` → accumulate output dictionary/list.
 
-## Pattern 3: Menu-Driven Branch
+6. Dictionary contract
+- Define required keys upfront; conditionally populate optional keys; output one stable dictionary object for downstream actions.
 
-- `Choose from Menu` for explicit user path
-- One branch per task
-- End each branch with uniform output format
+7. URL scheme launcher
+- Validate app availability or fallback app; safely encode parameters; debug mode → log final URL.
 
-## Pattern 4: Retry with Cap
+8. Cross-device safe output
+- Produce plain-text and rich-output variants; uncertain target capability → default to plain text.
 
-- Repeat N times
-- Stop early on success
-- Provide final failure notice after max attempts
+9. Confirmation gate
+- Before destructive action, show summary; confirm via menu/alert; explicit cancel path required.
 
-## Pattern 5: List Pipeline
-
-1. `Find` or `Filter`
-2. `Sort`
-3. `Repeat with Each`
-4. Accumulate output dictionary/list
-
-## Pattern 6: Dictionary Contract
-
-- Define required keys up front
-- Populate optional keys conditionally
-- Output one stable dictionary object for downstream actions
-
-## Pattern 7: URL Scheme Launcher
-
-- Validate app availability or fallback app
-- Encode parameters safely
-- Log the final URL in debug mode
-
-## Pattern 8: Cross-Device Safe Output
-
-- Produce plain text + rich output variant
-- Default to plain text when target capability uncertain
-
-## Pattern 9: Confirmation Gate
-
-- Show summary before destructive action
-- Confirm via menu or alert
-- Cancel path must be explicit
-
-## Pattern 10: Debug Toggle
-
-- Use a `debug` variable
-- Emit intermediate values only when debug is true
-- Keep production output clean
+10. Debug toggle
+- Use a `debug` variable; debug true → emit intermediate values; keep production output clean.
