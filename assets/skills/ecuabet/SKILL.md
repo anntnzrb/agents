@@ -120,13 +120,13 @@ Primary fields to report from `uv run --script <skill-dir>/scripts/cli.py run` o
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Exact runnable commands | `references/recipes.md` | Selecting flags or feed commands |
-| Compact prompt semantics | `references/shortcuts.md` | User supplies prompts like `<id> minmax` |
-| Scenario strategy | `references/workflows.md` | Pre-match, in-play, conflict, or watch-loop work |
-| Output-field interpretation | `references/output-contract.md` | Extracting or explaining result fields |
-| Failure recovery | `references/troubleshooting.md` | Any feed fails or data conflicts |
+|Need|Read|When|
+|---|---|---|
+|Exact runnable commands|`references/recipes.md`|Selecting flags or feed commands|
+|Compact prompt semantics|`references/shortcuts.md`|User supplies prompts like `<id> minmax`|
+|Scenario strategy|`references/workflows.md`|Pre-match, in-play, conflict, or watch-loop work|
+|Output-field interpretation|`references/output-contract.md`|Extracting or explaining result fields|
+|Failure recovery|`references/troubleshooting.md`|Any feed fails or data conflicts|
 
 ## Resource Policy
 
