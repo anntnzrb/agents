@@ -72,9 +72,9 @@ Detailed command examples and reusable snippets live in `references/command-exam
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Platform-specific commands and batch loops | `references/command-examples.md` | Building PowerShell or Bash operations |
+|Need|Read|When|
+|---|---|---|
+|Platform-specific commands and batch loops|`references/command-examples.md`|Building PowerShell or Bash operations|
 
 ## Safety Constraints
 
