@@ -34,9 +34,8 @@ repository; it is not a substitute for resource-specific JSON.
   local effects as explicit writes.
 - `gh repo list OWNER` reads repositories with filters; ask for `--json` fields when
   parsing.
-- `gh repo view` reads metadata. `gh repo edit` changes remote metadata and
-  `gh repo delete` is destructive; confirm target and authorization immediately
-  before either.
+- `gh repo view` reads metadata. `gh repo edit` changes remote metadata and `gh repo
+  delete` is destructive; confirm target and authorization immediately before either.
 
 ## Browse and search
 

@@ -1,10 +1,10 @@
 # Minimum stacked pull request workflow
 
-Read this reference before publishing a branch, creating a pull request, or linking a pull request to a stack. The workflow is repository-agnostic and separates read-only audit from each authorized write.
+Scope: Before publishing a branch, creating a pull request, or linking a pull request to a stack. Repository-agnostic; read-only audit separate from each authorized write.
 
 ## Audit before writing
 
-Run these checks in a fresh session:
+Fresh session MUST run:
 
 ```text
 gh --version
@@ -16,35 +16,34 @@ git remote -v
 gh repo view <host/owner/repo> --json nameWithOwner,url,defaultBranchRef,viewerPermission
 ```
 
-Establish the exact target and state:
+Establish target/state:
 
-- Confirm the current branch, clean tree, commit ancestry, intended remote, and explicit repository
-- Check for an existing remote branch and pull request:
-  `git ls-remote --heads <remote> <branch>` and
-  `gh pr list --repo <repo> --head <qualified-head> --state all --json number,title,state,url,headRefName,baseRefName`.
-- If a parent pull request exists, read its state, head/base refs and OIDs, mergeability, checks, and reviews. A new stacked PR MUST target the immediate parent branch, not the repository trunk
-- Resolve the remote stack and its actual stack number. Use `GH_PROMPT_DISABLED=1 gh stack view --json` when local tracking exists; otherwise use the supported remote stack read in `stack-commands.md` and `api.md`
-- Run `GH_PROMPT_DISABLED=1 gh stack link --help` before relying on version-sensitive flags. A local `gh stack view` exit 2 means local membership is absent; it does not prove the remote stack is absent
-- If code changed, run the relevant focused validation before external writes
+- Confirm current branch, clean tree, commit ancestry, intended remote, and explicit repository.
+- Check existing remote branch and PR:
+  `git ls-remote --heads <remote> <branch>` and `gh pr list --repo <repo> --head <qualified-head> --state all --json number,title,state,url,headRefName,baseRefName`.
+- If a parent PR exists, read state, head/base refs and OIDs, mergeability, checks, and reviews. New stacked PR MUST target the immediate parent branch, not repository trunk.
+- Resolve remote stack and actual stack number. With local tracking, use `GH_PROMPT_DISABLED=1 gh stack view --json`; otherwise use the supported remote-stack read in `stack-commands.md` and `api.md`.
+- Before version-sensitive flags, run `GH_PROMPT_DISABLED=1 gh stack link --help`. Local `gh stack view` exit 2 means absent local membership, not absent remote stack.
+- If code changed, run relevant focused validation before external writes.
 
-Stop before any mutation when the tree is dirty, a rebase/merge is in progress, the parent diverges, the stack is ambiguous or locked, or a duplicate pull request exists.
+MUST stop before mutation if tree dirty, rebase/merge in progress, parent diverged, stack ambiguous or locked, or duplicate PR exists.
 
-## Idempotent path selection
+## Idempotent path
 
-- **Branch without an open PR:** publish it, create exactly one PR, re-read that PR, then link it to the stack
-- **Branch with an open PR:** do not create a duplicate; re-read it, publish only if the local branch is ahead and the user authorized the push, then link it only if it is not already stacked
-- **Branch already in the target stack:** do not link again; re-read and report its position
-- **No existing stack:** do not silently create one. Confirm the intended trunk and complete the bottom-to-top stack before using `gh stack link --base`
+- Branch without open PR: publish; create exactly one PR; re-read it; link it.
+- Branch with open PR: never duplicate; re-read; publish only if local branch is ahead and user authorized push; link only if not already stacked.
+- Branch already in target stack: do not link again; re-read and report position.
+- No existing stack: do not silently create one. Confirm intended trunk and complete the bottom-to-top stack before `gh stack link --base`.
 
-## Default write sequence: create first, link second
+## Writes: create first, link second
 
-Require explicit authorization immediately before each external write. For a branch without an open PR:
+Explicit authorization required immediately before each external write. Branch without open PR:
 
 ```text
 git push -u <remote> <branch>
 ```
 
-Re-read the remote branch, then create the PR without an implicit prompt:
+Re-read remote branch, then create PR without an implicit prompt:
 
 ```text
 GH_PROMPT_DISABLED=1 gh pr create \
@@ -55,25 +54,25 @@ GH_PROMPT_DISABLED=1 gh pr create \
   --body ""
 ```
 
-An empty `--body ""` is intentional when no body was requested. If a body is requested, supply it explicitly with `--body-file` or `--body`; never open an editor or browser implicitly. Re-read the created PR and verify its number, head, base, state, draft status, and empty/non-empty body before linking.
+Empty `--body ""` is intentional when no body was requested. If a body is requested, supply it explicitly with `--body-file` or `--body`; NEVER open editor or browser implicitly. Re-read the created PR and verify number, head, base, state, draft status, and empty/non-empty body before linking.
 
-For an existing stack, append the new branch or PR from the top:
+Existing stack, append new branch or PR from the top:
 
 ```text
 GH_PROMPT_DISABLED=1 gh stack link \
   --remote <remote> <stack-number> <branch-or-pr>
 ```
 
-A stack number as the first positional argument means “append to this existing stack”; remaining arguments are processed in stack order. A branch argument may be pushed or used to find/create a PR by `gh-stack`, so use the explicit create-first sequence above when the user requests a separate PR creation.
+First positional stack number means append to that existing stack; remaining arguments process in stack order. A branch argument may be pushed or used by `gh-stack` to find/create a PR; when separate PR creation is requested, use the explicit create-first sequence above.
 
-After linking, re-read the PR and remote stack. Confirm that the PR is open, points to the immediate parent, and occupies the expected top position. Never fall back silently to ordinary PR commands if `gh-stack` is unavailable, returns exit 9, reports a lock/divergence, or rejects the graph.
+After linking, re-read PR and remote stack. Confirm PR open, immediate-parent target, expected top position. NEVER silently fall back to ordinary PR commands if `gh-stack` unavailable, returns exit 9, reports lock/divergence, or rejects graph.
 
 ## Optional post-creation writes
 
-Apply labels, reviewers, projects, or draft/ready changes only when requested and as separate authorized writes. Re-read each affected object after the write:
+Apply labels, reviewers, projects, or draft/ready changes only when requested, as separate authorized writes. Re-read each affected object after writing:
 
 ```text
 gh pr edit <pr> --repo <repo> --add-label <label>
 ```
 
-Report the repository, remote, branch, parent PR/base, created PR URL, stack number/position, writes performed, skipped paths, and unavailable checks.
+Report repository, remote, branch, parent PR/base, created PR URL, stack number/position, writes performed, skipped paths, and unavailable checks.

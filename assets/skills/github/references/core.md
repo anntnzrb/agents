@@ -108,12 +108,12 @@ reference does not settle the syntax.
 
 The documented general codes are:
 
-| Code | Meaning | Handling |
-| ---: | --- | --- |
-| `0` | Success | Parse the promised stdout and re-read after writes |
-| `1` | Failure | Preserve stderr/state; inspect command-specific help |
-| `2` | User cancellation | Treat as no-op/cancelled, not as permission to retry |
-| `4` | Authentication required | Report target/host auth blocker without revealing secrets |
+|Code|Meaning|Handling|
+|---:|---|---|
+|`0`|Success|Parse the promised stdout and re-read after writes|
+|`1`|Failure|Preserve stderr/state; inspect command-specific help|
+|`2`|User cancellation|Treat as no-op/cancelled, not as permission to retry|
+|`4`|Authentication required|Report target/host auth blocker without revealing secrets|
 
 Subcommands may add meanings. Check the command reference and installed help before
 interpreting a nonzero result. A partial response, timeout, 404, or conflict is

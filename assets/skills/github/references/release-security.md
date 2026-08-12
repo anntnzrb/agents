@@ -37,8 +37,8 @@ gh release view TAG --repo OWNER/REPO --json tagName,name,body,assets,isDraft,is
 - `--generate-notes`, `--notes-file`, and editor/browser flags can derive or open
   content. Inspect generated text and use noninteractive input when authorized.
 - Attestation verification may depend on repository visibility, artifact digest,
-  Actions permissions, and CLI/server rollout. Report an unavailable verifier rather
-  than weakening verification or treating a signature as trusted by default.
+  Actions permissions, and CLI/server rollout. Report an unavailable verifier
+  rather than weakening verification or treating a signature as trusted by default.
 
 ## Attestations
 
@@ -58,9 +58,9 @@ branch/tag applicability. Use explicit owner/repository and include enforcement,
 target, conditions, bypass actors, and rules in JSON where supported.
 
 `gh ruleset create`, `edit`, and `delete` change enforcement. Before an authorized
-write, record the current ruleset ID and effective scope; after it, re-read the ruleset
-and run a read-only applicability check. A 403 can mean missing administration scope,
-not an invalid ruleset. Preview/API availability varies by host.
+write, record the current ruleset ID and effective scope; after it, re-read the
+ruleset and run a read-only applicability check. A 403 can mean missing administration
+scope, not an invalid ruleset. Preview/API availability varies by host.
 
 ## SSH and GPG keys
 
