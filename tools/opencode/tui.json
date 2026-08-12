@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "keybinds": {
+    "leader": "ctrl+x",
+    "session_compact": "none",
+    "session_share": "none",
+    "agent_cycle": "none",
+    "agent_cycle_reverse": "none"
+  }
+}
