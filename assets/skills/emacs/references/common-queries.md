@@ -1,16 +1,14 @@
 # Common queries
 
-Use these with `scripts/emacsctl.py`. For structured output, return an alist with string keys and use `--json`.
+Use with `scripts/emacsctl.py`. Structured output: alist with string keys; use `--json`. Commands are relative to the skill directory; elsewhere resolve `<skill-dir>/scripts/cli.py` absolutely.
 
-Commands below are shown relative to the skill directory. When the working directory is elsewhere, resolve and use the absolute script path.
-
-## Runtime basics
+## Runtime
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py ping
 ```
 
-## Active fonts and faces
+## Faces
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py face default
@@ -18,7 +16,7 @@ uv run --script <skill-dir>/scripts/cli.py face fixed-pitch
 uv run --script <skill-dir>/scripts/cli.py face variable-pitch
 ```
 
-For a combined query, write this form to `<temp-dir>/emacs-query.el`:
+Combined query: write to `<temp-dir>/emacs-query.el`:
 
 ```elisp
 (list
@@ -31,23 +29,19 @@ For a combined query, write this form to `<temp-dir>/emacs-query.el`:
   (cons "frame_font" (or (frame-parameter nil 'font) "")))
 ```
 
-```text
-uv run --script <skill-dir>/scripts/cli.py eval-file <temp-dir>/emacs-query.el --json
-```
-
-## Current buffer context
+## Buffer
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py buffer
 ```
 
-## Keybinding lookup
+## Keybinding
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py key 'C-x C-f'
 ```
 
-## Feature and library lookup
+## Features and libraries
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py feature server
@@ -55,9 +49,9 @@ uv run --script <skill-dir>/scripts/cli.py library package
 uv run --script <skill-dir>/scripts/cli.py library use-package
 ```
 
-## Variable values
+## Variables
 
-When no helper exists, write this form to `<temp-dir>/emacs-query.el`:
+If no helper exists, write to `<temp-dir>/emacs-query.el`:
 
 ```elisp
 (list
@@ -66,13 +60,9 @@ When no helper exists, write this form to `<temp-dir>/emacs-query.el`:
   (cons "package_enable_at_startup" package-enable-at-startup))
 ```
 
-```text
-uv run --script <skill-dir>/scripts/cli.py eval-file <temp-dir>/emacs-query.el --json
-```
-
 ## Mode state
 
-Write this form to `<temp-dir>/emacs-query.el`:
+Write to `<temp-dir>/emacs-query.el`:
 
 ```elisp
 (list
@@ -82,13 +72,9 @@ Write this form to `<temp-dir>/emacs-query.el`:
   (cons "blink_cursor_mode" (bound-and-true-p blink-cursor-mode)))
 ```
 
-```text
-uv run --script <skill-dir>/scripts/cli.py eval-file <temp-dir>/emacs-query.el --json
-```
+## Docs/source roots
 
-## Locate docs/source roots
-
-Write this form to `<temp-dir>/emacs-query.el`:
+Write to `<temp-dir>/emacs-query.el`, then search locally with `rg`:
 
 ```elisp
 (list
@@ -98,15 +84,15 @@ Write this form to `<temp-dir>/emacs-query.el`:
   (cons "package_library" (or (locate-library "package") "")))
 ```
 
+Run every query file with:
+
 ```text
 uv run --script <skill-dir>/scripts/cli.py eval-file <temp-dir>/emacs-query.el --json
 ```
 
-Then search locally with `rg`.
-
 ## Eval from file
 
-For larger forms, write the query to `<temp-dir>/emacs-query.el`:
+For larger forms, write to `<temp-dir>/emacs-query.el`:
 
 ```elisp
 (list
@@ -114,11 +100,7 @@ For larger forms, write the query to `<temp-dir>/emacs-query.el`:
   (cons "default_height" (face-attribute 'default :height nil 'default)))
 ```
 
-```text
-uv run --script <skill-dir>/scripts/cli.py eval-file <temp-dir>/emacs-query.el --json
-```
-
-## Reload the current init file
+## Reload init
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py reload-init
@@ -130,4 +112,4 @@ Or load a specific file:
 uv run --script <skill-dir>/scripts/cli.py load path/to/init.el
 ```
 
-Remember: loading a file live does not mean every startup-time behavior is now active. Verify and call out restart requirements.
+Live loading does not activate every startup-time behavior; verify and call out restart requirements.
