@@ -31,14 +31,14 @@ Read-only Amazon catalog search through the bundled skill-local CLI. Use it for 
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Maintainer contract | `README.md` | Before changing CLI, parser, tests, or machine-readable behavior |
-| Shortest correct command | `references/cheatsheet.md` | For discovery, shortlist, details, scoring, zip-aware search, fixture parsing, or trusted fields |
-| Multi-step routing | `references/workflows.md` | For recommendations, accessory filtering, finalist validation, locality reruns, enrichment, or answer shape |
-| Operational contract | `references/operational-contract.md` | For output modes, exact controls, locality, enrichment, scoring, accessory heuristics, failures, or evidence fields |
-| Process integration | `references/rpc.md` | For `--mode rpc`, request/response schema, `zipCode`, or `query.zip_code` |
-| Recovery | `references/troubleshooting.md` | For blocked fetches, sparse details, locale drift, parser drift, conflicting fields, or fixture debugging |
+|Need|Read|When|
+|---|---|---|
+|Maintainer contract|`README.md`|Before changing CLI, parser, tests, or machine-readable behavior|
+|Shortest correct command|`references/cheatsheet.md`|For discovery, shortlist, details, scoring, zip-aware search, fixture parsing, or trusted fields|
+|Multi-step routing|`references/workflows.md`|For recommendations, accessory filtering, finalist validation, locality reruns, enrichment, or answer shape|
+|Operational contract|`references/operational-contract.md`|For output modes, exact controls, locality, enrichment, scoring, accessory heuristics, failures, or evidence fields|
+|Process integration|`references/rpc.md`|For `--mode rpc`, request/response schema, `zipCode`, or `query.zip_code`|
+|Recovery|`references/troubleshooting.md`|For blocked fetches, sparse details, locale drift, parser drift, conflicting fields, or fixture debugging|
 
 ## Workflow
 
@@ -57,3 +57,4 @@ Read-only Amazon catalog search through the bundled skill-local CLI. Use it for 
 ## Reference routing
 
 Use the Required follow-up reads table near the top of this file; do not preload references for routine searches.
+
