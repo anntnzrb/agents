@@ -1,34 +1,18 @@
-# Reference Guide
+# Clojure Reference
 
-Read this when core Clojure data, naming, project layout, error handling, or `deps.edn` details are needed.
+Use for Clojure data, naming, project layout, error handling, `deps.edn`, REPL, idioms, performance, and anti-patterns.
 
-## Section index
+## Data structures
 
-- Data structures, naming, and best practices
-- REPL workflow, performance, and code organization
-- Idioms, error handling, and project structure
-- `deps.edn`, dependency types, core patterns, and anti-patterns
+- Indexed access/append: Vector `[]` (default sequence; O(~1) indexed access and append).
+- Sequential prepend/stacks/recursion: List `'()`.
+- Key-value associations: Map `{}`; keywords suit named fields.
+- Membership, uniqueness, deduplication/filtering: Set `#{}`.
+- FIFO: `clojure.lang.PersistentQueue/EMPTY`.
+- Key order: `(sorted-map)`.
+- Coordinates: vector/tuple as map key.
 
-## Data Structure Selection
-
-| Need                           | Data Structure                       |
-| ------------------------------ | ------------------------------------ |
-| Indexed access, append at end  | Vector `[]`                          |
-| Sequential prepend             | List `'()`                           |
-| Key-value lookup               | Map `{}`                             |
-| Membership testing, uniqueness | Set `#{}`                            |
-| FIFO queue                     | `clojure.lang.PersistentQueue/EMPTY` |
-| Ordered by key                 | Sorted map `(sorted-map)`            |
-| Coordinate storage             | Vector/tuple as map key              |
-
-### When to Use What
-
-- **Vector**: Default choice for sequences. O(~1) indexed access and append
-- **List**: When prepending is the primary operation (stacks, recursion)
-- **Map**: Key-value associations. Keywords as keys for named fields
-- **Set**: Membership testing, deduplication, filtering
-
-## Naming Conventions
+## Naming
 
 ```clojure
 ;; kebab-case for vars and functions
@@ -54,29 +38,25 @@ Read this when core Clojure data, naming, project layout, error handling, or `de
 (defn process [data] ...)      ; Public API
 ```
 
-## Best Practices
+## Practices
 
-### Do
+Do:
+- Prefer pure functions: same input, same output, no side effects.
+- Use immutable data and persistent structures.
+- Use `->`/`->>` pipelines; destructure liberally; use keywords as functions (`(:name user)` rather than `(get user :name)`).
+- Keep functions small, single-responsibility, and independently testable.
+- Develop incrementally at the REPL and test immediately.
+- Define specs for critical domain entities.
 
-- **Prefer pure functions**: Same input, same output, no side effects
-- **Use immutable data**: Let Clojure's persistent data structures work for you
-- **Leverage threading macros**: `->` and `->>` for readable pipelines
-- **Destructure liberally**: Makes code self-documenting
-- **Use keywords as functions**: `(:name user)` instead of `(get user :name)`
-- **Keep functions small**: Single responsibility, testable in isolation
-- **Use the REPL**: Develop incrementally, test immediately
-- **Spec your data**: Define specs for critical domain entities
+Avoid:
+- Mutable state; use atoms/refs only when necessary.
+- Deep nesting; use threading and small functions.
+- Reinventing `clojure.core`/standard-library functionality.
+- Overusing macros; functions are simpler, composable, and testable.
+- Global state; pass dependencies explicitly or use dynamic vars.
+- Ignoring laziness; distinguish lazy from realized sequences.
 
-### Don't
-
-- **Avoid mutable state**: Use atoms/refs only when necessary
-- **Avoid deep nesting**: Threading macros and small functions
-- **Don't reinvent the wheel**: Check clojure.core and standard library first
-- **Don't overuse macros**: Functions are simpler, composable, testable
-- **Avoid global state**: Pass dependencies explicitly or use dynamic vars
-- **Don't ignore laziness**: Be aware when sequences are lazy vs realized
-
-## REPL Workflow
+## REPL
 
 ```clojure
 ;; Reload namespace
@@ -100,26 +80,15 @@ Read this when core Clojure data, naming, project layout, error handling, or `de
 (time (expensive-operation))
 ```
 
-## Performance Tips
+## Performance
 
-### Avoid
+Avoid reflection (use `^String` type hints in hot paths), unnecessary lazy-sequence realization (use `first`, `take` when possible), repeated hash lookups (destructure once/use locals), and tight-loop boxing (use primitive type hints).
 
-- **Reflection**: Use type hints `^String` for hot paths
-- **Realizing lazy seqs unnecessarily**: Use `first`, `take` when possible
-- **Repeated hash lookups**: Destructure once, use locals
-- **Boxing in tight loops**: Use primitive type hints
+Prefer transducers for multi-step large-data transformations; reducers for parallel folds; persistent vectors over lists for random access; `into` over repeated `conj` for batching; `mapv`/`filterv` when vectors are required and intermediate lazy seqs are undesirable.
 
-### Prefer
+## Code organization
 
-- **Transducers**: For multi-step transformations on large data
-- **Reducers**: For parallel fold operations
-- **Persistent vectors over lists**: For random access
-- **`into` over repeated `conj`**: Batches efficiently
-- **`mapv`/`filterv`**: When you need vectors, avoid intermediate lazy seqs
-
-## Code Organization
-
-```
+```text
 src/
 ├── myapp/
 │   ├── core.clj         ; Entry point, -main
@@ -137,7 +106,7 @@ test/
 │       └── user_test.clj
 ```
 
-## Common Idioms
+## Idioms
 
 ```clojure
 ;; Safe navigation (nil-punning)
@@ -170,7 +139,7 @@ test/
      (map-vals #(map :name %)))
 ```
 
-## Error Handling
+## Errors
 
 ```clojure
 ;; Use ex-info for exceptions with data
@@ -188,9 +157,9 @@ test/
 {:error {:type :not-found :message "..."}}
 ```
 
-## Project Structure
+## Project structure
 
-```
+```text
 myapp/
 ├── deps.edn
 ├── build.clj               # tools.build script
@@ -204,7 +173,7 @@ myapp/
 └── resources/
 ```
 
-## deps.edn Configuration
+## `deps.edn`
 
 ```clojure
 {:paths ["src" "resources"]
@@ -249,7 +218,7 @@ myapp/
    :main-opts ["-m" "antq.core"]}}}
 ```
 
-## Dependency Types
+## Dependency types
 
 ```clojure
 ;; Maven (most common)
@@ -263,9 +232,9 @@ myapp/
 {mylib {:local/root "../mylib"}}
 ```
 
-## Core Patterns
+## Core patterns
 
-### Pure Functions + Immutability
+### Pure functions and immutability
 
 ```clojure
 ;; Immutable by default
@@ -277,7 +246,7 @@ myapp/
 (update-in m [:user :age] inc)    ; Nested update
 ```
 
-### Threading Macros
+### Threading
 
 ```clojure
 ;; Thread-first: subject flows through
@@ -316,7 +285,7 @@ myapp/
   (format "Hello %s (%s)" name email))
 ```
 
-### Higher-Order Functions
+### Higher-order functions
 
 ```clojure
 ;; Composition
@@ -332,7 +301,7 @@ myapp/
 ; => ["Alice" 30]
 ```
 
-### Control Flow
+### Control flow
 
 ```clojure
 ;; when: single truthy branch
@@ -357,43 +326,17 @@ myapp/
   :else "zero")
 ```
 
-## Naming Conventions
+## Anti-patterns
 
-```clojure
-;; kebab-case for vars and functions
-(def max-retry-attempts 3)
-(defn calculate-total-price [items] ...)
-
-;; Predicates end with ?
-(defn valid-email? [email] ...)
-
-;; Side-effecting functions end with !
-(defn save-user! [user] ...)
-(defn reset-counter! [] ...)
-
-;; Dynamic vars use earmuffs
-(def ^:dynamic *config* {...})
-
-;; CamelCase for protocols and records
-(defprotocol Storage ...)
-(defrecord DatabaseStorage [conn] ...)
-
-;; Private functions use defn-
-(defn- parse [input] ...)      ; Internal helper
-(defn process [data] ...)      ; Public API
-```
-
-## Anti-Patterns
-
-| Avoid                        | Do Instead                                 |
-| ---------------------------- | ------------------------------------------ |
-| Mutable state everywhere     | Use atoms sparingly, prefer pure functions |
-| `(if (not x) ...)`           | `(if-not x ...)` or `(when-not x ...)`     |
-| `(not (= a b))`              | `(not= a b)`                               |
-| `(first (filter pred coll))` | `(some pred coll)`                         |
-| Deep nesting                 | Threading macros `->`, `->>`               |
-| `(into [] (map f coll))`     | `(mapv f coll)`                            |
-| String concatenation         | `(str a b c)` or `(format ...)`            |
-| `(nth coll 0)`               | `(first coll)`                             |
-| Manual recursion             | `reduce`, `iterate`, `loop/recur`          |
-| `def` inside functions       | `let` bindings                             |
+|Avoid|Do Instead|
+|---|---|
+|Mutable state everywhere|Use atoms sparingly, prefer pure functions|
+|`(if (not x) ...)`|`(if-not x ...)` or `(when-not x ...)`|
+|`(not (= a b))`|`(not= a b)`|
+|`(first (filter pred coll))`|`(some pred coll)`|
+|Deep nesting|Threading macros `->`, `->>`|
+|`(into [] (map f coll))`|`(mapv f coll)`|
+|String concatenation|`(str a b c)` or `(format ...)`|
+|`(nth coll 0)`|`(first coll)`|
+|Manual recursion|`reduce`, `iterate`, `loop/recur`|
+|`def` inside functions|`let` bindings|

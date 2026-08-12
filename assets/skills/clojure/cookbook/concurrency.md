@@ -1,33 +1,19 @@
-# Concurrency & State Management Cookbook
+# Clojure Concurrency & State Management Cookbook
 
-A guide to Clojure's concurrency primitives and state management patterns.
+Use when state ownership, coordination, asynchronous work, or concurrency primitives matter.
 
-Read this when state ownership, coordination, asynchronous work, or concurrency primitives matter.
+## Reference types
 
-## Section index
+|Type|Use Case|Coordination|Sync/Async|
+|---|---|---|---|
+|Atom|Independent state|None|Sync|
+|Ref|Coordinated state|STM|Sync|
+|Agent|Async updates|None|Async|
+|Var|Thread-local|None|Sync|
 
-- Atoms, validation, watches, and caches
-- Refs, STM, and transaction boundaries
-- Agents and dynamic vars
-- `core.async` channels, pipelines, fan-in/out, and pub/sub
-- Futures, promises, and delays
+## Atoms
 
-## Reference Types Overview
-
-| Type  | Use Case          | Coordination | Sync/Async |
-| ----- | ----------------- | ------------ | ---------- |
-| Atom  | Independent state | None         | Sync       |
-| Ref   | Coordinated state | STM          | Sync       |
-| Agent | Async updates     | None         | Async      |
-| Var   | Thread-local      | None         | Sync       |
-
----
-
-## Managing Independent State with Atoms
-
-**Problem**: You need thread-safe synchronous updates to independent state without coordination.
-
-**Solution**:
+Thread-safe synchronous updates to independent state. Prefer `swap!` for updates based on the current value; use `reset!` only to replace regardless of current state. `swap!` functions may retry, so keep them pure and side-effect-free. Validators reject invalid updates by throwing; watchers react after changes and suit logging or side effects.
 
 ```clojure
 ;; Create
@@ -50,16 +36,6 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
 (compare-and-set! counter 0 1) ; true if was 0
 ```
 
-**Tip**: Use `swap!` for updates based on current value. Only use `reset!` when you truly need to replace the value regardless of current state.
-
----
-
-## Conditional Updates with Atoms
-
-**Problem**: You need to update an atom only when certain conditions are met.
-
-**Solution**:
-
 ```clojure
 ;; Conditional update
 (swap! state
@@ -74,16 +50,6 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
   old)
 ```
 
-**Tip**: The function passed to `swap!` may be called multiple times due to retries, so keep it pure and free of side effects.
-
----
-
-## Validating and Watching Atom Changes
-
-**Problem**: You need to enforce constraints on atom values or react to changes.
-
-**Solution**:
-
 ```clojure
 ;; With validators
 (def positive (atom 0 :validator pos?))
@@ -97,15 +63,9 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
 (remove-watch counter :logger)
 ```
 
-**Tip**: Validators throw exceptions on invalid updates. Use watchers for logging or triggering side effects after state changes.
+## Atom cache
 
----
-
-## Building a Thread-Safe Cache
-
-**Problem**: You need a simple thread-safe cache that computes values on-demand.
-
-**Solution**:
+A simple on-demand thread-safe cache can use an atom. The `swap!` update-if-absent form ensures `compute-fn` runs only once under contention, preventing duplicate work.
 
 ```clojure
 (def cache (atom {}))
@@ -128,15 +88,9 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
            key)))
 ```
 
-**Tip**: The second approach ensures the compute function is only called once even under contention, preventing duplicate work.
+## Refs and STM
 
----
-
-## Coordinated Updates with Refs and STM
-
-**Problem**: You need to update multiple pieces of state atomically (all-or-nothing).
-
-**Solution**:
+Use refs for coordinated multi-state updates. `dosync` makes changes atomic and all-or-nothing.
 
 ```clojure
 ;; Create refs
@@ -155,15 +109,7 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
     (println "Total:" total)))
 ```
 
-**Tip**: Use refs when you need coordinated updates to multiple pieces of state. STM ensures all changes happen atomically or not at all.
-
----
-
-## Ref Operations for Different Use Cases
-
-**Problem**: You need to choose the right ref operation for your use case.
-
-**Solution**:
+`alter` applies a function and retries on conflict. `commute` suits commutative operations and avoids retrying the function. `ref-set` replaces the value. `ensure` provides consistent reads without modification.
 
 ```clojure
 ;; alter: apply fn (retries on conflict)
@@ -182,15 +128,7 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
     (alter account-b update :balance + 50)))
 ```
 
-**Tip**: Use `commute` for commutative operations (like `inc`) to reduce retries. Use `ensure` when you need consistent reads without modification.
-
----
-
-## Avoiding Side Effects in Transactions
-
-**Problem**: You need to perform side effects based on transactional state changes.
-
-**Solution**:
+Transactions may retry: NEVER perform side effects inside `dosync`; return the transactional result and perform side effects afterward.
 
 ```clojure
 ;; DON'T: Side effects in transactions (may retry!)
@@ -208,15 +146,9 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
   (alter orders conj new-order))
 ```
 
-**Tip**: Transactions may retry, so never put side effects inside `dosync`. Extract the result and perform side effects afterward.
+## Agents
 
----
-
-## Async State Updates with Agents
-
-**Problem**: You need to update state asynchronously without blocking the caller.
-
-**Solution**:
+Agents update state asynchronously without blocking the caller. `send` is for CPU-bound work on a fixed pool; `send-off` is for blocking I/O on a cached pool. Each agent executes actions in order, one at a time. Its dereferenced value may have pending actions. `await-for` timeout is in ms. Agents enter a failed state on action errors; inspect errors, configure handlers/mode, and restart as needed.
 
 ```clojure
 ;; Create
@@ -239,16 +171,6 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
 (await-for 1000 agent1 agent2) ; Timeout ms
 ```
 
-**Tip**: Use `send` for CPU-bound work and `send-off` for blocking I/O. Actions are executed in order, one at a time per agent.
-
----
-
-## Handling Agent Errors
-
-**Problem**: You need to detect and recover from errors in agent actions.
-
-**Solution**:
-
 ```clojure
 ;; Check for errors
 (agent-error log-agent)
@@ -266,15 +188,7 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
 (set-error-mode! log-agent :continue) ; or :fail
 ```
 
-**Tip**: Agents enter a failed state on errors. Set error handlers and modes proactively to handle failures gracefully.
-
----
-
-## Serializing I/O with Agents
-
-**Problem**: You need to serialize writes to a file or resource without explicit locking.
-
-**Solution**:
+Agents serialize operations, so they can coordinate resource writes without explicit locks.
 
 ```clojure
 (def file-writer (agent nil))
@@ -289,15 +203,9 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
 (write-line "log.txt" "Event 2")
 ```
 
-**Tip**: Agents naturally serialize operations, making them perfect for coordinating I/O without explicit locks.
+## Dynamic vars
 
----
-
-## Thread-Local State with Dynamic Vars
-
-**Problem**: You need context-specific state that's isolated per thread (like database connections or request data).
-
-**Solution**:
+Dynamic vars provide per-thread, context-specific state without explicit parameter passing. Define them with earmuffs `*var-name*`; nested `binding` forms shadow outer bindings.
 
 ```clojure
 ;; Define with earmuffs
@@ -320,15 +228,7 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
     (query)))  ; uses conn2
 ```
 
-**Tip**: Dynamic vars provide thread-local scope without passing parameters explicitly. Use earmuffs `*var-name*` by convention.
-
----
-
-## Preserving Bindings Across Threads
-
-**Problem**: You need thread-local bindings to be available in newly spawned threads.
-
-**Solution**:
+`bound-fn` captures current bindings for futures and other threads; without it, a new thread sees root bindings.
 
 ```clojure
 ;; bound-fn preserves bindings for new threads
@@ -340,15 +240,9 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
   (future (println *x*)))  ; prints root value
 ```
 
-**Tip**: Use `bound-fn` to capture current bindings for use in futures or other threads. Without it, new threads see only root bindings.
+## `core.async` channels
 
----
-
-## Creating and Using Channels
-
-**Problem**: You need to communicate between concurrent processes using CSP-style channels.
-
-**Solution**:
+Channels communicate between concurrent processes CSP-style. Unbuffered channels block until producer and consumer are ready; buffers decouple them. `sliding-buffer` drops oldest items; `dropping-buffer` drops newest items. Close channels with `close!`.
 
 ```clojure
 (require '[clojure.core.async :as a
@@ -368,15 +262,7 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
 (close! ch)
 ```
 
-**Tip**: Unbuffered channels block until both producer and consumer are ready. Use buffered channels when you need decoupling.
-
----
-
-## Producing and Consuming with Go Blocks
-
-**Problem**: You need lightweight threads for concurrent operations without blocking OS threads.
-
-**Solution**:
+Inside go blocks use parking `<!` and `>!`; outside use blocking `<!!` and `>!!`. Go blocks are lightweight and park without blocking OS threads.
 
 ```clojure
 ;; Produce
@@ -396,15 +282,7 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
 (<!! ch)        ; Block until available
 ```
 
-**Tip**: Use `<!` and `>!` inside go blocks, `<!!` and `>!!` outside. Go blocks are lightweight and can be parked efficiently.
-
----
-
-## Selecting from Multiple Channels
-
-**Problem**: You need to wait on multiple channels simultaneously with timeout support.
-
-**Solution**:
+`alts!` waits on multiple channels. Use `timeout` for timeouts, `:priority true` for deterministic ordering, and `:default` for non-blocking selection.
 
 ```clojure
 (go
@@ -421,15 +299,9 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
 (alts! [ch1 ch2] :default :none)  ; Don't block
 ```
 
-**Tip**: Use `timeout` channels for timeouts, `:priority true` for deterministic ordering, and `:default` for non-blocking operations.
+## Pipelines
 
----
-
-## Parallel Processing with Pipelines
-
-**Problem**: You need to process channel data in parallel with a specified level of concurrency.
-
-**Solution**:
+Use `pipeline` for CPU-bound work, `pipeline-async` for async operations, and `pipeline-blocking` for blocking I/O. The first argument sets parallelism.
 
 ```clojure
 ;; Parallel processing
@@ -454,15 +326,9 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
   in-ch)
 ```
 
-**Tip**: Use `pipeline` for CPU-bound work, `pipeline-async` for async operations, and `pipeline-blocking` for blocking I/O.
+## Fan-out, fan-in, pub/sub
 
----
-
-## Fan-Out Pattern
-
-**Problem**: You need multiple workers consuming from a single channel.
-
-**Solution**:
+Multiple consumers compete for values from one channel, distributing work naturally. Fan-in merges producer channels into one output for consolidated results.
 
 ```clojure
 ;; Fan-out: one producer, multiple consumers
@@ -473,16 +339,6 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
         (println "Worker" i "got" v)
         (recur)))))
 ```
-
-**Tip**: Multiple consumers automatically compete for values from the channel, distributing work naturally.
-
----
-
-## Fan-In Pattern
-
-**Problem**: You need to merge multiple producer channels into a single consumer channel.
-
-**Solution**:
 
 ```clojure
 ;; Fan-in: multiple producers, one consumer
@@ -496,15 +352,7 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
     out))
 ```
 
-**Tip**: Fan-in merges multiple channels into one, useful for consolidating results from parallel operations.
-
----
-
-## Publish-Subscribe Pattern
-
-**Problem**: You need to route messages to multiple subscribers based on topics.
-
-**Solution**:
+Pub/sub routes messages to all subscribers by a topic function and supports multiple subscribers per topic.
 
 ```clojure
 ;; Pub/sub
@@ -521,15 +369,9 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
 (go (>! publisher {:topic :news :content "Hello"}))
 ```
 
-**Tip**: Publications automatically route messages to subscribers based on a topic function. Supports multiple subscribers per topic.
+## Futures, promises, delays
 
----
-
-## Async Computations with Futures
-
-**Problem**: You need to run a computation asynchronously on a thread pool and retrieve the result later.
-
-**Solution**:
+Futures start immediately on creation, run on a thread pool, and block on dereference. Use `realized?` to test completion without blocking; `deref` accepts a timeout and fallback.
 
 ```clojure
 ;; Start async computation
@@ -545,15 +387,7 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
 (deref result 500 :timeout)  ; With timeout
 ```
 
-**Tip**: Futures start executing immediately on creation. Use `realized?` to check completion without blocking.
-
----
-
-## One-Time Value Delivery with Promises
-
-**Problem**: You need a container for a value that will be delivered exactly once, possibly from another thread.
-
-**Solution**:
+Promises deliver one value exactly once, possibly from another thread. Dereference blocks until delivery; later `deliver` calls have no effect.
 
 ```clojure
 ;; Create empty promise
@@ -569,15 +403,7 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
 (realized? p)
 ```
 
-**Tip**: Promises can only be delivered once. Subsequent `deliver` calls have no effect. Great for one-time signaling between threads.
-
----
-
-## Lazy Evaluation with Delays
-
-**Problem**: You need to defer an expensive computation until it's actually needed, and cache the result.
-
-**Solution**:
+Delays defer computation until first dereference, compute once, and cache the result; use them for lazy initialization.
 
 ```clojure
 ;; Deferred computation (runs once when dereferenced)
@@ -589,7 +415,3 @@ Read this when state ownership, coordination, asynchronous work, or concurrency 
 @expensive  ; prints "Computing...", returns result
 @expensive  ; returns cached result, no recomputation
 ```
-
-**Tip**: Delays compute their value only once, on first dereference. Subsequent derefs return the cached value. Perfect for lazy initialization.
-
----

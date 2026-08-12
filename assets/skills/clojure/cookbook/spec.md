@@ -1,23 +1,8 @@
 # clojure.spec Cookbook
 
-Data validation, generative testing, and runtime checking for Clojure.
+Clojure `clojure.spec.alpha` cookbook: validation, generative testing, conforming, runtime checking, custom generation, and organization.
 
-Read this when defining specs, conforming data, generating examples, or instrumenting functions.
-
-## Section index
-
-- Predicates, sets, nils, maps, collections, and regex specs
-- Alternatives and function contracts
-- Runtime checking and sample generation
-- Custom generators, polymorphic data, conforming, and organization
-
----
-
-## Setup clojure.spec
-
-**Problem**: You need to import the clojure.spec libraries for validation and testing.
-
-**Solution**:
+## Setup
 
 ```clojure
 (require '[clojure.spec.alpha :as s]
@@ -25,15 +10,7 @@ Read this when defining specs, conforming data, generating examples, or instrume
          '[clojure.spec.test.alpha :as stest])
 ```
 
-**Tip**: Use consistent aliases (`s`, `gen`, `stest`) for readability across your codebase.
-
----
-
-## Validate with Predicates
-
-**Problem**: You need to validate data against simple predicates like integers, strings, and custom constraints.
-
-**Solution**:
+## Predicates and enums
 
 ```clojure
 ;; Define specs with predicates
@@ -60,15 +37,7 @@ Read this when defining specs, conforming data, generating examples, or instrume
 ; {:clojure.spec.alpha/problems [...] ...}
 ```
 
-**Tip**: Use `s/explain` during development to understand validation failures, and `s/explain-data` in production for programmatic error handling.
-
----
-
-## Validate Against a Set of Values
-
-**Problem**: You need to restrict a value to a specific set of allowed options.
-
-**Solution**:
+Use `s/explain` for development diagnostics; use `s/explain-data` for programmatic production errors.
 
 ```clojure
 (s/def ::status #{:pending :active :done :cancelled})
@@ -78,15 +47,7 @@ Read this when defining specs, conforming data, generating examples, or instrume
 (s/valid? ::status :unknown) ; => false
 ```
 
-**Tip**: Sets are the simplest way to define enum-like specs in Clojure. They're clear and self-documenting.
-
----
-
-## Allow Nil Values
-
-**Problem**: You need to make a spec optional by allowing nil values.
-
-**Solution**:
+## Nil and maps
 
 ```clojure
 (s/def ::optional-name (s/nilable string?))
@@ -95,15 +56,7 @@ Read this when defining specs, conforming data, generating examples, or instrume
 (s/valid? ::optional-name "Alice") ; => true
 ```
 
-**Tip**: Use `s/nilable` when a field can be absent or explicitly nil. For optional map keys, use `:opt` in `s/keys` instead.
-
----
-
-## Validate Maps with Required and Optional Keys
-
-**Problem**: You need to validate maps with specific required and optional keys.
-
-**Solution**:
+Use `s/nilable` for a value that can be absent or explicitly `nil`; use `:opt` in `s/keys` for optional map keys.
 
 ```clojure
 ;; Required and optional keys (qualified)
@@ -128,15 +81,9 @@ Read this when defining specs, conforming data, generating examples, or instrume
 ; ... missing required keys: [:user/id :user/email]
 ```
 
-**Tip**: Use `:req-un` and `:opt-un` for unqualified keys when working with external APIs or JSON data.
+Use `:req-un`/`:opt-un` for unqualified external/API/JSON keys.
 
----
-
-## Validate Collections
-
-**Problem**: You need to validate homogeneous collections with type and size constraints.
-
-**Solution**:
+## Collections
 
 ```clojure
 ;; Homogeneous collection
@@ -155,15 +102,9 @@ Read this when defining specs, conforming data, generating examples, or instrume
 (s/valid? ::name-age ["Alice" 30]) ; => true
 ```
 
-**Tip**: Use `:kind` to restrict collection type (vector?, set?, list?), and `:min-count`/`:max-count`/`:count` for size constraints.
+`:kind` restricts collection type (`vector?`, `set?`, `list?`); `:min-count`, `:max-count`, and `:count` constrain size.
 
----
-
-## Match Sequences with Regex Operators
-
-**Problem**: You need to validate sequences with complex patterns like optional parts and alternatives.
-
-**Solution**:
+## Sequence regex and alternatives
 
 ```clojure
 ;; cat: concatenation (named parts)
@@ -196,15 +137,7 @@ Read this when defining specs, conforming data, generating examples, or instrume
 (s/def ::maybe-int (s/? int?))
 ```
 
-**Tip**: Regex operators (`s/cat`, `s/alt`, `s/*`, `s/+`, `s/?`) work on sequences and return structured data via `s/conform`.
-
----
-
-## Choose Between Alternatives with Or
-
-**Problem**: You need to accept one of several types with labeled alternatives.
-
-**Solution**:
+`s/cat`, `s/alt`, `s/*`, `s/+`, and `s/?` validate sequences; `s/conform` returns structured data.
 
 ```clojure
 ;; s/or: labeled alternatives
@@ -222,15 +155,9 @@ Read this when defining specs, conforming data, generating examples, or instrume
          #(> % 1000)))
 ```
 
-**Tip**: `s/or` returns a tagged tuple `[tag value]` so you can distinguish which alternative matched. Use `s/and` to combine multiple predicates.
+`s/or` returns tagged tuples `[tag value]`; `s/and` requires every predicate.
 
----
-
-## Specify Function Contracts
-
-**Problem**: You need to define contracts for function arguments, return values, and relationships.
-
-**Solution**:
+## Function contracts and runtime checking
 
 ```clojure
 (defn calculate-discount [price percentage]
@@ -249,15 +176,7 @@ Read this when defining specs, conforming data, generating examples, or instrume
 ; => true
 ```
 
-**Tip**: The `:fn` spec validates relationships between args and return value, enabling powerful invariant checking.
-
----
-
-## Enable Runtime Function Checking
-
-**Problem**: You want to catch invalid function calls during development.
-
-**Solution**:
+`:fn` checks relationships between arguments and return value.
 
 ```clojure
 ;; Turn on runtime checking (dev only!)
@@ -273,15 +192,9 @@ Read this when defining specs, conforming data, generating examples, or instrume
 (stest/instrument)
 ```
 
-**Tip**: Only use instrumentation in development—it adds runtime overhead. Never ship instrumented code to production.
+Instrumentation is development-only: it adds runtime overhead and MUST NOT ship to production.
 
----
-
-## Generate Sample Data
-
-**Problem**: You need to generate sample data that conforms to your specs for testing.
-
-**Solution**:
+## Sample and property-based data
 
 ```clojure
 ;; Generate sample values
@@ -299,15 +212,7 @@ Read this when defining specs, conforming data, generating examples, or instrume
 ; => ([("" "") [:name ""]] [("a") [:name "a"]] ...)
 ```
 
-**Tip**: Specs automatically generate sample data. Use `gen/sample` for quick data, and `s/exercise` to see both generated and conformed values.
-
----
-
-## Write Property-Based Tests
-
-**Problem**: You want to test functions with many random inputs to find edge cases.
-
-**Solution**:
+`gen/sample` gives quick samples; `s/exercise` shows generated and conformed values. Specs automatically generate sample data.
 
 ```clojure
 (require '[clojure.test.check.clojure-test :refer [defspec]]
@@ -325,15 +230,9 @@ Read this when defining specs, conforming data, generating examples, or instrume
 (stest/check `calculate-discount)
 ```
 
-**Tip**: Property-based testing with generated data can find bugs that example-based testing misses. Run `stest/check` to automatically test function specs.
+Property-based testing finds edge cases with generated inputs; `stest/check` tests function specs.
 
----
-
-## Create Custom Generators
-
-**Problem**: The default generator doesn't create realistic data for your domain.
-
-**Solution**:
+## Custom generators
 
 ```clojure
 ;; Override default generator
@@ -357,15 +256,9 @@ Read this when defining specs, conforming data, generating examples, or instrume
        (gen/choose 0 (System/currentTimeMillis)))))
 ```
 
-**Tip**: Use `s/with-gen` to provide custom generators for domain-specific data. Combine `gen/fmap`, `gen/tuple`, and `gen/such-that` to build complex generators.
+Use `s/with-gen` for domain-specific generators; `gen/fmap`, `gen/tuple`, and `gen/such-that` compose complex generators.
 
----
-
-## Validate Polymorphic Data
-
-**Problem**: You need different validation rules based on a discriminator field.
-
-**Solution**:
+## Polymorphic data
 
 ```clojure
 ;; Dispatch on :type field
@@ -397,15 +290,9 @@ Read this when defining specs, conforming data, generating examples, or instrume
 ; => true
 ```
 
-**Tip**: `s/multi-spec` with multimethods enables type-based validation for polymorphic data structures like events or commands.
+`s/multi-spec` plus multimethods selects validation by discriminator, useful for events or commands.
 
----
-
-## Transform Data with Conform
-
-**Problem**: You need to validate and transform data into a structured format.
-
-**Solution**:
+## Conform and unform
 
 ```clojure
 ;; conform: validate and transform
@@ -427,15 +314,9 @@ Read this when defining specs, conforming data, generating examples, or instrume
 ; => "Alice"
 ```
 
-**Tip**: `s/conform` returns transformed/tagged data on success or `::s/invalid` on failure. Use it to parse and destructure validated data. `s/unform` reverses the transformation.
+`s/conform` returns transformed/tagged data or `::s/invalid`; use it to parse/destructure validated data. `s/unform` reverses the transformation.
 
----
-
-## Organize Specs in a Central Namespace
-
-**Problem**: You need to organize domain specs in a maintainable way.
-
-**Solution**:
+## Organize specs
 
 ```clojure
 ;; specs.clj - Central spec definitions
@@ -458,15 +339,9 @@ Read this when defining specs, conforming data, generating examples, or instrume
           :opt-un [::display-name ::avatar-url]))
 ```
 
-**Tip**: Keep all specs in a dedicated namespace (e.g., `myapp.specs`). Define domain primitives first, then compose them into entity specs.
+Keep domain specs in a dedicated namespace (for example, `myapp.specs`), defining primitives before composing entities.
 
----
-
-## Create Validation Helpers
-
-**Problem**: You need reusable functions to validate and handle errors consistently.
-
-**Solution**:
+## Validation helpers
 
 ```clojure
 (defn validate! [spec data]
@@ -482,15 +357,9 @@ Read this when defining specs, conforming data, generating examples, or instrume
     {:error (s/explain-str spec data)}))
 ```
 
-**Tip**: Create helper functions for common patterns. `validate!` for throwing errors, `validate` for returning result maps.
+Use `validate!` to throw and `validate` to return result maps.
 
----
-
-## Assert Data Conforms to Spec
-
-**Problem**: You want runtime assertions that data matches a spec within your functions.
-
-**Solution**:
+## Assertions
 
 ```clojure
 ;; Enable spec assertions
@@ -505,6 +374,4 @@ Read this when defining specs, conforming data, generating examples, or instrume
 ;; Throws detailed error if invalid
 ```
 
-**Tip**: Enable `s/check-asserts` in development for automatic validation. Disable in production for performance. `s/assert` throws with detailed spec errors.
-
----
+Enable `s/check-asserts` in development; disable it in production for performance. `s/assert` throws detailed spec errors.

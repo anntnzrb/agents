@@ -9,7 +9,7 @@ metadata:
 
 # Clojure Development
 
-Functional-first Clojure with **deps.edn**, **tools.deps**, and **immutability**.
+Focus: functional Clojure; `deps.edn`, `tools.deps`, immutability.
 
 ## Workflow
 
@@ -53,15 +53,15 @@ clojure -M:search/outdated              # Find outdated deps
 
 ## Notes
 
-Project layout, deps.edn templates, core patterns, naming conventions, and anti-patterns live in `reference.md`.
+Project layout, deps.edn templates, core patterns, naming conventions, anti-patterns: `reference.md`.
 
 ## Engineering checks
 
-- Normalize untrusted input once at the boundary; use `clojure.spec` only where its validation or generation pays for itself
-- Preserve error context with `ex-info` and structured `ex-data`; do not catch-and-forget failures
-- Keep side effects, resource ownership, cancellation, and cleanup at the edge; keep core transformations pure
-- Test observable behavior and failure paths with deterministic values; avoid tests that pin private implementation shape
-- Introduce helpers, protocols, or abstraction only for a concrete reuse or boundary
+- Normalize untrusted input once at the boundary; use `clojure.spec` only when validation or generation pays for itself.
+- Preserve error context with `ex-info` and structured `ex-data`; NEVER catch-and-forget failures.
+- Keep side effects, resource ownership, cancellation, and cleanup at the edge; keep core transformations pure.
+- Test observable behavior and failure paths with deterministic values; avoid pinning private implementation shape.
+- Introduce helpers, protocols, or abstractions only for concrete reuse or boundary needs.
 
 ## Research Tools
 
@@ -74,11 +74,11 @@ gh search code "(s/def ::" --language=clojure
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Core language/project reference | `reference.md` | For data structures, idioms, errors, layout, or `deps.edn` |
-| Functional patterns | `cookbook/patterns.md` | For sequences, transducers, maps, reducers, or zippers |
-| Concurrency | `cookbook/concurrency.md` | For atoms, refs, agents, dynamic vars, `core.async`, futures, or promises |
-| Specs | `cookbook/spec.md` | For validation, conforming, generators, or function instrumentation |
-| Testing | `cookbook/testing.md` | For `clojure.test`, Kaocha, fixtures, async tests, or test.check |
-| Macros | `cookbook/macros.md` | Only when a function cannot express the required compile-time transformation |
+|Need|Read|When|
+|---|---|---|
+|Core language/project reference|`reference.md`|For data structures, idioms, errors, layout, or `deps.edn`|
+|Functional patterns|`cookbook/patterns.md`|For sequences, transducers, maps, reducers, or zippers|
+|Concurrency|`cookbook/concurrency.md`|For atoms, refs, agents, dynamic vars, `core.async`, futures, or promises|
+|Specs|`cookbook/spec.md`|For validation, conforming, generators, or function instrumentation|
+|Testing|`cookbook/testing.md`|For `clojure.test`, Kaocha, fixtures, async tests, or test.check|
+|Macros|`cookbook/macros.md`|Only when a function cannot express the required compile-time transformation|

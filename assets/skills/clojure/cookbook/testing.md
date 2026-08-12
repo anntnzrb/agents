@@ -1,23 +1,10 @@
 # Clojure Testing Cookbook
 
-Practical recipes for testing Clojure applications with clojure.test, Kaocha, and test.check.
+Clojure testing recipes: `clojure.test`, Kaocha, `test.check`. Covers unit tests, fixtures, async checks, Kaocha configuration, and generative tests.
 
-Read this when writing Clojure tests, fixtures, async checks, Kaocha config, or generative tests.
+## Basic Unit Tests
 
-## Section index
-
-- Assertions, table tests, fixtures, and async tests
-- Kaocha configuration, execution, and metadata filters
-- Test data, side effects, exceptions, and private functions
-- Property tests, generators, organization, and shared utilities
-
----
-
-## Write Basic Unit Tests
-
-**Problem**: You need to write simple unit tests for your Clojure functions.
-
-**Solution**:
+`testing` groups related assertions and improves failure context.
 
 ```clojure
 (ns myapp.core-test
@@ -38,15 +25,7 @@ Read this when writing Clojure tests, fixtures, async checks, Kaocha config, or 
     (is (= 0 (core/multiply 0 5)))))
 ```
 
-**Tip**: Use `testing` blocks to group related assertions and provide better error messages when tests fail.
-
----
-
-## Test Different Assertion Types
-
-**Problem**: You need to test equality, truthiness, types, and exceptions.
-
-**Solution**:
+## Assertion Types
 
 ```clojure
 ;; Equality
@@ -70,15 +49,11 @@ Read this when writing Clojure tests, fixtures, async checks, Kaocha config, or 
 (is (= 4 (+ 2 2)) "Math is broken!")
 ```
 
-**Tip**: Add custom messages to assertions to make failures easier to understand, especially in complex test scenarios.
+Add custom assertion messages, especially for complex scenarios.
 
----
+## Table-Driven Tests
 
-## Write Table-Driven Tests
-
-**Problem**: You need to test the same function with multiple input/output pairs without duplicating test code.
-
-**Solution**:
+`are` tests one pattern against multiple input/output rows; first row defines the pattern.
 
 ```clojure
 (deftest test-fizzbuzz
@@ -91,15 +66,9 @@ Read this when writing Clojure tests, fixtures, async checks, Kaocha config, or 
     30 "FizzBuzz"))
 ```
 
-**Tip**: Use `are` for table-driven tests where you have many similar test cases. The first row defines the pattern, and subsequent rows provide the test data.
+## Fixtures
 
----
-
-## Set Up Test Fixtures
-
-**Problem**: You need to run setup and teardown code before and after tests.
-
-**Solution**:
+`:each` runs setup/teardown per test; `:once` shares expensive setup across a namespace. `compose-fixtures` combines fixtures.
 
 ```clojure
 ;; Per-test fixture
@@ -123,15 +92,9 @@ Read this when writing Clojure tests, fixtures, async checks, Kaocha config, or 
   (compose-fixtures setup-fixture logging-fixture))
 ```
 
-**Tip**: Use `:each` for fixtures that need to run before/after every test, and `:once` for expensive setup that can be shared across all tests in a namespace.
+## Async Tests
 
----
-
-## Test Async Operations
-
-**Problem**: You need to test asynchronous code with promises or core.async channels.
-
-**Solution**:
+Always use timeouts when dereferencing promises or blocking on channels; otherwise tests can hang indefinitely.
 
 ```clojure
 ;; Test async with promises
@@ -151,15 +114,9 @@ Read this when writing Clojure tests, fixtures, async checks, Kaocha config, or 
     (is (= :value (a/<!! result)))))
 ```
 
-**Tip**: Always use timeouts when dereferencing promises or blocking on channels to prevent tests from hanging indefinitely.
+## Kaocha Configuration
 
----
-
-## Configure Kaocha Test Runner
-
-**Problem**: You need a modern test runner with watch mode and better output.
-
-**Solution**:
+Separate aliases for one-shot and watch runs; watch mode reruns tests when files change.
 
 ```clojure
 ;; deps.edn
@@ -192,15 +149,7 @@ Read this when writing Clojure tests, fixtures, async checks, Kaocha config, or 
  :color? true}
 ```
 
-**Tip**: Use separate aliases for running tests once vs. in watch mode. Watch mode automatically re-runs tests when files change.
-
----
-
-## Run Tests with Kaocha
-
-**Problem**: You need to run tests with different options like focusing on specific tests or skipping slow ones.
-
-**Solution**:
+## Run Kaocha
 
 ```bash
 # Run all tests
@@ -219,15 +168,11 @@ clojure -X:test/run :fail-fast? true
 clojure -X:test/run :skip-meta :slow
 ```
 
-**Tip**: Use `:fail-fast? true` during development to stop at the first failure and fix issues quickly.
+Use `:fail-fast? true` during development to stop at the first failure.
 
----
+## Metadata Filters
 
-## Filter Tests with Metadata
-
-**Problem**: You want to mark and selectively run slow, integration, or database tests.
-
-**Solution**:
+Tag slow tests with `^:slow`; skip them during regular development and include them in CI. Use `--skip-meta :slow` or `--focus-meta :slow`.
 
 ```clojure
 ;; Mark slow tests
@@ -242,15 +187,9 @@ clojure -X:test/run :skip-meta :slow
   ...)
 ```
 
-**Tip**: Tag slow tests with `^:slow` and skip them during regular development, but include them in CI pipelines.
+## Test Data Builders
 
----
-
-## Build Test Data
-
-**Problem**: You need to create test data with sensible defaults but allow customization.
-
-**Solution**:
+Builders provide sensible defaults and customization; override only fields relevant to each test.
 
 ```clojure
 (defn make-user
@@ -267,15 +206,9 @@ clojure -X:test/run :skip-meta :slow
     (is (= :admin (:role admin)))))
 ```
 
-**Tip**: Test data builders make tests more readable and maintainable. Override only the fields that matter for each specific test.
+## Side Effects
 
----
-
-## Test Side Effects
-
-**Problem**: You need to test code that performs side effects like logging or HTTP calls.
-
-**Solution**:
+`with-redefs` temporarily replaces functions; capture effects in atoms or return fixed external-dependency values.
 
 ```clojure
 ;; Capture side effects
@@ -291,15 +224,9 @@ clojure -X:test/run :skip-meta :slow
     (is (= :ok (fetch-data)))))
 ```
 
-**Tip**: Use `with-redefs` to temporarily replace functions during tests. Capture side effects in atoms or return fixed values for external dependencies.
+## Exceptions
 
----
-
-## Test and Inspect Exceptions
-
-**Problem**: You need to verify that code throws exceptions with specific types and messages.
-
-**Solution**:
+Use `ex-data` inspection for error details beyond type and message.
 
 ```clojure
 (deftest test-validation-errors
@@ -319,15 +246,9 @@ clojure -X:test/run :skip-meta :slow
     (is (contains? (ex-data ex) :field))))
 ```
 
-**Tip**: For detailed exception testing, catch the exception and inspect its `ex-data` to verify error details beyond just the message.
+## Private Functions
 
----
-
-## Test Private Functions
-
-**Problem**: You need to test a private function directly.
-
-**Solution**:
+Prefer testing through the public API; direct private-var access is possible:
 
 ```clojure
 ;; Access private var
@@ -338,15 +259,9 @@ clojure -X:test/run :skip-meta :slow
 ;; Better: test through public API
 ```
 
-**Tip**: While you can test private functions using `#'namespace/private-fn`, it's usually better to test them indirectly through the public API.
+## Property-Based Tests
 
----
-
-## Write Property-Based Tests
-
-**Problem**: You want to test properties that should hold for many generated inputs, not just specific examples.
-
-**Solution**:
+Use properties for invariants such as idempotency, commutativity, and round trips. The `defspec` count (`100` here) sets generated test cases.
 
 ```clojure
 (require '[clojure.test.check :as tc]
@@ -363,15 +278,9 @@ clojure -X:test/run :skip-meta :slow
     (= (sort v) (sort (sort v)))))
 ```
 
-**Tip**: Property-based testing is great for testing invariants like idempotency, commutativity, or round-trip conversions. The number (100) specifies how many random inputs to test.
+## Custom Generators
 
----
-
-## Create Custom Generators
-
-**Problem**: You need to generate complex domain-specific test data for property-based tests.
-
-**Solution**:
+Compose simple generators with `gen/hash-map`, `gen/vector`, and other combinators; constrain with `gen/not-empty` and `gen/choose`.
 
 ```clojure
 ;; Composite generator
@@ -388,15 +297,9 @@ clojure -X:test/run :skip-meta :slow
            (= (:id user) (:id result))))))
 ```
 
-**Tip**: Compose generators from simpler ones using `gen/hash-map`, `gen/vector`, and other combinators. Add constraints with functions like `gen/not-empty` and `gen/choose`.
+## Test Organization
 
----
-
-## Organize Test Code
-
-**Problem**: You need a clear structure for organizing tests, fixtures, and helpers.
-
-**Solution**:
+Mirror `src` structure in `test`, use `_test.clj`, and keep shared fixtures/helpers in separate directories.
 
 ```text
 test/
@@ -421,15 +324,9 @@ test/
             [myapp.test-helpers :as h]))
 ```
 
-**Tip**: Mirror your source directory structure in tests with `_test.clj` suffix. Keep shared fixtures and helpers in separate directories.
+## Shared Test Utilities
 
----
-
-## Create Shared Test Utilities
-
-**Problem**: You need to share common test setup code, fixtures, and macros across multiple test namespaces.
-
-**Solution**:
+Use a dedicated helper namespace for shared fixtures, builders, and macros; this reduces duplication and improves maintainability.
 
 ```clojure
 ;; test/myapp/test_helpers.clj
@@ -448,7 +345,3 @@ test/
   `(let [f# (future ~@body)]
      (deref f# ~ms :timeout)))
 ```
-
-**Tip**: Create a dedicated test helpers namespace for shared fixtures, test data builders, and testing macros. This reduces duplication and makes tests more maintainable.
-
----
