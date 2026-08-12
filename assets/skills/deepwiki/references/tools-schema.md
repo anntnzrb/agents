@@ -19,16 +19,16 @@ nix run github:numtide/llm-agents.nix#mcporter -- --config assets/mcporter.jsonc
 
 The command above captured this broad snapshot. Runtime calls MUST use live
 brief discovery plus the selected tool's schema first. NEVER invent structured
-response fields: all tools publish only the common string envelope below, not
-a schema for the string's semantic content.
+response fields: all tools publish only the common string envelope below, not a
+schema for the string's semantic content.
 
 ## Inventory
 
-| Tool | Purpose | Required input |
-| --- | --- | --- |
-| `read_wiki_structure` | List documentation topics for one GitHub repository | `repoName` string |
-| `read_wiki_contents` | View documentation for one GitHub repository | `repoName` string |
-| `ask_question` | Ask a context-grounded question about one or more GitHub repositories | `repoName` string or string array; `question` string |
+|Tool|Purpose|Required input|
+|---|---|---|
+|`read_wiki_structure`|List documentation topics for one GitHub repository|`repoName` string|
+|`read_wiki_contents`|View documentation for one GitHub repository|`repoName` string|
+|`ask_question`|Ask a context-grounded question about one or more GitHub repositories|`repoName` string or string array; `question` string|
 
 ## Common output envelope
 
