@@ -35,15 +35,15 @@ A command never combines requests. If a future composite is added, provenance MU
 
 Every success has nested `data.provenance` with:
 
-| Field | Contract |
-| --- | --- |
-| `provider` | Exactly `gamma`, `clob`, or `data` |
-| `official` | Exactly `true`; these are first-party production endpoints |
-| `auth_mode` | Exactly `none` |
-| `source_url` | Exact HTTPS URL actually requested, including encoded query values |
-| `endpoint` | Exact route path, such as `/markets/keyset` or `/book` |
-| `http_status` | Successful provider HTTP status, normally `200` |
-| `fetched_at` | UTC RFC3339 timestamp from the injected clock, ending in `Z` |
+|Field|Contract|
+|---|---|
+|`provider`|Exactly `gamma`, `clob`, or `data`|
+|`official`|Exactly `true`; these are first-party production endpoints|
+|`auth_mode`|Exactly `none`|
+|`source_url`|Exact HTTPS URL actually requested, including encoded query values|
+|`endpoint`|Exact route path, such as `/markets/keyset` or `/book`|
+|`http_status`|Successful provider HTTP status, normally `200`|
+|`fetched_at`|UTC RFC3339 timestamp from the injected clock, ending in `Z`|
 
 Do not duplicate provenance as flat aliases. Never substitute a docs URL, staging URL, redirect target, cache timestamp, or local-file path for `source_url`.
 
