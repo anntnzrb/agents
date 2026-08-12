@@ -21,10 +21,10 @@
 
   "default_agent": "build",
 
-  "keybinds": {
-    "leader": "ctrl+x",
-    "session_compact": "none",
-    "session_share": "none",
+  "agent": {
+    "plan": {
+      "disable": true,
+    },
   },
 
   /* **************************************************************************
