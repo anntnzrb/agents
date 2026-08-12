@@ -9,7 +9,7 @@ metadata:
 
 # Advent of Code Solver
 
-Language-agnostic problem-solving with **TDD** and **correctness-first** approach.
+Language-agnostic problem solving: TDD + correctness-first.
 
 ## Workflow
 
@@ -30,37 +30,37 @@ part1(data)  → answer
 part2(data)  → answer
 ```
 
-Parse once. Solve both parts. Test each function independently.
+Parse once; solve both parts; test each function independently.
 
 ## Algorithm Selection
 
-| Scenario                         | Algorithm           |
-| -------------------------------- | ------------------- |
-| Unweighted shortest path         | BFS                 |
-| Path existence / exhaustive      | DFS                 |
-| Weighted shortest path           | Dijkstra            |
-| Weighted + good heuristic        | A\*                 |
-| "After N iterations..." (huge N) | Cycle detection     |
-| "Find minimum X such that..."    | Binary search       |
-| "Count ways..." / "Min/max..."   | Dynamic programming |
-| Connected regions                | Flood fill          |
+|Scenario|Algorithm|
+|---|---|
+|Unweighted shortest path|BFS|
+|Path existence / exhaustive|DFS|
+|Weighted shortest path|Dijkstra|
+|Weighted + good heuristic|A\*|
+|"After N iterations..." (huge N)|Cycle detection|
+|"Find minimum X such that..."|Binary search|
+|"Count ways..." / "Min/max..."|Dynamic programming|
+|Connected regions|Flood fill|
 
-**Deep dive**: See [algorithms.md](cookbook/algorithms.md)
+Algorithms: [algorithms.md](cookbook/algorithms.md)
 
 ## Input Patterns
 
-| Format               | Approach                   |
-| -------------------- | -------------------------- |
-| Numbers in text      | Regex `-?\d+`              |
-| Grid of chars        | 2D array or dict by coords |
-| Blank-line groups    | Split on `\n\n` first      |
-| Key-value pairs      | Parse into map/dict        |
-| Instructions/opcodes | Pattern match each line    |
+|Format|Approach|
+|---|---|
+|Numbers in text|Regex `-?\d+`|
+|Grid of chars|2D array or dict by coords|
+|Blank-line groups|Split on `\n\n` first|
+|Key-value pairs|Parse into map/dict|
+|Instructions/opcodes|Pattern match each line|
 
-**Grids**: Use `(row, col)` with row↓. Sparse dict for infinite/sparse grids.
-**Directions**: `UP=(-1,0), DOWN=(1,0), LEFT=(0,-1), RIGHT=(0,1)`
+Grid coordinates: `(row, col)`, row↓; sparse dict for infinite/sparse grids.
+Directions: `UP=(-1,0), DOWN=(1,0), LEFT=(0,-1), RIGHT=(0,1)`
 
-**Deep dive**: See [parsing.md](cookbook/parsing.md)
+Parsing: [parsing.md](cookbook/parsing.md)
 
 ## Part 2 Patterns
 
@@ -80,13 +80,13 @@ Parse once. Solve both parts. Test each function independently.
 
 ## Complexity Targets
 
-| Input Size    | Target           |
-| ------------- | ---------------- |
-| n ≤ 20        | O(2^n) OK        |
-| n ≤ 500       | O(n³) OK         |
-| n ≤ 10,000    | O(n²) OK         |
-| n ≤ 1,000,000 | O(n log n)       |
-| n > 1,000,000 | O(n) or O(log n) |
+|Input Size|Target|
+|---|---|
+|n ≤ 20|O(2^n) OK|
+|n ≤ 500|O(n³) OK|
+|n ≤ 10,000|O(n²) OK|
+|n ≤ 1,000,000|O(n log n)|
+|n > 1,000,000|O(n) or O(log n)|
 
 ## Research Tools
 
@@ -99,8 +99,8 @@ gh search code "fn dijkstra" --language=rust
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Algorithm recipes | `cookbook/algorithms.md` | When selecting or implementing graph, DP, cycle, or search algorithms |
-| Parsing recipes | `cookbook/parsing.md` | For grids, grouped input, coordinates, hex grids, or irregular text |
-| General design reference | `reference.md` | For data structures, optimization, Part 2 adaptation, or anti-patterns |
+|Need|Read|When|
+|---|---|---|
+|Algorithm recipes|`cookbook/algorithms.md`|When selecting or implementing graph, DP, cycle, or search algorithms|
+|Parsing recipes|`cookbook/parsing.md`|For grids, grouped input, coordinates, hex grids, or irregular text|
+|General design reference|`reference.md`|For data structures, optimization, Part 2 adaptation, or anti-patterns|

@@ -1,16 +1,9 @@
 # Parsing Cookbook
 
-Recipes for extracting data from AoC inputs.
+AoC input recipes for structured, grid, grouped, or coordinate parsing.
 
-Read this when the puzzle input needs structured, grid, grouped, or coordinate parsing.
-
----
-
-## Extract All Integers
-
-**Problem**: Numbers scattered in text like `"pos=<3,-5>, vel=<-2,1>"`.
-
-**Solution**:
+## Extract all integers
+Scattered text such as `"pos=<3,-5>, vel=<-2,1>"`:
 
 ```python
 import re
@@ -18,15 +11,10 @@ nums = [int(x) for x in re.findall(r'-?\d+', line)]
 # [3, -5, -2, 1]
 ```
 
-**Tip**: `-?` handles negative numbers. Works on most AoC inputs.
+`-?` handles negative numbers; works on most AoC inputs.
 
----
-
-## Parse Character Grid
-
-**Problem**: Grid of characters, need 2D access.
-
-**Solution** (dense):
+## Parse character grids
+Dense 2D access:
 
 ```python
 lines = input.strip().split('\n')
@@ -34,7 +22,7 @@ grid = [list(line) for line in lines]
 value = grid[row][col]
 ```
 
-**Solution** (sparse/dict):
+Sparse/dict grid:
 
 ```python
 grid = {}
@@ -46,15 +34,10 @@ for row, line in enumerate(lines):
 value = grid.get((row, col), '.')
 ```
 
-**Tip**: Use sparse for infinite grids or when most cells are empty.
+Use sparse grids for infinite grids or grids mostly containing empty cells.
 
----
-
-## Parse Blank-Line Groups
-
-**Problem**: Input has sections separated by blank lines.
-
-**Solution**:
+## Parse blank-line groups
+Sections separated by blank lines:
 
 ```python
 groups = input.strip().split('\n\n')
@@ -62,15 +45,10 @@ for group in groups:
     items = group.split('\n')
 ```
 
-**Tip**: Common for "first section = rules, second section = data".
+Common pattern: first section rules, second section data.
 
----
-
-## Parse Key-Value Pairs
-
-**Problem**: Lines like `"name: value"` or `"key=value"`.
-
-**Solution**:
+## Parse key-value pairs
+Lines such as `"name: value"` or `"key=value"`:
 
 ```python
 data = {}
@@ -79,15 +57,10 @@ for line in lines:
     data[key] = value
 ```
 
-**Tip**: May need to cast value to int or further parse.
+Cast `value` to `int` or parse it further when needed.
 
----
-
-## Parse Instructions/Opcodes
-
-**Problem**: Lines like `"mov R1 42"` or `"jnz x -3"`.
-
-**Solution**:
+## Parse instructions/opcodes
+Lines such as `"mov R1 42"` or `"jnz x -3"`:
 
 ```python
 for line in lines:
@@ -99,15 +72,14 @@ for line in lines:
         case 'jnz': ...
 ```
 
-**Tip**: Use regex for complex formats: `re.match(r'(\w+) (\w+) (-?\d+)', line)`
+Use regex for complex formats:
 
----
+```python
+re.match(r'(\w+) (\w+) (-?\d+)', line)
+```
 
-## Cardinal Directions
-
-**Problem**: Need to move in 4 directions on a grid.
-
-**Solution**:
+## Cardinal directions
+Four-direction grid movement; `(row, col)` has row increasing downward:
 
 ```python
 UP, DOWN = (-1, 0), (1, 0)
@@ -118,15 +90,7 @@ DIRS4 = [UP, DOWN, LEFT, RIGHT]
 new_row, new_col = row + dr, col + dc
 ```
 
-**Tip**: `(row, col)` with row increasing downward matches visual grid layout.
-
----
-
-## 8-Directional Movement
-
-**Problem**: Need diagonals too.
-
-**Solution**:
+## 8-directional movement
 
 ```python
 DIRS8 = [(dr, dc)
@@ -135,13 +99,8 @@ DIRS8 = [(dr, dc)
          if (dr, dc) != (0, 0)]
 ```
 
----
-
-## Direction from Characters
-
-**Problem**: Input uses `^v<>` or `UDLR` for directions.
-
-**Solution**:
+## Directions from characters
+For `^v<>` or `UDLR` input:
 
 ```python
 DIR_MAP = {
@@ -153,13 +112,8 @@ DIR_MAP = {
 dr, dc = DIR_MAP[char]
 ```
 
----
-
 ## Rotation
-
-**Problem**: Turn left/right on a grid.
-
-**Solution** (tuples):
+Tuple formulas:
 
 ```python
 # 90° clockwise:     (row, col) → (col, -row)
@@ -167,7 +121,7 @@ dr, dc = DIR_MAP[char]
 # 180°:              (row, col) → (-row, -col)
 ```
 
-**Solution** (complex numbers):
+Complex-number alternative:
 
 ```python
 pos = col + row * 1j
@@ -175,15 +129,10 @@ turn_right = pos * -1j
 turn_left = pos * 1j
 ```
 
-**Tip**: Complex numbers make rotation trivial.
+Complex numbers make rotation trivial.
 
----
-
-## Hex Grid
-
-**Problem**: Hex grid with directions like `ne`, `sw`.
-
-**Solution** (cube coordinates, x + y + z = 0):
+## Hex grid
+Cube coordinates satisfy `x + y + z = 0`; directions include `ne` and `sw`:
 
 ```python
 HEX_DIRS = {
@@ -200,13 +149,7 @@ def hex_distance(a, b):
     return (abs(a[0]-b[0]) + abs(a[1]-b[1]) + abs(a[2]-b[2])) // 2
 ```
 
----
-
-## Bounds Checking
-
-**Problem**: Need to check if position is valid.
-
-**Solution**:
+## Bounds checking
 
 ```python
 def in_bounds(row, col, grid):
@@ -219,28 +162,17 @@ def neighbors(row, col, grid):
             yield nr, nc
 ```
 
-**Tip**: For sparse grids, use `grid.get((r,c), default)` instead.
+For sparse grids, use `grid.get((r,c), default)` instead.
 
----
-
-## Wrapping (Toroidal Grid)
-
-**Problem**: Grid wraps around edges.
-
-**Solution**:
+## Toroidal wrapping
 
 ```python
 row = row % height
 col = col % width
 ```
 
----
-
-## Padding with Sentinels
-
-**Problem**: Avoid bounds checking by padding edges.
-
-**Solution**:
+## Padding with sentinels
+Avoid bounds checking by padding edges:
 
 ```python
 padded = [['#'] * (width + 2)]
@@ -249,4 +181,4 @@ for line in lines:
 padded.append(['#'] * (width + 2))
 ```
 
-**Tip**: Choose sentinel that won't appear in real data.
+Choose a sentinel absent from real data.
