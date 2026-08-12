@@ -1,60 +1,37 @@
 # age Backend for Vars
 
-The **age** backend encrypts secrets using [age](https://github.com/FiloSottile/age) and decrypts them on the target machine during NixOS activation. Secrets are stored encrypted in your repository and uploaded encrypted to target machines — plaintext only exists in memory on the target.
+The **age** backend encrypts secrets with [age](https://github.com/FiloSottile/age), stores and uploads only ciphertext, and decrypts on the target during NixOS activation; plaintext exists only in target memory.
 
-## When to Use the Age Backend
+## Choose a Backend
 
-Choose the age backend when:
+Use age for direct age encryption without sops, target-side decryption without the sops-nix Go binary, automatic machine-key management, or hardware-token identities (YubiKey, PicoHSM) through age plugins. Use the [SOPS backend](../sops/secrets) for an existing sops workflow or sops-nix systemd service integration.
 
-- You want **simple, direct age encryption** without sops
-- You want **target-side decryption** without the sops-nix Go binary
-- You want automatic machine key management
-- Your identity is a hardware token (YubiKey, PicoHSM) via age plugins
+## Key Model
 
-Choose the [SOPS backend](../sops/secrets) when:
-
-- You already use sops in your workflow
-- You need sops-nix's systemd service integration
-
-## How It Works
-
-The age backend uses **machine keypairs** with key indirection:
-
-1. Each machine gets an age keypair. The private key is encrypted to your user key(s).
-2. Secrets are encrypted to machine public keys (not directly to user keys).
-3. During deployment, the machine's decrypted private key and encrypted secrets are uploaded.
-4. On boot, NixOS activation scripts decrypt secrets using the machine key.
-
-This means **user key rotation** only re-encrypts machine keys (one per machine), not every secret. Shared secrets are encrypted to all machines' public keys using age's native multi-recipient support.
+Each machine has an age keypair. Its private key is encrypted to user key(s); secrets are encrypted to machine public keys, not user keys. Deployment uploads the decrypted machine private key plus encrypted secrets; NixOS activation decrypts with the machine key. User-key rotation re-encrypts one machine key per machine, not every secret. Shared secrets use age multi-recipient encryption for all machines’ public keys.
 
 ## Quick Start
 
-### 1. Set Up Your Age Identity
+### 1. Age identity
 
-The backend automatically checks these locations for your private key:
+Private-key lookup, in order:
 
 1. `AGE_KEY` environment variable (key content)
-2. `AGE_KEYFILE` environment variable (path to key file)
+2. `AGE_KEYFILE` environment variable (key-file path)
 3. `~/.config/age/identities`
 4. `~/.config/sops/age/keys.txt`
 5. `~/.age/key.txt`
 
-If you don't have a key yet:
+Create an identity if needed:
 
 ```bash
 mkdir -p ~/.config/age
 age-keygen -o ~/.config/age/identities
 ```
 
-Note the public key from the output — you'll need it below.
+Use the generated public key below. Hardware-token age-plugin identity files may be placed at any listed path.
 
-:::admonition[Tip]{type=tip}
-Hardware tokens (YubiKey, PicoHSM) work via age plugin identity files placed at any of the paths above.
-:::
-
-### 2. Configure the Age Backend
-
-In your `clan.nix`:
+### 2. Configure in `clan.nix`
 
 ```nix
 {
@@ -74,18 +51,13 @@ In your `clan.nix`:
 }
 ```
 
-### 3. Generate Secrets
+### 3. Generate
 
 ```bash
 clan vars generate my-machine
 ```
 
-This will:
-
-1. Auto-generate a machine keypair (if not already present)
-2. Encrypt the machine's private key to your recipient key(s)
-3. Run generators and encrypt their secret outputs to the machine's public key
-4. Commit everything to the repository
+`clan vars generate my-machine` auto-generates a missing machine keypair, encrypts its private key to recipient key(s), runs generators, encrypts generator outputs to the machine public key, and commits the results.
 
 ### 4. Deploy
 
@@ -93,34 +65,26 @@ This will:
 clan machines update my-machine
 ```
 
-The backend uploads encrypted secrets to the target, where NixOS activation scripts decrypt them on boot.
+Encrypted secrets are uploaded to the target; NixOS activation decrypts them on boot.
 
 ## Decryption Phases
 
-Secrets are decrypted at different points during NixOS activation, controlled by the `neededFor` option on each secret file:
+Each secret file’s `neededFor` option controls activation timing:
 
-| Phase | Decrypted to | When | Use case |
-|-------|-------------|------|----------|
-| `users` | `/run/user-secrets/` (tmpfs) | Before user/group creation | Secrets needed by user definitions (e.g., `hashedPasswordFile`) |
-| `services` | `/run/secrets/` (tmpfs) | After users exist | Service credentials, API keys |
-| `activation` | In-place at upload location | During activation | Secrets for other activation scripts |
-| `partitioning` | `/run/partitioning-secrets/` (tmpfs) | During partitioning | Disk encryption keys |
+|Phase|Decrypted to|When|Use case|
+|---|---|---|---|
+|`users`|`/run/user-secrets/` (tmpfs)|Before user/group creation|Secrets needed by user definitions (e.g., `hashedPasswordFile`)|
+|`services`|`/run/secrets/` (tmpfs)|After users exist|Service credentials, API keys|
+|`activation`|In-place at upload location|During activation|Secrets for other activation scripts|
+|`partitioning`|`/run/partitioning-secrets/` (tmpfs)|During partitioning|Disk encryption keys|
 
-Secrets on tmpfs never touch disk and are lost on reboot (re-decrypted on next boot).
+Tmpfs secrets never touch disk and disappear on reboot; they are re-decrypted on the next boot.
 
-## Configuration Reference
+## Configuration
 
-### `vars.settings.secretStore`
+`vars.settings.secretStore = "age"` selects this backend.
 
-Set to `"age"` to use the age backend:
-
-```nix
-vars.settings.secretStore = "age";
-```
-
-### `vars.settings.recipients.hosts.<machine>`
-
-List of age public keys that can decrypt the machine's private key. Typically your admin key(s):
+`vars.settings.recipients.hosts.<machine>` lists age public keys that decrypt the machine private key, typically admin keys:
 
 ```nix
 vars.settings.recipients.hosts.webserver = [
@@ -129,9 +93,7 @@ vars.settings.recipients.hosts.webserver = [
 ];
 ```
 
-### `vars.settings.recipients.default`
-
-Fallback recipients used when no host-specific recipients are configured:
+`vars.settings.recipients.default` supplies fallback recipients when `recipients.hosts.<machine>` is not set; defaults do not combine with host-specific recipients:
 
 ```nix
 vars.settings.recipients.default = [
@@ -139,13 +101,7 @@ vars.settings.recipients.default = [
 ];
 ```
 
-:::admonition[Note]{type=note}
-Default recipients are only used if `recipients.hosts.<machine>` is **not** set. They do not combine with host-specific recipients.
-:::
-
-### `clan.core.vars.age.secretLocation`
-
-Location on the target where encrypted secrets are uploaded (default: `/etc/secret-vars`):
+`clan.core.vars.age.secretLocation` sets the target upload location; default `/etc/secret-vars`:
 
 ```nix
 clan.core.vars.age.secretLocation = "/etc/my-secrets";
@@ -180,7 +136,7 @@ your-clan/
 
 ## Multiple Recipients
 
-Multiple recipients can all decrypt a machine's private key. This is useful for team access:
+All listed recipients can decrypt a machine private key and run `clan vars generate` and `clan machines update` for that machine:
 
 ```nix
 {
@@ -192,41 +148,28 @@ Multiple recipients can all decrypt a machine's private key. This is useful for 
 }
 ```
 
-All listed recipients can run `clan vars generate` and `clan machines update` for that machine.
+## Key Rotation and Machine Changes
 
-## Key Rotation
-
-### Rotating user keys
-
-When admin keys change, re-encrypt machine private keys to the new recipients:
+After updating recipients in `clan.nix`, rotate admin access with:
 
 ```bash
 # Update recipients in clan.nix, then:
 clan vars fix my-machine
 ```
 
-This decrypts each machine key with the old identity and re-encrypts to the new recipients. Secrets themselves don't need re-encryption.
+`clan vars fix my-machine` decrypts each machine key with the old identity and re-encrypts it to new recipients; secrets do not need re-encryption. Adding or removing machines causes shared secrets to be re-encrypted during `clan vars generate` to include or exclude the machine’s public key.
 
-### Adding/removing machines
-
-When machines are added or removed, shared secrets are automatically re-encrypted to include/exclude the machine's public key during `clan vars generate`.
-
-## Health Checks
+## Health Check
 
 ```bash
 clan vars check my-machine
 ```
 
-Verifies:
-
-- Recipients are configured for the machine
-- An age identity is available for decryption
+Checks that machine recipients are configured and an age identity is available for decryption.
 
 ## Troubleshooting
 
 ### "No age recipients configured for machine"
-
-Set recipients in `clan.nix`:
 
 ```nix
 vars.settings.recipients.hosts.my-machine = [ "age1..." ];
@@ -234,7 +177,7 @@ vars.settings.recipients.hosts.my-machine = [ "age1..." ];
 
 ### "No age identity found"
 
-Place your age private key at one of the well-known paths, or set an environment variable:
+Use a well-known identity path or an environment variable:
 
 ```bash
 # File-based
@@ -246,19 +189,19 @@ export AGE_KEY="AGE-SECRET-KEY-1..."
 
 ### "AGE_KEYFILE points to non-existent file"
 
-Check the path in `AGE_KEYFILE` exists and is readable.
+Verify that the `AGE_KEYFILE` path exists and is readable.
 
 ## Comparison with SOPS Backend
 
-| Feature | Age Backend | SOPS Backend |
-|---------|-------------|--------------|
-| Encryption tool | age directly | sops (wrapping age) |
-| Decryption location | Target machine (activation scripts) | Target machine (sops-nix) |
-| Decryption binary | `age` (shell scripts) | `sops-install-secrets` (Go) |
-| Machine keys | Auto-generated, in-repo | Auto-generated, in-repo |
-| Key indirection | Yes (user → machine key → secret) | Yes (similar) |
-| Shared secrets | Multi-recipient age encryption | sops-nix groups |
-| Hardware tokens | Via age plugins | Via sops/age plugins |
+|Feature|Age Backend|SOPS Backend|
+|---|---|---|
+|Encryption tool|age directly|sops (wrapping age)|
+|Decryption location|Target machine (activation scripts)|Target machine (sops-nix)|
+|Decryption binary|`age` (shell scripts)|`sops-install-secrets` (Go)|
+|Machine keys|Auto-generated, in-repo|Auto-generated, in-repo|
+|Key indirection|Yes (user → machine key → secret)|Yes (similar)|
+|Shared secrets|Multi-recipient age encryption|sops-nix groups|
+|Hardware tokens|Via age plugins|Via sops/age plugins|
 
 ## See Also
 

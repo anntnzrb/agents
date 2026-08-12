@@ -1,74 +1,37 @@
-# NixOS Rebuild
+# NixOS rebuild with Clan
 
-## Can I still use `nixos-rebuild`?
+`nixos-rebuild` remains supported: Clan builds on standard NixOS and uses it internally. Direct use differs from `clan machines update`.
 
-**Yes, you can still use `nixos-rebuild` with Clan!**
+## Direct `nixos-rebuild`
 
-Clan is built on top of standard `NixOS` and uses `nixos-rebuild` internally.
-However, there are important considerations when using `nixos-rebuild` directly instead of `clan machines update`.
+- Vars present: MUST run `clan vars upload <machine>` first; otherwise secrets may be missing and services may break.
+- MUST specify `--build-host` and `--target-host` manually. Clan derives build-host configuration from machine settings during `clan machines update`.
 
-### Important Considerations
+Vars include generated secrets, keys, or configuration values from `clanServices` (for example, zerotier and borgbackup), custom generators, and shared service configuration. Vars are unnecessary for basic configurations without Clan-specific services, static hardcoded values, or traditional NixOS secrets management.
 
-:::admonition[Vars Must Be Uploaded First]{type=warning}
-If your configuration uses Clan vars, failing to run `clan vars upload` before `nixos-rebuild` will result in missing secrets and potentially broken services.
-:::
+## Manual workflow
 
-:::admonition[Build Host Configuration]{type=info}
-Clan automatically handles build host configuration based on your machine settings.
-When using `nixos-rebuild` manually, you need to specify `--build-host` and `--target-host` options yourself.
-:::
-
-### How Clan Uses nixos-rebuild
-
-Clan doesn't replace `nixos-rebuild` - it enhances it. When you run `clan machines update`, Clan:
-
-1. Generates and uploads secrets/variables (if any)
-2. Uploads the flake source to the target/build host (if needed)
-3. Builds the NixOS system closure
-4. Sets the system profile (`nix-env --set`)
-5. Runs `switch-to-configuration boot` to register the new generation in the bootloader
-6. Runs `switch-to-configuration switch` to live-activate the new configuration
-7. If the live switch is blocked by switch inhibitors (critical component changes
-   like dbus or systemd), reports the failure and suggests rebooting — the new
-   configuration is already registered for the next boot
-
-You can pass `--no-check` (or set `NIXOS_NO_CHECK=1`) to force past switch
-inhibitors when you know the live switch is safe.
-
-### When You Need `clan vars upload`
-
-If your Clan configuration uses **variables (vars)** - generated secrets, keys, or configuration values - you **must** run `clan vars upload` before using `nixos-rebuild` directly.
-
-#### Systems that use vars include:
-
-- Any `clanServices` with generated secrets (zerotier, borgbackup, etc.)
-- Custom generators that create passwords or keys
-- Services that need shared configuration values
-
-#### Systems that don't need vars:
-
-- Basic NixOS configurations without clan-specific services
-- Static configurations with hardcoded values
-- Systems using only traditional NixOS secrets management
-
-### Manual nixos-rebuild Workflow
-
-When you want to use `nixos-rebuild` directly:
-
-#### Step 1: Upload vars (if needed)
+### Step 1: Upload vars (if needed)
 
 ```bash
 # Upload secret vars to the target device
 clan vars upload my-machine
 ```
 
-#### Step 2: Run nixos-rebuild
+### Step 2: Run nixos-rebuild
 
 ```bash
 nixos-rebuild switch --flake .#my-machine --target-host root@target-ip --build-host local
 ```
 
-### Related Documentation
+## `clan machines update` sequence
 
-- [Getting-started](../getting-started/quick-start.md)
-- [Vars](vars/intro-to-vars.md)
+1. Generate and upload secrets/vars, if any.
+2. Upload flake source to target/build host, if needed.
+3. Build NixOS system closure.
+4. Set system profile with `nix-env --set`.
+5. Run `switch-to-configuration boot` to register the generation in the bootloader.
+6. Run `switch-to-configuration switch` to live-activate it.
+7. If switch inhibitors block live activation (for example, critical `dbus` or `systemd` changes), report failure and suggest rebooting; the configuration is already registered for next boot.
+
+`--no-check` or `NIXOS_NO_CHECK=1` forces past switch inhibitors; use only when live switching is known safe.

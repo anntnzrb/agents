@@ -1,20 +1,13 @@
 # Overview
 
-This section of the site provides an overview of available options and commands within the Clan Framework.
+Clan Framework options and commands.
 
----
-
-- Learn how to use the [Clan CLI](https://clan.lol/docs/26.05/reference/cli)
-- Explore available [services](../services/definition.md)
-- [NixOS Configuration Options](https://clan.lol/docs/26.05/reference/clan.core) - Additional options available on a NixOS machine.
-
----
+- Learn [Clan CLI](https://clan.lol/docs/26.05/reference/cli)
+- Explore [services](../services/definition.md)
+- [NixOS Configuration Options](https://clan.lol/docs/26.05/reference/clan.core) — additional options for a NixOS machine.
 
 :::admonition[Note]{type=note}
-This bundled overview is from Clan `26.05`, `clan-core` commit
-`1ec96dde9a8e3244b32abe41e3b3bfdd86520929`. Generated option, `clan.core`,
-CLI, and official-service pages are not vendored here; follow the pinned
-rendered routes:
+Bundled overview: Clan `26.05`; `clan-core` commit `1ec96dde9a8e3244b32abe41e3b3bfdd86520929`. Generated option, `clan.core`, CLI, and official-service pages are not vendored here; follow pinned rendered routes:
 
 - [CLI](https://clan.lol/docs/26.05/reference/cli)
 - [Clan options](https://clan.lol/docs/26.05/reference/options/clan)

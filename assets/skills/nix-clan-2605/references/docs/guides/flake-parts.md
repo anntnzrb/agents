@@ -1,12 +1,10 @@
 # Flake Parts
 
-[flake-parts](https://flake.parts/) is a framework for composing Nix flakes out of small, reusable modules. This guide shows you how to set up Clan inside a flake-parts project, so you can define your machines with Clan's options alongside whatever other flake-parts modules you already use.
+Clan + flake-parts setup: 3 steps — add inputs; import Clan’s module; define clan and machines.
 
-The setup is three steps: add the inputs, import Clan's flake-parts module, and define your clan and machines.
+## 1. Add inputs
 
-## 1. Add the inputs
-
-Add `flake-parts` to your `flake.nix` and wire it together with `clan-core`:
+Add `flake-parts` to `flake.nix` and wire it to `clan-core`:
 
 ```nix [flake.nix]
 inputs = {
@@ -23,15 +21,15 @@ inputs = {
 };
 ```
 
-The two `follows` lines on `clan-core` tell it to reuse your `nixpkgs` and `flake-parts` instead of bringing in its own copies. Without them you end up with duplicate inputs in `flake.lock`. See [Nixpkgs Flake Input](nixpkgs-flake-input/index.md) for how to diagnose and clean that up.
+`clan-core`’s two `follows` entries reuse your `nixpkgs` and `flake-parts`; omitting them creates duplicate inputs in `flake.lock`. Diagnose/clean up with [Nixpkgs Flake Input](nixpkgs-flake-input/index.md).
 
 :::admonition[Note]{type=note}
-If you want to track the exact `nixpkgs` that Clan's CI tests against, use `nixpkgs.follows = "clan-core/nixpkgs"` instead. The [Nixpkgs Flake Input guide](nixpkgs-flake-input/index.md) explains the trade-off.
+To track the exact `nixpkgs` tested by Clan’s CI, use `nixpkgs.follows = "clan-core/nixpkgs"` instead; see the [Nixpkgs Flake Input guide](nixpkgs-flake-input/index.md) for the trade-off.
 :::
 
-## 2. Import the Clan flake-parts module
+## 2. Import Clan’s flake-parts module
 
-Inside `mkFlake`, import Clan's module so its [options](https://clan.lol/docs/26.05/reference/options/clan) become available:
+Inside `mkFlake`, import Clan’s module to expose its [options](https://clan.lol/docs/26.05/reference/options/clan):
 
 ```nix
 {
@@ -45,11 +43,11 @@ Inside `mkFlake`, import Clan's module so its [options](https://clan.lol/docs/26
 }
 ```
 
-This pulls the `clan` option into your flake-parts configuration. Everything in the next step goes under that option.
+This exposes the `clan` option; put the next configuration under `clan`.
 
-## 3. Configure your clan and machines
+## 3. Configure clan and machines
 
-Fill in your clan metadata and define at least one machine:
+Define clan metadata and at least one machine:
 
 ```nix [flake.nix]
 {
@@ -88,11 +86,9 @@ Fill in your clan metadata and define at least one machine:
 }
 ```
 
-A few things are happening here:
+- `systems`: flake-parts option listing host platforms for `perSystem` outputs. Add `"aarch64-linux"` or a Darwin system as needed.
+- `clan.meta.name` and `clan.meta.domain`: required clan identifiers; each must be unique across managed clans.
+- `clan.machines` entries: NixOS configurations. `imports` loads your NixOS modules; `nixpkgs.hostPlatform` sets target architecture; `clan.core.networking.targetHost` sets Clan’s SSH destination for `clan machines update jon` and `clan ssh jon`.
+- `disko.devices.disk.main.device`: installation disk. Use a stable `/dev/disk/by-id/...` path so it does not change between boots.
 
-- `systems` is a flake-parts option. It lists the host platforms that `perSystem` outputs are built for. Add `"aarch64-linux"` or a Darwin system if you need them.
-- `clan.meta.name` and `clan.meta.domain` identify your clan. Both are required and both must be unique across the clans you manage.
-- Each entry under `clan.machines` is a NixOS configuration. `imports` pulls in your own NixOS modules, `nixpkgs.hostPlatform` sets the target architecture, and `clan.core.networking.targetHost` is the SSH destination Clan uses when you run `clan machines update jon` or `clan ssh jon`.
-- `disko.devices.disk.main.device` points at the disk that NixOS will be installed onto. Use a stable `/dev/disk/by-id/...` path so it does not change between boots.
-
-For the full list of options the Clan flake-parts module exposes, see the [module source](https://git.clan.lol/clan/clan-core/src/branch/26.05/flakeModules/clan.nix).
+Full option list: [module source](https://git.clan.lol/clan/clan-core/src/branch/26.05/flakeModules/clan.nix).

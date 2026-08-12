@@ -1,25 +1,8 @@
 # More on Backups
 
-## Table of Contents
+## Backup hooks
 
-- [Backup Hooks: Pre/Post Scripts](#backup-hooks-prepost-scripts)
-- [PostgreSQL Database Backups](#postgresql-database-backups)
-- [Backing up two machines](#backing-up-two-machines)
-  - [Installation Order](#installation-order)
-- [Excluding files and folders](#excluding-files-and-folders)
-- [Changing the Backup Schedule](#changing-the-backup-schedule)
-- [External Backup Destinations](#external-backup-destinations)
-- [Configuring multiple backups for a single client](#configuring-multiple-backups-for-a-single-client)
-
-## Backup Hooks: Pre/Post Scripts
-
-Sometimes you need to stop a service before backing up its data (to avoid corrupted files), then start it again after. Clan supports this with hooks.
-
-Hooks are defined as part of state, not as part of the backup service, because stopping a service before a backup is really about the *data*, not the backup tool.
-
-For example, you might be backing up a machine running Docker containers. You generally don't want to back up container volumes while the containers are actively writing to them, as the backup could capture inconsistent state.
-
-The following partial example shows how to pause all Docker containers before the backup and resume them afterward:
+Hooks belong to `clan.core.state`, not the backup service: they protect live, mutable data from inconsistent snapshots. Use them for containers, databases, VMs, mail delivery, append-only monitoring data (Prometheus/InfluxDB), and log rotation.
 
 ```nix
   machines = {
@@ -40,30 +23,18 @@ The following partial example shows how to pause all Docker containers before th
 
 ```
 
-Other cases where pre/post backup hooks are useful:
+Hooks:
 
-- Databases (see the complete PostgreSQL example below)
-- Virtual machines (stop the VM to get a consistent disk image)
-- Mail servers (pause delivery during backup)
-- Monitoring tools with append-only data files (e.g., Prometheus, InfluxDB)
-- Log rotation (rotate logs before backup for a clean cutoff)
+|Hook|When It Runs|
+|---|---|
+|`preBackupScript`|Before the backup starts|
+|`postBackupScript`|After the backup finishes|
+|`preRestoreScript`|Before a restore starts|
+|`postRestoreScript`|After a restore finishes|
 
-In general, use hooks for any service with live, mutable state.
+## PostgreSQL backups
 
-There are four hooks available:
-
-| Hook | When It Runs |
-|------|-------------|
-| `preBackupScript` | Before the backup starts |
-| `postBackupScript` | After the backup finishes |
-| `preRestoreScript` | Before a restore starts |
-| `postRestoreScript` | After a restore finishes |
-
-## PostgreSQL Database Backups
-
-Clan has built-in support for PostgreSQL. Instead of manually writing pre/post scripts to dump and restore databases, you can use the `clan.core.postgresql` module, which integrates automatically with the backup system.
-
-Below is a complete clan.nix example:
+`clan.core.postgresql` integrates PostgreSQL backup/restore with Clan; use it instead of manually writing dump/restore hooks.
 
 ```nix
 {
@@ -152,17 +123,13 @@ Below is a complete clan.nix example:
 }
 ```
 
-## Backing up two machines
+## Two machines → one backup server
 
-The following clan.nix file demonstrates how to back up two machines, a laptop (`alice-laptop`) and a database server (`postgres-server`), to a single backup server (`backup-server`).
+A borgbackup client can be selected by tag (`roles.client.tags`), so tagging another machine includes it; explicit `roles.client.machines` also selects clients.
 
-Note that `alice-laptop` has a tag called `"employees"`. The borgbackup service uses this tag to automatically include any machine tagged `"employees"` as a client, so adding the tag to a new machine is all that's needed to back it up.
+### Installation order
 
-### Installation Order
-
-When setting up borgbackup (or any service with cross-machine dependencies), the order in which you install your machines matters.
-
-The borgbackup client needs the server's SSH host key to establish a connection. This key is generated during the server's installation. If you install a client machine before the server, the client won't be able to find the server's key, and you'll need to re-generate its vars afterward. To avoid this, install the backup server before any client machines:
+Install/generate vars for the machine providing a cross-machine secret before its consumers. Borgbackup clients need the server SSH host key, generated during server installation; installing a client first requires regenerating its vars.
 
 ```bash
 clan machines install backup-server --target-host root@<BACKUP-IP>
@@ -175,8 +142,6 @@ clan machines install postgres-server --target-host root@<POSTGRES-IP>
 ```bash
 clan machines install alice-laptop --target-host root@<ALICE-IP>
 ```
-
-This applies to any service where one machine depends on another machine's generated secrets — always install or generate vars for the machine that provides the secret before the machines that consume it.
 
 ```nix
 {
@@ -282,9 +247,7 @@ This applies to any service where one machine depends on another machine's gener
 }
 ```
 
-## Excluding files and folders
-
-You can exclude files and folders from the backup using this general pattern:
+## Exclusions
 
 ```nix
 roles.client.tags.employees.settings = {
@@ -292,9 +255,7 @@ roles.client.tags.employees.settings = {
 }
 ```
 
-This would exclude all files ending with .bak on every machine tagged with employees.
-
-Here's an example that excludes multiple patterns on a specific machine:
+This excludes `*.bak` on every machine tagged `employees`.
 
 ```nix
 inventory.instances = {
@@ -312,9 +273,9 @@ inventory.instances = {
 };
 ```
 
-## Changing the Backup Schedule
+## Backup schedule
 
-The default schedule is 1:00 AM daily. To change it, add `startAt` to the client settings:
+Default: daily at 1:00 AM. Set `settings.startAt` per client; values use [systemd calendar event syntax](https://www.freedesktop.org/software/systemd/man/systemd.time.html).
 
 ```nix
 inventory.instances = {
@@ -327,18 +288,12 @@ inventory.instances = {
 };
 ```
 
-The schedule uses [systemd calendar event syntax](https://www.freedesktop.org/software/systemd/man/systemd.time.html).
-
-Here are some examples of the pattern:
-
-| Schedule | Meaning |
-|----------|---------|
-| `*-*-* 01:00:00` | Every day at 1 AM (default) |
-| `*-*-* 04:00:00` | Every day at 4 AM |
-| `*-*-* *:00:00` | Every hour |
-| `Mon *-*-* 03:00:00` | Every Monday at 3 AM |
-
-Below is a partial clan.nix file that demonstrates three workstations backing up to a NAS, each on a different schedule:
+|Schedule|Meaning|
+|---|---|
+|`*-*-* 01:00:00`|Every day at 1 AM (default)|
+|`*-*-* 04:00:00`|Every day at 4 AM|
+|`*-*-* *:00:00`|Every hour|
+|`Mon *-*-* 03:00:00`|Every Monday at 3 AM|
 
 ```nix
 # clan.nix
@@ -383,13 +338,9 @@ Below is a partial clan.nix file that demonstrates three workstations backing up
 }
 ```
 
-## External Backup Destinations
+## External destinations
 
-You don't have to back up to another Clan machine. You can add external destinations like a Hetzner Storage Box or any SSH-accessible BorgBackup server.
-
-Create a storage box on Hetzner (or use an existing one). If creating it, make sure to check **Allow SSH** and **External Reachability** under **Additional Settings**. Also, follow the on-screen instructions to add your own `id_ed25519.pub` key.
-
-Create a new clan, replace the entire `clan.nix` file with the one below, and fill in the clan name and domain you chose. Then create the `postgres-server` machine, gather its hardware configuration, and configure a disk as usual.
+Backups may target an external Hetzner Storage Box or any SSH-accessible BorgBackup server. For Hetzner, enable **Allow SSH** and **External Reachability** under **Additional Settings**, and add your `id_ed25519.pub` key. Create a Clan, replace `clan.nix` with the following, fill in the clan name/domain and storage-box values, create `postgres-server`, gather hardware configuration, and configure a disk as usual.
 
 ```nix
 {
@@ -466,9 +417,7 @@ Create a new clan, replace the entire `clan.nix` file with the one below, and fi
 }
 ```
 
-In the Hetzner web console, go to the storage box overview and copy the username and server URL into the `clan.nix` file where indicated.
-
-Now run `clan machines install` to install postgres-server. During installation, Clan generates an SSH keypair for borgbackup. After installation, retrieve the public key and upload it to your storage box. The first command below simply prints the key (use it for any SSH-accessible server other than Hetzner); the second is for Hetzner; pipes it directly to a Hetzner storage box. Replace `<BOX-USERID>` with your storage box username.
+Copy the Storage Box username and server URL from its web-console overview into `clan.nix`. Install `postgres-server`; Clan generates the borgbackup SSH keypair. Retrieve its public key and upload it to the destination. For a non-Hetzner SSH-accessible server, use the printed key from the first command; for Hetzner, use the second command, which pipes it directly:
 
 ```bash
 # For non-Hetzner: Get the public key Clan generated
@@ -478,26 +427,15 @@ clan vars get postgres-server borgbackup/borgbackup.ssh.pub
 clan vars get postgres-server borgbackup/borgbackup.ssh.pub | ssh -p23 <BOX-USERID>@<BOX-USERID>.your-storagebox.de install-ssh-key
 ```
 
-Here's a breakdown of the `rsh` attribute:
+`rsh` is Borg's remote-shell command: SSH port 23 for Hetzner; `accept-new` accepts a new host key but rejects later changes; `-i /run/secrets/vars/borgbackup/borgbackup.ssh` selects Clan's generated private key, deployed on `postgres-server` in RAM-only `/run/secrets/` and paired with the uploaded public key. `yes` would require a preexisting `known_hosts` entry; `no` would accept blindly and is insecure.
 
 ```nix
 rsh = "ssh -p 23 -oStrictHostKeyChecking=accept-new -i /run/secrets/vars/borgbackup/borgbackup.ssh";
 ```
 
-- **`rsh`**: stands for "remote shell." This borgbackup setting defines the command used to connect to the remote repository.
-- **`ssh`**: use SSH for the connection.
-- **`-p 23`**: connect on port 23 (Hetzner's SSH port for storage boxes, instead of the default port 22).
-- **`-oStrictHostKeyChecking=accept-new`** — controls host key verification:
-    - `yes` (default) would require the host key to already be in `known_hosts`, otherwise refuse
-    - `no` would blindly accept anything (insecure)
-    - `accept-new` is the sweet spot — accepts new hosts on first connection automatically, but rejects if the key changes later (protecting against man-in-the-middle attacks)
-- **`-i /run/secrets/vars/borgbackup/borgbackup.ssh`**: the Clan-generated borgbackup private key, deployed to postgres-server under `/run/secrets/` (a RAM-only directory, so the key never touches disk). This is the private half of the public key you uploaded to Hetzner.
+## Multiple destinations per client
 
-In plain English: "Connect via SSH on port 23, auto-trust new hosts but reject changed ones, and authenticate with the borgbackup private key from secrets."
-
-## Configuring multiple backups for a single client
-
-A single client can back up to multiple destinations simultaneously. The following clan.nix file backs `postgres-server` to both a local VM and a Hetzner storage box:
+A client backs up to every `borgbackup` server for which it is a client plus every explicit `settings.destinations` entry. Clan generates one systemd `borgbackup-job-*` unit per destination; jobs share the schedule and independently run the pre/post hooks.
 
 ```nix
 {
@@ -587,12 +525,4 @@ A single client can back up to multiple destinations simultaneously. The followi
 }
 ```
 
-A client machine backs up to every server in the borgbackup instance for which it's a client, plus any explicit destinations listed under its own settings.destinations.
-
-Under the hood, Clan generates one systemd `borgbackup-job-*` unit per destination. So `postgres-server` gets two scheduled jobs:
-
-- borgbackup-job-backup-server (to the local VM)
-
-- borgbackup-job-storagebox (to Hetzner)
-
-Both run on the same schedule and both honor the pre/post backup hooks, meaning postgres gets cleanly stopped/started around each backup independently.
+This configuration creates `borgbackup-job-backup-server` (local VM) and `borgbackup-job-storagebox` (Hetzner) for `postgres-server`; PostgreSQL is stopped/started around each job independently.

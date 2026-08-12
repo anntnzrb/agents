@@ -1,23 +1,6 @@
 # Vars Advanced Examples
 
-## Table of Contents
-
-- [Advanced Vars Examples](#advanced-vars-examples)
-  - [Certificate Authority with Intermediate Certificates](#certificate-authority-with-intermediate-certificates)
-  - [Multi-Service Secret Sharing](#multi-service-secret-sharing)
-  - [SSH Host Keys with Certificates](#ssh-host-keys-with-certificates)
-  - [WireGuard Mesh Network](#wireguard-mesh-network)
-  - [Conditional Generation Based on Machine Role](#conditional-generation-based-on-machine-role)
-  - [Backup Encryption Keys](#backup-encryption-keys)
-  - [Tips and Best Practices](#tips-and-best-practices)
-
-## Advanced Vars Examples
-
-This guide demonstrates complex, real-world patterns for the vars system.
-
 ### Certificate Authority with Intermediate Certificates
-
-This example shows how to create a complete certificate authority with root and intermediate certificates using dependencies.
 
 ```nix
 {
@@ -86,8 +69,6 @@ This example shows how to create a complete certificate authority with root and 
 
 ### Multi-Service Secret Sharing
 
-Generate secrets that multiple services can use:
-
 ```nix
 {
   # Generate database credentials
@@ -128,8 +109,6 @@ Generate secrets that multiple services can use:
 ```
 
 ### SSH Host Keys with Certificates
-
-Generate SSH host keys and sign them with a CA:
 
 ```nix
 {
@@ -192,8 +171,6 @@ Generate SSH host keys and sign them with a CA:
 
 ### WireGuard Mesh Network
 
-Create a WireGuard configuration with pre-shared keys:
-
 ```nix
 {
   # Generate WireGuard keys for this host
@@ -237,8 +214,6 @@ Create a WireGuard configuration with pre-shared keys:
 
 ### Conditional Generation Based on Machine Role
 
-Generate different secrets based on machine configuration:
-
 ```nix
 {
   clan.core.vars.generators = lib.mkMerge [
@@ -279,8 +254,6 @@ Generate different secrets based on machine configuration:
 
 ### Backup Encryption Keys
 
-Generate and manage backup encryption keys:
-
 ```nix
 {
   clan.core.vars.generators.backup = {
@@ -307,7 +280,7 @@ Generate and manage backup encryption keys:
   services.borgbackup.jobs.system = {
     encryption = {
       mode = "repokey-blake2";
-      passCommand = "cat ${config.clan.core.vars.generators.backup.files."encryption.key".path}";
+      passCommand = "cat ${config.clan.core.vars.generators.backup.files.\"encryption.key\".path}";
     };
   };
 }
@@ -315,9 +288,9 @@ Generate and manage backup encryption keys:
 
 ### Tips and Best Practices
 
-1. **Use dependencies** to build complex multi-stage generations
-2. **Share generators** when the same secret is needed across machines
-3. **Set appropriate permissions** for service-specific secrets
-4. **Use prompts** for user-specific values that shouldn't be generated
-5. **Combine secret and non-secret files** in the same generator when they're related
-6. **Use conditional generation** with `lib.mkIf` for role-specific secrets
+- Use dependencies for complex multi-stage generations.
+- Share generators when one secret is needed across machines.
+- Set service-specific secret permissions appropriately.
+- Use prompts for user-specific values that should not be generated.
+- Combine related secret and non-secret files in one generator.
+- Use `lib.mkIf` for role-specific conditional generation.

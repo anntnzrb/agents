@@ -1,12 +1,12 @@
 # Backup Intro
 
-Set up automated, encrypted backups for your Clan machines so you can restore files and databases when needed. Clan uses [BorgBackup](https://www.borgbackup.org/) under the hood for secure, deduplicated backups.
+Clan machines: automated, encrypted, secure, deduplicated backups via [BorgBackup](https://www.borgbackup.org/), enabling file/database restoration.
 
-## Basic File and Directory Backups
+## File and Directory Backups
 
-At its simplest, a state defines which folders to back up. This configuration goes in your machine's NixOS configuration.
+Configure each state in the machine's NixOS configuration; `folders` accepts multiple absolute directory paths and backs up all contained files/subdirectories.
 
-### Example: Backing Up Application Data
+### Application-data example
 
 ```nix
 {
@@ -19,31 +19,20 @@ At its simplest, a state defines which folders to back up. This configuration go
 }
 ```
 
-**Key points:**
-
-- Specify absolute paths to directories you want to protect
-- Multiple folders can be listed per state
-- The backup system will automatically include all files and subdirectories
-
 ## Hooks
 
-Hooks allow you to execute custom scripts during the backup lifecycle. Use them to prepare data, stop services, or perform cleanup.
+Lifecycle hooks run custom preparation, service control, synchronization, or cleanup scripts:
 
-### Available Hook Types
+|Hook|When It Executes|Common Use Cases|
+|---|---|---|
+|`preBackupScript`|Before backup starts|Stop services, dump databases, sync files|
+|`postBackupScript`|After backup completes|Restart services, cleanup temp files|
+|`preRestoreScript`|Before restoration starts|Prepare system, stop conflicting services|
+|`postRestoreScript`|After restoration completes|Restart services, verify integrity|
 
-| Hook | When It Executes | Common Use Cases |
-|------|------------------|------------------|
-| `preBackupScript` | Before backup starts | Stop services, dump databases, sync files |
-| `postBackupScript` | After backup completes | Restart services, cleanup temp files |
-| `preRestoreScript` | Before restoration starts | Prepare system, stop conflicting services |
-| `postRestoreScript` | After restoration completes | Restart services, verify integrity |
+### Pre/post backup example
 
-### Example: Pre and Post Backup Scripts
-
-In the following example, we configure the `nextcloud` service to:
-
-1. Stop the relevant services before syncing its data.
-2. Start the services back up after syncing its data.
+The `nextcloud` example stops relevant services before data synchronization and starts them afterward.
 
 ```nix
 clan.core.state.nextcloud = {
@@ -135,11 +124,7 @@ clan.core.state.linkding = {
 
 ## Database Backups
 
-The manual approach above works, but Clan provides built-in support for PostgreSQL databases with proper integration.
-
-### PostgreSQL Backup Integration
-
-Enable PostgreSQL backups and define databases to protect:
+Clan provides integrated PostgreSQL backups:
 
 ```nix
 {
@@ -166,9 +151,8 @@ Enable PostgreSQL backups and define databases to protect:
 }
 ```
 
-**What this does:**
-
-- Automatically dumps the database before each backup
-- Stores dumps securely in the backup repository
-- Manages service dependencies during restore
-- Recreates the database with correct settings on new deployments
+PostgreSQL integration:
+- Automatically dumps each database before every backup.
+- Stores dumps securely in the backup repository.
+- Manages restore service dependencies.
+- Recreates databases with correct settings on new deployments.

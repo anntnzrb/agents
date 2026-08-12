@@ -1,59 +1,54 @@
 # Secure Boot
 
-At the moment, NixOS/Clan does not support [Secure Boot](https://wiki.gentoo.org/wiki/Secure_Boot). Therefore, you need to disable it in the BIOS. You can watch this [video guide](https://www.youtube.com/watch?v=BKVShiMUePc) or follow the instructions below:
+NixOS/Clan currently does not support [Secure Boot](https://wiki.gentoo.org/wiki/Secure_Boot); disable it in BIOS. Optional [video guide](https://www.youtube.com/watch?v=BKVShiMUePc).
 
-## Insert the USB Stick
+## Insert USB Stick
 
-- Begin by inserting the USB stick into a USB port on your computer.
+- Insert the USB stick into a computer USB port.
 
-## Access the UEFI/BIOS Menu
+## Access UEFI/BIOS
 
-- Restart your computer.
-- As your computer restarts, press the appropriate key to enter the UEFI/BIOS settings.
+- Restart the computer; during restart, press the appropriate key to enter UEFI/BIOS settings. Press quickly and repeatedly if necessary—the entry window is brief.
 ::::admonition[The key depends on your laptop or motherboard manufacturer. Click to see a reference list:]{type=tip collapsible}
 
-| Manufacturer       | UEFI/BIOS Key(s)          |
-|--------------------|---------------------------|
-| ASUS               | `Del`, `F2`               |
-| MSI                | `Del`, `F2`               |
-| Gigabyte           | `Del`, `F2`               |
-| ASRock             | `Del`, `F2`               |
-| Lenovo             | `F1`, `F2`, `Enter` (alternatively `Fn + F2`) |
-| HP                 | `Esc`, `F10`              |
-| Dell               | `F2`, `Fn + F2`, `Esc`    |
-| Acer               | `F2`, `Del`               |
-| Samsung            | `F2`, `F10`               |
-| Toshiba            | `F2`, `Esc`               |
-| Sony               | `F2`, `Assist` button     |
-| Fujitsu            | `F2`                      |
-| Microsoft Surface  | `Volume Up` + `Power`     |
-| IBM/Lenovo ThinkPad| `Enter`, `F1`, `F12`      |
-| Biostar            | `Del`                     |
-| Zotac              | `Del`, `F2`               |
-| EVGA               | `Del`                     |
-| Origin PC          | `F2`, `Delete`            |
+|Manufacturer|UEFI/BIOS Key(s)|
+|---|---|
+|ASUS|`Del`, `F2`|
+|MSI|`Del`, `F2`|
+|Gigabyte|`Del`, `F2`|
+|ASRock|`Del`, `F2`|
+|Lenovo|`F1`, `F2`, `Enter` (alternatively `Fn + F2`)|
+|HP|`Esc`, `F10`|
+|Dell|`F2`, `Fn + F2`, `Esc`|
+|Acer|`F2`, `Del`|
+|Samsung|`F2`, `F10`|
+|Toshiba|`F2`, `Esc`|
+|Sony|`F2`, `Assist` button|
+|Fujitsu|`F2`|
+|Microsoft Surface|`Volume Up` + `Power`|
+|IBM/Lenovo ThinkPad|`Enter`, `F1`, `F12`|
+|Biostar|`Del`|
+|Zotac|`Del`, `F2`|
+|EVGA|`Del`|
+|Origin PC|`F2`, `Delete`|
 
 :::admonition[Note]{type=note}
-Pressing the key quickly and repeatedly is sometimes necessary to access the UEFI/BIOS menu, as the window to enter this mode is brief.
+Press the key quickly and repeatedly if necessary; the UEFI/BIOS entry window is brief.
 :::
 ::::
 
 ## Access Advanced Mode (Optional)
 
-- If your UEFI/BIOS has a `Simple` or `Easy` mode interface, look for an option labeled `Advanced Mode` (often found in the lower right corner).
-- Click on `Advanced Mode` to access more settings. This step is optional, as your boot settings might be available in the basic view.
+- If UEFI/BIOS uses `Simple` or `Easy` mode, click `Advanced Mode` (often lower right) for more settings. Optional: boot settings may already be available in the basic view.
 
 ## Disable Secure Boot
 
-- Locate the `Secure Boot` option in your UEFI/BIOS settings. This is typically found under a `Security` tab, `Boot` tab, or a similarly named section.
-- Set the `Secure Boot` option to `Disabled`.
+- Locate `Secure Boot`, typically under `Security`, `Boot`, or a similarly named section; set it to `Disabled`.
 
 ## Change Boot Order
 
-- Find the option to adjust the boot order—often labeled `Boot Order`, `Boot Sequence`, or `Boot Priority`.
-- Ensure that your USB device is set as the first boot option. This allows your computer to boot from the USB stick.
+- Find `Boot Order`, `Boot Sequence`, or `Boot Priority`; set the USB device as the first boot option so the computer boots from the USB stick.
 
 ## Save and Exit
 
-- Save your changes before exiting the UEFI/BIOS menu. Look for a `Save & Exit` option or press the corresponding function key (often `F10`).
-- Your computer should now restart and boot from the USB stick.
+- Save changes before exiting via `Save & Exit` or the corresponding function key (often `F10`). The computer should restart and boot from the USB stick.

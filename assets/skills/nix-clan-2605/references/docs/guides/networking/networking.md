@@ -1,16 +1,19 @@
 # Networking
 
-## Connecting to Your Machines
+## Machine connections
 
-Clan provides automatic networking with fallback mechanisms to reliably connect to your machines.
+Clan networking provides automatic fallback. `clan ssh` and `clan machines update` try configured networks by priority until one succeeds:
 
-### Option 1: Automatic Networking with Fallback (Recommended)
+1. Direct internet, if configured
+2. VPNs such as ZeroTier or Tailscale
+3. Tor hidden services
+4. Other configured networks
 
-Clan's networking module automatically manages connections through various network technologies with intelligent fallback. When you run `clan ssh` or `clan machines update`, Clan tries each configured network by priority until one succeeds.
+A failed network triggers the next attempt.
 
-#### Basic Setup with Internet Service
+### Automatic networking
 
-For machines with public IPs or DNS names, use the `internet` service to configure direct SSH while keeping fallback options:
+Public IPs or DNS names: configure direct SSH with the `internet` service; fallback remains available.
 
 ```nix [flake.nix] {7-10,14-16}
 {
@@ -42,7 +45,7 @@ For machines with public IPs or DNS names, use the `internet` service to configu
 }
 ```
 
-#### Advanced Setup with Multiple Networks
+Multiple networks are tried in declared priority order; this example uses internet, ZeroTier, then Tor:
 
 ```nix [flake.nix] {7-10,13-16,19-21}
 {
@@ -77,19 +80,6 @@ For machines with public IPs or DNS names, use the `internet` service to configu
 }
 ```
 
-#### How It Works
-
-Clan automatically tries networks in order of priority:
-
-1. Direct internet connections (if configured)
-2. VPN networks (ZeroTier, Tailscale, etc.)
-3. Tor hidden services
-4. Any other configured networks
-
-If one network fails, Clan automatically tries the next.
-
-#### Useful Commands
-
 ```bash
 # View all configured networks and their status
 clan network list
@@ -101,15 +91,13 @@ clan network ping machine1
 clan network overview
 ```
 
-### Option 2: Manual targetHost (Bypasses Fallback!)
+### Manual `targetHost`
 
 :::admonition[Warning]{type=warning}
-Setting `targetHost` directly **disables all automatic networking and fallback**. Only use this if you need complete control and don't want Clan's intelligent connection management.
+Setting `targetHost` directly **disables all automatic networking and fallback**. Use it only for complete control without Clan's connection management.
 :::
 
-#### Using Inventory (For Static Addresses)
-
-Use inventory-level `targetHost` when the address is **static** and doesn't depend on NixOS configuration:
+Inventory-level `deploy.targetHost` is evaluated immediately and is for static addresses independent of NixOS configuration:
 
 ```nix [flake.nix] {8}
 {
@@ -130,15 +118,9 @@ Use inventory-level `targetHost` when the address is **static** and doesn't depe
 }
 ```
 
-**When to use inventory-level:**
+Use inventory-level for static IPs (`"root@192.168.XXX.XXX"`), DNS names (`"user@server.example.com"`), or any unchanged address.
 
-- Static IP addresses: `"root@192.168.XXX.XXX"`
-- DNS names: `"user@server.example.com"`
-- Any address that doesn't change based on machine configuration
-
-#### Using NixOS Configuration (For Dynamic Addresses)
-
-Use machine-level `targetHost` when you need to **interpolate values from the NixOS configuration**:
+Machine-level `clan.core.networking.targetHost` is evaluated after NixOS configuration and can interpolate `config.*` values:
 
 ```nix [flake.nix] {7}
 {
@@ -161,30 +143,26 @@ Use machine-level `targetHost` when you need to **interpolate values from the Ni
 }
 ```
 
-**When to use machine-level (NixOS config):**
-
-- Using hostName from config: `"root@${config.networking.hostName}.local"`
-- Building from multiple config values: `"${config.users.users.deploy.name}@${config.networking.hostName}"`
-- Any address that depends on evaluated NixOS configuration
+Use machine-level for addresses derived from `config.networking.hostName`, multiple config values, or any evaluated NixOS configuration.
 
 :::admonition[Key Difference]{type=info}
 **Inventory-level** (`deploy.targetHost`) is evaluated immediately and works with static strings.
 **Machine-level** (`clan.core.networking.targetHost`) is evaluated after NixOS configuration and can access `config.*` values.
 :::
 
-### Quick Decision Guide
+### Selection
 
-| Scenario | Recommended Approach | Why |
-|----------|---------------------|-----|
-| Public servers | `internet` service | Keeps fallback options |
-| Mixed infrastructure | Multiple networks | Automatic failover |
-| Machines behind NAT | ZeroTier/Tor | NAT traversal with fallback |
-| Testing/debugging | Manual targetHost | Full control, no magic |
-| Single static machine | Manual targetHost | Simple, no overhead |
+|Scenario|Approach|Reason|
+|---|---|---|
+|Public servers|`internet` service|Fallback retained|
+|Mixed infrastructure|Multiple networks|Automatic failover|
+|Machines behind NAT|ZeroTier/Tor|NAT traversal with fallback|
+|Testing/debugging|Manual `targetHost`|Full control, no automatic management|
+|Single static machine|Manual `targetHost`|Simple|
 
-### Command-Line Override
+### `--target-host`
 
-The `--target-host` flag bypasses ALL networking configuration:
+`--target-host` bypasses **ALL networking configuration**:
 
 ```bash
 # Emergency access - ignores all networking config
@@ -194,4 +172,4 @@ clan machines update server --target-host root@backup-ip.com
 clan ssh laptop --target-host user@10.0.0.5
 ```
 
-Use this for debugging or emergency access when automatic networking isn't working.
+Use it for debugging or emergency access when automatic networking fails.

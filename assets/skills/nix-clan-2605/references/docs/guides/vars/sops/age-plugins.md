@@ -1,40 +1,32 @@
-# Age Plugins
+# Age plugins for Clan Vars
 
-## Using Age Plugins with Clan Vars
+`clan vars` uses `age` by default; `age` supports plugins.
 
-This guide explains how to set up YubiKey and other plugins for `clan vars` secrets.
+## Supported plugins
 
-By default the `clan vars` subcommand uses the `age` encryption tool, which supports various plugins.
+Popular [`age` plugins](https://github.com/FiloSottile/awesome-age?tab=readme-ov-file#plugins) usable with Clan (updated **September 12, 2025**):
 
----
+- ⭐️ [**age-plugin-yubikey**](https://github.com/str4d/age-plugin-yubikey): YubiKey and other PIV tokens; official.
+- [**age-plugin-se**](https://github.com/remko/age-plugin-se): Apple Secure Enclave.
+- 🧪 [**age-plugin-tpm**](https://github.com/Foxboron/age-plugin-tpm): TPM 2.0.
+- 🧪 [**age-plugin-tkey**](https://github.com/quite/age-plugin-tkey): Tillitis TKey.
+- [**age-plugin-trezor**](https://github.com/romanz/trezor-agent/blob/master/doc/README-age.md): hardware wallets (TREZOR, Ledger, etc.).
+- 🧪 [**age-plugin-sntrup761x25519**](https://github.com/keisentraut/age-plugin-sntrup761x25519): post-quantum hybrid (NTRU Prime + X25519).
+- 🧪 [**age-plugin-fido**](https://github.com/riastradh/age-plugin-fido): prototype symmetric encryption for FIDO2 keys.
+- 🧪 [**age-plugin-fido2-hmac**](https://github.com/olastor/age-plugin-fido2-hmac): FIDO2 with PIN support.
+- 🧪 [**age-plugin-sss**](https://github.com/olastor/age-plugin-sss): Shamir's Secret Sharing (SSS).
+- 🧪 [**age-plugin-amnesia**](https://github.com/cedws/amnesia/blob/master/README.md#age-plugin-experimental): Q&A-based identity wrapping.
 
-### Supported Age Plugins
+⭐️ official; 🧪 experimental.
 
-Below is a [list of popular `age` plugins](https://github.com/FiloSottile/awesome-age?tab=readme-ov-file#plugins) you can use with Clan. (Last updated: **September 12, 2025**)
+## Plugin-generated keys
 
-- ⭐️ [**age-plugin-yubikey**](https://github.com/str4d/age-plugin-yubikey): YubiKey (and other PIV tokens) plugin.
-- [**age-plugin-se**](https://github.com/remko/age-plugin-se): Apple Secure Enclave plugin.
-- 🧪 [**age-plugin-tpm**](https://github.com/Foxboron/age-plugin-tpm): TPM 2.0 plugin.
-- 🧪 [**age-plugin-tkey**](https://github.com/quite/age-plugin-tkey): Tillitis TKey plugin.
-   [**age-plugin-trezor**](https://github.com/romanz/trezor-agent/blob/master/doc/README-age.md): Hardware wallet plugin (TREZOR, Ledger, etc.).
-- 🧪 [**age-plugin-sntrup761x25519**](https://github.com/keisentraut/age-plugin-sntrup761x25519): Post-quantum hybrid plugin (NTRU Prime + X25519).
-- 🧪 [**age-plugin-fido**](https://github.com/riastradh/age-plugin-fido): Prototype symmetric encryption plugin for FIDO2 keys.
-- 🧪 [**age-plugin-fido2-hmac**](https://github.com/olastor/age-plugin-fido2-hmac): FIDO2 plugin with PIN support.
-- 🧪 [**age-plugin-sss**](https://github.com/olastor/age-plugin-sss): Shamir's Secret Sharing (SSS) plugin.
-- 🧪 [**age-plugin-amnesia**](https://github.com/cedws/amnesia/blob/master/README.md#age-plugin-experimental): Adds Q&A-based identity wrapping.
-
-> **Note:** Plugins marked with 🧪 are experimental. Plugins marked with ⭐️ are official.
-
----
-
-### Using Plugin-Generated Keys
-
-If you want to use `fido2 tokens` to encrypt your secret instead of the normal age secret key then you need to prefix your age secret key with the corresponding plugin name. In our case we want to use the `age-plugin-fido2-hmac` plugin so we replace `AGE-SECRET-KEY` with `AGE-PLUGIN-FIDO2-HMAC`.
+To encrypt with `fido2 tokens` instead of a normal age secret key, prefix the key with the plugin name: replace `AGE-SECRET-KEY` with `AGE-PLUGIN-FIDO2-HMAC`.
 
 :::admonition[Tip]{type=tip collapsible}
 
-- On Linux the age secret key is located at `~/.config/sops/age/keys.txt`
-- On macOS it is located at `/Users/admin/Library/Application Support/sops/age/keys.txt`
+- Linux: `~/.config/sops/age/keys.txt`
+- macOS: `/Users/admin/Library/Application Support/sops/age/keys.txt`
 :::
 
 **Before**:
@@ -44,23 +36,16 @@ If you want to use `fido2 tokens` to encrypt your secret instead of the normal a
 AGE-SECRET-KEY-1QQPQZRFR7ZZ2WCV...
 ```
 
-  **After**:
+**After**:
 
 ```text {2}
 # public key: age1zdy49ek6z60q9r34vf5mmzkx6u43pr9haqdh5lqdg7fh5tpwlfwqea356l
 AGE-PLUGIN-FIDO2-HMAC-1QQPQZRFR7ZZ2WCV...
 ```
 
-### Configuring Plugins in `flake.nix`
+## Configure `flake.nix`
 
-To use `age` plugins with Clan, you need to configure them in your `flake.nix` file.
-
-Each plugin entry can be either:
-
-- A package name from nixpkgs (e.g., `"age-plugin-yubikey"`)
-- A flake reference for plugins not in nixpkgs (e.g., `"github:owner/repo#package"`)
-
-Here's an example:
+Configure plugins in `flake.nix`. Each `secrets.age.plugins` entry is either a nixpkgs package name (for example, `"age-plugin-yubikey"`) or a flake reference for a package absent from nixpkgs (for example, `"github:owner/repo#package"`).
 
 ```nix [flake.nix]
 {

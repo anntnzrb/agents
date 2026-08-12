@@ -1,59 +1,55 @@
 # Install Nix and direnv
 
-Clan is built on [Nix](https://nixos.org/). The `clan` CLI, every template, and every machine configuration are fetched and evaluated through Nix, so you need it installed on any machine you want to use as a setup machine. [direnv](https://direnv.net/) is optional for everyday Clan use but required when you work on Clan itself, because it loads the right devshell as soon as you `cd` into the repository.
+Clan’s CLI, templates, and machine configurations are fetched/evaluated through [Nix](https://nixos.org/); Nix required on every setup machine. [direnv](https://direnv.net/) optional for Clan use, required for Clan development because it loads the repository devshell on `cd`.
 
-If you already run NixOS, you can skip the Nix section. Everything else applies equally.
+NixOS users skip Nix installation; all other instructions apply.
 
 ## Install Nix
 
-Install Nix through the official installer:
+Use the official installer:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf -L https://artifacts.nixos.org/nix-installer | sh -s -- install --enable-flakes
 ```
 
-This fetches the [NixOS installer](https://github.com/NixOS/nix-installer/releases) and runs it. The script sets up `/nix`, configures the daemon, and turns on the `nix-command` and `flakes` experimental features that Clan relies on. Passing `--enable-flakes` skips the interactive prompt the installer would otherwise show.
-
-Once the installer finishes, open a new shell and confirm the install:
+It sets up `/nix`, configures the daemon, and enables Clan’s required experimental features, `nix-command` and `flakes`; `--enable-flakes` skips the installer prompt. Open a new shell and verify:
 
 ```bash
 nix --version
 ```
 
-You should see a version string. If the command is not found, restart your terminal so the updated `PATH` takes effect.
+A version string confirms success. If the command is not found, restart the terminal to update `PATH`.
 
 :::admonition[Already on NixOS?]{type=tip}
-NixOS ships with Nix, so you can skip this section. Make sure `experimental-features = nix-command flakes` is present in your `nix.conf` or `nix.settings.experimental-features` in your NixOS configuration.
+NixOS ships with Nix; skip this section. Ensure `experimental-features = nix-command flakes` is in `nix.conf` or `nix.settings.experimental-features` in the NixOS configuration.
 :::
 
 ## Install direnv
 
-direnv watches for an `.envrc` file in the current directory and loads its environment automatically. In Clan, every devshell is wired up through an `.envrc`, so direnv makes the right tools appear the moment you enter a directory and disappear when you leave.
-
-Install `direnv` and its Nix integration through Nix itself:
+direnv loads and unloads the environment for the current directory’s `.envrc`; Clan devshells use `.envrc`.
 
 ```bash
 nix profile add nixpkgs#nix-direnv nixpkgs#direnv
 ```
 
-`nix-direnv` is the shim that makes direnv cache Nix devshells, so they only rebuild when inputs change.
+`nix-direnv` caches Nix devshells, rebuilding them only when inputs change.
 
-Next, [hook direnv into your shell](https://direnv.net/docs/hook.html). For bash and zsh in one go:
+Hook direnv into your shell ([instructions](https://direnv.net/docs/hook.html)); this handles bash and zsh:
 
 ```bash
 echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc && echo 'eval "$(direnv hook bash)"' >> ~/.bashrc && eval "$SHELL"
 ```
 
-The `eval "$SHELL"` at the end restarts your shell so the hook is active immediately.
+The final `eval "$SHELL"` restarts the shell, activating the hook immediately.
 
-From now on, every time you `cd` into a directory that contains an `.envrc`, direnv will ask you to approve it once:
+On first entry to each directory containing `.envrc`, approve it once:
 
 ```bash
 direnv: error .envrc is blocked. Run `direnv allow` to approve its content
 ```
 
-Run `direnv allow` in that directory and the environment loads. This only needs to happen once per `.envrc`, and again whenever the file changes.
+Run `direnv allow` in that directory. Repeat when `.envrc` changes.
 
 ## Next steps
 
-With Nix installed you are ready to follow the [Quick Start](quick-start.md) or any of the full install guides. If you intend to contribute to Clan itself, continue with the [Contributing guide](../guides/contributing/CONTRIBUTING.md), which relies on direnv to load the development environment.
+With Nix installed, follow [Quick Start](quick-start.md) or a full install guide. Contributors should continue with the [Contributing guide](../guides/contributing/CONTRIBUTING.md), which uses direnv for the development environment.

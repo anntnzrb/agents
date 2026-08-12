@@ -1,37 +1,12 @@
 # Styleguide
 
-<!-- nix-clan-updater:toc:start -->
-## Table of Contents
-- [Framework features](#framework-features)
-  - [Admonitions](#admonitions)
-  - [Code Examples](#code-examples)
-- [Writing Principles](#writing-principles)
-  - [Knowledge Expectations](#knowledge-expectations)
-    - [Show, Don't Tell](#show-dont-tell)
-    - [Grammar and Style](#grammar-and-style)
-    - [Content Organization](#content-organization)
-    - [Code Examples](#code-examples-1)
-    - [Hide Nix Where Possible](#hide-nix-where-possible)
-    - [Teach Nix Through Examples, Not Theory](#teach-nix-through-examples-not-theory)
-    - [General Rules](#general-rules)
-    - [Capitalization](#capitalization)
-    - [Imperative Mood, Voice, and Person](#imperative-mood-voice-and-person)
-    - [Tense](#tense)
-    - [Avoid Nominalizations](#avoid-nominalizations)
-    - [Filler Words and Weak Phrases](#filler-words-and-weak-phrases)
-    - [Writing Procedures](#writing-procedures)
-    - [Consistent Terminology](#consistent-terminology)
-    - [Links](#links)
-    - [UI Language](#ui-language)
-    - [Clean System Discipline](#clean-system-discipline)
-    - [Never Type Code — Always Copy-Paste](#never-type-code-always-copy-paste)
-<!-- nix-clan-updater:toc:end -->
+Scope: internal/external documentation, blog posts, and Clan communication. Consistent style improves usability.
 
 ## Framework features
 
 ### Admonitions
 
-Basic Syntax
+Basic syntax:
 
 ```md
 :::admonition[Title]{type=info collapsible open}
@@ -39,41 +14,47 @@ Collapsiple Info
 :::
 ```
 
-Types:
+Types: `info` | `important` | `tip` | `example`.
 
+```md
 :::admonition{type=info}
-Important information
+Content
 :::
 
 :::admonition{type=important}
-Important information
+Content
 :::
 
 :::admonition{type=tip}
-Important information
+Content
 :::
 
 :::admonition{type=example}
-Important information
+Content
 :::
+```
 
-Collapsible
+Collapsible state:
 
+```md
 :::admonition{type=info collapsible open}
-Collapsed info default open
+Default open
 :::
 
 :::admonition{type=info collapsible}
-Collapsed info default closed
+Default closed
 :::
+```
 
-Custom title
+Custom title:
 
+```md
 :::admonition[Custom Title]{type=info}
-Important information
+Content
 :::
+```
 
-### Code Examples
+### Code examples
 
 ```nix
 let
@@ -84,7 +65,7 @@ in
 }
 ```
 
-Highlight Code in a Snippet
+Highlight lines with a fence annotation:
 
 ```nix {2,4-6}
 {
@@ -97,73 +78,47 @@ Highlight Code in a Snippet
 }
 ```
 
-## Writing Principles
+## Writing principles
 
-A consistent style greatly increases the usability of all documentation and communication.
+### Audience and knowledge
 
-Use this page as a reference and style guide for our internal and external documentation, blog posts, and all other Clan communication.
-
-### Knowledge Expectations
-
-**Assume competence, not familiarity.**
-
-Write for someone who knows a great deal — up to but not including this project.
-
-**What readers know:**
+Assume competence, not familiarity. Write for readers who know much about computing, up to but not including Clan. Assume:
 
 - Basic computer operation
-- Command line familiarity
+- Command-line familiarity
 - General interest in systems configuration
 
-**What readers don't know:**
+Do not assume:
 
 - Clan-specific concepts
 - NixOS ecosystem details or grammar
 - Deployment workflows
 
-If specific knowledge is required, mention it at the start of the page.
+State required knowledge at the page start.
 
-#### Show, Don't Tell
+### Show, don't tell
 
-The fastest path to understanding is a working example.
-People learn by doing, not by reading about doing.
+A working example is the fastest route to understanding. Recommended order:
 
-**Recommended structure:**
+1. Minimal working code or command.
+2. Brief explanation.
+3. Edge cases and variations.
+4. Relevant further links instead of inlined detail.
 
-- Start with the minimal working code or command
-- Briefly explain what it does
-- Cover edge cases or variations
-- Link to further information instead of including it
+### Grammar and style
 
-#### Grammar and Style
+Use simple, direct sentences; split complex ideas into short sentences; avoid nested clauses. Describe the user-visible goal, not leaked implementation details.
 
-**Sentence structure:**
+### Content organization
 
-- Use simple, direct sentences
-- Break complex ideas into multiple short sentences
-- Avoid nested clauses
+Lead with the outcome. Use progressive disclosure:
 
-**Bad:**
+1. State the goal in one sentence.
+2. Show the simplest working example.
+3. Explain concepts as needed.
+4. Put advanced options separately or link to reference material.
 
-> The following command, which utilizes nixos-facter to generate a comprehensive hardware report, will write the results back into the respective machine folder located on your setup device.
-
-What the user does is hidden in the middle.
-`nixos-facter` is a leaked implementation detail.
-Users care about *hardware scanning*, not *the tool that does it*.
-
-**Good:**
-
-> This command generates a hardware report and saves it to your machine folder.
-
-#### Content Organization
-
-Lead with value. State what the reader will accomplish before explaining how.
-
-**Bad:**
-
-> To create a new machine that you can later use as a webserver, first navigate to your Clan directory, then execute the clan machines create command with the --name flag followed by your desired machine name.
-
-**Good:**
+Example:
 
 Create a new webserver machine in your Clan:
 
@@ -171,38 +126,13 @@ Create a new webserver machine in your Clan:
 clan machines create --name webserver
 ```
 
-Use **progressive disclosure**. Introduce concepts only when needed.
+### Code examples
 
-**Recommended structure:**
-
-1. State the goal (one sentence)
-2. Show the simplest working example
-3. Explain concepts if needed
-4. Provide advanced options separately or link to the reference
-
-#### Code Examples
-
-**Keep examples focused:**
-
-- Show one concept at a time
-- Use realistic but simple scenarios
-- Avoid dependencies on other examples
-
-**Minimal comments**
-
-Let the code speak for itself.
-Paste code examples directly and without further alteration.
-
-**Bad:**
-
-```nix
-# This sets the target host IP address for deployment
-clan.networking.targetHost = "192.168.1.10"; # Change this to your machine's IP
-# This enables SSH access
-services.openssh.enable = true; # Required for Clan deployment
-```
-
-**Good:**
+- Show one concept at a time.
+- Use realistic, simple scenarios.
+- Avoid dependencies on other examples.
+- Use minimal comments; let code speak for itself.
+- Paste examples directly, without alteration.
 
 ```nix
 {
@@ -211,19 +141,13 @@ services.openssh.enable = true; # Required for Clan deployment
 }
 ```
 
-#### Hide Nix Where Possible
+### Hide Nix where possible
 
-Nix knowledge is a barrier, not a feature.
+Nix knowledge is a barrier, not a feature:
 
-- Prefer `clan` CLI commands
-- Show configuration as *what you want*, not *how Nix works*
-- Explain only what Nix does in the context of Clan
-
-**Bad:**
-
-> Before adding a machine, you need to understand the NixOS module system and attribute set merging.
-
-**Good:**
+- Prefer `clan` CLI commands.
+- Show configuration as what the reader wants, not how Nix works.
+- Explain Nix only in Clan context.
 
 Add a machine:
 
@@ -231,31 +155,28 @@ Add a machine:
 clan machines create webserver
 ```
 
-This creates `machines/webserver/default.nix`, where you can configure it via NixOS.
+This creates `machines/webserver/default.nix`, configurable via NixOS.
 
-#### Teach Nix Through Examples, Not Theory
+### Teach Nix through examples
 
-*(After respecting the prior point)*
+After hiding Nix where possible, teach the NixOS module system through patterns:
 
-Users learn the NixOS module system by seeing patterns first.
+- Working example first; explanation after code.
+- Link deeper concepts instead of inlining them.
+- Link to `nix.dev` for optional learning.
 
-- Start with a working example
-- Explanation follows the code
-- Link deeper concepts instead of inlining them
-- Link to `nix.dev` for optional learning
+### General rules
 
-#### General Rules
+- Abbreviate keys, e.g. `ssh-ed25519 AAAAC3NzaC…`.
+- Abbreviate IP addresses, e.g. `192.168.XXX.XXX`.
+- Capitalize variables and prefix them with `$`, e.g. `$YOUR-CLAN-NAME`.
+- Make variables directly usable in copy-paste.
+- Do not describe missing code (`#elided`, `#omitted`).
+- `machine`: Clan identity; `device`: hardware.
 
-- Abbreviate keys like `ssh-ed25519 AAAAC3NzaC…`
-- Abbreviate IP addresses like `192.168.XXX.XXX`
-- Variables are capitalized and start with `$`, e.g. `$YOUR-CLAN-NAME`
-- Variables should be directly usable during copy-paste
-- Do **not** describe missing code parts (`#elided`, `#omitted`)
-- **Machines vs Devices**:
-    - machine = Clan identity
-    - device = hardware
+### Capitalization and terms
 
-#### Capitalization
+Use exactly:
 
 - Clan
 - GB / RAM / HDD
@@ -269,190 +190,65 @@ Users learn the NixOS module system by seeing patterns first.
 - direnv
 - Setup Device / Target Devices
 
-#### Imperative Mood, Voice, and Person
+### Mood, voice, person, tense
 
-Use imperative mood for instructions. Address the reader as "you", not "the user". Use active voice; in other words, make the subject do the action.
+- Instructions: imperative mood; address the reader as “you”, not “the user”.
+- Voice: active; make the subject perform the action.
+- Descriptions: present tense, not tentative future tense.
 
-**Don't:**
+### Word choice
 
-> The user should run the following command.
-> The configuration will need to be updated.
-> The key is generated by the system.
+- Avoid nominalizations; use the hidden verb directly (`Select`, not `Make a selection`; `Explain`, not `Provide an explanation`).
+- Delete filler: `simply`, `just`, `easily`, `basically`, `obviously`.
+- Replace `in order to` with `to`.
+- Replace `allows you to` with the direct verb.
+- Delete `it's worth noting that` and state the fact.
+- Every word earns its place.
 
-**Do:**
+### Procedures and limitations
 
-> Run the command.
-> Update the configuration.
-> The system generates the key.
+- One instruction per sentence; do not pack actions together.
+- Keep key negatives prominent; do not bury limitations after positive claims.
+- State unsupported behavior directly, e.g. `This service does not support multiple instances.`
 
-#### Tense
+### Terminology
 
-Use present tense for descriptions. Future tense makes documentation feel tentative.
+Choose one term and use it consistently. Repetition improves technical clarity; do not swap synonyms (`machine`, not alternately `host` or `node`).
 
-**Don't:**
+### Links
 
-> This will create a new machine folder.
-> Running this command will install the package.
+- Use descriptive link text; never `click here` or `this link`.
+- Link only destinations directly relevant to the task.
+- Do not send readers to generic background pages when a task-specific reference is needed.
 
-**Do:**
+### UI language
 
-> This creates a new machine folder.
-> Running this command installs the package.
+Match UI labels exactly, including wording, casing, and spacing. Example labels:
 
-#### Avoid Nominalizations
+- Click **Generate a Key**.
+- Click **Save Changes**.
 
-A nominalization is a verb turned into a noun, often by adding *-tion*, *-meant*, or *-ance* (e.g. "explanation", "selection"). The fix: find the hidden verb and use it directly.
-
-**Don't:**
-
-> Make a selection from the list.
-> Provide an explanation of the error.
-
-**Do:**
-
-> Select from the list.
-> Explain the error.
-
-#### Filler Words and Weak Phrases
-
-Cut words and phrases that add length without meaning.
-
-Delete on sight:
-
-- "simply", "just", "easily", "basically", "obviously"
-- "in order to" → use "to"
-- "allows you to" → use the verb directly
-- "it's worth noting that" → just say the thing
-
-**Don't:**
-
-> Simply run `clan machines create`.
-> In order to deploy, you first need to run the command, which allows you to push the config.
-> It's worth noting that this requires root access.
-
-**Do:**
-
-> Run `clan machines create`.
-> To deploy, run:
-> This requires root access.
-
-Every word must earn its place.
-
-#### Writing Procedures
-
-One instruction per sentence. Don't pack multiple actions into one sentence.
-
-**Don't:**
-
-> Navigate to your Clan directory and run the command, then check the output.
-
-**Do:**
-
-1. Navigate to your Clan directory.
-2. Run the command.
-3. Check the output.
-
-Don't bury the negative. Key limitations should be prominent, not a footnote after a positive description.
-
-**Don't:**
-
-> This service supports multiple roles, integrates with the vars system, and works great for most setups (note that multiple instances are not supported).
-
-**Do:**
-
-> This service does not support multiple instances.
-
-#### Consistent Terminology
-
-Pick a term and stick to it. Don't swap synonyms to avoid repetition. In technical documentation, repetition is clarity.
-
-**Don't:**
-
-> Create a machine... configure the host... deploy the node.
-
-**Do:**
-
-> Create a machine... configure the machine... deploy the machine.
-
-#### Links
-
-Use descriptive link text. Never use "click here" or "this link."
-
-**Don't:**
-
-> For more information, see `[this page](url)`.
-> Click `[here](url)` to read the reference.
-
-**Do:**
-
-> See `[inventory reference](url)` for details.
-> Read the `[NixOS module system guide](url)`.
-
-Only link when the destination is directly relevant, not for generic background context (sometimes known as "Wikipedia-style links"). Readers feel obligated to click links, fearing they'll miss something important. Don't send them to a generic article about a technology when they're looking for how *your* system uses it.
-
-**Don't:**
-
-> Our software uses [SQLite](https://sqlite.org/) for storage.
-> *(Reader clicks expecting schema details — finds a generic product page instead.)*
-
-(Note that in the above example, the SQLite link is the SQLite home page, which is likely not pertinent.)
-
-**Do:**
-
-> See `[database schema](url)` for the full table structure.
-
-#### UI Language
-
-Match UI element names exactly: wording, casing, and spacing (even if a label seems oddly worded).
-
-**Don't:**
-
-> Click the generator button.
-> Select the save option.
-
-**Do:**
-
-> Click **Generate a Key**.
-> Click **Save Changes**.
-
-Someone will go looking for a button labeled "generator." They will not find it. They will be frustrated.
-
-Consistency between documentation and interface builds confidence. Words are part of the interface.
+UI words are part of the interface and documentation/interface consistency builds confidence. UI changes are difficult; no policy currently covers them. Comments and suggestions are welcome.
 
 :::admonition{type=tip}
-This can be tricky as UI changes; we don't yet have a policy in place for how to handle this. We welcome comments and suggestions.
+UI changes are difficult; no policy currently covers them. Comments and suggestions are welcome.
 :::
 
-Tip:
+### Clean system discipline
 
-#### Clean System Discipline
+Local systems may contain cached credentials, installed tools, environment variables, and existing configuration. Do not write steps from memory on a development machine and assume they work everywhere.
 
-Your machine has things new users don't: cached credentials, installed tools, environment variables, existing configuration. When writing or updating documentation:
+- Start on a clean system: fresh VM or new user account.
+- Take notes while performing the steps.
+- Document every warning, prompt, and unexpected output.
+- Consider WSL versus native Linux and existing versus absent keys.
+- You need not test every matrix combination; identify which combinations diverge.
 
-**Don't:**
+### Never type code; always copy-paste
 
-> Write steps from memory on your development machine, assuming what works there will work everywhere.
+- Copy commands and code from a terminal where you just ran them successfully.
+- Never retype from memory.
+- Paste directly from the shell or IDE.
+- Replace sensitive values with `<YOUR-KEY>`, `<YOUR-HOST>`, and `<YOUR-TOKEN>`.
 
-**Do:**
-
-> - Start on a clean system — a fresh VM or new user account
-> - Take notes in real time as you work through the steps
-> - Document every warning, prompt, or unexpected output the system shows
-
-Also think in combinations: WSL vs native Linux, with and without existing keys. You don't need to test every matrix square — but you need to know which ones diverge.
-
-#### Never Type Code — Always Copy-Paste
-
-Always copy commands and code from a terminal where you just ran them successfully. Never retype from memory.
-
-**Don't:**
-
-> Retype a command from memory into the documentation.
-
-**Do:**
-
-> Paste commands directly from the shell or IDE.
-
-Replace sensitive values with placeholders: `<YOUR-KEY>`, `<YOUR-HOST>`, `<YOUR-TOKEN>`.
-
-Typed-from-memory commands introduce subtle errors. Even the most experienced software developers have occasional typos.
+Memory-retyped commands introduce subtle errors, even for experienced developers.

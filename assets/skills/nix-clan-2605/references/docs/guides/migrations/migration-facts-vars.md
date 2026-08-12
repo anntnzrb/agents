@@ -1,47 +1,29 @@
 # Migration Facts Vars
 
-## Migrate modules from `facts` to `vars`
+## `facts` → `vars`
 
-For a high level overview about `vars` see our [blog post](https://clan.lol/blog/vars/).
-
-This guide will help you migrate your modules that still use our [`facts`](migration-facts-vars.md) backend
-to the [`vars`](../vars/intro-to-vars.md) backend.
-
-The `vars` [module](https://clan.lol/docs/26.05/reference/clan.core/vars) and the Clan [command](https://clan.lol/docs/26.05/reference/cli/vars) work in tandem, they should ideally be kept in sync.
+Guide for migrating modules from the `facts` backend to the `vars` backend. The [`vars` module](https://clan.lol/docs/26.05/reference/clan.core/vars) and Clan [`vars` command](https://clan.lol/docs/26.05/reference/cli/vars) work in tandem; keep them in sync.
 
 :::admonition[Facts System Removed]{type=warning}
 
-The `facts` system has been fully removed from clan-core. The automatic migration feature (`migrateFact`) is no longer available.
-This guide is kept for historical reference, but you must now manually migrate your secrets and values from the old facts storage to the new vars system.
+`facts` is fully removed from clan-core; automatic migration via `migrateFact` is unavailable. Manually migrate secrets and values:
 
-To manually migrate:
+1. Locate old facts in the storage backend (`sops`, `password-store`, or in-repo).
+2. Copy their values.
+3. Run `clan vars generate`, then override generated values with the old values using `clan vars set`.
 
-1. Locate your old facts in your facts storage backend (sops, password-store, or in-repo)
-2. Copy the values
-3. Use `clan vars generate` to generate the new values initially, then `clan vars set` to override with old values.
-
-Alternative:
-Roll back to a clan-core version before December 2025 and use the automatic migration feature.
+Alternative: roll back to a clan-core version before December 2025 and use automatic migration.
 :::
 
-### Keep Existing Values (Historical)
+### Keep Existing Values (historical; removed feature)
 
-**Note:** This section describes the automatic migration feature that has been removed.
-
-In order to keep existing values and move them from `facts` to `vars`
-we used to be able to set the corresponding option in the vars module:
+Previously, a vars generator could preserve an existing fact with:
 
 ```nix
 migrateFact = "fact-name"
 ```
 
-This would check on `vars` generation if there is an existing `fact` with the
-name already present and if that was the case would migrate it to `vars`.
-
-Let us look at the mapping a little closer.
-Suppose we have the following fact: `facts.services.vaultwarden.secret.admin`.
-This would read as follows: The `vaultwarden` `fact` service has the `admin` secret.
-In order to migrate this fact, we would have needed the following `vars` configuration:
+During vars generation, an existing fact with that name was migrated to vars. Example: `facts.services.vaultwarden.secret.admin` means the `vaultwarden` fact service has an `admin` secret; its historical vars mapping was:
 
 ```nix
 vars.generators.vaultwarden = {
@@ -50,12 +32,11 @@ vars.generators.vaultwarden = {
 };
 ```
 
-And this would have read as follows: The vaultwarden `vars` module generates the admin file.
+This vars generator generates the `admin` file. The configuration is historical and `migrateFact` no longer works.
 
 ### Prompts
 
-Because prompts can be a necessity for certain systems `vars` have a shorthand for defining them.
-A prompt is a request for user input. Let us look how user input used to be handled in facts:
+A prompt requests user input. `vars` provides a shorthand; the former facts pattern was:
 
 ```nix
 facts.services.forgejo-api = {
@@ -65,7 +46,7 @@ facts.services.forgejo-api = {
 };
 ```
 
-To have analogous functionality in `vars`:
+Equivalent `vars` shorthand (also supports multiple prompts per generator):
 
 ```nix
 vars.generators.forgejo-api = {
@@ -76,8 +57,7 @@ vars.generators.forgejo-api = {
 };
 ```
 
-This does not only simplify prompting, it also now allows us to define multiple prompts in one generator.
-A more analogous way to the `fact` method is available, in case the module author needs more flexibility with the prompt input:
+For more control, use a file plus prompt description and script:
 
 ```nix
 vars.generators.forgejo-api = {
@@ -87,10 +67,9 @@ vars.generators.forgejo-api = {
 };
 ```
 
-### Migration of a complete module
+### Complete module migration
 
-Let us look closer at how we would migrate an existing generator for syncthing.
-This is the `fact` module of syncthing:
+Historical `facts` syncthing module:
 
 ```nix
 facts.services.syncthing = {
@@ -113,7 +92,7 @@ facts.services.syncthing = {
 };
 ```
 
-This would be the corresponding `vars` module, which also will migrate existing facts.
+Historical corresponding `vars` module:
 
 ```nix
 vars.generators.syncthing = {
@@ -138,11 +117,4 @@ vars.generators.syncthing = {
 };
 ```
 
-Most of the usage patterns stay the same, but `vars` have a more ergonomic interface.
-There are not two different ways to define files anymore (public/secret).
-Now files are defined under the `files` attribute and are secret by default.
-
-### Happy Migration
-
-We hope this gives you a clear path to start and finish your migration from `facts` to `vars`.
-Please do not hesitate reaching out if something is still unclear - either through [matrix](https://matrix.to/#/#clan:clan.lol) or through our git [forge](https://git.clan.lol/clan/clan-core).
+`vars` keeps most usage patterns but uses one `files` attribute instead of separate `public`/`secret` definitions. Files are secret by default; mark public files with `secret = false`. In the example, `generator.path` becomes `runtimeInputs`, and generated files use `$out`.

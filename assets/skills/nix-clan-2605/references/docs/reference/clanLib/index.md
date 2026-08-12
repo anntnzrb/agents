@@ -1,21 +1,20 @@
 # Clanlib
 
-`clanLib` is a collection of functions and utilities
+`clanLib`: functions and utilities.
 
 :::admonition[Danger]{type=danger}
-unless explicitly mentioned everything in ClanLib is for internal use in clan-core.
+All ClanLib items internal to `clan-core` unless explicitly mentioned.
 :::
 
 ## Stable Attributes
 
-The following attributes are publicly maintained
+Publicly maintained:
 
 ### `clanLib.clan`
 
-A function that takes [Clan options](https://clan.lol/docs/26.05/reference/options/clan)
-The option definitions can be composed by means of `imports`
+Function taking [Clan options](https://clan.lol/docs/26.05/reference/options/clan); option definitions composable via `imports`.
 
-Returns an evaluated Clan configuration - A `lib.evalModules` result:
+Returns evaluated Clan configuration, a `lib.evalModules` result:
 
-- `.config`: *The main result*
-- `.options`,`.moduleGraph`, ...: For debugging.
+- `.config`: main result.
+- `.options`, `.moduleGraph`, and other fields: debugging.

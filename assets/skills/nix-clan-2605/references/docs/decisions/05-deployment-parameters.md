@@ -1,36 +1,26 @@
 # 05 Deployment Parameters
 
-## Status
-
-accepted
+Status: accepted
 
 ## Context
 
-Currently different operations (install, update) have different modes. Install always evals locally and pushes the derivation to a remote system. update has a configurable buildHost and targetHost.
-Confusingly install always evals locally and update always evals on the targetHost, so hosts have different semantics in different operations contexts.
+- `install`: always evaluates locally, then pushes the derivation to a remote system.
+- `update`: configurable `buildHost` and `targetHost`, but always evaluates on `targetHost`.
+
+Install/update therefore have different host semantics.
 
 ## Decision
 
-Add evalHost to make this clear and configurable for the user. This would leave us with:
+`install` and `update` expose three hosts:
 
-- evalHost
-- buildHost
-- targetHost
+- `evalHost`: machine evaluating the NixOS configuration. If not `localhost`, upload non-secret vars and the Nix archived flake (usually one operation) to `evalMachine`.
+- `buildHost`: machine building; corresponds to `--build-host` for `nixos-rebuild` or `--builders` for `nix build`.
+- `targetHost`: machine receiving and activating the closure, through `install` or `switch-to-configuration`; corresponds to `--targetHost` for `nixos-rebuild` or the usual `nixos-anywhere` destination.
 
-for the update and install operation.
-
-`evalHost` would be the machine that evaluates the NixOS configuration. if evalHost is not localhost, we upload the non secret vars and the nix archived flake (this is usually the same operation) to the evalMachine.
-
-`buildHost` would be what is used by the machine to build, it would correspond to `--build-host` on the nixos-rebuild command or `--builders` for nix build.
-
-`targetHost` would be the machine where the closure gets copied to and activated (either through install or switch-to-configuration). It corresponds to `--targetHost` for nixos-rebuild or where we usually point `nixos-anywhere` to.
-
-This hosts could be set either through CLI args (or forms for the GUI) or via the inventory. If both are given, the CLI args would take precedence.
+Hosts come from CLI args (or GUI forms) or inventory. CLI args take precedence when both specify a host.
 
 ## Consequences
 
-We now support every deployment model of every tool out there with a bunch of simple flags. The semantics are more clear and we can write some nice documentation.
-
-The install code has to be reworked, since nixos-anywhere has problems with evalHost and targetHost being the same machine, So we would need to kexec first and use the kexec image (or installer) as the evalHost afterwards.
-
-In cases where the evalHost doesn't have access to the targetHost or buildHost, we need to setup temporary entries for the lifetime of the command.
+- Simple flags support every deployment model of every tool; semantics are clearer and documentation is easier.
+- Rework install: `nixos-anywhere` has problems when `evalHost` and `targetHost` are the same machine. Kexec first, then use the kexec image (or installer) as `evalHost`.
+- If `evalHost` cannot access `targetHost` or `buildHost`, set up temporary entries for the command lifetime.

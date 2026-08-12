@@ -6,73 +6,51 @@ accepted
 
 ## Context
 
-In our clan-cli we need to get a lot of values from nix into the python runtime. This is used to determine the hostname, the target ips address, scripts to generate vars, file locations and many more.
+`clan-cli` needs many Nix values in Python: hostnames, target IP addresses, variable-generation scripts, file locations, and more. Existing approaches:
 
-Currently we use two different accessing methods:
+### Method 1: `deployment.json`
 
-### Method 1: deployment.json
-
-A JSON file that serializes some predefined values into a JSON file as build-time artifact.
+Build-time JSON artifact serializing predefined values.
 
 Downsides:
 
-* no access to flake level values
-* all or nothing:
-    * values are either cached via deployment.json or not. So we can only put cheap values into there,
-    * in the past var generation script were added here, which added a huge build time overhead for every time we wanted to do any action
-* duplicated nix code
-    * values need duplicated nix code, once to define them at the correct place in the module system (clan.core.vars.generators) and code to accumulate them again for the deployment.json (system.clan.deployment.data)
-    * This duality adds unnecessary dependencies to the NixOS module system.
+- No flake-level values.
+- All-or-nothing caching: values are either cached there or not, so only cheap values fit; previously adding variable-generation scripts caused huge build-time overhead for every action.
+- Duplicated Nix: values are defined at their module-system location (`clan.core.vars.generators`) and accumulated again for `deployment.json` (`system.clan.deployment.data`), adding unnecessary NixOS module-system dependencies.
 
-Benefits:
+Benefit: simple `nix build` caching.
 
-* Utilize `nix build` for caching the file.
-* Caching mechanism is very simple.
+### Method 2: direct access
 
-### Method 2: Direct access
-
-Directly calling the evaluator / build sandbox via `nix build` and `nix eval`within the Python code
+Python directly invokes the evaluator/build sandbox through `nix build` and `nix eval`.
 
 Downsides:
 
-* Access is not cached: Static overhead (see below: \~1.5s) is present every time, if we invoke `nix commands`
-    * The static overhead depends obviously which value we need to retrieve, since the `evalModules` overhead depends, whether we evaluate some attribute inside a machine or a flake attribute
-    * Accessing more and more attributes with this method increases the static overhead, which leads to a linear decrease in performance.
-* Boilerplate for interacting with the CLI and Error handling code is repeated every time.
+- No access caching: each Nix command incurs ~1.5s static overhead. The overhead varies with the requested value because `evalModules` cost differs between machine attributes and flake attributes; retrieving more attributes increases overhead and causes a linear performance decrease.
+- CLI-interaction and error-handling boilerplate repeats per attribute.
+
+Benefits: native Nix-command interaction is simple and intuitive; per-attribute error handling is easy.
+
+Custom Nix expressions can provide values excluded from `deployment.json` or fetch flake-level values, but add:
+
+- Technical debt: embedded expressions in Python are error-prone, unsupported by language linters, commonly erroneous, and harder to debug; missing-value and reported-build-error paths require custom error reporting.
+- No caching/sharing infrastructure: values must be stored through one of the existing classes or not cached. Even cached expressions cannot share results: e.g. separate expressions fetching (1) paths and values for all generators and (2) values only must both execute in both contexts, although (2) could be skipped when (1) is cached.
+
+### Method 3: `nix select`
+
+Move all Nix-value extraction into a common class.
+
+Downside: maintaining a custom DSL adds complexity.
 
 Benefits:
 
-* Simple and native interaction with the `nix commands`is rather intuitive
-* Custom error handling for each attribute is easy
-
-This system could be enhanced with custom nix expressions, which could be used in places where we don't want to put values into deployment.json or want to fetch flake level values. This also has some downsides:
-
-* technical debt
-    * we have to maintain custom nix expressions inside python code, embedding code is error prone and the language linters won't help you here, so errors are common and harder to debug.
-    * we need custom error reporting code in case something goes wrong, either the value doesn't exist or there is an reported build error
-* no caching/custom caching logic
-    * currently there is no infrastructure to cache those extra values, so we would need to store them somewhere, we could either enhance one of the many classes we have or don't cache them at all
-    * even if we implement caching for extra nix expressions, there can be no sharing between extra nix expressions. for example we have 2 nix expressions, one fetches paths and values for all generators and the second one fetches only the values, we still need to execute both of them in both contexts although the second one could be skipped if the first one is already cached
-
-### Method 3: nix select
-
-Move all code that extracts nix values into a common class:
-
-Downsides:
-
-* added complexity for maintaining our own DSL
-
-Benefits:
-
-* we can implement an API (select DSL) to get those values from nix without writing complex nix expressions.
-* we can implement caching of those values beyond the runtime of the CLI
-* we can use precaching at different endpoints to eliminate most of multiple nix evaluations (except in cases where we have to break the cache or we don't know if we need the value in the value later and getting it is expensive).
+- Select DSL API retrieves Nix values without complex custom expressions.
+- Values can be cached beyond one CLI runtime.
+- Endpoints can precache values, eliminating most repeated Nix evaluations except when the cache breaks or an expensive value's need is unknown until later.
 
 ## Decision
 
-Use Method 3 (nix select) for extracting values out of nix.
-
-This adds the Flake class in flake.py with a select method, which takes a selector string and returns a python dict.
+Use Method 3 (`nix select`) to extract Nix values. Add `Flake` in `flake.py`; its `select` method accepts a selector string and returns a Python dict.
 
 Example:
 
@@ -94,7 +72,7 @@ returns:
 
 ## Consequences
 
-* Faster execution due to caching most things beyond a single execution, if no cache break happens execution is basically instant, because we don't need to run nix again.
-* Better error reporting, since all nix values go through one chokepoint, we can parse error messages in that chokepoint and report them in a more user friendly way, for example if a value is missing at the expected location inside the module system.
-* less embedded nix code inside python code
-* more portable CLI, since we need to import less modules into the module system and most things can be extracted by the python code directly
+- Faster execution: caching usually extends beyond one execution; without a cache break, execution is essentially instant because Nix need not run again.
+- Better error reporting: one chokepoint handles all Nix values, parses errors, and presents friendlier messages, e.g. when a value is missing at its expected module-system location.
+- Less embedded Nix in Python.
+- More portable CLI: fewer modules need importing into the module system; Python can extract most values directly.

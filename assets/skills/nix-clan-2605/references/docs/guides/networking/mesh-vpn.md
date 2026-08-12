@@ -1,11 +1,6 @@
-# Mesh Vpn
+# Mesh VPN
 
-Connect your Clan machines over a [ZeroTier VPN](https://zerotier.com) by
-setting up one machine as a controller and adding new machines as peers.
-
-## Concept
-
-By default all machines within one Clan are connected via a chosen network technology.
+Connect Clan machines over a [ZeroTier VPN](https://zerotier.com): configure one machine as controller, then add machines as peers. Clan machines use a chosen network technology by default. This guide configures `zerotier` through Clan’s `Inventory` system.
 
 ```text
 Clan
@@ -14,19 +9,13 @@ Clan
     Node B
 ```
 
-This guide shows you how to configure `zerotier` through Clan's `Inventory` System.
+## Controller
 
-## The Controller
+Controller: initial entrypoint for new VPN machines; signs their IDs. Continuous operation is not essential after signing, but choose a machine reachable for updates so new peers can be added.
 
-The controller is the initial entrypoint for new machines into the vpn.
-It will sign the id's of new machines.
-Once id's are signed, the controller's continuous operation is not essential.
-A good controller choice is nevertheless a machine that can always be reached for updates - so that new peers can be added to the network.
-
-For the purpose of this guide we have two machines:
-
-- The `controller` machine, which will be the zerotier controller.
-- The `new_machine` machine, which is the machine we want to add to the vpn network.
+Guide machines:
+- `controller`: ZeroTier controller.
+- `new_machine`: machine to add to the VPN.
 
 ## Configure the Service
 
@@ -69,7 +58,7 @@ For the purpose of this guide we have two machines:
 
 ## Apply the Configuration
 
-Update the `controller` machine first:
+Update `controller` first:
 
 ```bash
 clan machines update controller
@@ -83,13 +72,13 @@ clan machines update
 
 ### Verify Connection
 
-On the `new_machine` run:
+On `new_machine`:
 
 ```bash
 $ sudo zerotier-cli info
 ```
 
-The status should be "ONLINE":
+Expected status: "ONLINE":
 
 ```console
 200 info d2c71971db 1.12.1 ONLINE
@@ -97,14 +86,9 @@ The status should be "ONLINE":
 
 ## Further
 
-Currently **ZeroTier** is the only mesh-vpn that is fully integrated into clan.
-In the future we plan to add additional network technologies like tinc, head/tailscale
-Currently we support yggdrassil and mycelium through usage of the inventory,
-though it is not yet integrated into the networking module.
+**ZeroTier** currently is the only mesh-vpn fully integrated into clan. Planned network technologies include tinc and head/tailscale. yggdrassil and mycelium currently work through the Inventory, but are not integrated into the networking module.
 
-We chose ZeroTier because in our tests it was a straight forward solution to bootstrap.
-It allows you to selfhost a controller and the controller doesn't need to be globally reachable.
-Which made it a good fit for starting the project.
+ZeroTier was chosen because tests found it straightforward to bootstrap; it supports self-hosting a controller that need not be globally reachable, making it suitable for starting the project.
 
 ## Debugging
 
@@ -138,7 +122,7 @@ $ sudo zerotier-cli info
   $ sudo zerotier-members allow --member-ip $ZEROTIER_IP
   ```
 
-  Substitute `$ZEROTIER_IP` with the ZeroTier IP obtained previously.
+  `$ZEROTIER_IP`: ZeroTier IP obtained above.
 :::
 :::tab[with ZeroTierID]
 
@@ -146,6 +130,6 @@ $ sudo zerotier-cli info
   $ sudo zerotier-members allow $ZEROTIER_ID
   ```
 
-  Substitute `$ZEROTIER_ID` with the ZeroTier ID obtained previously.
+  `$ZEROTIER_ID`: ZeroTier ID obtained above.
 :::
 ::::

@@ -1,28 +1,12 @@
-# Writing Custom Vars Generators
+# Custom vars generator: hashed root password
 
-Declare a vars generator, generate a hashed root password, deploy it to a machine, change as needed.
+Workflow: declare generator → inspect status → generate → review repository changes → update machine → regenerate password as needed.
 
-This guide covers the full `clan vars` workflow:
+API: https://clan.lol/docs/26.05/reference/clan.core/vars
 
-1. Declare a `generator` in the machine's NixOS configuration.
-2. Inspect the status of variables using the Clan CLI.
-3. Generate variables interactively.
-4. Observe the changes made to your repository.
-5. Update the machine configuration.
-6. Change the root password when needed.
+## Declare
 
-For a detailed API reference, see the [vars module documentation](https://clan.lol/docs/26.05/reference/clan.core/vars).
-
-## Declare the generator
-
-In this example, a `vars` `generator` is used to:
-
-- prompt the user for the password
-- run the required `mkpasswd` command to generate the hash
-- store the hash in a file
-- expose the file path to the NixOS configuration
-
-Create a new Nix file `root-password.nix` with the following content and import it into your `configuration.nix`
+Create `root-password.nix` and import it from `configuration.nix`. This generator prompts for a hidden password, does not persist the prompt, runs `mkpasswd`, stores the hash, and exposes its path:
 
 ```nix
 { config, pkgs, ... }:
@@ -54,29 +38,21 @@ Create a new Nix file `root-password.nix` with the following content and import 
 }
 ```
 
-## Inspect the status
-
-Executing `clan vars list`, you should see the following:
+## Inspect and generate
 
 ```console
 $ clan vars list my-machine
 root-password/password-hash: <not set>
 ```
 
-...indicating that the value `password-hash` for the generator `root-password` is not set yet.
-
-## Generate the values
-
-This step is not strictly necessary, as deploying the machine via `clan machines update` would trigger the generator as well.
-
-To run the generator, execute `clan vars generate` for your machine
+`root-password/password-hash` is initially unset. Generation is optional: `clan machines update` also triggers it.
 
 ```console
 $ clan vars generate my-machine
 Enter the value for root-password/password-input (hidden):
 ```
 
-After entering the value, the updated status is reported:
+After input:
 
 ```console
 Updated var root-password/password-hash
@@ -84,12 +60,9 @@ Updated var root-password/password-hash
   new: $6$RMats/YMeypFtcYX$DUi...
 ```
 
-## Observe the changes
+## Repository changes
 
-With the last step, a new file was created in your repository:
-`vars/per-machine/my-machine/root-password/password-hash/value`
-
-If the repository is a git repository, a commit was created automatically:
+Generation creates `vars/per-machine/my-machine/root-password/password-hash/value`. In a git repository, it also creates a commit:
 
 ```console
 $ git log -n1
@@ -100,7 +73,7 @@ Date:   ...
     vars: update via generator root-password (machine: my-machine)
 ```
 
-## Update the machine
+## Deploy
 
 ```shell
 clan machines update my-machine
@@ -108,8 +81,7 @@ clan machines update my-machine
 
 ## Change the root password
 
-Changing the password can be done via this command.
-Replace `my-machine` with your machine.
+Replace `my-machine` with the machine name, then regenerate:
 
 ```console
 $ clan vars generate my-machine --generator root-password --regenerate

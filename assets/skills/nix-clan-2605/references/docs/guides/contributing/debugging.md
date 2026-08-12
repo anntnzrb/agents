@@ -1,18 +1,13 @@
-# Debugging
+# Debugging Clan CLI
 
-Here are some methods for debugging and testing the Clan CLI
-
-## Using a Development Branch
-
-To streamline your development process, I suggest not installing `clan-cli`. Instead, clone the `clan-core` repository and add `clan-core/pkgs/clan-cli/bin` to your PATH to use the checked-out version directly.
+## Development branch
+Suggested: don't install `clan-cli`; clone `clan-core`, add `clan-core/pkgs/clan-cli/bin` to `PATH`, and use the checkout.
 
 :::admonition[Note]{type=note}
-After cloning, navigate to `clan-core/pkgs/clan-cli` and execute `direnv allow` to activate the devshell. This will set up a symlink to nixpkgs at a specific location; without it, `clan-cli` won't function correctly.
+After cloning, run `direnv allow` in `clan-core/pkgs/clan-cli` to activate the devshell. This creates a nixpkgs symlink at a specific location; without it, `clan-cli` won't work correctly.
 :::
 
-With this setup, you can easily use [breakpoint()](https://docs.python.org/3/library/pdb.html) to inspect the application's internal state as needed.
-
-This approach is feasible because `clan-cli` only requires a Python interpreter and has no other dependencies.
+Use [breakpoint()](https://docs.python.org/3/library/pdb.html) to inspect application state. `clan-cli` requires only Python; it has no other dependencies.
 
 ```nix
 pkgs.mkShell {
@@ -27,12 +22,10 @@ pkgs.mkShell {
 ```
 
 ## Debugging nixos-anywhere
+For bugs in complex scripts such as `nixos-anywhere`, replace the command with a local project checkout; see [contribution](CONTRIBUTING.md) for an example.
 
-If you encounter a bug in a complex shell script such as `nixos-anywhere`, start by replacing the `nixos-anywhere` command with a local checkout of the project, look in the [contribution](CONTRIBUTING.md) section for an example.
-
-## The Debug Flag
-
-You can enhance your debugging process with the `--debug` flag in the `clan` command. When you add this flag to any command, it displays all subprocess commands initiated by `clan` in a readable format, along with the source code position that triggered them. This feature makes it easier to understand and trace what's happening under the hood.
+## `--debug`
+Add `--debug` to any `clan` command to print every subprocess command in readable form and its triggering source-code position.
 
 ```bash
 $ clan machines list --debug
@@ -54,37 +47,26 @@ wintux
 ```
 
 ## VS Code
+Source paths printed in the integrated terminal are clickable. Open the Clan in VS Code, run (for example) `clan machines list --debug`, then Ctrl-click (Cmd-click on macOS) the subprocess caller path and add `breakpoint()` there to inspect state.
 
-VS Code makes paths to source code files clickable in the integrated terminal. Combined with the previously mentioned techniques, you can open a Clan in VS Code, execute a command like `clan machines list --debug`, and receive a printed path to the code that initiates the subprocess. With the `Ctrl` key (or `Cmd` on macOS) and a mouse click, you can jump directly to the corresponding line in the code file and add a `breakpoint()` function to it, to inspect the internal state.
-
-## Finding Print Messages
-
-To trace the origin of print messages in `clan-cli`, you can enable special debugging features using environment variables:
-
-- Set `TRACE_PRINT=1` to include the source location with each print message:
+## Print-message tracing
+- `TRACE_PRINT=1`: add each print's source location; with `--debug`, every print shows its code trigger.
 
     ```bash
     export TRACE_PRINT=1
     ```
 
-    When running commands with `--debug`, every print will show where it was triggered in the code.
-
-- To see a deeper stack trace for each print, set `TRACE_DEPTH` to the desired number of stack frames (e.g., 3):
+- `TRACE_DEPTH=N`: show a deeper stack trace with N frames (for example, 3).
 
     ```bash
     export TRACE_DEPTH=3
     ```
 
-### Additional Debug Logging
-
-You can enable more detailed logging for specific components by setting these environment variables:
-
-- `CLAN_DEBUG_NIX_SELECTORS=1`: verbose logs for flake.select operations
-- `CLAN_DEBUG_NIX_PREFETCH=1`: verbose logs for flake.prefetch operations
+### Additional debug logging
+- `CLAN_DEBUG_NIX_SELECTORS=1`: verbose `flake.select` logs
+- `CLAN_DEBUG_NIX_PREFETCH=1`: verbose `flake.prefetch` logs
 - `CLAN_DEBUG_COMMANDS=1`: print the diffed environment of executed commands
-- `CLAN_NO_SELECT_DISK_CACHE=1`: don't use the on-disk select cache (only in-memory cache)
-
-Example:
+- `CLAN_NO_SELECT_DISK_CACHE=1`: disable the on-disk select cache; use only the in-memory cache
 
 ```bash
 export CLAN_DEBUG_NIX_SELECTORS=1
@@ -92,21 +74,13 @@ export CLAN_DEBUG_NIX_PREFETCH=1
 export CLAN_DEBUG_COMMANDS=1
 ```
 
-These options help you pinpoint the source and context of print messages and debug logs during development.
+Use these options to locate the source and context of print messages and debug logs.
 
-## Analyzing Performance
+## Performance
+Set `CLAN_CLI_PERF=1`; after a Clan command, receive a summary of performance metrics.
 
-To understand what's causing slow performance, set the environment variable `export CLAN_CLI_PERF=1`. When you complete a Clan command, you'll see a summary of various performance metrics, helping you identify what's taking up time.
-
-## See all possible packages and tests
-
-To quickly show all possible packages and tests execute:
-
-```bash
-nix flake show
-```
-
-Under `checks` you will find all tests that are executed in our CI. Under `packages` you find all our projects.
+## Packages and tests
+`nix flake show` lists packages and tests. `checks` contains CI tests; `packages` contains projects.
 
 ```console
 git+file:///home/lhebendanz/Projects/clan-core
@@ -136,25 +110,21 @@ git+file:///home/lhebendanz/Projects/clan-core
     └───default: template: Initialize a new clan flake
 ```
 
-You can execute every test separately by following the tree path `nix run .#checks.x86_64-linux.clan-pytest -L` for example.
+Run an individual test via its tree path, for example:
 
-## Test Locally in Devshell with Breakpoints
+```bash
+nix run .#checks.x86_64-linux.clan-pytest -L
+```
 
-To test the CLI locally in a development environment and set breakpoints for debugging, follow these steps:
+## Devshell tests with breakpoints
+```bash
+cd ./pkgs/clan-cli
+pytest -n0 -s --maxfail=1 ./tests/test_nameofthetest.py
+```
 
-1. Run the following command to execute your tests and allow for debugging with breakpoints:
+Put `breakpoint()` in Python code where execution should pause.
 
-    ```bash
-   cd ./pkgs/clan-cli
-   pytest -n0 -s --maxfail=1 ./tests/test_nameofthetest.py
-    ```
-
-    You can place `breakpoint()` in your Python code where you want to trigger a breakpoint for debugging.
-
-## Test Locally in a Nix Sandbox
-
-To run tests in a Nix sandbox:
-
+## Nix-sandbox tests
 ```bash
 nix build .#checks.x86_64-linux.clan-pytest-with-core
 ```
@@ -163,22 +133,19 @@ nix build .#checks.x86_64-linux.clan-pytest-with-core
 nix build .#checks.x86_64-linux.clan-pytest-without-core
 ```
 
-### Inspecting the Nix Sandbox
+### Inspect the Nix sandbox
+Insert an endless sleep where execution should pause:
 
-If you need to inspect the Nix sandbox while running tests, follow these steps:
+```python
+import time
+time.sleep(3600)  # Sleep for one hour
+```
 
-1. Insert an endless sleep into your test code where you want to pause the execution. For example:
+Find and attach to the sandbox:
 
-    ```python
-   import time
-   time.sleep(3600)  # Sleep for one hour
-    ```
+```bash
+psgrep $PROCESS_NAME
+cntr attach $CONTAINER_ID
+```
 
-2. Use `cntr` and `psgrep` to attach to the Nix sandbox, so you can interactively debug your code while it's paused. For example:
-
-    ```bash
-   psgrep $PROCESS_NAME
-   cntr attach $CONTAINER_ID
-    ```
-
-Or you can also use the [Nix breakpoint hook](https://nixos.org/manual/nixpkgs/stable/#breakpointhook)
+Alternatively, use the [Nix breakpoint hook](https://nixos.org/manual/nixpkgs/stable/#breakpointhook).

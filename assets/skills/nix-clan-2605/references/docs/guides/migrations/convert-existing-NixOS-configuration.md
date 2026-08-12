@@ -1,28 +1,18 @@
 # Convert Existing NixOS Configuration
 
-Convert your existing NixOS flake into a Clan, keeping your current hosts and configuration while gaining access to Clan's services, inventory, and CLI.
+Convert an existing NixOS flake to a Clan, retaining hosts/configuration and gaining Clan services, inventory, and CLI.
 
 :::admonition[Warning]{type=warning}
-Migrating instead of starting new can be trickier and might lead to bugs or
-unexpected issues. We recommend reading the [Getting Started](../../getting-started/quick-start.md) guide first.
-
-Once you have a working setup and understand the concepts transferring your NixOS configurations over is easy.
+Migration can be trickier than starting new and may cause bugs or unexpected issues. Read [Getting Started](../../getting-started/quick-start.md) first. After you have a working setup and understand the concepts, transferring a NixOS configuration is easy.
 :::
 
-## Back up your existing configuration
+## Back up
 
-Before you start, it is strongly recommended to back up your existing
-configuration in any form you see fit. If you use version control to manage
-your configuration changes, it is also a good idea to follow the migration
-guide in a separate branch until everything works as expected.
+Back up the existing configuration before starting. If using version control, perform the migration in a separate branch until it works as expected.
 
-## Starting Point
+## Starting point
 
-We assume you are already using NixOS flakes to manage your configuration. If
-not, migrate to a flake-based setup following the official [NixOS
-documentation](https://nix.dev/manual/nix/2.25/command-ref/new-cli/nix3-flake.html).
-The snippet below shows a common Nix flake. For this example we will assume you
-have have two hosts: **berlin** and **cologne**.
+This guide assumes NixOS flakes. Otherwise, first [migrate to a flake-based setup](https://nix.dev/manual/nix/2.25/command-ref/new-cli/nix3-flake.html). Example hosts: **berlin** and **cologne**.
 
 ```nix
 {
@@ -50,8 +40,6 @@ have have two hosts: **berlin** and **cologne**.
 
 ## 1. Add `clan-core` to `inputs`
 
-Add `clan-core` to your flake as input.
-
 ```nix
 inputs.clan-core = {
   url = "https://git.clan.lol/clan/clan-core/archive/26.05.tar.gz";
@@ -60,23 +48,16 @@ inputs.clan-core = {
 }
 ```
 
-## 2. Update Outputs
+## 2. Update outputs
 
-To be able to access our newly added dependency, it has to be added to the
-output parameters.
+Add `clan-core` to the output parameters:
 
 ```diff
 -  outputs = { self, nixpkgs, ... }:
 +  outputs = { self, nixpkgs, clan-core }:
 ```
 
-The existing `nixosConfigurations` output of your flake will be created by
-clan. In addition, a new `clanInternals` output will be added. Since both of
-these are provided by the output of `clan-core.lib.clan`, a common syntax is to use a
-`let...in` statement to create your Clan and access it's parameters in the flake
-outputs.
-
-For the provide flake example, your flake should now look like this:
+`clan-core.lib.clan` creates the existing `nixosConfigurations` output and adds `clanInternals`. Use `let...in` to define the Clan and expose its outputs:
 
 ```nix
 {
@@ -120,12 +101,7 @@ For the provide flake example, your flake should now look like this:
 }
 ```
 
-✅ Et voilà! Your existing hosts are now part of a clan.
-
-Existing Nix tooling
-should still work as normal. To check that you didn't make any errors, run `nix
-flake show` and verify both hosts are still recognized as if nothing had
-changed. You should also see the new `clan` output.
+Existing Nix tooling continues to work. Run `nix flake show`; verify both hosts remain recognized and the `clan` output appears:
 
 ```console
 ❯ nix flake show
@@ -136,18 +112,11 @@ git+file:///my-nixos-config
     └───cologne: NixOS configuration
 ```
 
-Of course you can also rebuild your configuration using `nixos-rebuild` and
-verify everything still works.
+You can also rebuild with `nixos-rebuild` and verify the result.
 
-## 3. Add `clan-cli` to your `devShells`
+## 3. Add `clan-cli` to `devShells`
 
-At this point Clan is set up, but you can't use the CLI yet. To do so, it is
-recommended to expose it via a `devShell` in your flake. It is also possible to
-install it any other way you would install a package in Nix, but using a
-developtment shell ensures the CLI's version will always be in sync with your
-configuration.
-
-A minimal example is provided below, add it to your flake outputs.
+Expose the CLI through a flake `devShell` (recommended); another Nix package-install method is possible, but a development shell keeps the CLI version synchronized with the configuration.
 
 ```nix
 devShells."x86_64-linux".default = nixpkgs.legacyPackages."x86_64-linux".mkShell {
@@ -155,12 +124,7 @@ devShells."x86_64-linux".default = nixpkgs.legacyPackages."x86_64-linux".mkShell
 }
 ```
 
-To use the CLI, execute `nix develop` in the directory of your flake. The
-resulting shell, provides you with the `clan` CLI tool. Since you will be using
-it every time you interact with Clan, it is recommended to set up
-[direnv](https://direnv.net/).
-
-Verify everything works as expected by running `clan machines list`.
+Run `nix develop` in the flake directory to enter a shell containing `clan`. Because it is used for every Clan interaction, [direnv](https://direnv.net/) is recommended. Verify it with `clan machines list`:
 
 ```console
 ❯ nix develop
@@ -169,10 +133,9 @@ berlin
 cologne
 ```
 
-## Specify Targets
+## Specify targets
 
-Clan needs to know where it can reach your hosts. For testing purpose set
-`clan.core.networking.targetHost` to the machines address or hostname.
+Clan needs reachable host addresses. For testing, set `clan.core.networking.targetHost` to each machine's address or hostname:
 
 ```nix
 # machines/berlin/configuration.nix
@@ -181,10 +144,8 @@ Clan needs to know where it can reach your hosts. For testing purpose set
 }
 ```
 
-See our guide on for properly [configuring machines networking](../networking/networking.md)
+See [configuring machine networking](../networking/networking.md).
 
-## Next Steps
+## Next steps
 
-You are now fully set up. Use the CLI to manage your hosts or proceed to
-configure further services. At this point you should be able to run commands
-like `clan machines update berlin` to deploy a host.
+The setup is complete. Use the CLI to manage hosts or configure services; for example, deploy with `clan machines update berlin`.

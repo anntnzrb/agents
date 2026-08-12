@@ -1,39 +1,37 @@
 # Create an SSH Key
 
 :::admonition[Tip]{type=tip}
-Use this short guide to determine if you have an existing key pair, and if not, to create one.
+Check for an existing key pair; create one if absent.
 :::
 
-First, check for an existing key by typing:
+Check for an existing pair:
 
 ```bash
 ls ~/.ssh/id_ed25519*
 ```
 
-If you see two files listed, id_ed25519 and id_ed25519.pub, you're good to go.
+Both `id_ed25519` and `id_ed25519.pub` listed → ready.
 
-If you see `No such file or directory`, you need to create the pair.
-
-To do so, type:
+`No such file or directory` → create the pair:
 
 ```bash
 ssh-keygen -t ed25519
 ```
 
-When prompted:
+Prompts:
 
-- File location: Press Enter to accept the default (~/.ssh/id_ed25519)
-- Passphrase: Enter a passphrase or press Enter for none
+- File location: press Enter for the default (`~/.ssh/id_ed25519`)
+- Passphrase: enter one or press Enter for none
 
-This creates two files:
+Created files:
 
-- ~/.ssh/id_ed25519 - Your private key (keep this secret!)
-- ~/.ssh/id_ed25519.pub - Your public key (this gets shared with target machines)
+- `~/.ssh/id_ed25519` — private key; keep secret
+- `~/.ssh/id_ed25519.pub` — public key; share with target machines
 
-Verify they exist by typing:
+Verify both files exist:
 
 ```bash
 ls ~/.ssh/id_ed25519*
 ```
 
-You should see both files listed.
+Both files should be listed.

@@ -1,12 +1,10 @@
 # NixOS specialisations
 
-Specialisations let you define named variations of your system configuration. Each specialisation produces a separate system closure that you can switch to at boot or at runtime, without rebuilding.
-
-A common use case is GPU drivers. If you rarely need your discrete GPU, you can keep drivers disabled in your base configuration and create a specialisation that enables them. At boot, you pick which configuration to start. The same idea applies to desktop environments, kernel parameters, or any set of options you want to toggle as a group.
+Named system-configuration variants; each produces a separate system closure, selectable at boot or runtime without rebuilding. Best for a small number of pre-defined variants sharing most configuration: GPU drivers, desktop environments, kernel parameters, or grouped options.
 
 ## Defining specialisations
 
-Add a `specialisation` block to your NixOS configuration. Each entry names a variation and provides the NixOS module options that differ from the base system.
+Add `specialisation`; each entry names a variant and supplies differing NixOS module options.
 
 ```nix
 { lib, ... }:
@@ -29,15 +27,15 @@ Add a `specialisation` block to your NixOS configuration. Each entry names a var
 }
 ```
 
-The `nvidia` specialisation inherits the full parent configuration and layers Nvidia driver options on top. The `plasma` specialisation does the same, adding Plasma alongside the base GNOME setup. Both appear as separate boot entries after you rebuild.
+Each specialisation inherits the full parent configuration and layers its options on top; `nvidia` adds Nvidia drivers, while `plasma` adds Plasma alongside GNOME. Both become separate boot entries after rebuilding.
 
 :::admonition[Overriding parent values]{type=tip}
-Specialisations receive the parent config by default. If the parent sets a value that a specialisation needs to change, mark the parent value with `lib.mkDefault` so the specialisation can override it without priority conflicts. In the example above, `hardware.nvidia.modesetting.enable = lib.mkDefault false;` allows the `nvidia` specialisation to set it to `true`.
+Specialisations inherit the parent by default. If a specialisation must change a parent value, mark the parent value with `lib.mkDefault`; this lets the specialisation override it without priority conflicts. Example: `hardware.nvidia.modesetting.enable = lib.mkDefault false;` permits `nvidia` to set it to `true`.
 :::
 
-## Starting from scratch with inheritParentConfig
+## Starting independently with `inheritParentConfig`
 
-By default, every specialisation inherits the parent configuration. If you want a specialisation that defines its own system independently, set `inheritParentConfig = false`:
+Default: every specialisation inherits the parent. For an independent system, set `inheritParentConfig = false`:
 
 ```nix
 specialisation = {
@@ -53,11 +51,11 @@ specialisation = {
 };
 ```
 
-This is useful for creating a stripped-down recovery configuration or a fundamentally different system variant. Be aware that `inheritParentConfig = false` means you must provide a complete, bootable NixOS configuration within the `configuration` block.
+Useful for stripped-down recovery or fundamentally different variants. With `inheritParentConfig = false`, `configuration` MUST specify a complete, bootable NixOS system.
 
 ## Excluding options from specialisations
 
-Sometimes the base configuration should include options that specialisations should not inherit. Use `config.specialisation != {}` as a condition to restrict options to the default (non-specialised) entry:
+To apply an option only to the default (non-specialised) entry, guard it with `config.specialisation != {}`:
 
 ```nix
 {
@@ -78,28 +76,28 @@ Sometimes the base configuration should include options that specialisations sho
 ```
 
 :::admonition[Condition requires specialisations]{type=warning}
-The expression `config.specialisation != {}` evaluates to `false` when no specialisations are defined. The conditional block only takes effect when at least one specialisation exists in the configuration.
+`config.specialisation != {}` evaluates to `false` when no specialisations exist; the conditional takes effect only when at least one exists.
 :::
 
-## Activating a specialisation at boot
+## Activating at boot
 
-After rebuilding your system (with `clan machines update` or `nixos-rebuild switch`), each specialisation appears as a separate entry in your bootloader menu. Select one during boot to start that configuration.
+After `clan machines update` or `nixos-rebuild switch`, each specialisation appears as a separate bootloader entry; select one at boot.
 
 ## Switching at runtime with Clan
 
-Clan supports switching specialisations at runtime through the `--specialisation` flag on `clan machines update`:
+Use `--specialisation` with `clan machines update`:
 
 ```bash
 clan machines update my-machine --specialisation nvidia
 ```
 
-This builds the system configuration and activates the named specialisation on the target machine. The specialisation's `switch-to-configuration switch` script runs on the target, applying the configuration without a reboot.
+This builds and activates the named specialisation on the target; its `switch-to-configuration switch` script applies it without rebooting.
 
 :::admonition[Runtime limitations]{type=warning}
-Not all configuration changes can take effect at runtime. If a specialisation uses a different kernel, for example, the running kernel will not change until you reboot and select the specialisation from the boot menu.
+Not all changes apply at runtime. A different kernel, for example, does not replace the running kernel until reboot; reboot and select the specialisation from the boot menu.
 :::
 
-You can also switch specialisations directly on the target machine using `nixos-rebuild`:
+On the target machine:
 
 ```bash
 sudo nixos-rebuild switch --specialisation nvidia
@@ -107,11 +105,11 @@ sudo nixos-rebuild switch --specialisation nvidia
 
 ## When to use specialisations
 
-Specialisations work well when you have a small number of pre-defined system variants that share most of their configuration. Typical examples:
+Typical variants:
 
 - GPU driver toggles (enable/disable proprietary drivers)
 - Desktop environment alternatives (GNOME vs. Plasma)
 - Performance profiles (power-saving vs. high-performance kernel parameters)
 - Debug configurations (verbose logging, extra diagnostic tools)
 
-For configuration differences that are more granular or need to compose independently, NixOS module options with `lib.mkDefault` and `lib.mkForce` may be a better fit than specialisations.
+For more granular or independently composable differences, NixOS module options with `lib.mkDefault` and `lib.mkForce` may fit better.

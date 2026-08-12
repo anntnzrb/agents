@@ -11,42 +11,28 @@ metadata:
 
 # Clan 26.05 Documentation
 
-Use this skill for Clan-specific 26.05 workflows, concepts, services, inventory,
-vars, deployment, migrations, and release behavior. Use the `nix` skill for
-generic Nix, NixOS, nixpkgs, flakes, or module-system mechanics.
+Clan-specific 26.05 workflows, concepts, services, inventory, vars, deployment, migrations, and release behavior → this skill. Generic Nix, NixOS, nixpkgs, flakes, or module-system mechanics → `nix` skill.
 
 ## Snapshot boundary
 
-The bundled snapshot is Clan `clan-core` branch `26.05`, commit
-`1ec96dde9a8e3244b32abe41e3b3bfdd86520929`, retrieved 2026-08-10. Do not silently
-substitute `main`, `latest`, or another release. State when guidance comes from
-the pinned snapshot versus a separately retrieved current source.
+Bundled snapshot: Clan `clan-core`, branch `26.05`, commit `1ec96dde9a8e3244b32abe41e3b3bfdd86520929`, retrieved 2026-08-10. NEVER silently substitute `main`, `latest`, or another release. State whether guidance comes from this pinned snapshot or separately retrieved current source.
 
 ## Use workflow
 
-1. Read `references/INDEX.md` to select only the relevant topic entry.
-2. Read the linked source page(s) under `references/docs/`; preserve their version
-   and hierarchy when applying procedures or quoting examples.
-3. For disk-encryption examples, read `references/docs/guides/disk-encryption.md`
-   and the matching files under `references/embeds/`.
-4. Treat links to options, `clan.core`, CLI, and official services as generated
-   documentation. Follow the pinned `https://clan.lol/docs/26.05/` URL; never
-   invent a local generated page.
-5. When asked to refresh this snapshot, read `references/update-workflow.md` and
-   invoke `scripts/cli.py`; plan first, then apply only after reviewing its
-   summary. Never remove the old release without explicit user approval.
-6. If the request is generic Nix rather than Clan-specific behavior, hand it to
-   the `nix` skill instead of loading this snapshot broadly.
+1. MUST read `references/INDEX.md`; select only its relevant topic entry.
+2. MUST read linked page(s) under `references/docs/`; preserve source version and hierarchy when applying procedures or quoting examples.
+3. Disk-encryption examples: MUST read `references/docs/guides/disk-encryption.md` and matching files under `references/embeds/`.
+4. Options, `clan.core`, CLI, and official-service links → generated documentation. Follow `https://clan.lol/docs/26.05/`; NEVER invent a local generated page.
+5. Snapshot refresh: MUST read `references/update-workflow.md`; invoke `scripts/cli.py`; plan first, then apply only after reviewing its summary. NEVER remove the old release without explicit user approval.
+6. Generic Nix request rather than Clan-specific behavior → hand off to `nix` skill; do not broadly load this snapshot.
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Topic routing and snapshot rules | `references/INDEX.md` | First read for every Clan request |
-| Installation or first deployment | `references/docs/getting-started/` | When creating or installing a Clan |
-| Inventory, services, vars, backups, or networking | Matching `references/docs/guides/<topic>/` | Before prescribing that workflow |
-| Migration or 26.05 release behavior | `references/docs/guides/migrations/` and `references/docs/releases/26-05.md` | When upgrading or migrating |
-| Disk encryption and initrd SSH | `references/docs/guides/disk-encryption.md` and `references/embeds/` | When configuring encrypted disks |
-| CLI, options, `clan.core`, or official service details | Pinned rendered URL in `references/INDEX.md` | When a generated reference is needed |
-| Snapshot updater | `references/update-workflow.md` | When refreshing to another release |
-| Copyright and redistribution terms | `references/NOTICE.md` | Before copying or redistributing text |
+- Every Clan request: `references/INDEX.md` — topic routing and snapshot rules; first read.
+- Creating or installing a Clan: `references/docs/getting-started/` — installation or first deployment.
+- Prescribing inventory, services, vars, backups, or networking: matching `references/docs/guides/<topic>/`.
+- Upgrading or migrating: `references/docs/guides/migrations/` and `references/docs/releases/26-05.md` — migration or 26.05 release behavior.
+- Configuring encrypted disks: `references/docs/guides/disk-encryption.md` and `references/embeds/` — disk encryption and initrd SSH.
+- Generated CLI, options, `clan.core`, or official-service reference: pinned rendered URL in `references/INDEX.md`.
+- Refreshing to another release: `references/update-workflow.md` — snapshot updater.
+- Copying or redistributing text: `references/NOTICE.md` — copyright and redistribution terms.

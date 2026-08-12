@@ -6,23 +6,13 @@ Accepted
 
 ## Context
 
-In the long term we envision the Clan application will consist of the following user facing tools in the long term.
-
-- `CLI`
-- `TUI`
-- `Desktop Application`
-- `REST-API`
-- `Mobile Application`
-
-We might not be sure whether all of those will exist but the architecture should be generic such that those are possible without major changes of the underlying system.
+Potential user-facing frontends: `CLI`, `TUI`, `Desktop Application`, `REST-API`, `Mobile Application`. Whether all will exist is uncertain; architecture SHOULD support them without major underlying-system changes.
 
 ## Decision
 
-This leads to the conclusion that we should do `library` centric development.
-With the current `clan` python code being a library that can be imported to create various tools ontop of it.
-All **CLI** or **UI** related parts should be moved out of the main library.
+Use `library`-centric development: current `clan` Python code becomes an importable library for multiple tools. Move all **CLI**/**UI** code out of the main library.
 
-Imagine roughly the following architecture:
+Illustrative architecture:
 
 ```mermaid
 graph TD
@@ -66,48 +56,37 @@ graph TD
   BusinessLogic --> NIX
 ```
 
-With this very simple design it is ensured that all the basic features remain stable across all frontends.
-In the end it is straight forward to create python library function calls in a testing framework to ensure that kind of stability.
+The shared library keeps basic features stable across frontends. Test that stability through Python library calls; use both integration and smaller unit tests. Library functions need not generally be JSON-serializable.
 
-Integration tests and smaller unit-tests should both be utilized to ensure the stability of the library.
-
-Note: Library function don't have to be JSON-serializable in general.
-
-Persistence includes but is not limited to: creating git commits, writing to inventory.json, reading and writing vars, and interacting with persisted data in general.
+Persistence includes, but is not limited to, creating git commits, writing `inventory.json`, reading/writing vars, and interacting with persisted data generally.
 
 ## Benefits / Drawbacks
 
-- (+) Less tight coupling of frontend- / backend-teams
+- (+) Looser frontend/backend-team coupling
 - (+) Consistency and inherent behavior
-- (+) Performance & Scalability
-- (+) Different frontends for different user groups
-- (+) Documentation per library function makes it convenient to interact with the Clan resources.
-- (+) Testing the library ensures stability of the underlyings for all layers above.
+- (+) Performance and scalability
+- (+) Frontends for different user groups
+- (+) Per-function documentation makes Clan-resource interaction convenient
+- (+) Library tests stabilize all layers above
 - (-) Complexity overhead
-- (-) library needs to be designed / documented
-- (+) library can be well documented since it is a finite set of functions.
-- (-) Error handling might be harder.
+- (-) Library requires design and documentation
+- (+) Finite function set enables thorough library documentation
+- (-) Error handling may be harder
 - (+) Common error reporting
-- (-) different frontends need different features. The library must include them all.
-- (+) All those core features must be implemented anyways.
-- (+) VPN Benchmarking uses the existing library's already and works relatively well.
+- (-) Different frontends need different features; library must include them all
+- (+) Core features must be implemented regardless
+- (+) VPN benchmarking already uses the existing library and works relatively well
 
 ## Implementation considerations
 
-Not all required details that need to change over time are possible to be pointed out ahead of time.
-The goal of this document is to create a common understanding for how we like our project to be structured.
-Any future commits should contribute to this goal.
+Future details cannot all be specified now. This document establishes the desired project structure; future commits SHOULD advance it.
 
-Some ideas what might be needed to change:
-
-- Having separate locations or packages for the library and the CLI.
-- Rename the `clan_cli` package to `clan` and move the CLI frontend into a subfolder or a separate package.
-- Python Argparse or other CLI-related code should not exist in the `clan` python library.
-- `__init__.py` should be very minimal. Only init the business logic models and resources. Note that all `__init__.py` files all the way up in the module tree are always executed as part of the python module import logic and thus should be as small as possible.
-  i.e. `from clan_cli.vars.generators import ...` executes both `clan_cli/__init__.py` and `clan_cli/vars/__init__.py` if any of those exist.
-- `api` folder doesn't make sense since the python library `clan` is the API.
-- Logic needed for the webui that performs JSON serialization and deserialization will be some `json-adapter` folder or package.
-- Code for serializing dataclasses and typed dictionaries is needed for the persistence layer. (i.e. for read-write of inventory.json)
-- The inventory JSON is a backend resource, that is internal. Its logic includes merging, unmerging and partial updates with considering nix values and their priorities. Nobody should try to read or write to it directly.
-  Instead there will be library methods i.e. to add a `service` or to update/read/delete some information from it.
-- Library functions should be carefully designed with suitable conventions for writing good APIs in mind. (i.e: [best practices](https://swagger.io/resources/articles/best-practices-in-api-design/)
+- Use separate locations or packages for library and CLI.
+- Rename `clan_cli` to `clan`; move CLI frontend into a subfolder or separate package.
+- No Python Argparse or other CLI-related code in the `clan` library.
+- Keep `__init__.py` very minimal: initialize only business-logic models and resources. Every ancestor `__init__.py` executes during module import, so keep all of them small. For example, `from clan_cli.vars.generators import ...` executes both `clan_cli/__init__.py` and `clan_cli/vars/__init__.py` when present.
+- No `api` folder: Python library `clan` is the API.
+- Put web-UI JSON serialization/deserialization in a `json-adapter` folder or package.
+- Persistence needs serialization for dataclasses and typed dictionaries, including `inventory.json` read/write.
+- `inventory.json` is an internal backend resource. Its logic covers merging, unmerging, and partial updates while considering Nix values and priorities. Nobody should read/write it directly; expose library methods such as adding a `service` and updating, reading, or deleting information.
+- Design library functions carefully, using suitable good-API conventions: https://swagger.io/resources/articles/best-practices-in-api-design/

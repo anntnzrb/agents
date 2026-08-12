@@ -1,149 +1,76 @@
-
-# Getting Started: AWS Edition
+# Getting Started: AWS
 
 :::admonition[Prerequisites]{type=note}
-Your setup machine needs the following:
-
-* **Nix** on your Setup Machine (unless you're using NixOS). See [Install Nix and direnv](install-nix.md).
-
-* An **id_ed25519** keypair on your Setup Machine. (Link coming soon.)
-
-* **Git** (Optional). Clan uses Git internally, but you can optionally install it to make your own use of it. See the [Git installation instructions](https://git-scm.com/install/linux).
+Setup Machine: **Nix** (unless NixOS), an **id_ed25519** keypair, and optionally **Git**. See [Install Nix and direnv](install-nix.md) and [Git installation instructions](https://git-scm.com/install/linux).
 :::
 
-## Table of Contents
-
-- [Step 1. Create a Server on AWS](#step-1-create-a-server-on-aws)
-- [Step 2. Add your id_ed25519 key pair](#step-2-add-your-id_ed25519-key-pair)
-- [Step 3. Run the Clan setup](#step-3-run-the-clan-setup)
-- [Step 4. Create a Machine Configuration](#step-4-create-a-machine-configuration)
-- [Step 5. Add your allowed keys](#step-5-add-your-allowed-keys)
-- [Step 6. Gather Hardware Configuration](#step-6-gather-hardware-configuration)
-- [Step 7. Add a Disk Configuration](#step-7-add-a-disk-configuration)
-- [Step 8. Install NixOS](#step-8-install-nixos)
-  - [If you get an error about Sandboxing](#if-you-get-an-error-about-sandboxing)
-- [Step 9. Test the Connection](#step-9-test-the-connection)
-- [Practice: Install Some Packages](#practice-install-some-packages)
-- [Practice: Configuring Users](#practice-configuring-users)
-  - [Add a New User (no sudo access)](#add-a-new-user-no-sudo-access)
-  - [Give that user sudo access](#give-that-user-sudo-access)
-  - [Revoke the sudo access](#revoke-the-sudo-access)
-
-## Step 1. Create a Server on AWS
+## 1. Create an AWS Server
 
 :::admonition[Danger]{type=danger}
-The steps in this document will erase all data on your AWS server's hard drive.
+These steps erase all data on the AWS server's hard drive.
 :::
 
-From inside the AWS Console, head to the EC2 service, and click on **Instances** on the left. Then click **Launch Instances**.
-
-Provide a name, such as `Clan Test Machine`.
-
-Under **Application and OS Images**, choose **Quick Start**, and under that click on **Ubuntu**.
-
-Under **Instance type** you have some flexibility, but we recommend choosing at least **t3-small**; however **t3-large** works best.
+AWS Console → EC2 → **Instances** → **Launch Instances**. Name it, e.g. `Clan Test Machine`. **Application and OS Images** → **Quick Start** → **Ubuntu**. Choose at least **t3-small**; **t3-large** works best.
 
 :::admonition[Note]{type=note}
-Do not use t2 instances. In general, use Nitro instance types: t3, m5, c5, r5, m6i, c6i, etc. Avoid Xen instance types: t2, m4, c4, r4, etc. as the newer kexec tool (used internally by Clan) doesn't work well with infrastructure changes Amazon recently put in place with the Xen technology.
+Do not use t2. Prefer Nitro types (`t3`, `m5`, `c5`, `r5`, `m6i`, `c6i`, etc.); avoid Xen types (`t2`, `m4`, `c4`, `r4`, etc.), because Clan's newer kexec tool does not work well with Amazon's Xen infrastructure changes.
 :::
 
-Under **Key pair**, select one of your existing key pairs, or create a new one. (If you create a new one, choose **ED25519** for the type. It will download automatically. Be sure to move it in your `~/.ssh` directory.)
+**Key pair**: select an existing pair or create an **ED25519** pair; move a downloaded new key to `~/.ssh`. **Network Settings**: create/use a security group allowing SSH from at least your IP. **Configure Storage**: `16` GB. Click **Launch instance**.
 
-Under **Network Settings** you can either create a security group or use an existing one; in either case it needs to allow SSH traffic from at least your own IP address.
-
-Under **Configure Storage** enter 16 for the **GB**.
-
-Click **Launch instance**.
-
-After the server is running, make sure you can log into it:
+After it runs, verify access (`ubuntu` is Ubuntu EC2's main username):
 
 ```bash
 ssh -i <KEY-PAIR-FILE> ubuntu@<IP-ADDRESS>
 ```
 
-substituting:
-
-* **\<KEY-PAIR-FILE\>** for the path and name of your key pair file
-* **\<IP-ADDRESS\>** for your new server's public IP address. You can find this by clicking on the instance ID in the console; it will be in the middle near the top.
-
-:::admonition[Tip]{type=tip}
-The main username for Ubuntu on EC2 is `ubuntu`.
-:::
-
-Then exit:
+`<KEY-PAIR-FILE>` = key path/name; `<IP-ADDRESS>` = server public IP (EC2 instance ID → near the console's upper middle). Then:
 
 ```bash
 exit
 ```
 
-## Step 2. Add your id_ed25519 key pair
+## 2. Add the `id_ed25519` Key Pair
 
-Next we need to configure your server by adding your key pair.
-
-Add the key pair from your local server:
+MUST do this: Clan connects using an existing `id_ed25519` key. From the local machine:
 
 ```bash
 ssh -i ~/.ssh/<KEY-PAIR-FILE>.pem ubuntu@<IP-ADDRESS> \
 "cat >> /home/ubuntu/.ssh/authorized_keys" < ~/.ssh/id_ed25519.pub
 ```
 
-replacing `<KEY-PAIR-FILE>` with the name of the file you used when you provisioned the server.
-
-Now you should be able to connect without specifying a key:
+`<KEY-PAIR-FILE>` = provisioning key filename. Verify keyless access, then exit:
 
 ```text
 ssh ubuntu@<IP-ADDRESS>
 ```
 
-Then exit:
-
 ```bash
 exit
 ```
 
-:::admonition[Important]{type=warning}
-This step is not optional; Clan uses an existing id_ed25519 key to connect.
-:::
+## 3. Set Up Clan
 
-## Step 3. Run the Clan setup
-
-Start by creating a new clan:
+Create a clan, then enter a name (e.g. `MY-CLAN-1`) and domain (e.g. `myclan1.lol`; it need not be registered):
 
 ```text
 nix run https://clan.lol/install/26.05 --refresh -- init
 ```
 
-and enter a name for it, e.g. `MY-CLAN-1`, followed by a domain, e.g. `myclan1.lol`. (This does not have to be an actual registered domain.)
-
-:::admonition[Important]{type=note}
-The first time you run this, Clan will automatically create an age key at `~/.config/sops/age/keys.txt`. This key encrypts your secrets - back it up somewhere safe, and then type "y".
-:::
-
-:::admonition[Important]{type=note}
-If you've run this before, you'll also be asked to select admin keys; you'll most likely want to type "1" and press enter.
-:::
-
-Change to the new folder:
+First run: Clan creates the age key `~/.config/sops/age/keys.txt` for secret encryption; back it up safely, then type `"y"`. If setup ran before, select admin keys, usually `"1"` then Enter.
 
 ```bash
 cd MY-CLAN-1
-```
-
-You will see a message about `direnv` needing approval to run. Type:
-
-```bash
 direnv allow
 ```
 
-## Step 4. Create a Machine Configuration
-
-Next, create a machine configuration, which adds a description of a machine to your inventory. For this example, call it `test-machine`, by typing:
+## 4. Create Machine Configuration
 
 ```bash
 clan machines create test-machine
 ```
 
-Open `clan.nix`, and find the `inventory.machines` line; add the following immediately after it:
+In `clan.nix`, add immediately after `inventory.machines`:
 
 ```nix [clan.nix] {2,3,4,5}
 inventory.machines = { # FIND THIS LINE, ADD THE FOLLOWING
@@ -152,7 +79,7 @@ inventory.machines = { # FIND THIS LINE, ADD THE FOLLOWING
     };
 ```
 
-Then, farther down, add the following and replace the IP address with your AWS server's IP address:
+Farther down, add this and replace `<IP-ADDRESS>` with the AWS server IP:
 
 ```nix [clan.nix] {2-8}
   inventory.instances = { # FIND THIS LINE, ADD THE FOLLOWING
@@ -162,118 +89,97 @@ Then, farther down, add the following and replace the IP address with your AWS s
         settings.user = "root";
       };
     };
-
 ```
 
-:::admonition[Note]{type=note}
-Although you normally log in to AWS Ubuntu servers with username `ubuntu`, when Clan boots to NixOS it will be using `root`, hence `settings.user = "root"` in this code snippet.
-:::
-
-Test it out:
+`settings.user = "root"` is required because Clan uses `root` after booting NixOS, although Ubuntu uses `ubuntu` before boot.
 
 ```bash
 clan machines list
 ```
 
-## Step 5. Add your allowed keys
-
-Next, add your public key to the allowed keys. You can find it by running:
+## 5. Add Allowed Keys
 
 ```bash
 cat ~/.ssh/id_ed25519.pub
 ```
 
-Open `clan.nix`, and replace `PASTE_YOUR_KEY_HERE` with the contents of the `id_ed25519.pub` file:
+In `clan.nix`, replace `PASTE_YOUR_KEY_HERE` with that file's contents:
 
 ```text
 "admin-machine-1" = "PASTE_YOUR_KEY_HERE";
 ```
 
-Verify that your configuration is valid:
-
 ```bash
 clan show
 ```
 
-## Step 6. Gather Hardware Configuration
+## 6. Gather Hardware Configuration
 
-Now gather the hardware configuration from the target machine; note that for this step we specify the `ubuntu` username:
+Use `ubuntu` for this pre-NixOS connection:
 
 ```bash
 clan machines init-hardware-config test-machine --target-host ubuntu@<IP-ADDRESS>
 ```
 
-You will be asked to enter "y" to proceed.
+Confirm with `"y"`. Repeated `"Connection timed out"` messages can occur while the server reboots; wait for reconnection.
 
-:::admonition[Note]{type=note}
-At some point, you will likely see "Connection timed out" occur multiple times. Please be patient, as the server is rebooting during this time, and it will eventually connect.
-:::
+## 7. Configure Disk
 
-## Step 7. Add a Disk Configuration
-
-Next, configure a disk for the target machine. You'll run this command in two steps; first, type it like so:
+Run once; the intentional error prints the disk ID (typically beginning `/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_`):
 
 ```bash
 clan templates apply disk ext4-single-disk test-machine --set mainDisk ""
 ```
 
-This will generate an error; note the disk ID it prints out (typically starting with /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_), and add it inside the quotes, e.g.:
+Insert that ID between the quotes and rerun, e.g.:
 
 ```bash
 clan templates apply disk ext4-single-disk test-machine --set mainDisk "/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_113572628"
 ```
 
-## Step 8. Install NixOS
-
-Install NixOS on the target machine by typing:
+## 8. Install NixOS
 
 ```bash
 clan machines install test-machine
 ```
 
-You will be asked whether you want to install — type `y`. You will also be prompted for a password; you can accept the defaults and press Enter.
+Confirm installation with `y`; password prompts accept defaults with Enter. Set a root-login password or let Clan generate a random one.
 
-You will then be asked for a password to assign to the root login for the machine. You can either create one, or let Clan assign a random one.
+### Sandboxing failure
 
-### If you get an error about Sandboxing
-
-If you get an error regarding sandboxing not being available, type the following to disable sandboxing, and then run the above command again:
+If sandboxing is unavailable, disable it and rerun the install command:
 
 ```bash
 clan vars generate test-machine --no-sandbox
 ```
 
-## Step 9. Test the Connection
-
-Now you can try connecting to the remote machine:
+## 9. Test Connection
 
 ```bash
 clan ssh test-machine
 ```
 
-You'll quite likely get an error at first regarding the host identification. It should include a line to type to remove the old ID; paste the line you're shown, which will look similar to this:
+On an initial host-identification error, run the displayed removal command (similar to):
 
 ```text
   ssh-keygen -f '/home/user/.ssh/known_hosts' -R '<IP-ADDRESS>'
 ```
 
-Then try again:
+Retry:
 
 ```bash
 clan ssh test-machine
 ```
 
-You should connect and see the prompt:
+Expected prompt:
 
 ```text
 [root@test-machine:~]#
 ```
 
-## Practice: Install Some Packages
+## Practice: Packages
 
-Now let's look at how you can use Clan to install and remove packages on a target machine.
-
-For this demonstration we'll add three command-line packages: `bat`, `btop`, and `tldr`. In clan.nix, under inventory.instances, add the following lines:
+Under `inventory.instances` in `clan.nix`, declare `bat`, `btop`, and `tldr`:
 
 ```nix [clan.nix] {2-6}
   inventory.instances = {
@@ -286,13 +192,11 @@ For this demonstration we'll add three command-line packages: `bat`, `btop`, and
   };
 ```
 
-This declares that the three packages will be present on the machine. To install them, type:
+Update and verify:
 
 ```bash
 clan machines update test-machine
 ```
-
-Now ssh into the machine, and they should be present:
 
 ```text
 which bat
@@ -300,7 +204,7 @@ which btop
 which tldr
 ```
 
-Each will show a path to the binary file:
+Expected paths:
 
 ```text
 /run/current-system/sw/bin/bat
@@ -308,19 +212,17 @@ Each will show a path to the binary file:
 /run/current-system/sw/bin/tldr
 ```
 
-Next, let's remove one of the three packages. The packages portion of clan.nix declares what additional packages should exist; by removing one, Nix will remove that package. Remove the `"tldr"` from the list:
+Remove `"tldr"` from the package declaration; Nix removes it on update:
 
 ```text
         packages = [ "bat" "btop" ];
 ```
 
-and run the update again:
-
 ```bash
 clan machines update test-machine
 ```
 
-Now when you check which `tldr`, it should show that it's not in the path:
+Then `which tldr` reports:
 
 ```text
 which tldr
@@ -328,13 +230,13 @@ which: no tldr in (/run/wrappers/bin:/root/.nix-profile/bin:/nix/profile/bin:/ro
 
 ```
 
-## Practice: Configuring Users
+## Practice: Users
 
-When you need to add a new user, you can do so right from within the clan.nix file, and then update the system.
+Add users in `clan.nix`, then update the machine.
 
-### Add a New User (no sudo access)
+### Add Alice without sudo
 
-Let's add a user called Alice. Open clan.nix, and under inventory.instances, add the following:
+Under `inventory.instances` in `clan.nix`:
 
 ```nix [clan.nix] {2-9}
   inventory.instances = { # Add the following under this line
@@ -348,31 +250,27 @@ Let's add a user called Alice. Open clan.nix, and under inventory.instances, add
     };
 ```
 
-Save the file. Now type the following to add a password for alice (include the no-sandbox if you needed no sandbox earlier):
+Generate Alice's password; include `--no-sandbox` if sandboxing required it earlier. Enter a password, or press Enter to generate one:
 
 ```bash
 clan vars generate test-machine --no-sandbox
 ```
 
-You will be prompted for a password. Or you can press Enter to automatically generate one.
-
-If you automatically generated one, to retrieve it type:
+Retrieve an automatically generated password:
 
 ```text
 clan vars get test-machine user-password-alice/user-password
 ```
 
 :::admonition[Note]{type=note}
-On cloud machines, this password will be used for sudo access if you grant it. Typically password login is disabled on a cloud machine.
+On cloud machines, this password is used for sudo if granted; password login is typically disabled.
 :::
 
-Next, let's add a key file so Alice can log in remotely. For this we'll use your own key file as before. Type:
+Get the public key and put it in `machines/test-machine/configuration.nix` before the closing brace, replacing `PASTE_YOUR_KEY_HERE`:
 
 ```bash
 cat ~/.ssh/id_ed25519.pub
 ```
-
-Then open `machines/test-machine/configuration.nix`. Add the following, before the closing brace:
 
 ```nix [machines/test-machine/configuration.nix] {8-10}
 {
@@ -388,25 +286,21 @@ Then open `machines/test-machine/configuration.nix`. Add the following, before t
 }
 ```
 
-and replace `PASTE_YOUR_KEY_HERE` with the contents of the file.
-
-Now update the machine by typing:
+Update, then connect as Alice:
 
 ```bash
 clan machines update test-machine
 ```
 
-Once complete, you can log in as alice:
-
 ```bash
 ssh alice@<IP-ADDRESS>
 ```
 
-replacing `<IP-ADDRESS>` with the AWS server's IP address.
+Replace `<IP-ADDRESS>` with the AWS server IP.
 
-### Give that user sudo access
+### Grant Alice sudo
 
-After you trust Alice, you can grant her sudo access. To do so, update the clan.nix file by adding her to the wheel group:
+Add Alice to `wheel` in `clan.nix`:
 
 ```nix [clan.nix] {7}
     user-alice = {
@@ -420,38 +314,32 @@ After you trust Alice, you can grant her sudo access. To do so, update the clan.
     };
 ```
 
-Again type:
-
 ```bash
 clan machines update test-machine
 ```
 
-If you were already logged in as alice before running the update, you will need to log out and back in for the change to take.
-
-Then after logged in as alice, try using sudo:
+If Alice was logged in during the update, log out and back in. Her password should authenticate:
 
 ```bash
 sudo echo "hello"
 ```
 
-You will be prompted for the password and should see "hello" printed.
+Expected output: `hello`.
 
-### Revoke the sudo access
+### Revoke Alice's sudo
 
-To revoke alice's sudo access, simply remove the line you added:
+Remove the `wheel` line:
 
 ```nix
         groups = [ "wheel" ];
 
 ```
 
-And once again run:
+Update, log Alice out and back in, then retry:
 
 ```bash
 clan machines update test-machine
 ```
-
-Log out, and log alice back in. Now try the same sudo command; you'll be prompted for password, but then shown:
 
 ```text
 alice is not in the sudoers file.

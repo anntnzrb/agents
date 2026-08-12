@@ -1,14 +1,14 @@
 # Nixpkgs Flake Input
 
-Your flake needs a `nixpkgs` input, and the version you pick affects which packages you get and whether Clan's CI has tested your combination. This guide shows you how to choose one, how to avoid duplicate versions sneaking into your lockfile, and how to patch individual packages with overlays.
+`nixpkgs` required; its version determines available packages and whether Clan CI tests the combination.
 
 ## Choose a nixpkgs version
 
-There are two sensible options. Pick the first unless you have a reason not to.
+Two options; use Option 1 unless you have a reason not to.
 
 ### Option 1: Follow clan-core (recommended)
 
-Use the `nixpkgs` version that Clan's CI already tests against:
+Use the `nixpkgs` version tested by Clan CI:
 
 ```nix
 inputs = {
@@ -17,11 +17,11 @@ inputs = {
 };
 ```
 
-This pins your flake to the same `nixpkgs` revision that `clan-core` pins. Every `clan-core` update brings a matching `nixpkgs` update, so you stay on a combination that has been verified end-to-end. The trade-off is that new upstream packages only reach you when `clan-core` bumps its input.
+This uses the same `nixpkgs` revision as `clan-core`; each `clan-core` update brings a matching, end-to-end-verified `nixpkgs`. New upstream packages wait for a `clan-core` input bump.
 
 ### Option 2: Track your own nixpkgs
 
-Pin `nixpkgs` yourself and make `clan-core` follow it:
+Pin `nixpkgs` and make `clan-core` follow it:
 
 ```nix
 inputs = {
@@ -32,13 +32,13 @@ inputs = {
 };
 ```
 
-This gives you faster access to upstream changes, at the cost of running a combination that Clan's CI does not cover. Use it if you need a package or fix that has not yet landed in the version `clan-core` follows.
+This provides upstream changes sooner, but the combination is not covered by Clan CI. Use it when you need a package or fix absent from the version followed by `clan-core`.
 
 ## Check for duplicate nixpkgs entries
 
-Even with `follows` set up correctly, a transitive input can still pull in its own `nixpkgs`. When that happens, your `flake.lock` ends up with more than one `nixpkgs` entry and you evaluate the same package tree twice.
+A transitive input can pull its own `nixpkgs` despite correct `follows`; multiple `nixpkgs` entries in `flake.lock` duplicate package-tree evaluation.
 
-Look at `flake.lock`. If you see two entries like this, you have a duplicate:
+Inspect `flake.lock`; two entries like these indicate a duplicate:
 
 ```json
 "nixpkgs": {
@@ -64,7 +64,7 @@ Look at `flake.lock`. If you see two entries like this, you have a duplicate:
 }
 ```
 
-The second entry is the one another input brought in. To find which input is responsible, search `flake.lock` for `nixpkgs_2`. You will usually find something like this:
+The second entry came from another input. Search `flake.lock` for `nixpkgs_2` to identify it; for example:
 
 ```json
 "home-manager": {
@@ -74,13 +74,13 @@ The second entry is the one another input brought in. To find which input is res
 }
 ```
 
-That tells you `home-manager` is the culprit. Add a `follows` line for it in your `flake.nix`:
+Here, `home-manager` is responsible. Add this to `flake.nix`:
 
 ```nix
 home-manager.inputs.nixpkgs.follows = "nixpkgs";
 ```
 
-This points `home-manager` at your main `nixpkgs` instead of its own. Repeat the search for any remaining `nixpkgs_3`, `nixpkgs_4`, and so on until `flake.lock` has only one `nixpkgs` entry.
+Repeat for remaining `nixpkgs_3`, `nixpkgs_4`, etc. until `flake.lock` contains one `nixpkgs` entry.
 
 :::admonition[Tip]{type=tip}
 Run `nix flake update` after adding a `follows` line so the lockfile picks up the change.
@@ -88,9 +88,9 @@ Run `nix flake update` after adding a `follows` line so the lockfile picks up th
 
 ## Customise packages with overlays
 
-If you need to patch a package that already exists in `nixpkgs`, use an [overlay](https://wiki.nixos.org/wiki/Overlays). Overlays are the right tool for modifying existing packages. If you want to add a brand-new package of your own, see the [Clan templates](https://git.clan.lol/clan/clan-core/src/branch/26.05/templates) instead.
+Patch an existing `nixpkgs` package with an [overlay](https://wiki.nixos.org/wiki/Overlays); add a new package via the [Clan templates](https://git.clan.lol/clan/clan-core/src/branch/26.05/templates) instead.
 
-Here is a `flake.nix` that wires an overlay into the `pkgs` that Clan uses:
+This `flake.nix` wires overlays into Clan's `pkgs`:
 
 ```nix [flake.nix]
 {
@@ -133,6 +133,4 @@ Here is a `flake.nix` that wires an overlay into the `pkgs` that Clan uses:
 }
 ```
 
-The `perSystem` block builds a custom `pkgs` by importing `nixpkgs` with your overlays applied, and hands it back to the module system through `_module.args.pkgs`. From that point on, every Clan module in your flake sees the patched package set. The first overlay in the list comes from another flake input (`inputs.foo`); the second is an inline overlay where you can override individual packages directly. Set `config.allowUnfree = true` if you need packages with non-free licences.
-
-For more complete examples, see the [Clan templates](https://git.clan.lol/clan/clan-core/src/branch/26.05/templates).
+`perSystem` imports `nixpkgs` with overlays, then exposes the custom package set through `_module.args.pkgs`; every Clan module in the flake sees it. The first overlay comes from `inputs.foo`; the second is an inline package override. Set `config.allowUnfree = true` for non-free packages. More examples: [Clan templates](https://git.clan.lol/clan/clan-core/src/branch/26.05/templates).

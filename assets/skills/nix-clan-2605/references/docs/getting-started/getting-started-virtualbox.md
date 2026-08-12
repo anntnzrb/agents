@@ -1,127 +1,73 @@
-# Getting Started: VirtualBox Edition
+# Getting Started: VirtualBox
 
 :::admonition[Prerequisites]{type=note collapsible}
-Your setup machine needs the following:
+Setup machine requirements:
 
-* VirtualBox: The virtualization software. Download it from the [official site](https://www.virtualbox.org/wiki/Downloads).
-
-* **Nix** or **NixOS** on your Setup Machine. See [Install Nix and direnv](install-nix.md).
-
-* An **id_ed25519** [keypair file](create-an-ssh-key.md) on your Setup Machine.
-
-* Git (Optional). Clan uses Git internally, but you can optionally install it to make your own use of it. See the [Git installation instructions](https://git-scm.com/install/linux).
+* VirtualBox ([official downloads](https://www.virtualbox.org/wiki/Downloads)).
+* **Nix** or **NixOS**; see [Install Nix and direnv](install-nix.md).
+* An **id_ed25519** [keypair file](create-an-ssh-key.md).
+* Git optional; Clan uses Git internally. See [Git installation](https://git-scm.com/install/linux).
 :::
 
 :::admonition[Tip]{type=tip}
-For your setup machine, we recommend Linux (preferably NixOS) for your setup machine. We cannot recommend Windows with WSL for the setup system; it is significantly slower, and the install command may freeze during package downloads.
+Linux, preferably NixOS, recommended for setup. Windows with WSL is not recommended: significantly slower; install may freeze during package downloads.
 :::
 
-## Table of Contents
+## 1. Download the ISO
 
-- [Step 1. Download the ISO](#step-1-download-the-iso)
-  - [If you are on X86_64 architecture](#if-you-are-on-x86_64-architecture)
-  - [If you are on AArch64 architecture](#if-you-are-on-aarch64-architecture)
-- [Step 2. Create the Virtual Machine](#step-2-create-the-virtual-machine)
-  - [Setup the VirtualBox Machine](#setup-the-virtualbox-machine)
-  - [Run the VirtualBox Machine](#run-the-virtualbox-machine)
-- [Step 3. Run the Clan setup](#step-3-run-the-clan-setup)
-- [Step 4. Add a Disk Configuration.](#step-4-add-a-disk-configuration)
-  - [If you get an error about Sandboxing](#if-you-get-an-error-about-sandboxing)
-- [Step 5. Unmount the ISO and Reboot](#step-5-unmount-the-iso-and-reboot)
-- [Practice: Configuring Users](#practice-configuring-users)
-  - [Add a New User (no sudo access)](#add-a-new-user-no-sudo-access)
-  - [Give that user sudo access](#give-that-user-sudo-access)
-  - [Revoke the sudo access](#revoke-the-sudo-access)
+* X86_64: [nixos-installer-x86_64-linux.iso](https://github.com/nix-community/nixos-images/releases/download/nixos-26.05/nixos-installer-x86_64-linux.iso)
+* AArch64: [nixos-installer-aarch64-linux.iso](https://github.com/nix-community/nixos-images/releases/download/nixos-26.05/nixos-installer-aarch64-linux.iso)
 
-## Step 1. Download the ISO
+## 2. Create and run the VirtualBox machine
 
-### If you are on X86_64 architecture
+In VirtualBox, click **New**:
 
-Download the installer's [ISO image by clicking here](https://github.com/nix-community/nixos-images/releases/download/nixos-26.05/nixos-installer-x86_64-linux.iso).
+1. Name: `NixOS Installer`; leave **Folder** default.
+2. **ISO Image** → **Other** → select the downloaded `nixos-installer-x86_64-linux.iso` or `nixos-installer-aarch64-linux.iso` → **Open**; continue with **Next**.
+3. Depending on UI version:
+   * **Type**: **Linux**; **Version**: **Linux 2.6 / 3.x / 4.x / 5.x (64-bit)**.
+   * **OS**: **Linux**; **OS Distribution**: **Other Linux**; **OS Version**: **Other Linux (64-bit)**.
+4. **Next** or **Specify virtual hardware**: **Base Memory** `8192`, **Processors** at least `3` when available; leave **Enable EFI (special OSes only)** unchecked; **Next**.
+5. **Virtual Hard Disk** or **Specify virtual hard disk** → **Create a Virtual Hard Disk Now** → size `20` GB → **Next** if present → **Finish**.
+6. **Do not run the machine yet.** Right-click **NixOS Installer** → **Settings** → **Network** → **Adapter 1** → **Attached to**: **Bridged Adapter**; leave **Name** unchanged → **OK**.
 
-### If you are on AArch64 architecture
+Select the VM → **Start**. Wait for the NixOS loader and screen beginning with a QR code. Record the installer root password under **Login Credentials** and the IP under **Network Information** (for example `10.0.0.18`). Use the IP, not the **Remote Access** hostname: the hostname stops working after installation.
 
-Download the installer's [ISO image by clicking here](https://github.com/nix-community/nixos-images/releases/download/nixos-26.05/nixos-installer-aarch64-linux.iso).
+:::admonition[Tip]{type=tip}
+If VM output obscures the IP, press **Ctrl+C**, then **Ctrl+D**, and wait for refresh.
+:::
 
-## Step 2. Create the Virtual Machine
+## 3. Initialize Clan
 
-### Setup the VirtualBox Machine
-
-In VirtualBox, click **New**.
-
-Provide a name for the **Name** box, such as NixOS Installer.
-
-Leave **Folder** the default.
-
-Click the dropdown to the right of ISO Image. Choose **Other**. Navigate to the location of your download. Choose either `nixos-installer-x86_64-linux.iso` or `nixos-installer-aarch64-linux.iso`, depending on which one you downloaded. Click **Open**.
-
-For the following step, what you see in the Virtual Box UI depends on the version. You'll either see **Type** and **Version** dropdowns; or you'll see **OS**, **OS Distribution**, and **OS Version dropdowns**.
-
-* If you see **Type**: For **Type**, select **Linux**. For **Version**, scroll near the top, and select **Linux 2.6 / 3.x / 4.x / 5.x (64-bit)**.
-
-* If you see **OS Distribution**: For **OS**, select **Linux**. For **OS Distribution**, select **Other Linux**. For **OS Version**, select **Other Linux (64-bit)**.
-
-Click **Next** or expand the **Specify virtual hardware** option, depending on which you see. Now choose the amount of memory and CPU cores. If you have enough memory and CPU installed, you will want to type **8192** into the box to the right of **Base Memory**, and at least **3** to the right of **Processors**. Keep **Enable EFI (special OSes only)** *unchecked*. Click Next.
-
-For **Virtual Hard Disk** (or expand the **Specify virtual hard disk**, depending on which you see), choose **Create a Virtual Hard Disk Now**, and in the box to the right, type **20**. (Remember, this is just practice, and we don't expect you will want to keep this installation going after you create it. So 20GB should be plenty.)
-
-Click **Next** (if present).
-
-Click **Finish**.
-
-*Do not run the machine yet!* You still have another item to configure. Right click on your new **NixOS Installer** machine, and choose **Settings**. In the left side, choose **Network**. Under the **Adapter 1** tab, click the **Attached to** dropdown, and choose **Bridged Adapter**. Leave **Name** as is. Click **OK**.
-
-### Run the VirtualBox Machine
-
-Click on the Virtual Machine you just created. (It will have a blue background).
-
-In the upper panel, click **Start**.
-
-You will see the NixOS loader start; simply wait. You will see text scroll and finally a screen will open that starts with a QR code, followed by:
-
-* **Login Credentials**. Below this is the root password for logging into the installer. (Not the installed NixOS after the procedure is complete.)
-
-* **Network Information**. Take note of the IP address, such as 10.0.0.18.
-
-* **Remote Access**. A hostname has been added to your local DNS; you can use it instead of the IP address, but it will no longer work after NixOS is installed. Make note of the IP address instead.
-
-## Step 3. Run the Clan setup
-
-Start by creating a new clan:
+Create a clan:
 
 ```bash
 nix run https://clan.lol/install/26.05 --refresh -- init
 ```
 
-and enter a name for it, e.g. `MY-CLAN-1`, followed by a domain, e.g. `myclan1.lol`. (This does not have to be an actual registered domain.)
+Enter a clan name, for example `MY-CLAN-1`, and domain, for example `myclan1.lol`; the domain need not be registered.
 
 :::admonition[Important]{type=note}
-The first time you run this, Clan will automatically create an age key at `~/.config/sops/age/keys.txt`. This key encrypts your secrets - back it up somewhere safe, and then type "y".
+First run creates the secret-encrypting age key at `~/.config/sops/age/keys.txt`; back it up safely, then type "y". If Clan was run before, select admin keys, usually `1` then Enter.
 :::
-
-:::admonition[Important]{type=note}
-If you have run this before, you will also be asked to select admin keys; you will most likely want to type "1" and press enter.
-:::
-
-Change to the new folder:
 
 ```bash
 cd MY-CLAN-1
 ```
 
-You will see a message about `direnv` needing approval to run. Type:
+Approve direnv:
 
 ```bash
 direnv allow
 ```
 
-Next, create a machine configuration, which adds a description of a machine to your inventory. For this example, call it `test-machine`, by typing:
+Create the machine:
 
 ```text
 clan machines create test-machine
 ```
 
-Open `clan.nix`, and find the `inventory.machines` line; add the following immediately after it:
+Immediately after `inventory.machines` in `clan.nix`, add:
 
 ```nix [clan.nix] {2,3,4,5}
 inventory.machines = { # FIND THIS LINE, ADD THE FOLLOWING
@@ -130,115 +76,93 @@ inventory.machines = { # FIND THIS LINE, ADD THE FOLLOWING
     };
 ```
 
-:::admonition[Tip]{type=tip}
-If text scrolls up in the virtual machine and obscures the IP address, press **Ctrl+C** followed by **Ctrl+D** and wait a moment for the screen to refresh.
-:::
-
-Test it out:
+Check the machine, add the setup machine's public key to the allowed keys, and validate:
 
 ```bash
 clan machines list
 ```
 
-Next, add your public key to the allowed keys. You can find it by running:
-
 ```bash
 cat ~/.ssh/id_ed25519.pub
 ```
 
-Open `clan.nix`, and replace `PASTE_YOUR_KEY_HERE` with the contents of the `id_ed25519.pub` file:
+Replace `PASTE_YOUR_KEY_HERE` with the contents of `id_ed25519.pub`:
 
 ```nix
 "admin-machine-1" = "PASTE_YOUR_KEY_HERE";
 ```
 
-Verify that your configuration is valid:
-
 ```bash
 clan show
 ```
 
-Copy your public key to the installer so `clan` can connect over SSH. Replace `<INSTALLER-IP>` with the IP address shown on the installer screen (for example `10.0.0.18`), and when prompted enter the root password displayed under the QR code:
+Replace `<INSTALLER-IP>` with the installer-screen IP (for example `10.0.0.18`). At the prompt, enter the QR-screen root password:
 
 ```bash
 ssh-copy-id -i ~/.ssh/id_ed25519.pub root@<INSTALLER-IP>
 ```
 
-Confirm that you can log in:
+Confirm login, then exit the SSH session before running the next command locally:
 
 ```bash
 ssh root@<INSTALLER-IP>
 ```
 
-Now gather the hardware configuration from the target machine:
+Gather hardware configuration:
 
 ```bash
 clan machines init-hardware-config test-machine --target-host root@<INSTALLER-IP>
 ```
 
-You will be asked to enter "y" to proceed.
+Confirm with `"y"`.
 
-## Step 4. Add a Disk Configuration.
+## 4. Configure disk and install
 
-Next, configure a disk for the target machine. You will run this command in two steps; first, type it like so:
+Run first with an empty disk value; it intentionally errors. Record the printed disk ID (typically beginning `/dev/disk/by-id/ata-VBOX_HARDDISK_VB`) and substitute it for the empty quotes:
 
 ```bash
 clan templates apply disk ext4-single-disk test-machine --set mainDisk ""
 ```
 
-This will generate an error; note the disk ID it prints out (typically starting with /dev/disk/by-id/ata-VBOX_HARDDISK_VB), and add it inside the quotes, e.g.:
+Example:
 
 ```bash
 clan templates apply disk ext4-single-disk test-machine --set mainDisk "/dev/disk/by-id/ata-VBOX_HARDDISK_VB21917326-250e62d3"
 ```
 
-Install NixOS on the target machine by typing:
+Install:
 
 ```bash
 clan machines install test-machine --target-host root@<INSTALLER-IP>
 ```
 
-You will be asked whether you want to install; type `y`. You will also be prompted for a password; you can accept the defaults and press Enter.
+Confirm with `y`; accept password defaults with Enter. Set a root-login password or let Clan generate one.
 
-You will then be asked for a password to assign to the root login for the machine. You can either create one, or let Clan assign a random one.
-
-### If you get an error about Sandboxing
-
-If you get an error regarding sandboxing not being available, type the following to disable sandboxing, and then run the above command again:
+If sandboxing is unavailable:
 
 ```bash
 clan vars generate test-machine --no-sandbox
 ```
 
-:::admonition[Tip]{type=tip}
-If you get an error regarding a secret not existing, simply run the **vars generate** command again.
-:::
+Then rerun the install command. If a secret does not exist, rerun the **vars generate** command.
 
-## Step 5. Unmount the ISO and Reboot
+## 5. Remove ISO and reboot
 
-Shut down the virtual machine by clicking the close ("X") button. In the popup that appears, choose **Send the shutdown signal.** Then click **OK**. (If **Send the shutdown signal** is not available, choose **Power off the machine**.)
+Shut down via VM close **X** → **Send the shutdown signal** → **OK**. If unavailable, choose **Power off the machine**. Right-click VM → **Settings...** → **Storage**. Under **Controller: IDE**, select the mounted `.iso`; click the CD-ROM image beside **Optical Drive: IDE Secondary Device 0** → **Remove Disk from Virtual Drive** → **OK**.
 
-In the main VirtualBox GUI, right-click on the VM, and choose **Settings...**.
-
-In the **Settings** window, on the left, choose **Storage**. You should see two controllers listed in the middle pane; under **Controller: IDE** you should see the .iso file mounted, with a CD-ROM image to its left. Click on the .iso file.
-
-In the right pane, to the right of **Optical Drive: IDE Secondary Device 0**, you should see another CD-ROM image. Click that image, and choose **Remove Disk from Virtual Drive**.
-
-Click **OK** to exit the Settings.
-
-Now click **Start** at the top of the window (or double-click the Virtual Machine) to run it again. After a moment, you should be presented with:
+Start the VM again. At:
 
 ```console
 test-machine login:
 ```
 
-The installed system gets a **new IP address** — the installer IP is no longer valid. At the `test-machine login:` prompt, log in as `root` (using the password you set during install) and run:
+Log in as `root` with the installation password and run:
 
 ```bash
 ip addr
 ```
 
-Note the IP address, then tell Clan how to reach the machine. In `clan.nix`, find the `inventory.instances` line and add:
+The installed system has a **new IP address**; the installer IP is invalid. Replace `<MACHINE-IP>` below with the new address and add this after `inventory.instances` in `clan.nix`:
 
 ```nix [clan.nix] {2-8}
   inventory.instances = { # FIND THIS LINE, ADD THE FOLLOWING
@@ -248,36 +172,35 @@ Note the IP address, then tell Clan how to reach the machine. In `clan.nix`, fin
         settings.user = "root";
       };
     };
-
 ```
 
-`clan ssh` and `clan machines update` use this address. Now you can try connecting to the remote machine:
+`clan ssh` and `clan machines update` use this address.
 
 ```bash
 clan ssh test-machine
 ```
 
-You will quite likely get an error at first regarding the host identification. It should include a line to type to remove the old ID; paste the line shown, which will look similar to this:
+The first connection may report stale host identification. Run the displayed removal command, similar to:
 
 ```bash
 ssh-keygen -f '/home/user/.ssh/known_hosts' -R '<MACHINE-IP>'
 ```
 
-Then try again:
+Then retry:
 
 ```bash
 clan ssh test-machine
 ```
 
-You should connect and see the prompt:
+Expected prompt:
 
 ```console
 [root@test-machine:~]#
 ```
 
-Next, you can use Clan to install and remove packages on a target machine.
+## Packages
 
-For this demonstration we'll add three command-line packages: `bat`, `btop`, and `tldr`. In clan.nix, under inventory.instances, add the following lines:
+Under `inventory.instances` in `clan.nix`, add:
 
 ```nix [clan.nix] {2-6}
   inventory.instances = {
@@ -290,13 +213,11 @@ For this demonstration we'll add three command-line packages: `bat`, `btop`, and
   };
 ```
 
-This declares that the three packages will be present on the machine. To install them, type:
+The list declares additional packages present on the machine. Apply and verify:
 
 ```bash
 clan machines update test-machine
 ```
-
-Now ssh into the machine, and they should be present:
 
 ```bash
 which bat
@@ -304,7 +225,7 @@ which btop
 which tldr
 ```
 
-Each will show a path to the binary file:
+Expected paths:
 
 ```console
 /run/current-system/sw/bin/bat
@@ -312,19 +233,17 @@ Each will show a path to the binary file:
 /run/current-system/sw/bin/tldr
 ```
 
-Next, let's remove one of the three packages. The packages portion of clan.nix declares what additional packages should exist; by removing one, Nix will remove that package. Remove the `"tldr"` from the list:
+Remove `"tldr"` from `clan.nix`, then update:
 
 ```nix
 packages = [ "bat" "btop" ];
 ```
 
-and run the update again:
-
 ```bash
 clan machines update test-machine
 ```
 
-Now when you check which `tldr`, it should show that it's not in the path:
+`which tldr` should report:
 
 ```console
 which tldr
@@ -332,13 +251,11 @@ which: no tldr in (/run/wrappers/bin:/root/.nix-profile/bin:/nix/profile/bin:/ro
 
 ```
 
-When you need to add a new user, you can do so right from within the clan.nix file, and then update the system.
+## Practice: users
 
-## Practice: Configuring Users
+### Add Alice without sudo
 
-### Add a New User (no sudo access)
-
-Let's add a user called Alice. Open clan.nix, and under inventory.instances, add the following:
+Under `inventory.instances` in `clan.nix`, add:
 
 ```nix [clan.nix] {2-9}
   inventory.instances = { # Add the following under this line
@@ -352,31 +269,27 @@ Let's add a user called Alice. Open clan.nix, and under inventory.instances, add
     };
 ```
 
-Save the file. Now type the following to add a password for alice (include the no-sandbox if you needed no sandbox earlier):
+Save the file. Generate Alice's password. If sandboxing was disabled earlier, use:
 
 ```bash
 clan vars generate test-machine --no-sandbox
 ```
 
-You will be prompted for a password. Or you can press Enter to automatically generate one.
-
-If you automatically generated one, to retrieve it type:
+Otherwise omit `--no-sandbox`. Enter a password, or press Enter for automatic generation. Retrieve an automatically generated password with:
 
 ```bash
 clan vars get test-machine user-password-alice/user-password
 ```
 
-Now update the machine by typing:
-
 ```bash
 clan machines update test-machine
 ```
 
-Once complete, you can log in as alice with the password inside the virtual machine.
+Alice can log in to the VM after the update.
 
-### Give that user sudo access
+### Grant sudo
 
-After you trust Alice, you can grant her sudo access. To do so, update the clan.nix file by adding her to the wheel group:
+After trusting Alice, add her to `wheel`:
 
 ```nix [clan.nix] {7}
     user-alice = {
@@ -390,25 +303,21 @@ After you trust Alice, you can grant her sudo access. To do so, update the clan.
     };
 ```
 
-Again type:
-
 ```bash
 clan machines update test-machine
 ```
 
-If you were already logged in as alice before running the update, you will need to log out and back in for the change to take.
-
-Then after logged in, try using sudo:
+If Alice was logged in during the update, log out and back in first. Then run:
 
 ```bash
 sudo echo "hello"
 ```
 
-You will be prompted for the password and should see "hello" printed.
+Sudo prompts for the password and prints `hello`.
 
-### Revoke the sudo access
+### Revoke sudo
 
-To revoke alice's sudo access, simply remove the line you added:
+Remove the `groups = [ "wheel" ];` line (marked `[!code --]` below):
 
 ```nix [clan.nix] {7}
     user-alice = {
@@ -422,13 +331,17 @@ To revoke alice's sudo access, simply remove the line you added:
     };
 ```
 
-And once again run:
-
 ```bash
 clan machines update test-machine
 ```
 
-Log out, and log alice back in. Now try the same sudo command; you will be prompted for password, but then shown:
+Log out and back in as Alice, then run:
+
+```bash
+sudo echo "hello"
+```
+
+After the password prompt, expected output:
 
 ```console
 alice is not in the sudoers file.

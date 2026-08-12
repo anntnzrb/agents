@@ -1,60 +1,23 @@
 # Introduction to Backups
 
-Clan makes it easy to back your machines up from one to another. You define what to back up and where to send it, and Clan handles the rest: encryption, scheduling, and restoration.
+Clan backs up selected machine data to another clan machine or a remote location. It handles BorgBackup encryption, scheduling, deduplication, compression, and restoration.
 
-<!-- nix-clan-updater:toc:start -->
-## Table of Contents
-- [How Clan Backups Work](#how-clan-backups-work)
-- [The Basic Setup](#the-basic-setup)
-- [Starting Example](#starting-example)
-- [Ready to install](#ready-to-install)
-  - [Set up some files on Alice's computer to back up](#set-up-some-files-on-alices-computer-to-back-up)
-  - [Perform a backup](#perform-a-backup)
-- [Backup Commands Reference](#backup-commands-reference)
-  - [clan backups create \<machine\>](#clan-backups-create)
-  - [clan backups list \<machine\>](#clan-backups-list)
-  - [clan backups restore \<machine\> \<provider\> \<name\>](#clan-backups-restore)
-<!-- nix-clan-updater:toc:end -->
+## Model
 
-## How Clan Backups Work
+Backup inputs: folders, databases, application state. BorgBackup encrypts before transfer; identical data is stored once on the server; compression reduces storage and transfer size.
 
-Clan backups have two parts:
+`borgbackup` roles:
 
-1. **What to back up**: folders, databases, application state
-2. **Where to send it**: another machine in your clan, or a remote location such as a Hetzner storage box.
+| Role | Function |
+|---|---|
+| client | Creates and sends backups |
+| server | Receives and stores backups |
 
-Under the hood, Clan uses [BorgBackup](https://www.borgbackup.org/), which provides:
+A machine can have both roles. On each client, declare persistent data with `clan.core.state` in the `machines` attribute of `clan.nix`; configure the backup server separately. `clan.core.state` means “important data,” not “backup”: providers consume it, and backup, restore, migration, or another backup tool can reuse the same definitions. State entries support `preBackupScript` and `postBackupScript`, useful for stopping or flushing databases.
 
-- **Deduplication**: If two identical files are backed up, they only occupy a single set of data on the backup server
-- **Encryption**: backups are encrypted before leaving the machine
-- **Compression**: smaller backups, faster transfers
+## Starting configuration
 
-You don't need to know BorgBackup to use Clan backups. Clan handles everything for you.
-
-## The Basic Setup
-
-The borgbackup service has two roles:
-
-| Role | What it does |
-|------|--------------|
-| **client** | Creates backups and sends them to the server |
-| **server** | Receives and stores backups from clients |
-
-A machine can be both. For example, a NAS might store backups from your laptops (server role) while also backing itself up to an offsite location (client role).
-
-On each client machine, you define a **state** — the folders and data to include in backups. This goes in the clan.nix file's `machines` attribute, as you'll see in the following example.
-
-You also define a backup server where backups will be stored.
-
-**Why "state" instead of "backup"?** The `clan.core.state` option declares "this data is important". It's not specific to backups. The backup service reads your state definitions and includes them automatically. This separation means you define what matters once, and different services (backup, restore, migration) can all use it. If you ever switch backup tools, your state definitions stay the same.
-
-## Starting Example
-
-This step-by-step example demonstrates how to set up and use backups.
-
-Start two machines under a single clan. If you're using VirtualBox or a cloud server, we suggest naming them `alice-laptop` and `backup-server`. Note the IP address of each machine.
-
-Replace the contents of your `clan.nix` file with the following. Update `meta.name` and `meta.domain` to your chosen values, replace the IP addresses for both machines, and paste your SSH public key in the two places indicated.
+Use two machines in one clan, conventionally `alice-laptop` and `backup-server`; record both IP addresses. Replace `meta.name`, `meta.domain`, both target IPs, the backup address, and both indicated SSH public-key placeholders. Install/configure hardware and disks as usual.
 
 ```nix
 {
@@ -144,108 +107,63 @@ Replace the contents of your `clan.nix` file with the following. Update `meta.na
 }
 ```
 
-Following are notes on the backup-relevant attributes:
+Configuration effects:
 
-**borgbackup:**
+- `roles.client.machines."alice-laptop"`: client, default settings.
+- `roles.server.machines."backup-server"`: server; `settings.address` is the client connection IP and `settings.directory` stores repositories.
+- Clan generates client/server SSH keys, configures both services, and schedules client backups.
+- `systemd.tmpfiles.rules` creates missing directories on boot. Each rule is `d path mode user group age`; here `d` creates a directory, `0755` sets permissions, `alice`/`users` set ownership, and `-` disables automatic cleanup.
+- State label `my-documents` is arbitrary; `folders` lists tracked paths. Providers automatically include these folders.
 
-This configures the BorgBackup service across two machines with distinct roles:
+## Install
 
-- Client: `roles.client.machines."alice-laptop"` designates alice-laptop as a backup client — meaning it's a machine whose data will be backed up. The empty {} means no custom client settings; defaults are used.
-- Server: `roles.server.machines."backup-server"` designates backup-server as the machine that receives and stores backups from clients. Its settings include:
-- address — the IP address where clients should connect to send backups
-- directory — the filesystem path on the server where backup repositories are stored
+Run `clan machines install`, installing `backup-server` first: the client needs the server’s SSH host key.
 
-When this config is applied, Clan automatically generates the SSH keys needed for client-to-server authentication, configures the borgbackup service on both machines, and sets up scheduled backup jobs on the client.
+## Exercise
 
-**systemd.tmpfiles.rules**
-
-This is a standard NixOS option that uses systemd's tmpfiles mechanism to ensure specific files and directories exist on the system. Each entry is a single string with space-separated fields:
-
-- `d`: the type: create a directory (other types include `f` for file, `L` for symlink, etc.)
-- `/home/alice/documents`: the path to create
-- `0755`: the permission mode (owner: read/write/execute; group and others: read/execute)
-- `alice`: the owning user
-- `users`: the owning group
-- `-`: the age/cleanup policy; `-` means "don't automatically clean up"
-
-On every boot, systemd checks these rules and creates any missing directories with the specified ownership and permissions. This guarantees the folders exist before any service tries to use them.
-
-**clan.core.state**
-
-This declares a named state entry telling Clan which directories contain important, persistent data that should be preserved across backups.
-
-- "my-documents" is just a label (any name you choose) for this group of stateful folders. It's used internally for tracking and can be referenced in backup hooks.
-- folders is the list of filesystem paths Clan should track as state.
-
-When any backup provider (like borgbackup above) runs on this machine, it automatically reads clan.core.state entries and includes their folders in the backup. Each state entry can also define preBackupScript and postBackupScript hooks — useful for services like databases that need to be stopped or flushed before a clean backup can be taken.
-
-## Ready to install
-
-Go through the usual steps (gather hardware configuration for both machines; configure a disk). Then run `clan machines install`, starting with the backup server. The server must be installed first because the client needs the server's SSH host key during setup.
-
-### Set up some files on Alice's computer to back up
-
-Now let's create some documents on Alice's laptop that will be backed up.
-
-Log into alice-laptop as **alice**. If you need her password, on the setup machine, type:
+Log in to `alice-laptop` as `alice`. To retrieve her password from the setup machine:
 
 ```text
 clan vars get alice-laptop user-password-alice/user-password
 ```
 
-Then log in via SSH:
-
-```text
+```bash
 ssh alice@<IP-ADDRESS>
 ```
 
-replacing `<IP-ADDRESS>` with the IP address of Alice's laptop virtual machine.
-
-Then, once logged in as **alice**, create some documents, like so:
+On the laptop, create sample state:
 
 ```bash
 cd documents
 nano welcome.md
 ```
 
-Type:
-
 ```text
 Hello World!
 ```
 
-Save (Ctrl+O, Enter) and Exit (Ctrl+X)
-
-Now in the same directory create a file called `finance.txt`:
+Save with Ctrl+O, Enter; exit with Ctrl+X. Create another file:
 
 ```bash
 nano finance.txt
 ```
 
-Type:
-
 ```text
 Account total: 5000
 ```
 
-Save (Ctrl+O, Enter) and Exit (Ctrl+X)
-
-Next, change to the pictures directory:
+Save and exit as above. Add an image:
 
 ```bash
 cd ~
 cd pictures
 ```
 
-Download any image you like, such as one from the Clan docs:
-
 ```text
 curl -o hero.jpg https://clan.lol/_assets/25.11/_app/immutable/assets/docs-hero.CUEOsCNu.jpg
 ```
 
-(We used curl here, because, by default, NixOS ships with curl, but not wget.)
-
-Now check that everything is present:
+NixOS includes `curl` by default, not `wget`. Verify, then leave the laptop:
 
 ```text
 cd ~
@@ -254,91 +172,77 @@ ls pictures
 
 ```
 
-You should see the two files in `documents` and the `hero.jpg` file in `pictures`.
-
-Exit:
+Expected: two files in `documents`, `hero.jpg` in `pictures`.
 
 ```bash
 exit
 ```
 
-### Perform a backup
+## Create and restore
 
-Now trigger a backup from the setup machine:
+From the setup machine, start an immediate backup across all configured providers:
 
 ```bash
 clan backups create alice-laptop
 ```
 
-You should see:
+Expected:
 
 ```text
 successfully started backup
 ```
 
-Wait a minute or so, and then list the backups:
+Wait about a minute, then list backups:
 
 ```bash
 clan backups list alice-laptop
 ```
 
-You'll see a list similar to this:
+Example output:
 
 ```text
 backup-server::borg@<IP-ADDRESS>:.::alice-laptop-backup-server-2026-04-14T03:53:34
 ```
 
-Next, log in to alice-laptop and delete a file to simulate data loss:
+Delete a file on the laptop:
 
 ```text
 cd documents
 rm welcome.md
 ```
 
-Exit:
-
 ```bash
 exit
 ```
 
-Now back on the setup machine, first list the backups again:
+List again on the setup machine. Multiple entries are possible after multiple backups; choose the most recent backup name:
 
 ```bash
 clan backups list alice-laptop
 ```
 
-You'll see a list of one item, similar to this:
-
 ```text
 backup-server::borg@<IP-ADDRESS>:.::alice-laptop-backup-server-2026-04-14T03:53:34
 ```
 
-If you ran the backup command multiple times, you might see more than one entry. Copy the most recent one to the clipboard, and then type:
+Restore with provider `borgbackup` and the selected name:
 
 ```bash
 clan backups restore alice-laptop borgbackup <PASTE>
 ```
 
-For `<PASTE>` paste the backup name from the clipboard, such as:
+Example:
 
 ```bash
 clan backups restore alice-laptop borgbackup backup-server::borg@<IP-ADDRESS>:.::alice-laptop-backup-server-2026-04-14T03:53:34
 ```
 
-Log back in to alice-laptop, return to the `documents` directory, and run `ls`. You should see that `welcome.md` has been restored.
+Log back in, run `ls` in `documents`, and verify `welcome.md` is restored.
 
-## Backup Commands Reference
+## Command reference
 
-For a quick reference, here are the three backup commands used above.
+`clan backups create <machine>` — immediate backup across all configured providers.
 
-### clan backups create \<machine\>
+`clan backups list <machine>` — list existing backups; optional `--provider` filters by provider.
 
-Triggers an immediate backup of the specified machine across all its configured backup providers.
-
-### clan backups list \<machine\>
-
-Lists all existing backups for the specified machine. Use the optional `--provider` flag to filter by a specific provider.
-
-### clan backups restore \<machine\> \<provider\> \<name\>
-
-Restores a specific backup to the given machine. The <provider> matches the destination name from your configuration, and <name> is one of the backup names returned by clan backups list.
+`clan backups restore <machine> <provider> <name>` — restore a named backup. `<provider>` is the configured destination name; `<name>` comes from `clan backups list`.

@@ -1,26 +1,21 @@
-# Migrate Admin Service
+# Migrate `admin` to `sshd` + `users`
 
-## Migrating from `admin` clanService to `sshd` and `users`
+`admin` clanService deprecated; functionality split:
+- `sshd` server role: SSH authorized keys, host certificates, RSA host-key generation
+- `users`: root-password management
 
-The `admin` clanService is deprecated. Its functionality has been split into dedicated services:
+## Mappings
 
-- `sshd` (server role): SSH authorized keys, host certificates, RSA host key generation
-- `users`: root password management
+|Deprecated|Replacement|
+|---|---|
+|`allowedKeys`|`sshd` server `authorizedKeys`|
+|`certificateSearchDomains`|`sshd` server `certificate.searchDomains`|
+|`rsaHostKey.enable`|`sshd` server `hostKeys.rsa.enable`|
+|root password|`users` `user = "root"`|
 
-### Option Mappings
+## Migration
 
-| Admin Option | New Service | New Option |
-|-------------|-------------|------------|
-| `allowedKeys` | sshd (server) | `authorizedKeys` |
-| `certificateSearchDomains` | sshd (server) | `certificate.searchDomains` |
-| `rsaHostKey.enable` | sshd (server) | `hostKeys.rsa.enable` |
-| (root password) | users | `user = "root"` |
-
-### Migration Steps
-
-#### Step 1: Replace admin with sshd
-
-**Before** (admin service):
+`admin` configuration:
 
 ```nix
 instances = {
@@ -37,7 +32,7 @@ instances = {
 };
 ```
 
-**After** (sshd service):
+Replace it with `sshd` and its `server` role:
 
 ```nix
 instances = {
@@ -56,9 +51,7 @@ instances = {
 };
 ```
 
-#### Step 2: Add root password via users service (if needed)
-
-If you relied on the admin service's root password generation, add the users service:
+If relying on `admin` root-password generation, add `users` (set `prompt = false` to auto-generate rather than prompt):
 
 ```nix
 instances = {
@@ -76,23 +69,23 @@ instances = {
 };
 ```
 
-### Vars Migration
+## Vars migration
 
-The admin service generated vars with different names than the new services. After migration, you'll need to regenerate these vars:
+After updating configuration, regenerate vars with:
 
-| Admin var path | New service var path |
-|----------------|----------------------|
-| `root-password/password-hash` | `user-password-root/user-password-hash` |
-| `admin-ssh-rsa/*` | `openssh-rsa/*` |
-| `admin-ssh/*` | `openssh/*` |
+```sh
+clan vars generate $MACHINE_NAME
+```
 
-Run `clan vars generate $MACHINE_NAME` after updating your configuration to generate the new vars.
+|Old var path|New service var path|
+|---|---|
+|`root-password/password-hash`|`user-password-root/user-password-hash`|
+|`admin-ssh-rsa/*`|`openssh-rsa/*`|
+|`admin-ssh/*`|`openssh/*`|
 
-### Complete Example
+## Inventory example
 
-Here's a full migration example:
-
-**Before:**
+Before:
 
 ```nix
 {
@@ -110,7 +103,7 @@ Here's a full migration example:
 }
 ```
 
-**After:**
+After:
 
 ```nix
 {
@@ -141,10 +134,4 @@ Here's a full migration example:
 }
 ```
 
-### Additional sshd Features
-
-The sshd service provides additional features not available in the admin service:
-
-- `client` role: configure machines to trust the SSH CA for TOFU-less verification
-
-See the [sshd service documentation](https://clan.lol/docs/26.05/services/official/sshd) for details.
+`sshd` also provides a `client` role for SSH-CA trust and TOFU-less verification. See [sshd service documentation](https://clan.lol/docs/26.05/services/official/sshd).

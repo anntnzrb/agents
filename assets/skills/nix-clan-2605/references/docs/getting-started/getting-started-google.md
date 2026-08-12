@@ -1,43 +1,20 @@
 # Getting Started: Google Cloud Edition
 
 :::admonition[Prerequisites]{type=note}
-Your setup machine needs the following:
+Setup machine requires:
 
-* **Nix** on your Setup Machine (unless you're using NixOS). See [Install Nix and direnv](install-nix.md).
-
-* An **id_ed25519** keypair on your Setup Machine. (Link coming soon.)
-
-* **Git** (Optional). Clan uses Git internally, but you can optionally install it to make your own use of it. See the [Git installation instructions](https://git-scm.com/install/linux).
+* **Nix**, unless setup machine runs NixOS. See [Install Nix and direnv](install-nix.md).
+* An **id_ed25519** keypair. (Link coming soon.)
+* **Git** optional; Clan uses Git internally. See [Git installation instructions](https://git-scm.com/install/linux).
 :::
-
-## Table of Contents
-
-- [Step 1. Create a Server on Google Cloud](#step-1-create-a-server-on-google-cloud)
-- [Step 2. Run the Clan setup](#step-2-run-the-clan-setup)
-- [Step 3. Create a Machine Configuration](#step-3-create-a-machine-configuration)
-- [Step 4. Add your allowed keys](#step-4-add-your-allowed-keys)
-- [Step 5. Gather Hardware Configuration](#step-5-gather-hardware-configuration)
-- [Step 6. Add a Disk Configuration.](#step-6-add-a-disk-configuration)
-- [Step 7. Install NixOS](#step-7-install-nixos)
-  - [If you get an error about Sandboxing](#if-you-get-an-error-about-sandboxing)
-- [Step 8. Test the Connection](#step-8-test-the-connection)
-- [Practice: Install Some Packages](#practice-install-some-packages)
-- [Practice: Configuring Users](#practice-configuring-users)
-  - [Add a New User (no sudo access)](#add-a-new-user-no-sudo-access)
-  - [Give that user sudo access](#give-that-user-sudo-access)
-  - [Revoke the sudo access](#revoke-the-sudo-access)
 
 ## Step 1. Create a Server on Google Cloud
 
 :::admonition[Danger]{type=danger}
-The steps in this document will erase all data on your Google Cloud server's hard drive.
+These steps erase all data on the Google Cloud server's hard drive.
 :::
 
-If you already have a server on Google Cloud running, you can skip this step.
-
-We recommend using gcloud command-line tool.
-
-Launch a server:
+Skip if a Google Cloud server already exists. `gcloud` recommended:
 
 ```text
 gcloud compute instances create linux-server-01 \
@@ -51,50 +28,38 @@ gcloud compute instances create linux-server-01 \
     --no-shielded-integrity-monitoring
 ```
 
-(Notice the `whoami`: We're creating a user on the remote machine with the same name as your local username.)
-
-After this command runs, you can find the IP address from the command's output, under `EXTERNAL_IP`:
+`whoami` creates a remote user matching the local username. Find the actual IP under `EXTERNAL_IP` in the output:
 
 ```text
 NAME             ZONE           MACHINE_TYPE  PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP  STATUS
 linux-server-01  us-central1-a  e2-medium                  10.128.0.4   34.170.5.83  RUNNING
 ```
 
-Verify that you can log in:
+After boot (possibly requiring retries), verify login, replacing placeholders:
 
 ```bash
 ssh <USERNAME>@<IP-ADDRESS>
 ```
 
-replacing `<USERNAME>` with your local username and `<IP-ADDRESS>` with the IP address displayed after the server was provisioned. (Note, the server sometimes takes a moment to boot up, so you might need to try this command a couple of times before it lets you in.)
-
-Next, enable `root` access. First, copy the `authorized_keys` file:
+Enable root access:
 
 ```bash
 gcloud compute ssh linux-server-01 --command="sudo mkdir -p /root/.ssh && sudo cp ~/.ssh/authorized_keys /root/.ssh/authorized_keys"
 ```
 
-Second, enable root login:
-
 ```bash
 gcloud compute ssh linux-server-01 --command="sudo sed -i 's/PermitRootLogin no/PermitRootLogin prohibit-password/g' /etc/ssh/sshd_config"
 ```
-
-Third, restart the ssh daemon:
 
 ```bash
 gcloud compute ssh linux-server-01 --command="sudo systemctl restart ssh"
 ```
 
-Now test out root access:
+Test root access, replacing `<IP-ADDRESS>`:
 
 ```bash
 ssh root@<IP-ADDRESS>
 ```
-
-replacing `<IP-ADDRESS>` with the ip address provided earlier.
-
-Then exit:
 
 ```bash
 exit
@@ -102,43 +67,26 @@ exit
 
 ## Step 2. Run the Clan setup
 
-Start by creating a new clan:
-
 ```text
 nix run https://clan.lol/install/26.05 --refresh -- init
 ```
 
-and enter a name for it, e.g. `MY-CLAN-1`, followed by a domain, e.g. `myclan1.lol`. (This does not have to be an actual registered domain.)
+Enter a clan name (for example, `MY-CLAN-1`) and domain (for example, `myclan1.lol`; it need not be registered).
 
-:::admonition[Important]{type=note}
-The first time you run this, Clan will automatically create an age key at `~/.config/sops/age/keys.txt`. This key encrypts your secrets - back it up somewhere safe, and then type "y".
-:::
-
-:::admonition[Important]{type=note}
-If you've run this before, you'll also be asked to select admin keys; you'll most likely want to type "1" and press enter.
-:::
-
-Change to the new folder:
+First run: Clan creates the age key `~/.config/sops/age/keys.txt` for secret encryption. Back it up safely, then type `y`. If setup ran before, select admin keys; usually type `1`, Enter.
 
 ```bash
 cd MY-CLAN-1
-```
-
-You will see a message about `direnv` needing approval to run. Type:
-
-```text
 direnv allow
 ```
 
 ## Step 3. Create a Machine Configuration
 
-Next, create a machine configuration, which adds a description of a machine to your inventory. For this example, call it `test-machine`, by typing:
-
 ```bash
 clan machines create test-machine
 ```
 
-Open `clan.nix`, and find the `inventory.machines` line; add the following immediately after it:
+In `clan.nix`, immediately after `inventory.machines`:
 
 ```nix [clan.nix] {2,3,4,5}
 inventory.machines = { # FIND THIS LINE, ADD THE FOLLOWING
@@ -147,7 +95,7 @@ inventory.machines = { # FIND THIS LINE, ADD THE FOLLOWING
     };
 ```
 
-Then, farther down, add the following and replace the IP address with your Google Cloud server's IP address:
+Farther down, under `inventory.instances`, replace the host IP:
 
 ```nix [clan.nix] {2-8}
   inventory.instances = { # FIND THIS LINE, ADD THE FOLLOWING
@@ -157,10 +105,7 @@ Then, farther down, add the following and replace the IP address with your Googl
         settings.user = "root";
       };
     };
-
 ```
-
-Test it out:
 
 ```bash
 clan machines list
@@ -168,19 +113,15 @@ clan machines list
 
 ## Step 4. Add your allowed keys
 
-Next, add your public key to the allowed keys. You can find it by running:
-
 ```bash
 cat ~/.ssh/id_ed25519.pub
 ```
 
-Open `clan.nix`, and replace `PASTE_YOUR_KEY_HERE` with the contents of the `id_ed25519.pub` file:
+In `clan.nix`, replace `PASTE_YOUR_KEY_HERE` with that file's contents:
 
 ```text
 "admin-machine-1" = "PASTE_YOUR_KEY_HERE";
 ```
-
-Verify that your configuration is valid:
 
 ```bash
 clan show
@@ -188,37 +129,31 @@ clan show
 
 ## Step 5. Gather Hardware Configuration
 
-Now gather the hardware configuration from the target machine:
-
 ```bash
 clan machines init-hardware-config test-machine
 ```
 
-You will be asked to enter "y" to proceed.
+Confirm with `y`.
 
-## Step 6. Add a Disk Configuration.
+## Step 6. Add a Disk Configuration
 
-Next, configure a disk for the target machine. You'll run this command in two steps; first, type it like so:
+Run once; it intentionally errors. Copy the printed disk ID, typically `/dev/disk/by-id/scsi-0Google_PersistentDisk_persistent-disk-0`, into the second command:
 
 ```bash
 clan templates apply disk ext4-single-disk test-machine --set mainDisk ""
 ```
 
-This will generate an error; note the disk ID it prints out (typically `/dev/disk/by-id/scsi-0Google_PersistentDisk_persistent-disk-0`), and add it inside the quotes, e.g.:
-
 ```bash
 clan templates apply disk ext4-single-disk test-machine --set mainDisk "/dev/disk/by-id/scsi-0Google_PersistentDisk_persistent-disk-0"
 ```
 
-Next we need to deal with a situation specific to Google Cloud. Google Cloud does not expose the partition tables to the guest operating systsem. As such, we need to make some adjustments to the default `configuration.nix` and `disko.nix` files.
-
-Switch to the directory holding these files:
+Google Cloud does not expose partition tables to the guest OS. Adjust the generated `configuration.nix` and `disko.nix`:
 
 ```bash
 cd machines/test-machine
 ```
 
-Open `configuration.nix` and replace its contents with:
+Replace `configuration.nix` with:
 
 ```nix
 { lib, modulesPath, ... }:
@@ -231,16 +166,15 @@ Open `configuration.nix` and replace its contents with:
 }
 ```
 
-The GCP module (google-compute-image.nix) provides essential drivers and services for running NixOS on Google Cloud, but it also enables Google OS Login by default, which is a GCP-specific SSH key management system that conflicts with clan's sshd service. We disable it with `security.googleOsLogin.enable = lib.mkForce false` so that clan's `authorized_keys` configuration works properly. The lib.mkForce is needed
-  because we're overriding values that the GCP module already sets.
+`google-compute-image.nix` supplies Google Cloud drivers/services but enables Google OS Login, which conflicts with Clan's `sshd`/`authorized_keys`; `lib.mkForce false` overrides the module's value.
 
-Next, open `disko.nix` and add the highlighted lines:
+In `disko.nix`, add the highlighted lines. Changes to this generated configuration wipe and reinstall the machine:
 
 ```nix [disko.nix] {8,14,15,39,48}
 # ---
 # schema = "ext4-single-disk"
 # [placeholders]
-# mainDisk = "/dev/disk/by-id/scsi-0Google_PersistentDisk_persistent-disk-0" 
+# mainDisk = "/dev/disk/by-id/scsi-0Google_PersistentDisk_persistent-disk-0"
 # ---
 # This file was automatically generated!
 # CHANGING this configuration requires wiping and reinstalling the machine
@@ -295,53 +229,45 @@ Next, open `disko.nix` and add the highlighted lines:
 }
 ```
 
-Then return to the root of the clan:
-
 ```bash
 cd ../..
 ```
 
 ## Step 7. Install NixOS
 
-Install NixOS on the target machine by typing:
-
 ```bash
 clan machines install test-machine
 ```
 
-You will be asked whether you want to install — type `y`. You will also be prompted for a password; you can accept the defaults and press Enter.
-
-You will then be asked for a password to assign to the root login for the machine. You can either create one, or let Clan assign a random one.
+Confirm installation with `y`. For the installation password, accept defaults with Enter. For the machine's root-login password, create one or let Clan generate a random one.
 
 ### If you get an error about Sandboxing
-
-If you get an error regarding sandboxing not being available, type the following to disable sandboxing, and then run the above command again:
 
 ```bash
 clan vars generate test-machine --no-sandbox
 ```
 
-## Step 8. Test the Connection
+Then rerun `clan machines install test-machine`.
 
-Now you can try connecting to the remote machine:
+## Step 8. Test the Connection
 
 ```bash
 clan ssh test-machine
 ```
 
-You'll quite likely get an error at first regarding the host identification. It should include a line to type to remove the old ID; paste the line you're shown, which will look similar to this:
+An initial host-identification error may show a command removing the old ID. Paste the displayed command, similar to:
 
 ```text
   ssh-keygen -f '/home/user/.ssh/known_hosts' -R '<IP-ADDRESS>'
 ```
 
-Then try again:
+Retry:
 
 ```bash
 clan ssh test-machine
 ```
 
-You should connect and see the prompt:
+Successful login shows a prompt such as:
 
 ```text
 [root@test-machine:~]#
@@ -349,9 +275,7 @@ You should connect and see the prompt:
 
 ## Practice: Install Some Packages
 
-Now let's look at how you can use Clan to install and remove packages on a target machine.
-
-For this demonstration we'll add three command-line packages: `bat`, `btop`, and `tldr`. In clan.nix, under inventory.instances, add the following lines:
+Under `inventory.instances` in `clan.nix`, add:
 
 ```nix [clan.nix] {2-6}
   inventory.instances = {
@@ -364,13 +288,11 @@ For this demonstration we'll add three command-line packages: `bat`, `btop`, and
   };
 ```
 
-This declares that the three packages will be present on the machine. To install them, type:
-
 ```bash
 clan machines update test-machine
 ```
 
-Now ssh into the machine, and they should be present:
+SSH into the machine and verify:
 
 ```text
 which bat
@@ -378,7 +300,7 @@ which btop
 which tldr
 ```
 
-Each will show a path to the binary file:
+Expected paths:
 
 ```text
 /run/current-system/sw/bin/bat
@@ -386,19 +308,19 @@ Each will show a path to the binary file:
 /run/current-system/sw/bin/tldr
 ```
 
-Next, let's remove one of the three packages. The packages portion of clan.nix declares what additional packages should exist; by removing one, Nix will remove that package. Remove the `"tldr"` from the list:
+To remove `tldr`, change the declaration:
 
 ```text
         packages = [ "bat" "btop" ];
 ```
 
-and run the update again:
+Then update again:
 
 ```bash
 clan machines update test-machine
 ```
 
-Now when you check which `tldr`, it should show that it's not in the path:
+`which tldr` should report it absent:
 
 ```text
 which tldr
@@ -408,11 +330,9 @@ which: no tldr in (/run/wrappers/bin:/root/.nix-profile/bin:/nix/profile/bin:/ro
 
 ## Practice: Configuring Users
 
-When you need to add a new user, you can do so right from within the clan.nix file, and then update the system.
-
 ### Add a New User (no sudo access)
 
-Let's add a user called Alice. Open clan.nix, and under inventory.instances, add the following:
+Under `inventory.instances` in `clan.nix`, add Alice:
 
 ```nix [clan.nix] {2-9}
   inventory.instances = { # Add the following under this line
@@ -426,31 +346,27 @@ Let's add a user called Alice. Open clan.nix, and under inventory.instances, add
     };
 ```
 
-Save the file. Now type the following to add a password for alice (include the no-sandbox if you needed no sandbox earlier):
+Generate Alice's password; include `--no-sandbox` if sandboxing previously required it:
 
 ```bash
 clan vars generate test-machine --no-sandbox
 ```
 
-You will be prompted for a password. Or you can press Enter to automatically generate one.
-
-If you automatically generated one, to retrieve it type:
+Enter a password or press Enter to generate one. Retrieve an automatically generated password with:
 
 ```text
 clan vars get test-machine user-password-alice/user-password
 ```
 
-:::admonition[Note]{type=note}
-On cloud machines, this password will be used for sudo access if you grant it. Typically password login is disabled on a cloud machine.
-:::
+On cloud machines, this password is used for sudo if granted; password login is typically disabled.
 
-Next, let's add a key file so Alice can log in remotely. For this we'll use your own key file as before. Type:
+Get your public key:
 
 ```bash
 cat ~/.ssh/id_ed25519.pub
 ```
 
-Then open `machines/test-machine/configuration.nix`. Add the following, before the closing brace:
+In `machines/test-machine/configuration.nix`, before the closing brace, add the following and replace `PASTE_YOUR_KEY_HERE`:
 
 ```nix [machines/test-machine/configuration.nix] {8-10}
 {
@@ -466,25 +382,18 @@ Then open `machines/test-machine/configuration.nix`. Add the following, before t
 }
 ```
 
-and replace `PASTE_YOUR_KEY_HERE` with the contents of the file.
-
-Now update the machine by typing:
+Update and connect:
 
 ```bash
 clan machines update test-machine
-```
-
-Once complete, you can log in as alice:
-
-```bash
 ssh alice@<IP-ADDRESS>
 ```
 
-replacing `<IP-ADDRESS>` with the Google Cloud server's IP address.
+Replace `<IP-ADDRESS>` with the Google Cloud server IP.
 
 ### Give that user sudo access
 
-After you trust Alice, you can grant her sudo access. To do so, update the clan.nix file by adding her to the wheel group:
+Add Alice to `wheel` in `clan.nix`:
 
 ```nix [clan.nix] {7}
     user-alice = {
@@ -498,38 +407,33 @@ After you trust Alice, you can grant her sudo access. To do so, update the clan.
     };
 ```
 
-Again type:
-
 ```bash
 clan machines update test-machine
 ```
 
-If you were already logged in as alice before running the update, you will need to log out and back in for the change to take.
-
-Then after logged in as alice, try using sudo:
+If already logged in as Alice, log out and back in. Then:
 
 ```bash
 sudo echo "hello"
 ```
 
-You will be prompted for the password and should see "hello" printed.
+Enter the password; `hello` should print.
 
 ### Revoke the sudo access
 
-To revoke alice's sudo access, simply remove the line you added:
+Remove the `groups` line:
 
 ```nix
         groups = [ "wheel" ];
-
 ```
 
-And once again run:
+Update and re-login:
 
 ```bash
 clan machines update test-machine
 ```
 
-Log out, and log alice back in. Now try the same sudo command; you'll be prompted for password, but then shown:
+Log Alice out and back in. The same command now prompts for a password and displays:
 
 ```text
 alice is not in the sudoers file.
