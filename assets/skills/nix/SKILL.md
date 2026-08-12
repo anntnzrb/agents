@@ -29,6 +29,6 @@ Research-first Nix development using **parallel Context7 `docs` queries** for ac
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Repository routing, Context7 queries, topic mapping | `reference.md` | Before selecting documentation sources |
+|Need|Read|When|
+|---|---|---|
+|Repository routing, Context7 queries, topic mapping|`reference.md`|Before selecting documentation sources|
