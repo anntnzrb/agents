@@ -1,16 +1,6 @@
 # Route Safety
 
-Route inspection in this skill is static analysis over local addon/controller source. It is read-only and should stay clearly separate from database inspection.
-
-## Purpose
-
-Use route commands to answer questions like:
-
-- Which controller routes exist in this local Odoo workspace?
-- Which routes are likely to mutate state?
-- Which controller handlers deserve manual review before invoking any endpoint?
-
-This is about **risk visibility**, not route execution.
+Scope: route inspection = read-only static analysis of local addon/controller source; keep it separate from DB inspection. Purpose: risk visibility, not route execution.
 
 ## Commands
 
@@ -20,7 +10,7 @@ List all discovered routes:
 uv run --script <skill-dir>/scripts/cli.py route list --json
 ```
 
-List only routes with heuristic write signals:
+List routes with heuristic write signals:
 
 ```text
 uv run --script <skill-dir>/scripts/cli.py route scan-writes --json
@@ -28,50 +18,36 @@ uv run --script <skill-dir>/scripts/cli.py route scan-writes --json
 
 Use `--json` by default.
 
-## Discovery source
+## Discovery
 
-Route scanning should work from the resolved addon paths for the current runtime backend.
-
-For a Compose runtime, that usually means:
+Scan resolved addon paths for the current runtime backend. Compose paths usually include:
 
 - `<odoo-runtime>/source/<odoo-version>/odoo/addons`
 - `<custom-addons>/addons`
 
-For host runtimes, it means addon paths derived from `odoo.conf`.
-
-The scanner should inspect Python files under addon directories and collect controller methods decorated with `@route`.
+For host runtimes, derive addon paths from `odoo.conf`. Inspect Python files under addon directories and collect controller methods decorated with `@route`.
 
 ## Heuristic write signals
 
-Mark a route as likely mutating when the controller handler name or AST body suggests state changes. Useful signals include:
+Mark a route likely mutating when its handler name or AST body suggests state changes.
 
-### Function names
+Function names:
 
-- `create`
-- `write`
-- `unlink`
-- `copy`
-- `action_*`
-- `button_*`
-- `save`
-- `submit`
-- `confirm`
-- `approve`
-- `assign`
-- `sync`
+- `create`, `write`, `unlink`, `copy`, `action_*`, `button_*`
+- `save`, `submit`, `confirm`, `approve`, `assign`, `sync`
 
-### Body-level signals
+Body signals:
 
-- ORM writes like `.create(...)`, `.write(...)`, `.unlink(...)`, `.copy(...)`
-- direct SQL like `cr.execute(...)`
-- explicit transaction control like `commit` / `rollback`
+- ORM writes: `.create(...)`, `.write(...)`, `.unlink(...)`, `.copy(...)`
+- direct SQL: `cr.execute(...)`
+- transaction control: `commit` / `rollback`
 - helper calls with obviously mutating names
 
-These are **signals**, not proof. A route can look suspicious and still be harmless, or look harmless and still trigger writes indirectly.
+Signals are not proof: suspicious routes may be harmless, and apparently harmless routes may trigger indirect writes.
 
 ## Output contract
 
-Each discovered route should include enough context for review:
+Each discovered route includes enough review context:
 
 - `module`
 - `controller`
@@ -84,47 +60,39 @@ Each discovered route should include enough context for review:
 - `line`
 - `write_signals`
 
-`route list` returns all routes.
+`route list` returns all routes. `route scan-writes` returns only routes with non-empty `write_signals`.
 
-`route scan-writes` returns only those with non-empty `write_signals`.
-
-`parse_errors` should surface files that could not be parsed. That is a warning, not proof that no routes exist there.
+Surface `parse_errors` for files that could not be parsed; this warns about skipped analysis, not proof that no routes exist there.
 
 ## Review flow
-
-Use this order:
 
 1. `uv run --script <skill-dir>/scripts/cli.py env inspect --json`
 2. `uv run --script <skill-dir>/scripts/cli.py route list --json`
 3. `uv run --script <skill-dir>/scripts/cli.py route scan-writes --json`
-4. read the flagged handler source before considering any invocation
+4. Read flagged handler source before considering any invocation.
 
-Do not jump from route discovery straight to conclusions about production safety.
+Do not infer production safety directly from route discovery.
 
-## Boundary with DB inspection
+## DB boundary
 
-Separate these clearly:
+Keep these distinct:
 
-- DB inspection
-- route inspection
-- route invocation
+- DB inspection — current data
+- route inspection — likely code paths
+- route invocation — out of scope unless a future version explicitly adds it
 
-DB inspection answers questions about current data.
-Route inspection answers questions about likely code paths.
-Route invocation is out of scope for this skill unless a future version explicitly adds it.
-
-A route with write signals is not a reason to mutate the database during investigation.
+Write signals do not justify database mutation during investigation.
 
 ## Failure behavior
 
-Good failures:
+Report:
 
 - parser could not read `controllers/foo.py` because of syntax error
 - no routes found under resolved addon paths
 - addon paths resolved but contained no controller modules
 
-Bad failures:
+Never:
 
-- silently ignoring parse errors
-- claiming no risky routes exist when files were skipped
-- presenting heuristics as certainty
+- silently ignore parse errors
+- claim no risky routes exist when files were skipped
+- present heuristics as certainty

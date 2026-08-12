@@ -1,23 +1,15 @@
 # Output Contracts
 
-The CLI is JSON-first with text fallback.
+CLI JSON-first; text fallback. MUST use `--json` for tool/agent consumers; text only for quick human inspection. Outputs command-shaped, not generic envelopes.
 
-Use `--json` whenever another tool or agent will consume the result. Text output is for quick human inspection only.
+## Core
 
-## Core conventions
+- Success: command-specific data only.
+- Expected absence: explicit `null`, empty lists, or empty counts.
+- Errors: actionable, secret-free.
+- NEVER emit raw secret values from `odoo.conf`, `.env`, or environment.
 
-Current command output is command-shaped, not wrapped in a generic envelope.
-
-Principles:
-
-- successful commands return only the data needed for that command
-- expected absences stay explicit as `null`, empty lists, or empty counts
-- errors are actionable and do not leak secrets
-- secret values from `odoo.conf`, `.env`, or environment are never emitted raw
-
-## Error shape
-
-Failures are machine-readable enough for agent use.
+## Errors
 
 ```json
 {
@@ -29,28 +21,13 @@ Failures are machine-readable enough for agent use.
 }
 ```
 
-Notes:
+`error` always primary message; `checked` appears when executable/path/runtime discovery matters; failure exits non-zero. Read-only SQL rejection also uses `error`.
 
-- `error` is always the primary message
-- `checked` appears when executable/path/runtime discovery matters
-- command exits non-zero on failure
-- read-only SQL rejection also uses the same `error` field
-
-## Success shapes by command family
+## Success contracts
 
 ### `env inspect`
 
-Top-level keys:
-
-- `runtime`
-- `root`
-- `config_path`
-- `config`
-- `addons_paths`
-- `effective_db_name`
-- `psql`
-
-Compose example:
+Top-level keys: `runtime`, `root`, `config_path`, `config`, `addons_paths`, `effective_db_name`, `psql`.
 
 ```json
 {
@@ -83,105 +60,41 @@ Compose example:
 }
 ```
 
-Host-runtime output has the same shape but `runtime.backend` is `windows-host` and `psql.path` is a host executable.
-
-`config` and runtime env are redacted automatically for secret-like keys.
+Host-runtime: same shape, but `runtime.backend: windows-host`; `psql.path` is host executable. `config` and runtime env automatically redact secret-like keys.
 
 ### `addons list`
 
-Top-level keys:
-
-- `count`
-- `modules`
-
-Each entry currently includes:
-
-- `module`
-- `path`
-- `addons_dir`
+Top-level: `count`, `modules`. Each entry: `module`, `path`, `addons_dir`.
 
 ### `addons manifest <module>`
 
-Top-level keys:
-
-- `module`
-- `path`
-- `manifest`
-
-`manifest` is literal manifest data parsed from `__manifest__.py`. Treat it as filesystem metadata, not proof of install state.
+Top-level: `module`, `path`, `manifest`. `manifest` is literal data parsed from `__manifest__.py`; treat as filesystem metadata, not install-state proof.
 
 ### `module status|models|tables|m2m|fks`
 
-Current DB-backed commands return the PostgreSQL helper payload directly, or a small module wrapper plus DB rows.
+DB-backed commands return the PostgreSQL helper payload directly, or a small module wrapper plus DB rows. Common payload: `database`, `runtime`, `rows`, `row_count`, `psql`, `checked`, `stdout`.
 
-Common DB payload keys:
+- `rows`: canonical parsed result.
+- `row_count`: parsed CSV row count.
+- `psql`: host executable or Compose service path.
+- `checked`: discovery attempts.
+- `stdout`: raw CSV traceability, not main contract.
 
-- `database`
-- `runtime`
-- `rows`
-- `row_count`
-- `psql`
-- `checked`
-- `stdout`
-
-Notes:
-
-- `rows` is canonical parsed result
-- `row_count` reflects parsed CSV rows
-- `psql` reports host executable or Compose service path
-- `checked` shows discovery attempts
-- `stdout` is raw CSV traceability, not the main contract
-
-`module status` additionally includes:
-
-- `module`
-- `path`
-- `manifest_version`
-- `depends`
+`module status` additionally: `module`, `path`, `manifest_version`, `depends`.
 
 ### `db summary|top-tables|top-rows|orphan-tables`
 
-These commands return the DB payload shape:
-
-- `database`
-- `runtime`
-- `rows`
-- `row_count`
-- `psql`
-- `checked`
-- `stdout`
-
-Treat `rows` as authoritative.
+Payload: `database`, `runtime`, `rows`, `row_count`, `psql`, `checked`, `stdout`. `rows` authoritative.
 
 ### `db clone`
 
-The command is dry-run by default. Its success payload includes:
+Dry-run by default. Success payload: `operation: db.clone`, `status: dry-run|cloned`, `source_database`, `target_database`, `admin_database`, `destructive`, `target_exists`, `replace_requested`, `preflight`.
 
-- `operation`: `db.clone`
-- `status`: `dry-run` or `cloned`
-- `source_database`
-- `target_database`
-- `admin_database`
-- `destructive`
-- `target_exists`
-- `replace_requested`
-- `preflight`
-
-Successful writes additionally include `replaced`, `postflight`, and `checked`.
-`preflight` and `postflight` report existence and active connection counts for
-both source and target. The command never returns a success status without a
-postflight target-exists check.
+Successful writes additionally include `replaced`, `postflight`, `checked`. `preflight` and `postflight` report existence and active connection counts for both source and target. NEVER return success without a postflight target-exists check.
 
 ### `db query --read-only`
 
-Current success shape:
-
-- `database`
-- `runtime`
-- `row_count`
-- `rows`
-
-Current failure shape for blocked SQL:
+Success: `database`, `runtime`, `row_count`, `rows`.
 
 ```json
 {
@@ -189,78 +102,39 @@ Current failure shape for blocked SQL:
 }
 ```
 
-Rules:
-
-- `--read-only` is required
-- exactly one of `--sql-file` or `--sql-stdin` is required
-- raw SQL text is not echoed back by default
+Rules: `--read-only` required; exactly one of `--sql-file` or `--sql-stdin` required; raw SQL not echoed by default.
 
 ### `workflow run`
 
-Workflow execution is foreground text output, not a JSON command. It requires
-`--profile`, `--workflow`, `--mode test|test-dev`, and `--allow-write`.
+Foreground text, not JSON. Requires `--profile`, `--workflow`, `--mode test|test-dev`, `--allow-write`.
 
-- The named profile owns the target database; a mismatching `--db` is rejected
-- The controller reports the resolved runtime, ensures the Compose `db` service
-  is running, then runs Odoo in a disposable named container.
-- A runtime/database-scoped lock makes a second invocation for the same
-  database fail fast. Workflows with different profile databases may run
-  concurrently.
-- Recovery removes only stale containers owned by that same runtime/database
-  scope. Normal execution uses `--rm` and additionally removes its exact
-  container before returning.
-- `test-dev` runs the test phase first, then keeps the dev server and database
-  lock in the foreground with service ports exposed.
+- Named profile owns target database; mismatching `--db` rejected.
+- Controller reports resolved runtime, ensures Compose `db` service is running, then runs Odoo in a disposable named container.
+- Runtime/database-scoped lock: second invocation for same database fails fast; different profile databases may run concurrently.
+- Recovery removes only stale containers owned by that runtime/database scope. Normal execution uses `--rm` and additionally removes its exact container before return.
+- `test-dev`: test phase first; then dev server and database lock remain foregrounded with service ports exposed.
+- Container isolation does not reset profile database; module initialization/upgrade and Odoo tests may mutate it.
 
-Container isolation does not reset the profile database: module
-initialization/upgrade and Odoo tests may mutate it.
+### `route list` / `route scan-writes`
 
-### `route list` and `route scan-writes`
+Top-level: `count`, `routes`, `parse_errors`. Each route: `module`, `controller`, `function`, `paths`, `methods`, `auth`, `route_type`, `source`, `line`, `write_signals`.
 
-Top-level keys:
-
-- `count`
-- `routes`
-- `parse_errors`
-
-Each route entry currently includes:
-
-- `module`
-- `controller`
-- `function`
-- `paths`
-- `methods`
-- `auth`
-- `route_type`
-- `source`
-- `line`
-- `write_signals`
-
-Interpretation:
-
-- `route list` returns all detected controller routes
-- `route scan-writes` returns only routes with heuristic write signals
-- `parse_errors` records files static analysis could not parse; these are warnings, not proof no routes exist there
+- `route list`: all detected controller routes.
+- `route scan-writes`: only routes with heuristic write signals.
+- `parse_errors`: files static analysis could not parse; warnings, not proof that no routes exist there.
 
 ## Text output
 
-Text output mirrors same facts with compact indentation. Do not build downstream parsing around text mode when `--json` is available.
+Mirrors the same facts with compact indentation. Do not build downstream parsing on text when `--json` is available.
 
-## Missing-data conventions
+## Missing data
 
-Normal absences:
+Normal absences: `db_name = False` in `odoo.conf`; zero matching module rows; no controller routes in a module/addon root; empty `parse_errors` or `routes`.
 
-- `db_name = False` in `odoo.conf`
-- zero matching module rows
-- no controller routes in a module or addon root
-- empty `parse_errors` or empty `routes`
+Hard failures reserved for missing workspace/config, unreadable files, unresolved DB execution paths, or invalid SQL input.
 
-Reserve hard failures for missing workspace/config, unreadable files, unresolved DB execution paths, or invalid SQL input.
+## Safety
 
-## Safety signals in output
-
-The CLI should make safety posture visible through command names and returned fields:
-
-- `db query` only succeeds in explicit read-only mode
-- route scanning is static analysis, not route invocation
-- future write-capable commands must expose opt-in state clearly instead of resembling read-only flows
+- `db query` succeeds only in explicit read-only mode.
+- Route scanning is static analysis, not route invocation.
+- Future write-capable commands MUST expose opt-in state clearly, not resemble read-only flows.

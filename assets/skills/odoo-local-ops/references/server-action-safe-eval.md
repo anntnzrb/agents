@@ -1,90 +1,50 @@
 # Odoo Server Action safe_eval reference
 
 Sources:
-
 - Odoo docs `https://www.odoo.com/documentation/17.0/developer/reference/backend/actions.html`
 - Odoo docs `https://www.odoo.com/documentation/17.0/applications/studio/automated_actions.html`
-- Local source `<odoo-source>/odoo/addons/base/models/ir_actions.py`, anchors `_run_action_code_multi` and `_get_eval_context`
-- Odoo 17 upstream `odoo/tools/safe_eval.py`, especially `_SAFE_OPCODES` and `_BUILTINS`
+- Local `<odoo-source>/odoo/addons/base/models/ir_actions.py`: `_run_action_code_multi`, `_get_eval_context`
+- Odoo 17 upstream `odoo/tools/safe_eval.py`: `_SAFE_OPCODES`, `_BUILTINS`
 
-## Known production runtime profile
+## Production profile
 
-The audited production deployment uses Odoo 17 on Python 3.10. Treat that as a
-deployment fact, not a universal Odoo 17 guarantee. Re-run the capability audit
-after changing the Odoo image or Python runtime.
+Audited deployment: Odoo 17 + Python 3.10. Deployment fact, not universal Odoo 17 guarantee; re-audit after changing Odoo image or Python runtime.
 
-The production gauntlet completed 43/43 checks with `write_executed: false` on
-`crm.lead`. This confirmed actual execution—not merely opcode compatibility—of
-function annotations, an import-free decorator without closure, positional-only
-and keyword-only arguments, generator functions and expressions, list/dict/set
-comprehensions, `map`, `filter`, `reduce`, a higher-order pipeline, literal
-`match`, simple walrus, dict merge, self-documenting f-strings, ordered set-backed
-deduplication, Odoo recordset operations, `search_count`, and `read_group`.
+Production gauntlet: 43/43 checks, `write_executed: false`, model `crm.lead`. This confirmed execution, not merely opcode compatibility, of: function annotations; import-free decorator without closure; positional-only and keyword-only arguments; generator functions/expressions; list/dict/set comprehensions; `map`, `filter`, `reduce`; higher-order pipeline; literal `match`; simple walrus; dict merge; self-documenting f-strings; ordered set-backed deduplication; Odoo recordset operations; `search_count`; `read_group`.
 
-Python syntax support has two gates:
+Syntax requires both: (1) Python 3.10 compilation; (2) every generated opcode, including nested functions, comprehensions, lambdas, and generators, in Odoo `_SAFE_OPCODES`.
 
-1. The construct must compile on Python 3.10
-2. Every generated opcode, including opcodes inside nested functions,
-   comprehensions, lambdas, and generators, must be in Odoo's `_SAFE_OPCODES`.
-
-An installed Python package is not automatically usable. Imports are blocked;
-only names explicitly injected by Odoo or included in its restricted built-ins
-are visible to the Server Action.
+Installed packages are not automatically usable: imports blocked; Server Actions see only Odoo-injected names and restricted built-ins.
 
 ## Available names
 
-- `env`
-- `model`
-- `record`
-- `records`
-- `time`
-- `datetime`
-- `dateutil`
-- `timezone`
-- `float_compare`
-- `log`
-- `_logger`
-- `UserError`
-- `Command`
-- `uid`
-- `user`
-- `b64encode`
-- `b64decode`
+`env`, `model`, `record`, `records`, `time`, `datetime`, `dateutil`, `timezone`, `float_compare`, `log`, `_logger`, `UserError`, `Command`, `uid`, `user`, `b64encode`, `b64decode`.
 
-Restricted functional built-ins confirmed in production include `map`,
-`filter`, `reduce`, `sorted`, `zip`, `enumerate`, `sum`, `min`, `max`, `all`,
-`any`, `set`, and `range`. `reduce` is injected directly; the `functools` and
-`itertools` modules are not importable.
+Production-confirmed restricted functional built-ins: `map`, `filter`, `reduce`, `sorted`, `zip`, `enumerate`, `sum`, `min`, `max`, `all`, `any`, `set`, `range`. `reduce` injected directly; `functools` and `itertools` not importable.
 
-## Python 3.10 idioms under safe_eval
+## Python 3.10 under safe_eval
 
-| Construct | Status | Guidance |
-| --- | --- | --- |
-| Small local helper without closure | supported | Prefer named pure helpers for repeated transformations. |
-| Function parameter/return annotations using visible built-ins | production-confirmed | Use sparingly for helper contracts; no static checker runs in the UI. |
-| Variable annotation | forbidden | Emits `SETUP_ANNOTATIONS`. |
-| List/dict/set comprehension | production-confirmed | Keep it single-purpose and bounded. |
-| Generator function/expression | production-confirmed | Useful with `sum`, `all`, or `any`; never hide ORM queries inside it. |
-| `map` / `filter` / `reduce` | production-confirmed | Prefer a comprehension, `sum`, or an explicit loop when clearer. Always give `reduce` an initializer. |
-| Ordered deduplication with `set` + `list` | production-confirmed | Use a set for O(1) membership and a list to preserve order. |
-| Import-free decorator without closure | production-confirmed | Useful only for a real local contract; imported and closure-producing decorators remain unavailable. |
-| Simple walrus expression | production-confirmed | Use only when it removes duplicate work without obscuring control flow. |
-| Walrus inside a comprehension at module scope | forbidden | Can emit blacklisted `STORE_GLOBAL`. |
-| Dict merge `left | right` | production-confirmed | Use for small copy-on-write dictionaries, not record mutation. |
-| Self-documenting f-string | production-confirmed | Useful for diagnostics, but compact JSON remains the audit output contract. |
-| `match` against scalar literals plus wildcard | production-confirmed | Use only when it is clearer than an `if/elif` chain. |
-| Sequence, mapping, or class structural patterns | forbidden | Emit unsupported `MATCH_*`/`GET_LEN` opcodes. |
-| Closure capturing an outer local | forbidden | Emits unsupported `LOAD_CLOSURE`/`LOAD_DEREF`; pass values explicitly instead. |
-| Specific `try/except` | supported | Catch only errors the snippet can handle; never convert an unknown failure into `ok`. |
-| `with` statement | forbidden in the audited allowlist | Do not build transaction/context-manager patterns inside snippets. |
+- Small local helper without closure — supported; prefer named pure helpers for repeated transformations.
+- Function parameter/return annotations using visible built-ins — production-confirmed; use sparingly for helper contracts; UI has no static checker.
+- Variable annotation — forbidden; emits `SETUP_ANNOTATIONS`.
+- List/dict/set comprehension — production-confirmed; single-purpose and bounded.
+- Generator function/expression — production-confirmed; useful with `sum`, `all`, `any`; NEVER hide ORM queries inside.
+- `map`/`filter`/`reduce` — production-confirmed; prefer comprehension, `sum`, or clearer explicit loop; `reduce` MUST have initializer.
+- Ordered deduplication with `set` + `list` — production-confirmed; set gives O(1) membership, list preserves order.
+- Import-free decorator without closure — production-confirmed; only for a real local contract; imported and closure-producing decorators unavailable.
+- Simple walrus — production-confirmed; use only when it removes duplicate work without obscuring control flow.
+- Walrus in module-scope comprehension — forbidden; may emit blacklisted `STORE_GLOBAL`.
+- Dict merge `left|right` — production-confirmed; small copy-on-write dictionaries, not record mutation.
+- Self-documenting f-string — production-confirmed; useful for diagnostics, but compact JSON remains audit-output contract.
+- `match` on scalar literals plus wildcard — production-confirmed; use only when clearer than `if/elif`.
+- Sequence, mapping, or class structural patterns — forbidden; emit unsupported `MATCH_*`/`GET_LEN` opcodes.
+- Closure capturing outer local — forbidden; emits unsupported `LOAD_CLOSURE`/`LOAD_DEREF`; pass values explicitly.
+- Specific `try/except` — supported; catch only errors the snippet can handle; NEVER turn unknown failure into `ok`.
+- `with` — forbidden in audited allowlist; do not build transaction/context-manager patterns inside snippets.
 
-Functional-first does not mean abstraction-first. Keep selection, ORM reads,
-writes, logging, and action return in an explicit imperative shell; use pure
-helpers or bounded comprehensions only for in-memory transformations. For ORM
-data, prefer vectorized recordset methods, `search_count`, and `read_group` over
-Python-level iteration.
+Functional-first ≠ abstraction-first. Keep selection, ORM reads, writes, logging, and action return in an explicit imperative shell; use pure helpers/bounded comprehensions only for in-memory transformations. For ORM data, prefer vectorized recordset methods, `search_count`, and `read_group` over Python-level iteration.
 
-Use literal `match` only for genuine scalar dispatch:
+Literal `match` only for genuine scalar dispatch:
 
 ```python
 match OUTPUT_MODE:
@@ -96,27 +56,26 @@ match OUTPUT_MODE:
         raise UserError('unsupported_output_mode')
 ```
 
-Do not rewrite a two-branch boolean check as `match`; that is modern-looking
-ceremony, not an improvement.
+Do not turn a two-branch boolean check into `match`; modern-looking ceremony is not an improvement.
 
-`record` and `records` may be `None`/empty unless context has matching `active_model` and `active_id(s)`. Global audit snippets must use `env['model.name']` explicitly.
+`record`/`records` may be `None`/empty unless context has matching `active_model` and `active_id(s)`. Global audit snippets MUST use `env['model.name']` explicitly.
 
-Odoo captures result via the `action` variable. Local source `_run_action_code_multi` uses `safe_eval(..., mode='exec', nocopy=True)` then `return eval_context.get('action')`. Server Action snippets assign `action = {...}` and do not use `return`.
+Odoo captures result through `action`: local `_run_action_code_multi` calls `safe_eval(..., mode='exec', nocopy=True)` then `return eval_context.get('action')`. Server Action snippets assign `action = {...}`; they do not use `return`.
 
-`log()` writes to `ir_logging` using an insert; strict read-only audits should avoid it and return JSON in `UserError` instead. `_logger.info()` writes server logs and is not the main audit output.
+`log()` inserts into `ir_logging`; strict read-only audits should avoid it and return JSON in `UserError` instead. `_logger.info()` writes server logs, not the main audit output.
 
-## Forbidden or avoided patterns
+## Forbidden or avoided
 
 - no `import json`
 - no `from odoo.exceptions import UserError`
-- no dunder access such as `record.__dict__`
+- no dunder access, e.g. `record.__dict__`
 - no direct field assignment `record.field = value`; use `record.write({'field': value})`
 - no `env.cr.commit()`/`rollback()`
 - no `sudo()` by default
 - no structural `match` patterns, closures, or context-manager syntax
 
-## Success and failure semantics
+## Success/failure semantics
 
-- Read-only audit can `raise UserError(payload_json)` because no writes should commit
-- Write success must set `action = {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {'type': 'success', 'title': '...', 'message': payload, 'sticky': True}}`
-- Write failure must `raise UserError(payload_json)` to abort and rollback
+- Read-only audit can `raise UserError(payload_json)`; no writes should commit.
+- Write success MUST set `action = {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {'type': 'success', 'title': '...', 'message': payload, 'sticky': True}}`.
+- Write failure MUST `raise UserError(payload_json)` to abort and rollback.
