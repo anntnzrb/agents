@@ -53,9 +53,9 @@ mcporter --config <agent-config-root>/assets/mcporter.jsonc call 'effect.effect-
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Dated broad tool/package inventory or exact-schema fallback | `references/mcporter-tools.md` | ONLY for broad comparison/package coverage, or when live discovery fails; NEVER before a targeted live schema |
+|Need|Read|When|
+|---|---|---|
+|Dated broad tool/package inventory or exact-schema fallback|`references/mcporter-tools.md`|ONLY for broad comparison/package coverage, or when live discovery fails; NEVER before a targeted live schema|
 
 ## Version safety
 
