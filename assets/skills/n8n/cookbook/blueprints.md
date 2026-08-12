@@ -1,15 +1,10 @@
 # n8n Blueprint Cookbook
 
-End-to-end flow: natural language → workflow JSON → apply → enable MCP →
-discover the live catalog → run a discovered tool.
-
----
+NL → workflow JSON → apply → enable MCP → discover live catalog → run discovered tool.
 
 ## NL to JSON to MCP Run
 
-**Problem**: Start from a plain-English request and end with a runnable MCP workflow.
-
-**Solution**:
+Plain-English request → runnable MCP workflow:
 
 ```bash
 # 1) Export or create a JSON blueprint (by hand or with agent help)
@@ -34,16 +29,11 @@ mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --schema --
 mcporter --config <agent-config-root>/assets/mcporter.jsonc call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
 ```
 
-**Tip**: MUST read `../references/mcporter.md` before step 4. Workflow enablement
-MUST NOT imply any tool name or schema.
-
----
+Before step 4, MUST read `../references/mcporter.md`. Workflow enablement MUST NOT imply any tool name or schema.
 
 ## Safe Iteration Loop
 
-**Problem**: Keep updating a workflow without breaking MCP access.
-
-**Solution**:
+Update a workflow without breaking MCP access:
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py export <WORKFLOW_ID> <WORKFLOW.json>
@@ -53,4 +43,4 @@ uv run --script <skill-dir>/scripts/cli.py mcp-enable <WORKFLOW_ID>
 uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
 ```
 
-**Tip**: MUST re-apply `mcp-enable` after major edits to preserve `availableInMCP`.
+After major edits, MUST re-apply `mcp-enable` to preserve `availableInMCP`.
