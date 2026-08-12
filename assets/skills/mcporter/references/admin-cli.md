@@ -1,278 +1,146 @@
-# MCPorter admin and generation CLI reference
+# MCPorter admin/generation CLI
 
-Snapshot: MCPorter 0.12.3, captured 2026-07-16 from live `--help` output.
-
-- Agents MUST read this reference before administrative commands
-- Live help MUST override this snapshot when different
+Snapshot: 0.12.3; live `--help` captured 2026-07-16. Agents MUST read this reference before administrative commands; live help overrides this snapshot.
 
 ```text
 mcporter <command> --help
 mcporter config <subcommand> --help
 ```
 
-- Agents MUST NOT probe `daemon <action> --help` in 0.12.3
-- Agents MUST use `mcporter daemon --help` instead
+0.12.3: Agents MUST NOT probe `mcporter daemon <action> --help`; use `mcporter daemon --help`.
 
-## Select a command
+## Command selection
 
-| Intent | Command |
+|Intent|Command|
 |---|---|
-| Generate a standalone CLI | `generate-cli` |
-| Inspect generated CLI metadata | `inspect-cli` |
-| Emit TypeScript types or a client | `emit-ts` |
-| Inspect or mutate server configuration | `config` |
-| Manage keep-alive processes | `daemon` |
-| Expose daemon-managed servers as one MCP server | `serve` |
+|Standalone CLI|`generate-cli`|
+|Generated-CLI metadata|`inspect-cli`|
+|TypeScript types/client|`emit-ts`|
+|Server config inspect/mutation|`config`|
+|Keep-alive process management|`daemon`|
+|One MCP server over daemon-managed servers|`serve`|
 
-Agents MUST read `references/core-cli.md` before core commands.
+Agents MUST read `references/core-cli.md` before core commands and authentication.
 
-## `generate-cli`
+## generate-cli
 
 ```text
 mcporter generate-cli [server | command | url] [flags]
 ```
 
-Target selection:
+Targets: `<server>` configured server; `<command|url>` infer an inline stdio/HTTP server; `--server <name|json>` server name, HTTP URL, or JSON definition; `--command <value>` inline stdio command or HTTP URL; `--from <artifact>` regenerate from an existing generated CLI.
 
-| Form | Meaning |
-|---|---|
-| `<server>` | Configured server. |
-| `<command\|url>` | Infer an inline stdio or HTTP server. |
-| `--server <name\|json>` | Server name, HTTP URL, or JSON definition. |
-| `--command <value>` | Inline stdio command or HTTP URL. |
-| `--from <artifact>` | Regenerate from an existing generated CLI. |
+Flags: `--output <path>` TypeScript template; `--bundle [path]` bundled JavaScript (optional path); `--compile [path]` Bun-compiled binary (optional path); `--runtime node|bun` generated-code runtime; `--bundler rolldown|bun` JavaScript bundler; `--timeout <ms>` discovery/call timeout; `--minify`/`--no-minify` bundle minification; `--include-tools a,b` only listed tools; `--exclude-tools a,b` omit listed tools; `--dry-run` with `--from`, print regeneration command.
 
-Flags:
+MUST select exactly one target form. Included/excluded tools MUST originate from discovery. `--output`, `--bundle`, and `--compile` write artifacts. `--dry-run` prints a regeneration command only with `--from`.
 
-| Flag | Meaning |
-|---|---|
-| `--output <path>` | Write the TypeScript template. |
-| `--bundle [path]` | Emit bundled JavaScript; path is optional. |
-| `--compile [path]` | Emit a Bun-compiled binary; path is optional. |
-| `--runtime node\|bun` | Runtime for generated code. |
-| `--bundler rolldown\|bun` | Bundler for JavaScript output. |
-| `--timeout <ms>` | Discovery and call timeout. |
-| `--minify` / `--no-minify` | Enable or disable bundle minification. |
-| `--include-tools a,b` | Generate only the comma-separated tools. |
-| `--exclude-tools a,b` | Omit the comma-separated tools. |
-| `--dry-run` | With `--from`, print the regeneration command. |
-
-- Agents MUST select exactly one target form
-- Included or excluded tools MUST originate from discovery
-
-`--output`, `--bundle`, and `--compile` write artifacts. `--dry-run` only prints a regeneration command when used with `--from`.
-
-## `inspect-cli`
+## inspect-cli
 
 ```text
 mcporter inspect-cli <artifact> [flags]
 ```
 
-| Flag | Meaning |
-|---|---|
-| `--json` | Print embedded metadata as JSON. |
-| `--format text\|json` | Choose output format. |
+`--json` embedded metadata as JSON; `--format text|json` output format. SHOULD inspect metadata before replacing generated artifacts.
 
-Agents SHOULD inspect metadata before replacing generated artifacts.
-
-## `emit-ts`
+## emit-ts
 
 ```text
 mcporter emit-ts <server> --out <file> [flags]
 ```
 
-| Flag | Meaning |
-|---|---|
-| `--mode types\|client` | Emit declarations only or a client plus declarations. |
-| `--out <path>` | Required primary `.ts` or `.d.ts` output. |
-| `--types-out <path>` | Declaration output path for `--mode client`. |
-| `--include-optional` | Include optional schema fields in signatures. |
-| `--json` | Print a JSON summary. |
+`--mode types|client` declarations only or client plus declarations; `--out <path>` required primary `.ts`/`.d.ts`; `--types-out <path>` declaration path with `--mode client`; `--include-optional` optional schema fields in signatures; `--json` JSON summary. Tool input schemas drive generated signatures. Generated types MUST NOT imply unpublished response fields.
 
-Tool input schemas drive generated signatures.
-
-Generated types MUST NOT imply unpublished response fields.
-
-## `config`
+## config
 
 ```text
 mcporter config <command> [options]
 ```
 
-| Intent | Subcommand |
-|---|---|
-| Show merged local/imported servers | `list` |
-| Inspect one server definition | `get` |
-| Add a local server definition | `add` |
-| Delete a local definition | `remove` |
-| Inspect or copy editor/tool imports | `import` |
-| Run auth | `login` |
-| Delete cached OAuth credentials | `logout` |
-| Validate config and token-cache prerequisites | `doctor` |
+`list` merged local/imported servers; `get` one server definition; `add` local definition; `remove` local definition; `import` inspect/copy editor/tool imports; `login` auth; `logout` delete cached OAuth credentials; `doctor` validate config/token-cache prerequisites.
 
-- Agents MUST inspect with `list`, `get`, and `doctor` first
-- Config additions MUST use `add --dry-run` before writing
-- Config mutations MUST have explicit task authorization
+MUST inspect with `list`, `get`, and `doctor` first. Config additions MUST use `add --dry-run` before writing. Config mutations MUST have explicit task authorization.
 
-### `config list`
+### config list
 
 ```text
 mcporter config list [options] [filter]
 ```
 
-| Flag/argument | Meaning |
-|---|---|
-| `--json` | Emit JSON instead of ANSI text. |
-| `--source local\|import` | Restrict to local definitions or imported entries. |
-| `[filter]` | Positional substring match against server names. |
+`--json` JSON instead of ANSI text; `--source local|import` restrict to local definitions or imported entries; `[filter]` positional substring match on server names.
 
-### `config get`
+### config get
 
 ```text
 mcporter config get <name> [--json]
 ```
 
-This shows transport, headers, and environment overrides. `--json` emits the entry as JSON.
+Shows transport, headers, and environment overrides; `--json` emits JSON. Secrets and resolved substitutions MUST be redacted.
 
-Secrets and resolved substitutions MUST be redacted from output.
-
-### `config add`
+### config add
 
 ```text
 mcporter config add [options] <name> [target]
 ```
 
-Target and transport flags:
+Transport/target flags: `--url <https-url>` HTTP/S base URL and implies HTTP transport; `--command <binary>` stdio executable and implies stdio transport; `--stdio <binary>` alias for `--command`; `--transport http|sse|stdio` force/validate transport; repeatable `--arg <value>` append stdio argument; `--` forward all remaining tokens as stdio arguments.
 
-| Flag | Meaning |
-|---|---|
-| `--url <https-url>` | Set HTTP/S base URL and imply HTTP transport. |
-| `--command <binary>` | Set stdio executable and imply stdio transport. |
-| `--stdio <binary>` | Alias for `--command`. |
-| `--transport http\|sse\|stdio` | Force and validate a transport. |
-| `--arg <value>` | Append a stdio argument; repeatable. |
-| `--` | Forward every remaining token as a stdio argument. |
+Definition flags: `--description <text>` summary; repeatable `--env KEY=value` environment entry; repeatable `--header KEY=value` HTTP header; `--token-cache-dir <path>` OAuth token persistence directory; `--client-name <name>` OAuth client identifier; `--oauth-client-id <id>` preregistered OAuth client ID; `--oauth-client-secret-env <env>` client secret environment variable; `--oauth-token-endpoint-auth-method <method>` token auth method, e.g. `client_secret_post`; `--oauth-redirect-url <url>` custom redirect URL; `--auth <strategy>` force auth type, e.g. `oauth`; `--copy-from <import:name>` seed from imported definition.
 
-Definition flags:
+Persistence flags: `--persist <config-path>` alternate MCPorter config; `--scope home|project` config scope, default `project`; `--dry-run` print proposed entry without writing.
 
-| Flag | Meaning |
-|---|---|
-| `--description <text>` | Human-readable summary. |
-| `--env KEY=value` | Environment entry; repeatable. |
-| `--header KEY=value` | HTTP header; repeatable. |
-| `--token-cache-dir <path>` | Override OAuth token persistence directory. |
-| `--client-name <name>` | Customize OAuth client identifier. |
-| `--oauth-client-id <id>` | Use a preregistered OAuth client ID. |
-| `--oauth-client-secret-env <env>` | Read client secret from an environment variable. |
-| `--oauth-token-endpoint-auth-method <method>` | Set token auth method, such as `client_secret_post`. |
-| `--oauth-redirect-url <url>` | Set a custom redirect URL. |
-| `--auth <strategy>` | Force auth type, such as `oauth`. |
-| `--copy-from <import:name>` | Seed from an imported definition. |
+Secrets SHOULD use environment-variable references. Secret values MUST NOT enter arguments or committed config.
 
-Persistence flags:
-
-| Flag | Meaning |
-|---|---|
-| `--persist <config-path>` | Write to an alternate MCPorter config. |
-| `--scope home\|project` | Select home or project config; default `project`. |
-| `--dry-run` | Print the proposed entry without writing. |
-
-- Secrets SHOULD use environment-variable references
-- Secret values MUST NOT enter arguments or committed config
-
-### `config remove`
+### config remove
 
 ```text
 mcporter config remove <name>
 ```
 
-Deletes the named definition from the active MCPorter config.
+Deletes the named definition from the active MCPorter config. MUST verify definition and active scope first.
 
-Agents MUST verify the definition and active scope first.
-
-### `config import`
+### config import
 
 ```text
 mcporter config import <kind> [options]
 ```
 
-Supported imports include Cursor, Claude, Codex, and other import kinds recognized by the installed version.
+Imports include Cursor, Claude, Codex, and other kinds recognized by the installed version. `--path <file>` read a specific import config; `--filter <substring>` filter names before listing/copying; `--copy` write filtered entries to local config; `--json` JSON instead of text. Read-only inspections MUST omit `--copy`; import kinds MUST come from CLI or existing config.
 
-| Flag | Meaning |
-|---|---|
-| `--path <file>` | Read a specific import config file. |
-| `--filter <substring>` | Filter names before listing or copying. |
-| `--copy` | Write filtered entries into local config. |
-| `--json` | Emit JSON instead of text. |
-
-- Read-only inspections MUST omit `--copy`
-- Import kinds MUST come from CLI or existing config
-
-### `config login` and `logout`
+### config login/logout
 
 ```text
 mcporter config login <name|url> [options]
 mcporter config logout <name>
 ```
 
-`login` delegates to `mcporter auth`, including its ephemeral/ad-hoc flags, `--reset`, `--no-browser`, and `--browser none`. `MCPORTER_OAUTH_NO_BROWSER=1`, `true`, or `yes` supplies the no-browser default.
+`login` delegates to `mcporter auth`, including ephemeral/ad-hoc flags, `--reset`, `--no-browser`, and `--browser none`. `MCPORTER_OAUTH_NO_BROWSER=1`, `true`, or `yes` supplies the no-browser default. `logout` deletes the OAuth-enabled server's token-cache directory. Both mutate credential state.
 
-Agents MUST read `references/core-cli.md` before authentication.
-
-`logout` deletes the token cache directory for the OAuth-enabled server. Both commands mutate credential state.
-
-### `config doctor`
+### config doctor
 
 ```text
 mcporter config doctor
 ```
 
-Validates config files, warns about missing token caches, and prints config locations.
+Validates config files, warns about missing token caches, and prints config locations. SHOULD be preferred for read-only prerequisite checks.
 
-Agents SHOULD prefer `doctor` for read-only prerequisite checks.
-
-## `daemon`
+## daemon
 
 ```text
 mcporter daemon <start|status|stop|restart>
 ```
 
-| Action | Effect |
-|---|---|
-| `start` | Start the keep-alive daemon and auto-detect keep-alive servers. |
-| `status` | Report daemon and active-server state. |
-| `stop` | Shut down the daemon and all managed servers. |
-| `restart` | Stop any running daemon and start a fresh instance. |
+`start` starts the keep-alive daemon and auto-detects keep-alive servers; `status` reports daemon/active-server state; `stop` shuts down daemon and all managed servers; `restart` stops any running daemon and starts a fresh instance.
 
-Parent-level flags reported by `mcporter daemon --help`:
+Parent flags from `mcporter daemon --help`: `--foreground` current-process debugging; `--log` daemon logging in MCPorter's state directory; `--log-file <path>` daemon stdout/stderr file; `--log-servers <csv>` calls only for listed servers, implies `--log`.
 
-| Flag | Meaning |
-|---|---|
-| `--foreground` | Run in the current process for debugging. |
-| `--log` | Enable daemon logging in MCPorter's state directory. |
-| `--log-file <path>` | Write daemon stdout/stderr to a specific file. |
-| `--log-servers <csv>` | Log calls only for listed servers; implies `--log`. |
+Logs can contain sensitive activity. In 0.12.3, action-level `--help` is not a help operation and may start, stop, or restart the daemon. MUST run `status` before state-changing daemon actions.
 
-Logs can contain sensitive activity. In 0.12.3, action-level `--help` is not a help operation and may start, stop, or restart the daemon.
-
-Agents MUST run `status` before state-changing daemon actions.
-
-## `serve`
+## serve
 
 ```text
 mcporter serve [--servers a,b,c] [--stdio | --http <port>]
 ```
 
-This exposes daemon-managed keep-alive servers as one MCP server.
+Exposes daemon-managed keep-alive servers as one MCP server. `--servers <csv>` restricts named servers; `--stdio` serve over stdio, default; `--http <port>` Streamable HTTP on `/mcp` and `/mcp/<server>`; `--host <host>` HTTP bind host, default `127.0.0.1`.
 
-| Flag | Meaning |
-|---|---|
-| `--servers <csv>` | Restrict the bridge to named keep-alive servers. |
-| `--stdio` | Serve over stdio; default mode. |
-| `--http <port>` | Serve Streamable HTTP on `/mcp` and `/mcp/<server>`. |
-| `--host <host>` | HTTP bind host; default `127.0.0.1`. |
-
-`--stdio` and `--http` are alternatives. Binding to a non-loopback host changes network exposure.
-
-- Non-loopback binding MUST have explicit task authorization
-- Agents MUST assess authentication before non-loopback exposure
+`--stdio` and `--http` are alternatives. Non-loopback binding changes network exposure, MUST have explicit task authorization, and requires authentication assessment.
