@@ -1,8 +1,8 @@
 # Example Flows
 
-Read this when a lookup needs a multi-step web, news, image, video, or local flow.
+Multi-step lookup: web, news, image, video, or local.
 
-All flows run through `scripts/cli.py`:
+All flows use:
 
 ```text
 uv run --script <skill-dir>/scripts/cli.py ...
@@ -10,23 +10,23 @@ uv run --script <skill-dir>/scripts/cli.py ...
 
 ## Quick lookup
 
-1. `web "<topic>"` for a small default result set with `result_filter=web`
-2. If a result looks promising, fetch the page with `raw <result-url>` (browser skill) or by hand
+1. `web "<topic>"`: small default result set; `result_filter=web`.
+2. Promising result → fetch via `raw <result-url>` (browser skill) or manually.
 
 ## Quick news scan
 
-1. `news "<topic>"` with `freshness=pd` for the past day
-2. Skim the compact `results` array; only the fields you actually use are present
+1. `news "<topic>"` with `freshness=pd`: past day.
+2. Skim compact `results`; only fields actually used are present.
 
-## Image / video shortlist
+## Image/video shortlist
 
-1. `image "<topic>"` (default `count=10`) to gather thumbnails and source pages
-2. `video "<topic>"` to get video titles, durations, and publishers
-3. For the upstream shape (e.g. raw `meta_url` or mixed-result fields), re-run with `raw=1` on the same command
+1. `image "<topic>"`: default `count=10`; thumbnails and source pages.
+2. `video "<topic>"`: titles, durations, publishers.
+3. Need upstream shape (e.g. raw `meta_url` or mixed-result fields) → rerun same command with `raw=1`.
 
 ## Provider failure triage
 
-1. Look at the compact error JSON on stderr — it carries the status, body byte count, and a summarized preview
-2. If `error.status` is `null`, this is a network/parse failure (rc=1), not a provider rejection
-3. If `error.status` is set, the provider responded with that code (rc=22) — chase key/quota/rate limits
-4. Usage errors (bad count, missing args) come back as rc=2 with plain text, not the JSON envelope
+1. Compact stderr error JSON contains status, body byte count, summarized preview.
+2. `error.status=null` → network/parse failure (rc=1), not provider rejection.
+3. Set `error.status` → provider returned that code (rc=22); investigate key/quota/rate limits.
+4. Bad count or missing args → rc=2, plain text; not JSON envelope.
