@@ -172,3 +172,4 @@ Use `pipeline()` instead of manual `.pipe()` chains when you want proper error p
 - attach timeouts to network and queue work
 - prefer bounded concurrency over fire-and-forget bursts
 - surface context on errors; keep original cause visible when possible
+

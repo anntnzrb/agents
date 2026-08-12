@@ -1,10 +1,9 @@
 # Modules and Packaging
 
-Read this file for ESM vs CJS decisions, `package.json` fields, dynamic import, conditional exports, and interop debugging.
+Scope: ESM/CJS choice, `package.json` `type`/`exports`/`imports`/`sideEffects`, dynamic import, interop, resolution, cycles, and package shipping.
 
-## Pick one module story per package
-
-Do not mix ESM and CJS casually. The module system is part of the runtime contract.
+## One module story/package
+Do not mix ESM and CJS casually; module system is runtime contract.
 
 ### ESM
 
@@ -28,7 +27,7 @@ module.exports = { add };
 const { add } = require("./math.cjs");
 ```
 
-## `package.json` fields that matter
+## Relevant `package.json` fields
 
 ### `type`
 
@@ -38,15 +37,7 @@ const { add } = require("./math.cjs");
 }
 ```
 
-In that package:
-
-- `.js` -> ESM
-- `.cjs` -> CJS escape hatch
-
-Without `type: module`:
-
-- `.js` -> CJS by default in Node
-- `.mjs` -> ESM escape hatch
+With `type: module`: `.js` → ESM; `.cjs` → CJS escape hatch. Without it: `.js` → CJS by default in Node; `.mjs` → ESM escape hatch.
 
 ### `exports`
 
@@ -59,7 +50,7 @@ Without `type: module`:
 }
 ```
 
-Use `exports` to control public entry points. It also blocks undeclared deep imports, which is usually good.
+`exports`: control public entry points; block undeclared deep imports (usually good).
 
 ### `imports`
 
@@ -71,7 +62,7 @@ Use `exports` to control public entry points. It also blocks undeclared deep imp
 }
 ```
 
-Useful for internal aliases in Node ESM without pretending they are public package paths.
+`imports`: internal aliases in Node ESM, not public package paths.
 
 ### `sideEffects`
 
@@ -81,11 +72,10 @@ Useful for internal aliases in Node ESM without pretending they are public packa
 }
 ```
 
-Only set this when modules are truly side-effect-free at import time. Otherwise tree shaking will eat required behavior.
+Set `sideEffects: false` only when modules are truly side-effect-free at import time; otherwise tree shaking removes required behavior.
 
 ## Dynamic import
-
-Use `import()` for optional, environment-specific, or heavy modules.
+Use `import()` for optional, environment-specific, or heavy modules:
 
 ```js
 if (process.env.NODE_ENV !== "production") {
@@ -96,17 +86,17 @@ if (process.env.NODE_ENV !== "production") {
 
 Do not use dynamic import to paper over confused boundaries.
 
-## Interop patterns
+## Interop
 
-### Import CJS from ESM
+### CJS from ESM
 
 ```js
 import legacyPkg from "legacy-pkg";
 ```
 
-Node synthesizes a default export for many CJS packages. Named imports from CJS are often where pain starts.
+Node synthesizes a default export for many CJS packages; named imports from CJS are often where pain starts.
 
-### Use `createRequire()` from ESM
+### `createRequire()` from ESM
 
 ```js
 import { createRequire } from "node:module";
@@ -114,9 +104,9 @@ const require = createRequire(import.meta.url);
 const pkg = require("legacy-pkg");
 ```
 
-Keep this at edges, not everywhere.
+Keep `createRequire()` at edges, not everywhere.
 
-### `__dirname` and `__filename` in ESM
+### ESM `__dirname` and `__filename`
 
 ```js
 import { fileURLToPath } from "node:url";
@@ -126,48 +116,28 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 ```
 
-## Resolution rules that bite people
-
-- ESM wants explicit relative file extensions in Node: `./thing.js`, not `./thing`
-- `exports` changes what consumers can import
-- bundlers may resolve extensionless imports that raw Node will reject
-- test runners may emulate ESM imperfectly; respect repo conventions before changing format
+## Resolution hazards
+- Node ESM requires explicit relative file extensions: `./thing.js`, not `./thing`.
+- `exports` changes what consumers can import.
+- Bundlers may resolve extensionless imports that raw Node rejects.
+- Test runners may emulate ESM imperfectly; respect repo conventions before changing format.
 
 ## Circular dependencies
-
 Circular imports usually fail at **execution time**.
-
-Symptoms:
-
-- imported binding is `undefined`
-- module partially initializes
-- class extends `undefined`
-
+Symptoms: imported binding `undefined`; partially initialized module; class extends `undefined`.
 Fixes:
-
-- move shared primitives to a third module
-- invert the dependency with callbacks / interfaces
-- delay one edge with dynamic import only if the dependency is truly optional
+- Move shared primitives to a third module.
+- Invert the dependency with callbacks / interfaces.
+- Delay one edge with dynamic import only when the dependency is truly optional.
 
 ## Shipping packages
+Start simple: one entry point; one module mode; explicit exports; minimal public surface.
 
-Start simple:
+Use dual ESM+CJS only when consumers actually need both, tooling cannot tolerate one mode, and you will test both paths continuously.
 
-- one entry point
-- one module mode
-- explicit exports
-- minimal public surface
-
-Reach for dual ESM+CJS only when:
-
-- consumers actually need both
-- tooling cannot tolerate one mode
-- you are willing to test both paths continuously
-
-## Quick heuristics
-
-- **App code** -> preserve repo convention
-- **Greenfield Node** -> ESM by default
-- **Interop with old tooling** -> isolate CJS edges
-- **Package distribution** -> define exports intentionally and avoid deep-import roulette
-- **Optional or heavy dependency** -> dynamic import
+## Heuristics
+- App code → preserve repo convention.
+- Greenfield Node → ESM by default.
+- Old-tooling interop → isolate CJS edges.
+- Package distribution → define exports intentionally; avoid deep-import roulette.
+- Optional/heavy dependency → dynamic import.

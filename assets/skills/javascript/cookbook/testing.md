@@ -4,12 +4,12 @@ Read this file for runner choice, test structure, async tests, mocking, integrat
 
 ## Pick the runner from repo context
 
-| Situation                                                  | Default                                  |
-| ---------------------------------------------------------- | ---------------------------------------- |
-| Vite / bundler repo with no runner yet                     | Vitest                                   |
-| Existing Jest repo / React Native / legacy ecosystem hooks | Jest                                     |
-| Browser UI behavior                                        | Existing runner + Testing Library        |
-| HTTP / DB boundary tests                                   | Existing runner + real integration setup |
+|Situation|Default|
+|---|---|
+|Vite / bundler repo with no runner yet|Vitest|
+|Existing Jest repo / React Native / legacy ecosystem hooks|Jest|
+|Browser UI behavior|Existing runner + Testing Library|
+|HTTP / DB boundary tests|Existing runner + real integration setup|
 
 Use the repo's current runner unless migration is the task.
 

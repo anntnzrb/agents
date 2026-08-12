@@ -1,10 +1,10 @@
 # Semantics and Weirdness
 
-Read this file when the bug smells like JavaScript itself: coercion, binding, closure state, execution order, or prototype lookup.
+Read for JavaScript-native bugs: coercion, binding, closure state, execution order, prototype lookup.
 
 ## Coercion and equality
 
-Use `===` by default. Reach for `Object.is()` when `NaN` or signed zero actually matter.
+`===` default; `Object.is()` when `NaN` or signed zero matter.
 
 ```js
 "5" + 3; // "53"
@@ -17,27 +17,15 @@ Object.is(NaN, NaN); // true
 Object.is(-0, 0); // false
 ```
 
-### Truthy / falsy traps
-
-Falsy values:
-
-- `false`
-- `0`
-- `-0`
-- `0n`
-- `""`
-- `null`
-- `undefined`
-- `NaN`
-
-Prefer `??` when you only want a default for `null` / `undefined`.
+Falsy: `false`, `0`, `-0`, `0n`, `""`, `null`, `undefined`, `NaN`.
+Use `??` for defaults only on `null`/`undefined`.
 
 ```js
 const port = config.port ?? 3000; // preserves 0
 const label = userInput || "default"; // replaces "", 0, false too
 ```
 
-### Type checks worth trusting
+Trusted type checks:
 
 ```js
 typeof value === "string";
@@ -48,7 +36,7 @@ Object.prototype.toString.call(value); // useful for edge cases
 
 ## Scope, closures, hoisting, TDZ
 
-`var` is function-scoped and hoisted in ways that cause ghost bugs. Prefer `const`; use `let` only when reassignment is real.
+`var` function-scoped and hoisted; prefer `const`, use `let` only for real reassignment.
 
 ```js
 for (var i = 0; i < 3; i++) {
@@ -62,7 +50,7 @@ for (let i = 0; i < 3; i++) {
 // 0, 1, 2
 ```
 
-Closures capture bindings from lexical scope, not snapshot copies of your intent.
+Closures capture lexical bindings, not snapshots.
 
 ```js
 function createCounter() {
@@ -79,7 +67,7 @@ function createCounter() {
 }
 ```
 
-Temporal Dead Zone: `let` and `const` are hoisted, but not initialized.
+TDZ: `let` and `const` hoisted but uninitialized.
 
 ```js
 console.log(a); // undefined
@@ -89,9 +77,9 @@ console.log(b); // ReferenceError
 let b = 1;
 ```
 
-## `this` is a call-site problem
+## `this`: call site
 
-The value of `this` depends on **how** a function is called, not where it was defined.
+`this` depends on how a function is called, not where defined.
 
 ```js
 const user = {
@@ -107,14 +95,12 @@ const loose = user.greet;
 loose(); // undefined in strict mode
 ```
 
-### Quick rules
+- `obj.method()` → `this === obj`
+- plain call → `undefined` in strict mode
+- `fn.call(x)` / `fn.apply(x)` / `fn.bind(x)` → explicit receiver
+- arrows define no own `this`; capture outer `this`
 
-- `obj.method()` -> `this === obj`
-- plain function call -> `undefined` in strict mode
-- `fn.call(x)` / `fn.apply(x)` / `fn.bind(x)` -> explicit receiver
-- arrow functions do **not** define their own `this`; they capture outer `this`
-
-Use arrow functions for callbacks and lexical binding. Use method syntax or normal functions when you need a real receiver.
+Use arrows for callbacks/lexical binding; method syntax or normal functions for a real receiver.
 
 ```js
 class Timer {
@@ -130,7 +116,7 @@ class Timer {
 
 ## Prototypes and classes
 
-Classes are syntax over the prototype chain. Property lookup climbs that chain until it finds a match or hits `null`.
+Classes are prototype-chain syntax. Property lookup climbs the chain until a match or `null`.
 
 ```js
 const animal = {
@@ -159,37 +145,19 @@ class Dog extends Animal {
 }
 ```
 
-When debugging, separate:
+Debug separately: own/inherited properties; instance fields/prototype methods; mutation/lookup behavior.
 
-- own properties vs inherited properties
-- instance fields vs prototype methods
-- data mutation vs lookup behavior
+## Weirdness checklist
 
-## Common weirdness checklist
+Stale state: closure captured an old value; object mutated elsewhere rather than replaced; loop used `var`; method passed as callback and receiver lost.
 
-### If state looks stale
+`undefined` property: actual value is `null` or unexpected primitive; `||` used instead of `??`; method is prototype rather than instance (or vice versa); destructure ran before initialization.
 
-- Did a closure capture an old value?
-- Did you mutate an object elsewhere instead of replacing it?
-- Did a loop use `var` instead of `let`?
-- Did you pass a method as a callback and lose the receiver?
+Cross-file/runtime difference: strict mode/ESM changes defaults; top-level `this` differs in Node/browser; bundler/transpiler rewrites class fields/modules.
 
-### If a property is `undefined`
+## Minimal debugging
 
-- Is the value actually `null` or an unexpected primitive?
-- Are you using `||` where `??` was intended?
-- Is the method on the prototype instead of the instance, or vice versa?
-- Did a destructure run before initialization?
-
-### If behavior differs between files or runtimes
-
-- Is strict mode / ESM changing defaults?
-- Is `this` in top-level code different between Node and the browser?
-- Is a bundler or transpiler rewriting class fields / modules?
-
-## Minimal debugging moves
-
-- Log the **actual value and type**, not just the property you hoped existed
-- Reduce the bug to a 10-line repro. JS semantics become obvious fast when stripped of framework noise
-- Replace clever chains with named intermediate values while debugging
-- Check call sites first. Most `this` bugs are introduced where the function is passed, not where it is defined
+- Log actual value and type, not merely the expected property.
+- Reduce to a 10-line repro; stripped framework noise exposes JS semantics.
+- Replace clever chains with named intermediates.
+- Check call sites first; most `this` bugs arise where the function is passed, not defined.

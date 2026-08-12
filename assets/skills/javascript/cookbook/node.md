@@ -1,6 +1,6 @@
 # Node.js Runtime Patterns
 
-Read this file for filesystem work, streams, processes, worker threads, and practical Node runtime behavior.
+Scope: filesystem, streams, processes, worker threads, practical Node runtime behavior.
 
 ## Filesystem with `fs/promises`
 
@@ -13,7 +13,7 @@ const raw = await readFile("./data/config.json", "utf8");
 const config = JSON.parse(raw);
 ```
 
-Prefer async filesystem APIs. Use sync variants only in tiny startup paths, scripts, or tests where blocking is irrelevant.
+Prefer async filesystem APIs. Sync variants only in tiny startup paths, scripts, or tests where blocking is irrelevant.
 
 ### JSON helpers
 
@@ -41,11 +41,11 @@ const file = join(process.cwd(), "data", "users.json");
 const here = fileURLToPath(import.meta.url);
 ```
 
-Do not manually concat file paths with `/` when portability matters.
+NEVER manually concatenate file paths with `/` when portability matters.
 
 ## Streams and pipeline
 
-Use streams when payload size is unknown or large.
+Unknown or large payloads → streams.
 
 ```js
 import { pipeline } from "node:stream/promises";
@@ -54,11 +54,11 @@ import { createReadStream, createWriteStream } from "node:fs";
 await pipeline(createReadStream("input.log"), createWriteStream("copy.log"));
 ```
 
-Use `pipeline()` for composed streams so backpressure and errors behave sanely.
+Use `pipeline()` for composed streams: sane backpressure and error behavior.
 
 ## EventEmitter
 
-Useful for local event fan-out, not for pretending everything is reactive architecture.
+Useful for local event fan-out; not for pretending everything is reactive architecture.
 
 ```js
 import { EventEmitter } from "node:events";
@@ -68,14 +68,12 @@ bus.on("done", (value) => console.log(value));
 bus.emit("done", 42);
 ```
 
-Remember to remove listeners on long-lived objects when lifetimes end.
+Long-lived objects: remove listeners when lifetimes end.
 
 ## Worker threads vs child processes
 
-| Tool             | Use when                                             | Notes                                 |
-| ---------------- | ---------------------------------------------------- | ------------------------------------- |
-| `worker_threads` | CPU-bound JS work needs parallelism                  | Shares process memory, lower overhead |
-| `child_process`  | Need a separate process, shell command, or isolation | Higher overhead, separate runtime     |
+`worker_threads`: CPU-bound JS parallelism; shared process memory; lower overhead.
+`child_process`: separate process, shell command, or isolation; higher overhead; separate runtime.
 
 ### Worker thread example
 
@@ -97,7 +95,7 @@ import { spawn } from "node:child_process";
 const child = spawn("git", ["status"], { stdio: "inherit" });
 ```
 
-Prefer `spawn()` for streaming output. Use `exec()` only when the output is small and shell parsing is intentional.
+Prefer `spawn()` for streaming output. Use `exec()` only when output is small and shell parsing is intentional.
 
 ## Process, env, and shutdown
 
@@ -108,18 +106,17 @@ process.on("SIGINT", async () => {
 });
 ```
 
-Good defaults:
-
-- validate required env vars at startup
-- set timeouts on outbound I/O
-- close servers, queues, and DB pools on shutdown
-- avoid calling `process.exit()` from deep app logic
+Defaults:
+- Validate required env vars at startup.
+- Set timeouts on outbound I/O.
+- Close servers, queues, and DB pools on shutdown.
+- Avoid calling `process.exit()` from deep app logic.
 
 ## HTTP basics
 
-Use the built-in `fetch` client in modern Node. Reach for native `http` / `https` only when you need low-level control.
+Use built-in `fetch` in modern Node. Native `http` / `https` only for low-level control.
 
-For servers, prefer the repo's existing framework. If writing raw Node:
+For servers, prefer the repo's existing framework. Raw Node:
 
 ```js
 import http from "node:http";
@@ -134,8 +131,8 @@ server.listen(3000);
 
 ## Common Node failure patterns
 
-- open handles keep tests or CLIs from exiting
-- `exec()` buffers too much output and explodes memory
-- giant `readFile()` on logs or blobs when streaming was needed
-- unhandled rejections crash late and far from the source
-- ESM path helpers are missing because code assumed `__dirname`
+- Open handles → tests or CLIs do not exit.
+- `exec()` buffers excessive output → memory explosion.
+- Giant `readFile()` on logs or blobs → stream instead.
+- Unhandled rejections → late crash far from source.
+- ESM path helpers missing → code assumed `__dirname`.

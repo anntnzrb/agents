@@ -1,10 +1,10 @@
 # Modern Syntax and Data Patterns
 
-Read this file for modern syntax, transformation patterns, iterators, and performance-friendly defaults.
+Modern syntax, transformation patterns, iterators, and performance defaults.
 
-## Prefer expressive built-ins
+## Built-ins
 
-### Destructuring, rest, and spread
+### Destructuring, rest, spread
 
 ```js
 const user = {
@@ -22,9 +22,9 @@ const [primaryRole, ...otherRoles] = user.roles;
 const next = { ...user, active: true };
 ```
 
-Use spread for shallow copies and local immutable updates. Do not pretend it is deep cloning.
+Spread: shallow copies and local immutable updates; not deep cloning.
 
-### Optional chaining and nullish coalescing
+### Optional chaining, nullish coalescing
 
 ```js
 const city = user?.profile?.city ?? "Unknown";
@@ -32,9 +32,9 @@ const first = list?.[0];
 const result = maybeFn?.();
 ```
 
-Use `??` for real nullish defaults. Use `||` only when all falsy values should collapse.
+`??`: nullish defaults. `||`: only when every falsy value should collapse.
 
-## Modern array and object helpers
+## Array/object helpers
 
 ```js
 const lastEven = numbers.findLast((n) => n % 2 === 0);
@@ -45,9 +45,9 @@ const replaced = numbers.with(index, newValue);
 const hasOwn = Object.hasOwn(config, "port");
 ```
 
-These methods keep intent visible and reduce accidental mutation.
+These preserve intent and reduce accidental mutation.
 
-### `map` / `filter` / `reduce` without turning code into soup
+### `map` / `filter` / `reduce`
 
 ```js
 const activeNames = users
@@ -60,11 +60,11 @@ const totalsByType = items.reduce((acc, item) => {
 }, {});
 ```
 
-If the chain becomes unreadable, split it into named steps. Brevity is not the goal; obviousness is.
+Split unreadable chains into named steps; obviousness > brevity.
 
-## Immutability without self-harm
+## Immutability
 
-Prefer copy-on-write updates for shared state and tests.
+Prefer copy-on-write for shared state and tests.
 
 ```js
 const nextUser = {
@@ -76,9 +76,7 @@ const nextUser = {
 };
 ```
 
-For deep structured cloning where supported, use `structuredClone(value)`.
-
-Do not repeatedly spread giant objects inside hot loops. That is how clean code becomes a perf bug.
+Use `structuredClone(value)` for deep structured cloning where supported. NEVER repeatedly spread giant objects in hot loops; that creates performance bugs.
 
 ## Function patterns
 
@@ -104,11 +102,11 @@ const pipe =
     fns.reduce((acc, fn) => fn(acc), value);
 ```
 
-Use composition for clear transformation pipelines, not to cosplay Haskell in a CRUD app.
+Use composition for clear transformation pipelines, not Haskell-style cleverness in CRUD apps.
 
 ### Currying and partial application
 
-Useful for reusable data transforms. Usually overkill for ad-hoc app code.
+Useful for reusable data transforms; usually overkill for ad-hoc app code.
 
 ```js
 const multiply = (a) => (b) => a * b;
@@ -131,9 +129,9 @@ for (const value of range(1, 3)) {
 }
 ```
 
-Async generators belong in `cookbook/async.md`, but the design principle is the same: produce values incrementally instead of buffering everything first.
+Async generators belong in `cookbook/async.md`; principle unchanged: produce incrementally, not by buffering everything first.
 
-## Class features that matter
+## Classes
 
 ```js
 class Cache {
@@ -149,9 +147,9 @@ class Cache {
 }
 ```
 
-Private fields are useful for encapsulation inside real classes. Do not reach for classes when a closure or module-level function set is simpler.
+Private fields: encapsulation inside real classes. Prefer a closure or module-level function set when simpler.
 
-## Small performance helpers
+## Performance helpers
 
 ### Debounce
 
@@ -180,9 +178,9 @@ const throttle = (fn, ms) => {
 };
 ```
 
-Use these for user-driven bursty events. Do not apply them blindly to hide slow logic.
+Use for user-driven bursty events; NEVER apply blindly to hide slow logic.
 
-## Pitfalls worth remembering
+## Pitfalls
 
 - `Array.prototype.sort()` mutates; `toSorted()` does not
 - Object spread is shallow
