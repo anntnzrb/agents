@@ -1,43 +1,29 @@
 # Media Cookbook
 
----
+## Audio overview
 
-## Create an audio overview
-
-**Problem**: Generate an audio summary for a notebook.
-
-**Solution**:
+Create:
 
 ```bash
 nlm audio-create <notebook-id> "Summarize the key points in a professional tone."
 ```
 
-**Tip**: Use `nlm audio-list <notebook-id>` to check status.
+Check status: `nlm audio-list <notebook-id>`.
 
----
-
-## Download an audio overview
-
-**Problem**: Download the audio file locally.
-
-**Solution**:
+Download locally:
 
 ```bash
 nlm audio-download <notebook-id> overview.mp3 --direct-rpc
 ```
 
-**Tip**: Requires `--direct-rpc`.
+Requires `--direct-rpc`.
 
----
+## Video overview
 
-## Create a video overview
-
-**Problem**: Generate a video summary.
-
-**Solution**:
+Create:
 
 ```bash
 nlm video-create <notebook-id> "Create a short overview video."
 ```
 
-**Tip**: Use `nlm video-list <notebook-id>` to check status.
+Check status: `nlm video-list <notebook-id>`.
