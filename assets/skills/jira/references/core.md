@@ -18,7 +18,8 @@ administration, unsupported Atlassian products, and Confluence work are outside 
 - Never request, print, persist, echo, or copy credentials, tokens, cookies, authorization headers,
   or credential-bearing URLs. Never start an interactive login merely to probe access.
 - Bind every command to the site and account established by the successful status output. If site,
-  account, project ownership, or issue ownership is ambiguous, stop rather than choosing a default.
+  account, project ownership, or issue ownership is ambiguous, stop rather than choosing a
+  default.
 - Keep stdout as structured data and stderr plus exit status as diagnostics. Redact secret-looking
   values from any displayed command result.
 
