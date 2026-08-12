@@ -1,163 +1,89 @@
 # Upgrading to GPT-5.6 Sol
 
-## Contents
+Use this guide for migrations of an OpenAI API integration, repository, prompt stack, agent, model router, or model picker to GPT-5.6 Sol/family.
 
-- [Core principle](#core-principle)
-- [Migration posture](#migration-posture)
-- [Inventory before editing](#inventory-before-editing)
-- [Choose the target model by role](#choose-the-target-model-by-role)
-- [Preserve effective reasoning before tuning](#preserve-effective-reasoning-before-tuning)
-- [Chat Completions and function tools](#chat-completions-and-function-tools)
-- [Responses API and conversation state](#responses-api-and-conversation-state)
-- [Prompt caching](#prompt-caching)
-- [Images, PDFs, files, and long context](#images-pdfs-files-and-long-context)
-- [Structured outputs, parsers, and tool contracts](#structured-outputs-parsers-and-tool-contracts)
-- [Optional: Pro mode](#optional-pro-mode)
-- [Optional: Programmatic Tool Calling](#optional-programmatic-tool-calling)
-- [Optional: multi-agent beta](#optional-multi-agent-beta)
-- [Prompt migration judgment](#prompt-migration-judgment)
-- [Upgrade workflow](#upgrade-workflow)
-- [Validation matrix](#validation-matrix)
-- [Required final report](#required-final-report)
+## Canonical docs
 
-Use this guide when the user asks to migrate an existing OpenAI API integration, repository, prompt stack, agent, model router, or model picker to GPT-5.6 Sol or the GPT-5.6 family.
-
-The default explicit target is `gpt-5.6-sol`. The alias `gpt-5.6` routes to Sol; use it only when the repository intentionally prefers family aliases. Do not treat every old model usage as a Sol candidate: GPT-5.6 is a family with different cost, latency, context, and quality roles.
-
-Before changing code, use the OpenAI Docs MCP to fetch the current live GPT-5.6 model guidance:
-
+Before code changes, use OpenAI Docs MCP to fetch current guidance:
 https://developers.openai.com/api/docs/guides/model-guidance?model=gpt-5.6
 
-For prompt changes, also read only the `## Prompting Best Practices` section from:
-
+For prompt edits, read only `## Prompting Best Practices`:
 https://developers.openai.com/api/docs/guides/model-guidance?model=gpt-5.6#prompting-best-practices
 
-Treat live docs as canonical for current model IDs, parameters, limits, pricing, and feature availability. This file supplies migration judgment: where to look, what can break, what to preserve, what not to adopt automatically, and how to validate the result.
+Live docs are canonical for model IDs, parameters, limits, pricing, and feature availability. This guide supplies migration judgment: search surfaces, breakage risks, preservation rules, adoption boundaries, and validation.
 
-## Core principle
+## Core rule
 
-Do not perform a blind model-string replacement.
+NEVER blindly replace model strings. For each usage site, first preserve behavior, latency/cost class, reasoning level, endpoint contract, tool semantics, cache behavior, and output contract; then make the smallest safe change. New GPT-5.6 capabilities require a measured problem or explicit user request. A model upgrade alone does not authorize reasoning fields, request-schema changes, or test rewrites. Add explicit reasoning only when old effective behavior is known and omission would change GPT-5.6 behavior.
 
-First preserve the behavior, latency class, cost class, reasoning level, endpoint contract, tool semantics, cache behavior, and output contract of each usage site. Then make the smallest safe migration. Adopt new GPT-5.6 capabilities only when they solve a measured problem or the user explicitly asks for them.
+Main hazards:
+- Sol replacing intentional mini/nano, low-cost, or latency-sensitive roles.
+- GPT-5.6 omitted reasoning becoming `medium` where old effective effort was `none`.
+- Chat Completions function tools without effective `none`.
+- Cache misses from a stable prefix plus changing suffix.
+- More image/PDF tokens from omitted/`auto` detail.
+- Unsupported new cache, persisted-reasoning, Pro, Programmatic Tool Calling, or multi-agent fields.
+- Model strings changed while registries, allowlists, pricing/capability metadata, tests, or UI pickers remain stale.
 
-A model upgrade alone does not authorize adding reasoning fields, changing request schemas, or rewriting tests. Only add explicit reasoning when the old effective behavior is established and omission would change behavior on GPT-5.6.
+## Classify every usage before editing
 
-The main 5.6 migration hazards are:
+- `simple Sol migration`: one flagship usage; endpoint/request shape unchanged; effort explicit or old effective value known; no cache, vision, file, tool, or parser implementation change.
+- `tier-aware family migration`: multiple roles, choices, fallbacks, routers, pricing, or capability metadata; map roles to Sol/Terra/Luna, not all to Sol.
+- `compatibility migration`: safe change requires parameter, endpoint, cache, state, tool-loop, or multimodal-detail work. Make it only if in scope; otherwise report exact blocker and smallest follow-up.
+- `prompt migration`: API shape remains, but representative traces show a prompt regression; make a surgical failure-linked edit, never a wholesale rewrite. Prompt-guidance tasks change only the directly tied prompt surface unless runtime/schema/tests require change.
+- `optional feature adoption`: deliberate Pro, persisted reasoning, explicit caching, Programmatic Tool Calling, or multi-agent addition; isolate from baseline for measurement.
+- `leave unchanged`: historical examples/docs, snapshots, fixtures, eval baselines, comparison code, pinned fallbacks, unsupported providers, or ambiguous usages.
 
-- choosing Sol for workloads that were intentionally mini, nano, low-cost, or latency-sensitive;
-- inheriting 5.6's default `medium` reasoning where the old effective effort was `none`;
-- using Chat Completions with function tools without explicitly setting effective reasoning to `none`;
-- losing prompt-cache hits when a stable prefix is followed by a changing suffix;
-- increasing image or PDF input tokens because omitted or `auto` detail behaves differently;
-- applying new cache, persisted-reasoning, Pro, Programmatic Tool Calling, or multi-agent fields to routes that do not support them;
-- updating model strings but forgetting registries, allowlists, pricing metadata, capability flags, tests, and UI model pickers
+If intent is unclear, leave the usage unchanged and request confirmation rather than silently changing its role.
 
-## Migration posture
+## Inventory
 
-Classify every usage site before editing:
+Search beyond literal model IDs:
+- model strings/aliases, environment variables, CLI flags, config defaults, deployment settings;
+- Responses, Chat Completions, Batch, and provider adapters;
+- reasoning, token budgets, sampling, and latency timeouts;
+- function/hosted tools, structured outputs, parsers, and replay;
+- system/developer/user/tool-description prompts;
+- routers, fallbacks, allowlists, enums, regexes, validation schemas, capability maps;
+- picker labels/descriptions, context limits, pricing, provider catalogs;
+- cache keys/retention, stable-prefix construction, metrics;
+- image/PDF/file/OCR/computer-use inputs;
+- tests, fixtures, snapshots, evals, analytics, billing tables, and docs.
 
-1. `simple Sol migration`
-   - One flagship model usage
-   - Same endpoint and request shape can remain
-   - Reasoning effort is explicit or its old effective value is known
-   - No cache, vision, file, tool, or parser behavior needs implementation changes
-2. `tier-aware family migration`
-   - The repository exposes multiple model roles, model choices, fallbacks, routers, pricing data, or capability metadata
-   - Map each role to Sol, Terra, or Luna instead of replacing everything with Sol
-3. `compatibility migration`
-   - The safe move requires parameter, endpoint, cache, state, tool-loop, or multimodal-detail changes
-   - Make these changes only when implementation work is inside the user's requested scope. Otherwise report the exact blocker and smallest follow-up
-4. `prompt migration`
-   - The API shape can remain, but representative traces show a prompt-specific regression
-   - Make a surgical prompt edit tied to that failure; do not rewrite a working prompt stack wholesale
-   - When the task is to update prompting guidance, edit the directly tied prompt surface only. Do not modify runtime request code, model schemas, or tests unless the prompt change requires it
-5. `optional feature adoption`
-   - Pro mode, persisted reasoning, explicit caching, Programmatic Tool Calling, or multi-agent behavior is being added deliberately
-   - Keep this separate from the baseline migration so its effect can be measured
-6. `leave unchanged`
-   - Historical examples, documentation about old models, snapshots, fixtures, eval baselines, comparison code, intentionally pinned fallbacks, unsupported providers, or ambiguous usages
+For changed defaults, update all active default surfaces together: runtime/config files, environment, setup docs, tests, CLI defaults, and deployment examples.
 
-When intent is unclear, prefer leaving a usage unchanged and list it for confirmation over silently changing its role.
+Record per site: source model and apparent purpose; endpoint/client; prompt; effective reasoning including defaults; latency/cost/context/quality role; tools, schemas, cache, replay, multimodal inputs; downstream parser/user contract; migration class; validation plan.
 
-## Inventory before editing
+## Target by workload role
 
-Search for more than literal model IDs. Inventory:
+| Existing role | Starting target | Rule |
+|---|---|---|
+| Unsuffixed GPT-5 flagship, GPT-5.5, GPT-5.4 flagship | `gpt-5.6-sol` | flagship-equivalent |
+| Mini, balanced lower-cost, medium-throughput worker | `gpt-5.6-terra` | mini-like tier |
+| Nano, classification, extraction, routing, high-volume, strict-latency | `gpt-5.6-luna` | nano-like tier |
+| GPT-4.1/GPT-4o latency-sensitive | Evaluate Luna/Terra first; Sol only if quality requires | flagship can materially change latency/cost |
+| Reasoning-heavy/quality-first | Sol at old effective effort | preserve contract before tuning |
+| Old Pro | Sol plus `reasoning.mode: "pro"`, only if Pro behavior wanted | Pro is a mode, not a separate slug |
+| Router/fallback/picker | Add family by role | do not collapse design |
+| Third-party/provider-specific | Unchanged unless provider migration explicitly requested | name similarity is unsafe |
 
-- model strings, aliases, environment variables, CLI flags, config defaults, and deployment settings;
-- SDK calls to Responses, Chat Completions, Batch, or provider adapters;
-- reasoning settings, token budgets, sampling settings, and latency timeouts;
-- function tools, hosted tools, structured outputs, response parsers, and replay logic;
-- system, developer, user, and tool-description prompts tied to each usage;
-- routers, fallbacks, model allowlists, enums, regexes, validation schemas, and capability maps;
-- model picker UI, display labels, descriptions, context limits, pricing metadata, and provider catalogs;
-- prompt-cache keys, retention options, stable-prefix construction, and cache metrics;
-- image, PDF, file, OCR, and computer-use inputs;
-- tests, fixtures, snapshots, evals, analytics labels, billing tables, and docs
+Default explicit target: `gpt-5.6-sol`. Alias `gpt-5.6` routes to Sol; use it only when the repository intentionally prefers family aliases. If used, record returned `response.model`; do not assume alias and explicit slug match in dashboards, rate limits, analytics, or billing.
 
-When changing a default model, search every active default surface: runtime config, environment/config files, setup docs, tests, CLI defaults, and deployment examples. Update them together.
+Check live docs for limits; do not invent prices, limits, capabilities, or registry metadata. Starting limits: Sol/Terra roughly 1.05M context and 128K max output; Luna 400K context and 128K max output; Sol/Terra requests above 272K input tokens can change pricing for the full request. Preserve existing picker/registry entries by default; add Sol/Terra/Luna options unless replacement/removal is requested.
 
-For each usage site, record:
+## Preserve effective reasoning
 
-- source model and why it appears to be used;
-- endpoint and SDK/client surface;
-- prompt surface;
-- effective reasoning effort, including defaults;
-- latency, cost, context, and quality role;
-- tools, structured outputs, caching, state replay, and multimodal inputs;
-- downstream parsers or user-visible contracts;
-- migration class and validation plan
+GPT-5.6 supports `none`, `low`, `medium`, `high`, `xhigh`, `max`; omitted defaults to `medium`. GPT-5.5 commonly defaulted to `medium`; GPT-5.4/mini/nano commonly to `none`. An omitted old setting can therefore become slower, costlier, and incompatible with Chat Completions function tools.
 
-## Choose the target model by role
+1. Preserve explicit effort on the first 5.6 run when supported.
+2. If omitted and old effective default is known, add it only when GPT-5.6 omission changes behavior; if defaults match, keep omission.
+3. If unknown, do not guess: flag and compare old behavior with 5.6 at likely baseline.
+4. After baseline, test same effort and one lower on representative tasks.
+5. Use `xhigh`/`max` only for hard quality-first workloads with measured gain.
 
-Use this as a starting map, then validate against the repository's workload:
-
-| Existing role | Starting GPT-5.6 target | Reason |
-| --- | --- | --- |
-| Unsuffixed GPT-5 flagship, GPT-5.5, or GPT-5.4 flagship | `gpt-5.6-sol` | Sol is the flagship-equivalent tier. |
-| Mini model, balanced lower-cost route, or medium-throughput worker | `gpt-5.6-terra` | Terra is the mini-like tier. |
-| Nano model, classification, extraction, routing, high-volume, or strict-latency route | `gpt-5.6-luna` | Luna is the nano-like tier. |
-| GPT-4.1 or GPT-4o latency-sensitive flow | Evaluate Luna and Terra first; use Sol only if quality requires it | A flagship replacement can change latency and cost materially. |
-| Reasoning-heavy or hardest quality-first flow | Start with Sol at the old effective effort | Preserve the reasoning contract before tuning. |
-| Old Pro usage | Sol plus `reasoning.mode: "pro"`, only if the user wants Pro behavior | GPT-5.6 Pro is a mode, not a separate model slug. |
-| Router, fallback, or model picker | Add the family by role | Do not collapse a multi-model design into Sol. |
-| Third-party or provider-specific model | Leave unchanged unless the user explicitly requests provider migration | Model-name similarity is not a safe mapping. |
-
-Important limits to check in live docs:
-
-- Sol and Terra have roughly 1.05M context and 128K maximum output
-- Luna has a smaller 400K context and 128K maximum output
-- Sol and Terra long-context requests above 272K input tokens can change pricing for the full request
-
-Do not invent prices, limits, or capability flags. Fetch them from current docs before updating a registry or UI.
-
-For model pickers and registries, preserve existing model entries by default. Add GPT-5.6 Sol, Terra, and Luna as new options unless the user explicitly asks to replace or remove older models. Do not invent pricing, context limits, capabilities, or metadata unless confirmed from canonical docs.
-
-If using the `gpt-5.6` alias, record the returned `response.model` during validation. Do not assume an alias and an explicit Sol slug appear identically in dashboards, rate-limit configuration, analytics, or billing metadata.
-
-## Preserve effective reasoning before tuning
-
-GPT-5.6 supports `none`, `low`, `medium`, `high`, `xhigh`, and `max`. If omitted, GPT-5.6 defaults to `medium`.
-
-This is a behavioral migration hazard:
-
-- GPT-5.5 commonly defaulted to `medium`
-- GPT-5.4, mini, and nano usages commonly defaulted to `none`
-- A previously omitted setting can therefore become slower, more expensive, and incompatible with Chat Completions function tools after the model swap
-
-For each usage:
-
-1. If effort is explicit, preserve it for the first 5.6 run when supported
-2. If effort is omitted and the old effective default is known, add it explicitly only when GPT-5.6's omitted default would change behavior. If both old and new omitted defaults are the same, keep it omitted
-3. If the old effective value is unknown, do not guess. Flag it and compare the old behavior with 5.6 at the likely baseline
-4. After the baseline passes, test the same setting and one lower on representative tasks
-5. Use `xhigh` or `max` only for hard quality-first workloads where evals show a meaningful gain
-
-Do not globally recommend `max`. Before increasing effort, check whether the actual failure is a missing success criterion, dependency rule, tool-routing rule, state-replay bug, or validation loop.
-
-Use the field shape that belongs to the endpoint.
+NEVER globally recommend `max`; first check success criteria, dependency/tool-routing rules, replay bugs, and validation loops. Use endpoint-specific field shape.
 
 Responses:
-
 ```json
 {
   "model": "gpt-5.6-sol",
@@ -166,7 +92,6 @@ Responses:
 ```
 
 Chat Completions:
-
 ```json
 {
   "model": "gpt-5.6-sol",
@@ -174,13 +99,9 @@ Chat Completions:
 }
 ```
 
-## Chat Completions and function tools
+## Chat Completions + function tools
 
-This is the most important endpoint-specific check.
-
-For GPT-5.6, function tools in Chat Completions are compatible only with effective reasoning `none`. Reasoning with tools should use the Responses API.
-
-Because GPT-5.6 defaults to `medium`, this combination is unsafe:
+GPT-5.6 Chat Completions function tools are compatible only with effective reasoning `none`; reasoning plus tools belongs on Responses. Since GPT-5.6 defaults to `medium`, this is unsafe:
 
 ```json
 {
@@ -189,8 +110,7 @@ Because GPT-5.6 defaults to `medium`, this combination is unsafe:
 }
 ```
 
-For a latency-sensitive Chat Completions flow that must keep function tools, explicitly preserve `none`:
-
+For a latency-sensitive flow retaining tools, explicitly set `none`:
 ```json
 {
   "model": "gpt-5.6-luna",
@@ -199,57 +119,28 @@ For a latency-sensitive Chat Completions flow that must keep function tools, exp
 }
 ```
 
-If the application needs both reasoning and tools:
+If reasoning and tools are both required, migrate to Responses only when in scope; otherwise report a compatibility blocker. NEVER conceal it by removing tools, dropping reasoning, or changing workload behavior without approval. If live API rejects the intended `none` path, report exact request and error; do not invent a workaround.
 
-- migrate that flow to Responses when implementation changes are in scope;
-- otherwise report it as a compatibility blocker;
-- do not hide the incompatibility by removing tools, dropping required reasoning, or changing the workload's behavior without approval
+## Responses and state
 
-If the live API rejects the intended `none` path, treat it as a current API compatibility issue and report the exact request and error rather than inventing a workaround.
+Prefer Responses for reasoning, tools, multi-turn agents, and new 5.6 capabilities. Preserve existing ordinary multi-turn state strategy; do not add persisted reasoning merely because available.
 
-## Responses API and conversation state
+When deliberately enabling persisted reasoning:
+- use `reasoning.context: "all_turns"` only when objective/assumptions remain stable;
+- prefer `previous_response_id` when server state is available;
+- manual replay preserves every prior user input and relevant output item, not only assistant text;
+- with `store: false` or ZDR, request/replay `reasoning.encrypted_content`;
+- use current-turn behavior when old reasoning may be stale/misleading.
 
-Prefer Responses for reasoning, tools, multi-turn agents, and new 5.6 capabilities.
-
-For ordinary multi-turn Responses calls, preserve the repository's existing state strategy. Do not add persisted reasoning merely because it exists.
-
-If deliberately enabling persisted reasoning:
-
-- use `reasoning.context: "all_turns"` only when the objective and assumptions remain stable;
-- prefer `previous_response_id` when the server can carry state;
-- when replaying manually, preserve every prior user input and every relevant output item, not only assistant text;
-- with `store: false` or ZDR, request and replay `reasoning.encrypted_content`;
-- use current-turn behavior when old reasoning may be stale or misleading
-
-For manual replay, preserve item types, IDs, call IDs, caller metadata, and assistant phase values exactly. Incomplete replay can silently reduce quality or break tool continuation.
+Manual replay preserves item types, IDs, call IDs, caller metadata, and assistant phase values exactly. Incomplete replay can silently reduce quality or break tool continuation.
 
 ## Prompt caching
 
-Do not assume old cache-hit behavior survives the model swap.
+Do not assume cache behavior survives the model swap. GPT-5.6 implicit caching uses a managed breakpoint near the latest user/tool message and no longer relies on 128-token rounding; a large stable prefix followed by changing suffix can lose hits.
 
-GPT-5.6 implicit caching places a managed breakpoint near the latest user or tool message and no longer relies on 128-token rounding. A prompt with a large stable prefix followed by a changing suffix can therefore lose cache hits even when the stable prefix itself has not changed.
+Audit reusable system/developer prompts, dynamic suffixes, changing timestamps/request IDs/user values/tool lists in prefixes, cache keys/retention/dashboards, and accounting for writes as well as reads. Keep reusable prefixes stable; avoid needless churn; compare `cached_tokens`, `cache_write_tokens`, latency, and cost. Use explicit breakpoints only for a measured stable boundary missed by implicit caching. Do not globally convert prompts or send 5.6-only cache fields to older routes. Shared builders must isolate 5.6-only fields.
 
-Audit:
-
-- large reusable system/developer prompts;
-- dynamic suffixes appended to otherwise stable prompts;
-- changing timestamps, request IDs, user-specific values, or tool lists in the prefix;
-- cache keys, retention settings, and cache dashboards;
-- token accounting that assumes reads only and ignores writes
-
-Migration rules:
-
-- keep reusable prefixes stable;
-- do not churn large system prompts unnecessarily;
-- compare old and new `cached_tokens`, `cache_write_tokens`, latency, and cost;
-- use explicit cache breakpoints only when a measured workload has a stable boundary that implicit caching misses;
-- do not globally convert every prompt to explicit caching;
-- do not send 5.6-only cache fields to older routes in a mixed-model system
-
-When old and GPT-5.6 routes share a request builder, isolate GPT-5.6-only fields instead of applying them globally.
-
-The new top-level request shape uses `prompt_cache_options`, for example:
-
+New top-level shape:
 ```json
 {
   "prompt_cache_options": {
@@ -259,47 +150,22 @@ The new top-level request shape uses `prompt_cache_options`, for example:
 }
 ```
 
-Place explicit breakpoints at the actual stable rendered boundary using `prompt_cache_breakpoint`. Preserve `prompt_cache_key` when the application already uses it. Treat the older `prompt_cache_retention` shape as deprecated and verify the live docs before rewriting it.
+Put `prompt_cache_breakpoint` at the actual stable rendered boundary. Preserve existing `prompt_cache_key`. Treat `prompt_cache_retention` as deprecated and verify live docs before rewriting. Cache writes cost more than ordinary uncached input; lower hit rate can be slower and more expensive.
 
-Cache writes cost more than ordinary uncached input, so a lower hit rate can be both slower and more expensive.
+## Images, PDFs, files, long context
 
-## Images, PDFs, files, and long context
+GPT-5.6 may change tokens/latency without prompt changes: omitted/`auto` image detail can preserve original dimensions; Responses PDF/file omitted or `input_file.detail: "auto"` can use high page-image detail; Chat Completions file inputs lack the same detail control; Sol/Terra long context can cross pricing thresholds; Luna's smaller context can break workloads fitting Sol/Terra.
 
-GPT-5.6 can change token and latency behavior without any prompt change:
+For multimodal/long-context sites: measure before/after input tokens and latency; make detail explicit when cost/latency matters; resize/lower detail when spatial precision is unnecessary; retain original/high detail for dense, coordinate-sensitive, OCR, localization, or visual-inspection work; test worst-case lengths. A missing metadata flag does not prove capability removal; verify docs and a representative request.
 
-- for image inputs, omitted or `auto` image detail can preserve original dimensions;
-- for PDF/file inputs in Responses, omitted or `input_file.detail: "auto"` can use high page-image detail;
-- Chat Completions file inputs do not expose the same detail control;
-- long-context Sol and Terra requests can cross pricing thresholds;
-- Luna's smaller context can break workloads that fit in Sol or Terra
+## Contracts
 
-For multimodal or long-context usages:
+Preserve explicit JSON schemas, required fields, enums, refusal handling, parser expectations, tool names/parameter schemas/call IDs/retries, and required citations/evidence/native artifacts. Validate the final answer, not merely tool success. NEVER fix migration failures by weakening schemas, deleting behavior/routes, dropping tools, or changing business logic unless explicitly requested.
 
-1. Measure input tokens and latency before and after
-2. Make detail explicit when cost or latency matters
-3. Resize images or use lower detail when the task does not need original spatial precision
-4. Keep original/high detail for dense, coordinate-sensitive, OCR, localization, or visual-inspection tasks where it materially improves quality
-5. Test worst-case context lengths, not only typical requests
+## Optional features
 
-Do not claim a capability was removed based only on a missing metadata flag. Verify against current docs and a representative request.
-
-## Structured outputs, parsers, and tool contracts
-
-Keep output contracts explicit:
-
-- preserve JSON schemas, required fields, enums, refusal handling, and parser expectations;
-- preserve tool names, parameter schemas, call IDs, and retry behavior;
-- keep citations, evidence fields, or native artifacts when downstream consumers require them;
-- validate that the final answer still satisfies the contract, not merely that a tool call succeeded
-
-Do not fix a failing migration by weakening a schema, deleting required behavior, removing routes, dropping tools, or changing business logic unless the user explicitly asked for that product change.
-
-## Optional: Pro mode
-
-Do not enable Pro mode during a baseline migration unless the old usage was Pro-like or the user explicitly asks for it.
-
-GPT-5.6 Pro uses the base model with a reasoning mode:
-
+### Pro
+Do not enable in baseline unless old usage was Pro-like or requested. GPT-5.6 Pro uses base model plus mode:
 ```json
 {
   "model": "gpt-5.6-sol",
@@ -309,38 +175,12 @@ GPT-5.6 Pro uses the base model with a reasoning mode:
   }
 }
 ```
+Use Responses, not Chat Completions; never invent/search for `gpt-5.6-pro`; supported Pro efforts start at `medium`; mode and effort are separate. Compare quality, total latency, and billed tokens with standard mode. Legacy Pro migration must explicitly change mode and be evaluated separately.
 
-Rules:
+### Programmatic Tool Calling (PTC)
+Optional; add only when code can reduce large structured intermediates before model context. Good: bounded read-only filtering/joining/sorting/ranking/deduplication/aggregation, batching, deterministic validation, compact-schema map-reduce. Poor: one direct call, adaptive next-decision workflows, writes/approvals/side effects, citation-heavy/native-artifact flows, or semantic judgment that should remain model-visible.
 
-- use Responses, not Chat Completions;
-- do not search for or invent a separate `gpt-5.6-pro` slug;
-- supported Pro efforts begin at `medium`;
-- mode and effort are separate decisions;
-- compare task quality, total latency, and actual billed token usage against standard mode
-
-If migrating a legacy Pro slug, make the mode change explicit and evaluate it separately from ordinary Sol migration.
-
-## Optional: Programmatic Tool Calling
-
-Programmatic Tool Calling is not a required part of moving to GPT-5.6. Add it only when code can reduce large structured intermediate results before they return to model context.
-
-Good candidates:
-
-- bounded read-only filtering, joining, sorting, ranking, deduplication, and aggregation;
-- batching many similar records;
-- repeated deterministic validation;
-- map-reduce style retrieval with a compact result schema
-
-Poor candidates:
-
-- one direct tool call;
-- adaptive workflows where each result changes the next decision;
-- write, approval, or side-effecting flows;
-- citation-heavy or native-artifact flows;
-- semantic judgment that should remain visible to the model
-
-Request-shape requirements:
-
+Required shape:
 ```json
 {
   "tools": [
@@ -354,50 +194,18 @@ Request-shape requirements:
 }
 ```
 
-Do not nest `programmatic_tool_calling` under another `tools` property. When enabled, the host must handle `program`, program-issued `function_call`, `function_call_output`, and `program_output` items. Preserve the original `call_id` and `caller` when returning function results.
+Do not nest `programmatic_tool_calling` under another `tools`. Host handles `program`, program-issued `function_call`, `function_call_output`, and `program_output`; preserve original `call_id` and `caller` in function results. Constrain stage, eligible read-only tools, output schema, retries, and handoff to direct judgment. Validate final user-visible answer.
 
-Constrain the stage, eligible read-only tools, output schema, retry limit, and handoff back to direct judgment. Validate the final user-visible answer; a correct program result can still become an incorrect final answer.
-
-## Optional: multi-agent beta
-
-Do not enable multi-agent behavior during a baseline migration unless the application already has a clear parallelizable workflow and the user asks for it.
-
-Enabling it requires:
-
-- the `OpenAI-Beta: responses_multi_agent=v1` header;
-- `multi_agent: { "enabled": true, "max_concurrent_subagents": 3 }`;
-- handling `multi_agent_call`, `multi_agent_call_output`, and `agent_message` items;
-- executing ordinary developer-defined function calls from any agent and returning all required outputs;
-- preserving new items for replay and tracing;
-- checking incompatibilities with compaction, reasoning summaries, and tool-call limits in current docs
-
-Cap concurrency. Do not let a migration task create unbounded subagents, duplicate work, or finish without a final synthesis.
+### Multi-agent beta
+Do not enable in baseline unless a clear parallelizable workflow exists and requested. Requirements: header `OpenAI-Beta: responses_multi_agent=v1`; `multi_agent: { "enabled": true, "max_concurrent_subagents": 3 }`; handle `multi_agent_call`, `multi_agent_call_output`, and `agent_message`; execute ordinary developer-defined function calls from any agent and return all required outputs; preserve new replay/tracing items; check current-doc incompatibilities with compaction, reasoning summaries, and tool-call limits. Cap concurrency; prevent unbounded/duplicate work and require final synthesis.
 
 ## Prompt migration judgment
 
-After the model and API baseline is working, run representative traces before editing prompts. Change prompts only for measured failures.
+After API/model baseline works, run representative traces and edit prompts only for measured failures. Prefer shorter outcome-oriented prompts; explicit success criteria, dependencies, stopping/completion boundaries; preserved user values; decision criteria instead of universal defaults/keyword maps; explicit autonomy/permission; tool routing, resource links, breadcrumbs, expected tool choice; staged plans, current-layer awareness, concise long-work handoffs; real validation before completion.
 
-For GPT-5.6, prefer:
+Avoid generic `be brief`, `be thorough`, or `think step by step`; blanket language instructions causing unwanted switching; repeated `ask first` that blocks safe local work; giant rewrites obscuring regressions; and minimizing tool loops when correctness/evidence/validation requires them.
 
-- shorter, outcome-oriented prompts;
-- explicit success criteria, dependencies, stopping conditions, and completion boundaries;
-- preserved user-provided values;
-- decision criteria for implicit choices instead of universal defaults or keyword maps;
-- explicit autonomy and permission boundaries;
-- explicit tool routing, resource links, breadcrumbs, and expected tool choice;
-- staged plans, current-layer awareness, and concise handoffs for long work;
-- real validation before declaring completion
-
-Avoid:
-
-- generic `be brief`, `be thorough`, or `think step by step` instructions;
-- blanket language instructions that can cause unwanted language switching;
-- repeating `ask first` until safe local work becomes blocked;
-- giant prompt rewrites that make the source of a regression impossible to identify;
-- telling the model to minimize tool loops when correctness, evidence, or required validation needs more work
-
-For coding or agentic migrations, add concrete preservation and verification rules:
-
+For coding/agentic migrations, add:
 ```
 Preserve existing functionality, routes, outputs, and user-visible behavior.
 Do not delete or disable required behavior merely to make the build pass.
@@ -405,64 +213,42 @@ Before finishing, run the relevant build, tests, type checks, render or smoke
 checks, and report the evidence.
 ```
 
-For long-running work, define the current layer: research, design, implementation, review, or external coordination. Do not let the model silently move to another layer.
+For long-running work, define current layer: research, design, implementation, review, or external coordination; do not silently switch layers.
 
-## Upgrade workflow
+## Workflow
 
-1. Fetch current live 5.6 docs and the Prompting Best Practices section
-2. Inventory every usage site and its adjacent prompt, config, registry, parser, and test surfaces
-3. Classify each usage by role and migration class
-4. Choose Sol, Terra, or Luna by the existing workload's role
-5. Preserve the old effective reasoning effort explicitly
-6. Run the compatibility gates:
-   - endpoint and SDK support;
-   - Chat Completions plus function tools;
-   - cache topology and cache fields;
-   - context length and long-context cost;
-   - image, PDF, and file detail;
-   - structured outputs and parsers;
-   - Responses state replay and tool continuation;
-   - mixed-model routing and unsupported new fields
-7. Apply the smallest safe model, config, registry, and prompt changes
-8. Do not add optional Pro, persisted reasoning, PTC, explicit caching, or multi-agent behavior unless needed and measurable
-9. Run existing tests and representative evals
-10. Report changed, unchanged, blocked, and confirmation-needed sites separately
+1. Fetch live 5.6 docs and Prompting Best Practices.
+2. Inventory every usage and adjacent prompt/config/registry/parser/test surface.
+3. Classify role and migration class.
+4. Select Sol/Terra/Luna by workload role.
+5. Preserve old effective effort explicitly.
+6. Gate endpoint/SDK support; Chat Completions/tools; cache topology/fields; context and long-context cost; image/PDF/file detail; schemas/parsers; Responses replay/tool continuation; mixed-model routing and unsupported fields.
+7. Apply smallest safe model/config/registry/prompt changes.
+8. Add Pro, persisted reasoning, PTC, explicit caching, or multi-agent only when needed and measurable.
+9. Run existing tests and representative evals.
+10. Report changed, unchanged, blocked, and confirmation-needed sites separately.
 
-## Validation matrix
+## Validation
 
-Prefer a controlled comparison:
-
+Controlled comparison:
 1. old model + old prompt + old settings;
-2. GPT-5.6 target + same prompt + preserved effective reasoning;
-3. GPT-5.6 target + same prompt + one lower effort;
-4. GPT-5.6 target + the smallest prompt or API fix required by a measured failure;
-5. optional feature treatment, isolated from the baseline
+2. target + same prompt + preserved effort;
+3. target + same prompt + one lower effort;
+4. target + smallest prompt/API fix for measured failure;
+5. optional feature treatment isolated from baseline.
 
-Measure what matters for the workflow:
-
-- task success and user-visible quality;
-- structured-output validity and parser success;
-- tool choice, tool arguments, retries, loop count, and completion rate;
-- TTFT, end-to-end latency, timeout rate, and concurrency behavior;
-- input, output, reasoning, cached, and cache-write tokens;
-- cost per successful task;
-- long-context, compaction, and replay behavior;
-- image/PDF token use and visual/OCR accuracy;
-- completeness, preserved behavior, citations, and validation evidence
-
-For model routers and pickers, test at least one representative workload for each role. Verify that the cheapest or fastest tier is not accidentally used for quality-critical work and that Sol is not accidentally used for every workload.
+Measure task success/user quality; schema/parser validity; tool choice/arguments/retries/loops/completion; TTFT, end-to-end latency, timeouts, concurrency; input/output/reasoning/cached/cache-write tokens; cost per successful task; long-context/compaction/replay; image/PDF tokens and visual/OCR accuracy; completeness, preserved behavior, citations, and validation evidence. For routers/pickers, test one representative workload per role; ensure cheapest/fastest tier is not used for quality-critical work and Sol is not used for everything.
 
 ## Required final report
 
 Return:
+- `Current usage inventory`: model site, endpoint, role, prompt surface, old effective reasoning;
+- `Target mapping`: Sol, Terra, Luna, unchanged, or confirmation-needed, with reason;
+- `Changes made`: model strings, reasoning, prompts, registries, metadata, tests, API shape;
+- `Compatibility checks`: Chat Completions/tools, caching, replay, multimodal detail, context/cost, schemas, mixed routing;
+- `Prompt changes`: each surgical edit and addressed failure;
+- `Validation`: commands, evals, traces, before/after measurements, remaining gaps;
+- `Unchanged sites`: historical, pinned, ambiguous, or intentionally role-specific;
+- `Blockers and open questions`: exact issue, why guessing is unsafe, smallest next step.
 
-- `Current usage inventory`: each model site, endpoint, role, prompt surface, and old effective reasoning
-- `Target mapping`: Sol, Terra, Luna, unchanged, or confirmation-needed, with the reason
-- `Changes made`: model strings, reasoning settings, prompts, registries, metadata, tests, and API-shape changes
-- `Compatibility checks`: Chat Completions/tools, caching, state replay, multimodal detail, context/cost, schemas, and mixed-model routing
-- `Prompt changes`: each surgical edit and the failure mode it addresses
-- `Validation`: commands, evals, traces, before/after measurements, and remaining gaps
-- `Unchanged sites`: historical, pinned, ambiguous, or intentionally role-specific usages
-- `Blockers and open questions`: exact issue, why it is unsafe to guess, and the smallest next step
-
-Never say the migration is complete merely because model strings changed. It is complete only when the affected behavior and contracts have been validated or the remaining gaps are stated explicitly.
+NEVER call migration complete merely because model strings changed. Completion requires validated affected behavior/contracts or explicit remaining gaps.

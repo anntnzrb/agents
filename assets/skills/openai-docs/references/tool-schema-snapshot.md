@@ -1,12 +1,12 @@
 # OpenAI Docs MCP Tool Schema Snapshot
 
-- Snapshot: **2026-07-16**, **MCPorter 0.12.3**
-- Server: `openai-docs` at `https://developers.openai.com/mcp`
-- Inventory: **5 tools**
-- Live schema is authoritative
-- ONLY load this snapshot for broad tool comparison or live discovery failure
-- NEVER load it before a targeted live schema
-- Declarations expose input schemas only. NEVER invent output fields or schemas
+Snapshot: **2026-07-16**; MCPorter **0.12.3**  
+Server: `openai-docs` at `https://developers.openai.com/mcp`  
+Inventory: **5 tools**  
+Live schema authoritative.  
+Load snapshot only for broad tool comparison or live discovery failure; NEVER before targeted live schema.  
+Declarations expose input schemas only; NEVER invent output fields or schemas.  
+Descriptions and input schemas below exact.
 
 Refresh when drift matters:
 
@@ -18,7 +18,7 @@ MUST inspect actual tool results.
 
 ## `search_openai_docs`
 
-Exact description:
+Description:
 
 ```text
 Search across `platform.openai.com`, `developers.openai.com`, and `learn.chatgpt.com` docs. Use this
@@ -33,7 +33,7 @@ Signature:
 function search_openai_docs(query: string, limit?: number, cursor?: string);
 ```
 
-Exact input schema:
+Input schema:
 
 ```json
 {
@@ -61,7 +61,7 @@ Exact input schema:
 
 ## `list_openai_docs`
 
-Exact description:
+Description:
 
 ```text
 List or browse pages from `platform.openai.com`, `developers.openai.com`, and `learn.chatgpt.com`
@@ -77,7 +77,7 @@ Signature:
 function list_openai_docs(limit?: number, cursor?: string);
 ```
 
-Exact input schema:
+Input schema:
 
 ```json
 {
@@ -98,7 +98,7 @@ Exact input schema:
 
 ## `fetch_openai_doc`
 
-Exact description:
+Description:
 
 ```text
 Fetch the markdown for a specific doc page from `developers.openai.com`, `platform.openai.com`, or
@@ -114,7 +114,7 @@ Signature:
 function fetch_openai_doc(url: string, anchor?: string);
 ```
 
-Exact input schema:
+Input schema:
 
 ```json
 {
@@ -137,7 +137,7 @@ Exact input schema:
 
 ## `list_api_endpoints`
 
-Exact description:
+Description:
 
 ```text
 List all OpenAI API endpoint URLs available in the OpenAPI spec.
@@ -149,7 +149,7 @@ Signature:
 function list_api_endpoints();
 ```
 
-Exact input schema:
+Input schema:
 
 ```json
 {
@@ -161,7 +161,7 @@ Exact input schema:
 
 ## `get_openapi_spec`
 
-Exact description:
+Description:
 
 ```text
 Return the OpenAPI spec for a specific API endpoint URL. Optionally filter code samples by language,
@@ -174,7 +174,7 @@ Signature:
 function get_openapi_spec(url: string, languages?: string[], codeExamplesOnly?: boolean);
 ```
 
-Exact input schema:
+Input schema:
 
 ```json
 {
