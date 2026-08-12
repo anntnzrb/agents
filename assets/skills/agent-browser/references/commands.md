@@ -1,8 +1,7 @@
-# Command Reference
+# Complete agent-browser command reference
 
-Complete reference for all agent-browser commands. For quick start and common patterns, see SKILL.md.
-
-Read this when the router omits a required command, flag, or output contract.
+Quick start/common patterns: SKILL.md.
+Use when router omits a required command, flag, or output contract.
 
 ## Navigation
 
@@ -70,7 +69,7 @@ agent-browser get styles @e1      # Get computed styles (font, color, bg, etc.)
 ```bash
 agent-browser is visible @e1      # Check if visible
 agent-browser is enabled @e1      # Check if enabled
-agent-browser is checked @e1      # Check if checked
+agent-browser is checked @e1       # Check if checked
 ```
 
 ## Screenshots and PDF
@@ -131,7 +130,7 @@ agent-browser find nth 2 "a" hover
 
 ```bash
 agent-browser set viewport 1920 1080          # Set viewport size
-agent-browser set device "iPhone 14"          # Emulate device
+agent-browser set device "iPhone 14"           # Emulate device
 agent-browser set geo 37.7749 -122.4194       # Set geolocation (alias: geolocation)
 agent-browser set offline on                  # Toggle offline mode
 agent-browser set headers '{"X-Key":"v"}'     # Extra HTTP headers
@@ -167,18 +166,18 @@ agent-browser network requests --filter api    # Filter requests
 
 ```bash
 agent-browser tab                 # List tabs
-agent-browser tab new [url]       # New tab
-agent-browser tab 2               # Switch to tab by index
-agent-browser tab close           # Close current tab
-agent-browser tab close 2         # Close tab by index
-agent-browser window new          # New window
+agent-browser tab new [url]        # New tab
+agent-browser tab 2                # Switch to tab by index
+agent-browser tab close            # Close current tab
+agent-browser tab close 2          # Close tab by index
+agent-browser window new           # New window
 ```
 
 ## Frames
 
 ```bash
 agent-browser frame "#iframe"     # Switch to iframe
-agent-browser frame main          # Back to main frame
+agent-browser frame main           # Back to main frame
 ```
 
 ## Dialogs

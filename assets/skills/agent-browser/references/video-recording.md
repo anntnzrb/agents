@@ -1,19 +1,6 @@
 # Video Recording
 
-Capture browser automation as video for debugging, documentation, or verification.
-
-Read this before recording, restarting, naming, or retaining browser videos.
-
-**Related**: [commands.md](commands.md) for full command reference, [SKILL.md](../SKILL.md) for quick start.
-
-## Contents
-
-- [Basic Recording](#basic-recording)
-- [Recording Commands](#recording-commands)
-- [Use Cases](#use-cases)
-- [Best Practices](#best-practices)
-- [Output Format](#output-format)
-- [Limitations](#limitations)
+Capture browser automation as video for debugging, documentation, or verification. Read before recording, restarting, naming, or retaining browser videos.
 
 ## Basic Recording
 
@@ -112,7 +99,7 @@ agent-browser record stop
 
 ## Best Practices
 
-### 1. Add Pauses for Clarity
+### Add Pauses for Clarity
 
 ```bash
 # Slow down for human viewing
@@ -120,7 +107,7 @@ agent-browser click @e1
 agent-browser wait 500  # Let viewer see result
 ```
 
-### 2. Use Descriptive Filenames
+### Use Descriptive Filenames
 
 ```bash
 # Include context in filename
@@ -128,7 +115,7 @@ agent-browser record start ./recordings/login-flow-2024-01-15.webm
 agent-browser record start ./recordings/checkout-test-run-42.webm
 ```
 
-### 3. Handle Recording in Error Cases
+### Handle Recording in Error Cases
 
 ```bash
 set -e
@@ -143,7 +130,7 @@ agent-browser record start ./automation.webm
 # ... automation steps ...
 ```
 
-### 4. Combine with Screenshots
+### Combine with Screenshots
 
 ```bash
 # Record video AND capture key frames
@@ -160,12 +147,8 @@ agent-browser record stop
 
 ## Output Format
 
-- Default format: WebM (VP8/VP9 codec)
-- Compatible with all modern browsers and video players
-- Compressed but high quality
+Default format: WebM (VP8/VP9 codec); compatible with all modern browsers and video players; compressed but high quality.
 
 ## Limitations
 
-- Recording adds slight overhead to automation
-- Large recordings can consume significant disk space
-- Some headless environments may have codec limitations
+Recording adds slight overhead to automation. Large recordings can consume significant disk space. Some headless environments may have codec limitations.

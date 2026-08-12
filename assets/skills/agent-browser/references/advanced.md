@@ -1,14 +1,12 @@
 # Advanced Usage
 
-Read this file when you need agent-browser security controls, diffing workflows, timeout strategy, ref lifecycle details, semantic locators, JavaScript evaluation, or persistent config behavior.
-
 ## Security
 
-All security features are opt-in. By default, agent-browser imposes no restrictions on navigation, actions, or output.
+Security features opt-in. Default: agent-browser restricts neither navigation, actions, nor output.
 
-### Content Boundaries (Recommended for AI Agents)
+### Content boundaries
 
-Enable `--content-boundaries` to wrap page-sourced output in markers that help LLMs distinguish tool output from untrusted page content:
+For AI-agent separation of tool output from untrusted page content, enable `--content-boundaries`:
 
 ```bash
 export AGENT_BROWSER_CONTENT_BOUNDARIES=1
@@ -19,9 +17,9 @@ agent-browser snapshot
 # --- END_AGENT_BROWSER_PAGE_CONTENT nonce=<hex> ---
 ```
 
-### Domain Allowlist
+### Domain allowlist
 
-Restrict navigation to trusted domains. Wildcards like `*.example.com` also match the bare domain `example.com`. Sub-resource requests, WebSocket, and EventSource connections to non-allowed domains are also blocked. Include CDN domains your target pages depend on:
+The domain allowlist restricts navigation to trusted domains. `*.example.com` matches `example.com` too. Non-allowed sub-resource, WebSocket, and EventSource requests are blocked; include required CDN domains:
 
 ```bash
 export AGENT_BROWSER_ALLOWED_DOMAINS="example.com,*.example.com"
@@ -29,15 +27,13 @@ agent-browser open https://example.com        # OK
 agent-browser open https://malicious.com       # Blocked
 ```
 
-### Action Policy
+### Action policy
 
 Use a policy file to gate destructive actions:
 
 ```bash
 export AGENT_BROWSER_ACTION_POLICY=./policy.json
 ```
-
-Example `policy.json`:
 
 ```json
 {
@@ -46,19 +42,19 @@ Example `policy.json`:
 }
 ```
 
-Auth vault operations (`auth login`, etc.) bypass action policy but domain allowlist still applies.
+Auth-vault operations (`auth login`, etc.) bypass action policy; domain allowlist still applies.
 
-### Output Limits
-
-Prevent context flooding from large pages:
+### Output limit
 
 ```bash
 export AGENT_BROWSER_MAX_OUTPUT=50000
 ```
 
-## Diffing (Verifying Changes)
+Limits large-page output and prevents context flooding.
 
-Use `diff snapshot` after performing an action to verify it had the intended effect. This compares the current accessibility tree against the last snapshot taken in the session.
+## Diffing
+
+After an action, use `diff snapshot` to verify its effect; it compares the current accessibility tree with the session's last snapshot:
 
 ```bash
 # Typical workflow: snapshot -> action -> diff
@@ -67,7 +63,7 @@ agent-browser click @e2            # Perform action
 agent-browser diff snapshot        # See what changed (auto-compares to last snapshot)
 ```
 
-For visual regression testing or monitoring:
+Visual regression or monitoring:
 
 ```bash
 # Save a baseline screenshot, then compare later
@@ -79,11 +75,11 @@ agent-browser diff screenshot --baseline baseline.png
 agent-browser diff url https://staging.example.com https://prod.example.com --screenshot
 ```
 
-`diff snapshot` output uses `+` for additions and `-` for removals, similar to git diff. `diff screenshot` produces a diff image with changed pixels highlighted in red, plus a mismatch percentage.
+`diff snapshot`: `+` additions, `-` removals, like git diff. `diff screenshot`: diff image with changed pixels highlighted red plus mismatch percentage.
 
-## Timeouts and Slow Pages
+## Timeouts and slow pages
 
-The default Playwright timeout is 25 seconds for local browsers. This can be overridden with the `AGENT_BROWSER_DEFAULT_TIMEOUT` environment variable (value in milliseconds). For slow websites or large pages, use explicit waits instead of relying on the default timeout:
+Default local-browser Playwright timeout: 25 seconds. Override with `AGENT_BROWSER_DEFAULT_TIMEOUT` in milliseconds. Prefer explicit waits for slow or large pages:
 
 ```bash
 # Wait for network activity to settle (best for slow pages)
@@ -103,11 +99,11 @@ agent-browser wait --fn "document.readyState === 'complete'"
 agent-browser wait 5000
 ```
 
-When dealing with consistently slow websites, use `wait --load networkidle` after `open` to ensure the page is fully loaded before taking a snapshot. If a specific element is slow to render, wait for it directly with `wait <selector>` or `wait @ref`.
+For consistently slow sites, run `wait --load networkidle` after `open` before `snapshot`. For slow-rendering elements, wait on `<selector>` or `@ref` directly.
 
-## Session Management and Cleanup
+## Session management and cleanup
 
-When running multiple agents or automations concurrently, always use named sessions to avoid conflicts:
+Concurrent agents/automations MUST use named, isolated sessions:
 
 ```bash
 # Each agent gets its own isolated session
@@ -118,22 +114,18 @@ agent-browser --session agent2 open site-b.com
 agent-browser session list
 ```
 
-Always close your browser session when done to avoid leaked processes:
+Always close sessions to prevent leaked processes:
 
 ```bash
 agent-browser close                    # Close default session
 agent-browser --session agent1 close   # Close specific session
 ```
 
-If a previous session was not closed properly, the daemon may still be running. Use `agent-browser close` to clean it up before starting new work.
+If a prior session was not closed properly and its daemon remains, run `agent-browser close` before starting.
 
-## Ref Lifecycle (Important)
+## Ref lifecycle
 
-Refs (`@e1`, `@e2`, etc.) are invalidated when the page changes. Always re-snapshot after:
-
-- Clicking links or buttons that navigate
-- Form submissions
-- Dynamic content loading (dropdowns, modals)
+Refs (`@e1`, `@e2`, etc.) become invalid when the page changes. Re-snapshot after navigation clicks, form submissions, or dynamic dropdown/modal loading:
 
 ```bash
 agent-browser click @e5              # Navigates to new page
@@ -141,9 +133,9 @@ agent-browser snapshot -i            # MUST re-snapshot
 agent-browser click @e1              # Use new refs
 ```
 
-## Annotated Screenshots (Vision Mode)
+## Annotated screenshots
 
-Use `--annotate` to take a screenshot with numbered labels overlaid on interactive elements. Each label `[N]` maps to ref `@eN`. This also caches refs, so you can interact with elements immediately without a separate snapshot.
+`--annotate` overlays numbered labels on interactive elements; `[N]` maps to `@eN`. It also caches refs, enabling immediate interaction without a separate snapshot:
 
 ```bash
 agent-browser screenshot --annotate
@@ -154,16 +146,11 @@ agent-browser screenshot --annotate
 agent-browser click @e2              # Click using ref from annotated screenshot
 ```
 
-Use annotated screenshots when:
+Use annotated screenshots for unlabeled icon/visual-only buttons, visual layout or styling verification, canvas/chart elements invisible to text snapshots, or spatial reasoning.
 
-- The page has unlabeled icon buttons or visual-only elements
-- You need to verify visual layout or styling
-- Canvas or chart elements are present (invisible to text snapshots)
-- You need spatial reasoning about element positions
+## Semantic locators
 
-## Semantic Locators (Alternative to Refs)
-
-When refs are unavailable or unreliable, use semantic locators:
+When refs are unavailable or unreliable:
 
 ```bash
 agent-browser find text "Sign In" click
@@ -173,9 +160,9 @@ agent-browser find placeholder "Search" type "query"
 agent-browser find testid "submit-btn" click
 ```
 
-## JavaScript Evaluation (eval)
+## JavaScript evaluation
 
-Use `eval` to run JavaScript in the browser context. **Shell quoting can corrupt complex expressions** -- use `--stdin` or `-b` to avoid issues.
+`eval` runs JavaScript in the browser context. Shell quoting can corrupt complex expressions; use `--stdin` or `-b`:
 
 ```bash
 # Simple expressions work with regular quoting
@@ -195,15 +182,14 @@ EVALEOF
 agent-browser eval -b "$(echo -n 'Array.from(document.querySelectorAll("a")).map(a => a.href)' | base64)"
 ```
 
-**Why this matters:** When the shell processes your command, inner double quotes, `!` characters (history expansion), backticks, and `$()` can all corrupt the JavaScript before it reaches agent-browser. The `--stdin` and `-b` flags bypass shell interpretation entirely.
+Shell processing can corrupt inner double quotes, `!` (history expansion), backticks, and `$()`; `--stdin` and `-b` bypass shell interpretation.
 
-**Rules of thumb:**
+Rules:
+- Single-line with no nested quotes: regular `eval 'expression'` is fine.
+- Nested quotes, arrow functions, template literals, or multiline: `eval --stdin <<'EVALEOF'`.
+- Programmatic/generated scripts: `eval -b` with base64.
 
-- Single-line, no nested quotes -> regular `eval 'expression'` with single quotes is fine
-- Nested quotes, arrow functions, template literals, or multiline -> use `eval --stdin <<'EVALEOF'`
-- Programmatic/generated scripts -> use `eval -b` with base64
-
-## Configuration File
+## Configuration file
 
 Create `agent-browser.json` in the project root for persistent settings:
 
@@ -215,4 +201,4 @@ Create `agent-browser.json` in the project root for persistent settings:
 }
 ```
 
-Priority (lowest to highest): `~/.agent-browser/config.json` < `./agent-browser.json` < env vars < CLI flags. Use `--config <path>` or `AGENT_BROWSER_CONFIG` env var for a custom config file (exits with error if missing/invalid). All CLI options map to camelCase keys (e.g., `--executable-path` -> `"executablePath"`). Boolean flags accept `true`/`false` values (e.g., `--headed false` overrides config). Extensions from user and project configs are merged, not replaced.
+Priority, lowest → highest: `~/.agent-browser/config.json` < `./agent-browser.json` < env vars < CLI flags. `--config <path>` or `AGENT_BROWSER_CONFIG` selects a custom config; missing/invalid files exit with an error. CLI options map to camelCase keys, e.g. `--executable-path` → `"executablePath"`. Boolean flags accept `true`/`false`, e.g. `--headed false` overrides config. User and project config extensions merge rather than replace.

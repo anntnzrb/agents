@@ -1,20 +1,8 @@
 # Profiling
 
-Capture Chrome DevTools performance profiles during browser automation for performance analysis.
+Chrome DevTools performance profiles during browser automation for performance analysis. Read before recording or diagnosing performance traces.
 
-Read this before recording or diagnosing a performance trace.
-
-**Related**: [commands.md](commands.md) for full command reference, [SKILL.md](../SKILL.md) for quick start.
-
-## Contents
-
-- [Basic Profiling](#basic-profiling)
-- [Profiler Commands](#profiler-commands)
-- [Categories](#categories)
-- [Use Cases](#use-cases)
-- [Output Format](#output-format)
-- [Viewing Profiles](#viewing-profiles)
-- [Limitations](#limitations)
+Related: [commands.md](commands.md) for full command reference; [SKILL.md](../SKILL.md) for quick start.
 
 ## Basic Profiling
 
@@ -46,17 +34,17 @@ agent-browser profiler stop ./trace.json
 
 ## Categories
 
-The `--categories` flag accepts a comma-separated list of Chrome trace categories. Default categories include:
+`--categories`: comma-separated Chrome trace categories. Default categories include:
 
-- `devtools.timeline` -- standard DevTools performance traces
-- `v8.execute` -- time spent running JavaScript
-- `blink` -- renderer events
-- `blink.user_timing` -- `performance.mark()` / `performance.measure()` calls
-- `latencyInfo` -- input-to-latency tracking
-- `renderer.scheduler` -- task scheduling and execution
-- `toplevel` -- broad-spectrum basic events
+- `devtools.timeline` — standard DevTools performance traces
+- `v8.execute` — JavaScript execution time
+- `blink` — renderer events
+- `blink.user_timing` — `performance.mark()` / `performance.measure()` calls
+- `latencyInfo` — input-to-latency tracking
+- `renderer.scheduler` — task scheduling and execution
+- `toplevel` — broad-spectrum basic events
 
-Several `disabled-by-default-*` categories are also included for detailed timeline, call stack, and V8 CPU profiling data.
+`disabled-by-default-*` categories also included for detailed timeline, call stack, and V8 CPU profiling data.
 
 ## Use Cases
 
@@ -90,7 +78,7 @@ agent-browser profiler stop "./profiles/build-${BUILD_ID}.json"
 
 ## Output Format
 
-The output is a JSON file in Chrome Trace Event format:
+Output: JSON file in Chrome Trace Event format.
 
 ```json
 {
@@ -104,18 +92,18 @@ The output is a JSON file in Chrome Trace Event format:
 }
 ```
 
-The `metadata.clock-domain` field is set based on the host platform (Linux or macOS). On Windows it is omitted.
+`metadata.clock-domain`: host-platform-based; set on Linux or macOS, omitted on Windows.
 
 ## Viewing Profiles
 
-Load the output JSON file in any of these tools:
+Load the output JSON in:
 
 - **Chrome DevTools**: Performance panel > Load profile (Ctrl+Shift+I > Performance)
-- **Perfetto UI**: https://ui.perfetto.dev/ -- drag and drop the JSON file
+- **Perfetto UI**: https://ui.perfetto.dev/ — drag and drop the JSON file
 - **Trace Viewer**: `chrome://tracing` in any Chromium browser
 
 ## Limitations
 
-- Only works with Chromium-based browsers (Chrome, Edge). Not supported on Firefox or WebKit
-- Trace data accumulates in memory while profiling is active (capped at 5 million events). Stop profiling promptly after the area of interest
-- Data collection on stop has a 30-second timeout. If the browser is unresponsive, the stop command may fail
+- Chromium-based browsers only (Chrome, Edge); Firefox and WebKit unsupported.
+- Trace data accumulates in memory while profiling is active, capped at 5 million events. Stop promptly after the area of interest.
+- Stop data collection timeout: 30 seconds; if the browser is unresponsive, the stop command may fail.

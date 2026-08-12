@@ -1,24 +1,8 @@
-# Authentication Patterns
+# Authentication
 
-Login flows, session persistence, OAuth, 2FA, and authenticated browsing.
+Login, session persistence, OAuth/SSO, 2FA, authenticated browsing. Read before automating authentication, saved state, OAuth, or 2FA. Related: [session-management.md](session-management.md) (state persistence); [SKILL.md](../SKILL.md) (quick start).
 
-Read this before automating authentication, saved state, OAuth, or 2FA.
-
-**Related**: [session-management.md](session-management.md) for state persistence details, [SKILL.md](../SKILL.md) for quick start.
-
-## Contents
-
-- [Basic Login Flow](#basic-login-flow)
-- [Saving Authentication State](#saving-authentication-state)
-- [Restoring Authentication](#restoring-authentication)
-- [OAuth / SSO Flows](#oauth--sso-flows)
-- [Two-Factor Authentication](#two-factor-authentication)
-- [HTTP Basic Auth](#http-basic-auth)
-- [Cookie-Based Auth](#cookie-based-auth)
-- [Token Refresh Handling](#token-refresh-handling)
-- [Security Best Practices](#security-best-practices)
-
-## Basic Login Flow
+## Basic login
 
 ```bash
 # Navigate to login page
@@ -41,9 +25,9 @@ agent-browser wait --load networkidle
 agent-browser get url  # Should be dashboard, not login
 ```
 
-## Saving Authentication State
+## Save authentication state
 
-After logging in, save state for reuse:
+After login, save state for reuse:
 
 ```bash
 # Login first (see above)
@@ -58,9 +42,9 @@ agent-browser wait --url "**/dashboard"
 agent-browser state save ./auth-state.json
 ```
 
-## Restoring Authentication
+## Restore authentication
 
-Skip login by loading saved state:
+Load saved state to skip login, then verify:
 
 ```bash
 # Load saved auth state
@@ -73,9 +57,9 @@ agent-browser open https://app.example.com/dashboard
 agent-browser snapshot -i
 ```
 
-## OAuth / SSO Flows
+## OAuth/SSO
 
-For OAuth redirects:
+OAuth redirects:
 
 ```bash
 # Start OAuth flow
@@ -98,9 +82,9 @@ agent-browser wait --url "**/app.example.com**"
 agent-browser state save ./oauth-state.json
 ```
 
-## Two-Factor Authentication
+## 2FA
 
-Handle 2FA with manual intervention:
+Manual intervention required:
 
 ```bash
 # Login with credentials
@@ -120,7 +104,7 @@ agent-browser state save ./2fa-state.json
 
 ## HTTP Basic Auth
 
-For sites using HTTP Basic Authentication:
+Set credentials before navigation:
 
 ```bash
 # Set credentials before navigation
@@ -130,9 +114,9 @@ agent-browser set credentials username password
 agent-browser open https://protected.example.com/api
 ```
 
-## Cookie-Based Auth
+## Cookie-based auth
 
-Manually set authentication cookies:
+Set authentication cookies manually:
 
 ```bash
 # Set auth cookie
@@ -142,9 +126,9 @@ agent-browser cookies set session_token "abc123xyz"
 agent-browser open https://app.example.com/dashboard
 ```
 
-## Token Refresh Handling
+## Token refresh
 
-For sessions with expiring tokens:
+For expiring-token sessions:
 
 ```bash
 # Wrapper that handles token refresh
@@ -175,29 +159,29 @@ else
 fi
 ```
 
-## Security Best Practices
+## Security
 
-1. **Never commit state files** - They contain session tokens
+1. NEVER commit state files: they contain session tokens.
 
    ```bash
    echo "*.auth-state.json" >> .gitignore
    ```
 
-2. **Use environment variables for credentials**
+2. Use environment variables for credentials.
 
    ```bash
    agent-browser fill @e1 "$APP_USERNAME"
    agent-browser fill @e2 "$APP_PASSWORD"
    ```
 
-3. **Clean up after automation**
+3. Clean up after automation.
 
    ```bash
    agent-browser cookies clear
    rm -f ./auth-state.json
    ```
 
-4. **Use short-lived sessions for CI/CD**
+4. Use short-lived CI/CD sessions; do not persist CI state.
    ```bash
    # Don't persist state in CI
    agent-browser open https://app.example.com/login
