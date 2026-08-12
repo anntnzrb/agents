@@ -46,14 +46,14 @@ Use `--include-itad` only when broader aggregation is useful. Use `provider gg -
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Search, comparison, bundle, and regional procedures | `references/workflows.md` | Every user-facing deal task |
-| Provider capabilities and evidence limits | `references/provider-contracts.md` | Selecting or interpreting providers |
-| JSON fields, classifications, ranking, and answer shape | `references/output-contract.md` | Consuming CLI output or reporting results |
-| Retailer, activation, fee, tax, and total verification | `references/checkout-verification.md` | Any finalist or “final price” claim |
-| Ownership, key, gift, subscription, account, and bundle risk | `references/acquisition-risk.md` | Classifying or recommending an offer |
-| Failures, ambiguity, stale data, and conflicting prices | `references/troubleshooting.md` | Any warning, provider failure, or verification block |
+|Need|Read|When|
+|---|---|---|
+|Search, comparison, bundle, and regional procedures|`references/workflows.md`|Every user-facing deal task|
+|Provider capabilities and evidence limits|`references/provider-contracts.md`|Selecting or interpreting providers|
+|JSON fields, classifications, ranking, and answer shape|`references/output-contract.md`|Consuming CLI output or reporting results|
+|Retailer, activation, fee, tax, and total verification|`references/checkout-verification.md`|Any finalist or “final price” claim|
+|Ownership, key, gift, subscription, account, and bundle risk|`references/acquisition-risk.md`|Classifying or recommending an offer|
+|Failures, ambiguity, stale data, and conflicting prices|`references/troubleshooting.md`|Any warning, provider failure, or verification block|
 
 ## Workflow
 

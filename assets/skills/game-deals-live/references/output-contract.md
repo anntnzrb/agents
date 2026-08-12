@@ -102,8 +102,8 @@ Resolve each `offer_index` against `offers`. Absolute cheapest may be account, s
 
 Lead with one sentence naming the absolute cheapest and what the buyer actually receives. Then use a compact table:
 
-| Rank | Store / exact product | Acquisition | DRM | Listed | Fees + tax | Total | Region | Evidence |
-| --- | --- | --- | --- | ---: | ---: | ---: | --- | --- |
+|Rank|Store / exact product|Acquisition|DRM|Listed|Fees + tax|Total|Region|Evidence|
+|---|---|---|---|---:|---:|---:|---|---|
 
 After the table, state:
 
