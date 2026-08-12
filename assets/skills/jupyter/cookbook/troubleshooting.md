@@ -1,14 +1,7 @@
 # Troubleshooting Cookbook
 
-Common errors and how to fix them.
-
----
-
 ## Kernel Not Found
-
-**Problem**: `RuntimeError: Kernel 'python3' not found`
-
-**Solution**:
+`RuntimeError: Kernel 'python3' not found`
 
 ```bash
 # List available kernels
@@ -21,15 +14,10 @@ uv run --with ipykernel python -m ipykernel install --user
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -k python
 ```
 
-**Tip**: Kernel names are in the notebook's `metadata.kernelspec.name`. Use `inspect` to check.
-
----
+Tip: Kernel names are in `metadata.kernelspec.name`; use `inspect` to check.
 
 ## Execution Timeout
-
-**Problem**: `CellTimeoutError: Timeout waiting for execute reply`
-
-**Solution**:
+`CellTimeoutError: Timeout waiting for execute reply`
 
 ```bash
 # Increase timeout (default: 600 seconds)
@@ -39,15 +27,10 @@ uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -t 3600  # 1 h
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 5 -t 7200  # 2 hours for cell 5
 ```
 
-**Tip**: Consider breaking long-running cells into smaller chunks.
-
----
+Tip: Consider breaking long-running cells into smaller chunks.
 
 ## Cell Execution Failed
-
-**Problem**: Cell raises an exception, execution stops.
-
-**Solution**:
+Cell raises an exception; execution stops.
 
 ```bash
 # Continue past errors
@@ -57,15 +40,10 @@ uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb --allow-errors
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -o | grep -A 20 "Error:"
 ```
 
-**Tip**: The error output includes the full traceback.
-
----
+Tip: Error output includes the full traceback.
 
 ## Stale State Issues
-
-**Problem**: Variable defined in cell 10, used in cell 5 after reordering.
-
-**Solution**:
+Variable defined in cell 10, used in cell 5 after reordering.
 
 ```bash
 # Clear all outputs (resets execution order)
@@ -75,15 +53,10 @@ uv run --script <skill-dir>/scripts/cli.py clear notebook.ipynb
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -i
 ```
 
-**Tip**: Always "Run All" to verify notebook works in order.
-
----
+Tip: Always "Run All" to verify notebook works in order.
 
 ## Import Fails Only in Execution
-
-**Problem**: Package works in terminal but fails in notebook execution.
-
-**Solution**:
+Package works in terminal but fails in notebook execution.
 
 ```bash
 # Check which Python the kernel uses
@@ -94,15 +67,10 @@ jupyter kernelspec list --json
 uv add missing_package
 ```
 
-**Tip**: The kernel's Python may differ from your shell's Python.
-
----
+Tip: Kernel Python may differ from shell Python.
 
 ## Notebook Won't Parse
-
-**Problem**: `JSONDecodeError: Expecting value`
-
-**Solution**:
+`JSONDecodeError: Expecting value`
 
 ```bash
 # Check if file is valid JSON
@@ -113,15 +81,10 @@ uv run python -c "import json; json.load(open('notebook.ipynb'))"
 grep -n "<<<<<<" notebook.ipynb
 ```
 
-**Tip**: Use `git show HEAD:notebook.ipynb > backup.ipynb` to recover last committed version.
-
----
+Tip: Recover the last committed version with `git show HEAD:notebook.ipynb > backup.ipynb`.
 
 ## Output Too Large
-
-**Problem**: Notebook file is huge due to large outputs (dataframes, images).
-
-**Solution**:
+Notebook file is huge due to large outputs (dataframes, images).
 
 ```bash
 # Clear outputs
@@ -133,16 +96,10 @@ uv run --script <skill-dir>/scripts/cli.py clear notebook.ipynb
 # fig.show() with limited points
 ```
 
-**Tip**: Add `pd.set_option('display.max_rows', 10)` in first cell.
-
----
+Tip: Add `pd.set_option('display.max_rows', 10)` in the first cell.
 
 ## ANSI Codes in Error Output
-
-**Problem**: Tracebacks have unreadable escape sequences.
-
-**Solution**:
-The `uv run --script <skill-dir>/scripts/cli.py show` command automatically strips ANSI codes. If you're still seeing them:
+Tracebacks contain unreadable escape sequences. `uv run --script <skill-dir>/scripts/cli.py show` automatically strips ANSI codes; if they remain:
 
 ```bash
 # The default output is already cleaned
@@ -152,15 +109,10 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o --raw
 ```
 
-**Tip**: ANSI codes are for terminal colors; they're stripped for readability.
-
----
+Tip: ANSI codes provide terminal colors and are stripped for readability.
 
 ## Execution Hangs
-
-**Problem**: Cell never completes, no timeout triggered.
-
-**Solution**:
+Cell never completes; no timeout triggers.
 
 ```bash
 # Kill any running kernels
@@ -173,15 +125,10 @@ ps aux | grep python | grep jupyter
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -t 60 -c 5
 ```
 
-**Tip**: Common causes: infinite loops, waiting for user input, network I/O.
-
----
+Tip: Common causes include infinite loops, waiting for user input, and network I/O.
 
 ## Permission Denied
-
-**Problem**: `PermissionError: [Errno 13] Permission denied`
-
-**Solution**:
+`PermissionError: [Errno 13] Permission denied`
 
 ```bash
 # Check file permissions
@@ -194,16 +141,12 @@ chmod 644 notebook.ipynb
 chown $USER notebook.ipynb
 ```
 
-**Tip**: This often happens when notebooks are copied from external sources.
-
----
+Tip: Often caused by notebooks copied from external sources.
 
 ## nbclient Not Installed
+`ModuleNotFoundError: No module named 'nbclient'`
 
-**Problem**: `ModuleNotFoundError: No module named 'nbclient'`
-
-**Solution**:
-The scripts use inline dependencies with `uv run`. If uv isn't handling deps:
+Scripts use inline dependencies with `uv run`; if uv does not handle dependencies:
 
 ```bash
 # Install uv using the official instructions for your platform
@@ -213,4 +156,4 @@ The scripts use inline dependencies with `uv run`. If uv isn't handling deps:
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb
 ```
 
-**Tip**: For the lightweight `validate.py`, only `nbformat` is needed.
+Tip: Lightweight `validate.py` needs only `nbformat`.

@@ -1,14 +1,8 @@
 # Workflows Cookbook
 
-Common notebook workflows and recipes.
+Common notebook workflows.
 
----
-
-## Full Edit-Execute-Verify Cycle
-
-**Problem**: Need to edit code, run it, and verify outputs without switching to browser.
-
-**Solution**:
+## Full edit→execute→verify
 
 ```bash
 # 1. Inspect current state
@@ -26,15 +20,11 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb --output-only
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o
 ```
 
-**Tip**: Use `-i` (in-place) to save outputs back to the file for persistence.
+`-i` saves outputs in place for persistence.
 
----
+## Execute cell range
 
-## Execute Specific Cell Range
-
-**Problem**: Only want to run cells 3-7 after editing one of them.
-
-**Solution**:
+Cells 3–7 example:
 
 ```bash
 # Execute cells 3 through 7
@@ -44,15 +34,9 @@ uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 3-7 -i
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 3-7 --output-only
 ```
 
-**Tip**: Cell indices are 0-based. Use `inspect` to see the cell list first.
+Cell indices are 0-based; use `inspect` first to see the cell list.
 
----
-
-## Prepare Notebook for Git Commit
-
-**Problem**: Want to commit notebook without bloated outputs.
-
-**Solution**:
+## Prepare notebook for Git
 
 ```bash
 # Validate syntax
@@ -65,30 +49,20 @@ uv run --script <skill-dir>/scripts/cli.py clear notebook.ipynb
 git add notebook.ipynb
 ```
 
-**Tip**: Consider adding a pre-commit hook that runs `clear` automatically.
+A pre-commit hook can run `clear` automatically.
 
----
-
-## Convert Notebook to Python Script
-
-**Problem**: Want to extract pure Python code for production use.
-
-**Solution**:
+## Convert notebook→Python
 
 ```bash
 # Convert to .py file
 uv run --script <skill-dir>/scripts/cli.py convert notebook.ipynb --to py -o script.py
 ```
 
-**Tip**: The output includes cell markers as comments for reference.
+Output includes cell-marker comments for reference.
 
----
+## Generate HTML report
 
-## Generate HTML Report
-
-**Problem**: Need to share notebook as static HTML.
-
-**Solution**:
+Ensure outputs are current, then convert:
 
 ```bash
 # First ensure outputs are current
@@ -98,15 +72,11 @@ uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -i
 uv run --script <skill-dir>/scripts/cli.py convert notebook.ipynb --to html -o report.html
 ```
 
-**Tip**: For PDF, use `--to pdf` but requires additional system dependencies.
+PDF: use `--to pdf`; additional system dependencies required.
 
----
+## Debug import errors
 
-## Debug Import Errors
-
-**Problem**: Notebook fails on imports, need to identify missing packages.
-
-**Solution**:
+Execute import cells and inspect errors:
 
 ```bash
 # Execute just the import cells
@@ -116,15 +86,9 @@ uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 0-2 --allow
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 0-2 -o
 ```
 
-**Tip**: The error output will show `ModuleNotFoundError` with the missing package name.
+Error output identifies the missing package with `ModuleNotFoundError`.
 
----
-
-## Incremental Execution
-
-**Problem**: Notebook takes long to run, want to execute incrementally.
-
-**Solution**:
+## Incremental execution
 
 ```bash
 # Execute in batches
@@ -136,30 +100,18 @@ uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -c 6-10 -i
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 10 -o
 ```
 
-**Tip**: Use `--allow-errors` if you want to continue past failures.
+Use `--allow-errors` to continue past failures.
 
----
-
-## Extract Code from Notebook
-
-**Problem**: Want to see only the code cells, not markdown.
-
-**Solution**:
+## Extract code
 
 ```bash
 # Show only code cells
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -t code
 ```
 
-**Tip**: Use `-t markdown` to show only markdown cells.
+Use `-t markdown` for only markdown cells.
 
----
-
-## Check Notebook Health
-
-**Problem**: Want to verify notebook is well-formed before sharing.
-
-**Solution**:
+## Check notebook health
 
 ```bash
 # Quick syntax validation
@@ -169,30 +121,20 @@ uv run --script <skill-dir>/scripts/cli.py validate notebook.ipynb
 uv run --script <skill-dir>/scripts/cli.py validate notebook.ipynb --require-outputs
 ```
 
-**Tip**: Fix syntax errors before execution to avoid cryptic kernel errors.
+Fix syntax errors before execution to avoid cryptic kernel errors.
 
----
+## View raw output data
 
-## View Raw Output Data
-
-**Problem**: Need to see the actual JSON structure of outputs (for debugging display issues).
-
-**Solution**:
+For output JSON structure and display debugging:
 
 ```bash
 # Show raw output data
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o --raw
 ```
 
-**Tip**: Raw mode shows the full MIME type data including base64-encoded images.
+Raw mode shows full MIME-type data, including base64-encoded images.
 
----
-
-## Find Cells Containing Pattern
-
-**Problem**: Need to find which cells define a function or import a specific module.
-
-**Solution**:
+## Find cells by pattern
 
 ```bash
 # Find cells importing pandas
@@ -208,15 +150,9 @@ uv run --script <skill-dir>/scripts/cli.py grep -C "class.*Model" notebook.ipynb
 uv run --script <skill-dir>/scripts/cli.py grep --cells-only "TODO" notebook.ipynb
 ```
 
-**Tip**: Pass the returned `--cells-only` indices to `execute -c <indices>`.
+Pass returned `--cells-only` indices to `execute -c <indices>`.
 
----
-
-## Extract Images from Notebook
-
-**Problem**: Need to save matplotlib plots or other images from notebook outputs.
-
-**Solution**:
+## Extract images
 
 ```bash
 # Save all images from outputs to a directory
@@ -229,4 +165,4 @@ uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb --save-images 
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5,10-12 -o --save-images <figures-dir>
 ```
 
-**Tip**: Images are saved as `cell_N_output_M.png` (or `.jpg`, `.svg`). Supports PNG, JPEG, and SVG formats.
+Images save as `cell_N_output_M.png` (or `.jpg`, `.svg`). PNG, JPEG, and SVG supported.

@@ -1,10 +1,10 @@
 # Jupyter Reference
 
-Read this reference before structural notebook edits or execution design.
+MUST read before structural notebook edits or execution design.
 
-## Notebook Structure (nbformat v4)
+## Notebook structure (nbformat v4)
 
-A `.ipynb` file is JSON with this structure:
+`.ipynb`: JSON with this shape:
 
 ```json
 {
@@ -18,9 +18,9 @@ A `.ipynb` file is JSON with this structure:
 }
 ```
 
-### Cell Types
+### Cell types
 
-**Code cells:**
+Code cell:
 
 ```json
 {
@@ -33,7 +33,7 @@ A `.ipynb` file is JSON with this structure:
 }
 ```
 
-**Markdown cells:**
+Markdown cell:
 
 ```json
 {
@@ -44,77 +44,60 @@ A `.ipynb` file is JSON with this structure:
 }
 ```
 
-### Output Types
+### Output types
 
-| Type             | Field                          | Description                     |
-| ---------------- | ------------------------------ | ------------------------------- |
-| `stream`         | `text`                         | stdout/stderr output            |
-| `execute_result` | `data`                         | Return value of last expression |
-| `display_data`   | `data`                         | Explicit display (plots, HTML)  |
-| `error`          | `ename`, `evalue`, `traceback` | Exception info                  |
+`stream`: `text` — stdout/stderr.
+`execute_result`: `data` — last expression's return value.
+`display_data`: `data` — explicit plots, HTML, etc.
+`error`: `ename`, `evalue`, `traceback` — exception information.
 
-### Data MIME Types
+### Data MIME types
 
-Common output data formats:
+`text/plain` — text representation; `text/html` — tables/rich output; `image/png` — PNG, base64 encoded; `image/svg+xml` — SVG; `application/json` — JSON.
 
-- `text/plain` - Text representation
-- `text/html` - HTML (tables, rich output)
-- `image/png` - PNG image (base64 encoded)
-- `image/svg+xml` - SVG graphics
-- `application/json` - JSON data
+## Execution model
 
-## Execution Model
+Kernel lifecycle: start kernel (initialize Python interpreter) → execute cells in order (state persists) → capture stdout, stderr, and display data → store results in notebook.
 
-### Kernel Lifecycle
+Cells share state; variables persist across cells. Execution order matters: earlier cells must run first. “Restart and Run All” ensures clean state.
 
-1. **Start kernel** - Initialize Python interpreter
-2. **Execute cells** - Run code in order, maintain state
-3. **Capture outputs** - stdout, stderr, display data
-4. **Store results** - Save outputs back to notebook
+Common kernel names:
 
-### Cell Execution Order
+|Name|Description|
+|---|---|
+|`python3`|Default Python 3 kernel|
+|`python`|May be Python 2 or 3|
+|`ir`|R kernel|
+|`julia-1.9`|Julia kernel|
 
-- Cells share state - variables persist across cells
-- Execution order matters - earlier cells must run first
-- "Restart and Run All" ensures clean state
+## Best practices
 
-### Common Kernel Names
+Clean notebooks:
 
-| Name        | Description             |
-| ----------- | ----------------------- |
-| `python3`   | Default Python 3 kernel |
-| `python`    | May be Python 2 or 3    |
-| `ir`        | R kernel                |
-| `julia-1.9` | Julia kernel            |
+1. Clear outputs before commit — manageable diffs.
+2. Restart kernel regularly — avoid hidden-state bugs.
+3. Run all cells in order — verify end-to-end operation.
+4. Use markdown headers — navigation structure.
 
-## Best Practices
+Reproducibility:
 
-### For Clean Notebooks
+1. Pin dependencies in first cell.
+2. Set random seeds.
+3. Avoid external state; do not depend on prior runs.
+4. Document assumptions and data sources.
 
-1. **Clear outputs before commit** - Keeps diffs manageable
-2. **Restart kernel regularly** - Avoid hidden state bugs
-3. **Run all cells in order** - Verify notebook works end-to-end
-4. **Use markdown headers** - Structure for navigation
+Cell granularity:
 
-### For Reproducibility
+|Good|Bad|
+|---|---|
+|One concept per cell|Giant cells with many operations|
+|Imports in first cell|Imports scattered throughout|
+|Markdown before code|Code without explanation|
+|Small, testable units|Monolithic scripts|
 
-1. **Pin dependencies** - Include requirements in first cell
-2. **Set random seeds** - For reproducible results
-3. **Avoid external state** - Don't depend on prior runs
-4. **Document assumptions** - Explain data sources
+## Anti-patterns
 
-### Cell Granularity
-
-| Good                  | Bad                              |
-| --------------------- | -------------------------------- |
-| One concept per cell  | Giant cells with many operations |
-| Imports in first cell | Imports scattered throughout     |
-| Markdown before code  | Code without explanation         |
-| Small, testable units | Monolithic scripts               |
-
-## Anti-Patterns
-
-### State Confusion
+### State confusion
 
 ```python
 # Cell 1
@@ -127,9 +110,9 @@ print(x)  # Works if Cell 1 ran
 y = x + 1  # NameError: x not defined
 ```
 
-**Fix:** Restart kernel and "Run All" to verify order-independence.
+Fix: Restart kernel and “Run All” to verify order-independence.
 
-### Hidden State
+### Hidden state
 
 ```python
 # Cell 1
@@ -139,9 +122,9 @@ data = load_data()  # Takes 5 minutes
 result = process(data)  # Uses stale 'data' from old Cell 1
 ```
 
-**Fix:** Re-run upstream cells after modifications.
+Fix: Re-run upstream cells after modifications.
 
-### Output Bloat
+### Output bloat
 
 ```python
 # Avoid: Giant outputs that inflate notebook size
@@ -152,9 +135,9 @@ df.head()
 df.describe()
 ```
 
-## Cell Addressing
+## Cell addressing
 
-### By Index (0-based)
+### By index (0-based)
 
 ```bash
 # Show cell 0
@@ -167,18 +150,18 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 2-4
 uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 0,5,10
 ```
 
-### By Cell ID
+### By cell ID
 
-Each cell has a unique `id` field. Use with `NotebookEdit`:
+Each cell has a unique `id`; `NotebookEdit` targets a specific cell:
 
 ```python
 # NotebookEdit parameters
 cell_id = "abc123"  # Targets specific cell
 ```
 
-## Kernel Management
+## Kernel management
 
-### Timeout Handling
+### Timeout handling
 
 Long-running cells may timeout. Adjust with `-t`:
 
@@ -190,26 +173,26 @@ uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -t 600
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -t 3600
 ```
 
-### Kernel Selection
+### Kernel selection
 
-Force a specific kernel:
+Force a specific kernel with `-k`:
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -k uv-py
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb -k ir  # R kernel
 ```
 
-### Error Handling
+### Error handling
 
-Continue past failing cells:
+Continue past failing cells with `--allow-errors`:
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb --allow-errors
 ```
 
-## Output Interpretation
+## Output interpretation
 
-### Stream Output
+### Stream output
 
 ```json
 { "output_type": "stream", "name": "stdout", "text": "Hello\n" }
@@ -217,7 +200,7 @@ uv run --script <skill-dir>/scripts/cli.py execute notebook.ipynb --allow-errors
 
 Displayed as plain text.
 
-### Execute Result
+### Execute result
 
 ```json
 {
@@ -231,7 +214,7 @@ Displayed as plain text.
 
 `text/plain` shown by default. Use `--raw` for full data.
 
-### Error Output
+### Error output
 
 ```json
 {
@@ -242,4 +225,4 @@ Displayed as plain text.
 }
 ```
 
-Traceback is displayed with ANSI codes stripped.
+Traceback displayed with ANSI codes stripped.

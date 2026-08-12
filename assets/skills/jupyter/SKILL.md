@@ -9,7 +9,7 @@ metadata:
 
 # Jupyter Notebook Skill
 
-Execute, inspect, and manage Jupyter notebooks directly from Claude Code. Eliminates the context-switching loop between CLI and browser.
+Claude Code can execute, inspect, and manage Jupyter notebooks directly, avoiding CLI/browser context switching.
 
 ## Workflow
 
@@ -42,10 +42,10 @@ uv run --with ipykernel python -m ipykernel install --user --name uv-py
 
 Public dispatcher: `scripts/cli.py`.
 
-| Command                                                  | Purpose            | Internal      |
-| -------------------------------------------------------- | ------------------ | ------------- |
-| `inspect`, `show`, `execute`, `convert`, `clear`, `grep` | Full notebook CLI  | `nb.py`       |
-| `validate`                                               | Quick syntax check | `validate.py` |
+|Command|Purpose|Internal|
+|---|---|---|
+|`inspect`, `show`, `execute`, `convert`, `clear`, `grep`|Full notebook CLI|`nb.py`|
+|`validate`|Quick syntax check|`validate.py`|
 
 `cli.py` carries inline dependencies (PEP 723); uv handles everything automatically.
 
@@ -109,8 +109,7 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o
 
 ### Edit Cell (Built-in Tool)
 
-Use Claude's `NotebookEdit` tool to modify cells:
-
+`NotebookEdit` parameters:
 - `cell_id`: The cell ID or index
 - `new_source`: New cell content
 - `edit_mode`: "replace", "insert", or "delete"
@@ -126,24 +125,14 @@ uv run --script <skill-dir>/scripts/cli.py validate notebook.ipynb
 uv run --script <skill-dir>/scripts/cli.py clear notebook.ipynb
 ```
 
-## Tool Integration
-
-| Task                    | Tool                                                                    |
-| ----------------------- | ----------------------------------------------------------------------- |
-| Read notebook structure | `uv run --script <skill-dir>/scripts/cli.py inspect`                    |
-| Read cell contents      | `uv run --script <skill-dir>/scripts/cli.py show` or `read` tool        |
-| Edit cells              | `NotebookEdit` tool                                                     |
-| Execute cells           | `uv run --script <skill-dir>/scripts/cli.py execute`                    |
-| View outputs            | `uv run --script <skill-dir>/scripts/cli.py show -o` or `--output-only` |
-| Search cells            | `uv run --script <skill-dir>/scripts/cli.py grep`                       |
-| Extract images          | `uv run --script <skill-dir>/scripts/cli.py show -o --save-images DIR`  |
-| Validate syntax         | `uv run --script <skill-dir>/scripts/cli.py validate`                   |
-| Convert formats         | `uv run --script <skill-dir>/scripts/cli.py convert`                    |
+Cell contents: `uv run --script <skill-dir>/scripts/cli.py show` or `read` tool.
+Outputs: `uv run --script <skill-dir>/scripts/cli.py show -o` or `--output-only`.
+Images: `uv run --script <skill-dir>/scripts/cli.py show -o --save-images DIR`.
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Notebook structure and execution model | `reference.md` | Before structural edits or execution design |
-| Common notebook workflows | `cookbook/workflows.md` | When a documented workflow matches |
-| Errors and recovery | `cookbook/troubleshooting.md` | After execution, kernel, or format failure |
+|Need|Read|When|
+|---|---|---|
+|Notebook structure and execution model|`reference.md`|Before structural edits or execution design|
+|Common notebook workflows|`cookbook/workflows.md`|When a documented workflow matches|
+|Errors and recovery|`cookbook/troubleshooting.md`|After execution, kernel, or format failure|
