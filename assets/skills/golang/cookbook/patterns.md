@@ -1,27 +1,8 @@
-# Patterns Cookbook
+# Go Patterns Cookbook
 
-Recipes for common Go design patterns: functional options, dependency injection, logging, and more.
-
----
-
-## Contents
-
-- [Functional Options](#functional-options)
-- [Functional Options with Validation](#functional-options-with-validation)
-- [Constructor Injection](#constructor-injection)
-- [Dependency Injection with uber-go/fx](#dependency-injection-with-uber-gofx)
-- [fx Lifecycle Hooks](#fx-lifecycle-hooks)
-- [Structured Logging with slog](#structured-logging-with-slog)
-- [slog HandlerOptions and Context-Aware Logging](#slog-handleroptions-and-context-aware-logging)
-- [Small Interfaces and Composition](#small-interfaces-and-composition)
-- [Repository Pattern](#repository-pattern)
-
----
 ## Functional Options
 
-**Problem**: How to create flexible constructors with optional configuration?
-
-**Solution**:
+Flexible constructors with optional configuration: define `Option func(*Server)`, initialize defaults, then apply options in caller order; options override only explicitly set fields and compose without signature changes.
 
 ```go
 type Server struct {
@@ -63,15 +44,9 @@ server := NewServer(
 )
 ```
 
-**Tip**: Set sensible defaults before applying options. Options only override what's explicitly set. This pattern composes well — callers add options without changing signatures.
-
----
-
 ## Functional Options with Validation
 
-**Problem**: How to validate option values and return configuration errors?
-
-**Solution**:
+Validate each option in its own domain; return errors to catch misconfiguration at startup rather than runtime.
 
 ```go
 type Option func(*Config) error
@@ -107,15 +82,9 @@ func NewConfig(opts ...Option) (*Config, error) {
 }
 ```
 
-**Tip**: Return errors from option functions for validation. This catches misconfigurations at startup instead of at runtime. Each option validates its own domain — keep validation logic colocated with the option.
-
----
-
 ## Constructor Injection
 
-**Problem**: How to make code testable and explicit about its dependencies?
-
-**Solution**:
+Accept interfaces, return structs. Define interfaces at the consumer, not implementation package, to keep them small/relevant. Do not inject `context.Context`; pass it as each method’s first parameter.
 
 ```go
 type UserService struct {
@@ -135,15 +104,9 @@ type UserRepository interface {
 
 ```
 
-**Tip**: Accept interfaces, return structs. Define interfaces where they are consumed, not where they are implemented. This keeps interfaces small and relevant. Do not inject `context.Context` — pass it as the first parameter to methods.
-
----
-
 ## Dependency Injection with uber-go/fx
 
-**Problem**: How to wire up complex dependency graphs automatically?
-
-**Solution**:
+`fx` resolves dependencies by type. Use `fx.Annotate` named groups/tags for multiple implementations. Manual constructor injection is usually simpler; use `fx` when the graph exceeds 10+ constructors.
 
 ```go
 import "go.uber.org/fx"
@@ -170,15 +133,9 @@ func NewUserService(repo UserRepository, log *slog.Logger) *UserService {
 }
 ```
 
-**Tip**: fx resolves dependencies by type. Use `fx.Annotate` with named groups or tags when multiple implementations of the same type exist. For most applications, manual constructor injection is simpler and clearer — reach for fx when the dependency graph grows beyond 10+ constructors.
-
----
-
 ## fx Lifecycle Hooks
 
-**Problem**: How to manage startup and shutdown of resources in fx?
-
-**Solution**:
+`OnStart` runs in dependency order; `OnStop` runs in reverse. Each hook receives a context with the startup/shutdown timeout.
 
 ```go
 func NewDatabase(lc fx.Lifecycle) *sql.DB {
@@ -197,15 +154,9 @@ func NewDatabase(lc fx.Lifecycle) *sql.DB {
 }
 ```
 
-**Tip**: OnStart hooks run in dependency order; OnStop hooks run in reverse order. Each hook receives a context with the startup/shutdown timeout.
-
----
-
 ## Structured Logging with slog
 
-**Problem**: How to produce structured, machine-readable logs without third-party libraries?
-
-**Solution**:
+Use `slog.NewJSONHandler` in production (parseable), `slog.NewTextHandler` in development (readable). Pass loggers as constructor dependencies; never use a package-level global logger.
 
 ```go
 import "log/slog"
@@ -239,15 +190,9 @@ func main() {
 }
 ```
 
-**Tip**: Use `slog.NewJSONHandler` for production (parseable), `slog.NewTextHandler` for development (readable). Pass loggers as constructor dependencies — never use a package-level global logger.
-
----
-
 ## slog HandlerOptions and Context-Aware Logging
 
-**Problem**: How to control log levels, add static attributes, and propagate context values to logs?
-
-**Solution**:
+`HandlerOptions.Level` controls level; `WithAttrs` adds static attributes. `ReplaceAttr` can redact secrets or reformat timestamps; `AddSource` includes file/line in development. `slog.LogAttrs` is most efficient because it avoids `any` allocation for attribute values. Stdlib handlers do **not** automatically extract context values: pass attributes explicitly or install a handler that reads `ctx`.
 
 ```go
 // Handler with custom level and static attributes
@@ -289,15 +234,9 @@ func logMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
 }
 ```
 
-**Tip**: `slog.LogAttrs` is the most efficient way to log — it avoids `any` allocation for attribute values. Use `HandlerOptions.AddSource` to include file/line in development. Use `HandlerOptions.ReplaceAttr` to redact secrets or reformat timestamps.
-
----
-
 ## Small Interfaces and Composition
 
-**Problem**: How to design interfaces that are easy to implement, mock, and compose?
-
-**Solution**:
+Prefer focused 1–2-method interfaces: larger interfaces weaken abstractions. Define them at the consumer; compose small interfaces into broader contracts at the call site. Depend only on what the handler needs.
 
 ```go
 // Small, focused interfaces — 1-2 methods each
@@ -331,15 +270,9 @@ func NewHandler(fetcher UserFetcher, logger *slog.Logger) *Handler {
 }
 ```
 
-**Tip**: The bigger the interface, the weaker the abstraction. Prefer 1-2 methods per interface. Compose small interfaces into larger ones at the call site when needed. Define interfaces where they are consumed, not where they are implemented.
-
----
-
 ## Repository Pattern
 
-**Problem**: How to abstract data access behind a clean, testable interface?
-
-**Solution**:
+Abstract data access behind a testable interface. Always accept `context.Context` first. Translate database-specific errors such as `sql.ErrNoRows` to domain sentinel errors so callers need not import the driver.
 
 ```go
 type UserRepository interface {
@@ -371,5 +304,3 @@ func (r *postgresUserRepo) Get(ctx context.Context, id string) (*User, error) {
     return &user, nil
 }
 ```
-
-**Tip**: Always accept `context.Context` as the first parameter. Translate database-specific errors (`sql.ErrNoRows`) to domain-level sentinel errors so callers don't import the database driver.

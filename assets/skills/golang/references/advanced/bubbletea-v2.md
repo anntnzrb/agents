@@ -1,35 +1,12 @@
-# Bubbletea v2 — TUI with First-Class CJK / IME Support
+# Bubbletea v2 — CJK/IME-safe TUI
 
-## Index
+## Use
 
-Read the section whose heading matches the task; use heading search before loading unrelated detail.
+Read the section matching the task; search headings before loading unrelated detail.
 
-The TUI stack for 2026. Use **v2 RC**, not v1. If your users include Korean, Japanese, or Chinese speakers, v1 is broken — IME composition lands in the wrong cells. v2 fixes this. This document is the canonical setup.
+Use **Bubbletea v2 RC**, not v1. v1's software cursor leaves the terminal cursor at `(0, 0)`, so CJK IME candidate windows anchor at top-left instead of the typing position. v2 exposes the real cursor through `tea.View{Cursor: *tea.Cursor}` and `textarea.Cursor()`; disable the textarea's drawn cursor with `SetVirtualCursor(false)`. Both are required. Reference implementation: [`code-yeongyu/bubbletea-wm`](https://github.com/code-yeongyu/bubbletea-wm).
 
-The reference implementation this document is distilled from: [`code-yeongyu/bubbletea-wm`](https://github.com/code-yeongyu/bubbletea-wm) — a floating window manager built specifically to nail down v2 + IME.
-
----
-
-## Why v2 (not v1) — the IME story
-
-Bubbletea v1 manages cursor positioning in software ("virtual cursor"). It draws a `█` at the cursor position. The terminal's *real* cursor stays at `(0, 0)`.
-
-This breaks every CJK input method. IME candidate windows (the popup showing Hangul composition choices for Korean, kana → kanji for Japanese, and pinyin lookup for Chinese) anchor to the terminal's **real** cursor position. With v1, the candidate window appears at top-left while you are typing somewhere in the middle of the screen.
-
-Bubbletea v2 fixes this with two changes:
-
-1. **`tea.View{Cursor: *tea.Cursor}`** — your `View()` method returns a view that *includes* the desired cursor position. The framework moves the terminal's real cursor there
-2. **`textarea.SetVirtualCursor(false)`** — textareas no longer draw their own `█`. They expose `.Cursor()` so you can read where they want the real cursor
-
-Together: IME popups appear where the user is typing. As they should.
-
-### Other v2 wins (incidental)
-
-- `tea.MouseClickMsg` / `MouseMotionMsg` / `MouseReleaseMsg` instead of one coarse `MouseMsg`
-- Cleaner `View` struct with `AltScreen`, `MouseMode` fields instead of `tea.Cmd` setters
-- Pluggable rendering pipeline; better performance under high message volume
-
----
+v2 also provides typed mouse events (`tea.MouseClickMsg`, `MouseMotionMsg`, `MouseReleaseMsg`), `View.AltScreen`/`MouseMode`, and a pluggable rendering pipeline.
 
 ## `go.mod`
 
@@ -46,11 +23,9 @@ require (
 )
 ```
 
-The packages live under `charm.land/` (NOT `github.com/charmbracelet/...`) for v2. This is the Charm team's deliberate import-path break to keep v2 separate from v1 until stable.
+v2 imports use `charm.land/`, not `github.com/charmbracelet/...`; this deliberate break separates v2 from v1 until stable.
 
----
-
-## Minimal app — the IME-correct skeleton
+## Minimal IME-correct app
 
 ```go
 package main
@@ -114,20 +89,9 @@ func main() {
 }
 ```
 
-The two lines that matter:
+## CJK display width
 
-1. `ta.SetVirtualCursor(false)` — disables the virtual `█`
-2. `view.Cursor = cursor` (where `cursor = m.ta.Cursor()`) — exports the real cursor position to the framework
-
-Without **both**, IME breaks.
-
----
-
-## CJK width — go-runewidth, not `len()`
-
-Korean, Japanese, Chinese characters render as **two terminal cells** (wide characters per Unicode East Asian Width). Naive `len(string)` returns byte count, not display width. `utf8.RuneCountInString` returns rune count, also not display width.
-
-Use `github.com/mattn/go-runewidth`:
+CJK characters occupy two terminal cells. `len(string)` measures bytes; `utf8.RuneCountInString` measures runes, not cells. Use `github.com/mattn/go-runewidth` outside lipgloss; `lipgloss/v2` uses it internally (`lipgloss.Width("\u4e2d\u6587")` returns 4, not 2).
 
 ```go
 import "github.com/mattn/go-runewidth"
@@ -147,11 +111,9 @@ for _, r := range s {
 }
 ```
 
-`lipgloss/v2` uses `go-runewidth` internally — `lipgloss.Width("\u4e2d\u6587")` returns 4, not 2. **If you measure outside lipgloss, you must call runewidth directly.**
+## Mouse
 
----
-
-## Mouse — v2 has typed events
+Handle typed events:
 
 ```go
 case tea.MouseClickMsg:
@@ -165,17 +127,15 @@ case tea.MouseReleaseMsg:
     return m.handleRelease(msg.X, msg.Y)
 ```
 
-Enable mouse via the `View`:
+Enable it in the view:
 
 ```go
 view.MouseMode = tea.MouseModeCellMotion  // or MouseModeAll
 ```
 
-`CellMotion` reports clicks + motion-while-button-pressed (drag). `MouseModeAll` reports motion always — heavier, only when you need hover.
+`CellMotion` reports clicks and motion while a button is pressed, including drag. `MouseModeAll` reports motion always; use it for hover only when needed because it is heavier.
 
----
-
-## Components from `bubbles/v2`
+## Bubbles and Lipgloss v2
 
 ```go
 import (
@@ -190,11 +150,7 @@ import (
 )
 ```
 
-All v2 components support `SetVirtualCursor(false)` where they accept text input. Use it for every text input that users might type CJK into — and "might" should be assumed *yes*.
-
----
-
-## Styling — `lipgloss/v2`
+Every v2 text-input component supports `SetVirtualCursor(false)` where applicable. Assume every user input might contain CJK and use it accordingly.
 
 ```go
 import "charm.land/lipgloss/v2"
@@ -210,11 +166,9 @@ titleStyle := lipgloss.NewStyle().
 rendered := titleStyle.Render("\u4e2d\u6587")
 ```
 
-`lipgloss/v2` width and padding correctly account for CJK display width. v1 did too — this is not a v2-specific fix, just a reminder.
+`lipgloss/v2` width and padding account for CJK display width; v1 did too.
 
----
-
-## Architecture pattern — Model–Update–View
+## Model–Update–View
 
 ```
 +--------------------------------------------+
@@ -229,12 +183,10 @@ rendered := titleStyle.Render("\u4e2d\u6587")
 +--------------------------------------------+
 ```
 
-Rules:
-
-- **Model is a value type, not a pointer.** Bubbletea calls `Update` with a value receiver and expects a new value returned. Pointer receivers cause subtle bugs where state mutation leaks across draws
-- **`Update` is pure.** No I/O. No goroutines started inline. Any I/O returns a `tea.Cmd` — Bubbletea runs it in a goroutine and feeds the result back as a message
-- **`View` is read-only.** It returns a `tea.View` without modifying state
-- **`tea.Cmd` is `func() tea.Msg`.** It runs once, returns a message, exits. For repeating work, use `tea.Tick` or a self-resending command
+- Model: value type, not pointer; use value receivers and return the new model. Pointer receivers can leak state across draws.
+- `Update`: pure; no I/O or inline goroutines. Return I/O as `tea.Cmd`; Bubbletea runs it in a goroutine and feeds its result back as a message.
+- `View`: read-only; return `tea.View` without changing state.
+- `tea.Cmd`: `func() tea.Msg`; runs once, returns one message, exits. Use `tea.Tick` or a self-resending command for repetition.
 
 ```go
 // One-shot command
@@ -254,9 +206,7 @@ func tickEvery() tea.Cmd {
 }
 ```
 
----
-
-## Splitting the model — sub-models
+### Sub-models
 
 ```go
 type model struct {
@@ -282,9 +232,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 ```
 
-`tea.Batch` runs commands concurrently. The framework collects their results in the order they arrive.
-
-When the model exceeds 250 LOC, split by sub-model into separate files:
+`tea.Batch` runs commands concurrently; results arrive in completion order. Once the model exceeds 250 LOC, split sub-model state/update/view into:
 
 ```
 internal/ui/
@@ -294,9 +242,7 @@ internal/ui/
 └── spinner.go        # spinner sub-model
 ```
 
----
-
-## Testing TUI code — `teatest`
+## Testing with `teatest`
 
 ```go
 import "charm.land/bubbletea/v2/teatest"
@@ -318,40 +264,32 @@ func TestModel_typing_cjk_keeps_cursor_in_position(t *testing.T) {
 }
 ```
 
-`teatest` lets you drive the model through synthetic messages and inspect the rendered output. Pair with `autogold` snapshots for full-view regression tests.
+`teatest` drives models with synthetic messages and inspects rendered output. Pair it with `autogold` snapshots for full-view regression tests.
 
----
-
-## Common antipatterns
+## Antipatterns
 
 | Bad | Why | Good |
 |---|---|---|
-| `tea.Program` with `tea.WithoutSignals()` | Ctrl-C does not work | Default signal handling |
-| Pointer receivers on Model | Bubbletea expects value semantics | Value receivers, return new model |
-| `time.Sleep` inside `Update` | Blocks the event loop | `tea.Tick` or async `tea.Cmd` |
-| `fmt.Println` for debug | Corrupts the rendered output | `tea.Printf` for logging, or write to a file |
-| `len(s)` for CJK width | Off by 2x | `runewidth.StringWidth(s)` |
-| `Bubbletea v1` for an app with text input | Korean/Japanese IME breaks | v2 + `SetVirtualCursor(false)` |
-| Drawing your own `█` block cursor in v2 | Conflicts with `view.Cursor` | Let the terminal handle it |
+| `tea.Program` + `tea.WithoutSignals()` | Ctrl-C fails | Default signal handling |
+| Pointer Model receivers | Violates value semantics | Value receivers; return new model |
+| `time.Sleep` in `Update` | Blocks event loop | `tea.Tick` or async `tea.Cmd` |
+| `fmt.Println` debugging | Corrupts rendered output | `tea.Printf` or file logging |
+| `len(s)` for CJK width | 2x error | `runewidth.StringWidth(s)` |
+| Bubbletea v1 with text input | Korean/Japanese IME breaks | v2 + `SetVirtualCursor(false)` |
+| Drawing a `█` cursor in v2 | Conflicts with `view.Cursor` | Let terminal handle it |
 
----
+## Performance
 
-## Performance — when v2 starts to crawl
+- Gate redraws with a dirty flag when state changes more often than rendered output.
+- Use `viewport.Model` for scrollable content; avoid rerendering thousands of lines per keystroke.
+- Use `tea.Batch` to parallelize commands; otherwise synchronous commands serialize.
+- Use `tea.WithFPS(N)` to cap repaint rate during development.
 
-- **Reduce View frequency.** If the model changes 60 times/sec but the rendered view changes once/sec, gate redraws on a "dirty" flag
-- **`viewport.Model` for scrollable content.** Avoid re-rendering thousands of lines on every keystroke
-- **`Batch` your commands.** A series of synchronous `tea.Cmd` returns serializes; `tea.Batch` parallelizes
-- **Profile with `tea.WithFPS(N)`** to cap repaint rate during development
+## When not to use Bubbletea
 
----
-
-## When NOT to use Bubbletea
-
-- The app is one prompt + one answer. Use `huh` (also from Charm) — simpler, no Model–Update–View ceremony
-- The app is a long-running daemon with occasional status output. Use `slog` to stderr and `tea.Program` only if interactivity becomes necessary
-- The app must run as a non-tty subprocess (CI, redirected stdin). `tea.Program` requires a tty for input. Detect via `term.IsTerminal(int(os.Stdin.Fd()))` and fall back to a non-interactive path
-
----
+- One prompt plus one answer: use Charm's `huh`.
+- Long-running daemon with occasional status: use `slog` to stderr; use `tea.Program` only if interactivity becomes necessary.
+- Non-TTY subprocess such as CI or redirected stdin: `tea.Program` requires a TTY for input. Detect with `term.IsTerminal(int(os.Stdin.Fd()))` and use a non-interactive fallback.
 
 ## Sources
 
@@ -359,6 +297,6 @@ func TestModel_typing_cjk_keeps_cursor_in_position(t *testing.T) {
 - bubbles v2: https://github.com/charmbracelet/bubbles/tree/v2
 - lipgloss v2: https://github.com/charmbracelet/lipgloss/tree/v2
 - bubbletea-wm (IME reference): https://github.com/code-yeongyu/bubbletea-wm
-- crush CLI (production IME impl): https://github.com/charmbracelet/crush
+- crush (production IME implementation): https://github.com/charmbracelet/crush
 - go-runewidth: https://github.com/mattn/go-runewidth
 - Unicode East Asian Width: https://www.unicode.org/reports/tr11/

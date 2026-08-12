@@ -188,23 +188,23 @@ formatters:
 
 ## Per-linter rationale (why each is on)
 
-| Linter | What it catches | Why no compromise |
+|Linter|What it catches|Why no compromise|
 |---|---|---|
-| `errcheck` (incl. `check-blank: true`) | `_ = err`, ignored errors from `Close()`, `Write()`, `json.Marshal()` | Silent error ignore is the #1 Go bug class. Banning `_ = err` forces a decision at every site. |
-| `errorlint` | `err == io.EOF` instead of `errors.Is(err, io.EOF)`; missing `%w` in `fmt.Errorf` | Once you wrap in middleware, `==` checks silently break. `errors.Is/As` is the only safe form. |
-| `nilerr` / `nilnil` | `return nil` after `err != nil`; `return nil, nil` from `(*T, error)` | Classic AI-generated bugs. Linter catches them mechanically. |
-| `bodyclose` | `defer resp.Body.Close()` missed | Single most common Go memory leak. |
-| `contextcheck` | `ctx := context.Background()` inside a function that received `ctx` | Breaks cancellation propagation — the entire reason ctx exists. |
-| `exhaustive` | `switch x.(type)` missing a sealed-interface variant | **Go's weakest type-system spot.** This linter is the closest thing to compiler-enforced exhaustiveness. |
-| `sloglint` | `slog.Info(...)` (global), mixed `Any`/typed attrs | Without this, structured logging silently degrades into string concatenation. |
-| `govet/shadow` strict | `err := ... ; if ... { err := ...; ... }` shadowing | Hides the real error from outer scope — extremely common. |
-| `govet/fieldalignment` | Struct field order wasting memory | Cheap correctness signal. Disable per-file when JSON tag order matters for OpenAPI. |
-| `copyloopvar` + `intrange` | Pre-1.22 loop-var capture and old `for i := 0; i < N; i++` | The language modernized; the lint enforces it. |
-| `usetesting` | `os.Setenv` / `os.Mkdir` in tests instead of `t.Setenv` / `t.TempDir` | Avoids test isolation bugs. |
-| `gocognit` / `gocyclo` / `funlen` | Functions exceeding cognitive thresholds | Direct architectural signal — same purpose as the 250 LOC ceiling, at function granularity. |
-| `gosec` | CWE patterns — SQL injection, weak crypto, path traversal | Production must pass this. |
-| `testifylint` | `assert.Equal` where `require.Equal` was meant; `ObjectsAreEqual` misuse | Subtle test-correctness bugs. |
-| `perfsprint` | `fmt.Sprintf("%d", n)` instead of `strconv.Itoa(n)` | 5–10x faster in tight loops, lints catch the lazy form. |
+|`errcheck` (incl. `check-blank: true`)|`_ = err`, ignored errors from `Close()`, `Write()`, `json.Marshal()`|Silent error ignore is the #1 Go bug class. Banning `_ = err` forces a decision at every site.|
+|`errorlint`|`err == io.EOF` instead of `errors.Is(err, io.EOF)`; missing `%w` in `fmt.Errorf`|Once you wrap in middleware, `==` checks silently break. `errors.Is/As` is the only safe form.|
+|`nilerr` / `nilnil`|`return nil` after `err != nil`; `return nil, nil` from `(*T, error)`|Classic AI-generated bugs. Linter catches them mechanically.|
+|`bodyclose`|`defer resp.Body.Close()` missed|Single most common Go memory leak.|
+|`contextcheck`|`ctx := context.Background()` inside a function that received `ctx`|Breaks cancellation propagation — the entire reason ctx exists.|
+|`exhaustive`|`switch x.(type)` missing a sealed-interface variant|**Go's weakest type-system spot.** This linter is the closest thing to compiler-enforced exhaustiveness.|
+|`sloglint`|`slog.Info(...)` (global), mixed `Any`/typed attrs|Without this, structured logging silently degrades into string concatenation.|
+|`govet/shadow` strict|`err := ... ; if ... { err := ...; ... }` shadowing|Hides the real error from outer scope — extremely common.|
+|`govet/fieldalignment`|Struct field order wasting memory|Cheap correctness signal. Disable per-file when JSON tag order matters for OpenAPI.|
+|`copyloopvar` + `intrange`|Pre-1.22 loop-var capture and old `for i := 0; i < N; i++`|The language modernized; the lint enforces it.|
+|`usetesting`|`os.Setenv` / `os.Mkdir` in tests instead of `t.Setenv` / `t.TempDir`|Avoids test isolation bugs.|
+|`gocognit` / `gocyclo` / `funlen`|Functions exceeding cognitive thresholds|Direct architectural signal — same purpose as the 250 LOC ceiling, at function granularity.|
+|`gosec`|CWE patterns — SQL injection, weak crypto, path traversal|Production must pass this.|
+|`testifylint`|`assert.Equal` where `require.Equal` was meant; `ObjectsAreEqual` misuse|Subtle test-correctness bugs.|
+|`perfsprint`|`fmt.Sprintf("%d", n)` instead of `strconv.Itoa(n)`|5–10x faster in tight loops, lints catch the lazy form.|
 
 ## `nolint` policy
 

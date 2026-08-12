@@ -452,15 +452,15 @@ Each test then uses a transaction it rolls back at the end — fast and isolated
 
 ## Why NOT gorm
 
-| Concern | gorm | sqlc + pgx |
+|Concern|gorm|sqlc + pgx|
 |---|---|---|
-| Type safety | runtime reflection; column-to-field via tags | compile-time-checked from SQL |
-| Performance | 2–5x slower than pgx | pgx is the fastest Go pg driver |
-| N+1 queries | encouraged by `Preload` API | explicit JOIN in `.sql` |
-| Migrations | AutoMigrate (unsafe in prod) | goose, explicit |
-| Debugging | "what query did it run?" requires logging | the query IS the source |
-| Cancellation | spotty ctx support | first-class |
-| Active development | Yes but with churn and breaking changes | sqlc is stable |
+|Type safety|runtime reflection; column-to-field via tags|compile-time-checked from SQL|
+|Performance|2–5x slower than pgx|pgx is the fastest Go pg driver|
+|N+1 queries|encouraged by `Preload` API|explicit JOIN in `.sql`|
+|Migrations|AutoMigrate (unsafe in prod)|goose, explicit|
+|Debugging|"what query did it run?" requires logging|the query IS the source|
+|Cancellation|spotty ctx support|first-class|
+|Active development|Yes but with churn and breaking changes|sqlc is stable|
 
 Existing gorm projects: leave them. New code: sqlc + pgx.
 

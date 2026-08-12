@@ -1,28 +1,10 @@
-# Errors Cookbook
+# Go Errors Cookbook
 
-Recipes for creating, wrapping, inspecting, and mapping errors in Go.
+Recipes: create, wrap, inspect, map errors.
 
----
+## Wrapping with Context
 
-## Contents
-
-- [Wrapping Errors with Context](#wrapping-errors-with-context)
-- [Sentinel Errors](#sentinel-errors)
-- [Custom Error Types](#custom-error-types)
-- [errors.As for Type Extraction](#errorsas-for-type-extraction)
-- [errors.AsType (Go 1.26+)](#errorsastype-go-126)
-- [errors.Join for Multiple Errors](#errorsjoin-for-multiple-errors)
-- [Mapping Errors Across Layers](#mapping-errors-across-layers)
-- [When to Use Each Error Pattern](#when-to-use-each-error-pattern)
-- [Preserving Stack Traces](#preserving-stack-traces)
-- [Error Handling in Defer](#error-handling-in-defer)
-
----
-## Wrapping Errors with Context
-
-**Problem**: How to add context to an error while preserving the original for callers to inspect?
-
-**Solution**:
+Preserve originals for `errors.Is`/`errors.As` with `%w`; use `%w` once per `fmt.Errorf` call. Wrap each layer adding meaningful context; include operator-useful details such as file paths.
 
 ```go
 func ReadConfig(path string) (*Config, error) {
@@ -40,15 +22,9 @@ func ReadConfig(path string) (*Config, error) {
 }
 ```
 
-**Tip**: Use `%w` once per `fmt.Errorf` call. Wrap at every layer that adds meaningful context — the file path above helps the operator, not just the programmer.
-
----
-
 ## Sentinel Errors
 
-**Problem**: How to define package-level error values that callers can check with `errors.Is`?
-
-**Solution**:
+Package-level values let callers match fixed conditions with `errors.Is`:
 
 ```go
 var (
@@ -77,15 +53,11 @@ if errors.Is(err, ErrNotFound) {
 }
 ```
 
-**Tip**: Sentinel errors are immutable. Never `fmt.Errorf("%w", ErrNotFound)` to add a message — create a new error and wrap the sentinel instead.
-
----
+Sentinels immutable. Never use `fmt.Errorf("%w", ErrNotFound)` to add a message; create a new error and wrap the sentinel instead.
 
 ## Custom Error Types
 
-**Problem**: How to attach structured metadata to errors for programmatic handling?
-
-**Solution**:
+Use a custom type for structured metadata callers handle programmatically. It MUST implement `Error() string`; use pointer receivers so `errors.As` can unwrap through the chain. Export only caller-needed fields, not logging-only fields.
 
 ```go
 type ValidationError struct {
@@ -116,15 +88,9 @@ if errors.As(err, &valErr) {
 }
 ```
 
-**Tip**: Custom error types must implement `Error() string`. Use pointer receivers so `errors.As` can unwrap through the chain. Do not export fields that are just for logging — export only what callers need.
+## `errors.As`
 
----
-
-## errors.As for Type Extraction
-
-**Problem**: How to extract a specific error type from a wrapped chain?
-
-**Solution**:
+Extract a matching type from a wrapped chain:
 
 ```go
 var dnsErr *net.DNSError
@@ -142,15 +108,11 @@ if errors.As(err, &dnsErr) {
 // → errors.As extracts *net.DNSError correctly.
 ```
 
-**Tip**: `errors.As` walks the chain and calls `Unwrap() error` on each link. It matches any error in the chain whose type matches the target.
+`errors.As` walks the chain, calling `Unwrap() error` on each link; it matches any chain error whose type matches the target.
 
----
+## `errors.AsType` (Go 1.26+)
 
-## errors.AsType (Go 1.26+)
-
-**Problem**: How to extract a typed error from a chain without a pointer-to-pointer dance?
-
-**Solution**:
+Extract a typed chain error directly, avoiding pointer-to-pointer:
 
 ```go
 // Go 1.26+ — returns the extracted value directly
@@ -166,15 +128,11 @@ if timeout, ok := errors.AsType[interface{ Timeout() bool }](err); ok {
 }
 ```
 
-**Tip**: `errors.AsType[T]` returns `(T, bool)`. Prefer it over `errors.As` when the target is known at compile time — it avoids the error-prone pointer-to-pointer pattern and works with non-pointer types.
+`errors.AsType[T]` returns `(T, bool)`. Prefer it over `errors.As` when the target is known at compile time: it avoids the error-prone pointer-to-pointer pattern and works with non-pointer types.
 
----
+## `errors.Join`
 
-## errors.Join for Multiple Errors
-
-**Problem**: How to combine multiple errors into one return value?
-
-**Solution**:
+Combine independent failures into one return value:
 
 ```go
 func validateAll(ctx context.Context, items []Item) error {
@@ -203,15 +161,11 @@ if err := validateAll(ctx, items); err != nil {
 }
 ```
 
-**Tip**: `errors.Is` and `errors.As` recurse into joined errors. An error joined from `[ErrNotFound, ErrConflict]` matches `errors.Is(err, ErrNotFound)`.
+`errors.Is` and `errors.As` recurse into joined errors. Joining `[ErrNotFound, ErrConflict]` makes `errors.Is(err, ErrNotFound)` match.
 
----
+## Mapping Across Layers
 
-## Mapping Errors Across Layers
-
-**Problem**: How to translate errors cleanly when crossing architectural boundaries?
-
-**Solution**:
+Translate across architectural boundaries; each layer wraps, never rewrites:
 
 ```go
 // === Repository layer (DB errors → domain errors) ===
@@ -255,34 +209,24 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-**Tip**: Repository returns domain sentinels. Service adds operation context. Handler maps to status codes. Each layer wraps, never rewrites.
+Repository returns domain sentinels; service adds operation context; handler maps to status codes.
 
----
+## Pattern Selection
 
-## When to Use Each Error Pattern
-
-**Problem**: Which error pattern should I use for this situation?
-
-**Solution**:
-
-| Situation | Pattern |
+|Situation|Pattern|
 |---|---|
-| Caller needs to match a fixed condition | Sentinel error (`var ErrX = errors.New(...)`) |
-| Caller needs to extract structured data | Custom error type + `errors.As` / `errors.AsType` |
-| Caller only logs or surfaces to user | `fmt.Errorf("context: %w", err)` |
-| Multiple independent failures to report | `errors.Join` |
-| Error originates from a 3rd-party library | Wrap and convert to your own sentinel or type |
-| Error is fatal, no recovery possible | Unwrap chain unchanged, or return directly |
+|Caller needs to match a fixed condition|Sentinel error (`var ErrX = errors.New(...)`)|
+|Caller needs to extract structured data|Custom error type + `errors.As` / `errors.AsType`|
+|Caller only logs or surfaces to user|`fmt.Errorf("context: %w", err)`|
+|Multiple independent failures to report|`errors.Join`|
+|Error originates from a 3rd-party library|Wrap and convert to your own sentinel or type|
+|Error is fatal, no recovery possible|Unwrap chain unchanged, or return directly|
 
-**Tip**: Start with wrapped `fmt.Errorf`. Add a sentinel only when a caller needs to branch on it. Add a custom type only when callers need structured fields.
+Start with wrapped `fmt.Errorf`; add a sentinel only for caller branching; add a custom type only when callers need structured fields.
 
----
+## Stack Traces
 
-## Preserving Stack Traces
-
-**Problem**: How to capture a stack trace at the error origin for debugging?
-
-**Solution**: Use `runtime/debug.Stack` to capture a stack trace at the error origin, or rely on structured logging with `slog` to attach caller information.
+Capture a stack at the error origin with `runtime/debug.Stack`, or use structured `slog` logging with caller information.
 
 ```go
 import (
@@ -304,15 +248,11 @@ func handler() {
 }
 ```
 
-**Tip**: Prefer stdlib `fmt.Errorf` wrapping for error chains. Capture stack traces with `runtime/debug.Stack` at the logging boundary (handler/middleware), not at every error site. Reserve `github.com/pkg/errors` only for maintaining inherited codebases that already depend on it — it is in maintenance mode and not recommended for new code.
+Prefer stdlib `fmt.Errorf` wrapping for chains. Capture stacks at the logging boundary (handler/middleware), not every error site. Reserve `github.com/pkg/errors` for inherited codebases already depending on it; it is in maintenance mode and not recommended for new code.
 
----
+## Deferred Cleanup Errors
 
-## Error Handling in Defer
-
-**Problem**: How to capture or handle errors from deferred cleanup functions?
-
-**Solution**:
+Use a named return error to capture deferred cleanup errors; override only when the main operation succeeded, otherwise preserve the primary error. Use `errors.Join` when both matter.
 
 ```go
 func processFile(path string) (err error) {
@@ -330,6 +270,3 @@ func processFile(path string) (err error) {
     return nil
 }
 ```
-
-**Tip**: Name the return error (`err error`) to capture the close error. Only override if the main operation succeeded — otherwise prefer the primary error. Use `errors.Join` if both errors matter.
-

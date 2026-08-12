@@ -1,29 +1,8 @@
 # Go 1.24–1.26 Cookbook
 
-Recipes for Swiss Tables maps, generic type aliases, tool directives, testing improvements, and modernizers.
-
----
-
-## Contents
-
-- [Swiss Tables Maps (1.24)](#swiss-tables-maps-124)
-- [Generic Type Aliases (1.24)](#generic-type-aliases-124)
-- [go.mod Tool Directive (1.24)](#gomod-tool-directive-124)
-- [testing.B.Loop (1.24)](#testingbloop-124)
-- [testing/synctest (1.25)](#testingsynctest-125)
-- [testing/slogtest (Go 1.21+)](#testingslogtest-go-121)
-- [Container-Aware GOMAXPROCS (1.25)](#container-aware-gomaxprocs-125)
-- [new(expr) (1.26)](#newexpr-126)
-- [errors.AsType (1.26)](#errorsastype-126)
-- [testing.T.ArtifactDir (1.26)](#testingtartifactdir-126)
-- [go fix Modernizers (1.26)](#go-fix-modernizers-126)
-
----
 ## Swiss Tables Maps (1.24)
 
-**Problem**: Go maps historically used a custom hash table with separate overflow chains. Under high collision or load-factor pressure, lookup latency degrades.
-
-**Solution**: Go 1.24 replaced the map backend with Swiss Tables, giving better cache locality and faster lookups.
+Go 1.24 replaced the map backend with Swiss Tables: better cache locality and faster lookups. No API change; existing map code benefits automatically after rebuilding with Go 1.24+. Hash-based iteration order may differ; NEVER depend on map iteration order.
 
 ```go
 // No API change — all existing map code benefits automatically
@@ -32,15 +11,9 @@ m["key"] = 42
 v := m["key"] // faster under the hood
 ```
 
-**Tip**: The map API is unchanged. Rebuild with Go 1.24+ to get the performance improvement. Hash-based ordering of map iteration may differ from prior versions — never depend on iteration order.
-
----
-
 ## Generic Type Aliases (1.24)
 
-**Problem**: How to create a short alias for a parameterized type without defining a new named type?
-
-**Solution**: Go 1.24 allows type aliases to carry type parameters.
+Go 1.24 supports type aliases with type parameters. Generic aliases preserve identity and are interchangeable with their underlying type; `=` distinguishes an alias from a new named type. Use them to shorten repetitive parameterized types.
 
 ```go
 // Before 1.24: must define a new named type
@@ -60,15 +33,9 @@ m["hello"] = struct{}{}
 delete(m, "hello") // delete works without conversion
 ```
 
-**Tip**: Generic type aliases are interchangeable with the underlying type. Use them to shorten repetitive parameterized types. The `=` token distinguishes aliases from new named types.
-
----
-
 ## go.mod Tool Directive (1.24)
 
-**Problem**: How to declare tool dependencies (linters, generators) in `go.mod` so they're versioned and reproducible?
-
-**Solution**: The `tool` directive in `go.mod` declares tools the module needs without them being imported.
+`go.mod` `tool` declares versioned, reproducible tool dependencies (linters, generators) without imports. `go tool` downloads and caches declared binaries in the module cache; use `go tool <name>` to run any declared tool. Replace old `tools.go` and `//go:build tools` patterns.
 
 ```go
 // go.mod
@@ -98,15 +65,9 @@ go tool staticcheck ./...
 go get -tool honnef.co/go/tools/cmd/staticcheck
 ```
 
-**Tip**: `go tool` commands download and cache tool binaries under the module cache. Use `go tool <name>` to run any declared tool. Replace old `tools.go` files and `//go:build tools` patterns.
-
----
-
 ## testing.B.Loop (1.24)
 
-**Problem**: The `for i := 0; i < b.N; i++` benchmark loop is boilerplate. Mispasting or resetting `b.N` silently breaks benchmarks.
-
-**Solution**: `b.Loop()` replaces the manual loop and avoids `b.N` entirely.
+`b.Loop()` replaces `for i := 0; i < b.N; i++`, avoiding `b.N`, boilerplate, off-by-one risk, and silent errors from mispasting or resetting `b.N`. It returns true exactly `b.N` times. The compiler requires it at the top of a `for` loop; misuse is a compile error.
 
 ```go
 // Before 1.24
@@ -128,15 +89,9 @@ func BenchmarkProcess(b *testing.B) {
 }
 ```
 
-**Tip**: `b.Loop()` returns true exactly `b.N` times. It replaces the entire `for i := 0; i < b.N; i++` pattern. The compiler checks that `b.Loop()` is called at the top of a for-loop — misuse is a compile error.
-
----
-
 ## testing/synctest (1.25)
 
-**Problem**: How to test concurrent code with deterministic, fake-time control instead of flaky `time.Sleep` races?
-
-**Solution**: `testing/synctest` provides a test-only goroutine bubble where time is fake and concurrency is deterministic.
+`testing/synctest` provides a test-only goroutine bubble with fake time and deterministic concurrency, replacing flaky `time.Sleep` races. `synctest.Test` wraps the test in one fake clock shared by all inner goroutines; the runner advances time in deterministic steps, eliminating races and flakes. `synctest.Wait()` blocks until all goroutines are idle. Stable since Go 1.25; replaces experimental Go 1.24 `synctest.Run`.
 
 ```go
 import "testing/synctest"
@@ -164,21 +119,13 @@ func TestWithTimeout(t *testing.T) {
 }
 ```
 
-**Tip**: `synctest.Test` wraps the test function in a deterministic fake-time bubble. All goroutines started inside share a single fake clock. The test runner advances time in deterministic steps — no races, no flakes. Use `synctest.Wait()` to block until all goroutines are idle. Stable since Go 1.25 (replaces the experimental `synctest.Run` from Go 1.24).
-
-
----
-
 ## testing/slogtest (Go 1.21+)
 
-**Note**: `testing/slogtest` is not a Go 1.25 addition — it has been available since Go 1.21. It provides `slogtest.TestHandler` for validating custom `slog.Handler` implementations. It does **not** provide log capture or structured assertion for application logs. Use `slog.NewRecord` and manual inspection, or a handler that collects into a buffer, for testing application log output.
----
+Not a Go 1.25 addition: available since Go 1.21. `slogtest.TestHandler` validates custom `slog.Handler` implementations; it does NOT capture logs or provide structured assertions for application logs. For application output, use `slog.NewRecord` with manual inspection or a buffer-collecting handler.
 
 ## Container-Aware GOMAXPROCS (1.25)
 
-**Problem**: Go's runtime previously read `/proc/cpuinfo` for CPU count, ignoring cgroup limits, leading to too many OS threads inside containers.
-
-**Solution**: Go 1.25 detects cgroup v2 CPU limits automatically. `runtime.GOMAXPROCS` defaults to the container's quota, not the host's core count.
+Go 1.25 detects cgroup v2 CPU limits automatically; `runtime.GOMAXPROCS` defaults to the container quota rather than host core count. Rebuild with Go 1.25+. It respects cgroup v2 `cpu.max`, including Kubernetes, Docker, and systemd cgroups; Dockerfiles no longer need `GOMAXPROCS=2` environment settings. Manual override remains available.
 
 ```go
 // Automatic — no code change needed
@@ -188,15 +135,9 @@ func TestWithTimeout(t *testing.T) {
 runtime.GOMAXPROCS(4)
 ```
 
-**Tip**: Rebuild with Go 1.25+ and the runtime respects cgroup v2 `cpu.max`. No more `GOMAXPROCS=2` env vars in Dockerfiles. Works with Kubernetes, Docker, and systemd cgroup setups.
-
----
-
 ## new(expr) (1.26)
 
-**Problem**: `new(T)` only zero-initializes. To initialize a pointer-to-struct, you need a separate variable or a constructor function.
-
-**Solution**: `new(T{...})` allocates and initializes in one expression.
+Go 1.26 adds `new(expr)`: allocate and initialize from one value expression. It is syntactic sugar for taking the address of that expression and allocates on the heap only if the pointer escapes. Prefer `&T{...}` for struct literals; `new(expr)` can help generic code where `&` on a value expression is awkward.
 
 ```go
 // Before 1.26
@@ -211,15 +152,9 @@ s := new("hello")          // *string pointing to "hello"
 ch := new(make(chan int))  // *chan int (unbuffered)
 ```
 
-**Tip**: `new(expr)` is syntactic sugar for taking the address of a value expression. It never allocates on the heap unless the pointer escapes. Prefer `&T{...}` for struct literals; `new(expr)` is useful in generic code where `&` on a value expression is awkward.
-
----
-
 ## errors.AsType (1.26)
 
-**Problem**: `errors.As(err, &target)` requires declaring a variable first, which is verbose for single-error-type matching.
-
-**Solution**: `errors.AsType[T]` returns `(T, bool)` directly — no pointer-to-interface ceremony.
+`errors.AsType[T]` returns `(T, bool)` directly, avoiding the variable and pointer-to-interface ceremony of `errors.As(err, &target)`. It traverses the error chain like `errors.As`; `if`-declaration scope keeps the extracted value branch-local.
 
 ```go
 // Before 1.26: two-step
@@ -244,16 +179,9 @@ default:
 }
 ```
 
-**Tip**: `errors.AsType` works through the error chain like `errors.As`. The `if`-with-declaration form keeps the extracted value scoped to the branch.
-
----
-
-
 ## testing.T.ArtifactDir (1.26)
 
-**Problem**: Where to write test artifacts (profiles, golden files, debug dumps) so they survive for inspection after the test?
-
-**Solution**: `t.ArtifactDir()` always returns a per-test directory. When `go test -artifacts` is set, the directory is preserved after the test; otherwise it is cleaned up.
+`t.ArtifactDir()` always returns a per-test directory for profiles, golden files, and debug dumps. With `go test -artifacts`, it is preserved after the test; otherwise it is cleaned up. No guard is needed. The directory is under the test binary's working directory.
 
 ```go
 func TestGenerate(t *testing.T) {
@@ -285,15 +213,11 @@ func TestProfile(t *testing.T) {
 }
 ```
 
-**Tip**: `t.ArtifactDir()` always returns a directory — no guard needed. Set `-artifacts` with `go test` to preserve artifacts after the test run. The directory is a subdirectory of the test binary's working directory. Available since Go 1.26.
-
----
+Available since Go 1.26. Set `-artifacts` with `go test` to preserve artifacts after the run.
 
 ## go fix Modernizers (1.26)
 
-**Problem**: Codebases accumulate legacy patterns that need updating across many files.
-
-**Solution**: `go fix` in 1.26 includes new modernizers that rewrite old idioms to their modern equivalents.
+Go 1.26 `go fix` includes modernizers that rewrite legacy idioms. Run `go fix -diff` first; commit before applying so changes can be reverted. Modernizers apply mechanically, but review diffs for edge cases.
 
 ```bash
 # Preview changes
@@ -312,5 +236,3 @@ go fix -fix=loopvar,bnloop ./...
 #   aserror   — convert errors.As patterns to errors.AsType
 #   new       — convert &T{...} to new(T{...}) where idiomatic
 ```
-
-**Tip**: Run `go fix -diff` first to review changes. Commit before applying so you can revert. Modernizers are safe to apply mechanically but review the diff for edge cases.

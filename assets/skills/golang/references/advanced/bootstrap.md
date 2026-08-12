@@ -2,13 +2,11 @@
 
 ## Index
 
-Read the section whose heading matches the task; use heading search before loading unrelated detail.
-
-What a new Go project needs in its first 60 seconds. This document explains the layout, toolchain, and CI choices; create them with the repository's normal tooling rather than relying on a bundled scaffold.
+Read the heading matching the task; search headings before loading unrelated detail. Create project files with repository-normal tooling, not a bundled scaffold.
 
 ## Toolchain pin
 
-`go.work` (monorepo) or just rely on `go.mod`'s `go 1.23` directive (single module). Go 1.21+ auto-downloads matching toolchain when the local `go` binary is older. **No `.tool-versions` / `asdf` / `mise` indirection required** unless your shop standardizes on it.
+Monorepo: `go.work`; single module: `go.mod` `go 1.23`. Go 1.21+ auto-downloads the matching toolchain when local `go` is older. No `.tool-versions` / `asdf` / `mise` indirection unless shop-standard.
 
 ```bash
 # Confirm a working toolchain
@@ -18,7 +16,7 @@ go version           # ≥ 1.23
 
 ## Required global installs
 
-These are CLI tools, installed once per machine via `go install`:
+Install once per machine via `go install`:
 
 ```bash
 go install mvdan.cc/gofumpt@latest
@@ -31,7 +29,7 @@ go install go.uber.org/mock/mockgen@latest
 go install github.com/go-task/task/v3/cmd/task@latest
 ```
 
-For Connect/protobuf projects, additionally:
+Connect/protobuf projects additionally:
 
 ```bash
 go install github.com/bufbuild/buf/cmd/buf@latest
@@ -39,7 +37,7 @@ go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
 ```
 
-## Project layout — the canonical tree
+## Project layout — canonical tree
 
 ```
 myservice/
@@ -89,17 +87,17 @@ myservice/
 └── .github/workflows/ci.yml
 ```
 
-**Rules**:
+Rules:
+- `cmd/<binary>/main.go` ≤ 50 LOC; move excess to `internal/cmd/`.
+- `internal/` is the business code; other modules cannot import it (Go compiler-enforced).
+- `pkg/` only for libraries genuinely intended for third-party import; empty until proven otherwise.
+- No `utils/`, `helpers/`, `common/`, or `shared/`: **REJECT**. Name files after the concept they own.
+- One package per directory.
+- One responsibility per package.
 
-- `cmd/<binary>/main.go` is ≤ 50 LOC. Anything more lives in `internal/cmd/`
-- `internal/` is **the** business code. Other modules cannot import it (Go compiler-enforced)
-- `pkg/` is for things you genuinely want third parties to import. Empty until proven otherwise
-- No `utils/`, `helpers/`, `common/`, `shared/`. **REJECT.** Files are named after the concept they own
-- One package per directory. One responsibility per package
+## `Taskfile.yml` — entry point for every action
 
-## `Taskfile.yml` — the entry point for every action
-
-`go-task/task` is the modern Make replacement. Cross-platform, YAML, fast.
+`go-task/task` is the cross-platform YAML Make replacement.
 
 ```yaml
 version: '3'
@@ -187,7 +185,7 @@ tasks:
     deps: [fmt, lint, test, build]
 ```
 
-`task` (no args) runs format + lint + test in parallel where possible. `task ci` runs the full pipeline.
+`task` with no args runs format + lint + test, parallel where possible; `task ci` runs the full pipeline.
 
 ## `go.mod` template
 
@@ -206,7 +204,7 @@ require (
 )
 ```
 
-Only direct deps listed; `go mod tidy` populates indirects.
+List direct dependencies only; `go mod tidy` populates indirects.
 
 ## `.editorconfig`
 
@@ -293,11 +291,11 @@ jobs:
         run: go build -trimpath ./...
 ```
 
-The order matters: format → lint → nilaway → test → build. Fail fast on the cheap checks.
+CI order is format → lint → nilaway → test → build; fail fast on cheap checks.
 
 ## `AGENTS.md` — agent-readable project facts
 
-Every new project gets an `AGENTS.md` at the root. The content is **machine-friendly**: short, declarative, no marketing prose. Example:
+Every new project gets root `AGENTS.md`: machine-friendly, short, declarative, no marketing prose. Example:
 
 ```markdown
 # AGENTS.md
@@ -322,11 +320,11 @@ Go 1.23+ HTTP service for {one-line purpose}.
 - 250 pure LOC ceiling per file — split before adding lines
 ```
 
-The skill's `cmd/new-project.go` writes this file with project-specific values filled in.
+`cmd/new-project.go` writes `AGENTS.md` with project-specific values filled in.
 
 ## Sources
 
 - Go modules reference: https://go.dev/ref/mod
 - go-task: https://taskfile.dev
 - golangci-lint v2: https://golangci-lint.run/docs/configuration/
-- Standard project layout debate: https://go.dev/doc/modules/layout (NOT `golang-standards/project-layout` — that repo is community, not official)
+- Standard project layout debate: https://go.dev/doc/modules/layout (NOT `golang-standards/project-layout` — community, not official)

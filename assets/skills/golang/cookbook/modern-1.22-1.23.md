@@ -1,14 +1,8 @@
 # Go 1.22–1.23 Cookbook
 
-Recipes for loop variable semantics, range-over-int, ServeMux routing, math/rand/v2, and iterators.
+## Loop variables (1.22+)
 
----
-
-## Loop Variable Semantics (1.22+)
-
-**Problem**: In Go ≤1.21, loop variables are reused across iterations, causing subtle bugs with goroutines and closures.
-
-**Solution**: Go 1.22+ gives each iteration its own variable. No more `item := item` workaround.
+Go ≤1.21 reuses loop variables across iterations, causing goroutine/closure bugs. Go 1.22+ gives each iteration its own variable; no `item := item` workaround.
 
 ```go
 // Before 1.22 — BUG: all goroutines see the last value
@@ -26,15 +20,11 @@ for _, item := range items {
 }
 ```
 
-**Tip**: When a module declares `go 1.22` or later, the new semantics apply. A module with `go 1.22` requires a Go ≥1.22 toolchain — the old semantics are not available on a compatible toolchain. Libraries should bump the `go` line when they are ready to require Go 1.22+ for all consumers.
+A module declaring `go 1.22` or later uses the new semantics and requires a Go ≥1.22 toolchain; old semantics are unavailable on a compatible toolchain. Libraries should bump the `go` line when ready to require Go 1.22+ for all consumers.
 
----
+## Range over integers
 
-## Range over Integer
-
-**Problem**: How to loop N times without an unused index variable?
-
-**Solution**: `for range n` iterates from 0 to n-1.
+`for range n` loops 0..n-1 without an unused index.
 
 ```go
 // Before 1.22
@@ -48,15 +38,11 @@ for range n {
 }
 ```
 
-**Tip**: `n` must be an integer expression (or constant). Negative values iterate zero times. Use `for range len(slice)` as a concise form.
+`n`: integer expression or constant; negative values iterate zero times. `for range len(slice)` is a concise form.
 
----
+## ServeMux routing (1.22+)
 
-## Enhanced ServeMux Routing
-
-**Problem**: How to build HTTP APIs with method-based routing and path parameters without a third-party router?
-
-**Solution**: Go 1.22+ `http.ServeMux` supports `METHOD /path` patterns, wildcards, and path-value extraction.
+`http.ServeMux` supports method-based `METHOD /path` patterns, wildcards, and path-value extraction, enabling HTTP APIs without a third-party router.
 
 ```go
 mux := http.NewServeMux()
@@ -82,15 +68,11 @@ mux.HandleFunc("GET /files/{path...}", func(w http.ResponseWriter, r *http.Reque
 mux.HandleFunc("GET /users/me", meHandler)
 ```
 
-**Tip**: `{name}` matches a single path segment; `{name...}` matches the remainder of the path. Use `r.PathValue("name")` to extract values. A pattern ending in `/` acts as a subtree prefix match.
+`{name}` matches one path segment; `{name...}` matches the remainder. Extract values with `r.PathValue("name")`. A pattern ending `/` is a subtree-prefix match.
 
----
+## `math/rand/v2`
 
-## math/rand/v2
-
-**Problem**: `math/rand` has confusing seeding and poor statistical quality for many applications.
-
-**Solution**: `math/rand/v2` provides a cleaner API with better defaults and no global source.
+`math/rand` has confusing seeding and poor statistical quality for many applications. `math/rand/v2` provides a cleaner API, better defaults, and no global source.
 
 ```go
 import "math/rand/v2"
@@ -107,15 +89,11 @@ perm := rng.Perm(10)         // random permutation of [0,10)
 import "crypto/rand"
 ```
 
-**Tip**: Drop the old `math/rand` entirely. `rand/v2` uses a PCG generator by default, is automatically seeded, and `IntN`, `UintN`, and `Float64` replace the old `Intn`, `Int31n`, etc. methods.
+Drop old `math/rand`. `rand/v2` uses a PCG generator by default, is automatically seeded, and replaces old `Intn`, `Int31n`, etc. with `IntN`, `UintN`, and `Float64`.
 
----
+## `iter.Seq` and `iter.Seq2` (1.23)
 
-## iter.Seq and iter.Seq2
-
-**Problem**: How to write custom iterators that work with `for range`?
-
-**Solution**: Go 1.23 stabilised the `iter` package. Return `iter.Seq[V]` or `iter.Seq2[K, V]` from a function to make it rangeable.
+Go 1.23 stabilised the `iter` package. A function returning `iter.Seq[V]` or `iter.Seq2[K, V]` becomes rangeable.
 
 ```go
 import "iter"
@@ -152,15 +130,11 @@ for i, v := range Enumerate([]string{"a", "b"}) {
 }
 ```
 
-**Tip**: Check `yield`'s return value — returning `false` stops the loop (`break`). Always return from the iterator function after `yield` returns false.
+Check `yield`'s return: `false` stops the loop (`break`); always return from the iterator function after `yield` returns false.
 
----
+## Pull iterators
 
-## Pull Iterators
-
-**Problem**: How to step through an iterator manually instead of with `for range`?
-
-**Solution**: Use `iter.Pull` to convert a push iterator into a pull-style next/stop pair.
+`iter.Pull` converts a push iterator to a pull-style `next`/`stop` pair.
 
 ```go
 next, stop := iter.Pull(Count(3))
@@ -179,15 +153,11 @@ for k, v, ok := next2(); ok; k, v, ok = next2() {
 }
 ```
 
-**Tip**: Always call `stop()` when done — it releases resources. `defer stop()` is the standard pattern.
+Always call `stop()` when done; it releases resources. Standard pattern: `defer stop()`.
 
----
+## Stdlib iterator integration
 
-## Stdlib Iterator Integration (slices, maps)
-
-**Problem**: How to iterate over stdlib collections using the new iterator protocol?
-
-**Solution**: `slices.All`, `maps.All`, and related functions return iterators.
+`slices.All`, `maps.All`, and related functions return iterators.
 
 ```go
 import (
@@ -222,15 +192,11 @@ for k, v := range maps.All(m) {
 collected := slices.Collect(slices.Values(items))
 ```
 
-**Tip**: Use `slices.Collect` to drain an iterator into a slice, and `maps.Collect` to drain a `Seq2` into a map. These functions replace ad-hoc accumulation loops.
+Use `slices.Collect` to drain an iterator into a slice and `maps.Collect` to drain a `Seq2` into a map; they replace ad-hoc accumulation loops.
 
----
+## Iterator chaining: Filter/Map
 
-## Iterator Chaining with Filter/Map
-
-**Problem**: How to filter, transform, or combine iterators without intermediate allocations?
-
-**Solution**: Compose iterators manually from the `iter` package primitives.
+Compose iterators manually from `iter` primitives to filter, transform, or combine without intermediate allocations.
 
 ```go
 // Filter an iterator inline
@@ -267,4 +233,4 @@ for s := range squared {
 }
 ```
 
-**Tip**: Write iterator combinators inline when you need them — they are small and self-contained. For common patterns (Filter, Map, Concat), define package-level helpers once and reuse them across the codebase.
+Write small, self-contained combinators inline when needed. Define package-level helpers once for common patterns such as Filter, Map, and Concat, then reuse them across the codebase.

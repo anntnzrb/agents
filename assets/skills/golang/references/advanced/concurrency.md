@@ -2,22 +2,18 @@
 
 ## Index
 
-Read the section whose heading matches the task; use heading search before loading unrelated detail.
+Read the section matching the task; search headings before loading unrelated detail.
 
-Goroutines, context, errgroup, channels, locks, and the discipline that keeps them from leaking. Go makes concurrency *easy to start* and *easy to get wrong*. This document is the boring rule set.
+Scope: goroutines, context, errgroup, channels, locks, leak prevention.
 
----
+## Non-negotiables
 
-## The four non-negotiables
+1. `ctx context.Context` first parameter of every public function doing I/O or cancellable.
+2. Every `go` has a shutdown path.
+3. Run `-race` on every test; `Taskfile.yml` and CI enforce it.
+4. Every package spawning goroutines uses `goleak` in `TestMain`; it catches leaks race detection cannot.
 
-1. **`ctx context.Context` is the first parameter of every public function that does I/O or can be cancelled.**
-2. **No goroutine without a shutdown path.** Every `go` keyword must answer "how does this stop?"
-3. **`-race` on every test run.** The `Taskfile.yml` and CI both enforce it
-4. **`goleak` in `TestMain`** for every package that spawns goroutines. Catches leaks the race detector cannot
-
----
-
-## `context.Context` — the cancellation backbone
+## `context.Context`
 
 ```go
 // GOOD — ctx as first param, propagated through
@@ -39,9 +35,9 @@ func (s *UserService) Create(email Email) (User, error) {
 }
 ```
 
-The `contextcheck` linter (enabled in `golangci-strict.md`) refuses any function that has `ctx context.Context` available but uses `context.Background()` instead.
+`contextcheck` (enabled in `golangci-strict.md`) rejects `context.Background()` when a `ctx context.Context` is available. Propagate the caller's context.
 
-### `context.Value` — use sparingly
+### `context.Value`
 
 ```go
 // Typed key — never use a bare string
@@ -58,12 +54,13 @@ func RequestID(ctx context.Context) string {
 }
 ```
 
-**Rules**:
-- Keys are unexported struct types, not strings. Prevents collisions across packages
-- `context.Value` is for *request-scoped metadata* (request ID, auth subject, trace span), NEVER for application-scoped dependencies
-- Dependencies (loggers, DB pools, config) go in your service struct, not in `context.Value`
+- Keys: unexported struct types, never strings; prevents cross-package collisions.
+- `context.Value`: request-scoped metadata only — request ID, auth subject, trace span; NEVER application-scoped dependencies.
+- Put loggers, DB pools, and config in the service struct, not `context.Value`.
 
-### `WithTimeout` / `WithCancel` — always pair with `defer cancel()`
+### `WithTimeout` / `WithCancel`
+
+Always `defer cancel()`; `fatcontext` catches misses and `lostcancel` vet catches the resulting context-goroutine leak until parent expiry.
 
 ```go
 ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -72,13 +69,9 @@ defer cancel()  // ← MUST be deferred. fatcontext linter catches misses.
 if err := slow(ctx); err != nil { ... }
 ```
 
-Forgetting `defer cancel()` leaks a context goroutine until the parent expires — the `lostcancel` vet check catches it.
+## `errgroup`
 
----
-
-## `errgroup` — the structured concurrency primitive
-
-`golang.org/x/sync/errgroup` is Go's answer to Python's `asyncio.TaskGroup` or Rust's `JoinSet`. Use it instead of raw `go` for any group of related goroutines.
+Use `golang.org/x/sync/errgroup` instead of raw `go` for related goroutines.
 
 ```go
 import "golang.org/x/sync/errgroup"
@@ -105,11 +98,10 @@ func FetchAll(ctx context.Context, urls []string) ([][]byte, error) {
 }
 ```
 
-Properties:
+- `WithContext(parent)` returns a child cancelled on the first non-nil error; in-flight goroutines must observe `ctx.Done()` and exit.
+- Always `SetLimit(n)`; it blocks `g.Go(...)` at `n` in-flight goroutines. Unbounded fan-out can kill services.
+- `g.Wait()` returns the first non-nil error and drops others. Accumulate manually when all errors are needed:
 
-- `WithContext(parent)` returns a child ctx that gets cancelled on **first non-nil error**. All in-flight goroutines see `ctx.Done()` and bail
-- `SetLimit(n)` blocks `g.Go(...)` when the in-flight count hits `n`. **Always set this.** Unbounded fan-out is how services die
-- `g.Wait()` returns the **first** non-nil error. Others are dropped. If you need all errors, accumulate them manually:
   ```go
   var mu sync.Mutex
   var errs []error
@@ -118,9 +110,9 @@ Properties:
   // after Wait, errors.Join(errs...)
   ```
 
----
-
 ## Goroutine leaks — `goleak`
+
+At the top of `*_test.go`:
 
 ```go
 package store_test
@@ -135,11 +127,9 @@ func TestMain(m *testing.M) {
 }
 ```
 
-This single line at the top of `*_test.go` runs goleak's check after every test in the package. If a test leaks a goroutine, the run fails — pointing at which goroutine.
+`VerifyTestMain` checks after every package test and fails with the leaking goroutine. It catches unjoined setup goroutines, DB pools, workers, and ticker loops; race detection does NOT catch leaks.
 
-**The bug it catches**: starting a goroutine in `setUp` and never joining it. Common in DB connection pools, background workers, ticker loops. The race detector does NOT catch this.
-
-If you have a known long-lived goroutine (a singleton background worker, a metrics exporter), use `goleak.IgnoreTopFunction`:
+For known long-lived goroutines such as singleton workers or metrics exporters:
 
 ```go
 goleak.VerifyTestMain(m,
@@ -147,9 +137,7 @@ goleak.VerifyTestMain(m,
 )
 ```
 
----
-
-## Channels — the rules that hold
+## Channels
 
 ### Direction
 
@@ -160,13 +148,15 @@ func consume(in <-chan Item)
 func pipeline(in <-chan Item, out chan<- Item)
 ```
 
-Direction restricts misuse. A consumer cannot close the producer's channel.
+Use directional signatures; consumers cannot close the producer's channel.
 
 ### Closing
 
-- **The sender closes.** Always. Never the receiver, never multiple senders
-- **Multiple senders → use a `sync.WaitGroup` + one closer.**
-- **Closing a closed channel panics.** Closing a `nil` channel panics. Sending on a closed channel panics. Receiving from a closed channel returns zero value with `ok = false`
+- Sender closes, always; never receiver or multiple senders.
+- Multiple senders require `sync.WaitGroup` plus one closer.
+- Closing a closed or `nil` channel panics; sending on a closed channel panics; receiving from a closed channel returns the zero value with `ok = false`.
+
+Canonical fan-in:
 
 ```go
 // Canonical fan-in: multiple producers, one closer
@@ -204,15 +194,15 @@ case <-time.After(5 * time.Second):
 }
 ```
 
-- `time.After` allocates a timer each call — fine for occasional selects, **NOT for hot loops**. Use `time.NewTimer` + `timer.Reset` for repeat selects
-- A `default:` case makes `select` non-blocking. Use deliberately, not by accident
+- `time.After` allocates a timer each call; okay for occasional selects, NOT hot loops. Use `time.NewTimer` + `timer.Reset` for repeat selects.
+- `default:` makes `select` non-blocking; use deliberately.
 
-### Buffered vs unbuffered
+### Buffering
 
-- **Unbuffered** (`make(chan T)`) = synchronous handoff. Sender blocks until receiver is ready. Use for *coordination*
-- **Buffered** (`make(chan T, n)`) = asynchronous up to `n`. Use for *decoupling producer rate from consumer rate*
+- `make(chan T)`: unbuffered synchronous handoff; sender blocks until receiver; use for coordination.
+- `make(chan T, n)`: buffered asynchronous handoff up to `n`; use to decouple producer and consumer rates.
 
-A buffered channel of size 1 acts as a **non-blocking signal**:
+Buffered size 1 gives a non-blocking signal:
 
 ```go
 ready := make(chan struct{}, 1)
@@ -225,9 +215,9 @@ default:                    // already signaled, skip
 <-ready
 ```
 
----
+## Locks
 
-## Locks — the pyramid
+Preferred to rare:
 
 ```
 Highest level (preferred)
@@ -243,7 +233,9 @@ Lowest level (rare)
   unsafe.Pointer + barriers  (custom lock-free; needs -race AND review)
 ```
 
-### `sync.Mutex` — embed, don't expose
+### `sync.Mutex`
+
+Embed; do not expose:
 
 ```go
 type Cache struct {
@@ -265,13 +257,13 @@ func (c *Cache) Set(key string, e Entry) {
 }
 ```
 
-- `sync.Mutex` is **not** copyable. The `copylocks` vet check catches `var c2 = c1` where `c1` has a mutex
-- Always `defer mu.Unlock()` immediately after `Lock()`. Forgetting is the #1 deadlock cause
-- Never call user code (callbacks, listener notifications) while holding the lock. Drop the lock, snapshot the data, release, then call out
+- `sync.Mutex` is NOT copyable; `copylocks` vet catches `var c2 = c1` when `c1` contains one.
+- `defer mu.Unlock()` immediately after `Lock()`; forgetting causes deadlocks.
+- Never call user code while locked. Snapshot under lock, unlock, then invoke callbacks/listeners.
 
 ### `sync.OnceValue` / `sync.OnceFunc` (Go 1.21+)
 
-Replacement for `sync.Once` for typed lazy init:
+Typed lazy initialization replaces `sync.Once` plus a global variable:
 
 ```go
 var loadConfig = sync.OnceValue(func() Config {
@@ -283,9 +275,9 @@ var loadConfig = sync.OnceValue(func() Config {
 func handler() { cfg := loadConfig(); ... }
 ```
 
-Type-safe, no `sync.Once` + global variable boilerplate.
+### Atomics
 
-### Atomics — the typed API only
+Use typed `atomic.*` APIs (Go 1.19+), never old function-style APIs:
 
 ```go
 // Go 1.19+ — use the typed atomic.* family
@@ -297,9 +289,9 @@ n := counter.Load()
 atomic.AddInt64(&counter, 1)  // ← rejected
 ```
 
----
+## Time
 
-## Time — inject a clock for testability
+Inject a clock:
 
 ```go
 type Clock interface {
@@ -320,42 +312,32 @@ fake.Set(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
 svc := &Service{clock: fake}
 ```
 
-**Never call `time.Now()` in domain or service code.** The `time` package becomes a hidden dependency — tests become flaky, retries become time-of-day-dependent, expirations cannot be tested.
+NEVER call `time.Now()` in domain/service code; inject it to avoid hidden dependencies, flaky tests, time-of-day-dependent retries, and untestable expirations.
 
-`time.Sleep` in production code is a code smell. Use:
-- `time.NewTicker` for periodic work (and a `<-ctx.Done()` exit)
-- `time.NewTimer` for one-shot delays
-- `time.After` ONLY in select statements, ONLY in non-hot paths
+`time.Sleep` in production is a code smell. Use `time.NewTicker` for periodic work with a `<-ctx.Done()` exit; `time.NewTimer` for one-shot delays; `time.After` ONLY in select statements and ONLY on non-hot paths.
 
----
-
-## Race detector — non-negotiable in CI
+## Race detector
 
 ```bash
 go test -race -shuffle=on -count=1 ./...
 ```
 
-- `-race` instruments memory accesses; catches data races at runtime. ~10x slow-down — acceptable for tests, not production
-- `-shuffle=on` randomizes test order; catches hidden ordering dependencies
-- `-count=1` defeats the test cache. Without it, "passing" might mean "ran 3 weeks ago"
-
-If a test ONLY fails under `-race`, the bug is real. Don't disable the test; fix the race.
-
----
+- `-race` instruments accesses and catches runtime data races; ~10x slowdown, acceptable in tests, not production.
+- `-shuffle=on` randomizes test order and catches ordering dependencies.
+- `-count=1` defeats test caching; without it, passing may mean the test ran 3 weeks ago.
+- A test failing ONLY under `-race` has a real bug; fix the race, do not disable the test.
 
 ## Common antipatterns
 
-| Bad | Why | Good |
+|Bad|Why|Good|
 |---|---|---|
-| `go func() { ... }()` with no `ctx` plumbing | Leaks on shutdown | `errgroup.WithContext` or pass ctx |
-| Bare `time.Sleep(d)` in production | Untestable, blocks | `time.NewTimer` + select with `ctx.Done()` |
-| Channel of `interface{}` | Loses type | Typed channel; use sealed interface if variants needed |
-| `sync.Mutex` in a struct passed by value | Locked copies, undefined behavior | Embed in pointer-receiver type; copylocks catches it |
-| Locking around an entire request handler | Serializes the whole API | Lock only the smallest critical section |
-| `for { select { ... } }` without `<-ctx.Done()` | Cannot stop | Add ctx case in every long-lived select |
-| `sync.WaitGroup.Add(1)` inside the goroutine | Race: Wait can return before Add | Add **before** `go` |
-
----
+|`go func() { ... }()` with no `ctx` plumbing|Leaks on shutdown|`errgroup.WithContext` or pass ctx|
+|Bare `time.Sleep(d)` in production|Untestable, blocks|`time.NewTimer` + select with `ctx.Done()`|
+|Channel of `interface{}`|Loses type|Typed channel; use sealed interface if variants needed|
+|`sync.Mutex` in a struct passed by value|Locked copies, undefined behavior|Embed in pointer-receiver type; copylocks catches it|
+|Locking around an entire request handler|Serializes the whole API|Lock only the smallest critical section|
+|`for { select { ... } }` without `<-ctx.Done()`|Cannot stop|Add ctx case in every long-lived select|
+|`sync.WaitGroup.Add(1)` inside the goroutine|Race: Wait can return before Add|Add **before** `go`|
 
 ## Sources
 

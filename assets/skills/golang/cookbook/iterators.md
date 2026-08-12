@@ -1,28 +1,10 @@
 # Iterators Cookbook
 
-Recipes for Go's range-over-func iterators (`iter.Seq`, `iter.Seq2`) added in Go 1.23+.
+Go 1.23+ range-over-function iterators: `iter.Seq`, `iter.Seq2`.
 
----
+## Range over a function
 
-## Contents
-
-- [Range Over a Function](#range-over-a-function)
-- [Iterating with Keys (iter.Seq2)](#iterating-with-keys-iterseq2)
-- [Consuming Iterators with Stdlib](#consuming-iterators-with-stdlib)
-- [Filtering Iterators](#filtering-iterators)
-- [Mapping Iterators](#mapping-iterators)
-- [Pull-Style Consumption (iter.Pull)](#pull-style-consumption-iterpull)
-- [Pull2 for Key-Value Iterators](#pull2-for-key-value-iterators)
-- [Lazy Pipeline (Filter + Map + Take)](#lazy-pipeline-filter--map--take)
-- [When NOT to Use Iterators](#when-not-to-use-iterators)
-- [Interop: Converting Slices and Maps to Iterators](#interop-converting-slices-and-maps-to-iterators)
-
----
-## Range Over a Function
-
-**Problem**: How to make a custom data structure iterable with `for range`?
-
-**Solution**:
+Custom types implement `for range` with `iter.Seq[V]` (`func(yield func(V) bool)`):
 
 ```go
 // iter.Seq[V] is func(yield func(V) bool)
@@ -42,15 +24,11 @@ for v := range s.All() {
 }
 ```
 
-**Tip**: The `yield` function returns `false` when the caller breaks, returns, or the loop body panics. Always check its return value and stop iterating — it avoids wasted work.
+`yield` returns `false` when the caller breaks, returns, or the loop body panics. MUST check it and stop to avoid wasted work.
 
----
+## Key-value iteration
 
-## Iterating with Keys (iter.Seq2)
-
-**Problem**: How to iterate over key-value pairs from a custom collection?
-
-**Solution**:
+`iter.Seq2[K, V]` is `func(yield func(K, V) bool)`:
 
 ```go
 // iter.Seq2[K, V] is func(yield func(K, V) bool)
@@ -70,15 +48,9 @@ for k, v := range m.All() {
 }
 ```
 
-**Tip**: Naming convention: `All()` returns an iterator over all elements. For filtered views, use descriptive method names like `Filtered(…)`, `Keys()`, `Values()`.
+Convention: `All()` iterates all elements; filtered views use descriptive names such as `Filtered(…)`, `Keys()`, `Values()`.
 
----
-
-## Consuming Iterators with Stdlib
-
-**Problem**: How to collect iterator values into a slice, map, or use them with standard library functions?
-
-**Solution**:
+## Stdlib consumption
 
 ```go
 import (
@@ -115,15 +87,11 @@ for word := range strings.SplitSeq("a b c", " ") {
 }
 ```
 
-**Tip**: `slices.Collect` allocates a new slice. Use `slices.AppendSeq` if you already have a buffer. `maps.Keys` and `maps.Values` are lazy — they don't allocate intermediates.
+`slices.Collect` allocates a new slice; use `slices.AppendSeq` with an existing buffer. `maps.Keys` and `maps.Values` are lazy and allocate no intermediates.
 
----
+## Filtering
 
-## Filtering Iterators
-
-**Problem**: How to create a filtered view of an iterator without allocating a new collection?
-
-**Solution**:
+Lazy, allocation-free (no intermediate slice) filtered view:
 
 ```go
 func Filter[V any](seq iter.Seq[V], pred func(V) bool) iter.Seq[V] {
@@ -142,15 +110,11 @@ for v := range Filter(items.All(), func(v int) bool { return v > 0 }) {
 }
 ```
 
-**Tip**: Filter is lazy — elements are evaluated one at a time as the caller pulls. No intermediate slice is allocated.
+Elements evaluate one at a time as the caller pulls.
 
----
+## Mapping
 
-## Mapping Iterators
-
-**Problem**: How to transform each element of an iterator without an intermediate collection?
-
-**Solution**:
+Lazy transformation without an intermediate collection:
 
 ```go
 func Map[In, Out any](seq iter.Seq[In], fn func(In) Out) iter.Seq[Out] {
@@ -170,15 +134,11 @@ for name := range names {
 }
 ```
 
-**Tip**: Chain Map and Filter together for pipeline-style data processing. Each step is lazy — the full chain runs one element at a time.
+Map and Filter can form a pipeline; each stage remains lazy and processes one element at a time.
 
----
+## Pull-style consumption
 
-## Pull-Style Consumption (iter.Pull)
-
-**Problem**: How to consume an iterator imperatively with next/done rather than `for range`?
-
-**Solution**:
+`iter.Pull` converts push-style `Seq` consumption to imperative next/done consumption. MUST `defer stop()` to release iterator state/resources. `iter.Pull2` is the `Seq2` equivalent.
 
 ```go
 seq := mySet.All()
@@ -196,15 +156,7 @@ for {
 }
 ```
 
-**Tip**: Always `defer stop()` to release resources — the iterator function may hold state that needs cleanup. `Pull` converts the push style into pull style; `Pull2` is the equivalent for `Seq2`.
-
----
-
-## Pull2 for Key-Value Iterators
-
-**Problem**: How to pull key-value pairs from a Seq2 iterator imperatively?
-
-**Solution**:
+## Pull2
 
 ```go
 seq2 := myMap.All()
@@ -220,15 +172,9 @@ for {
 }
 ```
 
-**Tip**: `Pull2` returns `(func() (K, V, bool), func())`. The `next` function returns a third `bool` that is `false` when the iterator is exhausted.
+`Pull2` returns `(func() (K, V, bool), func())`; `next`'s third result is `false` on exhaustion.
 
----
-
-## Lazy Pipeline (Filter + Map + Take)
-
-**Problem**: How to build a composable lazy pipeline of iterator transformations?
-
-**Solution**:
+## Lazy Filter + Map + Take pipeline
 
 ```go
 func Take[V any](seq iter.Seq[V], n int) iter.Seq[V] {
@@ -256,15 +202,22 @@ for name := range top {
 }
 ```
 
-**Tip**: Each adapter allocates a closure but no intermediate data. The pipeline processes one element fully through all stages before moving to the next.
+Each adapter allocates a closure but no intermediate data; each element passes through the full pipeline before the next.
 
----
+## When to use iterators
 
-## When NOT to Use Iterators
+Use for:
+- Custom structures benefiting from lazy iteration (tree, graph, generator).
+- Filter/map/take transformation pipelines.
+- Public APIs exposing contents without underlying representation (for example, a `Set` backed by a map).
+- Interoperation with functions accepting `iter.Seq`.
 
-**Problem**: Iterators are elegant — should I use them everywhere?
+Skip for:
+- Plain slices, maps, or arrays; use `for range` directly.
+- Simple logic where indirection adds no benefit.
+- Performance-critical paths where closure allocation matters; measure first.
 
-**Solution**:
+Iterators are primarily a public-API concern. Do not refactor private loops unless iterators simplify the code.
 
 ```go
 // BAD — overhead for a trivial loop
@@ -284,26 +237,9 @@ for b := range iterBytes(data) { ... }
 for _, b := range data { ... }
 ```
 
-Use iterators when:
-- You have a custom data structure that benefits from lazy iteration (tree, graph, generator)
-- You are composing transformation pipelines (filter, map, take)
-- You need to expose collection contents without exposing the underlying representation
-- You are interop with functions that accept `iter.Seq`
+## Collection interop
 
-Skip iterators when:
-- You have a plain slice, map, or array — use `for range` directly
-- The logic is simple and adding an iterator adds indirection without benefit
-- Performance is critical and the closure allocation overhead matters (measure first)
-
-**Tip**: Iterators are a public API concern. Use them to hide implementation details (e.g., a `Set` backed by a map). Don't refactor private loops into iterators unless they simplify the code.
-
----
-
-## Interop: Converting Slices and Maps to Iterators
-
-**Problem**: How to pass slices and maps to functions that expect `iter.Seq` or `iter.Seq2`?
-
-**Solution**:
+Use these allocation-free bridges from concrete collections to `iter.Seq`/`iter.Seq2`: `slices.Values`, `slices.All`, `slices.Backward`, `maps.All`, `maps.Keys`, `maps.Values`.
 
 ```go
 // Slice/array/map values to Seq
@@ -328,6 +264,3 @@ for i, v := range slices.Backward(items) {
     fmt.Println(i, v)
 }
 ```
-
-**Tip**: `slices.Values`, `slices.All`, `slices.Backward`, `maps.All`, `maps.Keys`, `maps.Values` — use these to bridge concrete collections into the iterator world without allocation.
-

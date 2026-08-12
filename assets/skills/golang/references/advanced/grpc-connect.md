@@ -10,14 +10,14 @@ Read the section whose heading matches the task; use heading search before loadi
 
 ## When Connect vs grpc-go
 
-| Need | Use |
+|Need|Use|
 |---|---|
-| Standard unary + server-streaming + client-streaming | **Connect** |
-| Browser client without `grpc-web` proxy | **Connect** (native gRPC-Web support) |
-| HTTP/1.1 fallback for hostile networks | **Connect** (gRPC requires HTTP/2 end-to-end) |
-| Server reflection for `grpcurl` | grpc-go (Connect has reflection too, but ecosystem smaller) |
-| Bidirectional streaming with frame-level control | grpc-go |
-| Strict gRPC environment (Envoy with gRPC filters, Istio strict mode) | grpc-go |
+|Standard unary + server-streaming + client-streaming|**Connect**|
+|Browser client without `grpc-web` proxy|**Connect** (native gRPC-Web support)|
+|HTTP/1.1 fallback for hostile networks|**Connect** (gRPC requires HTTP/2 end-to-end)|
+|Server reflection for `grpcurl`|grpc-go (Connect has reflection too, but ecosystem smaller)|
+|Bidirectional streaming with frame-level control|grpc-go|
+|Strict gRPC environment (Envoy with gRPC filters, Istio strict mode)|grpc-go|
 
 **Default**: Connect. The default has been correct since 2024.
 
@@ -99,6 +99,8 @@ plugins:
 ```
 
 The `buf.build/...` plugin URIs use Buf's hosted remote registry — no local plugin installation needed.
+
+---
 
 ## Taskfile target
 

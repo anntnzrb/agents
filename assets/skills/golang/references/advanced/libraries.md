@@ -1,22 +1,12 @@
-# Library Defaults — Full Decision Tree (Go 2026)
+# Go 2026 Library Defaults
 
-## Index
+`stdlib` default; add a dependency only when a rule below gives a reason. Read only the heading matching the task.
 
-Read the section whose heading matches the task; use heading search before loading unrelated detail.
+## HTTP framework
 
-The opinionated, in-production stack for 2026 Go. Every entry has a one-line rationale and a canonical snippet so the agent does not relearn each library's idioms.
+`gin` default; `chi` minimalist; `net/http` no-dependency option.
 
-The biggest difference from Python/Rust/TypeScript: **Go has fewer "best" choices and more "boring" choices.** The standard library is the default; reach outside it only when the rationale below applies.
-
----
-
-## HTTP framework — `gin` (default) or `chi` (minimalist) or `net/http` (no deps)
-
-The reality of 2026 Go: **`gin` runs ~48% of new Go API projects** (Go Developer Survey 2024 + crawls of new repos), with `gorilla/mux` (~17%, in maintenance), `echo` (~16%), and `fiber` (~11%) the remaining quarter. The skill picks gin not because it is technically superior — it is not — but because:
-
-1. The ecosystem (middleware, examples, SO answers) is largest
-2. The CLIProxyAPI codebase, which this skill's `backend-stack.md` is distilled from, uses gin in production for OpenAI/Gemini/Claude proxying including SSE streaming and WebSocket upgrades. That is real reference code, not a toy
-3. Gin's `Context` API is the closest thing Go has to a framework-blessed "request-scoped object", which makes middleware composition straightforward
+Gin rationale: largest middleware/examples/SO ecosystem; CLIProxyAPI uses it in production for OpenAI/Gemini/Claude proxying, SSE, and WebSocket upgrades; `gin.Context` simplifies request-scoped middleware composition. This is ecosystem/reference-code preference, not technical superiority.
 
 ```go
 import "github.com/gin-gonic/gin"
@@ -29,27 +19,15 @@ func main() {
 }
 ```
 
-**Pick `chi` instead** when:
-- You want `net/http`-compatible handlers (you do, eventually — chi is closer to stdlib)
-- The service is small and you do not need gin's binding helpers
+Choose `chi` when handlers must be `net/http`-compatible or the service is small and does not need Gin binding helpers. Choose `net/http` directly when `<10` routes and zero auth complexity; Go 1.22 method+path `ServeMux` patterns remove most historical framework motivation.
 
-**Pick `net/http` (stdlib) directly** when:
-- The service has fewer than 10 routes and zero auth complexity. Go 1.22's enhanced `ServeMux` (method+path patterns) eliminated 80% of the historical reason to use a framework
+NEVER use `gorilla/mux` (effectively maintenance), `fiber` (`fasthttp` is not stdlib-compatible; middleware ecosystems split), or `echo` (smaller ecosystem, no real current advantage).
 
-**Never use** `gorilla/mux` (effectively in maintenance), `fiber` (uses `fasthttp` which is **not stdlib-compatible**, so middleware ecosystem is split), or `echo` (smaller eco than gin, no real advantage today).
+## RPC
 
-See `backend-stack.md` for the gin canonical layout, middleware ordering, SSE, graceful shutdown, structured logging integration.
+Default: `connectrpc/connect-go`; use Connect, not raw `grpc-go`, unless a measured reason applies. Connect is gRPC-wire-compatible and supports HTTP/1.1, HTTP/2, and Connect protocol: one server, gRPC/gRPC-Web/Connect-Web browser clients. Streaming, interceptors, deadlines, and errors are first-class. Buf (`buf generate`, `buf lint`, `buf breaking`) is preferred over `protoc`.
 
----
-
-## RPC — `connectrpc/connect-go`
-
-The default RPC layer. **Use Connect, not raw grpc-go**, unless you have a measured reason.
-
-- Connect is wire-compatible with gRPC AND speaks HTTP/1.1 + HTTP/2 + Connect protocol. One server, three clients (gRPC, gRPC-Web, Connect-Web from browsers)
-- No `grpcurl` needed for debugging — `curl -H "Content-Type: application/json" -d ...` works
-- Streaming, interceptors, deadlines, errors are first-class
-- Buf toolchain (`buf generate`, `buf lint`, `buf breaking`) for codegen is dramatically nicer than `protoc`
+Debugging can use `curl -H "Content-Type: application/json" -d ...`; `grpcurl` is not required.
 
 ```go
 // Server
@@ -65,15 +43,11 @@ client := elizav1connect.NewElizaServiceClient(
 res, err := client.Say(ctx, connect.NewRequest(&elizav1.SayRequest{Sentence: "hi"}))
 ```
 
-**Use raw `grpc-go`** only when:
-- You need server-streaming-from-multiple-services with a single gRPC mux
-- You are integrating with a strict gRPC-only environment (Envoy proxy with gRPC reflection, Istio strict-gRPC)
+Use raw `grpc-go` only for server-streaming from multiple services through one gRPC mux or strict gRPC-only environments (for example, Envoy with gRPC reflection or Istio strict-gRPC).
 
-See `grpc-connect.md`.
+## Database
 
----
-
-## Database — `pgx/v5` + `sqlc` + `goose`
+Default stack: `pgx/v5` + `sqlc` + `goose`.
 
 ```bash
 go get github.com/jackc/pgx/v5
@@ -81,25 +55,21 @@ go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 go install github.com/pressly/goose/v3/cmd/goose@latest
 ```
 
-- **`pgx/v5`** is faster, more type-safe, and has better PostgreSQL feature coverage than `database/sql + lib/pq`. Use the `pgxpool` package for connection pooling. Avoid `database/sql` driver mode — it loses pgx's batch, COPY, listen/notify
-- **`sqlc`** generates type-safe Go from `.sql` files. Hand-written SQL with hand-written struct mapping is the #1 source of subtle DB bugs. sqlc eliminates the class
-- **`goose`** for migrations — small, command-line first, no global state
+- `pgx/v5`: faster, more type-safe, and more PostgreSQL coverage than `database/sql + lib/pq`; use `pgxpool` for pooling. Avoid `database/sql` driver mode: it loses pgx batch, COPY, and listen/notify.
+- `sqlc`: type-safe Go from `.sql`; prefer it over hand-written SQL plus hand-written struct mapping, a major source of subtle DB bugs.
+- `goose`: small, CLI-first migrations with no global state.
 
-**Never use** `gorm` (active record, slow, brings runtime reflection into hot paths, encourages N+1 queries). **Never use** `ent` (heavy, opinionated graph layer) unless you specifically want a graph-shaped data model.
+NEVER use `gorm` (active record, slow, reflection in hot paths, encourages N+1) or `ent` (heavy, opinionated graph layer), unless you specifically want a graph-shaped data model.
 
-See `sqlc-pgx.md`.
+## Validation
 
----
+Three boundaries:
 
-## Validation — three layers, three tools
-
-Go has no Pydantic / Zod equivalent and **does not need one** — but only because you wire three layers properly:
-
-| Layer | Tool | Pattern |
+|Layer|Tool|Pattern|
 |---|---|---|
-| HTTP boundary (gin/chi/net/http) | `go-playground/validator/v10` via struct tags | `binding:"required,email,min=3"` |
-| RPC boundary (protobuf) | `bufbuild/protovalidate-go` | `(buf.validate.field).string.min_len = 3` in `.proto` |
-| Domain core | **Smart constructor + unexported fields** | `NewEmail(s) (Email, error)` returns a type whose fields cannot be set from outside |
+|HTTP (`gin`/`chi`/`net/http`)|`go-playground/validator/v10` via struct tags|`binding:"required,email,min=3"`|
+|RPC (protobuf)|`bufbuild/protovalidate-go`|`(buf.validate.field).string.min_len = 3` in `.proto`|
+|Domain|Smart constructor + unexported fields|`NewEmail(s) (Email, error)`|
 
 ```go
 // HTTP boundary
@@ -117,13 +87,11 @@ func NewEmail(s string) (Email, error) {
 func (e Email) String() string { return e.raw }
 ```
 
-The boundary parses raw input into the domain type **once**. Inside the domain, no further validation is permitted — the types prove it. This is parse-don't-validate adapted to Go.
+Parse raw boundary input into the domain type once. Inside the domain, no further validation: unexported fields and the constructor prove validity.
 
-See `data-modeling.md` for the full pattern.
+## Logging
 
----
-
-## Logging — `log/slog` (stdlib)
+Default: stdlib `log/slog` (stdlib since 1.21, stable since 1.23). Structured performance is on par with zerolog and well ahead of logrus; major OpenTelemetry, Datadog, and Honeycomb exporters implement `slog.Handler`.
 
 ```go
 import "log/slog"
@@ -141,15 +109,11 @@ slog.InfoContext(ctx, "request handled",
 )
 ```
 
-- **stdlib since 1.21**, stable since 1.23. Performance is on par with zerolog for structured output, and faster than logrus by a wide margin
-- The `slog.Handler` interface is implemented by all major exporters (OpenTelemetry, Datadog, Honeycomb)
-- The skill bans `logrus`, `zap`, `zerolog` for new code. They are not bad — they are simply superseded. Existing projects on those keep them; new files use slog
+New code: ban `logrus`, `zap`, `zerolog`; existing projects may keep them, but new files use `slog`. Use `sloglint` from `golangci-strict.md`; prefer `slog.String(...)` over `slog.Any(...)`.
 
-Use the `sloglint` linter from `golangci-strict.md` to enforce attr style (`slog.String(...)` instead of `slog.Any(...)`).
+## CLI
 
----
-
-## CLI — `cobra` + `pflag` + slog
+Default: `cobra` + `pflag` + `slog`; Cobra is the de facto framework.
 
 ```bash
 go install github.com/spf13/cobra-cli@latest
@@ -157,29 +121,21 @@ cobra-cli init mytool
 cobra-cli add server
 ```
 
-`cobra` is the de facto Go CLI framework — Kubernetes, Docker CLI, Helm, GitHub CLI all use it. The companion `viper` for config-file-+-env-+-flag merging is **optional**: prefer `caarlos0/env/v11` for env-only configs (12-factor apps), reach for viper only when you genuinely need file-based config.
+`viper` is optional for file+env+flag merging. Prefer `caarlos0/env/v11` for env-only 12-factor configuration; use Viper only when file-based config is genuinely needed.
 
-See `cobra-stack.md`.
+## TUI
 
----
+Default: `charm.land/bubbletea/v2` RC + `bubbles v2` + `lipgloss v2`; NEVER v1.
 
-## TUI — `bubbletea v2` + `bubbles v2` + `lipgloss v2`
+- `tea.View{Cursor: *tea.Cursor, ...}`: real-cursor positioning.
+- Textareas: `SetVirtualCursor(false)` lets the terminal own the cursor; required for CJK IME (Korean Hangul, Japanese kana→kanji, Chinese pinyin).
+- Mouse: `MouseClickMsg`, `MouseMotionMsg`, `MouseReleaseMsg`, replacing v1 coarse `MouseMsg`.
 
-Use **v2 RC** (`charm.land/bubbletea/v2`), not v1. The v2 model adds:
+If text input and CJK users are both in scope, v1 is broken: it cannot correctly position the IME candidate window.
 
-- `tea.View{Cursor: *tea.Cursor, ...}` for real-cursor positioning
-- `SetVirtualCursor(false)` on textareas — lets the terminal own the cursor, which is **required** for CJK IME (Korean Hangul composition, Japanese kana→kanji conversion, Chinese pinyin lookup)
-- Granular mouse events (`MouseClickMsg`, `MouseMotionMsg`, `MouseReleaseMsg`) instead of v1's coarse `MouseMsg`
+## HTTP client
 
-This is not a preference. v1 has no way to position the IME candidate window correctly — Korean input shows up two cells to the left of where you typed, every time. **If your TUI accepts text input AND your users include CJK speakers, v1 is broken.**
-
-See `bubbletea-v2.md` for the full IME-correct skeleton.
-
----
-
-## HTTP client — stdlib + `hashicorp/go-retryablehttp`
-
-Default: `net/http.Client` with a tuned `http.Transport`. The stdlib client is **already excellent** in 2026 — HTTP/2 by default, connection pooling, sane timeouts when configured.
+Default: `net/http.Client` with tuned `http.Transport`; stdlib provides HTTP/2 by default and connection pooling, but configure timeouts.
 
 ```go
 client := &http.Client{
@@ -194,43 +150,37 @@ client := &http.Client{
 }
 ```
 
-For retry/backoff, add `github.com/hashicorp/go-retryablehttp` — small, single-purpose, integrates as a wrapper.
+Retry/backoff: add `github.com/hashicorp/go-retryablehttp` as a small wrapper. NEVER use `resty` (magic, hides headers, wrong-default risk). `req` is acceptable but adds dependency surface for marginal benefit over stdlib + retry wrapper.
 
-**Never use** `resty` (too much magic, hides headers, encourages wrong defaults). `req` is fine but adds dependency surface for marginal benefit over the stdlib + retry wrapper.
+## JSON
 
----
+Default: stdlib `encoding/json` (substantially improved since Go 1.21).
 
-## JSON — stdlib (default), `goccy/go-json` (perf), `bytedance/sonic` (extreme perf)
-
-Stdlib `encoding/json` improved dramatically in Go 1.21+. **Use it.**
-
-Reach for `goccy/go-json` (~3x faster) only when you have measured a hot-path bottleneck:
+Measured hot-path bottleneck only: `goccy/go-json` (~3× faster, drop-in API):
 
 ```go
 import json "github.com/goccy/go-json"
 // drop-in replacement — same API
 ```
 
-Reach for `bytedance/sonic` (~5x faster, requires amd64/arm64) for production proxies with thousands of RPS of JSON traversal. CLIProxyAPI uses `tidwall/gjson` + `tidwall/sjson` for **partial-tree mutation without full unmarshal** — a different optimization, useful when you transform large payloads. See `backend-stack.md`.
+Production proxies doing thousands of RPS of JSON traversal: `bytedance/sonic` (~5× faster; requires amd64/arm64). For large-payload partial-tree mutation without full unmarshal, CLIProxyAPI uses `tidwall/gjson` + `tidwall/sjson`; this is a different optimization.
 
----
+## Concurrency primitives
 
-## Concurrency primitives — stdlib only
+Use stdlib plus stdlib-quality `golang.org/x/sync` packages (outside `std`) only:
 
-| Need | Use |
+|Need|Use|
 |---|---|
-| Goroutine group with error propagation | `golang.org/x/sync/errgroup` |
-| Semaphore | `golang.org/x/sync/semaphore` |
-| Single-flight dedup | `golang.org/x/sync/singleflight` |
-| Lazy init | **`sync.OnceValue` / `sync.OnceFunc`** (Go 1.21+, replaces `sync.Once` for typed values) |
-| Atomic counter | `atomic.Int64` (Go 1.19+, typed atomics — don't use the old func-style) |
-| Channel-based fanout | `chan T` with `errgroup` for shutdown |
+|Goroutine group + error propagation|`golang.org/x/sync/errgroup`|
+|Semaphore|`golang.org/x/sync/semaphore`|
+|Single-flight dedup|`golang.org/x/sync/singleflight`|
+|Typed lazy init|`sync.OnceValue` / `sync.OnceFunc` (Go 1.21+; replaces `sync.Once` for typed values)|
+|Atomic counter|`atomic.Int64` (Go 1.19+; not old func-style atomics)|
+|Channel fanout|`chan T` + `errgroup` for shutdown|
 
-The `x/sync` packages are stdlib-quality but live outside `std`. See `concurrency.md` for the discipline.
+## Time
 
----
-
-## Time — stdlib + `benbjohnson/clock` for tests
+Default: stdlib plus `benbjohnson/clock` in tests. NEVER call `time.Now()` directly in domain code; inject `Clock` for deterministic tests and no `time.Sleep` flakiness.
 
 ```go
 type Clock interface { Now() time.Time }
@@ -241,67 +191,56 @@ fake := clock.NewMock()
 fake.Set(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
 ```
 
-**Never call `time.Now()` directly inside domain code.** Inject a `Clock`. Tests become deterministic, no `time.Sleep` flakiness.
+## IDs
 
----
-
-## IDs — `google/uuid` (UUID v4/v7) or `xid` (sortable short ID)
+Default: `google/uuid`, UUID v7; use v4 when leaking creation time is a privacy concern. v7 is sortable/time-ordered, random, and 128-bit.
 
 ```go
 import "github.com/google/uuid"
 id := uuid.Must(uuid.NewV7())  // sortable, time-ordered, 128-bit
 ```
 
-UUID v7 is the modern default — sortable like v6, random like v4. Use v4 only when leaking creation time is a privacy concern.
+Short URL-safe sortable IDs (~12 bytes): `rs/xid` (Kubernetes-style).
 
-For short, URL-safe IDs (~12 bytes, sortable) use `rs/xid` — Kubernetes-style.
+## Crypto
 
----
-
-## Crypto — stdlib + `alecthomas/argon2id` for passwords
-
-Stdlib `crypto/*` for everything. For password hashing, **argon2id is the 2026 standard** — bcrypt is acceptable but argon2 is OWASP's recommendation since 2023.
+Use stdlib `crypto/*` for everything except passwords. Password default: `alecthomas/argon2id`; Argon2id is the 2026 standard and OWASP recommendation since 2023. bcrypt remains acceptable.
 
 ```go
 import "github.com/alecthomas/argon2id"
 hash, err := argon2id.CreateHash("password", argon2id.DefaultParams)
 ```
 
----
+## Data
 
-## Data — `apache/arrow-go/v18` + `marcboeker/go-duckdb` + `gonum`
+Default stack: `apache/arrow-go/v18` + `marcboeker/go-duckdb` + `gonum`.
 
-Same philosophy as Python's "never pandas":
-
-| Need | Use |
+|Need|Use|
 |---|---|
-| Tabular over CSV/Parquet/JSON | DuckDB-Go bindings — zero-copy Arrow integration |
-| In-memory frame | Arrow + custom code (Go has no pandas-equivalent and that's fine) |
-| Numerical | `gonum.org/v1/gonum` |
-| Stats | `gonum/stat` |
+|Tabular CSV/Parquet/JSON|DuckDB-Go bindings; zero-copy Arrow integration|
+|In-memory frame|Arrow + custom code; no pandas equivalent needed|
+|Numerical|`gonum.org/v1/gonum`|
+|Stats|`gonum/stat`|
 
-Go's data-science story is intentionally thin. For heavy data work, write the pipeline in Polars/DuckDB (see `python/data-processing.md`), expose the result via Parquet or Arrow, consume from Go.
+For heavy data work, use a Polars/DuckDB pipeline, expose Parquet or Arrow, and consume it from Go.
 
----
+## Testing
 
-## Testing — stdlib + selective additions
-
-| Need | Use |
+|Need|Use|
 |---|---|
-| Assertions | `stretchr/testify/require` (fail-fast) — `assert` only in table-driven loops |
-| Snapshots / golden | `hexops/autogold/v2` (auto-updates with `-update`) |
-| Property-based | `pgregory.net/rapid` (modern) or stdlib `testing/quick` |
-| Mocks | `go.uber.org/mock` (gomock successor) |
-| HTTP mocks | `h2non/gock` for outbound, stdlib `httptest` for inbound |
-| Integration containers | `testcontainers/testcontainers-go` |
-| Goroutine leak | `go.uber.org/goleak` |
-| Benchmarks | stdlib `testing.B` + `perf.dev/benchstat` |
+|Assertions|`stretchr/testify/require` fail-fast; `assert` only in table-driven loops|
+|Snapshots/golden|`hexops/autogold/v2`, auto-updates with `-update`|
+|Property-based|`pgregory.net/rapid` or stdlib `testing/quick`|
+|Mocks|`go.uber.org/mock` (gomock successor)|
+|Outbound HTTP mocks|`h2non/gock`|
+|Inbound HTTP|stdlib `httptest`|
+|Integration containers|`testcontainers/testcontainers-go`|
+|Goroutine leaks|`go.uber.org/goleak`|
+|Benchmarks|stdlib `testing.B` + `perf.dev/benchstat`|
 
-See `testing.md` for canonical patterns.
+## Config
 
----
-
-## Config — `caarlos0/env/v11`
+Default: `caarlos0/env/v11`; pure 12-factor, with struct-tag defaults, required markers, and parsing for `time.Duration`, slices, and maps. Use Viper only for file-based config.
 
 ```go
 type Config struct {
@@ -314,28 +253,13 @@ var cfg Config
 if err := env.Parse(&cfg); err != nil { log.Fatal(err) }
 ```
 
-Pure 12-factor. Defaults via struct tag, required marker, parsing for `time.Duration`, slices, maps. **Use viper only if you also need file-based config** — most services do not.
+## New-dependency checklist
 
----
+Before `go get`:
 
-## Choosing an unfamiliar dependency — the checklist
-
-Before `go get`-ing anything new:
-
-1. Is it maintained? Latest tag within 12 months? Owner active?
-2. Does it expose stdlib-compatible types (`io.Reader`, `context.Context`, `http.Handler`)? If it invents its own `Connection` or `Request` type, that's a yellow flag
-3. Does it use `init()` for side effects? **REJECT.** `init()` ruins testability
-4. Does it call `log.Fatal` / `panic` outside of true programmer-error paths? **REJECT.**
-5. Does it have a `context.Context` first-arg convention? If not, **REJECT** — cancellation is non-negotiable
-6. Does adding it overlap with something already in your `go.mod`? Pick one
-
----
-
-## Sources
-
-- 2024 Go Developer Survey: https://go.dev/blog/survey2024-h1-results
-- Connect-Go docs: https://connectrpc.com/docs/go/getting-started
-- sqlc: https://docs.sqlc.dev
-- bubbletea v2 IME: https://github.com/code-yeongyu/bubbletea-wm (reference for `SetVirtualCursor(false)` pattern)
-- CLIProxyAPI (gin + SSE + WebSocket in production): https://github.com/router-for-me/CLIProxyAPI
-- slog blog: https://go.dev/blog/slog
+1. Maintained: latest tag within 12 months and active owner?
+2. Stdlib-compatible types (`io.Reader`, `context.Context`, `http.Handler`)? Custom `Connection`/`Request` types are a yellow flag.
+3. `init()` side effects? **REJECT**; they ruin testability.
+4. `log.Fatal`/`panic` outside true programmer-error paths? **REJECT**.
+5. `context.Context` first argument? If not, **REJECT**; cancellation is non-negotiable.
+6. Overlap with existing `go.mod` dependency? Pick one.

@@ -1,28 +1,8 @@
-# Tooling Cookbook
+# Go Tooling Cookbook
 
-Recipes for Go tooling: linting, formatting, LSP setup, protobuf, mocking, integration testing, and releases.
+Recipes: linting, formatting, LSP, protobuf, mocking, integration tests, releases.
 
----
-
-## Contents
-
-- [golangci-lint v2 Configuration](#golangci-lint-v2-configuration)
-- [gofumpt for Stricter Formatting](#gofumpt-for-stricter-formatting)
-- [gopls — Official Go LSP](#gopls--official-go-lsp)
-- [`go.mod` `tool` Directive (Go 1.24+)](#gomod-tool-directive-go-124)
-- [buf for Protocol Buffers](#buf-for-protocol-buffers)
-- [uber-go/mock for Mock Generation](#uber-gomock-for-mock-generation)
-- [When to Prefer Hand-Written Fakes](#when-to-prefer-hand-written-fakes)
-- [testcontainers-go for Integration Tests](#testcontainers-go-for-integration-tests)
-- [Singleton Containers for Speed](#singleton-containers-for-speed)
-- [goreleaser v2 Basic Configuration](#goreleaser-v2-basic-configuration)
-
----
-## golangci-lint v2 Configuration
-
-**Problem**: How to set up comprehensive linting with a modern golangci-lint v2 config?
-
-**Solution**:
+## golangci-lint v2
 
 ```yaml
 # .golangci.yml
@@ -53,47 +33,33 @@ linters:
           severity: warning
 ```
 
-**Tip**: `default: standard` enables the recommended set. Add linters individually in `enable` rather than using `presets` — explicit opt-in makes it clear what's enforced. Run `golangci-lint config verify` to validate your config.
+`default: standard` enables recommended linters. Add individual linters under `enable`, not `presets`, for explicit enforcement. Validate with `golangci-lint config verify`.
 
----
+## gofumpt
 
-## gofumpt for Stricter Formatting
+Stricter, drop-in `gofmt` replacement:
 
-**Problem**: `gofmt` leaves some formatting decisions ambiguous. How to enforce stricter rules?
+- No empty lines at function start/end.
+- Consistent import grouping with blank lines.
+- Short inline declarations: `var foo int = 1` → `foo := 1`.
+- Remove unnecessary trailing commas in composite literals.
+- Split field lists when any field splits.
 
-**Solution**:
-
-`gofumpt` is a drop-in replacement for `gofmt` that enforces additional rules:
-
-- No empty lines at the start or end of a function
-- Consistent grouping of imports with blank lines
-- Short inline var declarations (`var foo int = 1` → `foo := 1`)
-- Removal of unnecessary trailing commas in composite literals
-- Field lists always split across lines when any field does
-
-Enable it in golangci-lint (as above) or run standalone:
+Enable in golangci-lint or run:
 
 ```bash
 gofumpt -l -w .
 ```
 
-**Tip**: Configure your editor to run `gofumpt` on save. In VS Code, set `"go.formatTool": "gofumpt"` and use `"editor.formatOnSave": true`. In Neovim, synchronize `g:go_fmt_command` with `gofumpt`. `gofumpt` is a superset of `gofmt` — any `gofumpt`-formatted code passes `gofmt`.
+Run on editor save. VS Code: `"go.formatTool": "gofumpt"` and `"editor.formatOnSave": true`. Neovim: synchronize `g:go_fmt_command` with `gofumpt`. `gofumpt` is a `gofmt` superset; gofumpt-formatted code passes gofmt.
 
----
-
-## gopls — Official Go LSP
-
-**Problem**: How to set up the Go language server for IDE features across multi-module workspaces?
-
-**Solution**:
-
-Install gopls:
+## gopls
 
 ```bash
 go install golang.org/x/tools/gopls@latest
 ```
 
-For multi-module workspaces, create a `go.work` file at the repo root:
+For multi-module workspaces, create `go.work` at repo root:
 
 ```go
 // go.work
@@ -106,25 +72,17 @@ use (
 )
 ```
 
-Run:
-
 ```bash
 go work sync   # sync workspace vendor/module state
 ```
 
-**Tip**: `go.work` lets gopls understand multiple modules without `replace` directives. It is local-only — never commit `go.work` to version control (add to `.gitignore`). For CI, build each module independently. Use `go work use -r .` to recursively discover modules.
+`go.work` lets gopls understand multiple modules without `replace` directives. It is local-only: never commit it; add it to `.gitignore`. CI builds modules independently. Recursively discover modules with `go work use -r .`.
 
----
+## `go.mod` `tool` directive (Go 1.24+)
 
-## `go.mod` `tool` Directive (Go 1.24+)
+Pin tools without `tools.go` or a separate `tools` module:
 
-**Problem**: How to pin tool versions without a `tools.go` file or a separate `tools` module?
-
-**Solution**:
-
-Add a `tool` directive to `go.mod`:
-
-```
+```go
 // go.mod
 module example.com/app
 
@@ -137,24 +95,16 @@ tool (
 )
 ```
 
-Then run tools with `go tool`:
-
 ```bash
 go tool golang.org/x/tools/cmd/stringer -type=Status
 go tool golangci-lint run ./...
 ```
 
-**Tip**: The `tool` directive records exact versions in `go.mod` and checksums in `go.sum`. It replaces the old `tools.go` pattern (a `//go:build tools` file with blank imports). Tools declared here are not normal module dependencies — they don't affect the build graph.
+`tool` records exact versions in `go.mod` and checksums in `go.sum`; it replaces the `//go:build tools` plus blank-imports pattern. Declared tools are not normal module dependencies and do not affect the build graph.
 
----
+## buf
 
-## buf for Protocol Buffers
-
-**Problem**: How to lint, generate, and detect breaking changes in protobuf schemas?
-
-**Solution**:
-
-`buf.gen.yaml` for code generation:
+`buf.gen.yaml`:
 
 ```yaml
 # buf.gen.yaml
@@ -170,7 +120,7 @@ plugins:
       - paths=source_relative
 ```
 
-`buf.yaml` for lint and breaking change detection:
+`buf.yaml`:
 
 ```yaml
 # buf.yaml
@@ -185,31 +135,21 @@ breaking:
     - FILE
 ```
 
-Commands:
-
 ```bash
 buf lint                      # lint proto files
 buf breaking --against '.git#branch=main'  # detect breaking changes
 buf generate                  # generate Go code
 ```
 
-**Tip**: `buf` replaces `protoc` with a single binary — no manual plugin management. The `remote` plugins are pre-built and cached. For breaking change detection in CI, compare against the merge-base: `buf breaking --against '.git#branch=main'`.
+`buf` replaces `protoc` with one binary, avoiding manual plugin management. Remote plugins are pre-built and cached. In CI, compare breaking changes against the merge-base with `.git#branch=main`.
 
----
+## uber-go/mock
 
-## uber-go/mock for Mock Generation
-
-**Problem**: How to generate testify-compatible mocks from Go interfaces automatically?
-
-**Solution**:
-
-Install:
+Install and generate mocks from interfaces:
 
 ```bash
 go install go.uber.org/mock/mockgen@latest
 ```
-
-Annotate the interface file:
 
 ```go
 //go:generate mockgen -destination=mocks/user_repo.go -package=mocks . UserRepository
@@ -220,13 +160,9 @@ type UserRepository interface {
 }
 ```
 
-Generate:
-
 ```bash
 go generate ./...
 ```
-
-Use the mock:
 
 ```go
 import (
@@ -250,15 +186,11 @@ func TestService(t *testing.T) {
 }
 ```
 
-**Tip**: Call `ctrl.Finish()` (via `defer ctrl.Finish()`) to verify all expected calls were made. Use `gomock.Any()` for arguments you don't care about. Prefer hand-written fakes when the interface is small (1-2 methods) and the mock would obscure test intent — a simple stub struct is often clearer.
+Use `defer ctrl.Finish()` to verify expected calls. Use `gomock.Any()` for irrelevant arguments. Prefer hand-written fakes for 1–2-method interfaces when mocks obscure intent.
 
----
+## Hand-written fakes
 
-## When to Prefer Hand-Written Fakes
-
-**Problem**: Generated mocks with ordered expectations can produce brittle tests. When is a hand-written fake better?
-
-**Solution**:
+Prefer fakes over generated mocks when ordered expectations would make tests brittle; use generated mocks for call counts, argument values, and ordering on interfaces with 3+ methods. Use fakes for simple interfaces, stateful backends such as fake DBs, or when readability outweighs call-level verification.
 
 ```go
 // A hand-written fake — no generation, no expectation matching:
@@ -294,15 +226,9 @@ func TestService(t *testing.T) {
 }
 ```
 
-**Tip**: Use generated mocks when you need to assert call counts, argument values, and call ordering against interfaces with 3+ methods. Use hand-written fakes for simple interfaces, stateful backends (like a fake DB), or when test readability matters more than call-level verification.
+## testcontainers-go
 
----
-
-## testcontainers-go for Integration Tests
-
-**Problem**: How to run integration tests against real databases without manual setup?
-
-**Solution**:
+Run integration tests against real databases without manual setup:
 
 ```go
 import (
@@ -338,15 +264,11 @@ func TestWithPostgres(t *testing.T) {
 }
 ```
 
-**Tip**: Use `testcontainers.WithReuse()` for development — the container stays running across test runs. In CI, skip reuse to guarantee clean state. Always call `container.Terminate(ctx)` (or `testcontainers.CleanupContainer(t, container)`) to remove the container after the test.
+`testcontainers.WithReuse()` keeps a container across development test runs; skip reuse in CI for clean state. Always call `container.Terminate(ctx)` or `testcontainers.CleanupContainer(t, container)`.
 
----
+## Singleton containers
 
-## Singleton Containers for Speed
-
-**Problem**: Starting a new container per test is slow. How to share one container across all tests in a package?
-
-**Solution**:
+Share one container across a package with `TestMain`; isolate tests with separate databases or schemas. Use separate containers for truly parallel test packages.
 
 ```go
 var (
@@ -392,15 +314,9 @@ func TestCreateUser(t *testing.T) {
 }
 ```
 
-**Tip**: Share the container across all tests in a package with `TestMain`. Each test connects to a separate database or schema to maintain isolation. For truly parallel test packages, use separate containers per package.
+## goreleaser v2
 
----
-
-## goreleaser v2 Basic Configuration
-
-**Problem**: How to automate cross-compiled Go releases for multiple platforms?
-
-**Solution**:
+Cross-compiled Go releases:
 
 ```yaml
 # .goreleaser.yml
@@ -442,4 +358,4 @@ changelog:
       - "^ci:"
 ```
 
-**Tip**: `CGO_ENABLED=0` produces statically linked binaries — they run on any distro of the target OS. `-trimpath` removes absolute filesystem paths from binaries for reproducible builds. `-s -w` strips the symbol table and DWARF debug info, reducing binary size by ~30%.
+`CGO_ENABLED=0` produces statically linked binaries runnable on any target-OS distro. `-trimpath` removes absolute filesystem paths for reproducible builds. `-s -w` strips symbols and DWARF, reducing binary size by ~30%.

@@ -1,78 +1,68 @@
-# Update Playbook
+# Go skill update playbook
 
-Repeatable process for refreshing this Go skill when new Go releases or tooling changes land.
+Purpose: repeatably refresh this Go skill after new Go releases or tooling changes.
 
-## When to use
-
-Load this file only when the user asks to update, audit, refresh, or research the Go skill itself.
-Do NOT load it for normal Go development tasks.
+Use only when the user asks to update, audit, refresh, or research the Go skill itself; NEVER load for normal Go development.
 
 ## Refresh checklist
 
-### 1. Verify the latest stable Go release
+1. **Latest stable Go**
+   - Check `go.dev/doc/` for latest release notes.
+   - Check `endoflife.date/go` for the support window.
+   - Check `https://go.dev/doc/toolchain` for toolchain-directive changes.
+   - Confirm support for the two most recent major releases.
 
-- Check `go.dev/doc/` for the latest release notes
-- Check `endoflife.date/go` for the support window
-- Check `https://go.dev/doc/toolchain` for toolchain directive changes
-- Confirm which versions are supported: the two most recent major releases
+   **Query opens:**
 
-**Query opens:**
+   ```bash
+   context7 docs /golang/go "Go release notes latest"
+   web_search "Go latest stable release 202X"
+   ```
 
-```bash
-context7 docs /golang/go "Go release notes latest"
-web_search "Go latest stable release 202X"
-```
+   Read `references/sources.md`; update its `Go Releases & Language` section.
 
-Read: `references/sources.md` — update the "Go Releases & Language" section.
+2. **Prune experimental/deprecated material**
+   - Remove GOEXPERIMENT-only features from baseline recommendations.
+   - Remove features moved from experimental to stable in the appropriate version file.
+   - Remove archived or superseded libraries.
+   - Check `golangci-lint` version/config format with `golangci-lint linters` for available linters.
 
-### 2. Prune experimental and deprecated material
+3. **Version-scoped modern docs**
+   - If a new major Go release shipped, create `cookbook/modern-1.XX-1.YY.md` or revise range files.
+   - Follow `cookbook/modern-1.24-1.26.md`: feature table plus code examples with Problems/Solutions/Tips.
+   - Add the new version row to `cookbook/modern.md`.
 
-- Remove any GOEXPERIMENT-only features from baseline recommendations
-- Remove features that moved from experimental to stable in the right version file
-- Remove any library that has been archived or superseded
-- Check `golangci-lint` version and config format: `golangci-lint linters` for available linters
+4. **`references/guide.md`**
+   Update:
+   - Stable Modern Go Feature Table.
+   - CLI quick reference for new commands/flag changes.
+   - Tooling defaults if ecosystem consensus shifted.
+   - Library routing table for new recommended defaults.
+   - Anti-patterns for new preferred idioms or obsolete ones.
 
-### 3. Update version-scoped modern docs
+5. **`SKILL.md`**
+   Update:
+   - One-line identity and activation triggers if domains expanded.
+   - Required follow-up reads table with new cookbook files.
+   - Must/Must Not list for new idioms or deprecated patterns.
 
-- If a new major Go release shipped, create a new `cookbook/modern-1.XX-1.YY.md` or revise the range files
-- Follow the pattern in `cookbook/modern-1.24-1.26.md`: feature table, code examples with Problems/Solutions/Tips
-- Update `cookbook/modern.md` (the index) with the new version row
+6. **Cookbooks**
+   - Revise each updated topic's cookbook using Problems/Solutions/Tips.
+   - If a file grows past ~300 lines, consider splitting it and updating the routing table.
+   - Delete recipes no longer correct or superseded.
 
-### 4. Update `references/guide.md`
+7. **Validate**
 
-- Update the "Stable Modern Go Feature Table"
-- Update CLI quick reference for any new commands or flag changes
-- Update tooling defaults if the ecosystem consensus shifted
-- Update the library routing table if there are new recommended defaults
-- Update anti-patterns if there are new idioms to prefer or old ones to avoid
+   ```bash
+   uv run --script assets/skills/skill-creator/scripts/cli.py quick-validate assets/skills/golang
+   ```
 
-### 5. Update `SKILL.md`
-
-- Update the one-line identity and activation triggers if domains expanded
-- Update the required follow-up reads table with any new cookbook files
-- Update the Must/Must Not list for new idioms or deprecated patterns
-
-### 6. Update cookbook files
-
-- For each updated topic, revise the relevant cookbook file: Problems/Solutions/Tips format
-- If a file grows past ~300 lines, consider splitting it and updating the routing table
-- Delete any recipe that is no longer correct or superseded
-
-### 7. Validate
-
-```bash
-uv run --script assets/skills/skill-creator/scripts/cli.py quick-validate assets/skills/golang
-```
-
-### 8. Update sources ledger
-
-- Update `references/sources.md` `Last checked` date
-- Add any new official or primary sources discovered during the refresh
-- Remove dead links
+8. **Sources ledger**
+   - Update `references/sources.md` `Last checked` date.
+   - Add new official or primary sources discovered during refresh.
+   - Remove dead links.
 
 ## Research starting points
-
-When investigating what changed:
 
 | Question | Source |
 |---|---|
@@ -89,10 +79,10 @@ When investigating what changed:
 
 ## File dependency order
 
-When updating, follow this order (earlier files feed later ones):
+Update in this order; earlier files feed later ones:
 
-1. `references/sources.md` — source ledger
-2. `references/guide.md` — feature table, CLI ref, layout, tooling, routing
-3. `cookbook/modern.md` + version files — language/runtime features
-4. Topic cookbooks — domain-specific recipes
-5. `SKILL.md` — routing table and triggers (last, since it references everything else)
+1. `references/sources.md` — source ledger.
+2. `references/guide.md` — feature table, CLI reference, layout, tooling, routing.
+3. `cookbook/modern.md` + version files — language/runtime features.
+4. Topic cookbooks — domain-specific recipes.
+5. `SKILL.md` — routing table and triggers; last because it references everything else.

@@ -1,29 +1,8 @@
 # HTTP Services Cookbook
 
-Recipes for building HTTP services with Go 1.22+ stdlib routing, middleware, testing, and observability.
+Go 1.22+ standard-library routing, middleware, testing, and observability recipes.
 
----
-
-## Contents
-
-- [Go 1.22+ ServeMux Routing](#go-122-servemux-routing)
-- [Building a REST Endpoint](#building-a-rest-endpoint)
-- [Middleware Chain with `chi`](#middleware-chain-with-chi)
-- [Request-Scoped Context Values](#request-scoped-context-values)
-- [Structured Logging with `log/slog`](#structured-logging-with-logslog)
-- [Health Check Endpoint](#health-check-endpoint)
-- [Timeout Middleware](#timeout-middleware)
-- [Rate Limiting with `golang.org/x/time/rate`](#rate-limiting-with-golangorgxtimerate)
-- [HTTP Handler Testing with `httptest`](#http-handler-testing-with-httptest)
-- [Client Testing with `httptest.NewServer`](#client-testing-with-httptestnewserver)
-- [Graceful Shutdown](#graceful-shutdown)
-
----
 ## Go 1.22+ ServeMux Routing
-
-**Problem**: How to define routes with HTTP method and path parameters using only the standard library?
-
-**Solution**:
 
 ```go
 mux := http.NewServeMux()
@@ -47,15 +26,9 @@ func getUser(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-**Tip**: Path patterns use `{name}` for single-segment params and `{name...}` for multi-segment wildcards. `r.PathValue` returns `""` when the param is absent — validate it.
-
----
+`{name}` matches one segment; `{name...}` matches multiple. `r.PathValue` returns `""` when absent; validate it.
 
 ## Building a REST Endpoint
-
-**Problem**: How to structure a complete REST resource with validation, domain logic, and JSON responses?
-
-**Solution**:
 
 ```go
 type UserHandler struct {
@@ -117,15 +90,9 @@ func writeJSON(w http.ResponseWriter, status int, v any) error {
 }
 ```
 
-**Tip**: Keep handlers thin — parse/validate input, call the service/repo, write the response. Business logic lives in the service layer, not in HTTP handlers.
-
----
+Keep handlers thin: parse/validate, call service/repository, write response; business logic belongs in the service layer.
 
 ## Middleware Chain with `chi`
-
-**Problem**: How to compose middleware and mount sub-routers with clean separation of concerns?
-
-**Solution**:
 
 ```go
 import "github.com/go-chi/chi/v5"
@@ -163,15 +130,9 @@ func main() {
 }
 ```
 
-**Tip**: chi's `Route` and `Group` create sub-routers that inherit parent middleware. chi is compatible with the `net/http` handler interface — any `http.Handler` middleware works with it.
-
----
+`Route` and `Group` sub-routers inherit parent middleware. chi implements the `net/http` handler interface; any `http.Handler` middleware works.
 
 ## Request-Scoped Context Values
-
-**Problem**: How to carry request-scoped data (request ID, authenticated user) through handler call chains?
-
-**Solution**:
 
 ```go
 type ctxKey string
@@ -206,15 +167,9 @@ func RequestID(ctx context.Context) string {
 }
 ```
 
-**Tip**: Don't use `string` directly as a context key — it risks collisions with other packages. Use an unexported custom type. Context values are for request-scoped data only, never for dependency injection.
-
----
+Use an unexported custom context-key type, not `string` (collision risk). Context values are request-scoped only, never dependency injection.
 
 ## Structured Logging with `log/slog`
-
-**Problem**: How to add structured, level-based logging to HTTP handlers?
-
-**Solution**:
 
 ```go
 import "log/slog"
@@ -258,15 +213,9 @@ func main() {
 }
 ```
 
-**Tip**: Use `slog.NewJSONHandler` in production for machine-readable logs. Use `slog.NewTextHandler` during development. The `slog.SetDefault` call makes `slog.Info` et al. use your configured logger everywhere.
-
----
+Use `slog.NewJSONHandler` for machine-readable production logs and `slog.NewTextHandler` during development. `slog.SetDefault` routes package-level `slog.Info` calls through the configured logger.
 
 ## Health Check Endpoint
-
-**Problem**: How to expose a liveness/readiness endpoint that checks downstream dependencies?
-
-**Solution**:
 
 ```go
 type HealthChecker struct {
@@ -309,15 +258,9 @@ hc.Add("redis", redisClient.Ping)
 mux.HandleFunc("GET /health", hc.Handler())
 ```
 
-**Tip**: Separate liveness (is the process alive?) from readiness (can it serve traffic?). A minimal liveness check just returns 200; readiness checks downstream deps. Use different paths (`/healthz`, `/readyz`).
-
----
+Separate liveness (process alive; minimal response 200) from readiness (downstream dependencies); use distinct paths such as `/healthz` and `/readyz`.
 
 ## Timeout Middleware
-
-**Problem**: How to enforce a per-request deadline so slow handlers don't hold connections open?
-
-**Solution**:
 
 ```go
 func TimeoutMiddleware(timeout time.Duration) func(http.Handler) http.Handler {
@@ -328,16 +271,9 @@ func TimeoutMiddleware(timeout time.Duration) func(http.Handler) http.Handler {
 }
 ```
 
-**Tip**: Use `http.TimeoutHandler` from the standard library — it handles the goroutine lifecycle, context cancellation, and response body races correctly. For chi users, `middleware.Timeout` wraps this and provides the same guarantees.
-
-
----
+`http.TimeoutHandler` handles goroutine lifecycle, context cancellation, and response-body races. chi's `middleware.Timeout` wraps it with the same guarantees.
 
 ## Rate Limiting with `golang.org/x/time/rate`
-
-**Problem**: How to limit requests per client or globally to protect the service?
-
-**Solution**:
 
 ```go
 import "golang.org/x/time/rate"
@@ -380,15 +316,9 @@ func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 }
 ```
 
-**Tip**: `rate.Limiter` implements the token-bucket algorithm. `Allow()` is non-blocking — it returns `false` immediately when the bucket is empty. For a global limit, use a single limiter without the per-key map. Periodically clean up idle limiters to avoid unbounded memory growth.
-
----
+`rate.Limiter` uses token buckets; `Allow()` is non-blocking and immediately returns `false` when empty. A global limit uses one limiter without the per-key map. Periodically remove idle limiters to prevent unbounded memory growth.
 
 ## HTTP Handler Testing with `httptest`
-
-**Problem**: How to test an HTTP handler without starting a real server?
-
-**Solution**:
 
 ```go
 func TestGetUser(t *testing.T) {
@@ -424,15 +354,9 @@ func TestCreateUser_Validation(t *testing.T) {
 }
 ```
 
-**Tip**: Use `req.SetPathValue` to set path parameters for Go 1.22+ routed handlers. `httptest.NewRecorder` captures the full response including status, headers, and body.
-
----
+`req.SetPathValue` supplies Go 1.22+ route parameters; `httptest.NewRecorder` captures status, headers, and body without starting a server.
 
 ## Client Testing with `httptest.NewServer`
-
-**Problem**: How to test an HTTP client against a fake server that returns controlled responses?
-
-**Solution**:
 
 ```go
 func TestClient_FetchUser(t *testing.T) {
@@ -460,16 +384,9 @@ func TestClient_FetchUser(t *testing.T) {
 }
 ```
 
-**Tip**: `httptest.NewServer` starts a real HTTP server on a random port. Use the returned `server.URL` as the client base URL. Always `defer server.Close()`. For TLS testing, use `httptest.NewTLSServer`.
-
-
----
+`httptest.NewServer` starts a real server on a random port; use `server.URL` as the base URL and always `defer server.Close()`. Use `httptest.NewTLSServer` for TLS.
 
 ## Graceful Shutdown
-
-**Problem**: How to shut down an HTTP server gracefully, letting in-flight requests finish?
-
-**Solution**:
 
 ```go
 func runServer(ctx context.Context, srv *http.Server) error {
@@ -503,4 +420,4 @@ func main() {
 }
 ```
 
-**Tip**: `server.Shutdown(ctx)` drains active connections without interrupting them. The `signal.NotifyContext` creates a context that cancels on SIGINT/SIGTERM. Use a separate `context.WithTimeout` for the shutdown deadline so the process doesn't hang indefinitely.
+`server.Shutdown(ctx)` drains active connections without interrupting them. `signal.NotifyContext` cancels on SIGINT/SIGTERM. Use a separate `context.WithTimeout` for the shutdown deadline to prevent indefinite hangs.
