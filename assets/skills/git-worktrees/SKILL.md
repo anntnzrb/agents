@@ -9,9 +9,9 @@ Use for an isolated workspace, linked-worktree assignment, parallel task, PR rev
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Exact raw CLI contract | `references/cli.md` | Before invoking this CLI, parsing its JSON, or recovering a raw-CLI lifecycle |
+|Need|Read|When|
+|---|---|---|
+|Exact raw CLI contract|`references/cli.md`|Before invoking this CLI, parsing its JSON, or recovering a raw-CLI lifecycle|
 
 Do not preload the reference for consumer-only or native-manager work.
 
