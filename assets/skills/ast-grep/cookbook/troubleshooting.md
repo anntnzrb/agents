@@ -1,87 +1,67 @@
 # Troubleshooting Cookbook
 
-Read this when binary resolution, quoting, language parsing, or patterns fail.
+Use when binary resolution, quoting, language parsing, or pattern searches fail.
 
----
+## `sg` not found
 
-## sg not found
-
-**Problem**: `sg` command missing.
-
-**Solution**:
+`sg` command missing.
 
 ```bash
 ast-grep run -p 'pattern' -l ts src
 ```
 
-**Tip**: If not installed, use `nix run nixpkgs#ast-grep -- run -p 'pattern' -l ts src`.
+If not installed:
 
----
+```bash
+nix run nixpkgs#ast-grep -- run -p 'pattern' -l ts src
+```
 
 ## No matches
 
-**Problem**: Expected matches, got none.
-
-**Solution**:
+Expected matches absent:
 
 ```bash
 sg -p 'pattern' -l ts --debug-query=ast
 ```
 
-**Tip**: Verify `--lang`, try `--strictness=relaxed`.
-
----
+Verify `--lang`; try `--strictness=relaxed`.
 
 ## Wrong language detection
 
-**Problem**: Files parsed as wrong language.
-
-**Solution**:
+Files parsed as the wrong language:
 
 ```bash
 sg -p 'pattern' -l ts path/to/file
 ```
 
-**Tip**: Force `--lang` for generated or unusual extensions.
-
----
+Force `--lang` for generated or unusual extensions.
 
 ## Too many matches
 
-**Problem**: Pattern too broad.
-
-**Solution**:
+Pattern too broad:
 
 ```bash
 sg -p 'pattern' -l ts --selector identifier src
 ```
 
-**Tip**: Add structure or use `--strictness=cst`.
-
----
+Add structure or use `--strictness=cst`.
 
 ## Slow search
 
-**Problem**: Search takes too long.
-
-**Solution**:
+Search takes too long:
 
 ```bash
 sg -p 'pattern' -l ts --globs 'src/**/*.ts' --threads 4 .
 ```
 
-**Tip**: Limit paths, exclude large dirs with `--globs '!**/dist/**'`.
-
----
+Limit paths; exclude large directories with `--globs '!**/dist/**'`.
 
 ## Stdin errors
 
-**Problem**: Stdin search fails.
-
-**Solution**:
+Stdin search fails:
 
 ```bash
 cat file.ts | sg -p 'pattern' -l ts --stdin
 ```
 
-**Tip**: `--lang` required; interactive mode is incompatible with stdin.
+`--lang` required; interactive mode incompatible with stdin.

@@ -2,88 +2,56 @@
 
 Read-only recipes for fast code exploration.
 
-Read this for common call-site, definition, import, and file-match recipes.
-
----
-
 ## Find call sites
-
-**Problem**: Find all `console.log` calls in TS.
-
-**Solution**:
+Find all `console.log` calls in TS:
 
 ```bash
 sg -p 'console.log($$$)' -l ts src
 ```
 
-**Tip**: Use `--files-with-matches` for quick file list.
-
----
+Quick file list: add `--files-with-matches`.
 
 ## Find a pattern across repo
-
-**Problem**: Find `if ($A) { $B }` patterns in JS.
-
-**Solution**:
+Find `if ($A) { $B }` patterns in JS:
 
 ```bash
 sg -p 'if ($A) { $B }' -l js .
 ```
 
-**Tip**: Add `-C 2` for context.
-
----
+Add `-C 2` for context.
 
 ## Find function declarations
-
-**Problem**: List JS/TS function declarations.
-
-**Solution**:
+List JS/TS function declarations:
 
 ```bash
 sg -p 'function $NAME($$$) { $$$ }' -l ts src
 ```
 
-**Tip**: Use `--files-with-matches` for a fast index.
-
----
+Fast index: add `--files-with-matches`.
 
 ## Find Python defs
-
-**Problem**: Find Python function definitions.
-
-**Solution**:
+Find Python function definitions:
 
 ```bash
 sg -p 'def $NAME($$$): $$$' -l py src
 ```
 
-**Tip**: Use `-C 1` to see the signature context.
-
----
+See signature context: add `-C 1`.
 
 ## Stream JSON to other tools
-
-**Problem**: Pipe matches to another script.
-
-**Solution**:
+Pipe matches to another script:
 
 ```bash
 sg -p 'new $TYPE($$$)' -l ts --json=stream src
 ```
 
-**Tip**: `--json=stream` is one JSON object per line.
-
----
+`--json=stream`: one JSON object per line.
 
 ## Use stdin safely
-
-**Problem**: Search a snippet from stdin.
-
-**Solution**:
+Search a snippet from stdin:
 
 ```bash
 cat snippet.ts | sg -p 'await $CALL($$$)' -l ts --stdin
 ```
 
-**Tip**: `--lang` is required for stdin.
+`--lang` required for stdin.
