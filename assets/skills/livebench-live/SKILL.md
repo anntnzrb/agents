@@ -31,14 +31,15 @@ Score-table subtask cells remain `published`. Category means and overall are sep
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| Output envelope | `references/output-contract.md` | Before consuming stdout or designing integrations |
-| Source/release authority | `references/source-discovery.md` | Before live release/catalog requests or interpreting bundle limitations |
-| Asset extraction | `references/extraction.md` | When shell, bundle, CSV, JSON, embedded JSON, RSC, or HTML fallback is involved |
-| Dynamic records and formulas | `references/normalization.md` | Before score/category/subtask/cost comparisons |
-| Cache and evidence | `references/provenance.md` | Before refresh, stale, snapshot, or provenance questions |
-| Drift and failures | `references/drift-handling.md` | On missing/malformed/mixed-release/unknown-field diagnostics |
-| Overlap warnings | `references/overlap-model.md` | When comparing coding populations across benchmarks |
-| Deterministic validation | `references/eval-notes.md` | Before fixture/eval or opt-in live-smoke work |
+|Need|Read|When|
+|---|---|---|
+|Output envelope|`references/output-contract.md`|Before consuming stdout or designing integrations|
+|Source/release authority|`references/source-discovery.md`|Before live release/catalog requests or interpreting bundle limitations|
+|Asset extraction|`references/extraction.md`|When shell, bundle, CSV, JSON, embedded JSON, RSC, or HTML fallback is involved|
+|Dynamic records and formulas|`references/normalization.md`|Before score/category/subtask/cost comparisons|
+|Cache and evidence|`references/provenance.md`|Before refresh, stale, snapshot, or provenance questions|
+|Drift and failures|`references/drift-handling.md`|On missing/malformed/mixed-release/unknown-field diagnostics|
+|Overlap warnings|`references/overlap-model.md`|When comparing coding populations across benchmarks|
+|Deterministic validation|`references/eval-notes.md`|Before fixture/eval or opt-in live-smoke work|
 
 Never infer a fixed release/category/model allow-list from examples. Do not use screenshots, OCR, search snippets, list prices, Artificial Analysis, or DeepSWE values as LiveBench numeric evidence.

@@ -2,22 +2,22 @@
 
 ## Authority
 
-The official application (`https://livebench.ai/`) is a shell. The current deferred JavaScript bundle is the authority for the selectable release array and the exact asset templates it advertises. The selector is bundle-bounded: it is not an origin-wide directory/index, and `RELEASE_DISCOVERY_LIMITED` is retained in every discovery result.
+`https://livebench.ai/` official application = shell. Current deferred JavaScript bundle = authority for selectable release array and exact advertised asset templates. Discovery bundle-bounded, not origin-wide directory/index; every discovery result retains `RELEASE_DISCOVERY_LIMITED`.
 
-The adapter fetches the shell, extracts its official same-origin bundle URL, extracts release IDs in advertised order, and resolves `latest` to the last advertised entry. Bundle/deployment timestamps and cache-busting query values are transport metadata, not release IDs.
+Adapter: fetch shell → extract official same-origin bundle URL → extract release IDs in advertised order; `latest` = last advertised entry. Bundle/deployment timestamps and cache-busting query values = transport metadata, not release IDs.
 
 ## Target planning
 
-A resolved release is atomic:
+Resolved release = atomic:
 
 - required `table_<release with hyphens replaced by underscores>.csv`;
 - required `categories_<same>.json`;
-- optional `cost_<same>.csv`, only when the bundle advertises that target.
+- optional `cost_<same>.csv`, only when bundle advertises target.
 
-Every target carries the same release ID, exact URL, discovered-from authority URL, expected content type, and required/optional status. Table/category failure is a release failure. Cost HTTP 404 is recorded as absent with attempted URL; it is never backfilled from another release.
+Every target carries the same release ID, exact URL, discovered-from authority URL, expected content type, and required/optional status. Table/category failure = release failure. Cost HTTP 404 = absent, with attempted URL; NEVER backfill from another release.
 
-An explicit unadvertised release is allowed only with exact caller-supplied official asset URLs/manifest. The implementation allows fixture/file URLs for local deterministic snapshots and official HTTPS hosts for live targets; it never guesses directory listings or filenames.
+Explicit unadvertised release allowed only with exact caller-supplied official asset URLs/manifest. Fixture/file URLs allowed for local deterministic snapshots; official HTTPS hosts allowed for live targets. NEVER guess directory listings or filenames.
 
 ## Separate source surfaces
 
-The application leaderboard assets are distinct from the official repository, Hugging Face datasets, paper, and datasheet. Those surfaces can corroborate methodology or historical questions but cannot replace an application release score/cost asset.
+Application leaderboard assets distinct from official repository, Hugging Face datasets, paper, and datasheet. Those surfaces may corroborate methodology or historical questions but cannot replace an application release score/cost asset.
