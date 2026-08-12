@@ -1,52 +1,40 @@
 # Pillow Patterns
 
-Read this reference before writing a task-specific Pillow script.
-
-## Contents
-
-- [Prerequisites](#prerequisites)
-- [Output Format Guide](#output-format-guide)
-- [Save with Format-Specific Quality](#save-with-format-specific-quality)
-- [Resize with Aspect Ratio](#resize-with-aspect-ratio)
-- [Trim Whitespace](#trim-whitespace-auto-crop)
-- [Thumbnail](#thumbnail)
-- [Optimise for Web](#optimise-for-web)
-- [Cross-Platform Font Discovery](#cross-platform-font-discovery)
-- [OG Card Generation](#og-card-generation-1200x630)
+Read before writing a task-specific Pillow script.
 
 ## Prerequisites
 
-Pillow is required for generated scripts:
+Pillow required for generated scripts:
 
 ```text
 uv run --with Pillow <script.py>
 ```
 
-For a project-local dependency, use `uv add Pillow`.
+Project-local dependency: `uv add Pillow`.
 
-If Pillow is unavailable, use alternatives:
+Without Pillow:
 
-| Alternative | Platform         | Install               | Best for                           |
-| ----------- | ---------------- | --------------------- | ---------------------------------- |
-| `sips`      | macOS (built-in) | None                  | Resize, convert (no trim/OG)       |
-| `sharp`     | Node.js          | `npm install sharp`   | Full feature set, high performance |
-| `ffmpeg`    | Cross-platform   | `brew install ffmpeg` | Resize, convert                    |
+|Alternative|Platform|Install|Best for|
+|---|---|---|---|
+|`sips`|macOS (built-in)|None|Resize, convert (no trim/OG)|
+|`sharp`|Node.js|`npm install sharp`|Full feature set, high performance|
+|`ffmpeg`|Cross-platform|`brew install ffmpeg`|Resize, convert|
 
 ## Output Format Guide
 
-| Use case                         | Format      | Why                                    |
-| -------------------------------- | ----------- | -------------------------------------- |
-| Photos, hero images              | WebP        | Best compression, wide browser support |
-| Logos, icons (need transparency) | PNG         | Lossless, supports alpha               |
-| Fallback for older browsers      | JPG         | Universal support                      |
-| Thumbnails                       | WebP or JPG | Small file size priority               |
-| OG cards                         | PNG         | Social platforms handle PNG best       |
+|Use case|Format|Why|
+|---|---|---|
+|Photos, hero images|WebP|Best compression, wide browser support|
+|Logos, icons (need transparency)|PNG|Lossless, supports alpha|
+|Fallback for older browsers|JPG|Universal support|
+|Thumbnails|WebP or JPG|Small file size priority|
+|OG cards|PNG|Social platforms handle PNG best|
 
 ## Core Patterns
 
 ### Save with Format-Specific Quality
 
-Different formats need different save parameters. Always handle RGBA-to-JPG compositing — JPG does not support transparency, so composite onto a white background first.
+Use format-specific save parameters; JPG does not support transparency, so composite RGBA onto white first.
 
 ```python
 from pathlib import Path
@@ -76,7 +64,7 @@ def save_image(img, output_path, quality=None):
 
 ### Resize with Aspect Ratio
 
-When only width or height is given, calculate the other from aspect ratio. Use `Image.LANCZOS` for high-quality downscaling.
+When only one dimension is given, derive the other from aspect ratio; use `Image.LANCZOS` for high-quality downscaling.
 
 ```python
 def resize_image(img, width=None, height=None):
@@ -93,7 +81,7 @@ def resize_image(img, width=None, height=None):
 
 ### Trim Whitespace (Auto-Crop)
 
-Remove surrounding whitespace from logos and icons. Convert to RGBA first, then use `getbbox()` to find content bounds.
+For logos/icons, convert to RGBA, use `getbbox()` for content bounds, and crop when bounds exist.
 
 ```python
 img = Image.open(input_path)
@@ -106,7 +94,7 @@ if bbox:
 
 ### Thumbnail
 
-Fit within max dimensions while maintaining aspect ratio:
+Fit within `(size, size)` while maintaining aspect ratio:
 
 ```python
 img.thumbnail((size, size), Image.LANCZOS)
@@ -114,11 +102,11 @@ img.thumbnail((size, size), Image.LANCZOS)
 
 ### Optimise for Web
 
-Resize + compress in one step. Convert to WebP for best compression. Typical settings: width 1920, quality 85.
+Resize and compress in one step; WebP gives best compression. Typical settings: width 1920, quality 85.
 
 ### Cross-Platform Font Discovery
 
-System font paths differ by OS. Try multiple paths, fall back to Pillow's default. On Linux, `fc-list` can discover fonts dynamically.
+Try OS-specific font paths, fall back to Pillow’s default; Linux can discover fonts dynamically with `fc-list`.
 
 ```python
 from pathlib import Path
@@ -147,7 +135,7 @@ def get_font(size):
 
 ### OG Card Generation (1200x630)
 
-Composite text on a background image or solid colour. Apply semi-transparent overlay for text readability. Centre text horizontally.
+Composite text over an image or solid color, add a semi-transparent readability overlay, and center text horizontally.
 
 ```python
 from PIL import Image, ImageDraw, ImageFont

@@ -24,9 +24,9 @@ uv run --with Pillow <temp-dir>/image-task.py
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Pillow setup, format choice, and implementation patterns | `references/pillow-patterns.md` | Before writing the task-specific script |
+|Need|Read|When|
+|---|---|---|
+|Pillow setup, format choice, and implementation patterns|`references/pillow-patterns.md`|Before writing the task-specific script|
 
 ## Workflow
 
