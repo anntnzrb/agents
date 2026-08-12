@@ -1,25 +1,23 @@
-# Reference Guide
+# Gleam reference
 
 ## Research
 
-**Priority**: `context7 docs` → fallback to `gh` CLI
+Priority: `context7 docs` → fallback to `gh` CLI.
 
-### 1. Context7 (Primary)
+### Context7
 
 Query Context7 library IDs (GitHub project = libraryId) for accurate, up-to-date information:
 
-| Topic                                         | Library ID                       |
-| --------------------------------------------- | -------------------------------- |
-| Standard library (list, dict, result, option) | `/gleam-lang/stdlib`             |
-| Regular expressions                           | `/gleam-lang/regexp`             |
-| Practical code examples, recipes              | `/gleam-lang/cookbook`           |
-| Testing with gleeunit                         | `/lpil/gleeunit`                 |
-| HTTP types (Request, Response, Method)        | `/gleam-lang/http`               |
-| Time, timestamps, durations, dates            | `/gleam-lang/time`               |
-| JSON encoding/decoding                        | `/gleam-lang/json`               |
-| Data structures (heap, map, set, deque)       | `/schurhammer/gleamy_structures` |
-| HTTP server (mist, WebSocket, SSE)            | `/rawhat/mist`                   |
-| Package discovery, ecosystem                  | `/gleam-lang/awesome-gleam`      |
+- Standard library (list, dict, result, option) → `/gleam-lang/stdlib`
+- Regular expressions → `/gleam-lang/regexp`
+- Practical code examples, recipes → `/gleam-lang/cookbook`
+- Testing with gleeunit → `/lpil/gleeunit`
+- HTTP types (Request, Response, Method) → `/gleam-lang/http`
+- Time, timestamps, durations, dates → `/gleam-lang/time`
+- JSON encoding/decoding → `/gleam-lang/json`
+- Data structures (heap, map, set, deque) → `/schurhammer/gleamy_structures`
+- HTTP server (mist, WebSocket, SSE) → `/rawhat/mist`
+- Package discovery, ecosystem → `/gleam-lang/awesome-gleam`
 
 ```
 task(
@@ -29,7 +27,7 @@ task(
 )
 ```
 
-### 2. GitHub CLI (Fallback)
+### GitHub CLI
 
 When Context7 is unavailable or lacks detail, use `gh` to search/read repos directly:
 
@@ -47,11 +45,11 @@ gh api repos/gleam-lang/stdlib/contents/src/gleam --jq '.[].name'
 gh search issues "json decode" --repo gleam-lang/json
 ```
 
-**Query multiple repos in parallel** when topics overlap (e.g., HTTP server + HTTP types).
+Query multiple repos in parallel when topics overlap (e.g., HTTP server + HTTP types).
 
 ## Patterns
 
-### Error Propagation with `use`
+### Error propagation with `use`
 
 ```gleam
 pub fn process(path: String) -> Result(Data, Error) {
@@ -68,7 +66,7 @@ use raw <- result.map_error(read(path), FileError)
 use <- bool.guard(string.is_empty(name), Error(EmptyName))
 ```
 
-### Opaque Types (Enforce Invariants)
+### Opaque types: enforce invariants
 
 ```gleam
 pub opaque type Email {
@@ -83,7 +81,7 @@ pub fn from_string(s: String) -> Result(Email, String) {
 }
 ```
 
-### Make Illegal States Unrepresentable
+### Make illegal states unrepresentable
 
 ```gleam
 // BAD: allows invalid combinations
@@ -99,7 +97,7 @@ pub type Request {
 }
 ```
 
-### Subject-First for Pipelines
+### Subject-first pipelines
 
 ```gleam
 pub fn add(to num: Int, value: Int) -> Int
@@ -110,7 +108,7 @@ items
 |> int.sum
 ```
 
-### Pattern Matching
+### Pattern matching
 
 ```gleam
 // Multi-subject
@@ -139,7 +137,7 @@ case n {
 let assert Ok(config) = load_required_config()
 ```
 
-### Custom Error Types
+### Custom error types
 
 ```gleam
 pub type UserError {
@@ -155,9 +153,9 @@ pub type AppError {
 }
 ```
 
-### Labelled Arguments
+### Labelled arguments
 
-Proactively use labels for readability.
+Use labels proactively for readability.
 
 ```gleam
 pub fn create(name name: String, email email: String) -> User
@@ -167,13 +165,13 @@ let name = "Alice"
 create(name:, email: "a@b.com")
 ```
 
-## Anti-Patterns
+## Anti-patterns
 
-| Avoid                         | Do Instead             |
-| ----------------------------- | ---------------------- |
-| `import gleam/io.{println}`   | `io.println(...)`      |
-| `panic` for expected failures | Return `Result`        |
-| `let assert` on user input    | Pattern match + handle |
-| `list.at(items, n)` indexing  | Pattern match or fold  |
-| Nested `result.try` callbacks | `use` expressions      |
-| Boolean flags for states      | Sum types              |
+|Avoid|Do Instead|
+|---|---|
+|`import gleam/io.{println}`|`io.println(...)`|
+|`panic` for expected failures|Return `Result`|
+|`let assert` on user input|Pattern match + handle|
+|`list.at(items, n)` indexing|Pattern match or fold|
+|Nested `result.try` callbacks|`use` expressions|
+|Boolean flags for states|Sum types|

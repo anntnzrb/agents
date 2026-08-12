@@ -35,9 +35,9 @@ Use `context7 docs` first, then `gh` as fallback.
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Research routing and code patterns | `references/guide.md` | API research or implementation guidance |
+|Need|Read|When|
+|---|---|---|
+|Research routing and code patterns|`references/guide.md`|API research or implementation guidance|
 
 ## CLI
 
@@ -48,3 +48,4 @@ gleam run                      # Execute main
 gleam format                   # Format all
 gleam add pkg --dev            # Dev dependency
 ```
+
