@@ -1,28 +1,9 @@
 # Functional Patterns: Composition and Immutability
 
-Reduce, partials, dispatch, pipelines, and immutable data techniques.
-
-## Contents
-
-- [Reduce](#reduce-for-accumulation)
-- [Partial application](#partial-application)
-- [Memoization](#memoization)
-- [Function overloading](#function-overloading)
-- [Function composition](#function-composition)
-- [Pipeline pattern](#pipeline-pattern)
-- [Fluent pipeline class](#fluent-pipeline-class)
-- [Frozen dataclasses](#frozen-dataclasses)
-- [NamedTuple](#namedtuple-for-immutability)
-- [Immutable collections](#immutable-collections)
-- [Copy-on-write](#copy-on-write-pattern)
-
----
+Reduce, partials, dispatch, pipelines, immutable data.
 
 ## Reduce for Accumulation
-
-**Problem**: You need to combine all elements of a sequence into a single value using a custom operation.
-
-**Solution**:
+Combine a sequence into one value with a custom operation.
 
 ```python
 from functools import reduce
@@ -44,15 +25,10 @@ result = reduce(concat_strings, words, "")
 assert result == "apple,banana,cherry"
 ```
 
-**Tip**: Always provide an initial value to reduce() when possible. Use operator module functions (add, mul) instead of lambdas for better performance.
-
----
+Tip: Provide an initial `reduce()` value when possible; prefer `operator` functions (`add`, `mul`) to lambdas for better performance.
 
 ## Partial Application
-
-**Problem**: You need to create specialized versions of functions by fixing some arguments.
-
-**Solution**:
+Create specialized functions by fixing arguments.
 
 ```python
 from functools import partial
@@ -74,15 +50,10 @@ say_hello = partial(greet, "Hello")
 assert say_hello("Alice") == "Hello, Alice!"
 ```
 
-**Tip**: Use partial() to create specialized functions without writing wrapper functions. Great for callbacks and configuration.
-
----
+Tip: Use `partial()` instead of wrapper functions for specialized functions; useful for callbacks and configuration.
 
 ## Memoization
-
-**Problem**: You have expensive function calls that repeat with the same arguments.
-
-**Solution**:
+Cache repeated expensive calls with identical arguments.
 
 ```python
 from functools import lru_cache, cached_property
@@ -109,15 +80,10 @@ class User:
         return f"User-{self.user_id}"  # Computed once
 ```
 
-**Tip**: lru_cache is perfect for recursive functions and expensive computations. Use cached_property for expensive instance computations that only need to run once.
-
----
+Tip: `lru_cache` suits recursive and expensive computations; use `cached_property` for expensive instance computations needed only once.
 
 ## Function Overloading
-
-**Problem**: You want different behavior based on the argument type without manual type checking.
-
-**Solution**:
+Dispatch behavior by argument type without manual type checks.
 
 ```python
 from functools import singledispatch
@@ -139,15 +105,10 @@ assert process([1, 2, 3]) == "List with 3 items"
 assert process("hello") == "Default: hello"
 ```
 
-**Tip**: singledispatch dispatches on the type of the first argument. Great for creating extensible APIs without complex if/isinstance chains.
-
----
+Tip: `singledispatch` dispatches on the first argument's type; it supports extensible APIs without complex `if`/`isinstance` chains.
 
 ## Function Composition
-
-**Problem**: You want to combine multiple functions into a single function that applies them in sequence.
-
-**Solution**:
+Combine functions into one sequential function.
 
 ```python
 from typing import Callable, TypeVar
@@ -171,15 +132,10 @@ add_then_double = compose(add_one, double)
 assert add_then_double(5) == 12  # (5 + 1) * 2
 ```
 
-**Tip**: Composition reads right-to-left (mathematical style). For left-to-right, use pipe functions or method chaining.
-
----
+Tip: Composition reads right-to-left mathematically; use pipe functions or method chaining for left-to-right execution.
 
 ## Pipeline Pattern
-
-**Problem**: You want to chain multiple transformations in a readable left-to-right order.
-
-**Solution**:
+Chain transformations left-to-right.
 
 ```python
 from functools import reduce
@@ -198,15 +154,10 @@ pipeline = pipe(add_one, triple, lambda x: x - 2)
 assert pipeline(5) == 16  # 5 -> 6 -> 18 -> 16
 ```
 
-**Tip**: Pipelines make data transformations more readable. Each function receives the output of the previous one.
-
----
+Tip: Pipelines clarify data transformations; each function receives the previous function's output.
 
 ## Fluent Pipeline Class
-
-**Problem**: You want method chaining for readable, type-safe data transformations.
-
-**Solution**:
+Use method chaining for readable, type-safe transformations.
 
 ```python
 from typing import Generic, TypeVar, Callable
@@ -240,15 +191,10 @@ result = (
 assert result == 16
 ```
 
-**Tip**: Fluent interfaces improve readability. This pattern is especially useful for data processing workflows.
-
----
+Tip: Fluent interfaces improve readability, especially in data-processing workflows.
 
 ## Frozen Dataclasses
-
-**Problem**: You want immutable data structures that prevent accidental modification.
-
-**Solution**:
+Use immutable data structures to prevent accidental modification.
 
 ```python
 from dataclasses import dataclass
@@ -268,15 +214,10 @@ assert c1.x == 0  # Original unchanged
 assert c2.x == 1  # New instance
 ```
 
-**Tip**: Frozen dataclasses are hashable and can be used as dictionary keys. Return new instances instead of mutating for immutability.
-
----
+Tip: Frozen dataclasses are hashable and usable as dictionary keys; return new instances rather than mutating.
 
 ## NamedTuple for Immutability
-
-**Problem**: You need lightweight, immutable records with named fields.
-
-**Solution**:
+Use lightweight immutable records with named fields.
 
 ```python
 from typing import NamedTuple
@@ -290,15 +231,10 @@ x, y = p1  # Unpack
 # p1.x = 5  # TypeError - immutable
 ```
 
-**Tip**: NamedTuples are memory-efficient and faster than dataclasses. Use them for simple immutable records.
-
----
+Tip: NamedTuples are memory-efficient and faster than dataclasses; use them for simple immutable records.
 
 ## Immutable Collections
-
-**Problem**: You need to prevent modifications to dictionaries or expose read-only views.
-
-**Solution**:
+Prevent dictionary modification or expose a read-only view; use tuples for immutable sequences.
 
 ```python
 from types import MappingProxyType
@@ -317,15 +253,10 @@ assert numbers == (1, 2, 3)  # Unchanged
 assert new_numbers == (1, 2, 3, 4)
 ```
 
-**Tip**: MappingProxyType creates a read-only view of a dictionary. Use tuples instead of lists for immutable sequences.
-
----
+Tip: `MappingProxyType` creates a read-only dictionary view; use tuples instead of lists for immutable sequences.
 
 ## Copy-on-Write Pattern
-
-**Problem**: You need to update data structures without mutating the original.
-
-**Solution**:
+Update data structures without mutating the original.
 
 ```python
 from copy import copy
@@ -348,6 +279,4 @@ assert profile1.settings["theme"] == "light"  # Unchanged
 assert profile2.settings["theme"] == "dark"
 ```
 
-**Tip**: Copy-on-write provides a balance between immutability and performance. Use copy() for shallow copies or deepcopy() for nested structures.
-
----
+Tip: Copy-on-write balances immutability and performance; use `copy()` for shallow copies or `deepcopy()` for nested structures.

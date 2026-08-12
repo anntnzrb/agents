@@ -6,18 +6,18 @@ NEVER pandas. Polars (with numpy) plus DuckDB. Pandas is 10-50x slower, has weak
 
 ## Quick decision tree
 
-| Operation | Use | Why |
+|Operation|Use|Why|
 |---|---|---|
-| `.csv` / `.parquet` / `.json` direct query | DuckDB | Zero memory load, SQL ergonomics |
-| `.duckdb` file | DuckDB | Native format |
-| Filter (any size) | Polars | 128x faster than DuckDB for filtering |
-| Sort | Polars | 12x faster |
-| Multi-table join | DuckDB | 3x faster, more join types |
-| Heavy GROUP BY aggregation | DuckDB | 4x faster on large datasets |
-| Window function | Polars | 3-5x faster |
-| Pivot / melt / string ops | Polars | 2x faster |
-| Larger than RAM | Polars streaming or DuckDB out-of-core | Both handle OOM |
-| Mixed pipeline | Hybrid (zero-copy via Arrow) | Use each tool's strengths |
+|`.csv` / `.parquet` / `.json` direct query|DuckDB|Zero memory load, SQL ergonomics|
+|`.duckdb` file|DuckDB|Native format|
+|Filter (any size)|Polars|128x faster than DuckDB for filtering|
+|Sort|Polars|12x faster|
+|Multi-table join|DuckDB|3x faster, more join types|
+|Heavy GROUP BY aggregation|DuckDB|4x faster on large datasets|
+|Window function|Polars|3-5x faster|
+|Pivot / melt / string ops|Polars|2x faster|
+|Larger than RAM|Polars streaming or DuckDB out-of-core|Both handle OOM|
+|Mixed pipeline|Hybrid (zero-copy via Arrow)|Use each tool's strengths|
 
 For the deep version (per-operation benchmarks, OOM strategies, full execution templates), load the **`data-scientist`** skill - it lives in this same skill set and is the source of truth for performance numbers.
 
@@ -116,18 +116,19 @@ basedpyright understands `polars-stubs`, which ship with polars itself. No extra
 
 ## Things you might miss from pandas (and how to do them in Polars)
 
-| pandas | polars |
+|pandas|polars|
 |---|---|
-| `df.iloc[5]` | `df.row(5)` (named tuple) or `df[5]` (single-row frame) |
-| `df.loc[df["x"] > 5]` | `df.filter(pl.col("x") > 5)` |
-| `df["x"].apply(fn)` | `df["x"].map_elements(fn)` (slow path) or use native expressions |
-| `df.merge(...)` | `df.join(other, on="key")` |
-| `df.groupby(...).agg(...)` | `df.group_by(...).agg(...)` |
-| `pd.read_csv(...).dtypes` | `pl.read_csv(...).schema` |
-| `df.to_dict("records")` | `df.to_dicts()` |
+|`df.iloc[5]`|`df.row(5)` (named tuple) or `df[5]` (single-row frame)|
+|`df.loc[df["x"] > 5]`|`df.filter(pl.col("x") > 5)`|
+|`df["x"].apply(fn)`|`df["x"].map_elements(fn)` (slow path) or use native expressions|
+|`df.merge(...)`|`df.join(other, on="key")`|
+|`df.groupby(...).agg(...)`|`df.group_by(...).agg(...)`|
+|`pd.read_csv(...).dtypes`|`pl.read_csv(...).schema`|
+|`df.to_dict("records")`|`df.to_dicts()`|
 
 ## Sources
 
 - Polars docs: <https://docs.pola.rs>
 - DuckDB Python API: <https://duckdb.org/docs/api/python/overview>
 - Cross-reference - this skill set's `data-scientist` skill (load it for the deep version)
+

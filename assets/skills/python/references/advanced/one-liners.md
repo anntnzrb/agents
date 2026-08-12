@@ -1,12 +1,12 @@
 # One-liner Scripts (PEP 723 + uv)
 
-Self-contained Python scripts with declared dependencies, run with no environment setup. The combination eliminates the historical reason to write small tools in Go or Bash.
+Self-contained Python scripts declare dependencies and run without environment setup. The script IS its environment spec.
 
-**Rule: EVERY `.py` script — even throwaway — MUST use PEP 723 inline metadata with the usage comment block.** No venv, no requirements.txt, no setup.py. The script IS the environment spec.
+**Rule: EVERY `.py` script—even throwaway—MUST use PEP 723 inline metadata plus the usage comment block.** No venv, `requirements.txt`, or `setup.py`.
 
-## The two patterns
+## Patterns
 
-### Pattern 1: inline `uv run` invocation
+### 1. Inline `uv run`
 
 ```bash
 uv run --with httpx2 --with rich python -c "
@@ -16,11 +16,11 @@ print(httpx2.get('https://api.github.com').json())
 "
 ```
 
-Use for terminal one-shots that you don't want to save. `--with PKG` may be repeated.
+Terminal one-shot; do not save. Repeat `--with PKG` as needed.
 
-### Pattern 2: PEP 723 script with shebang (THE CANONICAL PATTERN)
+### 2. PEP 723 script + shebang (canonical)
 
-A regular `.py` file with metadata in a comment block. uv reads the metadata, materialises a disposable venv (cached), and runs the script.
+`.py` file with a comment metadata block. uv reads it, materialises a disposable cached venv, and runs the script.
 
 ```python
 #!/usr/bin/env -S uv run --script
@@ -58,17 +58,17 @@ if __name__ == "__main__":
     main()
 ```
 
-### Mandatory elements
+### Mandatory order
 
-Every PEP 723 script MUST include these, in order:
+Every PEP 723 script MUST contain:
 
-1. **Shebang**: `#!/usr/bin/env -S uv run --script`
-2. **PEP 723 metadata block**: `# /// script` ... `# ///` with `requires-python` and `dependencies`
-3. **Usage comment block**: How to install uv + how to run the script. Copy the template above verbatim
-4. **`from __future__ import annotations`**: Always first import
-5. **`if __name__ == "__main__": main()`**: Entry point guard
+1. `#!/usr/bin/env -S uv run --script`
+2. `# /// script` … `# ///`, containing `requires-python` and `dependencies`
+3. The usage comment block: uv installation plus script execution; use the exact template below
+4. `from __future__ import annotations` as the first import
+5. `if __name__ == "__main__": main()` entry-point guard
 
-### The usage comment block (NON-NEGOTIABLE)
+### Required usage comment block
 
 ```python
 # ─── How to run ───
@@ -81,17 +81,15 @@ Every PEP 723 script MUST include these, in order:
 # ──────────────────
 ```
 
-Replace `<SCRIPT_NAME>` with the actual filename. Add argument descriptions if the script takes CLI args. This block goes immediately after the `# ///` closing line, before any imports.
+Replace `<SCRIPT_NAME>` with the actual filename; add CLI-argument descriptions when applicable. Place this block immediately after `# ///` and before imports. It is the runnable documentation for every recipient, CI job, and future maintainer.
 
-**Why mandatory**: Anyone who receives this script — colleague, CI, future you — must know how to run it without reading docs. The comment IS the docs.
+## New-script template
 
-## Template
-
-Start a new PEP 723 script by copying the metadata and usage-comment pattern above, then declare only the dependencies the script imports. Run it portably with `uv run --script <script.py> [args]`.
+Copy the metadata and usage-comment pattern; declare only dependencies the script imports. Run portably with `uv run --script <script.py> [args]`.
 
 ## Common dependency sets
 
-| Use case | Dependencies line |
+| Use case | Dependencies |
 |---|---|
 | API client | `"httpx2[http2,brotli,zstd]"` |
 | Data processing | `"polars"`, `"duckdb"` |
@@ -101,7 +99,7 @@ Start a new PEP 723 script by copying the metadata and usage-comment pattern abo
 | JSON pretty | `"rich"` |
 | AI / LLM | `"pydantic-ai"`, `"httpx2[http2,brotli,zstd]"` |
 
-## Real-world examples
+## Examples
 
 ### Fetch + print JSON
 
@@ -140,7 +138,7 @@ if __name__ == "__main__":
     main()
 ```
 
-### CSV → Parquet conversion
+### CSV → Parquet
 
 ```python
 #!/usr/bin/env -S uv run --script
@@ -248,18 +246,18 @@ if __name__ == "__main__":
 
 ## Anti-patterns
 
-| ❌ Don't | ✅ Do |
+| Don’t | Do |
 |---|---|
 | `pip install httpx2 && python script.py` | `uv run script.py` |
-| `requirements.txt` alongside script | PEP 723 inline metadata |
-| `python -m venv .venv && ...` | `uv run --script` handles it |
-| Script without usage comment | Always include the "How to run" block |
+| `requirements.txt` beside script | PEP 723 inline metadata |
+| `python -m venv .venv && ...` | `uv run --script` handles the environment |
+| Script without usage comment | Always include the “How to run” block |
 | `import asyncio; asyncio.run(main())` | `import anyio; anyio.run(main)` |
 | Bare `httpx2.AsyncClient()` | Full production defaults (see `references/httpx2-optimization.md`) |
 
 ## Sources
 
-- PEP 723 - Inline script metadata: <https://peps.python.org/pep-0723/>
+- PEP 723 — Inline script metadata: <https://peps.python.org/pep-0723/>
 - uv `run --script` docs: <https://docs.astral.sh/uv/guides/scripts/>
 - Original article: <https://www.cottongeeks.com/articles/2025-06-24-fun-with-uv-and-pep-723>
 - Simon Willison on one-shot Python tools: <https://simonwillison.net/2024/Dec/19/one-shot-python-tools/>

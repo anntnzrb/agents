@@ -1,12 +1,9 @@
 # Type Patterns
 
-How to use Python's type system to catch bugs at check time, not runtime.
-
----
+Catch bugs at check time, not runtime.
 
 ## NewType — distinct primitives
-
-Same runtime type, different meaning. The type checker prevents mixing.
+Same runtime type, distinct meaning; the type checker prevents mixing.
 
 ```python
 from typing import NewType
@@ -32,14 +29,10 @@ get_user(42)  # type error: int is not UserId
 sleep(Milliseconds(100.0))  # type error
 ```
 
-**Use when**: IDs, indices, keys, units of measurement — any pair where swapping is a bug.
-**Skip when**: ephemeral local math where branding adds noise with zero safety gain.
+Use for IDs, indices, keys, units, or any swappable pair where mixing is a bug. Skip ephemeral local math where branding adds noise without safety.
 
----
-
-## Final — constants are const
-
-Module-level constants declare their intent. Reassignment is a type error.
+## Final — constants
+Module-level constants declare intent; reassignment is a type error.
 
 ```python
 from typing import Final
@@ -51,13 +44,10 @@ DEFAULT_TIMEOUT: Final = 30.0
 MAX_RETRIES = 5  # type error: cannot assign to Final
 ```
 
-If it changes at runtime, it's not a constant — make it a function parameter or config field.
-
----
+Runtime-changing values are not constants; use a function parameter or config field.
 
 ## TypeAlias — name complex types
-
-If a union or generic appears more than once, give it a name.
+Name unions or generics appearing more than once.
 
 ```python
 # Python 3.12+
@@ -75,11 +65,8 @@ JsonValue: TypeAlias = (
 )
 ```
 
----
-
 ## StrEnum / IntEnum — closed sets
-
-Any fixed set of known values. No string literals scattered through code.
+Use enums for fixed known values; avoid scattered string literals.
 
 ```python
 from enum import StrEnum, IntEnum, unique
@@ -107,13 +94,10 @@ def check_role(role: str) -> bool: ...
 def check_role(role: Role) -> bool: ...
 ```
 
-`StrEnum` when values serialize as strings (API, DB). `IntEnum` for numeric codes. Plain `Enum` for pure labels.
+`StrEnum` for values serialized as strings (API, DB); `IntEnum` for numeric codes; plain `Enum` for pure labels.
 
----
-
-## Type narrowing — let the checker follow your logic
-
-`isinstance`, `is None`, and `match` narrow types automatically. Use them instead of `cast`.
+## Type narrowing
+`isinstance`, `is None`, and `match` narrow automatically; prefer them to `cast`.
 
 ```python
 def process(value: str | int | None) -> str:
@@ -128,7 +112,7 @@ def process(value: str | int | None) -> str:
     return str(value * 2)
 ```
 
-### TypeGuard for custom narrowing
+### TypeGuard — custom narrowing
 
 ```python
 from typing import TypeGuard
@@ -145,9 +129,8 @@ def send(addr: str) -> None:
     deliver(addr)
 ```
 
-### TypeIs (Python 3.13+) — the strict version
-
-`TypeIs` is stricter than `TypeGuard` — it narrows in both `if` and `else` branches.
+### TypeIs (Python 3.13+) — strict narrowing
+Stricter than `TypeGuard`; narrows both `if` and `else` branches.
 
 ```python
 from typing import TypeIs
@@ -164,11 +147,8 @@ def handle(v: str | int) -> None:
         print(v + 1)  # checker knows: int
 ```
 
----
-
 ## Union syntax
-
-Always `X | Y`. Never `Union[X, Y]` or `Optional[X]`.
+Always `X | Y`; never `Union[X, Y]` or `Optional[X]`.
 
 ```python
 # BAD
@@ -181,8 +161,6 @@ def f(x: Optional[int]) -> Union[str, int]: ...
 # GOOD
 def f(x: int | None) -> str | int: ...
 ```
-
----
 
 ## Sources
 

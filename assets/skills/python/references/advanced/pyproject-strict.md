@@ -165,13 +165,13 @@ exclude_lines = [
 
 basedpyright's modes, strictest first:
 
-| Mode | Behavior |
+|Mode|Behavior|
 |---|---|
-| `"all"` | Every diagnostic at `error` |
-| `"recommended"` | Same rules; less severe ones at `warning`; `failOnWarnings = true` makes CI still fail |
-| `"strict"` | pyright's strict mode |
-| `"standard"` | Default |
-| `"basic"` / `"off"` | Loose / disabled |
+|`"all"`|Every diagnostic at `error`|
+|`"recommended"`|Same rules; less severe ones at `warning`; `failOnWarnings = true` makes CI still fail|
+|`"strict"`|pyright's strict mode|
+|`"standard"`|Default|
+|`"basic"` / `"off"`|Loose / disabled|
 
 `"all"` enables basedpyright-exclusive rules pyright lacks: `reportImplicitOverride`, `reportImplicitStringConcatenation`, `reportIncompatibleUnannotatedOverride`, `reportUnannotatedClassAttribute`. No need to opt-in to additional flags.
 
@@ -183,13 +183,13 @@ The official docs say *"Use ALL with discretion. Enabling ALL will implicitly en
 
 The minimal ignore set:
 
-| Rule | Reason |
+|Rule|Reason|
 |---|---|
-| `COM812`, `ISC001` | Conflict with `ruff format` (ruff itself documents this) |
-| `D203` vs `D211`, `D213` vs `D212` | Mutually-exclusive docstring conventions; pick the modern one |
-| `CPY001` | Most projects don't need a copyright header on every file |
-| `FBT001`, `FBT002` | Boolean flags are ergonomic for CLI/typer; ban makes typer awkward |
-| `TD002`, `TD003`, `FIX002` | TODOs without a JIRA link are fine in solo / internal code |
+|`COM812`, `ISC001`|Conflict with `ruff format` (ruff itself documents this)|
+|`D203` vs `D211`, `D213` vs `D212`|Mutually-exclusive docstring conventions; pick the modern one|
+|`CPY001`|Most projects don't need a copyright header on every file|
+|`FBT001`, `FBT002`|Boolean flags are ergonomic for CLI/typer; ban makes typer awkward|
+|`TD002`, `TD003`, `FIX002`|TODOs without a JIRA link are fine in solo / internal code|
 
 `ANN101` and `ANN102` were **removed in ruff 0.8.0** (Nov 2024). Do NOT include them in `ignore` - ruff errors on unknown rule codes.
 
@@ -211,15 +211,15 @@ A single `make ci` target combining the four works fine.
 
 The config above, combined with code review, enforces:
 
-| What | How |
+|What|How|
 |---|---|
-| Exhaustive match | basedpyright `all` mode + `assert_never` |
-| No `Any` | basedpyright `all` mode + script `cast-any` rule |
-| Ignored return values | `reportUnusedCallResult = "warning"` |
-| Immutable default | Script `mutable-dataclass` + `missing-slots` rules |
-| No null surprise | basedpyright strict `None` analysis |
-| Constants are const | basedpyright catches `Final` reassignment |
-| Unused variables | `reportUnusedVariable = "error"` |
+|Exhaustive match|basedpyright `all` mode + `assert_never`|
+|No `Any`|basedpyright `all` mode + script `cast-any` rule|
+|Ignored return values|`reportUnusedCallResult = "warning"`|
+|Immutable default|Script `mutable-dataclass` + `missing-slots` rules|
+|No null surprise|basedpyright strict `None` analysis|
+|Constants are const|basedpyright catches `Final` reassignment|
+|Unused variables|`reportUnusedVariable = "error"`|
 
 ## Sources
 

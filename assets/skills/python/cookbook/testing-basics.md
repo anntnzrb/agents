@@ -1,18 +1,14 @@
 # Testing Cookbook: Basics
 
-Core pytest setup, unit tests, exceptions, floats, and fixtures.
+## Pytest + coverage
 
----
-
-## Setup pytest with Coverage
-
-**Problem**: Need to configure pytest with coverage reporting and best practices for a Python project.
-
-**Solution**:
+Install:
 
 ```bash
 uv add --dev pytest pytest-cov pytest-asyncio
 ```
+
+`pyproject.toml`:
 
 ```toml
 # pyproject.toml
@@ -34,15 +30,11 @@ markers = [
 asyncio_mode = "auto"
 ```
 
-**Tip**: Use `asyncio_mode = "auto"` to avoid decorating every async test with `@pytest.mark.asyncio`.
+`asyncio_mode = "auto"` avoids `@pytest.mark.asyncio` on every async test.
 
----
+## Basic unit tests
 
-## Write Basic Unit Tests
-
-**Problem**: Need to test class methods, validation, and equality in a structured way.
-
-**Solution**:
+Test class methods, validation, and equality; `Test*` classes organize related tests and enable shared setup.
 
 ```python
 # tests/test_entities.py
@@ -66,15 +58,9 @@ class TestUser:
         assert user1 == user2
 ```
 
-**Tip**: Group related tests in classes with the `Test` prefix for better organization and shared setup.
+## Exceptions
 
----
-
-## Test Exceptions
-
-**Problem**: Need to verify that code raises the correct exceptions with specific messages.
-
-**Solution**:
+`pytest.raises` checks exception type; `match` checks the message with a regex.
 
 ```python
 def test_division_by_zero():
@@ -86,15 +72,9 @@ def test_value_error_message():
         create_user(age=-1)
 ```
 
-**Tip**: Use the `match` parameter with a regex pattern to verify exception messages contain expected text.
+## Floating-point comparison
 
----
-
-## Compare Floating Point Numbers
-
-**Problem**: Floating point arithmetic can produce slightly different results that fail equality checks.
-
-**Solution**:
+Use `pytest.approx`; `abs` sets fixed-margin tolerance, `rel` percentage-based tolerance.
 
 ```python
 def test_float_comparison():
@@ -106,15 +86,9 @@ def test_with_tolerance():
     assert 2.0 == pytest.approx(2.02, rel=0.02)
 ```
 
-**Tip**: Use `abs` for absolute tolerance (fixed margin) or `rel` for relative tolerance (percentage-based).
+## Reusable fixtures
 
----
-
-## Create Reusable Test Fixtures
-
-**Problem**: Tests need shared setup objects like users or database connections with proper cleanup.
-
-**Solution**:
+Fixtures provide shared users/database connections and cleanup. Use `yield` for post-test cleanup.
 
 ```python
 # tests/conftest.py
@@ -141,15 +115,9 @@ def test_save_user(database, user):
     assert database.get_user(user.id) == user
 ```
 
-**Tip**: Use `yield` in fixtures to run cleanup code after the test completes, ensuring resources are properly released.
+## Fixture scope
 
----
-
-## Control Fixture Scope
-
-**Problem**: Some fixtures are expensive to create and should be shared across multiple tests.
-
-**Solution**:
+Use `scope="session"` for expensive one-time setup (such as database connections); use default `scope="function"` for test isolation.
 
 ```python
 @pytest.fixture(scope="session")
@@ -173,7 +141,3 @@ def temp_file():
     with tempfile.NamedTemporaryFile() as f:
         yield f
 ```
-
-**Tip**: Use `scope="session"` for expensive one-time setup like database connections, and `scope="function"` (default) for test isolation.
-
----

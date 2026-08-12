@@ -1,14 +1,8 @@
 # Modern Python: 3.13 to 3.14
 
-Free-threaded mode, new stdlib features, and newer syntax.
-
----
-
 ## Free-Threaded Python (3.13+)
 
-**Problem**: You need true parallel execution for CPU-bound tasks without multiprocessing overhead.
-
-**Solution**:
+True CPU-bound parallelism with threads, without multiprocessing overhead. Enable at build time with `--disable-gil`; experimental in 3.13.
 
 ```python
 # Build/install with: --disable-gil
@@ -27,15 +21,9 @@ for t in threads:
     t.join()
 ```
 
-**Tip**: Free-threaded mode must be enabled at build time. It's experimental in 3.13 but enables true CPU parallelism with threads.
-
----
-
 ## Copy and Replace (3.13+)
 
-**Problem**: You want to create a copy of an object with some fields changed, especially for dataclasses.
-
-**Solution**:
+Copy an object while changing fields, especially dataclasses. `replace()` supports objects with `__replace__()`, including dataclasses, namedtuples, and custom classes.
 
 ```python
 from copy import replace
@@ -51,15 +39,9 @@ bob = replace(alice, name="Bob")
 # User(name='Bob', age=30)
 ```
 
-**Tip**: `replace()` works with any object that has `__replace__()`, including dataclasses, namedtuples, and custom classes.
-
----
-
 ## Deprecated Decorator (3.13+)
 
-**Problem**: You need to mark functions as deprecated with proper warnings.
-
-**Solution**:
+`warnings.deprecated` marks APIs with proper warnings and clarifies migration paths.
 
 ```python
 from warnings import deprecated
@@ -71,15 +53,9 @@ def old_function():
 old_function()  # Emits DeprecationWarning
 ```
 
-**Tip**: The decorator provides a standard way to deprecate APIs, making migration paths clear to users.
-
----
-
 ## Template Strings (3.14+)
 
-**Problem**: You want safe, inspectable string templates that aren't immediately evaluated like f-strings.
-
-**Solution**:
+`t"..."` creates safe, inspectable template objects rather than immediately evaluated f-string-like values; inspect or transform them before rendering. This helps prevent injection attacks in user-provided templates.
 
 ```python
 name = "Alice"
@@ -94,15 +70,9 @@ print(template.strings)       # ("Hello ", ", age ", "")
 print(template.interpolations) # (Interpolation(name, ...), ...)
 ```
 
-**Tip**: t-strings return template objects you can inspect and control, preventing injection attacks in user-provided templates.
-
----
-
 ## Deferred Annotation Evaluation (3.14+)
 
-**Problem**: You need forward references in type hints without quote strings.
-
-**Solution**:
+Annotations evaluate lazily, enabling unquoted forward references to classes before full definition.
 
 ```python
 # Forward references work without quotes!
@@ -116,15 +86,9 @@ class Node:
         return node
 ```
 
-**Tip**: Annotations are evaluated lazily, so you can reference classes before they're fully defined without string quotes.
-
----
-
 ## Time-Sortable UUIDs (3.14+)
 
-**Problem**: You need UUIDs that maintain chronological order for database efficiency.
-
-**Solution**:
+`uuid7()` includes a timestamp, producing chronologically sortable UUIDs that are more database-friendly than UUID v4 and suitable for database primary keys.
 
 ```python
 from uuid import uuid7
@@ -136,15 +100,9 @@ assert id1 < id2  # Chronologically sortable!
 # Great for database primary keys
 ```
 
-**Tip**: UUID v7 includes a timestamp, making them naturally sortable and more database-friendly than UUID v4.
-
----
-
 ## Pathlib Copy and Move (3.14+)
 
-**Problem**: You want to copy or move files using pathlib instead of shutil.
-
-**Solution**:
+`Path` copy/move methods integrate file operations into pathlib, avoiding separate `shutil` imports.
 
 ```python
 from pathlib import Path
@@ -157,15 +115,9 @@ src.move(Path("archive/file.txt"))
 Path("src/").copy(Path("backup/"), recursive=True)
 ```
 
-**Tip**: These methods integrate file operations directly into Path objects, eliminating the need for separate shutil imports.
-
----
-
 ## Simplified Exception Syntax (3.14+)
 
-**Problem**: You want to catch multiple exception types without tuple syntax.
-
-**Solution**:
+Catch multiple exception types with comma-separated syntax, without tuple syntax; this reduces visual clutter and matches other Python syntax.
 
 ```python
 # Multiple exception types without parentheses
@@ -174,5 +126,3 @@ try:
 except ValueError, TypeError, KeyError:  # No tuple needed!
     handle_error()
 ```
-
-**Tip**: The comma-separated syntax matches the consistency of other Python syntax and reduces visual clutter.

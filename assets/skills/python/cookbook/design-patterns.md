@@ -1,23 +1,10 @@
 # Design Patterns Cookbook
 
-Functional and OOP patterns in Python using Protocols.
-
-## Contents
-
-- [Builder pattern](#builder-pattern-fluent-api)
-- [Dependency injection](#dependency-injection)
-- [Factory pattern](#factory-pattern)
-- [Strategy pattern](#strategy-pattern)
-- [Repository pattern](#repository-pattern)
-- [Observer pattern](#observer-pattern-event-based)
-
----
+Python functional/OOP patterns using Protocols.
 
 ## Builder Pattern (Fluent API)
 
-**Problem**: You need to construct complex objects step-by-step with a clean, readable API that allows method chaining.
-
-**Solution**:
+Problem: Construct complex objects step-by-step with a clean, readable, chainable API.
 
 ```python
 from typing import Optional
@@ -55,15 +42,11 @@ query = (
 assert query == "SELECT * FROM users WHERE age > 18 AND status = 'active' LIMIT 10"
 ```
 
-**Tip**: Return `self` from each builder method to enable method chaining. This creates a fluent API that reads like natural language.
-
----
+Tip: Builder methods return `self`, enabling natural-language method chaining.
 
 ## Dependency Injection
 
-**Problem**: You want to decouple your code from specific implementations and make it easy to swap dependencies for testing or runtime configuration.
-
-**Solution**:
+Problem: Decouple code from specific implementations and enable dependency swaps for testing or runtime configuration.
 
 ```python
 from typing import Protocol
@@ -100,15 +83,11 @@ service = Service(FileLogger("app.log"))
 service.process()
 ```
 
-**Tip**: Use Protocol types to define interfaces without requiring inheritance. This allows any class with matching methods to satisfy the dependency.
-
----
+Tip: Protocols define interfaces without inheritance; any class with matching methods satisfies the dependency.
 
 ## Factory Pattern
 
-**Problem**: You need to create different types of objects based on runtime conditions without exposing the creation logic to the client.
-
-**Solution**:
+Problem: Create runtime-selected object types without exposing creation logic to the client.
 
 ```python
 from typing import Protocol, Literal
@@ -154,15 +133,11 @@ db = create_datasource("postgres")
 db.connect()
 ```
 
-**Tip**: Combine factory functions with Literal types for type-safe object creation. Python's match statement makes factories clean and exhaustive.
-
----
+Tip: Factory functions plus `Literal` provide type-safe creation; `match` keeps factories clean and exhaustive.
 
 ## Strategy Pattern
 
-**Problem**: You need to switch between different algorithms or behaviors at runtime without modifying the client code.
-
-**Solution**:
+Problem: Switch algorithms or behaviors at runtime without modifying client code.
 
 ```python
 from typing import Protocol
@@ -218,15 +193,11 @@ sorter = Sorter(MergeSort())
 assert sorter.sort([3, 1, 4, 1, 5]) == [1, 1, 3, 4, 5]
 ```
 
-**Tip**: Strategy pattern is ideal when you have multiple ways to perform an operation. The Protocol type ensures all strategies share the same interface.
-
----
+Tip: Use Strategy for multiple ways to perform an operation; its Protocol enforces a shared interface.
 
 ## Repository Pattern
 
-**Problem**: You want to abstract data access logic and provide a collection-like interface for domain objects, making it easy to switch storage backends.
-
-**Solution**:
+Problem: Abstract data access behind a collection-like domain-object interface, enabling storage-backend changes.
 
 ```python
 from typing import Protocol, TypeVar, Generic
@@ -268,15 +239,11 @@ repo.save(User(1, "Alice", "alice@example.com"))
 user = repo.get(1)
 ```
 
-**Tip**: Use Generic protocols to create reusable repository interfaces. This pattern isolates business logic from persistence details.
-
----
+Tip: Generic protocols make repository interfaces reusable; the pattern isolates business logic from persistence details.
 
 ## Observer Pattern (Event-Based)
 
-**Problem**: You need to notify multiple objects about state changes or events without creating tight coupling between components.
-
-**Solution**:
+Problem: Notify multiple objects of state changes or events without tight component coupling.
 
 ```python
 from typing import Callable
@@ -314,6 +281,4 @@ emitter.on("user:created", send_welcome_email)
 emitter.emit("user:created", {"name": "Alice", "email": "alice@example.com"})
 ```
 
-**Tip**: Event-based systems decouple components by communicating through named events. Use string event names with namespaces (e.g., "user:created") for clarity.
-
----
+Tip: Event-based communication decouples components. Use namespaced string event names such as `"user:created"` for clarity.

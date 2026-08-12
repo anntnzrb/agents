@@ -1,14 +1,8 @@
-# Modern Python: 3.11 to 3.12
+# Modern Python 3.11–3.12
+Concurrency, typing, stdlib upgrades.
 
-Concurrency, typing, and stdlib upgrades.
-
----
-
-## Exception Groups (3.11+)
-
-**Problem**: You need to raise or handle multiple exceptions at once, common in concurrent code.
-
-**Solution**:
+## Exception groups (3.11+)
+Raise/handle multiple exceptions at once, common in concurrent code.
 
 ```python
 # Raise multiple exceptions
@@ -26,15 +20,10 @@ except* TypeError as eg:
     print(f"Type errors: {eg.exceptions}")
 ```
 
-**Tip**: Use `except*` (not `except`) to handle exception groups. Each handler processes all exceptions of that type.
+`except*` (not `except`) handles exception groups; each handler processes all exceptions of its type.
 
----
-
-## TaskGroup for Structured Concurrency (3.11+)
-
-**Problem**: You want to run multiple async tasks and ensure all complete or all cancel together on error.
-
-**Solution**:
+## TaskGroup: structured concurrency (3.11+)
+Multiple async tasks: all complete, or all cancel together on error. TaskGroup automatically cancels sibling tasks when one fails, preventing orphaned tasks.
 
 ```python
 import asyncio
@@ -47,15 +36,8 @@ async def main():
     return task1.result(), task2.result()
 ```
 
-**Tip**: TaskGroup provides automatic cancellation of sibling tasks if any task fails, preventing orphaned tasks.
-
----
-
-## TOML Parser (3.11+)
-
-**Problem**: You need to parse TOML configuration files without external dependencies.
-
-**Solution**:
+## TOML parser (3.11+)
+Parse TOML without external dependencies.
 
 ```python
 import tomllib
@@ -67,15 +49,10 @@ with open("pyproject.toml", "rb") as f:
 data = tomllib.loads('[section]\nkey = "value"')
 ```
 
-**Tip**: Note that files must be opened in binary mode (`"rb"`). `tomllib` is read-only; use `tomli_w` for writing.
+Files MUST use binary mode (`"rb"`); `tomllib` is read-only—use `tomli_w` to write.
 
----
-
-## Self Type (3.11+)
-
-**Problem**: You want method return types to correctly refer to the current class, not the parent.
-
-**Solution**:
+## Self type (3.11+)
+`Self` makes method returns refer to the current class, not the parent; especially useful for builder methods returning `self` for chaining.
 
 ```python
 from typing import Self
@@ -89,15 +66,8 @@ class Builder:
         return type(self)()
 ```
 
-**Tip**: `Self` is especially useful for builder patterns and methods that return the instance for chaining.
-
----
-
-## Type Parameter Syntax (3.12+)
-
-**Problem**: You want to write generic functions and classes without the boilerplate of `TypeVar`.
-
-**Solution**:
+## Type-parameter syntax (3.12+)
+Generic functions/classes without `TypeVar` boilerplate; bracket syntax is more concise and puts parameters in the function/class signature.
 
 ```python
 # Old way
@@ -125,15 +95,8 @@ def add[T: (int, float)](a: T, b: T) -> T:
     return a + b
 ```
 
-**Tip**: The new bracket syntax is more concise and puts type parameters directly in function/class signatures.
-
----
-
-## Type Alias Statement (3.12+)
-
-**Problem**: You want to create type aliases that are properly recognized as types, not runtime values.
-
-**Solution**:
+## Type-alias statement (3.12+)
+`type` creates aliases recognized as types rather than runtime values and supports generic parameters cleanly.
 
 ```python
 # Old way
@@ -146,15 +109,8 @@ type Point = tuple[float, float]
 type Callback[T] = Callable[[T], None]
 ```
 
-**Tip**: The `type` statement creates proper type aliases that support generic parameters cleanly.
-
----
-
-## F-String Improvements (3.12+)
-
-**Problem**: You need to use quotes inside f-strings or format complex multiline expressions.
-
-**Solution**:
+## F-string improvements (3.12+)
+F-strings accept any quote style inside expressions without escaping and support multiline expressions, improving JSON/dict access. `f"{x:=10}"` uses a format spec, not a walrus.
 
 ```python
 # Nested quotes (any quote style)
@@ -173,15 +129,8 @@ result = f"{
 f"{x:=10}"  # This is a format spec, not walrus!
 ```
 
-**Tip**: You can now use any quote style inside f-strings without escaping, making JSON and dict access much cleaner.
-
----
-
-## Override Decorator (3.12+)
-
-**Problem**: You want to catch typos or signature mismatches when overriding parent class methods.
-
-**Solution**:
+## Override decorator (3.12+)
+`@override` makes type checkers verify parent-method existence and signature, catching typos/mismatches early.
 
 ```python
 from typing import override
@@ -200,15 +149,8 @@ class Child(Parent):
         return "Oops"
 ```
 
-**Tip**: Use `@override` to make type checkers verify that you're actually overriding a parent method, catching typos early.
-
----
-
-## Batched Iteration (3.12+)
-
-**Problem**: You need to process data in fixed-size chunks.
-
-**Solution**:
+## Batched iteration (3.12+)
+`batched()` processes fixed-size chunks more efficiently than manual chunking and automatically handles the final partial batch.
 
 ```python
 from itertools import batched
@@ -220,5 +162,3 @@ list(batched("ABCDEFG", 3))
 for batch in batched(large_dataset, 100):
     process_batch(batch)
 ```
-
-**Tip**: `batched()` is more efficient than manual chunking and handles the final partial batch automatically.

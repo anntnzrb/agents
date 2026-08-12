@@ -2,13 +2,11 @@
 
 ## Index
 
-Read the section whose heading matches the task; use heading search before loading unrelated detail.
-
-For each domain, the canonical 2026 choice, why, and the canonical usage snippet. The skill enforces these unless the project's `pyproject.toml` explicitly says otherwise.
+Use heading search; load only the task-matching section. Each domain lists the canonical 2026 choice, rationale, and usage. The skill MUST enforce these defaults unless the project's `pyproject.toml` explicitly says otherwise.
 
 ## CLI — typer
 
-`typer` builds a CLI from type-annotated function signatures. argparse needs 5x the code; click ignores type annotations; fire is magic that breaks at scale.
+`typer`: type-annotated CLI generation. `argparse`: 5x more code; `click`: ignores type annotations; `fire`: scale-breaking magic. Single-function script: `typer.run(main)`. Subcommands: `@app.command()`.
 
 ```python
 import typer
@@ -29,11 +27,9 @@ if __name__ == "__main__":
     app()
 ```
 
-For a single-function script, `typer.run(main)` skips the `Typer()` boilerplate. Subcommands use `@app.command()`.
-
 ## Terminal output — rich
 
-`rich` produces tables, progress bars, syntax highlighting, traceback rendering. Use it for any structured output. Plain `print` is acceptable for non-interactive log lines (and even those are usually better via `rich.console.Console(stderr=True).log(...)`).
+Use `rich` for structured output: tables, progress bars, syntax highlighting, tracebacks. Plain `print` MAY serve non-interactive log lines; prefer `rich.console.Console(stderr=True).log(...)` even there. Install rich tracebacks once at process start.
 
 ```python
 from rich.console import Console
@@ -55,11 +51,9 @@ install(show_locals=True)
 
 ## HTTP client — [httpx2](https://github.com/pydantic/httpx2)
 
-Next-generation HTTP client under Pydantic stewardship. Sync and async in one library, HTTP/2 native, brotli + zstd content decoding, real type stubs. Replaces `requests` (sync only), `aiohttp` (async only), and the original `httpx`.
+`httpx2`: Pydantic-stewarded, sync+async, HTTP/2-native, brotli+zstd decoding, typed; replaces `requests`, `aiohttp`, and original `httpx`.
 
-**Install**: `httpx2[http2,brotli,zstd]` — always include all three extras, no exceptions.
-
-**A bare `httpx2.AsyncClient()` / `httpx2.Client()` is a bug.** Always use the factory pattern from `references/httpx2-optimization.md` with ALL optimizations enabled by default:
+Install exactly `httpx2[http2,brotli,zstd]`; always include all three extras. Bare `httpx2.AsyncClient()` or `httpx2.Client()` is a bug. MUST use the factory pattern from `references/httpx2-optimization.md`, with all optimizations enabled by default. Load that reference whenever writing ANY network code; it also defines `create_client()` / `create_async_client()`, event hooks, and setting rationale.
 
 ```python
 import socket
@@ -95,11 +89,9 @@ with httpx2.Client(
     users = response.json()
 ```
 
-See `references/httpx2-optimization.md` for the full factory functions (`create_client()` / `create_async_client()`), event hooks, and the rationale behind every setting. **Load that reference whenever you write ANY network code.**
-
 ## JSON — stdlib `json` (default) or `orjson` (hot paths)
 
-Stdlib `json` is fine for cold paths and configs. **Reach for `orjson` when JSON is in the hot path** — cache layers, queue payloads, streaming responses, structured logs, FastAPI endpoints returning raw `dict` / `list`.
+Use stdlib `json` for cold paths/configs; use `orjson` when JSON is hot: cache layers, queue payloads, streaming responses, structured logs, or FastAPI raw `dict`/`list` responses. `orjson.dumps` returns `bytes`. For Pydantic v2, use `model_dump_json()`; pydantic-core (Rust) beats the `orjson + default=` bridge for Pydantic-shaped responses. FastAPI: `app = FastAPI(default_response_class=ORJSONResponse)`; Pydantic-typed responses correctly bypass it, while raw `dict`/`list` responses use orjson. See `references/orjson-stack.md` for the decision tree, flags, FastAPI, Redis/queue/logging patterns, and benchmark.
 
 ```python
 import orjson
@@ -111,19 +103,9 @@ raw: bytes = orjson.dumps(
 )
 ```
 
-**Critical 2026 fact**: with Pydantic v2, `model.model_dump_json()` is backed by pydantic-core (Rust) and is faster than `orjson + default=` bridge for Pydantic-shaped responses. **Use `model_dump_json()` for Pydantic; orjson for everything else.**
-
-For FastAPI: `app = FastAPI(default_response_class=ORJSONResponse)`. Pydantic-typed responses bypass it (and that's correct — Pydantic's path is faster). Raw `dict`/`list` returns go through orjson.
-
-See `references/orjson-stack.md` for the full decision tree, option flag reference, FastAPI integration, Redis/queue/logging patterns, and the `model_dump_json()` vs orjson benchmark.
-
 ## Validation — pydantic v2
 
-Pydantic v2's core is in Rust (~10x faster than v1). It is the de-facto boundary validator. Use it for:
-
-- HTTP request/response models (FastAPI uses pydantic natively)
-- Config files (env vars via `pydantic-settings`)
-- Anything entering the program from outside
+Use Pydantic v2 as the boundary validator for HTTP models, config (env vars via `pydantic-settings`), and anything entering from outside. Its Rust core is ~10x faster than v1. `@dataclass` is acceptable for internal records needing no validation; process-boundary data requires Pydantic.
 
 ```python
 from pydantic import BaseModel, Field, EmailStr, field_validator
@@ -148,11 +130,9 @@ user = User.model_validate({"id": 1, "email": "a@b.com", "name": "Alice"})
 print(user.model_dump_json(indent=2))
 ```
 
-`@dataclass` is fine for purely internal records (no validation needed). For anything crossing a process boundary, use Pydantic.
-
 ## Async — anyio
 
-Full reference: [async-anyio.md](async-anyio.md). The summary:
+Full reference: [async-anyio.md](async-anyio.md). Use anyio; NEVER `import asyncio` directly. Called third-party libraries MAY use asyncio internally.
 
 ```python
 import anyio
@@ -172,11 +152,9 @@ async def main() -> None:
 anyio.run(main)
 ```
 
-Never `import asyncio` directly. The third-party libraries you call are free to use asyncio internally.
-
 ## Web framework — fastapi
 
-Type-hint-driven HTTP framework. Pydantic models become OpenAPI schemas automatically.
+Type-hint-driven HTTP framework; Pydantic models automatically become OpenAPI schemas. Full database stack: [fastapi-stack.md](fastapi-stack.md).
 
 ```python
 from fastapi import FastAPI
@@ -201,11 +179,9 @@ async def create_user(payload: CreateUser) -> User:
     return User(id=1, **payload.model_dump())
 ```
 
-Full stack with database: [fastapi-stack.md](fastapi-stack.md).
-
 ## ORM — sqlalchemy 2.x async
 
-SQLAlchemy 2.x finally has a real async API. Use the modern declarative `MappedAsDataclass` style with type annotations.
+Use SQLAlchemy 2.x async with modern declarative `MappedAsDataclass` and type annotations. Full FastAPI integration: [fastapi-stack.md](fastapi-stack.md).
 
 ```python
 from sqlalchemy import String
@@ -228,15 +204,11 @@ engine = create_async_engine("postgresql+asyncpg://localhost/myapp")
 SessionFactory = async_sessionmaker(engine, expire_on_commit=False)
 ```
 
-Full pattern with FastAPI integration: [fastapi-stack.md](fastapi-stack.md).
-
 ## Database — postgres + asyncpg
 
-For new applications, default to Postgres. SQLite for tests is fine; SQLite for production is not.
+New applications: Postgres. SQLite MAY be used for tests, but NEVER production. `asyncpg` is the fastest Python Postgres driver and is native to SQLAlchemy 2.x async and FastAPI's lifespan model. URL: `postgresql+asyncpg://user:pass@host:5432/db`.
 
-asyncpg is the fastest Python Postgres driver, native to SQLAlchemy 2.x async, native to FastAPI's lifespan model. URL: `postgresql+asyncpg://user:pass@host:5432/db`.
-
-For migrations, use Alembic with `[alembic.context]` configured to use the async engine. Single-step:
+Migrations: Alembic, with `[alembic.context]` configured for the async engine.
 
 ```bash
 uv add alembic
@@ -245,28 +217,23 @@ uv run alembic init -t async migrations
 
 ## TUI — textual
 
-Textual builds rich, mouse-aware, mobile-style TUIs on the rich rendering engine. See [textual-tui.md](textual-tui.md).
+`textual`: rich, mouse-aware, mobile-style TUIs on the rich rendering engine. See [textual-tui.md](textual-tui.md).
 
 ## AI agents — pydantic-ai
 
-The agent framework from the Pydantic team. Type-strict, structured outputs are first-class, model-agnostic. See [pydantic-ai.md](pydantic-ai.md).
+`pydantic-ai`: Pydantic-team agent framework; type-strict, structured outputs first-class, model-agnostic. See [pydantic-ai.md](pydantic-ai.md).
 
 ## DataFrames — polars + numpy
 
-Polars is 10-50x faster than pandas, has a real type system, and supports lazy evaluation. Numpy stays in the toolbox for arrays. See [data-processing.md](data-processing.md).
+Polars: 10–50x faster than pandas, real type system, lazy evaluation. Numpy remains for arrays. See [data-processing.md](data-processing.md).
 
 ## OLAP / SQL — duckdb
 
-DuckDB is the SQL engine for analytical workloads. Query CSV/Parquet/JSON files directly without loading into memory; perform joins and aggregations 3-4x faster than Polars; zero-copy interchange with Polars via Arrow. See [data-processing.md](data-processing.md).
+DuckDB: analytical SQL engine; queries CSV/Parquet/JSON directly without loading into memory, joins/aggregations 3–4x faster than Polars, zero-copy Polars interchange via Arrow. See [data-processing.md](data-processing.md).
 
 ## Tests — pytest
 
-Plain `unittest` is fine for stdlib; everything else uses pytest. Conventions:
-
-- File names `test_*.py`, function names `test_*`
-- Fixtures via `@pytest.fixture`. Async fixtures are anyio-aware (`@pytest.fixture` on an async function works under `pytest-anyio` which is bundled with anyio)
-- Parametrise with `@pytest.mark.parametrize`
-- Mark async tests with `@pytest.mark.anyio` (provided by anyio's pytest plugin)
+Use `unittest` for stdlib-only code; otherwise pytest. Conventions: files `test_*.py`; functions `test_*`; fixtures `@pytest.fixture`; async fixtures use `@pytest.fixture` on async functions under bundled `pytest-anyio`; parametrization `@pytest.mark.parametrize`; async tests `@pytest.mark.anyio` from anyio's pytest plugin.
 
 ```python
 import pytest
@@ -290,8 +257,6 @@ async def test_async_fetch() -> None:
     assert True
 ```
 
-`pyproject.toml`:
-
 ```toml
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -301,7 +266,7 @@ addopts = ["-ra", "--strict-config", "--strict-markers"]
 
 ## Settings / config — pydantic-settings
 
-Loads env vars and `.env` files into a Pydantic model. Replaces ad-hoc `os.environ.get(...)` everywhere.
+Use `pydantic-settings` to load env vars and `.env` into a Pydantic model; it replaces ad-hoc `os.environ.get(...)`. The shown `Settings()` loads at import time and raises when required variables are missing.
 
 ```python
 from pydantic import Field
@@ -321,7 +286,7 @@ settings = Settings()  # loads at import time; raises if any required var is mis
 
 ## Logging — stdlib logging + rich handler
 
-Stdlib `logging` is fine; it gets a face-lift from `rich.logging.RichHandler`.
+Use stdlib `logging` with `rich.logging.RichHandler`; for production structured logs, use separate-dependency `structlog`, not a custom implementation.
 
 ```python
 import logging
@@ -336,5 +301,3 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 log.info("ready")
 ```
-
-For structured logging in production, swap to `structlog` (separate dep). Don't roll your own.

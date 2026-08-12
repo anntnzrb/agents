@@ -1,14 +1,7 @@
 # Testing Cookbook: Coverage and Organization
+Coverage reports, exclusions, test layout, markers, pytest commands.
 
-Coverage reports, exclusions, test layout, markers, and commands.
-
----
-
-## Generate Coverage Reports
-
-**Problem**: Need to know which lines of code are tested and identify gaps.
-
-**Solution**:
+## Coverage reports
 
 ```bash
 # Basic coverage
@@ -25,15 +18,9 @@ open htmlcov/index.html
 uv run pytest --cov=src --cov-fail-under=80
 ```
 
-**Tip**: Use `--cov-report=term-missing` during development to quickly see uncovered lines, and HTML reports for detailed analysis.
+During development, use `--cov-report=term-missing` to see uncovered lines; use HTML reports for detailed analysis.
 
----
-
-## Configure Coverage Exclusions
-
-**Problem**: Some lines like debug code or type checking shouldn't count against coverage.
-
-**Solution**:
+## Coverage exclusions
 
 ```toml
 # pyproject.toml
@@ -52,15 +39,9 @@ exclude_lines = [
 fail_under = 80
 ```
 
-**Tip**: Enable `branch = true` to measure branch coverage, not just line coverage, for more thorough testing.
+`branch = true` measures branch coverage, not only line coverage.
 
----
-
-## Organize Tests by Type
-
-**Problem**: Large projects need structure to separate unit, integration, and end-to-end tests.
-
-**Solution**:
+## Test layout
 
 ```text
 tests/
@@ -74,15 +55,9 @@ tests/
     `-- test_workflow.py
 ```
 
-**Tip**: Place shared fixtures in `conftest.py` at each level to make them available to all tests in that directory and subdirectories.
+Place shared fixtures in each level's `conftest.py`; they are available to tests in that directory and its subdirectories.
 
----
-
-## Mark Tests by Category
-
-**Problem**: Need to selectively run slow tests, integration tests, or exclude certain categories.
-
-**Solution**:
+## Test markers
 
 ```python
 import pytest
@@ -102,15 +77,9 @@ def test_database_integration():
 # uv run pytest -m integration
 ```
 
-**Tip**: Define markers in `pyproject.toml` with descriptions to document what each marker means and enable `--strict-markers`.
+Define markers with descriptions in `pyproject.toml`; enable `--strict-markers`.
 
----
-
-## Common pytest Commands
-
-**Problem**: Need quick reference for running tests in different ways during development.
-
-**Solution**:
+## pytest commands
 
 ```bash
 # Run all tests
@@ -138,6 +107,4 @@ uv run pytest --lf
 uv run pytest -n auto
 ```
 
-**Tip**: Use `pytest -x --lf` during development to quickly iterate: stop on first failure, then rerun only failures on next run.
-
----
+Development iteration: `pytest -x --lf` stops on the first failure, then reruns only failures on the next run.

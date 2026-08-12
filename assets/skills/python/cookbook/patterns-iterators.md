@@ -2,13 +2,9 @@
 
 Iterator algebra, batching, filtering, grouping, and itertools recipes.
 
----
-
 ## Infinite Iterators
 
-**Problem**: You need to generate infinite sequences or cycle through values repeatedly.
-
-**Solution**:
+Generate infinite sequences or repeated values.
 
 ```python
 from itertools import count, cycle, repeat
@@ -27,15 +23,11 @@ repeated = list(repeat('x', 3))
 assert repeated == ['x', 'x', 'x']
 ```
 
-**Tip**: Infinite iterators are memory-efficient but need explicit stopping conditions. Use with islice() or takewhile() to limit output.
-
----
+Memory-efficient, but require explicit stopping conditions; limit with `islice()` or `takewhile()`.
 
 ## Chaining and Accumulating
 
-**Problem**: You need to concatenate iterables or compute running aggregations.
-
-**Solution**:
+Concatenate iterables and compute running aggregations.
 
 ```python
 from itertools import chain, accumulate
@@ -53,15 +45,11 @@ cumprod = list(accumulate([1, 2, 3, 4], mul))
 assert cumprod == [1, 2, 6, 24]
 ```
 
-**Tip**: Use chain.from_iterable() to flatten nested iterables efficiently. accumulate() is great for running totals and cumulative operations.
-
----
+`chain.from_iterable()` efficiently flattens nested iterables; `accumulate()` supports running totals and cumulative operations.
 
 ## Batching and Pairing
 
-**Problem**: You need to group elements into chunks or create consecutive pairs.
-
-**Solution**:
+Group elements into chunks or consecutive pairs.
 
 ```python
 from itertools import batched, pairwise
@@ -75,15 +63,11 @@ pairs = list(pairwise('ABCD'))
 assert pairs == [('A', 'B'), ('B', 'C'), ('C', 'D')]
 ```
 
-**Tip**: batched() is perfect for processing data in chunks. pairwise() is useful for comparing consecutive elements or computing differences.
-
----
+`batched()` suits chunk processing; `pairwise()` suits consecutive comparisons or differences.
 
 ## Filtering Iterators
 
-**Problem**: You need to filter or slice iterators based on conditions.
-
-**Solution**:
+Filter or slice iterators by conditions.
 
 ```python
 from itertools import filterfalse, takewhile, dropwhile, islice
@@ -107,15 +91,11 @@ sliced = list(islice(range(10), 2, 7, 2))
 assert sliced == [2, 4, 6]
 ```
 
-**Tip**: takewhile() and dropwhile() stop at the first failure, unlike filter(). Use islice() for memory-efficient slicing of large iterators.
-
----
+`takewhile()` and `dropwhile()` stop at the first failure, unlike `filter()`; `islice()` enables memory-efficient slicing of large iterators.
 
 ## Combinatorics
 
-**Problem**: You need to generate combinations, permutations, or cartesian products.
-
-**Solution**:
+Generate combinations, permutations, or Cartesian products.
 
 ```python
 from itertools import combinations, permutations, product
@@ -137,15 +117,11 @@ all_binary = list(product([0, 1], repeat=3))
 assert len(all_binary) == 8  # 2^3
 ```
 
-**Tip**: These functions grow exponentially. Be careful with large inputs. Use them for small sets or with islice() to limit output.
-
----
+These functions grow exponentially: use small sets or `islice()` to limit output.
 
 ## Grouping Elements
 
-**Problem**: You need to group consecutive equal elements or group by a key.
-
-**Solution**:
+Group consecutive equal elements or group by a key.
 
 ```python
 from itertools import groupby
@@ -168,15 +144,11 @@ for dept, group in groupby(sorted_people, key=lambda x: x["dept"]):
     print(f"{dept}: {members}")
 ```
 
-**Tip**: Always sort your data by the grouping key before using groupby(). The groups are consecutive, not global.
-
----
+Sort by the grouping key first: `groupby()` groups consecutive, not global, matches.
 
 ## Itertools Recipes
 
-**Problem**: You need common iterator patterns like flattening, taking n items, or finding unique elements.
-
-**Solution**:
+Common patterns—flattening, taking `n` items, and ordered uniqueness—are often more efficient than list-based approaches.
 
 ```python
 from itertools import islice, chain
@@ -204,6 +176,3 @@ def unique(iterable, key=None):
             yield item
 ```
 
-**Tip**: Build a library of common iterator recipes. These patterns appear frequently and are more efficient than list-based approaches.
-
----

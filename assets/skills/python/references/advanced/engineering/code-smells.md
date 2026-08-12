@@ -1,25 +1,16 @@
-# Code Smells — Full Reference
+# Code Smells — Reference
 
 ## Index
 
-Read the section whose heading matches the task; use heading search before loading unrelated detail.
+Read the section matching the task; search headings before loading unrelated detail.
 
-When any of these smells is detected, **stop and re-examine the design.** A code smell is not a syntax error; it signals that the structure deserves a second look. Fix it when the task and project contract support that change, or document a specific reason to carry it. Do not trigger an unrelated rewrite merely because a smell exists.
+On detection, **stop and re-examine the design**. A smell is not a syntax error: fix it when the task and project contract support the change; otherwise document a specific reason to carry it. Do not trigger an unrelated rewrite merely because a smell exists.
 
 ---
 
 ## Smell 1 — File exceeds 250 pure LOC
 
-### Why 250
-
-At 250 pure LOC a file still fits in one screen on a 32-inch monitor with a 14pt font. A reviewer can hold the whole thing in working memory and spot a cross-cutting bug. At 500 LOC they cannot. At 1000 LOC they stop trying. The number is the cognitive ceiling of a single human reviewer who has not memorized the file.
-
-A file past this line is telling you:
-
-- The module is doing more than one thing
-- Multiple cohesive units got merged "to save a file."
-- Re-exports, barrels, and orchestrators got fused into pure-logic units
-- Every future reader pays a tax to find what they need
+At 250 pure LOC, a reviewer can still hold the file in working memory; at 500 they cannot, and at 1000 they stop trying. Exceeding the threshold commonly means multiple responsibilities, merged cohesive units, re-exports/barrels or orchestrators fused with logic, and reader navigation cost.
 
 ### Measuring pure LOC
 
@@ -31,31 +22,24 @@ awk '!/^[[:space:]]*$/ && !/^[[:space:]]*(\/\/|#|--)/' <file> | wc -l
 cloc --by-file <file>   # the "code" column is the number
 ```
 
-### Required behavior when detected
+### Required behavior
 
-**Creating a file that will exceed 250 pure LOC.** Split it before the first commit. Carve by responsibility, one cohesive unit per file. Use a barrel (`__init__.py`, `mod.rs`, `index.ts`) for re-exports ONLY — never for logic.
-
-**Editing a file that already exceeds 250 pure LOC and your edit adds lines.** Refactor the unit you are touching into its own file BEFORE adding the new lines. The split is part of THIS task, not a follow-up someone will never do.
-
-**Reading a file that exceeds 250 pure LOC while implementing a feature.** Surface the smell in your reply, propose a concrete split, and ask the user whether to split now or carry the smell.
+- Creating a file projected to exceed 250 pure LOC: split before first commit, by responsibility, one cohesive unit per file. A barrel (`__init__.py`, `mod.rs`, `index.ts`) is for re-exports ONLY, never logic.
+- Editing an existing file over 250 pure LOC and adding lines: extract the touched unit BEFORE adding lines; splitting belongs to THIS task.
+- Reading an existing file over 250 pure LOC while implementing a feature: surface the smell, propose a concrete split, and ask whether to split now or carry it.
 
 ### Forbidden escapes
 
-- Counting comments and blank lines toward the budget. **Pure LOC means code lines.**
-- Splitting by token count (`foo_1.py`, `module_part_A.rs`, `service-2.ts`). Split by what each file DOES
-- Catch-all dump files: `utils.py`, `helpers.ts`, `lib.rs` (as a logic dump), `common.py`, `shared.ts`
-- "It's generated, so it's fine." Only true if the file lives in `dist/`, `target/`, `__generated__/`
-- "It's a test file with many cases." Split by SUT or by behavior cluster
-- "230 pure LOC, close enough." A 230-LOC file about to grow is already at the limit. Split now
+- Pure LOC excludes comments and blank lines.
+- Split by what each file DOES, never token count (`foo_1.py`, `module_part_A.rs`, `service-2.ts`).
+- No catch-all logic dumps: `utils.py`, `helpers.ts`, `lib.rs`, `common.py`, `shared.ts`.
+- Generated is exempt only under `dist/`, `target/`, or `__generated__/`.
+- Many test cases are not an exemption: split by SUT or behavior cluster.
+- A 230-pure-LOC file about to grow is already at the limit: split now.
 
-### Acceptable exceptions (rare, require justification)
+### Rare exceptions
 
-A file may legitimately exceed 250 pure LOC if **and only if** it is:
-
-- A truly indivisible single-responsibility unit (e.g., a generated parser table, a state machine whose states share a single closure). Mark with `// allow: SIZE_OK — <reason>`
-- A pure data table (translation strings, error code lookup, brand color palette)
-
-`// allow: SIZE_OK` without a justifying comment is itself slop.
+A file may exceed 250 only if it is (a) a truly indivisible single-responsibility unit (for example, a generated parser table or a state machine whose states share one closure), marked with `// allow: SIZE_OK — <reason>`; or (b) a pure data table (translation strings, error-code lookup, brand-color palette). `// allow: SIZE_OK` without a reason is slop.
 
 ### Concrete split examples
 
@@ -66,7 +50,7 @@ A file may legitimately exceed 250 pure LOC if **and only if** it is:
 class UserRepository: ...        # 90 LOC of SQLAlchemy
 class UserValidator: ...         # 60 LOC of Pydantic + business rules
 class PasswordHasher: ...        # 40 LOC of bcrypt wrapper
-class EmailSender: ...           # 50 LOC of httpx2 client
+class EmailSender: ...            # 50 LOC of httpx2 client
 class UserService: ...           # 130 LOC orchestrating the four above
 def _build_query(...): ...       # 25 LOC helper
 def _format_email(...): ...      # 17 LOC helper
@@ -137,42 +121,41 @@ src/orders/
 
 ## Smell 2 — Function with more than 3 parameters
 
-### Why 3
+Parameters are the function’s contract with every caller. More than 3 independent inputs overwhelm working memory and signal either excessive function responsibility or related parameters that belong in a typed domain concept. Split the function or group related parameters. If 4+ inputs truly remain independent, justify WHY they cannot be grouped; “the function needs them all” is insufficient.
 
-A function's parameters are its contract with every caller. More than 3 independent inputs overwhelm the caller's working memory and signal one of two design problems:
-
-1. **The function does too much.** It should be two functions
-2. **Related parameters belong together.** They should be a typed struct/object — a domain concept, not a parameter bag
-
-### Workaround detection — THESE COUNT AS THE SAME SMELL
-
-Disguising parameter count does not fix the design. The following patterns are the same smell wearing a different hat:
+### Disguises that count as the same smell
 
 **Dict/map smuggling:**
+
 ```python
 # SMELL — hiding 6 args in a dict
 def create_order(params: dict[str, Any]) -> Order: ...
 ```
+
 ```typescript
 // SMELL — untyped options bag
 function createOrder(opts: Record<string, unknown>): Order { ... }
 ```
+
 ```go
 // SMELL — map instead of typed params
 func CreateOrder(params map[string]any) (*Order, error) { ... }
 ```
 
 **Variadic/kwargs catch-all:**
+
 ```python
 # SMELL — hiding real params behind kwargs
 def send_notification(recipient: str, **kwargs) -> None: ...
 ```
+
 ```typescript
 // SMELL — rest params to avoid naming args
 function sendNotification(recipient: string, ...args: unknown[]): void { ... }
 ```
 
-**Config object that wraps positional args:**
+**Config object wrapping positional args:**
+
 ```python
 # SMELL — "options" object that exists only to bundle what would be positional args
 @dataclass
@@ -189,9 +172,9 @@ class CreateUserOptions:
 def create_user(opts: CreateUserOptions) -> User: ...
 ```
 
-**When the options object is NOT a smell:** when it represents a genuine domain concept reused across multiple call sites with sensible defaults for most fields (e.g., `HttpClientConfig`, `DatabaseConnectionOptions`, `RetryPolicy`).
+An options object is NOT a smell when it represents a genuine domain concept reused across multiple call sites with sensible defaults for most fields (e.g., `HttpClientConfig`, `DatabaseConnectionOptions`, `RetryPolicy`).
 
-### The fix
+### Fix
 
 Group related parameters into typed value objects with domain names:
 
@@ -242,23 +225,11 @@ type Placement struct {
 func CreateUser(identity UserIdentity, placement Placement, password string) (*User, error) { ... }
 ```
 
-If 4+ truly independent inputs are required, justify it — the justification must name WHY these inputs cannot be grouped, not just "the function needs them all."
-
 ---
 
 ## Smell 3 — Redundant verification after a destructive action
 
-### Why this is slop
-
-The contract of a destructive operation (delete, remove, clear, drop) IS the verification. If the operation returns without error, the thing is gone. Re-querying to "confirm" is:
-
-1. **Dead code.** The check can never fail unless the operation itself is broken — in which case fix the operation, not the caller
-2. **Misleading.** It teaches the next reader (human or AI) that the operation is unreliable
-3. **Performance waste.** An unnecessary round-trip to the database, filesystem, or data structure
-
-This pattern is the hallmark of AI-generated defensive bloat. LLMs produce it because they optimize for "looking thorough" over "being correct." **Recognize it. Delete it.**
-
-### Examples
+The contract of a destructive operation (`delete`, `remove`, `clear`, `drop`) IS verification: if it returns without error, the target is gone. Re-querying or asserting at the call site is dead code, misleading, and a performance waste. If the operation’s return cannot be trusted, fix the operation, not its caller. This is defensive bloat, not correctness.
 
 ```python
 # SLOP — delete then verify deletion
@@ -308,43 +279,29 @@ if map.contains_key(&key) {
 map.remove(&key);
 ```
 
-### Broader pattern — same smell, different disguise
+Same defect in any immediate postcondition check:
 
-Any of these are the same defect:
-
-- Calling a **setter** then immediately calling the **getter** to "confirm" the value changed
-- **Writing** a file then **reading** it back to "verify" the write
-- **Inserting** a row then **SELECT-ing** it to "confirm" the insert
-- **Pushing** to an array then checking `.length` increased by 1
-- **Assigning** a variable then asserting the variable equals the assigned value
-
-**The contract of the operation IS the verification.** If you cannot trust the operation's return, the defect is in the operation — fix it there, not at the call site.
+- setter → getter to confirm the value;
+- file write → read to verify it;
+- row insert → `SELECT` to confirm it;
+- array push → `.length` increased by 1;
+- assignment → assertion of the assigned value.
 
 ---
 
 ## Smell 4 — Negative-form names and conditions
 
-### Why positive form wins
+Negation forces mental inversion; double negatives (`if !isNotReady`) become logic and review hazards. Prefer naming the presence of the quality you care about, then invert branch logic as needed.
 
-Every negation forces the reader to mentally invert. One negation is tolerable. Two (`if !isNotReady`) is a logic puzzle. Codebases that default to negative naming accumulate double and triple negations that nobody can review confidently.
-
-Positive form reads in the direction of intent: "is this ready?" rather than "is this not-not-ready?"
-
-### Naming
-
-| Negative (SMELL) | Positive (CLEAN) |
+|Negative (SMELL)|Positive (CLEAN)|
 |---|---|
-| `isNotValid` | `isValid` (invert branch) |
-| `isDisabled` | `isEnabled` |
-| `noErrors` | `isClean` / `errorsResolved` |
-| `notFound` | `found` (invert branch) |
-| `isNotEmpty` | `hasItems` / `isPopulated` |
-| `missingAuth` | `hasAuth` / `isAuthenticated` |
-| `cannotProceed` | `canProceed` (invert branch) |
-
-Name the **presence** of the quality you care about, not the absence of its opposite.
-
-### Conditions
+|`isNotValid`|`isValid` (invert branch)|
+|`isDisabled`|`isEnabled`|
+|`noErrors`|`isClean` / `errorsResolved`|
+|`notFound`|`found` (invert branch)|
+|`isNotEmpty`|`hasItems` / `isPopulated`|
+|`missingAuth`|`hasAuth` / `isAuthenticated`|
+|`cannotProceed`|`canProceed` (invert branch)|
 
 ```python
 # SMELL — double negative
@@ -392,10 +349,10 @@ if should_validate {
 }
 ```
 
-### When negation IS appropriate
+Negation IS appropriate for:
 
-- **Early returns / guard clauses:** `if !authorized { return Err(...) }` — the negative form IS the intent (reject the bad case)
-- **Filtering out:** `items.filter(|x| !x.is_expired())` — the negation describes the keep/discard decision directly
-- **Error state names:** `Error`, `Failed`, `Timeout` are negative concepts by nature — do not force them into positive wrappers like `isSuccessAbsent`
+- early-return/guard clauses: `if !authorized { return Err(...) }`;
+- filtering out: `items.filter(|x| !x.is_expired())`;
+- inherently negative error states: `Error`, `Failed`, `Timeout` (do not force positive wrappers such as `isSuccessAbsent`).
 
-The rule is not "never use negation." The rule is: **when you have a choice between naming the presence and naming the absence, name the presence.** The branch logic follows from the name, not the other way around.
+The rule is not “never use negation”: when presence and absence are both viable names, name presence; branch logic follows from the name.

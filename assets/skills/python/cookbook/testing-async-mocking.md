@@ -1,14 +1,10 @@
 # Testing Cookbook: Async and Mocking
 
-Parameterized fixtures, async tests, and mocking patterns.
+Pytest patterns: parameterized fixtures/tests, async tests/fixtures, and `unittest.mock`.
 
----
+## Multiple backend implementations
 
-## Run Tests with Multiple Backend Implementations
-
-**Problem**: Need to verify code works with different database backends or configurations.
-
-**Solution**:
+Parameterized fixtures run each dependent test once per parameter; useful for database backends/configurations.
 
 ```python
 @pytest.fixture(params=["postgres", "mysql", "sqlite"])
@@ -20,15 +16,9 @@ def database(request):
     db.close()
 ```
 
-**Tip**: Parameterized fixtures automatically run all tests using the fixture multiple times, once per parameter value.
+## Factory fixtures
 
----
-
-## Create Factory Fixtures
-
-**Problem**: Need to create multiple instances of an object with different attributes in a single test.
-
-**Solution**:
+Return a callable for creating multiple objects with per-test custom attributes.
 
 ```python
 @pytest.fixture
@@ -44,15 +34,9 @@ def test_multiple_users(make_user):
     assert alice.name != bob.name
 ```
 
-**Tip**: Factory fixtures return a callable function, allowing flexible object creation with custom parameters in each test.
+## Multiple input values
 
----
-
-## Test with Multiple Input Values
-
-**Problem**: Need to test the same function with many different input/output combinations.
-
-**Solution**:
+`parametrize` creates one test per input/output tuple, making failing inputs identifiable.
 
 ```python
 @pytest.mark.parametrize("input,expected", [
@@ -66,15 +50,9 @@ def test_double(input, expected):
     assert double(input) == expected
 ```
 
-**Tip**: Parametrize creates a separate test for each tuple, making it easy to spot which specific inputs fail.
+## All parameter combinations
 
----
-
-## Test All Combinations of Parameters
-
-**Problem**: Need to test a function with every combination of two or more parameter sets.
-
-**Solution**:
+Stacked `@pytest.mark.parametrize` decorators create the cartesian product.
 
 ```python
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -84,15 +62,9 @@ def test_multiply(x, y):
     assert multiply(x, y) == x * y
 ```
 
-**Tip**: Stacking multiple `@pytest.mark.parametrize` decorators creates the cartesian product of all parameters.
+## Descriptive test IDs
 
----
-
-## Add Descriptive Test IDs
-
-**Problem**: Parametrized test names like `test_age[0]` don't clearly indicate what's being tested.
-
-**Solution**:
+Custom IDs make output readable: `test_age_validation[adult]` rather than `test_age_validation[18-True]`.
 
 ```python
 @pytest.mark.parametrize("age,valid", [
@@ -110,15 +82,9 @@ def test_age_validation(age, valid):
             User(name="Test", age=age)
 ```
 
-**Tip**: Custom IDs make test output readable: `test_age_validation[adult]` instead of `test_age_validation[18-True]`.
+## Async functions
 
----
-
-## Test Async Functions
-
-**Problem**: Need to test asynchronous functions and coroutines.
-
-**Solution**:
+Use `@pytest.mark.asyncio` for coroutine tests; with `asyncio_mode = "auto"` in config, the decorator may be omitted.
 
 ```python
 # tests/test_async.py
@@ -138,15 +104,9 @@ async def test_fetch_multiple_users():
     assert len(users) == 3
 ```
 
-**Tip**: With `asyncio_mode = "auto"` in config, you can omit the `@pytest.mark.asyncio` decorator.
+## Async fixtures
 
----
-
-## Create Async Fixtures
-
-**Problem**: Tests need async setup like HTTP clients or database connections.
-
-**Solution**:
+Use async fixtures for setup such as HTTP clients or database connections; async generators automatically handle async context-manager cleanup.
 
 ```python
 @pytest.fixture
@@ -161,15 +121,9 @@ async def test_api_call(async_client):
     assert response.status_code == 200
 ```
 
-**Tip**: Async fixtures automatically handle async context managers and cleanup with async generators.
+## Mock external dependencies
 
----
-
-## Mock External Dependencies
-
-**Problem**: Tests shouldn't call real databases or external APIs.
-
-**Solution**:
+Avoid calls to real databases/external APIs. Set `return_value`; verify use with `assert_called_once()`.
 
 ```python
 from unittest.mock import Mock, patch, AsyncMock
@@ -185,15 +139,9 @@ def test_with_mock():
     mock_db.query.assert_called_once()
 ```
 
-**Tip**: Use `return_value` to set what the mock returns, and `assert_called_once()` to verify it was used correctly.
+## Patch module-level functions
 
----
-
-## Patch Module-Level Functions
-
-**Problem**: Need to mock imported functions like `requests.get` without modifying the code under test.
-
-**Solution**:
+Patch at the full import path where the function is used, not where defined: `my_project.services.requests`, not `requests`.
 
 ```python
 @patch("my_project.services.requests.get")
@@ -212,15 +160,9 @@ def test_with_context_manager():
         assert result == []
 ```
 
-**Tip**: Use the full import path where the function is used, not where it's defined: `my_project.services.requests`, not `requests`.
+## Mock async functions
 
----
-
-## Mock Async Functions
-
-**Problem**: Need to mock async functions and verify they were awaited.
-
-**Solution**:
+Use `AsyncMock`, not `Mock`, for async functions; verify awaits with `assert_awaited_once()`, not `assert_called_once()`.
 
 ```python
 @pytest.fixture
@@ -238,15 +180,9 @@ async def test_async_service(mock_api):
     mock_api.fetch.assert_awaited_once()
 ```
 
-**Tip**: Use `AsyncMock` instead of `Mock` for async functions, and `assert_awaited_once()` instead of `assert_called_once()`.
+## Mock context managers
 
----
-
-## Mock Context Managers
-
-**Problem**: Need to mock objects that use `__enter__` and `__exit__` like file handles.
-
-**Solution**:
+`MagicMock` automatically implements magic methods including `__enter__`, `__exit__`, `__len__`, and `__iter__`.
 
 ```python
 from unittest.mock import MagicMock
@@ -260,15 +196,9 @@ def test_context_manager():
         assert f.read() == "content"
 ```
 
-**Tip**: `MagicMock` automatically implements magic methods like `__enter__`, `__exit__`, `__len__`, and `__iter__`.
+## Spy on real objects
 
----
-
-## Spy on Real Objects
-
-**Problem**: Want to verify a method was called while still executing the real implementation.
-
-**Solution**:
+`patch.object(..., wraps=...)` tracks calls while executing the original implementation.
 
 ```python
 from unittest.mock import patch
@@ -280,7 +210,3 @@ def test_spy_on_method():
         user.save()
         spy.assert_called_once()
 ```
-
-**Tip**: The `wraps` parameter creates a spy that tracks calls but still executes the original method.
-
----

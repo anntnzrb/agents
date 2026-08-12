@@ -1,10 +1,10 @@
 # Correctness and Boundaries
 
-Use the smallest tool that makes failures obvious: Pyright strict first, runtime validation only at edges, plain typed objects elsewhere.
+Use smallest tool making failures obvious: Pyright strict first; runtime validation only at edges; plain typed objects elsewhere.
 
 ## Pyright strict baseline
 
-New projects: start with Pyright strict. Legacy repos may keep mypy as a secondary check, not the primary gate.
+New projects MUST start with Pyright strict. Legacy repos MAY retain mypy as a secondary check, never the primary gate.
 
 ### `pyproject.toml`
 
@@ -35,44 +35,44 @@ uv run ruff format --check .
 uv run pytest
 ```
 
-For inherited loose codebases, `strict = ["src"]` is a migration step only. New projects should not stop there.
+Inherited loose codebases: `strict = ["src"]` migration step only. New projects MUST NOT stop there.
 
 ## Boundary validation
 
-Use static types for known JSON shape:
+Known JSON shape → static types:
 
-| Shape                  | Prefer                                    |
-| ---------------------- | ----------------------------------------- |
-| object with fixed keys | `TypedDict`                               |
-| fixed field value      | `Literal`                                 |
-| small variant set      | discriminated union (`kind` / `type` tag) |
+|Shape|Prefer|
+|---|---|
+|object with fixed keys|`TypedDict`|
+|fixed field value|`Literal`|
+|small variant set|discriminated union (`kind` / `type` tag)|
 
-Use runtime validators only when bytes or JSON cross a boundary:
+Bytes or JSON crossing a boundary → runtime validators:
 
-| Need                                                    | Tool       |
-| ------------------------------------------------------- | ---------- |
-| fast typed decode/encode and lightweight structs        | `msgspec`  |
-| richer validation, aliases, or an existing Pydantic API | `pydantic` |
+|Need|Tool|
+|---|---|
+|fast typed decode/encode and lightweight structs|`msgspec`|
+|richer validation, aliases, or an existing Pydantic API|`pydantic`|
 
-Choose one boundary tool per edge. Parse once, normalize once, then hand the app plain typed objects.
+Exactly one boundary tool per edge. Parse once, normalize once → plain typed objects for the app.
 
-## What not to do
+## Prohibitions
 
-- Don't use `dict[str, Any]` for known payloads
-- Don't keep `BaseModel` or `Struct` objects in core business logic
-- Don't validate every function argument at runtime
-- Don't silently coerce bad input with ad hoc `str()`, `int()`, or defaulting chains
-- Don't stack multiple validation libraries on the same edge
+- NEVER use `dict[str, Any]` for known payloads.
+- NEVER keep `BaseModel` or `Struct` objects in core business logic.
+- NEVER validate every function argument at runtime.
+- NEVER silently coerce bad input with ad hoc `str()`, `int()`, or defaulting chains.
+- NEVER stack multiple validation libraries on one edge.
 
 ## Tiered quality gates
 
-Pick the smallest gate that matches project shape:
+Choose the smallest gate matching project shape:
 
-| Project shape                      | Baseline gate                                     | Add when needed                             |
-| ---------------------------------- | ------------------------------------------------- | ------------------------------------------- |
-| small library / CLI                | `pyright` strict + `ruff` check/format + `pytest` | —                                           |
-| API or service with external input | baseline + boundary tests                         | schema fixtures for request/response shapes |
-| parser / transformer / serializer  | baseline + boundary tests                         | targeted Hypothesis properties              |
-| legacy codebase                    | strict on new code first                          | expand repo-wide once the debt is paid      |
+|Project shape|Baseline gate|Add when needed|
+|---|---|---|
+|small library / CLI|`pyright` strict + `ruff` check/format + `pytest`|—|
+|API or service with external input|baseline + boundary tests|schema fixtures for request/response shapes|
+|parser / transformer / serializer|baseline + boundary tests|targeted Hypothesis properties|
+|legacy codebase|strict on new code first|expand repo-wide once the debt is paid|
 
-Gate order: `pyright` strict, then lint/format, then tests.
+Gate order: `pyright` strict → lint/format → tests.

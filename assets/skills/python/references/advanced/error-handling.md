@@ -97,13 +97,13 @@ def handle_result(result: GetUserResult) -> str:
 
 **The heuristic**: caller is 1-2 levels away and MUST handle it → union return. Error should propagate up many layers to a boundary → exception.
 
-| Scenario | Pattern | Why |
+|Scenario|Pattern|Why|
 |---|---|---|
-| Repository → service (caller handles it) | Union return (`User \| UserNotFound`) | Caller is right there, must handle both |
-| Validation at boundary (parsing input) | Exception (typed, with fields) | Propagates up to HTTP/CLI handler |
-| Infrastructure failure (network, OOM) | Exception | Can't handle locally, must propagate |
-| Service → service (deep internal) | Exception (typed) | Union boilerplate across many layers is worse than exceptions |
-| HTTP handler → response | Catch exceptions, convert to response | Boundary code catches and translates |
+|Repository → service (caller handles it)|Union return (`User \|UserNotFound`)|Caller is right there, must handle both|
+|Validation at boundary (parsing input)|Exception (typed, with fields)|Propagates up to HTTP/CLI handler|
+|Infrastructure failure (network, OOM)|Exception|Can't handle locally, must propagate|
+|Service → service (deep internal)|Exception (typed)|Union boilerplate across many layers is worse than exceptions|
+|HTTP handler → response|Catch exceptions, convert to response|Boundary code catches and translates|
 
 **Practical tradeoff**: union returns are safest (type checker forces handling) but create boilerplate when every caller in a chain must `match`. If the error would just propagate through 3+ layers unchanged, use a typed exception instead.
 

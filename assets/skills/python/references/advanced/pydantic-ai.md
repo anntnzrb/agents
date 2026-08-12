@@ -37,17 +37,17 @@ agent = Agent(
 
 Format: `provider:model-name`. The framework infers the provider from the prefix.
 
-| Provider prefix | Example |
+|Provider prefix|Example|
 |---|---|
-| `openai:` | `'openai:gpt-5.5'`, `'openai:gpt-4o'` |
-| `anthropic:` | `'anthropic:claude-sonnet-4-6'`, `'anthropic:claude-opus-4-1'` |
-| `google-gla:` | `'google-gla:gemini-3-flash-preview'` |
-| `google-vertex:` | `'google-vertex:gemini-3-pro-preview'` |
-| `bedrock:` | `'bedrock:anthropic.claude-sonnet-4-6'` |
-| `xai:` / `grok:` | `'xai:grok-3'`, `'grok:grok-3-fast'` |
-| `deepseek:` | `'deepseek:deepseek-chat'` |
-| `cohere:` | `'cohere:command-r-08-2024'` |
-| `gateway/...` | `'gateway/openai:gpt-5.5'` (PydanticAI Gateway) |
+|`openai:`|`'openai:gpt-5.5'`, `'openai:gpt-4o'`|
+|`anthropic:`|`'anthropic:claude-sonnet-4-6'`, `'anthropic:claude-opus-4-1'`|
+|`google-gla:`|`'google-gla:gemini-3-flash-preview'`|
+|`google-vertex:`|`'google-vertex:gemini-3-pro-preview'`|
+|`bedrock:`|`'bedrock:anthropic.claude-sonnet-4-6'`|
+|`xai:` / `grok:`|`'xai:grok-3'`, `'grok:grok-3-fast'`|
+|`deepseek:`|`'deepseek:deepseek-chat'`|
+|`cohere:`|`'cohere:command-r-08-2024'`|
+|`gateway/...`|`'gateway/openai:gpt-5.5'` (PydanticAI Gateway)|
 
 Model can also be omitted at construction and passed per-run: `agent.run(prompt, model='openai:gpt-5.5')`.
 
@@ -117,11 +117,11 @@ print(result.output.name)  # 'Tokyo'
 
 ## 5. Async vs Sync
 
-| Method | Mode | Returns |
+|Method|Mode|Returns|
 |---|---|---|
-| `await agent.run(prompt, ...)` | async | `AgentRunResult[OutputDataT]` |
-| `agent.run_sync(prompt, ...)` | sync | `AgentRunResult[OutputDataT]` |
-| `async with agent.run_stream(prompt, ...) as response:` | async streaming | `StreamedRunResult` |
+|`await agent.run(prompt, ...)`|async|`AgentRunResult[OutputDataT]`|
+|`agent.run_sync(prompt, ...)`|sync|`AgentRunResult[OutputDataT]`|
+|`async with agent.run_stream(prompt, ...) as response:`|async streaming|`StreamedRunResult`|
 
 ```python
 # Sync
@@ -298,8 +298,6 @@ async def main() -> None:
 
 anyio.run(main)
 ```
-
----
 
 ## Version Notes
 

@@ -1,6 +1,6 @@
 # Property-Based Testing
 
-Use Hypothesis when the property is the point: parsers, transforms, serializers, invariants. A few examples will not cover the failure surface.
+Use Hypothesis when the property matters: parsers, transforms, serializers, invariants; examples miss failure surface.
 
 ## Install
 
@@ -11,13 +11,13 @@ uv add --dev hypothesis
 ## Strategy rules
 
 - Prefer narrow, domain-shaped strategies (`st.dates()`, `st.integers()`, bounded lists)
-- Keep generated values small so shrink works fast
-- Use `assume()` sparingly; if you need many, narrow the strategy instead
-- Turn the smallest counterexample into a normal regression test
+- Small generated values → fast shrinking
+- Use `assume()` sparingly; many assumptions → narrow the strategy
+- Smallest counterexample → normal regression test
 
 ## Parser round-trip
 
-A parser should round-trip valid values.
+Valid values round-trip.
 
 ```python
 from datetime import date
@@ -36,7 +36,7 @@ def test_parse_date_round_trip(value: date) -> None:
 
 ## Transform idempotence
 
-A normalizer should be idempotent.
+Normalizers are idempotent.
 
 ```python
 from hypothesis import given, strategies as st
@@ -54,7 +54,7 @@ def test_normalize_whitespace_is_idempotent(text: str) -> None:
 
 ## Serializer round-trip
 
-Encoding and decoding should preserve the object.
+Encoding/decoding preserve the object.
 
 ```python
 import msgspec
@@ -76,7 +76,7 @@ def test_point_json_round_trip(x: int, y: int) -> None:
 
 ## Invariant checks
 
-An invariant should hold for every valid input; invalid inputs should fail fast.
+Every valid input satisfies the invariant; invalid inputs fail fast.
 
 ```python
 from dataclasses import dataclass
