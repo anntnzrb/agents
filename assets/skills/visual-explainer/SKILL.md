@@ -24,29 +24,29 @@ Generate self-contained HTML pages that explain systems, code changes, plans, da
 
 Read only the references needed for the current output:
 
-| Need | Read | When |
+|Need|Read|When|
 |---|---|---|
-| Text-heavy architecture/cards | `templates/architecture.html` | Building that page shape |
-| Mermaid diagrams | `templates/mermaid-flowchart.html`, Mermaid sections in `references/libraries.md` | A graph is the chosen representation |
-| Data tables, comparisons, audits | `templates/data-table.html` | Tabular HTML is chosen |
-| Slide decks | `templates/slide-deck.html`, `references/slide-patterns.md` | Slides are explicitly requested |
-| Layout, overflow, depth, connectors, images | `references/css-patterns.md` | The selected layout needs those patterns |
-| 4+ major page sections | `references/responsive-nav.md` | Adding responsive section navigation |
-| Prose-heavy pages | Prose sections in `references/css-patterns.md` and `references/libraries.md` | Prose dominates the page |
-| Command workflows | Matching file under `commands/` | Running that named command |
+|Text-heavy architecture/cards|`templates/architecture.html`|Building that page shape|
+|Mermaid diagrams|`templates/mermaid-flowchart.html`, Mermaid sections in `references/libraries.md`|A graph is the chosen representation|
+|Data tables, comparisons, audits|`templates/data-table.html`|Tabular HTML is chosen|
+|Slide decks|`templates/slide-deck.html`, `references/slide-patterns.md`|Slides are explicitly requested|
+|Layout, overflow, depth, connectors, images|`references/css-patterns.md`|The selected layout needs those patterns|
+|4+ major page sections|`references/responsive-nav.md`|Adding responsive section navigation|
+|Prose-heavy pages|Prose sections in `references/css-patterns.md` and `references/libraries.md`|Prose dominates the page|
+|Command workflows|Matching file under `commands/`|Running that named command|
 
 ## Choose the representation
 
-| Content | Default representation |
+|Content|Default representation|
 |---|---|
-| Flowchart, pipeline, state machine, decision tree | Mermaid |
-| Sequence, ER/schema, class, C4, topology-focused architecture | Mermaid |
-| Text-heavy architecture, module internals, implementation plans | CSS grid cards, optionally with a Mermaid overview |
-| 15+ element architecture | Hybrid: small Mermaid overview + CSS detail cards |
-| Comparison/audit/status matrix | Semantic HTML `<table>` |
-| Timeline/roadmap | CSS timeline |
-| Dashboard/metrics | CSS grid + charts/KPIs |
-| Slide deck | `100dvh` slides using slide template patterns |
+|Flowchart, pipeline, state machine, decision tree|Mermaid|
+|Sequence, ER/schema, class, C4, topology-focused architecture|Mermaid|
+|Text-heavy architecture, module internals, implementation plans|CSS grid cards, optionally with a Mermaid overview|
+|15+ element architecture|Hybrid: small Mermaid overview + CSS detail cards|
+|Comparison/audit/status matrix|Semantic HTML `<table>`|
+|Timeline/roadmap|CSS timeline|
+|Dashboard/metrics|CSS grid + charts/KPIs|
+|Slide deck|`100dvh` slides using slide template patterns|
 
 ## Mermaid invariants
 
@@ -102,3 +102,4 @@ Before delivery, verify:
 - slides fit one viewport, include carousel dots, and preserve source coverage;
 - visual hierarchy makes the main idea obvious in the first viewport;
 - styling would still be recognizable if compared against a generic dark/violet template
+
