@@ -1,0 +1,8 @@
+{
+  "name": "pi-autommit",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "arktype": "^2"
+  }
+}
