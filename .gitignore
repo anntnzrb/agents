@@ -4,9 +4,9 @@ __pycache__/
 node_modules/
 bun.lock
 package-lock.json
-assets/skills/*/.env
-assets/skills/*/.env.local
-assets/skills/darksouls3/resources/guides/**/*.pdf
+skills/*/*/.env
+skills/*/*/.env.local
+skills/*/darksouls3/resources/guides/**/*.pdf
 artifacts/
 .env
 *.skill

@@ -3,7 +3,9 @@
 ## Scope
 
 - `assets/AGENTS.md`: SSOT for global, harness-agnostic agent instructions
-- `assets/skills/`: SSOT for shared skills and skill-scoped policy
+- `assets/skills-gate.md`: SSOT for skill-scoped policy; repo-only, not synced
+- `skills/current/`: SSOT for shared skills synced to every harness
+- `skills/legacy/`: archived skills; repo-only, not synced
 - Other `assets/` entries: SSOT for shared agents and configuration
 - `tools/`: tool-specific configs staged for sync
 - `sync/`: isolated TypeScript sync application; owns all JS/TS app config and dependencies
@@ -17,7 +19,7 @@
 
 ## Skills
 
-Skills are modified here, in the SSOT. Always run against skill gate: `./assets/skills/AGENTS.md`
+Skills are modified here, in the SSOT. Always run against skill gate: `./assets/skills-gate.md`
 
 ## Sync Contract
 
