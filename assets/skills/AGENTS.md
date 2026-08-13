@@ -25,6 +25,12 @@
 - Validate every changed skill with `quick-validate`; it enforces the 120-character description cap
 - Before adding a skill, prune or consolidate overlapping skills if the inventory would exceed this budget. Do not trade context capacity for keyword soup
 
+## Licensing
+
+- Every `SKILL.md` declares `license: AGPL-3.0-or-later`, including `legacy/`; root `COPYING` holds the official text
+- No license headers in non-Markdown files
+- Before porting from another repo, read its license: MIT/Apache/BSD/GPL/AGPL port as AGPL with a `NOTICE.md` preserving upstream notices; CC BY-SA keeps attribution; no-license, BUSL, or CC BY-NC: do not port
+
 ## Model-facing text
 
 - Treat skill bodies, loaded references, agent definitions, and tool descriptions as model-facing prompts
