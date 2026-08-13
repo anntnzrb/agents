@@ -87,14 +87,14 @@ echo "$PM"
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Config, modules, migration, monorepos | `reference.md` | Scope includes toolchain/config |
-| Advanced type patterns | `cookbook/types.md` | Designing non-trivial types |
-| Type/runtime tests | `cookbook/testing.md` | Adding or debugging tests |
-| Opinionated stack recipes and deep implementation patterns | `references/advanced/README.md`, then its matching reference | A task needs a detailed framework, strict-config, boundary-modeling, or bootstrap recipe; repository policy and existing tooling take precedence |
-| Cross-language code-smell or logging review | `references/advanced/engineering/code-smells.md`, `references/advanced/engineering/logging.md` | Reviewing structure or observability beyond TypeScript-specific mechanics |
-| Starter compiler config | `assets/tsconfig-bundler.json`, `assets/tsconfig-nodenext.json` | Creating a new matching config |
+|Need|Read|When|
+|---|---|---|
+|Config, modules, migration, monorepos|`reference.md`|Scope includes toolchain/config|
+|Advanced type patterns|`cookbook/types.md`|Designing non-trivial types|
+|Type/runtime tests|`cookbook/testing.md`|Adding or debugging tests|
+|Opinionated stack recipes and deep implementation patterns|`references/advanced/README.md`, then its matching reference|A task needs a detailed framework, strict-config, boundary-modeling, or bootstrap recipe; repository policy and existing tooling take precedence|
+|Cross-language code-smell or logging review|`references/advanced/engineering/code-smells.md`, `references/advanced/engineering/logging.md`|Reviewing structure or observability beyond TypeScript-specific mechanics|
+|Starter compiler config|`assets/tsconfig-bundler.json`, `assets/tsconfig-nodenext.json`|Creating a new matching config|
 
 ## Research Tools
 
