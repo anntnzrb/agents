@@ -21,7 +21,7 @@ uv run --script <skill-dir>/scripts/cli.py ...
 
 Resolve `<skill-dir>` independently from the Odoo repo. Normal commands should not need `--root` when invoked inside a discoverable runtime or workspace. Use `--root` or `--runtime-dir` only when discovery cannot infer the target.
 
-Do not replace it with raw `psql`, Docker Compose `exec`, shell pipelines, or inline SQL blobs unless the user explicitly asks for lower-level debugging.
+Do not replace it with raw `psql`, Docker Compose `exec`, shell pipelines, or inline SQL blobs for an operation the CLI supports. For an explicitly requested unsupported operation, such as importing a plain SQL dump, follow the gated fallback in `references/db-recipes.md` instead of improvising.
 
 ## Activation triggers
 

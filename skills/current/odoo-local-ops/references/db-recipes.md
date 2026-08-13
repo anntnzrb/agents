@@ -62,7 +62,24 @@ system databases, refuses active connections, drops the target only with
 `--replace`, and recreates it with `CREATE DATABASE ... TEMPLATE ...`. It does
 not terminate connections, mutate the source, install modules, or run Odoo.
 The success payload identifies `source_database`, `target_database`,
-`replaced`, and postflight state.
+`replaced`, and postflight state. Database identifiers containing hyphens are
+quoted by the CLI; use `db clone` rather than hand-written administrative SQL
+when the source is another local database.
+
+### Explicit plain-SQL dump restore
+
+`db clone` copies an existing database; it does not import `.sql` or `.sql.gz`.
+Only for an explicitly requested local dump restore, and only after the normal
+runtime/connection checks, use the lower-level path described here:
+
+- Verify the dump format/header, target name, owner role, and required extensions before dropping anything.
+- In administrative SQL, quote database identifiers containing hyphens: `DROP DATABASE IF EXISTS "erptech_0804-b2b";`. Passing a name as `psql -d <database>` is not a substitute for quoting it inside SQL.
+- Stream the dump with `psql -X -w -v ON_ERROR_STOP=1 -f -`, preserve both decompressor and `psql` exit statuses, and capture stdout/stderr. A zero pipeline status without `ON_ERROR_STOP` or a grep for `ERROR` is not sufficient proof.
+- Re-run `env inspect --json`, `db summary --db <target> --json`, and targeted module/row checks after the restore. Treat zero module rows as a result to investigate, not as permission to index `rows[0]`.
+
+This exception is still write-gated: the user must explicitly request the local
+destructive operation, the target must be explicit, and Odoo must be stopped with
+zero active connections before drop/restore.
 
 ### `db top-tables --limit N`
 

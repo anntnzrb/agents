@@ -17,7 +17,7 @@ That means:
 
 Host runtime DB access uses `psql.exe`/`psql` discovered from the local install tree or PATH.
 
-Compose runtime DB access uses `docker compose exec -T db psql ...` through the CLI. Agents should still invoke `uv run --script <skill-dir>/scripts/cli.py`, not raw Compose commands, so redaction and read-only guards remain centralized.
+Compose runtime DB access uses `docker compose exec -T db psql ...` through the CLI. Agents should still invoke `uv run --script <skill-dir>/scripts/cli.py`, not raw Compose commands, so redaction and read-only guards remain centralized. The only documented lower-level exception is an explicitly requested local plain-SQL dump restore; follow `references/db-recipes.md` rather than improvising raw SQL.
 
 ## Read-only SQL rules
 
