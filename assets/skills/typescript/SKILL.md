@@ -40,6 +40,7 @@ Type-safe design. Runtime-aware config. One-shot validation. Minimal config chur
 - Prefer `interface` for extendable object contracts
 - Prefer `type` for unions, mapped types, template literal types, and helpers
 - Prefer `unknown` over `any`; validate at boundaries
+- Model validity by construction: choose the shape that cannot build the illegal value (see `cookbook/types.md`); strengthen a type only where a `!`, cast, or throw shows it is too weak
 - Parse external data once into domain values. Keep raw transport data, retries, logging, and process exits at I/O boundaries
 - Model domain concepts separately when mixing them would be a bug. Use discriminated unions for meaningful states and exhaustively handle variants you own
 - Use `satisfies`, `as const`, discriminated unions, and type-only imports when they cut noise

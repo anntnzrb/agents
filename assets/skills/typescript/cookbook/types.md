@@ -93,6 +93,47 @@ function parsePort(raw: string): Result<number, "invalid-port"> {
 
 ---
 
+## Constructive Modeling: Shape Out the Illegal Value
+
+**Problem**: A validity constraint lives in callers' heads, enforced by checks scattered at use sites.
+
+**Solution**: Choose the shape that cannot build the illegal value:
+
+```ts
+// Non-empty list: a head plus a rest, not a list plus a length check.
+type NonEmpty<T> = [T, ...T[]];
+
+// Even-length pairs: pairs of pairs, not a length check.
+type Pairs<T> = [T, T][];
+
+// A valid range: start plus duration, not two timestamps you must keep ordered.
+interface TimeRange {
+  start: Date;
+  duration: number;
+}
+```
+
+**Tip**: Strengthen only where partiality actually appears. If every operation on the plain shape is total, keep the plain shape. A `!`, cast, or "should never happen" throw marks the place a type is too weak; push that check up into the type, then stop.
+
+---
+
+## Schema-Derived Types
+
+**Problem**: Hand-rolled types duplicate a shape an authoritative schema already owns.
+
+**Solution**: Derive instead of redeclaring:
+
+```ts
+type ApiUser = typeof api.types.user; // from a server's schema module or a generated type
+type Update = Omit<ApiUser, "id" | "createdAt">;
+type HandlerArgs = Parameters<typeof handler>[0];
+type Unwrapped<T> = Awaited<T>;
+```
+
+**Tip**: Reach for `Pick`/`Omit`/`Parameters`/`ReturnType`/`Awaited`/`typeof` before declaring a new interface. Manual duplication drifts.
+
+---
+
 ## Exhaustive Tagged-State Handling
 
 **Problem**: A new state can be added without updating every consumer.
