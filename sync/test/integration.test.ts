@@ -50,6 +50,10 @@ test("integration_happy_path_matches_expected_outputs", () => {
       existsSync(join(home, ".omp", "agent", "skills", "skill.txt")),
       true,
     );
+    assert.equal(
+      existsSync(join(home, ".omp", "agent", "skills", "legacy")),
+      false,
+    );
     assert.equal(existsSync(join(home, ".mcporter", "mcporter.json")), true);
     assert.equal(existsSync(join(home, ".pi", "agent", "auth.json")), true);
   });
@@ -174,12 +178,19 @@ function writeFixtureFiles(home: string): void {
     join(home, ".config", "agents", "assets", "mcporter.jsonc"),
     '{"x":1}',
   );
-  mkdirSync(join(home, ".config", "agents", "assets", "skills"), {
+  mkdirSync(join(home, ".config", "agents", "skills", "current"), {
     recursive: true,
   });
   writeFileSync(
-    join(home, ".config", "agents", "assets", "skills", "skill.txt"),
+    join(home, ".config", "agents", "skills", "current", "skill.txt"),
     "skill-content",
+  );
+  mkdirSync(join(home, ".config", "agents", "skills", "legacy"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(home, ".config", "agents", "skills", "legacy", "old.txt"),
+    "legacy-content",
   );
   writeFileSync(
     join(home, ".config", "agents", "tools", "codex", "config.toml"),

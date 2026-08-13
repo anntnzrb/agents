@@ -8,6 +8,8 @@ import {
   harnessRenameAsset,
   harnessRoot,
   harnessSourceRoot,
+  SKILLS_DST_DIR,
+  SKILLS_SOURCE_SUBDIR,
   SOURCE_AGENT_FILE,
   type Harness,
   type SyncEnv,
@@ -72,6 +74,7 @@ export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
     jobs: [
       ...harnessDirJobs(harnesses),
       ...assetJobs(syncEnv, harnesses, assetNames),
+      ...skillsJobs(syncEnv, harnesses),
       ...instructionJobs(syncEnv, harnesses),
       ...configJobs(syncEnv),
     ],
@@ -97,6 +100,7 @@ function buildHarnessPlan(
     harness,
     sourceRoot,
     assetNames,
+    skillsSourceExists(syncEnv),
   );
   const cleanupEntryNames = uniqueSorted([
     ...currentEntryNames,
@@ -118,6 +122,7 @@ function currentManagedEntryNames(
   harness: Harness,
   sourceRoot: string,
   assetNames: readonly string[],
+  hasSkillsSource: boolean,
 ): string[] {
   const names = new Set<string>();
   names.add(harnessInstructionFileName(harness));
@@ -126,6 +131,9 @@ function currentManagedEntryNames(
   }
   for (const assetName of assetNames) {
     names.add(harnessRenameAsset(harness, assetName));
+  }
+  if (hasSkillsSource) {
+    names.add(harnessRenameAsset(harness, SKILLS_DST_DIR));
   }
   return uniqueSorted([...names]);
 }
@@ -157,6 +165,23 @@ function assetJobs(
     }
   }
   return jobs;
+}
+
+function skillsJobs(
+  syncEnv: SyncEnv,
+  harnesses: readonly HarnessPlan[],
+): Job[] {
+  const skillsSource = join(syncEnv.skillsHome, SKILLS_SOURCE_SUBDIR);
+  return harnesses.map((plan) => ({
+    src: skillsSource,
+    dst: join(plan.root, harnessRenameAsset(plan.harness, SKILLS_DST_DIR)),
+    kind: "Dir",
+    scope: "Tree",
+  }));
+}
+
+function skillsSourceExists(syncEnv: SyncEnv): boolean {
+  return isDirectory(join(syncEnv.skillsHome, SKILLS_SOURCE_SUBDIR));
 }
 
 function instructionJobs(

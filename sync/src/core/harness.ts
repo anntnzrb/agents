@@ -5,6 +5,8 @@ export const SOURCE_AGENT_FILE = "AGENTS.md";
 const INSTALL_TIMEOUT_SECONDS = 120;
 export const MANAGED_STATE_SUBDIR = ".local/share/agents/sync-managed";
 const DEFAULT_PACKAGE_CACHE_SUBDIR = ".local/share/agents/pi-packages";
+export const SKILLS_DST_DIR = "skills";
+export const SKILLS_SOURCE_SUBDIR = "current";
 
 export type AssetRename = readonly [string, string];
 
@@ -68,6 +70,7 @@ export interface Harness {
 export class SyncEnv {
   readonly home: string;
   readonly assetsHome: string;
+  readonly skillsHome: string;
   readonly toolsHome: string;
   readonly mcporterHome: string;
   readonly managedStateHome: string;
@@ -77,6 +80,7 @@ export class SyncEnv {
   constructor(
     home: string,
     assetsHome: string,
+    skillsHome: string,
     toolsHome: string,
     mcporterHome: string,
     managedStateHome: string,
@@ -85,6 +89,7 @@ export class SyncEnv {
   ) {
     this.home = home;
     this.assetsHome = assetsHome;
+    this.skillsHome = skillsHome;
     this.toolsHome = toolsHome;
     this.mcporterHome = mcporterHome;
     this.managedStateHome = managedStateHome;
@@ -108,6 +113,7 @@ export class SyncEnv {
     return new SyncEnv(
       home,
       path.join(agentsHome, "assets"),
+      path.join(agentsHome, "skills"),
       path.join(agentsHome, "tools"),
       path.join(home, ".mcporter"),
       path.join(home, MANAGED_STATE_SUBDIR),

@@ -691,7 +691,7 @@ setInterval(() => {}, 1_000);
         '{"x":1}',
       );
       writeFile(
-        join(root, ".config", "agents", "assets", "skills", "skill.txt"),
+        join(root, ".config", "agents", "skills", "current", "skill.txt"),
         "skill-content",
       );
       writeFile(
@@ -784,7 +784,7 @@ setInterval(() => {}, 1_000);
 
       writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
       writeFile(
-        join(agentsRoot, "assets", "skills", "skill.txt"),
+        join(agentsRoot, "skills", "current", "skill.txt"),
         "fresh-skill",
       );
       writeFile(
@@ -840,7 +840,7 @@ setInterval(() => {}, 1_000);
 
       writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
       writeFile(
-        join(agentsRoot, "assets", "skills", "skill.txt"),
+        join(agentsRoot, "skills", "current", "skill.txt"),
         "fresh-skill",
       );
       writeFile(
@@ -895,7 +895,7 @@ setInterval(() => {}, 1_000);
       const syncEnv = makeSyncEnv(root);
       const agentsRoot = join(root, ".config", "agents");
       const codexConfig = join(agentsRoot, "tools", "codex", "config.toml");
-      const skillsRoot = join(agentsRoot, "assets", "skills");
+      const skillsRoot = join(agentsRoot, "skills", "current");
 
       writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
       writeFile(join(skillsRoot, "skill.txt"), "fresh-skill");
@@ -918,6 +918,66 @@ setInterval(() => {}, 1_000);
       assert.equal(await call<boolean>(runSync, syncEnv), true);
       assert.equal(exists(join(root, ".codex", "config.toml")), false);
       assert.equal(exists(join(root, ".codex", "skills")), false);
+      assert.equal(exists(join(root, ".codex", "logs", "keep.txt")), true);
+    });
+  });
+
+  test("run_sync_copies_current_skills_but_not_legacy_skills", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const agentsRoot = join(root, ".config", "agents");
+
+      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(
+        join(agentsRoot, "skills", "current", "skill.txt"),
+        "fresh-skill",
+      );
+      writeFile(
+        join(agentsRoot, "skills", "legacy", "old-skill.txt"),
+        "legacy-skill",
+      );
+
+      assert.equal(await call<boolean>(runSync, syncEnv), true);
+      assert.equal(exists(join(root, ".codex", "skills", "skill.txt")), true);
+      assert.equal(exists(join(root, ".codex", "skills", "legacy")), false);
+      assert.equal(
+        exists(join(root, ".omp", "agent", "skills", "skill.txt")),
+        true,
+      );
+      assert.equal(
+        exists(join(root, ".omp", "agent", "skills", "legacy")),
+        false,
+      );
+    });
+  });
+
+  test("run_sync_copies_generic_asset_dirs_and_cleans_stale_ones", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const agentsRoot = join(root, ".config", "agents");
+
+      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(
+        join(agentsRoot, "assets", "prompts", "hello.txt"),
+        "prompt-content",
+      );
+
+      assert.equal(await call<boolean>(runSync, syncEnv), true);
+      assert.equal(exists(join(root, ".codex", "prompts", "hello.txt")), true);
+      assert.equal(
+        exists(join(root, ".omp", "agent", "prompts", "hello.txt")),
+        true,
+      );
+
+      rmSync(join(agentsRoot, "assets", "prompts"), {
+        recursive: true,
+        force: true,
+      });
+      writeFile(join(root, ".codex", "logs", "keep.txt"), "keep-me");
+
+      assert.equal(await call<boolean>(runSync, syncEnv), true);
+      assert.equal(exists(join(root, ".codex", "prompts")), false);
+      assert.equal(exists(join(root, ".omp", "agent", "prompts")), false);
       assert.equal(exists(join(root, ".codex", "logs", "keep.txt")), true);
     });
   });
