@@ -1,7 +1,7 @@
 ---
 name: darksouls
 description: Spoiler-safe Dark Souls Remastered help for builds, mechanics, routes, mods, and read-only saves.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

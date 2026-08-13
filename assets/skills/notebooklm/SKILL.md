@@ -1,7 +1,7 @@
 ---
 name: notebooklm
 description: Query NotebookLM notebooks and knowledge bases through the nlm CLI.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

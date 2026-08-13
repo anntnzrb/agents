@@ -1,6 +1,7 @@
 ---
 name: vals-live
 description: Discover and compare official Vals benchmarks, model variants, scores, quality, cost/test, latency, and uncertainty.
+license: AGPL-3.0-or-later
 ---
 
 # Vals Live

@@ -1,7 +1,7 @@
 ---
 name: python
 description: "Develop and debug Python: uv, typing, validation, APIs, async, tests, packaging, and .py projects."
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

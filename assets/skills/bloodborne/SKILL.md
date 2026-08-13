@@ -1,7 +1,7 @@
 ---
 name: bloodborne
 description: Spoiler-safe Bloodborne help for builds, mechanics, weapons, routing, farming, and progression.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

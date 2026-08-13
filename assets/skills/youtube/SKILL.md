@@ -1,7 +1,7 @@
 ---
 name: youtube
 description: "Work with YouTube or media links: inspect, download, convert, extract, list, or explore."
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

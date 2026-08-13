@@ -1,7 +1,7 @@
 ---
 name: aoc
 description: Solve Advent of Code, algorithm, and competitive-programming puzzles.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

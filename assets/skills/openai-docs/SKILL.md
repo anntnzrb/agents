@@ -1,6 +1,7 @@
 ---
 name: openai-docs
 description: Use current official OpenAI and Codex docs through MCPorter for APIs, models, configuration, and citations.
+license: AGPL-3.0-or-later
 ---
 
 # OpenAI Docs

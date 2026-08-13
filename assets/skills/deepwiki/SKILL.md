@@ -1,7 +1,7 @@
 ---
 name: deepwiki
 description: Query public GitHub repository documentation and codebase questions through the configured DeepWiki MCP server.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

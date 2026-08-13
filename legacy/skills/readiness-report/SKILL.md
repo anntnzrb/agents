@@ -1,7 +1,7 @@
 ---
 name: readiness-report
 description: Assess a codebase's readiness for autonomous AI development and identify maturity gaps.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

@@ -1,7 +1,7 @@
 ---
 name: brave-search
 description: Use Brave Search for quick, current web, image, video, or local-result lookups.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

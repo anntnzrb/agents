@@ -1,6 +1,7 @@
 ---
 name: lies-of-p
 description: Deterministic Lies of P 1.12.0.0 and Overture platinum companion with spoiler-safe routes.
+license: AGPL-3.0-or-later
 ---
 
 # Lies of P companion

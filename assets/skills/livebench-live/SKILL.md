@@ -1,6 +1,7 @@
 ---
 name: livebench-live
 description: Query official LiveBench releases, dynamic categories, subtasks, model rows, scores, and published costs.
+license: AGPL-3.0-or-later
 ---
 
 # LiveBench Live

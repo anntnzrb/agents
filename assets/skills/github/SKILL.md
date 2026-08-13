@@ -1,7 +1,7 @@
 ---
 name: github
 description: Use GitHub CLI (`gh`) for repositories, issues, pull requests, Actions, releases, APIs, extensions, and stacked PRs.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

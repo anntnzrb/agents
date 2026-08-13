@@ -1,7 +1,7 @@
 ---
 name: context7
 description: Fetch current library and API documentation through Context7 with MCPorter.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

@@ -1,6 +1,7 @@
 ---
 name: hunk
 description: "Control live Hunk diff reviews: inspect diffs, navigate hunks, reload content, and add inline comments."
+license: AGPL-3.0-or-later
 ---
 
 # Hunk

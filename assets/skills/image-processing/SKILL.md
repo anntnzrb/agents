@@ -1,7 +1,7 @@
 ---
 name: image-processing
 description: "Process web images with Pillow: resize, crop, trim, convert, optimize, thumbnail, or OG card."
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 ---

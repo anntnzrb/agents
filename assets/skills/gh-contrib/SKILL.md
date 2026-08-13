@@ -1,7 +1,7 @@
 ---
 name: gh-contrib
 description: Create upstream GitHub issues and pull requests following repository contribution rules.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

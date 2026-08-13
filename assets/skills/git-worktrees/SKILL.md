@@ -1,6 +1,7 @@
 ---
 name: git-worktrees
 description: "Route Git worktree lifecycle safely: consume linked worktrees, select native managers, or use raw-Git leases."
+license: AGPL-3.0-or-later
 ---
 
 # Git Worktrees

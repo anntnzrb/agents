@@ -1,6 +1,7 @@
 ---
 name: orca-cli
 description: Use Orca CLI for worktrees, terminals, repos, artifacts, browser, handoffs, and structured multi-agent coordination.
+license: AGPL-3.0-or-later
 ---
 
 # Orca CLI

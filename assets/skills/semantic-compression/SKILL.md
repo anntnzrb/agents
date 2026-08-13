@@ -1,7 +1,7 @@
 ---
 name: semantic-compression
 description: Compress prompts or documents aggressively while preserving meaning for LLM consumption.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

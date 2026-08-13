@@ -1,7 +1,7 @@
 ---
 name: vox-interpres
 description: "Analyze audio tracks: tempo, key, sections, energy, metadata, codecs, and segment comparisons."
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 compatibility: Requires `uv`, `ffmpeg`/`ffprobe`, and local audio files.
 metadata:
   author: anntnzrb

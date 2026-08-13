@@ -1,7 +1,7 @@
 ---
 name: xml-surgeon
 description: Read and surgically edit XML with XPath, minimal formatting changes, and batch operations.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

@@ -1,7 +1,7 @@
 ---
 name: skill-creator
 description: Create, audit, refactor, validate, benchmark, or optimize skills and their trigger metadata.
-license: Apache-2.0
+license: AGPL-3.0-or-later
 metadata:
   author: Anthropic
   local-maintainer: anntnzrb

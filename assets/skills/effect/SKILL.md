@@ -1,7 +1,7 @@
 ---
 name: effect
 description: "Use Effect TypeScript APIs and docs: effect-ts, @effect/*, fibers, layers, schemas, and RPC."
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

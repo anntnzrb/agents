@@ -1,7 +1,7 @@
 ---
 name: rust-script
 description: Create and debug Cargo single-file Rust scripts, rust-script fallback, and embedded manifests.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

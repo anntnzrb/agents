@@ -1,7 +1,7 @@
 ---
 name: exa-search
 description: Use Exa for deep web research, full-page retrieval, and source-backed synthesis.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

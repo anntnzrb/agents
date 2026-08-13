@@ -5,7 +5,6 @@
 # dependencies = ["zstandard>=0.23,<1"]
 # ///
 
-# SPDX-License-Identifier: GPL-3.0-or-later
 """Find saved sessions across supported coding harnesses."""
 
 from __future__ import annotations

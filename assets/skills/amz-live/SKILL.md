@@ -1,7 +1,7 @@
 ---
 name: amz-live
 description: Search and compare Amazon products, prices, and recommendations with read-only catalog data.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 compatibility: Requires `uv`. Uses bundled skill-local `scripts/cli.py`. Network access required for live mode.
 metadata:
   author: anntnzrb
