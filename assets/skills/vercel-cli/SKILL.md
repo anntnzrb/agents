@@ -7,25 +7,22 @@ metadata:
 
 ---
 
-# Vercel CLI Skill
+# Vercel CLI
 
-The Vercel CLI (`vercel` or `vc`) deploys, manages, and develops projects on the Vercel platform from the command line. Use `vercel <command> -h` for full flag details on any command.
+`vercel`/`vc`: deploy, manage, and develop Vercel projects from the command line. `vercel <command> -h`: full flags for any command.
 
-## Critical: Project Linking
+## Project linking
 
-Set `<VERCEL_CMD>` to installed `vercel`, or to `bun x vercel` for ephemeral
-execution. Examples use `vercel` for readability.
+Set `<VERCEL_CMD>` to installed `vercel` or ephemeral `bun x vercel`; examples use `vercel`.
 
-Commands must be run from the directory containing the `.vercel` folder (or a subdirectory of it). How `.vercel` gets set up depends on your project structure:
+MUST run commands from the directory containing `.vercel/` or a descendant.
 
-- **`.vercel/project.json`**: Created by `vercel link`. Links a single project. Fine for single-project repos, and can work in monorepos if there's only one project
-- **`.vercel/repo.json`**: Created by `vercel link --repo`. Links a repo that may contain multiple projects. Always a good idea when any project has a non-root directory (e.g., `apps/web`)
+- `.vercel/project.json`: created by `vercel link`; links one project; suitable for single-project repos and monorepos containing only one project.
+- `.vercel/repo.json`: created by `vercel link --repo`; links a repo containing multiple projects; recommended when any project has a non-root directory such as `apps/web`.
 
-Running from a project subdirectory (e.g., `apps/web/`) skips the "which project?" prompt since it's unambiguous.
+Running from an unambiguous project subdirectory such as `apps/web/` skips the project-selection prompt. Troubleshooting: inspect `.vercel/` first and identify `project.json` versus `repo.json`; verify the team with `vercel whoami`. Wrong-team linking is a common failure.
 
-**When something goes wrong, check how things are linked first** — look at what's in `.vercel/` and whether it's `project.json` or `repo.json`. Also verify you're on the right team with `vercel whoami` — linking while on the wrong team is a common mistake.
-
-## Quick Start
+## Quick start
 
 ```bash
 vercel login
@@ -40,39 +37,39 @@ vercel --prod     # production deployment
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Deployment | `references/deployment.md` | Deploying or promoting |
-| Local development | `references/local-development.md` | Running locally |
-| Environment variables | `references/environment-variables.md` | Reading or changing env |
-| CI/CD | `references/ci-automation.md` | Automating deployment |
-| Domains/DNS | `references/domains-and-dns.md` | Changing domain state |
-| Projects/teams | `references/projects-and-teams.md` | Linking or scoping |
-| Logs, debugging, protected previews | `references/monitoring-and-debugging.md` | Diagnosing or using `vercel curl` |
-| Blob storage | `references/storage.md` | Managing blobs |
-| Integrations | `references/integrations.md` | Managing connected services |
-| Missing CLI surface, API, webhooks | `references/advanced.md` | Falling back to `vercel api` |
-| Node backends | `references/node-backends.md` | Deploying Express/Hono/etc. |
-| Monorepos | `references/monorepos.md` | Repo has workspaces or multiple projects |
-| Bun runtime | `references/bun.md` | Deploying with Bun |
-| Feature flags | `references/flags.md` | Managing flags |
-| Global flags | `references/global-options.md` | Exact global options are needed |
-| First setup | `references/getting-started.md` | Login/link is incomplete |
-| Command workflow | `command/vercel.md` | Running the packaged command surface |
+|Need|Read|When|
+|---|---|---|
+|Deployment|`references/deployment.md`|Deploying or promoting|
+|Local development|`references/local-development.md`|Running locally|
+|Environment variables|`references/environment-variables.md`|Reading or changing env|
+|CI/CD|`references/ci-automation.md`|Automating deployment|
+|Domains/DNS|`references/domains-and-dns.md`|Changing domain state|
+|Projects/teams|`references/projects-and-teams.md`|Linking or scoping|
+|Logs, debugging, protected previews|`references/monitoring-and-debugging.md`|Diagnosing or using `vercel curl`|
+|Blob storage|`references/storage.md`|Managing blobs|
+|Integrations|`references/integrations.md`|Managing connected services|
+|Missing CLI surface, API, webhooks|`references/advanced.md`|Falling back to `vercel api`|
+|Node backends|`references/node-backends.md`|Deploying Express/Hono/etc.|
+|Monorepos|`references/monorepos.md`|Repo has workspaces or multiple projects|
+|Bun runtime|`references/bun.md`|Deploying with Bun|
+|Feature flags|`references/flags.md`|Managing flags|
+|Global flags|`references/global-options.md`|Exact global options are needed|
+|First setup|`references/getting-started.md`|Login/link is incomplete|
+|Command workflow|`command/vercel.md`|Running the packaged command surface|
 
 ## Environment
 
 - Tracked template: `.env.example`
 - Primary non-interactive auth var: `VERCEL_TOKEN`
-- Do not infer missing auth from `VERCEL_TOKEN` being unset in the parent shell; existing `vercel login` state may already be valid. Use `vercel whoami` to verify real auth state. `VERCEL_TOKEN` is mainly for unattended/CI flows
-- The CLI does not auto-load `.env`; use direnv or CI secret injection for unattended auth
+- NEVER infer missing auth solely because `VERCEL_TOKEN` is unset in the parent shell; existing `vercel login` state may be valid. Verify actual auth with `vercel whoami`. `VERCEL_TOKEN` is mainly for unattended/CI flows.
+- CLI does not auto-load `.env`; use direnv or CI secret injection for unattended auth.
 
-## Anti-Patterns
+## Anti-patterns
 
-- **Wrong link type in monorepos with multiple projects**: `vercel link` creates `project.json`, which only tracks one project. Use `vercel link --repo` instead. When things break, check `.vercel/` first
-- **Letting commands auto-link in monorepos**: Many commands implicitly run `vercel link` if `.vercel/` doesn't exist. This creates `project.json`, which may be wrong. Run `vercel link` (or `--repo`) explicitly first
-- **Linking while on the wrong team**: Use `vercel whoami` to check, `vercel teams switch` to change
-- **Forgetting `--yes` in CI**: Required to skip interactive prompts
-- **Using `vercel deploy` after `vercel build` without `--prebuilt`**: The build output is ignored
-- **Hardcoding tokens in flags**: Use `VERCEL_TOKEN` env var instead of `--token`
-- **Disabling deployment protection**: Use `vercel curl` instead to access preview deploys
+- Multiple-project monorepo: `vercel link` creates `project.json`, tracking one project; explicitly use `vercel link --repo`. Check `.vercel/` first when things break.
+- Monorepo without `.vercel/`: commands may implicitly run `vercel link` and create the potentially wrong `project.json`; explicitly run `vercel link` or `vercel link --repo` first.
+- Wrong team: check with `vercel whoami`; switch with `vercel teams switch`.
+- CI: `--yes` required to skip interactive prompts.
+- After `vercel build`, `vercel deploy` ignores build output unless run with `--prebuilt`.
+- Tokens: use `VERCEL_TOKEN`, not `--token`.
+- Preview deploy access: use `vercel curl`, not deployment-protection disabling.
