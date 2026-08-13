@@ -5,7 +5,11 @@
    * MODELS
    * ************************************************************************ */
 
-  // "small_model": "github-copilot/gemini-3-flash-preview",
+  // title, summary, and compaction utils
+  "small_model": "opencode-go/deepseek-v4-flash",
+
+  // main agent (build)
+  "model": "opencode-go/deepseek-v4-pro",
 
   /* **************************************************************************
    * PLUGINS
