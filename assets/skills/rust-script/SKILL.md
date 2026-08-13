@@ -76,20 +76,20 @@ Detection hint:
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Cargo script runbook | `references/cargo-script-workflow.md` | Building or debugging a Cargo-native script |
-| Supported command surface | `references/command-support-matrix.md` | Before uncommon Cargo commands |
-| Exact error recovery | `references/error-catalog.md` | A known command fails |
-| Current stabilization state | `references/upstream-status.md` | Behavior may have changed upstream |
-| Stable fallback | `references/rust-script-fallback.md` | Nightly is unavailable or rejected |
-| Minimal scripts, frontmatter, verification, and sources | `references/contracts-and-verification.md` | Creating or validating a Cargo-native script |
-| Error, type, async, test, or unsafe design inside a script | `references/scripting-engineering.md` | Applying Rust engineering checks without turning a script into a service |
-| Opinionated production-Rust patterns | `references/advanced/rust/README.md`, then its matching reference | A script is becoming package-scale or needs deep async, CLI, web, type-state, test, concurrency, or safety guidance; repository policy and toolchain constraints take precedence |
-| Undefined-behavior investigation | `references/advanced/rust-ub/README.md`, then its matching reference | Auditing unsafe code with Miri, sanitizers, Loom, or the UB taxonomy |
-| Cross-language code-smell or logging review | `references/advanced/engineering/code-smells.md`, `references/advanced/engineering/logging.md` | Reviewing structure or observability beyond Rust-specific mechanics |
-| Legacy `rust-script` CLI | `reference/cli.md` | Exact fallback flags or environment variables are needed |
-| Starter source | `templates/script.rs`, `templates/async.rs` | Creating a matching script |
+|Need|Read|When|
+|---|---|---|
+|Cargo script runbook|`references/cargo-script-workflow.md`|Building or debugging a Cargo-native script|
+|Supported command surface|`references/command-support-matrix.md`|Before uncommon Cargo commands|
+|Exact error recovery|`references/error-catalog.md`|A known command fails|
+|Current stabilization state|`references/upstream-status.md`|Behavior may have changed upstream|
+|Stable fallback|`references/rust-script-fallback.md`|Nightly is unavailable or rejected|
+|Minimal scripts, frontmatter, verification, and sources|`references/contracts-and-verification.md`|Creating or validating a Cargo-native script|
+|Error, type, async, test, or unsafe design inside a script|`references/scripting-engineering.md`|Applying Rust engineering checks without turning a script into a service|
+|Opinionated production-Rust patterns|`references/advanced/rust/README.md`, then its matching reference|A script is becoming package-scale or needs deep async, CLI, web, type-state, test, concurrency, or safety guidance; repository policy and toolchain constraints take precedence|
+|Undefined-behavior investigation|`references/advanced/rust-ub/README.md`, then its matching reference|Auditing unsafe code with Miri, sanitizers, Loom, or the UB taxonomy|
+|Cross-language code-smell or logging review|`references/advanced/engineering/code-smells.md`, `references/advanced/engineering/logging.md`|Reviewing structure or observability beyond Rust-specific mechanics|
+|Legacy `rust-script` CLI|`reference/cli.md`|Exact fallback flags or environment variables are needed|
+|Starter source|`templates/script.rs`, `templates/async.rs`|Creating a matching script|
 
 ## Agent Operating Procedure
 
