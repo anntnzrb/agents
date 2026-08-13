@@ -9,17 +9,15 @@ metadata:
 
 # yt-dlp Video Downloader Skill
 
-Expert at using `yt-dlp` CLI for downloading and processing videos from YouTube and other platforms.
+Use `yt-dlp` CLI to download and process videos from YouTube and other platforms.
 
 ## Availability
 
-Before any operation, verify yt-dlp is installed: `yt-dlp --version`
-
-If not installed, just quit, user will handle the installation manually.
+Before every operation, run `yt-dlp --version`. If unavailable, quit; the user installs it manually.
 
 ## Documentation Access
 
-The full `yt-dlp` documentation is extensive. When you need to look up specific options or features:
+For specific options/features or complex, unfamiliar requests:
 
 1. Fetch the docs:
 
@@ -42,12 +40,12 @@ The full `yt-dlp` documentation is extensive. When you need to look up specific 
 
 ## Workflow
 
-1. **Simple requests** → Execute directly with known options
-2. **Complex/unfamiliar requests** → Fetch docs → Subagent search → Execute
+Simple requests → execute directly with known options.
+Complex/unfamiliar requests → fetch docs → subagent search → execute.
 
 ## Guidelines
 
-1. **Check installation first** - verify yt-dlp is available
-2. **Delegate doc searches** - use subagent for extensive docs
-3. **Show the command** - always display the command being run
-4. **Handle errors** - explain common issues (geo-restrictions, age-gates, etc.)
+- Verify installation first.
+- Delegate extensive doc searches to a subagent.
+- Always show the command being run.
+- Explain common issues (geo-restrictions, age-gates, etc.).
