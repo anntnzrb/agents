@@ -1,7 +1,7 @@
 ---
 name: flight-live
 description: Search live flights, compare date windows and fares, and rank travel options.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 compatibility: Requires `uv` and `nix`. Uses bundled skill-local `scripts/cli.py`. Network access required.
 metadata:
   author: anntnzrb

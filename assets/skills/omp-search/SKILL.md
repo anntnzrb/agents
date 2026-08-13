@@ -1,7 +1,7 @@
 ---
 name: omp-search
 description: Run OMP web search headlessly from agents with automatic or explicit provider selection and structured JSON results.
-license: MIT
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

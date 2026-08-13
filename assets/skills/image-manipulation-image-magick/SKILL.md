@@ -1,7 +1,7 @@
 ---
 name: image-manipulation-image-magick
 description: "Process images with ImageMagick: resize, convert, batch-edit, create thumbnails, or inspect metadata."
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 compatibility: Requires ImageMagick installed and available as `magick` on PATH. Cross-platform examples provided for PowerShell (Windows) and Bash (Linux/macOS).
 metadata:
   author: anntnzrb

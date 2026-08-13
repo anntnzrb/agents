@@ -1,7 +1,7 @@
 ---
 name: commit
 description: Create, split, stage, unstage, or polish precise Git commits and commit history.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

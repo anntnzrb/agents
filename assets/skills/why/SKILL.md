@@ -1,7 +1,7 @@
 ---
 name: why
 description: "Use for 'why was this built this way': query git history, PRs, issues, and docs in parallel, then cite the evidence."
-license: MIT
+license: AGPL-3.0-or-later
 ---
 
 # Why

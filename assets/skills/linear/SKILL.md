@@ -1,6 +1,7 @@
 ---
 name: linear
 description: "Manage Linear through MCPorter: discover live tools, inspect schemas, and safely read or change data."
+license: AGPL-3.0-or-later
 compatibility: Requires MCPorter configuration and Linear authentication.
 ---
 

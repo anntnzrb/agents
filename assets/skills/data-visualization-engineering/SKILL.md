@@ -1,7 +1,7 @@
 ---
 name: data-visualization-engineering
 description: Engineer truthful, accessible, shareable data visualizations in web products and React applications.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
   provenance: Clean-room original guidance; informed by the linked primary standards and documentation, not copied from plugins or templates.

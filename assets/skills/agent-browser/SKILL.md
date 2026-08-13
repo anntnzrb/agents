@@ -1,7 +1,7 @@
 ---
 name: agent-browser
 description: "Automate websites: browse, log in, fill forms, click, scrape, screenshot, or test web apps."
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

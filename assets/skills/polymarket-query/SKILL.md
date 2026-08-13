@@ -1,7 +1,7 @@
 ---
 name: polymarket-query
 description: Read official public Polymarket markets, events, CLOB prices/books, and aggregate data without account access.
-license: Apache-2.0
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 ---

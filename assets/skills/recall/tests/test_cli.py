@@ -1,5 +1,4 @@
 # Copyright (c) 2026
-# SPDX-License-Identifier: GPL-3.0-or-later
 # ruff: noqa: PLR2004, S101, S603
 """Executable contracts for the multi-harness session finder."""
 

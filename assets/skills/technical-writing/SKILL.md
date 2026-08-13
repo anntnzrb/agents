@@ -1,7 +1,7 @@
 ---
 name: technical-writing
 description: "For docs, RFCs, readmes, PR descriptions, commit messages: Diátaxis, Google style, STE, Global English."
-license: MIT
+license: AGPL-3.0-or-later
 ---
 
 # Technical writing

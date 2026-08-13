@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
 """Read-only DARK SOULS REMASTERED local frame scanner.
 
 This module deliberately keeps all binary payloads in memory.  Public values

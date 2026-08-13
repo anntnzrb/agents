@@ -1,7 +1,7 @@
 ---
 name: swarm
 description: "Fan out N parallel workers across slices or races, then aggregate one report."
-license: MIT
+license: AGPL-3.0-or-later
 ---
 
 # Swarm

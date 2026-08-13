@@ -1,7 +1,7 @@
 ---
 name: artificial-analysis-live
 description: Compare current AI models and providers by benchmarks, speed, latency, and cost.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 compatibility: Requires `uv` and network access.
 metadata:
   author: anntnzrb

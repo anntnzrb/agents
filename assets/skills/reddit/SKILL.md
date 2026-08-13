@@ -1,7 +1,7 @@
 ---
 name: reddit
 description: Browse, search, and retrieve Reddit posts, comments, subreddits, and user activity via JSON.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

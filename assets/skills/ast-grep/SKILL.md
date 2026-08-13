@@ -1,7 +1,7 @@
 ---
 name: ast-grep
 description: Perform read-only AST-aware code search with ast-grep/sg, including structural find-usages.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

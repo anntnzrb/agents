@@ -1,7 +1,7 @@
 ---
 name: javascript
 description: "Implement and debug JavaScript in Node or browsers: modules, async, APIs, tests, and performance."
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

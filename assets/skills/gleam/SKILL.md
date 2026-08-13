@@ -1,7 +1,7 @@
 ---
 name: gleam
 description: Develop and debug Gleam, gleam.toml, BEAM/Erlang projects, TDD, and type-driven code.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

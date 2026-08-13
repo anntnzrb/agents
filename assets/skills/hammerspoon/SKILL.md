@@ -1,7 +1,7 @@
 ---
 name: hammerspoon
 description: Inspect, configure, debug, or automate Hammerspoon, hs.*, Lua hotkeys, and macOS windows.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 compatibility: Requires `uv`. Runtime introspection requires Hammerspoon running with `require("hs.ipc")` and the `hs` CLI installed. Docs/source lookup requires network unless cached.
 metadata:
   author: anntnzrb

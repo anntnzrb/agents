@@ -1,7 +1,7 @@
 ---
 name: world-cup-forecast
 description: Forecast World Cup matches using current scores, odds, form, xG, players, and source disagreement.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 compatibility: Requires uv and network access. Uses bundled skill-local scripts/cli.py. Outputs JSON only.
 metadata:
   author: anntnzrb

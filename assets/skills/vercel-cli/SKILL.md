@@ -1,7 +1,7 @@
 ---
 name: vercel-cli
 description: Deploy, manage, and debug Vercel projects, environments, domains, logs, integrations, and CI/CD.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

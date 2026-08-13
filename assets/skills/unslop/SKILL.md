@@ -1,7 +1,7 @@
 ---
 name: unslop
 description: "For deslop, AI cleanup, or review: cut prose slop patterns; run bounded behavior-preserving code cleanup diffs."
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 ---

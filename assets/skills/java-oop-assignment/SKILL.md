@@ -1,7 +1,7 @@
 ---
 name: java-oop-assignment
 description: Complete Java OOP/FOP assignments from PDF specifications with minimal compliant code.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

@@ -1,7 +1,7 @@
 ---
 name: tdd
 description: "For TDD requests or bugs with a cheap local test path: failing test first, then the smallest fix, then evidence."
-license: MIT
+license: AGPL-3.0-or-later
 ---
 
 # TDD Bug Fix

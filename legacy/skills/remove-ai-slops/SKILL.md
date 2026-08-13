@@ -1,6 +1,7 @@
 ---
 name: remove-ai-slops
 description: Clean AI-generated code in a bounded diff while preserving behavior; use for deslop, AI cleanup, or review.
+license: AGPL-3.0-or-later
 ---
 
 # Remove AI Slops

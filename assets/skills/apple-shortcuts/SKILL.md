@@ -1,7 +1,7 @@
 ---
 name: apple-shortcuts
 description: Build, inspect, debug, validate, sign, and remix Apple Shortcuts and Shortcuts.app automations.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

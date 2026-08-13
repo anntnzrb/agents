@@ -1,7 +1,7 @@
 ---
 name: nix
 description: Develop and debug Nix, nixpkgs, flakes, NixOS, derivations, shells, and Home Manager.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

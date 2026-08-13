@@ -1,7 +1,7 @@
 ---
 name: how
 description: "Answers 'how does X work': walkthroughs before changes, placement/layering; critique mode on request."
-license: MIT
+license: AGPL-3.0-or-later
 ---
 
 # How

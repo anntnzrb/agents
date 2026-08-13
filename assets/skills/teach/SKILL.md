@@ -1,7 +1,7 @@
 ---
 name: teach
 description: "Explain a subsystem or change plainly: how plus why woven into one account, built diagram by diagram."
-license: MIT
+license: AGPL-3.0-or-later
 ---
 
 # Teach

@@ -1,7 +1,7 @@
 ---
 name: nixpkgs-update
 description: Update nixpkgs packages with nix-update/nixpkgs-review or contribute package bumps upstream.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

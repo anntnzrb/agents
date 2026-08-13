@@ -1,7 +1,7 @@
 ---
 name: research
 description: Route research, fact-checking, comparisons, and evidence gathering to the best available source.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

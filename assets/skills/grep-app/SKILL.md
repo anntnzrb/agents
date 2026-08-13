@@ -1,7 +1,7 @@
 ---
 name: grep-app
 description: Search public GitHub code with Grep.app for real-world API and configuration examples.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

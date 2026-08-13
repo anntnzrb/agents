@@ -1,7 +1,7 @@
 ---
 name: golang
 description: "Develop and debug Go: .go modules, concurrency, HTTP, CLI, databases, errors, and tests."
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

@@ -1,7 +1,7 @@
 ---
 name: n8n
 description: Inspect and operate n8n workflows through its bundled REST CLI or targeted MCP tools.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

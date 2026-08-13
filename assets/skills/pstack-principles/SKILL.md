@@ -1,7 +1,7 @@
 ---
 name: pstack-principles
 description: "Apply before design, refactor, debug, or delegation: smallest change, correct types, verify real artifacts, root causes."
-license: MIT
+license: AGPL-3.0-or-later
 ---
 
 # Pstack Principles

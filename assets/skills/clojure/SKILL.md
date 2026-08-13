@@ -1,7 +1,7 @@
 ---
 name: clojure
 description: Develop and debug Clojure, ClojureScript, deps.edn, REPL, spec, and functional code.
-license: GPL-3.0-or-later
+license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 

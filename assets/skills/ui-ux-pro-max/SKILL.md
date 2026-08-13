@@ -1,6 +1,7 @@
 ---
 name: ui-ux-pro-max
 description: "Design, build, review, or improve web/mobile UI and UX: layout, accessibility, styles, and components."
+license: AGPL-3.0-or-later
 ---
 
 # UI/UX Pro Max
