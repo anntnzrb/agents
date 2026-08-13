@@ -1,8 +1,6 @@
 name = "qa-executor"
-description = "DeepSeek Flash QA executor. Runs real scenarios and records artifact-backed surface evidence."
+description = "QA executor. Runs real scenarios and records artifact-backed surface evidence."
 nickname_candidates = ["Forseti", "Urd", "Verdandi", "Skuld", "Mimir"]
-model = "deepseek-v4-flash"
-model_provider = "opencode-go"
 model_reasoning_effort = "max"
 default_permissions = "agent-workspace"
 
