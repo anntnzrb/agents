@@ -39,10 +39,10 @@ uv run --script <skill-dir>/scripts/cli.py match --team-a Brazil --team-b Japan 
 
 ## Required follow-up reads
 
-| Need | Read | When |
-| --- | --- | --- |
-| Live command and output schema | `scripts/cli.py` via `schema` | Before forming or consuming a forecast call |
-| Exact flags | `scripts/cli.py` via `--help` | A non-default source or date is needed |
+|Need|Read|When|
+|---|---|---|
+|Live command and output schema|`scripts/cli.py` via `schema`|Before forming or consuming a forecast call|
+|Exact flags|`scripts/cli.py` via `--help`|A non-default source or date is needed|
 
 ## Evidence fields to trust most
 
