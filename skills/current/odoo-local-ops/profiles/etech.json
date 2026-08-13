@@ -10,45 +10,17 @@
         "whatsapp_bot",
         "web_espol",
         "url_shortener",
-        "template_editor"
+        "template_editor",
+        "b2b"
       ],
       "test_modules": [
         "crm_espol",
+        "b2b",
         "whatsapp_utils",
         "whatsapp_bot",
         "web_espol",
         "url_shortener",
         "template_editor"
-      ]
-    },
-    "b2b": {
-      "database": "erptech_0804-b2b",
-      "modules": [
-        "budget",
-        "budget_hr",
-        "crm_espol",
-        "whatsapp_utils",
-        "whatsapp_bot",
-        "web_espol",
-        "b2b",
-        "url_shortener"
-      ],
-      "test_modules": [
-        "crm_espol",
-        "whatsapp_utils",
-        "whatsapp_bot",
-        "web_espol",
-        "b2b",
-        "url_shortener"
-      ]
-    },
-    "b2b-fast": {
-      "database": "erptech_0804-b2b",
-      "modules": [
-        "b2b"
-      ],
-      "test_modules": [
-        "b2b"
       ]
     }
   }
