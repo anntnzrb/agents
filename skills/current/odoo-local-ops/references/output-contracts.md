@@ -9,6 +9,12 @@ CLI JSON-first; text fallback. MUST use `--json` for tool/agent consumers; text 
 - Errors: actionable, secret-free.
 - NEVER emit raw secret values from `odoo.conf`, `.env`, or environment.
 
+## Consumer discipline
+
+- `rows` is authoritative; use `row_count` before indexing or formatting a row. `row_count: 0` is a successful absence, not permission to use `rows[0]`.
+- Consume the exact field names in the contract. Do not invent aliases such as `table`, `size`, or `rows` for the `db top-tables` fields `table_name`, `total_size`, and `live_rows`.
+- Preserve stderr and the process exit status while parsing. Do not hide CLI errors with `2>/dev/null` or feed an empty error stream to `json.load`; a surrounding shell pipeline can otherwise obscure the real failure.
+
 ## Errors
 
 ```json
@@ -80,11 +86,13 @@ DB-backed commands return the PostgreSQL helper payload directly, or a small mod
 - `checked`: discovery attempts.
 - `stdout`: raw CSV traceability, not main contract.
 
-`module status` additionally: `module`, `path`, `manifest_version`, `depends`.
+`module status` additionally: `module`, `path`, `manifest_version`, `depends`. A zero-row status is normal when a module is unregistered or absent from `ir_module_module`; use a direct read-only query if the distinction matters.
 
 ### `db summary|top-tables|top-rows|orphan-tables`
 
 Payload: `database`, `runtime`, `rows`, `row_count`, `psql`, `checked`, `stdout`. `rows` authoritative.
+
+`db top-tables` rows use `table_name`, `relation_kind`, `estimated_rows`, `live_rows`, `dead_rows`, `total_bytes`, and `total_size` (among other metrics). `db top-rows` uses `table_name`, `estimated_rows`, and `total_size`; these commands do not provide shorthand `table`, `rows`, or `size` keys.
 
 ### `db clone`
 
@@ -94,7 +102,7 @@ Successful writes additionally include `replaced`, `postflight`, `checked`. `pre
 
 ### `db query --read-only`
 
-Success: `database`, `runtime`, `row_count`, `rows`.
+Success: `database`, `runtime`, `row_count`, `rows`. The CLI exposes one parsed `rows` list; send one statement/result set per call rather than multiple standalone `SELECT`s.
 
 ```json
 {

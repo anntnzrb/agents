@@ -49,6 +49,7 @@ Do not replace it with raw `psql`, Docker Compose `exec`, shell pipelines, or in
    - Compose backend uses `docker compose exec -T db psql ...`
    - Host backend resolves `psql.exe`/`psql` from explicit flag, nearby install tree, `pg_path`, or PATH
 4. Prefer JSON output
+   - Before parsing, transforming, or branching on CLI JSON, read `references/output-contracts.md`; use exact row keys and handle empty `rows`.
    - For Server Actions, always stage the Python snippet under `<temp-dir>` first, then copy it and parse returned JSON from clipboard/output files. Never compose long snippets inline in chat
    - Default to read-only audit and dry-run snippets. Write snippets require explicit user intent plus precheck/postcheck and rollback-on-failure
    - Prefer ORM for small writes and business-logic-sensitive operations; use SQL set-based writes only when the UI/ORM path is likely to freeze, spam tracking, or time out, and only with a frozen candidate table and exact postcheck
@@ -85,6 +86,8 @@ uv run --script <skill-dir>/scripts/cli.py db query --read-only --sql-file <sql-
 ## Query guidance
 
 - Prefer `--sql-file` or `--sql-stdin`; do not embed long SQL inside shell strings
+- Send one SQL statement/result set per `db query` call; split independent checks or combine them into one `SELECT`/CTE/`UNION`
+- Before using undocumented table columns, inspect `information_schema.columns`; do not infer SQL columns from ORM field names
 - Default to `--read-only` for ad-hoc queries
 - In local Odoo databases, cast `jsonb` to `::text` before `ILIKE`
 - `ir_model` does not expose `_table`; derive table names with `replace(model,'.','_')` when needed
@@ -156,8 +159,8 @@ hold that database lock and expose service ports.
 | --- | --- | --- |
 | Workspace, Compose, config, DB, psql resolution | `references/runtime-discovery.md` | Discovery is ambiguous or fails |
 | Read-only defaults, redaction, write gates | `references/safety-model.md` | Before DB or route operations |
-| DB commands and SQL recipes | `references/db-recipes.md` | Selecting DB inspection commands |
-| JSON shapes and failure contracts | `references/output-contracts.md` | Consuming CLI output programmatically |
+| DB commands, schema probes, and dump-restore fallback | `references/db-recipes.md` | Selecting DB inspection commands, ad-hoc SQL, or an explicitly requested dump import |
+| JSON shapes and failure contracts | `references/output-contracts.md` | Before parsing, transforming, or branching on CLI output |
 | Controller route heuristics | `references/route-safety.md` | Reviewing route write risk |
 | Production Server Action workflow | `references/server-action-playbook.md` | Auditing, dry-running, writing, or closing out |
 | Odoo 17 capability map | `references/server-action-capabilities.md` | Choosing actions, automation, webhooks, cron, or modules |

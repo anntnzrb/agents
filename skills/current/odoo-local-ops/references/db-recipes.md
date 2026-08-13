@@ -130,6 +130,22 @@ Rules:
 
 If DB execution cannot be resolved, the command should fail clearly and report which backend/path was attempted.
 
+### Schema-first ad-hoc SQL
+
+The CLI cannot validate model-specific columns. Before selecting a column not exposed by a canned recipe, inspect the live table in a separate read-only call:
+
+```sql
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = '<table>'
+ORDER BY ordinal_position;
+```
+
+Use only columns returned by that probe. Odoo ORM field names are not a stable SQL schema contract. In the audited Odoo 17 database, guessed columns such as `res_users.last_login_at`, `mail_mail.body`/`attachment_ids`, `ir_cron.name`/`state`, and `mail_followers.mail_message_id` failed; probe first instead of copying those guesses.
+
+Run one statement/result set per `db query` invocation. For multiple checks, use one `SELECT` with CTEs/`UNION`, or make separate calls. Preserve the CLI's exit status and stderr when formatting JSON; do not suppress errors before `json.load`.
+
 ## Module-aware inspection
 
 Use module-scoped commands before ad-hoc SQL when possible.
