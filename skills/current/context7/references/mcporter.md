@@ -66,13 +66,13 @@ MCP commonly returns readable text or Markdown with code and source URLs. Observ
 Use source URLs and matching language/context when comparing snippets. Do not infer undocumented response fields.
 
 ## Authentication and rate limits
-Context7 calls use `Authorization: Bearer ${CONTEXT7_API_KEY}` from the shared MCPorter registry. Invoke MCPorter only through the skill launcher so credentials can come from the existing process environment or skill-local `.env`.
+Context7 calls use `Authorization: Bearer ${CONTEXT7_API_KEY}` from the shared MCPorter registry when a key is configured. The key is optional: without it the launcher passes a header-stripped config copy and Context7 serves anonymous requests at low rate limits. Invoke MCPorter only through the skill launcher so credentials can come from the existing process environment or skill-local `.env`.
 
 NEVER print, persist in tracked files, or pass credentials as command arguments. NEVER invoke OAuth.
 
 Authentication, quota, or rate-limit failure:
 1. State the failure.
-2. Suggest checking `CONTEXT7_API_KEY` or the skill-local `.env`.
+2. Anonymous access is rate-limited; suggest `CONTEXT7_API_KEY` or the skill-local `.env` for higher limits.
 3. Do not silently use training data as current documentation.
 
 ## Errors

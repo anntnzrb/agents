@@ -12,7 +12,7 @@ metadata:
 Use Context7 through the configured `context7` MCP server with MCPorter. This skill is read-only: no setup, installs, generated skills, persistent login flows, or configuration mutations.
 
 - MUST resolve `<agent-config-root>` and `<skill-dir>` dynamically; commands MUST work from any current directory
-- MUST invoke MCPorter through `uv run --script <skill-dir>/scripts/cli.py` so the launcher can load authenticated Context7 credentials
+- MUST invoke MCPorter through `uv run --script <skill-dir>/scripts/cli.py` so the launcher can load Context7 credentials or fall back to anonymous access
 
 ## Entry points
 
@@ -34,6 +34,8 @@ Inspect only the tool needed for the next operation. Do not repeat successful di
 
 ## Credentials
 
+- `CONTEXT7_API_KEY` is optional. With it: higher rate limits and custom configuration
+- Without it: anonymous access at low rate limits; the launcher strips the auth header from the config automatically
 - Keep `.env` beside this skill and populate it from `.env.example`
 - Existing `CONTEXT7_API_KEY` values take precedence
 - Launcher lookup order:

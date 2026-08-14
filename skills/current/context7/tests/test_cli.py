@@ -68,21 +68,103 @@ def test_explicit_env_file_supplies_key(
     assert os.environ["CONTEXT7_API_KEY"] == "file-key"
 
 
-def test_missing_key_fails_before_exec(
+CONFIG_WITH_HEADER = """\
+{
+  "mcpServers": {
+    "context7": {
+      "description": "Context7 documentation MCP",
+      "serverUrl": "https://mcp.context7.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${CONTEXT7_API_KEY}",
+      },
+    },
+  },
+}
+"""
+
+CONFIG_WITHOUT_HEADER = """\
+{
+  "mcpServers": {
+    "context7": {
+      "description": "Context7 documentation MCP",
+      "serverUrl": "https://mcp.context7.com/mcp",
+    },
+  },
+}
+"""
+
+
+def test_keyless_strips_auth_header_before_forwarding(
     cli: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Reject execution before MCPorter when no credential is available."""
-    monkeypatch.setattr(cli, "load_env", lambda: None)
+    """Forward a header-stripped config copy when no credential is available."""
+    config = tmp_path / "mcporter.jsonc"
+    config.write_text(CONFIG_WITH_HEADER, encoding="utf-8")
+    captured: dict[str, str | list[str]] = {}
+
+    def fake_run(args: list[str]) -> int:
+        captured["args"] = args
+        captured["stripped"] = Path(args[1]).read_text(encoding="utf-8")
+        return 0
+
+    monkeypatch.setattr(cli, "run_mcporter", fake_run)
+
+    exit_code = cli.main(["--config", str(config), "list", "context7", "--brief"])
+
+    assert exit_code == 0
+    assert captured["args"][0] == "--config"
+    rewritten = Path(captured["args"][1])
+    assert rewritten != config
+    assert not rewritten.exists()
+    assert "CONTEXT7_API_KEY" not in captured["stripped"]
+    assert '"serverUrl"' in captured["stripped"]
+    assert "anonymous access" in capsys.readouterr().err
+
+
+def test_keyless_config_without_header_forwarded_unchanged(
+    cli: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Keep the original config when it already lacks an auth header."""
+    config = tmp_path / "mcporter.jsonc"
+    config.write_text(CONFIG_WITHOUT_HEADER, encoding="utf-8")
+    forwarded: list[list[str]] = []
     monkeypatch.setattr(
         cli,
         "run_mcporter",
-        lambda _args: pytest.fail("must not execute MCPorter without a key"),
+        lambda args: forwarded.append(args) or 0,
     )
 
-    assert cli.main(["list", "context7", "--brief"]) == cli.USAGE_ERROR_EXIT
-    assert "CONTEXT7_API_KEY required" in capsys.readouterr().err
+    exit_code = cli.main(["--config", str(config), "list", "context7", "--brief"])
+
+    assert exit_code == 0
+    assert forwarded == [["--config", str(config), "list", "context7", "--brief"]]
+
+
+def test_key_present_forwards_config_unchanged(
+    cli: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Keep the credential-backed config untouched when a key is available."""
+    config = tmp_path / "mcporter.jsonc"
+    config.write_text(CONFIG_WITH_HEADER, encoding="utf-8")
+    forwarded: list[list[str]] = []
+    monkeypatch.setenv("CONTEXT7_API_KEY", "test-key")
+    monkeypatch.setattr(
+        cli,
+        "run_mcporter",
+        lambda args: forwarded.append(args) or 0,
+    )
+
+    exit_code = cli.main(["--config", str(config), "list", "context7", "--brief"])
+
+    assert exit_code == 0
+    assert forwarded == [["--config", str(config), "list", "context7", "--brief"]]
 
 
 def test_main_forwards_arguments_after_loading_key(
