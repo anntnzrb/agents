@@ -18,8 +18,13 @@ import {
   planManagedEntriesForSyncPlan,
   recordManagedEntries,
 } from "./managed-state.ts";
+import {
+  isCliProxyRunning,
+  type PreparedManagedTool,
+  prepareManagedTools,
+} from "./managed-tools.ts";
 import { buildSyncPlan, type SyncHookPlan, type SyncPlan } from "./plan.ts";
-import { reconcileWrappers } from "./wrappers.ts";
+import { managedToolWrapperDestination, reconcileWrappers } from "./wrappers.ts";
 
 export { copyTree, isSymlink, rmEntry } from "@runtime/fs.ts";
 
@@ -98,7 +103,10 @@ export function startSyncWatchdog(timeoutSeconds: number): void {
   timer.unref();
 }
 
-export async function runSync(syncEnv: SyncEnv): Promise<boolean> {
+export async function runSync(
+  syncEnv: SyncEnv,
+  options: { readonly warnManagedServices?: boolean } = {},
+): Promise<boolean> {
   let syncPlan: SyncPlan;
   let managedPlan: ManagedSyncPlan;
   let extensionHookStates: ReadonlyMap<string, ExtensionHookRuntimeState>;
@@ -123,7 +131,24 @@ export async function runSync(syncEnv: SyncEnv): Promise<boolean> {
       })()
     : false;
 
-  const wrapperSuccess = baseSuccess ? reconcileWrappers(syncEnv) : false;
+  let managedTools: PreparedManagedTool[] = [];
+  let managedToolSuccess = baseSuccess;
+  if (baseSuccess) {
+    try {
+      managedTools = [...(await prepareManagedTools(syncEnv))];
+    } catch (error) {
+      err(panicMessage(error));
+      managedToolSuccess = false;
+    }
+  }
+
+  const wrapperSuccess = managedToolSuccess
+    ? reconcileWrappers(syncEnv, {
+        additionalDestinations: managedTools.map((tool) =>
+          managedToolWrapperDestination(syncEnv, tool),
+        ),
+      })
+    : false;
 
   const managedStateSuccess =
     baseSuccess && wrapperSuccess ? recordManagedEntries(managedPlan) : true;
@@ -132,7 +157,17 @@ export async function runSync(syncEnv: SyncEnv): Promise<boolean> {
       ? await runSyncHooks(syncPlan.hooks, extensionHookStates)
       : true;
 
-  return baseSuccess && wrapperSuccess && managedStateSuccess && hookSuccess;
+  const success =
+    baseSuccess && managedToolSuccess && wrapperSuccess && managedStateSuccess && hookSuccess;
+  if (
+    success &&
+    options.warnManagedServices &&
+    managedTools.some((tool) => tool.name === "cliproxyapi") &&
+    !(await isCliProxyRunning())
+  ) {
+    warn("CLIProxyAPI is installed but not running; start it with: cli-proxy-api");
+  }
+  return success;
 }
 
 export const main = async (): Promise<number> => {
@@ -160,7 +195,7 @@ export const main = async (): Promise<number> => {
 
   try {
     startSyncWatchdog(syncTimeout());
-    const success = await runSync(syncEnv);
+    const success = await runSync(syncEnv, { warnManagedServices: true });
     return success ? 0 : 1;
   } finally {
     releaseSyncLockImpl(lock);

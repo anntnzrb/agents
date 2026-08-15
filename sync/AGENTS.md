@@ -21,6 +21,13 @@ This is the isolated sync application.
 - Sync owns generated launch wrappers: Unix targets live in `~/.local/bin`; Windows targets live in `%LOCALAPPDATA%/Programs/Agents/bin`.
 - Unix PATH is assumed to be configured. Windows user PATH is updated at most once and recorded by the durable `windows-path-added` marker.
 
+## Managed Tool Contract
+
+- Managed release manifests live under `../assets/` and pin every supported platform asset by SHA-256.
+- Sync downloads only pinned official release assets and caches verified executables under `~/.cache/github-tools` by default.
+- Managed tool wrappers use the upstream executable name and pass generated configuration explicitly.
+- Sync does not install or control system services.
+
 ## Launch Wrapper Contract
 
 - A manual sync creates or reconciles wrappers before returning.

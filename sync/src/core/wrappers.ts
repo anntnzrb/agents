@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { isErrno, panicMessage } from "@runtime/errors.ts";
 import type { Harness, HostPlatform, SyncEnv } from "./harness.ts";
+import type { PreparedManagedTool } from "./managed-tools.ts";
 
 export const UNIX_WRAPPER_DIR = [".local", "bin"] as const;
 export const WINDOWS_WRAPPER_DIR = ["Programs", "Agents", "bin"] as const;
@@ -15,9 +16,12 @@ interface WrapperState {
 }
 
 export interface WrapperDestination {
-  readonly harness: Harness;
   readonly path: string;
   readonly content: string;
+}
+
+export interface HarnessWrapperDestination extends WrapperDestination {
+  readonly harness: Harness;
 }
 
 export interface WrapperReconcileResult {
@@ -29,6 +33,7 @@ export interface WrapperReconcileResult {
 export interface WrapperRuntime {
   readonly platform?: HostPlatform;
   readonly writeWindowsPath?: (directory: string) => boolean;
+  readonly additionalDestinations?: readonly WrapperDestination[];
 }
 
 export function wrapperDirectory(
@@ -54,7 +59,7 @@ export function wrapperPath(
 export function wrapperDestinations(
   syncEnv: Pick<SyncEnv, "home" | "platform" | "localAppData" | "harnesses">,
   platform: HostPlatform = syncEnv.platform,
-): readonly WrapperDestination[] {
+): readonly HarnessWrapperDestination[] {
   return syncEnv.harnesses.map((harness) => {
     const destination = wrapperPath(syncEnv, harness, platform);
     return {
@@ -90,10 +95,47 @@ export function renderWrapper(
   ].join("\n");
 }
 
+export function managedToolWrapperDestination(
+  syncEnv: Pick<SyncEnv, "home" | "platform" | "localAppData">,
+  tool: PreparedManagedTool,
+  platform: HostPlatform = syncEnv.platform,
+): WrapperDestination {
+  const suffix = platform === "win32" ? ".cmd" : "";
+  return {
+    path: path.join(wrapperDirectory(syncEnv, platform), `${tool.command}${suffix}`),
+    content: renderManagedToolWrapper(tool, platform),
+  };
+}
+
+export function renderManagedToolWrapper(
+  tool: PreparedManagedTool,
+  platform: HostPlatform,
+): string {
+  if (platform === "win32") {
+    return [
+      "@echo off",
+      `rem ${WRAPPER_MARKER}`,
+      `${windowsQuote(tool.executable)} --config ${windowsQuote(tool.configPath)} %*`,
+      "exit /b %ERRORLEVEL%",
+      "",
+    ].join("\r\n");
+  }
+  return [
+    "#!/bin/sh",
+    `# ${WRAPPER_MARKER}`,
+    "set -eu",
+    `exec ${shellQuote(tool.executable)} --config ${shellQuote(tool.configPath)} "$@"`,
+    "",
+  ].join("\n");
+}
+
 export function reconcileWrappers(syncEnv: SyncEnv, runtime: WrapperRuntime = {}): boolean {
   try {
     const platform = runtime.platform ?? syncEnv.platform;
-    const desired = wrapperDestinations(syncEnv, platform);
+    const desired = [
+      ...wrapperDestinations(syncEnv, platform),
+      ...(runtime.additionalDestinations ?? []),
+    ];
     const result = reconcileWrapperFiles(syncEnv, desired, platform);
     if (result.conflicts.length > 0) {
       for (const conflict of result.conflicts) {

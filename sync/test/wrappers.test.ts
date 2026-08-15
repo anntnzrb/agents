@@ -15,6 +15,7 @@ import { join } from "node:path";
 
 import { buildHarness, SyncEnv } from "@core/harness.ts";
 import {
+  managedToolWrapperDestination,
   reconcileWrapperFiles,
   reconcileWrappers,
   renderWrapper,
@@ -94,6 +95,31 @@ test("wrapper_destinations_render_unix_and_windows_launchers", () => {
     assert.equal(windows[0]?.content.includes(`rem ${WRAPPER_MARKER}`), true);
     assert.equal(windows[0]?.content.endsWith("%ERRORLEVEL%\r\n"), true);
     assert.equal(renderWrapper(unixEnv, unixEnv.harnesses[0]!, "linux"), unix[0]!.content);
+  });
+});
+
+test("managed_tool_wrappers_use_the_cached_binary_and_generated_config", () => {
+  withTempHome((home) => {
+    const tool = {
+      name: "cliproxyapi",
+      command: "cli-proxy-api",
+      executable: join(home, ".cache", "cli-proxy-api"),
+      version: "7.2.132",
+      configPath: join(home, ".cli-proxy-api", "config.yaml"),
+    };
+    const unixEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
+    const unix = managedToolWrapperDestination(unixEnv, tool, "linux");
+    assert.equal(unix.path, join(home, ".local", "bin", "cli-proxy-api"));
+    assert.equal(unix.content.includes(tool.executable), true);
+    assert.equal(unix.content.includes(`--config '${tool.configPath}'`), true);
+
+    const windowsEnv = SyncEnv.fromHome(home, 1000, {
+      platform: "win32",
+      localAppData: join(home, "local-app-data"),
+    });
+    const windows = managedToolWrapperDestination(windowsEnv, tool, "win32");
+    assert.equal(windows.path.endsWith("cli-proxy-api.cmd"), true);
+    assert.equal(windows.content.includes("--config"), true);
   });
 });
 
