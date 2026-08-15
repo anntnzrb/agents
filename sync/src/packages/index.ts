@@ -106,13 +106,13 @@ export function patchRuntimeSettings(filePath: string, packagePaths: readonly st
 
   let value: unknown;
   try {
-    value = JSON.parse(current) as unknown;
+    value = JSON.parse(current);
   } catch (error) {
     throw new Error(`parse ${filePath} (${String(error)})`, { cause: error });
   }
 
   const settings = isRecord(value) ? value : {};
-  settings["packages"] = packagePaths.map((packagePath) => packagePath.toString());
+  settings["packages"] = [...packagePaths];
 
   const parent = path.dirname(filePath);
   if (parent && parent !== ".") {

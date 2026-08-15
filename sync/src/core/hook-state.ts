@@ -94,7 +94,7 @@ export function fingerprintTree(root: string): string {
 function walkTree(root: string, current: string, hash: ReturnType<typeof createHash>): void {
   const entries = fs
     .readdirSync(current, { withFileTypes: true })
-    .sort((left, right) => left.name.localeCompare(right.name));
+    .toSorted((left, right) => left.name.localeCompare(right.name));
 
   for (const entry of entries) {
     if (shouldSkipEntry(entry.name)) {
@@ -166,7 +166,7 @@ function loadExtensionHookState(path: string): LoadedExtensionHookState | undefi
     return undefined;
   }
 
-  const normalizedGeneratedEntries = [...new Set(generatedEntries)].sort();
+  const normalizedGeneratedEntries = [...new Set(generatedEntries)].toSorted();
   const filteredGeneratedEntries = normalizedGeneratedEntries.filter(isGeneratedExtensionEntryName);
 
   return {

@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 
+import { panicMessage } from "@runtime/errors.ts";
 import {
   logCommandFailure,
   pickBunRunner,
@@ -40,7 +41,7 @@ export const installInferredImportPackages = async (
   try {
     missing = missingPackageRoots(dir);
   } catch (error) {
-    console.error(`sync: dependency scan failed in ${dir}: ${(error as Error).message}`);
+    console.error(`sync: dependency scan failed in ${dir}: ${panicMessage(error)}`);
     return false;
   }
   if (missing.length === 0) {
@@ -87,8 +88,7 @@ const ensureInstallProject = async (dir: string): Promise<boolean> => {
       );
       return true;
     } catch (error) {
-      const io = error as NodeJS.ErrnoException;
-      console.error(`sync: write ${dir}/package.json (${io.message})`);
+      console.error(`sync: write ${dir}/package.json (${panicMessage(error)})`);
       return false;
     }
   }

@@ -101,7 +101,7 @@ export function missingPackageRoots(dir: string): string[] {
       }
     }
   }
-  return [...missing].sort();
+  return [...missing].toSorted();
 }
 
 export const validatePackageForTests = (dir: string): boolean => packageIsHealthy(dir);
@@ -137,7 +137,7 @@ const isPatternEntry = (value: string): boolean =>
   value.includes("*") ||
   value.includes("?");
 
-function readJsonFile(path: string): unknown | null {
+function readJsonFile(path: string): unknown {
   const content = readFile(path);
   try {
     return JSON.parse(content);

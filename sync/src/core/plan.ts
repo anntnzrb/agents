@@ -252,7 +252,7 @@ function dirEntryNames(root: string, dirsOnly: boolean): string[] {
   return uniqueSorted(names);
 }
 
-const uniqueSorted = (names: readonly string[]): string[] => [...new Set(names)].sort();
+const uniqueSorted = (names: readonly string[]): string[] => [...new Set(names)].toSorted();
 
 function isDirectory(root: string): boolean {
   try {

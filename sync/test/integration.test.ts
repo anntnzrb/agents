@@ -296,7 +296,7 @@ function walk(absolute: string, relative: string, out: SnapshotEntry[]): void {
   }
   if (stat.isDirectory()) {
     out.push({ path: normalizePath(relative), kind: "dir" });
-    const children = readdirSync(absolute).sort();
+    const children = readdirSync(absolute).toSorted();
     for (const child of children) {
       walk(join(absolute, child), relative ? `${relative}/${child}` : child, out);
     }

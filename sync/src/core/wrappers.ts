@@ -132,11 +132,12 @@ export function reconcileWrapperFiles(
     desired.map((entry) => path.resolve(path.dirname(entry.path))),
   );
   if (syncEnv.home && syncEnv.platform) {
-    allowedDirectories.add(
-      path.resolve(
-        wrapperDirectory(syncEnv as Pick<SyncEnv, "home" | "platform" | "localAppData">, platform),
-      ),
-    );
+    const wrapperEnv = {
+      home: syncEnv.home,
+      platform: syncEnv.platform,
+      localAppData: syncEnv.localAppData,
+    };
+    allowedDirectories.add(path.resolve(wrapperDirectory(wrapperEnv, platform)));
   }
   const owned: string[] = [];
   const conflicts: string[] = [];
@@ -172,7 +173,7 @@ export function reconcileWrapperFiles(
     statePath,
     {
       version: 1,
-      entries: [...new Set(owned)].sort(),
+      entries: [...new Set(owned)].toSorted(),
     },
     platform,
   );
@@ -211,7 +212,7 @@ export function readWrapperState(statePath: string): WrapperState {
   const entries = parsed["entries"].filter(
     (entry): entry is string => typeof entry === "string" && path.isAbsolute(entry),
   );
-  return { version: 1, entries: [...new Set(entries)].sort() };
+  return { version: 1, entries: [...new Set(entries)].toSorted() };
 }
 
 function writeWrapperState(statePath: string, state: WrapperState, platform: HostPlatform): void {

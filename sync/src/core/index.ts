@@ -292,7 +292,7 @@ function preservePathsByDst(
     }
     const paths = preserveByDst.get(hook.jobRoot) ?? [];
     paths.push(...state.preservePaths);
-    preserveByDst.set(hook.jobRoot, [...new Set(paths)].sort());
+    preserveByDst.set(hook.jobRoot, [...new Set(paths)].toSorted());
   }
   return preserveByDst;
 }

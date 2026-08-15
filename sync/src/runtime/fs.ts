@@ -245,7 +245,7 @@ function childPreserve(preservePaths: readonly string[], childName: string): str
 }
 
 const normalizePreservePaths = (preservePaths: readonly string[]): string[] =>
-  [...new Set(preservePaths.filter((candidate) => candidate.length > 0))].sort();
+  [...new Set(preservePaths.filter((candidate) => candidate.length > 0))].toSorted();
 
 function safeReadDir(targetPath: string): fs.Dirent[] {
   try {

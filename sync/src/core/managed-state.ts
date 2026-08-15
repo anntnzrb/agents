@@ -106,7 +106,7 @@ export function loadRecordedEntryNames(path: string): string[] {
       warn(`ignoring unsafe managed entry ${JSON.stringify(entryName)} in ${path}`);
     }
   }
-  return [...safeNames].sort();
+  return [...safeNames].toSorted();
 }
 
 export function writeRecordedEntryNames(path: string, entryNames: string[]): void {
@@ -193,4 +193,4 @@ function createTempStateFile(path: string): { tempPath: string; fd: number } {
   throw new Error(`create temporary managed state near ${path} (name collision)`);
 }
 
-const uniqueSorted = (names: readonly string[]): string[] => [...new Set(names)].sort();
+const uniqueSorted = (names: readonly string[]): string[] => [...new Set(names)].toSorted();

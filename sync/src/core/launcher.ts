@@ -275,7 +275,7 @@ async function runLauncherProcess(
       stdin: stdio === "pipe" ? "ignore" : "inherit",
       stdout: stdio,
       stderr: stdio,
-    }) as typeof subprocess;
+    });
   } catch (error) {
     return {
       exitCode: 127,

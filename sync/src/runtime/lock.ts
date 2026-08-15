@@ -15,9 +15,8 @@ const WOULD_BLOCK_ERRNOS = new Set(
 );
 
 const posixLibc = IS_WINDOWS ? undefined : createPosixLibc();
-const errnoAccessor = (process.platform === "darwin" ? "__error" : "__errno_location") as
-  | "__error"
-  | "__errno_location";
+const errnoAccessor: "__error" | "__errno_location" =
+  process.platform === "darwin" ? "__error" : "__errno_location";
 
 interface PosixLibcSymbols {
   readonly flock: (fd: number, operation: number) => number;
@@ -130,6 +129,7 @@ function createPosixLibc(): PosixLibcSymbols {
         }),
   });
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Bun FFI exposes untyped symbols at this boundary.
   return libc.symbols as unknown as PosixLibcSymbols;
 }
 
@@ -146,6 +146,7 @@ function currentErrno(): number {
     throw new Error("missing errno accessor");
   }
   const errnoPtr = errnoFn();
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Bun's pointer overload is represented as never.
   return toBuffer(errnoPtr as never, 0, 4).readInt32LE(0);
 }
 
