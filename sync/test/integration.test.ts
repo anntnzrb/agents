@@ -45,6 +45,11 @@ test("integration_happy_path_matches_expected_outputs", () => {
     assert.equal(existsSync(join(home, ".omp", "agent", "skills", "skill.txt")), true);
     assert.equal(existsSync(join(home, ".omp", "agent", "skills", "legacy")), false);
     assert.equal(existsSync(join(home, ".mcporter", "mcporter.json")), true);
+    assert.equal(
+      readFileSync(join(home, ".cli-proxy-api", "config.yaml"), "utf8"),
+      'api-key: "gateway-secret"\n',
+    );
+    assert.equal(lstatSync(join(home, ".cli-proxy-api", "config.yaml")).mode & 0o777, 0o600);
     assert.equal(existsSync(join(home, ".pi", "agent", "auth.json")), true);
     for (const harness of ["codex", "opencode", "pi", "omp"]) {
       const wrapper = join(home, ".local", "bin", harness);
@@ -165,6 +170,14 @@ function makeFixture(root: string): string {
 function writeFixtureFiles(home: string): void {
   writeFileSync(join(home, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
   writeFileSync(join(home, ".config", "agents", "assets", "mcporter.jsonc"), '{"x":1}');
+  writeFileSync(
+    join(home, ".config", "agents", "assets", "cliproxyapi.yaml.tmpl"),
+    `api-key: \${CLIPROXY_API_KEY}\n`,
+  );
+  writeFileSync(
+    join(home, ".config", "agents", "secrets.local.json"),
+    '{"CLIPROXY_API_KEY":"gateway-secret"}\n',
+  );
   mkdirSync(join(home, ".config", "agents", "skills", "current"), {
     recursive: true,
   });
@@ -264,6 +277,7 @@ function snapshotHome(home: string): SnapshotEntry[] {
     ".pi",
     ".omp",
     ".mcporter",
+    ".cli-proxy-api",
     ".local/share/agents/sync-managed",
     ".local/share/agents/pi-packages",
     ".local/bin",

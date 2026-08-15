@@ -10,4 +10,5 @@ skills/*/*/.env.local
 skills/*/darksouls3/resources/guides/**/*.pdf
 artifacts/
 .env
+secrets.local.json
 *.skill

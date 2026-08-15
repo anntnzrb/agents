@@ -202,6 +202,12 @@ function configJobs(syncEnv: SyncEnv): Job[] {
       dst: join(syncEnv.mcporterHome, "mcporter.json"),
       kind: "File",
     },
+    {
+      src: join(syncEnv.assetsHome, "cliproxyapi.yaml.tmpl"),
+      dst: join(syncEnv.home, ".cli-proxy-api", "config.yaml"),
+      kind: "SecretTemplate",
+      secretsPath: join(syncEnv.home, ".config", "agents", "secrets.local.json"),
+    },
   ];
 }
 

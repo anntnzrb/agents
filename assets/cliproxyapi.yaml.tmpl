@@ -1,0 +1,53 @@
+host: "127.0.0.1"
+port: 8317
+
+tls:
+  enable: false
+  cert: ""
+  key: ""
+
+remote-management:
+  allow-remote: false
+  secret-key: ""
+  disable-control-panel: true
+  disable-auto-update-panel: true
+
+auth-dir: "~/.cli-proxy-api"
+
+api-keys:
+  - ${CLIPROXY_API_KEY}
+
+debug: false
+logging-to-file: false
+usage-statistics-enabled: true
+disable-image-generation: "chat"
+force-model-prefix: true
+ws-auth: true
+
+request-retry: 1
+max-retry-credentials: 2
+
+routing:
+  strategy: "round-robin"
+  session-affinity: true
+  session-affinity-ttl: "1h"
+
+codex:
+  identity-confuse: false
+  disable-codex-cloaking: false
+  optimize-multi-agent-v2: false
+
+codex-api-key:
+  - api-key: ${OPENCODE_GO_API_KEY}
+    prefix: "go"
+    base-url: "https://opencode.ai/zen/go/v1"
+    request-retry: 1
+    models:
+      - name: "gpt-5.6-luna"
+        alias: "gpt-5.6-luna"
+        display-name: "OpenCode Go - GPT 5.6 Luna"
+        max-context-length: 272000
+        force-mapping: true
+        is-compat: true
+        thinking:
+          levels: ["xhigh", "high", "medium", "low"]
