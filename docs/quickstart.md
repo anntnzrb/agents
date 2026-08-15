@@ -143,18 +143,8 @@ unset CLIPROXY_KEY
 
 ## Start a harness
 
-Start DeepSeek Harness:
+Open `sync/src/core/harness-adapters.ts`. Choose an adapter whose source directory exists and whose `platforms` field includes your host. Run the command in its `launcher.bin` field. Add harness arguments when needed.
 
-```bash
-dsh web
-```
-
-The command starts its Web UI. Start Pi with:
-
-```bash
-pi
-```
-
-Each wrapper syncs the configuration, installs the cached harness package if needed, and opens the harness. Codex, OpenCode, and OMP use the `codex`, `opencode`, and `omp` commands.
+The wrapper syncs the configuration, installs the cached harness package if needed, and opens the harness. The wrapper returns the harness exit status.
 
 For later gateway operations, use [Operate CLIProxyAPI](cliproxyapi.md).

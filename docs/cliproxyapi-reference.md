@@ -1,6 +1,6 @@
 # CLIProxyAPI reference
 
-CLIProxyAPI provides the local OpenAI-compatible endpoint used by Codex, OpenCode, Pi, and OMP. The generated configuration binds to `127.0.0.1:8317`, disables remote management, and keeps the local control panel enabled.
+CLIProxyAPI provides the local OpenAI-compatible endpoint for harnesses configured to use it. The generated configuration binds to `127.0.0.1:8317`, disables remote management, and keeps the local control panel enabled.
 
 ## Artifacts
 

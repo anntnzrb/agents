@@ -28,9 +28,9 @@ The repository separates committed sources from generated files and host-local r
 
 ### Harness sources
 
-Codex, DeepSeek Harness, and OpenCode store their source files directly under `harnesses/<harness>/`. Pi and OMP use `harnesses/<harness>/agent/` as their runtime source.
+Each harness source starts under `harnesses/<id>/`. When an adapter defines `runtimeSubdir`, sync appends that subdirectory to the source root.
 
-`sync/src/core/harness-adapters.ts` defines the supported harness IDs, package launchers, generated homes, runtime subdirectories, and hooks. A matching directory under `harnesses/` enables that adapter.
+`sync/src/core/harness-adapters.ts` defines the supported harness IDs, package launchers, generated homes, platforms, runtime subdirectories, and hooks. A matching directory under `harnesses/` enables that adapter on a supported platform.
 
 ### Sync application
 
@@ -45,13 +45,12 @@ Codex, DeepSeek Harness, and OpenCode store their source files directly under `h
 
 ## Generated targets
 
+For each harness, `homeSegments` defines the generated harness home. When the adapter defines `runtimeSubdir`, sync appends that subdirectory to the generated root.
+
+Other jobs use fixed generated targets:
+
 | Path | Owner |
 | --- | --- |
-| `~/.codex/` | Codex adapter |
-| `~/.dsh/` | DeepSeek Harness adapter |
-| `~/.config/opencode/` | OpenCode adapter |
-| `~/.pi/agent/` | Pi adapter |
-| `~/.omp/agent/` | OMP adapter |
 | `~/.mcporter/mcporter.json` | MCPorter job |
 | `~/.cli-proxy-api/config.yaml` | CLIProxyAPI configuration job |
 | `~/.local/share/agents/sync/` | Installed sync runtime |

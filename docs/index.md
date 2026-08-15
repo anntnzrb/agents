@@ -16,5 +16,5 @@ This documentation covers the committed configuration, the sync application, and
 
 - [Repository layout](repository-layout.md) maps committed sources, generated targets, and runtime state.
 - [Sync reference](sync.md) lists commands, reconciliation stages, caches, and failure behavior.
-- [Harness reference](harnesses.md) lists supported harnesses, generated targets, model integration, and wrappers.
+- [Harness adapter reference](harnesses.md) defines adapter metadata, generated paths, model integration, and wrappers.
 - [CLIProxyAPI reference](cliproxyapi-reference.md) lists artifacts, configuration fields, discovery rules, and routing settings.

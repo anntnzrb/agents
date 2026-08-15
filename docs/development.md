@@ -60,7 +60,7 @@ Keep these contracts intact:
 
 1. Edit the matching source under `harnesses/`.
 2. Run `bun ./sync/src/cli.ts` from the repository root.
-3. Inspect the generated harness home listed in the [Harness reference](harnesses.md).
+3. Inspect the generated root derived from the adapter's `homeSegments` and `runtimeSubdir` fields.
 4. Run the harness-specific smoke check.
 
 Do not edit a generated harness home. Sync replaces managed files on the next run.
@@ -72,6 +72,7 @@ Do not edit a generated harness home. Sync replaces managed files on the next ru
 3. Add wrapper tests for every supported platform.
 4. Add integration coverage for generated files and hooks.
 5. Run the full checks.
-6. Document the source path, generated target, package, and platform support in the [Harness reference](harnesses.md).
+6. Update the [Harness adapter reference](harnesses.md) only when the adapter changes the shared workflow or requires a harness-specific user action.
 
 Store launcher metadata in the adapter. Do not repeat package names, target homes, or hook rules in user configuration.
+Do not add a supported-harness roster to the documentation. `HARNESS_ADAPTERS` owns that list.
