@@ -11,9 +11,7 @@
   "hideThinkingBlock": true,
   "lastChangelogVersion": "0.74.0",
   "enabledModels": [
-    "openai-codex/gpt-5.6-sol:low",
-    "openai-codex/gpt-5.6-luna:max",
-    "opencode-go/deepseek-v4-flash:xhigh"
+    "cliproxy/**"
   ],
   "providerPatcher": {
     "_comment": "serviceTier.openai options: off, priority",
