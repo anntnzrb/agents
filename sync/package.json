@@ -3,12 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "check": "biome check --error-on-warnings . ../harnesses.ts",
+    "check:write": "biome check --write --error-on-warnings . ../harnesses.ts",
+    "format": "biome format --write . ../harnesses.ts",
     "sync": "bun run ./src/cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "test:integration": "bun test ./test/integration.test.ts"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.8",
     "@types/bun": "^1.3.14",
     "typescript": "^6.0.3"
   }

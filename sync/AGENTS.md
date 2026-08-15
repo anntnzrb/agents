@@ -7,6 +7,7 @@ This is the isolated sync application.
 - `./package.json`: sync app scripts and dependencies
 - `./tsconfig.json`: sync app TypeScript config
 - `./bun.lock`: sync app lockfile
+- `./biome.jsonc`: sync-scoped formatting, linting, and import organization
 - `./src/`: application code
 - `./test/`: sync-specific tests
 
@@ -31,6 +32,7 @@ This is the isolated sync application.
 Run from repo root when sync code or tests change:
 
 - `bun ./sync/src/cli.ts`
+- `cd ./sync && bun run check`
 - `cd ./sync && bun run typecheck`
 - `cd ./sync && bun test`
 - `cd ./sync && bun run test:integration`
