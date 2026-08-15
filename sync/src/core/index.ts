@@ -18,6 +18,8 @@ import {
 } from "./managed-state.ts";
 import { bootstrapPackageTarget } from "@packages/index.ts";
 import { buildSyncPlan, type SyncHookPlan } from "./plan.ts";
+import { launchHarness } from "./launcher.ts";
+import { reconcileWrappers } from "./wrappers.ts";
 export { copyTree, isSymlink, rmEntry } from "@runtime/fs.ts";
 import { panicMessage } from "@runtime/errors.ts";
 import {
@@ -40,7 +42,10 @@ export function warn(message: string): void {
 }
 
 async function ensurePythonEnv(): Promise<void> {
-  const venvPython = path.join(homedir(), ".omp", "python-env", "bin", "python");
+  const venvPython =
+    process.platform === "win32"
+      ? path.join(homedir(), ".omp", "python-env", "Scripts", "python.exe")
+      : path.join(homedir(), ".omp", "python-env", "bin", "python");
   if (existsSync(venvPython)) return;
 
   if (!Bun.which("uv")) {
@@ -116,15 +121,17 @@ export async function runSync(syncEnv: SyncEnv): Promise<boolean> {
       })()
     : false;
 
-  const managedStateSuccess = baseSuccess
+  const wrapperSuccess = baseSuccess ? reconcileWrappers(syncEnv) : false;
+
+  const managedStateSuccess = baseSuccess && wrapperSuccess
     ? recordManagedEntries(managedPlan)
     : true;
   const hookSuccess =
-    baseSuccess && managedStateSuccess
+    baseSuccess && wrapperSuccess && managedStateSuccess
       ? await runSyncHooks(syncPlan.hooks, extensionHookStates)
       : true;
 
-  return baseSuccess && managedStateSuccess && hookSuccess;
+  return baseSuccess && wrapperSuccess && managedStateSuccess && hookSuccess;
 }
 
 export const main = async (): Promise<number> => {
@@ -157,6 +164,60 @@ export const main = async (): Promise<number> => {
     return success ? 0 : 1;
   } finally {
     releaseSyncLockImpl(lock);
+  }
+};
+
+/**
+ * Wrapper entrypoint: reconcile config first, then hand control to the
+ * selected harness. Sync failures are soft here so an unavailable network or
+ * broken optional hook cannot strand an otherwise cached agent binary.
+ */
+export const launchMain = async (
+  sourceName: string,
+  args: readonly string[],
+): Promise<number> => {
+  let syncEnv: SyncEnv;
+  try {
+    syncEnv = SyncEnv.fromSystem();
+  } catch (error) {
+    err(panicMessage(error));
+    return 1;
+  }
+
+  await ensurePythonEnv();
+  const harness = syncEnv.harnesses.find(
+    (candidate) => candidate.sourceName === sourceName,
+  );
+  if (!harness) {
+    err(`unsupported harness: ${sourceName}`);
+    return 2;
+  }
+
+  let lock: SyncLock | undefined;
+  try {
+    lock = tryAcquireSyncLock(syncEnv);
+  } catch (error) {
+    warn(`sync before launch unavailable: ${panicMessage(error)}`);
+  }
+
+  if (lock) {
+    try {
+      const success = await runSync(syncEnv);
+      if (!success) {
+        warn("continuing launch without completed sync");
+      }
+    } finally {
+      releaseSyncLockImpl(lock);
+    }
+  } else {
+    warn("another sync is already running; continuing launch");
+  }
+
+  try {
+    return await launchHarness(syncEnv, harness, args);
+  } catch (error) {
+    err(`launch failed: ${panicMessage(error)}`);
+    return 1;
   }
 };
 

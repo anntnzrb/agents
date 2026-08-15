@@ -56,6 +56,11 @@ test("integration_happy_path_matches_expected_outputs", () => {
     );
     assert.equal(existsSync(join(home, ".mcporter", "mcporter.json")), true);
     assert.equal(existsSync(join(home, ".pi", "agent", "auth.json")), true);
+    for (const harness of ["codex", "opencode", "pi", "omp"]) {
+      const wrapper = join(home, ".local", "bin", harness);
+      assert.equal(existsSync(wrapper), true, wrapper);
+      assert.equal(readFileSync(wrapper, "utf8").includes("agents-managed-wrapper:v1"), true);
+    }
   });
 });
 
@@ -288,6 +293,7 @@ function snapshotHome(home: string): SnapshotEntry[] {
     ".mcporter",
     ".local/share/agents/sync-managed",
     ".local/share/agents/pi-packages",
+    ".local/bin",
   ];
   const entries: SnapshotEntry[] = [];
   for (const root of roots) {
