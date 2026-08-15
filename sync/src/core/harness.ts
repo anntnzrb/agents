@@ -1,28 +1,31 @@
 import os from "node:os";
 import path from "node:path";
 
+import {
+  HARNESS_CATALOG,
+  HarnessId,
+  type AssetRename,
+  type HarnessDeclaration,
+  type HarnessLauncherSpec,
+  type HostPlatform,
+} from "../../../harnesses.ts";
+
+export {
+  HARNESS_CATALOG,
+  HarnessId,
+  type AssetRename,
+  type HostPlatform,
+} from "../../../harnesses.ts";
+
 export const SOURCE_AGENT_FILE = "AGENTS.md";
 const INSTALL_TIMEOUT_SECONDS = 120;
 export const MANAGED_STATE_SUBDIR = ".local/share/agents/sync-managed";
 const DEFAULT_PACKAGE_CACHE_SUBDIR = ".local/share/agents/pi-packages";
 export const SKILLS_DST_DIR = "skills";
 export const SKILLS_SOURCE_SUBDIR = "current";
+const PATH_COMPONENT_PATTERN = /^[A-Za-z0-9._-]+$/;
 
-export type AssetRename = readonly [string, string];
-
-const PI_COMPAT_MANAGED_ENTRIES = ["legacy"] as const;
-
-export type HarnessHookSpec =
-  | {
-      readonly kind: "PackageBootstrap";
-      readonly manifestFile?: string;
-      readonly settingsFile?: string;
-      readonly cacheSubdir?: string;
-    }
-  | {
-      readonly kind: "ExtensionDeps";
-      readonly rootDir: string;
-    };
+export type HarnessHookSpec = NonNullable<HarnessDeclaration["hooks"]>[number];
 
 export type HarnessHook =
   | {
@@ -36,30 +39,18 @@ export type HarnessHook =
       readonly rootDir: string;
     };
 
-export const HarnessId = {
-  Codex: "Codex",
-  Opencode: "Opencode",
-  Pi: "Pi",
-  Omp: "Omp",
-} as const;
-
-export type HarnessId = (typeof HarnessId)[keyof typeof HarnessId];
-
-export interface HarnessSpec {
+export interface HarnessSpec
+  extends Omit<HarnessDeclaration, "homeSegments" | "platforms"> {
   readonly id: HarnessId;
   readonly sourceName: string;
   readonly home: string;
-  readonly instructionFile?: string;
-  readonly assetRenames?: readonly AssetRename[];
-  readonly runtimeSubdir?: string;
-  readonly compatManagedEntries?: readonly string[];
-  readonly hooks?: readonly HarnessHookSpec[];
 }
 
 export interface Harness {
   readonly id: HarnessId;
   readonly sourceName: string;
   readonly home: string;
+  readonly launcher: Required<HarnessLauncherSpec>;
   readonly instructionFile: string;
   readonly assetRenames: readonly AssetRename[];
   readonly runtimeSubdir: string | undefined;
@@ -76,6 +67,8 @@ export class SyncEnv {
   readonly managedStateHome: string;
   readonly installTimeoutMs: number;
   readonly harnesses: readonly Harness[];
+  readonly platform: HostPlatform;
+  readonly localAppData: string | undefined;
 
   constructor(
     home: string,
@@ -86,6 +79,8 @@ export class SyncEnv {
     managedStateHome: string,
     installTimeoutMs: number,
     harnesses: readonly Harness[],
+    platform: HostPlatform = platformFromProcess(),
+    localAppData: string | undefined = process.env.LOCALAPPDATA,
   ) {
     this.home = home;
     this.assetsHome = assetsHome;
@@ -95,10 +90,16 @@ export class SyncEnv {
     this.managedStateHome = managedStateHome;
     this.installTimeoutMs = installTimeoutMs;
     this.harnesses = harnesses;
+    this.platform = platform;
+    this.localAppData = localAppData;
   }
 
   static fromSystem(): SyncEnv {
-    const home = [process.env.HOME, process.env.USERPROFILE, os.homedir()].find(
+    const homeCandidates =
+      process.platform === "win32"
+        ? [process.env.USERPROFILE, process.env.HOME, os.homedir()]
+        : [process.env.HOME, process.env.USERPROFILE, os.homedir()];
+    const home = homeCandidates.find(
       (candidate): candidate is string =>
         typeof candidate === "string" && candidate.trim().length > 0,
     );
@@ -108,8 +109,16 @@ export class SyncEnv {
     return SyncEnv.fromHome(home, INSTALL_TIMEOUT_SECONDS * 1000);
   }
 
-  static fromHome(home: string, installTimeoutMs: number): SyncEnv {
+  static fromHome(
+    home: string,
+    installTimeoutMs: number,
+    options: {
+      readonly platform?: HostPlatform;
+      readonly localAppData?: string;
+    } = {},
+  ): SyncEnv {
     const agentsHome = path.join(home, ".config", "agents");
+    const platform = options.platform ?? platformFromProcess();
     return new SyncEnv(
       home,
       path.join(agentsHome, "assets"),
@@ -118,7 +127,10 @@ export class SyncEnv {
       path.join(home, ".mcporter"),
       path.join(home, MANAGED_STATE_SUBDIR),
       installTimeoutMs,
-      defaultHarnesses(home),
+      defaultHarnesses(home, platform),
+      platform,
+      options.localAppData ??
+        (platform === "win32" ? process.env.LOCALAPPDATA : undefined),
     );
   }
 
@@ -128,10 +140,17 @@ export class SyncEnv {
 }
 
 export function buildHarness(spec: HarnessSpec): Harness {
+  assertPathComponent(spec.sourceName, "harness id");
   return {
     id: spec.id,
     sourceName: spec.sourceName,
     home: spec.home,
+    launcher: {
+      package: spec.launcher.package,
+      bin: spec.launcher.bin,
+      distTag: spec.launcher.distTag ?? "latest",
+      smokeCheck: spec.launcher.smokeCheck ?? "--version",
+    },
     instructionFile: spec.instructionFile ?? SOURCE_AGENT_FILE,
     assetRenames: spec.assetRenames ?? [],
     runtimeSubdir: spec.runtimeSubdir,
@@ -140,45 +159,44 @@ export function buildHarness(spec: HarnessSpec): Harness {
   };
 }
 
-export function defaultHarnesses(home: string): readonly Harness[] {
-  const harnessSpecs: HarnessSpec[] = [
-    {
-      id: HarnessId.Codex,
-      sourceName: "codex",
-      home: path.join(home, ".codex"),
-    },
-    {
-      id: HarnessId.Opencode,
-      sourceName: "opencode",
-      home: path.join(home, ".config", "opencode"),
-    },
-    {
-      id: HarnessId.Pi,
-      sourceName: "pi",
-      home: path.join(home, ".pi"),
-      runtimeSubdir: "agent",
-      compatManagedEntries: PI_COMPAT_MANAGED_ENTRIES,
-      hooks: [
-        {
-          kind: "PackageBootstrap",
-          manifestFile: "packages.json",
-          settingsFile: "settings.json",
-          cacheSubdir: DEFAULT_PACKAGE_CACHE_SUBDIR,
-        },
-        {
-          kind: "ExtensionDeps",
-          rootDir: "extensions",
-        },
-      ],
-    },
-    {
-      id: HarnessId.Omp,
-      sourceName: "omp",
-      home: path.join(home, ".omp"),
-      runtimeSubdir: "agent",
-    },
-  ];
-  return harnessSpecs.map(buildHarness);
+export function defaultHarnesses(
+  home: string,
+  platform: HostPlatform = platformFromProcess(),
+): readonly Harness[] {
+  return (Object.entries(HARNESS_CATALOG) as readonly [HarnessId, HarnessDeclaration][])
+    .filter(([, entry]) => entry.platforms.includes(platform))
+    .map(([id, entry]) => {
+      for (const segment of entry.homeSegments) {
+        assertPathComponent(segment, `${id} home segment`);
+      }
+      return buildHarness({
+        ...entry,
+        id,
+        sourceName: id,
+        home: path.join(home, ...entry.homeSegments),
+      });
+    });
+}
+
+function platformFromProcess(): HostPlatform {
+  if (
+    process.platform === "darwin" ||
+    process.platform === "linux" ||
+    process.platform === "win32"
+  ) {
+    return process.platform;
+  }
+  throw new Error(`unsupported platform: ${process.platform}`);
+}
+
+function assertPathComponent(value: string, label: string): void {
+  if (
+    !PATH_COMPONENT_PATTERN.test(value) ||
+    value === "." ||
+    value === ".."
+  ) {
+    throw new Error(`invalid ${label}: ${value}`);
+  }
 }
 
 export const harnessRoot = (harness: Harness): string =>
