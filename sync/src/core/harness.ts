@@ -1,21 +1,21 @@
 import os from "node:os";
 import path from "node:path";
-
 import {
-  HARNESS_CATALOG,
-  HarnessId,
   type AssetRename,
+  HARNESS_CATALOG,
   type HarnessDeclaration,
+  type HarnessId,
   type HarnessLauncherSpec,
   type HostPlatform,
-} from "../../../harnesses.ts";
+} from "@catalog";
+import { assertNever } from "@runtime/errors.ts";
 
 export {
+  type AssetRename,
   HARNESS_CATALOG,
   HarnessId,
-  type AssetRename,
   type HostPlatform,
-} from "../../../harnesses.ts";
+} from "@catalog";
 
 export const SOURCE_AGENT_FILE = "AGENTS.md";
 const INSTALL_TIMEOUT_SECONDS = 120;
@@ -39,8 +39,7 @@ export type HarnessHook =
       readonly rootDir: string;
     };
 
-export interface HarnessSpec
-  extends Omit<HarnessDeclaration, "homeSegments" | "platforms"> {
+export interface HarnessSpec extends Omit<HarnessDeclaration, "homeSegments" | "platforms"> {
   readonly id: HarnessId;
   readonly sourceName: string;
   readonly home: string;
@@ -80,7 +79,7 @@ export class SyncEnv {
     installTimeoutMs: number,
     harnesses: readonly Harness[],
     platform: HostPlatform = platformFromProcess(),
-    localAppData: string | undefined = process.env.LOCALAPPDATA,
+    localAppData: string | undefined = process.env["LOCALAPPDATA"],
   ) {
     this.home = home;
     this.assetsHome = assetsHome;
@@ -97,8 +96,8 @@ export class SyncEnv {
   static fromSystem(): SyncEnv {
     const homeCandidates =
       process.platform === "win32"
-        ? [process.env.USERPROFILE, process.env.HOME, os.homedir()]
-        : [process.env.HOME, process.env.USERPROFILE, os.homedir()];
+        ? [process.env["USERPROFILE"], process.env["HOME"], os.homedir()]
+        : [process.env["HOME"], process.env["USERPROFILE"], os.homedir()];
     const home = homeCandidates.find(
       (candidate): candidate is string =>
         typeof candidate === "string" && candidate.trim().length > 0,
@@ -129,8 +128,7 @@ export class SyncEnv {
       installTimeoutMs,
       defaultHarnesses(home, platform),
       platform,
-      options.localAppData ??
-        (platform === "win32" ? process.env.LOCALAPPDATA : undefined),
+      options.localAppData ?? (platform === "win32" ? process.env["LOCALAPPDATA"] : undefined),
     );
   }
 
@@ -190,19 +188,13 @@ function platformFromProcess(): HostPlatform {
 }
 
 function assertPathComponent(value: string, label: string): void {
-  if (
-    !PATH_COMPONENT_PATTERN.test(value) ||
-    value === "." ||
-    value === ".."
-  ) {
+  if (!PATH_COMPONENT_PATTERN.test(value) || value === "." || value === "..") {
     throw new Error(`invalid ${label}: ${value}`);
   }
 }
 
 export const harnessRoot = (harness: Harness): string =>
-  harness.runtimeSubdir
-    ? path.join(harness.home, harness.runtimeSubdir)
-    : harness.home;
+  harness.runtimeSubdir ? path.join(harness.home, harness.runtimeSubdir) : harness.home;
 
 export function harnessSourceRoot(harness: Harness, toolsHome: string): string {
   return harness.runtimeSubdir
@@ -213,21 +205,15 @@ export function harnessSourceRoot(harness: Harness, toolsHome: string): string {
 export const harnessInstructionTarget = (harness: Harness): string =>
   path.join(harnessRoot(harness), harness.instructionFile);
 
-export const harnessInstructionFileName = (harness: Harness): string =>
-  harness.instructionFile;
+export const harnessInstructionFileName = (harness: Harness): string => harness.instructionFile;
 
-export function harnessRenameAsset(
-  harness: Harness,
-  assetName: string,
-): string {
+export function harnessRenameAsset(harness: Harness, assetName: string): string {
   const match = harness.assetRenames.find(([src]) => src === assetName);
   return match ? match[1] : assetName;
 }
 
-export const harnessManagedStatePath = (
-  harness: Harness,
-  managedStateHome: string,
-): string => path.join(managedStateHome, `${harness.sourceName}.json`);
+export const harnessManagedStatePath = (harness: Harness, managedStateHome: string): string =>
+  path.join(managedStateHome, `${harness.sourceName}.json`);
 
 function normalizeHooks(hooks: readonly HarnessHookSpec[]): HarnessHook[] {
   return hooks.map((hook) => {
@@ -244,6 +230,8 @@ function normalizeHooks(hooks: readonly HarnessHookSpec[]): HarnessHook[] {
           kind: hook.kind,
           rootDir: hook.rootDir,
         };
+      default:
+        return assertNever(hook);
     }
   });
 }

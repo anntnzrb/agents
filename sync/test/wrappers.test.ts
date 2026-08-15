@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import assert from "node:assert/strict";
 import {
   existsSync,
@@ -9,22 +10,21 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { test } from "bun:test";
+import { join } from "node:path";
 
-import { HARNESS_CATALOG } from "../../harnesses.ts";
-import { buildHarness, HarnessId, SyncEnv } from "../src/core/harness.ts";
+import { HARNESS_CATALOG } from "@catalog";
+import { buildHarness, HarnessId, SyncEnv } from "@core/harness.ts";
 import {
-  WRAPPER_MARKER,
-  WINDOWS_PATH_MARKER_FILE,
-  WRAPPER_STATE_FILE,
   reconcileWrapperFiles,
   reconcileWrappers,
   renderWrapper,
-  wrapperDirectory,
+  WINDOWS_PATH_MARKER_FILE,
+  WRAPPER_MARKER,
+  WRAPPER_STATE_FILE,
   wrapperDestinations,
-} from "../src/core/wrappers.ts";
+  wrapperDirectory,
+} from "@core/wrappers.ts";
 
 function withTempHome<T>(fn: (home: string) => T): T {
   const root = mkdtempSync(join(tmpdir(), "agents-wrapper-test-"));
@@ -42,7 +42,7 @@ test("catalog_is_keyed_and_platform_selection_is_explicit", () => {
   }
 
   withTempHome((home) => {
-    const syncEnv = SyncEnv.fromHome(home, 1_000, {
+    const syncEnv = SyncEnv.fromHome(home, 1000, {
       platform: "win32",
       localAppData: join(home, "local-app-data"),
     });
@@ -69,14 +69,14 @@ test("harness_ownership_ids_cannot_escape_the_wrapper_directory", () => {
 
 test("wrapper_destinations_render_unix_and_windows_launchers", () => {
   withTempHome((home) => {
-    const unixEnv = SyncEnv.fromHome(home, 1_000, { platform: "linux" });
+    const unixEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
     const unix = wrapperDestinations(unixEnv, "linux");
     assert.equal(unix[0]?.path, join(home, ".local", "bin", "codex"));
     assert.equal(unix[0]?.content.startsWith("#!/bin/sh\n"), true);
     assert.equal(unix[0]?.content.includes(WRAPPER_MARKER), true);
     assert.equal(unix[0]?.content.includes("launch 'codex'"), true);
 
-    const windowsEnv = SyncEnv.fromHome(home, 1_000, {
+    const windowsEnv = SyncEnv.fromHome(home, 1000, {
       platform: "win32",
       localAppData: join(home, "local-app-data"),
     });
@@ -94,7 +94,7 @@ test("wrapper_destinations_render_unix_and_windows_launchers", () => {
 
 test("wrapper_reconciliation_is_idempotent_and_removes_owned_stale_entries", () => {
   withTempHome((home) => {
-    const syncEnv = SyncEnv.fromHome(home, 1_000, { platform: "linux" });
+    const syncEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
     const first = reconcileWrappers(syncEnv);
     assert.equal(first, true);
     const destinations = wrapperDestinations(syncEnv, "linux");
@@ -109,7 +109,10 @@ test("wrapper_reconciliation_is_idempotent_and_removes_owned_stale_entries", () 
 
     const withoutOmp = destinations.filter((entry) => entry.harness.sourceName !== "omp");
     const result = reconcileWrapperFiles(syncEnv, withoutOmp, "linux");
-    assert.equal(result.removed.some((entry) => entry.endsWith("/omp")), true);
+    assert.equal(
+      result.removed.some((entry) => entry.endsWith("/omp")),
+      true,
+    );
     assert.equal(existsSync(join(home, ".local", "bin", "omp")), false);
     assert.equal(existsSync(join(home, ".local", "bin", "codex")), true);
     assert.equal(existsSync(join(syncEnv.managedStateHome, WRAPPER_STATE_FILE)), true);
@@ -118,14 +121,19 @@ test("wrapper_reconciliation_is_idempotent_and_removes_owned_stale_entries", () 
 
 test("wrapper_reconciliation_preserves_unmanaged_conflicts", () => {
   withTempHome((home) => {
-    const syncEnv = SyncEnv.fromHome(home, 1_000, { platform: "linux" });
+    const syncEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
     const destination = wrapperDestinations(syncEnv, "linux")[0]!;
     mkdirSync(join(home, ".local", "bin"), { recursive: true });
     writeFileSync(destination.path, "#!/bin/sh\necho user-owned\n", "utf8");
 
     assert.equal(reconcileWrappers(syncEnv), true);
     assert.equal(readFileSync(destination.path, "utf8"), "#!/bin/sh\necho user-owned\n");
-    assert.equal(readFileSync(join(syncEnv.managedStateHome, WRAPPER_STATE_FILE), "utf8").includes(destination.path), false);
+    assert.equal(
+      readFileSync(join(syncEnv.managedStateHome, WRAPPER_STATE_FILE), "utf8").includes(
+        destination.path,
+      ),
+      false,
+    );
 
     // A stale state entry outside the canonical wrapper directory is never a
     // deletion authority, even if the file carries our marker.
@@ -143,7 +151,7 @@ test("wrapper_reconciliation_preserves_unmanaged_conflicts", () => {
 
 test("windows_path_marker_is_durable_and_path_hook_runs_once", () => {
   withTempHome((home) => {
-    const syncEnv = SyncEnv.fromHome(home, 1_000, {
+    const syncEnv = SyncEnv.fromHome(home, 1000, {
       platform: "win32",
       localAppData: join(home, "local-app-data"),
     });
@@ -155,19 +163,16 @@ test("windows_path_marker_is_durable_and_path_hook_runs_once", () => {
     assert.equal(reconcileWrappers(syncEnv, { writeWindowsPath }), true);
     assert.equal(reconcileWrappers(syncEnv, { writeWindowsPath }), true);
     assert.equal(calls, 1);
+    assert.equal(existsSync(join(syncEnv.managedStateHome, WINDOWS_PATH_MARKER_FILE)), true);
     assert.equal(
-      existsSync(join(syncEnv.managedStateHome, WINDOWS_PATH_MARKER_FILE)),
-      true,
+      wrapperDirectory(syncEnv, "win32"),
+      join(home, "local-app-data", "Programs", "Agents", "bin"),
     );
-    assert.equal(wrapperDirectory(syncEnv, "win32"), join(home, "local-app-data", "Programs", "Agents", "bin"));
 
     const [codex] = wrapperDestinations(syncEnv, "win32");
     assert.ok(codex);
     const updated = { ...codex, content: `${codex.content}rem updated\r\n` };
-    assert.deepEqual(
-      reconcileWrapperFiles(syncEnv, [updated], "win32").owned,
-      [updated.path],
-    );
+    assert.deepEqual(reconcileWrapperFiles(syncEnv, [updated], "win32").owned, [updated.path]);
     assert.equal(readFileSync(updated.path, "utf8"), updated.content);
   });
 });

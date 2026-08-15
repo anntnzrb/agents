@@ -1,6 +1,7 @@
 import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { assertNever } from "./errors.ts";
 
 export type CommandOutcome =
   | { readonly _tag: "Success" }
@@ -30,7 +31,7 @@ const pathCommandCandidates = (command: string): string[] => {
   if (process.platform !== "win32" || path.extname(command)) {
     return [command];
   }
-  const extensions = (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD")
+  const extensions = (process.env["PATHEXT"] ?? ".COM;.EXE;.BAT;.CMD")
     .split(";")
     .map((extension) => extension.trim())
     .filter((extension) => extension.length > 0);
@@ -45,14 +46,10 @@ const pathCommandCandidates = (command: string): string[] => {
 
 const executableForCommand = (command: string, cwd?: string): string => {
   const resolved = resolveCommandPath(command, cwd);
-  return hasPathSeparator(resolved)
-    ? resolved
-    : (Bun.which(resolved) ?? resolved);
+  return hasPathSeparator(resolved) ? resolved : (Bun.which(resolved) ?? resolved);
 };
 
-const existingPathCommand = async (
-  command: string,
-): Promise<string | undefined> => {
+const existingPathCommand = async (command: string): Promise<string | undefined> => {
   for (const candidate of pathCommandCandidates(command)) {
     try {
       const metadata = await fs.stat(candidate);
@@ -61,17 +58,12 @@ const existingPathCommand = async (
       }
       await fs.access(candidate, fsConstants.X_OK);
       return candidate;
-    } catch {
-      continue;
-    }
+    } catch {}
   }
   return undefined;
 };
 
-const resolveExecutable = async (
-  command: string,
-  cwd?: string,
-): Promise<string | undefined> => {
+const resolveExecutable = async (command: string, cwd?: string): Promise<string | undefined> => {
   const executable = executableForCommand(command, cwd);
   if (!hasPathSeparator(executable)) {
     return Bun.which(executable) ?? undefined;
@@ -79,10 +71,8 @@ const resolveExecutable = async (
   return await existingPathCommand(executable);
 };
 
-export const commandExists = async (
-  command: string,
-  cwd?: string,
-): Promise<boolean> => (await resolveExecutable(command, cwd)) !== undefined;
+export const commandExists = async (command: string, cwd?: string): Promise<boolean> =>
+  (await resolveExecutable(command, cwd)) !== undefined;
 
 export const runCommandOutcome = async (
   command: readonly string[],
@@ -152,12 +142,13 @@ export const logCommandFailure = (
       console.error(`sync: missing command for ${action}: ${command[0]}`);
       return;
     case "Failure":
-      console.error(
-        `sync: ${action} failed: ${command.join(" ")} (${outcome.detail})`,
-      );
+      console.error(`sync: ${action} failed: ${command.join(" ")} (${outcome.detail})`);
       return;
     case "TimedOut":
       console.error(`sync: ${action} timed out: ${command.join(" ")}`);
+      return;
+    default:
+      assertNever(outcome);
   }
 };
 

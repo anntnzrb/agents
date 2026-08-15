@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
@@ -11,9 +12,8 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { basename, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { test } from "bun:test";
+import { basename, join, resolve } from "node:path";
 
 const SYNC_ROOT = resolve(import.meta.dir, "..");
 const SRC_ROOT = join(SYNC_ROOT, "src");
@@ -38,9 +38,6 @@ let commandForTests: any;
 let cloneAttemptsForTests: any;
 let validatePackageForTests: any;
 let packageHasBuildScript: any;
-let main: any;
-let tryAcquireSyncLock: any;
-let startSyncWatchdog: any;
 let buildSyncPlan: any;
 let harnessSourceRoot: any;
 let harnessInstructionTarget: any;
@@ -71,9 +68,6 @@ if (!runtime) {
     cloneAttemptsForTests,
     validatePackageForTests,
     packageHasBuildScript,
-    main,
-    tryAcquireSyncLock,
-    startSyncWatchdog,
     buildSyncPlan,
     harnessSourceRoot,
     harnessInstructionTarget,
@@ -120,7 +114,6 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
     managedModule,
     planModule,
     packagesModule,
-    packagesProcessModule,
     runtimeProcessModule,
   ] = await Promise.all([
     import("@core/index.ts"),
@@ -130,15 +123,14 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
     import("@core/managed-state.ts"),
     import("@core/plan.ts"),
     import("@packages/index.ts"),
-    import("@packages/process.ts"),
     import("@runtime/process.ts"),
   ]);
 
   return {
     HarnessId:
-      (harnessModule as Record<string, unknown>).HarnessId ??
-      (harnessModule as Record<string, unknown>).harnessId,
-    SyncEnv: (harnessModule as Record<string, unknown>).SyncEnv,
+      (harnessModule as Record<string, unknown>)["HarnessId"] ??
+      (harnessModule as Record<string, unknown>)["harnessId"],
+    SyncEnv: (harnessModule as Record<string, unknown>)["SyncEnv"],
     harnessSourceRoot: pickFn(
       harnessModule as Record<string, unknown>,
       "harnessSourceRoot",
@@ -149,21 +141,9 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
       "harnessInstructionTarget",
       "harness_instruction_target",
     ),
-    runSync: pickFn(
-      libModule as Record<string, unknown>,
-      "runSync",
-      "run_sync",
-    ),
-    copyItem: pickFn(
-      jobsModule as Record<string, unknown>,
-      "copyItem",
-      "copy_item",
-    ),
-    copyDirInto: pickFn(
-      jobsModule as Record<string, unknown>,
-      "copyDirInto",
-      "copy_dir_into",
-    ),
+    runSync: pickFn(libModule as Record<string, unknown>, "runSync", "run_sync"),
+    copyItem: pickFn(jobsModule as Record<string, unknown>, "copyItem", "copy_item"),
+    copyDirInto: pickFn(jobsModule as Record<string, unknown>, "copyDirInto", "copy_dir_into"),
     runJobsWithPreserve: pickFn(
       jobsModule as Record<string, unknown>,
       "runJobsWithPreserve",
@@ -174,11 +154,7 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
       "iterExtensionPackages",
       "iter_extension_packages",
     ),
-    runInstall: pickFn(
-      installModule as Record<string, unknown>,
-      "runInstall",
-      "run_install",
-    ),
+    runInstall: pickFn(installModule as Record<string, unknown>, "runInstall", "run_install"),
     runCommandOutcome: pickFn(
       runtimeProcessModule as Record<string, unknown>,
       "runCommandOutcome",
@@ -249,23 +225,10 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
       "buildSyncPlan",
       "build_sync_plan",
     ),
-    main: pickFn(libModule as Record<string, unknown>, "main"),
-    tryAcquireSyncLock: pickFn(
-      libModule as Record<string, unknown>,
-      "tryAcquireSyncLock",
-      "try_acquire_sync_lock",
-    ),
-    startSyncWatchdog: pickFn(
-      libModule as Record<string, unknown>,
-      "startSyncWatchdog",
-      "start_sync_watchdog",
-    ),
   };
 }
 
-async function withTempDir<T>(
-  fn: (root: string) => T | Promise<T>,
-): Promise<T> {
+async function withTempDir<T>(fn: (root: string) => T | Promise<T>): Promise<T> {
   const root = mkdtempSync(join(tmpdir(), "agents-tests-"));
   try {
     return await fn(root);
@@ -309,13 +272,9 @@ const readText = (path: string): string => readFileSync(path, "utf8");
 
 const exists = (path: string): boolean => existsSync(path);
 
-const isPosix = (): boolean =>
-  process.platform === "darwin" || process.platform === "linux";
+const isPosix = (): boolean => process.platform === "darwin" || process.platform === "linux";
 
-async function call<T>(
-  fn: (...args: unknown[]) => unknown,
-  ...args: unknown[]
-): Promise<T> {
+async function call<T>(fn: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<T> {
   return await resolveValue(fn(...args));
 }
 
@@ -359,15 +318,9 @@ if (runtime) {
       const src = join(root, "src");
       const dst = join(root, "dst");
 
-      writeFile(
-        join(src, "extensions", "context", "index.ts"),
-        "export const live = true;\n",
-      );
+      writeFile(join(src, "extensions", "context", "index.ts"), "export const live = true;\n");
       writeFile(join(dst, "extensions", "stale.ts"), "stale\n");
-      writeFile(
-        join(dst, "extensions", "package.json"),
-        '{"name":"generated"}\n',
-      );
+      writeFile(join(dst, "extensions", "package.json"), '{"name":"generated"}\n');
       writeFile(
         join(dst, "extensions", "node_modules", "dep", "index.js"),
         "module.exports = 1;\n",
@@ -376,22 +329,14 @@ if (runtime) {
       const result = await call<boolean>(
         runJobsWithPreserve,
         [{ src, dst, kind: "Dir" }],
-        new Map([
-          [dst, ["extensions/package.json", "extensions/node_modules"]],
-        ]),
+        new Map([[dst, ["extensions/package.json", "extensions/node_modules"]]]),
       );
 
       assert.equal(result, true);
-      assert.equal(
-        exists(join(dst, "extensions", "context", "index.ts")),
-        true,
-      );
+      assert.equal(exists(join(dst, "extensions", "context", "index.ts")), true);
       assert.equal(exists(join(dst, "extensions", "stale.ts")), false);
       assert.equal(exists(join(dst, "extensions", "package.json")), true);
-      assert.equal(
-        exists(join(dst, "extensions", "node_modules", "dep", "index.js")),
-        true,
-      );
+      assert.equal(exists(join(dst, "extensions", "node_modules", "dep", "index.js")), true);
     });
   });
 
@@ -406,29 +351,26 @@ if (runtime) {
       writeFile(join(firstDestination, "shared.txt"), "xxx\n");
       writeFile(join(sourceTwo, "shared.txt"), "new\n");
 
-      const result = await call<boolean>(
-        runJobsWithPreserve,
-        [
-          {
-            src: sourceOne,
-            dst: firstDestination,
-            kind: "Dir",
-            scope: "Tree",
-          },
-          {
-            src: sourceTwo,
-            dst: sourceOne,
-            kind: "Dir",
-            scope: "Children",
-          },
-          {
-            src: sourceOne,
-            dst: finalDestination,
-            kind: "Dir",
-            scope: "Tree",
-          },
-        ],
-      );
+      const result = await call<boolean>(runJobsWithPreserve, [
+        {
+          src: sourceOne,
+          dst: firstDestination,
+          kind: "Dir",
+          scope: "Tree",
+        },
+        {
+          src: sourceTwo,
+          dst: sourceOne,
+          kind: "Dir",
+          scope: "Children",
+        },
+        {
+          src: sourceOne,
+          dst: finalDestination,
+          kind: "Dir",
+          scope: "Tree",
+        },
+      ]);
 
       assert.equal(result, true);
       assert.equal(readText(join(finalDestination, "shared.txt")), "new\n");
@@ -441,15 +383,15 @@ if (runtime) {
       writeFile(join(root, "a", "nested", "package.json"), "{}");
       writeFile(join(root, "a", "node_modules", "skip", "package.json"), "{}");
 
-      const packages = [
-        ...(await call<string[]>(iterExtensionPackages, root)),
-      ].sort();
+      const packages = [...(await call<string[]>(iterExtensionPackages, root))].sort();
       assert.equal(packages.length, 2);
     });
   });
 
   test("run_install_handles_success_failure_and_timeout", async () => {
-    if (!isPosix()) return;
+    if (!isPosix()) {
+      return;
+    }
 
     await withTempDir(async (root) => {
       const bin = join(root, "bin");
@@ -474,8 +416,7 @@ if (runtime) {
       const scriptDir = join(root, "scripts");
       mkdirSync(scriptDir, { recursive: true });
 
-      const command =
-        process.platform === "win32" ? ".\\scripts\\ok" : "./scripts/ok";
+      const command = process.platform === "win32" ? ".\\scripts\\ok" : "./scripts/ok";
       if (process.platform === "win32") {
         writeFile(join(scriptDir, "ok.cmd"), "@echo off\r\nexit /b 0\r\n");
       } else {
@@ -505,17 +446,16 @@ if (runtime) {
   });
 
   test("run_install_force_kills_term_trapping_process", async () => {
-    if (!isPosix()) return;
+    if (!isPosix()) {
+      return;
+    }
 
     await withTempDir(async (root) => {
       const bin = join(root, "bin");
       mkdirSync(bin, { recursive: true });
 
       const trapped = join(bin, "trapped");
-      writeExecutable(
-        trapped,
-        "#!/bin/sh\ntrap '' TERM\nwhile :; do sleep 1; done\n",
-      );
+      writeExecutable(trapped, "#!/bin/sh\ntrap '' TERM\nwhile :; do sleep 1; done\n");
 
       const helper = join(root, "helper.ts");
       writeFileSync(
@@ -533,7 +473,7 @@ console.log(String(result));
         timeout: 5000,
         env: {
           ...process.env,
-          PATH: process.env.PATH ?? "",
+          PATH: process.env["PATH"] ?? "",
         },
       });
 
@@ -544,7 +484,9 @@ console.log(String(result));
   });
 
   test("main_reports_lock_contention_and_skips", async () => {
-    if (!isPosix()) return;
+    if (!isPosix()) {
+      return;
+    }
 
     await withTempDir(async (root) => {
       const helper = join(root, "helper.ts");
@@ -570,16 +512,13 @@ console.log(String(exit));
         env: {
           ...process.env,
           HOME: root,
-          PATH: process.env.PATH ?? "",
+          PATH: process.env["PATH"] ?? "",
         },
       });
 
       assert.equal(result.status, 0, result.stderr || result.stdout);
       assert.equal(result.stdout.trim(), "0");
-      assert.equal(
-        result.stderr.includes("another sync is already running; skipping"),
-        true,
-      );
+      assert.equal(result.stderr.includes("another sync is already running; skipping"), true);
     });
   });
 
@@ -598,10 +537,10 @@ setInterval(() => {}, 1_000);
         cwd: SYNC_ROOT,
         encoding: "utf8",
         stdio: "pipe",
-        timeout: 5_000,
+        timeout: 5000,
         env: {
           ...process.env,
-          PATH: process.env.PATH ?? "",
+          PATH: process.env["PATH"] ?? "",
         },
       });
 
@@ -627,10 +566,7 @@ setInterval(() => {}, 1_000);
         harnessSourceRoot(pi!, syncEnv.toolsHome),
         join(root, ".config", "agents", "tools", "pi", "agent"),
       );
-      assert.equal(
-        harnessInstructionTarget(pi!),
-        join(root, ".pi", "agent", "AGENTS.md"),
-      );
+      assert.equal(harnessInstructionTarget(pi!), join(root, ".pi", "agent", "AGENTS.md"));
     });
   });
 
@@ -641,40 +577,25 @@ setInterval(() => {}, 1_000);
         hooks: Record<string, unknown>[];
       }>(buildSyncPlan, syncEnv);
 
-      const packageHook = syncPlan.hooks.find(
-        (hook) => hook.kind === "PackageBootstrap",
-      );
-      const extensionHook = syncPlan.hooks.find(
-        (hook) => hook.kind === "ExtensionDeps",
-      );
+      const packageHook = syncPlan.hooks.find((hook) => hook["kind"] === "PackageBootstrap");
+      const extensionHook = syncPlan.hooks.find((hook) => hook["kind"] === "ExtensionDeps");
 
       assert.ok(packageHook);
       assert.equal(
-        packageHook!.manifestPath,
-        join(
-          root,
-          ".config",
-          "agents",
-          "tools",
-          "pi",
-          "agent",
-          "packages.json",
-        ),
+        packageHook!["manifestPath"],
+        join(root, ".config", "agents", "tools", "pi", "agent", "packages.json"),
       );
       assert.equal(
-        packageHook!.runtimeSettingsPath,
+        packageHook!["runtimeSettingsPath"],
         join(root, ".pi", "agent", "settings.json"),
       );
       assert.equal(
-        packageHook!.cacheRoot,
+        packageHook!["cacheRoot"],
         join(root, ".local", "share", "agents", "pi-packages"),
       );
 
       assert.ok(extensionHook);
-      assert.equal(
-        extensionHook!.root,
-        join(root, ".pi", "agent", "extensions"),
-      );
+      assert.equal(extensionHook!["root"], join(root, ".pi", "agent", "extensions"));
     });
   });
 
@@ -682,22 +603,10 @@ setInterval(() => {}, 1_000);
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
 
-      writeFile(
-        join(root, ".config", "agents", "assets", "AGENTS.md"),
-        "agent-instructions",
-      );
-      writeFile(
-        join(root, ".config", "agents", "assets", "mcporter.jsonc"),
-        '{"x":1}',
-      );
-      writeFile(
-        join(root, ".config", "agents", "skills", "current", "skill.txt"),
-        "skill-content",
-      );
-      writeFile(
-        join(root, ".config", "agents", "tools", "codex", "config.toml"),
-        "codex = true",
-      );
+      writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(root, ".config", "agents", "assets", "mcporter.jsonc"), '{"x":1}');
+      writeFile(join(root, ".config", "agents", "skills", "current", "skill.txt"), "skill-content");
+      writeFile(join(root, ".config", "agents", "tools", "codex", "config.toml"), "codex = true");
       writeFile(
         join(root, ".config", "agents", "tools", "omp", "agent", "config.yml"),
         "theme:\n  dark: graphite\n",
@@ -734,39 +643,21 @@ setInterval(() => {}, 1_000);
       );
       writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
       writeFile(join(root, ".pi", "agent", "extensions", "stale.ts"), "stale");
-      writeFile(
-        join(root, ".omp", "agent", "skills", "stale.txt"),
-        "stale-skill",
-      );
+      writeFile(join(root, ".omp", "agent", "skills", "stale.txt"), "stale-skill");
       writeFile(join(root, ".omp", "agent", "logs", "keep.txt"), "keep-me");
 
       assert.equal(await call<boolean>(runSync, syncEnv), true);
       assert.equal(exists(join(root, ".codex", "AGENTS.md")), true);
-      assert.equal(
-        exists(join(root, ".config", "opencode", "AGENTS.md")),
-        true,
-      );
+      assert.equal(exists(join(root, ".config", "opencode", "AGENTS.md")), true);
       assert.equal(exists(join(root, ".pi", "agent", "AGENTS.md")), true);
       assert.equal(exists(join(root, ".omp", "agent", "AGENTS.md")), true);
       assert.equal(exists(join(root, ".omp", "agent", "config.yml")), true);
-      assert.equal(
-        exists(join(root, ".omp", "agent", "skills", "skill.txt")),
-        true,
-      );
+      assert.equal(exists(join(root, ".omp", "agent", "skills", "skill.txt")), true);
       assert.equal(exists(join(root, ".mcporter", "mcporter.json")), true);
       assert.equal(exists(join(root, ".pi", "agent", "auth.json")), true);
-      assert.equal(
-        exists(join(root, ".pi", "agent", "extensions", "stale.ts")),
-        false,
-      );
-      assert.equal(
-        exists(join(root, ".omp", "agent", "skills", "stale.txt")),
-        false,
-      );
-      assert.equal(
-        exists(join(root, ".omp", "agent", "logs", "keep.txt")),
-        true,
-      );
+      assert.equal(exists(join(root, ".pi", "agent", "extensions", "stale.ts")), false);
+      assert.equal(exists(join(root, ".omp", "agent", "skills", "stale.txt")), false);
+      assert.equal(exists(join(root, ".omp", "agent", "logs", "keep.txt")), true);
     });
   });
 
@@ -783,14 +674,8 @@ setInterval(() => {}, 1_000);
       const agentsRoot = join(root, ".config", "agents");
 
       writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
-      writeFile(
-        join(agentsRoot, "skills", "current", "skill.txt"),
-        "fresh-skill",
-      );
-      writeFile(
-        join(agentsRoot, "tools", "codex", "config.toml"),
-        "fresh = true\n",
-      );
+      writeFile(join(agentsRoot, "skills", "current", "skill.txt"), "fresh-skill");
+      writeFile(join(agentsRoot, "tools", "codex", "config.toml"), "fresh = true\n");
       writeFile(
         join(agentsRoot, "tools", "omp", "agent", "config.yml"),
         "theme:\n  light: graphite\n",
@@ -800,36 +685,21 @@ setInterval(() => {}, 1_000);
       writeFile(join(root, ".codex", "skills", "stale.txt"), "stale-skill");
       writeFile(join(root, ".codex", "logs", "keep.txt"), "keep-me");
       writeFile(join(root, ".omp", "agent", "config.yml"), "stale-config\n");
-      writeFile(
-        join(root, ".omp", "agent", "skills", "stale.txt"),
-        "stale-skill",
-      );
+      writeFile(join(root, ".omp", "agent", "skills", "stale.txt"), "stale-skill");
       writeFile(join(root, ".omp", "agent", "logs", "keep.txt"), "keep-me");
 
       assert.equal(await call<boolean>(runSync, syncEnv), true);
-      assert.equal(
-        readText(join(root, ".codex", "config.toml")),
-        "fresh = true\n",
-      );
+      assert.equal(readText(join(root, ".codex", "config.toml")), "fresh = true\n");
       assert.equal(
         readText(join(root, ".omp", "agent", "config.yml")),
         "theme:\n  light: graphite\n",
       );
       assert.equal(exists(join(root, ".codex", "skills", "skill.txt")), true);
-      assert.equal(
-        exists(join(root, ".omp", "agent", "skills", "skill.txt")),
-        true,
-      );
+      assert.equal(exists(join(root, ".omp", "agent", "skills", "skill.txt")), true);
       assert.equal(exists(join(root, ".codex", "skills", "stale.txt")), false);
-      assert.equal(
-        exists(join(root, ".omp", "agent", "skills", "stale.txt")),
-        false,
-      );
+      assert.equal(exists(join(root, ".omp", "agent", "skills", "stale.txt")), false);
       assert.equal(exists(join(root, ".codex", "logs", "keep.txt")), true);
-      assert.equal(
-        exists(join(root, ".omp", "agent", "logs", "keep.txt")),
-        true,
-      );
+      assert.equal(exists(join(root, ".omp", "agent", "logs", "keep.txt")), true);
     });
   });
 
@@ -839,20 +709,14 @@ setInterval(() => {}, 1_000);
       const agentsRoot = join(root, ".config", "agents");
 
       writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
-      writeFile(
-        join(agentsRoot, "skills", "current", "skill.txt"),
-        "fresh-skill",
-      );
+      writeFile(join(agentsRoot, "skills", "current", "skill.txt"), "fresh-skill");
       writeFile(
         join(agentsRoot, "tools", "omp", "agent", "config.yml"),
         "theme:\n  light: graphite\n",
       );
 
       writeFile(join(root, ".omp", "agent", "config.yml"), "stale-config\n");
-      writeFile(
-        join(root, ".omp", "agent", "skills", "stale.txt"),
-        "stale-skill",
-      );
+      writeFile(join(root, ".omp", "agent", "skills", "stale.txt"), "stale-skill");
       writeFile(join(root, ".omp", "agent", "logs", "keep.txt"), "keep-me");
 
       assert.equal(await call<boolean>(runSync, syncEnv), true);
@@ -860,18 +724,9 @@ setInterval(() => {}, 1_000);
         readText(join(root, ".omp", "agent", "config.yml")),
         "theme:\n  light: graphite\n",
       );
-      assert.equal(
-        exists(join(root, ".omp", "agent", "skills", "skill.txt")),
-        true,
-      );
-      assert.equal(
-        exists(join(root, ".omp", "agent", "skills", "stale.txt")),
-        false,
-      );
-      assert.equal(
-        exists(join(root, ".omp", "agent", "logs", "keep.txt")),
-        true,
-      );
+      assert.equal(exists(join(root, ".omp", "agent", "skills", "skill.txt")), true);
+      assert.equal(exists(join(root, ".omp", "agent", "skills", "stale.txt")), false);
+      assert.equal(exists(join(root, ".omp", "agent", "logs", "keep.txt")), true);
     });
   });
 
@@ -905,9 +760,7 @@ setInterval(() => {}, 1_000);
       assert.equal(exists(join(root, ".codex", "config.toml")), true);
       assert.equal(exists(join(root, ".codex", "skills", "skill.txt")), true);
       assert.equal(
-        exists(
-          join(root, ".local", "share", "agents", "sync-managed", "codex.json"),
-        ),
+        exists(join(root, ".local", "share", "agents", "sync-managed", "codex.json")),
         true,
       );
 
@@ -928,26 +781,14 @@ setInterval(() => {}, 1_000);
       const agentsRoot = join(root, ".config", "agents");
 
       writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
-      writeFile(
-        join(agentsRoot, "skills", "current", "skill.txt"),
-        "fresh-skill",
-      );
-      writeFile(
-        join(agentsRoot, "skills", "legacy", "old-skill.txt"),
-        "legacy-skill",
-      );
+      writeFile(join(agentsRoot, "skills", "current", "skill.txt"), "fresh-skill");
+      writeFile(join(agentsRoot, "skills", "legacy", "old-skill.txt"), "legacy-skill");
 
       assert.equal(await call<boolean>(runSync, syncEnv), true);
       assert.equal(exists(join(root, ".codex", "skills", "skill.txt")), true);
       assert.equal(exists(join(root, ".codex", "skills", "legacy")), false);
-      assert.equal(
-        exists(join(root, ".omp", "agent", "skills", "skill.txt")),
-        true,
-      );
-      assert.equal(
-        exists(join(root, ".omp", "agent", "skills", "legacy")),
-        false,
-      );
+      assert.equal(exists(join(root, ".omp", "agent", "skills", "skill.txt")), true);
+      assert.equal(exists(join(root, ".omp", "agent", "skills", "legacy")), false);
     });
   });
 
@@ -957,17 +798,11 @@ setInterval(() => {}, 1_000);
       const agentsRoot = join(root, ".config", "agents");
 
       writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
-      writeFile(
-        join(agentsRoot, "assets", "prompts", "hello.txt"),
-        "prompt-content",
-      );
+      writeFile(join(agentsRoot, "assets", "prompts", "hello.txt"), "prompt-content");
 
       assert.equal(await call<boolean>(runSync, syncEnv), true);
       assert.equal(exists(join(root, ".codex", "prompts", "hello.txt")), true);
-      assert.equal(
-        exists(join(root, ".omp", "agent", "prompts", "hello.txt")),
-        true,
-      );
+      assert.equal(exists(join(root, ".omp", "agent", "prompts", "hello.txt")), true);
 
       rmSync(join(agentsRoot, "assets", "prompts"), {
         recursive: true,
@@ -987,10 +822,7 @@ setInterval(() => {}, 1_000);
       const syncEnv = makeSyncEnv(root);
       const { fingerprintTree } = await import("@core/hook-state.ts");
 
-      writeFile(
-        join(root, ".config", "agents", "assets", "AGENTS.md"),
-        "agent-instructions",
-      );
+      writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
       writeFile(
         join(
           root,
@@ -1006,43 +838,17 @@ setInterval(() => {}, 1_000);
         "export const live = true;\n",
       );
       writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
+      writeFile(join(root, ".pi", "agent", "extensions", "package.json"), '{"name":"generated"}\n');
       writeFile(
-        join(root, ".pi", "agent", "extensions", "package.json"),
-        '{"name":"generated"}\n',
-      );
-      writeFile(
-        join(
-          root,
-          ".pi",
-          "agent",
-          "extensions",
-          "node_modules",
-          "dep",
-          "index.js",
-        ),
+        join(root, ".pi", "agent", "extensions", "node_modules", "dep", "index.js"),
         "module.exports = 1;\n",
       );
       writeFile(
-        join(
-          root,
-          ".local",
-          "share",
-          "agents",
-          "sync-managed",
-          "pi.extension-deps.json",
-        ),
+        join(root, ".local", "share", "agents", "sync-managed", "pi.extension-deps.json"),
         `${JSON.stringify(
           {
             fingerprint: fingerprintTree(
-              join(
-                root,
-                ".config",
-                "agents",
-                "tools",
-                "pi",
-                "agent",
-                "extensions",
-              ),
+              join(root, ".config", "agents", "tools", "pi", "agent", "extensions"),
             ),
             generatedEntries: ["package.json", "node_modules"],
           },
@@ -1053,22 +859,9 @@ setInterval(() => {}, 1_000);
 
       const success = await call<boolean>(runSync, syncEnv);
       assert.equal(success, true);
+      assert.equal(exists(join(root, ".pi", "agent", "extensions", "package.json")), true);
       assert.equal(
-        exists(join(root, ".pi", "agent", "extensions", "package.json")),
-        true,
-      );
-      assert.equal(
-        exists(
-          join(
-            root,
-            ".pi",
-            "agent",
-            "extensions",
-            "node_modules",
-            "dep",
-            "index.js",
-          ),
-        ),
+        exists(join(root, ".pi", "agent", "extensions", "node_modules", "dep", "index.js")),
         true,
       );
     });
@@ -1078,15 +871,7 @@ setInterval(() => {}, 1_000);
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
       const { fingerprintTree } = await import("@core/hook-state.ts");
-      const sourceRoot = join(
-        root,
-        ".config",
-        "agents",
-        "tools",
-        "pi",
-        "agent",
-        "extensions",
-      );
+      const sourceRoot = join(root, ".config", "agents", "tools", "pi", "agent", "extensions");
       const statePath = join(
         root,
         ".local",
@@ -1096,29 +881,12 @@ setInterval(() => {}, 1_000);
         "pi.extension-deps.json",
       );
 
-      writeFile(
-        join(root, ".config", "agents", "assets", "AGENTS.md"),
-        "agent-instructions",
-      );
-      writeFile(
-        join(sourceRoot, "context", "index.ts"),
-        "export const live = true;\n",
-      );
+      writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(sourceRoot, "context", "index.ts"), "export const live = true;\n");
       writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
+      writeFile(join(root, ".pi", "agent", "extensions", "package.json"), '{"name":"generated"}\n');
       writeFile(
-        join(root, ".pi", "agent", "extensions", "package.json"),
-        '{"name":"generated"}\n',
-      );
-      writeFile(
-        join(
-          root,
-          ".pi",
-          "agent",
-          "extensions",
-          "node_modules",
-          "dep",
-          "index.js",
-        ),
+        join(root, ".pi", "agent", "extensions", "node_modules", "dep", "index.js"),
         "module.exports = 1;\n",
       );
       writeFile(
@@ -1148,40 +916,18 @@ setInterval(() => {}, 1_000);
 
       const success = await call<boolean>(runSync, syncEnv);
       assert.equal(success, true);
+      assert.equal(exists(join(root, ".pi", "agent", "extensions", "package.json")), true);
       assert.equal(
-        exists(join(root, ".pi", "agent", "extensions", "package.json")),
+        exists(join(root, ".pi", "agent", "extensions", "node_modules", "dep", "index.js")),
         true,
       );
-      assert.equal(
-        exists(
-          join(
-            root,
-            ".pi",
-            "agent",
-            "extensions",
-            "node_modules",
-            "dep",
-            "index.js",
-          ),
-        ),
-        true,
-      );
-      assert.equal(
-        exists(join(root, ".pi", "agent", "extensions", "package-lock.json")),
-        false,
-      );
-      assert.equal(
-        exists(join(root, ".pi", "agent", "extensions", "npm-shrinkwrap.json")),
-        false,
-      );
+      assert.equal(exists(join(root, ".pi", "agent", "extensions", "package-lock.json")), false);
+      assert.equal(exists(join(root, ".pi", "agent", "extensions", "npm-shrinkwrap.json")), false);
 
       const state = JSON.parse(readText(statePath)) as {
         generatedEntries?: unknown;
       };
-      assert.deepEqual(state.generatedEntries, [
-        "package.json",
-        "node_modules",
-      ]);
+      assert.deepEqual(state.generatedEntries, ["package.json", "node_modules"]);
     });
   });
 
@@ -1189,10 +935,7 @@ setInterval(() => {}, 1_000);
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
 
-      writeFile(
-        join(root, ".config", "agents", "assets", "AGENTS.md"),
-        "agent-instructions",
-      );
+      writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
       writeFile(
         join(
           root,
@@ -1208,31 +951,13 @@ setInterval(() => {}, 1_000);
         "export const live = true;\n",
       );
       writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
+      writeFile(join(root, ".pi", "agent", "extensions", "package.json"), '{"name":"generated"}\n');
       writeFile(
-        join(root, ".pi", "agent", "extensions", "package.json"),
-        '{"name":"generated"}\n',
-      );
-      writeFile(
-        join(
-          root,
-          ".pi",
-          "agent",
-          "extensions",
-          "node_modules",
-          "dep",
-          "index.js",
-        ),
+        join(root, ".pi", "agent", "extensions", "node_modules", "dep", "index.js"),
         "module.exports = 1;\n",
       );
       writeFile(
-        join(
-          root,
-          ".local",
-          "share",
-          "agents",
-          "sync-managed",
-          "pi.extension-deps.json",
-        ),
+        join(root, ".local", "share", "agents", "sync-managed", "pi.extension-deps.json"),
         `${JSON.stringify(
           {
             fingerprint: "stale",
@@ -1245,14 +970,8 @@ setInterval(() => {}, 1_000);
 
       const success = await call<boolean>(runSync, syncEnv);
       assert.equal(success, true);
-      assert.equal(
-        exists(join(root, ".pi", "agent", "extensions", "package.json")),
-        false,
-      );
-      assert.equal(
-        exists(join(root, ".pi", "agent", "extensions", "node_modules")),
-        false,
-      );
+      assert.equal(exists(join(root, ".pi", "agent", "extensions", "package.json")), false);
+      assert.equal(exists(join(root, ".pi", "agent", "extensions", "node_modules")), false);
     });
   });
 
@@ -1294,10 +1013,7 @@ setInterval(() => {}, 1_000);
 }`,
       );
 
-      const manifest = await call<{ packages: string[] }>(
-        readPackageManifest,
-        path,
-      );
+      const manifest = await call<{ packages: string[] }>(readPackageManifest, path);
       assert.equal(manifest.packages.length, 2);
     });
   });
@@ -1341,12 +1057,7 @@ setInterval(() => {}, 1_000);
 
   test("package_cache_dir_uses_basename_for_local_paths", async () => {
     const root = "/tmp/cache-root";
-    const sources = [
-      "packages\\foo",
-      ".\\packages\\foo",
-      "C:\\x\\foo",
-      "\\\\server\\share\\foo",
-    ];
+    const sources = ["packages\\foo", ".\\packages\\foo", "C:\\x\\foo", "\\\\server\\share\\foo"];
 
     for (const source of sources) {
       const cacheDir = await call<string>(packageCacheDir, root, source);
@@ -1364,10 +1075,7 @@ setInterval(() => {}, 1_000);
       );
       assert.equal(command[0], "gh");
       assert.equal(
-        await call<string | null>(
-          githubSlugForTests,
-          "https://github.com/tintinweb/pi-supervisor",
-        ),
+        await call<string | null>(githubSlugForTests, "https://github.com/tintinweb/pi-supervisor"),
         "tintinweb/pi-supervisor",
       );
     });
@@ -1388,10 +1096,7 @@ setInterval(() => {}, 1_000);
       assert.equal(attempts.length, 2);
       assert.equal(attempts[0]![0], "gh");
       assert.equal(attempts[1]![0], "git");
-      assert.equal(
-        attempts[1]![3],
-        "https://github.com/tintinweb/pi-supervisor",
-      );
+      assert.equal(attempts[1]![3], "https://github.com/tintinweb/pi-supervisor");
     });
   });
 
@@ -1407,20 +1112,11 @@ setInterval(() => {}, 1_000);
 }`,
       );
       writeFile(join(manifestPkg, "src", "index.ts"), "export default {}\n");
-      assert.equal(
-        await call<boolean>(validatePackageForTests, manifestPkg),
-        true,
-      );
+      assert.equal(await call<boolean>(validatePackageForTests, manifestPkg), true);
 
       const conventionalPkg = join(root, "conventional-pkg");
-      writeFile(
-        join(conventionalPkg, "extensions", "index.ts"),
-        "export default {}\n",
-      );
-      assert.equal(
-        await call<boolean>(validatePackageForTests, conventionalPkg),
-        true,
-      );
+      writeFile(join(conventionalPkg, "extensions", "index.ts"), "export default {}\n");
+      assert.equal(await call<boolean>(validatePackageForTests, conventionalPkg), true);
     });
   });
 
@@ -1441,10 +1137,7 @@ setInterval(() => {}, 1_000);
       );
       assert.equal(await call<boolean>(validatePackageForTests, pkg), false);
 
-      writeFile(
-        join(pkg, "node_modules", "@earendil-works", "pi-tui", "package.json"),
-        "{}\n",
-      );
+      writeFile(join(pkg, "node_modules", "@earendil-works", "pi-tui", "package.json"), "{}\n");
       assert.equal(await call<boolean>(validatePackageForTests, pkg), true);
     });
   });
@@ -1460,14 +1153,13 @@ setInterval(() => {}, 1_000);
   });
 
   test("run_sync_bootstraps_packages_and_patches_runtime_settings", async () => {
-    if (!isPosix()) return;
+    if (!isPosix()) {
+      return;
+    }
 
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
-      writeFile(
-        join(root, ".config", "agents", "assets", "AGENTS.md"),
-        "agent-instructions",
-      );
+      writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
       writeFile(join(root, ".pi", "agent", "settings.json"), "{}\n");
 
       const repos = join(root, "repos");
@@ -1502,15 +1194,7 @@ setInterval(() => {}, 1_000);
       initGitRepo(buildRepo);
 
       writeFile(
-        join(
-          root,
-          ".config",
-          "agents",
-          "tools",
-          "pi",
-          "agent",
-          "packages.json",
-        ),
+        join(root, ".config", "agents", "tools", "pi", "agent", "packages.json"),
         `{
   "packages": [
     "${sourceRepo}",
@@ -1525,10 +1209,7 @@ setInterval(() => {}, 1_000);
       const settings = readText(join(root, ".pi", "agent", "settings.json"));
       assert.equal(settings.includes("source-pkg"), true);
       assert.equal(settings.includes("build-pkg"), true);
-      assert.equal(
-        exists(join(root, ".local", "share", "agents", "pi-packages")),
-        true,
-      );
+      assert.equal(exists(join(root, ".local", "share", "agents", "pi-packages")), true);
     });
   });
 
@@ -1589,7 +1270,9 @@ setInterval(() => {}, 1_000);
   });
 
   test("managed_state_replaces_identical_symlink", async () => {
-    if (!isPosix()) return;
+    if (!isPosix()) {
+      return;
+    }
 
     await withTempDir(async (root) => {
       const path = join(root, "state", "codex.json");
@@ -1611,14 +1294,7 @@ setInterval(() => {}, 1_000);
   test("managed_state_malformed_json_is_recoverable", async () => {
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
-      const statePath = join(
-        root,
-        ".local",
-        "share",
-        "agents",
-        "sync-managed",
-        "codex.json",
-      );
+      const statePath = join(root, ".local", "share", "agents", "sync-managed", "codex.json");
       writeFile(statePath, "{not valid json");
 
       const recovered = await call<string[]>(loadRecordedEntryNames, statePath);
@@ -1636,13 +1312,13 @@ setInterval(() => {}, 1_000);
 function makeSyncEnv(root: string): any {
   const value = SyncEnv as any;
   if (typeof value?.fromHome === "function") {
-    return value.fromHome(root, 1_000);
+    return value.fromHome(root, 1000);
   }
   if (typeof value?.from_home === "function") {
-    return value.from_home(root, 1_000);
+    return value.from_home(root, 1000);
   }
   if (typeof value === "function") {
-    return new value(root, 1_000);
+    return new value(root, 1000);
   }
   throw new Error("missing SyncEnv factory");
 }

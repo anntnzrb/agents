@@ -1,26 +1,26 @@
+import { test } from "bun:test";
 import assert from "node:assert/strict";
 import {
   chmodSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readlinkSync,
   rmSync,
-  mkdirSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { test } from "bun:test";
+import { join } from "node:path";
 
-import { SyncEnv } from "../src/core/harness.ts";
+import { SyncEnv } from "@core/harness.ts";
 import {
   executableCommand,
+  type LauncherProcessResult,
   launchHarness,
   npmCacheLayout,
   npmCommand,
   prepareNpmPackage,
-  type LauncherProcessResult,
-} from "../src/core/launcher.ts";
+} from "@core/launcher.ts";
 
 function withTempHome<T>(fn: (home: string) => T | Promise<T>): Promise<T> {
   const root = mkdtempSync(join(tmpdir(), "agents-launcher-test-"));
@@ -59,7 +59,7 @@ test("npm_launcher_resolves_latest_and_caches_current_previous_without_network",
 
     const prepared = await prepareNpmPackage(
       { tool: "demo", package: "demo-package", bin: "demo" },
-      { home, cacheHome: join(home, "cache"), runtime, timeoutMs: 1_000 },
+      { home, cacheHome: join(home, "cache"), runtime, timeoutMs: 1000 },
     );
     assert.equal(prepared.resolvedVersion, "1.2.3");
     assert.equal(existsSync(prepared.currentBin), true);
@@ -67,11 +67,14 @@ test("npm_launcher_resolves_latest_and_caches_current_previous_without_network",
       readlinkSync(prepared.layout.currentLink).endsWith(join("versions", "1.2.3")),
       true,
     );
-    assert.equal(calls.some((command) => command.includes("demo-package@1.2.3")), true);
+    assert.equal(
+      calls.some((command) => command.includes("demo-package@1.2.3")),
+      true,
+    );
 
     const second = await prepareNpmPackage(
       { tool: "demo", package: "demo-package", bin: "demo" },
-      { home, cacheHome: join(home, "cache"), runtime, timeoutMs: 1_000 },
+      { home, cacheHome: join(home, "cache"), runtime, timeoutMs: 1000 },
     );
     assert.equal(second.currentBin, prepared.currentBin);
     assert.equal(calls.filter((command) => command[0] === "npm").length, 1);
@@ -113,24 +116,24 @@ test("npm_launcher_rotates_previous_and_falls_back_to_last_known_good", async ()
         return success();
       },
     };
-    const options = { home, cacheHome: join(home, "cache"), runtime, timeoutMs: 1_000 };
+    const options = { home, cacheHome: join(home, "cache"), runtime, timeoutMs: 1000 };
 
-    const first = await prepareNpmPackage({ tool: "demo", package: "demo-package", bin: "demo" }, options);
+    const first = await prepareNpmPackage(
+      { tool: "demo", package: "demo-package", bin: "demo" },
+      options,
+    );
     version = "2.0.0";
-    const second = await prepareNpmPackage({ tool: "demo", package: "demo-package", bin: "demo" }, options);
+    const second = await prepareNpmPackage(
+      { tool: "demo", package: "demo-package", bin: "demo" },
+      options,
+    );
     const layout = npmCacheLayout(
       home,
       { tool: "demo", package: "demo-package" },
       join(home, "cache"),
     );
-    assert.equal(
-      readlinkSync(layout.currentLink).endsWith(join("versions", "2.0.0")),
-      true,
-    );
-    assert.equal(
-      readlinkSync(layout.previousLink).endsWith(join("versions", "1.0.0")),
-      true,
-    );
+    assert.equal(readlinkSync(layout.currentLink).endsWith(join("versions", "2.0.0")), true);
+    assert.equal(readlinkSync(layout.previousLink).endsWith(join("versions", "1.0.0")), true);
     assert.equal(existsSync(first.currentBin), true);
     assert.equal(existsSync(second.currentBin), true);
 
@@ -141,10 +144,7 @@ test("npm_launcher_rotates_previous_and_falls_back_to_last_known_good", async ()
     );
     assert.equal(offline.resolvedVersion, "2.0.0");
     assert.equal(offline.currentBin, second.currentBin);
-    assert.equal(
-      readlinkSync(layout.currentLink).endsWith(join("versions", "2.0.0")),
-      true,
-    );
+    assert.equal(readlinkSync(layout.currentLink).endsWith(join("versions", "2.0.0")), true);
 
     version = "3.0.0";
     failInstall = true;
@@ -180,7 +180,7 @@ test("npm_launcher_first_ever_resolution_failure_still_errors", async () => {
               throw new Error("network unavailable");
             },
           },
-          timeoutMs: 1_000,
+          timeoutMs: 1000,
         },
       ),
       /network unavailable/,
@@ -199,9 +199,7 @@ test("npm_launcher_separates_cache_versions_when_a_harness_changes_package", asy
         }
         return "1.0.0";
       },
-      run: async (
-        command: readonly string[],
-      ): Promise<LauncherProcessResult> => {
+      run: async (command: readonly string[]): Promise<LauncherProcessResult> => {
         if (command[0] === "npm") {
           installs += 1;
           const stage = command[3]!;
@@ -220,7 +218,7 @@ test("npm_launcher_separates_cache_versions_when_a_harness_changes_package", asy
       home,
       cacheHome: join(home, "cache"),
       runtime,
-      timeoutMs: 1_000,
+      timeoutMs: 1000,
     };
 
     const first = await prepareNpmPackage(
@@ -271,7 +269,7 @@ test("interactive_harness_launch_is_unbounded_and_keeps_arguments", async () => 
           : success();
       },
     };
-    const syncEnv = SyncEnv.fromHome(home, 1_000, { platform: "linux" });
+    const syncEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
     const harness = syncEnv.harnesses.find((candidate) => candidate.sourceName === "codex")!;
     assert.equal(await launchHarness(syncEnv, harness, ["--help", "hello"], runtime), 7);
     const launchCall = calls.at(-1)!;
@@ -295,7 +293,7 @@ test("windows_cmd_bins_and_npm_are_mediated_without_string_interpolation", () =>
   assert.deepEqual(
     executableCommand(
       "C:\\Users\\Test User\\bin\\codex.cmd",
-      ["--help", "hello world", "%PATH%", "a&b", "a\"b"],
+      ["--help", "hello world", "%PATH%", "a&b", 'a"b'],
       "win32",
     ),
     [
@@ -305,13 +303,13 @@ test("windows_cmd_bins_and_npm_are_mediated_without_string_interpolation", () =>
       "hello world",
       "%PATH%",
       "a&b",
-      "a\"b",
+      'a"b',
     ],
   );
-  assert.deepEqual(
-    executableCommand("C:\\bin\\codex.exe", ["--version"], "win32"),
-    ["C:\\bin\\codex.exe", "--version"],
-  );
+  assert.deepEqual(executableCommand("C:\\bin\\codex.exe", ["--version"], "win32"), [
+    "C:\\bin\\codex.exe",
+    "--version",
+  ]);
   assert.deepEqual(npmCommand(["view", "pkg@latest", "version"], "win32"), [
     ...powershellPrefix,
     "npm.cmd",
@@ -321,11 +319,7 @@ test("windows_cmd_bins_and_npm_are_mediated_without_string_interpolation", () =>
   ]);
 });
 
-function writePackageManifest(
-  root: string,
-  packageName: string,
-  version: string,
-): void {
+function writePackageManifest(root: string, packageName: string, version: string): void {
   const packageDir = join(root, "node_modules", ...packageName.split("/"));
   mkdirSync(packageDir, { recursive: true });
   writeFileSync(

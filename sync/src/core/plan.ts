@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import { join, posix } from "node:path";
-
+import { assertNever, panicMessage } from "@runtime/errors.ts";
 import {
+  type Harness,
   harnessInstructionFileName,
   harnessInstructionTarget,
   harnessManagedStatePath,
@@ -11,10 +12,8 @@ import {
   SKILLS_DST_DIR,
   SKILLS_SOURCE_SUBDIR,
   SOURCE_AGENT_FILE,
-  type Harness,
   type SyncEnv,
 } from "./harness.ts";
-import { panicMessage } from "@runtime/errors.ts";
 
 export type JobKind = "File" | "Dir";
 
@@ -82,11 +81,9 @@ export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
   };
 }
 
-export const assetDirNames = (root: string): string[] =>
-  dirEntryNames(root, true);
+export const assetDirNames = (root: string): string[] => dirEntryNames(root, true);
 
-export const topLevelEntryNames = (root: string): string[] =>
-  dirEntryNames(root, false);
+export const topLevelEntryNames = (root: string): string[] => dirEntryNames(root, false);
 
 function buildHarnessPlan(
   syncEnv: SyncEnv,
@@ -102,10 +99,7 @@ function buildHarnessPlan(
     assetNames,
     skillsSourceExists(syncEnv),
   );
-  const cleanupEntryNames = uniqueSorted([
-    ...currentEntryNames,
-    ...harness.compatManagedEntries,
-  ]);
+  const cleanupEntryNames = uniqueSorted([...currentEntryNames, ...harness.compatManagedEntries]);
   return {
     harness,
     statePath: harnessManagedStatePath(harness, syncEnv.managedStateHome),
@@ -167,10 +161,7 @@ function assetJobs(
   return jobs;
 }
 
-function skillsJobs(
-  syncEnv: SyncEnv,
-  harnesses: readonly HarnessPlan[],
-): Job[] {
+function skillsJobs(syncEnv: SyncEnv, harnesses: readonly HarnessPlan[]): Job[] {
   const skillsSource = join(syncEnv.skillsHome, SKILLS_SOURCE_SUBDIR);
   return harnesses.map((plan) => ({
     src: skillsSource,
@@ -184,10 +175,7 @@ function skillsSourceExists(syncEnv: SyncEnv): boolean {
   return isDirectory(join(syncEnv.skillsHome, SKILLS_SOURCE_SUBDIR));
 }
 
-function instructionJobs(
-  syncEnv: SyncEnv,
-  harnesses: readonly HarnessPlan[],
-): Job[] {
+function instructionJobs(syncEnv: SyncEnv, harnesses: readonly HarnessPlan[]): Job[] {
   return harnesses.map((plan) => ({
     src: join(syncEnv.assetsHome, SOURCE_AGENT_FILE),
     dst: plan.instructionTarget,
@@ -233,14 +221,13 @@ function buildHookPlans(
           statePath: extensionHookStatePath(syncEnv.managedStateHome, harness),
           timeoutMs: syncEnv.installTimeoutMs,
         };
+      default:
+        return assertNever(hook);
     }
   });
 }
 
-const extensionHookStatePath = (
-  managedStateHome: string,
-  harness: Harness,
-): string =>
+const extensionHookStatePath = (managedStateHome: string, harness: Harness): string =>
   join(managedStateHome, `${harness.sourceName}.extension-deps.json`);
 
 function dirEntryNames(root: string, dirsOnly: boolean): string[] {
@@ -252,7 +239,7 @@ function dirEntryNames(root: string, dirsOnly: boolean): string[] {
   try {
     entries = fs.readdirSync(root, { withFileTypes: true });
   } catch (error) {
-    throw new Error(`read ${root} (${panicMessage(error)})`);
+    throw new Error(`read ${root} (${panicMessage(error)})`, { cause: error });
   }
 
   const names: string[] = [];
@@ -265,8 +252,7 @@ function dirEntryNames(root: string, dirsOnly: boolean): string[] {
   return uniqueSorted(names);
 }
 
-const uniqueSorted = (names: readonly string[]): string[] =>
-  [...new Set(names)].sort();
+const uniqueSorted = (names: readonly string[]): string[] => [...new Set(names)].sort();
 
 function isDirectory(root: string): boolean {
   try {
@@ -283,5 +269,4 @@ const isTopLevel = (entryName: string): boolean =>
   entryName !== "." &&
   entryName !== "..";
 
-export const isSafeManagedEntryName = (entryName: string): boolean =>
-  isTopLevel(entryName);
+export const isSafeManagedEntryName = (entryName: string): boolean => isTopLevel(entryName);

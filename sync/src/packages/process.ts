@@ -10,10 +10,7 @@ import { missingPackageRoots } from "./validate.ts";
 
 export { runCommand } from "@runtime/process.ts";
 
-export const installPackageDeps = async (
-  dir: string,
-  timeoutMs: number,
-): Promise<boolean> => {
+export const installPackageDeps = async (dir: string, timeoutMs: number): Promise<boolean> => {
   const hasPackageJson = await fs
     .stat(`${dir}/package.json`)
     .then((metadata) => metadata.isFile())
@@ -43,9 +40,7 @@ export const installInferredImportPackages = async (
   try {
     missing = missingPackageRoots(dir);
   } catch (error) {
-    console.error(
-      `sync: dependency scan failed in ${dir}: ${(error as Error).message}`,
-    );
+    console.error(`sync: dependency scan failed in ${dir}: ${(error as Error).message}`);
     return false;
   }
   if (missing.length === 0) {
@@ -70,10 +65,7 @@ export const installInferredImportPackages = async (
   return false;
 };
 
-export const runPackageBuild = async (
-  dir: string,
-  timeoutMs: number,
-): Promise<boolean> => {
+export const runPackageBuild = async (dir: string, timeoutMs: number): Promise<boolean> => {
   const tool = await pickBunRunner();
   if (!tool) {
     console.error(`sync: bun is required for build in ${dir}`);

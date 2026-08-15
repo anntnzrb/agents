@@ -2,10 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { isErrno } from "./errors.ts";
 
-type SourceContentCache = Map<
-  string,
-  { readonly metadata: fs.Stats; readonly content: Buffer }
->;
+type SourceContentCache = Map<string, { readonly metadata: fs.Stats; readonly content: Buffer }>;
 
 export function isSymlink(targetPath: string): boolean {
   try {
@@ -55,12 +52,7 @@ export function syncManagedTree(
     syncManagedFile(src, dst, metadata, sourceContentCache);
     return;
   }
-  syncManagedTreeRecursive(
-    src,
-    dst,
-    normalizePreservePaths(preservePaths),
-    sourceContentCache,
-  );
+  syncManagedTreeRecursive(src, dst, normalizePreservePaths(preservePaths), sourceContentCache);
 }
 
 export function syncManagedChildren(
@@ -74,12 +66,7 @@ export function syncManagedChildren(
     syncManagedFile(src, dst, metadata, sourceContentCache);
     return;
   }
-  syncManagedChildrenRecursive(
-    src,
-    dst,
-    normalizePreservePaths(preservePaths),
-    sourceContentCache,
-  );
+  syncManagedChildrenRecursive(src, dst, normalizePreservePaths(preservePaths), sourceContentCache);
 }
 
 function copyTreeRecursive(src: string, dst: string): void {
@@ -137,12 +124,7 @@ function syncManagedTreeRecursive(
     const childPreservePaths = childPreserve(preservePaths, srcEntry.name);
     const childMetadata = fs.statSync(childSrc);
     if (childMetadata.isDirectory()) {
-      syncManagedTreeRecursive(
-        childSrc,
-        childDst,
-        childPreservePaths,
-        sourceContentCache,
-      );
+      syncManagedTreeRecursive(childSrc, childDst, childPreservePaths, sourceContentCache);
       continue;
     }
     syncManagedFile(childSrc, childDst, childMetadata, sourceContentCache);
@@ -169,12 +151,7 @@ function syncManagedChildrenRecursive(
     const childPreservePaths = childPreserve(preservePaths, srcEntry.name);
     const childMetadata = fs.statSync(childSrc);
     if (childMetadata.isDirectory()) {
-      syncManagedTreeRecursive(
-        childSrc,
-        childDst,
-        childPreservePaths,
-        sourceContentCache,
-      );
+      syncManagedTreeRecursive(childSrc, childDst, childPreservePaths, sourceContentCache);
       continue;
     }
     syncManagedFile(childSrc, childDst, childMetadata, sourceContentCache);
@@ -260,10 +237,7 @@ function ensureDirectory(dst: string): void {
   fs.mkdirSync(dst, { recursive: true });
 }
 
-function childPreserve(
-  preservePaths: readonly string[],
-  childName: string,
-): string[] {
+function childPreserve(preservePaths: readonly string[], childName: string): string[] {
   const prefix = `${childName}/`;
   return preservePaths
     .filter((candidate) => candidate.startsWith(prefix))
@@ -271,9 +245,7 @@ function childPreserve(
 }
 
 const normalizePreservePaths = (preservePaths: readonly string[]): string[] =>
-  [
-    ...new Set(preservePaths.filter((candidate) => candidate.length > 0)),
-  ].sort();
+  [...new Set(preservePaths.filter((candidate) => candidate.length > 0))].sort();
 
 function safeReadDir(targetPath: string): fs.Dirent[] {
   try {

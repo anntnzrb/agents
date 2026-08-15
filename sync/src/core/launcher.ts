@@ -1,13 +1,8 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-
+import { releaseSyncLock, type SyncLock, tryAcquireSyncLock } from "@runtime/lock.ts";
 import type { Harness, SyncEnv } from "./harness.ts";
-import {
-  releaseSyncLock,
-  tryAcquireSyncLock,
-  type SyncLock,
-} from "@runtime/lock.ts";
 
 const DEFAULT_LAUNCH_TIMEOUT_MS = 120_000;
 const VERSION_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
@@ -68,14 +63,11 @@ export interface PreparedNpmPackage {
 export function npmCacheLayout(
   home: string,
   spec: Pick<NpmPackageSpec, "tool" | "package">,
-  cacheHome = process.env.XDG_CACHE_HOME || path.join(home, ".cache"),
+  cacheHome = process.env["XDG_CACHE_HOME"] || path.join(home, ".cache"),
 ): NpmCacheLayout {
   requireComponent(spec.tool, "tool");
   const toolCache = path.join(cacheHome, "npm-tools", spec.tool);
-  const packageKey = createHash("sha256")
-    .update(spec.package)
-    .digest("hex")
-    .slice(0, 16);
+  const packageKey = createHash("sha256").update(spec.package).digest("hex").slice(0, 16);
   const packageCache = path.join(toolCache, "packages", packageKey);
   return {
     toolCache,
@@ -106,9 +98,7 @@ export async function prepareNpmPackage(
         runtime.resolveVersion ??
         ((packageName: string, tag: string, timeout: number) =>
           resolveVersion(packageName, tag, timeout, options.platform));
-      resolvedVersion = validateResolvedVersion(
-        await resolve(spec.package, distTag, timeoutMs),
-      );
+      resolvedVersion = validateResolvedVersion(await resolve(spec.package, distTag, timeoutMs));
     } catch (error) {
       if (!cached) {
         throw error;
@@ -171,11 +161,7 @@ export async function prepareNpmPackage(
         }
         if ((spec.smokeCheck ?? "--version") !== "-") {
           const smoke = await (runtime.run ?? runLauncherProcess)(
-            executableCommand(
-              installedBin,
-              [spec.smokeCheck ?? "--version"],
-              options.platform,
-            ),
+            executableCommand(installedBin, [spec.smokeCheck ?? "--version"], options.platform),
             stageDir,
             timeoutMs,
             "pipe",
@@ -192,11 +178,7 @@ export async function prepareNpmPackage(
       updateCurrentAndPrevious(layout, resolvedVersion, options.platform);
       pruneVersions(layout);
 
-      const currentBin = packageBinPath(
-        layout.currentLink,
-        spec.bin,
-        options.platform,
-      );
+      const currentBin = packageBinPath(layout.currentLink, spec.bin, options.platform);
       if (!isExecutable(currentBin, options.platform)) {
         throw new Error(`current package has no executable bin: ${spec.bin}`);
       }
@@ -282,10 +264,12 @@ async function runLauncherProcess(
   stdio: "pipe" | "inherit",
 ): Promise<LauncherProcessResult> {
   const signal = timeoutMs === undefined ? undefined : AbortSignal.timeout(timeoutMs);
-  let subprocess: Bun.Subprocess<"pipe", "pipe", "inherit"> | Bun.Subprocess<"inherit", "inherit", "inherit">;
+  let subprocess:
+    | Bun.Subprocess<"pipe", "pipe", "inherit">
+    | Bun.Subprocess<"inherit", "inherit", "inherit">;
   try {
     subprocess = Bun.spawn([...command], {
-      cwd: cwd ?? undefined,
+      ...(cwd === undefined ? {} : { cwd }),
       killSignal: "SIGKILL",
       ...(signal ? { signal } : {}),
       stdin: stdio === "pipe" ? "ignore" : "inherit",
@@ -302,7 +286,7 @@ async function runLauncherProcess(
 
   if (stdio === "inherit") {
     const exitCode = await subprocess.exited;
-    return { exitCode, stdout: "", stderr: "", timedOut: signal?.aborted };
+    return { exitCode, stdout: "", stderr: "", timedOut: signal?.aborted ?? false };
   }
 
   const [stdout, stderr, exitCode] = await Promise.all([
@@ -310,13 +294,10 @@ async function runLauncherProcess(
     new Response(subprocess.stderr).text().catch(() => ""),
     subprocess.exited,
   ]);
-  return { exitCode, stdout, stderr, timedOut: signal?.aborted };
+  return { exitCode, stdout, stderr, timedOut: signal?.aborted ?? false };
 }
 
-async function acquireCacheLock(
-  layout: NpmCacheLayout,
-  timeoutMs: number,
-): Promise<SyncLock> {
+async function acquireCacheLock(layout: NpmCacheLayout, timeoutMs: number): Promise<SyncLock> {
   const startedAt = Date.now();
   while (true) {
     const lock = tryAcquireSyncLock(layout.toolCache, layout.lockFile);
@@ -338,10 +319,7 @@ function updateCurrentAndPrevious(
   const expectedTarget =
     platform === "win32"
       ? path.join(layout.versionsDir, version)
-      : path.relative(
-          path.dirname(layout.currentLink),
-          path.join(layout.versionsDir, version),
-        );
+      : path.relative(path.dirname(layout.currentLink), path.join(layout.versionsDir, version));
   const currentTarget = readLinkTarget(layout.currentLink);
   if (currentTarget === expectedTarget) {
     return;
@@ -352,11 +330,7 @@ function updateCurrentAndPrevious(
   replaceLink(layout.currentLink, expectedTarget, platform);
 }
 
-function replaceLink(
-  linkPath: string,
-  target: string,
-  platform = process.platform,
-): void {
+function replaceLink(linkPath: string, target: string, platform = process.platform): void {
   const tempPath = `${linkPath}.${process.pid}.tmp`;
   fs.rmSync(tempPath, { recursive: true, force: true });
   fs.symlinkSync(target, tempPath, platform === "win32" ? "junction" : "dir");
@@ -404,11 +378,7 @@ function readLinkTarget(linkPath: string): string | undefined {
   }
 }
 
-function packageBinPath(
-  root: string,
-  bin: string,
-  platform = process.platform,
-): string {
+function packageBinPath(root: string, bin: string, platform = process.platform): string {
   const base = path.join(root, "node_modules", ".bin", bin);
   if (platform === "win32") {
     if (exists(`${base}.cmd`)) {
@@ -428,11 +398,7 @@ function validateSpec(spec: NpmPackageSpec): void {
   if (!PACKAGE_PATTERN.test(spec.package)) {
     throw new Error(`invalid package: ${spec.package}`);
   }
-  if (
-    spec.smokeCheck !== undefined &&
-    !spec.smokeCheck.trim() &&
-    spec.smokeCheck !== "-"
-  ) {
+  if (spec.smokeCheck !== undefined && !spec.smokeCheck.trim() && spec.smokeCheck !== "-") {
     throw new Error("missing smoke check");
   }
 }
@@ -470,11 +436,7 @@ export function npmCommand(
   args: readonly string[],
   platform: NodeJS.Platform = process.platform,
 ): string[] {
-  return executableCommand(
-    platform === "win32" ? "npm.cmd" : "npm",
-    args,
-    platform,
-  );
+  return executableCommand(platform === "win32" ? "npm.cmd" : "npm", args, platform);
 }
 
 function currentCachedPackage(
@@ -501,11 +463,7 @@ function currentCachedPackage(
   }
 }
 
-function warnUsingCachedPackage(
-  spec: NpmPackageSpec,
-  version: string,
-  error: unknown,
-): void {
+function warnUsingCachedPackage(spec: NpmPackageSpec, version: string, error: unknown): void {
   console.error(
     `sync: warning: latest ${spec.package}@${spec.distTag ?? "latest"} unavailable (${detailFromError(error)}); using cached ${spec.tool}@${version}`,
   );

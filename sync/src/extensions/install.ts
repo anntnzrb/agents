@@ -2,15 +2,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { installInferredImportPackages } from "@packages/process.ts";
-import {
-  commandExists,
-  type CommandOutcome,
-  runCommandOutcome,
-} from "@runtime/process.ts";
+import { assertNever } from "@runtime/errors.ts";
+import { type CommandOutcome, commandExists, runCommandOutcome } from "@runtime/process.ts";
 
-export const iterExtensionPackages = async (
-  root: string,
-): Promise<string[]> => {
+export const iterExtensionPackages = async (root: string): Promise<string[]> => {
   const stat = await fs.stat(root).catch(() => undefined);
   if (!stat?.isDirectory()) {
     return [];
@@ -63,19 +58,14 @@ const needsNodeInstall = async (packageDir: string): Promise<boolean> => {
     .stat(path.join(packageDir, "package.json"))
     .then((metadata) => metadata.isFile())
     .catch(() => false);
-  const nodeModules = await fs
-    .stat(path.join(packageDir, "node_modules"))
-    .catch(() => undefined);
+  const nodeModules = await fs.stat(path.join(packageDir, "node_modules")).catch(() => undefined);
   return packageJson && !nodeModules;
 };
 
 const chooseInstaller = async (): Promise<string[] | undefined> =>
   (await commandExists("bun")) ? ["bun", "install"] : undefined;
 
-export const installExtensionDeps = async (
-  root: string,
-  timeoutMs: number,
-): Promise<boolean> => {
+export const installExtensionDeps = async (root: string, timeoutMs: number): Promise<boolean> => {
   const results: boolean[] = [];
   for (const packageDir of await iterExtensionPackages(root)) {
     if (!(await needsNodeInstall(packageDir))) {
@@ -113,8 +103,9 @@ function logInstallFailure(
       );
       return;
     case "TimedOut":
-      console.error(
-        `sync: deps install timed out in ${packageDir}: ${command[0]}`,
-      );
+      console.error(`sync: deps install timed out in ${packageDir}: ${command[0]}`);
+      return;
+    default:
+      assertNever(outcome);
   }
 }

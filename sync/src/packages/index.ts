@@ -15,6 +15,7 @@ import {
   stagingDirFor,
 } from "./source.ts";
 import { packageHasBuildScript, packageIsHealthy } from "./validate.ts";
+
 export {
   cloneAttemptsForTests,
   commandForTests,
@@ -53,20 +54,20 @@ export function readPackageManifest(filePath: string): PackageManifest {
     if (isErrno(error, "ENOENT")) {
       return { packages: [] };
     }
-    throw new Error(`${filePath} (${String(error)})`);
+    throw new Error(`${filePath} (${String(error)})`, { cause: error });
   }
 
   let value: unknown;
   try {
     value = JSON.parse(content) as unknown;
   } catch (error) {
-    throw new Error(`invalid JSON in ${filePath}: ${String(error)}`);
+    throw new Error(`invalid JSON in ${filePath}: ${String(error)}`, { cause: error });
   }
 
   if (!isRecord(value)) {
     throw new Error(`${filePath} must contain a JSON object`);
   }
-  const packagesValue = value.packages;
+  const packagesValue = value["packages"];
   if (packagesValue === undefined) {
     throw new Error(`${filePath} missing "packages" array`);
   }
@@ -93,16 +94,13 @@ export function readPackageManifest(filePath: string): PackageManifest {
   return { packages };
 }
 
-export function patchRuntimeSettings(
-  filePath: string,
-  packagePaths: readonly string[],
-): void {
+export function patchRuntimeSettings(filePath: string, packagePaths: readonly string[]): void {
   let current = "{}";
   try {
     current = fs.readFileSync(filePath, "utf8");
   } catch (error) {
     if (!isErrno(error, "ENOENT")) {
-      throw new Error(`read ${filePath} (${String(error)})`);
+      throw new Error(`read ${filePath} (${String(error)})`, { cause: error });
     }
   }
 
@@ -110,11 +108,11 @@ export function patchRuntimeSettings(
   try {
     value = JSON.parse(current) as unknown;
   } catch (error) {
-    throw new Error(`parse ${filePath} (${String(error)})`);
+    throw new Error(`parse ${filePath} (${String(error)})`, { cause: error });
   }
 
   const settings = isRecord(value) ? value : {};
-  settings.packages = packagePaths.map((packagePath) => packagePath.toString());
+  settings["packages"] = packagePaths.map((packagePath) => packagePath.toString());
 
   const parent = path.dirname(filePath);
   if (parent && parent !== ".") {
@@ -124,7 +122,7 @@ export function patchRuntimeSettings(
   try {
     fs.writeFileSync(filePath, `${JSON.stringify(settings, null, 2)}\n`);
   } catch (error) {
-    throw new Error(`write ${filePath} (${String(error)})`);
+    throw new Error(`write ${filePath} (${String(error)})`, { cause: error });
   }
 }
 
@@ -175,16 +173,12 @@ async function ensurePackage(
   }
 }
 
-export async function bootstrapPackageTarget(
-  target: PackageBootstrapTarget,
-): Promise<boolean> {
+export async function bootstrapPackageTarget(target: PackageBootstrapTarget): Promise<boolean> {
   let manifest: PackageManifest;
   try {
     manifest = readPackageManifest(target.manifestPath);
   } catch (error) {
-    err(
-      `package bootstrap failed: ${String(error instanceof Error ? error.message : error)}`,
-    );
+    err(`package bootstrap failed: ${String(error instanceof Error ? error.message : error)}`);
     return false;
   }
 
@@ -192,9 +186,7 @@ export async function bootstrapPackageTarget(
   let success = true;
   for (const source of manifest.packages) {
     try {
-      installedPaths.push(
-        await ensurePackage(source, target.cacheRoot, target.timeoutMs),
-      );
+      installedPaths.push(await ensurePackage(source, target.cacheRoot, target.timeoutMs));
     } catch (error) {
       err(
         `package bootstrap failed for ${source}: ${String(error instanceof Error ? error.message : error)}`,
@@ -206,9 +198,7 @@ export async function bootstrapPackageTarget(
   try {
     patchRuntimeSettings(target.runtimeSettingsPath, installedPaths);
   } catch (error) {
-    err(
-      `package settings patch failed: ${String(error instanceof Error ? error.message : error)}`,
-    );
+    err(`package settings patch failed: ${String(error instanceof Error ? error.message : error)}`);
     success = false;
   }
 

@@ -8,6 +8,11 @@ import { runCommand } from "./process.ts";
 
 export { rmEntry } from "@runtime/fs.ts";
 
+const ALPHANUMERIC_PATTERN = /[A-Za-z0-9]/;
+const SOURCE_SEPARATOR_PATTERN = /[/:]/;
+const TRAILING_PATH_SEPARATOR_PATTERN = /[\\/]+$/;
+const WINDOWS_ABSOLUTE_PATH_PATTERN = /^[A-Za-z]:[\\/]/;
+
 export function packageCacheDir(cacheRoot: string, source: string): string {
   const slug = sourceSlug(source);
   return path.join(cacheRoot, `${slug}-${fnv1a64(source)}`);
@@ -18,10 +23,7 @@ export function stagingDirFor(finalDir: string): string {
   return withExtension(finalDir, `staging-${process.pid}-${now}`);
 }
 
-export async function replaceDirAtomically(
-  src: string,
-  dst: string,
-): Promise<void> {
+export async function replaceDirAtomically(src: string, dst: string): Promise<void> {
   const backup = withExtension(dst, "backup");
   rmEntry(backup);
   if (exists(dst)) {
@@ -48,16 +50,12 @@ export async function clonePackage(
   targetDir: string,
   timeoutMs: number,
 ): Promise<boolean> {
-  return clonePackageWithRunner(
-    source,
-    targetDir,
-    await commandExists("gh"),
-    (command) => runCommand(command, undefined, timeoutMs, "clone"),
+  return clonePackageWithRunner(source, targetDir, await commandExists("gh"), (command) =>
+    runCommand(command, undefined, timeoutMs, "clone"),
   );
 }
 
-export const githubSlugForTests = (source: string): string | null =>
-  githubRepoSlug(source);
+export const githubSlugForTests = (source: string): string | null => githubRepoSlug(source);
 
 export function commandForTests(source: string, targetDir: string): string[] {
   const command = cloneCommands(source, targetDir, true)[0];
@@ -75,33 +73,28 @@ export async function cloneAttemptsForTests(
 ): Promise<[boolean, string[][]]> {
   const attempts: string[][] = [];
   let index = 0;
-  const result = await clonePackageWithRunner(
-    source,
-    targetDir,
-    ghAvailable,
-    async (command) => {
-      attempts.push([...command]);
-      const outcome = outcomes[index] ?? false;
-      index += 1;
-      return outcome;
-    },
-  );
+  const result = await clonePackageWithRunner(source, targetDir, ghAvailable, async (command) => {
+    attempts.push([...command]);
+    const outcome = outcomes[index] ?? false;
+    index += 1;
+    return outcome;
+  });
   return [result, attempts];
 }
 
 function sourceSlug(source: string): string {
-  const trimmed = source.trim().replace(/[\\/]+$/, "");
+  const trimmed = source.trim().replace(TRAILING_PATH_SEPARATOR_PATTERN, "");
   const normalized = trimmed.endsWith(".git") ? trimmed.slice(0, -4) : trimmed;
   const sourceParts = isLocalPathSource(normalized)
     ? [localPathBasename(normalized)]
     : normalized
-        .split(/[/:]/)
+        .split(SOURCE_SEPARATOR_PATTERN)
         .filter((part) => part.length > 0)
         .slice(-2);
   const joined = sourceParts.length === 0 ? "package" : sourceParts.join("-");
   const sanitized = joined
     .split("")
-    .map((ch) => (/[A-Za-z0-9]/.test(ch) ? ch.toLowerCase() : "-"))
+    .map((ch) => (ALPHANUMERIC_PATTERN.test(ch) ? ch.toLowerCase() : "-"))
     .join("");
   const compact = sanitized
     .split("-")
@@ -115,7 +108,7 @@ const localPathBasename = (source: string): string =>
 
 const isLocalPathSource = (source: string): boolean =>
   path.isAbsolute(source) ||
-  /^[A-Za-z]:[\\/]/.test(source) ||
+  WINDOWS_ABSOLUTE_PATH_PATTERN.test(source) ||
   source.startsWith("\\\\") ||
   source.startsWith(".\\") ||
   source.startsWith("..\\") ||
@@ -152,11 +145,7 @@ async function clonePackageWithRunner(
   return false;
 }
 
-function cloneCommands(
-  source: string,
-  targetDir: string,
-  ghAvailable: boolean,
-): string[][] {
+function cloneCommands(source: string, targetDir: string, ghAvailable: boolean): string[][] {
   const commands: string[][] = [];
   const slug = githubRepoSlug(source);
   if (slug && ghAvailable) {

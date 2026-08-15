@@ -1,8 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-
-import type { HostPlatform, Harness, SyncEnv } from "./harness.ts";
 import { isErrno, panicMessage } from "@runtime/errors.ts";
+import type { Harness, HostPlatform, SyncEnv } from "./harness.ts";
 
 export const UNIX_WRAPPER_DIR = [".local", "bin"] as const;
 export const WINDOWS_WRAPPER_DIR = ["Programs", "Agents", "bin"] as const;
@@ -37,8 +36,7 @@ export function wrapperDirectory(
   platform: HostPlatform = syncEnv.platform,
 ): string {
   if (platform === "win32") {
-    const localAppData =
-      syncEnv.localAppData ?? path.join(syncEnv.home, "AppData", "Local");
+    const localAppData = syncEnv.localAppData ?? path.join(syncEnv.home, "AppData", "Local");
     return path.join(localAppData, ...WINDOWS_WRAPPER_DIR);
   }
   return path.join(syncEnv.home, ...UNIX_WRAPPER_DIR);
@@ -72,14 +70,7 @@ export function renderWrapper(
   harness: Harness,
   platform: HostPlatform,
 ): string {
-  const syncScript = path.join(
-    syncEnv.home,
-    ".config",
-    "agents",
-    "sync",
-    "src",
-    "cli.ts",
-  );
+  const syncScript = path.join(syncEnv.home, ".config", "agents", "sync", "src", "cli.ts");
   if (platform === "win32") {
     return [
       "@echo off",
@@ -94,15 +85,12 @@ export function renderWrapper(
     "#!/bin/sh",
     `# ${WRAPPER_MARKER}`,
     "set -eu",
-    `exec bun ${shellQuote(syncScript)} launch ${shellQuote(harness.sourceName)} -- \"$@\"`,
+    `exec bun ${shellQuote(syncScript)} launch ${shellQuote(harness.sourceName)} -- "$@"`,
     "",
   ].join("\n");
 }
 
-export function reconcileWrappers(
-  syncEnv: SyncEnv,
-  runtime: WrapperRuntime = {},
-): boolean {
+export function reconcileWrappers(syncEnv: SyncEnv, runtime: WrapperRuntime = {}): boolean {
   try {
     const platform = runtime.platform ?? syncEnv.platform;
     const desired = wrapperDestinations(syncEnv, platform);
@@ -115,10 +103,7 @@ export function reconcileWrappers(
     if (platform === "win32") {
       const addPath =
         runtime.writeWindowsPath ?? ((directory) => ensureWindowsUserPath(syncEnv, directory));
-      const markerPath = path.join(
-        syncEnv.managedStateHome,
-        WINDOWS_PATH_MARKER_FILE,
-      );
+      const markerPath = path.join(syncEnv.managedStateHome, WINDOWS_PATH_MARKER_FILE);
       if (!exists(markerPath)) {
         if (!addPath(wrapperDirectory(syncEnv, platform))) {
           return false;
@@ -149,10 +134,7 @@ export function reconcileWrapperFiles(
   if (syncEnv.home && syncEnv.platform) {
     allowedDirectories.add(
       path.resolve(
-        wrapperDirectory(
-          syncEnv as Pick<SyncEnv, "home" | "platform" | "localAppData">,
-          platform,
-        ),
+        wrapperDirectory(syncEnv as Pick<SyncEnv, "home" | "platform" | "localAppData">, platform),
       ),
     );
   }
@@ -206,33 +188,33 @@ export function readWrapperState(statePath: string): WrapperState {
     if (isErrno(error, "ENOENT")) {
       return { version: 1, entries: [] };
     }
-    throw new Error(`read ${statePath} (${panicMessage(error)})`);
+    throw new Error(`read ${statePath} (${panicMessage(error)})`, { cause: error });
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
   } catch (error) {
-    console.error(`sync: warning: wrapper state parse failed, ignoring ${statePath} (${panicMessage(error)})`);
+    console.error(
+      `sync: warning: wrapper state parse failed, ignoring ${statePath} (${panicMessage(error)})`,
+    );
     return { version: 1, entries: [] };
   }
 
-  if (!isRecord(parsed) || parsed.version !== 1 || !Array.isArray(parsed.entries)) {
-    console.error(`sync: warning: wrapper state parse failed, ignoring ${statePath} (invalid shape)`);
+  if (!isRecord(parsed) || parsed["version"] !== 1 || !Array.isArray(parsed["entries"])) {
+    console.error(
+      `sync: warning: wrapper state parse failed, ignoring ${statePath} (invalid shape)`,
+    );
     return { version: 1, entries: [] };
   }
 
-  const entries = parsed.entries.filter(
+  const entries = parsed["entries"].filter(
     (entry): entry is string => typeof entry === "string" && path.isAbsolute(entry),
   );
   return { version: 1, entries: [...new Set(entries)].sort() };
 }
 
-function writeWrapperState(
-  statePath: string,
-  state: WrapperState,
-  platform: HostPlatform,
-): void {
+function writeWrapperState(statePath: string, state: WrapperState, platform: HostPlatform): void {
   const content = `${JSON.stringify(state, null, 2)}\n`;
   try {
     if (fs.readFileSync(statePath, "utf8") === content) {
@@ -240,7 +222,7 @@ function writeWrapperState(
     }
   } catch (error) {
     if (!isErrno(error, "ENOENT")) {
-      throw new Error(`read ${statePath} (${panicMessage(error)})`);
+      throw new Error(`read ${statePath} (${panicMessage(error)})`, { cause: error });
     }
   }
   const tempPath = `${statePath}.${process.pid}.tmp`;
@@ -256,7 +238,7 @@ function writeWrapperState(
     } catch {
       // Best effort cleanup; preserve the original replacement error.
     }
-    throw new Error(`replace ${statePath} (${panicMessage(error)})`);
+    throw new Error(`replace ${statePath} (${panicMessage(error)})`, { cause: error });
   }
 }
 
@@ -278,7 +260,7 @@ function writeManagedWrapper(
     }
   } catch (error) {
     if (!isErrno(error, "ENOENT")) {
-      throw new Error(`inspect wrapper ${targetPath} (${panicMessage(error)})`);
+      throw new Error(`inspect wrapper ${targetPath} (${panicMessage(error)})`, { cause: error });
     }
   }
 
@@ -299,7 +281,7 @@ function writeManagedWrapper(
     } catch {
       // Best effort cleanup; preserve the original replacement error.
     }
-    throw new Error(`replace wrapper ${targetPath} (${panicMessage(error)})`);
+    throw new Error(`replace wrapper ${targetPath} (${panicMessage(error)})`, { cause: error });
   }
   return "owned";
 }
@@ -321,21 +303,18 @@ function removeWrapper(targetPath: string): void {
     fs.rmSync(targetPath, { force: false });
   } catch (error) {
     if (!isErrno(error, "ENOENT")) {
-      throw new Error(`remove wrapper ${targetPath} (${panicMessage(error)})`);
+      throw new Error(`remove wrapper ${targetPath} (${panicMessage(error)})`, { cause: error });
     }
   }
 }
 
 export function ensureWindowsUserPath(syncEnv: SyncEnv, directory: string): boolean {
-  const markerPath = path.join(
-    syncEnv.managedStateHome,
-    WINDOWS_PATH_MARKER_FILE,
-  );
+  const markerPath = path.join(syncEnv.managedStateHome, WINDOWS_PATH_MARKER_FILE);
   if (exists(markerPath)) {
     return true;
   }
 
-  const currentPath = process.env.PATH ?? "";
+  const currentPath = process.env["PATH"] ?? "";
   const normalizedDirectory = path.normalize(directory).toLowerCase();
   const hasDirectory = currentPath
     .split(path.delimiter)
@@ -351,7 +330,9 @@ export function ensureWindowsUserPath(syncEnv: SyncEnv, directory: string): bool
     ];
     const result = Bun.spawnSync(command, { stdout: "ignore", stderr: "pipe" });
     if (!result.success) {
-      console.error(`sync: failed to add wrapper directory to Windows user PATH: ${result.stderr?.toString().trim() ?? "unknown error"}`);
+      console.error(
+        `sync: failed to add wrapper directory to Windows user PATH: ${result.stderr?.toString().trim() ?? "unknown error"}`,
+      );
       return false;
     }
   }
@@ -366,7 +347,7 @@ function shellQuote(value: string): string {
 }
 
 function windowsQuote(value: string): string {
-  return `"${value.replaceAll("\"", "\\\"")}"`;
+  return `"${value.replaceAll('"', '\\"')}"`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

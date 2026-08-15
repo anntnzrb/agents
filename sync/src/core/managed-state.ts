@@ -1,14 +1,10 @@
 import fs from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { isErrno } from "@runtime/errors.ts";
+import { err, isErrno, panicMessage, warn } from "@runtime/errors.ts";
+import { rmEntry } from "@runtime/fs.ts";
 
-import { SyncEnv } from "./harness.ts";
-import {
-  buildSyncPlan,
-  isSafeManagedEntryName,
-  type SyncPlan,
-} from "./plan.ts";
-import { err, panicMessage, rmEntry, warn } from "./index.ts";
+import type { SyncEnv } from "./harness.ts";
+import { buildSyncPlan, isSafeManagedEntryName, type SyncPlan } from "./plan.ts";
 
 export interface ManagedSyncPlan {
   harnesses: ManagedHarnessPlan[];
@@ -24,9 +20,7 @@ export function planManagedEntries(syncEnv: SyncEnv): ManagedSyncPlan {
   return planManagedEntriesForSyncPlan(buildSyncPlan(syncEnv));
 }
 
-export function planManagedEntriesForSyncPlan(
-  syncPlan: SyncPlan,
-): ManagedSyncPlan {
+export function planManagedEntriesForSyncPlan(syncPlan: SyncPlan): ManagedSyncPlan {
   return {
     harnesses: syncPlan.harnesses.map((harnessPlan) => {
       const currentEntryNames = [...harnessPlan.currentEntryNames];
@@ -84,16 +78,14 @@ export function loadRecordedEntryNames(path: string): string[] {
     if (isErrno(error, "ENOENT")) {
       return [];
     }
-    throw new Error(`read ${path} (${panicMessage(error)})`);
+    throw new Error(`read ${path} (${panicMessage(error)})`, { cause: error });
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
   } catch (error) {
-    warn(
-      `managed state parse failed, ignoring ${path} (${panicMessage(error)})`,
-    );
+    warn(`managed state parse failed, ignoring ${path} (${panicMessage(error)})`);
     return [];
   }
 
@@ -102,9 +94,7 @@ export function loadRecordedEntryNames(path: string): string[] {
     return [];
   }
   if (!parsed.every((entryName) => typeof entryName === "string")) {
-    warn(
-      `managed state parse failed, ignoring ${path} (entries must be strings)`,
-    );
+    warn(`managed state parse failed, ignoring ${path} (entries must be strings)`);
     return [];
   }
 
@@ -113,30 +103,25 @@ export function loadRecordedEntryNames(path: string): string[] {
     if (isSafeManagedEntryName(entryName)) {
       safeNames.add(entryName);
     } else {
-      warn(
-        `ignoring unsafe managed entry ${JSON.stringify(entryName)} in ${path}`,
-      );
+      warn(`ignoring unsafe managed entry ${JSON.stringify(entryName)} in ${path}`);
     }
   }
   return [...safeNames].sort();
 }
 
-export function writeRecordedEntryNames(
-  path: string,
-  entryNames: string[],
-): void {
+export function writeRecordedEntryNames(path: string, entryNames: string[]): void {
   const parent = dirname(path);
   try {
     fs.mkdirSync(parent, { recursive: true });
   } catch (error) {
-    throw new Error(`create ${parent} (${panicMessage(error)})`);
+    throw new Error(`create ${parent} (${panicMessage(error)})`, { cause: error });
   }
 
   let content: string;
   try {
     content = `${JSON.stringify(entryNames, null, 2)}\n`;
   } catch (error) {
-    throw new Error(`serialize ${path} (${panicMessage(error)})`);
+    throw new Error(`serialize ${path} (${panicMessage(error)})`, { cause: error });
   }
   try {
     const existing = fs.lstatSync(path);
@@ -145,7 +130,7 @@ export function writeRecordedEntryNames(
     }
   } catch (error) {
     if (!isErrno(error, "ENOENT")) {
-      throw new Error(`read ${path} (${panicMessage(error)})`);
+      throw new Error(`read ${path} (${panicMessage(error)})`, { cause: error });
     }
   }
   const { tempPath, fd } = createTempStateFile(path);
@@ -153,12 +138,12 @@ export function writeRecordedEntryNames(
     try {
       fs.writeFileSync(fd, content, "utf8");
     } catch (error) {
-      throw new Error(`write ${tempPath} (${panicMessage(error)})`);
+      throw new Error(`write ${tempPath} (${panicMessage(error)})`, { cause: error });
     }
     try {
       fs.fsyncSync(fd);
     } catch (error) {
-      throw new Error(`sync ${tempPath} (${panicMessage(error)})`);
+      throw new Error(`sync ${tempPath} (${panicMessage(error)})`, { cause: error });
     }
     try {
       fs.closeSync(fd);
@@ -168,7 +153,7 @@ export function writeRecordedEntryNames(
     try {
       fs.renameSync(tempPath, path);
     } catch (error) {
-      throw new Error(`replace ${path} (${panicMessage(error)})`);
+      throw new Error(`replace ${path} (${panicMessage(error)})`, { cause: error });
     }
   } catch (error) {
     try {
@@ -194,24 +179,18 @@ function createTempStateFile(path: string): { tempPath: string; fd: number } {
   const baseName = basename(path) || "managed-state.json";
   const nonce = Date.now().toString(16);
   for (let attempt = 0; attempt < 16; attempt += 1) {
-    const tempPath = join(
-      dirname(path),
-      `.${baseName}.${process.pid}.${nonce}-${attempt}.tmp`,
-    );
+    const tempPath = join(dirname(path), `.${baseName}.${process.pid}.${nonce}-${attempt}.tmp`);
     try {
       const fd = fs.openSync(tempPath, "wx");
       return { tempPath, fd };
     } catch (error) {
       if (!isErrno(error, "EEXIST")) {
-        throw new Error(`create ${tempPath} (${panicMessage(error)})`);
+        throw new Error(`create ${tempPath} (${panicMessage(error)})`, { cause: error });
       }
     }
   }
 
-  throw new Error(
-    `create temporary managed state near ${path} (name collision)`,
-  );
+  throw new Error(`create temporary managed state near ${path} (name collision)`);
 }
 
-const uniqueSorted = (names: readonly string[]): string[] =>
-  [...new Set(names)].sort();
+const uniqueSorted = (names: readonly string[]): string[] => [...new Set(names)].sort();

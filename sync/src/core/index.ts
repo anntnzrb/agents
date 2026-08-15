@@ -1,27 +1,29 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
-
+import { installExtensionDeps } from "@extensions/install.ts";
+import { bootstrapPackageTarget } from "@packages/index.ts";
 import { SyncEnv } from "./harness.ts";
 import {
   clearExtensionHookState,
+  type PreparedExtensionHookState,
   prepareExtensionHookState,
   recordExtensionHookState,
-  type PreparedExtensionHookState,
 } from "./hook-state.ts";
-import { installExtensionDeps } from "@extensions/install.ts";
 import { runJobsWithPreserve } from "./jobs.ts";
+import { launchHarness } from "./launcher.ts";
 import {
   cleanManagedEntries,
+  type ManagedSyncPlan,
   planManagedEntriesForSyncPlan,
   recordManagedEntries,
 } from "./managed-state.ts";
-import { bootstrapPackageTarget } from "@packages/index.ts";
-import { buildSyncPlan, type SyncHookPlan } from "./plan.ts";
-import { launchHarness } from "./launcher.ts";
+import { buildSyncPlan, type SyncHookPlan, type SyncPlan } from "./plan.ts";
 import { reconcileWrappers } from "./wrappers.ts";
+
 export { copyTree, isSymlink, rmEntry } from "@runtime/fs.ts";
-import { panicMessage } from "@runtime/errors.ts";
+
+import { assertNever, err, panicMessage, warn } from "@runtime/errors.ts";
 import {
   releaseSyncLock as releaseSyncLockImpl,
   type SyncLock,
@@ -33,20 +35,14 @@ const SYNC_LOCK_FILE = "sync.lock";
 
 export type { SyncLock } from "@runtime/lock.ts";
 
-export function err(message: string): void {
-  console.error(`sync: ${message}`);
-}
-
-export function warn(message: string): void {
-  console.error(`sync: warning: ${message}`);
-}
-
 async function ensurePythonEnv(): Promise<void> {
   const venvPython =
     process.platform === "win32"
       ? path.join(homedir(), ".omp", "python-env", "Scripts", "python.exe")
       : path.join(homedir(), ".omp", "python-env", "bin", "python");
-  if (existsSync(venvPython)) return;
+  if (existsSync(venvPython)) {
+    return;
+  }
 
   if (!Bun.which("uv")) {
     warn("uv not found; skipping python-env bootstrap.");
@@ -54,21 +50,33 @@ async function ensurePythonEnv(): Promise<void> {
   }
 
   const install = Bun.spawnSync(["uv", "python", "install"]);
-  if (!install.success) { warn("uv python install failed; skipping."); return; }
+  if (!install.success) {
+    warn("uv python install failed; skipping.");
+    return;
+  }
 
   const find = Bun.spawnSync(["uv", "python", "find"], { stdout: "pipe" });
   const latest = find.stdout?.toString().trim();
-  if (!latest) { warn("uv python find returned empty; skipping."); return; }
+  if (!latest) {
+    warn("uv python find returned empty; skipping.");
+    return;
+  }
 
-  const venv = Bun.spawnSync(["uv", "venv", "--python", latest, path.join(homedir(), ".omp", "python-env")]);
-  if (!venv.success) warn("failed to create python-env");
+  const venv = Bun.spawnSync([
+    "uv",
+    "venv",
+    "--python",
+    latest,
+    path.join(homedir(), ".omp", "python-env"),
+  ]);
+  if (!venv.success) {
+    warn("failed to create python-env");
+  }
 }
-export { panicMessage } from "@runtime/errors.ts";
 
-export function parseTimeoutSeconds(
-  value: string | undefined,
-  defaultSeconds: number,
-): number {
+export { err, panicMessage, warn } from "@runtime/errors.ts";
+
+export function parseTimeoutSeconds(value: string | undefined, defaultSeconds: number): number {
   const parsed = value ? Number.parseInt(value, 10) : Number.NaN;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultSeconds;
 }
@@ -79,10 +87,7 @@ export const syncLockPath = (syncEnv: SyncEnv): string =>
   path.join(syncEnv.managedStateHome, SYNC_LOCK_FILE);
 
 export function tryAcquireSyncLock(syncEnv: SyncEnv): SyncLock | undefined {
-  return tryAcquireSyncLockImpl(
-    syncEnv.managedStateHome,
-    syncLockPath(syncEnv),
-  );
+  return tryAcquireSyncLockImpl(syncEnv.managedStateHome, syncLockPath(syncEnv));
 }
 
 export function startSyncWatchdog(timeoutSeconds: number): void {
@@ -94,9 +99,9 @@ export function startSyncWatchdog(timeoutSeconds: number): void {
 }
 
 export async function runSync(syncEnv: SyncEnv): Promise<boolean> {
-  let syncPlan;
-  let managedPlan;
-  let extensionHookStates;
+  let syncPlan: SyncPlan;
+  let managedPlan: ManagedSyncPlan;
+  let extensionHookStates: ReadonlyMap<string, ExtensionHookRuntimeState>;
   try {
     syncPlan = buildSyncPlan(syncEnv);
     managedPlan = planManagedEntriesForSyncPlan(syncPlan);
@@ -110,10 +115,7 @@ export async function runSync(syncEnv: SyncEnv): Promise<boolean> {
   const baseSuccess = cleanupSuccess
     ? (() => {
         try {
-          return runJobsWithPreserve(
-            syncPlan.jobs,
-            preservePathsByDst(extensionHookStates),
-          );
+          return runJobsWithPreserve(syncPlan.jobs, preservePathsByDst(extensionHookStates));
         } catch (error) {
           err(panicMessage(error));
           return false;
@@ -123,9 +125,8 @@ export async function runSync(syncEnv: SyncEnv): Promise<boolean> {
 
   const wrapperSuccess = baseSuccess ? reconcileWrappers(syncEnv) : false;
 
-  const managedStateSuccess = baseSuccess && wrapperSuccess
-    ? recordManagedEntries(managedPlan)
-    : true;
+  const managedStateSuccess =
+    baseSuccess && wrapperSuccess ? recordManagedEntries(managedPlan) : true;
   const hookSuccess =
     baseSuccess && wrapperSuccess && managedStateSuccess
       ? await runSyncHooks(syncPlan.hooks, extensionHookStates)
@@ -143,7 +144,6 @@ export const main = async (): Promise<number> => {
     return 1;
   }
   await ensurePythonEnv();
-
 
   let lock: SyncLock | undefined;
   try {
@@ -172,10 +172,7 @@ export const main = async (): Promise<number> => {
  * selected harness. Sync failures are soft here so an unavailable network or
  * broken optional hook cannot strand an otherwise cached agent binary.
  */
-export const launchMain = async (
-  sourceName: string,
-  args: readonly string[],
-): Promise<number> => {
+export const launchMain = async (sourceName: string, args: readonly string[]): Promise<number> => {
   let syncEnv: SyncEnv;
   try {
     syncEnv = SyncEnv.fromSystem();
@@ -185,9 +182,7 @@ export const launchMain = async (
   }
 
   await ensurePythonEnv();
-  const harness = syncEnv.harnesses.find(
-    (candidate) => candidate.sourceName === sourceName,
-  );
+  const harness = syncEnv.harnesses.find((candidate) => candidate.sourceName === sourceName);
   if (!harness) {
     err(`unsupported harness: ${sourceName}`);
     return 2;
@@ -228,9 +223,7 @@ async function runSyncHooks(
   let success = true;
   for (const hook of hooks) {
     const hookState =
-      hook.kind === "ExtensionDeps"
-        ? extensionHookStates.get(hook.statePath)?.state
-        : undefined;
+      hook.kind === "ExtensionDeps" ? extensionHookStates.get(hook.statePath)?.state : undefined;
     if (!(await runSyncHook(hook, hookState))) {
       success = false;
     }
@@ -255,15 +248,14 @@ async function runSyncHook(
         }
         const success = await installExtensionDeps(hook.root, hook.timeoutMs);
         if (success) {
-          recordExtensionHookState(
-            hook,
-            extensionHookState ?? prepareExtensionHookState(hook),
-          );
+          recordExtensionHookState(hook, extensionHookState ?? prepareExtensionHookState(hook));
         } else {
           clearExtensionHookState(hook.statePath);
         }
         return success;
       }
+      default:
+        return assertNever(hook);
     }
   } catch (error) {
     if (hook.kind === "ExtensionDeps") {

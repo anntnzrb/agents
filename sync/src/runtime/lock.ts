@@ -7,6 +7,7 @@ import { isErrno, panicMessage } from "./errors.ts";
 const IS_WINDOWS = process.platform === "win32";
 const LOCK_EX = 2;
 const LOCK_NB = 4;
+const LOCK_PID_PATTERN = /pid=(\d+)/;
 const WOULD_BLOCK_ERRNOS = new Set(
   [os.constants.errno.EAGAIN, os.constants.errno.EWOULDBLOCK].filter(
     (value): value is number => typeof value === "number",
@@ -14,9 +15,9 @@ const WOULD_BLOCK_ERRNOS = new Set(
 );
 
 const posixLibc = IS_WINDOWS ? undefined : createPosixLibc();
-const errnoAccessor = (
-  process.platform === "darwin" ? "__error" : "__errno_location"
-) as "__error" | "__errno_location";
+const errnoAccessor = (process.platform === "darwin" ? "__error" : "__errno_location") as
+  | "__error"
+  | "__errno_location";
 
 interface PosixLibcSymbols {
   readonly flock: (fd: number, operation: number) => number;
@@ -30,16 +31,11 @@ export interface SyncLock {
   readonly lockPath?: string;
 }
 
-export function tryAcquireSyncLock(
-  stateDir: string,
-  lockPath: string,
-): SyncLock | undefined {
+export function tryAcquireSyncLock(stateDir: string, lockPath: string): SyncLock | undefined {
   try {
     fs.mkdirSync(stateDir, { recursive: true });
   } catch (error) {
-    throw new Error(
-      `create sync state dir ${stateDir} (${panicMessage(error)})`,
-    );
+    throw new Error(`create sync state dir ${stateDir} (${panicMessage(error)})`, { cause: error });
   }
 
   if (IS_WINDOWS) {
@@ -50,7 +46,7 @@ export function tryAcquireSyncLock(
   try {
     fd = fs.openSync(lockPath, "a+");
   } catch (error) {
-    throw new Error(`open sync lock ${lockPath} (${panicMessage(error)})`);
+    throw new Error(`open sync lock ${lockPath} (${panicMessage(error)})`, { cause: error });
   }
 
   const closeLock = (): void => {
@@ -79,14 +75,14 @@ export function tryAcquireSyncLock(
     fs.ftruncateSync(fd, 0);
   } catch (error) {
     closeLock();
-    throw new Error(`clear sync lock ${lockPath} (${panicMessage(error)})`);
+    throw new Error(`clear sync lock ${lockPath} (${panicMessage(error)})`, { cause: error });
   }
 
   try {
     fs.writeFileSync(fd, `pid=${process.pid}\n`, "utf8");
   } catch (error) {
     closeLock();
-    throw new Error(`write sync lock ${lockPath} (${panicMessage(error)})`);
+    throw new Error(`write sync lock ${lockPath} (${panicMessage(error)})`, { cause: error });
   }
 
   return { fd };
@@ -109,8 +105,7 @@ export function releaseSyncLock(lock: SyncLock): void {
 }
 
 function createPosixLibc(): PosixLibcSymbols {
-  const libcPath =
-    process.platform === "darwin" ? "libSystem.B.dylib" : "libc.so.6";
+  const libcPath = process.platform === "darwin" ? "libSystem.B.dylib" : "libc.so.6";
   const libc = dlopen(libcPath, {
     flock: {
       args: [FFIType.i32, FFIType.i32],
@@ -165,7 +160,7 @@ function tryAcquireWindowsSyncLock(lockPath: string): SyncLock | undefined {
       if (isErrno(error, "EEXIST")) {
         return undefined;
       }
-      throw new Error(`open sync lock ${lockPath} (${panicMessage(error)})`);
+      throw new Error(`open sync lock ${lockPath} (${panicMessage(error)})`, { cause: error });
     }
   };
 
@@ -193,7 +188,7 @@ function tryAcquireWindowsSyncLock(lockPath: string): SyncLock | undefined {
     } catch {
       // best effort
     }
-    throw new Error(`write sync lock ${lockPath} (${panicMessage(error)})`);
+    throw new Error(`write sync lock ${lockPath} (${panicMessage(error)})`, { cause: error });
   }
 
   return { fd, lockPath };
@@ -224,7 +219,7 @@ function clearStaleWindowsLock(lockPath: string): boolean {
 }
 
 function parseLockPid(content: string): number | undefined {
-  const match = content.match(/pid=(\d+)/);
+  const match = content.match(LOCK_PID_PATTERN);
   if (!match?.[1]) {
     return undefined;
   }

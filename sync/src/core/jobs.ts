@@ -1,23 +1,12 @@
 import fs from "node:fs";
 import { dirname } from "node:path";
+import { err, panicMessage } from "@runtime/errors.ts";
+import { copyTree, isSymlink, rmEntry, syncManagedChildren, syncManagedTree } from "@runtime/fs.ts";
+import type { Job } from "./plan.ts";
 
-import { err, panicMessage } from "./index.ts";
-import { type Job } from "./plan.ts";
-import {
-  copyTree,
-  isSymlink,
-  rmEntry,
-  syncManagedChildren,
-  syncManagedTree,
-} from "@runtime/fs.ts";
+type SourceContentCache = Map<string, { readonly metadata: fs.Stats; readonly content: Buffer }>;
 
-type SourceContentCache = Map<
-  string,
-  { readonly metadata: fs.Stats; readonly content: Buffer }
->;
-
-export type { JobKind } from "./plan.ts";
-export type { Job } from "./plan.ts";
+export type { Job, JobKind } from "./plan.ts";
 
 export function copyItem(src: string, dst: string): boolean {
   try {
@@ -63,9 +52,7 @@ export function runJobsWithPreserve(
   preservePathsByDst: ReadonlyMap<string, readonly string[]> = new Map(),
 ): boolean {
   const sourceContentCache: SourceContentCache = new Map();
-  return jobs.every((job) =>
-    runJob(job, preservePathsByDst, sourceContentCache),
-  );
+  return jobs.every((job) => runJob(job, preservePathsByDst, sourceContentCache));
 }
 
 function runJob(
@@ -76,12 +63,7 @@ function runJob(
   try {
     if (job.kind === "Dir") {
       return job.scope === "Children"
-        ? syncDirInto(
-            job.src,
-            job.dst,
-            preservePathsByDst.get(job.dst) ?? [],
-            sourceContentCache,
-          )
+        ? syncDirInto(job.src, job.dst, preservePathsByDst.get(job.dst) ?? [], sourceContentCache)
         : syncManagedDir(
             job.src,
             job.dst,

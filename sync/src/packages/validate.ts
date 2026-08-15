@@ -1,12 +1,7 @@
 import fs from "node:fs";
 import { extname, join } from "node:path";
 
-export const RESOURCE_KEYS = [
-  "extensions",
-  "skills",
-  "prompts",
-  "themes",
-] as const;
+export const RESOURCE_KEYS = ["extensions", "skills", "prompts", "themes"] as const;
 
 const BUILTIN_PACKAGE_ROOTS = new Set([
   "assert",
@@ -64,7 +59,7 @@ export function packageIsHealthy(dir: string): boolean {
   if (isFile(packageJsonPath)) {
     const packageJson = readJsonFile(packageJsonPath);
     if (isRecord(packageJson)) {
-      const pi = packageJson.pi;
+      const pi = packageJson["pi"];
       if (isRecord(pi)) {
         const validated = validatePiManifest(dir, pi);
         if (validated !== null) {
@@ -88,7 +83,7 @@ export function packageHasBuildScript(dir: string): boolean {
     return false;
   }
 
-  const scripts = packageJson.scripts;
+  const scripts = packageJson["scripts"];
   return isRecord(scripts) && Object.hasOwn(scripts, "build");
 }
 
@@ -109,13 +104,9 @@ export function missingPackageRoots(dir: string): string[] {
   return [...missing].sort();
 }
 
-export const validatePackageForTests = (dir: string): boolean =>
-  packageIsHealthy(dir);
+export const validatePackageForTests = (dir: string): boolean => packageIsHealthy(dir);
 
-function validatePiManifest(
-  dir: string,
-  pi: Record<string, unknown>,
-): boolean | null {
+function validatePiManifest(dir: string, pi: Record<string, unknown>): boolean | null {
   let hasEntries = false;
   for (const key of RESOURCE_KEYS) {
     const entries = pi[key];
@@ -151,7 +142,7 @@ function readJsonFile(path: string): unknown | null {
   try {
     return JSON.parse(content);
   } catch (error) {
-    throw new Error(`parse ${path} (${String(error)})`);
+    throw new Error(`parse ${path} (${String(error)})`, { cause: error });
   }
 }
 
@@ -159,7 +150,7 @@ function readFile(path: string): string {
   try {
     return fs.readFileSync(path, "utf8");
   } catch (error) {
-    throw new Error(`read ${path} (${String(error)})`);
+    throw new Error(`read ${path} (${String(error)})`, { cause: error });
   }
 }
 
@@ -177,11 +168,7 @@ function walk(root: string, files: string[]): void {
     const entryPath = join(root, entry.name);
 
     if (entry.isDirectory()) {
-      if (
-        entry.name.startsWith(".") ||
-        entry.name === "node_modules" ||
-        entry.name === ".git"
-      ) {
+      if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === ".git") {
         continue;
       }
       walk(entryPath, files);
