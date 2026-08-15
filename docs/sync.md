@@ -10,6 +10,12 @@ Run a manual sync from the repository root:
 bun ./sync/src/cli.ts
 ```
 
+Force model-catalog revalidation even when the cache is fresh:
+
+```bash
+bun ./sync/src/cli.ts sync --refresh-models
+```
+
 Generated harness wrappers use:
 
 ```text
@@ -25,7 +31,7 @@ A sync run performs these stages:
 1. Build the sync and cleanup plans.
 2. Remove stale managed harness entries.
 3. Copy shared and harness-specific configuration.
-4. Render secret templates and CLIProxyAPI configuration.
+4. Refresh cached model catalogs and render secret templates and CLIProxyAPI configuration.
 5. Prepare pinned managed tools.
 6. Reconcile launch wrappers.
 7. Record managed state.
@@ -46,6 +52,22 @@ The `CliProxyConfig` job parses `assets/cliproxyapi.yaml.tmpl` as YAML and injec
 For native API-key sections, sync duplicates the shared provider profile once per account. For `openai-compatibility`, sync generates one `api-key-entries` item per account. The `x-credential-pool` marker never appears in the generated config.
 
 The renderer uses Bun's YAML parser and serializer, validates all pool references, and writes the target atomically with mode `0600`. Missing local secrets preserve an existing generated target; malformed credentials fail sync without replacing it.
+
+### Model catalogs
+
+`x-model-sources` in `assets/cliproxyapi.yaml.tmpl` declares provider endpoints, credential pools, public prefixes, and matching [models.dev](https://models.dev/) provider IDs. It does not list model IDs.
+
+Sync fetches each provider's authenticated `/models` catalog and intersects it with models.dev metadata. The live provider catalog decides availability. Models.dev supplies protocol, capabilities, modalities, context and output limits, and published costs. Sync groups models by protocol and generates CLIProxyAPI `codex-api-key`, `claude-api-key`, and `openai-compatibility` profiles.
+
+Catalog responses are cached under:
+
+```text
+~/.cache/agents/model-catalog/
+```
+
+Models.dev metadata is fresh for one hour. Provider catalogs are fresh for six hours. Sync sends cached ETags during revalidation, uses a stale cache after transient failures, and keeps launch-time refresh warnings quiet. `sync --refresh-models` bypasses freshness windows and fails instead of silently accepting stale network data.
+
+The normalized, harness-independent catalog is `~/.cache/agents/model-catalog/catalog.json`. Generated model IDs and metadata are deterministic, and unchanged syncs do not replace the file.
 
 ## Managed tools
 

@@ -49,9 +49,35 @@ The `CLIPROXY_MANAGEMENT_KEY` authenticates the local management API and control
 
 Add an account by appending another object. Supported per-account fields are `apiKey`, `weight`, and `proxyUrl`. Equal accounts use weight `1`; weights must be integers from 1 through 1,000,000.
 
-Provider API keys stay in the ignored `secrets.local.json`. The committed template owns base URLs, prefixes, and model mappings. Sync expands each pool into CLIProxyAPI's native credential entries, bcrypt-hashes the management key before rendering, and writes the generated config atomically with mode `0600`.
+Provider API keys stay in the ignored `secrets.local.json`. The committed template owns base URLs, prefixes, credential-pool references, and models.dev provider identities. Model IDs are discovered rather than committed. Sync expands each pool into CLIProxyAPI's native credential entries, bcrypt-hashes the management key before rendering, and writes the generated config atomically with mode `0600`.
 
 Sync rejects empty pools, duplicate keys within a pool, unknown account fields, invalid weights, missing template pools, and pools that the template does not reference. Never commit `secrets.local.json` or OAuth files.
+
+## Model discovery
+
+Run a normal cached reconciliation:
+
+```bash
+bun ./sync/src/cli.ts
+```
+
+Force authenticated upstream discovery and gateway refresh:
+
+```bash
+bun ./sync/src/cli.ts sync --refresh-models
+```
+
+Sync treats each upstream `/models` response as the availability boundary and enriches matching IDs from [models.dev](https://models.dev/). Provider-level and per-model `npm` and `shape` metadata select the upstream protocol:
+
+| Metadata | Generated CLIProxyAPI route |
+|---|---|
+| `@ai-sdk/openai` or `shape: responses` | Responses through `codex-api-key` |
+| `@ai-sdk/anthropic` | Messages through `claude-api-key` |
+| `@ai-sdk/openai-compatible`, `@openrouter/ai-sdk-provider`, or `shape: completions` | Chat Completions through `openai-compatibility` |
+
+Models without tool support or text output are omitted from the agent catalog. Unsupported transports are reported during forced refresh. For example, CLIProxyAPI's native Gemini executor fixes the Google API path to `/v1beta`; it cannot safely represent OpenCode Zen's custom Google path, so those models remain excluded until the gateway can express that transport.
+
+The source catalog uses stable protocol mappings rather than model-specific exceptions. Adding or removing an upstream model does not require editing `assets/cliproxyapi.yaml.tmpl`.
 
 ## Authenticate ChatGPT
 

@@ -52,6 +52,7 @@ bun ./sync/src/cli.ts
 Sync performs these actions:
 
 - generates harness configuration;
+- discovers API-key provider models and caches enriched metadata;
 - downloads and verifies the pinned CLIProxyAPI release;
 - writes `~/.local/bin/cli-proxy-api`;
 - renders `~/.cli-proxy-api/config.yaml` with mode `0600`.
@@ -59,6 +60,12 @@ Sync performs these actions:
 A manual sync warns when CLIProxyAPI is installed but not running.
 
 When running, open the local control panel at `http://127.0.0.1:8317/management.html` and authenticate with `CLIPROXY_MANAGEMENT_KEY`. Remote management remains disabled.
+
+After CLIProxyAPI is running, force one complete catalog refresh:
+
+```bash
+bun ./sync/src/cli.ts sync --refresh-models
+```
 
 ## Authenticate CLIProxyAPI
 
