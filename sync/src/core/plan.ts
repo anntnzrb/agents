@@ -15,14 +15,26 @@ import {
   type SyncEnv,
 } from "./harness.ts";
 
-export type JobKind = "File" | "Dir";
+export type JobKind = "File" | "Dir" | "SecretTemplate";
 
-export interface Job {
-  readonly src: string;
-  readonly dst: string;
-  readonly kind: JobKind;
-  readonly scope?: "Tree" | "Children";
-}
+export type Job =
+  | {
+      readonly src: string;
+      readonly dst: string;
+      readonly kind: "File";
+    }
+  | {
+      readonly src: string;
+      readonly dst: string;
+      readonly kind: "Dir";
+      readonly scope?: "Tree" | "Children";
+    }
+  | {
+      readonly src: string;
+      readonly dst: string;
+      readonly kind: "SecretTemplate";
+      readonly secretsPath: string;
+    };
 
 export interface HarnessPlan {
   readonly harness: Harness;

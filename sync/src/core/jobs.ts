@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import { dirname } from "node:path";
-import { err, panicMessage } from "@runtime/errors.ts";
+import { assertNever, err, panicMessage, warn } from "@runtime/errors.ts";
 import { copyTree, isSymlink, rmEntry, syncManagedChildren, syncManagedTree } from "@runtime/fs.ts";
 import type { Job } from "./plan.ts";
+import { syncSecretTemplate } from "./secret-template.ts";
 
 type SourceContentCache = Map<string, { readonly metadata: fs.Stats; readonly content: Buffer }>;
 
@@ -61,21 +62,34 @@ function runJob(
   sourceContentCache: SourceContentCache,
 ): boolean {
   try {
-    if (job.kind === "Dir") {
-      return job.scope === "Children"
-        ? syncDirInto(job.src, job.dst, preservePathsByDst.get(job.dst) ?? [], sourceContentCache)
-        : syncManagedDir(
-            job.src,
-            job.dst,
-            preservePathsByDst.get(job.dst) ?? [],
-            sourceContentCache,
-          );
+    switch (job.kind) {
+      case "Dir":
+        return job.scope === "Children"
+          ? syncDirInto(job.src, job.dst, preservePathsByDst.get(job.dst) ?? [], sourceContentCache)
+          : syncManagedDir(
+              job.src,
+              job.dst,
+              preservePathsByDst.get(job.dst) ?? [],
+              sourceContentCache,
+            );
+      case "File":
+        return syncItem(job.src, job.dst);
+      case "SecretTemplate":
+        if (!fs.existsSync(job.src)) {
+          err(`missing source: ${job.src}`);
+          return true;
+        }
+        if (!fs.existsSync(job.secretsPath)) {
+          warn(`missing local secrets ${job.secretsPath}; skipping ${job.dst}`);
+          return true;
+        }
+        syncSecretTemplate(job.src, job.dst, job.secretsPath);
+        return true;
+      default:
+        return assertNever(job);
     }
-    return syncItem(job.src, job.dst);
   } catch (error) {
-    err(
-      `unexpected error in ${job.kind === "Dir" ? "copy_dir_into" : "copy_item"}: ${panicMessage(error)}`,
-    );
+    err(`unexpected error in ${job.kind}: ${panicMessage(error)}`);
     return false;
   }
 }

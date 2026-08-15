@@ -308,6 +308,70 @@ if (runtime) {
     });
   });
 
+  test("run_jobs_with_preserve_renders_secret_template_idempotently", async () => {
+    await withTempDir(async (root) => {
+      const src = join(root, "config.yaml.tmpl");
+      const dst = join(root, "runtime", "config.yaml");
+      const secretsPath = join(root, "secrets.local.json");
+      writeFile(src, `api-key: \${API_KEY}\n`);
+      writeFile(secretsPath, `${JSON.stringify({ API_KEY: 'quoted"value' })}\n`);
+
+      const jobs = [{ src, dst, kind: "SecretTemplate", secretsPath }];
+      assert.equal(await call<boolean>(runJobsWithPreserve, jobs), true);
+      assert.equal(readText(dst), `api-key: ${JSON.stringify('quoted"value')}\n`);
+      if (isPosix()) {
+        assert.equal(lstatSync(dst).mode & 0o777, 0o600);
+      }
+
+      const first = lstatSync(dst);
+      assert.equal(await call<boolean>(runJobsWithPreserve, jobs), true);
+      const second = lstatSync(dst);
+      assert.equal(second.ino, first.ino);
+      assert.equal(second.mtimeMs, first.mtimeMs);
+    });
+  });
+
+  test("run_jobs_with_preserve_skips_secret_template_without_local_secrets", async () => {
+    await withTempDir(async (root) => {
+      const src = join(root, "config.yaml.tmpl");
+      const dst = join(root, "config.yaml");
+      writeFile(src, `api-key: \${API_KEY}\n`);
+      writeFile(dst, "keep\n");
+
+      assert.equal(
+        await call<boolean>(runJobsWithPreserve, [
+          {
+            src,
+            dst,
+            kind: "SecretTemplate",
+            secretsPath: join(root, "missing-secrets.json"),
+          },
+        ]),
+        true,
+      );
+      assert.equal(readText(dst), "keep\n");
+    });
+  });
+
+  test("run_jobs_with_preserve_rejects_missing_template_secret", async () => {
+    await withTempDir(async (root) => {
+      const src = join(root, "config.yaml.tmpl");
+      const dst = join(root, "config.yaml");
+      const secretsPath = join(root, "secrets.local.json");
+      writeFile(src, `api-key: \${API_KEY}\n`);
+      writeFile(dst, "keep\n");
+      writeFile(secretsPath, "{}\n");
+
+      assert.equal(
+        await call<boolean>(runJobsWithPreserve, [
+          { src, dst, kind: "SecretTemplate", secretsPath },
+        ]),
+        false,
+      );
+      assert.equal(readText(dst), "keep\n");
+    });
+  });
+
   test("run_jobs_with_preserve_keeps_generated_extension_entries", async () => {
     await withTempDir(async (root) => {
       const src = join(root, "src");
