@@ -18,6 +18,19 @@ Sync supports Codex, OpenCode, Pi, and OMP. A matching source directory under `h
 
 Do not edit generated tool homes. A later sync replaces managed files.
 
+## Use CLIProxyAPI models
+
+Sync writes the first `CLIPROXY_CLIENT_API_KEYS` entry to the private runtime file `~/.local/share/agents/cliproxyapi/client-api-key`. Each harness uses one `cliproxy` provider:
+
+| Harness | Catalog mechanism | Request protocol |
+|---|---|---|
+| Codex | Native remote model refresh | OpenAI Responses |
+| OMP | Native `openai-models-list` discovery and cache | OpenAI Responses |
+| OpenCode | Minimal config plugin backed by the shared sync catalog | OpenAI Responses |
+| Pi | Minimal provider extension backed by the shared sync catalog | OpenAI Responses |
+
+The OpenCode plugin and Pi extension read `~/.local/share/agents/model-catalog/catalog.json` through the installed runtime catalog client. They contain no model IDs and do not fetch provider catalogs themselves. Sync owns discovery, metadata enrichment, caching, and stale recovery.
+
 ## Launch wrappers
 
 Sync writes harness commands to `~/.local/bin` on macOS and Linux. On Windows, it writes commands under `%LOCALAPPDATA%/Programs/Agents/bin` and adds that directory to the user path once.

@@ -43,6 +43,9 @@ Generated targets include:
 - `~/.omp/agent`;
 - `~/.mcporter/mcporter.json`;
 - `~/.cli-proxy-api/config.yaml`;
+- `~/.local/share/agents/sync`;
+- `~/.local/share/agents/model-catalog/catalog.json`;
+- `~/.local/share/agents/cliproxyapi/client-api-key`;
 - `~/.local/bin` on macOS and Linux.
 
 Do not edit generated targets. Sync replaces managed content from the committed sources.

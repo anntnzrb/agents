@@ -13,11 +13,13 @@
 - `docs/`: SSOT for repository documentation; flat, topic-based pages indexed by `docs/index.md`
 - `harnesses/<harness>/`: directory presence opts into a supported harness; sync owns its internal adapter metadata
 - Agent config root: `~/.config/agents/`
+- Installed runtime root: `~/.local/share/agents/`
 - Synced tool homes (`~/.codex`, `~/.claude`, etc.) and agent launch wrappers are generated targets
 - Make durable changes in this repository so sync does not overwrite them
 
 <critical>
 - NEVER edit generated synced homes unless the user asks and the SSOT impact is clear
+- Only sync may read the SSOT directly; wrappers, harnesses, and runtime adapters must use installed state
 </critical>
 
 ## Skills

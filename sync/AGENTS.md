@@ -38,7 +38,9 @@ This is the isolated sync application.
 ## Launch Wrapper Contract
 
 - A manual sync creates or reconciles wrappers before returning.
-- Generated wrappers call `bun ~/.config/agents/sync/src/cli.ts launch <harness> -- ...`; launch performs a best-effort sync, then resolves and runs the cached npm binary.
+- Sync installs its runtime under `~/.local/share/agents/sync/`.
+- Generated wrappers call `bun ~/.local/share/agents/sync/src/cli.ts launch <harness> -- ...`; launch performs a best-effort sync when the SSOT is available, then resolves and runs the cached npm binary.
+- Runtime consumers must read installed state under `~/.local/share/agents/`, not files under the SSOT.
 - Launch-time sync failures are warnings; cached harness launch remains available.
 - Wrapper ownership is marker- and state-based. Stale generated wrappers are removed only when still owned; unmanaged conflicts are preserved.
 - npm launch cache layout is `~/.cache/npm-tools/<tool>/packages/<package-key>/`, with version installs under `versions/<version>/` and package-local `current`/`previous` links.

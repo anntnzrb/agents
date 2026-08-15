@@ -21,7 +21,7 @@ git clone https://github.com/anntnzrb/agents.git ~/.config/agents
 cd ~/.config/agents
 ```
 
-The repository must use `~/.config/agents` because generated wrappers call the sync entrypoint at that path.
+The repository must use `~/.config/agents` as the sync source of truth. Sync installs the runtime used by generated wrappers under `~/.local/share/agents/sync`.
 
 ## Provide local secrets
 
@@ -104,3 +104,5 @@ pi
 ```
 
 Managed harness wrappers run a best-effort sync before each launch. They continue with the cached harness package if launch-time sync cannot reach the network.
+
+Sync installs the first `CLIPROXY_CLIENT_API_KEYS` entry as private runtime state. You do not need separate gateway credentials for Codex, OpenCode, Pi, and OMP.
