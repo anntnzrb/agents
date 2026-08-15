@@ -38,41 +38,24 @@ codex:
   disable-codex-cloaking: false
   optimize-multi-agent-v2: false
 
-codex-api-key:
-  - x-credential-pool: "opencode-go"
+x-model-sources:
+  - id: "opencode-go"
+    models-dev-provider: "opencode-go"
+    credential-pool: "opencode-go"
     prefix: "go"
     base-url: "https://opencode.ai/zen/go/v1"
-    request-retry: 1
-    models:
-      - name: "gpt-5.6-luna"
-        alias: "gpt-5.6-luna"
-        display-name: "OpenCode Go - GPT 5.6 Luna"
-        max-context-length: 272000
-        force-mapping: true
-        is-compat: true
-        thinking:
-          levels: ["xhigh", "high", "medium", "low"]
-openai-compatibility:
-  - x-credential-pool: "deepseek"
-    name: "deepseek"
+  - id: "deepseek"
+    models-dev-provider: "deepseek"
+    credential-pool: "deepseek"
     prefix: "deepseek"
     base-url: "https://api.deepseek.com/v1"
-    models:
-      - name: "deepseek-v4-flash"
-        alias: "deepseek-v4-flash"
-      - name: "deepseek-v4-pro"
-        alias: "deepseek-v4-pro"
-  - x-credential-pool: "openrouter"
-    name: "openrouter"
+  - id: "openrouter"
+    models-dev-provider: "openrouter"
+    credential-pool: "openrouter"
     prefix: "openrouter"
     base-url: "https://openrouter.ai/api/v1"
-    models:
-      - name: "openrouter/auto"
-        alias: "auto"
-  - x-credential-pool: "opencode-zen"
-    name: "opencode-zen"
+  - id: "opencode-zen"
+    models-dev-provider: "opencode"
+    credential-pool: "opencode-zen"
     prefix: "zen"
     base-url: "https://opencode.ai/zen/v1"
-    models:
-      - name: "minimax-m3"
-        alias: "minimax-m3"
