@@ -28,7 +28,7 @@ The repository separates committed sources from generated files and host-local r
 
 ### Harness sources
 
-Codex and OpenCode store their source files directly under `harnesses/<harness>/`. Pi and OMP use `harnesses/<harness>/agent/` as their runtime source.
+Codex, DeepSeek Harness, and OpenCode store their source files directly under `harnesses/<harness>/`. Pi and OMP use `harnesses/<harness>/agent/` as their runtime source.
 
 `sync/src/core/harness-adapters.ts` defines the supported harness IDs, package launchers, generated homes, runtime subdirectories, and hooks. A matching directory under `harnesses/` enables that adapter.
 
@@ -48,6 +48,7 @@ Codex and OpenCode store their source files directly under `harnesses/<harness>/
 | Path | Owner |
 | --- | --- |
 | `~/.codex/` | Codex adapter |
+| `~/.dsh/` | DeepSeek Harness adapter |
 | `~/.config/opencode/` | OpenCode adapter |
 | `~/.pi/agent/` | Pi adapter |
 | `~/.omp/agent/` | OMP adapter |

@@ -1,6 +1,6 @@
 # Harness reference
 
-Sync has adapters for Codex, OpenCode, Pi, and OMP. A matching source directory enables an adapter on macOS, Linux, and Windows.
+Sync has adapters for Codex, DeepSeek Harness, OpenCode, Pi, and OMP. A matching source directory enables an adapter on macOS, Linux, and Windows.
 
 The current CLIProxyAPI release manifest supports only macOS ARM64 and Linux x86_64. On Windows, managed-tool preparation fails before wrapper reconciliation because the manifest has no Windows asset.
 
@@ -9,6 +9,7 @@ The current CLIProxyAPI release manifest supports only macOS ARM64 and Linux x86
 | Harness | Source | Generated target | npm package |
 | --- | --- | --- | --- |
 | Codex | `harnesses/codex/` | `~/.codex/` | `@openai/codex` |
+| DeepSeek Harness | `harnesses/deepseek/` | `~/.dsh/` | `@deepseek-ai/dsh` |
 | OpenCode | `harnesses/opencode/` | `~/.config/opencode/` | `opencode-ai` |
 | Pi | `harnesses/pi/agent/` | `~/.pi/agent/` | `@earendil-works/pi-coding-agent` |
 | OMP | `harnesses/omp/agent/` | `~/.omp/agent/` | `@oh-my-pi/pi-coding-agent` |
@@ -26,7 +27,7 @@ Pi has two additional hooks:
 
 ## CLIProxyAPI integration
 
-Every harness defines one provider named `cliproxy`. The provider reads the first client key from `~/.local/share/agents/cliproxyapi/client-api-key` and sends requests to `http://127.0.0.1:8317/v1`.
+Codex, OpenCode, Pi, and OMP define one provider named `cliproxy`. The provider reads the first client key from `~/.local/share/agents/cliproxyapi/client-api-key` and sends requests to `http://127.0.0.1:8317/v1`.
 
 | Harness | Catalog source | Request protocol |
 | --- | --- | --- |
@@ -41,11 +42,15 @@ API-key model IDs use the prefix declared by `x-model-sources`. The committed pr
 
 OpenCode, Pi, and OMP selectors include the harness provider name, such as `cliproxy/openrouter/auto`. Codex stores `model_provider = "cliproxy"` separately, so its `model` value contains only the CLIProxyAPI model ID.
 
+DeepSeek Harness keeps its upstream model and credential configuration. Configure models through its Web UI or `~/.dsh/settings.yaml`; its managed credentials live in `~/.dsh/.credentials.yaml`. Sync does not copy the CLIProxyAPI client key into that credential store.
+
 ## Launch wrappers
 
 Sync writes Unix wrappers under `~/.local/bin/`. On Windows, sync writes `.cmd` wrappers under `%LOCALAPPDATA%/Programs/Agents/bin/` and adds that directory to the user `PATH` once.
 
 Each wrapper calls the installed sync runtime with the `launch` command. The launch path attempts reconciliation, prepares the cached npm package, forwards all arguments, and returns the harness exit status.
+
+Wrapper commands use the package executable name. DeepSeek Harness therefore uses `dsh`, while its adapter and source directory use `deepseek`.
 
 Wrapper state lives at `~/.local/share/agents/sync-managed/wrappers.json`. Sync removes stale wrappers only when they contain its ownership marker and remain in an allowed wrapper directory. Unmanaged conflicts are preserved and reported.
 

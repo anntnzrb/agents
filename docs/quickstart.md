@@ -9,6 +9,7 @@ The managed CLIProxyAPI release supports macOS on ARM64 and Linux on x86_64. The
 Install these commands:
 
 - `bun` runs the sync application.
+- `node` runs the npm-installed harness packages.
 - `npm` installs harness packages on first launch.
 - `git` clones the repository.
 - `tar` extracts CLIProxyAPI.
@@ -19,6 +20,7 @@ Confirm that each command is available:
 
 ```bash
 bun --version
+node --version
 npm --version
 git --version
 tar --version
@@ -141,12 +143,18 @@ unset CLIPROXY_KEY
 
 ## Start a harness
 
-Start Pi:
+Start DeepSeek Harness:
+
+```bash
+dsh web
+```
+
+The command starts its Web UI. Start Pi with:
 
 ```bash
 pi
 ```
 
-The wrapper syncs the configuration, installs the cached harness package if needed, and opens Pi. Codex, OpenCode, and OMP use the `codex`, `opencode`, and `omp` commands.
+Each wrapper syncs the configuration, installs the cached harness package if needed, and opens the harness. Codex, OpenCode, and OMP use the `codex`, `opencode`, and `omp` commands.
 
 For later gateway operations, use [Operate CLIProxyAPI](cliproxyapi.md).
