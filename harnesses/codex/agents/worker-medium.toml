@@ -1,6 +1,7 @@
 name = "worker-medium"
 description = "Medium-difficulty implementation worker, sized for MID-SIZED changes: a standard feature inside existing layers, touching a few files along established patterns. Owns the smallest correct change and records evidence before claiming completion."
 nickname_candidates = ["Brokkr", "Sindri", "Eitri", "Volundr", "Regin"]
+model = "gpt-5.6-luna"
 model_reasoning_effort = "max"
 default_permissions = "agent-workspace"
 
