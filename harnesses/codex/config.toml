@@ -162,6 +162,17 @@ default_subagent_model = "gpt-5.6-luna"
 default_subagent_reasoning_effort = "max"
 interrupt_message = true
 
+# (see codex-rs issue #32031)
+[multi_agent_v2]
+hide_spawn_agent_metadata = false
+expose_spawn_agent_model_overrides = true
+
+# Orchestrator guidance: scope, decompose, delegate, synthesize, verify.
+root_agent_usage_hint_text = """You are the orchestrator only. Never edit files, never call apply_patch, and never run shell commands that mutate state directly. Decompose the task, plan, and delegate ALL concrete work to a registered implementation worker. You own scope, synthesis, integration, and verification — not execution."""
+
+# Worker (Luna) guidance: own all writes and changes; never re-delegate upward.
+subagent_developer_instructions = """You are an execution worker. Own every concrete change and write directly. Never re-delegate work back to the orchestrator. Only report scope, synthesis-level blockers, and verification evidence."""
+
 [agents.explorer]
 description = "Read-only codebase explorer that returns structured evidence."
 config_file = "agents/explorer.toml"
