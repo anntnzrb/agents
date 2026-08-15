@@ -6,10 +6,10 @@
    * ************************************************************************ */
 
   // title, summary, and compaction utils
-  "small_model": "opencode-go/deepseek-v4-flash",
+  "small_model": "cliproxy/go/deepseek-v4-flash",
 
   // main agent (build)
-  "model": "opencode-go/deepseek-v4-pro",
+  "model": "cliproxy/go/deepseek-v4-pro",
 
   /* **************************************************************************
    * PLUGINS
@@ -21,7 +21,16 @@
    * PROVIDERS
    * ************************************************************************ */
 
-  // "provider": {},
+  "provider": {
+    "cliproxy": {
+      "name": "CLIProxyAPI",
+      "npm": "@ai-sdk/openai",
+      "options": {
+        "apiKey": "{file:~/.local/share/agents/cliproxyapi/client-api-key}",
+        "baseURL": "http://127.0.0.1:8317/v1",
+      },
+    },
+  },
 
   "default_agent": "build",
 
@@ -41,7 +50,7 @@
       "disable": true,
     },
     "general": {
-      "model": "opencode-go/deepseek-v4-flash",
+      "model": "cliproxy/go/deepseek-v4-flash",
       "description":
         "General-purpose subagent for researching complex questions and executing multi-step tasks in a fresh, isolated context. Use this agent to delegate units of work in parallel; it returns only its final summary to the orchestrator, keeping the main session context clean.",
       "permission": {
@@ -49,7 +58,7 @@
       },
     },
     "explore": {
-      "model": "opencode-go/deepseek-v4-flash",
+      "model": "cliproxy/go/deepseek-v4-flash",
       "description":
         "Fast, read-only subagent specialized for exploring codebases: find files by pattern, search code by keyword, answer codebase questions. Use it to delegate searches and keep the orchestrator context clean. Specify thoroughness: 'quick', 'medium', or 'very thorough'.",
       "permission": {
