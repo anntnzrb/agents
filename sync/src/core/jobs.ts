@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { dirname } from "node:path";
 import { assertNever, err, panicMessage, warn } from "@runtime/errors.ts";
 import { copyTree, isSymlink, rmEntry, syncManagedChildren, syncManagedTree } from "@runtime/fs.ts";
+import { syncCliProxyConfig } from "./cliproxy-config.ts";
 import type { Job } from "./plan.ts";
 import { syncSecretTemplate } from "./secret-template.ts";
 
@@ -84,6 +85,17 @@ function runJob(
           return true;
         }
         syncSecretTemplate(job.src, job.dst, job.secretsPath);
+        return true;
+      case "CliProxyConfig":
+        if (!fs.existsSync(job.src)) {
+          err(`missing source: ${job.src}`);
+          return true;
+        }
+        if (!fs.existsSync(job.secretsPath)) {
+          warn(`missing local secrets ${job.secretsPath}; skipping ${job.dst}`);
+          return true;
+        }
+        syncCliProxyConfig(job.src, job.dst, job.secretsPath);
         return true;
       default:
         return assertNever(job);

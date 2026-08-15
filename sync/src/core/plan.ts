@@ -15,7 +15,7 @@ import {
   type SyncEnv,
 } from "./harness.ts";
 
-export type JobKind = "File" | "Dir" | "SecretTemplate";
+export type JobKind = "File" | "Dir" | "SecretTemplate" | "CliProxyConfig";
 
 export type Job =
   | {
@@ -33,6 +33,12 @@ export type Job =
       readonly src: string;
       readonly dst: string;
       readonly kind: "SecretTemplate";
+      readonly secretsPath: string;
+    }
+  | {
+      readonly src: string;
+      readonly dst: string;
+      readonly kind: "CliProxyConfig";
       readonly secretsPath: string;
     };
 
@@ -205,7 +211,7 @@ function configJobs(syncEnv: SyncEnv): Job[] {
     {
       src: join(syncEnv.assetsHome, "cliproxyapi.yaml.tmpl"),
       dst: join(syncEnv.home, ".cli-proxy-api", "config.yaml"),
-      kind: "SecretTemplate",
+      kind: "CliProxyConfig",
       secretsPath: join(syncEnv.home, ".config", "agents", "secrets.local.json"),
     },
   ];

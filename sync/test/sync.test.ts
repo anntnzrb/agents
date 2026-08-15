@@ -372,6 +372,112 @@ if (runtime) {
     });
   });
 
+  test("run_jobs_with_preserve_expands_cliproxy_credential_pools_idempotently", async () => {
+    await withTempDir(async (root) => {
+      const src = join(root, "cliproxyapi.yaml.tmpl");
+      const dst = join(root, "config.yaml");
+      const secretsPath = join(root, "secrets.local.json");
+      writeFile(
+        src,
+        `remote-management:
+  secret-key: \${CLIPROXY_MANAGEMENT_KEY}
+api-keys: \${CLIPROXY_CLIENT_API_KEYS}
+codex-api-key:
+  - x-credential-pool: opencode-go
+    prefix: go
+    base-url: https://example.test/v1
+openai-compatibility:
+  - x-credential-pool: openrouter
+    name: openrouter
+    base-url: https://openrouter.example/v1
+`,
+      );
+      writeFile(
+        secretsPath,
+        `${JSON.stringify({
+          CLIPROXY_MANAGEMENT_KEY: 'management"key',
+          CLIPROXY_CLIENT_API_KEYS: ["client-one", "client-two"],
+          CLIPROXY_CREDENTIAL_POOLS: {
+            "opencode-go": [
+              { apiKey: "go-one", weight: 1 },
+              { apiKey: "go-two", weight: 2 },
+            ],
+            openrouter: [{ apiKey: "router-one", weight: 1 }],
+          },
+        })}\n`,
+      );
+
+      const jobs = [{ src, dst, kind: "CliProxyConfig", secretsPath }];
+      assert.equal(await call<boolean>(runJobsWithPreserve, jobs), true);
+      const config = Bun.YAML.parse(readText(dst)) as Record<string, any>;
+      assert.equal(
+        Bun.password.verifySync(
+          'management"key',
+          config["remote-management"]["secret-key"] as string,
+        ),
+        true,
+      );
+      assert.deepEqual(config["api-keys"], ["client-one", "client-two"]);
+      assert.deepEqual(
+        config["codex-api-key"].map((entry: Record<string, unknown>) => ({
+          apiKey: entry["api-key"],
+          weight: entry["weight"],
+          poolMarker: entry["x-credential-pool"],
+        })),
+        [
+          { apiKey: "go-one", weight: 1, poolMarker: undefined },
+          { apiKey: "go-two", weight: 2, poolMarker: undefined },
+        ],
+      );
+      assert.deepEqual(config["openai-compatibility"][0]["api-key-entries"], [
+        { "api-key": "router-one", weight: 1 },
+      ]);
+      if (isPosix()) {
+        assert.equal(lstatSync(dst).mode & 0o777, 0o600);
+      }
+
+      const first = lstatSync(dst);
+      assert.equal(await call<boolean>(runJobsWithPreserve, jobs), true);
+      const second = lstatSync(dst);
+      assert.equal(second.ino, first.ino);
+      assert.equal(second.mtimeMs, first.mtimeMs);
+    });
+  });
+
+  test("run_jobs_with_preserve_rejects_duplicate_cliproxy_credentials", async () => {
+    await withTempDir(async (root) => {
+      const src = join(root, "cliproxyapi.yaml.tmpl");
+      const dst = join(root, "config.yaml");
+      const secretsPath = join(root, "secrets.local.json");
+      writeFile(
+        src,
+        `api-keys: \${CLIPROXY_CLIENT_API_KEYS}
+codex-api-key:
+  - x-credential-pool: opencode-go
+`,
+      );
+      writeFile(dst, "keep\n");
+      writeFile(
+        secretsPath,
+        `${JSON.stringify({
+          CLIPROXY_MANAGEMENT_KEY: "management",
+          CLIPROXY_CLIENT_API_KEYS: ["client"],
+          CLIPROXY_CREDENTIAL_POOLS: {
+            "opencode-go": [{ apiKey: "duplicate" }, { apiKey: "duplicate" }],
+          },
+        })}\n`,
+      );
+
+      assert.equal(
+        await call<boolean>(runJobsWithPreserve, [
+          { src, dst, kind: "CliProxyConfig", secretsPath },
+        ]),
+        false,
+      );
+      assert.equal(readText(dst), "keep\n");
+    });
+  });
+
   test("run_jobs_with_preserve_keeps_generated_extension_entries", async () => {
     await withTempDir(async (root) => {
       const src = join(root, "src");

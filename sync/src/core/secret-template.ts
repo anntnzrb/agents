@@ -11,6 +11,16 @@ export function syncSecretTemplate(src: string, dst: string, secretsPath: string
   const secrets = readSecrets(secretsPath);
   const content = renderSecretTemplate(template, secrets);
 
+  try {
+    syncPrivateTextFile(dst, content);
+  } catch (error) {
+    throw new Error(`render secret template ${src} -> ${dst} (${panicMessage(error)})`, {
+      cause: error,
+    });
+  }
+}
+
+export function syncPrivateTextFile(dst: string, content: string): void {
   if (matchesOutput(dst, content)) {
     return;
   }
@@ -30,9 +40,7 @@ export function syncSecretTemplate(src: string, dst: string, secretsPath: string
       // Already closed.
     }
     fs.rmSync(tempPath, { force: true });
-    throw new Error(`render secret template ${src} -> ${dst} (${panicMessage(error)})`, {
-      cause: error,
-    });
+    throw error;
   }
 }
 

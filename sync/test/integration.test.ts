@@ -45,10 +45,19 @@ test("integration_happy_path_matches_expected_outputs", () => {
     assert.equal(existsSync(join(home, ".omp", "agent", "skills", "skill.txt")), true);
     assert.equal(existsSync(join(home, ".omp", "agent", "skills", "legacy")), false);
     assert.equal(existsSync(join(home, ".mcporter", "mcporter.json")), true);
-    assert.equal(
+    const cliProxyConfig = Bun.YAML.parse(
       readFileSync(join(home, ".cli-proxy-api", "config.yaml"), "utf8"),
-      'api-key: "gateway-secret"\n',
+    ) as Record<string, any>;
+    assert.equal(
+      Bun.password.verifySync(
+        "management-secret",
+        cliProxyConfig["remote-management"]["secret-key"] as string,
+      ),
+      true,
     );
+    assert.deepEqual(cliProxyConfig["api-keys"], ["gateway-secret"]);
+    assert.equal(cliProxyConfig["codex-api-key"][0]["api-key"], "upstream-secret");
+    assert.equal(cliProxyConfig["codex-api-key"][0]["x-credential-pool"], undefined);
     assert.equal(lstatSync(join(home, ".cli-proxy-api", "config.yaml")).mode & 0o777, 0o600);
     assert.equal(existsSync(join(home, ".pi", "agent", "auth.json")), true);
     for (const harness of ["codex", "opencode", "pi", "omp"]) {
@@ -172,11 +181,23 @@ function writeFixtureFiles(home: string): void {
   writeFileSync(join(home, ".config", "agents", "assets", "mcporter.jsonc"), '{"x":1}');
   writeFileSync(
     join(home, ".config", "agents", "assets", "cliproxyapi.yaml.tmpl"),
-    `api-key: \${CLIPROXY_API_KEY}\n`,
+    `remote-management:
+  secret-key: \${CLIPROXY_MANAGEMENT_KEY}
+api-keys: \${CLIPROXY_CLIENT_API_KEYS}
+codex-api-key:
+  - x-credential-pool: fixture
+    prefix: fixture
+`,
   );
   writeFileSync(
     join(home, ".config", "agents", "secrets.local.json"),
-    '{"CLIPROXY_API_KEY":"gateway-secret"}\n',
+    `${JSON.stringify({
+      CLIPROXY_MANAGEMENT_KEY: "management-secret",
+      CLIPROXY_CLIENT_API_KEYS: ["gateway-secret"],
+      CLIPROXY_CREDENTIAL_POOLS: {
+        fixture: [{ apiKey: "upstream-secret", weight: 1 }],
+      },
+    })}\n`,
   );
   mkdirSync(join(home, ".config", "agents", "skills", "current"), {
     recursive: true,
