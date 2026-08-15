@@ -12,6 +12,7 @@ web_search = "live"
 # -----------------------------------------------------------------------------
 
 model = "gpt-5.6-sol"
+model_provider = "cliproxy"
 review_model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 model_verbosity = "low"
@@ -30,6 +31,17 @@ You are the primary coordinator. Prefer delegating substantial or independent wo
 Use direct commands and edits when they are the smallest or fastest in-scope path.
 When local read tools are unavailable, delegate filesystem inspection to the registered explorer agent.
 """
+
+[model_providers.cliproxy]
+name = "CLIProxyAPI"
+base_url = "http://127.0.0.1:8317/v1"
+wire_api = "responses"
+
+[model_providers.cliproxy.auth]
+command = "cat"
+args = ["client-api-key"]
+cwd = "~/.local/share/agents/cliproxyapi"
+refresh_interval_ms = 0
 
 [permissions.agent-workspace]
 extends = ":workspace"
