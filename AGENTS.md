@@ -9,6 +9,8 @@
 - Other `assets/` entries: SSOT for shared agents and configuration
 - `tools/`: tool-specific configs staged for sync
 - `sync/`: isolated TypeScript sync application; owns all JS/TS app config, launcher wrappers, and dependencies
+- `README.md`: concise repository landing page and route into detailed documentation
+- `docs/`: SSOT for repository documentation; flat, topic-based pages indexed by `docs/index.md`
 - `tools/<harness>/`: directory presence opts into a supported harness; sync owns its internal adapter metadata
 - Agent config root: `~/.config/agents/`
 - Synced tool homes (`~/.codex`, `~/.claude`, etc.) and agent launch wrappers are generated targets
@@ -21,6 +23,20 @@
 ## Skills
 
 Skills are modified here, in the SSOT. Always run against skill gate: `./assets/skills-gate.md`
+
+## Documentation Gate
+
+For changes that affect user-visible behavior, setup, configuration, lifecycle, supported platforms, commands, generated paths, or repository structure:
+
+1. Read `docs/index.md` and every related page completely; follow their cross-references before editing.
+2. Update the relevant existing page in the same change. Create a new focused topic page only when no current page fits.
+3. Link new pages from `docs/index.md`; link them from `README.md` only when they are primary entry points.
+4. Keep `README.md` short. Put detailed procedures, explanation, and reference material under `docs/`.
+5. Separate procedures, explanation, and reference with clear headings. Use direct language, concrete paths, and copy-pasteable commands.
+6. Derive claims from the implementation and validated behavior. Never document guessed behavior, secrets, local credentials, or generated machine-specific values.
+7. Validate links, paths, platform claims, and commands. Run `git diff --check` and the relevant code checks before handoff.
+
+Documentation-only changes must still preserve navigation and factual accuracy. Do not generate filler pages, duplicate existing guidance, or cargo-cult documentation templates.
 
 ## Sync Contract
 
