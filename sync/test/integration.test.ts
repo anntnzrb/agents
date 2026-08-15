@@ -38,6 +38,9 @@ test("integration_happy_path_matches_expected_outputs", () => {
 
     assert.equal(result.exitCode, 0, result.stderr || result.stdout);
     assert.equal(existsSync(join(home, ".codex", "AGENTS.md")), true);
+    assert.equal(existsSync(join(home, ".dsh", "AGENTS.md")), true);
+    assert.equal(existsSync(join(home, ".dsh", "cordis.patch.yml")), true);
+    assert.equal(existsSync(join(home, ".dsh", "skills", "skill.txt")), true);
     assert.equal(existsSync(join(home, ".config", "opencode", "AGENTS.md")), true);
     assert.equal(existsSync(join(home, ".pi", "agent", "AGENTS.md")), true);
     assert.equal(existsSync(join(home, ".omp", "agent", "AGENTS.md")), true);
@@ -76,8 +79,8 @@ test("integration_happy_path_matches_expected_outputs", () => {
       "export {};\n",
     );
     assert.equal(existsSync(join(home, ".pi", "agent", "auth.json")), true);
-    for (const harness of ["codex", "opencode", "pi", "omp"]) {
-      const wrapper = join(home, ".local", "bin", harness);
+    for (const command of ["codex", "dsh", "opencode", "pi", "omp"]) {
+      const wrapper = join(home, ".local", "bin", command);
       assert.equal(existsSync(wrapper), true, wrapper);
       assert.equal(readFileSync(wrapper, "utf8").includes("agents-managed-wrapper:v1"), true);
       assert.equal(readFileSync(wrapper, "utf8").includes(".local/share/agents/sync"), true);
@@ -174,6 +177,9 @@ function makeFixture(root: string): string {
   mkdirSync(join(home, ".config", "agents", "harnesses", "codex"), {
     recursive: true,
   });
+  mkdirSync(join(home, ".config", "agents", "harnesses", "deepseek"), {
+    recursive: true,
+  });
   mkdirSync(join(home, ".config", "agents", "harnesses", "opencode"), {
     recursive: true,
   });
@@ -231,6 +237,10 @@ codex-api-key:
   writeFileSync(
     join(home, ".config", "agents", "harnesses", "codex", "config.toml"),
     "codex = true",
+  );
+  writeFileSync(
+    join(home, ".config", "agents", "harnesses", "deepseek", "cordis.patch.yml"),
+    "[]\n",
   );
   writeFileSync(
     join(home, ".config", "agents", "harnesses", "omp", "agent", "config.yml"),
@@ -318,6 +328,7 @@ function runSyncProcess(home: string): RunResult {
 function snapshotHome(home: string): SnapshotEntry[] {
   const roots = [
     ".codex",
+    ".dsh",
     ".config/opencode",
     ".pi",
     ".omp",

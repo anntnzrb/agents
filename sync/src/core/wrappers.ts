@@ -53,7 +53,7 @@ export function wrapperPath(
   platform: HostPlatform = syncEnv.platform,
 ): string {
   const suffix = platform === "win32" ? ".cmd" : "";
-  return path.join(wrapperDirectory(syncEnv, platform), `${harness.sourceName}${suffix}`);
+  return path.join(wrapperDirectory(syncEnv, platform), `${harness.launcher.bin}${suffix}`);
 }
 
 export function wrapperDestinations(

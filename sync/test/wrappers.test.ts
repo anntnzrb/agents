@@ -35,7 +35,10 @@ function withTempHome<T>(fn: (home: string) => T): T {
   }
 }
 
-function addHarnessSources(home: string, ids = ["codex", "opencode", "pi", "omp"]): void {
+function addHarnessSources(
+  home: string,
+  ids = ["codex", "deepseek", "opencode", "pi", "omp"],
+): void {
   for (const id of ids) {
     mkdirSync(join(home, ".config", "agents", "harnesses", id), { recursive: true });
   }
@@ -75,6 +78,10 @@ test("harness_ownership_ids_cannot_escape_the_wrapper_directory", () => {
 test("installed_runtime_resolves_known_harness_without_ssot", () => {
   withTempHome((home) => {
     assert.equal(existsSync(join(home, ".config", "agents")), false);
+    const deepseek = supportedHarness(home, "deepseek", "linux");
+    assert.equal(deepseek?.home, join(home, ".dsh"));
+    assert.equal(deepseek?.launcher.package, "@deepseek-ai/dsh");
+    assert.equal(deepseek?.launcher.bin, "dsh");
     assert.equal(supportedHarness(home, "pi", "linux")?.home, join(home, ".pi"));
     assert.equal(supportedHarness(home, "unknown", "linux"), undefined);
   });
@@ -94,6 +101,9 @@ test("wrapper_destinations_render_unix_and_windows_launchers", () => {
       true,
     );
     assert.equal(unix[0]?.content.includes(join(home, ".config", "agents")), false);
+    const deepseekUnix = unix.find((entry) => entry.harness.sourceName === "deepseek");
+    assert.equal(deepseekUnix?.path, join(home, ".local", "bin", "dsh"));
+    assert.equal(deepseekUnix?.content.includes("launch 'deepseek'"), true);
 
     const windowsEnv = SyncEnv.fromHome(home, 1000, {
       platform: "win32",
@@ -107,6 +117,12 @@ test("wrapper_destinations_render_unix_and_windows_launchers", () => {
     assert.equal(windows[0]?.content.startsWith("@echo off\r\n"), true);
     assert.equal(windows[0]?.content.includes(`rem ${WRAPPER_MARKER}`), true);
     assert.equal(windows[0]?.content.endsWith("%ERRORLEVEL%\r\n"), true);
+    const deepseekWindows = windows.find((entry) => entry.harness.sourceName === "deepseek");
+    assert.equal(
+      deepseekWindows?.path,
+      join(home, "local-app-data", "Programs", "Agents", "bin", "dsh.cmd"),
+    );
+    assert.equal(deepseekWindows?.content.includes("launch deepseek"), true);
     assert.equal(renderWrapper(unixEnv, unixEnv.harnesses[0]!, "linux"), unix[0]!.content);
   });
 });

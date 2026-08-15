@@ -49,6 +49,15 @@ export const HARNESS_ADAPTERS = [
     },
   },
   {
+    id: "deepseek",
+    homeSegments: [".dsh"],
+    platforms: ["darwin", "linux", "win32"],
+    launcher: {
+      package: "@deepseek-ai/dsh",
+      bin: "dsh",
+    },
+  },
+  {
     id: "opencode",
     homeSegments: [".config", "opencode"],
     platforms: ["darwin", "linux", "win32"],
