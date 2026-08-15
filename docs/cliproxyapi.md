@@ -99,6 +99,12 @@ cli-proxy-api --codex-device-login
 
 Do not copy one active refresh token between two running gateways. Stop the old gateway before transferring OAuth state, or authenticate again on the new host.
 
+After adding or changing an account, refresh the shared catalog:
+
+```bash
+bun ./sync/src/cli.ts sync --refresh-models
+```
+
 ## Run the gateway
 
 ```bash
@@ -113,7 +119,7 @@ The local control panel is available at:
 http://127.0.0.1:8317/management.html
 ```
 
-It requires `CLIPROXY_MANAGEMENT_KEY`. Remote management remains disabled, and sync overwrites panel changes on the next run. Put persistent API-key providers in `assets/cliproxyapi.yaml.tmpl` and their values in `secrets.local.json`.
+It requires `CLIPROXY_MANAGEMENT_KEY`. Remote management remains disabled, and sync overwrites generated configuration changes on the next run. Put persistent API-key providers in `assets/cliproxyapi.yaml.tmpl` and their values in `secrets.local.json`. OAuth auth-file metadata, including an Antigravity prefix, remains in the host-local OAuth file.
 
 The control panel lists OAuth files and configured API-key providers separately. The **Auth Files** count does not include `codex-api-key` or `openai-compatibility` entries.
 
@@ -144,7 +150,7 @@ curl -fsS http://127.0.0.1:8317/v1/models \
   jq -r '.data[].id'
 ```
 
-Expected model names include `gpt-5.6-luna`, `go/gpt-5.6-luna`, `openrouter/auto`, `deepseek/deepseek-v4-flash`, and `zen/minimax-m3`.
+Expected model names include `gpt-5.6-luna`, `antigravity/gemini-3.7-flash-high`, `go/gpt-5.6-luna`, `openrouter/auto`, `deepseek/deepseek-v4-flash`, and `zen/minimax-m3`.
 
 ## Future home-server deployment
 

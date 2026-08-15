@@ -31,6 +31,18 @@ Sync writes the first `CLIPROXY_CLIENT_API_KEYS` entry to the private runtime fi
 
 The OpenCode plugin and Pi extension read `~/.local/share/agents/model-catalog/catalog.json` through the installed runtime catalog client. They contain no model IDs and do not fetch provider catalogs themselves. Sync owns discovery, metadata enrichment, caching, and stale recovery.
 
+CLIProxy model IDs identify the upstream credential pool:
+
+| Model ID | Upstream |
+|---|---|
+| `gpt-5.6-luna` | Unprefixed ChatGPT/Codex OAuth credentials |
+| `antigravity/gemini-3.7-flash-high` | Prefixed Antigravity OAuth credentials |
+| `go/gpt-5.6-luna` | OpenCode Go credential pool |
+| `zen/gpt-5.6-luna` | OpenCode Zen credential pool |
+| `openrouter/openai/gpt-5.6-luna` | OpenRouter credential pool |
+
+OpenCode, Pi, and OMP selectors prepend the harness provider, such as `cliproxy/antigravity/gemini-3.7-flash-high`. Codex sets `model_provider = "cliproxy"` separately, so its model value is only the CLIProxy model ID.
+
 ## Launch wrappers
 
 Sync writes harness commands to `~/.local/bin` on macOS and Linux. On Windows, it writes commands under `%LOCALAPPDATA%/Programs/Agents/bin` and adds that directory to the user path once.
