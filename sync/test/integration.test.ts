@@ -142,6 +142,9 @@ function makeFixture(root: string): string {
   mkdirSync(join(home, ".config", "agents", "tools", "codex"), {
     recursive: true,
   });
+  mkdirSync(join(home, ".config", "agents", "tools", "opencode"), {
+    recursive: true,
+  });
   mkdirSync(join(home, ".config", "agents", "tools", "omp", "agent"), {
     recursive: true,
   });

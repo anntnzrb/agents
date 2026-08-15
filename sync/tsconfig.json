@@ -6,7 +6,6 @@
     "moduleDetection": "force",
     "moduleResolution": "bundler",
     "paths": {
-      "@catalog": ["../harnesses.ts"],
       "@core/*": ["./src/core/*"],
       "@extensions/*": ["./src/extensions/*"],
       "@packages/*": ["./src/packages/*"],

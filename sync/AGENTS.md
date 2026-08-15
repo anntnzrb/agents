@@ -8,6 +8,7 @@ This is the isolated sync application.
 - `./tsconfig.json`: sync app TypeScript config
 - `./bun.lock`: sync app lockfile
 - `./biome.jsonc`: sync-scoped formatting, linting, and import organization
+- `./.oxlintrc.jsonc`: sync-scoped semantic and type-aware linting
 - `./src/`: application code
 - `./test/`: sync-specific tests
 
@@ -15,8 +16,8 @@ This is the isolated sync application.
 
 - Keep behavior changes deliberate.
 - Public callable entrypoint is `src/cli.ts`; wrappers/tooling invoke it with an explicit Bun runner.
-- `../harnesses.ts` is the typed source of truth for supported harnesses and npm launch metadata.
-- Use `@catalog` and layer aliases for cross-boundary imports. Keep same-directory imports relative.
+- A supported `../tools/<harness>/` directory opts into that harness; `src/core/harness-adapters.ts` owns internal launch and sync metadata.
+- Use layer aliases for cross-boundary imports. Keep same-directory imports relative.
 - Sync owns generated launch wrappers: Unix targets live in `~/.local/bin`; Windows targets live in `%LOCALAPPDATA%/Programs/Agents/bin`.
 - Unix PATH is assumed to be configured. Windows user PATH is updated at most once and recorded by the durable `windows-path-added` marker.
 

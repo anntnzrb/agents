@@ -13,8 +13,7 @@
       "package.json",
       "tsconfig.json",
       "src/**",
-      "test/**",
-      "../harnesses.ts"
+      "test/**"
     ]
   },
   "formatter": {

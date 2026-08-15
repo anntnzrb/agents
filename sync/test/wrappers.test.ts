@@ -13,8 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { HARNESS_CATALOG } from "@catalog";
-import { buildHarness, HarnessId, SyncEnv } from "@core/harness.ts";
+import { buildHarness, SyncEnv } from "@core/harness.ts";
 import {
   reconcileWrapperFiles,
   reconcileWrappers,
@@ -35,20 +34,25 @@ function withTempHome<T>(fn: (home: string) => T): T {
   }
 }
 
-test("catalog_is_keyed_and_platform_selection_is_explicit", () => {
-  assert.deepEqual(Object.keys(HARNESS_CATALOG), ["codex", "opencode", "pi", "omp"]);
-  for (const declaration of Object.values(HARNESS_CATALOG)) {
-    assert.deepEqual(declaration.platforms, ["darwin", "linux", "win32"]);
+function addHarnessSources(home: string, ids = ["codex", "opencode", "pi", "omp"]): void {
+  for (const id of ids) {
+    mkdirSync(join(home, ".config", "agents", "tools", id), { recursive: true });
   }
+}
 
+test("harnesses_are_discovered_from_known_tool_directories", () => {
   withTempHome((home) => {
+    addHarnessSources(home, ["codex", "opencode"]);
+    mkdirSync(join(home, ".config", "agents", "tools", "unrelated"), { recursive: true });
+    writeFileSync(join(home, ".config", "agents", "tools", "pi"), "not a directory");
+
     const syncEnv = SyncEnv.fromHome(home, 1000, {
       platform: "win32",
       localAppData: join(home, "local-app-data"),
     });
     assert.deepEqual(
       syncEnv.harnesses.map((harness) => harness.sourceName),
-      ["codex", "opencode", "pi", "omp"],
+      ["codex", "opencode"],
     );
     assert.equal(syncEnv.platform, "win32");
   });
@@ -58,7 +62,7 @@ test("harness_ownership_ids_cannot_escape_the_wrapper_directory", () => {
   assert.throws(
     () =>
       buildHarness({
-        id: HarnessId.Codex,
+        id: "codex",
         sourceName: "../codex",
         home: "/tmp/codex",
         launcher: { package: "@openai/codex", bin: "codex" },
@@ -69,6 +73,7 @@ test("harness_ownership_ids_cannot_escape_the_wrapper_directory", () => {
 
 test("wrapper_destinations_render_unix_and_windows_launchers", () => {
   withTempHome((home) => {
+    addHarnessSources(home);
     const unixEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
     const unix = wrapperDestinations(unixEnv, "linux");
     assert.equal(unix[0]?.path, join(home, ".local", "bin", "codex"));
@@ -94,6 +99,7 @@ test("wrapper_destinations_render_unix_and_windows_launchers", () => {
 
 test("wrapper_reconciliation_is_idempotent_and_removes_owned_stale_entries", () => {
   withTempHome((home) => {
+    addHarnessSources(home);
     const syncEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
     const first = reconcileWrappers(syncEnv);
     assert.equal(first, true);
@@ -121,6 +127,7 @@ test("wrapper_reconciliation_is_idempotent_and_removes_owned_stale_entries", () 
 
 test("wrapper_reconciliation_preserves_unmanaged_conflicts", () => {
   withTempHome((home) => {
+    addHarnessSources(home);
     const syncEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
     const destination = wrapperDestinations(syncEnv, "linux")[0]!;
     mkdirSync(join(home, ".local", "bin"), { recursive: true });
@@ -151,6 +158,7 @@ test("wrapper_reconciliation_preserves_unmanaged_conflicts", () => {
 
 test("windows_path_marker_is_durable_and_path_hook_runs_once", () => {
   withTempHome((home) => {
+    addHarnessSources(home);
     const syncEnv = SyncEnv.fromHome(home, 1000, {
       platform: "win32",
       localAppData: join(home, "local-app-data"),

@@ -1,21 +1,18 @@
+import { existsSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { assertNever } from "@runtime/errors.ts";
 import {
   type AssetRename,
-  HARNESS_CATALOG,
-  type HarnessDeclaration,
+  HARNESS_ADAPTERS,
+  type HarnessAdapter,
+  type HarnessHookSpec,
   type HarnessId,
   type HarnessLauncherSpec,
   type HostPlatform,
-} from "@catalog";
-import { assertNever } from "@runtime/errors.ts";
+} from "./harness-adapters.ts";
 
-export {
-  type AssetRename,
-  HARNESS_CATALOG,
-  HarnessId,
-  type HostPlatform,
-} from "@catalog";
+export type { AssetRename, HarnessId, HostPlatform } from "./harness-adapters.ts";
 
 export const SOURCE_AGENT_FILE = "AGENTS.md";
 const INSTALL_TIMEOUT_SECONDS = 120;
@@ -24,8 +21,6 @@ const DEFAULT_PACKAGE_CACHE_SUBDIR = ".local/share/agents/pi-packages";
 export const SKILLS_DST_DIR = "skills";
 export const SKILLS_SOURCE_SUBDIR = "current";
 const PATH_COMPONENT_PATTERN = /^[A-Za-z0-9._-]+$/;
-
-export type HarnessHookSpec = NonNullable<HarnessDeclaration["hooks"]>[number];
 
 export type HarnessHook =
   | {
@@ -39,7 +34,7 @@ export type HarnessHook =
       readonly rootDir: string;
     };
 
-export interface HarnessSpec extends Omit<HarnessDeclaration, "homeSegments" | "platforms"> {
+export interface HarnessSpec extends Omit<HarnessAdapter, "homeSegments" | "id" | "platforms"> {
   readonly id: HarnessId;
   readonly sourceName: string;
   readonly home: string;
@@ -117,16 +112,17 @@ export class SyncEnv {
     } = {},
   ): SyncEnv {
     const agentsHome = path.join(home, ".config", "agents");
+    const toolsHome = path.join(agentsHome, "tools");
     const platform = options.platform ?? platformFromProcess();
     return new SyncEnv(
       home,
       path.join(agentsHome, "assets"),
       path.join(agentsHome, "skills"),
-      path.join(agentsHome, "tools"),
+      toolsHome,
       path.join(home, ".mcporter"),
       path.join(home, MANAGED_STATE_SUBDIR),
       installTimeoutMs,
-      defaultHarnesses(home, platform),
+      discoverHarnesses(home, toolsHome, platform),
       platform,
       options.localAppData ?? (platform === "win32" ? process.env["LOCALAPPDATA"] : undefined),
     );
@@ -157,23 +153,29 @@ export function buildHarness(spec: HarnessSpec): Harness {
   };
 }
 
-export function defaultHarnesses(
+export function discoverHarnesses(
   home: string,
+  toolsHome: string,
   platform: HostPlatform = platformFromProcess(),
 ): readonly Harness[] {
-  return (Object.entries(HARNESS_CATALOG) as readonly [HarnessId, HarnessDeclaration][])
-    .filter(([, entry]) => entry.platforms.includes(platform))
-    .map(([id, entry]) => {
-      for (const segment of entry.homeSegments) {
-        assertPathComponent(segment, `${id} home segment`);
-      }
-      return buildHarness({
-        ...entry,
-        id,
-        sourceName: id,
-        home: path.join(home, ...entry.homeSegments),
-      });
+  return HARNESS_ADAPTERS.filter(
+    (adapter) =>
+      adapter.platforms.includes(platform) && isDirectory(path.join(toolsHome, adapter.id)),
+  ).map((adapter) => {
+    for (const segment of adapter.homeSegments) {
+      assertPathComponent(segment, `${adapter.id} home segment`);
+    }
+    return buildHarness({
+      ...adapter,
+      id: adapter.id,
+      sourceName: adapter.id,
+      home: path.join(home, ...adapter.homeSegments),
     });
+  });
+}
+
+function isDirectory(candidate: string): boolean {
+  return existsSync(candidate) && statSync(candidate).isDirectory();
 }
 
 function platformFromProcess(): HostPlatform {

@@ -18,7 +18,6 @@ import { basename, join, resolve } from "node:path";
 const SYNC_ROOT = resolve(import.meta.dir, "..");
 const SRC_ROOT = join(SYNC_ROOT, "src");
 
-let HarnessId: any;
 let SyncEnv: any;
 let runSync: any;
 let copyItem: any;
@@ -48,7 +47,6 @@ if (!runtime) {
   test.skip("TS runtime modules unavailable yet", () => {});
 } else {
   ({
-    HarnessId,
     SyncEnv,
     runSync,
     copyItem,
@@ -127,9 +125,6 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
   ]);
 
   return {
-    HarnessId:
-      (harnessModule as Record<string, unknown>)["HarnessId"] ??
-      (harnessModule as Record<string, unknown>)["harnessId"],
     SyncEnv: (harnessModule as Record<string, unknown>)["SyncEnv"],
     harnessSourceRoot: pickFn(
       harnessModule as Record<string, unknown>,
@@ -383,7 +378,7 @@ if (runtime) {
       writeFile(join(root, "a", "nested", "package.json"), "{}");
       writeFile(join(root, "a", "node_modules", "skip", "package.json"), "{}");
 
-      const packages = [...(await call<string[]>(iterExtensionPackages, root))].sort();
+      const packages = [...(await call<string[]>(iterExtensionPackages, root))].toSorted();
       assert.equal(packages.length, 2);
     });
   });
@@ -560,7 +555,7 @@ setInterval(() => {}, 1_000);
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
 
-      const pi = syncEnv.harness(enumMember(HarnessId, "Pi"));
+      const pi = syncEnv.harness("pi");
       assert.ok(pi);
       assert.equal(
         harnessSourceRoot(pi!, syncEnv.toolsHome),
@@ -1216,7 +1211,7 @@ setInterval(() => {}, 1_000);
   test("managed_state_helpers_match_safe_entry_rules", async () => {
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
-      const harness = syncEnv.harness(enumMember(HarnessId, "Codex"));
+      const harness = syncEnv.harness("codex");
       assert.ok(harness);
 
       writeFile(
@@ -1310,6 +1305,9 @@ setInterval(() => {}, 1_000);
 }
 
 function makeSyncEnv(root: string): any {
+  for (const id of ["codex", "opencode", "pi", "omp"]) {
+    mkdirSync(join(root, ".config", "agents", "tools", id), { recursive: true });
+  }
   const value = SyncEnv as any;
   if (typeof value?.fromHome === "function") {
     return value.fromHome(root, 1000);
@@ -1321,11 +1319,4 @@ function makeSyncEnv(root: string): any {
     return new value(root, 1000);
   }
   throw new Error("missing SyncEnv factory");
-}
-
-function enumMember(value: unknown, name: string): unknown {
-  if (value && typeof value === "object" && name in value) {
-    return (value as Record<string, unknown>)[name];
-  }
-  return name;
 }

@@ -1,11 +1,3 @@
-/**
- * User-facing harness catalog.
- *
- * This is intentionally executable TypeScript rather than JSON/YAML: the
- * sync application imports this declaration directly, so paths and wrapper
- * behavior cannot silently drift between two config formats.
- */
-
 export type HostPlatform = "darwin" | "linux" | "win32";
 export type AssetRename = readonly [string, string];
 
@@ -28,7 +20,8 @@ export type HarnessHookSpec =
       readonly rootDir: string;
     };
 
-export interface HarnessDeclaration {
+export interface HarnessAdapter {
+  readonly id: string;
   readonly homeSegments: readonly string[];
   readonly platforms: readonly HostPlatform[];
   readonly launcher: HarnessLauncherSpec;
@@ -39,15 +32,15 @@ export interface HarnessDeclaration {
   readonly hooks?: readonly HarnessHookSpec[];
 }
 
-export function defineHarnesses<const T extends Record<string, HarnessDeclaration>>(
-  declarations: T,
-): T {
-  return declarations;
-}
-
-/** The only supported harness declaration used by sync and wrapper generation. */
-export const HARNESS_CATALOG = defineHarnesses({
-  codex: {
+/**
+ * Internal adapters for harnesses understood by sync.
+ *
+ * A matching directory under tools/ opts into an adapter. Users never need to
+ * repeat launcher, platform, destination, or hook plumbing in configuration.
+ */
+export const HARNESS_ADAPTERS = [
+  {
+    id: "codex",
     homeSegments: [".codex"],
     platforms: ["darwin", "linux", "win32"],
     launcher: {
@@ -55,7 +48,8 @@ export const HARNESS_CATALOG = defineHarnesses({
       bin: "codex",
     },
   },
-  opencode: {
+  {
+    id: "opencode",
     homeSegments: [".config", "opencode"],
     platforms: ["darwin", "linux", "win32"],
     launcher: {
@@ -63,7 +57,8 @@ export const HARNESS_CATALOG = defineHarnesses({
       bin: "opencode",
     },
   },
-  pi: {
+  {
+    id: "pi",
     homeSegments: [".pi"],
     platforms: ["darwin", "linux", "win32"],
     launcher: {
@@ -85,7 +80,8 @@ export const HARNESS_CATALOG = defineHarnesses({
       },
     ],
   },
-  omp: {
+  {
+    id: "omp",
     homeSegments: [".omp"],
     platforms: ["darwin", "linux", "win32"],
     launcher: {
@@ -94,15 +90,6 @@ export const HARNESS_CATALOG = defineHarnesses({
     },
     runtimeSubdir: "agent",
   },
-});
+] as const satisfies readonly HarnessAdapter[];
 
-export type HarnessId = keyof typeof HARNESS_CATALOG;
-
-// Convenience members preserve the existing API while the record keys remain
-// the authoritative ownership IDs.
-export const HarnessId = {
-  Codex: "codex",
-  Opencode: "opencode",
-  Pi: "pi",
-  Omp: "omp",
-} as const satisfies Record<string, HarnessId>;
+export type HarnessId = (typeof HARNESS_ADAPTERS)[number]["id"];
