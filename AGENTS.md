@@ -8,9 +8,10 @@
 - `skills/legacy/`: archived skills; repo-only, not synced
 - Other `assets/` entries: SSOT for shared agents and configuration
 - `tools/`: tool-specific configs staged for sync
-- `sync/`: isolated TypeScript sync application; owns all JS/TS app config and dependencies
+- `sync/`: isolated TypeScript sync application; owns all JS/TS app config, launcher wrappers, and dependencies
+- `harnesses.ts`: typed root harness catalog; sync and generated launchers consume this declaration directly
 - Agent config root: `~/.config/agents/`
-- Synced tool homes (`~/.codex`, `~/.claude`, etc.) are generated targets
+- Synced tool homes (`~/.codex`, `~/.claude`, etc.) and agent launch wrappers are generated targets
 - Make durable changes in this repository so sync does not overwrite them
 
 <critical>
