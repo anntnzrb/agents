@@ -7,11 +7,11 @@
 - `skills/current/`: SSOT for shared skills synced to every harness
 - `skills/legacy/`: archived skills; repo-only, not synced
 - Other `assets/` entries: SSOT for shared agents and configuration
-- `tools/`: tool-specific configs staged for sync
+- `harnesses/`: harness-specific configs staged for sync
 - `sync/`: isolated TypeScript sync application; owns all JS/TS app config, launcher wrappers, and dependencies
 - `README.md`: concise repository landing page and route into detailed documentation
 - `docs/`: SSOT for repository documentation; flat, topic-based pages indexed by `docs/index.md`
-- `tools/<harness>/`: directory presence opts into a supported harness; sync owns its internal adapter metadata
+- `harnesses/<harness>/`: directory presence opts into a supported harness; sync owns its internal adapter metadata
 - Agent config root: `~/.config/agents/`
 - Synced tool homes (`~/.codex`, `~/.claude`, etc.) and agent launch wrappers are generated targets
 - Make durable changes in this repository so sync does not overwrite them

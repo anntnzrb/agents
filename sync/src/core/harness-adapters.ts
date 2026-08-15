@@ -35,7 +35,7 @@ export interface HarnessAdapter {
 /**
  * Internal adapters for harnesses understood by sync.
  *
- * A matching directory under tools/ opts into an adapter. Users never need to
+ * A matching directory under harnesses/ opts into an adapter. Users never need to
  * repeat launcher, platform, destination, or hook plumbing in configuration.
  */
 export const HARNESS_ADAPTERS = [

@@ -587,7 +587,7 @@ test("warns for shell content-search commands", () => {
   );
   assert.equal(
     reasonForCommand(
-      'git log --oneline -n 8 && rg -n "foo" tools/pi/agent/extensions/footer/index.ts && git status --short',
+      'git log --oneline -n 8 && rg -n "foo" harnesses/pi/agent/extensions/footer/index.ts && git status --short',
       searchConfig,
     ),
     "prefer native grep tool",

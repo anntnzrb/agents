@@ -7,7 +7,7 @@ The repository separates committed sources, generated targets, and runtime state
 | `assets/` | Shared instructions and standalone configuration sources |
 | `skills/current/` | Shared skills synced to every harness |
 | `skills/legacy/` | Archived skills that sync does not publish |
-| `tools/<harness>/` | Harness-specific source configuration |
+| `harnesses/<harness>/` | Harness-specific source configuration |
 | `sync/` | Bun and TypeScript reconciliation application |
 | `docs/` | Repository documentation |
 | `secrets.local.json` | Ignored machine-local secret values |
@@ -25,9 +25,9 @@ Standalone files include:
 - `cliproxyapi.release.json` for the pinned release and checksums;
 - `skills-gate.md` for skill policy.
 
-### `tools/`
+### `harnesses/`
 
-A known directory under `tools/` opts into its adapter in `sync/src/core/harness-adapters.ts`. Pi and OMP use an `agent/` runtime subdirectory. Codex and OpenCode sync directly from their tool directory.
+A known directory under `harnesses/` opts into its adapter in `sync/src/core/harness-adapters.ts`. Pi and OMP use an `agent/` runtime subdirectory. Codex and OpenCode sync directly from their harness directory.
 
 ### `sync/`
 

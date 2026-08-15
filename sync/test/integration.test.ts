@@ -85,7 +85,7 @@ test("integration_package_bootstrap_patches_settings_and_cache_paths", () => {
     const buildRepo = join(root, "repos", "build-pkg");
     setupPackageRepos(sourceRepo, buildRepo);
     writeFileSync(
-      join(home, ".config", "agents", "tools", "pi", "agent", "packages.json"),
+      join(home, ".config", "agents", "harnesses", "pi", "agent", "packages.json"),
       `${JSON.stringify({ packages: [sourceRepo, buildRepo] }, null, 2)}\n`,
     );
 
@@ -116,7 +116,7 @@ test("integration_invalid_package_json_fails_package_bootstrap", () => {
     initGitRepo(badRepo);
 
     writeFileSync(
-      join(home, ".config", "agents", "tools", "pi", "agent", "packages.json"),
+      join(home, ".config", "agents", "harnesses", "pi", "agent", "packages.json"),
       `${JSON.stringify({ packages: [badRepo] }, null, 2)}\n`,
     );
 
@@ -153,16 +153,16 @@ function withTempDir<T>(fn: (root: string) => T): T {
 function makeFixture(root: string): string {
   const home = join(root, "ts-home");
   mkdirSync(join(home, ".config", "agents", "assets"), { recursive: true });
-  mkdirSync(join(home, ".config", "agents", "tools", "codex"), {
+  mkdirSync(join(home, ".config", "agents", "harnesses", "codex"), {
     recursive: true,
   });
-  mkdirSync(join(home, ".config", "agents", "tools", "opencode"), {
+  mkdirSync(join(home, ".config", "agents", "harnesses", "opencode"), {
     recursive: true,
   });
-  mkdirSync(join(home, ".config", "agents", "tools", "omp", "agent"), {
+  mkdirSync(join(home, ".config", "agents", "harnesses", "omp", "agent"), {
     recursive: true,
   });
-  mkdirSync(join(home, ".config", "agents", "tools", "pi", "agent"), {
+  mkdirSync(join(home, ".config", "agents", "harnesses", "pi", "agent"), {
     recursive: true,
   });
   mkdirSync(join(home, ".pi", "agent"), { recursive: true });
@@ -207,9 +207,12 @@ codex-api-key:
     recursive: true,
   });
   writeFileSync(join(home, ".config", "agents", "skills", "legacy", "old.txt"), "legacy-content");
-  writeFileSync(join(home, ".config", "agents", "tools", "codex", "config.toml"), "codex = true");
   writeFileSync(
-    join(home, ".config", "agents", "tools", "omp", "agent", "config.yml"),
+    join(home, ".config", "agents", "harnesses", "codex", "config.toml"),
+    "codex = true",
+  );
+  writeFileSync(
+    join(home, ".config", "agents", "harnesses", "omp", "agent", "config.yml"),
     "theme:\n  dark: graphite\n",
   );
   writeFileSync(join(home, ".pi", "agent", "auth.json"), '{"token":1}');

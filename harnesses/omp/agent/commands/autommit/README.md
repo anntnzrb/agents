@@ -15,4 +15,4 @@ Re-evaluate the role before changing its model; provider catalogs, free tiers, q
 7. Prefer a genuinely free model when its task-relevant evidence is competitive. Otherwise choose the lowest-cost paid model that materially improves end-to-end reliability.
 8. Smoke-test the candidate on representative clean, mixed, split, and malformed diffs before making it the default.
 
-The durable configuration is `tools/omp/agent/config.yml`. Run the repository sync entrypoint after changing it so the generated OMP home receives the update.
+The durable configuration is `harnesses/omp/agent/config.yml`. Run the repository sync entrypoint after changing it so the generated OMP home receives the update.

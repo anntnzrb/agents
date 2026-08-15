@@ -269,7 +269,7 @@ test("interactive_harness_launch_is_unbounded_and_keeps_arguments", async () => 
           : success();
       },
     };
-    mkdirSync(join(home, ".config", "agents", "tools", "codex"), { recursive: true });
+    mkdirSync(join(home, ".config", "agents", "harnesses", "codex"), { recursive: true });
     const syncEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
     const harness = syncEnv.harnesses.find((candidate) => candidate.sourceName === "codex")!;
     assert.equal(await launchHarness(syncEnv, harness, ["--help", "hello"], runtime), 7);

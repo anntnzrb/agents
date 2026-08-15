@@ -728,8 +728,8 @@ setInterval(() => {}, 1_000);
       const pi = syncEnv.harness("pi");
       assert.ok(pi);
       assert.equal(
-        harnessSourceRoot(pi!, syncEnv.toolsHome),
-        join(root, ".config", "agents", "tools", "pi", "agent"),
+        harnessSourceRoot(pi!, syncEnv.harnessesHome),
+        join(root, ".config", "agents", "harnesses", "pi", "agent"),
       );
       assert.equal(harnessInstructionTarget(pi!), join(root, ".pi", "agent", "AGENTS.md"));
     });
@@ -748,7 +748,7 @@ setInterval(() => {}, 1_000);
       assert.ok(packageHook);
       assert.equal(
         packageHook!["manifestPath"],
-        join(root, ".config", "agents", "tools", "pi", "agent", "packages.json"),
+        join(root, ".config", "agents", "harnesses", "pi", "agent", "packages.json"),
       );
       assert.equal(
         packageHook!["runtimeSettingsPath"],
@@ -771,9 +771,12 @@ setInterval(() => {}, 1_000);
       writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
       writeFile(join(root, ".config", "agents", "assets", "mcporter.jsonc"), '{"x":1}');
       writeFile(join(root, ".config", "agents", "skills", "current", "skill.txt"), "skill-content");
-      writeFile(join(root, ".config", "agents", "tools", "codex", "config.toml"), "codex = true");
       writeFile(
-        join(root, ".config", "agents", "tools", "omp", "agent", "config.yml"),
+        join(root, ".config", "agents", "harnesses", "codex", "config.toml"),
+        "codex = true",
+      );
+      writeFile(
+        join(root, ".config", "agents", "harnesses", "omp", "agent", "config.yml"),
         "theme:\n  dark: graphite\n",
       );
       writeFile(
@@ -781,7 +784,7 @@ setInterval(() => {}, 1_000);
           root,
           ".config",
           "agents",
-          "tools",
+          "harnesses",
           "pi",
           "agent",
           "extensions",
@@ -795,7 +798,7 @@ setInterval(() => {}, 1_000);
           root,
           ".config",
           "agents",
-          "tools",
+          "harnesses",
           "pi",
           "agent",
           "extensions",
@@ -840,9 +843,9 @@ setInterval(() => {}, 1_000);
 
       writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
       writeFile(join(agentsRoot, "skills", "current", "skill.txt"), "fresh-skill");
-      writeFile(join(agentsRoot, "tools", "codex", "config.toml"), "fresh = true\n");
+      writeFile(join(agentsRoot, "harnesses", "codex", "config.toml"), "fresh = true\n");
       writeFile(
-        join(agentsRoot, "tools", "omp", "agent", "config.yml"),
+        join(agentsRoot, "harnesses", "omp", "agent", "config.yml"),
         "theme:\n  light: graphite\n",
       );
 
@@ -876,7 +879,7 @@ setInterval(() => {}, 1_000);
       writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
       writeFile(join(agentsRoot, "skills", "current", "skill.txt"), "fresh-skill");
       writeFile(
-        join(agentsRoot, "tools", "omp", "agent", "config.yml"),
+        join(agentsRoot, "harnesses", "omp", "agent", "config.yml"),
         "theme:\n  light: graphite\n",
       );
 
@@ -914,7 +917,7 @@ setInterval(() => {}, 1_000);
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
       const agentsRoot = join(root, ".config", "agents");
-      const codexConfig = join(agentsRoot, "tools", "codex", "config.toml");
+      const codexConfig = join(agentsRoot, "harnesses", "codex", "config.toml");
       const skillsRoot = join(agentsRoot, "skills", "current");
 
       writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
@@ -993,7 +996,7 @@ setInterval(() => {}, 1_000);
           root,
           ".config",
           "agents",
-          "tools",
+          "harnesses",
           "pi",
           "agent",
           "extensions",
@@ -1013,7 +1016,7 @@ setInterval(() => {}, 1_000);
         `${JSON.stringify(
           {
             fingerprint: fingerprintTree(
-              join(root, ".config", "agents", "tools", "pi", "agent", "extensions"),
+              join(root, ".config", "agents", "harnesses", "pi", "agent", "extensions"),
             ),
             generatedEntries: ["package.json", "node_modules"],
           },
@@ -1036,7 +1039,7 @@ setInterval(() => {}, 1_000);
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
       const { fingerprintTree } = await import("@core/hook-state.ts");
-      const sourceRoot = join(root, ".config", "agents", "tools", "pi", "agent", "extensions");
+      const sourceRoot = join(root, ".config", "agents", "harnesses", "pi", "agent", "extensions");
       const statePath = join(
         root,
         ".local",
@@ -1106,7 +1109,7 @@ setInterval(() => {}, 1_000);
           root,
           ".config",
           "agents",
-          "tools",
+          "harnesses",
           "pi",
           "agent",
           "extensions",
@@ -1147,11 +1150,11 @@ setInterval(() => {}, 1_000);
 
       writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
       writeFile(
-        join(agentsRoot, "tools", "omp", "agent", "config.yml"),
+        join(agentsRoot, "harnesses", "omp", "agent", "config.yml"),
         "interruptMode: immediate\n",
       );
       writeFile(
-        join(agentsRoot, "tools", "omp", "agent", "packages.json"),
+        join(agentsRoot, "harnesses", "omp", "agent", "packages.json"),
         "this is not valid json\n",
       );
 
@@ -1359,7 +1362,7 @@ setInterval(() => {}, 1_000);
       initGitRepo(buildRepo);
 
       writeFile(
-        join(root, ".config", "agents", "tools", "pi", "agent", "packages.json"),
+        join(root, ".config", "agents", "harnesses", "pi", "agent", "packages.json"),
         `{
   "packages": [
     "${sourceRepo}",
@@ -1476,7 +1479,7 @@ setInterval(() => {}, 1_000);
 
 function makeSyncEnv(root: string): any {
   for (const id of ["codex", "opencode", "pi", "omp"]) {
-    mkdirSync(join(root, ".config", "agents", "tools", id), { recursive: true });
+    mkdirSync(join(root, ".config", "agents", "harnesses", id), { recursive: true });
   }
   const value = SyncEnv as any;
   if (typeof value?.fromHome === "function") {

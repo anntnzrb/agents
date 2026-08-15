@@ -56,7 +56,7 @@ export class SyncEnv {
   readonly home: string;
   readonly assetsHome: string;
   readonly skillsHome: string;
-  readonly toolsHome: string;
+  readonly harnessesHome: string;
   readonly mcporterHome: string;
   readonly managedStateHome: string;
   readonly installTimeoutMs: number;
@@ -68,7 +68,7 @@ export class SyncEnv {
     home: string,
     assetsHome: string,
     skillsHome: string,
-    toolsHome: string,
+    harnessesHome: string,
     mcporterHome: string,
     managedStateHome: string,
     installTimeoutMs: number,
@@ -79,7 +79,7 @@ export class SyncEnv {
     this.home = home;
     this.assetsHome = assetsHome;
     this.skillsHome = skillsHome;
-    this.toolsHome = toolsHome;
+    this.harnessesHome = harnessesHome;
     this.mcporterHome = mcporterHome;
     this.managedStateHome = managedStateHome;
     this.installTimeoutMs = installTimeoutMs;
@@ -112,17 +112,17 @@ export class SyncEnv {
     } = {},
   ): SyncEnv {
     const agentsHome = path.join(home, ".config", "agents");
-    const toolsHome = path.join(agentsHome, "tools");
+    const harnessesHome = path.join(agentsHome, "harnesses");
     const platform = options.platform ?? platformFromProcess();
     return new SyncEnv(
       home,
       path.join(agentsHome, "assets"),
       path.join(agentsHome, "skills"),
-      toolsHome,
+      harnessesHome,
       path.join(home, ".mcporter"),
       path.join(home, MANAGED_STATE_SUBDIR),
       installTimeoutMs,
-      discoverHarnesses(home, toolsHome, platform),
+      discoverHarnesses(home, harnessesHome, platform),
       platform,
       options.localAppData ?? (platform === "win32" ? process.env["LOCALAPPDATA"] : undefined),
     );
@@ -155,12 +155,12 @@ export function buildHarness(spec: HarnessSpec): Harness {
 
 export function discoverHarnesses(
   home: string,
-  toolsHome: string,
+  harnessesHome: string,
   platform: HostPlatform = platformFromProcess(),
 ): readonly Harness[] {
   return HARNESS_ADAPTERS.filter(
     (adapter) =>
-      adapter.platforms.includes(platform) && isDirectory(path.join(toolsHome, adapter.id)),
+      adapter.platforms.includes(platform) && isDirectory(path.join(harnessesHome, adapter.id)),
   ).map((adapter) => {
     for (const segment of adapter.homeSegments) {
       assertPathComponent(segment, `${adapter.id} home segment`);
@@ -198,10 +198,10 @@ function assertPathComponent(value: string, label: string): void {
 export const harnessRoot = (harness: Harness): string =>
   harness.runtimeSubdir ? path.join(harness.home, harness.runtimeSubdir) : harness.home;
 
-export function harnessSourceRoot(harness: Harness, toolsHome: string): string {
+export function harnessSourceRoot(harness: Harness, harnessesHome: string): string {
   return harness.runtimeSubdir
-    ? path.join(toolsHome, harness.sourceName, harness.runtimeSubdir)
-    : path.join(toolsHome, harness.sourceName);
+    ? path.join(harnessesHome, harness.sourceName, harness.runtimeSubdir)
+    : path.join(harnessesHome, harness.sourceName);
 }
 
 export const harnessInstructionTarget = (harness: Harness): string =>

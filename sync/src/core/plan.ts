@@ -110,7 +110,7 @@ function buildHarnessPlan(
   assetNames: readonly string[],
 ): HarnessPlan {
   const root = harnessRoot(harness);
-  const sourceRoot = harnessSourceRoot(harness, syncEnv.toolsHome);
+  const sourceRoot = harnessSourceRoot(harness, syncEnv.harnessesHome);
   const instructionTarget = harnessInstructionTarget(harness);
   const currentEntryNames = currentManagedEntryNames(
     harness,

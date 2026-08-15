@@ -37,15 +37,15 @@ function withTempHome<T>(fn: (home: string) => T): T {
 
 function addHarnessSources(home: string, ids = ["codex", "opencode", "pi", "omp"]): void {
   for (const id of ids) {
-    mkdirSync(join(home, ".config", "agents", "tools", id), { recursive: true });
+    mkdirSync(join(home, ".config", "agents", "harnesses", id), { recursive: true });
   }
 }
 
-test("harnesses_are_discovered_from_known_tool_directories", () => {
+test("harnesses_are_discovered_from_known_harness_directories", () => {
   withTempHome((home) => {
     addHarnessSources(home, ["codex", "opencode"]);
-    mkdirSync(join(home, ".config", "agents", "tools", "unrelated"), { recursive: true });
-    writeFileSync(join(home, ".config", "agents", "tools", "pi"), "not a directory");
+    mkdirSync(join(home, ".config", "agents", "harnesses", "unrelated"), { recursive: true });
+    writeFileSync(join(home, ".config", "agents", "harnesses", "pi"), "not a directory");
 
     const syncEnv = SyncEnv.fromHome(home, 1000, {
       platform: "win32",
