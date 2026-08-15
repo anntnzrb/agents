@@ -57,7 +57,7 @@ export function wrapperPath(
 }
 
 export function wrapperDestinations(
-  syncEnv: Pick<SyncEnv, "home" | "platform" | "localAppData" | "harnesses">,
+  syncEnv: Pick<SyncEnv, "home" | "runtimeHome" | "platform" | "localAppData" | "harnesses">,
   platform: HostPlatform = syncEnv.platform,
 ): readonly HarnessWrapperDestination[] {
   return syncEnv.harnesses.map((harness) => {
@@ -71,11 +71,11 @@ export function wrapperDestinations(
 }
 
 export function renderWrapper(
-  syncEnv: Pick<SyncEnv, "home">,
+  syncEnv: Pick<SyncEnv, "runtimeHome">,
   harness: Harness,
   platform: HostPlatform,
 ): string {
-  const syncScript = path.join(syncEnv.home, ".config", "agents", "sync", "src", "cli.ts");
+  const syncScript = path.join(syncEnv.runtimeHome, "sync", "src", "cli.ts");
   if (platform === "win32") {
     return [
       "@echo off",

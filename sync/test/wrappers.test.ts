@@ -13,7 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { buildHarness, SyncEnv } from "@core/harness.ts";
+import { buildHarness, SyncEnv, supportedHarness } from "@core/harness.ts";
 import {
   managedToolWrapperDestination,
   reconcileWrapperFiles,
@@ -72,6 +72,14 @@ test("harness_ownership_ids_cannot_escape_the_wrapper_directory", () => {
   );
 });
 
+test("installed_runtime_resolves_known_harness_without_ssot", () => {
+  withTempHome((home) => {
+    assert.equal(existsSync(join(home, ".config", "agents")), false);
+    assert.equal(supportedHarness(home, "pi", "linux")?.home, join(home, ".pi"));
+    assert.equal(supportedHarness(home, "unknown", "linux"), undefined);
+  });
+});
+
 test("wrapper_destinations_render_unix_and_windows_launchers", () => {
   withTempHome((home) => {
     addHarnessSources(home);
@@ -81,6 +89,11 @@ test("wrapper_destinations_render_unix_and_windows_launchers", () => {
     assert.equal(unix[0]?.content.startsWith("#!/bin/sh\n"), true);
     assert.equal(unix[0]?.content.includes(WRAPPER_MARKER), true);
     assert.equal(unix[0]?.content.includes("launch 'codex'"), true);
+    assert.equal(
+      unix[0]?.content.includes(join(home, ".local", "share", "agents", "sync", "src", "cli.ts")),
+      true,
+    );
+    assert.equal(unix[0]?.content.includes(join(home, ".config", "agents")), false);
 
     const windowsEnv = SyncEnv.fromHome(home, 1000, {
       platform: "win32",

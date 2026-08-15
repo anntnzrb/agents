@@ -52,6 +52,7 @@ type ConfigRecord = Record<string, unknown>;
 
 export interface CliProxyConfigSyncOptions {
   readonly cacheRoot?: string;
+  readonly runtimeRoot?: string;
   readonly forceModelRefresh?: boolean;
   readonly quietModelRefresh?: boolean;
   readonly fetch?: CachedJsonRequest["fetch"];
@@ -66,6 +67,12 @@ export async function syncCliProxyConfig(
 ): Promise<void> {
   const template = readText(src, "CLIProxyAPI template");
   const secrets = readCliProxySecrets(secretsPath);
+  if (options.runtimeRoot) {
+    syncPrivateTextFile(
+      runtimeClientApiKeyPath(options.runtimeRoot),
+      `${firstString(secrets.CLIPROXY_CLIENT_API_KEYS, "CLIPROXY_CLIENT_API_KEYS")}\n`,
+    );
+  }
   const sources = modelSourcesFromTemplate(template);
   const discovery =
     sources.length === 0
@@ -89,6 +96,7 @@ export async function syncCliProxyConfig(
       secrets,
       options,
     );
+    removeLegacyModelCatalog(requireCacheRoot(options.cacheRoot));
   }
 }
 
@@ -157,7 +165,13 @@ export function modelSourcesFromTemplate(template: string): readonly CliProxyMod
   return parseModelSources(config[MODEL_SOURCES_MARKER]);
 }
 
-export const sharedModelCatalogPath = (cacheRoot: string): string =>
+export const runtimeClientApiKeyPath = (runtimeRoot: string): string =>
+  join(runtimeRoot, "cliproxyapi", "client-api-key");
+
+export const runtimeModelCatalogPath = (runtimeRoot: string): string =>
+  join(runtimeRoot, "model-catalog", "catalog.json");
+
+export const legacyModelCatalogPath = (cacheRoot: string): string =>
   join(cacheRoot, "catalog.json");
 
 async function discoverModelSources(
@@ -221,6 +235,7 @@ async function syncSharedModelCatalog(
   options: CliProxyConfigSyncOptions,
 ): Promise<void> {
   const cacheRoot = requireCacheRoot(options.cacheRoot);
+  const runtimeRoot = requireRuntimeRoot(options.runtimeRoot);
   const externalModels = [...discoveredSources.values()].flatMap((source) => source.models);
   let gatewayPayload: unknown = { data: [] };
   try {
@@ -246,7 +261,7 @@ async function syncSharedModelCatalog(
     }
   }
   writeModelCatalog(
-    sharedModelCatalogPath(cacheRoot),
+    runtimeModelCatalogPath(runtimeRoot),
     enrichGatewayModels(externalModels, gatewayPayload, {
       modelsDev,
       managedPrefixes: sources.map((source) => source.prefix),
@@ -276,6 +291,17 @@ function requireCacheRoot(value: string | undefined): string {
     throw new Error("missing model catalog cache root");
   }
   return value;
+}
+
+function requireRuntimeRoot(value: string | undefined): string {
+  if (!value) {
+    throw new Error("missing agents runtime root");
+  }
+  return value;
+}
+
+function removeLegacyModelCatalog(cacheRoot: string): void {
+  fs.rmSync(legacyModelCatalogPath(cacheRoot), { force: true });
 }
 
 function gatewayModelsUrl(generatedConfig: string): string {

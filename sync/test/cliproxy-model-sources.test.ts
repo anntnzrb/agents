@@ -1,10 +1,20 @@
 import { expect, test } from "bun:test";
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  legacyModelCatalogPath,
   renderCliProxyConfig,
-  sharedModelCatalogPath,
+  runtimeClientApiKeyPath,
+  runtimeModelCatalogPath,
   syncCliProxyConfig,
 } from "@core/cliproxy-config.ts";
 import { modelsForSource } from "@core/model-catalog.ts";
@@ -99,7 +109,10 @@ test("cliproxy_sync_discovers_once_then_reuses_fresh_catalog_cache", async () =>
     const dst = join(root, "runtime", "config.yaml");
     const secretsPath = join(root, "secrets.json");
     const cacheRoot = join(root, "cache");
+    const runtimeRoot = join(root, "data");
     mkdirSync(join(root, "runtime"), { recursive: true });
+    mkdirSync(cacheRoot, { recursive: true });
+    writeFileSync(legacyModelCatalogPath(cacheRoot), "legacy catalog\n");
     writeFileSync(
       src,
       `host: 127.0.0.1
@@ -152,6 +165,7 @@ x-model-sources:
     };
     const options = {
       cacheRoot,
+      runtimeRoot,
       forceModelRefresh: true,
       fetch: fetchImpl,
       now: () => 1000,
@@ -171,15 +185,18 @@ x-model-sources:
         },
       ],
     });
-    const catalog = JSON.parse(readFileSync(sharedModelCatalogPath(cacheRoot), "utf8"));
+    const catalog = JSON.parse(readFileSync(runtimeModelCatalogPath(runtimeRoot), "utf8"));
     expect(catalog.models.map((model: { id: string }) => model.id)).toEqual([
       "example/chat-next",
       "oauth-next",
     ]);
+    expect(existsSync(legacyModelCatalogPath(cacheRoot))).toBe(false);
 
     calls.length = 0;
     const configStat = lstatSync(dst);
-    const catalogStat = lstatSync(sharedModelCatalogPath(cacheRoot));
+    expect(readFileSync(runtimeClientApiKeyPath(runtimeRoot), "utf8")).toBe("client\n");
+    expect(lstatSync(runtimeClientApiKeyPath(runtimeRoot)).mode & 0o777).toBe(0o600);
+    const catalogStat = lstatSync(runtimeModelCatalogPath(runtimeRoot));
     await syncCliProxyConfig(src, dst, secretsPath, {
       ...options,
       forceModelRefresh: false,
@@ -187,7 +204,7 @@ x-model-sources:
     });
     expect(calls).toEqual([]);
     expect(lstatSync(dst).ino).toBe(configStat.ino);
-    expect(lstatSync(sharedModelCatalogPath(cacheRoot)).ino).toBe(catalogStat.ino);
+    expect(lstatSync(runtimeModelCatalogPath(runtimeRoot)).ino).toBe(catalogStat.ino);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

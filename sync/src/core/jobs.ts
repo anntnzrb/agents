@@ -109,6 +109,7 @@ async function runJob(
         }
         await syncCliProxyConfig(job.src, job.dst, job.secretsPath, {
           ...(job.cacheRoot === undefined ? {} : { cacheRoot: job.cacheRoot }),
+          ...(job.runtimeRoot === undefined ? {} : { runtimeRoot: job.runtimeRoot }),
           ...(options.forceModelRefresh === undefined
             ? {}
             : { forceModelRefresh: options.forceModelRefresh }),

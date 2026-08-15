@@ -59,11 +59,29 @@ test("integration_happy_path_matches_expected_outputs", () => {
     assert.equal(cliProxyConfig["codex-api-key"][0]["api-key"], "upstream-secret");
     assert.equal(cliProxyConfig["codex-api-key"][0]["x-credential-pool"], undefined);
     assert.equal(lstatSync(join(home, ".cli-proxy-api", "config.yaml")).mode & 0o777, 0o600);
+    assert.equal(
+      readFileSync(
+        join(home, ".local", "share", "agents", "cliproxyapi", "client-api-key"),
+        "utf8",
+      ),
+      "gateway-secret\n",
+    );
+    assert.equal(
+      lstatSync(join(home, ".local", "share", "agents", "cliproxyapi", "client-api-key")).mode &
+        0o777,
+      0o600,
+    );
+    assert.equal(
+      readFileSync(join(home, ".local", "share", "agents", "sync", "src", "cli.ts"), "utf8"),
+      "export {};\n",
+    );
     assert.equal(existsSync(join(home, ".pi", "agent", "auth.json")), true);
     for (const harness of ["codex", "opencode", "pi", "omp"]) {
       const wrapper = join(home, ".local", "bin", harness);
       assert.equal(existsSync(wrapper), true, wrapper);
       assert.equal(readFileSync(wrapper, "utf8").includes("agents-managed-wrapper:v1"), true);
+      assert.equal(readFileSync(wrapper, "utf8").includes(".local/share/agents/sync"), true);
+      assert.equal(readFileSync(wrapper, "utf8").includes(".config/agents/sync"), false);
     }
   });
 });
@@ -171,12 +189,15 @@ function makeFixture(root: string): string {
   mkdirSync(join(home, ".codex"), { recursive: true });
   mkdirSync(join(home, ".config", "opencode"), { recursive: true });
   mkdirSync(join(home, ".mcporter"), { recursive: true });
+  mkdirSync(join(home, ".config", "agents", "sync", "src"), { recursive: true });
 
   writeFixtureFiles(home);
   return home;
 }
 
 function writeFixtureFiles(home: string): void {
+  writeFileSync(join(home, ".config", "agents", "sync", "src", "cli.ts"), "export {};\n");
+  writeFileSync(join(home, ".config", "agents", "sync", "tsconfig.json"), "{}\n");
   writeFileSync(join(home, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
   writeFileSync(join(home, ".config", "agents", "assets", "mcporter.jsonc"), '{"x":1}');
   writeFileSync(

@@ -54,6 +54,8 @@ export interface Harness {
 
 export class SyncEnv {
   readonly home: string;
+  readonly ssotHome: string;
+  readonly runtimeHome: string;
   readonly assetsHome: string;
   readonly skillsHome: string;
   readonly harnessesHome: string;
@@ -66,6 +68,8 @@ export class SyncEnv {
 
   constructor(
     home: string,
+    ssotHome: string,
+    runtimeHome: string,
     assetsHome: string,
     skillsHome: string,
     harnessesHome: string,
@@ -77,6 +81,8 @@ export class SyncEnv {
     localAppData: string | undefined = process.env["LOCALAPPDATA"],
   ) {
     this.home = home;
+    this.ssotHome = ssotHome;
+    this.runtimeHome = runtimeHome;
     this.assetsHome = assetsHome;
     this.skillsHome = skillsHome;
     this.harnessesHome = harnessesHome;
@@ -112,10 +118,13 @@ export class SyncEnv {
     } = {},
   ): SyncEnv {
     const agentsHome = path.join(home, ".config", "agents");
+    const runtimeHome = path.join(home, ".local", "share", "agents");
     const harnessesHome = path.join(agentsHome, "harnesses");
     const platform = options.platform ?? platformFromProcess();
     return new SyncEnv(
       home,
+      agentsHome,
+      runtimeHome,
       path.join(agentsHome, "assets"),
       path.join(agentsHome, "skills"),
       harnessesHome,
@@ -171,6 +180,25 @@ export function discoverHarnesses(
       sourceName: adapter.id,
       home: path.join(home, ...adapter.homeSegments),
     });
+  });
+}
+
+export function supportedHarness(
+  home: string,
+  sourceName: string,
+  platform: HostPlatform,
+): Harness | undefined {
+  const adapter = HARNESS_ADAPTERS.find(
+    (candidate) => candidate.id === sourceName && candidate.platforms.includes(platform),
+  );
+  if (!adapter) {
+    return undefined;
+  }
+  return buildHarness({
+    ...adapter,
+    id: adapter.id,
+    sourceName: adapter.id,
+    home: path.join(home, ...adapter.homeSegments),
   });
 }
 

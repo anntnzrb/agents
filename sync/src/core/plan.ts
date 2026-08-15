@@ -41,6 +41,7 @@ export type Job =
       readonly kind: "CliProxyConfig";
       readonly secretsPath: string;
       readonly cacheRoot?: string;
+      readonly runtimeRoot?: string;
     };
 
 export interface HarnessPlan {
@@ -90,6 +91,7 @@ export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
   return {
     harnesses,
     jobs: [
+      ...runtimeJobs(syncEnv),
       ...harnessDirJobs(harnesses),
       ...assetJobs(syncEnv, harnesses, assetNames),
       ...skillsJobs(syncEnv, harnesses),
@@ -98,6 +100,24 @@ export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
     ],
     hooks: harnesses.flatMap((plan) => plan.hooks),
   };
+}
+
+function runtimeJobs(syncEnv: SyncEnv): Job[] {
+  const sourceRoot = join(syncEnv.ssotHome, "sync");
+  const runtimeRoot = join(syncEnv.runtimeHome, "sync");
+  return [
+    {
+      src: join(sourceRoot, "src"),
+      dst: join(runtimeRoot, "src"),
+      kind: "Dir",
+      scope: "Tree",
+    },
+    {
+      src: join(sourceRoot, "tsconfig.json"),
+      dst: join(runtimeRoot, "tsconfig.json"),
+      kind: "File",
+    },
+  ];
 }
 
 export const assetDirNames = (root: string): string[] => dirEntryNames(root, true);
@@ -215,6 +235,7 @@ function configJobs(syncEnv: SyncEnv): Job[] {
       kind: "CliProxyConfig",
       secretsPath: join(syncEnv.home, ".config", "agents", "secrets.local.json"),
       cacheRoot: join(syncEnv.home, ".cache", "agents", "model-catalog"),
+      runtimeRoot: syncEnv.runtimeHome,
     },
   ];
 }

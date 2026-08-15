@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { installExtensionDeps } from "@extensions/install.ts";
 import { bootstrapPackageTarget } from "@packages/index.ts";
-import { SyncEnv } from "./harness.ts";
+import { SyncEnv, supportedHarness } from "./harness.ts";
 import {
   clearExtensionHookState,
   type PreparedExtensionHookState,
@@ -234,30 +234,37 @@ export const launchMain = async (sourceName: string, args: readonly string[]): P
   }
 
   await ensurePythonEnv();
-  const harness = syncEnv.harnesses.find((candidate) => candidate.sourceName === sourceName);
+  const ssotAvailable = existsSync(syncEnv.ssotHome);
+  const harness =
+    syncEnv.harnesses.find((candidate) => candidate.sourceName === sourceName) ??
+    (ssotAvailable ? undefined : supportedHarness(syncEnv.home, sourceName, syncEnv.platform));
   if (!harness) {
     err(`unsupported harness: ${sourceName}`);
     return 2;
   }
 
-  let lock: SyncLock | undefined;
-  try {
-    lock = tryAcquireSyncLock(syncEnv);
-  } catch (error) {
-    warn(`sync before launch unavailable: ${panicMessage(error)}`);
-  }
-
-  if (lock) {
+  if (ssotAvailable) {
+    let lock: SyncLock | undefined;
     try {
-      const success = await runSync(syncEnv);
-      if (!success) {
-        warn("continuing launch without completed sync");
+      lock = tryAcquireSyncLock(syncEnv);
+    } catch (error) {
+      warn(`sync before launch unavailable: ${panicMessage(error)}`);
+    }
+
+    if (lock) {
+      try {
+        const success = await runSync(syncEnv);
+        if (!success) {
+          warn("continuing launch without completed sync");
+        }
+      } finally {
+        releaseSyncLockImpl(lock);
       }
-    } finally {
-      releaseSyncLockImpl(lock);
+    } else {
+      warn("another sync is already running; continuing launch");
     }
   } else {
-    warn("another sync is already running; continuing launch");
+    warn("agent configuration source is unavailable; continuing with installed runtime");
   }
 
   try {
