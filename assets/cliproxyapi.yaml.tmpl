@@ -8,8 +8,8 @@ tls:
 
 remote-management:
   allow-remote: false
-  secret-key: ""
-  disable-control-panel: true
+  secret-key: ${CLIPROXY_MANAGEMENT_KEY}
+  disable-control-panel: false
   disable-auto-update-panel: true
 
 auth-dir: "~/.cli-proxy-api"
