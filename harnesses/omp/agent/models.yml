@@ -1,4 +1,10 @@
 providers:
+  cliproxy:
+    baseUrl: http://127.0.0.1:8317/v1
+    apiKey: "!cat ~/.local/share/agents/cliproxyapi/client-api-key"
+    api: openai-responses
+    discovery:
+      type: openai-models-list
   opencode-go:
     modelOverrides:
       gpt-5.6-luna:
