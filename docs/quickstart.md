@@ -9,6 +9,7 @@ Install these commands before cloning the repository:
 - `bun`
 - `npm`
 - `git`
+- `jq`
 - `tar`
 
 The sync application supports macOS ARM64 and Linux x86_64 for CLIProxyAPI.
@@ -30,13 +31,15 @@ chmod 600 secrets.local.json
 $EDITOR secrets.local.json
 ```
 
-Set all three values:
+Set these values:
 
-- `CLIPROXY_API_KEY` authenticates local clients.
 - `CLIPROXY_MANAGEMENT_KEY` authenticates the local control panel.
-- `OPENCODE_GO_API_KEY` authenticates CLIProxyAPI to OpenCode Go.
+- `CLIPROXY_CLIENT_API_KEYS` contains keys accepted from gateway clients.
+- `CLIPROXY_CREDENTIAL_POOLS` groups upstream accounts by provider.
 
-Generate `CLIPROXY_API_KEY` and `CLIPROXY_MANAGEMENT_KEY` with `openssl rand -hex 32`.
+Each credential pool is an array. Add another account by appending an object with its `apiKey`. Equal accounts use `weight: 1`.
+
+Generate the management key and each client key with `openssl rand -hex 32`.
 
 `secrets.local.json` is ignored by Git. Transfer it through a secure channel when you configure another machine.
 

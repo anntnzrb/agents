@@ -25,7 +25,7 @@ A sync run performs these stages:
 1. Build the sync and cleanup plans.
 2. Remove stale managed harness entries.
 3. Copy shared and harness-specific configuration.
-4. Render secret templates.
+4. Render secret templates and CLIProxyAPI configuration.
 5. Prepare pinned managed tools.
 6. Reconcile launch wrappers.
 7. Record managed state.
@@ -38,6 +38,14 @@ A process lock prevents concurrent sync runs from writing the same targets.
 `SecretTemplate` jobs read placeholders from a committed template and values from `secrets.local.json`. The renderer validates the JSON once, JSON-quotes each value for YAML, and writes the target atomically with mode `0600`.
 
 If `secrets.local.json` does not exist, sync warns and preserves any existing generated target. If the file exists but lacks a required value, sync fails.
+
+## CLIProxyAPI configuration
+
+The `CliProxyConfig` job parses `assets/cliproxyapi.yaml.tmpl` as YAML and injects typed values from `secrets.local.json`. A template entry with `x-credential-pool` references one provider pool.
+
+For native API-key sections, sync duplicates the shared provider profile once per account. For `openai-compatibility`, sync generates one `api-key-entries` item per account. The `x-credential-pool` marker never appears in the generated config.
+
+The renderer uses Bun's YAML parser and serializer, validates all pool references, and writes the target atomically with mode `0600`. Missing local secrets preserve an existing generated target; malformed credentials fail sync without replacing it.
 
 ## Managed tools
 
