@@ -1,54 +1,56 @@
-# Harnesses
+# Harness reference
 
-Sync supports Codex, OpenCode, Pi, and OMP. A matching source directory under `harnesses/` opts into the harness.
+Sync has adapters for Codex, OpenCode, Pi, and OMP. A matching source directory enables an adapter on macOS, Linux, and Windows.
 
-| Harness | Source | Generated target |
-|---|---|---|
-| Codex | `harnesses/codex/` | `~/.codex/` |
-| OpenCode | `harnesses/opencode/` | `~/.config/opencode/` |
-| Pi | `harnesses/pi/agent/` | `~/.pi/agent/` |
-| OMP | `harnesses/omp/agent/` | `~/.omp/agent/` |
+The current CLIProxyAPI release manifest supports only macOS ARM64 and Linux x86_64. On Windows, managed-tool preparation fails before wrapper reconciliation because the manifest has no Windows asset.
 
-## Change harness configuration
+## Adapter paths
 
-1. Edit the matching path under `harnesses/`.
-2. Run `bun ./sync/src/cli.ts`.
-3. Inspect the generated target.
-4. Run the harness-specific smoke test.
+| Harness | Source | Generated target | npm package |
+| --- | --- | --- | --- |
+| Codex | `harnesses/codex/` | `~/.codex/` | `@openai/codex` |
+| OpenCode | `harnesses/opencode/` | `~/.config/opencode/` | `opencode-ai` |
+| Pi | `harnesses/pi/agent/` | `~/.pi/agent/` | `@earendil-works/pi-coding-agent` |
+| OMP | `harnesses/omp/agent/` | `~/.omp/agent/` | `@oh-my-pi/pi-coding-agent` |
 
-Do not edit generated tool homes. A later sync replaces managed files.
+`sync/src/core/harness-adapters.ts` owns launcher packages, target homes, runtime subdirectories, compatibility cleanup entries, and hooks.
 
-## Use CLIProxyAPI models
+## Shared configuration
 
-Sync writes the first `CLIPROXY_CLIENT_API_KEYS` entry to the private runtime file `~/.local/share/agents/cliproxyapi/client-api-key`. Each harness uses one `cliproxy` provider:
+Sync publishes `assets/AGENTS.md` and `skills/current/` to every enabled harness. Asset directories under `assets/` are also published to each harness. An adapter can rename an asset at the destination.
 
-| Harness | Catalog mechanism | Request protocol |
-|---|---|---|
+Pi has two additional hooks:
+
+- `PackageBootstrap` prepares packages declared by its source manifest and updates runtime settings.
+- `ExtensionDeps` installs dependencies for generated extensions when the hook inputs change.
+
+## CLIProxyAPI integration
+
+Every harness defines one provider named `cliproxy`. The provider reads the first client key from `~/.local/share/agents/cliproxyapi/client-api-key` and sends requests to `http://127.0.0.1:8317/v1`.
+
+| Harness | Catalog source | Request protocol |
+| --- | --- | --- |
 | Codex | Native remote model refresh | OpenAI Responses |
-| OMP | Native `openai-models-list` discovery and cache | OpenAI Responses |
-| OpenCode | Minimal config plugin backed by the shared sync catalog | OpenAI Responses |
-| Pi | Minimal provider extension backed by the shared sync catalog | OpenAI Responses |
+| OMP | Native `openai-models-list` discovery | OpenAI Responses |
+| OpenCode | Shared runtime catalog through `harnesses/opencode/plugins/cliproxy.ts` | OpenAI Responses |
+| Pi | Shared runtime catalog through `harnesses/pi/agent/extensions/cliproxy/index.ts` | OpenAI Responses |
 
-The OpenCode plugin and Pi extension read `~/.local/share/agents/model-catalog/catalog.json` through the installed runtime catalog client. They contain no model IDs and do not fetch provider catalogs themselves. Sync owns discovery, metadata enrichment, caching, and stale recovery.
+The OpenCode plugin and the Pi extension read `~/.local/share/agents/model-catalog/catalog.json` through the installed runtime client. Neither adapter contains a static list of CLIProxyAPI model IDs.
 
-CLIProxy model IDs identify the upstream credential pool:
+API-key model IDs use the prefix declared by `x-model-sources`. The committed prefixes are `go`, `deepseek`, `openrouter`, and `zen`. ChatGPT OAuth models remain unprefixed.
 
-| Model ID | Upstream |
-|---|---|
-| `gpt-5.6-luna` | Unprefixed ChatGPT/Codex OAuth credentials |
-| `antigravity/gemini-3.7-flash-high` | Prefixed Antigravity OAuth credentials |
-| `go/gpt-5.6-luna` | OpenCode Go credential pool |
-| `zen/gpt-5.6-luna` | OpenCode Zen credential pool |
-| `openrouter/openai/gpt-5.6-luna` | OpenRouter credential pool |
-
-OpenCode, Pi, and OMP selectors prepend the harness provider, such as `cliproxy/antigravity/gemini-3.7-flash-high`. Codex sets `model_provider = "cliproxy"` separately, so its model value is only the CLIProxy model ID.
+OpenCode, Pi, and OMP selectors include the harness provider name, such as `cliproxy/openrouter/auto`. Codex stores `model_provider = "cliproxy"` separately, so its `model` value contains only the CLIProxyAPI model ID.
 
 ## Launch wrappers
 
-Sync writes harness commands to `~/.local/bin` on macOS and Linux. On Windows, it writes commands under `%LOCALAPPDATA%/Programs/Agents/bin` and adds that directory to the user path once.
+Sync writes Unix wrappers under `~/.local/bin/`. On Windows, sync writes `.cmd` wrappers under `%LOCALAPPDATA%/Programs/Agents/bin/` and adds that directory to the user `PATH` once.
 
-Each wrapper runs sync before it resolves and launches the cached npm package. The cache keeps the current and previous known-good package versions.
+Each wrapper calls the installed sync runtime with the `launch` command. The launch path attempts reconciliation, prepares the cached npm package, forwards all arguments, and returns the harness exit status.
 
-## Add a harness
+Wrapper state lives at `~/.local/share/agents/sync-managed/wrappers.json`. Sync removes stale wrappers only when they contain its ownership marker and remain in an allowed wrapper directory. Unmanaged conflicts are preserved and reported.
 
-Add an adapter to `sync/src/core/harness-adapters.ts`, create its source directory under `harnesses/`, and add wrapper and integration tests. Keep launcher metadata in the adapter instead of repeating it in user configuration.
+## Package cache
+
+Each harness has a versioned npm cache under `<cache-home>/npm-tools/`. `<cache-home>` is `XDG_CACHE_HOME` or `~/.cache`.
+
+The cache keeps the current and previous known-good package versions. The launcher checks the package identity, executable, and adapter smoke command before promoting a version.

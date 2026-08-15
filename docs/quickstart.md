@@ -1,87 +1,105 @@
-# Quickstart
+# Set up agent configuration
 
-This guide produces synced harness configuration and a verified CLIProxyAPI executable.
+This tutorial builds synced harness configuration, starts CLIProxyAPI, and verifies the local model endpoint.
 
-## Install prerequisites
+The managed CLIProxyAPI release supports macOS on ARM64 and Linux on x86_64. The harness adapters also support Windows, but the release manifest has no Windows CLIProxyAPI asset.
 
-Install these commands before cloning the repository:
+## Install the required commands
 
-- `bun`
-- `npm`
-- `git`
-- `jq`
-- `tar`
+Install these commands:
 
-The sync application supports macOS ARM64 and Linux x86_64 for CLIProxyAPI.
+- `bun` runs the sync application.
+- `npm` installs harness packages on first launch.
+- `git` clones the repository.
+- `tar` extracts CLIProxyAPI.
+- `openssl` generates local keys.
+- `curl` and `jq` verify the gateway.
+
+Confirm that each command is available:
+
+```bash
+bun --version
+npm --version
+git --version
+tar --version
+openssl version
+curl --version
+jq --version
+```
+
+Each command prints its version or help text.
 
 ## Clone the repository
+
+Clone the repository at the path that sync expects:
 
 ```bash
 git clone https://github.com/anntnzrb/agents.git ~/.config/agents
 cd ~/.config/agents
 ```
 
-The repository must use `~/.config/agents` as the sync source of truth. Sync installs the runtime used by generated wrappers under `~/.local/share/agents/sync`.
+The working directory is now `~/.config/agents`.
 
-## Provide local secrets
+## Add local secrets
+
+Copy the example and restrict access to the new file:
 
 ```bash
 cp secrets.local.example.json secrets.local.json
 chmod 600 secrets.local.json
+```
+
+Generate a management key and at least one client key:
+
+```bash
+openssl rand -hex 32
+```
+
+Run the command again for each key. Then edit the secrets file:
+
+```bash
 $EDITOR secrets.local.json
 ```
 
-Set these values:
+Replace every `replace-me` value. The credential pools contain upstream provider API keys. Use `weight: 1` when accounts have equal priority.
 
-- `CLIPROXY_MANAGEMENT_KEY` authenticates the local control panel.
-- `CLIPROXY_CLIENT_API_KEYS` contains keys accepted from gateway clients.
-- `CLIPROXY_CREDENTIAL_POOLS` groups upstream accounts by provider.
+The repository ignores `secrets.local.json`. Keep the file out of Git and transfer it only through an encrypted channel.
 
-Each credential pool is an array. Add another account by appending an object with its `apiKey`. Equal accounts use `weight: 1`.
+## Generate the runtime files
 
-Generate the management key and each client key with `openssl rand -hex 32`.
-
-`secrets.local.json` is ignored by Git. Transfer it through a secure channel when you configure another machine.
-
-## Run sync
+Run sync from the repository root:
 
 ```bash
 bun ./sync/src/cli.ts
 ```
 
-Sync performs these actions:
+The first run downloads the pinned CLIProxyAPI archive, verifies its SHA-256 checksum, and generates the runtime files. The run can warn that CLIProxyAPI is not running yet.
 
-- generates harness configuration;
-- discovers API-key provider models and caches enriched metadata;
-- downloads and verifies the pinned CLIProxyAPI release;
-- writes `~/.local/bin/cli-proxy-api`;
-- renders `~/.cli-proxy-api/config.yaml` with mode `0600`.
-
-A manual sync warns when CLIProxyAPI is installed but not running.
-
-When running, open the local control panel at `http://127.0.0.1:8317/management.html` and authenticate with `CLIPROXY_MANAGEMENT_KEY`. Remote management remains disabled.
-
-After CLIProxyAPI is running, force one complete catalog refresh:
+Confirm that sync created the main artifacts:
 
 ```bash
-bun ./sync/src/cli.ts sync --refresh-models
+test -x ~/.local/bin/cli-proxy-api
+test -f ~/.cli-proxy-api/config.yaml
+test -f ~/.local/share/agents/model-catalog/catalog.json
 ```
 
-## Authenticate CLIProxyAPI
+All three commands exit with status `0`.
 
-On macOS, run:
+## Authenticate a ChatGPT account
+
+On macOS, start browser authentication:
 
 ```bash
 cli-proxy-api --codex-login
 ```
 
-On a headless Linux host, run:
+On a headless Linux host, start device authentication:
 
 ```bash
 cli-proxy-api --codex-device-login
 ```
 
-Then restrict the generated OAuth file:
+After authentication, restrict the generated OAuth file:
 
 ```bash
 chmod 600 ~/.cli-proxy-api/codex-*.json
@@ -89,20 +107,46 @@ chmod 600 ~/.cli-proxy-api/codex-*.json
 
 ## Start CLIProxyAPI
 
-Run CLIProxyAPI in the foreground:
+Start the gateway in a separate terminal:
 
 ```bash
 cli-proxy-api
 ```
 
-The managed wrapper passes `--config ~/.cli-proxy-api/config.yaml` automatically. Use your preferred process manager if the gateway must survive logout or reboot.
+The process listens on `127.0.0.1:8317`. Leave it running for the remaining steps.
+
+## Refresh the model catalog
+
+Return to the repository root and force a complete refresh:
+
+```bash
+bun ./sync/src/cli.ts sync --refresh-models
+```
+
+The forced refresh updates provider catalogs, models.dev metadata, and the live CLIProxyAPI catalog. A forced refresh fails instead of using stale network data.
+
+## Verify the gateway
+
+Read the client key without printing it, then query the model endpoint:
+
+```bash
+CLIPROXY_KEY="$(jq -r '.CLIPROXY_CLIENT_API_KEYS[0]' secrets.local.json)"
+curl -fsS http://127.0.0.1:8317/v1/models \
+	-H "Authorization: Bearer $CLIPROXY_KEY" | \
+	jq -e '.data | type == "array" and length > 0'
+unset CLIPROXY_KEY
+```
+
+`jq` prints `true`. The exact model IDs depend on the current upstream catalogs and authenticated OAuth accounts.
 
 ## Start a harness
+
+Start Pi:
 
 ```bash
 pi
 ```
 
-Managed harness wrappers run a best-effort sync before each launch. They continue with the cached harness package if launch-time sync cannot reach the network.
+The wrapper syncs the configuration, installs the cached harness package if needed, and opens Pi. Codex, OpenCode, and OMP use the `codex`, `opencode`, and `omp` commands.
 
-Sync installs the first `CLIPROXY_CLIENT_API_KEYS` entry as private runtime state. You do not need separate gateway credentials for Codex, OpenCode, Pi, and OMP.
+For later gateway operations, use [Operate CLIProxyAPI](cliproxyapi.md).

@@ -1,102 +1,95 @@
-# Sync
+# Sync reference
 
-Sync reconciles committed sources into tool homes. It is idempotent: a repeated run with unchanged inputs does not replace unchanged files.
+Sync reconciles the repository source at `~/.config/agents` with harness homes and installed runtime state. The public entrypoint is `sync/src/cli.ts` and requires an explicit Bun runner.
 
-## Entrypoints
+## Command syntax
 
-Run a manual sync from the repository root:
+| Invocation | Behavior |
+| --- | --- |
+| `bun ./sync/src/cli.ts` | Runs a normal reconciliation |
+| `bun ./sync/src/cli.ts sync` | Runs the same normal reconciliation |
+| `bun ./sync/src/cli.ts sync --refresh-models` | Bypasses model-catalog freshness windows and disallows stale network data |
+| `bun ~/.local/share/agents/sync/src/cli.ts launch <harness> -- <arguments>` | Syncs when the source is available, prepares the harness package, and launches it |
 
-```bash
-bun ./sync/src/cli.ts
-```
+Unknown commands and invalid arguments exit with status `2`. A manual sync exits with status `1` after a fatal reconciliation error.
 
-Force model-catalog revalidation even when the cache is fresh:
+## Reconciliation stages
 
-```bash
-bun ./sync/src/cli.ts sync --refresh-models
-```
+A manual sync uses this order:
 
-Generated harness wrappers use:
+1. Build the sync plan and the managed cleanup plan.
+2. Remove stale top-level harness entries owned by earlier sync state.
+3. Install the sync runtime and reconcile source files, shared assets, skills, and generated configuration.
+4. Prepare managed tools from committed release manifests.
+5. Reconcile harness and managed-tool wrappers.
+6. Record managed harness entries.
+7. Run package bootstrap and extension dependency hooks.
 
-```text
-bun ~/.local/share/agents/sync/src/cli.ts launch <harness> -- <arguments>
-```
+The process lock is `~/.local/share/agents/sync-managed/sync.lock`. A second manual sync reports the lock and exits with status `0` without changing targets. A watchdog ends a manual sync after 15 minutes with status `124`.
 
-`launch` performs a best-effort sync when `~/.config/agents` is available, prepares the cached harness package, and executes it. A sync failure or unavailable SSOT does not block an already cached harness.
+## File reconciliation
 
-## Reconciliation order
+Sync compares file content and modes before replacement. An unchanged run leaves matching files in place.
 
-A sync run performs these stages:
+Directory jobs have one of two scopes:
 
-1. Build the sync and cleanup plans.
-2. Remove stale managed harness entries.
-3. Install the sync runtime and copy shared and harness-specific configuration.
-4. Refresh cached model catalogs and render secret templates and CLIProxyAPI configuration.
-5. Prepare pinned managed tools.
-6. Reconcile launch wrappers.
-7. Record managed state.
-8. Run package and extension hooks.
+- A tree job makes the destination tree match its source.
+- A children job reconciles managed top-level entries inside an existing harness home.
 
-A process lock prevents concurrent sync runs from writing the same targets.
-
-## Secret templates
-
-`SecretTemplate` jobs read placeholders from a committed template and values from `secrets.local.json`. The renderer validates the JSON once, JSON-quotes each value for YAML, and writes the target atomically with mode `0600`.
-
-If `secrets.local.json` does not exist, sync warns and preserves any existing generated target. If the file exists but lacks a required value, sync fails.
-
-## CLIProxyAPI configuration
-
-The `CliProxyConfig` job parses `assets/cliproxyapi.yaml.tmpl` as YAML and injects typed values from `secrets.local.json`. A template entry with `x-credential-pool` references one provider pool.
-
-For native API-key sections, sync duplicates the shared provider profile once per account. For `openai-compatibility`, sync generates one `api-key-entries` item per account. The `x-credential-pool` marker never appears in the generated config.
-
-The renderer uses Bun's YAML parser and serializer, validates all pool references, and writes the target atomically with mode `0600`. Missing local secrets preserve an existing generated target; malformed credentials fail sync without replacing it.
-
-### Model catalogs
-
-`x-model-sources` in `assets/cliproxyapi.yaml.tmpl` declares provider endpoints, credential pools, public prefixes, and matching [models.dev](https://models.dev/) provider IDs. It does not list model IDs.
-
-Sync fetches each provider's authenticated `/models` catalog and intersects it with models.dev metadata. The live provider catalog decides availability. Models.dev supplies protocol, capabilities, modalities, context and output limits, and published costs. Sync groups models by protocol and generates CLIProxyAPI `codex-api-key`, `claude-api-key`, and `openai-compatibility` profiles.
-
-Raw HTTP catalog responses are cached under:
-
-```text
-~/.cache/agents/model-catalog/
-```
-
-Models.dev metadata is fresh for one hour. Provider catalogs are fresh for six hours. Sync sends cached ETags during revalidation, uses a stale cache after transient failures, and keeps launch-time refresh warnings quiet. `sync --refresh-models` bypasses freshness windows and fails instead of silently accepting stale network data.
-
-The normalized, harness-independent runtime catalog is `~/.local/share/agents/model-catalog/catalog.json`. Sync also writes the first configured client key to `~/.local/share/agents/cliproxyapi/client-api-key` with mode `0600`. Generated model IDs and metadata are deterministic, and unchanged syncs do not replace either file.
-
-After publishing the runtime catalog, sync removes the deprecated `~/.cache/agents/model-catalog/catalog.json`. The remaining files in that cache directory are HTTP response caches.
-
-## Installed runtime
-
-Sync copies its dependency-free runtime source and `tsconfig.json` to:
-
-```text
-~/.local/share/agents/sync/
-```
-
-Harness wrappers execute this installed copy. Only sync reads the SSOT under `~/.config/agents`; harnesses and their runtime adapters read generated homes or installed state under `~/.local/share/agents`.
-
-## Managed tools
-
-`assets/cliproxyapi.release.json` pins CLIProxyAPI by version, platform asset, and SHA-256 checksum. Sync downloads the official GitHub release only when the pinned executable is absent.
-
-The cache path is:
-
-```text
-~/.cache/github-tools/cliproxyapi/versions/<version>/<platform>-<architecture>/
-```
-
-Sync extracts only the executable named by the manifest. It then generates a stable command in `~/.local/bin`.
-
-## Managed state
-
-Sync records ownership under `~/.local/share/agents/sync-managed`. Cleanup removes only entries that previous sync state owns. Unmanaged wrapper conflicts are preserved and reported.
+Recorded ownership limits cleanup to safe top-level names. Sync preserves unmanaged wrapper conflicts and reports each conflict.
 
 ## Missing sources
 
-Most missing source directories are non-fatal. This permits partial harness configurations. Invalid committed configuration and failed first-time managed-tool installation are fatal.
+Most missing source files and directories produce diagnostics but do not fail the run. Non-fatal missing-source errors permit partial harness sources.
+
+Invalid committed configuration, malformed local secrets, hook failures, and a failed first managed-tool installation are fatal. If `secrets.local.json` is absent, sync warns and leaves the existing generated CLIProxyAPI configuration unchanged.
+
+## CLIProxyAPI configuration job
+
+The job reads `assets/cliproxyapi.yaml.tmpl` and `secrets.local.json`. The job writes these private files with mode `0600`:
+
+- `~/.cli-proxy-api/config.yaml`
+- `~/.local/share/agents/cliproxyapi/client-api-key`
+- `~/.local/share/agents/model-catalog/catalog.json`
+
+The renderer parses and serializes YAML with Bun. The renderer bcrypt-hashes the management key and reuses the existing hash when the plaintext key is unchanged. The renderer also expands each credential pool into the CLIProxyAPI profile type selected by model metadata.
+
+The job writes files through a temporary file and an atomic rename. Invalid secrets or model data fail before the job replaces the generated configuration.
+
+## Model-catalog caches
+
+`assets/cliproxyapi.yaml.tmpl` declares provider endpoints, credential pools, public prefixes, and models.dev provider IDs under `x-model-sources`. Provider `/models` responses determine availability. [models.dev](https://models.dev/) supplies protocol hints and model metadata.
+
+| Catalog | Freshness window | Cache file |
+| --- | --- | --- |
+| models.dev | 1 hour | `~/.cache/agents/model-catalog/models-dev.json` |
+| Provider `/models` | 6 hours | `~/.cache/agents/model-catalog/source-<id>.json` |
+| CLIProxyAPI `/v1/models` | 1 hour | `~/.cache/agents/model-catalog/gateway.json` |
+
+Expired entries use ETag revalidation when the server supplied an ETag. A normal sync accepts a stale entry after a refresh error. A launch-time sync suppresses stale-cache warnings. A forced refresh rejects stale data.
+
+After catalog publication, sync removes the obsolete `~/.cache/agents/model-catalog/catalog.json` file.
+
+## Installed runtime
+
+Sync copies `sync/src/` and `sync/tsconfig.json` to `~/.local/share/agents/sync/`. Generated wrappers execute this installed copy.
+
+Only sync reads the repository source directly. Harness configuration and runtime adapters read generated homes or files under `~/.local/share/agents`.
+
+## Managed CLIProxyAPI release
+
+`assets/cliproxyapi.release.json` selects the GitHub repository, version, platform archive, and checksum. Sync downloads an archive only when the cached executable or its receipt does not match the manifest.
+
+The cache path has this form, where `<cache-home>` is `XDG_CACHE_HOME` or `~/.cache`:
+
+```text
+<cache-home>/github-tools/cliproxyapi/versions/<version>/<platform>-<architecture>/
+```
+
+Sync verifies the SHA-256 checksum, extracts only the named executable, writes a receipt, and generates a stable wrapper. The current manifest contains macOS ARM64 and Linux x86_64 assets.
+
+## Launch behavior
+
+Harness wrappers perform a best-effort sync before launch. A failed sync, an active sync lock, or an unavailable repository does not block a cached harness package.
+
+The launcher resolves the adapter's npm dist-tag and installs the resolved version into a versioned cache. The launcher retains the current and previous known-good versions. If network resolution or a new package installation fails, the launcher uses the current valid cache. A first launch without a valid cache fails.

@@ -1,19 +1,20 @@
 # Agent configuration documentation
 
-This repository keeps agent configuration in one source of truth and generates each tool's runtime files.
+This documentation covers the committed configuration, the sync application, and the generated runtime state.
 
-## Start here
+## Tutorial
 
-- [Quickstart](quickstart.md) - clone the repository, provide local secrets, and run sync.
-- [Repository layout](repository-layout.md) - find the source of truth for each subsystem.
-- [Sync](sync.md) - understand reconciliation, wrappers, managed tools, and generated state.
+- [Set up agent configuration](quickstart.md) builds a working local installation and verifies CLIProxyAPI.
 
-## Configuration
+## How-to guides
 
-- [Harnesses](harnesses.md) - configure Codex, OpenCode, Pi, and OMP.
-- [Skills](skills.md) - add, validate, and publish shared skills.
-- [CLIProxyAPI](cliproxyapi.md) - configure and run the local model gateway.
+- [Manage shared skills](skills.md) changes, validates, publishes, and archives skills.
+- [Operate CLIProxyAPI](cliproxyapi.md) configures credentials, authenticates accounts, starts the gateway, and verifies access.
+- [Develop the sync application](development.md) runs checks and changes sync or harness integration.
 
-## Development
+## Reference
 
-- [Development](development.md) - run checks and change the sync application.
+- [Repository layout](repository-layout.md) maps committed sources, generated targets, and runtime state.
+- [Sync reference](sync.md) lists commands, reconciliation stages, caches, and failure behavior.
+- [Harness reference](harnesses.md) lists supported harnesses, generated targets, model integration, and wrappers.
+- [CLIProxyAPI reference](cliproxyapi-reference.md) lists artifacts, configuration fields, discovery rules, and routing settings.

@@ -1,161 +1,148 @@
-# CLIProxyAPI
+# Operate CLIProxyAPI
 
-CLIProxyAPI provides one local API for ChatGPT subscription access, OpenCode Go, DeepSeek, OpenRouter, and OpenCode Zen.
+Use this guide to change gateway credentials, authenticate ChatGPT, refresh models, run the gateway, and verify access. For field definitions and discovery rules, see the [CLIProxyAPI reference](cliproxyapi-reference.md).
 
-## Managed artifacts
+## Configure local secrets
 
-| Artifact | Path |
-|---|---|
-| Portable config template | `assets/cliproxyapi.yaml.tmpl` |
-| Release pin and checksums | `assets/cliproxyapi.release.json` |
-| Local secrets | `secrets.local.json` |
-| Generated config | `~/.cli-proxy-api/config.yaml` |
-| OAuth runtime files | `~/.cli-proxy-api/*.json` |
-| Runtime client key | `~/.local/share/agents/cliproxyapi/client-api-key` |
-| Runtime model catalog | `~/.local/share/agents/model-catalog/catalog.json` |
-| Managed command | `~/.local/bin/cli-proxy-api` |
-
-Sync supports the official macOS ARM64 and Linux x86_64 release assets pinned in the manifest. It downloads from GitHub, verifies SHA-256, extracts only `cli-proxy-api`, and caches the result.
-
-## Configure secrets
-
-Copy the example and set the management key, client keys, and provider credential pools:
+Create the ignored secrets file if it does not exist:
 
 ```bash
 cp secrets.local.example.json secrets.local.json
 chmod 600 secrets.local.json
 $EDITOR secrets.local.json
-bun ./sync/src/cli.ts
 ```
 
-The `CLIPROXY_MANAGEMENT_KEY` authenticates the local management API and control panel. `CLIPROXY_CLIENT_API_KEYS` is an array of keys accepted from clients. The initial configuration uses one shared client key.
+Set a non-empty management key, one or more unique client keys, and every credential pool referenced by `assets/cliproxyapi.yaml.tmpl`.
 
-`CLIPROXY_CREDENTIAL_POOLS` maps a provider name to one or more accounts:
+Generate local management and client keys with:
+
+```bash
+openssl rand -hex 32
+```
+
+Never commit `secrets.local.json` or files under `~/.cli-proxy-api/`.
+
+## Add an API-key account
+
+Append an account to the matching array in `CLIPROXY_CREDENTIAL_POOLS`:
 
 ```json
 {
-  "CLIPROXY_CREDENTIAL_POOLS": {
-    "openrouter": [
-      {
-        "apiKey": "first-key",
-        "weight": 1
-      },
-      {
-        "apiKey": "second-key",
-        "weight": 1
-      }
-    ]
-  }
+	"CLIPROXY_CREDENTIAL_POOLS": {
+		"openrouter": [
+			{
+				"apiKey": "first-key",
+				"weight": 1
+			},
+			{
+				"apiKey": "second-key",
+				"weight": 1
+			}
+		]
+	}
 }
 ```
 
-Add an account by appending another object. Supported per-account fields are `apiKey`, `weight`, and `proxyUrl`. Equal accounts use weight `1`; weights must be integers from 1 through 1,000,000.
+Use the same weight for accounts with equal priority. Add `proxyUrl` only when that account requires a proxy.
 
-Provider API keys stay in the ignored `secrets.local.json`. The committed template owns base URLs, prefixes, credential-pool references, and models.dev provider identities. Model IDs are discovered rather than committed. Sync expands each pool into CLIProxyAPI's native credential entries, bcrypt-hashes the management key before rendering, and writes the generated config atomically with mode `0600`.
-
-Sync rejects empty pools, duplicate keys within a pool, unknown account fields, invalid weights, missing template pools, and pools that the template does not reference. Never commit `secrets.local.json` or OAuth files.
-
-## Model discovery
-
-Run a normal cached reconciliation:
-
-```bash
-bun ./sync/src/cli.ts
-```
-
-Force authenticated upstream discovery and gateway refresh:
+Apply the change:
 
 ```bash
 bun ./sync/src/cli.ts sync --refresh-models
 ```
 
-Sync treats each upstream `/models` response as the availability boundary and enriches matching IDs from [models.dev](https://models.dev/). Provider-level and per-model `npm` and `shape` metadata select the upstream protocol:
-
-| Metadata | Generated CLIProxyAPI route |
-|---|---|
-| `@ai-sdk/openai` or `shape: responses` | Responses through `codex-api-key` |
-| `@ai-sdk/anthropic` | Messages through `claude-api-key` |
-| `@ai-sdk/openai-compatible`, `@openrouter/ai-sdk-provider`, or `shape: completions` | Chat Completions through `openai-compatibility` |
-
-Models without tool support or text output are omitted from the agent catalog. Unsupported transports are reported during forced refresh. For example, CLIProxyAPI's native Gemini executor fixes the Google API path to `/v1beta`; it cannot safely represent OpenCode Zen's custom Google path, so those models remain excluded until the gateway can express that transport.
-
-The source catalog uses stable protocol mappings rather than model-specific exceptions. Adding or removing an upstream model does not require editing `assets/cliproxyapi.yaml.tmpl`.
-
-Codex and OMP discover the gateway through native model-catalog support. OpenCode and Pi use minimal runtime adapters that consume the same normalized catalog generated by sync. All four harnesses read the generated runtime client key and send model requests to CLIProxyAPI through the Responses endpoint. No harness reads `secrets.local.json` or another SSOT file directly.
+If the gateway is not running, omit `--refresh-models` for the first sync. Start the gateway, then run the forced refresh.
 
 ## Authenticate ChatGPT
 
-Use browser OAuth on macOS:
+On macOS, use browser OAuth:
 
 ```bash
 cli-proxy-api --codex-login
 ```
 
-Use device login on a headless Linux host:
+On a headless Linux host, use device OAuth:
 
 ```bash
 cli-proxy-api --codex-device-login
 ```
 
-Do not copy one active refresh token between two running gateways. Stop the old gateway before transferring OAuth state, or authenticate again on the new host.
+Restrict the generated file:
 
-After adding or changing an account, refresh the shared catalog:
+```bash
+chmod 600 ~/.cli-proxy-api/codex-*.json
+```
+
+Do not run two gateways with the same active refresh token. Before moving OAuth state, stop the old gateway. Reauthentication on the new host is safer than copying an active token.
+
+After authentication, refresh the shared catalog:
 
 ```bash
 bun ./sync/src/cli.ts sync --refresh-models
 ```
 
-## Run the gateway
+## Start the gateway
+
+Start CLIProxyAPI in the foreground:
 
 ```bash
 cli-proxy-api
 ```
 
-The wrapper supplies the generated config path. CLIProxyAPI listens on `127.0.0.1:8317`. Sync does not install a service. Use launchd, systemd, tmux, or another process manager when you need background operation.
+The managed wrapper supplies `--config ~/.cli-proxy-api/config.yaml`. Use a process manager when the gateway must survive logout or reboot. This repository does not install a service.
 
-The local control panel is available at:
+## Open the control panel
+
+Open this local URL:
 
 ```text
 http://127.0.0.1:8317/management.html
 ```
 
-It requires `CLIPROXY_MANAGEMENT_KEY`. Remote management remains disabled, and sync overwrites generated configuration changes on the next run. Put persistent API-key providers in `assets/cliproxyapi.yaml.tmpl` and their values in `secrets.local.json`. OAuth auth-file metadata, including an Antigravity prefix, remains in the host-local OAuth file.
+Authenticate with `CLIPROXY_MANAGEMENT_KEY`.
 
-The control panel lists OAuth files and configured API-key providers separately. The **Auth Files** count does not include `codex-api-key` or `openai-compatibility` entries.
+Do not make durable configuration changes in the control panel. Sync replaces the generated configuration from `assets/cliproxyapi.yaml.tmpl` and `secrets.local.json`.
 
-## Account routing
+## Verify model access
 
-The generated configuration uses equal weighted round-robin routing. Every account currently has weight `1`.
-
-Session affinity keeps each active provider, model, and conversation tuple on one account. The one-hour TTL is sliding: activity refreshes it. If the bound account becomes unavailable or enters cooldown, CLIProxyAPI automatically selects another account.
-
-Cross-credential retries are unlimited within the eligible pool. Cooldown scheduling remains enabled, and cooldown state persists next to the OAuth files so a gateway restart does not immediately retry an exhausted account.
-
-CLIProxyAPI scheduling is reactive. It distributes new sessions, records upstream quota failures, and skips cooled credentials. It does not proactively schedule from every account's remaining five-hour or weekly quota. Persistent quota dashboards require a separately reviewed monitoring service.
-
-Perplexity and GitHub Copilot OAuth credentials cannot use this path because CLIProxyAPI has no compatible import or login flow for those providers. They remain available only through harnesses that support those providers directly.
-
-A manual sync prints this warning when the endpoint is unavailable:
-
-```text
-sync: warning: CLIProxyAPI is installed but not running; start it with: cli-proxy-api
-```
-
-## Verify the gateway
+Query the gateway with the first configured client key:
 
 ```bash
-KEY=$(jq -r '.CLIPROXY_CLIENT_API_KEYS[0]' secrets.local.json)
+CLIPROXY_KEY="$(jq -r '.CLIPROXY_CLIENT_API_KEYS[0]' secrets.local.json)"
 curl -fsS http://127.0.0.1:8317/v1/models \
-  -H "Authorization: Bearer $KEY" |
-  jq -r '.data[].id'
+	-H "Authorization: Bearer $CLIPROXY_KEY" | \
+	jq -r '.data[].id'
+unset CLIPROXY_KEY
 ```
 
-Expected model names include `gpt-5.6-luna`, `antigravity/gemini-3.7-flash-high`, `go/gpt-5.6-luna`, `openrouter/auto`, `deepseek/deepseek-v4-flash`, and `zen/minimax-m3`.
+The command prints the currently available model IDs. The list changes with provider catalogs and OAuth accounts.
 
-## Future home-server deployment
+To verify that the response contains at least one model, use:
 
-Keep the API tailnet-only. Bind CLIProxyAPI to the server's Tailscale address, keep remote management disabled, and reach management through a Tailscale SSH port forward. Do not expose the gateway through the ordinary LAN, Tailscale Funnel, or the public internet.
+```bash
+CLIPROXY_KEY="$(jq -r '.CLIPROXY_CLIENT_API_KEYS[0]' secrets.local.json)"
+curl -fsS http://127.0.0.1:8317/v1/models \
+	-H "Authorization: Bearer $CLIPROXY_KEY" | \
+	jq -e '.data | type == "array" and length > 0'
+unset CLIPROXY_KEY
+```
 
-Use one shared client key initially to minimize host configuration. If per-host revocation becomes necessary, add client keys without changing provider pools.
+`jq` prints `true` on success.
 
-Back up `secrets.local.json` through an encrypted channel. Reauthenticate OAuth accounts after disaster recovery instead of backing up active refresh tokens. A single home server is the initial availability boundary.
+## Refresh stale catalogs
+
+Force every catalog request after an account or provider change:
+
+```bash
+bun ./sync/src/cli.ts sync --refresh-models
+```
+
+The forced refresh bypasses freshness windows and rejects stale fallback data. Use a normal sync for routine launches so a transient provider failure can fall back to a valid cache.
+
+## Deploy on a home server
+
+Bind the gateway only to a trusted private interface. For a Tailscale deployment, use the server's tailnet address and keep remote management disabled.
+
+Reach the local management endpoint through a Tailscale SSH port forward. Do not expose the gateway through the public internet, Tailscale Funnel, or an untrusted LAN.
+
+Back up `secrets.local.json` through an encrypted channel. Reauthenticate OAuth accounts after recovery instead of backing up active refresh tokens.
