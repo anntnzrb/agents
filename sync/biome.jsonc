@@ -8,6 +8,7 @@
   },
   "files": {
     "includes": [
+      ".oxlintrc.jsonc",
       "biome.jsonc",
       "package.json",
       "tsconfig.json",

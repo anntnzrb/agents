@@ -3,9 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "biome check --error-on-warnings . ../harnesses.ts",
-    "check:write": "biome check --write --error-on-warnings . ../harnesses.ts",
-    "format": "biome format --write . ../harnesses.ts",
+    "check": "biome check --error-on-warnings . && oxlint .",
+    "check:write": "biome check --write --error-on-warnings . && oxlint --fix .",
+    "format": "biome format --write .",
+    "lint": "oxlint .",
     "sync": "bun run ./src/cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
@@ -14,6 +15,8 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.8",
     "@types/bun": "^1.3.14",
-    "typescript": "^6.0.3"
+    "oxlint": "1.78.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "typescript": "7.0.2"
   }
 }
