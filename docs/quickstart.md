@@ -30,12 +30,13 @@ chmod 600 secrets.local.json
 $EDITOR secrets.local.json
 ```
 
-Set both values:
+Set all three values:
 
 - `CLIPROXY_API_KEY` authenticates local clients.
+- `CLIPROXY_MANAGEMENT_KEY` authenticates the local control panel.
 - `OPENCODE_GO_API_KEY` authenticates CLIProxyAPI to OpenCode Go.
 
-Generate `CLIPROXY_API_KEY` with `openssl rand -hex 32`.
+Generate `CLIPROXY_API_KEY` and `CLIPROXY_MANAGEMENT_KEY` with `openssl rand -hex 32`.
 
 `secrets.local.json` is ignored by Git. Transfer it through a secure channel when you configure another machine.
 
@@ -53,6 +54,8 @@ Sync performs these actions:
 - renders `~/.cli-proxy-api/config.yaml` with mode `0600`.
 
 A manual sync warns when CLIProxyAPI is installed but not running.
+
+When running, open the local control panel at `http://127.0.0.1:8317/management.html` and authenticate with `CLIPROXY_MANAGEMENT_KEY`. Remote management remains disabled.
 
 ## Authenticate CLIProxyAPI
 

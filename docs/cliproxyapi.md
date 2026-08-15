@@ -17,7 +17,7 @@ Sync supports the official macOS ARM64 and Linux x86_64 release assets pinned in
 
 ## Configure secrets
 
-Copy the example and set both values:
+Copy the example and set all three values:
 
 ```bash
 cp secrets.local.example.json secrets.local.json
@@ -26,7 +26,7 @@ $EDITOR secrets.local.json
 bun ./sync/src/cli.ts
 ```
 
-Never commit `secrets.local.json` or OAuth files.
+The `CLIPROXY_MANAGEMENT_KEY` authenticates the local management API and control panel. Never commit `secrets.local.json` or OAuth files.
 
 ## Authenticate ChatGPT
 
@@ -51,6 +51,14 @@ cli-proxy-api
 ```
 
 The wrapper supplies the generated config path. CLIProxyAPI listens on `127.0.0.1:8317`. Sync does not install a service. Use launchd, systemd, tmux, or another process manager when you need background operation.
+
+The local control panel is available at:
+
+```text
+http://127.0.0.1:8317/management.html
+```
+
+It requires `CLIPROXY_MANAGEMENT_KEY`. Remote management remains disabled, and sync overwrites panel changes on the next run.
 
 A manual sync prints this warning when the endpoint is unavailable:
 
