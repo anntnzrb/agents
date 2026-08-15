@@ -6,6 +6,7 @@
     "moduleDetection": "force",
     "moduleResolution": "bundler",
     "paths": {
+      "@catalog": ["../harnesses.ts"],
       "@core/*": ["./src/core/*"],
       "@extensions/*": ["./src/extensions/*"],
       "@packages/*": ["./src/packages/*"],
@@ -15,14 +16,23 @@
     "verbatimModuleSyntax": true,
     "types": ["bun"],
     "strict": true,
+    "exactOptionalPropertyTypes": true,
     "noImplicitReturns": true,
     "noUncheckedIndexedAccess": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "useUnknownInCatchVariables": true,
     "noImplicitOverride": true,
+    "isolatedModules": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
     "erasableSyntaxOnly": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": false
   },
   "include": ["src/**/*.ts", "test/**/*.ts"]
 }
