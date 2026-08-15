@@ -105,7 +105,10 @@ export function startSyncWatchdog(timeoutSeconds: number): void {
 
 export async function runSync(
   syncEnv: SyncEnv,
-  options: { readonly warnManagedServices?: boolean } = {},
+  options: {
+    readonly warnManagedServices?: boolean;
+    readonly forceModelRefresh?: boolean;
+  } = {},
 ): Promise<boolean> {
   let syncPlan: SyncPlan;
   let managedPlan: ManagedSyncPlan;
@@ -120,16 +123,23 @@ export async function runSync(
   }
 
   const cleanupSuccess = cleanManagedEntries(managedPlan);
-  const baseSuccess = cleanupSuccess
-    ? (() => {
-        try {
-          return runJobsWithPreserve(syncPlan.jobs, preservePathsByDst(extensionHookStates));
-        } catch (error) {
-          err(panicMessage(error));
-          return false;
-        }
-      })()
-    : false;
+  let baseSuccess = false;
+  if (cleanupSuccess) {
+    try {
+      baseSuccess = await runJobsWithPreserve(
+        syncPlan.jobs,
+        preservePathsByDst(extensionHookStates),
+        {
+          ...(options.forceModelRefresh === undefined
+            ? {}
+            : { forceModelRefresh: options.forceModelRefresh }),
+          quietModelRefresh: !options.warnManagedServices,
+        },
+      );
+    } catch (error) {
+      err(panicMessage(error));
+    }
+  }
 
   let managedTools: PreparedManagedTool[] = [];
   let managedToolSuccess = baseSuccess;
@@ -170,7 +180,9 @@ export async function runSync(
   return success;
 }
 
-export const main = async (): Promise<number> => {
+export const main = async (
+  options: { readonly forceModelRefresh?: boolean } = {},
+): Promise<number> => {
   let syncEnv: SyncEnv;
   try {
     syncEnv = SyncEnv.fromSystem();
@@ -195,7 +207,12 @@ export const main = async (): Promise<number> => {
 
   try {
     startSyncWatchdog(syncTimeout());
-    const success = await runSync(syncEnv, { warnManagedServices: true });
+    const success = await runSync(syncEnv, {
+      warnManagedServices: true,
+      ...(options.forceModelRefresh === undefined
+        ? {}
+        : { forceModelRefresh: options.forceModelRefresh }),
+    });
     return success ? 0 : 1;
   } finally {
     releaseSyncLockImpl(lock);

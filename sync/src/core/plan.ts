@@ -40,6 +40,7 @@ export type Job =
       readonly dst: string;
       readonly kind: "CliProxyConfig";
       readonly secretsPath: string;
+      readonly cacheRoot?: string;
     };
 
 export interface HarnessPlan {
@@ -213,6 +214,7 @@ function configJobs(syncEnv: SyncEnv): Job[] {
       dst: join(syncEnv.home, ".cli-proxy-api", "config.yaml"),
       kind: "CliProxyConfig",
       secretsPath: join(syncEnv.home, ".config", "agents", "secrets.local.json"),
+      cacheRoot: join(syncEnv.home, ".cache", "agents", "model-catalog"),
     },
   ];
 }

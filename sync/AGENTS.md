@@ -28,6 +28,13 @@ This is the isolated sync application.
 - Managed tool wrappers use the upstream executable name and pass generated configuration explicitly.
 - Sync does not install or control system services.
 
+## Model Catalog Contract
+
+- The normalized model catalog and its cache are harness-agnostic.
+- Prefer each harness's native remote-model discovery over generated per-harness catalogs.
+- Do not add per-harness model serializers or a `src/harnesses/` materialization layer.
+- Live provider catalogs decide availability; models.dev supplies metadata and protocol hints.
+
 ## Launch Wrapper Contract
 
 - A manual sync creates or reconciles wrappers before returning.

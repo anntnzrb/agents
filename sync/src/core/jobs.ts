@@ -10,6 +10,11 @@ type SourceContentCache = Map<string, { readonly metadata: fs.Stats; readonly co
 
 export type { Job, JobKind } from "./plan.ts";
 
+export interface JobRunOptions {
+  readonly forceModelRefresh?: boolean;
+  readonly quietModelRefresh?: boolean;
+}
+
 export function copyItem(src: string, dst: string): boolean {
   try {
     if (!fs.existsSync(src) && !isSymlink(src)) {
@@ -49,19 +54,26 @@ export function copyDirInto(srcDir: string, dstDir: string): boolean {
   }
 }
 
-export function runJobsWithPreserve(
+export async function runJobsWithPreserve(
   jobs: readonly Job[],
   preservePathsByDst: ReadonlyMap<string, readonly string[]> = new Map(),
-): boolean {
+  options: JobRunOptions = {},
+): Promise<boolean> {
   const sourceContentCache: SourceContentCache = new Map();
-  return jobs.every((job) => runJob(job, preservePathsByDst, sourceContentCache));
+  for (const job of jobs) {
+    if (!(await runJob(job, preservePathsByDst, sourceContentCache, options))) {
+      return false;
+    }
+  }
+  return true;
 }
 
-function runJob(
+async function runJob(
   job: Job,
   preservePathsByDst: ReadonlyMap<string, readonly string[]>,
   sourceContentCache: SourceContentCache,
-): boolean {
+  options: JobRunOptions,
+): Promise<boolean> {
   try {
     switch (job.kind) {
       case "Dir":
@@ -95,7 +107,15 @@ function runJob(
           warn(`missing local secrets ${job.secretsPath}; skipping ${job.dst}`);
           return true;
         }
-        syncCliProxyConfig(job.src, job.dst, job.secretsPath);
+        await syncCliProxyConfig(job.src, job.dst, job.secretsPath, {
+          ...(job.cacheRoot === undefined ? {} : { cacheRoot: job.cacheRoot }),
+          ...(options.forceModelRefresh === undefined
+            ? {}
+            : { forceModelRefresh: options.forceModelRefresh }),
+          ...(options.quietModelRefresh === undefined
+            ? {}
+            : { quietModelRefresh: options.quietModelRefresh }),
+        });
         return true;
       default:
         return assertNever(job);

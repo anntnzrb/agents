@@ -21,15 +21,19 @@ export function syncSecretTemplate(src: string, dst: string, secretsPath: string
 }
 
 export function syncPrivateTextFile(dst: string, content: string): void {
-  if (matchesOutput(dst, content)) {
+  syncTextFile(dst, content, OUTPUT_MODE);
+}
+
+export function syncTextFile(dst: string, content: string, mode: number): void {
+  if (matchesOutput(dst, content, mode)) {
     return;
   }
 
   fs.mkdirSync(dirname(dst), { recursive: true });
-  const { fd, tempPath } = createTempFile(dst);
+  const { fd, tempPath } = createTempFile(dst, mode);
   try {
     fs.writeFileSync(fd, content, "utf8");
-    fs.fchmodSync(fd, OUTPUT_MODE);
+    fs.fchmodSync(fd, mode);
     fs.fsyncSync(fd);
     fs.closeSync(fd);
     fs.renameSync(tempPath, dst);
@@ -89,13 +93,13 @@ function readText(path: string, label: string): string {
   }
 }
 
-function matchesOutput(path: string, content: string): boolean {
+function matchesOutput(path: string, content: string, mode: number): boolean {
   try {
     const metadata = fs.lstatSync(path);
     return (
       metadata.isFile() &&
       !metadata.isSymbolicLink() &&
-      (metadata.mode & 0o777) === OUTPUT_MODE &&
+      (metadata.mode & 0o777) === mode &&
       fs.readFileSync(path, "utf8") === content
     );
   } catch {
@@ -103,7 +107,10 @@ function matchesOutput(path: string, content: string): boolean {
   }
 }
 
-function createTempFile(path: string): { readonly fd: number; readonly tempPath: string } {
+function createTempFile(
+  path: string,
+  mode: number,
+): { readonly fd: number; readonly tempPath: string } {
   const nonce = Date.now().toString(16);
   for (let attempt = 0; attempt < 16; attempt += 1) {
     const tempPath = join(
@@ -111,7 +118,7 @@ function createTempFile(path: string): { readonly fd: number; readonly tempPath:
       `.${basename(path) || "config"}.${process.pid}.${nonce}-${attempt}.tmp`,
     );
     try {
-      return { fd: fs.openSync(tempPath, "wx", OUTPUT_MODE), tempPath };
+      return { fd: fs.openSync(tempPath, "wx", mode), tempPath };
     } catch (error) {
       if (!isErrno(error, "EEXIST")) {
         throw error;

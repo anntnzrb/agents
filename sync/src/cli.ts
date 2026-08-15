@@ -16,7 +16,12 @@ if (command === "launch") {
 }
 
 if (command === "sync" || command === undefined) {
-  process.exit(await main());
+  const syncArgs = command === "sync" ? args.slice(1) : args;
+  if (syncArgs.some((arg) => arg !== "--refresh-models")) {
+    console.error("sync: usage: sync [--refresh-models]");
+    process.exit(2);
+  }
+  process.exit(await main({ forceModelRefresh: syncArgs.includes("--refresh-models") }));
 }
 
 console.error(`sync: unknown command: ${command}`);
