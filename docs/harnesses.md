@@ -43,6 +43,8 @@ Sync writes Unix wrappers under `~/.local/bin/`. On Windows, sync writes `.cmd` 
 
 Each wrapper calls the installed sync runtime with the `launch` command. The launch path attempts reconciliation, prepares the cached npm package, forwards all arguments, and returns the harness exit status.
 
+When the installed sync runtime is missing, the wrapper prints a hint to run sync from the agents repository and exits with status `127` instead of failing with a raw interpreter error.
+
 The wrapper command is `launcher.bin`. The wrapper passes the adapter `id` to the installed runtime, so the command and the source directory name do not need to match.
 
 Wrapper state lives at `~/.local/share/agents/sync-managed/wrappers.json`. Sync removes stale wrappers only when they contain its ownership marker and remain in an allowed wrapper directory. Unmanaged conflicts are preserved and reported.
