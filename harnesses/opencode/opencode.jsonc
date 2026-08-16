@@ -38,6 +38,8 @@
 
   "agent": {
     "build": {
+      "model": "cliproxy/chatgpt/gpt-5.6-sol",
+      "variant": "high",
       "description":
         "Orchestrator Agent: executes tools and delegates exploration and analysis to subagents in parallel to keep the main context lean.",
       "permission": {
@@ -51,6 +53,7 @@
     },
     "general": {
       "model": "cliproxy/antigravity/gemini-3.7-flash-high",
+      "variant": "max",
       "description":
         "General-purpose subagent for researching complex questions and executing multi-step tasks in a fresh, isolated context. Use this agent to delegate units of work in parallel; it returns only its final summary to the orchestrator, keeping the main session context clean.",
       "permission": {
@@ -59,6 +62,7 @@
     },
     "explore": {
       "model": "cliproxy/antigravity/gemini-3.7-flash-high",
+      "variant": "max",
       "description":
         "Fast, read-only subagent specialized for exploring codebases: find files by pattern, search code by keyword, answer codebase questions. Use it to delegate searches and keep the orchestrator context clean. Specify thoroughness: 'quick', 'medium', or 'very thorough'.",
       "permission": {

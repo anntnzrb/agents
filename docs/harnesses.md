@@ -36,7 +36,11 @@ A harness uses CLIProxyAPI only when its committed source defines a `cliproxy` p
 
 Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `assets/cliproxyapi/deployment.json`. Harness providers use a static placeholder API key because their SDKs require a non-empty value; the gateway ignores it. A harness can use native model discovery or read `~/.local/share/agents/model-catalog/catalog.json` through the installed runtime client. The harness source owns its model-selector syntax and discovery adapter.
 
-API-key model IDs use the prefix declared by `x-model-sources`. The committed prefixes are `go`, `deepseek`, and `zen`. ChatGPT OAuth models remain unprefixed.
+API-key model IDs use the prefix declared by `x-model-sources`. The committed prefixes are `go`, `deepseek`, and `zen`. OAuth model IDs use the prefix stored in their CLIProxyAPI auth files, such as `chatgpt`, `antigravity`, or `grok`.
+
+The OpenCode CLIProxyAPI plugin projects catalog reasoning levels into variants from `minimal` through `max`. When a requested level is unsupported, the plugin selects the greatest supported level at or below it. A request below the model's minimum selects the lowest supported level. Model options and variants declared in `opencode.jsonc` override generated values and survive synchronization.
+
+`harnesses/opencode/opencode.jsonc` sets the `build` agent to the `high` variant. It sets the `general` and `explore` subagents to `max`; the generated variant clamps that request when their model supports a lower maximum.
 
 ## Launch wrappers
 
