@@ -36,12 +36,12 @@ Sync rejects wildcard listeners, unspecified IPv6 spellings, unknown fields, mal
 Sync compares the local OS hostname with `server.hostname` to select the host role:
 
 - On the gateway host, sync writes the server configuration before it checks the client endpoint.
-- On another host, sync checks `client.baseUrl/models` with the candidate client key before it changes a CLIProxyAPI artifact.
+- On another host, sync checks `client.baseUrl/models` with the candidate client key. If local secrets are absent, sync uses the installed runtime client key.
 - Only the gateway host prepares the managed CLIProxyAPI binary and wrapper; client hosts reconcile away a previously owned wrapper.
 - An unavailable endpoint preserves the existing server configuration, client key, model catalog, and harness endpoints.
 - A ready endpoint updates the client key, model catalog, and harness endpoints while leaving the local server configuration unchanged.
 
-Endpoint publication is transactional.
+Endpoint publication is transactional. Publication preserves Codex-owned hook and project trust tables in `~/.codex/config.toml`.
 
 To move the gateway, change the host and endpoint fields in `assets/cliproxyapi.deployment.json`, deploy the repository and secrets to the new gateway host, start CLIProxyAPI there, and run sync on clients. Clients keep their current endpoint until the new `/models` endpoint returns a non-empty `data` array. Update harness sources or documentation only when the configuration schema changes.
 
