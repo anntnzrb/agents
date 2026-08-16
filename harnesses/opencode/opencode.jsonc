@@ -26,7 +26,7 @@
       "name": "CLIProxyAPI",
       "npm": "@ai-sdk/openai",
       "options": {
-        "apiKey": "{file:~/.local/share/agents/cliproxyapi/client-api-key}",
+        "apiKey": "keyless",
         "baseURL": "${CLIPROXY_CLIENT_BASE_URL}",
       },
     },
