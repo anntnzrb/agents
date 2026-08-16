@@ -56,7 +56,6 @@ Other jobs use fixed generated targets:
 | `~/.cli-proxy-api/config.yaml` | CLIProxyAPI configuration job |
 | `~/.local/share/agents/sync/` | Installed sync runtime |
 | `~/.local/share/agents/model-catalog/catalog.json` | Shared model-catalog job |
-| `~/.local/share/agents/cliproxyapi/client-api-key` | CLIProxyAPI client-key job |
 | `~/.local/share/agents/sync-managed/` | Managed ownership and hook state |
 | `~/.local/bin/` | Unix harness and managed-tool wrappers |
 | `%LOCALAPPDATA%/Programs/Agents/bin/` | Windows harness wrappers |

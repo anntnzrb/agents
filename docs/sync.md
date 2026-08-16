@@ -42,25 +42,25 @@ Recorded ownership limits cleanup to safe top-level names. Sync preserves unmana
 
 Most missing source files and directories produce diagnostics but do not fail the run. Non-fatal missing-source errors permit partial harness sources.
 
-Invalid committed configuration, malformed local secrets, hook failures, and a failed first managed-tool installation are fatal. A client host can operate without `secrets.local.json` when it has an installed runtime client key.
+Invalid committed configuration, malformed local secrets, hook failures, and a failed first managed-tool installation are fatal. A client host can operate without `secrets.local.json`.
 
 ## CLIProxyAPI configuration job
 
 The job reads `assets/cliproxyapi.yaml.tmpl` and `secrets.local.json`. The job writes these private files with mode `0600`:
 
 - `~/.cli-proxy-api/config.yaml`
-- `~/.local/share/agents/cliproxyapi/client-api-key`
 - `~/.local/share/agents/model-catalog/catalog.json`
 
 Sync validates `assets/cliproxyapi.deployment.json` before reconciliation. It injects `listen.host` and `listen.port` into the generated gateway configuration. It uses `client.baseUrl` for catalog discovery and health checks. The deployment file is the only source for these host and endpoint values.
 
+The gateway accepts requests without client keys, and sync removes a stale `~/.local/share/agents/cliproxyapi/client-api-key` file when it finds one.
+
 The readiness job compares the local OS hostname with `server.hostname`:
 
 - On the gateway host, the readiness state remains unset. The configuration job writes the server configuration, and endpoint publication checks the target afterward.
-- On another host, the readiness job checks the configured `/models` target with the first candidate client key from `secrets.local.json`. If that key is unavailable, it uses the installed runtime client key.
-- Without either key, sync preserves the existing client artifacts.
-- An unavailable target leaves the existing CLIProxyAPI configuration, client key, model catalog, and harness endpoint files unchanged. It does not fail the initial client sync.
-- A ready target lets the configuration job update the client key and model catalog without replacing the local server configuration.
+- On another host, the readiness job checks the configured `/models` target without authentication.
+- An unavailable target leaves the existing CLIProxyAPI configuration, model catalog, and harness endpoint files unchanged. It does not fail the initial client sync.
+- A ready target lets the configuration job update the model catalog without replacing the local server configuration.
 
 Endpoint publication then replaces all configured `${CLIPROXY_CLIENT_BASE_URL}` harness targets as one transaction. Publication preserves the Codex-owned `[hooks.state]` and `[projects]` tail in `~/.codex/config.toml`. A write failure restores every endpoint's previous content and mode.
 

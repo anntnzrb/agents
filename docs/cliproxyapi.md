@@ -6,7 +6,7 @@ Use this guide to change gateway credentials, authenticate ChatGPT, refresh mode
 
 Keep the gateway host and endpoint values in `assets/cliproxyapi.deployment.json`. Set `server.hostname` to the host that runs CLIProxyAPI. Set `listen.host` and `listen.port` to the listener on that host. Set `client.baseUrl` to the `/v1` endpoint that clients use. Do not copy these values into harness sources or documentation.
 
-When you move the gateway, update that file, start the new gateway, and run sync on clients. A client keeps its existing generated configuration and endpoints until the new endpoint passes the authenticated `/models` readiness check.
+When you move the gateway, update that file, start the new gateway, and run sync on clients. A client keeps its existing generated configuration and endpoints until the new endpoint passes the `/models` readiness check.
 
 ## Configure local secrets
 
@@ -18,9 +18,9 @@ chmod 600 secrets.local.json
 $EDITOR secrets.local.json
 ```
 
-Set a non-empty management key, one or more unique client keys, and every credential pool referenced by `assets/cliproxyapi.yaml.tmpl`.
+Set a non-empty management key and every credential pool referenced by `assets/cliproxyapi.yaml.tmpl`. The gateway accepts client requests without client keys; the tailnet is the access boundary.
 
-Generate local management and client keys with:
+Generate the local management key with:
 
 ```bash
 openssl rand -hex 32
@@ -35,7 +35,7 @@ Append an account to the matching array in `CLIPROXY_CREDENTIAL_POOLS`:
 ```json
 {
 	"CLIPROXY_CREDENTIAL_POOLS": {
-		"openrouter": [
+		"deepseek": [
 			{
 				"apiKey": "first-key",
 				"weight": 1
@@ -117,16 +117,14 @@ Do not make durable configuration changes in the control panel. Sync replaces th
 
 ## Verify model access
 
-Query the gateway with the first configured client key:
+The gateway accepts requests without client keys. Query it directly:
 
 ```bash
-CLIPROXY_KEY="$(jq -r '.CLIPROXY_CLIENT_API_KEYS[0]' secrets.local.json)"
 CLIPROXY_DEPLOYMENT=assets/cliproxyapi.deployment.json
 CLIPROXY_BASE_URL="$(jq -r '.client.baseUrl' "$CLIPROXY_DEPLOYMENT")"
-curl -fsS "$CLIPROXY_BASE_URL/models" \
-	-H "Authorization: Bearer $CLIPROXY_KEY" | \
+curl -fsS "$CLIPROXY_BASE_URL/models" | \
 	jq -r '.data[].id'
-unset CLIPROXY_BASE_URL CLIPROXY_KEY
+unset CLIPROXY_BASE_URL
 ```
 
 The command prints the currently available model IDs. The list changes with provider catalogs and OAuth accounts.
@@ -134,13 +132,11 @@ The command prints the currently available model IDs. The list changes with prov
 To verify that the response contains at least one model, use:
 
 ```bash
-CLIPROXY_KEY="$(jq -r '.CLIPROXY_CLIENT_API_KEYS[0]' secrets.local.json)"
 CLIPROXY_DEPLOYMENT=assets/cliproxyapi.deployment.json
 CLIPROXY_BASE_URL="$(jq -r '.client.baseUrl' "$CLIPROXY_DEPLOYMENT")"
-curl -fsS "$CLIPROXY_BASE_URL/models" \
-	-H "Authorization: Bearer $CLIPROXY_KEY" | \
+curl -fsS "$CLIPROXY_BASE_URL/models" | \
 	jq -e '.data | type == "array" and length > 0'
-unset CLIPROXY_BASE_URL CLIPROXY_KEY
+unset CLIPROXY_BASE_URL
 ```
 
 `jq` prints `true` on success.

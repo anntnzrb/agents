@@ -31,11 +31,11 @@ Adapters can declare these hooks:
 
 ## CLIProxyAPI integration
 
-A harness uses CLIProxyAPI only when its committed source defines a `cliproxy` provider. Sync has no adapter-wide injection step and does not copy the client key into harness-native credential stores.
+A harness uses CLIProxyAPI only when its committed source defines a `cliproxy` provider. Sync has no adapter-wide injection step and does not manage client credentials; the gateway accepts requests without client keys, and the tailnet is the access boundary.
 
-Configured integrations read the client key from `~/.local/share/agents/cliproxyapi/client-api-key`. Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `assets/cliproxyapi.deployment.json`. A harness can use native model discovery or read `~/.local/share/agents/model-catalog/catalog.json` through the installed runtime client. The harness source owns its model-selector syntax and discovery adapter.
+Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `assets/cliproxyapi.deployment.json`. Harness providers use a static placeholder API key because their SDKs require a non-empty value; the gateway ignores it. A harness can use native model discovery or read `~/.local/share/agents/model-catalog/catalog.json` through the installed runtime client. The harness source owns its model-selector syntax and discovery adapter.
 
-API-key model IDs use the prefix declared by `x-model-sources`. The committed prefixes are `go`, `deepseek`, `openrouter`, and `zen`. ChatGPT OAuth models remain unprefixed.
+API-key model IDs use the prefix declared by `x-model-sources`. The committed prefixes are `go`, `deepseek`, and `zen`. ChatGPT OAuth models remain unprefixed.
 
 ## Launch wrappers
 

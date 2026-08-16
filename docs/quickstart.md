@@ -51,19 +51,19 @@ cp secrets.local.example.json secrets.local.json
 chmod 600 secrets.local.json
 ```
 
-Generate a management key and at least one client key:
+Generate a management key:
 
 ```bash
 openssl rand -hex 32
 ```
 
-Run the command again for each key. Then edit the secrets file:
+Then edit the secrets file:
 
 ```bash
 $EDITOR secrets.local.json
 ```
 
-Replace every `replace-me` value. The credential pools contain upstream provider API keys. Use `weight: 1` when accounts have equal priority.
+Replace every `replace-me` value. The credential pools contain upstream provider API keys. Use `weight: 1` when accounts have equal priority. Clients do not need client keys; the tailnet is the access boundary.
 
 The repository ignores `secrets.local.json`. Keep the file out of Git and transfer it only through an encrypted channel.
 
@@ -129,15 +129,13 @@ The forced refresh updates provider catalogs, models.dev metadata, and the live 
 
 ## Verify the gateway
 
-Read the client key without printing it, then query the model endpoint:
+Query the model endpoint without authentication:
 
 ```bash
-CLIPROXY_KEY="$(jq -r '.CLIPROXY_CLIENT_API_KEYS[0]' secrets.local.json)"
 CLIPROXY_BASE_URL="$(jq -r '.client.baseUrl' assets/cliproxyapi.deployment.json)"
-curl -fsS "$CLIPROXY_BASE_URL/models" \
-	-H "Authorization: Bearer $CLIPROXY_KEY" | \
+curl -fsS "$CLIPROXY_BASE_URL/models" | \
 	jq -e '.data | type == "array" and length > 0'
-unset CLIPROXY_BASE_URL CLIPROXY_KEY
+unset CLIPROXY_BASE_URL
 ```
 
 `jq` prints `true`. The exact model IDs depend on the current upstream catalogs and authenticated OAuth accounts.

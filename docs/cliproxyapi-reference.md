@@ -12,7 +12,6 @@ CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses configured to 
 | Local secrets | `secrets.local.json` |
 | Generated configuration | `~/.cli-proxy-api/config.yaml` |
 | OAuth files | `~/.cli-proxy-api/*.json` |
-| Runtime client key | `~/.local/share/agents/cliproxyapi/client-api-key` |
 | Runtime model catalog | `~/.local/share/agents/model-catalog/catalog.json` |
 | Managed command | `~/.local/bin/cli-proxy-api` |
 
@@ -36,10 +35,10 @@ Sync rejects wildcard listeners, unspecified IPv6 spellings, unknown fields, mal
 Sync compares the local OS hostname with `server.hostname` to select the host role:
 
 - On the gateway host, sync writes the server configuration before it checks the client endpoint.
-- On another host, sync checks `client.baseUrl/models` with the candidate client key. If local secrets are absent, sync uses the installed runtime client key.
+- On another host, sync checks `client.baseUrl/models` without authentication.
 - Only the gateway host prepares the managed CLIProxyAPI binary and wrapper; client hosts reconcile away a previously owned wrapper.
-- An unavailable endpoint preserves the existing server configuration, client key, model catalog, and harness endpoints.
-- A ready endpoint updates the client key, model catalog, and harness endpoints while leaving the local server configuration unchanged.
+- An unavailable endpoint preserves the existing server configuration, model catalog, and harness endpoints.
+- A ready endpoint updates the model catalog and harness endpoints while leaving the local server configuration unchanged.
 
 Endpoint publication is transactional. Publication preserves Codex-owned hook and project trust tables in `~/.codex/config.toml`.
 
@@ -47,12 +46,11 @@ To move the gateway, change the host and endpoint fields in `assets/cliproxyapi.
 
 ## Local secrets
 
-`secrets.local.json` contains three top-level fields:
+`secrets.local.json` contains two top-level fields:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `CLIPROXY_MANAGEMENT_KEY` | Non-empty string | Local management API and control-panel credential |
-| `CLIPROXY_CLIENT_API_KEYS` | Non-empty array of unique strings | Bearer keys accepted from gateway clients |
 | `CLIPROXY_CREDENTIAL_POOLS` | Non-empty object of account arrays | API-key accounts grouped by provider source |
 
 Each credential account accepts these fields:
@@ -69,11 +67,11 @@ The renderer rejects unknown account fields, duplicate keys within a pool, inval
 
 ## Generated secrets
 
-Sync writes the generated configuration, the first client key, and the shared model catalog with mode `0600`.
+Sync writes the generated configuration and the shared model catalog with mode `0600`.
 
 The generated configuration contains a bcrypt hash of `CLIPROXY_MANAGEMENT_KEY`. Sync reuses the existing hash when the plaintext key still matches, which keeps an unchanged sync idempotent.
 
-No harness reads `secrets.local.json`. Harnesses read the generated client-key file.
+No harness reads `secrets.local.json`. The gateway accepts client requests without client keys; harness providers send a static placeholder key because their SDKs require a non-empty value.
 
 ## Model sources
 
@@ -83,7 +81,6 @@ No harness reads `secrets.local.json`. Harnesses read the generated client-key f
 | --- | --- | --- | --- | --- |
 | `opencode-go` | `opencode-go` | `opencode-go` | `go` | `https://opencode.ai/zen/go/v1` |
 | `deepseek` | `deepseek` | `deepseek` | `deepseek` | `https://api.deepseek.com/v1` |
-| `openrouter` | `openrouter` | `openrouter` | `openrouter` | `https://openrouter.ai/api/v1` |
 | `opencode-zen` | `opencode` | `opencode-zen` | `zen` | `https://opencode.ai/zen/v1` |
 
 The `x-model-sources` marker does not appear in the generated configuration.
@@ -106,7 +103,7 @@ Provider metadata selects the generated CLIProxyAPI profile:
 | --- | --- | --- |
 | `shape: responses`, `@ai-sdk/openai`, or `@ai-sdk/azure` | OpenAI Responses | `codex-api-key` |
 | `@ai-sdk/anthropic` | Anthropic Messages | `claude-api-key` |
-| `shape: completions`, `@ai-sdk/openai-compatible`, or `@openrouter/ai-sdk-provider` | OpenAI Chat Completions | `openai-compatibility` |
+| `shape: completions` or `@ai-sdk/openai-compatible` | OpenAI Chat Completions | `openai-compatibility` |
 
 An unsupported provider package excludes the model from the generated profiles. A forced refresh reports the count and package names for excluded transports.
 
@@ -141,6 +138,7 @@ The committed template sets these CLIProxyAPI values:
 | `max-retry-credentials` | `0` |
 | `disable-cooling` | `false` |
 | `save-cooldown-status` | `true` |
+| `ws-auth` | `false` |
 
 The repository has no quota-monitoring service and does not generate quota dashboards.
 
