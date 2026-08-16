@@ -32,10 +32,10 @@ function withTempHome<T>(fn: (home: string) => T | Promise<T>): Promise<T> {
 }
 
 function writeManifest(home: string, checksum = CHECKSUM): void {
-  const assets = join(home, ".config", "agents", "assets");
-  mkdirSync(assets, { recursive: true });
+  const cliProxyAssets = join(home, ".config", "agents", "assets", "cliproxyapi");
+  mkdirSync(cliProxyAssets, { recursive: true });
   writeFileSync(
-    join(assets, "cliproxyapi.release.json"),
+    join(cliProxyAssets, "release.json"),
     `${JSON.stringify({
       repository: "router-for-me/CLIProxyAPI",
       version: "7.2.132",

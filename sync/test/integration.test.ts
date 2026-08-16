@@ -249,7 +249,7 @@ function writeFixtureFiles(home: string): void {
   writeFileSync(join(home, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
   writeFileSync(join(home, ".config", "agents", "assets", "mcporter.jsonc"), '{"x":1}');
   writeFileSync(
-    join(home, ".config", "agents", "assets", "cliproxyapi.yaml.tmpl"),
+    join(home, ".config", "agents", "assets", "cliproxyapi", "config.yaml.tmpl"),
     `host: \${CLIPROXY_LISTEN_HOST}
 port: \${CLIPROXY_LISTEN_PORT}
 remote-management:
@@ -340,8 +340,11 @@ function writeDeployment(
   serverHostname = hostname(),
   clientBaseUrl = "http://127.0.0.1:1/v1",
 ): void {
+  mkdirSync(join(home, ".config", "agents", "assets", "cliproxyapi"), {
+    recursive: true,
+  });
   writeFileSync(
-    join(home, ".config", "agents", "assets", "cliproxyapi.deployment.json"),
+    join(home, ".config", "agents", "assets", "cliproxyapi", "deployment.json"),
     `${JSON.stringify({
       server: { hostname: serverHostname },
       listen: { host: "100.64.0.42", port: 8317 },

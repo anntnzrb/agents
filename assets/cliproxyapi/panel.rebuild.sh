@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rebuild the pinned CLIProxyAPI management panel asset (assets/cliproxy-panel.html)
+# Rebuild the pinned CLIProxyAPI management panel asset (assets/cliproxyapi/panel.html)
 # from upstream PR https://github.com/router-for-me/Cli-Proxy-API-Management-Center/pull/381.
 # Run from anywhere; requires git and bun on PATH.
 set -eu
@@ -17,5 +17,5 @@ git -C "$WORK/panel" checkout --detach FETCH_HEAD
 cd "$WORK/panel"
 bun install --frozen-lockfile
 bun run build
-cp dist/index.html "$OUT_DIR/cliproxy-panel.html"
-echo "wrote $OUT_DIR/cliproxy-panel.html"
+cp dist/index.html "$OUT_DIR/panel.html"
+echo "wrote $OUT_DIR/panel.html"

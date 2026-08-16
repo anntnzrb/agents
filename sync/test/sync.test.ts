@@ -377,7 +377,7 @@ if (runtime) {
 
   test("run_jobs_with_preserve_expands_cliproxy_credential_pools_idempotently", async () => {
     await withTempDir(async (root) => {
-      const src = join(root, "cliproxyapi.yaml.tmpl");
+      const src = join(root, "config.yaml.tmpl");
       const dst = join(root, "config.yaml");
       const secretsPath = join(root, "secrets.local.json");
       writeFile(
@@ -447,7 +447,7 @@ openai-compatibility:
 
   test("run_jobs_with_preserve_rejects_duplicate_cliproxy_credentials", async () => {
     await withTempDir(async (root) => {
-      const src = join(root, "cliproxyapi.yaml.tmpl");
+      const src = join(root, "config.yaml.tmpl");
       const dst = join(root, "config.yaml");
       const secretsPath = join(root, "secrets.local.json");
       writeFile(
@@ -755,7 +755,7 @@ setInterval(() => {}, 1_000);
   test("sync_plan_deploys_cliproxy_panel_asset_only_on_gateway_host", async () => {
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
-      const panelSrc = join(root, ".config", "agents", "assets", "cliproxy-panel.html");
+      const panelSrc = join(root, ".config", "agents", "assets", "cliproxyapi", "panel.html");
       writeFile(panelSrc, "<html>panel</html>\n");
       const panelDst = join(".cli-proxy-api", "static", "management.html");
 
@@ -768,7 +768,7 @@ setInterval(() => {}, 1_000);
       assert.equal(panelJob?.src, panelSrc);
 
       writeFile(
-        join(root, ".config", "agents", "assets", "cliproxyapi.deployment.json"),
+        join(root, ".config", "agents", "assets", "cliproxyapi", "deployment.json"),
         `${JSON.stringify({
           ...TEST_CLIPROXY_DEPLOYMENT,
           server: { hostname: "not-the-gateway.example.test" },
@@ -994,7 +994,7 @@ setInterval(() => {}, 1_000);
       );
 
       writeFile(
-        join(agentsRoot, "assets", "cliproxyapi.release.json"),
+        join(agentsRoot, "assets", "cliproxyapi", "release.json"),
         `${JSON.stringify(
           {
             repository,
@@ -1023,7 +1023,7 @@ setInterval(() => {}, 1_000);
         assert.equal(readText(wrappersStatePath).includes(wrapperPath), true);
 
         writeFile(
-          join(agentsRoot, "assets", "cliproxyapi.deployment.json"),
+          join(agentsRoot, "assets", "cliproxyapi", "deployment.json"),
           `${JSON.stringify({
             server: { hostname: "different-gateway.example.test" },
             listen: { host: "100.64.0.42", port: 9443 },
@@ -1068,10 +1068,13 @@ setInterval(() => {}, 1_000);
 
       writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
       writeFile(join(agentsRoot, "assets", "prompts", "hello.txt"), "prompt-content");
+      writeFile(join(agentsRoot, "assets", "cliproxyapi", "panel.html"), "private-asset");
 
       assert.equal(await call<boolean>(runSync, syncEnv), true);
       assert.equal(exists(join(root, ".codex", "prompts", "hello.txt")), true);
       assert.equal(exists(join(root, ".omp", "agent", "prompts", "hello.txt")), true);
+      assert.equal(exists(join(root, ".codex", "cliproxyapi")), false);
+      assert.equal(exists(join(root, ".omp", "agent", "cliproxyapi")), false);
 
       rmSync(join(agentsRoot, "assets", "prompts"), {
         recursive: true,
@@ -1572,7 +1575,7 @@ setInterval(() => {}, 1_000);
 
 function makeSyncEnv(root: string): any {
   writeFile(
-    join(root, ".config", "agents", "assets", "cliproxyapi.deployment.json"),
+    join(root, ".config", "agents", "assets", "cliproxyapi", "deployment.json"),
     `${JSON.stringify(TEST_CLIPROXY_DEPLOYMENT)}\n`,
   );
   for (const id of ["codex", "opencode", "pi", "omp"]) {

@@ -2,11 +2,15 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { panicMessage } from "@runtime/errors.ts";
-import { type CliProxyDeployment, cliProxyModelsUrl } from "./cliproxy-deployment.ts";
+import {
+  CLI_PROXY_ASSETS_DIR,
+  type CliProxyDeployment,
+  cliProxyModelsUrl,
+} from "./cliproxy-deployment.ts";
 import type { SyncEnv } from "./harness.ts";
 
 const TOOL_NAME = "cliproxyapi";
-const RELEASE_FILE = "cliproxyapi.release.json";
+const RELEASE_FILE = "release.json";
 const COMPONENT_PATTERN = /^[A-Za-z0-9._-]+$/;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
@@ -51,7 +55,7 @@ export async function prepareManagedTools(
   syncEnv: SyncEnv,
   runtime: ManagedToolRuntime = {},
 ): Promise<readonly PreparedManagedTool[]> {
-  const manifestPath = path.join(syncEnv.assetsHome, RELEASE_FILE);
+  const manifestPath = path.join(syncEnv.assetsHome, CLI_PROXY_ASSETS_DIR, RELEASE_FILE);
   if (!fs.existsSync(manifestPath)) {
     return [];
   }

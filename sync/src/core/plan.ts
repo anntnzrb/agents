@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { join, posix } from "node:path";
 import { assertNever, panicMessage } from "@runtime/errors.ts";
 import {
+  CLI_PROXY_ASSETS_DIR,
   CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER,
   type CliProxyDeployment,
   type CliProxyEndpointTarget,
@@ -117,7 +118,7 @@ export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
     buildHarnessPlan(syncEnv, harness, assetNames),
   );
   const cliProxyDeployment = readCliProxyDeployment(
-    join(syncEnv.assetsHome, "cliproxyapi.deployment.json"),
+    join(syncEnv.assetsHome, CLI_PROXY_ASSETS_DIR, "deployment.json"),
   );
   const gatewayHost = isCliProxyGatewayHost(cliProxyDeployment);
   return {
@@ -154,7 +155,8 @@ function runtimeJobs(syncEnv: SyncEnv): Job[] {
   ];
 }
 
-export const assetDirNames = (root: string): string[] => dirEntryNames(root, true);
+export const assetDirNames = (root: string): string[] =>
+  dirEntryNames(root, true).filter((name) => name !== CLI_PROXY_ASSETS_DIR);
 
 export const topLevelEntryNames = (root: string): string[] => dirEntryNames(root, false);
 
@@ -299,7 +301,7 @@ function configJobs(
       kind: "File",
     },
     {
-      src: join(syncEnv.assetsHome, "cliproxyapi.yaml.tmpl"),
+      src: join(syncEnv.assetsHome, CLI_PROXY_ASSETS_DIR, "config.yaml.tmpl"),
       dst: join(syncEnv.home, ".cli-proxy-api", "config.yaml"),
       kind: "CliProxyConfig",
       secretsPath: join(syncEnv.home, ".config", "agents", "secrets.local.json"),
@@ -311,7 +313,7 @@ function configJobs(
     ...(gatewayHost
       ? [
           {
-            src: join(syncEnv.assetsHome, "cliproxy-panel.html"),
+            src: join(syncEnv.assetsHome, CLI_PROXY_ASSETS_DIR, "panel.html"),
             dst: join(syncEnv.home, ".cli-proxy-api", "static", "management.html"),
             kind: "File",
           } satisfies Job,

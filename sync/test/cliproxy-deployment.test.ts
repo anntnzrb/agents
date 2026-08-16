@@ -334,7 +334,7 @@ test("codex_committed_source_places_multi_agent_v2_under_features", () => {
 
 test("cliproxy_deployment_is_the_only_committed_endpoint_value", () => {
   const deployment = readCliProxyDeployment(
-    join(REPOSITORY_ROOT, "assets", "cliproxyapi.deployment.json"),
+    join(REPOSITORY_ROOT, "assets", "cliproxyapi", "deployment.json"),
   );
   const sources = [
     join("harnesses", "codex", "config.toml"),
@@ -349,7 +349,10 @@ test("cliproxy_deployment_is_the_only_committed_endpoint_value", () => {
     assert.doesNotMatch(source, new RegExp(escapeRegExp(deployment.listen.host)), relativePath);
   }
 
-  const template = readFileSync(join(REPOSITORY_ROOT, "assets", "cliproxyapi.yaml.tmpl"), "utf8");
+  const template = readFileSync(
+    join(REPOSITORY_ROOT, "assets", "cliproxyapi", "config.yaml.tmpl"),
+    "utf8",
+  );
   assert.match(template, /host: "\$\{CLIPROXY_LISTEN_HOST\}"/);
   assert.match(template, /port: \$\{CLIPROXY_LISTEN_PORT\}/);
   assert.match(template, /remote-management:\n\s+allow-remote: true/);
@@ -366,8 +369,11 @@ test("cliproxy_endpoint_publication_is_one_job_after_config_and_directory_copies
   try {
     const agents = join(home, ".config", "agents");
     const assets = join(agents, "assets");
-    mkdirSync(assets, { recursive: true });
-    writeFileSync(join(assets, "cliproxyapi.deployment.json"), `${JSON.stringify(DEPLOYMENT)}\n`);
+    mkdirSync(join(assets, "cliproxyapi"), { recursive: true });
+    writeFileSync(
+      join(assets, "cliproxyapi", "deployment.json"),
+      `${JSON.stringify(DEPLOYMENT)}\n`,
+    );
     for (const [harness, relativeRoot, relativeFile] of [
       ["codex", "", "config.toml"],
       ["opencode", "", "opencode.jsonc"],
@@ -380,6 +386,10 @@ test("cliproxy_endpoint_publication_is_one_job_after_config_and_directory_copies
     }
 
     const plan = buildSyncPlan(SyncEnv.fromHome(home, 1000, { platform: "linux" }));
+    assert.equal(
+      plan.jobs.some((job) => job.kind === "Dir" && job.src === join(assets, "cliproxyapi")),
+      false,
+    );
     const endpointJobs = plan.jobs.filter((job) => job.kind === "CliProxyEndpointTemplates");
     assert.equal(endpointJobs.length, 1);
     const endpointJob = endpointJobs[0];

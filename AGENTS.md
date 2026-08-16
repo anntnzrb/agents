@@ -4,6 +4,7 @@
 
 - `assets/AGENTS.md`: SSOT for global, harness-agnostic agent instructions
 - `assets/skills-gate.md`: SSOT for skill-scoped policy; repo-only, not synced
+- `assets/cliproxyapi/`: repo-only CLIProxyAPI sources; not synced to harness homes
 - `skills/current/`: SSOT for shared skills synced to every harness
 - `skills/legacy/`: archived skills; repo-only, not synced
 - Other `assets/` entries: SSOT for shared agents and configuration
