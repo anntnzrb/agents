@@ -46,6 +46,17 @@ interface OpenCodeConfig {
   provider?: Record<string, { models?: Record<string, unknown> }>;
 }
 
+function displayName(id: string, catalogName: string): string {
+  const slash = id.indexOf("/");
+  if (slash <= 0) {
+    return catalogName || id;
+  }
+  const prefix = id.slice(0, slash);
+  const model = id.slice(slash + 1);
+  const title = catalogName && catalogName !== id ? catalogName : model;
+  return `${prefix} — ${title}`;
+}
+
 export const CLIProxyCatalog = async () => ({
   config: async (config: OpenCodeConfig) => {
     const provider = config.provider?.["cliproxy"];
@@ -61,7 +72,7 @@ function openCodeModel(model: CatalogModel): readonly [string, unknown] {
   return [
     model.id,
     {
-      name: model.name,
+      name: displayName(model.id, model.name),
       reasoning: model.reasoning,
       tool_call: true,
       modalities: { input: model.input, output: ["text"] },
