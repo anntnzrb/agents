@@ -57,7 +57,7 @@ Edit the secrets file:
 $EDITOR secrets.local.json
 ```
 
-Replace every `replace-me` value. The credential pools contain upstream provider API keys. Use `weight: 1` when accounts have equal priority. Clients do not need client keys and the gateway has no management key; the tailnet is the access boundary.
+Replace every `replace-me` value. The credential pools contain upstream provider API keys. Use `weight: 1` when accounts have equal priority. Clients do not need client keys, and the management panel uses the static token committed in the template; the tailnet is the access boundary.
 
 The repository ignores `secrets.local.json`. Keep the file out of Git and transfer it only through an encrypted channel.
 

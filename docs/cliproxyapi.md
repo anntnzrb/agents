@@ -93,7 +93,15 @@ The managed wrapper supplies `--config ~/.cli-proxy-api/config.yaml`. Sync reads
 
 ## Open the control panel
 
-The control panel page is served at the configured gateway listener, but its management API is disabled because the deployment has no management key. All management endpoints answer `403`. Configure the gateway through the repository: edit `assets/cliproxyapi.yaml.tmpl` and `secrets.local.json`, then run sync.
+Open the control panel at the configured gateway listener:
+
+```text
+http://munich.trex-gamut.ts.net:8317/management.html
+```
+
+The panel accepts the static management token committed in `assets/cliproxyapi.yaml.tmpl`. It is not a credential: the tailnet is the access boundary.
+
+Do not make durable configuration changes in the control panel. Sync replaces the generated configuration from `assets/cliproxyapi.yaml.tmpl` and `secrets.local.json`.
 
 ## Verify model access
 
@@ -133,7 +141,7 @@ The forced refresh bypasses freshness windows and rejects stale fallback data. U
 
 ## Deploy on a home server
 
-Bind the gateway only to a trusted private interface. For a Tailscale deployment, use the server's tailnet address. The management API is disabled; the tailnet is the access boundary.
+Bind the gateway only to a trusted private interface. For a Tailscale deployment, use the server's tailnet address. The tailnet is the access boundary; the management panel uses the static token committed in the template.
 
 Do not expose the gateway through the public internet, Tailscale Funnel, or an untrusted LAN.
 

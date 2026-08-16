@@ -1,6 +1,6 @@
 # CLIProxyAPI reference
 
-CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses configured to use it. `assets/cliproxyapi.deployment.json` is the only deployment-specific source. It selects the gateway host, server listener, and client endpoint. The management API and control panel are disabled; the tailnet is the access boundary.
+CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses configured to use it. `assets/cliproxyapi.deployment.json` is the only deployment-specific source. It selects the gateway host, server listener, and client endpoint. The management API and control panel use the static token committed in the template; the tailnet is the access boundary.
 
 ## Artifacts
 
@@ -69,7 +69,7 @@ The renderer rejects unknown account fields, duplicate keys within a pool, inval
 
 Sync writes the generated configuration and the shared model catalog with mode `0600`.
 
-The generated configuration contains no management key; the gateway disables its management API and control panel when no key is configured.
+The generated configuration carries the static management token committed in the template. The gateway hashes the plaintext value at startup; the token is not a credential because the tailnet is the access boundary.
 
 No harness reads `secrets.local.json`. The gateway accepts client requests without client keys; harness providers send a static placeholder key because their SDKs require a non-empty value.
 
@@ -144,7 +144,7 @@ The repository has no quota-monitoring service and does not generate quota dashb
 
 ## Control panel
 
-The gateway disables its management API and control panel because the deployment has no management key. Every management endpoint answers `403`. Configure the gateway through the repository: edit `assets/cliproxyapi.yaml.tmpl` and `secrets.local.json`, then run sync.
+The control panel is available at `http://<listen-host>:<listen-port>/management.html`. The current deployment uses `http://munich.trex-gamut.ts.net:8317/management.html`. The panel accepts the static management token committed in the template; it is not a credential because the tailnet is the access boundary.
 
 The template keeps `remote-management.disable-auto-update-panel` at `true`.
 
