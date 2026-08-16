@@ -78,6 +78,7 @@ test("models_dev_metadata_routes_live_models_without_local model policies", () =
   expect(result.models.find((model) => model.id.endsWith("responses-next"))).toMatchObject({
     api: "openai-responses",
     reasoning: true,
+    reasoningEfforts: ["low", "high"],
     input: ["text", "image"],
     contextWindow: 300000,
     maxTokens: 100000,
@@ -244,7 +245,13 @@ test("gateway_catalog_cross_checks_live_reasoning_metadata", () => {
             display_name: "DeepSeek Next Live",
             context_window: 900000,
             input_modalities: ["text", "image"],
-            supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }, { effort: "max" }],
+            default_reasoning_level: "high",
+            supported_reasoning_levels: [
+              { effort: "low" },
+              { effort: "high" },
+              { effort: "max" },
+              { effort: "ultra" },
+            ],
           },
           {
             slug: "antigravity/gemini-next-high",
@@ -266,31 +273,44 @@ test("gateway_catalog_cross_checks_live_reasoning_metadata", () => {
   expect(merged.find((model) => model.id === "example/deepseek-next")).toMatchObject({
     name: "DeepSeek Next Live",
     reasoning: true,
-    thinkingLevelMap: {
-      minimal: null,
-      low: "low",
-      medium: null,
-      high: "high",
-      xhigh: null,
-      max: "max",
-    },
+    reasoningEfforts: ["low", "high", "max", "ultra"],
+    defaultReasoningEffort: "high",
     input: ["text", "image"],
     contextWindow: 900000,
   });
   expect(merged.find((model) => model.id === "antigravity/gemini-next-high")).toMatchObject({
     name: "Gemini Next High",
     reasoning: true,
-    thinkingLevelMap: {
-      minimal: "minimal",
-      low: "low",
-      medium: "medium",
-      high: "high",
-      xhigh: null,
-      max: null,
-    },
+    reasoningEfforts: ["minimal", "low", "medium", "high"],
     input: ["text", "image"],
     contextWindow: 1000000,
   });
+});
+
+test("gateway_catalog_treats_an_empty_live_effort_list_as_authoritative", () => {
+  const [model] = enrichGatewayModels(
+    [
+      {
+        ...catalogModel("oauth/not-reasoning"),
+        reasoning: true,
+        reasoningEfforts: ["low"],
+      },
+    ],
+    { data: [] },
+    {
+      richGatewayPayload: {
+        models: [
+          {
+            slug: "oauth/not-reasoning",
+            supported_reasoning_levels: [],
+          },
+        ],
+      },
+    },
+  );
+
+  expect(model?.reasoning).toBe(false);
+  expect(model && "reasoningEfforts" in model).toBe(false);
 });
 
 function modelMetadata(name: string): Record<string, unknown> {

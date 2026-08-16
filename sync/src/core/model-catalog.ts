@@ -22,9 +22,8 @@ export interface CatalogModel {
   readonly name: string;
   readonly api: CatalogApi;
   readonly reasoning: boolean;
-  readonly thinkingLevelMap?: Readonly<
-    Partial<Record<"minimal" | "low" | "medium" | "high" | "xhigh" | "max", string | null>>
-  >;
+  readonly reasoningEfforts?: readonly string[];
+  readonly defaultReasoningEffort?: string;
   readonly input: readonly ("text" | "image")[];
   readonly cost: CatalogCost;
   readonly contextWindow: number;
@@ -79,8 +78,6 @@ const compareIds = (left: string, right: string): number => {
 };
 const MODEL_CATALOG_VERSION = 1;
 const MODEL_CATALOG_MODE = 0o600;
-
-const THINKING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
 const GENERATION_ONLY_MODEL_PATTERNS = [
   /^codex-auto-review$/i,
@@ -250,7 +247,8 @@ function normalizeModel(
   ];
   const pricing = optionalRecord(upstream["pricing"]);
   const metadataCost = optionalRecord(metadata?.["cost"]);
-  const thinkingLevelMap = reasoningLevelMap(metadata?.["reasoning_options"]);
+  const efforts = reasoningEfforts(metadata?.["reasoning_options"]);
+  const defaultReasoningEffort = stringField(metadata, "default_reasoning_effort");
   const supportedParameters = stringArray(upstream["supported_parameters"]);
   return {
     id: `${source.prefix}/${alias}`,
@@ -258,9 +256,11 @@ function normalizeModel(
     api,
     reasoning:
       metadata?.["reasoning"] === true ||
+      efforts?.some((effort) => effort !== "none") === true ||
       supportedParameters.includes("reasoning") ||
       supportedParameters.includes("reasoning_effort"),
-    ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
+    ...(efforts ? { reasoningEfforts: efforts } : {}),
+    ...(defaultReasoningEffort ? { defaultReasoningEffort } : {}),
     input: inputModalities.includes("image") ? ["text", "image"] : ["text"],
     cost: {
       input:
@@ -322,12 +322,6 @@ function isAgentModel(
 }
 
 function mappingFor(upstreamId: string, alias: string, model: CatalogModel): CliProxyModelMapping {
-  const levels = model.thinkingLevelMap
-    ? THINKING_LEVELS.flatMap((level) => {
-        const value = model.thinkingLevelMap?.[level];
-        return typeof value === "string" ? [value] : [];
-      })
-    : [];
   return {
     name: upstreamId,
     alias,
@@ -335,7 +329,9 @@ function mappingFor(upstreamId: string, alias: string, model: CatalogModel): Cli
     "max-context-length": model.contextWindow,
     "force-mapping": true,
     "is-compat": true,
-    ...(levels.length > 0 ? { thinking: { levels: [...new Set(levels)] } } : {}),
+    ...(model.reasoningEfforts && model.reasoningEfforts.length > 0
+      ? { thinking: { levels: model.reasoningEfforts } }
+      : {}),
   };
 }
 
@@ -360,7 +356,8 @@ function gatewayModel(
     Math.min(contextWindow, 16384);
   const modalities = optionalRecord(metadata?.["modalities"]);
   const cost = optionalRecord(metadata?.["cost"]);
-  const thinkingLevelMap = reasoningLevelMap(metadata?.["reasoning_options"]);
+  const efforts = reasoningEfforts(metadata?.["reasoning_options"]);
+  const defaultReasoningEffort = stringField(metadata, "default_reasoning_effort");
   const supportedParameters = stringArray(gateway["supported_parameters"]);
   return {
     id,
@@ -368,10 +365,11 @@ function gatewayModel(
     api,
     reasoning:
       metadata?.["reasoning"] === true ||
-      thinkingLevelMap !== undefined ||
+      efforts?.some((effort) => effort !== "none") === true ||
       supportedParameters.includes("reasoning") ||
       supportedParameters.includes("reasoning_effort"),
-    ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
+    ...(efforts ? { reasoningEfforts: efforts } : {}),
+    ...(defaultReasoningEffort ? { defaultReasoningEffort } : {}),
     input: stringArray(modalities?.["input"]).includes("image") ? ["text", "image"] : ["text"],
     cost: cost
       ? {
@@ -391,7 +389,8 @@ interface RichGatewayModel {
   readonly name?: string;
   readonly contextWindow?: number;
   readonly input?: readonly ("text" | "image")[];
-  readonly reasoningLevels?: readonly string[];
+  readonly reasoningEfforts?: readonly string[];
+  readonly defaultReasoningEffort?: string;
 }
 
 function richGatewayModels(payload: unknown): ReadonlyMap<string, RichGatewayModel> {
@@ -414,32 +413,36 @@ function richGatewayModels(payload: unknown): ReadonlyMap<string, RichGatewayMod
     );
     const name = stringField(row, "display_name");
     const contextWindow = positiveInteger(row["context_window"]);
+    const defaultReasoningEffort = stringField(row, "default_reasoning_level");
     models.set(id, {
       ...(name ? { name } : {}),
       ...(contextWindow ? { contextWindow } : {}),
       ...(input.length > 0 ? { input } : {}),
       ...(row["supported_reasoning_levels"] === undefined
         ? {}
-        : { reasoningLevels: richReasoningLevels(row["supported_reasoning_levels"], index) }),
+        : { reasoningEfforts: richReasoningEfforts(row["supported_reasoning_levels"], index) }),
+      ...(defaultReasoningEffort ? { defaultReasoningEffort } : {}),
     });
   }
   return models;
 }
 
-function richReasoningLevels(value: unknown, modelIndex: number): readonly string[] {
+function richReasoningEfforts(value: unknown, modelIndex: number): readonly string[] {
   if (!Array.isArray(value)) {
     throw new Error(
       `invalid CLIProxyAPI rich model catalog.models[${modelIndex}].supported_reasoning_levels`,
     );
   }
-  return value.flatMap((entry, levelIndex) => {
-    const level = expectRecord(
-      entry,
-      `CLIProxyAPI rich model catalog.models[${modelIndex}].supported_reasoning_levels[${levelIndex}]`,
-    );
-    const effort = stringField(level, "effort");
-    return effort ? [effort] : [];
-  });
+  return orderedUnique(
+    value.flatMap((entry, levelIndex) => {
+      const level = expectRecord(
+        entry,
+        `CLIProxyAPI rich model catalog.models[${modelIndex}].supported_reasoning_levels[${levelIndex}]`,
+      );
+      const effort = stringField(level, "effort");
+      return effort ? [effort] : [];
+    }),
+  );
 }
 
 function enrichWithRichGatewayModel(
@@ -449,18 +452,22 @@ function enrichWithRichGatewayModel(
   if (!rich) {
     return model;
   }
-  const reasoningLevels = rich.reasoningLevels;
-  const thinkingLevelMap = reasoningLevels
-    ? reasoningLevelMapFromValues(reasoningLevels)
-    : model.thinkingLevelMap;
-  const { thinkingLevelMap: _oldThinkingLevelMap, ...base } = model;
+  const efforts =
+    rich.reasoningEfforts === undefined
+      ? model.reasoningEfforts
+      : rich.reasoningEfforts.length > 0
+        ? rich.reasoningEfforts
+        : undefined;
+  const { reasoningEfforts: _oldReasoningEfforts, ...base } = model;
   return {
     ...base,
     ...(rich.name ? { name: rich.name } : {}),
-    reasoning: reasoningLevels
-      ? reasoningLevels.some((level) => level !== "none")
-      : model.reasoning,
-    ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
+    reasoning:
+      rich.reasoningEfforts !== undefined
+        ? rich.reasoningEfforts.some((effort) => effort !== "none")
+        : model.reasoning,
+    ...(efforts ? { reasoningEfforts: efforts } : {}),
+    ...(rich.defaultReasoningEffort ? { defaultReasoningEffort: rich.defaultReasoningEffort } : {}),
     ...(rich.input ? { input: rich.input } : {}),
     ...(rich.contextWindow ? { contextWindow: rich.contextWindow } : {}),
   };
@@ -507,10 +514,10 @@ function parseCatalogModel(value: unknown, label: string): CatalogModel {
   const cost = expectRecord(model["cost"], `${label}.cost`);
   const contextWindow = positiveInteger(model["contextWindow"]);
   const maxTokens = positiveInteger(model["maxTokens"]);
-  const thinkingLevelMap = parseThinkingLevelMap(
-    model["thinkingLevelMap"],
-    `${label}.thinkingLevelMap`,
-  );
+  const efforts =
+    parseReasoningEfforts(model["reasoningEfforts"], `${label}.reasoningEfforts`) ??
+    parseLegacyThinkingLevelMap(model["thinkingLevelMap"], `${label}.thinkingLevelMap`);
+  const defaultReasoningEffort = stringField(model, "defaultReasoningEffort");
   const compat = optionalRecord(model["compat"]);
   if (
     !id ||
@@ -527,7 +534,8 @@ function parseCatalogModel(value: unknown, label: string): CatalogModel {
     name,
     api,
     reasoning: model["reasoning"],
-    ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
+    ...(efforts ? { reasoningEfforts: efforts } : {}),
+    ...(defaultReasoningEffort ? { defaultReasoningEffort } : {}),
     input,
     cost: {
       input: nonNegativeNumber(cost["input"]),
@@ -541,22 +549,32 @@ function parseCatalogModel(value: unknown, label: string): CatalogModel {
   };
 }
 
-function parseThinkingLevelMap(
-  value: unknown,
-  label: string,
-): CatalogModel["thinkingLevelMap"] | undefined {
+function parseReasoningEfforts(value: unknown, label: string): readonly string[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value) || !value.every((effort) => typeof effort === "string" && effort)) {
+    throw new Error(`invalid ${label}`);
+  }
+  const efforts = orderedUnique(value);
+  return efforts.length > 0 ? efforts : undefined;
+}
+
+function parseLegacyThinkingLevelMap(value: unknown, label: string): readonly string[] | undefined {
   if (value === undefined) {
     return undefined;
   }
   const record = expectRecord(value, label);
-  const parsed: Partial<Record<(typeof THINKING_LEVELS)[number], string | null>> = {};
-  for (const [level, mapped] of Object.entries(record)) {
-    if (!isThinkingLevel(level) || (typeof mapped !== "string" && mapped !== null)) {
-      throw new Error(`invalid ${label}.${level}`);
+  const efforts: string[] = [];
+  for (const [name, mapped] of Object.entries(record)) {
+    if (typeof mapped !== "string" && mapped !== null) {
+      throw new Error(`invalid ${label}.${name}`);
     }
-    parsed[level] = mapped;
+    if (mapped) {
+      efforts.push(mapped);
+    }
   }
-  return parsed;
+  return efforts.length > 0 ? orderedUnique(efforts) : undefined;
 }
 
 function modelsDevReferenceFromProvider(
@@ -608,24 +626,24 @@ function compatFor(
   return undefined;
 }
 
-function reasoningLevelMap(value: unknown): CatalogModel["thinkingLevelMap"] | undefined {
+function reasoningEfforts(value: unknown): readonly string[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
   }
   const effort = value.map(optionalRecord).find((option) => option?.["type"] === "effort");
-  return reasoningLevelMapFromValues(stringArray(effort?.["values"]));
-}
-
-function reasoningLevelMapFromValues(
-  values: readonly string[],
-): CatalogModel["thinkingLevelMap"] | undefined {
-  const supported = new Set(values);
-  if (supported.size === 0) {
+  if (!Array.isArray(effort?.["values"])) {
     return undefined;
   }
-  return Object.fromEntries(
-    THINKING_LEVELS.map((level) => [level, supported.has(level) ? level : null]),
+  const efforts = orderedUnique(
+    effort["values"].flatMap((raw) =>
+      raw === null ? ["none"] : typeof raw === "string" && raw ? [raw] : [],
+    ),
   );
+  return efforts.length > 0 ? efforts : undefined;
+}
+
+function orderedUnique(values: readonly string[]): string[] {
+  return [...new Set(values)];
 }
 
 export function openAIDataRows(payload: unknown, label: string): Record<string, unknown>[] {
@@ -690,15 +708,4 @@ function optionalRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? Object.fromEntries(Object.entries(value))
     : undefined;
-}
-
-function isThinkingLevel(value: string): value is (typeof THINKING_LEVELS)[number] {
-  return (
-    value === "minimal" ||
-    value === "low" ||
-    value === "medium" ||
-    value === "high" ||
-    value === "xhigh" ||
-    value === "max"
-  );
 }

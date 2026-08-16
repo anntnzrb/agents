@@ -1,15 +1,13 @@
 import fs from "node:fs";
 
 const CATALOG_VERSION = 1;
-const THINKING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
-
-type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 
 export interface RuntimeCatalogModel {
   readonly id: string;
   readonly name: string;
   readonly reasoning: boolean;
-  readonly thinkingLevelMap?: Readonly<Partial<Record<ThinkingLevel, string | null>>>;
+  readonly reasoningEfforts?: readonly string[];
+  readonly defaultReasoningEffort?: string;
   readonly input: readonly ("text" | "image")[];
   readonly cost: {
     readonly input: number;
@@ -44,15 +42,19 @@ function parseModel(value: unknown, label: string): RuntimeCatalogModel {
   }
   const input = requireInput(model["input"], `${label}.input`);
   const cost = requireRecord(model["cost"], `${label}.cost`);
-  const thinkingLevelMap = parseThinkingLevelMap(
-    model["thinkingLevelMap"],
-    `${label}.thinkingLevelMap`,
+  const reasoningEfforts =
+    parseReasoningEfforts(model["reasoningEfforts"], `${label}.reasoningEfforts`) ??
+    parseLegacyThinkingLevelMap(model["thinkingLevelMap"], `${label}.thinkingLevelMap`);
+  const defaultReasoningEffort = optionalString(
+    model["defaultReasoningEffort"],
+    `${label}.defaultReasoningEffort`,
   );
   return {
     id,
     name,
     reasoning: model["reasoning"],
-    ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
+    ...(reasoningEfforts ? { reasoningEfforts } : {}),
+    ...(defaultReasoningEffort ? { defaultReasoningEffort } : {}),
     input,
     cost: {
       input: requireNonNegativeNumber(cost["input"], `${label}.cost.input`),
@@ -65,22 +67,32 @@ function parseModel(value: unknown, label: string): RuntimeCatalogModel {
   };
 }
 
-function parseThinkingLevelMap(
-  value: unknown,
-  label: string,
-): RuntimeCatalogModel["thinkingLevelMap"] | undefined {
+function parseReasoningEfforts(value: unknown, label: string): readonly string[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value) || !value.every((effort) => typeof effort === "string" && effort)) {
+    throw new Error(`invalid ${label}`);
+  }
+  const efforts = [...new Set(value)];
+  return efforts.length > 0 ? efforts : undefined;
+}
+
+function parseLegacyThinkingLevelMap(value: unknown, label: string): readonly string[] | undefined {
   if (value === undefined) {
     return undefined;
   }
   const record = requireRecord(value, label);
-  const result: Partial<Record<ThinkingLevel, string | null>> = {};
-  for (const [level, mapped] of Object.entries(record)) {
-    if (!isThinkingLevel(level) || (typeof mapped !== "string" && mapped !== null)) {
-      throw new Error(`invalid ${label}.${level}`);
+  const efforts: string[] = [];
+  for (const [name, mapped] of Object.entries(record)) {
+    if (typeof mapped !== "string" && mapped !== null) {
+      throw new Error(`invalid ${label}.${name}`);
     }
-    result[level] = mapped;
+    if (mapped) {
+      efforts.push(mapped);
+    }
   }
-  return result;
+  return efforts.length > 0 ? [...new Set(efforts)] : undefined;
 }
 
 function requireInput(value: unknown, label: string): readonly ("text" | "image")[] {
@@ -108,6 +120,10 @@ function requireString(value: unknown, label: string): string {
   return value;
 }
 
+function optionalString(value: unknown, label: string): string | undefined {
+  return value === undefined ? undefined : requireString(value, label);
+}
+
 function requireNonNegativeNumber(value: unknown, label: string): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
     throw new Error(`invalid ${label}`);
@@ -120,8 +136,4 @@ function requirePositiveInteger(value: unknown, label: string): number {
     throw new Error(`invalid ${label}`);
   }
   return value;
-}
-
-function isThinkingLevel(value: string): value is ThinkingLevel {
-  return THINKING_LEVELS.some((level) => level === value);
 }
