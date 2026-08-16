@@ -121,7 +121,7 @@ export function modelsForSource(
       continue;
     }
     const alias = publicAlias(source, id);
-    const model = normalizeModel(source, alias, api, npm, metadata, upstream);
+    const model = normalizeModel(source, alias, api, metadata, upstream);
     entries.push({
       mapping: mappingFor(id, alias, model),
       model,
@@ -208,7 +208,6 @@ function normalizeModel(
   source: ModelCatalogSource,
   alias: string,
   api: CatalogApi,
-  npm: string,
   metadata: Record<string, unknown> | undefined,
   upstream: Record<string, unknown>,
 ): CatalogModel {
@@ -256,7 +255,7 @@ function normalizeModel(
     },
     contextWindow,
     maxTokens,
-    ...compatFor(npm, metadata, supportedParameters),
+    ...compatFor(metadata, supportedParameters),
   };
 }
 
@@ -273,7 +272,7 @@ function apiForProvider(npm: string, shape: string | undefined): CatalogApi | un
   if (npm === "@ai-sdk/anthropic") {
     return "anthropic-messages";
   }
-  if (npm === "@ai-sdk/openai-compatible" || npm === "@openrouter/ai-sdk-provider") {
+  if (npm === "@ai-sdk/openai-compatible") {
     return "openai-completions";
   }
   return undefined;
@@ -357,7 +356,7 @@ function gatewayModel(
       : ZERO_COST,
     contextWindow,
     maxTokens,
-    ...compatFor(npm, metadata, []),
+    ...compatFor(metadata, []),
   };
 }
 
@@ -471,13 +470,12 @@ function publicAlias(source: ModelCatalogSource, id: string): string {
 }
 
 function compatFor(
-  npm: string,
   metadata: Record<string, unknown> | undefined,
   supportedParameters: readonly string[],
 ): { readonly compat: Readonly<Record<string, unknown>> } | undefined {
   const interleaved = optionalRecord(metadata?.["interleaved"]);
   const reasoningField = stringField(interleaved, "field");
-  if (npm === "@openrouter/ai-sdk-provider" || reasoningField === "reasoning_details") {
+  if (reasoningField === "reasoning_details") {
     return {
       compat: {
         thinkingFormat: "openrouter",

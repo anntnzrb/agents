@@ -130,7 +130,7 @@ test("rich_openai_catalog_fields_enrich_models_dev_metadata", () => {
     },
     {
       router: {
-        npm: "@openrouter/ai-sdk-provider",
+        npm: "@ai-sdk/openai-compatible",
         models: {
           "router/auto": modelMetadata("Catalog Name"),
         },
