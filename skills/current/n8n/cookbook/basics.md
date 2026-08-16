@@ -41,7 +41,8 @@ uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
 
 ```text
 mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --status --quiet --no-oauth
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --schema --all-parameters
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --brief
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n.<DISCOVERED_TOOL> --schema --all-parameters
 mcporter --config <agent-config-root>/assets/mcporter.jsonc call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
 ```
 

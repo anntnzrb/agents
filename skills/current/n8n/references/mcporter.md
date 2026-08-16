@@ -6,7 +6,7 @@ MUST read before using optional MCPorter `n8n`.
 
 The registry proves configuration only, not reachability, auth, or tools.
 
-Live `list n8n --schema --all-parameters` is the sole authority for:
+Live brief inventory plus targeted `list n8n.<tool> --schema --all-parameters` is the authority for:
 
 - current tool names;
 - required and optional arguments;
@@ -53,10 +53,11 @@ MCPorter/supergateway pair can expose the bearer token.
 
 ## Live Discovery and Calls
 
-After gate success, MUST discover the complete live schema:
+After gate success, MUST discover the compact inventory, select a tool, then inspect only its complete schema:
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --schema --all-parameters
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --brief
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n.<DISCOVERED_TOOL> --schema --all-parameters
 ```
 
 Discovery output is sensitive. MUST extract only needed names/schemas; MUST NOT

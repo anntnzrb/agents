@@ -22,10 +22,11 @@ uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
 # 4) Confirm MCP health without printing transport details
 mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --status --quiet --no-oauth
 
-# 5) Discover the current tool names and schemas
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --schema --all-parameters
+# 5) Discover compact names, then inspect only the selected tool
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --brief
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n.<DISCOVERED_TOOL> --schema --all-parameters
 
-# 6) Call only a tool returned by discovery
+# 6) Call only the inspected tool
 mcporter --config <agent-config-root>/assets/mcporter.jsonc call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
 ```
 
