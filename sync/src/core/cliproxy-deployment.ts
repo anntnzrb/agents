@@ -358,7 +358,7 @@ function isZeroIpv6Group(group: string): boolean {
   return ZERO_IPV6_GROUP_PATTERN.test(group);
 }
 
-function readClientApiKey(path: string): string | undefined {
+export function readClientApiKey(path: string): string | undefined {
   try {
     const key = fs.readFileSync(path, "utf8").trim();
     return key.length > 0 ? key : undefined;

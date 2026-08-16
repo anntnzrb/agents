@@ -6,6 +6,7 @@ import { syncCliProxyConfig } from "./cliproxy-config.ts";
 import {
   isCliProxyTargetReady,
   publishCliProxyEndpointTemplates,
+  readClientApiKey,
   readCliProxyCandidateClientApiKey,
 } from "./cliproxy-deployment.ts";
 import type { Job } from "./plan.ts";
@@ -113,7 +114,9 @@ async function runJob(
         if (job.gatewayHost) {
           return true;
         }
-        const candidateKey = readCliProxyCandidateClientApiKey(job.secretsPath);
+        const candidateKey =
+          readCliProxyCandidateClientApiKey(job.secretsPath) ??
+          readClientApiKey(job.clientApiKeyPath);
         state.cliProxyTargetReady =
           candidateKey !== undefined && (await isCliProxyTargetReady(job.deployment, candidateKey));
         if (!state.cliProxyTargetReady) {
@@ -145,6 +148,9 @@ async function runJob(
           return true;
         }
         if (!fs.existsSync(job.secretsPath)) {
+          if (job.gatewayHost === false) {
+            return true;
+          }
           warn(`missing local secrets ${job.secretsPath}; skipping ${job.dst}`);
           return true;
         }

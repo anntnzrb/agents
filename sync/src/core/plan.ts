@@ -35,6 +35,7 @@ export type Job =
       readonly kind: "CliProxyReadiness";
       readonly deployment: CliProxyDeployment;
       readonly secretsPath: string;
+      readonly clientApiKeyPath: string;
       readonly gatewayHost: boolean;
     }
   | {
@@ -294,6 +295,7 @@ function configJobs(
       kind: "CliProxyReadiness",
       deployment,
       secretsPath: join(syncEnv.home, ".config", "agents", "secrets.local.json"),
+      clientApiKeyPath: join(syncEnv.runtimeHome, "cliproxyapi", "client-api-key"),
       gatewayHost,
     },
     {
