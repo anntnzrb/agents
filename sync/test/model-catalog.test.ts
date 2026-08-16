@@ -210,6 +210,89 @@ test("gateway_catalog_adds_oauth_models_without_overwriting_richer_models", () =
   });
 });
 
+test("gateway_catalog_cross_checks_live_reasoning_metadata", () => {
+  const discovered = modelsForSource(
+    SOURCE,
+    { data: [{ id: "deepseek-next" }] },
+    {
+      example: {
+        npm: "@ai-sdk/openai-compatible",
+        models: {
+          "deepseek-next": {
+            ...modelMetadata("DeepSeek Next"),
+            reasoning_options: [{ type: "effort", values: ["low", "high", "max"] }],
+          },
+        },
+      },
+    },
+  ).models;
+
+  const merged = enrichGatewayModels(
+    discovered,
+    {
+      data: [
+        { id: "example/deepseek-next", owned_by: "example" },
+        { id: "antigravity/gemini-next-high", owned_by: "antigravity" },
+      ],
+    },
+    {
+      modelsDev: {},
+      richGatewayPayload: {
+        models: [
+          {
+            slug: "example/deepseek-next",
+            display_name: "DeepSeek Next Live",
+            context_window: 900000,
+            input_modalities: ["text", "image"],
+            supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }, { effort: "max" }],
+          },
+          {
+            slug: "antigravity/gemini-next-high",
+            display_name: "Gemini Next High",
+            context_window: 1000000,
+            input_modalities: ["text", "image"],
+            supported_reasoning_levels: [
+              { effort: "minimal" },
+              { effort: "low" },
+              { effort: "medium" },
+              { effort: "high" },
+            ],
+          },
+        ],
+      },
+    },
+  );
+
+  expect(merged.find((model) => model.id === "example/deepseek-next")).toMatchObject({
+    name: "DeepSeek Next Live",
+    reasoning: true,
+    thinkingLevelMap: {
+      minimal: null,
+      low: "low",
+      medium: null,
+      high: "high",
+      xhigh: null,
+      max: "max",
+    },
+    input: ["text", "image"],
+    contextWindow: 900000,
+  });
+  expect(merged.find((model) => model.id === "antigravity/gemini-next-high")).toMatchObject({
+    name: "Gemini Next High",
+    reasoning: true,
+    thinkingLevelMap: {
+      minimal: "minimal",
+      low: "low",
+      medium: "medium",
+      high: "high",
+      xhigh: null,
+      max: null,
+    },
+    input: ["text", "image"],
+    contextWindow: 1000000,
+  });
+});
+
 function modelMetadata(name: string): Record<string, unknown> {
   return {
     id: name.toLowerCase().replaceAll(" ", "-"),

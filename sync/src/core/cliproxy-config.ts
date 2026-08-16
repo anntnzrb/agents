@@ -2,7 +2,11 @@ import fs from "node:fs";
 import { join } from "node:path";
 import { panicMessage, warn } from "@runtime/errors.ts";
 import { type CachedJsonRequest, fetchCachedJson } from "./catalog-cache.ts";
-import { type CliProxyDeployment, cliProxyModelsUrl } from "./cliproxy-deployment.ts";
+import {
+  type CliProxyDeployment,
+  cliProxyModelsUrl,
+  cliProxyRichModelsUrl,
+} from "./cliproxy-deployment.ts";
 import type {
   CatalogApi,
   CatalogModel,
@@ -127,6 +131,14 @@ export async function syncClientModelCatalog(
     },
     options,
   );
+  const richGatewayResult = await cachedCatalogRequest(
+    {
+      url: cliProxyRichModelsUrl(deployment),
+      cachePath: join(cacheRoot, "gateway-rich.json"),
+      ttlMs: GATEWAY_MODELS_TTL_MS,
+    },
+    options,
+  );
   const gatewayRows = openAIDataRows(gatewayResult.payload, "CLIProxyAPI model catalog");
   const externalModels: CatalogModel[] = [];
   for (const source of sources) {
@@ -150,6 +162,7 @@ export async function syncClientModelCatalog(
     enrichGatewayModels(externalModels, gatewayResult.payload, {
       modelsDev: modelsDevResult.payload,
       managedPrefixes: sources.map((source) => source.prefix),
+      richGatewayPayload: richGatewayResult.payload,
     }),
   );
   removeLegacyModelCatalog(cacheRoot);
@@ -292,6 +305,7 @@ async function syncSharedModelCatalog(
   const runtimeRoot = requireRuntimeRoot(options.runtimeRoot);
   const externalModels = [...discoveredSources.values()].flatMap((source) => source.models);
   let gatewayPayload: unknown = { data: [] };
+  let richGatewayPayload: unknown;
   try {
     gatewayPayload = (
       await cachedCatalogRequest(
@@ -308,11 +322,28 @@ async function syncSharedModelCatalog(
       throw error;
     }
   }
+  try {
+    richGatewayPayload = (
+      await cachedCatalogRequest(
+        {
+          url: cliProxyRichModelsUrl(deployment),
+          cachePath: join(cacheRoot, "gateway-rich.json"),
+          ttlMs: GATEWAY_MODELS_TTL_MS,
+        },
+        options,
+      )
+    ).payload;
+  } catch (error) {
+    if (options.forceModelRefresh) {
+      throw error;
+    }
+  }
   writeModelCatalog(
     runtimeModelCatalogPath(runtimeRoot),
     enrichGatewayModels(externalModels, gatewayPayload, {
       modelsDev,
       managedPrefixes: sources.map((source) => source.prefix),
+      richGatewayPayload,
     }),
   );
 }

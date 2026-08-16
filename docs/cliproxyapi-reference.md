@@ -109,13 +109,16 @@ OAuth prefixes live in the generated auth files, not in the repository. Re-authe
 
 ## Discovery inputs
 
-Sync combines three catalog sources:
+Sync combines four catalog sources:
 
 1. Each provider's authenticated `/models` response determines API-key model availability.
-2. [models.dev](https://models.dev/) supplies protocol hints, names, capabilities, modalities, token limits, and published costs.
-3. The live CLIProxyAPI `/v1/models` response adds gateway models from OAuth accounts.
+2. The live CLIProxyAPI `/v1/models` response determines gateway model availability and origin.
+3. The live CLIProxyAPI `/v1/models?client_version=0.144.1` response supplies the gateway's reasoning levels, names, modalities, and context limits.
+4. [models.dev](https://models.dev/) supplies protocol hints, compatibility fields, output limits, and published costs.
 
 The normalized output is `~/.local/share/agents/model-catalog/catalog.json`. Model records are sorted by ID, and duplicate IDs fail publication.
+
+The rich gateway response overrides models.dev for live names, input modalities, context limits, and reasoning levels. This precedence covers provider-specific IDs that models.dev does not list, including Antigravity models. The catalog keeps models.dev metadata for fields that the gateway does not return.
 
 ## Protocol selection
 
@@ -144,6 +147,7 @@ The generated model ID is `<prefix>/<upstream-id>` for an `x-model-sources` entr
 | models.dev | 1 hour | Yes |
 | Provider `/models` | 6 hours | Yes |
 | CLIProxyAPI `/v1/models` | 1 hour | Yes |
+| CLIProxyAPI rich `/v1/models` | 1 hour | Yes |
 
 `sync --refresh-models` bypasses every freshness window and disables stale fallback. Cached responses use mode `0600` and store the payload, fetch time, and optional ETag.
 

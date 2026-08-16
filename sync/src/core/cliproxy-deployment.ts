@@ -101,6 +101,10 @@ export function cliProxyModelsUrl(deployment: CliProxyDeployment): string {
   return `${deployment.client.baseUrl.replace(TRAILING_SLASH_PATTERN, "")}/models`;
 }
 
+export function cliProxyRichModelsUrl(deployment: CliProxyDeployment): string {
+  return `${cliProxyModelsUrl(deployment)}?client_version=0.144.1`;
+}
+
 export async function publishCliProxyEndpointTemplates(
   targets: readonly CliProxyEndpointTarget[],
   deployment: CliProxyDeployment,

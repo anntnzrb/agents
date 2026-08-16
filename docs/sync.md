@@ -72,13 +72,14 @@ The job writes files through a temporary file and an atomic rename. Invalid secr
 
 ## Model-catalog caches
 
-`assets/cliproxyapi/config.yaml.tmpl` declares provider endpoints, credential pools, public prefixes, and models.dev provider IDs under `x-model-sources`. Provider `/models` responses determine availability. [models.dev](https://models.dev/) supplies protocol hints and model metadata.
+`assets/cliproxyapi/config.yaml.tmpl` declares provider endpoints, credential pools, public prefixes, and models.dev provider IDs under `x-model-sources`. Provider `/models` responses determine availability. The CLIProxyAPI rich model response supplies live reasoning levels, names, modalities, and context limits. [models.dev](https://models.dev/) supplies protocol hints, compatibility fields, output limits, and costs.
 
 | Catalog | Freshness window | Cache file |
 | --- | --- | --- |
 | models.dev | 1 hour | `~/.cache/agents/model-catalog/models-dev.json` |
 | Provider `/models` | 6 hours | `~/.cache/agents/model-catalog/source-<id>.json` |
 | CLIProxyAPI `/v1/models` | 1 hour | `~/.cache/agents/model-catalog/gateway.json` |
+| CLIProxyAPI rich `/v1/models` | 1 hour | `~/.cache/agents/model-catalog/gateway-rich.json` |
 
 Each cache entry records the request URL. Sync ignores a cache entry created for another URL, so an endpoint migration cannot reuse the old gateway response. Expired entries use ETag revalidation when the server supplied an ETag. A normal sync accepts a stale entry after a refresh error. A launch-time sync suppresses stale-cache warnings. A forced refresh rejects stale data.
 

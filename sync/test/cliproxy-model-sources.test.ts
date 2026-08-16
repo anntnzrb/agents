@@ -162,6 +162,19 @@ x-model-sources:
           data: [{ id: "oauth-next", owned_by: "example-oauth" }],
         });
       }
+      if (url === "https://gateway.example.test:9443/v1/models?client_version=0.144.1") {
+        return Response.json({
+          models: [
+            {
+              slug: "example/chat-next",
+              display_name: "Chat Next Live",
+              context_window: 256000,
+              input_modalities: ["text"],
+              supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }],
+            },
+          ],
+        });
+      }
       return new Response(null, { status: 404 });
     };
     const options = {
@@ -177,6 +190,7 @@ x-model-sources:
       "https://models.dev/api.json",
       "https://example.test/v1/models",
       "https://gateway.example.test:9443/v1/models",
+      "https://gateway.example.test:9443/v1/models?client_version=0.144.1",
     ]);
     expect(Bun.YAML.parse(readFileSync(dst, "utf8"))).toMatchObject({
       host: DEPLOYMENT.listen.host,
@@ -300,6 +314,19 @@ test("cliproxy_client_catalog_syncs_from_gateway_models_without_secrets", async 
           ],
         });
       }
+      if (url === "https://gateway.example.test:9443/v1/models?client_version=0.144.1") {
+        return Response.json({
+          models: [
+            {
+              slug: "example/chat-next",
+              display_name: "Chat Next Live",
+              context_window: 256000,
+              input_modalities: ["text", "image"],
+              supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }],
+            },
+          ],
+        });
+      }
       return new Response(null, { status: 404 });
     };
 
@@ -314,6 +341,7 @@ test("cliproxy_client_catalog_syncs_from_gateway_models_without_secrets", async 
     expect(calls).toEqual([
       "https://models.dev/api.json",
       "https://gateway.example.test:9443/v1/models",
+      "https://gateway.example.test:9443/v1/models?client_version=0.144.1",
     ]);
     const catalog = JSON.parse(readFileSync(runtimeModelCatalogPath(runtimeRoot), "utf8"));
     expect(catalog.models.map((model: { id: string }) => model.id)).toEqual([
@@ -323,9 +351,19 @@ test("cliproxy_client_catalog_syncs_from_gateway_models_without_secrets", async 
     expect(
       catalog.models.find((model: { id: string }) => model.id === "example/chat-next"),
     ).toMatchObject({
-      name: "Chat Next",
+      name: "Chat Next Live",
       api: "openai-completions",
-      contextWindow: 200000,
+      reasoning: true,
+      thinkingLevelMap: {
+        minimal: null,
+        low: "low",
+        medium: null,
+        high: "high",
+        xhigh: null,
+        max: null,
+      },
+      input: ["text", "image"],
+      contextWindow: 256000,
       maxTokens: 64000,
       cost: { input: 1, output: 2, cacheRead: 3, cacheWrite: 4 },
     });

@@ -59,6 +59,7 @@ export interface SourceModels {
 export interface GatewayCatalogOptions {
   readonly modelsDev?: unknown;
   readonly managedPrefixes?: readonly string[];
+  readonly richGatewayPayload?: unknown;
 }
 
 const ZERO_COST: CatalogCost = {
@@ -156,7 +157,13 @@ export function enrichGatewayModels(
   gatewayPayload: unknown,
   options: GatewayCatalogOptions = {},
 ): CatalogModel[] {
-  const byId = new Map(discovered.map((model) => [model.id, model]));
+  const richModels = richGatewayModels(options.richGatewayPayload);
+  const byId = new Map(
+    discovered.map((model) => [
+      model.id,
+      enrichWithRichGatewayModel(model, richModels.get(model.id)),
+    ]),
+  );
   const managedPrefixes = new Set(options.managedPrefixes ?? []);
   for (const row of openAIDataRows(gatewayPayload, "CLIProxyAPI model catalog")) {
     const id = stringField(row, "id");
@@ -170,7 +177,13 @@ export function enrichGatewayModels(
     ) {
       continue;
     }
-    byId.set(id, gatewayModel(id, ownedBy, row, options.modelsDev));
+    byId.set(
+      id,
+      enrichWithRichGatewayModel(
+        gatewayModel(id, ownedBy, row, options.modelsDev),
+        richModels.get(id),
+      ),
+    );
   }
   return [...byId.values()].toSorted((left, right) => compareIds(left.id, right.id));
 }
@@ -348,11 +361,16 @@ function gatewayModel(
   const modalities = optionalRecord(metadata?.["modalities"]);
   const cost = optionalRecord(metadata?.["cost"]);
   const thinkingLevelMap = reasoningLevelMap(metadata?.["reasoning_options"]);
+  const supportedParameters = stringArray(gateway["supported_parameters"]);
   return {
     id,
     name: stringField(metadata, "name") ?? id,
     api,
-    reasoning: metadata?.["reasoning"] === true,
+    reasoning:
+      metadata?.["reasoning"] === true ||
+      thinkingLevelMap !== undefined ||
+      supportedParameters.includes("reasoning") ||
+      supportedParameters.includes("reasoning_effort"),
     ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
     input: stringArray(modalities?.["input"]).includes("image") ? ["text", "image"] : ["text"],
     cost: cost
@@ -365,7 +383,86 @@ function gatewayModel(
       : ZERO_COST,
     contextWindow,
     maxTokens,
-    ...compatFor(metadata, []),
+    ...compatFor(metadata, supportedParameters),
+  };
+}
+
+interface RichGatewayModel {
+  readonly name?: string;
+  readonly contextWindow?: number;
+  readonly input?: readonly ("text" | "image")[];
+  readonly reasoningLevels?: readonly string[];
+}
+
+function richGatewayModels(payload: unknown): ReadonlyMap<string, RichGatewayModel> {
+  if (payload === undefined) {
+    return new Map();
+  }
+  const root = expectRecord(payload, "CLIProxyAPI rich model catalog");
+  if (!Array.isArray(root["models"])) {
+    throw new Error("invalid CLIProxyAPI rich model catalog: expected models array");
+  }
+  const models = new Map<string, RichGatewayModel>();
+  for (const [index, value] of root["models"].entries()) {
+    const row = expectRecord(value, `CLIProxyAPI rich model catalog.models[${index}]`);
+    const id = stringField(row, "slug");
+    if (!id) {
+      throw new Error(`invalid CLIProxyAPI rich model catalog.models[${index}].slug`);
+    }
+    const input = stringArray(row["input_modalities"]).filter(
+      (entry): entry is "text" | "image" => entry === "text" || entry === "image",
+    );
+    const name = stringField(row, "display_name");
+    const contextWindow = positiveInteger(row["context_window"]);
+    models.set(id, {
+      ...(name ? { name } : {}),
+      ...(contextWindow ? { contextWindow } : {}),
+      ...(input.length > 0 ? { input } : {}),
+      ...(row["supported_reasoning_levels"] === undefined
+        ? {}
+        : { reasoningLevels: richReasoningLevels(row["supported_reasoning_levels"], index) }),
+    });
+  }
+  return models;
+}
+
+function richReasoningLevels(value: unknown, modelIndex: number): readonly string[] {
+  if (!Array.isArray(value)) {
+    throw new Error(
+      `invalid CLIProxyAPI rich model catalog.models[${modelIndex}].supported_reasoning_levels`,
+    );
+  }
+  return value.flatMap((entry, levelIndex) => {
+    const level = expectRecord(
+      entry,
+      `CLIProxyAPI rich model catalog.models[${modelIndex}].supported_reasoning_levels[${levelIndex}]`,
+    );
+    const effort = stringField(level, "effort");
+    return effort ? [effort] : [];
+  });
+}
+
+function enrichWithRichGatewayModel(
+  model: CatalogModel,
+  rich: RichGatewayModel | undefined,
+): CatalogModel {
+  if (!rich) {
+    return model;
+  }
+  const reasoningLevels = rich.reasoningLevels;
+  const thinkingLevelMap = reasoningLevels
+    ? reasoningLevelMapFromValues(reasoningLevels)
+    : model.thinkingLevelMap;
+  const { thinkingLevelMap: _oldThinkingLevelMap, ...base } = model;
+  return {
+    ...base,
+    ...(rich.name ? { name: rich.name } : {}),
+    reasoning: reasoningLevels
+      ? reasoningLevels.some((level) => level !== "none")
+      : model.reasoning,
+    ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
+    ...(rich.input ? { input: rich.input } : {}),
+    ...(rich.contextWindow ? { contextWindow: rich.contextWindow } : {}),
   };
 }
 
@@ -516,7 +613,13 @@ function reasoningLevelMap(value: unknown): CatalogModel["thinkingLevelMap"] | u
     return undefined;
   }
   const effort = value.map(optionalRecord).find((option) => option?.["type"] === "effort");
-  const supported = new Set(stringArray(effort?.["values"]));
+  return reasoningLevelMapFromValues(stringArray(effort?.["values"]));
+}
+
+function reasoningLevelMapFromValues(
+  values: readonly string[],
+): CatalogModel["thinkingLevelMap"] | undefined {
+  const supported = new Set(values);
   if (supported.size === 0) {
     return undefined;
   }
