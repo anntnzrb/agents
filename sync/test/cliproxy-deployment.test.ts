@@ -236,6 +236,8 @@ test("cliproxy_deployment_is_the_only_committed_endpoint_value", () => {
   const template = readFileSync(join(REPOSITORY_ROOT, "assets", "cliproxyapi.yaml.tmpl"), "utf8");
   assert.match(template, /host: "\$\{CLIPROXY_LISTEN_HOST\}"/);
   assert.match(template, /port: \$\{CLIPROXY_LISTEN_PORT\}/);
+  assert.match(template, /remote-management:\n\s+allow-remote: true/);
+  assert.match(template, /usage-statistics-enabled: true/);
   assert.doesNotMatch(template, new RegExp(escapeRegExp(deployment.listen.host)));
 });
 

@@ -99,22 +99,19 @@ The managed wrapper supplies `--config ~/.cli-proxy-api/config.yaml`. Sync reads
 
 ## Open the control panel
 
-Reach the control panel through a Tailscale SSH port forward, then open this local URL:
+Open the control panel at the configured gateway listener:
 
 ```text
-http://127.0.0.1:<listen-port>/management.html
+http://<listen-host>:<listen-port>/management.html
 ```
 
-Read the configured listener, then forward a local port through the gateway's SSH host:
+For the current deployment, use:
 
-```bash
-CLIPROXY_DEPLOYMENT=assets/cliproxyapi.deployment.json
-CLIPROXY_LISTEN_HOST="$(jq -r '.listen.host' "$CLIPROXY_DEPLOYMENT")"
-CLIPROXY_LISTEN_PORT="$(jq -r '.listen.port' "$CLIPROXY_DEPLOYMENT")"
-ssh -N -L "$CLIPROXY_LISTEN_PORT:$CLIPROXY_LISTEN_HOST:$CLIPROXY_LISTEN_PORT" <gateway-ssh-host>
+```text
+http://munich.trex-gamut.ts.net:8317/management.html
 ```
 
-Authenticate with `CLIPROXY_MANAGEMENT_KEY`.
+Authenticate with `CLIPROXY_MANAGEMENT_KEY`. The page is reachable without authentication, but its management API requires the key.
 
 Do not make durable configuration changes in the control panel. Sync replaces the generated configuration from `assets/cliproxyapi.yaml.tmpl` and `secrets.local.json`.
 
@@ -160,8 +157,8 @@ The forced refresh bypasses freshness windows and rejects stale fallback data. U
 
 ## Deploy on a home server
 
-Bind the gateway only to a trusted private interface. For a Tailscale deployment, use the server's tailnet address and keep remote management disabled.
+Bind the gateway only to a trusted private interface. For a Tailscale deployment, use the server's tailnet address. Remote management is enabled for tailnet clients and requires `CLIPROXY_MANAGEMENT_KEY`.
 
-Reach the local management endpoint through a Tailscale SSH port forward. Do not expose the gateway through the public internet, Tailscale Funnel, or an untrusted LAN.
+Do not expose the gateway through the public internet, Tailscale Funnel, or an untrusted LAN.
 
 Back up `secrets.local.json` through an encrypted channel. Reauthenticate OAuth accounts after recovery instead of backing up active refresh tokens.

@@ -1,6 +1,6 @@
 # CLIProxyAPI reference
 
-CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses configured to use it. `assets/cliproxyapi.deployment.json` is the only deployment-specific source. It selects the gateway host, server listener, and client endpoint. Remote management stays disabled, while the control panel remains enabled for an SSH-forwarded local session.
+CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses configured to use it. `assets/cliproxyapi.deployment.json` is the only deployment-specific source. It selects the gateway host, server listener, and client endpoint. Remote management and the control panel are available to clients that can reach the private listener and authenticate with the management key.
 
 ## Artifacts
 
@@ -143,9 +143,9 @@ The repository has no quota-monitoring service and does not generate quota dashb
 
 ## Control panel
 
-The control panel is available at `http://127.0.0.1:<listen-port>/management.html` after an SSH port forward to the configured listener. The control panel uses `CLIPROXY_MANAGEMENT_KEY` for authentication.
+The control panel is available at `http://<listen-host>:<listen-port>/management.html`. The current deployment uses `http://munich.trex-gamut.ts.net:8317/management.html`. The page itself is public on the private listener. Its management API uses `CLIPROXY_MANAGEMENT_KEY` for authentication.
 
-Remote management is disabled. The template also sets `remote-management.disable-auto-update-panel` to `true`.
+Remote management is enabled on the private Tailscale listener. The template also sets `remote-management.disable-auto-update-panel` to `true`.
 
 ## Provider limits
 
