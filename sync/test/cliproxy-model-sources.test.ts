@@ -13,7 +13,6 @@ import { join } from "node:path";
 import {
   legacyModelCatalogPath,
   renderCliProxyConfig,
-  runtimeClientApiKeyPath,
   runtimeModelCatalogPath,
   syncCliProxyConfig,
 } from "@core/cliproxy-config.ts";
@@ -58,7 +57,6 @@ test("cliproxy_renderer_synthesizes_protocol_profiles_from_model_sources", () =>
   const rendered = renderCliProxyConfig(
     `remote-management:
   secret-key: \${CLIPROXY_MANAGEMENT_KEY}
-api-keys: \${CLIPROXY_CLIENT_API_KEYS}
 x-model-sources:
   - id: example
     models-dev-provider: example
@@ -68,7 +66,6 @@ x-model-sources:
 `,
     {
       CLIPROXY_MANAGEMENT_KEY: "management",
-      CLIPROXY_CLIENT_API_KEYS: ["client"],
       CLIPROXY_CREDENTIAL_POOLS: {
         example: [
           { apiKey: "one", weight: 1 },
@@ -129,7 +126,6 @@ tls:
   enable: false
 remote-management:
   secret-key: \${CLIPROXY_MANAGEMENT_KEY}
-api-keys: \${CLIPROXY_CLIENT_API_KEYS}
 x-model-sources:
   - id: example
     models-dev-provider: example
@@ -142,7 +138,6 @@ x-model-sources:
       secretsPath,
       `${JSON.stringify({
         CLIPROXY_MANAGEMENT_KEY: "management",
-        CLIPROXY_CLIENT_API_KEYS: ["client"],
         CLIPROXY_CREDENTIAL_POOLS: {
           example: [{ apiKey: "upstream", weight: 1 }],
         },
@@ -204,8 +199,7 @@ x-model-sources:
 
     calls.length = 0;
     const configStat = lstatSync(dst);
-    expect(readFileSync(runtimeClientApiKeyPath(runtimeRoot), "utf8")).toBe("client\n");
-    expect(lstatSync(runtimeClientApiKeyPath(runtimeRoot)).mode & 0o777).toBe(0o600);
+    expect(existsSync(join(runtimeRoot, "cliproxyapi", "client-api-key"))).toBe(false);
     const catalogStat = lstatSync(runtimeModelCatalogPath(runtimeRoot));
     await syncCliProxyConfig(src, dst, secretsPath, DEPLOYMENT, {
       ...options,
@@ -220,15 +214,18 @@ x-model-sources:
   }
 });
 
-test("cliproxy_client_sync_updates_client_key_without_replacing_server_config", async () => {
+test("cliproxy_client_sync_preserves_server_config_and_drops_stale_client_key", async () => {
   const root = mkdtempSync(join(tmpdir(), "cliproxy-client-config-test-"));
   try {
     const src = join(root, "config.yaml.tmpl");
     const dst = join(root, "runtime", "config.yaml");
     const secretsPath = join(root, "secrets.json");
     const runtimeRoot = join(root, "data");
+    const staleKeyPath = join(runtimeRoot, "cliproxyapi", "client-api-key");
     mkdirSync(join(root, "runtime"), { recursive: true });
+    mkdirSync(join(runtimeRoot, "cliproxyapi"), { recursive: true });
     writeFileSync(dst, "existing gateway config\n", { mode: 0o600 });
+    writeFileSync(staleKeyPath, "stale-client-key\n", { mode: 0o600 });
     writeFileSync(
       src,
       "host: $" +
@@ -238,8 +235,6 @@ test("cliproxy_client_sync_updates_client_key_without_replacing_server_config", 
         "remote-management:\n" +
         "  secret-key: $" +
         "{CLIPROXY_MANAGEMENT_KEY}\n" +
-        "api-keys: $" +
-        "{CLIPROXY_CLIENT_API_KEYS}\n" +
         "codex-api-key:\n" +
         "  - x-credential-pool: fixture\n",
     );
@@ -247,7 +242,6 @@ test("cliproxy_client_sync_updates_client_key_without_replacing_server_config", 
       secretsPath,
       `${JSON.stringify({
         CLIPROXY_MANAGEMENT_KEY: "management",
-        CLIPROXY_CLIENT_API_KEYS: ["new-client"],
         CLIPROXY_CREDENTIAL_POOLS: { fixture: [{ apiKey: "upstream" }] },
       })}\n`,
     );
@@ -258,7 +252,7 @@ test("cliproxy_client_sync_updates_client_key_without_replacing_server_config", 
     });
 
     expect(readFileSync(dst, "utf8")).toBe("existing gateway config\n");
-    expect(readFileSync(runtimeClientApiKeyPath(runtimeRoot), "utf8")).toBe("new-client\n");
+    expect(existsSync(staleKeyPath)).toBe(false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -3,12 +3,7 @@ import { dirname } from "node:path";
 import { assertNever, err, panicMessage, warn } from "@runtime/errors.ts";
 import { copyTree, isSymlink, rmEntry, syncManagedChildren, syncManagedTree } from "@runtime/fs.ts";
 import { syncCliProxyConfig } from "./cliproxy-config.ts";
-import {
-  isCliProxyTargetReady,
-  publishCliProxyEndpointTemplates,
-  readClientApiKey,
-  readCliProxyCandidateClientApiKey,
-} from "./cliproxy-deployment.ts";
+import { isCliProxyTargetReady, publishCliProxyEndpointTemplates } from "./cliproxy-deployment.ts";
 import type { Job } from "./plan.ts";
 import { syncSecretTemplate } from "./secret-template.ts";
 
@@ -114,11 +109,7 @@ async function runJob(
         if (job.gatewayHost) {
           return true;
         }
-        const candidateKey =
-          readCliProxyCandidateClientApiKey(job.secretsPath) ??
-          readClientApiKey(job.clientApiKeyPath);
-        state.cliProxyTargetReady =
-          candidateKey !== undefined && (await isCliProxyTargetReady(job.deployment, candidateKey));
+        state.cliProxyTargetReady = await isCliProxyTargetReady(job.deployment);
         if (!state.cliProxyTargetReady) {
           warn("CLIProxyAPI endpoint is not ready; preserving existing client artifacts");
         }
@@ -128,12 +119,9 @@ async function runJob(
         if (state.cliProxyTargetReady === false) {
           return true;
         }
-        const publication = await publishCliProxyEndpointTemplates(
-          job.targets,
-          job.deployment,
-          job.clientApiKeyPath,
-          { skipReadiness: state.cliProxyTargetReady === true },
-        );
+        const publication = await publishCliProxyEndpointTemplates(job.targets, job.deployment, {
+          skipReadiness: state.cliProxyTargetReady === true,
+        });
         if (publication === "skipped" && job.targets.length > 0) {
           warn("CLIProxyAPI endpoint is not ready; preserving existing harness endpoints");
         }

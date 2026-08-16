@@ -143,7 +143,7 @@ test("cliproxy_target_readiness_requires_a_nonempty_models_payload", async () =>
   ] as const;
   for (const [response, expected] of responses) {
     assert.equal(
-      await isCliProxyTargetReady(DEPLOYMENT, "client-key", {
+      await isCliProxyTargetReady(DEPLOYMENT, {
         fetch: async () => response,
       }),
       expected,
@@ -151,21 +151,18 @@ test("cliproxy_target_readiness_requires_a_nonempty_models_payload", async () =>
   }
 });
 
-test("cliproxy_endpoint_publication_requires_an_authenticated_uncached_target", async () => {
+test("cliproxy_endpoint_publication_requires_a_keyless_ready_target", async () => {
   const root = mkdtempSync(join(tmpdir(), "cliproxy-endpoint-ready-test-"));
   try {
     const src = join(root, "source.toml");
     const dst = join(root, "generated", "config.toml");
-    const keyPath = join(root, "runtime", "client-api-key");
     writeFileSync(src, `base_url = "${CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n`);
     mkdirSync(join(root, "generated"), { recursive: true });
     writeFileSync(dst, 'base_url = "old"\n');
     chmodSync(dst, 0o600);
-    mkdirSync(join(root, "runtime"), { recursive: true });
-    writeFileSync(keyPath, "client-key\n");
 
     let requestInit: RequestInit | undefined;
-    const skipped = await publishCliProxyEndpointTemplates([{ src, dst }], DEPLOYMENT, keyPath, {
+    const skipped = await publishCliProxyEndpointTemplates([{ src, dst }], DEPLOYMENT, {
       fetch: async (_input, init) => {
         requestInit = init;
         return new Response(null, { status: 503 });
@@ -174,7 +171,7 @@ test("cliproxy_endpoint_publication_requires_an_authenticated_uncached_target", 
     assert.equal(skipped, "skipped");
     assert.equal(readFileSync(dst, "utf8"), 'base_url = "old"\n');
     assert.equal(lstatSync(dst).mode & 0o777, 0o600);
-    assert.equal(new Headers(requestInit?.headers).get("authorization"), "Bearer client-key");
+    assert.equal(new Headers(requestInit?.headers).get("authorization"), null);
     assert.equal(requestInit?.cache, "no-store");
     assert.equal(new Headers(requestInit?.headers).get("cache-control"), "no-cache");
   } finally {
@@ -189,15 +186,12 @@ test("cliproxy_endpoint_publication_rolls_back_all_targets_after_a_write_failure
     const srcTwo = join(root, "source-two.toml");
     const dstOne = join(root, "generated", "one.toml");
     const dstTwo = join(root, "generated", "two.toml");
-    const keyPath = join(root, "runtime", "client-api-key");
     writeFileSync(srcOne, `base_url = "${CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n`);
     writeFileSync(srcTwo, `base_url = "${CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n`);
     mkdirSync(join(root, "generated"), { recursive: true });
     writeFileSync(dstOne, "old\n");
     chmodSync(dstOne, 0o600);
     mkdirSync(dstTwo, { recursive: true });
-    mkdirSync(join(root, "runtime"), { recursive: true });
-    writeFileSync(keyPath, "client-key\n");
 
     await assert.rejects(
       publishCliProxyEndpointTemplates(
@@ -206,7 +200,6 @@ test("cliproxy_endpoint_publication_rolls_back_all_targets_after_a_write_failure
           { src: srcTwo, dst: dstTwo },
         ],
         DEPLOYMENT,
-        keyPath,
         { fetch: async () => Response.json({ data: [{ id: "ready" }] }) },
       ),
       /EISDIR|directory|not a file/,
@@ -224,11 +217,8 @@ test("cliproxy_endpoint_replacement_preserves_codex_owned_tail", async () => {
   try {
     const src = join(root, "source.toml");
     const dst = join(root, "generated", "config.toml");
-    const keyPath = join(root, "runtime", "client-api-key");
     writeFileSync(src, `base_url = "${CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n`);
     mkdirSync(join(root, "generated"), { recursive: true });
-    mkdirSync(join(root, "runtime"), { recursive: true });
-    writeFileSync(keyPath, "client-key\n");
 
     const ownedTail = `\n[hooks.state."orchestrator"]\nspawn_count = 3\n\n[projects."~/work/example"]\nmodel = "gpt-5.6-sol"\n`;
     const rendered = renderCliProxyEndpointTemplate(readFileSync(src, "utf8"), DEPLOYMENT);
@@ -237,7 +227,7 @@ test("cliproxy_endpoint_replacement_preserves_codex_owned_tail", async () => {
 
     const targets = [{ src, dst, preserveTopLevels: ["hooks.state", "projects"] }];
     assert.equal(
-      await publishCliProxyEndpointTemplates(targets, DEPLOYMENT, keyPath, {
+      await publishCliProxyEndpointTemplates(targets, DEPLOYMENT, {
         fetch: fetchReady,
       }),
       "published",
@@ -246,7 +236,7 @@ test("cliproxy_endpoint_replacement_preserves_codex_owned_tail", async () => {
     assert.equal(lstatSync(dst).mode & 0o777, 0o600);
     const first = lstatSync(dst);
 
-    await publishCliProxyEndpointTemplates(targets, DEPLOYMENT, keyPath, {
+    await publishCliProxyEndpointTemplates(targets, DEPLOYMENT, {
       fetch: fetchReady,
     });
     assert.equal(readFileSync(dst, "utf8"), `${rendered}${ownedTail}`);
@@ -257,69 +247,52 @@ test("cliproxy_endpoint_replacement_preserves_codex_owned_tail", async () => {
   }
 });
 
-test("cliproxy_runtime_key_fallback_publishes_without_secrets", async () => {
-  const root = mkdtempSync(join(tmpdir(), "cliproxy-runtime-key-test-"));
+test("cliproxy_keyless_readiness_publishes_without_client_keys", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cliproxy-keyless-test-"));
   try {
     const src = join(root, "source.toml");
     const dst = join(root, "generated", "config.toml");
-    const keyPath = join(root, "runtime", "client-api-key");
     writeFileSync(src, `base_url = "${CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n`);
     mkdirSync(join(root, "generated"), { recursive: true });
-    mkdirSync(join(root, "runtime"), { recursive: true });
     writeFileSync(dst, 'base_url = "old"\n');
-    writeFileSync(keyPath, "runtime-secret\n");
 
     const modelsUrl = cliProxyModelsUrl(DEPLOYMENT);
     const requests: Array<{ url: string; init: RequestInit | undefined }> = [];
-    const logs: string[] = [];
     const originalFetch = globalThis.fetch;
-    const originalError = console.error;
     globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
       requests.push({ url: String(input), init });
       return Response.json({ data: [{ id: "ready" }] });
     }) as typeof fetch;
-    console.error = (...parts: unknown[]) => logs.push(parts.map(String).join(" "));
     let ok = false;
     try {
       const jobs: Job[] = [
         {
           kind: "CliProxyReadiness",
           deployment: DEPLOYMENT,
-          secretsPath: join(root, "config", "agents", "secrets.local.json"),
-          clientApiKeyPath: keyPath,
           gatewayHost: false,
         },
         {
           kind: "CliProxyEndpointTemplates",
           targets: [{ src, dst }],
           deployment: DEPLOYMENT,
-          clientApiKeyPath: keyPath,
         },
       ];
       ok = await runJobsWithPreserve(jobs);
     } finally {
       globalThis.fetch = originalFetch;
-      console.error = originalError;
     }
 
     assert.equal(ok, true);
     assert.equal(readFileSync(dst, "utf8"), `base_url = "${DEPLOYMENT.client.baseUrl}"\n`);
     const readinessRequest = requests.find((request) => request.url === modelsUrl);
-    assert.equal(
-      new Headers(readinessRequest?.init?.headers).get("authorization"),
-      "Bearer runtime-secret",
-    );
-    assert.equal(
-      logs.some((line) => line.includes("runtime-secret")),
-      false,
-    );
+    assert.equal(new Headers(readinessRequest?.init?.headers).get("authorization"), null);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("cliproxy_readiness_without_any_key_preserves_endpoints", async () => {
-  const root = mkdtempSync(join(tmpdir(), "cliproxy-no-key-test-"));
+test("cliproxy_readiness_failure_preserves_endpoints", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cliproxy-unready-test-"));
   try {
     const src = join(root, "source.toml");
     const dst = join(root, "generated", "config.toml");
@@ -328,22 +301,18 @@ test("cliproxy_readiness_without_any_key_preserves_endpoints", async () => {
     writeFileSync(dst, 'base_url = "old"\n');
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () =>
-      Response.json({ data: [{ id: "ready" }] })) as unknown as typeof fetch;
+    globalThis.fetch = (async () => new Response(null, { status: 503 })) as unknown as typeof fetch;
     try {
       const jobs: Job[] = [
         {
           kind: "CliProxyReadiness",
           deployment: DEPLOYMENT,
-          secretsPath: join(root, "config", "agents", "secrets.local.json"),
-          clientApiKeyPath: join(root, "runtime", "client-api-key"),
           gatewayHost: false,
         },
         {
           kind: "CliProxyEndpointTemplates",
           targets: [{ src, dst }],
           deployment: DEPLOYMENT,
-          clientApiKeyPath: join(root, "runtime", "client-api-key"),
         },
       ];
       assert.equal(await runJobsWithPreserve(jobs), true);
@@ -385,6 +354,9 @@ test("cliproxy_deployment_is_the_only_committed_endpoint_value", () => {
   assert.match(template, /port: \$\{CLIPROXY_LISTEN_PORT\}/);
   assert.match(template, /remote-management:\n\s+allow-remote: true/);
   assert.match(template, /usage-statistics-enabled: true/);
+  assert.match(template, /ws-auth: false/);
+  assert.doesNotMatch(template, /api-keys:/);
+  assert.doesNotMatch(template, /openrouter/);
   assert.doesNotMatch(template, new RegExp(escapeRegExp(deployment.listen.host)));
 });
 
@@ -420,12 +392,7 @@ test("cliproxy_endpoint_publication_is_one_job_after_config_and_directory_copies
     );
     assert.deepEqual(codexTarget?.preserveTopLevels, ["hooks.state", "projects"]);
     const readinessJob = plan.jobs.find((job) => job.kind === "CliProxyReadiness");
-    if (readinessJob?.kind === "CliProxyReadiness") {
-      assert.equal(
-        readinessJob.clientApiKeyPath,
-        join(home, ".local", "share", "agents", "cliproxyapi", "client-api-key"),
-      );
-    }
+    assert.ok(readinessJob?.kind === "CliProxyReadiness");
     const configJobIndex = plan.jobs.findIndex((job) => job.kind === "CliProxyConfig");
     assert.ok(configJobIndex >= 0);
     assert.ok(plan.jobs.indexOf(endpointJob) > configJobIndex);

@@ -61,21 +61,13 @@ test("integration_happy_path_matches_expected_outputs", () => {
       ),
       true,
     );
-    assert.deepEqual(cliProxyConfig["api-keys"], ["gateway-secret"]);
+    assert.equal("api-keys" in cliProxyConfig, false);
     assert.equal(cliProxyConfig["codex-api-key"][0]["api-key"], "upstream-secret");
     assert.equal(cliProxyConfig["codex-api-key"][0]["x-credential-pool"], undefined);
     assert.equal(lstatSync(join(home, ".cli-proxy-api", "config.yaml")).mode & 0o777, 0o600);
     assert.equal(
-      readFileSync(
-        join(home, ".local", "share", "agents", "cliproxyapi", "client-api-key"),
-        "utf8",
-      ),
-      "gateway-secret\n",
-    );
-    assert.equal(
-      lstatSync(join(home, ".local", "share", "agents", "cliproxyapi", "client-api-key")).mode &
-        0o777,
-      0o600,
+      existsSync(join(home, ".local", "share", "agents", "cliproxyapi", "client-api-key")),
+      false,
     );
     for (const path of [
       join(home, ".codex", "config.toml"),
@@ -119,13 +111,10 @@ test("integration_unavailable_client_preserves_all_cliproxy_artifacts", () => {
     writeDeployment(home, "different-host", "http://127.0.0.1:1/v1");
 
     const configPath = join(home, ".cli-proxy-api", "config.yaml");
-    const clientKeyPath = join(home, ".local", "share", "agents", "cliproxyapi", "client-api-key");
     const catalogPath = join(home, ".local", "share", "agents", "model-catalog", "catalog.json");
     mkdirSync(join(home, ".cli-proxy-api"), { recursive: true });
-    mkdirSync(join(home, ".local", "share", "agents", "cliproxyapi"), { recursive: true });
     mkdirSync(join(home, ".local", "share", "agents", "model-catalog"), { recursive: true });
     writeFileSync(configPath, "existing-server-config\n", { mode: 0o600 });
-    writeFileSync(clientKeyPath, "existing-client-key\n", { mode: 0o600 });
     writeFileSync(catalogPath, '{"models":[{"id":"existing"}]}\n', { mode: 0o600 });
 
     const endpointPaths = [
@@ -134,7 +123,7 @@ test("integration_unavailable_client_preserves_all_cliproxy_artifacts", () => {
       join(home, ".pi", "agent", "extensions", "cliproxy", "index.ts"),
       join(home, ".omp", "agent", "models.yml"),
     ];
-    const activePaths = [configPath, clientKeyPath, catalogPath, ...endpointPaths];
+    const activePaths = [configPath, catalogPath, ...endpointPaths];
     const before = activePaths.map((path) => ({
       content: readFileSync(path, "utf8"),
       mode: lstatSync(path).mode & 0o777,
@@ -271,7 +260,6 @@ function writeFixtureFiles(home: string): void {
 port: \${CLIPROXY_LISTEN_PORT}
 remote-management:
   secret-key: \${CLIPROXY_MANAGEMENT_KEY}
-api-keys: \${CLIPROXY_CLIENT_API_KEYS}
 codex-api-key:
   - x-credential-pool: fixture
     prefix: fixture
@@ -281,7 +269,6 @@ codex-api-key:
     join(home, ".config", "agents", "secrets.local.json"),
     `${JSON.stringify({
       CLIPROXY_MANAGEMENT_KEY: "management-secret",
-      CLIPROXY_CLIENT_API_KEYS: ["gateway-secret"],
       CLIPROXY_CREDENTIAL_POOLS: {
         fixture: [{ apiKey: "upstream-secret", weight: 1 }],
       },

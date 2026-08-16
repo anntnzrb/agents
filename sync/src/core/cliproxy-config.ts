@@ -41,7 +41,6 @@ interface Credential {
 
 interface CliProxySecrets {
   readonly CLIPROXY_MANAGEMENT_KEY: string;
-  readonly CLIPROXY_CLIENT_API_KEYS: readonly string[];
   readonly CLIPROXY_CREDENTIAL_POOLS: Readonly<Record<string, readonly Credential[]>>;
 }
 
@@ -71,10 +70,7 @@ export async function syncCliProxyConfig(
   const template = readText(src, "CLIProxyAPI template");
   const secrets = readCliProxySecrets(secretsPath);
   if (options.runtimeRoot) {
-    syncPrivateTextFile(
-      runtimeClientApiKeyPath(options.runtimeRoot),
-      `${firstString(secrets.CLIPROXY_CLIENT_API_KEYS, "CLIPROXY_CLIENT_API_KEYS")}\n`,
-    );
+    fs.rmSync(runtimeClientApiKeyPath(options.runtimeRoot), { force: true });
   }
   const sources = modelSourcesFromTemplate(template);
   const discovery =
@@ -104,7 +100,6 @@ export async function syncCliProxyConfig(
       sources,
       discovery.sources,
       discovery.modelsDev,
-      secrets,
       options,
     );
     removeLegacyModelCatalog(requireCacheRoot(options.cacheRoot));
@@ -129,7 +124,7 @@ export function renderCliProxyConfig(
   unresolvedConfig["host"] = deployment.listen.host;
   unresolvedConfig["port"] = deployment.listen.port;
   const config = expectRecord(
-    resolvePlaceholders(unresolvedConfig, secrets, managementKey),
+    resolvePlaceholders(unresolvedConfig, managementKey),
     "CLIProxyAPI template root",
   );
   const referencedPools = new Set<string>();
@@ -180,8 +175,9 @@ export function modelSourcesFromTemplate(template: string): readonly CliProxyMod
   return parseModelSources(config[MODEL_SOURCES_MARKER]);
 }
 
-export const runtimeClientApiKeyPath = (runtimeRoot: string): string =>
-  join(runtimeRoot, "cliproxyapi", "client-api-key");
+function runtimeClientApiKeyPath(runtimeRoot: string): string {
+  return join(runtimeRoot, "cliproxyapi", "client-api-key");
+}
 
 export const runtimeModelCatalogPath = (runtimeRoot: string): string =>
   join(runtimeRoot, "model-catalog", "catalog.json");
@@ -246,7 +242,6 @@ async function syncSharedModelCatalog(
   sources: readonly CliProxyModelSource[],
   discoveredSources: ReadonlyMap<string, SourceModels>,
   modelsDev: unknown,
-  secrets: CliProxySecrets,
   options: CliProxyConfigSyncOptions,
 ): Promise<void> {
   const cacheRoot = requireCacheRoot(options.cacheRoot);
@@ -260,12 +255,6 @@ async function syncSharedModelCatalog(
           url: cliProxyModelsUrl(deployment),
           cachePath: join(cacheRoot, "gateway.json"),
           ttlMs: GATEWAY_MODELS_TTL_MS,
-          headers: {
-            Authorization: `Bearer ${firstString(
-              secrets.CLIPROXY_CLIENT_API_KEYS,
-              "CLIPROXY_CLIENT_API_KEYS",
-            )}`,
-          },
         },
         options,
       )
@@ -319,11 +308,7 @@ function removeLegacyModelCatalog(cacheRoot: string): void {
   fs.rmSync(legacyModelCatalogPath(cacheRoot), { force: true });
 }
 
-function resolvePlaceholders(
-  value: unknown,
-  secrets: CliProxySecrets,
-  managementKey: string,
-): unknown {
+function resolvePlaceholders(value: unknown, managementKey: string): unknown {
   if (typeof value === "string") {
     const match = PLACEHOLDER_PATTERN.exec(value);
     if (!match) {
@@ -336,23 +321,18 @@ function resolvePlaceholders(
     switch (name) {
       case "CLIPROXY_MANAGEMENT_KEY":
         return managementKey;
-      case "CLIPROXY_CLIENT_API_KEYS":
-        return [...secrets.CLIPROXY_CLIENT_API_KEYS];
       default:
         throw new Error(`unsupported CLIProxyAPI secret placeholder: ${name}`);
     }
   }
   if (Array.isArray(value)) {
-    return value.map((entry) => resolvePlaceholders(entry, secrets, managementKey));
+    return value.map((entry) => resolvePlaceholders(entry, managementKey));
   }
   if (!isRecord(value)) {
     return value;
   }
   return Object.fromEntries(
-    Object.entries(value).map(([name, entry]) => [
-      name,
-      resolvePlaceholders(entry, secrets, managementKey),
-    ]),
+    Object.entries(value).map(([name, entry]) => [name, resolvePlaceholders(entry, managementKey)]),
   );
 }
 
@@ -584,14 +564,6 @@ function firstCredentialKey(credentials: readonly Credential[], poolName: string
   return credential.apiKey;
 }
 
-function firstString(values: readonly string[], label: string): string {
-  const value = values[0];
-  if (!value) {
-    throw new Error(`empty ${label}`);
-  }
-  return value;
-}
-
 function credentialConfig(credential: Credential): ConfigRecord {
   return {
     "api-key": credential.apiKey,
@@ -611,10 +583,6 @@ function readCliProxySecrets(path: string): CliProxySecrets {
   const managementKey = requireNonEmptyString(
     root["CLIPROXY_MANAGEMENT_KEY"],
     "CLIPROXY_MANAGEMENT_KEY",
-  );
-  const clientKeys = requireUniqueStrings(
-    root["CLIPROXY_CLIENT_API_KEYS"],
-    "CLIPROXY_CLIENT_API_KEYS",
   );
   const rawPools = expectRecord(root["CLIPROXY_CREDENTIAL_POOLS"], "CLIPROXY_CREDENTIAL_POOLS");
   const pools: Record<string, readonly Credential[]> = {};
@@ -636,7 +604,6 @@ function readCliProxySecrets(path: string): CliProxySecrets {
   }
   return {
     CLIPROXY_MANAGEMENT_KEY: managementKey,
-    CLIPROXY_CLIENT_API_KEYS: clientKeys,
     CLIPROXY_CREDENTIAL_POOLS: pools,
   };
 }
@@ -706,17 +673,6 @@ function rejectDuplicateCredentialKeys(poolName: string, credentials: readonly C
     }
     keys.add(credential.apiKey);
   }
-}
-
-function requireUniqueStrings(value: unknown, label: string): readonly string[] {
-  if (!Array.isArray(value) || value.length === 0) {
-    throw new Error(`invalid ${label}: expected non-empty array`);
-  }
-  const entries = value.map((entry, index) => requireNonEmptyString(entry, `${label}[${index}]`));
-  if (new Set(entries).size !== entries.length) {
-    throw new Error(`invalid ${label}: duplicate value`);
-  }
-  return entries;
 }
 
 function requireNonEmptyString(value: unknown, label: string): string {

@@ -103,18 +103,13 @@ export function cliProxyModelsUrl(deployment: CliProxyDeployment): string {
 export async function publishCliProxyEndpointTemplates(
   targets: readonly CliProxyEndpointTarget[],
   deployment: CliProxyDeployment,
-  clientApiKeyPath: string,
   options: CliProxyEndpointSyncOptions = {},
 ): Promise<CliProxyEndpointPublication> {
   if (targets.length === 0) {
     return "published";
   }
 
-  const clientApiKey = readClientApiKey(clientApiKeyPath);
-  if (
-    !options.skipReadiness &&
-    (!clientApiKey || !(await isCliProxyTargetReady(deployment, clientApiKey, options)))
-  ) {
+  if (!options.skipReadiness && !(await isCliProxyTargetReady(deployment, options))) {
     return "skipped";
   }
 
@@ -137,14 +132,12 @@ export async function publishCliProxyEndpointTemplates(
 
 export async function isCliProxyTargetReady(
   deployment: CliProxyDeployment,
-  clientApiKey: string,
   options: CliProxyEndpointSyncOptions = {},
 ): Promise<boolean> {
   try {
     const response = await (options.fetch ?? fetch)(cliProxyModelsUrl(deployment), {
       headers: {
         Accept: "application/json",
-        Authorization: `Bearer ${clientApiKey}`,
         "Cache-Control": "no-cache",
       },
       cache: "no-store",
@@ -356,34 +349,6 @@ function ipv4TailGroups(address: string): string[] | undefined {
 
 function isZeroIpv6Group(group: string): boolean {
   return ZERO_IPV6_GROUP_PATTERN.test(group);
-}
-
-export function readClientApiKey(path: string): string | undefined {
-  try {
-    const key = fs.readFileSync(path, "utf8").trim();
-    return key.length > 0 ? key : undefined;
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return undefined;
-    }
-    throw new Error(`read CLIProxyAPI client key ${path} (${panicMessage(error)})`, {
-      cause: error,
-    });
-  }
-}
-
-export function readCliProxyCandidateClientApiKey(path: string): string | undefined {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(fs.readFileSync(path, "utf8"));
-  } catch {
-    return undefined;
-  }
-  if (!isRecord(parsed) || !Array.isArray(parsed["CLIPROXY_CLIENT_API_KEYS"])) {
-    return undefined;
-  }
-  const first = parsed["CLIPROXY_CLIENT_API_KEYS"][0];
-  return typeof first === "string" && first.length > 0 ? first : undefined;
 }
 
 interface EndpointTargetSnapshot {

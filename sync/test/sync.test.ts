@@ -388,28 +388,26 @@ if (runtime) {
         src,
         `remote-management:
   secret-key: \${CLIPROXY_MANAGEMENT_KEY}
-api-keys: \${CLIPROXY_CLIENT_API_KEYS}
 codex-api-key:
   - x-credential-pool: opencode-go
     prefix: go
     base-url: https://example.test/v1
 openai-compatibility:
-  - x-credential-pool: openrouter
-    name: openrouter
-    base-url: https://openrouter.example/v1
+  - x-credential-pool: deepseek
+    name: deepseek
+    base-url: https://deepseek.example/v1
 `,
       );
       writeFile(
         secretsPath,
         `${JSON.stringify({
           CLIPROXY_MANAGEMENT_KEY: 'management"key',
-          CLIPROXY_CLIENT_API_KEYS: ["client-one", "client-two"],
           CLIPROXY_CREDENTIAL_POOLS: {
             "opencode-go": [
               { apiKey: "go-one", weight: 1 },
               { apiKey: "go-two", weight: 2 },
             ],
-            openrouter: [{ apiKey: "router-one", weight: 1 }],
+            deepseek: [{ apiKey: "router-one", weight: 1 }],
           },
         })}\n`,
       );
@@ -432,7 +430,7 @@ openai-compatibility:
         ),
         true,
       );
-      assert.deepEqual(config["api-keys"], ["client-one", "client-two"]);
+      assert.equal("api-keys" in config, false);
       assert.deepEqual(
         config["codex-api-key"].map((entry: Record<string, unknown>) => ({
           apiKey: entry["api-key"],
@@ -466,8 +464,7 @@ openai-compatibility:
       const secretsPath = join(root, "secrets.local.json");
       writeFile(
         src,
-        `api-keys: \${CLIPROXY_CLIENT_API_KEYS}
-codex-api-key:
+        `codex-api-key:
   - x-credential-pool: opencode-go
 `,
       );
@@ -476,7 +473,6 @@ codex-api-key:
         secretsPath,
         `${JSON.stringify({
           CLIPROXY_MANAGEMENT_KEY: "management",
-          CLIPROXY_CLIENT_API_KEYS: ["client"],
           CLIPROXY_CREDENTIAL_POOLS: {
             "opencode-go": [{ apiKey: "duplicate" }, { apiKey: "duplicate" }],
           },
