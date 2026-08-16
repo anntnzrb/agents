@@ -177,7 +177,7 @@ test("gateway_catalog_adds_oauth_models_without_overwriting_richer_models", () =
     {
       data: [
         { id: "example/responses-next", owned_by: "openai" },
-        { id: "gpt-oauth-next", owned_by: "openai" },
+        { id: "chatgpt/gpt-oauth-next", owned_by: "openai" },
         { id: "gemini-oauth-next", owned_by: "antigravity" },
         { id: "gpt-image-next", owned_by: "openai" },
       ],
@@ -195,14 +195,15 @@ test("gateway_catalog_adds_oauth_models_without_overwriting_richer_models", () =
   );
 
   expect(merged.map((model) => model.id)).toEqual([
+    "chatgpt/gpt-oauth-next",
     "example/responses-next",
     "gemini-oauth-next",
-    "gpt-oauth-next",
   ]);
   expect(merged.find((model) => model.id === "example/responses-next")).toMatchObject({
     contextWindow: 300000,
   });
-  expect(merged.find((model) => model.id === "gpt-oauth-next")).toMatchObject({
+  expect(merged.find((model) => model.id === "chatgpt/gpt-oauth-next")).toMatchObject({
+    name: "GPT OAuth Next",
     api: "openai-responses",
     reasoning: true,
     contextWindow: 300000,

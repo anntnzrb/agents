@@ -332,7 +332,7 @@ function gatewayModel(
   gateway: Record<string, unknown>,
   modelsDevPayload: unknown,
 ): CatalogModel {
-  const reference = findModelsDevReference(modelsDevPayload, ownedBy, id);
+  const reference = findModelsDevReference(modelsDevPayload, ownedBy, unprefixedModelId(id));
   const metadata = reference?.model;
   const modelProvider = optionalRecord(metadata?.["provider"]);
   const npm =
@@ -476,6 +476,11 @@ function modelsDevReferenceFromProvider(
 function publicAlias(source: ModelCatalogSource, id: string): string {
   const repeatedPrefix = `${source.prefix}/`;
   return id.startsWith(repeatedPrefix) ? id.slice(repeatedPrefix.length) : id;
+}
+
+function unprefixedModelId(id: string): string {
+  const slash = id.indexOf("/");
+  return slash > 0 ? id.slice(slash + 1) : id;
 }
 
 function compatFor(
