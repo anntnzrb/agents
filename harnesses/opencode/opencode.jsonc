@@ -6,10 +6,10 @@
    * ************************************************************************ */
 
   // title, summary, and compaction utils
-  "small_model": "cliproxy/go/deepseek-v4-flash",
+  "small_model": "cliproxy/antigravity/gemini-3.7-flash-high",
 
   // main agent (build)
-  "model": "cliproxy/go/deepseek-v4-pro",
+  "model": "cliproxy/chatgpt/gpt-5.6-sol",
 
   /* **************************************************************************
    * PLUGINS
@@ -50,7 +50,7 @@
       "disable": true,
     },
     "general": {
-      "model": "cliproxy/go/deepseek-v4-flash",
+      "model": "cliproxy/antigravity/gemini-3.7-flash-high",
       "description":
         "General-purpose subagent for researching complex questions and executing multi-step tasks in a fresh, isolated context. Use this agent to delegate units of work in parallel; it returns only its final summary to the orchestrator, keeping the main session context clean.",
       "permission": {
@@ -58,7 +58,7 @@
       },
     },
     "explore": {
-      "model": "cliproxy/go/deepseek-v4-flash",
+      "model": "cliproxy/antigravity/gemini-3.7-flash-high",
       "description":
         "Fast, read-only subagent specialized for exploring codebases: find files by pattern, search code by keyword, answer codebase questions. Use it to delegate searches and keep the orchestrator context clean. Specify thoroughness: 'quick', 'medium', or 'very thorough'.",
       "permission": {
