@@ -353,7 +353,7 @@ test("cliproxy_deployment_is_the_only_committed_endpoint_value", () => {
   assert.match(template, /host: "\$\{CLIPROXY_LISTEN_HOST\}"/);
   assert.match(template, /port: \$\{CLIPROXY_LISTEN_PORT\}/);
   assert.match(template, /remote-management:\n\s+allow-remote: true/);
-  assert.doesNotMatch(template, /secret-key/);
+  assert.match(template, /secret-key: tailnet/);
   assert.match(template, /usage-statistics-enabled: true/);
   assert.match(template, /ws-auth: false/);
   assert.doesNotMatch(template, /api-keys:/);

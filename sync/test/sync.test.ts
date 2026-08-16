@@ -388,6 +388,7 @@ if (runtime) {
         src,
         `remote-management:
   allow-remote: true
+  secret-key: tailnet
 codex-api-key:
   - x-credential-pool: opencode-go
     prefix: go
@@ -422,7 +423,7 @@ openai-compatibility:
       ];
       assert.equal(await call<boolean>(runJobsWithPreserve, jobs), true);
       const config = Bun.YAML.parse(readText(dst)) as Record<string, any>;
-      assert.equal("secret-key" in config["remote-management"], false);
+      assert.equal(config["remote-management"]["secret-key"], "tailnet");
       assert.equal("api-keys" in config, false);
       assert.deepEqual(
         config["codex-api-key"].map((entry: Record<string, unknown>) => ({

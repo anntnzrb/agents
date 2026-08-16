@@ -54,7 +54,7 @@ test("integration_happy_path_matches_expected_outputs", () => {
     ) as Record<string, any>;
     assert.equal(cliProxyConfig["host"], "100.64.0.42");
     assert.equal(cliProxyConfig["port"], 8317);
-    assert.equal("secret-key" in (cliProxyConfig["remote-management"] ?? {}), false);
+    assert.equal(cliProxyConfig["remote-management"]["secret-key"], "tailnet");
     assert.equal("api-keys" in cliProxyConfig, false);
     assert.equal(cliProxyConfig["codex-api-key"][0]["api-key"], "upstream-secret");
     assert.equal(cliProxyConfig["codex-api-key"][0]["x-credential-pool"], undefined);
@@ -254,6 +254,7 @@ function writeFixtureFiles(home: string): void {
 port: \${CLIPROXY_LISTEN_PORT}
 remote-management:
   allow-remote: true
+  secret-key: tailnet
 codex-api-key:
   - x-credential-pool: fixture
     prefix: fixture
