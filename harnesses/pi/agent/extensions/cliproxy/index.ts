@@ -2,12 +2,13 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { piThinkingLevelMap } from "./thinking-levels.ts";
 
 interface CatalogModel {
   readonly id: string;
   readonly name: string;
   readonly reasoning: boolean;
-  readonly thinkingLevelMap?: Readonly<Record<string, string | null>>;
+  readonly reasoningEfforts?: readonly string[];
   readonly input: readonly ("text" | "image")[];
   readonly cost: {
     readonly input: number;
@@ -62,7 +63,9 @@ function piModel(model: CatalogModel) {
     id: model.id,
     name: model.name,
     reasoning: model.reasoning,
-    ...(model.thinkingLevelMap ? { thinkingLevelMap: model.thinkingLevelMap } : {}),
+    ...(model.reasoning && model.reasoningEfforts
+      ? { thinkingLevelMap: piThinkingLevelMap(model.reasoningEfforts) }
+      : {}),
     input: [...model.input],
     cost: { ...model.cost },
     contextWindow: model.contextWindow,
