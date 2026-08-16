@@ -52,11 +52,12 @@ mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --status --
 ```
 
 After success:
-- MUST discover live schemas.
+- MUST discover the compact live inventory, then inspect only each selected tool.
 - MUST call only a discovered tool.
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --schema --all-parameters
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --brief
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n.<DISCOVERED_TOOL> --schema --all-parameters
 mcporter --config <agent-config-root>/assets/mcporter.jsonc call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
 ```
 

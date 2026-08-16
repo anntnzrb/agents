@@ -1,30 +1,25 @@
 # Context7 MCPorter
-Use for Context7 discovery, authentication, output shape, or failures.
+Use for Context7 recovery, authentication, output shape, or failures.
 
 MCPorter only Context7 transport in this skill.
 
-## Discovery
-Before first Context7 MCP call/session:
+## Known tools
 
-```text
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc list context7 --brief
-```
-
-Expected tools:
+The skill's direct recipes use:
 
 ```text
 resolve-library-id(query: string, libraryName: string)
 query-docs(libraryId: string, query: string)
 ```
 
-Before first call to each selected tool, inspect its live schema:
+Do not discover these tools or inspect their schemas before ordinary calls. If a call reports a missing tool or invalid input, or optional inputs matter, inspect only the affected tool:
 
 ```text
 uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc list context7.resolve-library-id --schema
 uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc list context7.query-docs --schema
 ```
 
-Inspect only the tool needed for the next operation. Live discovery overrides this reference; do not repeat successful discovery or schema inspection in the same session.
+Live schemas override this reference when inspected. Never load the whole server schema.
 
 ## Calls
 Resolve a library:
@@ -83,4 +78,4 @@ Authentication, quota, or rate-limit failure:
 - Thin results → state coverage is thin and route to repository docs or code search.
 - Rate limit/quota → report it and suggest the user's normal secret-management path.
 
-Keep Context7 retrieval calls to three per user question unless the user explicitly requests broader exploration. Discovery does not consume that retrieval budget.
+Keep Context7 retrieval calls to three per user question unless the user explicitly requests broader exploration. Diagnostics do not consume that retrieval budget.

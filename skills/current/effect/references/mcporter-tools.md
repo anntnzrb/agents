@@ -1,6 +1,6 @@
 # Effect MCPorter tool snapshot
 
-Live schema/resources authoritative. Use this dated snapshot ONLY for broad tool comparison, package coverage, or live-discovery failure; NEVER before targeted live schema. Discard snapshot conflicts when live discovery recovers.
+Live schema/resources authoritative when inspected. Use this dated snapshot only for broad package coverage or targeted live-schema failure. The focused skill already provides the two ordinary call recipes. Discard snapshot conflicts when live discovery recovers.
 
 Snapshot: captured `2026-07-16` (`America/Guayaquil`); MCPorter `0.12.3`; server `effect` (`Effect MCP`); observed transport STDIO via `bun x @niklaserik/effect-mcp`; server package resolution observed during capture `@niklaserik/effect-mcp@1.0.7` (config unpinned, so this resolution may drift independently of the snapshot); 2 tools.
 
@@ -8,7 +8,8 @@ Refresh when drift matters:
 
 ```text
 mcporter --version
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list effect --schema
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list effect.effect-documentation --schema
+mcporter --config <agent-config-root>/assets/mcporter.jsonc list effect.effect-doc-links --schema
 mcporter --config <agent-config-root>/assets/mcporter.jsonc resource effect
 ```
 

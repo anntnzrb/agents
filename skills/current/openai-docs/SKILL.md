@@ -17,16 +17,11 @@ Missing `mcporter`: MUST use this Nix prefix:
 nix run github:numtide/llm-agents.nix#mcporter --
 ```
 
-## Discover and call
+## Call and recover
 
-- Live server schema MUST remain authoritative
-- MUST discover live inventory first:
-
-```text
-mcporter list openai-docs --brief
-```
-
-Argument constraints: MUST inspect only targeted live schema:
+- The known recipes below SHOULD be called directly without inventory or schema discovery
+- Live server schema MUST remain authoritative when inspected
+- Unknown optional arguments or input-validation failures: MUST inspect only targeted live schema, then retry once:
 
 ```text
 mcporter list openai-docs.<tool> --schema
@@ -104,7 +99,7 @@ uv run --script <skill-dir>/scripts/cli.py codex-manual
 
 | Need | Read | When |
 | --- | --- | --- |
-| Dated broad tool inventory or exact-schema fallback | `references/tool-schema-snapshot.md` | ONLY for broad tool comparison, or when live discovery fails; NEVER before a targeted live schema |
+| Dated tool snapshot | `references/tool-schema-snapshot.md` | Broad tool comparison or targeted live-schema failure; not for a known recipe |
 | Latest-model fallback | `references/latest-model.md` | The live latest-model page is unavailable |
 | Upgrade fallback | `references/upgrade-guide.md` | Live migration guidance is unavailable |
 | Prompting fallback | `references/prompting-guide.md` | Live prompting guidance is unavailable |

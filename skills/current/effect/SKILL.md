@@ -19,13 +19,9 @@ nix run github:numtide/llm-agents.nix#mcporter --
 
 ## Workflow
 
-1. MUST discover live inventory first:
+1. Choose the known `effect-doc-links` or `effect-documentation` recipe below and call it directly.
 
-```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list effect --brief
-```
-
-2. Unfamiliar or constrained arguments: MUST inspect targeted live schema:
+2. Unfamiliar, optional, or rejected arguments: MUST inspect targeted live schema, then retry once:
 
 ```text
 mcporter --config <agent-config-root>/assets/mcporter.jsonc list effect.<tool> --schema
@@ -45,7 +41,7 @@ mcporter --config <agent-config-root>/assets/mcporter.jsonc call 'effect.effect-
 mcporter --config <agent-config-root>/assets/mcporter.jsonc call 'effect.effect-documentation(libraries: ["effect"])'
 ```
 
-- Live schema and resources MUST remain authoritative
+- Live schema and resources MUST remain authoritative when inspected
 - NEVER treat generated links as coverage or health evidence
 - MUST inspect content despite MCPorter exit `0`
 - MUST disclose embedded errors or broken resources
@@ -55,7 +51,7 @@ mcporter --config <agent-config-root>/assets/mcporter.jsonc call 'effect.effect-
 
 |Need|Read|When|
 |---|---|---|
-|Dated broad tool/package inventory or exact-schema fallback|`references/mcporter-tools.md`|ONLY for broad comparison/package coverage, or when live discovery fails; NEVER before a targeted live schema|
+|Dated tool/package snapshot|`references/mcporter-tools.md`|Broad package coverage or targeted live-schema failure; not for a known recipe|
 
 ## Version safety
 
