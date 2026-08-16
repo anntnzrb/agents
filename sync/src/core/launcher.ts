@@ -50,7 +50,6 @@ export interface PreparePackageOptions {
   readonly home: string;
   readonly cacheHome?: string;
   readonly timeoutMs?: number;
-  readonly platform?: NodeJS.Platform;
   readonly runtime?: LauncherRuntime;
 }
 
@@ -91,13 +90,13 @@ export async function prepareNpmPackage(
   try {
     const runtime = options.runtime ?? {};
     const distTag = spec.distTag ?? "latest";
-    const cached = currentCachedPackage(layout, spec, options.platform);
+    const cached = currentCachedPackage(layout, spec);
     let resolvedVersion: string;
     try {
       const resolve =
         runtime.resolveVersion ??
         ((packageName: string, tag: string, timeout: number) =>
-          resolveVersion(packageName, tag, timeout, options.platform));
+          resolveVersion(packageName, tag, timeout));
       resolvedVersion = validateResolvedVersion(await resolve(spec.package, distTag, timeoutMs));
     } catch (error) {
       if (!cached) {
@@ -111,37 +110,32 @@ export async function prepareNpmPackage(
       };
     }
     const versionDir = path.join(layout.versionsDir, resolvedVersion);
-    const stagedBin = packageBinPath(versionDir, spec.bin, options.platform);
+    const stagedBin = packageBinPath(versionDir, spec.bin);
     let stageDir: string | undefined;
 
     try {
-      if (
-        isExecutable(stagedBin, options.platform) &&
-        !installedPackageMatches(versionDir, spec, resolvedVersion)
-      ) {
+      if (isExecutable(stagedBin) && !installedPackageMatches(versionDir, spec, resolvedVersion)) {
         throw new Error(`cached package identity mismatch: ${resolvedVersion}`);
       }
-      if (!isExecutable(stagedBin, options.platform)) {
-        if (exists(versionDir)) {
+      if (!isExecutable(stagedBin)) {
+        if (fs.existsSync(versionDir)) {
           throw new Error(`cached package is incomplete: ${resolvedVersion}`);
         }
 
         stageDir = fs.mkdtempSync(path.join(layout.versionsDir, ".stage."));
         const install = await (runtime.run ?? runLauncherProcess)(
-          npmCommand(
-            [
-              "install",
-              "--prefix",
-              stageDir,
-              "--no-save",
-              "--no-package-lock",
-              "--no-audit",
-              "--no-fund",
-              "--loglevel=error",
-              `${spec.package}@${resolvedVersion}`,
-            ],
-            options.platform,
-          ),
+          [
+            "npm",
+            "install",
+            "--prefix",
+            stageDir,
+            "--no-save",
+            "--no-package-lock",
+            "--no-audit",
+            "--no-fund",
+            "--loglevel=error",
+            `${spec.package}@${resolvedVersion}`,
+          ],
           undefined,
           timeoutMs,
           "pipe",
@@ -150,8 +144,8 @@ export async function prepareNpmPackage(
           throw new Error(`npm install failed: ${detailFromResult(install)}`);
         }
 
-        const installedBin = packageBinPath(stageDir, spec.bin, options.platform);
-        if (!isExecutable(installedBin, options.platform)) {
+        const installedBin = packageBinPath(stageDir, spec.bin);
+        if (!isExecutable(installedBin)) {
           throw new Error(`installed package has no executable bin: ${spec.bin}`);
         }
         if (!installedPackageMatches(stageDir, spec, resolvedVersion)) {
@@ -161,7 +155,7 @@ export async function prepareNpmPackage(
         }
         if ((spec.smokeCheck ?? "--version") !== "-") {
           const smoke = await (runtime.run ?? runLauncherProcess)(
-            executableCommand(installedBin, [spec.smokeCheck ?? "--version"], options.platform),
+            [installedBin, spec.smokeCheck ?? "--version"],
             stageDir,
             timeoutMs,
             "pipe",
@@ -175,17 +169,17 @@ export async function prepareNpmPackage(
         stageDir = undefined;
       }
 
-      updateCurrentAndPrevious(layout, resolvedVersion, options.platform);
+      updateCurrentAndPrevious(layout, resolvedVersion);
       pruneVersions(layout);
 
-      const currentBin = packageBinPath(layout.currentLink, spec.bin, options.platform);
-      if (!isExecutable(currentBin, options.platform)) {
+      const currentBin = packageBinPath(layout.currentLink, spec.bin);
+      if (!isExecutable(currentBin)) {
         throw new Error(`current package has no executable bin: ${spec.bin}`);
       }
 
       return { layout, resolvedVersion, currentBin };
     } catch (error) {
-      const fallback = currentCachedPackage(layout, spec, options.platform);
+      const fallback = currentCachedPackage(layout, spec);
       if (!fallback) {
         throw error;
       }
@@ -222,12 +216,11 @@ export async function launchHarness(
     {
       home: syncEnv.home,
       timeoutMs: syncEnv.installTimeoutMs,
-      platform: syncEnv.platform,
       runtime,
     },
   );
   const result = await (runtime.run ?? runLauncherProcess)(
-    executableCommand(prepared.currentBin, args, syncEnv.platform),
+    [prepared.currentBin, ...args],
     undefined,
     undefined,
     "inherit",
@@ -243,10 +236,9 @@ async function resolveVersion(
   packageName: string,
   distTag: string,
   timeoutMs: number,
-  platform: NodeJS.Platform = process.platform,
 ): Promise<string> {
   const result = await runLauncherProcess(
-    npmCommand(["view", `${packageName}@${distTag}`, "version"], platform),
+    ["npm", "view", `${packageName}@${distTag}`, "version"],
     undefined,
     timeoutMs,
     "pipe",
@@ -311,29 +303,25 @@ async function acquireCacheLock(layout: NpmCacheLayout, timeoutMs: number): Prom
   }
 }
 
-function updateCurrentAndPrevious(
-  layout: NpmCacheLayout,
-  version: string,
-  platform = process.platform,
-): void {
-  const expectedTarget =
-    platform === "win32"
-      ? path.join(layout.versionsDir, version)
-      : path.relative(path.dirname(layout.currentLink), path.join(layout.versionsDir, version));
+function updateCurrentAndPrevious(layout: NpmCacheLayout, version: string): void {
+  const expectedTarget = path.relative(
+    path.dirname(layout.currentLink),
+    path.join(layout.versionsDir, version),
+  );
   const currentTarget = readLinkTarget(layout.currentLink);
   if (currentTarget === expectedTarget) {
     return;
   }
   if (currentTarget) {
-    replaceLink(layout.previousLink, currentTarget, platform);
+    replaceLink(layout.previousLink, currentTarget);
   }
-  replaceLink(layout.currentLink, expectedTarget, platform);
+  replaceLink(layout.currentLink, expectedTarget);
 }
 
-function replaceLink(linkPath: string, target: string, platform = process.platform): void {
+function replaceLink(linkPath: string, target: string): void {
   const tempPath = `${linkPath}.${process.pid}.tmp`;
   fs.rmSync(tempPath, { recursive: true, force: true });
-  fs.symlinkSync(target, tempPath, platform === "win32" ? "junction" : "dir");
+  fs.symlinkSync(target, tempPath, "dir");
   fs.rmSync(linkPath, { recursive: true, force: true });
   fs.renameSync(tempPath, linkPath);
 }
@@ -378,18 +366,8 @@ function readLinkTarget(linkPath: string): string | undefined {
   }
 }
 
-function packageBinPath(root: string, bin: string, platform = process.platform): string {
-  const base = path.join(root, "node_modules", ".bin", bin);
-  if (platform === "win32") {
-    if (exists(`${base}.cmd`)) {
-      return `${base}.cmd`;
-    }
-    if (exists(`${base}.exe`)) {
-      return `${base}.exe`;
-    }
-  }
-  return base;
-}
+const packageBinPath = (root: string, bin: string): string =>
+  path.join(root, "node_modules", ".bin", bin);
 
 function validateSpec(spec: NpmPackageSpec): void {
   requireComponent(spec.tool, "tool");
@@ -410,47 +388,17 @@ function validateResolvedVersion(version: string): string {
   return version;
 }
 
-export function executableCommand(
-  executable: string,
-  args: readonly string[],
-  platform: NodeJS.Platform = process.platform,
-): string[] {
-  if (platform !== "win32" || !executable.toLowerCase().endsWith(".cmd")) {
-    return [executable, ...args];
-  }
-  return [
-    "powershell.exe",
-    "-NoLogo",
-    "-NoProfile",
-    "-NonInteractive",
-    "-ExecutionPolicy",
-    "Bypass",
-    "-Command",
-    "$command=$args[0];$commandArgs=@($args | Select-Object -Skip 1);& $command @commandArgs;exit $LASTEXITCODE",
-    executable,
-    ...args,
-  ];
-}
-
-export function npmCommand(
-  args: readonly string[],
-  platform: NodeJS.Platform = process.platform,
-): string[] {
-  return executableCommand(platform === "win32" ? "npm.cmd" : "npm", args, platform);
-}
-
 function currentCachedPackage(
   layout: NpmCacheLayout,
   spec: NpmPackageSpec,
-  platform = process.platform,
 ): { readonly version: string; readonly currentBin: string } | undefined {
   try {
     const target = readLinkTarget(layout.currentLink);
     if (!target) {
       return undefined;
     }
-    const currentBin = packageBinPath(layout.currentLink, spec.bin, platform);
-    if (!isExecutable(currentBin, platform)) {
+    const currentBin = packageBinPath(layout.currentLink, spec.bin);
+    if (!isExecutable(currentBin)) {
       return undefined;
     }
     const version = path.basename(target);
@@ -505,19 +453,10 @@ function requireComponent(value: string, label: string): void {
   }
 }
 
-function isExecutable(targetPath: string, platform = process.platform): boolean {
+function isExecutable(targetPath: string): boolean {
   try {
     const metadata = fs.statSync(targetPath);
-    return metadata.isFile() && (platform === "win32" || (metadata.mode & 0o111) !== 0);
-  } catch {
-    return false;
-  }
-}
-
-function exists(targetPath: string): boolean {
-  try {
-    fs.accessSync(targetPath);
-    return true;
+    return metadata.isFile() && (metadata.mode & 0o111) !== 0;
   } catch {
     return false;
   }

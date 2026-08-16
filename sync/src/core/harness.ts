@@ -64,7 +64,6 @@ export class SyncEnv {
   readonly installTimeoutMs: number;
   readonly harnesses: readonly Harness[];
   readonly platform: HostPlatform;
-  readonly localAppData: string | undefined;
 
   constructor(
     home: string,
@@ -78,7 +77,6 @@ export class SyncEnv {
     installTimeoutMs: number,
     harnesses: readonly Harness[],
     platform: HostPlatform = platformFromProcess(),
-    localAppData: string | undefined = process.env["LOCALAPPDATA"],
   ) {
     this.home = home;
     this.ssotHome = ssotHome;
@@ -91,20 +89,16 @@ export class SyncEnv {
     this.installTimeoutMs = installTimeoutMs;
     this.harnesses = harnesses;
     this.platform = platform;
-    this.localAppData = localAppData;
   }
 
   static fromSystem(): SyncEnv {
-    const homeCandidates =
-      process.platform === "win32"
-        ? [process.env["USERPROFILE"], process.env["HOME"], os.homedir()]
-        : [process.env["HOME"], process.env["USERPROFILE"], os.homedir()];
+    const homeCandidates = [process.env["HOME"], os.homedir()];
     const home = homeCandidates.find(
       (candidate): candidate is string =>
         typeof candidate === "string" && candidate.trim().length > 0,
     );
     if (!home) {
-      throw new Error("missing HOME/USERPROFILE");
+      throw new Error("missing HOME");
     }
     return SyncEnv.fromHome(home, INSTALL_TIMEOUT_SECONDS * 1000);
   }
@@ -114,7 +108,6 @@ export class SyncEnv {
     installTimeoutMs: number,
     options: {
       readonly platform?: HostPlatform;
-      readonly localAppData?: string;
     } = {},
   ): SyncEnv {
     const agentsHome = path.join(home, ".config", "agents");
@@ -133,7 +126,6 @@ export class SyncEnv {
       installTimeoutMs,
       discoverHarnesses(home, harnessesHome, platform),
       platform,
-      options.localAppData ?? (platform === "win32" ? process.env["LOCALAPPDATA"] : undefined),
     );
   }
 
@@ -207,11 +199,7 @@ function isDirectory(candidate: string): boolean {
 }
 
 function platformFromProcess(): HostPlatform {
-  if (
-    process.platform === "darwin" ||
-    process.platform === "linux" ||
-    process.platform === "win32"
-  ) {
+  if (process.platform === "darwin" || process.platform === "linux") {
     return process.platform;
   }
   throw new Error(`unsupported platform: ${process.platform}`);

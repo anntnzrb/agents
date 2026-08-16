@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { panicMessage } from "@runtime/errors.ts";
 import { type CliProxyDeployment, cliProxyModelsUrl } from "./cliproxy-deployment.ts";
-import type { HostPlatform, SyncEnv } from "./harness.ts";
+import type { SyncEnv } from "./harness.ts";
 
 const TOOL_NAME = "cliproxyapi";
 const RELEASE_FILE = "cliproxyapi.release.json";
@@ -86,7 +86,7 @@ async function prepareCliProxy(
     throw new Error(`CLIProxyAPI has no release asset for ${platformKey}`);
   }
 
-  const executableName = syncEnv.platform === "win32" ? `${manifest.binary}.exe` : manifest.binary;
+  const executableName = manifest.binary;
   const cacheHome =
     runtime.cacheHome ?? process.env["XDG_CACHE_HOME"] ?? path.join(syncEnv.home, ".cache");
   const installDir = path.join(
@@ -110,7 +110,7 @@ async function prepareCliProxy(
     2,
   )}\n`;
 
-  if (!installedToolMatches(executable, receiptPath, receipt, syncEnv.platform)) {
+  if (!installedToolMatches(executable, receiptPath, receipt)) {
     fs.rmSync(installDir, { recursive: true, force: true });
     fs.mkdirSync(path.dirname(installDir), { recursive: true });
     const stageDir = fs.mkdtempSync(path.join(path.dirname(installDir), ".stage."));
@@ -129,9 +129,7 @@ async function prepareCliProxy(
       if (!fs.statSync(path.join(stageDir, executableName)).isFile()) {
         throw new Error(`CLIProxyAPI archive is missing ${executableName}`);
       }
-      if (syncEnv.platform !== "win32") {
-        fs.chmodSync(path.join(stageDir, executableName), 0o755);
-      }
+      fs.chmodSync(path.join(stageDir, executableName), 0o755);
       fs.writeFileSync(path.join(stageDir, "receipt.json"), receipt, "utf8");
       fs.renameSync(stageDir, installDir);
     } catch (error) {
@@ -238,17 +236,12 @@ function verifyChecksum(archive: string, expected: string): void {
   }
 }
 
-function installedToolMatches(
-  executable: string,
-  receiptPath: string,
-  receipt: string,
-  platform: HostPlatform,
-): boolean {
+function installedToolMatches(executable: string, receiptPath: string, receipt: string): boolean {
   try {
     const metadata = fs.statSync(executable);
     return (
       metadata.isFile() &&
-      (platform === "win32" || (metadata.mode & 0o111) !== 0) &&
+      (metadata.mode & 0o111) !== 0 &&
       fs.readFileSync(receiptPath, "utf8") === receipt
     );
   } catch {

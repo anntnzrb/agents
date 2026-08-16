@@ -14,11 +14,9 @@ import { join } from "node:path";
 
 import { SyncEnv } from "@core/harness.ts";
 import {
-  executableCommand,
   type LauncherProcessResult,
   launchHarness,
   npmCacheLayout,
-  npmCommand,
   prepareNpmPackage,
 } from "@core/launcher.ts";
 
@@ -278,46 +276,6 @@ test("interactive_harness_launch_is_unbounded_and_keeps_arguments", async () => 
     assert.equal(launchCall.timeout, undefined);
     assert.equal(launchCall.stdio, "inherit");
   });
-});
-
-test("windows_cmd_bins_and_npm_are_mediated_without_string_interpolation", () => {
-  const powershellPrefix = [
-    "powershell.exe",
-    "-NoLogo",
-    "-NoProfile",
-    "-NonInteractive",
-    "-ExecutionPolicy",
-    "Bypass",
-    "-Command",
-    "$command=$args[0];$commandArgs=@($args | Select-Object -Skip 1);& $command @commandArgs;exit $LASTEXITCODE",
-  ];
-  assert.deepEqual(
-    executableCommand(
-      "C:\\Users\\Test User\\bin\\codex.cmd",
-      ["--help", "hello world", "%PATH%", "a&b", 'a"b'],
-      "win32",
-    ),
-    [
-      ...powershellPrefix,
-      "C:\\Users\\Test User\\bin\\codex.cmd",
-      "--help",
-      "hello world",
-      "%PATH%",
-      "a&b",
-      'a"b',
-    ],
-  );
-  assert.deepEqual(executableCommand("C:\\bin\\codex.exe", ["--version"], "win32"), [
-    "C:\\bin\\codex.exe",
-    "--version",
-  ]);
-  assert.deepEqual(npmCommand(["view", "pkg@latest", "version"], "win32"), [
-    ...powershellPrefix,
-    "npm.cmd",
-    "view",
-    "pkg@latest",
-    "version",
-  ]);
 });
 
 function writePackageManifest(root: string, packageName: string, version: string): void {

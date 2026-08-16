@@ -10,8 +10,7 @@ export { rmEntry } from "@runtime/fs.ts";
 
 const ALPHANUMERIC_PATTERN = /[A-Za-z0-9]/;
 const SOURCE_SEPARATOR_PATTERN = /[/:]/;
-const TRAILING_PATH_SEPARATOR_PATTERN = /[\\/]+$/;
-const WINDOWS_ABSOLUTE_PATH_PATTERN = /^[A-Za-z]:[\\/]/;
+const TRAILING_PATH_SEPARATOR_PATTERN = /\/+$/;
 
 export function packageCacheDir(cacheRoot: string, source: string): string {
   const slug = sourceSlug(source);
@@ -103,16 +102,9 @@ function sourceSlug(source: string): string {
   return compact.length > 0 ? compact : "package";
 }
 
-const localPathBasename = (source: string): string =>
-  source.includes("\\") ? path.win32.basename(source) : path.basename(source);
+const localPathBasename = (source: string): string => path.basename(source);
 
-const isLocalPathSource = (source: string): boolean =>
-  path.isAbsolute(source) ||
-  WINDOWS_ABSOLUTE_PATH_PATTERN.test(source) ||
-  source.startsWith("\\\\") ||
-  source.startsWith(".\\") ||
-  source.startsWith("..\\") ||
-  source.includes("\\");
+const isLocalPathSource = (source: string): boolean => path.isAbsolute(source);
 
 function fnv1a64(input: string): string {
   let hash = 0xcbf29ce484222325n;

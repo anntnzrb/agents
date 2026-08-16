@@ -20,29 +20,12 @@ const detailFromOutput = (stdout: string, stderr: string): string => {
 };
 
 const hasPathSeparator = (command: string): boolean =>
-  command.includes(path.sep) || command.includes("/") || command.includes("\\");
+  command.includes(path.sep) || command.includes("/");
 
 const resolveCommandPath = (command: string, cwd?: string): string =>
   hasPathSeparator(command) && cwd && !path.isAbsolute(command)
     ? path.resolve(cwd, command)
     : command;
-
-const pathCommandCandidates = (command: string): string[] => {
-  if (process.platform !== "win32" || path.extname(command)) {
-    return [command];
-  }
-  const extensions = (process.env["PATHEXT"] ?? ".COM;.EXE;.BAT;.CMD")
-    .split(";")
-    .map((extension) => extension.trim())
-    .filter((extension) => extension.length > 0);
-  return [
-    command,
-    ...extensions.flatMap((extension) => [
-      `${command}${extension.toLowerCase()}`,
-      `${command}${extension.toUpperCase()}`,
-    ]),
-  ];
-};
 
 const executableForCommand = (command: string, cwd?: string): string => {
   const resolved = resolveCommandPath(command, cwd);
@@ -50,17 +33,16 @@ const executableForCommand = (command: string, cwd?: string): string => {
 };
 
 const existingPathCommand = async (command: string): Promise<string | undefined> => {
-  for (const candidate of pathCommandCandidates(command)) {
-    try {
-      const metadata = await fs.stat(candidate);
-      if (!metadata.isFile()) {
-        continue;
-      }
-      await fs.access(candidate, fsConstants.X_OK);
-      return candidate;
-    } catch {}
+  try {
+    const metadata = await fs.stat(command);
+    if (!metadata.isFile()) {
+      return undefined;
+    }
+    await fs.access(command, fsConstants.X_OK);
+    return command;
+  } catch {
+    return undefined;
   }
-  return undefined;
 };
 
 const resolveExecutable = async (command: string, cwd?: string): Promise<string | undefined> => {

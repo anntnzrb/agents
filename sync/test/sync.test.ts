@@ -268,8 +268,6 @@ const readText = (path: string): string => readFileSync(path, "utf8");
 
 const exists = (path: string): boolean => existsSync(path);
 
-const isPosix = (): boolean => process.platform === "darwin" || process.platform === "linux";
-
 const TEST_CLIPROXY_DEPLOYMENT = {
   server: { hostname: hostname() },
   listen: { host: "100.64.0.42", port: 9443 },
@@ -326,9 +324,7 @@ if (runtime) {
       const jobs = [{ src, dst, kind: "SecretTemplate", secretsPath }];
       assert.equal(await call<boolean>(runJobsWithPreserve, jobs), true);
       assert.equal(readText(dst), `api-key: ${JSON.stringify('quoted"value')}\n`);
-      if (isPosix()) {
-        assert.equal(lstatSync(dst).mode & 0o777, 0o600);
-      }
+      assert.equal(lstatSync(dst).mode & 0o777, 0o600);
 
       const first = lstatSync(dst);
       assert.equal(await call<boolean>(runJobsWithPreserve, jobs), true);
@@ -439,9 +435,7 @@ openai-compatibility:
       assert.deepEqual(config["openai-compatibility"][0]["api-key-entries"], [
         { "api-key": "router-one", weight: 1 },
       ]);
-      if (isPosix()) {
-        assert.equal(lstatSync(dst).mode & 0o777, 0o600);
-      }
+      assert.equal(lstatSync(dst).mode & 0o777, 0o600);
 
       const first = lstatSync(dst);
       assert.equal(await call<boolean>(runJobsWithPreserve, jobs), true);
@@ -564,10 +558,6 @@ openai-compatibility:
   });
 
   test("run_install_handles_success_failure_and_timeout", async () => {
-    if (!isPosix()) {
-      return;
-    }
-
     await withTempDir(async (root) => {
       const bin = join(root, "bin");
       mkdirSync(bin, { recursive: true });
@@ -591,12 +581,8 @@ openai-compatibility:
       const scriptDir = join(root, "scripts");
       mkdirSync(scriptDir, { recursive: true });
 
-      const command = process.platform === "win32" ? ".\\scripts\\ok" : "./scripts/ok";
-      if (process.platform === "win32") {
-        writeFile(join(scriptDir, "ok.cmd"), "@echo off\r\nexit /b 0\r\n");
-      } else {
-        writeExecutable(join(scriptDir, "ok"), "#!/bin/sh\nexit 0\n");
-      }
+      const command = "./scripts/ok";
+      writeExecutable(join(scriptDir, "ok"), "#!/bin/sh\nexit 0\n");
 
       assert.deepEqual(await call(runCommandOutcome, [command], root, 1000), {
         _tag: "Success",
@@ -621,10 +607,6 @@ openai-compatibility:
   });
 
   test("run_install_force_kills_term_trapping_process", async () => {
-    if (!isPosix()) {
-      return;
-    }
-
     await withTempDir(async (root) => {
       const bin = join(root, "bin");
       mkdirSync(bin, { recursive: true });
@@ -659,10 +641,6 @@ console.log(String(result));
   });
 
   test("main_reports_lock_contention_and_skips", async () => {
-    if (!isPosix()) {
-      return;
-    }
-
     await withTempDir(async (root) => {
       const helper = join(root, "helper.ts");
       writeFileSync(
@@ -1348,7 +1326,7 @@ setInterval(() => {}, 1_000);
 
   test("package_cache_dir_uses_basename_for_local_paths", async () => {
     const root = "/tmp/cache-root";
-    const sources = ["packages\\foo", ".\\packages\\foo", "C:\\x\\foo", "\\\\server\\share\\foo"];
+    const sources = ["/opt/packages/foo", "/var/tmp/foo/"];
 
     for (const source of sources) {
       const cacheDir = await call<string>(packageCacheDir, root, source);
@@ -1444,10 +1422,6 @@ setInterval(() => {}, 1_000);
   });
 
   test("run_sync_bootstraps_packages_and_patches_runtime_settings", async () => {
-    if (!isPosix()) {
-      return;
-    }
-
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
       writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
@@ -1561,10 +1535,6 @@ setInterval(() => {}, 1_000);
   });
 
   test("managed_state_replaces_identical_symlink", async () => {
-    if (!isPosix()) {
-      return;
-    }
-
     await withTempDir(async (root) => {
       const path = join(root, "state", "codex.json");
       const target = join(root, "target.json");

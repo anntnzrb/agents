@@ -1,4 +1,4 @@
-export type HostPlatform = "darwin" | "linux" | "win32";
+export type HostPlatform = "darwin" | "linux";
 export type AssetRename = readonly [string, string];
 
 export interface HarnessLauncherSpec {
@@ -42,7 +42,7 @@ export const HARNESS_ADAPTERS = [
   {
     id: "codex",
     homeSegments: [".codex"],
-    platforms: ["darwin", "linux", "win32"],
+    platforms: ["darwin", "linux"],
     launcher: {
       package: "@openai/codex",
       bin: "codex",
@@ -51,7 +51,7 @@ export const HARNESS_ADAPTERS = [
   {
     id: "deepseek",
     homeSegments: [".dsh"],
-    platforms: ["darwin", "linux", "win32"],
+    platforms: ["darwin", "linux"],
     launcher: {
       package: "@deepseek-ai/dsh",
       bin: "dsh",
@@ -60,7 +60,7 @@ export const HARNESS_ADAPTERS = [
   {
     id: "opencode",
     homeSegments: [".config", "opencode"],
-    platforms: ["darwin", "linux", "win32"],
+    platforms: ["darwin", "linux"],
     launcher: {
       package: "opencode-ai",
       bin: "opencode",
@@ -69,7 +69,7 @@ export const HARNESS_ADAPTERS = [
   {
     id: "pi",
     homeSegments: [".pi"],
-    platforms: ["darwin", "linux", "win32"],
+    platforms: ["darwin", "linux"],
     launcher: {
       package: "@earendil-works/pi-coding-agent",
       bin: "pi",
@@ -92,7 +92,7 @@ export const HARNESS_ADAPTERS = [
   {
     id: "omp",
     homeSegments: [".omp"],
-    platforms: ["darwin", "linux", "win32"],
+    platforms: ["darwin", "linux"],
     launcher: {
       package: "@oh-my-pi/pi-coding-agent",
       bin: "omp",

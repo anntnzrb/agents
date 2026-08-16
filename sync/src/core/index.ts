@@ -41,10 +41,7 @@ const SYNC_LOCK_FILE = "sync.lock";
 export type { SyncLock } from "@runtime/lock.ts";
 
 async function ensurePythonEnv(): Promise<void> {
-  const venvPython =
-    process.platform === "win32"
-      ? path.join(homedir(), ".omp", "python-env", "Scripts", "python.exe")
-      : path.join(homedir(), ".omp", "python-env", "bin", "python");
+  const venvPython = path.join(homedir(), ".omp", "python-env", "bin", "python");
   if (existsSync(venvPython)) {
     return;
   }

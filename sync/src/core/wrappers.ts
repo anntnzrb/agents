@@ -1,13 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { isErrno, panicMessage } from "@runtime/errors.ts";
-import type { Harness, HostPlatform, SyncEnv } from "./harness.ts";
+import type { Harness, SyncEnv } from "./harness.ts";
 import type { PreparedManagedTool } from "./managed-tools.ts";
 
 export const UNIX_WRAPPER_DIR = [".local", "bin"] as const;
-export const WINDOWS_WRAPPER_DIR = ["Programs", "Agents", "bin"] as const;
 export const WRAPPER_STATE_FILE = "wrappers.json";
-export const WINDOWS_PATH_MARKER_FILE = "windows-path-added";
 export const WRAPPER_MARKER = "agents-managed-wrapper:v1";
 
 interface WrapperState {
@@ -31,65 +29,32 @@ export interface WrapperReconcileResult {
 }
 
 export interface WrapperRuntime {
-  readonly platform?: HostPlatform;
-  readonly writeWindowsPath?: (directory: string) => boolean;
   readonly additionalDestinations?: readonly WrapperDestination[];
 }
 
-export function wrapperDirectory(
-  syncEnv: Pick<SyncEnv, "home" | "platform" | "localAppData">,
-  platform: HostPlatform = syncEnv.platform,
-): string {
-  if (platform === "win32") {
-    const localAppData = syncEnv.localAppData ?? path.join(syncEnv.home, "AppData", "Local");
-    return path.join(localAppData, ...WINDOWS_WRAPPER_DIR);
-  }
+export function wrapperDirectory(syncEnv: Pick<SyncEnv, "home">): string {
   return path.join(syncEnv.home, ...UNIX_WRAPPER_DIR);
 }
 
-export function wrapperPath(
-  syncEnv: Pick<SyncEnv, "home" | "platform" | "localAppData">,
-  harness: Harness,
-  platform: HostPlatform = syncEnv.platform,
-): string {
-  const suffix = platform === "win32" ? ".cmd" : "";
-  return path.join(wrapperDirectory(syncEnv, platform), `${harness.launcher.bin}${suffix}`);
+export function wrapperPath(syncEnv: Pick<SyncEnv, "home">, harness: Harness): string {
+  return path.join(wrapperDirectory(syncEnv), harness.launcher.bin);
 }
 
 export function wrapperDestinations(
-  syncEnv: Pick<SyncEnv, "home" | "runtimeHome" | "platform" | "localAppData" | "harnesses">,
-  platform: HostPlatform = syncEnv.platform,
+  syncEnv: Pick<SyncEnv, "home" | "runtimeHome" | "harnesses">,
 ): readonly HarnessWrapperDestination[] {
   return syncEnv.harnesses.map((harness) => {
-    const destination = wrapperPath(syncEnv, harness, platform);
+    const destination = wrapperPath(syncEnv, harness);
     return {
       harness,
       path: destination,
-      content: renderWrapper(syncEnv, harness, platform),
+      content: renderWrapper(syncEnv, harness),
     };
   });
 }
 
-export function renderWrapper(
-  syncEnv: Pick<SyncEnv, "runtimeHome">,
-  harness: Harness,
-  platform: HostPlatform,
-): string {
+export function renderWrapper(syncEnv: Pick<SyncEnv, "runtimeHome">, harness: Harness): string {
   const syncScript = path.join(syncEnv.runtimeHome, "sync", "src", "cli.ts");
-  if (platform === "win32") {
-    return [
-      "@echo off",
-      `rem ${WRAPPER_MARKER}`,
-      `if not exist "${windowsQuote(syncScript)}" (`,
-      "  echo agents: sync runtime is missing; run sync from the agents repository 1>&2",
-      "  exit /b 127",
-      ")",
-      `bun ${windowsQuote(syncScript)} launch ${harness.sourceName} -- %*`,
-      "exit /b %ERRORLEVEL%",
-      "",
-    ].join("\r\n");
-  }
-
   return [
     "#!/bin/sh",
     `# ${WRAPPER_MARKER}`,
@@ -104,30 +69,16 @@ export function renderWrapper(
 }
 
 export function managedToolWrapperDestination(
-  syncEnv: Pick<SyncEnv, "home" | "platform" | "localAppData">,
+  syncEnv: Pick<SyncEnv, "home">,
   tool: PreparedManagedTool,
-  platform: HostPlatform = syncEnv.platform,
 ): WrapperDestination {
-  const suffix = platform === "win32" ? ".cmd" : "";
   return {
-    path: path.join(wrapperDirectory(syncEnv, platform), `${tool.command}${suffix}`),
-    content: renderManagedToolWrapper(tool, platform),
+    path: path.join(wrapperDirectory(syncEnv), tool.command),
+    content: renderManagedToolWrapper(tool),
   };
 }
 
-export function renderManagedToolWrapper(
-  tool: PreparedManagedTool,
-  platform: HostPlatform,
-): string {
-  if (platform === "win32") {
-    return [
-      "@echo off",
-      `rem ${WRAPPER_MARKER}`,
-      `${windowsQuote(tool.executable)} --config ${windowsQuote(tool.configPath)} %*`,
-      "exit /b %ERRORLEVEL%",
-      "",
-    ].join("\r\n");
-  }
+function renderManagedToolWrapper(tool: PreparedManagedTool): string {
   return [
     "#!/bin/sh",
     `# ${WRAPPER_MARKER}`,
@@ -139,27 +90,11 @@ export function renderManagedToolWrapper(
 
 export function reconcileWrappers(syncEnv: SyncEnv, runtime: WrapperRuntime = {}): boolean {
   try {
-    const platform = runtime.platform ?? syncEnv.platform;
-    const desired = [
-      ...wrapperDestinations(syncEnv, platform),
-      ...(runtime.additionalDestinations ?? []),
-    ];
-    const result = reconcileWrapperFiles(syncEnv, desired, platform);
+    const desired = [...wrapperDestinations(syncEnv), ...(runtime.additionalDestinations ?? [])];
+    const result = reconcileWrapperFiles(syncEnv, desired);
     if (result.conflicts.length > 0) {
       for (const conflict of result.conflicts) {
         console.error(`sync: warning: preserving unmanaged wrapper conflict: ${conflict}`);
-      }
-    }
-    if (platform === "win32") {
-      const addPath =
-        runtime.writeWindowsPath ?? ((directory) => ensureWindowsUserPath(syncEnv, directory));
-      const markerPath = path.join(syncEnv.managedStateHome, WINDOWS_PATH_MARKER_FILE);
-      if (!exists(markerPath)) {
-        if (!addPath(wrapperDirectory(syncEnv, platform))) {
-          return false;
-        }
-        fs.mkdirSync(path.dirname(markerPath), { recursive: true });
-        fs.writeFileSync(markerPath, `${wrapperDirectory(syncEnv, platform)}\n`, "utf8");
       }
     }
     return true;
@@ -170,10 +105,8 @@ export function reconcileWrappers(syncEnv: SyncEnv, runtime: WrapperRuntime = {}
 }
 
 export function reconcileWrapperFiles(
-  syncEnv: Pick<SyncEnv, "managedStateHome"> &
-    Partial<Pick<SyncEnv, "home" | "platform" | "localAppData">>,
+  syncEnv: Pick<SyncEnv, "managedStateHome"> & Partial<Pick<SyncEnv, "home">>,
   desired: readonly WrapperDestination[],
-  platform: HostPlatform,
 ): WrapperReconcileResult {
   const statePath = path.join(syncEnv.managedStateHome, WRAPPER_STATE_FILE);
   const previous = readWrapperState(statePath);
@@ -181,13 +114,8 @@ export function reconcileWrapperFiles(
   const allowedDirectories = new Set(
     desired.map((entry) => path.resolve(path.dirname(entry.path))),
   );
-  if (syncEnv.home && syncEnv.platform) {
-    const wrapperEnv = {
-      home: syncEnv.home,
-      platform: syncEnv.platform,
-      localAppData: syncEnv.localAppData,
-    };
-    allowedDirectories.add(path.resolve(wrapperDirectory(wrapperEnv, platform)));
+  if (syncEnv.home) {
+    allowedDirectories.add(path.resolve(wrapperDirectory({ home: syncEnv.home })));
   }
   const owned: string[] = [];
   const conflicts: string[] = [];
@@ -210,7 +138,7 @@ export function reconcileWrapperFiles(
   }
 
   for (const entry of desired) {
-    const status = writeManagedWrapper(entry.path, entry.content, platform);
+    const status = writeManagedWrapper(entry.path, entry.content);
     if (status === "owned") {
       owned.push(entry.path);
     } else {
@@ -219,14 +147,10 @@ export function reconcileWrapperFiles(
   }
 
   fs.mkdirSync(path.dirname(statePath), { recursive: true });
-  writeWrapperState(
-    statePath,
-    {
-      version: 1,
-      entries: [...new Set(owned)].toSorted(),
-    },
-    platform,
-  );
+  writeWrapperState(statePath, {
+    version: 1,
+    entries: [...new Set(owned)].toSorted(),
+  });
 
   return { owned, conflicts: [...new Set(conflicts)], removed };
 }
@@ -265,7 +189,7 @@ export function readWrapperState(statePath: string): WrapperState {
   return { version: 1, entries: [...new Set(entries)].toSorted() };
 }
 
-function writeWrapperState(statePath: string, state: WrapperState, platform: HostPlatform): void {
+function writeWrapperState(statePath: string, state: WrapperState): void {
   const content = `${JSON.stringify(state, null, 2)}\n`;
   try {
     if (fs.readFileSync(statePath, "utf8") === content) {
@@ -279,9 +203,6 @@ function writeWrapperState(statePath: string, state: WrapperState, platform: Hos
   const tempPath = `${statePath}.${process.pid}.tmp`;
   fs.writeFileSync(tempPath, content, "utf8");
   try {
-    if (platform === "win32") {
-      fs.rmSync(statePath, { force: true });
-    }
     fs.renameSync(tempPath, statePath);
   } catch (error) {
     try {
@@ -293,11 +214,7 @@ function writeWrapperState(statePath: string, state: WrapperState, platform: Hos
   }
 }
 
-function writeManagedWrapper(
-  targetPath: string,
-  content: string,
-  platform: HostPlatform,
-): "owned" | "conflict" {
+function writeManagedWrapper(targetPath: string, content: string): "owned" | "conflict" {
   try {
     const metadata = fs.lstatSync(targetPath);
     if (!metadata.isFile() || metadata.isSymbolicLink()) {
@@ -318,13 +235,8 @@ function writeManagedWrapper(
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
   const tempPath = `${targetPath}.${process.pid}.tmp`;
   fs.writeFileSync(tempPath, content, "utf8");
-  if (process.platform !== "win32" && !targetPath.endsWith(".cmd")) {
-    fs.chmodSync(tempPath, 0o755);
-  }
+  fs.chmodSync(tempPath, 0o755);
   try {
-    if (platform === "win32") {
-      fs.rmSync(targetPath, { force: true });
-    }
     fs.renameSync(tempPath, targetPath);
   } catch (error) {
     try {
@@ -359,57 +271,10 @@ function removeWrapper(targetPath: string): void {
   }
 }
 
-export function ensureWindowsUserPath(syncEnv: SyncEnv, directory: string): boolean {
-  const markerPath = path.join(syncEnv.managedStateHome, WINDOWS_PATH_MARKER_FILE);
-  if (exists(markerPath)) {
-    return true;
-  }
-
-  const currentPath = process.env["PATH"] ?? "";
-  const normalizedDirectory = path.normalize(directory).toLowerCase();
-  const hasDirectory = currentPath
-    .split(path.delimiter)
-    .some((entry) => path.normalize(entry).toLowerCase() === normalizedDirectory);
-  if (!hasDirectory) {
-    const command = [
-      "powershell.exe",
-      "-NoProfile",
-      "-NonInteractive",
-      "-Command",
-      "$old=[Environment]::GetEnvironmentVariable('Path','User');$parts=@();if($old){$parts=$old -split ';'};if($parts -notcontains $args[0]){$parts += $args[0];[Environment]::SetEnvironmentVariable('Path',($parts -join ';'),'User')}",
-      directory,
-    ];
-    const result = Bun.spawnSync(command, { stdout: "ignore", stderr: "pipe" });
-    if (!result.success) {
-      console.error(
-        `sync: failed to add wrapper directory to Windows user PATH: ${result.stderr?.toString().trim() ?? "unknown error"}`,
-      );
-      return false;
-    }
-  }
-
-  fs.mkdirSync(path.dirname(markerPath), { recursive: true });
-  fs.writeFileSync(markerPath, `${directory}\n`, "utf8");
-  return true;
-}
-
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
-function windowsQuote(value: string): string {
-  return `"${value.replaceAll('"', '\\"')}"`;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function exists(targetPath: string): boolean {
-  try {
-    fs.accessSync(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
 }
