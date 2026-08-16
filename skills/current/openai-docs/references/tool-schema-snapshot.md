@@ -3,15 +3,15 @@
 Snapshot: **2026-07-16**; MCPorter **0.12.3**  
 Server: `openai-docs` at `https://developers.openai.com/mcp`  
 Inventory: **5 tools**  
-Live schema authoritative.  
-Load snapshot only for broad tool comparison or live discovery failure; NEVER before targeted live schema.  
+Live schema authoritative when inspected.
+Load this snapshot only for broad tool comparison or targeted live-schema failure; the focused skill already provides ordinary recipes.
 Declarations expose input schemas only; NEVER invent output fields or schemas.  
 Descriptions and input schemas below exact.
 
 Refresh when drift matters:
 
 ```text
-nix run github:numtide/llm-agents.nix#mcporter -- --config <agent-config-root>/assets/mcporter.jsonc list openai-docs --schema
+nix run github:numtide/llm-agents.nix#mcporter -- --config <agent-config-root>/assets/mcporter.jsonc list openai-docs.<tool> --schema
 ```
 
 MUST inspect actual tool results.
