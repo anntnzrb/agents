@@ -16,10 +16,10 @@ This is the isolated sync application.
 
 - Keep behavior changes deliberate.
 - Public callable entrypoint is `src/cli.ts`; wrappers/tooling invoke it with an explicit Bun runner.
+- Sync supports macOS and Linux only.
 - A supported `../harnesses/<harness>/` directory opts into that harness; `src/core/harness-adapters.ts` owns internal launch and sync metadata.
 - Use layer aliases for cross-boundary imports. Keep same-directory imports relative.
-- Sync owns generated launch wrappers: Unix targets live in `~/.local/bin`; Windows targets live in `%LOCALAPPDATA%/Programs/Agents/bin`.
-- Unix PATH is assumed to be configured. Windows user PATH is updated at most once and recorded by the durable `windows-path-added` marker.
+- Sync owns generated launch wrappers under `~/.local/bin` and assumes that directory is on `PATH`.
 
 ## Managed Tool Contract
 

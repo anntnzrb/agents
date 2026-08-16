@@ -57,8 +57,7 @@ Other jobs use fixed generated targets:
 | `~/.local/share/agents/sync/` | Installed sync runtime |
 | `~/.local/share/agents/model-catalog/catalog.json` | Shared model-catalog job |
 | `~/.local/share/agents/sync-managed/` | Managed ownership and hook state |
-| `~/.local/bin/` | Unix harness and managed-tool wrappers |
-| `%LOCALAPPDATA%/Programs/Agents/bin/` | Windows harness wrappers |
+| `~/.local/bin/` | Harness and managed-tool wrappers |
 
 Sync replaces managed content in these targets. Durable changes belong in the matching committed source.
 

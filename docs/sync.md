@@ -1,6 +1,6 @@
 # Sync reference
 
-Sync reconciles the repository source at `~/.config/agents` with harness homes and installed runtime state. The public entrypoint is `sync/src/cli.ts` and requires an explicit Bun runner.
+Sync reconciles the repository source at `~/.config/agents` with harness homes and installed runtime state on macOS and Linux. The public entrypoint is `sync/src/cli.ts` and requires an explicit Bun runner.
 
 ## Command syntax
 

@@ -2,7 +2,7 @@
 
 `HARNESS_ADAPTERS` in `sync/src/core/harness-adapters.ts` is the source of truth for supported harnesses. A matching directory under `harnesses/` enables an adapter when the current platform appears in its `platforms` field.
 
-The current CLIProxyAPI release manifest supports only macOS ARM64 and Linux x86_64. On Windows, managed-tool preparation fails before wrapper reconciliation because the manifest has no Windows asset.
+Sync supports macOS and Linux only. The current CLIProxyAPI release manifest supports macOS ARM64 and Linux x86_64.
 
 ## Adapter metadata
 
@@ -39,7 +39,7 @@ API-key model IDs use the prefix declared by `x-model-sources`. The committed pr
 
 ## Launch wrappers
 
-Sync writes Unix wrappers under `~/.local/bin/`. On Windows, sync writes `.cmd` wrappers under `%LOCALAPPDATA%/Programs/Agents/bin/` and adds that directory to the user `PATH` once.
+Sync writes wrappers under `~/.local/bin/` and assumes that directory is on `PATH`.
 
 Each wrapper calls the installed sync runtime with the `launch` command. The launch path attempts reconciliation, prepares the cached npm package, forwards all arguments, and returns the harness exit status.
 

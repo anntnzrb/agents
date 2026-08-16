@@ -2,7 +2,7 @@
 
 This tutorial builds synced harness configuration, starts CLIProxyAPI on the configured gateway host, and verifies the shared model endpoint. Run it on the host whose name matches `server.hostname` in `assets/cliproxyapi.deployment.json`; client-only hosts use the safe readiness-gated path described in the [sync reference](sync.md).
 
-The managed CLIProxyAPI release supports macOS on ARM64 and Linux on x86_64. The harness adapters also support Windows, but the release manifest has no Windows CLIProxyAPI asset.
+Sync supports macOS and Linux only. The managed CLIProxyAPI release supports macOS on ARM64 and Linux on x86_64.
 
 ## Install the required commands
 
