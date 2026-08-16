@@ -51,19 +51,13 @@ cp secrets.local.example.json secrets.local.json
 chmod 600 secrets.local.json
 ```
 
-Generate a management key:
-
-```bash
-openssl rand -hex 32
-```
-
-Then edit the secrets file:
+Edit the secrets file:
 
 ```bash
 $EDITOR secrets.local.json
 ```
 
-Replace every `replace-me` value. The credential pools contain upstream provider API keys. Use `weight: 1` when accounts have equal priority. Clients do not need client keys; the tailnet is the access boundary.
+Replace every `replace-me` value. The credential pools contain upstream provider API keys. Use `weight: 1` when accounts have equal priority. Clients do not need client keys and the gateway has no management key; the tailnet is the access boundary.
 
 The repository ignores `secrets.local.json`. Keep the file out of Git and transfer it only through an encrypted channel.
 

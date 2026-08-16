@@ -18,13 +18,7 @@ chmod 600 secrets.local.json
 $EDITOR secrets.local.json
 ```
 
-Set a non-empty management key and every credential pool referenced by `assets/cliproxyapi.yaml.tmpl`. The gateway accepts client requests without client keys; the tailnet is the access boundary.
-
-Generate the local management key with:
-
-```bash
-openssl rand -hex 32
-```
+Set every credential pool referenced by `assets/cliproxyapi.yaml.tmpl`. The gateway accepts client requests without client keys; the tailnet is the access boundary. Upstream API keys come from the provider accounts themselves.
 
 Never commit `secrets.local.json` or files under `~/.cli-proxy-api/`.
 
@@ -99,21 +93,7 @@ The managed wrapper supplies `--config ~/.cli-proxy-api/config.yaml`. Sync reads
 
 ## Open the control panel
 
-Open the control panel at the configured gateway listener:
-
-```text
-http://<listen-host>:<listen-port>/management.html
-```
-
-For the current deployment, use:
-
-```text
-http://munich.trex-gamut.ts.net:8317/management.html
-```
-
-Authenticate with `CLIPROXY_MANAGEMENT_KEY`. The page is reachable without authentication, but its management API requires the key.
-
-Do not make durable configuration changes in the control panel. Sync replaces the generated configuration from `assets/cliproxyapi.yaml.tmpl` and `secrets.local.json`.
+The control panel page is served at the configured gateway listener, but its management API is disabled because the deployment has no management key. All management endpoints answer `403`. Configure the gateway through the repository: edit `assets/cliproxyapi.yaml.tmpl` and `secrets.local.json`, then run sync.
 
 ## Verify model access
 
@@ -153,7 +133,7 @@ The forced refresh bypasses freshness windows and rejects stale fallback data. U
 
 ## Deploy on a home server
 
-Bind the gateway only to a trusted private interface. For a Tailscale deployment, use the server's tailnet address. Remote management is enabled for tailnet clients and requires `CLIPROXY_MANAGEMENT_KEY`.
+Bind the gateway only to a trusted private interface. For a Tailscale deployment, use the server's tailnet address. The management API is disabled; the tailnet is the access boundary.
 
 Do not expose the gateway through the public internet, Tailscale Funnel, or an untrusted LAN.
 

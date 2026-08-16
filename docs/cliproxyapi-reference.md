@@ -1,6 +1,6 @@
 # CLIProxyAPI reference
 
-CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses configured to use it. `assets/cliproxyapi.deployment.json` is the only deployment-specific source. It selects the gateway host, server listener, and client endpoint. Remote management and the control panel are available to clients that can reach the private listener and authenticate with the management key.
+CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses configured to use it. `assets/cliproxyapi.deployment.json` is the only deployment-specific source. It selects the gateway host, server listener, and client endpoint. The management API and control panel are disabled; the tailnet is the access boundary.
 
 ## Artifacts
 
@@ -47,11 +47,10 @@ To move the gateway, change the host and endpoint fields in `assets/cliproxyapi.
 
 ## Local secrets
 
-`secrets.local.json` contains two top-level fields:
+`secrets.local.json` contains one top-level field:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `CLIPROXY_MANAGEMENT_KEY` | Non-empty string | Local management API and control-panel credential |
 | `CLIPROXY_CREDENTIAL_POOLS` | Non-empty object of account arrays | API-key accounts grouped by provider source |
 
 Each credential account accepts these fields:
@@ -70,7 +69,7 @@ The renderer rejects unknown account fields, duplicate keys within a pool, inval
 
 Sync writes the generated configuration and the shared model catalog with mode `0600`.
 
-The generated configuration contains a bcrypt hash of `CLIPROXY_MANAGEMENT_KEY`. Sync reuses the existing hash when the plaintext key still matches, which keeps an unchanged sync idempotent.
+The generated configuration contains no management key; the gateway disables its management API and control panel when no key is configured.
 
 No harness reads `secrets.local.json`. The gateway accepts client requests without client keys; harness providers send a static placeholder key because their SDKs require a non-empty value.
 
@@ -145,9 +144,9 @@ The repository has no quota-monitoring service and does not generate quota dashb
 
 ## Control panel
 
-The control panel is available at `http://<listen-host>:<listen-port>/management.html`. The current deployment uses `http://munich.trex-gamut.ts.net:8317/management.html`. The page itself is public on the private listener. Its management API uses `CLIPROXY_MANAGEMENT_KEY` for authentication.
+The gateway disables its management API and control panel because the deployment has no management key. Every management endpoint answers `403`. Configure the gateway through the repository: edit `assets/cliproxyapi.yaml.tmpl` and `secrets.local.json`, then run sync.
 
-Remote management is enabled on the private Tailscale listener. The template also sets `remote-management.disable-auto-update-panel` to `true`.
+The template keeps `remote-management.disable-auto-update-panel` at `true`.
 
 ## Provider limits
 

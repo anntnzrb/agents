@@ -65,7 +65,7 @@ The readiness job compares the local OS hostname with `server.hostname`:
 
 Endpoint publication then replaces all configured `${CLIPROXY_CLIENT_BASE_URL}` harness targets as one transaction. Publication preserves the Codex-owned `[hooks.state]` and `[projects]` tail in `~/.codex/config.toml`. A write failure restores every endpoint's previous content and mode.
 
-The renderer parses and serializes YAML with Bun. The renderer bcrypt-hashes the management key and reuses the existing hash when the plaintext key is unchanged. The renderer also expands each credential pool into the CLIProxyAPI profile type selected by model metadata.
+The renderer parses and serializes YAML with Bun. The renderer expands each credential pool into the CLIProxyAPI profile type selected by model metadata.
 
 The job writes files through a temporary file and an atomic rename. Invalid secrets or model data fail before the job replaces the generated configuration.
 
