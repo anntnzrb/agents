@@ -161,7 +161,7 @@ default_subagent_reasoning_effort = "max"
 interrupt_message = true
 
 # (see codex-rs issue #32031)
-[multi_agent_v2]
+[features.multi_agent_v2]
 hide_spawn_agent_metadata = false
 expose_spawn_agent_model_overrides = true
 
