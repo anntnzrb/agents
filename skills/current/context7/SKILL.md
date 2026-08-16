@@ -23,14 +23,14 @@ uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/m
 uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"<libraryId>","query":"<user question>"}'
 ```
 
-Before the first call in a session, discover the focused server with `uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc list context7 --brief`. Before the first call to each selected tool, inspect its live schema:
+These recipes encode the complete required inputs. Call them directly; do not list the server or inspect schemas first. If a call reports a missing tool or invalid input, inspect only that tool's live schema, correct the call, and retry once:
 
 ```text
 uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc list context7.resolve-library-id --schema
 uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc list context7.query-docs --schema
 ```
 
-Inspect only the tool needed for the next operation. Do not repeat successful discovery or schema inspection in the same session.
+Optional or unfamiliar inputs also require targeted schema inspection.
 
 ## Credentials
 
@@ -54,7 +54,7 @@ Inspect only the tool needed for the next operation. Do not repeat successful di
 4. Fetch docs with `context7.query-docs`
 5. Answer from the fetched docs. If Context7 fails, state the failure and do not silently pretend the answer is current
 
-Keep Context7 retrieval calls to three per user question unless the user explicitly asks for broader exploration. MCPorter discovery does not consume that retrieval budget.
+Keep Context7 retrieval calls to three per user question unless the user explicitly asks for broader exploration. MCPorter diagnostics do not consume that retrieval budget.
 
 ## Query discipline
 
