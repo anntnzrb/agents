@@ -71,23 +71,7 @@
    * PERMISSIONS
    * ************************************************************************ */
 
-  "permission": {
-    "edit": "allow",
-    "external_directory": {
-      "*": "allow",
-    },
-    "bash": {
-      // python
-      "python *": "deny",
-      "python3 *": "deny",
-      "uv *": "allow",
-
-      // git
-      "git merge *": "ask",
-      "git pull *": "ask",
-      "git push *": "ask",
-    },
-  },
+  "permission": "allow",
 
   /* **************************************************************************
    * SERVER
