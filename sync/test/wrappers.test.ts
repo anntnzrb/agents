@@ -96,6 +96,8 @@ test("wrapper_destinations_render_unix_and_windows_launchers", () => {
     assert.equal(unix[0]?.content.startsWith("#!/bin/sh\n"), true);
     assert.equal(unix[0]?.content.includes(WRAPPER_MARKER), true);
     assert.equal(unix[0]?.content.includes("launch 'codex'"), true);
+    assert.equal(unix[0]?.content.includes("exit 127"), true);
+    assert.equal(unix[0]?.content.includes("sync runtime is missing"), true);
     assert.equal(
       unix[0]?.content.includes(join(home, ".local", "share", "agents", "sync", "src", "cli.ts")),
       true,
@@ -116,6 +118,8 @@ test("wrapper_destinations_render_unix_and_windows_launchers", () => {
     );
     assert.equal(windows[0]?.content.startsWith("@echo off\r\n"), true);
     assert.equal(windows[0]?.content.includes(`rem ${WRAPPER_MARKER}`), true);
+    assert.equal(windows[0]?.content.includes("exit /b 127"), true);
+    assert.equal(windows[0]?.content.includes("sync runtime is missing"), true);
     assert.equal(windows[0]?.content.endsWith("%ERRORLEVEL%\r\n"), true);
     const deepseekWindows = windows.find((entry) => entry.harness.sourceName === "deepseek");
     assert.equal(

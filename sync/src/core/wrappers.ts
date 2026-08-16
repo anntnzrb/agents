@@ -80,6 +80,10 @@ export function renderWrapper(
     return [
       "@echo off",
       `rem ${WRAPPER_MARKER}`,
+      `if not exist "${windowsQuote(syncScript)}" (`,
+      "  echo agents: sync runtime is missing; run sync from the agents repository 1>&2",
+      "  exit /b 127",
+      ")",
       `bun ${windowsQuote(syncScript)} launch ${harness.sourceName} -- %*`,
       "exit /b %ERRORLEVEL%",
       "",
@@ -90,6 +94,10 @@ export function renderWrapper(
     "#!/bin/sh",
     `# ${WRAPPER_MARKER}`,
     "set -eu",
+    `if [ ! -f ${shellQuote(syncScript)} ]; then`,
+    "  echo 'agents: sync runtime is missing; run sync from the agents repository' >&2",
+    "  exit 127",
+    "fi",
     `exec bun ${shellQuote(syncScript)} launch ${shellQuote(harness.sourceName)} -- "$@"`,
     "",
   ].join("\n");
