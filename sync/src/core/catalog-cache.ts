@@ -1,11 +1,12 @@
 import fs from "node:fs";
 import { syncTextFile } from "./secret-template.ts";
 
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 const CACHE_MODE = 0o600;
 
 interface CacheEntry {
   readonly version: typeof CACHE_VERSION;
+  readonly url: string;
   readonly fetchedAt: number;
   readonly etag?: string;
   readonly payload: unknown;
@@ -32,7 +33,7 @@ export type CatalogFetch = (input: string | URL | Request, init?: RequestInit) =
 export async function fetchCachedJson(request: CachedJsonRequest): Promise<CachedJsonResult> {
   validateRequest(request);
   const now = request.now ?? Date.now;
-  const cached = readCache(request.cachePath);
+  const cached = readCache(request.cachePath, request.url);
   if (!request.force && cached && now() - cached.fetchedAt < request.ttlMs) {
     return { payload: cached.payload, source: "cache" };
   }
@@ -61,6 +62,7 @@ export async function fetchCachedJson(request: CachedJsonRequest): Promise<Cache
     const etag = response.headers.get("etag");
     const entry: CacheEntry = {
       version: CACHE_VERSION,
+      url: request.url,
       fetchedAt: now(),
       ...(etag ? { etag } : {}),
       payload: await response.json(),
@@ -85,7 +87,7 @@ function validateRequest(request: CachedJsonRequest): void {
   }
 }
 
-function readCache(path: string): CacheEntry | undefined {
+function readCache(path: string, requestUrl: string): CacheEntry | undefined {
   try {
     const value: unknown = JSON.parse(fs.readFileSync(path, "utf8"));
     if (
@@ -94,6 +96,9 @@ function readCache(path: string): CacheEntry | undefined {
       Array.isArray(value) ||
       !("version" in value) ||
       value.version !== CACHE_VERSION ||
+      !("url" in value) ||
+      typeof value.url !== "string" ||
+      value.url !== requestUrl ||
       !("fetchedAt" in value) ||
       typeof value.fetchedAt !== "number" ||
       !Number.isSafeInteger(value.fetchedAt) ||
@@ -105,6 +110,7 @@ function readCache(path: string): CacheEntry | undefined {
     const etag = "etag" in value ? value.etag : undefined;
     return {
       version: CACHE_VERSION,
+      url: value.url,
       fetchedAt: value.fetchedAt,
       ...(typeof etag === "string" ? { etag } : {}),
       payload: value.payload,

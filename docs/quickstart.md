@@ -1,6 +1,6 @@
 # Set up agent configuration
 
-This tutorial builds synced harness configuration, starts CLIProxyAPI, and verifies the local model endpoint.
+This tutorial builds synced harness configuration, starts CLIProxyAPI on the configured gateway host, and verifies the shared model endpoint. Run it on the host whose name matches `server.hostname` in `assets/cliproxyapi.deployment.json`; client-only hosts use the safe readiness-gated path described in the [sync reference](sync.md).
 
 The managed CLIProxyAPI release supports macOS on ARM64 and Linux on x86_64. The harness adapters also support Windows, but the release manifest has no Windows CLIProxyAPI asset.
 
@@ -115,7 +115,7 @@ Start the gateway in a separate terminal:
 cli-proxy-api
 ```
 
-The process listens on `127.0.0.1:8317`. Leave it running for the remaining steps.
+The process uses the listener from `assets/cliproxyapi.deployment.json`. Leave it running for the remaining steps.
 
 ## Refresh the model catalog
 
@@ -133,10 +133,11 @@ Read the client key without printing it, then query the model endpoint:
 
 ```bash
 CLIPROXY_KEY="$(jq -r '.CLIPROXY_CLIENT_API_KEYS[0]' secrets.local.json)"
-curl -fsS http://127.0.0.1:8317/v1/models \
+CLIPROXY_BASE_URL="$(jq -r '.client.baseUrl' assets/cliproxyapi.deployment.json)"
+curl -fsS "$CLIPROXY_BASE_URL/models" \
 	-H "Authorization: Bearer $CLIPROXY_KEY" | \
 	jq -e '.data | type == "array" and length > 0'
-unset CLIPROXY_KEY
+unset CLIPROXY_BASE_URL CLIPROXY_KEY
 ```
 
 `jq` prints `true`. The exact model IDs depend on the current upstream catalogs and authenticated OAuth accounts.

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { panicMessage } from "@runtime/errors.ts";
+import { type CliProxyDeployment, cliProxyModelsUrl } from "./cliproxy-deployment.ts";
 import type { HostPlatform, SyncEnv } from "./harness.ts";
 
 const TOOL_NAME = "cliproxyapi";
@@ -9,6 +10,8 @@ const RELEASE_FILE = "cliproxyapi.release.json";
 const COMPONENT_PATTERN = /^[A-Za-z0-9._-]+$/;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+
+type FetchImplementation = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 type SupportedArch = "arm64" | "x64";
 
@@ -55,9 +58,13 @@ export async function prepareManagedTools(
   return [await prepareCliProxy(syncEnv, manifestPath, runtime)];
 }
 
-export async function isCliProxyRunning(timeoutMs = 500): Promise<boolean> {
+export async function isCliProxyRunning(
+  deployment: CliProxyDeployment,
+  timeoutMs = 500,
+  fetchImpl: FetchImplementation = fetch,
+): Promise<boolean> {
   try {
-    await fetch("http://127.0.0.1:8317/v1/models", {
+    await fetchImpl(cliProxyModelsUrl(deployment), {
       signal: AbortSignal.timeout(timeoutMs),
     });
     return true;

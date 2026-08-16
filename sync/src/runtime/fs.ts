@@ -119,6 +119,9 @@ function syncManagedTreeRecursive(
   }
 
   for (const srcEntry of srcEntries) {
+    if (preservePaths.includes(srcEntry.name)) {
+      continue;
+    }
     const childSrc = path.join(src, srcEntry.name);
     const childDst = path.join(dst, srcEntry.name);
     const childPreservePaths = childPreserve(preservePaths, srcEntry.name);
@@ -146,6 +149,9 @@ function syncManagedChildrenRecursive(
   ensureDirectory(dst);
 
   for (const srcEntry of fs.readdirSync(src, { withFileTypes: true })) {
+    if (preservePaths.includes(srcEntry.name)) {
+      continue;
+    }
     const childSrc = path.join(src, srcEntry.name);
     const childDst = path.join(dst, srcEntry.name);
     const childPreservePaths = childPreserve(preservePaths, srcEntry.name);

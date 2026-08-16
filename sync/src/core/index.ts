@@ -173,7 +173,7 @@ export async function runSync(
     success &&
     options.warnManagedServices &&
     managedTools.some((tool) => tool.name === "cliproxyapi") &&
-    !(await isCliProxyRunning())
+    !(await isCliProxyRunning(syncPlan.cliProxyDeployment))
   ) {
     warn("CLIProxyAPI is installed but not running; start it with: cli-proxy-api");
   }

@@ -12,11 +12,17 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CliProxyDeployment } from "@core/cliproxy-deployment.ts";
 import { SyncEnv } from "@core/harness.ts";
-import { prepareManagedTools } from "@core/managed-tools.ts";
+import { isCliProxyRunning, prepareManagedTools } from "@core/managed-tools.ts";
 
 const ARCHIVE = "fixture archive";
 const CHECKSUM = createHash("sha256").update(ARCHIVE).digest("hex");
+const DEPLOYMENT: CliProxyDeployment = {
+  server: { hostname: "test-gateway" },
+  listen: { host: "100.64.0.42", port: 9443 },
+  client: { baseUrl: "https://gateway.example.test:9443/v1" },
+};
 
 function withTempHome<T>(fn: (home: string) => T | Promise<T>): Promise<T> {
   const home = mkdtempSync(join(tmpdir(), "agents-managed-tool-test-"));
@@ -104,4 +110,17 @@ test("managed_tool_rejects_platform_without_pinned_asset", async () => {
       /no release asset for linux-arm64/,
     );
   });
+});
+
+test("managed_tool_health_check_targets_deployment_client", async () => {
+  const calls: string[] = [];
+  const healthy = await isCliProxyRunning(DEPLOYMENT, 500, async (input) => {
+    calls.push(
+      typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url,
+    );
+    return new Response(null, { status: 503 });
+  });
+
+  assert.equal(healthy, true);
+  assert.deepEqual(calls, ["https://gateway.example.test:9443/v1/models"]);
 });

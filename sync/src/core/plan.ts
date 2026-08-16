@@ -2,6 +2,13 @@ import fs from "node:fs";
 import { join, posix } from "node:path";
 import { assertNever, panicMessage } from "@runtime/errors.ts";
 import {
+  CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER,
+  type CliProxyDeployment,
+  type CliProxyEndpointTarget,
+  isCliProxyGatewayHost,
+  readCliProxyDeployment,
+} from "./cliproxy-deployment.ts";
+import {
   type Harness,
   harnessInstructionFileName,
   harnessInstructionTarget,
@@ -15,9 +22,21 @@ import {
   type SyncEnv,
 } from "./harness.ts";
 
-export type JobKind = "File" | "Dir" | "SecretTemplate" | "CliProxyConfig";
+export type JobKind =
+  | "File"
+  | "Dir"
+  | "SecretTemplate"
+  | "CliProxyReadiness"
+  | "CliProxyEndpointTemplates"
+  | "CliProxyConfig";
 
 export type Job =
+  | {
+      readonly kind: "CliProxyReadiness";
+      readonly deployment: CliProxyDeployment;
+      readonly secretsPath: string;
+      readonly gatewayHost: boolean;
+    }
   | {
       readonly src: string;
       readonly dst: string;
@@ -28,6 +47,7 @@ export type Job =
       readonly dst: string;
       readonly kind: "Dir";
       readonly scope?: "Tree" | "Children";
+      readonly preservePaths?: readonly string[];
     }
   | {
       readonly src: string;
@@ -36,10 +56,18 @@ export type Job =
       readonly secretsPath: string;
     }
   | {
+      readonly kind: "CliProxyEndpointTemplates";
+      readonly targets: readonly CliProxyEndpointTarget[];
+      readonly deployment: CliProxyDeployment;
+      readonly clientApiKeyPath: string;
+    }
+  | {
       readonly src: string;
       readonly dst: string;
       readonly kind: "CliProxyConfig";
       readonly secretsPath: string;
+      readonly deployment: CliProxyDeployment;
+      readonly gatewayHost?: boolean;
       readonly cacheRoot?: string;
       readonly runtimeRoot?: string;
     };
@@ -59,6 +87,8 @@ export interface SyncPlan {
   readonly harnesses: readonly HarnessPlan[];
   readonly jobs: readonly Job[];
   readonly hooks: readonly SyncHookPlan[];
+  readonly cliProxyDeployment: CliProxyDeployment;
+  readonly gatewayHost: boolean;
 }
 
 export type SyncHookPlan = PackageBootstrapHookPlan | ExtensionDepsHookPlan;
@@ -88,6 +118,10 @@ export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
   const harnesses = syncEnv.harnesses.map((harness) =>
     buildHarnessPlan(syncEnv, harness, assetNames),
   );
+  const cliProxyDeployment = readCliProxyDeployment(
+    join(syncEnv.assetsHome, "cliproxyapi.deployment.json"),
+  );
+  const gatewayHost = isCliProxyGatewayHost(cliProxyDeployment);
   return {
     harnesses,
     jobs: [
@@ -96,9 +130,11 @@ export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
       ...assetJobs(syncEnv, harnesses, assetNames),
       ...skillsJobs(syncEnv, harnesses),
       ...instructionJobs(syncEnv, harnesses),
-      ...configJobs(syncEnv),
+      ...configJobs(syncEnv, harnesses, cliProxyDeployment, gatewayHost),
     ],
     hooks: harnesses.flatMap((plan) => plan.hooks),
+    cliProxyDeployment,
+    gatewayHost,
   };
 }
 
@@ -172,12 +208,16 @@ function currentManagedEntryNames(
 }
 
 function harnessDirJobs(harnesses: readonly HarnessPlan[]): Job[] {
-  return harnesses.map((plan) => ({
-    src: plan.sourceRoot,
-    dst: plan.root,
-    kind: "Dir",
-    scope: "Children",
-  }));
+  return harnesses.map((plan) => {
+    const endpointTemplatePath = cliProxyEndpointTemplatePath(plan);
+    return {
+      src: plan.sourceRoot,
+      dst: plan.root,
+      kind: "Dir",
+      scope: "Children",
+      ...(endpointTemplatePath === undefined ? {} : { preservePaths: [endpointTemplatePath] }),
+    };
+  });
 }
 
 function assetJobs(
@@ -222,8 +262,39 @@ function instructionJobs(syncEnv: SyncEnv, harnesses: readonly HarnessPlan[]): J
   }));
 }
 
-function configJobs(syncEnv: SyncEnv): Job[] {
+const CLIPROXY_ENDPOINT_TEMPLATE_PATHS: Partial<Record<Harness["id"], string>> = {
+  codex: "config.toml",
+  opencode: "opencode.jsonc",
+  pi: join("extensions", "cliproxy", "index.ts"),
+  omp: "models.yml",
+};
+
+function configJobs(
+  syncEnv: SyncEnv,
+  harnesses: readonly HarnessPlan[],
+  deployment: CliProxyDeployment,
+  gatewayHost: boolean,
+): Job[] {
+  const endpointTargets = harnesses.flatMap((plan): CliProxyEndpointTarget[] => {
+    const relativePath = cliProxyEndpointTemplatePath(plan);
+    if (relativePath === undefined) {
+      return [];
+    }
+    const sourcePath = join(plan.sourceRoot, relativePath);
+    return [
+      {
+        src: sourcePath,
+        dst: join(plan.root, relativePath),
+      },
+    ];
+  });
   return [
+    {
+      kind: "CliProxyReadiness",
+      deployment,
+      secretsPath: join(syncEnv.home, ".config", "agents", "secrets.local.json"),
+      gatewayHost,
+    },
     {
       src: join(syncEnv.assetsHome, "mcporter.jsonc"),
       dst: join(syncEnv.mcporterHome, "mcporter.json"),
@@ -234,10 +305,30 @@ function configJobs(syncEnv: SyncEnv): Job[] {
       dst: join(syncEnv.home, ".cli-proxy-api", "config.yaml"),
       kind: "CliProxyConfig",
       secretsPath: join(syncEnv.home, ".config", "agents", "secrets.local.json"),
+      deployment,
+      gatewayHost,
       cacheRoot: join(syncEnv.home, ".cache", "agents", "model-catalog"),
       runtimeRoot: syncEnv.runtimeHome,
     },
+    {
+      kind: "CliProxyEndpointTemplates",
+      targets: endpointTargets,
+      deployment,
+      clientApiKeyPath: join(syncEnv.runtimeHome, "cliproxyapi", "client-api-key"),
+    },
   ];
+}
+
+function cliProxyEndpointTemplatePath(plan: HarnessPlan): string | undefined {
+  const relativePath = CLIPROXY_ENDPOINT_TEMPLATE_PATHS[plan.harness.id];
+  if (relativePath === undefined) {
+    return undefined;
+  }
+  const sourcePath = join(plan.sourceRoot, relativePath);
+  return fs.existsSync(sourcePath) &&
+    fs.readFileSync(sourcePath, "utf8").includes(CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER)
+    ? relativePath
+    : undefined;
 }
 
 function buildHookPlans(

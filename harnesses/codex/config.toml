@@ -35,7 +35,7 @@ When local read tools are unavailable, delegate filesystem inspection to the reg
 
 [model_providers.cliproxy]
 name = "CLIProxyAPI"
-base_url = "http://127.0.0.1:8317/v1"
+base_url = "${CLIPROXY_CLIENT_BASE_URL}"
 wire_api = "responses"
 
 [model_providers.cliproxy.auth]

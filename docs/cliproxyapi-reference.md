@@ -1,12 +1,13 @@
 # CLIProxyAPI reference
 
-CLIProxyAPI provides the local OpenAI-compatible endpoint for harnesses configured to use it. The generated configuration binds to `127.0.0.1:8317`, disables remote management, and keeps the local control panel enabled.
+CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses configured to use it. `assets/cliproxyapi.deployment.json` is the only deployment-specific source. It selects the gateway host, server listener, and client endpoint. Remote management stays disabled, while the control panel remains enabled for an SSH-forwarded local session.
 
 ## Artifacts
 
 | Artifact | Path |
 | --- | --- |
 | Portable configuration template | `assets/cliproxyapi.yaml.tmpl` |
+| Deployment endpoints | `assets/cliproxyapi.deployment.json` |
 | Release manifest and checksums | `assets/cliproxyapi.release.json` |
 | Local secrets | `secrets.local.json` |
 | Generated configuration | `~/.cli-proxy-api/config.yaml` |
@@ -16,6 +17,30 @@ CLIProxyAPI provides the local OpenAI-compatible endpoint for harnesses configur
 | Managed command | `~/.local/bin/cli-proxy-api` |
 
 The current release manifest contains an official macOS ARM64 archive and an official Linux x86_64 archive. Sync verifies the selected SHA-256 checksum and extracts only the manifest's executable.
+
+## Deployment endpoints
+
+`assets/cliproxyapi.deployment.json` is the source of truth for gateway placement:
+
+| Field | Constraint | Meaning |
+| --- | --- | --- |
+| `server.hostname` | Local OS hostname | Host that runs the CLIProxyAPI gateway |
+| `listen.host` | Specific host or interface address | Address that CLIProxyAPI binds |
+| `listen.port` | Integer from 1 through 65,535 | Port that CLIProxyAPI binds |
+| `client.baseUrl` | HTTP or HTTPS `/v1` URL without credentials, query, or fragment | Endpoint used by harnesses, catalog discovery, and health checks |
+
+Sync rejects wildcard listeners, unspecified IPv6 spellings, unknown fields, malformed client URLs, raw query or fragment delimiters, and invalid ports. It renders the listener into `~/.cli-proxy-api/config.yaml` and replaces `${CLIPROXY_CLIENT_BASE_URL}` in each configured harness target.
+
+Sync compares the local OS hostname with `server.hostname` to select the host role:
+
+- On the gateway host, sync writes the server configuration before it checks the client endpoint.
+- On another host, sync checks `client.baseUrl/models` with the candidate client key before it changes a CLIProxyAPI artifact.
+- An unavailable endpoint preserves the existing server configuration, client key, model catalog, and harness endpoints.
+- A ready endpoint updates the client key, model catalog, and harness endpoints while leaving the local server configuration unchanged.
+
+Endpoint publication is transactional.
+
+To move the gateway, change the host and endpoint fields in `assets/cliproxyapi.deployment.json`, deploy the repository and secrets to the new gateway host, start CLIProxyAPI there, and run sync on clients. Clients keep their current endpoint until the new `/models` endpoint returns a non-empty `data` array. Update harness sources or documentation only when the configuration schema changes.
 
 ## Local secrets
 
@@ -118,7 +143,7 @@ The repository has no quota-monitoring service and does not generate quota dashb
 
 ## Control panel
 
-The local control panel is `http://127.0.0.1:8317/management.html`. The control panel uses `CLIPROXY_MANAGEMENT_KEY` for authentication.
+The control panel is available at `http://127.0.0.1:<listen-port>/management.html` after an SSH port forward to the configured listener. The control panel uses `CLIPROXY_MANAGEMENT_KEY` for authentication.
 
 Remote management is disabled. The template also sets `remote-management.disable-auto-update-panel` to `true`.
 

@@ -17,7 +17,14 @@ import {
   runtimeModelCatalogPath,
   syncCliProxyConfig,
 } from "@core/cliproxy-config.ts";
+import type { CliProxyDeployment } from "@core/cliproxy-deployment.ts";
 import { modelsForSource } from "@core/model-catalog.ts";
+
+const DEPLOYMENT: CliProxyDeployment = {
+  server: { hostname: "test-gateway" },
+  listen: { host: "100.64.0.42", port: 9443 },
+  client: { baseUrl: "https://gateway.example.test:9443/v1" },
+};
 
 test("cliproxy_renderer_synthesizes_protocol_profiles_from_model_sources", () => {
   const source = {
@@ -69,6 +76,7 @@ x-model-sources:
         ],
       },
     },
+    DEPLOYMENT,
     "management-hash",
     new Map([["example", discovered]]),
   );
@@ -115,8 +123,8 @@ test("cliproxy_sync_discovers_once_then_reuses_fresh_catalog_cache", async () =>
     writeFileSync(legacyModelCatalogPath(cacheRoot), "legacy catalog\n");
     writeFileSync(
       src,
-      `host: 127.0.0.1
-port: 8317
+      `host: \${CLIPROXY_LISTEN_HOST}
+port: \${CLIPROXY_LISTEN_PORT}
 tls:
   enable: false
 remote-management:
@@ -156,7 +164,7 @@ x-model-sources:
       if (url === "https://example.test/v1/models") {
         return Response.json({ data: [{ id: "chat-next" }] });
       }
-      if (url === "http://127.0.0.1:8317/v1/models") {
+      if (url === "https://gateway.example.test:9443/v1/models") {
         return Response.json({
           data: [{ id: "oauth-next", owned_by: "example-oauth" }],
         });
@@ -171,13 +179,15 @@ x-model-sources:
       now: () => 1000,
     };
 
-    await syncCliProxyConfig(src, dst, secretsPath, options);
+    await syncCliProxyConfig(src, dst, secretsPath, DEPLOYMENT, options);
     expect(calls).toEqual([
       "https://models.dev/api.json",
       "https://example.test/v1/models",
-      "http://127.0.0.1:8317/v1/models",
+      "https://gateway.example.test:9443/v1/models",
     ]);
     expect(Bun.YAML.parse(readFileSync(dst, "utf8"))).toMatchObject({
+      host: DEPLOYMENT.listen.host,
+      port: DEPLOYMENT.listen.port,
       "openai-compatibility": [
         {
           prefix: "example",
@@ -197,7 +207,7 @@ x-model-sources:
     expect(readFileSync(runtimeClientApiKeyPath(runtimeRoot), "utf8")).toBe("client\n");
     expect(lstatSync(runtimeClientApiKeyPath(runtimeRoot)).mode & 0o777).toBe(0o600);
     const catalogStat = lstatSync(runtimeModelCatalogPath(runtimeRoot));
-    await syncCliProxyConfig(src, dst, secretsPath, {
+    await syncCliProxyConfig(src, dst, secretsPath, DEPLOYMENT, {
       ...options,
       forceModelRefresh: false,
       now: () => 1100,
@@ -205,6 +215,50 @@ x-model-sources:
     expect(calls).toEqual([]);
     expect(lstatSync(dst).ino).toBe(configStat.ino);
     expect(lstatSync(runtimeModelCatalogPath(runtimeRoot)).ino).toBe(catalogStat.ino);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("cliproxy_client_sync_updates_client_key_without_replacing_server_config", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cliproxy-client-config-test-"));
+  try {
+    const src = join(root, "config.yaml.tmpl");
+    const dst = join(root, "runtime", "config.yaml");
+    const secretsPath = join(root, "secrets.json");
+    const runtimeRoot = join(root, "data");
+    mkdirSync(join(root, "runtime"), { recursive: true });
+    writeFileSync(dst, "existing gateway config\n", { mode: 0o600 });
+    writeFileSync(
+      src,
+      "host: $" +
+        "{CLIPROXY_LISTEN_HOST}\n" +
+        "port: $" +
+        "{CLIPROXY_LISTEN_PORT}\n" +
+        "remote-management:\n" +
+        "  secret-key: $" +
+        "{CLIPROXY_MANAGEMENT_KEY}\n" +
+        "api-keys: $" +
+        "{CLIPROXY_CLIENT_API_KEYS}\n" +
+        "codex-api-key:\n" +
+        "  - x-credential-pool: fixture\n",
+    );
+    writeFileSync(
+      secretsPath,
+      `${JSON.stringify({
+        CLIPROXY_MANAGEMENT_KEY: "management",
+        CLIPROXY_CLIENT_API_KEYS: ["new-client"],
+        CLIPROXY_CREDENTIAL_POOLS: { fixture: [{ apiKey: "upstream" }] },
+      })}\n`,
+    );
+
+    await syncCliProxyConfig(src, dst, secretsPath, DEPLOYMENT, {
+      runtimeRoot,
+      writeServerConfig: false,
+    });
+
+    expect(readFileSync(dst, "utf8")).toBe("existing gateway config\n");
+    expect(readFileSync(runtimeClientApiKeyPath(runtimeRoot), "utf8")).toBe("new-client\n");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

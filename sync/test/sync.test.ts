@@ -12,7 +12,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
 const SYNC_ROOT = resolve(import.meta.dir, "..");
@@ -269,6 +269,12 @@ const exists = (path: string): boolean => existsSync(path);
 
 const isPosix = (): boolean => process.platform === "darwin" || process.platform === "linux";
 
+const TEST_CLIPROXY_DEPLOYMENT = {
+  server: { hostname: hostname() },
+  listen: { host: "100.64.0.42", port: 9443 },
+  client: { baseUrl: "https://gateway.example.test:9443/v1" },
+} as const;
+
 async function call<T>(fn: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<T> {
   return await resolveValue(fn(...args));
 }
@@ -407,7 +413,15 @@ openai-compatibility:
         })}\n`,
       );
 
-      const jobs = [{ src, dst, kind: "CliProxyConfig", secretsPath }];
+      const jobs = [
+        {
+          src,
+          dst,
+          kind: "CliProxyConfig",
+          secretsPath,
+          deployment: TEST_CLIPROXY_DEPLOYMENT,
+        },
+      ];
       assert.equal(await call<boolean>(runJobsWithPreserve, jobs), true);
       const config = Bun.YAML.parse(readText(dst)) as Record<string, any>;
       assert.equal(
@@ -470,7 +484,13 @@ codex-api-key:
 
       assert.equal(
         await call<boolean>(runJobsWithPreserve, [
-          { src, dst, kind: "CliProxyConfig", secretsPath },
+          {
+            src,
+            dst,
+            kind: "CliProxyConfig",
+            secretsPath,
+            deployment: TEST_CLIPROXY_DEPLOYMENT,
+          },
         ]),
         false,
       );
@@ -1478,6 +1498,10 @@ setInterval(() => {}, 1_000);
 }
 
 function makeSyncEnv(root: string): any {
+  writeFile(
+    join(root, ".config", "agents", "assets", "cliproxyapi.deployment.json"),
+    `${JSON.stringify(TEST_CLIPROXY_DEPLOYMENT)}\n`,
+  );
   for (const id of ["codex", "opencode", "pi", "omp"]) {
     mkdirSync(join(root, ".config", "agents", "harnesses", id), { recursive: true });
   }

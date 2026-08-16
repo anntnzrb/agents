@@ -23,6 +23,7 @@ The repository separates committed sources from generated files and host-local r
 | `assets/AGENTS.md` | Global harness-independent agent instructions |
 | `assets/mcporter.jsonc` | MCPorter configuration source |
 | `assets/cliproxyapi.yaml.tmpl` | CLIProxyAPI configuration template and model-source declarations |
+| `assets/cliproxyapi.deployment.json` | CLIProxyAPI listener and client endpoint source of truth |
 | `assets/cliproxyapi.release.json` | Pinned release assets and SHA-256 checksums |
 | `assets/skills-gate.md` | Policy and validation commands for shared skills |
 

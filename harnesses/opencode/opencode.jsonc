@@ -27,7 +27,7 @@
       "npm": "@ai-sdk/openai",
       "options": {
         "apiKey": "{file:~/.local/share/agents/cliproxyapi/client-api-key}",
-        "baseURL": "http://127.0.0.1:8317/v1",
+        "baseURL": "${CLIPROXY_CLIENT_BASE_URL}",
       },
     },
   },

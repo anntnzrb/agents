@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { join } from "node:path";
 import { panicMessage, warn } from "@runtime/errors.ts";
 import { type CachedJsonRequest, fetchCachedJson } from "./catalog-cache.ts";
+import { type CliProxyDeployment, cliProxyModelsUrl } from "./cliproxy-deployment.ts";
 import type {
   CatalogApi,
   CliProxyModelMapping,
@@ -51,6 +52,7 @@ export interface CliProxyModelSource extends ModelCatalogSource {
 type ConfigRecord = Record<string, unknown>;
 
 export interface CliProxyConfigSyncOptions {
+  readonly writeServerConfig?: boolean;
   readonly cacheRoot?: string;
   readonly runtimeRoot?: string;
   readonly forceModelRefresh?: boolean;
@@ -63,6 +65,7 @@ export async function syncCliProxyConfig(
   src: string,
   dst: string,
   secretsPath: string,
+  deployment: CliProxyDeployment,
   options: CliProxyConfigSyncOptions = {},
 ): Promise<void> {
   const template = readText(src, "CLIProxyAPI template");
@@ -79,17 +82,25 @@ export async function syncCliProxyConfig(
       ? { sources: new Map<string, SourceModels>(), modelsDev: undefined }
       : await discoverModelSources(sources, secrets, options);
   const managementKey = reusableManagementKey(dst, secrets.CLIPROXY_MANAGEMENT_KEY);
-  const content = renderCliProxyConfig(template, secrets, managementKey, discovery.sources);
-  try {
-    syncPrivateTextFile(dst, content);
-  } catch (error) {
-    throw new Error(`render CLIProxyAPI config ${src} -> ${dst} (${panicMessage(error)})`, {
-      cause: error,
-    });
+  const content = renderCliProxyConfig(
+    template,
+    secrets,
+    deployment,
+    managementKey,
+    discovery.sources,
+  );
+  if (options.writeServerConfig !== false) {
+    try {
+      syncPrivateTextFile(dst, content);
+    } catch (error) {
+      throw new Error(`render CLIProxyAPI config ${src} -> ${dst} (${panicMessage(error)})`, {
+        cause: error,
+      });
+    }
   }
   if (sources.length > 0) {
     await syncSharedModelCatalog(
-      content,
+      deployment,
       sources,
       discovery.sources,
       discovery.modelsDev,
@@ -103,6 +114,7 @@ export async function syncCliProxyConfig(
 export function renderCliProxyConfig(
   template: string,
   secrets: CliProxySecrets,
+  deployment: CliProxyDeployment,
   managementKey = secrets.CLIPROXY_MANAGEMENT_KEY,
   discoveredSources: ReadonlyMap<string, SourceModels> = new Map(),
 ): string {
@@ -113,8 +125,11 @@ export function renderCliProxyConfig(
     throw new Error(`parse CLIProxyAPI template (${panicMessage(error)})`, { cause: error });
   }
 
+  const unresolvedConfig = expectRecord(parsed, "CLIProxyAPI template root");
+  unresolvedConfig["host"] = deployment.listen.host;
+  unresolvedConfig["port"] = deployment.listen.port;
   const config = expectRecord(
-    resolvePlaceholders(parsed, secrets, managementKey),
+    resolvePlaceholders(unresolvedConfig, secrets, managementKey),
     "CLIProxyAPI template root",
   );
   const referencedPools = new Set<string>();
@@ -227,7 +242,7 @@ async function discoverModelSources(
 }
 
 async function syncSharedModelCatalog(
-  generatedConfig: string,
+  deployment: CliProxyDeployment,
   sources: readonly CliProxyModelSource[],
   discoveredSources: ReadonlyMap<string, SourceModels>,
   modelsDev: unknown,
@@ -242,7 +257,7 @@ async function syncSharedModelCatalog(
     gatewayPayload = (
       await cachedCatalogRequest(
         {
-          url: gatewayModelsUrl(generatedConfig),
+          url: cliProxyModelsUrl(deployment),
           cachePath: join(cacheRoot, "gateway.json"),
           ttlMs: GATEWAY_MODELS_TTL_MS,
           headers: {
@@ -302,22 +317,6 @@ function requireRuntimeRoot(value: string | undefined): string {
 
 function removeLegacyModelCatalog(cacheRoot: string): void {
   fs.rmSync(legacyModelCatalogPath(cacheRoot), { force: true });
-}
-
-function gatewayModelsUrl(generatedConfig: string): string {
-  const config = expectRecord(Bun.YAML.parse(generatedConfig), "generated CLIProxyAPI config");
-  const rawHost = requireNonEmptyString(config["host"], "host");
-  const host = rawHost === "0.0.0.0" || rawHost === "::" ? "127.0.0.1" : rawHost;
-  const port = config["port"];
-  if (typeof port !== "number" || !Number.isSafeInteger(port) || port < 1 || port > 65535) {
-    throw new Error("invalid generated CLIProxyAPI port");
-  }
-  const tls = expectRecord(config["tls"], "tls");
-  const url = new URL(`${tls["enable"] === true ? "https" : "http"}://localhost`);
-  url.hostname = host;
-  url.port = String(port);
-  url.pathname = "/v1/models";
-  return url.toString();
 }
 
 function resolvePlaceholders(

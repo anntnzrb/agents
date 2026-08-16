@@ -50,7 +50,7 @@ export default async function cliproxy(pi: ExtensionAPI): Promise<void> {
 
   pi.registerProvider("cliproxy", {
     name: "CLIProxyAPI",
-    baseUrl: "http://127.0.0.1:8317/v1",
+    baseUrl: "${CLIPROXY_CLIENT_BASE_URL}",
     apiKey: "!cat ~/.local/share/agents/cliproxyapi/client-api-key",
     api: "openai-responses",
     models,

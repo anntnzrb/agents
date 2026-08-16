@@ -52,6 +52,17 @@ The job reads `assets/cliproxyapi.yaml.tmpl` and `secrets.local.json`. The job w
 - `~/.local/share/agents/cliproxyapi/client-api-key`
 - `~/.local/share/agents/model-catalog/catalog.json`
 
+Sync validates `assets/cliproxyapi.deployment.json` before reconciliation. It injects `listen.host` and `listen.port` into the generated gateway configuration. It uses `client.baseUrl` for catalog discovery and health checks. The deployment file is the only source for these host and endpoint values.
+
+The readiness job compares the local OS hostname with `server.hostname`:
+
+- On the gateway host, the readiness state remains unset. The configuration job writes the server configuration, and endpoint publication checks the target afterward.
+- On another host, the readiness job checks the configured `/models` target with the first candidate client key from `secrets.local.json` before the configuration job runs.
+- An unavailable target leaves the existing CLIProxyAPI configuration, client key, model catalog, and harness endpoint files unchanged. It does not fail the initial client sync.
+- A ready target lets the configuration job update the client key and model catalog without replacing the local server configuration.
+
+Endpoint publication then replaces all configured `${CLIPROXY_CLIENT_BASE_URL}` harness targets as one transaction. A write failure restores every endpoint's previous content and mode.
+
 The renderer parses and serializes YAML with Bun. The renderer bcrypt-hashes the management key and reuses the existing hash when the plaintext key is unchanged. The renderer also expands each credential pool into the CLIProxyAPI profile type selected by model metadata.
 
 The job writes files through a temporary file and an atomic rename. Invalid secrets or model data fail before the job replaces the generated configuration.
@@ -66,7 +77,7 @@ The job writes files through a temporary file and an atomic rename. Invalid secr
 | Provider `/models` | 6 hours | `~/.cache/agents/model-catalog/source-<id>.json` |
 | CLIProxyAPI `/v1/models` | 1 hour | `~/.cache/agents/model-catalog/gateway.json` |
 
-Expired entries use ETag revalidation when the server supplied an ETag. A normal sync accepts a stale entry after a refresh error. A launch-time sync suppresses stale-cache warnings. A forced refresh rejects stale data.
+Each cache entry records the request URL. Sync ignores a cache entry created for another URL, so an endpoint migration cannot reuse the old gateway response. Expired entries use ETag revalidation when the server supplied an ETag. A normal sync accepts a stale entry after a refresh error. A launch-time sync suppresses stale-cache warnings. A forced refresh rejects stale data.
 
 After catalog publication, sync removes the obsolete `~/.cache/agents/model-catalog/catalog.json` file.
 

@@ -2,6 +2,12 @@
 
 Use this guide to change gateway credentials, authenticate ChatGPT, refresh models, run the gateway, and verify access. For field definitions and discovery rules, see the [CLIProxyAPI reference](cliproxyapi-reference.md).
 
+## Select the deployment
+
+Keep the gateway host and endpoint values in `assets/cliproxyapi.deployment.json`. Set `server.hostname` to the host that runs CLIProxyAPI. Set `listen.host` and `listen.port` to the listener on that host. Set `client.baseUrl` to the `/v1` endpoint that clients use. Do not copy these values into harness sources or documentation.
+
+When you move the gateway, update that file, start the new gateway, and run sync on clients. A client keeps its existing generated configuration and endpoints until the new endpoint passes the authenticated `/models` readiness check.
+
 ## Configure local secrets
 
 Create the ignored secrets file if it does not exist:
@@ -83,20 +89,29 @@ bun ./sync/src/cli.ts sync --refresh-models
 
 ## Start the gateway
 
-Start CLIProxyAPI in the foreground:
+On the configured gateway host, start CLIProxyAPI in the foreground:
 
 ```bash
 cli-proxy-api
 ```
 
-The managed wrapper supplies `--config ~/.cli-proxy-api/config.yaml`. Use a process manager when the gateway must survive logout or reboot. This repository does not install a service.
+The managed wrapper supplies `--config ~/.cli-proxy-api/config.yaml`. Sync reads the listener and client endpoint from `assets/cliproxyapi.deployment.json`. Use a process manager when the gateway must survive logout or reboot.
 
 ## Open the control panel
 
-Open this local URL:
+Reach the control panel through a Tailscale SSH port forward, then open this local URL:
 
 ```text
-http://127.0.0.1:8317/management.html
+http://127.0.0.1:<listen-port>/management.html
+```
+
+Read the configured listener, then forward a local port through the gateway's SSH host:
+
+```bash
+CLIPROXY_DEPLOYMENT=assets/cliproxyapi.deployment.json
+CLIPROXY_LISTEN_HOST="$(jq -r '.listen.host' "$CLIPROXY_DEPLOYMENT")"
+CLIPROXY_LISTEN_PORT="$(jq -r '.listen.port' "$CLIPROXY_DEPLOYMENT")"
+ssh -N -L "$CLIPROXY_LISTEN_PORT:$CLIPROXY_LISTEN_HOST:$CLIPROXY_LISTEN_PORT" <gateway-ssh-host>
 ```
 
 Authenticate with `CLIPROXY_MANAGEMENT_KEY`.
@@ -109,10 +124,12 @@ Query the gateway with the first configured client key:
 
 ```bash
 CLIPROXY_KEY="$(jq -r '.CLIPROXY_CLIENT_API_KEYS[0]' secrets.local.json)"
-curl -fsS http://127.0.0.1:8317/v1/models \
+CLIPROXY_DEPLOYMENT=assets/cliproxyapi.deployment.json
+CLIPROXY_BASE_URL="$(jq -r '.client.baseUrl' "$CLIPROXY_DEPLOYMENT")"
+curl -fsS "$CLIPROXY_BASE_URL/models" \
 	-H "Authorization: Bearer $CLIPROXY_KEY" | \
 	jq -r '.data[].id'
-unset CLIPROXY_KEY
+unset CLIPROXY_BASE_URL CLIPROXY_KEY
 ```
 
 The command prints the currently available model IDs. The list changes with provider catalogs and OAuth accounts.
@@ -121,10 +138,12 @@ To verify that the response contains at least one model, use:
 
 ```bash
 CLIPROXY_KEY="$(jq -r '.CLIPROXY_CLIENT_API_KEYS[0]' secrets.local.json)"
-curl -fsS http://127.0.0.1:8317/v1/models \
+CLIPROXY_DEPLOYMENT=assets/cliproxyapi.deployment.json
+CLIPROXY_BASE_URL="$(jq -r '.client.baseUrl' "$CLIPROXY_DEPLOYMENT")"
+curl -fsS "$CLIPROXY_BASE_URL/models" \
 	-H "Authorization: Bearer $CLIPROXY_KEY" | \
 	jq -e '.data | type == "array" and length > 0'
-unset CLIPROXY_KEY
+unset CLIPROXY_BASE_URL CLIPROXY_KEY
 ```
 
 `jq` prints `true` on success.

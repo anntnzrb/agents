@@ -72,3 +72,35 @@ test("model_catalog_cache_uses_stale_data_only_when_allowed", async () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("model_catalog_cache_does_not_reuse_data_for_a_different_request_url", async () => {
+  const root = mkdtempSync(join(tmpdir(), "catalog-cache-url-test-"));
+  try {
+    const cachePath = join(root, "catalog.json");
+    let requests = 0;
+    const fetchImpl = async (input: string | URL | Request) => {
+      requests += 1;
+      const url =
+        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      return Response.json({ data: [{ id: url }] });
+    };
+    const firstUrl = "https://old-gateway.test/v1/models";
+    const secondUrl = "https://new-gateway.test/v1/models";
+    const base = {
+      cachePath,
+      ttlMs: 60_000,
+      now: () => 1000,
+      fetch: fetchImpl,
+    };
+
+    await fetchCachedJson({ ...base, url: firstUrl });
+    const result = await fetchCachedJson({ ...base, url: secondUrl });
+
+    expect(result.source).toBe("network");
+    expect(result.payload).toEqual({ data: [{ id: secondUrl }] });
+    expect(requests).toBe(2);
+    expect(JSON.parse(readFileSync(cachePath, "utf8")).url).toBe(secondUrl);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
