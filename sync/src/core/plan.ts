@@ -285,6 +285,7 @@ function configJobs(
       {
         src: sourcePath,
         dst: join(plan.root, relativePath),
+        ...(plan.harness.id === "codex" ? { preserveTopLevels: ["hooks.state", "projects"] } : {}),
       },
     ];
   });

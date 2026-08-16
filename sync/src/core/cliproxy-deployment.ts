@@ -11,6 +11,8 @@ const IPV4_ZERO_PATTERN = /^(?:0+(?:\.0+){0,3}|0x0+)$/i;
 const IPV4_PART_PATTERN = /^\d{1,3}$/;
 const ZERO_IPV6_GROUP_PATTERN = /^0{1,4}$/i;
 const TRAILING_SLASH_PATTERN = /\/+$/;
+const NEWLINE_SPLIT_PATTERN = /(?<=\n)/;
+const TRAILING_CR_PATTERN = /\r$/;
 const CLIENT_BASE_URL_PLACEHOLDER_NAME = "CLIPROXY_CLIENT_BASE_URL";
 export const CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER = `\${${CLIENT_BASE_URL_PLACEHOLDER_NAME}}`;
 
@@ -32,6 +34,7 @@ export interface CliProxyDeployment {
 export interface CliProxyEndpointTarget {
   readonly src: string;
   readonly dst: string;
+  readonly preserveTopLevels?: readonly string[];
 }
 
 export interface CliProxyEndpointSyncOptions {
@@ -118,7 +121,12 @@ export async function publishCliProxyEndpointTemplates(
   const snapshots = targets.map((target) => snapshotEndpointTarget(target.dst));
   try {
     for (const target of targets) {
-      syncCliProxyEndpointTemplate(target.src, target.dst, deployment);
+      syncCliProxyEndpointTemplate(
+        target.src,
+        target.dst,
+        deployment,
+        target.preserveTopLevels ?? [],
+      );
     }
   } catch (error) {
     restoreEndpointTargets(snapshots);
@@ -168,19 +176,21 @@ export function syncCliProxyEndpointTemplate(
   src: string,
   dst: string,
   deployment: CliProxyDeployment,
+  preserveTopLevels: readonly string[] = [],
 ): void {
   let template: string;
   let mode: number;
   try {
     template = fs.readFileSync(src, "utf8");
-    mode = fs.statSync(src).mode & 0o777;
+    mode = existingFileMode(dst) ?? fs.statSync(src).mode & 0o777;
   } catch (error) {
     throw new Error(`read CLIProxyAPI endpoint template ${src} (${panicMessage(error)})`, {
       cause: error,
     });
   }
   try {
-    syncTextFile(dst, renderCliProxyEndpointTemplate(template, deployment), mode);
+    const rendered = renderCliProxyEndpointTemplate(template, deployment);
+    syncTextFile(dst, `${rendered}${readPreservedTopLevelTail(dst, preserveTopLevels)}`, mode);
   } catch (error) {
     throw new Error(
       `render CLIProxyAPI endpoint template ${src} -> ${dst} (${panicMessage(error)})`,
@@ -189,6 +199,59 @@ export function syncCliProxyEndpointTemplate(
       },
     );
   }
+}
+
+function existingFileMode(path: string): number | undefined {
+  try {
+    const metadata = fs.lstatSync(path);
+    return metadata.isFile() && !metadata.isSymbolicLink() ? metadata.mode & 0o777 : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function readPreservedTopLevelTail(path: string, topLevels: readonly string[]): string {
+  if (topLevels.length === 0) {
+    return "";
+  }
+  let existing: string;
+  try {
+    existing = fs.readFileSync(path, "utf8");
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return "";
+    }
+    throw error;
+  }
+
+  let firstHeader = -1;
+  for (const topLevel of topLevels) {
+    const header = `[${topLevel}`;
+    let offset = 0;
+    for (const line of existing.split(NEWLINE_SPLIT_PATTERN)) {
+      const trimmed = line.endsWith("\n")
+        ? line.slice(0, -1).replace(TRAILING_CR_PATTERN, "")
+        : line;
+      if (
+        trimmed.startsWith(header) &&
+        (trimmed[header.length] === "." || trimmed[header.length] === "]")
+      ) {
+        firstHeader = firstHeader < 0 ? offset : Math.min(firstHeader, offset);
+        break;
+      }
+      offset += line.length;
+    }
+  }
+  if (firstHeader < 0) {
+    return "";
+  }
+  const separatorStart =
+    firstHeader >= 2 && existing.slice(firstHeader - 2, firstHeader) === "\r\n"
+      ? firstHeader - 2
+      : firstHeader >= 1 && existing[firstHeader - 1] === "\n"
+        ? firstHeader - 1
+        : firstHeader;
+  return existing.slice(separatorStart);
 }
 
 function requireListenHost(value: unknown): string {
