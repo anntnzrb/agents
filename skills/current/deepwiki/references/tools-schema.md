@@ -1,7 +1,7 @@
 # DeepWiki MCP tool schema snapshot
 
-NEVER load this snapshot before live discovery. Load it only after discovery
-fails or for broad comparison; live contracts MUST override it.
+NEVER load this snapshot for ordinary known calls. Load it only after a call or
+targeted-schema failure, or for broad comparison; live contracts MUST override it.
 
 ## Snapshot metadata
 
@@ -17,8 +17,8 @@ fails or for broad comparison; live contracts MUST override it.
 nix run github:numtide/llm-agents.nix#mcporter -- --config assets/mcporter.jsonc list deepwiki --schema --json
 ```
 
-The command above captured this broad snapshot. Runtime calls MUST use live
-brief discovery plus the selected tool's schema first. NEVER invent structured
+The command above captured this broad snapshot. Runtime calls SHOULD use the
+focused skill's exact recipes directly. NEVER invent structured
 response fields: all tools publish only the common string envelope below, not a
 schema for the string's semantic content.
 
@@ -87,7 +87,7 @@ Exact input schema:
 Example:
 
 ```text
-mcporter --config assets/mcporter.jsonc call deepwiki.read_wiki_structure repoName=facebook/react
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call deepwiki.read_wiki_structure repoName=facebook/react
 ```
 
 ## `read_wiki_contents`
@@ -125,7 +125,7 @@ Exact input schema:
 Example:
 
 ```text
-mcporter --config assets/mcporter.jsonc call deepwiki.read_wiki_contents repoName=facebook/react
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call deepwiki.read_wiki_contents repoName=facebook/react
 ```
 
 `read_wiki_contents` may be large. SHOULD use structure or a narrow question
@@ -181,34 +181,34 @@ Exact input schema:
 Single-repository example:
 
 ```text
-mcporter --config assets/mcporter.jsonc call deepwiki.ask_question repoName=facebook/react question='Where is concurrent rendering implemented?'
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call deepwiki.ask_question repoName=facebook/react question='Where is concurrent rendering implemented?'
 ```
 
 Multiple-repository example:
 
 ```text
-mcporter --config assets/mcporter.jsonc call deepwiki.ask_question --args '{"repoName":["facebook/react","vuejs/core"],"question":"How do their reactivity models differ?"}'
+mcporter --config <agent-config-root>/assets/mcporter.jsonc call deepwiki.ask_question --args '{"repoName":["facebook/react","vuejs/core"],"question":"How do their reactivity models differ?"}'
 ```
 
 The description limits repository lists to 10, but JSON Schema omits `maxItems`.
 MUST respect the limit without claiming schema enforcement. MCPorter renders
 `repoName` as `unknown` because `anyOf` accepts a string or string array.
 
-## Discovery and drift
+## Drift recovery
 
-- MUST discover the live inventory first:
+- If a known call reports a missing tool, MAY inspect the brief inventory:
 
   ```text
-  mcporter --config assets/mcporter.jsonc list deepwiki --brief
+  mcporter --config <agent-config-root>/assets/mcporter.jsonc list deepwiki --brief
   ```
 
 - MUST inspect the selected tool's live schema:
 
   ```text
-  mcporter --config assets/mcporter.jsonc list deepwiki.ask_question --schema
+  mcporter --config <agent-config-root>/assets/mcporter.jsonc list deepwiki.ask_question --schema
   ```
 
-- MUST run from the agent-config root so the config path resolves
+- MUST resolve `<agent-config-root>` dynamically
 - If `mcporter` is absent, replace it with
   `nix run github:numtide/llm-agents.nix#mcporter --`; keep all arguments.
 - Live success MUST override this snapshot. On failure, MUST use only recorded
