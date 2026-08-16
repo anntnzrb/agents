@@ -90,6 +90,23 @@ No harness reads `secrets.local.json`. The gateway accepts client requests witho
 
 The `x-model-sources` marker does not appear in the generated configuration.
 
+## Model prefixes
+
+Every served model ID starts with the prefix of its origin:
+
+| Prefix | Origin | Prefix source |
+| --- | --- | --- |
+| `go` | OpenCode Go subscription | `x-model-sources` template entry |
+| `zen` | OpenCode Zen | `x-model-sources` template entry |
+| `deepseek` | DeepSeek API | `x-model-sources` template entry |
+| `chatgpt` | ChatGPT OAuth accounts | `prefix` field in `~/.cli-proxy-api/codex-*.json` |
+| `antigravity` | Google Antigravity OAuth accounts | `prefix` field in `~/.cli-proxy-api/antigravity-*.json` |
+| `grok` | XAI Grok OAuth accounts | `prefix` field in `~/.cli-proxy-api/xai-*.json` |
+
+Prefixes are single path segments. `force-model-prefix: true` drops the unprefixed ID of every account that carries a prefix, so identical upstream names from different origins never collide: `gpt-5.6-sol` exists only as `chatgpt/gpt-5.6-sol` and `zen/gpt-5.6-sol`.
+
+OAuth prefixes live in the generated auth files, not in the repository. Re-authentication recreates those files and drops the prefix; re-apply it as described in the [operations guide](cliproxyapi.md#scope-models-by-origin).
+
 ## Discovery inputs
 
 Sync combines three catalog sources:

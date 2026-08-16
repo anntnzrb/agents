@@ -117,6 +117,28 @@ sh assets/cliproxy-panel.rebuild.sh
 
 The script pins the upstream head commit. When upstream merges the PR into a release, replace the pinned build with the official asset and delete the panel job from `sync/src/core/plan.ts`.
 
+## Scope models by origin
+
+Every model the gateway serves carries an origin prefix. See the [prefix table](cliproxyapi-reference.md#model-sources) for the full mapping. `force-model-prefix` drops the unprefixed IDs, so each model request names its origin. A name like `gpt-5.6-sol` therefore appears only as `chatgpt/gpt-5.6-sol` or `zen/gpt-5.6-sol`.
+
+API-key pools get prefixes from `x-model-sources` in the template. OAuth accounts get prefixes from the top-level `prefix` field in their auth files under `~/.cli-proxy-api/`. Re-authentication recreates an auth file and drops its prefix. Re-apply it afterwards:
+
+```bash
+for f in ~/.cli-proxy-api/codex-*.json; do
+	jq '.prefix = "chatgpt"' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+done
+chmod 600 ~/.cli-proxy-api/codex-*.json
+systemctl --user restart cliproxyapi
+```
+
+After a prefix change, refresh the shared catalog so clients pick up the new IDs:
+
+```bash
+bun ./sync/src/cli.ts sync --refresh-models
+```
+
+Sessions and configurations that reference an old unprefixed ID stop working after its prefix appears; reselect the model.
+
 ## Verify model access
 
 The gateway accepts requests without client keys. Query it directly:
