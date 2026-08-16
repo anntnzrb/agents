@@ -58,6 +58,7 @@ The gateway accepts requests without client keys, and sync removes a stale `~/.l
 The readiness job compares the local OS hostname with `server.hostname`:
 
 - On the gateway host, the readiness state remains unset. The configuration job writes the server configuration, and endpoint publication checks the target afterward.
+- On the gateway host, sync also deploys `assets/cliproxy-panel.html` to `~/.cli-proxy-api/static/management.html`. The job compares content and mode first, so an unchanged run leaves the deployed panel in place. Client hosts do not receive the panel asset.
 - On another host, the readiness job checks the configured `/models` target without authentication.
 - A client host without local secrets refreshes the model catalog from the gateway `/models` response and public models.dev metadata; it never writes the server configuration.
 - An unavailable target leaves the existing CLIProxyAPI configuration, model catalog, and harness endpoint files unchanged. It does not fail the initial client sync.
