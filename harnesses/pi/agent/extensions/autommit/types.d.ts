@@ -4,6 +4,10 @@ declare module "@earendil-works/pi-coding-agent" {
   };
 }
 
+declare module "node:fs" {
+  export function existsSync(path: string): boolean;
+}
+
 declare module "node:fs/promises" {
   type FileHandle = {
     writeFile: (content: string, encoding?: string) => Promise<void>;
@@ -32,7 +36,32 @@ declare module "node:fs/promises" {
   export function writeFile(path: string, content: string, options?: unknown): Promise<void>;
 }
 
+declare module "node:child_process" {
+  export function execFile(
+    file: string,
+    args: readonly string[],
+    options: { cwd?: string; maxBuffer?: number },
+    callback: (error: Error | null, stdout: string, stderr: string) => void,
+  ): void;
+}
+
+declare module "node:util" {
+  export function promisify<T>(
+    fn: (
+      file: string,
+      args: readonly string[],
+      options: { cwd?: string; maxBuffer?: number },
+      callback: (error: Error | null, stdout: string, stderr: string) => void,
+    ) => void,
+  ): (
+    file: string,
+    args: readonly string[],
+    options: { cwd?: string; maxBuffer?: number },
+  ) => Promise<{ stdout: string; stderr: string }>;
+}
+
 declare module "node:os" {
+  export function homedir(): string;
   export function tmpdir(): string;
 }
 
@@ -68,30 +97,4 @@ declare const Buffer: BufferConstructor;
 declare class TextDecoder {
   constructor(label?: string, options?: { readonly fatal?: boolean });
   decode(input?: Uint8Array): string;
-}
-
-declare module "bun:test" {
-  interface Expectation<T = unknown> {
-    readonly not: Expectation<T>;
-    readonly rejects: Expectation<unknown>;
-    readonly resolves: Expectation<Awaited<T>>;
-    toBe(expected: unknown): void;
-    toBeGreaterThan(expected: number): void;
-    toContain(expected: unknown): void;
-    toEqual(expected: unknown): void;
-    toHaveLength(expected: number): void;
-    toMatch(expected: RegExp | string): void;
-    toBeNull(): void;
-    toThrow(expected?: unknown): void;
-  }
-
-  interface ExpectFactory {
-    <T>(actual: T): Expectation<T>;
-    any(constructor: unknown): unknown;
-    arrayContaining(values: readonly unknown[]): unknown;
-  }
-
-  export const describe: (name: string, callback: () => void) => void;
-  export const expect: ExpectFactory;
-  export const test: (name: string, callback: () => void | Promise<void>) => void;
 }
