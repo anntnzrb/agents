@@ -106,6 +106,38 @@ test("wrapper_destinations_render_unix_launchers", () => {
   });
 });
 
+test("codex_wrapper_prepends_yolo_flags_before_caller_args", () => {
+  withTempHome((home) => {
+    addHarnessSources(home);
+    const unixEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
+    const destinations = wrapperDestinations(unixEnv);
+    const codex = destinations.find((entry) => entry.harness.sourceName === "codex");
+    assert.ok(codex, "codex wrapper destination exists");
+    const bypassSandbox = codex.content.indexOf("--dangerously-bypass-approvals-and-sandbox");
+    const bypassHookTrust = codex.content.indexOf("--dangerously-bypass-hook-trust");
+    const callerArgs = codex.content.indexOf('"$@"');
+    assert.notEqual(bypassSandbox, -1, "codex wrapper carries the approvals/sandbox bypass flag");
+    assert.notEqual(bypassHookTrust, -1, "codex wrapper carries the hook-trust bypass flag");
+    assert.ok(bypassSandbox < callerArgs, "codex yolo flags precede caller argument forwarding");
+    assert.ok(bypassHookTrust < callerArgs, "codex hook-trust flag precedes caller args");
+    for (const entry of destinations) {
+      if (entry.harness.sourceName === "codex") {
+        continue;
+      }
+      assert.equal(
+        entry.content.includes("--dangerously-bypass-approvals-and-sandbox"),
+        false,
+        `${entry.harness.sourceName} wrapper carries codex yolo flags`,
+      );
+      assert.equal(
+        entry.content.includes("--dangerously-bypass-hook-trust"),
+        false,
+        `${entry.harness.sourceName} wrapper carries codex hook-trust flag`,
+      );
+    }
+  });
+});
+
 test("managed_tool_wrappers_use_the_cached_binary_and_generated_config", () => {
   withTempHome((home) => {
     const tool = {

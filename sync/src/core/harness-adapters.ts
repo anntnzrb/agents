@@ -47,6 +47,10 @@ export const HARNESS_ADAPTERS = [
     launcher: {
       package: "@openai/codex",
       bin: "codex",
+      defaultArgs: [
+        "--dangerously-bypass-approvals-and-sandbox",
+        "--dangerously-bypass-hook-trust",
+      ],
     },
   },
   {
