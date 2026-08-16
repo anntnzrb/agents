@@ -116,9 +116,9 @@ Sync combines four catalog sources:
 3. The live CLIProxyAPI `/v1/models?client_version=0.144.1` response supplies the gateway's reasoning levels, names, modalities, and context limits.
 4. [models.dev](https://models.dev/) supplies protocol hints, compatibility fields, output limits, and published costs.
 
-The normalized output is `~/.local/share/agents/model-catalog/catalog.json`. Model records are sorted by ID, and duplicate IDs fail publication.
+The normalized output is `~/.local/share/agents/model-catalog/catalog.json`. Model records are sorted by ID, and duplicate IDs fail publication. Each reasoning model keeps the discovered effort strings in order under `reasoningEfforts`; the catalog does not restrict them to a local enum. The rich response also supplies `defaultReasoningEffort` when the gateway advertises one.
 
-The rich gateway response overrides models.dev for live names, input modalities, context limits, and reasoning levels. This precedence covers provider-specific IDs that models.dev does not list, including Antigravity models. The catalog keeps models.dev metadata for fields that the gateway does not return.
+The rich gateway response overrides models.dev for live names, input modalities, context limits, reasoning efforts, and default effort. This precedence covers provider-specific IDs that models.dev does not list, including Antigravity models. The catalog keeps models.dev metadata for fields that the gateway does not return.
 
 ## Protocol selection
 

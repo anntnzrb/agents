@@ -72,7 +72,7 @@ The job writes files through a temporary file and an atomic rename. Invalid secr
 
 ## Model-catalog caches
 
-`assets/cliproxyapi/config.yaml.tmpl` declares provider endpoints, credential pools, public prefixes, and models.dev provider IDs under `x-model-sources`. Provider `/models` responses determine availability. The CLIProxyAPI rich model response supplies live reasoning levels, names, modalities, and context limits. [models.dev](https://models.dev/) supplies protocol hints, compatibility fields, output limits, and costs.
+`assets/cliproxyapi/config.yaml.tmpl` declares provider endpoints, credential pools, public prefixes, and models.dev provider IDs under `x-model-sources`. Provider `/models` responses determine availability. The CLIProxyAPI rich model response supplies ordered reasoning efforts, the default effort, names, modalities, and context limits. [models.dev](https://models.dev/) supplies protocol hints, compatibility fields, output limits, and costs. Sync preserves effort strings that it does not recognize instead of filtering them through a local enum.
 
 | Catalog | Freshness window | Cache file |
 | --- | --- | --- |
