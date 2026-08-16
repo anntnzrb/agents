@@ -47,7 +47,9 @@
 
 - Tool prompts teach when and why to use a tool, non-obvious input grammar, cross-tool routing, output caveats, and failures the agent can correct
 - Let the machine-readable schema own field names, types, requiredness, enums, and ranges. Repeat schema mechanics only when the schema is unavailable or history proves the reminder prevents failures
-- Discover the live inventory first, then inspect only the selected tool's schema. Use dated full-schema snapshots only for broad selection or discovery failure; NEVER load a snapshot before an available targeted schema
+- Focused skills own stable tool discovery: inline a compact inventory and exact common call shapes, then call known recipes directly
+- Large stable surfaces use an inline routing index plus targeted reference sections; dynamic or unknown surfaces use a brief live inventory, then only the selected tool's schema
+- Use dated full-schema snapshots only for broad selection or discovery failure; NEVER load a snapshot before an available targeted schema
 - Input schemas do not imply output schemas. Only a published output schema is contractual; observed responses are samples
 - Keep implementation internals, recovery machinery, caching, telemetry, and performance details out unless they change the agent's decision
 - Worked examples MUST match the real call grammar. Anti-patterns MUST come from observed failures, not speculation
