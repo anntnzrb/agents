@@ -107,4 +107,7 @@
   "share": "manual",
   "formatter": false,
   "lsp": false,
+    "experimental": {
+    "disable_paste_summary": true,
+  },
 }
