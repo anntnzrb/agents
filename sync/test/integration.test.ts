@@ -54,13 +54,7 @@ test("integration_happy_path_matches_expected_outputs", () => {
     ) as Record<string, any>;
     assert.equal(cliProxyConfig["host"], "100.64.0.42");
     assert.equal(cliProxyConfig["port"], 8317);
-    assert.equal(
-      Bun.password.verifySync(
-        "management-secret",
-        cliProxyConfig["remote-management"]["secret-key"] as string,
-      ),
-      true,
-    );
+    assert.equal("secret-key" in (cliProxyConfig["remote-management"] ?? {}), false);
     assert.equal("api-keys" in cliProxyConfig, false);
     assert.equal(cliProxyConfig["codex-api-key"][0]["api-key"], "upstream-secret");
     assert.equal(cliProxyConfig["codex-api-key"][0]["x-credential-pool"], undefined);
@@ -259,7 +253,7 @@ function writeFixtureFiles(home: string): void {
     `host: \${CLIPROXY_LISTEN_HOST}
 port: \${CLIPROXY_LISTEN_PORT}
 remote-management:
-  secret-key: \${CLIPROXY_MANAGEMENT_KEY}
+  allow-remote: true
 codex-api-key:
   - x-credential-pool: fixture
     prefix: fixture
@@ -268,7 +262,6 @@ codex-api-key:
   writeFileSync(
     join(home, ".config", "agents", "secrets.local.json"),
     `${JSON.stringify({
-      CLIPROXY_MANAGEMENT_KEY: "management-secret",
       CLIPROXY_CREDENTIAL_POOLS: {
         fixture: [{ apiKey: "upstream-secret", weight: 1 }],
       },

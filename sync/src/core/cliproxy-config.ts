@@ -18,9 +18,7 @@ import {
 } from "./model-catalog.ts";
 import { syncPrivateTextFile } from "./secret-template.ts";
 
-const PLACEHOLDER_PATTERN = /^\$\{([A-Z][A-Z0-9_]*)\}$/;
 const POOL_NAME_PATTERN = /^[a-z][a-z0-9-]*$/;
-const BCRYPT_HASH_PATTERN = /^\$2[aby]\$\d{2}\$/;
 const TRAILING_SLASH_PATTERN = /\/+$/;
 const TRAILING_V1_PATTERN = /\/v1\/?$/;
 const POOL_MARKER = "x-credential-pool";
@@ -46,7 +44,6 @@ interface Credential {
 }
 
 interface CliProxySecrets {
-  readonly CLIPROXY_MANAGEMENT_KEY: string;
   readonly CLIPROXY_CREDENTIAL_POOLS: Readonly<Record<string, readonly Credential[]>>;
 }
 
@@ -83,14 +80,7 @@ export async function syncCliProxyConfig(
     sources.length === 0
       ? { sources: new Map<string, SourceModels>(), modelsDev: undefined }
       : await discoverModelSources(sources, secrets, options);
-  const managementKey = reusableManagementKey(dst, secrets.CLIPROXY_MANAGEMENT_KEY);
-  const content = renderCliProxyConfig(
-    template,
-    secrets,
-    deployment,
-    managementKey,
-    discovery.sources,
-  );
+  const content = renderCliProxyConfig(template, secrets, deployment, discovery.sources);
   if (options.writeServerConfig !== false) {
     try {
       syncPrivateTextFile(dst, content);
@@ -169,7 +159,6 @@ export function renderCliProxyConfig(
   template: string,
   secrets: CliProxySecrets,
   deployment: CliProxyDeployment,
-  managementKey = secrets.CLIPROXY_MANAGEMENT_KEY,
   discoveredSources: ReadonlyMap<string, SourceModels> = new Map(),
 ): string {
   let parsed: unknown;
@@ -179,13 +168,9 @@ export function renderCliProxyConfig(
     throw new Error(`parse CLIProxyAPI template (${panicMessage(error)})`, { cause: error });
   }
 
-  const unresolvedConfig = expectRecord(parsed, "CLIProxyAPI template root");
-  unresolvedConfig["host"] = deployment.listen.host;
-  unresolvedConfig["port"] = deployment.listen.port;
-  const config = expectRecord(
-    resolvePlaceholders(unresolvedConfig, managementKey),
-    "CLIProxyAPI template root",
-  );
+  const config = expectRecord(parsed, "CLIProxyAPI template root");
+  config["host"] = deployment.listen.host;
+  config["port"] = deployment.listen.port;
   const referencedPools = new Set<string>();
   expandModelSources(config, secrets.CLIPROXY_CREDENTIAL_POOLS, referencedPools, discoveredSources);
 
@@ -365,55 +350,6 @@ function requireRuntimeRoot(value: string | undefined): string {
 
 function removeLegacyModelCatalog(cacheRoot: string): void {
   fs.rmSync(legacyModelCatalogPath(cacheRoot), { force: true });
-}
-
-function resolvePlaceholders(value: unknown, managementKey: string): unknown {
-  if (typeof value === "string") {
-    const match = PLACEHOLDER_PATTERN.exec(value);
-    if (!match) {
-      return value;
-    }
-    const name = match[1];
-    if (name === undefined) {
-      return value;
-    }
-    switch (name) {
-      case "CLIPROXY_MANAGEMENT_KEY":
-        return managementKey;
-      default:
-        throw new Error(`unsupported CLIProxyAPI secret placeholder: ${name}`);
-    }
-  }
-  if (Array.isArray(value)) {
-    return value.map((entry) => resolvePlaceholders(entry, managementKey));
-  }
-  if (!isRecord(value)) {
-    return value;
-  }
-  return Object.fromEntries(
-    Object.entries(value).map(([name, entry]) => [name, resolvePlaceholders(entry, managementKey)]),
-  );
-}
-
-function reusableManagementKey(path: string, plaintextKey: string): string {
-  try {
-    const config = expectRecord(Bun.YAML.parse(fs.readFileSync(path, "utf8")), "generated config");
-    const remoteManagement = expectRecord(config["remote-management"], "remote-management");
-    const storedKey = remoteManagement["secret-key"];
-    if (
-      typeof storedKey === "string" &&
-      BCRYPT_HASH_PATTERN.test(storedKey) &&
-      Bun.password.verifySync(plaintextKey, storedKey)
-    ) {
-      return storedKey;
-    }
-  } catch {
-    // A missing, malformed, or stale output is replaced from the source template.
-  }
-  return Bun.password.hashSync(plaintextKey, {
-    algorithm: "bcrypt",
-    cost: 10,
-  });
 }
 
 function expandNativeCredentialSection(
@@ -639,10 +575,6 @@ function readCliProxySecrets(path: string): CliProxySecrets {
     throw new Error(`parse CLIProxyAPI secrets ${path} (${panicMessage(error)})`, { cause: error });
   }
   const root = expectRecord(parsed, "CLIProxyAPI secrets");
-  const managementKey = requireNonEmptyString(
-    root["CLIPROXY_MANAGEMENT_KEY"],
-    "CLIPROXY_MANAGEMENT_KEY",
-  );
   const rawPools = expectRecord(root["CLIPROXY_CREDENTIAL_POOLS"], "CLIPROXY_CREDENTIAL_POOLS");
   const pools: Record<string, readonly Credential[]> = {};
   for (const [poolName, rawCredentials] of Object.entries(rawPools)) {
@@ -662,7 +594,6 @@ function readCliProxySecrets(path: string): CliProxySecrets {
     throw new Error("invalid CLIPROXY_CREDENTIAL_POOLS: expected at least one pool");
   }
   return {
-    CLIPROXY_MANAGEMENT_KEY: managementKey,
     CLIPROXY_CREDENTIAL_POOLS: pools,
   };
 }

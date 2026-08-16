@@ -57,7 +57,7 @@ test("cliproxy_renderer_synthesizes_protocol_profiles_from_model_sources", () =>
   );
   const rendered = renderCliProxyConfig(
     `remote-management:
-  secret-key: \${CLIPROXY_MANAGEMENT_KEY}
+  allow-remote: true
 x-model-sources:
   - id: example
     models-dev-provider: example
@@ -66,7 +66,6 @@ x-model-sources:
     base-url: https://example.test/v1
 `,
     {
-      CLIPROXY_MANAGEMENT_KEY: "management",
       CLIPROXY_CREDENTIAL_POOLS: {
         example: [
           { apiKey: "one", weight: 1 },
@@ -75,7 +74,6 @@ x-model-sources:
       },
     },
     DEPLOYMENT,
-    "management-hash",
     new Map([["example", discovered]]),
   );
   const config = Bun.YAML.parse(rendered) as Record<string, any>;
@@ -126,7 +124,7 @@ port: \${CLIPROXY_LISTEN_PORT}
 tls:
   enable: false
 remote-management:
-  secret-key: \${CLIPROXY_MANAGEMENT_KEY}
+  allow-remote: true
 x-model-sources:
   - id: example
     models-dev-provider: example
@@ -138,7 +136,6 @@ x-model-sources:
     writeFileSync(
       secretsPath,
       `${JSON.stringify({
-        CLIPROXY_MANAGEMENT_KEY: "management",
         CLIPROXY_CREDENTIAL_POOLS: {
           example: [{ apiKey: "upstream", weight: 1 }],
         },
@@ -234,15 +231,13 @@ test("cliproxy_client_sync_preserves_server_config_and_drops_stale_client_key", 
         "port: $" +
         "{CLIPROXY_LISTEN_PORT}\n" +
         "remote-management:\n" +
-        "  secret-key: $" +
-        "{CLIPROXY_MANAGEMENT_KEY}\n" +
+        "  allow-remote: true\n" +
         "codex-api-key:\n" +
         "  - x-credential-pool: fixture\n",
     );
     writeFileSync(
       secretsPath,
       `${JSON.stringify({
-        CLIPROXY_MANAGEMENT_KEY: "management",
         CLIPROXY_CREDENTIAL_POOLS: { fixture: [{ apiKey: "upstream" }] },
       })}\n`,
     );

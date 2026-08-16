@@ -387,7 +387,7 @@ if (runtime) {
       writeFile(
         src,
         `remote-management:
-  secret-key: \${CLIPROXY_MANAGEMENT_KEY}
+  allow-remote: true
 codex-api-key:
   - x-credential-pool: opencode-go
     prefix: go
@@ -401,7 +401,6 @@ openai-compatibility:
       writeFile(
         secretsPath,
         `${JSON.stringify({
-          CLIPROXY_MANAGEMENT_KEY: 'management"key',
           CLIPROXY_CREDENTIAL_POOLS: {
             "opencode-go": [
               { apiKey: "go-one", weight: 1 },
@@ -423,13 +422,7 @@ openai-compatibility:
       ];
       assert.equal(await call<boolean>(runJobsWithPreserve, jobs), true);
       const config = Bun.YAML.parse(readText(dst)) as Record<string, any>;
-      assert.equal(
-        Bun.password.verifySync(
-          'management"key',
-          config["remote-management"]["secret-key"] as string,
-        ),
-        true,
-      );
+      assert.equal("secret-key" in config["remote-management"], false);
       assert.equal("api-keys" in config, false);
       assert.deepEqual(
         config["codex-api-key"].map((entry: Record<string, unknown>) => ({
@@ -472,7 +465,6 @@ openai-compatibility:
       writeFile(
         secretsPath,
         `${JSON.stringify({
-          CLIPROXY_MANAGEMENT_KEY: "management",
           CLIPROXY_CREDENTIAL_POOLS: {
             "opencode-go": [{ apiKey: "duplicate" }, { apiKey: "duplicate" }],
           },
