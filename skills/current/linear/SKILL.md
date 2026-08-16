@@ -1,6 +1,6 @@
 ---
 name: linear
-description: "Manage Linear through MCPorter: discover live tools, inspect schemas, and safely read or change data."
+description: Manage Linear through MCPorter with compact tool routing and safe read or write calls.
 license: AGPL-3.0-or-later
 compatibility: Requires MCPorter configuration and Linear authentication.
 ---
@@ -9,16 +9,52 @@ compatibility: Requires MCPorter configuration and Linear authentication.
 
 Linear work MUST use literal MCPorter server `linear`.
 
-- Live schema MUST remain authoritative
+- Live schema MUST remain authoritative when inspected
 - The catalog is a dated fallback snapshot
-- NEVER guess against available live discovery
 
 ## Required follow-up reads
 
 | Need | Read | When |
 | --- | --- | --- |
-| Broad inventory selection | `references/tool-catalog.md` | Tool choice spans entities or remains unclear |
+| Tool signature or safety notes | Relevant section of `references/tool-catalog.md` | Needed details are absent from common recipes; NEVER load the whole catalog |
 | Live discovery failure | `references/tool-catalog.md` | Current live schema cannot be retrieved |
+
+## Tool routes
+
+This stable name index is the default discovery layer. Read only the matching catalog section when its signature or safety notes are needed.
+
+| Domain | Tools |
+| --- | --- |
+| Attachments | `get_attachment`, `prepare_attachment_upload`, `create_attachment_from_upload`, `create_attachment`, `delete_attachment` |
+| Agent skills | `list_agent_skills`, `get_agent_skill` |
+| Comments | `list_comments`, `save_comment`, `delete_comment` |
+| Cycles | `list_cycles` |
+| Documents | `get_document`, `list_documents`, `save_document`, `extract_images` |
+| Issues | `get_issue`, `list_issues`, `save_issue`, `list_issue_statuses`, `get_issue_status`, `list_issue_labels`, `create_issue_label` |
+| Projects | `list_projects`, `get_project`, `save_project`, `list_project_labels` |
+| Releases | `list_release_pipelines`, `list_releases`, `get_release`, `save_release`, `list_release_notes`, `get_release_note`, `save_release_note` |
+| Diffs | `get_diff`, `list_diffs`, `get_diff_threads` |
+| Milestones | `list_milestones`, `get_milestone`, `save_milestone` |
+| Teams and users | `list_teams`, `get_team`, `list_users`, `get_user` |
+| Documentation | `search_documentation` |
+| Status updates | `get_status_updates`, `save_status_update`, `delete_status_update` |
+
+## Common reads
+
+These complete recipes use known inputs and SHOULD be called directly:
+
+```text
+mcporter call linear.list_issues assignee=me orderBy=updatedAt limit=5 --output json
+mcporter call linear.get_issue id=ENG-42 --output json
+mcporter call linear.list_projects query='<name>' limit=50 --output json
+mcporter call linear.list_comments issueId=ENG-42 limit=50 --output json
+mcporter call linear.list_teams query='<name>' limit=50 --output json
+mcporter call linear.list_users query='<name-or-email>' limit=50 --output json
+```
+
+`list_issues` common inputs: `limit?:number=50`, `orderBy?:createdAt|updatedAt=updatedAt`, `assignee?:string|null`; `assignee=me` selects the current user. Priority values are `0=None`, `1=Urgent`, `2=High`, `3=Medium`, `4=Low`.
+
+`--output json` selects rendering, not a response contract. Inspect returned issue records defensively for requested fields; input-schema discovery cannot validate output fields.
 
 Missing `mcporter`: MUST use this Nix prefix:
 
@@ -26,23 +62,26 @@ Missing `mcporter`: MUST use this Nix prefix:
 nix run github:numtide/llm-agents.nix#mcporter --
 ```
 
-## Connect and discover
+## Recovery
 
 - Missing SSOT config: MUST add `--config <path-to-mcporter.jsonc>`
 - NEVER expose, copy, or log tokens
 
 ```text
-mcporter config get linear
 mcporter list linear --status --no-oauth --exit-code
 mcporter list linear --brief
 mcporter list linear.<tool> --schema
 ```
 
-- Known/schema-sensitive tool: MUST inspect targeted live schema
-- Broad selection: MUST read catalog, then inspect chosen schema
-- Discovery failure: MUST read catalog and disclose drift
+- Select the tool from the route index; search only its catalog section for an unknown signature
+- If the needed capability is absent from the index, use brief live inventory
+- Inputs absent from a common recipe or catalog signature: inspect targeted live schema
+- Rejected inputs or tool-not-found errors: inspect targeted live schema, then retry once
+- Every mutation: MUST inspect targeted live schema
+- Live discovery failure: MAY use the relevant catalog entry and MUST disclose possible drift
 - NEVER invent tools, arguments, or response fields
 
+- Run status only after a connection or authentication failure
 - Auth failure: MUST run `mcporter auth linear`, then recheck status
 - Persistent 401/403: MUST report missing access. NEVER write
 
