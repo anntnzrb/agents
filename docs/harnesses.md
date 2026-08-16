@@ -12,6 +12,7 @@ Sync supports macOS and Linux only. The current CLIProxyAPI release manifest sup
 | `homeSegments` | Path components from the user home to the generated harness home |
 | `platforms` | Host platforms on which sync enables the adapter |
 | `launcher` | npm package, executable name, dist-tag, and smoke command |
+| `launcher.defaultArgs` | Optional arguments sync renders into the wrapper before caller arguments |
 | `instructionFile` | Harness instruction filename when it differs from `AGENTS.md` |
 | `assetRenames` | Destination names for shared assets |
 | `runtimeSubdir` | Optional subdirectory appended to both the source and generated roots |
@@ -46,6 +47,8 @@ Each wrapper calls the installed sync runtime with the `launch` command. The lau
 When the installed sync runtime is missing, the wrapper prints a hint to run sync from the agents repository and exits with status `127` instead of failing with a raw interpreter error.
 
 The wrapper command is `launcher.bin`. The wrapper passes the adapter `id` to the installed runtime, so the command and the source directory name do not need to match.
+
+A `launcher.defaultArgs` list is rendered into the wrapper before `"$@"`, so those arguments reach the harness binary before anything the caller supplies.
 
 Wrapper state lives at `~/.local/share/agents/sync-managed/wrappers.json`. Sync removes stale wrappers only when they contain its ownership marker and remain in an allowed wrapper directory. Unmanaged conflicts are preserved and reported.
 

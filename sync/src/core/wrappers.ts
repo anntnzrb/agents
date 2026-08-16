@@ -55,6 +55,7 @@ export function wrapperDestinations(
 
 export function renderWrapper(syncEnv: Pick<SyncEnv, "runtimeHome">, harness: Harness): string {
   const syncScript = path.join(syncEnv.runtimeHome, "sync", "src", "cli.ts");
+  const defaultArgs = harness.launcher.defaultArgs.map(shellQuote).join(" ");
   return [
     "#!/bin/sh",
     `# ${WRAPPER_MARKER}`,
@@ -63,7 +64,7 @@ export function renderWrapper(syncEnv: Pick<SyncEnv, "runtimeHome">, harness: Ha
     "  echo 'agents: sync runtime is missing; run sync from the agents repository' >&2",
     "  exit 127",
     "fi",
-    `exec bun ${shellQuote(syncScript)} launch ${shellQuote(harness.sourceName)} -- "$@"`,
+    `exec bun ${shellQuote(syncScript)} launch ${shellQuote(harness.sourceName)} --${defaultArgs ? ` ${defaultArgs}` : ""} "$@"`,
     "",
   ].join("\n");
 }

@@ -6,6 +6,7 @@ export interface HarnessLauncherSpec {
   readonly bin: string;
   readonly distTag?: string;
   readonly smokeCheck?: string;
+  readonly defaultArgs?: readonly string[];
 }
 
 export type HarnessHookSpec =

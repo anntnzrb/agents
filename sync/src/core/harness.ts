@@ -145,6 +145,7 @@ export function buildHarness(spec: HarnessSpec): Harness {
       bin: spec.launcher.bin,
       distTag: spec.launcher.distTag ?? "latest",
       smokeCheck: spec.launcher.smokeCheck ?? "--version",
+      defaultArgs: spec.launcher.defaultArgs ?? [],
     },
     instructionFile: spec.instructionFile ?? SOURCE_AGENT_FILE,
     assetRenames: spec.assetRenames ?? [],
