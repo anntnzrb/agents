@@ -36,6 +36,7 @@ Sync compares the local OS hostname with `server.hostname` to select the host ro
 
 - On the gateway host, sync writes the server configuration before it checks the client endpoint.
 - On another host, sync checks `client.baseUrl/models` without authentication.
+- A client host without local secrets refreshes the model catalog from the gateway `/models` response and public models.dev metadata; it never writes the server configuration.
 - Only the gateway host prepares the managed CLIProxyAPI binary and wrapper; client hosts reconcile away a previously owned wrapper.
 - An unavailable endpoint preserves the existing server configuration, model catalog, and harness endpoints.
 - A ready endpoint updates the model catalog and harness endpoints while leaving the local server configuration unchanged.

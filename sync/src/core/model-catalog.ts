@@ -511,7 +511,7 @@ function reasoningLevelMap(value: unknown): CatalogModel["thinkingLevelMap"] | u
   );
 }
 
-function openAIDataRows(payload: unknown, label: string): Record<string, unknown>[] {
+export function openAIDataRows(payload: unknown, label: string): Record<string, unknown>[] {
   const root = expectRecord(payload, label);
   if (!Array.isArray(root["data"])) {
     throw new Error(`invalid ${label}: expected data array`);

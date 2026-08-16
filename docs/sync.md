@@ -59,6 +59,7 @@ The readiness job compares the local OS hostname with `server.hostname`:
 
 - On the gateway host, the readiness state remains unset. The configuration job writes the server configuration, and endpoint publication checks the target afterward.
 - On another host, the readiness job checks the configured `/models` target without authentication.
+- A client host without local secrets refreshes the model catalog from the gateway `/models` response and public models.dev metadata; it never writes the server configuration.
 - An unavailable target leaves the existing CLIProxyAPI configuration, model catalog, and harness endpoint files unchanged. It does not fail the initial client sync.
 - A ready target lets the configuration job update the model catalog without replacing the local server configuration.
 

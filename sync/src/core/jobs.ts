@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { dirname } from "node:path";
 import { assertNever, err, panicMessage, warn } from "@runtime/errors.ts";
 import { copyTree, isSymlink, rmEntry, syncManagedChildren, syncManagedTree } from "@runtime/fs.ts";
-import { syncCliProxyConfig } from "./cliproxy-config.ts";
+import { syncClientModelCatalog, syncCliProxyConfig } from "./cliproxy-config.ts";
 import { isCliProxyTargetReady, publishCliProxyEndpointTemplates } from "./cliproxy-deployment.ts";
 import type { Job } from "./plan.ts";
 import { syncSecretTemplate } from "./secret-template.ts";
@@ -137,6 +137,16 @@ async function runJob(
         }
         if (!fs.existsSync(job.secretsPath)) {
           if (job.gatewayHost === false) {
+            await syncClientModelCatalog(job.src, job.deployment, {
+              ...(job.cacheRoot === undefined ? {} : { cacheRoot: job.cacheRoot }),
+              ...(job.runtimeRoot === undefined ? {} : { runtimeRoot: job.runtimeRoot }),
+              ...(options.forceModelRefresh === undefined
+                ? {}
+                : { forceModelRefresh: options.forceModelRefresh }),
+              ...(options.quietModelRefresh === undefined
+                ? {}
+                : { quietModelRefresh: options.quietModelRefresh }),
+            });
             return true;
           }
           warn(`missing local secrets ${job.secretsPath}; skipping ${job.dst}`);

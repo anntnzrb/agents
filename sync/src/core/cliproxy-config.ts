@@ -5,11 +5,17 @@ import { type CachedJsonRequest, fetchCachedJson } from "./catalog-cache.ts";
 import { type CliProxyDeployment, cliProxyModelsUrl } from "./cliproxy-deployment.ts";
 import type {
   CatalogApi,
+  CatalogModel,
   CliProxyModelMapping,
   ModelCatalogSource,
   SourceModels,
 } from "./model-catalog.ts";
-import { enrichGatewayModels, modelsForSource, writeModelCatalog } from "./model-catalog.ts";
+import {
+  enrichGatewayModels,
+  modelsForSource,
+  openAIDataRows,
+  writeModelCatalog,
+} from "./model-catalog.ts";
 import { syncPrivateTextFile } from "./secret-template.ts";
 
 const PLACEHOLDER_PATTERN = /^\$\{([A-Z][A-Z0-9_]*)\}$/;
@@ -104,6 +110,59 @@ export async function syncCliProxyConfig(
     );
     removeLegacyModelCatalog(requireCacheRoot(options.cacheRoot));
   }
+}
+
+export async function syncClientModelCatalog(
+  src: string,
+  deployment: CliProxyDeployment,
+  options: CliProxyConfigSyncOptions = {},
+): Promise<void> {
+  const sources = modelSourcesFromTemplate(readText(src, "CLIProxyAPI template"));
+  const cacheRoot = requireCacheRoot(options.cacheRoot);
+  const runtimeRoot = requireRuntimeRoot(options.runtimeRoot);
+  fs.rmSync(runtimeClientApiKeyPath(runtimeRoot), { force: true });
+  const modelsDevResult = await cachedCatalogRequest(
+    {
+      url: MODELS_DEV_URL,
+      cachePath: join(cacheRoot, "models-dev.json"),
+      ttlMs: MODELS_DEV_TTL_MS,
+    },
+    options,
+  );
+  const gatewayResult = await cachedCatalogRequest(
+    {
+      url: cliProxyModelsUrl(deployment),
+      cachePath: join(cacheRoot, "gateway.json"),
+      ttlMs: GATEWAY_MODELS_TTL_MS,
+    },
+    options,
+  );
+  const gatewayRows = openAIDataRows(gatewayResult.payload, "CLIProxyAPI model catalog");
+  const externalModels: CatalogModel[] = [];
+  for (const source of sources) {
+    const prefix = `${source.prefix}/`;
+    const rows = gatewayRows.flatMap((row) => {
+      const id = row["id"];
+      if (typeof id !== "string" || !id.startsWith(prefix)) {
+        return [];
+      }
+      const stripped = { ...row };
+      stripped["id"] = id.slice(prefix.length);
+      return [stripped];
+    });
+    if (rows.length === 0) {
+      continue;
+    }
+    externalModels.push(...modelsForSource(source, { data: rows }, modelsDevResult.payload).models);
+  }
+  writeModelCatalog(
+    runtimeModelCatalogPath(runtimeRoot),
+    enrichGatewayModels(externalModels, gatewayResult.payload, {
+      modelsDev: modelsDevResult.payload,
+      managedPrefixes: sources.map((source) => source.prefix),
+    }),
+  );
+  removeLegacyModelCatalog(cacheRoot);
 }
 
 export function renderCliProxyConfig(

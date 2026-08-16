@@ -14,6 +14,7 @@ import {
   legacyModelCatalogPath,
   renderCliProxyConfig,
   runtimeModelCatalogPath,
+  syncClientModelCatalog,
   syncCliProxyConfig,
 } from "@core/cliproxy-config.ts";
 import type { CliProxyDeployment } from "@core/cliproxy-deployment.ts";
@@ -252,6 +253,87 @@ test("cliproxy_client_sync_preserves_server_config_and_drops_stale_client_key", 
     });
 
     expect(readFileSync(dst, "utf8")).toBe("existing gateway config\n");
+    expect(existsSync(staleKeyPath)).toBe(false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("cliproxy_client_catalog_syncs_from_gateway_models_without_secrets", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cliproxy-client-catalog-test-"));
+  try {
+    const src = join(root, "config.yaml.tmpl");
+    const cacheRoot = join(root, "cache");
+    const runtimeRoot = join(root, "data");
+    mkdirSync(cacheRoot, { recursive: true });
+    const staleKeyPath = join(runtimeRoot, "cliproxyapi", "client-api-key");
+    mkdirSync(join(runtimeRoot, "cliproxyapi"), { recursive: true });
+    writeFileSync(staleKeyPath, "stale\n", { mode: 0o600 });
+    writeFileSync(
+      src,
+      `x-model-sources:
+  - id: example
+    models-dev-provider: example
+    credential-pool: example
+    prefix: example
+    base-url: https://example.test/v1
+`,
+    );
+    const calls: string[] = [];
+    const fetchImpl = async (input: string | URL | Request) => {
+      const url =
+        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      calls.push(url);
+      if (url === "https://models.dev/api.json") {
+        return Response.json({
+          example: {
+            npm: "@ai-sdk/openai-compatible",
+            models: {
+              "chat-next": {
+                ...metadata("Chat Next"),
+                cost: { input: 1, output: 2, cache_read: 3, cache_write: 4 },
+              },
+            },
+          },
+        });
+      }
+      if (url === "https://gateway.example.test:9443/v1/models") {
+        return Response.json({
+          data: [
+            { id: "example/chat-next", owned_by: "example" },
+            { id: "oauth-next", owned_by: "openai" },
+          ],
+        });
+      }
+      return new Response(null, { status: 404 });
+    };
+
+    await syncClientModelCatalog(src, DEPLOYMENT, {
+      cacheRoot,
+      runtimeRoot,
+      forceModelRefresh: true,
+      fetch: fetchImpl,
+      now: () => 1000,
+    });
+
+    expect(calls).toEqual([
+      "https://models.dev/api.json",
+      "https://gateway.example.test:9443/v1/models",
+    ]);
+    const catalog = JSON.parse(readFileSync(runtimeModelCatalogPath(runtimeRoot), "utf8"));
+    expect(catalog.models.map((model: { id: string }) => model.id)).toEqual([
+      "example/chat-next",
+      "oauth-next",
+    ]);
+    expect(
+      catalog.models.find((model: { id: string }) => model.id === "example/chat-next"),
+    ).toMatchObject({
+      name: "Chat Next",
+      api: "openai-completions",
+      contextWindow: 200000,
+      maxTokens: 64000,
+      cost: { input: 1, output: 2, cacheRead: 3, cacheWrite: 4 },
+    });
     expect(existsSync(staleKeyPath)).toBe(false);
   } finally {
     rmSync(root, { recursive: true, force: true });
