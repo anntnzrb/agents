@@ -44,6 +44,7 @@ Documentation-only changes must still preserve navigation and factual accuracy. 
 - Public sync entrypoint: `sync/src/cli.ts`
 - Invoke it with an explicit Bun runner, e.g. `bun ./sync/src/cli.ts` from repo root
 - NEVER add `bin/` shell trampolines for sync
+- Use TDD
 
 ## Git Contract
 
