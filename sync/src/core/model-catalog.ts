@@ -67,6 +67,15 @@ const ZERO_COST: CatalogCost = {
   cacheRead: 0,
   cacheWrite: 0,
 };
+const compareIds = (left: string, right: string): number => {
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+  return 0;
+};
 const MODEL_CATALOG_VERSION = 1;
 const MODEL_CATALOG_MODE = 0o600;
 
@@ -128,7 +137,7 @@ export function modelsForSource(
     });
   }
 
-  const sorted = entries.toSorted((left, right) => left.model.id.localeCompare(right.model.id));
+  const sorted = entries.toSorted((left, right) => compareIds(left.model.id, right.model.id));
   const groups = new Map<CatalogApi, CliProxyModelMapping[]>();
   for (const entry of sorted) {
     const group = groups.get(entry.model.api) ?? [];
@@ -136,9 +145,9 @@ export function modelsForSource(
     groups.set(entry.model.api, group);
   }
   return {
-    groups: new Map([...groups.entries()].toSorted(([left], [right]) => left.localeCompare(right))),
+    groups: new Map([...groups.entries()].toSorted(([left], [right]) => compareIds(left, right))),
     models: sorted.map((entry) => entry.model),
-    unsupported: unsupported.toSorted((left, right) => left.id.localeCompare(right.id)),
+    unsupported: unsupported.toSorted((left, right) => compareIds(left.id, right.id)),
   };
 }
 
@@ -163,7 +172,7 @@ export function enrichGatewayModels(
     }
     byId.set(id, gatewayModel(id, ownedBy, row, options.modelsDev));
   }
-  return [...byId.values()].toSorted((left, right) => left.id.localeCompare(right.id));
+  return [...byId.values()].toSorted((left, right) => compareIds(left.id, right.id));
 }
 
 export function writeModelCatalog(path: string, models: readonly CatalogModel[]): void {
@@ -179,7 +188,7 @@ export function writeModelCatalog(path: string, models: readonly CatalogModel[])
     `${JSON.stringify(
       {
         version: MODEL_CATALOG_VERSION,
-        models: [...unique.values()].toSorted((left, right) => left.id.localeCompare(right.id)),
+        models: [...unique.values()].toSorted((left, right) => compareIds(left.id, right.id)),
       },
       null,
       2,

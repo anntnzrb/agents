@@ -1,8 +1,14 @@
 import { expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
+  type CatalogModel,
   enrichGatewayModels,
   type ModelCatalogSource,
   modelsForSource,
+  readModelCatalog,
+  writeModelCatalog,
 } from "@core/model-catalog.ts";
 
 const SOURCE = {
@@ -213,5 +219,37 @@ function modelMetadata(name: string): Record<string, unknown> {
     modalities: { input: ["text", "image"], output: ["text"] },
     limit: { context: 300000, output: 100000 },
     cost: { input: 0.2, output: 0.8, cache_read: 0.02 },
+  };
+}
+
+test("catalog_orders_models_by_codepoint_not_locale", () => {
+  const root = mkdtempSync(join(tmpdir(), "catalog-order-test-"));
+  try {
+    const path = join(root, "catalog.json");
+    writeModelCatalog(path, [
+      catalogModel("zen/nemotron-3.5-lightning-free"),
+      catalogModel("zen/nemotron-3-ultra-free"),
+      catalogModel("zen/gpt-5.6-sol"),
+    ]);
+    expect(readModelCatalog(path).map((model) => model.id)).toEqual([
+      "zen/gpt-5.6-sol",
+      "zen/nemotron-3-ultra-free",
+      "zen/nemotron-3.5-lightning-free",
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function catalogModel(id: string): CatalogModel {
+  return {
+    id,
+    name: id,
+    api: "openai-completions",
+    reasoning: true,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 128000,
+    maxTokens: 16384,
   };
 }
