@@ -38,12 +38,6 @@ name = "CLIProxyAPI"
 base_url = "${CLIPROXY_CLIENT_BASE_URL}"
 wire_api = "responses"
 
-[model_providers.cliproxy.auth]
-command = "cat"
-args = ["client-api-key"]
-cwd = "~/.local/share/agents/cliproxyapi"
-refresh_interval_ms = 0
-
 [permissions.agent-workspace]
 extends = ":workspace"
 
