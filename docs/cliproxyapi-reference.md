@@ -160,13 +160,25 @@ The committed template sets these CLIProxyAPI values:
 | `routing.strategy` | `weighted-round-robin` |
 | `routing.session-affinity` | `true` |
 | `routing.session-affinity-ttl` | `1h` |
-| `request-retry` | `1` |
+| `request-retry` | `3` |
 | `max-retry-credentials` | `0` |
+| `max-retry-interval` | `30` |
 | `disable-cooling` | `false` |
 | `save-cooldown-status` | `true` |
+| `streaming.bootstrap-retries` | `1` |
 | `ws-auth` | `false` |
 
-The repository has no quota-monitoring service and does not generate quota dashboards.
+`weighted-round-robin` rotates new sessions across matching credentials according to their weights. An omitted weight is `1`. Credentials with equal weights receive equal shares.
+
+Session affinity binds a provider, session identifier, and model to one credential. Each request refreshes the one-hour binding. CLIProxyAPI prefers explicit client session headers, then request fields such as `prompt_cache_key` and a Responses conversation ID, before it derives a fallback identity. Requests without a session identifier use weighted round-robin directly. Keeping one conversation on one credential can preserve provider-side prompt-cache locality. Cache behavior and billing remain provider-controlled.
+
+If the bound credential becomes unavailable, session affinity selects another available credential and replaces the binding. `max-retry-credentials: 0` leaves the number of credentials uncapped, so one failed request can try every matching credential. Request-invalid errors stop instead of rotating.
+
+After the available credentials are exhausted or cooling down, `request-retry: 3` permits another attempt when a credential can recover within `max-retry-interval: 30`. Cooling remains enabled, and persisted cooldown state prevents a restart from immediately selecting a credential that is still unavailable. `streaming.bootstrap-retries: 1` permits one restart when a stream fails before CLIProxyAPI sends a deliverable payload to the client.
+
+Retrying improves availability but cannot guarantee zero duplicate upstream work. An upstream might accept work before CLIProxyAPI receives an error or before a stream produces its first deliverable payload.
+
+The repository does not enable `quota-exceeded.antigravity-credits`, because that fallback can consume paid credits. It also has no quota-monitoring service and does not generate quota dashboards.
 
 ## Control panel
 

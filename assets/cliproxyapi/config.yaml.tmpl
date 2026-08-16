@@ -21,10 +21,14 @@ disable-image-generation: "chat"
 force-model-prefix: true
 ws-auth: false
 
-request-retry: 1
+request-retry: 3
 max-retry-credentials: 0
+max-retry-interval: 30
 disable-cooling: false
 save-cooldown-status: true
+
+streaming:
+  bootstrap-retries: 1
 
 routing:
   strategy: "weighted-round-robin"
