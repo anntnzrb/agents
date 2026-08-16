@@ -4,7 +4,7 @@ Use this guide to change gateway credentials, authenticate ChatGPT, refresh mode
 
 ## Select the deployment
 
-Keep the gateway host and endpoint values in `assets/cliproxyapi.deployment.json`. Set `server.hostname` to the host that runs CLIProxyAPI. Set `listen.host` and `listen.port` to the listener on that host. Set `client.baseUrl` to the `/v1` endpoint that clients use. Do not copy these values into harness sources or documentation.
+Keep the gateway host and endpoint values in `assets/cliproxyapi/deployment.json`. Set `server.hostname` to the host that runs CLIProxyAPI. Set `listen.host` and `listen.port` to the listener on that host. Set `client.baseUrl` to the `/v1` endpoint that clients use. Do not copy these values into harness sources or documentation.
 
 When you move the gateway, update that file, start the new gateway, and run sync on clients. A client keeps its existing generated configuration and endpoints until the new endpoint passes the `/models` readiness check.
 
@@ -18,7 +18,7 @@ chmod 600 secrets.local.json
 $EDITOR secrets.local.json
 ```
 
-Set every credential pool referenced by `assets/cliproxyapi.yaml.tmpl`. The gateway accepts client requests without client keys; the tailnet is the access boundary. Upstream API keys come from the provider accounts themselves.
+Set every credential pool referenced by `assets/cliproxyapi/config.yaml.tmpl`. The gateway accepts client requests without client keys; the tailnet is the access boundary. Upstream API keys come from the provider accounts themselves.
 
 Never commit `secrets.local.json` or files under `~/.cli-proxy-api/`.
 
@@ -89,7 +89,7 @@ On the configured gateway host, start CLIProxyAPI in the foreground:
 cli-proxy-api
 ```
 
-The managed wrapper supplies `--config ~/.cli-proxy-api/config.yaml`. Sync reads the listener and client endpoint from `assets/cliproxyapi.deployment.json`. Use a process manager when the gateway must survive logout or reboot.
+The managed wrapper supplies `--config ~/.cli-proxy-api/config.yaml`. Sync reads the listener and client endpoint from `assets/cliproxyapi/deployment.json`. Use a process manager when the gateway must survive logout or reboot.
 
 ## Open the control panel
 
@@ -99,20 +99,20 @@ Open the control panel at the configured gateway listener:
 http://munich.trex-gamut.ts.net:8317/management.html
 ```
 
-The panel accepts the static management token committed in `assets/cliproxyapi.yaml.tmpl`. It is not a credential: the tailnet is the access boundary.
+The panel accepts the static management token committed in `assets/cliproxyapi/config.yaml.tmpl`. It is not a credential: the tailnet is the access boundary.
 
-Do not make durable configuration changes in the control panel. Sync replaces the generated configuration from `assets/cliproxyapi.yaml.tmpl` and `secrets.local.json`.
+Do not make durable configuration changes in the control panel. Sync replaces the generated configuration from `assets/cliproxyapi/config.yaml.tmpl` and `secrets.local.json`.
 
 ## Control panel asset
 
-The panel itself is a single HTML file. The default upstream panel cannot show OpenCode Go quota, so this repository pins a patched build. The gateway host syncs the asset from `assets/cliproxy-panel.html` to `~/.cli-proxy-api/static/management.html`; clients do not receive it.
+The panel itself is a single HTML file. The default upstream panel cannot show OpenCode Go quota, so this repository pins a patched build. The gateway host syncs the asset from `assets/cliproxyapi/panel.html` to `~/.cli-proxy-api/static/management.html`; clients do not receive it.
 
-The patch is upstream PR `router-for-me/Cli-Proxy-API-Management-Center#381` ("feat(quota): add OpenCode Go usage support"). The exact diff is committed as `assets/cliproxy-panel.patch`. The panel queries `https://opencode.ai/zen/go/v1/usage` through the gateway's `/v0/management/api-call` proxy, so API keys never leave the gateway. `remote-management.disable-auto-update-panel` stays `true` so the gateway never replaces the pinned build.
+The patch is upstream PR `router-for-me/Cli-Proxy-API-Management-Center#381` ("feat(quota): add OpenCode Go usage support"). The exact diff is committed as `assets/cliproxyapi/panel.patch`. The panel queries `https://opencode.ai/zen/go/v1/usage` through the gateway's `/v0/management/api-call` proxy, so API keys never leave the gateway. `remote-management.disable-auto-update-panel` stays `true` so the gateway never replaces the pinned build.
 
 Rebuild the asset after adopting a new upstream revision:
 
 ```bash
-sh assets/cliproxy-panel.rebuild.sh
+sh assets/cliproxyapi/panel.rebuild.sh
 ```
 
 The script pins the upstream head commit. When upstream merges the PR into a release, replace the pinned build with the official asset and delete the panel job from `sync/src/core/plan.ts`.
@@ -144,7 +144,7 @@ Sessions and configurations that reference an old unprefixed ID stop working aft
 The gateway accepts requests without client keys. Query it directly:
 
 ```bash
-CLIPROXY_DEPLOYMENT=assets/cliproxyapi.deployment.json
+CLIPROXY_DEPLOYMENT=assets/cliproxyapi/deployment.json
 CLIPROXY_BASE_URL="$(jq -r '.client.baseUrl' "$CLIPROXY_DEPLOYMENT")"
 curl -fsS "$CLIPROXY_BASE_URL/models" | \
 	jq -r '.data[].id'
@@ -156,7 +156,7 @@ The command prints the currently available model IDs. The list changes with prov
 To verify that the response contains at least one model, use:
 
 ```bash
-CLIPROXY_DEPLOYMENT=assets/cliproxyapi.deployment.json
+CLIPROXY_DEPLOYMENT=assets/cliproxyapi/deployment.json
 CLIPROXY_BASE_URL="$(jq -r '.client.baseUrl' "$CLIPROXY_DEPLOYMENT")"
 curl -fsS "$CLIPROXY_BASE_URL/models" | \
 	jq -e '.data | type == "array" and length > 0'

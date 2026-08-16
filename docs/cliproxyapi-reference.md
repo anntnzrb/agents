@@ -1,17 +1,17 @@
 # CLIProxyAPI reference
 
-CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses configured to use it. `assets/cliproxyapi.deployment.json` is the only deployment-specific source. It selects the gateway host, server listener, and client endpoint. The management API and control panel use the static token committed in the template; the tailnet is the access boundary.
+CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses configured to use it. `assets/cliproxyapi/deployment.json` is the only deployment-specific source. It selects the gateway host, server listener, and client endpoint. The management API and control panel use the static token committed in the template; the tailnet is the access boundary.
 
 ## Artifacts
 
 | Artifact | Path |
 | --- | --- |
-| Portable configuration template | `assets/cliproxyapi.yaml.tmpl` |
-| Deployment endpoints | `assets/cliproxyapi.deployment.json` |
-| Release manifest and checksums | `assets/cliproxyapi.release.json` |
-| Control panel asset | `assets/cliproxy-panel.html` |
-| Control panel patch source | `assets/cliproxy-panel.patch` |
-| Control panel rebuild script | `assets/cliproxy-panel.rebuild.sh` |
+| Portable configuration template | `assets/cliproxyapi/config.yaml.tmpl` |
+| Deployment endpoints | `assets/cliproxyapi/deployment.json` |
+| Release manifest and checksums | `assets/cliproxyapi/release.json` |
+| Control panel asset | `assets/cliproxyapi/panel.html` |
+| Control panel patch source | `assets/cliproxyapi/panel.patch` |
+| Control panel rebuild script | `assets/cliproxyapi/panel.rebuild.sh` |
 | Local secrets | `secrets.local.json` |
 | Generated configuration | `~/.cli-proxy-api/config.yaml` |
 | Deployed control panel | `~/.cli-proxy-api/static/management.html` |
@@ -25,7 +25,7 @@ Sync prepares the managed binary and the `~/.local/bin/cli-proxy-api` wrapper on
 
 ## Deployment endpoints
 
-`assets/cliproxyapi.deployment.json` is the source of truth for gateway placement:
+`assets/cliproxyapi/deployment.json` is the source of truth for gateway placement:
 
 | Field | Constraint | Meaning |
 | --- | --- | --- |
@@ -48,7 +48,7 @@ Sync compares the local OS hostname with `server.hostname` to select the host ro
 
 Endpoint publication is transactional. Publication preserves Codex-owned hook and project trust tables in `~/.codex/config.toml`.
 
-To move the gateway, change the host and endpoint fields in `assets/cliproxyapi.deployment.json`, deploy the repository and secrets to the new gateway host, start CLIProxyAPI there, and run sync on clients. Clients keep their current endpoint until the new `/models` endpoint returns a non-empty `data` array. Update harness sources or documentation only when the configuration schema changes.
+To move the gateway, change the host and endpoint fields in `assets/cliproxyapi/deployment.json`, deploy the repository and secrets to the new gateway host, start CLIProxyAPI there, and run sync on clients. Clients keep their current endpoint until the new `/models` endpoint returns a non-empty `data` array. Update harness sources or documentation only when the configuration schema changes.
 
 ## Local secrets
 
@@ -80,7 +80,7 @@ No harness reads `secrets.local.json`. The gateway accepts client requests witho
 
 ## Model sources
 
-`x-model-sources` in `assets/cliproxyapi.yaml.tmpl` defines API-key providers without committing model IDs.
+`x-model-sources` in `assets/cliproxyapi/config.yaml.tmpl` defines API-key providers without committing model IDs.
 
 | Source ID | models.dev provider | Credential pool | Public prefix | Base URL |
 | --- | --- | --- | --- | --- |
@@ -170,7 +170,7 @@ The control panel is available at `http://<listen-host>:<listen-port>/management
 
 The template keeps `remote-management.disable-auto-update-panel` at `true`.
 
-The deployed panel is a pinned patched build from `assets/cliproxy-panel.html`. The patch adds OpenCode Go quota (5-hour, weekly, and monthly windows) to the quota view. The panel fetches `https://opencode.ai/zen/go/v1/usage` through the gateway's `/v0/management/api-call` proxy, which substitutes the selected credential server-side; API keys never reach the browser. The gateway never replaces the pinned asset while `disable-auto-update-panel` is `true`. Rebuild the asset with `assets/cliproxy-panel.rebuild.sh` after adopting a new upstream revision.
+The deployed panel is a pinned patched build from `assets/cliproxyapi/panel.html`. The patch adds OpenCode Go quota (5-hour, weekly, and monthly windows) to the quota view. The panel fetches `https://opencode.ai/zen/go/v1/usage` through the gateway's `/v0/management/api-call` proxy, which substitutes the selected credential server-side; API keys never reach the browser. The gateway never replaces the pinned asset while `disable-auto-update-panel` is `true`. Rebuild the asset with `assets/cliproxyapi/panel.rebuild.sh` after adopting a new upstream revision.
 
 ## Provider limits
 

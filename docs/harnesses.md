@@ -22,7 +22,7 @@ Without `runtimeSubdir`, the source root is `harnesses/<id>/` and the generated 
 
 ## Shared configuration
 
-Sync publishes `assets/AGENTS.md` and `skills/current/` to every enabled harness. Sync also publishes asset directories under `assets/`. The `instructionFile` and `assetRenames` fields control destination names.
+Sync publishes `assets/AGENTS.md` and `skills/current/` to every enabled harness. Sync also publishes shared asset directories under `assets/`; the repository-only `assets/cliproxyapi/` directory is excluded. The `instructionFile` and `assetRenames` fields control destination names.
 
 Adapters can declare these hooks:
 
@@ -33,7 +33,7 @@ Adapters can declare these hooks:
 
 A harness uses CLIProxyAPI only when its committed source defines a `cliproxy` provider. Sync has no adapter-wide injection step and does not manage client credentials; the gateway accepts requests without client keys, and the tailnet is the access boundary.
 
-Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `assets/cliproxyapi.deployment.json`. Harness providers use a static placeholder API key because their SDKs require a non-empty value; the gateway ignores it. A harness can use native model discovery or read `~/.local/share/agents/model-catalog/catalog.json` through the installed runtime client. The harness source owns its model-selector syntax and discovery adapter.
+Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `assets/cliproxyapi/deployment.json`. Harness providers use a static placeholder API key because their SDKs require a non-empty value; the gateway ignores it. A harness can use native model discovery or read `~/.local/share/agents/model-catalog/catalog.json` through the installed runtime client. The harness source owns its model-selector syntax and discovery adapter.
 
 API-key model IDs use the prefix declared by `x-model-sources`. The committed prefixes are `go`, `deepseek`, and `zen`. ChatGPT OAuth models remain unprefixed.
 

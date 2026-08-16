@@ -46,19 +46,19 @@ Invalid committed configuration, malformed local secrets, hook failures, and a f
 
 ## CLIProxyAPI configuration job
 
-The job reads `assets/cliproxyapi.yaml.tmpl` and `secrets.local.json`. The job writes these private files with mode `0600`:
+The job reads `assets/cliproxyapi/config.yaml.tmpl` and `secrets.local.json`. The job writes these private files with mode `0600`:
 
 - `~/.cli-proxy-api/config.yaml`
 - `~/.local/share/agents/model-catalog/catalog.json`
 
-Sync validates `assets/cliproxyapi.deployment.json` before reconciliation. It injects `listen.host` and `listen.port` into the generated gateway configuration. It uses `client.baseUrl` for catalog discovery and health checks. The deployment file is the only source for these host and endpoint values.
+Sync validates `assets/cliproxyapi/deployment.json` before reconciliation. It injects `listen.host` and `listen.port` into the generated gateway configuration. It uses `client.baseUrl` for catalog discovery and health checks. The deployment file is the only source for these host and endpoint values.
 
 The gateway accepts requests without client keys, and sync removes a stale `~/.local/share/agents/cliproxyapi/client-api-key` file when it finds one.
 
 The readiness job compares the local OS hostname with `server.hostname`:
 
 - On the gateway host, the readiness state remains unset. The configuration job writes the server configuration, and endpoint publication checks the target afterward.
-- On the gateway host, sync also deploys `assets/cliproxy-panel.html` to `~/.cli-proxy-api/static/management.html`. The job compares content and mode first, so an unchanged run leaves the deployed panel in place. Client hosts do not receive the panel asset.
+- On the gateway host, sync also deploys `assets/cliproxyapi/panel.html` to `~/.cli-proxy-api/static/management.html`. The job compares content and mode first, so an unchanged run leaves the deployed panel in place. Client hosts do not receive the panel asset.
 - On another host, the readiness job checks the configured `/models` target without authentication.
 - A client host without local secrets refreshes the model catalog from the gateway `/models` response and public models.dev metadata; it never writes the server configuration.
 - An unavailable target leaves the existing CLIProxyAPI configuration, model catalog, and harness endpoint files unchanged. It does not fail the initial client sync.
@@ -72,7 +72,7 @@ The job writes files through a temporary file and an atomic rename. Invalid secr
 
 ## Model-catalog caches
 
-`assets/cliproxyapi.yaml.tmpl` declares provider endpoints, credential pools, public prefixes, and models.dev provider IDs under `x-model-sources`. Provider `/models` responses determine availability. [models.dev](https://models.dev/) supplies protocol hints and model metadata.
+`assets/cliproxyapi/config.yaml.tmpl` declares provider endpoints, credential pools, public prefixes, and models.dev provider IDs under `x-model-sources`. Provider `/models` responses determine availability. [models.dev](https://models.dev/) supplies protocol hints and model metadata.
 
 | Catalog | Freshness window | Cache file |
 | --- | --- | --- |
@@ -92,7 +92,7 @@ Only sync reads the repository source directly. Harness configuration and runtim
 
 ## Managed CLIProxyAPI release
 
-`assets/cliproxyapi.release.json` selects the GitHub repository, version, platform archive, and checksum. Sync downloads an archive only when the cached executable or its receipt does not match the manifest.
+`assets/cliproxyapi/release.json` selects the GitHub repository, version, platform archive, and checksum. Sync downloads an archive only when the cached executable or its receipt does not match the manifest.
 
 The cache path has this form, where `<cache-home>` is `XDG_CACHE_HOME` or `~/.cache`:
 
