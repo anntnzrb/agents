@@ -1,6 +1,7 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   chmodSync,
   existsSync,
@@ -960,6 +961,87 @@ setInterval(() => {}, 1_000);
       assert.equal(exists(join(root, ".codex", "config.toml")), false);
       assert.equal(exists(join(root, ".codex", "skills")), false);
       assert.equal(exists(join(root, ".codex", "logs", "keep.txt")), true);
+    });
+  });
+
+  test("run_sync_removes_cli_proxy_api_wrapper_after_gateway_to_client_transition", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const agentsRoot = join(root, ".config", "agents");
+
+      const arch = process.arch === "arm64" || process.arch === "x64" ? process.arch : "arm64";
+      const platformKey = `${process.platform}-${arch}`;
+      const version = "7.2.132";
+      const repository = "router-for-me/CLIProxyAPI";
+      const assetName = "CLIProxyAPI_fixture.tar.gz";
+      const checksum = createHash("sha256").update("fixture archive").digest("hex");
+      const installDir = join(
+        root,
+        "cache",
+        "github-tools",
+        "cliproxyapi",
+        "versions",
+        version,
+        platformKey,
+      );
+      const wrapperPath = join(root, ".local", "bin", "cli-proxy-api");
+      const wrappersStatePath = join(
+        root,
+        ".local",
+        "share",
+        "agents",
+        "sync-managed",
+        "wrappers.json",
+      );
+
+      writeFile(
+        join(agentsRoot, "assets", "cliproxyapi.release.json"),
+        `${JSON.stringify(
+          {
+            repository,
+            version,
+            binary: "cli-proxy-api",
+            assets: { [platformKey]: { name: assetName, sha256: checksum } },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      writeExecutable(join(installDir, "cli-proxy-api"), "#!/bin/sh\nexit 0\n");
+      writeFile(
+        join(installDir, "receipt.json"),
+        `${JSON.stringify({ repository, version, asset: assetName, sha256: checksum }, null, 2)}\n`,
+      );
+      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(agentsRoot, "skills", "current", "skill.txt"), "fresh-skill");
+      writeFile(join(agentsRoot, "harnesses", "codex", "config.toml"), "fresh = true\n");
+
+      const previousCacheHome = process.env["XDG_CACHE_HOME"];
+      process.env["XDG_CACHE_HOME"] = join(root, "cache");
+      try {
+        assert.equal(await call<boolean>(runSync, syncEnv), true);
+        assert.equal(exists(wrapperPath), true);
+        assert.equal(readText(wrappersStatePath).includes(wrapperPath), true);
+
+        writeFile(
+          join(agentsRoot, "assets", "cliproxyapi.deployment.json"),
+          `${JSON.stringify({
+            server: { hostname: "different-gateway.example.test" },
+            listen: { host: "100.64.0.42", port: 9443 },
+            client: { baseUrl: "https://gateway.example.test:9443/v1" },
+          })}\n`,
+        );
+
+        assert.equal(await call<boolean>(runSync, syncEnv), true);
+        assert.equal(exists(wrapperPath), false);
+        assert.equal(readText(wrappersStatePath).includes(wrapperPath), false);
+      } finally {
+        if (previousCacheHome === undefined) {
+          delete process.env["XDG_CACHE_HOME"];
+        } else {
+          process.env["XDG_CACHE_HOME"] = previousCacheHome;
+        }
+      }
     });
   });
 

@@ -143,7 +143,7 @@ export async function runSync(
 
   let managedTools: PreparedManagedTool[] = [];
   let managedToolSuccess = baseSuccess;
-  if (baseSuccess) {
+  if (baseSuccess && syncPlan.gatewayHost) {
     try {
       managedTools = [...(await prepareManagedTools(syncEnv))];
     } catch (error) {

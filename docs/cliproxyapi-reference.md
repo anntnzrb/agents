@@ -18,6 +18,8 @@ CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses configured to 
 
 The current release manifest contains an official macOS ARM64 archive and an official Linux x86_64 archive. Sync verifies the selected SHA-256 checksum and extracts only the manifest's executable.
 
+Sync prepares the managed binary and the `~/.local/bin/cli-proxy-api` wrapper only on the gateway host. Client hosts do not prepare managed tools and reconcile away a previously owned `cli-proxy-api` wrapper on their next sync.
+
 ## Deployment endpoints
 
 `assets/cliproxyapi.deployment.json` is the source of truth for gateway placement:
@@ -35,6 +37,7 @@ Sync compares the local OS hostname with `server.hostname` to select the host ro
 
 - On the gateway host, sync writes the server configuration before it checks the client endpoint.
 - On another host, sync checks `client.baseUrl/models` with the candidate client key before it changes a CLIProxyAPI artifact.
+- Only the gateway host prepares the managed CLIProxyAPI binary and wrapper; client hosts reconcile away a previously owned wrapper.
 - An unavailable endpoint preserves the existing server configuration, client key, model catalog, and harness endpoints.
 - A ready endpoint updates the client key, model catalog, and harness endpoints while leaving the local server configuration unchanged.
 

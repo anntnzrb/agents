@@ -20,8 +20,8 @@ A manual sync uses this order:
 1. Build the sync plan and the managed cleanup plan.
 2. Remove stale top-level harness entries owned by earlier sync state.
 3. Install the sync runtime and reconcile source files, shared assets, skills, and generated configuration.
-4. Prepare managed tools from committed release manifests.
-5. Reconcile harness and managed-tool wrappers.
+4. On the gateway host only, prepare managed tools from committed release manifests.
+5. Reconcile harness and managed-tool wrappers, removing stale owned managed-tool wrappers on client hosts.
 6. Record managed harness entries.
 7. Run package bootstrap and extension dependency hooks.
 
@@ -98,6 +98,8 @@ The cache path has this form, where `<cache-home>` is `XDG_CACHE_HOME` or `~/.ca
 ```
 
 Sync verifies the SHA-256 checksum, extracts only the named executable, writes a receipt, and generates a stable wrapper. The current manifest contains macOS ARM64 and Linux x86_64 assets.
+
+Sync prepares the managed CLIProxyAPI binary and its wrapper only on the gateway host (where the local hostname matches `server.hostname`). Client hosts never prepare managed tools; a previously owned `cli-proxy-api` wrapper recorded in wrapper state is reconciled away on the next sync.
 
 ## Launch behavior
 
