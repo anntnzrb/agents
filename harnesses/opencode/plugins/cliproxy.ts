@@ -2,14 +2,11 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const THINKING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
-type ThinkingLevel = (typeof THINKING_LEVELS)[number];
-
 export interface OpenCodeCatalogModel {
   readonly id: string;
   readonly name: string;
   readonly reasoning: boolean;
-  readonly thinkingLevelMap?: Readonly<Partial<Record<ThinkingLevel, string | null>>>;
+  readonly reasoningEfforts?: readonly string[];
   readonly input: readonly ("text" | "image")[];
   readonly cost: {
     readonly input: number;
@@ -101,8 +98,8 @@ function openCodeModel(model: OpenCodeCatalogModel): readonly [string, unknown] 
     {
       name: displayName(model.id, model.name),
       reasoning: model.reasoning,
-      ...(model.thinkingLevelMap
-        ? { variants: reasoningVariants(model.thinkingLevelMap) }
+      ...(model.reasoning && model.reasoningEfforts
+        ? { variants: reasoningVariants(model.reasoningEfforts) }
         : {}),
       tool_call: true,
       modalities: { input: model.input, output: ["text"] },
@@ -118,18 +115,13 @@ function openCodeModel(model: OpenCodeCatalogModel): readonly [string, unknown] 
 }
 
 function reasoningVariants(
-  levelMap: NonNullable<OpenCodeCatalogModel["thinkingLevelMap"]>,
-): Readonly<Record<ThinkingLevel, { readonly reasoningEffort: string }>> {
-  const supported = THINKING_LEVELS.flatMap((level, index) =>
-    typeof levelMap[level] === "string" ? [{ level, index, effort: levelMap[level] }] : [],
+  efforts: readonly string[],
+): Readonly<Record<string, { readonly reasoningEffort: string }>> {
+  const variants = Object.fromEntries(
+    efforts.map((effort) => [effort, { reasoningEffort: effort }]),
   );
-  return Object.fromEntries(
-    THINKING_LEVELS.flatMap((requested, requestedIndex) => {
-      const selected =
-        supported.findLast(({ index }) => index <= requestedIndex) ?? supported.at(0);
-      return selected ? [[requested, { reasoningEffort: selected.effort }]] : [];
-    }),
-  ) as Record<ThinkingLevel, { readonly reasoningEffort: string }>;
+  const highest = efforts.at(-1);
+  return highest ? { ...variants, max: { reasoningEffort: highest } } : variants;
 }
 
 function mergeField(

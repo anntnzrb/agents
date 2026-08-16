@@ -3,28 +3,39 @@ import {
   mergeOpenCodeModels,
   type OpenCodeCatalogModel,
 } from "../../harnesses/opencode/plugins/cliproxy.ts";
+import { piThinkingLevelMap } from "../../harnesses/pi/agent/extensions/cliproxy/thinking-levels.ts";
 
-test("opencode_cliproxy_models_expose_clamped_reasoning_variants", () => {
+test("opencode_cliproxy_models_preserve_fetched_efforts_and_resolve_max_policy", () => {
   const models = mergeOpenCodeModels(
-    [catalogModel("go/deepseek-next", { low: "low", high: "high", max: "max" })],
+    [catalogModel("go/deepseek-next", ["low", "high", "max", "ultra"])],
     {},
   );
 
   expect(models["go/deepseek-next"]).toMatchObject({
     reasoning: true,
     variants: {
-      minimal: { reasoningEffort: "low" },
       low: { reasoningEffort: "low" },
-      medium: { reasoningEffort: "low" },
       high: { reasoningEffort: "high" },
-      xhigh: { reasoningEffort: "high" },
-      max: { reasoningEffort: "max" },
+      max: { reasoningEffort: "ultra" },
+      ultra: { reasoningEffort: "ultra" },
     },
   });
 });
 
+test("pi_cliproxy_models_project_fetched_efforts_at_the_closed_harness_boundary", () => {
+  expect(piThinkingLevelMap(["low", "high", "max", "ultra"])).toEqual({
+    off: null,
+    minimal: null,
+    low: "low",
+    medium: null,
+    high: "high",
+    xhigh: null,
+    max: "ultra",
+  });
+});
+
 test("opencode_cliproxy_models_preserve_configured_options_and_variants", () => {
-  const models = mergeOpenCodeModels([catalogModel("chatgpt/sol", { low: "low", high: "high" })], {
+  const models = mergeOpenCodeModels([catalogModel("chatgpt/sol", ["low", "high"])], {
     "chatgpt/sol": {
       name: "Configured Sol",
       options: { textVerbosity: "low" },
@@ -40,7 +51,7 @@ test("opencode_cliproxy_models_preserve_configured_options_and_variants", () => 
     name: "Configured Sol",
     options: { textVerbosity: "low" },
     variants: {
-      minimal: { reasoningEffort: "low" },
+      low: { reasoningEffort: "low" },
       high: { reasoningEffort: "high", reasoningSummary: "detailed" },
       max: { reasoningEffort: "high" },
       custom: { reasoningEffort: "low" },
@@ -51,13 +62,13 @@ test("opencode_cliproxy_models_preserve_configured_options_and_variants", () => 
 
 function catalogModel(
   id: string,
-  thinkingLevelMap: OpenCodeCatalogModel["thinkingLevelMap"],
+  reasoningEfforts: OpenCodeCatalogModel["reasoningEfforts"],
 ): OpenCodeCatalogModel {
   return {
     id,
     name: id,
     reasoning: true,
-    ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
+    ...(reasoningEfforts ? { reasoningEfforts } : {}),
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 128000,
