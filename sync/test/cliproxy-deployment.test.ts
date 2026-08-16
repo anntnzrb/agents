@@ -13,6 +13,7 @@ import { hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER,
+  cliProxyModelsUrl,
   isCliProxyTargetReady,
   parseCliProxyDeployment,
   publishCliProxyEndpointTemplates,
@@ -21,7 +22,8 @@ import {
   syncCliProxyEndpointTemplate,
 } from "@core/cliproxy-deployment.ts";
 import { SyncEnv } from "@core/harness.ts";
-import { buildSyncPlan } from "@core/plan.ts";
+import { runJobsWithPreserve } from "@core/jobs.ts";
+import { buildSyncPlan, type Job } from "@core/plan.ts";
 
 const REPOSITORY_ROOT = resolve(import.meta.dir, "../..");
 const DEPLOYMENT = {
@@ -29,6 +31,7 @@ const DEPLOYMENT = {
   listen: { host: "100.64.0.42", port: 9443 },
   client: { baseUrl: "https://gateway.example.test:9443/v1" },
 } as const;
+const fetchReady = async () => Response.json({ data: [{ id: "ready" }] });
 
 test("cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary", () => {
   assert.deepEqual(
@@ -216,6 +219,150 @@ test("cliproxy_endpoint_publication_rolls_back_all_targets_after_a_write_failure
   }
 });
 
+test("cliproxy_endpoint_replacement_preserves_codex_owned_tail", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cliproxy-endpoint-tail-test-"));
+  try {
+    const src = join(root, "source.toml");
+    const dst = join(root, "generated", "config.toml");
+    const keyPath = join(root, "runtime", "client-api-key");
+    writeFileSync(src, `base_url = "${CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n`);
+    mkdirSync(join(root, "generated"), { recursive: true });
+    mkdirSync(join(root, "runtime"), { recursive: true });
+    writeFileSync(keyPath, "client-key\n");
+
+    const ownedTail = `\n[hooks.state."orchestrator"]\nspawn_count = 3\n\n[projects."~/work/example"]\nmodel = "gpt-5.6-sol"\n`;
+    const rendered = renderCliProxyEndpointTemplate(readFileSync(src, "utf8"), DEPLOYMENT);
+    writeFileSync(dst, `${rendered}${ownedTail}`);
+    chmodSync(dst, 0o600);
+
+    const targets = [{ src, dst, preserveTopLevels: ["hooks.state", "projects"] }];
+    assert.equal(
+      await publishCliProxyEndpointTemplates(targets, DEPLOYMENT, keyPath, {
+        fetch: fetchReady,
+      }),
+      "published",
+    );
+    assert.equal(readFileSync(dst, "utf8"), `${rendered}${ownedTail}`);
+    assert.equal(lstatSync(dst).mode & 0o777, 0o600);
+    const first = lstatSync(dst);
+
+    await publishCliProxyEndpointTemplates(targets, DEPLOYMENT, keyPath, {
+      fetch: fetchReady,
+    });
+    assert.equal(readFileSync(dst, "utf8"), `${rendered}${ownedTail}`);
+    assert.equal(lstatSync(dst).ino, first.ino);
+    assert.equal(lstatSync(dst).mtimeMs, first.mtimeMs);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("cliproxy_runtime_key_fallback_publishes_without_secrets", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cliproxy-runtime-key-test-"));
+  try {
+    const src = join(root, "source.toml");
+    const dst = join(root, "generated", "config.toml");
+    const keyPath = join(root, "runtime", "client-api-key");
+    writeFileSync(src, `base_url = "${CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n`);
+    mkdirSync(join(root, "generated"), { recursive: true });
+    mkdirSync(join(root, "runtime"), { recursive: true });
+    writeFileSync(dst, 'base_url = "old"\n');
+    writeFileSync(keyPath, "runtime-secret\n");
+
+    const modelsUrl = cliProxyModelsUrl(DEPLOYMENT);
+    const requests: Array<{ url: string; init: RequestInit | undefined }> = [];
+    const logs: string[] = [];
+    const originalFetch = globalThis.fetch;
+    const originalError = console.error;
+    globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
+      requests.push({ url: String(input), init });
+      return Response.json({ data: [{ id: "ready" }] });
+    }) as typeof fetch;
+    console.error = (...parts: unknown[]) => logs.push(parts.map(String).join(" "));
+    let ok = false;
+    try {
+      const jobs: Job[] = [
+        {
+          kind: "CliProxyReadiness",
+          deployment: DEPLOYMENT,
+          secretsPath: join(root, "config", "agents", "secrets.local.json"),
+          clientApiKeyPath: keyPath,
+          gatewayHost: false,
+        },
+        {
+          kind: "CliProxyEndpointTemplates",
+          targets: [{ src, dst }],
+          deployment: DEPLOYMENT,
+          clientApiKeyPath: keyPath,
+        },
+      ];
+      ok = await runJobsWithPreserve(jobs);
+    } finally {
+      globalThis.fetch = originalFetch;
+      console.error = originalError;
+    }
+
+    assert.equal(ok, true);
+    assert.equal(readFileSync(dst, "utf8"), `base_url = "${DEPLOYMENT.client.baseUrl}"\n`);
+    const readinessRequest = requests.find((request) => request.url === modelsUrl);
+    assert.equal(
+      new Headers(readinessRequest?.init?.headers).get("authorization"),
+      "Bearer runtime-secret",
+    );
+    assert.equal(
+      logs.some((line) => line.includes("runtime-secret")),
+      false,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("cliproxy_readiness_without_any_key_preserves_endpoints", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cliproxy-no-key-test-"));
+  try {
+    const src = join(root, "source.toml");
+    const dst = join(root, "generated", "config.toml");
+    writeFileSync(src, `base_url = "${CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n`);
+    mkdirSync(join(root, "generated"), { recursive: true });
+    writeFileSync(dst, 'base_url = "old"\n');
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      Response.json({ data: [{ id: "ready" }] })) as unknown as typeof fetch;
+    try {
+      const jobs: Job[] = [
+        {
+          kind: "CliProxyReadiness",
+          deployment: DEPLOYMENT,
+          secretsPath: join(root, "config", "agents", "secrets.local.json"),
+          clientApiKeyPath: join(root, "runtime", "client-api-key"),
+          gatewayHost: false,
+        },
+        {
+          kind: "CliProxyEndpointTemplates",
+          targets: [{ src, dst }],
+          deployment: DEPLOYMENT,
+          clientApiKeyPath: join(root, "runtime", "client-api-key"),
+        },
+      ];
+      assert.equal(await runJobsWithPreserve(jobs), true);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    assert.equal(readFileSync(dst, "utf8"), 'base_url = "old"\n');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("codex_committed_source_places_multi_agent_v2_under_features", () => {
+  const source = readFileSync(join(REPOSITORY_ROOT, "harnesses", "codex", "config.toml"), "utf8");
+  assert.doesNotMatch(source, /^\[multi_agent_v2\]$/m);
+  assert.match(source, /^\[features\.multi_agent_v2\]$/m);
+});
+
 test("cliproxy_deployment_is_the_only_committed_endpoint_value", () => {
   const deployment = readCliProxyDeployment(
     join(REPOSITORY_ROOT, "assets", "cliproxyapi.deployment.json"),
@@ -268,6 +415,17 @@ test("cliproxy_endpoint_publication_is_one_job_after_config_and_directory_copies
       return;
     }
     assert.equal(endpointJob.targets.length, 4);
+    const codexTarget = endpointJob.targets.find((target) =>
+      target.dst.endsWith(join(".codex", "config.toml")),
+    );
+    assert.deepEqual(codexTarget?.preserveTopLevels, ["hooks.state", "projects"]);
+    const readinessJob = plan.jobs.find((job) => job.kind === "CliProxyReadiness");
+    if (readinessJob?.kind === "CliProxyReadiness") {
+      assert.equal(
+        readinessJob.clientApiKeyPath,
+        join(home, ".local", "share", "agents", "cliproxyapi", "client-api-key"),
+      );
+    }
     const configJobIndex = plan.jobs.findIndex((job) => job.kind === "CliProxyConfig");
     assert.ok(configJobIndex >= 0);
     assert.ok(plan.jobs.indexOf(endpointJob) > configJobIndex);
