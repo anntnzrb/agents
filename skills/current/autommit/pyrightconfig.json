@@ -1,0 +1,5 @@
+{
+  "typeCheckingMode": "strict",
+  "include": ["lib", "scripts", "tests"],
+  "extraPaths": ["lib"]
+}

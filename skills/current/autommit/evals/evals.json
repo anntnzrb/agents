@@ -1,0 +1,41 @@
+{
+  "skill_name": "autommit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Autommit this repository. One file is already staged and has additional unstaged edits; preserve the unstaged edits exactly.",
+      "expected_output": "Uses prepare and the bound snapshot, plans only the cached diff, validates, applies transactionally, and reports the created commit without sweeping in unstaged work.",
+      "files": [],
+      "expectations": [
+        "The workflow invokes the bundled Python CLI through uv run --script",
+        "The existing staged snapshot is committed without running a broad direct git add or git commit flow",
+        "The plan is validated against the prepare snapshot before apply",
+        "The final report accounts for the created commit and preserved unstaged work"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Run autommit with context to keep generated files separate. The staged diff contains two independently reversible behaviors and mixed-file hunks.",
+      "expected_output": "Preserves user context, produces complete non-overlapping hunk coverage, performs atomicity review when required, and publishes split commits through the temporary-worktree transaction.",
+      "files": [],
+      "expectations": [
+        "The user context is passed to prepare in its original order",
+        "Every staged file and changed hunk is assigned exactly once overall",
+        "A broad single-commit proposal receives a focused atomicity critic pass",
+        "A split decision causes replacement-plan validation with --require-split before apply"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Autommit after an interrupted prior run left transaction evidence. If repository state changed, do not guess or clean anything up.",
+      "expected_output": "Lets prepare recover a matching receipt, stops after recovery, or reports a structured refusal while preserving locks, receipts, index state, and worktree changes.",
+      "files": [],
+      "expectations": [
+        "The workflow delegates receipt handling to prepare rather than deleting transaction files",
+        "A recovered result stops the current workflow before planning new commits",
+        "A mismatched snapshot or receipt is reported as a safe refusal",
+        "The answer never removes a stale lock or falls back to direct in-place commits"
+      ]
+    }
+  ]
+}
