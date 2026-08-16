@@ -774,6 +774,38 @@ setInterval(() => {}, 1_000);
     });
   });
 
+  test("sync_plan_deploys_cliproxy_panel_asset_only_on_gateway_host", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const panelSrc = join(root, ".config", "agents", "assets", "cliproxy-panel.html");
+      writeFile(panelSrc, "<html>panel</html>\n");
+      const panelDst = join(".cli-proxy-api", "static", "management.html");
+
+      const gatewayPlan = await call<{
+        jobs: { kind: string; src?: string; dst?: string }[];
+      }>(buildSyncPlan, syncEnv);
+      const panelJob = gatewayPlan.jobs.find(
+        (job) => job.kind === "File" && job.dst?.endsWith(panelDst),
+      );
+      assert.equal(panelJob?.src, panelSrc);
+
+      writeFile(
+        join(root, ".config", "agents", "assets", "cliproxyapi.deployment.json"),
+        `${JSON.stringify({
+          ...TEST_CLIPROXY_DEPLOYMENT,
+          server: { hostname: "not-the-gateway.example.test" },
+        })}\n`,
+      );
+      const clientPlan = await call<{
+        jobs: { kind: string; dst?: string }[];
+      }>(buildSyncPlan, syncEnv);
+      assert.equal(
+        clientPlan.jobs.some((job) => job.kind === "File" && job.dst?.endsWith(panelDst)),
+        false,
+      );
+    });
+  });
+
   test("run_sync_happy_path", async () => {
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);

@@ -308,6 +308,15 @@ function configJobs(
       cacheRoot: join(syncEnv.home, ".cache", "agents", "model-catalog"),
       runtimeRoot: syncEnv.runtimeHome,
     },
+    ...(gatewayHost
+      ? [
+          {
+            src: join(syncEnv.assetsHome, "cliproxy-panel.html"),
+            dst: join(syncEnv.home, ".cli-proxy-api", "static", "management.html"),
+            kind: "File",
+          } satisfies Job,
+        ]
+      : []),
     {
       kind: "CliProxyEndpointTemplates",
       targets: endpointTargets,
