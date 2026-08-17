@@ -10,9 +10,9 @@ The repository separates committed sources from generated files and host-local r
 | `assets/` | Shared instructions, MCPorter configuration, repository-only CLIProxyAPI sources, and the skill gate |
 | `skills/current/` | Shared skills published to enabled harnesses |
 | `skills/legacy/` | Archived skills excluded from sync |
-| `harnesses/<harness>/` | Source configuration for one supported harness |
+| `harnesses/<harness>/` | Harness-owned configuration, implementation, adjacent tests, and local documentation |
 | `sync/` | The Bun and TypeScript sync application |
-| `docs/` | Repository documentation indexed by `docs/index.md` |
+| `docs/` | Sync application and repository-sync workflow documentation indexed by `docs/index.md` |
 | `secrets.local.example.json` | Schema and placeholder values for local CLIProxyAPI secrets |
 | `secrets.local.json` | Ignored host-local CLIProxyAPI secrets |
 
@@ -45,7 +45,7 @@ Each harness source starts under `harnesses/<id>/`. When an adapter defines `run
 | `sync/src/extensions/` | Extension dependency hooks |
 | `sync/src/packages/` | Harness package bootstrap logic |
 | `sync/src/runtime/` | Filesystem, process, lock, and error boundaries |
-| `sync/test/` | Unit and process-level integration tests |
+| `sync/test/` | Unit and process-level integration tests for sync behavior |
 
 ## Generated targets
 

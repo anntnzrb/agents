@@ -8,9 +8,11 @@
 - `skills/current/`: SSOT for shared skills synced to every harness
 - `skills/legacy/`: archived skills; repo-only, not synced
 - Other `assets/` entries: SSOT for shared agents and configuration
-- `harnesses/`: harness-specific configs staged for sync
-- `sync/`: isolated TypeScript sync application; owns all JS/TS app config, launcher wrappers, and dependencies
-- `docs/`: SSOT for repository documentation; flat, topic-based pages indexed by `docs/index.md`
+- `harnesses/`: harness-specific configs, implementations, adjacent tests, and local documentation staged for sync
+- `sync/`: isolated TypeScript sync application; owns all JS/TS app config, launcher wrappers, dependencies, and `sync/test/`
+- `sync/test/`: tests sync behavior only; harness names and paths MAY appear as fixtures or adapter boundaries, but tests MUST NOT import harness implementations or assert harness-local behavior
+- `docs/`: sync application and repository-sync workflow documentation; adapter boundaries MAY be described, but harness-local behavior and configuration belong under `harnesses/`
+- Harness-specific tests and documentation stay beside their owning source under `harnesses/`
 - `harnesses/<harness>/`: directory presence opts into a supported harness; sync owns its internal adapter metadata
 - Agent config root: `~/.config/agents/`
 - Installed runtime root: `~/.local/share/agents/`
@@ -28,7 +30,12 @@ Skills are modified here, in the SSOT. Always run against skill gate: `./assets/
 
 ## Documentation Gate
 
-For changes that affect user-visible behavior, setup, configuration, lifecycle, supported platforms, commands, generated paths, or repository structure:
+Route documentation by owner:
+
+- For sync application behavior, setup, configuration, lifecycle, supported platforms, commands, generated paths, repository structure, and adapter boundaries, use `docs/`.
+- For behavior or configuration owned entirely by one harness, keep documentation beside the source under `harnesses/<harness>/`; do not add it to `docs/`.
+
+For changes routed to `docs/`:
 
 1. Read `docs/index.md` and every related page completely; follow their cross-references before editing.
 2. Update the relevant existing page in the same change. Create a new focused topic page only when no current page fits.

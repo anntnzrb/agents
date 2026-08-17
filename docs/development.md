@@ -36,7 +36,7 @@ bun test ./test/managed-tools.test.ts
 bun test ./test/wrappers.test.ts
 ```
 
-Add the narrowest regression test that covers the changed contract. Add process-level integration coverage when a change creates a generated target or crosses a runtime boundary.
+Add the narrowest regression test that covers the changed sync contract. Add process-level integration coverage when a change creates a generated target or crosses a runtime boundary. Harness names and paths can serve as fixtures or adapter boundaries. Keep tests of harness implementations and harness-local behavior beside their source under `harnesses/`.
 
 ## Change sync behavior
 
@@ -62,6 +62,8 @@ Keep these contracts intact:
 2. Run `bun ./sync/src/cli.ts` from the repository root.
 3. Inspect the generated root derived from the adapter's `homeSegments` and `runtimeSubdir` fields.
 4. Run the harness-specific smoke check.
+
+Keep harness-specific tests and documentation beside the owning source under `harnesses/`. Do not place them in `sync/test/` or `docs/`.
 
 Do not edit a generated harness home. Sync replaces managed files on the next run.
 
