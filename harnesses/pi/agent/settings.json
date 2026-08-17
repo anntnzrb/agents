@@ -1,24 +1,16 @@
 {
   "collapseChangelog": true,
   "doubleEscapeAction": "none",
-  "compaction": {
-    "enabled": true,
-    "reserveTokens": 28672,
-    "keepRecentTokens": 40000
-  },
   "editorPaddingX": 1,
   "followUpMode": "all",
   "hideThinkingBlock": true,
-  "lastChangelogVersion": "0.74.0",
+  "lastChangelogVersion": "0.84.2",
   "enabledModels": [
-    "cliproxy/**"
+    "cliproxy/chatgpt/gpt-5.6-sol:high",
+    "cliproxy/chatgpt/gpt-5.6-luna:max",
+    "cliproxy/go/deepseek-v4-flash:max",
+    "cliproxy/antigravity/gemini-3.7-flash-high:max"
   ],
-  "providerPatcher": {
-    "_comment": "serviceTier.openai options: off, priority",
-    "serviceTier": {
-      "openai": "off"
-    }
-  },
   "quietStartup": true,
   "showHardwareCursor": true,
   "steeringMode": "all",
