@@ -72,12 +72,12 @@ The job writes files through a temporary file and an atomic rename. Invalid secr
 
 ## Model-catalog caches
 
-`assets/cliproxyapi/config.yaml.tmpl` declares provider endpoints, credential pools, public prefixes, and models.dev provider IDs under `x-model-sources`. Provider `/models` responses determine availability. The CLIProxyAPI rich model response supplies ordered reasoning efforts, the default effort, names, modalities, and context limits. [models.dev](https://models.dev/) supplies protocol hints, compatibility fields, output limits, and costs. Sync preserves effort strings that it does not recognize instead of filtering them through a local enum.
+`assets/cliproxyapi/config.yaml.tmpl` declares provider endpoints, credential pools, public prefixes, and models.dev provider IDs under `x-model-sources`. Each source uses `<base-url>/models` and the top-level `data` array by default. A source can set `models-url` and `models-field` for a different catalog endpoint and top-level array. The provider catalog determines availability. The CLIProxyAPI rich model response supplies ordered reasoning efforts, the default effort, names, modalities, and context limits. [models.dev](https://models.dev/) supplies protocol hints, compatibility fields, output limits, and costs. Sync preserves effort strings that it does not recognize instead of filtering them through a local enum.
 
 | Catalog | Freshness window | Cache file |
 | --- | --- | --- |
 | models.dev | 1 hour | `~/.cache/agents/model-catalog/models-dev.json` |
-| Provider `/models` | 6 hours | `~/.cache/agents/model-catalog/source-<id>.json` |
+| Provider model catalog | 6 hours | `~/.cache/agents/model-catalog/source-<id>.json` |
 | CLIProxyAPI `/v1/models` | 1 hour | `~/.cache/agents/model-catalog/gateway.json` |
 | CLIProxyAPI rich `/v1/models` | 1 hour | `~/.cache/agents/model-catalog/gateway-rich.json` |
 

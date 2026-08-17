@@ -53,6 +53,8 @@ interface CliProxySecrets {
 
 export interface CliProxyModelSource extends ModelCatalogSource {
   readonly credentialPool: string;
+  readonly modelsUrl?: string;
+  readonly modelsField?: string;
 }
 
 type ConfigRecord = Record<string, unknown>;
@@ -265,14 +267,18 @@ async function discoverModelSources(
       const apiKey = firstCredentialKey(credentials, source.credentialPool);
       const result = await cachedCatalogRequest(
         {
-          url: `${source.baseUrl}/models`,
+          url: source.modelsUrl ?? `${source.baseUrl}/models`,
           cachePath: join(cacheRoot, `source-${source.id}.json`),
           ttlMs: UPSTREAM_MODELS_TTL_MS,
           headers: { Authorization: `Bearer ${apiKey}` },
         },
         options,
       );
-      const discovered = modelsForSource(source, result.payload, modelsDevResult.payload);
+      const discovered = modelsForSource(
+        source,
+        sourceModelPayload(source, result.payload),
+        modelsDevResult.payload,
+      );
       if (
         options.forceModelRefresh &&
         discovered.unsupported.length > 0 &&
@@ -535,6 +541,18 @@ function appendProfiles(
   config[sectionName] = [...(existing ?? []), ...profiles];
 }
 
+function sourceModelPayload(source: CliProxyModelSource, payload: unknown): unknown {
+  if (!source.modelsField) {
+    return payload;
+  }
+  const root = expectRecord(payload, `${source.id} model catalog`);
+  const rows = root[source.modelsField];
+  if (!Array.isArray(rows)) {
+    throw new Error(`invalid ${source.id} model catalog: expected ${source.modelsField} array`);
+  }
+  return { data: rows };
+}
+
 function parseModelSources(value: unknown): CliProxyModelSource[] {
   if (value === undefined) {
     return [];
@@ -547,7 +565,15 @@ function parseModelSources(value: unknown): CliProxyModelSource[] {
   return value.map((rawSource, index) => {
     const label = `${MODEL_SOURCES_MARKER}[${index}]`;
     const source = expectRecord(rawSource, label);
-    const allowed = new Set(["id", "models-dev-provider", "credential-pool", "prefix", "base-url"]);
+    const allowed = new Set([
+      "id",
+      "models-dev-provider",
+      "credential-pool",
+      "prefix",
+      "base-url",
+      "models-url",
+      "models-field",
+    ]);
     for (const field of Object.keys(source)) {
       if (!allowed.has(field)) {
         throw new Error(`invalid ${label}: unknown field ${field}`);
@@ -572,12 +598,22 @@ function parseModelSources(value: unknown): CliProxyModelSource[] {
     }
     seenPrefixes.add(prefix);
     const baseUrl = requireHttpUrl(source["base-url"], `${label}.base-url`);
+    const modelsUrl =
+      source["models-url"] === undefined
+        ? undefined
+        : requireHttpUrl(source["models-url"], `${label}.models-url`);
+    const modelsField =
+      source["models-field"] === undefined
+        ? undefined
+        : requireNonEmptyString(source["models-field"], `${label}.models-field`);
     return {
       id,
       modelsDevProvider,
       credentialPool,
       prefix,
       baseUrl,
+      ...(modelsUrl === undefined ? {} : { modelsUrl }),
+      ...(modelsField === undefined ? {} : { modelsField }),
     };
   });
 }

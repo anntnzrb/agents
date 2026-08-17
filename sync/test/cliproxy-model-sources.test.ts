@@ -366,6 +366,94 @@ test("cliproxy_client_catalog_syncs_from_gateway_models_without_secrets", async 
   }
 });
 
+test("cliproxy_sync_discovers_models_from_a_custom_catalog_field", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cliproxy-custom-catalog-test-"));
+  try {
+    const src = join(root, "config.yaml.tmpl");
+    const dst = join(root, "runtime", "config.yaml");
+    const secretsPath = join(root, "secrets.json");
+    const cacheRoot = join(root, "cache");
+    const runtimeRoot = join(root, "data");
+    mkdirSync(join(root, "runtime"), { recursive: true });
+    mkdirSync(cacheRoot, { recursive: true });
+    writeFileSync(
+      src,
+      `x-model-sources:
+  - id: cline-pass
+    models-dev-provider: cline-pass
+    credential-pool: cline-pass
+    prefix: cline-pass
+    base-url: https://api.cline.test/api/v1
+    models-url: https://api.cline.test/api/v1/ai/cline/recommended-models
+    models-field: clinePass
+`,
+    );
+    writeFileSync(
+      secretsPath,
+      `${JSON.stringify({
+        CLIPROXY_CREDENTIAL_POOLS: {
+          "cline-pass": [{ apiKey: "subscription-key", weight: 1 }],
+        },
+      })}\n`,
+    );
+    const calls: string[] = [];
+    const fetchImpl = async (input: string | URL | Request) => {
+      const url =
+        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      calls.push(url);
+      if (url === "https://models.dev/api.json") {
+        return Response.json({
+          "cline-pass": {
+            npm: "@ai-sdk/openai-compatible",
+            models: {
+              "cline-pass/glm-next": metadata("GLM Next"),
+            },
+          },
+        });
+      }
+      if (url === "https://api.cline.test/api/v1/ai/cline/recommended-models") {
+        return Response.json({
+          clinePass: [{ id: "cline-pass/glm-next" }],
+          recommended: [{ id: "paid/frontier-next" }],
+        });
+      }
+      if (url === "https://gateway.example.test:9443/v1/models") {
+        return Response.json({ data: [] });
+      }
+      if (url === "https://gateway.example.test:9443/v1/models?client_version=0.144.1") {
+        return Response.json({ models: [] });
+      }
+      return new Response(null, { status: 404 });
+    };
+
+    await syncCliProxyConfig(src, dst, secretsPath, DEPLOYMENT, {
+      cacheRoot,
+      runtimeRoot,
+      forceModelRefresh: true,
+      fetch: fetchImpl,
+      now: () => 1000,
+    });
+
+    expect(calls).toEqual([
+      "https://models.dev/api.json",
+      "https://api.cline.test/api/v1/ai/cline/recommended-models",
+      "https://gateway.example.test:9443/v1/models",
+      "https://gateway.example.test:9443/v1/models?client_version=0.144.1",
+    ]);
+    const config = Bun.YAML.parse(readFileSync(dst, "utf8")) as Record<string, any>;
+    expect(config["openai-compatibility"]).toMatchObject([
+      {
+        name: "cline-pass",
+        prefix: "cline-pass",
+        "base-url": "https://api.cline.test/api/v1",
+        models: [{ name: "cline-pass/glm-next", alias: "glm-next" }],
+      },
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 function metadata(name: string): Record<string, unknown> {
   return {
     id: name.toLowerCase().replaceAll(" ", "-"),
