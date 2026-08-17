@@ -1,6 +1,6 @@
 # Repository layout
 
-The repository separates committed sources from generated files and host-local runtime state.
+The repository separates committed sources, local inputs, generated targets, and runtime state.
 
 ## Committed sources
 
@@ -14,7 +14,6 @@ The repository separates committed sources from generated files and host-local r
 | `sync/` | The Bun and TypeScript sync application |
 | `docs/` | Sync application and repository-sync workflow documentation indexed by `docs/index.md` |
 | `secrets.local.example.json` | Schema and placeholder values for local CLIProxyAPI secrets |
-| `secrets.local.json` | Ignored host-local CLIProxyAPI secrets |
 
 ### Shared assets
 
@@ -23,7 +22,7 @@ The repository separates committed sources from generated files and host-local r
 | `assets/AGENTS.md` | Global harness-independent agent instructions |
 | `assets/mcporter.jsonc` | MCPorter configuration source |
 | `assets/cliproxyapi/config.yaml.tmpl` | CLIProxyAPI configuration template and model-source declarations |
-| `assets/cliproxyapi/deployment.json` | CLIProxyAPI listener and client endpoint source of truth |
+| `assets/cliproxyapi/deployment.json` | CLIProxyAPI listener and client endpoint values |
 | `assets/cliproxyapi/release.json` | Pinned release assets and SHA-256 checksums |
 | `assets/cliproxyapi/panel.html` | Pinned management panel asset |
 | `assets/cliproxyapi/panel.patch` | Management panel patch source |
@@ -47,6 +46,10 @@ Each harness source starts under `harnesses/<id>/`. When an adapter defines `run
 | `sync/src/runtime/` | Filesystem, process, lock, and error boundaries |
 | `sync/test/` | Unit and process-level integration tests for sync behavior |
 
+## Local inputs
+
+`secrets.local.json` contains host-local CLIProxyAPI credentials. The repository ignores it. Create it from `secrets.local.example.json` and keep it outside Git.
+
 ## Generated targets
 
 For each harness, `homeSegments` defines the generated harness home. When the adapter defines `runtimeSubdir`, sync appends that subdirectory to the generated root.
@@ -62,11 +65,13 @@ Other jobs use fixed generated targets:
 | `~/.local/share/agents/sync-managed/` | Managed ownership and hook state |
 | `~/.local/bin/` | Harness and managed-tool wrappers |
 
-Sync replaces managed content in these targets. Durable changes belong in the matching committed source.
+Sync replaces managed content in these targets. Make durable changes in the matching committed source.
 
 ## Runtime state
 
-Credentials, OAuth files, sessions, logs, databases, and HTTP caches remain outside the repository. Sync changes only paths owned by a job, a wrapper marker, or recorded managed state.
+Credentials, OAuth files, sessions, logs, databases, and HTTP caches remain outside the repository.
+
+Sync changes only paths owned by a job, a wrapper marker, or recorded managed state.
 
 The main caches use these default paths. `XDG_CACHE_HOME` replaces `~/.cache` for managed releases and harness packages when the variable is set.
 

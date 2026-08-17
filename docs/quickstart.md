@@ -1,20 +1,12 @@
 # Set up agent configuration
 
-This tutorial builds synced harness configuration, starts CLIProxyAPI on the configured gateway host, and verifies the shared model endpoint. Run it on the host whose name matches `server.hostname` in `assets/cliproxyapi/deployment.json`; client-only hosts use the safe readiness-gated path described in the [sync reference](sync.md).
+Follow this tutorial on the gateway host, whose name matches `server.hostname` in `assets/cliproxyapi/deployment.json`. It creates the generated files, starts CLIProxyAPI, verifies the model endpoint, and starts a harness. A client host can run sync without local secrets; see [Sync reference](sync.md) for that path.
 
-Sync supports macOS and Linux only. The managed CLIProxyAPI release supports macOS on ARM64 and Linux on x86_64.
+Sync supports macOS and Linux. The managed CLIProxyAPI release supports macOS on ARM64 and Linux on x86_64.
 
 ## Install the required commands
 
-Install these commands:
-
-- `bun` runs the sync application.
-- `node` runs the npm-installed harness packages.
-- `npm` installs harness packages on first launch.
-- `git` clones the repository.
-- `tar` extracts CLIProxyAPI.
-- `openssl` generates local keys.
-- `curl` and `jq` verify the gateway.
+Install `bun`, `node`, `npm`, `git`, `tar`, `curl`, and `jq`.
 
 Confirm that each command is available:
 
@@ -24,12 +16,11 @@ node --version
 npm --version
 git --version
 tar --version
-openssl version
 curl --version
 jq --version
 ```
 
-Each command prints its version or help text.
+Each command prints its version.
 
 ## Clone the repository
 
@@ -40,7 +31,7 @@ git clone https://github.com/anntnzrb/agents.git ~/.config/agents
 cd ~/.config/agents
 ```
 
-The working directory is now `~/.config/agents`.
+The shell is now in `~/.config/agents`.
 
 ## Add local secrets
 
@@ -57,9 +48,9 @@ Edit the secrets file:
 $EDITOR secrets.local.json
 ```
 
-Replace every `replace-me` value. The credential pools contain upstream provider API keys. Use `weight: 1` when accounts have equal priority. Clients do not need client keys, and the management panel uses the static token committed in the template; the tailnet is the access boundary.
+Replace every `replace-me` value with an upstream provider API key. Use `weight: 1` when accounts have equal priority. The [CLIProxyAPI reference](cliproxyapi-reference.md#local-secrets) describes the file shape.
 
-The repository ignores `secrets.local.json`. Keep the file out of Git and transfer it only through an encrypted channel.
+The repository ignores `secrets.local.json`. Keep the file out of Git and transfer it through an encrypted channel.
 
 ## Generate the runtime files
 
@@ -69,7 +60,7 @@ Run sync from the repository root:
 bun ./sync/src/cli.ts
 ```
 
-The first run downloads the pinned CLIProxyAPI archive, verifies its SHA-256 checksum, and generates the runtime files. The run can warn that CLIProxyAPI is not running yet.
+The first gateway-host run may download the pinned CLIProxyAPI archive. Sync verifies its SHA-256 checksum and generates the runtime files. Sync can warn that CLIProxyAPI is not running yet.
 
 Confirm that sync created the main artifacts:
 
@@ -79,7 +70,7 @@ test -f ~/.cli-proxy-api/config.yaml
 test -f ~/.local/share/agents/model-catalog/catalog.json
 ```
 
-All three commands exit with status `0`.
+Each test exits with status `0` when the required path exists with the expected type and permissions.
 
 ## Authenticate a ChatGPT account
 
@@ -109,7 +100,7 @@ Start the gateway in a separate terminal:
 cli-proxy-api
 ```
 
-The process uses the listener from `assets/cliproxyapi/deployment.json`. Leave it running for the remaining steps.
+The process uses the listener from `assets/cliproxyapi/deployment.json`. Keep it running for the remaining steps.
 
 ## Refresh the model catalog
 
@@ -119,7 +110,7 @@ Return to the repository root and force a complete refresh:
 bun ./sync/src/cli.ts sync --refresh-models
 ```
 
-The forced refresh updates provider catalogs, models.dev metadata, and the live CLIProxyAPI catalog. A forced refresh fails instead of using stale network data.
+The forced refresh updates provider catalogs, models.dev metadata, and the live CLIProxyAPI catalog. It fails instead of using stale network data.
 
 ## Verify the gateway
 
@@ -132,12 +123,12 @@ curl -fsS "$CLIPROXY_BASE_URL/models" | \
 unset CLIPROXY_BASE_URL
 ```
 
-`jq` prints `true`. The exact model IDs depend on the current upstream catalogs and authenticated OAuth accounts.
+`jq` prints `true`. Model IDs depend on the current upstream catalogs and authenticated OAuth accounts.
 
 ## Start a harness
 
-Open `sync/src/core/harness-adapters.ts`. Choose an adapter whose source directory exists and whose `platforms` field includes your host. Run the command in its `launcher.bin` field. Add harness arguments when needed.
+Choose an adapter whose source directory exists under `harnesses/` and whose `platforms` field includes your host. Read its `launcher.bin` value in `sync/src/core/harness-adapters.ts`, then run that wrapper command.
 
-The wrapper syncs the configuration, installs the cached harness package if needed, and opens the harness. The wrapper returns the harness exit status.
+The wrapper runs sync, prepares the cached harness package, forwards your arguments, and returns the harness exit status.
 
 For later gateway operations, use [Operate CLIProxyAPI](cliproxyapi.md).
