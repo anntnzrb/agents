@@ -1,12 +1,21 @@
 # Operate CLIProxyAPI
 
-Use this guide to change gateway credentials, authenticate ChatGPT, refresh models, run the gateway, and verify access. For field definitions and discovery rules, see the [CLIProxyAPI reference](cliproxyapi-reference.md).
+Use this guide to change gateway credentials, authenticate ChatGPT, run the gateway, and check model access. See the [CLIProxyAPI reference](cliproxyapi-reference.md) for field definitions, catalog rules, and routing settings.
 
-## Select the deployment
+## Set the deployment
 
-Keep the gateway host and endpoint values in `assets/cliproxyapi/deployment.json`. Set `server.hostname` to the host that runs CLIProxyAPI. Set `listen.host` and `listen.port` to the listener on that host. Set `client.baseUrl` to the `/v1` endpoint that clients use. Do not copy these values into harness sources or documentation.
+Keep the gateway host and endpoint values in `assets/cliproxyapi/deployment.json`:
 
-When you move the gateway, update that file, start the new gateway, and run sync on clients. A client keeps its existing generated configuration and endpoints until the new endpoint passes the `/models` readiness check.
+| Field | Set it to |
+| --- | --- |
+| `server.hostname` | The host that runs CLIProxyAPI |
+| `listen.host` | The interface address that CLIProxyAPI binds |
+| `listen.port` | The listener port |
+| `client.baseUrl` | The client-facing `/v1` endpoint |
+
+Do not copy these values into harness sources or documentation.
+
+To move the gateway, update `deployment.json`, start CLIProxyAPI on the new host, and run sync on the clients. A client keeps its existing generated configuration and harness endpoints until the new `/models` endpoint returns a non-empty `data` array.
 
 ## Configure local secrets
 
@@ -18,7 +27,7 @@ chmod 600 secrets.local.json
 $EDITOR secrets.local.json
 ```
 
-Set every credential pool referenced by `assets/cliproxyapi/config.yaml.tmpl`. The gateway accepts client requests without client keys; the tailnet is the access boundary. Upstream API keys come from the provider accounts themselves.
+Set every credential pool referenced by `assets/cliproxyapi/config.yaml.tmpl`. The gateway accepts requests without a client key. Keep the listener on a trusted private interface.
 
 Never commit `secrets.local.json` or files under `~/.cli-proxy-api/`.
 
@@ -43,9 +52,9 @@ Append an account to the matching array in `CLIPROXY_CREDENTIAL_POOLS`:
 }
 ```
 
-Use the same weight for accounts with equal priority. Add `proxyUrl` only when that account requires a proxy.
+Use the same weight for accounts with equal priority. Add `proxyUrl` only when an account requires a proxy.
 
-For ClinePass, create a long-lived API key in **Settings > API Keys** at [app.cline.bot](https://app.cline.bot). Add the key to the `cline-pass` pool. Do not use an account OAuth token from the Cline extension or CLI. OAuth tokens expire and rotate, but CLIProxyAPI credential pools require stable API keys.
+For ClinePass, create a long-lived API key in **Settings > API Keys** at [app.cline.bot](https://app.cline.bot). Add the key to the `cline-pass` pool. Do not use an OAuth token from the Cline extension or CLI. CLIProxyAPI credential pools require stable API keys.
 
 Apply the change:
 
@@ -53,7 +62,7 @@ Apply the change:
 bun ./sync/src/cli.ts sync --refresh-models
 ```
 
-If the gateway is not running, omit `--refresh-models` for the first sync. Start the gateway, then run the forced refresh.
+If the gateway is not running, run a normal sync first. Start the gateway, then run the forced refresh.
 
 ## Authenticate ChatGPT
 
@@ -69,15 +78,15 @@ On a headless Linux host, use device OAuth:
 cli-proxy-api --codex-device-login
 ```
 
-Restrict the generated file:
+Restrict the generated OAuth files:
 
 ```bash
 chmod 600 ~/.cli-proxy-api/codex-*.json
 ```
 
-Do not run two gateways with the same active refresh token. Before moving OAuth state, stop the old gateway. Reauthentication on the new host is safer than copying an active token.
+Do not run two gateways with the same active refresh token. Stop the old gateway before you move OAuth state. Reauthenticate on the new host instead of copying an active token.
 
-After authentication, refresh the shared catalog:
+After authentication, refresh the model catalog:
 
 ```bash
 bun ./sync/src/cli.ts sync --refresh-models
@@ -95,79 +104,63 @@ The managed wrapper supplies `--config ~/.cli-proxy-api/config.yaml`. Sync reads
 
 ## Open the control panel
 
-Open the control panel at the configured gateway listener:
+Open `http://<listen-host>:<listen-port>/management.html` with the values from `assets/cliproxyapi/deployment.json`.
 
-```text
-http://munich.trex-gamut.ts.net:8317/management.html
-```
-
-The panel accepts the static management token committed in `assets/cliproxyapi/config.yaml.tmpl`. It is not a credential: the tailnet is the access boundary.
+The panel uses `remote-management.secret-key` from `assets/cliproxyapi/config.yaml.tmpl`. Treat that value as a credential. Do not expose the panel through the public internet, Tailscale Funnel, or an untrusted LAN.
 
 Do not make durable configuration changes in the control panel. Sync replaces the generated configuration from `assets/cliproxyapi/config.yaml.tmpl` and `secrets.local.json`.
 
-## Control panel asset
+## Rebuild the control-panel asset
 
-The panel itself is a single HTML file. The repository pins an upstream revision that includes OpenCode Go quota support, then applies `assets/cliproxyapi/panel.patch` to add ClinePass quota. The gateway host syncs `assets/cliproxyapi/panel.html` to `~/.cli-proxy-api/static/management.html`; clients do not receive it.
-
-The panel queries both provider usage endpoints through the gateway's `/v0/management/api-call` proxy. OpenCode Go uses `https://opencode.ai/zen/go/v1/usage`. ClinePass uses `https://api.cline.bot/api/v1/users/me/plan/usage-limits`. The gateway substitutes the selected credential, so API keys never leave the gateway. `remote-management.disable-auto-update-panel` stays `true` so the gateway never replaces the pinned build.
-
-Rebuild the asset after adopting a new upstream revision:
+The repository pins a management-panel revision and applies `assets/cliproxyapi/panel.patch`. Rebuild the asset after adopting a new upstream revision:
 
 ```bash
 sh assets/cliproxyapi/panel.rebuild.sh
 ```
 
-The script pins the upstream revision and applies `assets/cliproxyapi/panel.patch` before it builds the asset. Remove the local patch when upstream supports ClinePass quota.
+The script runs from any directory and requires `git` and `bun` on `PATH`. It writes `assets/cliproxyapi/panel.html`.
 
 ## Scope models by origin
 
-Every model the gateway serves carries an origin prefix. See the [prefix table](cliproxyapi-reference.md#model-sources) for the full mapping. `force-model-prefix` drops the unprefixed IDs, so each model request names its origin. A name like `gpt-5.6-sol` therefore appears only as `chatgpt/gpt-5.6-sol` or `zen/gpt-5.6-sol`.
+The template enables `force-model-prefix`. Accounts with a prefix expose model IDs in `<prefix>/<alias>` form. See the [model prefix table](cliproxyapi-reference.md#model-prefixes).
 
-API-key pools get prefixes from `x-model-sources` in the template. OAuth accounts get prefixes from the top-level `prefix` field in their auth files under `~/.cli-proxy-api/`. Re-authentication recreates an auth file and drops its prefix. Re-apply it afterwards:
+API-key pools get prefixes from `x-model-sources` in the template. OAuth accounts get prefixes from the top-level `prefix` field in their auth files under `~/.cli-proxy-api/`. Reauthentication recreates an auth file and drops its prefix.
+
+To restore the ChatGPT prefix after reauthentication:
 
 ```bash
+set -eu
 for f in ~/.cli-proxy-api/codex-*.json; do
-	jq '.prefix = "chatgpt"' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+	[ -f "$f" ] || continue
+	tmp="$f.tmp"
+	jq '.prefix = "chatgpt"' "$f" > "$tmp"
+	chmod 600 "$tmp"
+	mv "$tmp" "$f"
 done
-chmod 600 ~/.cli-proxy-api/codex-*.json
-systemctl --user restart cliproxyapi
 ```
 
-After a prefix change, refresh the shared catalog so clients pick up the new IDs:
+Restart the running gateway process after you edit the auth files. Then refresh the model catalog:
 
 ```bash
 bun ./sync/src/cli.ts sync --refresh-models
 ```
 
-Sessions and configurations that reference an old unprefixed ID stop working after its prefix appears; reselect the model.
+Sessions and configurations that reference an old unprefixed ID stop working after its prefix appears. Select the prefixed model again.
 
 ## Verify model access
 
-The gateway accepts requests without client keys. Query it directly:
+Query the gateway without a client key:
 
 ```bash
-CLIPROXY_DEPLOYMENT=assets/cliproxyapi/deployment.json
-CLIPROXY_BASE_URL="$(jq -r '.client.baseUrl' "$CLIPROXY_DEPLOYMENT")"
-curl -fsS "$CLIPROXY_BASE_URL/models" | \
-	jq -r '.data[].id'
-unset CLIPROXY_BASE_URL
-```
-
-The command prints the currently available model IDs. The list changes with provider catalogs and OAuth accounts.
-
-To verify that the response contains at least one model, use:
-
-```bash
-CLIPROXY_DEPLOYMENT=assets/cliproxyapi/deployment.json
-CLIPROXY_BASE_URL="$(jq -r '.client.baseUrl' "$CLIPROXY_DEPLOYMENT")"
-curl -fsS "$CLIPROXY_BASE_URL/models" | \
+base_url="$(jq -r '.client.baseUrl' assets/cliproxyapi/deployment.json)"
+curl -fsS "$base_url/models" | \
 	jq -e '.data | type == "array" and length > 0'
-unset CLIPROXY_BASE_URL
+unset base_url
 ```
 
-`jq` prints `true` on success.
+`jq` prints `true` when the response contains at least one model. Model IDs depend on the current provider catalogs and authenticated OAuth accounts.
 
-## Refresh stale catalogs
+## Refresh model catalogs
 
 Force every catalog request after an account or provider change:
 
@@ -175,12 +168,10 @@ Force every catalog request after an account or provider change:
 bun ./sync/src/cli.ts sync --refresh-models
 ```
 
-The forced refresh bypasses freshness windows and rejects stale fallback data. Use a normal sync for routine launches so a transient provider failure can fall back to a valid cache.
+The forced refresh bypasses freshness windows and rejects stale fallback data. Use a normal sync for routine launches so a transient provider failure can use a valid cache.
 
 ## Deploy on a home server
 
-Bind the gateway only to a trusted private interface. For a Tailscale deployment, use the server's tailnet address. The tailnet is the access boundary; the management panel uses the static token committed in the template.
-
-Do not expose the gateway through the public internet, Tailscale Funnel, or an untrusted LAN.
+Bind the gateway to a trusted private interface. For a Tailscale deployment, use the server's tailnet address.
 
 Back up `secrets.local.json` through an encrypted channel. Reauthenticate OAuth accounts after recovery instead of backing up active refresh tokens.
