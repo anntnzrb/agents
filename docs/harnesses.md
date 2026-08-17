@@ -38,12 +38,6 @@ Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with
 
 API-key model IDs use the prefix declared by `x-model-sources`. The committed prefixes are `go`, `deepseek`, `zen`, and `cline-pass`. OAuth model IDs use the prefix stored in their CLIProxyAPI auth files, such as `chatgpt`, `antigravity`, or `grok`.
 
-The OpenCode CLIProxyAPI plugin creates variants from the ordered effort strings returned by discovery. It does not maintain a model list or an effort enum. Unknown future effort names pass through unchanged. The configured `max` policy always maps to the last advertised effort. Model options and variants declared in `opencode.jsonc` override generated values and survive synchronization.
-
-`harnesses/opencode/opencode.jsonc` sets the `build` agent to the `high` variant. It sets the `general` and `explore` subagents to the portable `max` policy.
-
-The Pi adapter projects the fetched effort strings into Pi's closed `thinkingLevelMap` input. It marks absent Pi levels unsupported and maps Pi's `max` selector to the last advertised effort. A future provider effort remains intact in the shared catalog and stays reachable through `max` even when the installed Pi version cannot name it directly.
-
 ## Launch wrappers
 
 Sync writes wrappers under `~/.local/bin/` and assumes that directory is on `PATH`.
