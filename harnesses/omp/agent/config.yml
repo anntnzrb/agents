@@ -121,7 +121,7 @@ async:
   maxJobs: 8
 
 features:
-  unexpectedStopDetection: true
+  unexpectedStopDetection: false
 
 # =============================================================================
 # Code Intelligence
