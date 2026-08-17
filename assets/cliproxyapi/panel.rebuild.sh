@@ -1,6 +1,6 @@
 #!/bin/sh
 # Rebuild the pinned CLIProxyAPI management panel asset (assets/cliproxyapi/panel.html)
-# from upstream PR https://github.com/router-for-me/Cli-Proxy-API-Management-Center/pull/381.
+# from a pinned upstream revision plus the local ClinePass quota patch.
 # Run from anywhere; requires git and bun on PATH.
 set -eu
 
@@ -14,6 +14,7 @@ git clone --depth 1 "$REPO" "$WORK/panel"
 git -C "$WORK/panel" fetch --depth 1 origin "$HEAD"
 git -C "$WORK/panel" checkout --detach FETCH_HEAD
 
+git -C "$WORK/panel" apply "$OUT_DIR/panel.patch"
 cd "$WORK/panel"
 bun install --frozen-lockfile
 bun run build
