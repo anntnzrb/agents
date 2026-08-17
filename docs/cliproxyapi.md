@@ -107,9 +107,9 @@ Do not make durable configuration changes in the control panel. Sync replaces th
 
 ## Control panel asset
 
-The panel itself is a single HTML file. The default upstream panel cannot show OpenCode Go quota, so this repository pins a patched build. The gateway host syncs the asset from `assets/cliproxyapi/panel.html` to `~/.cli-proxy-api/static/management.html`; clients do not receive it.
+The panel itself is a single HTML file. The repository pins an upstream revision that includes OpenCode Go quota support, then applies `assets/cliproxyapi/panel.patch` to add ClinePass quota. The gateway host syncs `assets/cliproxyapi/panel.html` to `~/.cli-proxy-api/static/management.html`; clients do not receive it.
 
-The patch is upstream PR `router-for-me/Cli-Proxy-API-Management-Center#381` ("feat(quota): add OpenCode Go usage support"). The exact diff is committed as `assets/cliproxyapi/panel.patch`. The panel queries `https://opencode.ai/zen/go/v1/usage` through the gateway's `/v0/management/api-call` proxy, so API keys never leave the gateway. `remote-management.disable-auto-update-panel` stays `true` so the gateway never replaces the pinned build.
+The panel queries both provider usage endpoints through the gateway's `/v0/management/api-call` proxy. OpenCode Go uses `https://opencode.ai/zen/go/v1/usage`. ClinePass uses `https://api.cline.bot/api/v1/users/me/plan/usage-limits`. The gateway substitutes the selected credential, so API keys never leave the gateway. `remote-management.disable-auto-update-panel` stays `true` so the gateway never replaces the pinned build.
 
 Rebuild the asset after adopting a new upstream revision:
 
@@ -117,7 +117,7 @@ Rebuild the asset after adopting a new upstream revision:
 sh assets/cliproxyapi/panel.rebuild.sh
 ```
 
-The script pins the upstream head commit. When upstream merges the PR into a release, replace the pinned build with the official asset and delete the panel job from `sync/src/core/plan.ts`.
+The script pins the upstream revision and applies `assets/cliproxyapi/panel.patch` before it builds the asset. Remove the local patch when upstream supports ClinePass quota.
 
 ## Scope models by origin
 

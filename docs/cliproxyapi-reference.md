@@ -200,7 +200,7 @@ The control panel is available at `http://<listen-host>:<listen-port>/management
 
 The template keeps `remote-management.disable-auto-update-panel` at `true`.
 
-The deployed panel is a pinned patched build from `assets/cliproxyapi/panel.html`. The patch adds OpenCode Go quota (5-hour, weekly, and monthly windows) to the quota view. The panel fetches `https://opencode.ai/zen/go/v1/usage` through the gateway's `/v0/management/api-call` proxy, which substitutes the selected credential server-side; API keys never reach the browser. The gateway never replaces the pinned asset while `disable-auto-update-panel` is `true`. Rebuild the asset with `assets/cliproxyapi/panel.rebuild.sh` after adopting a new upstream revision.
+The deployed panel is a pinned patched build from `assets/cliproxyapi/panel.html`. The pinned upstream revision includes OpenCode Go quota. The local patch adds ClinePass quota with 5-hour, weekly, and monthly windows. The panel fetches `https://opencode.ai/zen/go/v1/usage` and `https://api.cline.bot/api/v1/users/me/plan/usage-limits` through the gateway's `/v0/management/api-call` proxy. The gateway substitutes the selected credential server-side, so API keys never reach the browser. The gateway never replaces the pinned asset while `disable-auto-update-panel` is `true`. Rebuild the asset with `assets/cliproxyapi/panel.rebuild.sh` after adopting a new upstream revision.
 
 ## Provider limits
 
