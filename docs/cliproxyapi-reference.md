@@ -82,13 +82,26 @@ No harness reads `secrets.local.json`. The gateway accepts client requests witho
 
 `x-model-sources` in `assets/cliproxyapi/config.yaml.tmpl` defines API-key providers without committing model IDs.
 
-| Source ID | models.dev provider | Credential pool | Public prefix | Base URL |
-| --- | --- | --- | --- | --- |
-| `opencode-go` | `opencode-go` | `opencode-go` | `go` | `https://opencode.ai/zen/go/v1` |
-| `deepseek` | `deepseek` | `deepseek` | `deepseek` | `https://api.deepseek.com/v1` |
-| `opencode-zen` | `opencode` | `opencode-zen` | `zen` | `https://opencode.ai/zen/v1` |
+| Source ID | models.dev provider | Credential pool | Public prefix | Base URL | Model catalog |
+| --- | --- | --- | --- | --- | --- |
+| `opencode-go` | `opencode-go` | `opencode-go` | `go` | `https://opencode.ai/zen/go/v1` | `<base-url>/models`, field `data` |
+| `deepseek` | `deepseek` | `deepseek` | `deepseek` | `https://api.deepseek.com/v1` | `<base-url>/models`, field `data` |
+| `opencode-zen` | `opencode` | `opencode-zen` | `zen` | `https://opencode.ai/zen/v1` | `<base-url>/models`, field `data` |
+| `cline-pass` | `cline-pass` | `cline-pass` | `cline-pass` | `https://api.cline.bot/api/v1` | `https://api.cline.bot/api/v1/ai/cline/recommended-models`, field `clinePass` |
 
-The `x-model-sources` marker does not appear in the generated configuration.
+Each source accepts these fields:
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `id` | Yes | Unique source and cache ID |
+| `models-dev-provider` | Yes | Provider key in the models.dev catalog |
+| `credential-pool` | Yes | Pool in `CLIPROXY_CREDENTIAL_POOLS` |
+| `prefix` | Yes | Public model prefix and CLIProxyAPI profile prefix |
+| `base-url` | Yes | Upstream inference endpoint |
+| `models-url` | No | Catalog endpoint; defaults to `<base-url>/models` |
+| `models-field` | No | Top-level array in the catalog response; defaults to `data` |
+
+The renderer sends the first credential in the selected pool as a Bearer token when it fetches the model catalog. It rejects a configured `models-field` when the response does not contain that array. The `x-model-sources` marker and its catalog-only fields do not appear in the generated configuration.
 
 ## Model prefixes
 
@@ -99,6 +112,7 @@ Every served model ID starts with the prefix of its origin:
 | `go` | OpenCode Go subscription | `x-model-sources` template entry |
 | `zen` | OpenCode Zen | `x-model-sources` template entry |
 | `deepseek` | DeepSeek API | `x-model-sources` template entry |
+| `cline-pass` | ClinePass subscription | `x-model-sources` template entry |
 | `chatgpt` | ChatGPT OAuth accounts | `prefix` field in `~/.cli-proxy-api/codex-*.json` |
 | `antigravity` | Google Antigravity OAuth accounts | `prefix` field in `~/.cli-proxy-api/antigravity-*.json` |
 | `grok` | XAI Grok OAuth accounts | `prefix` field in `~/.cli-proxy-api/xai-*.json` |
@@ -111,7 +125,7 @@ OAuth prefixes live in the generated auth files, not in the repository. Re-authe
 
 Sync combines four catalog sources:
 
-1. Each provider's authenticated `/models` response determines API-key model availability.
+1. Each API-key source's authenticated model catalog determines availability. Sources use `<base-url>/models` and the `data` field unless the template overrides `models-url` or `models-field`.
 2. The live CLIProxyAPI `/v1/models` response determines gateway model availability and origin.
 3. The live CLIProxyAPI `/v1/models?client_version=0.144.1` response supplies the gateway's reasoning levels, names, modalities, and context limits.
 4. [models.dev](https://models.dev/) supplies protocol hints, compatibility fields, output limits, and published costs.
@@ -145,7 +159,7 @@ The generated model ID is `<prefix>/<upstream-id>` for an `x-model-sources` entr
 | Input | Freshness window | Stale fallback during normal sync |
 | --- | --- | --- |
 | models.dev | 1 hour | Yes |
-| Provider `/models` | 6 hours | Yes |
+| Provider model catalog | 6 hours | Yes |
 | CLIProxyAPI `/v1/models` | 1 hour | Yes |
 | CLIProxyAPI rich `/v1/models` | 1 hour | Yes |
 

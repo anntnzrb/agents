@@ -45,6 +45,8 @@ Append an account to the matching array in `CLIPROXY_CREDENTIAL_POOLS`:
 
 Use the same weight for accounts with equal priority. Add `proxyUrl` only when that account requires a proxy.
 
+For ClinePass, create a long-lived API key in **Settings > API Keys** at [app.cline.bot](https://app.cline.bot). Add the key to the `cline-pass` pool. Do not use an account OAuth token from the Cline extension or CLI. OAuth tokens expire and rotate, but CLIProxyAPI credential pools require stable API keys.
+
 Apply the change:
 
 ```bash
