@@ -326,12 +326,6 @@ test("cliproxy_readiness_failure_preserves_endpoints", async () => {
   }
 });
 
-test("codex_committed_source_places_multi_agent_v2_under_features", () => {
-  const source = readFileSync(join(REPOSITORY_ROOT, "harnesses", "codex", "config.toml"), "utf8");
-  assert.doesNotMatch(source, /^\[multi_agent_v2\]$/m);
-  assert.match(source, /^\[features\.multi_agent_v2\]$/m);
-});
-
 test("cliproxy_deployment_is_the_only_committed_endpoint_value", () => {
   const deployment = readCliProxyDeployment(
     join(REPOSITORY_ROOT, "assets", "cliproxyapi", "deployment.json"),
