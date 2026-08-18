@@ -106,7 +106,7 @@ test("wrapper_destinations_render_unix_launchers", () => {
   });
 });
 
-test("codex_wrapper_prepends_yolo_flags_before_caller_args", () => {
+test("codex_wrapper defers sandbox and hook policies to config", () => {
   withTempHome((home) => {
     addHarnessSources(home);
     const unixEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
@@ -115,11 +115,8 @@ test("codex_wrapper_prepends_yolo_flags_before_caller_args", () => {
     assert.ok(codex, "codex wrapper destination exists");
     const bypassSandbox = codex.content.indexOf("--dangerously-bypass-approvals-and-sandbox");
     const bypassHookTrust = codex.content.indexOf("--dangerously-bypass-hook-trust");
-    const callerArgs = codex.content.indexOf('"$@"');
-    assert.notEqual(bypassSandbox, -1, "codex wrapper carries the approvals/sandbox bypass flag");
-    assert.notEqual(bypassHookTrust, -1, "codex wrapper carries the hook-trust bypass flag");
-    assert.ok(bypassSandbox < callerArgs, "codex yolo flags precede caller argument forwarding");
-    assert.ok(bypassHookTrust < callerArgs, "codex hook-trust flag precedes caller args");
+    assert.equal(bypassSandbox, -1, "codex wrapper must not override agent permission profiles");
+    assert.equal(bypassHookTrust, -1, "codex wrapper must not bypass hook trust");
     for (const entry of destinations) {
       if (entry.harness.sourceName === "codex") {
         continue;
