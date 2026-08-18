@@ -116,7 +116,7 @@ process.stdout.write(JSON.stringify(registered[0]));
         models: [
           {
             id: "cliproxy/example",
-            name: "Example",
+            name: "cliproxy — Example",
             reasoning: true,
             thinkingLevelMap: {
               off: null,
@@ -134,7 +134,7 @@ process.stdout.write(JSON.stringify(registered[0]));
           },
           {
             id: "cliproxy/plain",
-            name: "Plain",
+            name: "cliproxy — Plain",
             reasoning: false,
             input: ["text"],
             cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

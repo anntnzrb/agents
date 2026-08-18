@@ -6,10 +6,10 @@
   "hideThinkingBlock": true,
   "lastChangelogVersion": "0.84.2",
   "enabledModels": [
-    "cliproxy/chatgpt/gpt-5.6-sol:high",
-    "cliproxy/chatgpt/gpt-5.6-luna:max",
-    "cliproxy/go/deepseek-v4-flash:max",
-    "cliproxy/antigravity/gemini-3.7-flash-high:max"
+    "cliproxy/chatgpt/nnn-gpt-5.6-sol-high",
+    "cliproxy/chatgpt/nnn-gpt-5.6-luna-max",
+    "cliproxy/go/nnn-deepseek-v4-flash-max",
+    "cliproxy/antigravity/nnn-gemini-3.7-flash-medium"
   ],
   "quietStartup": true,
   "showHardwareCursor": true,
