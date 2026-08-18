@@ -140,12 +140,12 @@ export const resolveCliPath = Effect.fn("resolveCliPath")(function*(): Effect.fn
   return yield* new AutommitCliNotFoundError({ candidates });
 });
 
-export const runCli = <T = Record<string, unknown>>(
+export const runCli = Effect.fn("runCli")(<T = Record<string, unknown>>(
   cliPath: string,
   command: string,
   args: readonly string[],
   cwd: string,
-): Effect.Effect<T, AutommitCliError> =>
+) =>
   Effect.tryPromise({
     try: async (signal) => {
       const { stdout } = await execFileAsync(
@@ -179,7 +179,8 @@ export const runCli = <T = Record<string, unknown>>(
       const message = error instanceof Error ? error.message : String(error);
       return new AutommitCliError({ command, message, cause: error });
     },
-  });
+  }),
+);
 
 const modelRequestOptions = (ctx: CommandContext): Record<string, unknown> => ({
   cacheRetention: "none",
@@ -309,10 +310,10 @@ export const makeTempDir = Effect.acquireRelease(
     ),
 );
 
-export const writeTextFile = (
+export const writeTextFile = Effect.fn("writeTextFile")((
   path: string,
   content: string,
-): Effect.Effect<void, AutommitCliError> =>
+) =>
   Effect.tryPromise({
     try: () => writeFile(path, content, "utf8"),
     catch: (cause) =>
@@ -321,7 +322,8 @@ export const writeTextFile = (
         message: `Failed to write ${path}`,
         cause,
       }),
-  });
+  }),
+);
 
 const generateValidatedPlan = Effect.fn("generateValidatedPlan")(function*(
   ctx: CommandContext,
