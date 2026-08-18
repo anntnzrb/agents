@@ -111,7 +111,7 @@ export const loadProjectContextFilesEffect = Effect.fn("loadProjectContextFiles"
   return out;
 });
 
-export async function loadProjectContextFiles(
+export function loadProjectContextFiles(
   cwd: string,
 ): Promise<Array<{ path: string; tokens: number; bytes: number }>> {
   return Effect.runPromise(loadProjectContextFilesEffect(cwd));

@@ -245,7 +245,7 @@ const readPreviousSessionPromptsEffect = Effect.fn("readPreviousSessionPrompts")
   return prompts;
 });
 
-async function readPreviousSessionPrompts(
+function readPreviousSessionPrompts(
   sessionDir: string,
   excludeSessionFile?: string,
 ): Promise<PromptEntry[]> {

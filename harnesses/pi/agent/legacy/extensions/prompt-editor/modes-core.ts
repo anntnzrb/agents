@@ -161,7 +161,7 @@ const withFileLockEffect = Effect.fn("withFileLock")(function*<T, E>(
     }
   });
 
-async function withFileLock<T>(
+function withFileLock<T>(
   filePath: string,
   fn: () => Promise<T>,
 ): Promise<T> {

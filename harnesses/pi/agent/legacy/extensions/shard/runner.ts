@@ -385,12 +385,12 @@ export const finalizeChildRun = (
   };
 };
 
-export const mapConcurrent = async <TIn, TOut>(
+export const mapConcurrent = <TIn, TOut>(
   items: readonly TIn[],
   concurrency: number,
   fn: (item: TIn, index: number) => Promise<TOut>,
 ): Promise<TOut[]> => {
-  if (items.length === 0) return [];
+  if (items.length === 0) return Promise.resolve([]);
   const limit = Math.max(1, Math.min(concurrency, items.length));
 
   return Effect.runPromise(

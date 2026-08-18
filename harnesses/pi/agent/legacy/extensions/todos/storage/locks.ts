@@ -153,7 +153,7 @@ export const acquireLockEffect = Effect.fn("acquireTodoLock")(function*(
   });
 });
 
-export const withTodoLock = async <T>(
+export const withTodoLock = <T>(
   todosDir: string,
   id: string,
   ctx: ExtensionContext,
