@@ -68,10 +68,21 @@ export default async function cliproxy(pi: ExtensionAPI): Promise<void> {
   });
 }
 
+function displayName(id: string, catalogName: string): string {
+  const slash = id.indexOf("/");
+  if (slash <= 0) {
+    return catalogName || id;
+  }
+  const prefix = id.slice(0, slash);
+  const model = id.slice(slash + 1);
+  const title = catalogName && catalogName !== id ? catalogName : model;
+  return `${prefix} — ${title}`;
+}
+
 function piModel(model: CatalogModel): ProviderModelConfig {
   return {
     id: model.id,
-    name: model.name,
+    name: displayName(model.id, model.name),
     reasoning: model.reasoning,
     ...(model.reasoning && model.reasoningEfforts
       ? { thinkingLevelMap: piThinkingLevelMap(model.reasoningEfforts) }
