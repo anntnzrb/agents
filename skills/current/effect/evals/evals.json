@@ -19,14 +19,14 @@
       "expected_output": "Selects the relevant ecosystem sources and keeps package ownership explicit.",
       "files": [],
       "expectations": [
-        "The workflow includes `@effect/platform` and/or `@effect/sql` in the selected library list",
+        "The workflow includes `@effect/platform`, `@effect/sql`, or both in the selected library list",
         "The answer keeps package names explicit instead of merging responsibilities",
         "The workflow does not fetch the entire supported catalog when two libraries are enough"
       ]
     },
     {
       "id": 3,
-      "prompt": "I'm using `@effect/opentelemetry` and want an API walkthrough. If the MCP doesn't cover it, don't bluff; tell me what fallback source to use.",
+      "prompt": "I'm using `@effect/opentelemetry` and want an API walkthrough. If the MCP doesn't cover it, don't bluff. Tell me what fallback source to use.",
       "expected_output": "Recognizes unsupported MCP coverage and uses matching source or another authoritative fallback.",
       "files": [],
       "expectations": [
@@ -66,7 +66,7 @@
       "files": [],
       "expectations": [
         "The answer uses Bun, TypeScript 7 or newer, native ESM, Oxlint, Oxfmt, and bun:test",
-        "The answer detects the current v4 release channel and uses matching packages; while RC is current, it uses effect@rc and @effect/platform-bun@rc",
+        "The answer detects the current v4 release channel and uses matching packages. While RC is current, it uses effect@rc and @effect/platform-bun@rc",
         "The answer uses Schema.TaggedError, Context.Service, Layer, Config, Schedule, and scoped resource cleanup only where requested",
         "The answer runs TypeScript diagnostics and @effect/tsgo diagnostics separately",
         "The answer does not add an HTTP framework, ORM, Zod, Vitest, Jest, ESLint, or Prettier"
@@ -146,7 +146,7 @@
         "The service method uses Effect.fn and is not async, with Effect.gen only for Effect sequencing",
         "The answer removes JavaScript try/catch around yield* and removes Effect runners from service or business logic",
         "Foreign Promise failures are wrapped once with Effect.tryPromise, mapped to Schema.TaggedError, and receive an AbortSignal when supported",
-        "Recovery is selective and semantic; the answer does not catch-log-return-null or log and rethrow at multiple layers",
+        "Recovery is selective and semantic. The answer does not catch, log, and return null or log and rethrow at multiple layers",
         "The validation plan includes TypeScript diagnostics, @effect/tsgo diagnostics, typed-failure tests, interruption, and cleanup where relevant"
       ]
     },
@@ -175,6 +175,34 @@
         "Schema decoding occurs once at the external boundary and typed domain values flow downstream",
         "Diagnostic suppressions are removed unless a matching upstream exception proves and documents the need",
         "The answer traces one complete path and tests success, expected failures, interruption, and resource cleanup without unrelated rewrites"
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "Review and patch a six-file TypeScript migration to Effect v4. Before editing, audit the whole changed path. The patch includes runSync around async filesystem work, JSON.parse inside Effect.map, async wrappers that only return Effect.runPromise, Effect.promise around a rejecting API, an unowned runFork, and nested Effect.gen blocks. Some nested generators are legitimate local programs under acquireUseRelease and retry. The migration also rewrote unrelated UI behavior. Make the first pass complete and preserve behavior.",
+      "expected_output": "Classifies boundaries before editing, fixes mixed control flow and lifecycle defects, preserves justified local composition, and records the required evidence after an independent or cold review.",
+      "files": [],
+      "expectations": [
+        "The workflow loads both the Effect and TypeScript skills, reads the Effect code-quality reference, and classifies changed functions as pure TypeScript, Effect programs, or host adapters before editing",
+        "The correction removes async filesystem work from runSync, keeps throwing JSON parsing in the Effect error channel, removes redundant async Promise adapters, and replaces rejecting Effect.promise usage",
+        "Every runner is placed at a final host boundary, and every fiber has explicit completion, interruption, or cleanup ownership",
+        "The answer preserves nested Effect.gen where acquireUseRelease or retry owns a real local program instead of flattening all nesting mechanically",
+        "The unrelated UI rewrite is reverted or separately approved rather than accepted as part of the Effect migration",
+        "Because the change is broad, the workflow performs an independent read-only review when available or a distinct cold structural pass before claiming completion"
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "I ran @effect/tsgo on a 20-file Effect migration and it exited successfully with filesChecked: 0. Can I call the migration idiomatic and green? Show the validation sequence you require before handoff.",
+      "expected_output": "Rejects the false green, validates the diagnostics setup and coverage, and treats diagnostics as one input to a separate structural and behavioral review.",
+      "files": [],
+      "expectations": [
+        "The answer treats zero checked files as a failed diagnostics run",
+        "The workflow confirms the Effect language-service plugin is active and requires filesChecked to match the intended non-zero file count",
+        "An unfamiliar or uncertain diagnostics setup is tested with a deliberate known-diagnostic probe before its output is trusted",
+        "Ordinary TypeScript diagnostics, Effect diagnostics, focused behavior tests, and the structural review run as separate gates",
+        "The answer does not claim diagnostics alone prove idiomatic nesting, correct boundaries, resource ownership, or behavior preservation",
+        "The final report records expected and checked file counts and separates introduced failures from verified baseline failures"
       ]
     }
   ]
