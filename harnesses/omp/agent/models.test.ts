@@ -2,19 +2,26 @@ import { expect, test } from "bun:test";
 
 type OmpModelsConfig = {
   readonly providers: {
-    readonly "opencode-go": {
+    readonly cliproxy: {
       readonly modelOverrides: Readonly<Record<string, { readonly contextWindow: number }>>;
     };
   };
 };
 
-test("caps GPT-5.6 model variants at the 272K operating point", async () => {
+test("caps GPT-5.6 aliases at the 272K operating point", async () => {
   const config = Bun.YAML.parse(
     await Bun.file(new URL("./models.yml", import.meta.url)).text(),
   ) as OmpModelsConfig;
-  const overrides = config.providers["opencode-go"].modelOverrides;
+  const overrides = config.providers.cliproxy.modelOverrides;
+  const modelIds = [
+    "chatgpt/nnn-gpt-5.6-luna-max",
+    "chatgpt/nnn-gpt-5.6-luna-max-fast",
+    "chatgpt/nnn-gpt-5.6-sol-high",
+    "chatgpt/nnn-gpt-5.6-terra-max",
+    "chatgpt/nnn-gpt-5.6-terra-max-fast",
+  ];
 
-  expect(overrides["gpt-5.6-luna"]?.contextWindow).toBe(272000);
-  expect(overrides["gpt-5.6-sol"]?.contextWindow).toBe(272000);
-  expect(overrides["gpt-5.6-terra"]?.contextWindow).toBe(272000);
+  for (const modelId of modelIds) {
+    expect(overrides[modelId]?.contextWindow).toBe(272000);
+  }
 });

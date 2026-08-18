@@ -5,14 +5,17 @@ providers:
     api: openai-responses
     discovery:
       type: openai-models-list
-  opencode-go:
     modelOverrides:
-      # Keep the GPT-5.6 family at the 272K default; reserve 1M for huge inputs.
-      gpt-5.6-luna:
+      # Keep the GPT-5.6 aliases at the 272K operating point.
+      chatgpt/nnn-gpt-5.6-luna-max:
         contextWindow: 272000
-      gpt-5.6-sol:
+      chatgpt/nnn-gpt-5.6-luna-max-fast:
         contextWindow: 272000
-      gpt-5.6-terra:
+      chatgpt/nnn-gpt-5.6-sol-high:
+        contextWindow: 272000
+      chatgpt/nnn-gpt-5.6-terra-max:
+        contextWindow: 272000
+      chatgpt/nnn-gpt-5.6-terra-max-fast:
         contextWindow: 272000
   cline-api:
     baseUrl: https://api.cline.bot/api/v1
