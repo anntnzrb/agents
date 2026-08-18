@@ -4,18 +4,19 @@
     {
       "id": 1,
       "prompt": "I'm migrating a small TypeScript service to Effect and need a compact example of how `Effect.gen` and `Effect.tryPromise` should work together for a fetch wrapper with typed errors. Keep it on core `effect` only.",
-      "expected_output": "Uses the effect skill, fetches core `effect` docs, and answers with guidance rooted in the core package only.",
+      "expected_output": "Uses the effect skill, inspects matching source and core `effect` docs, and keeps the answer within the core package.",
       "files": [],
       "expectations": [
         "The workflow selects only the `effect` library for documentation lookup",
         "The answer keeps core `effect` guidance separate from ecosystem packages",
+        "The answer uses Effect.fn for the named wrapper and Schema.TaggedError for expected v4 errors",
         "The answer does not invent unsupported APIs or packages"
       ]
     },
     {
       "id": 2,
       "prompt": "I have a repo using `@effect/platform` and `@effect/sql`. I need to know which package should own HTTP server/runtime wiring versus database layer abstractions. Point me at the right package docs first.",
-      "expected_output": "Uses the effect skill, selects the relevant ecosystem packages, and keeps package ownership explicit.",
+      "expected_output": "Selects the relevant ecosystem sources and keeps package ownership explicit.",
       "files": [],
       "expectations": [
         "The workflow includes `@effect/platform` and/or `@effect/sql` in the selected library list",
@@ -26,34 +27,113 @@
     {
       "id": 3,
       "prompt": "I'm using `@effect/opentelemetry` and want an API walkthrough. If the MCP doesn't cover it, don't bluff; tell me what fallback source to use.",
-      "expected_output": "Recognizes unsupported coverage and falls back cleanly instead of hallucinating docs.",
+      "expected_output": "Recognizes unsupported MCP coverage and uses matching source or another authoritative fallback.",
       "files": [],
       "expectations": [
-        "The answer states the package is outside the current supported library list or upstream coverage",
-        "The answer falls back to `context7`, `gh`, or `research`",
+        "The answer states that the package is outside current MCP coverage when live resources confirm that",
+        "The answer falls back to matching vendored source, context7, gh, or research",
         "The answer avoids hallucinated `@effect/opentelemetry` APIs"
       ]
     },
     {
       "id": 4,
       "prompt": "My app runs on Node and depends on `effect ^3.21.0` plus `@effect/platform-node ^0.106.0`. I need help wiring the runtime and filesystem layer. If MCP doesn't directly cover `@effect/platform-node`, handle that safely.",
-      "expected_output": "Recognizes `@effect/platform-node` as unsupported by the MCP, avoids passing it to MCP, and falls back without hallucinating direct package docs.",
+      "expected_output": "Honors the existing v3 project, avoids unsupported MCP requests, and does not mix v4 guidance into maintenance work.",
       "files": [],
       "expectations": [
-        "The answer states that `@effect/platform-node` is not in the supported MCP library list",
-        "The workflow does not pass `@effect/platform-node` to `effect.effect-doc-links` or `effect.effect-documentation`",
-        "The answer uses fallback sources or clearly labeled adjacent context instead of claiming direct `@effect/platform-node` docs from MCP"
+        "The answer identifies the project as Effect v3 and does not initiate a v4 migration",
+        "The workflow does not pass unsupported `@effect/platform-node` to an MCP tool",
+        "The answer uses matching source or another authoritative fallback",
+        "The answer does not apply v4-only package names or runtime APIs"
       ]
     },
     {
       "id": 5,
-      "prompt": "This repo pins `effect 4.0.0-beta.35` and `@effect/platform-node 4.0.0-beta.35`. I want guidance for the current APIs, but I also need you to call out whether this is safe for production default use.",
-      "expected_output": "Recognizes an explicit v4 beta repo, allows beta-targeted guidance, and clearly labels the channel and production caveat.",
+      "prompt": "This repo pins `effect 4.0.0-beta.35` and `@effect/platform-node 4.0.0-beta.35`. I want guidance for the pinned APIs, but I also need you to call out whether this is safe for production default use.",
+      "expected_output": "Honors the pinned v4 beta, labels the prerelease channel, and does not substitute current-main or stable-v3 APIs.",
       "files": [],
       "expectations": [
-        "The answer identifies the repo as targeting Effect v4 beta rather than stable v3",
-        "The answer explicitly calls the v4 surface beta or opt-in",
-        "The answer does not silently rewrite the request into stable-channel v3 guidance"
+        "The answer identifies the repository as an explicit v4 beta project",
+        "The answer labels the API channel as prerelease and calls out the production decision",
+        "The answer does not rewrite the request into stable-channel v3 guidance",
+        "The answer states any mismatch between the pinned beta and current vendored source"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Create a new Bun backend with Effect. I need strict TypeScript, configuration, typed errors, one replaceable API service, retries, resource cleanup, tests, and the complete validation commands. Keep the stack minimal.",
+      "expected_output": "Applies the TypeScript Bun application policy and Effect v4 policy with matching RC packages, current idioms, and separate diagnostics.",
+      "files": [],
+      "expectations": [
+        "The answer uses Bun, TypeScript 7 or newer, native ESM, Oxlint, Oxfmt, and bun:test",
+        "The answer detects the current v4 release channel and uses matching packages; while RC is current, it uses effect@rc and @effect/platform-bun@rc",
+        "The answer uses Schema.TaggedError, Context.Service, Layer, Config, Schedule, and scoped resource cleanup only where requested",
+        "The answer runs TypeScript diagnostics and @effect/tsgo diagnostics separately",
+        "The answer does not add an HTTP framework, ORM, Zod, Vitest, Jest, ESLint, or Prettier"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Before implementing an Effect Schema transformation, inspect the real Effect source and tests. Tell me where you look, how you refresh it, and what happens if my lockfile version differs from current main.",
+      "expected_output": "Uses the shared lightweight Effect checkout as read-only reference and keeps the project version authoritative.",
+      "files": [],
+      "expectations": [
+        "The answer uses ~/src/vendored/github.com/Effect-TS/effect",
+        "The answer reads relevant implementation, tests, LLMS.md, and MIGRATION.md",
+        "The answer treats the checkout as read-only and never imports from it",
+        "The answer uses a depth-1 blob-filtered clone or clean fast-forward pull and does not switch, reset, clean, or fetch full tag history in the shared checkout",
+        "The answer states the mismatch and inspects matching installed code or a matching revision instead of trusting main"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Add Effect to a Pi extension tool handler. The extension is loaded by Pi and has no standalone main process. Show where the Effect is executed and how typed failures become Pi tool failures.",
+      "expected_output": "Applies Effect internals while respecting Pi's hosted lifecycle and error contract.",
+      "files": [],
+      "expectations": [
+        "The answer does not use BunRuntime.runMain or @effect/platform-bun in hosted extension code",
+        "The answer bridges one final Effect at the Pi tool-handler boundary",
+        "The answer uses the current matching Effect v4 channel and Schema.TaggedError for expected errors",
+        "The answer keeps expected failures typed internally and throws once at the Pi boundary",
+        "The answer passes Pi cancellation through supported Effect work",
+        "The answer does not install process or signal lifecycle handlers"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "My lockfile pins an older Effect v4 release candidate, while the shared vendored checkout is on today's main. An API exists in main but not in my installed declarations. Which one do you use?",
+      "expected_output": "Uses the installed project version, states the mismatch, and refuses to copy a current-main API into the pinned project.",
+      "files": [],
+      "expectations": [
+        "The answer treats the manifest, lockfile, installed exports, and declarations as authoritative",
+        "The answer states that vendored main does not match the pinned release candidate",
+        "The answer does not use the unavailable main-only API",
+        "The answer suggests matching-tag or installed-source inspection"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Plan a small Effect CLI backed by SQLite. Do not add AI, telemetry export, HTTP, clustering, workflows, an ORM, or other modules unless the requirements need them.",
+      "expected_output": "Selects only current Effect v4 CLI and Bun SQLite capabilities and rejects unrelated packages.",
+      "files": [],
+      "expectations": [
+        "The answer uses the current Effect v4 CLI module and the matching @effect/sql-sqlite-bun package",
+        "The answer uses Effect SQL directly without an ORM",
+        "The answer omits Effect AI, OpenTelemetry export, HTTP frameworks, cluster, workflow, and persistence extras",
+        "The answer uses BunRuntime.runMain only at the standalone CLI process boundary",
+        "The answer includes bun:test and both TypeScript and Effect diagnostics"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "Assume Effect v4 stable has now been published and the official dist-tags and installed package metadata confirm it. Start a new application. Should I still install effect@rc and @effect/platform-bun@rc?",
+      "expected_output": "Switches new applications to matching stable v4 packages while preserving RC only for projects that pin it.",
+      "files": [],
+      "expectations": [
+        "The answer uses stable Effect v4 packages for the new application",
+        "The answer does not keep @rc after official stable v4 is confirmed and does not invoke npm to inspect registry metadata",
+        "The answer keeps all Effect ecosystem packages on one matching version and channel",
+        "The answer preserves RC dependencies only for an existing project that pins them"
       ]
     }
   ]
