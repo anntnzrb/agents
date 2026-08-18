@@ -130,32 +130,43 @@ function collectUserPromptsFromEntries(entries: Array<unknown>): PromptEntry[] {
   return prompts;
 }
 
-const readTailEffect = (filePath: string): Effect.Effect<string> =>
+const readTailEffect = Effect.fn("readTail")((
+  filePath: string,
+  maxBytes = 256 * 1024,
+) =>
   Effect.acquireUseRelease(
     Effect.tryPromise({
       try: () => fs.open(filePath, "r"),
       catch: () => undefined,
     }).pipe(Effect.orElseSucceed(() => undefined)),
-    (handle) =>
-      Effect.tryPromise({
+    (handle) => {
+      if (!handle) return Effect.succeed("");
+      return Effect.tryPromise({
         try: async () => {
-          if (!handle) return "";
-          const stat = await handle.stat();
-          const size = stat.size;
-          if (size <= 0) return "";
-          const readSize = Math.min(size, 64 * 1024);
-          const buffer = Buffer.alloc(readSize);
-          await handle.read(buffer, 0, readSize, size - readSize);
-          return buffer.toString("utf8");
+          const { size } = await handle.stat();
+          const start = Math.max(0, size - maxBytes);
+          const length = size - start;
+          if (length <= 0) return "";
+
+          const buffer = Buffer.alloc(length);
+          const { bytesRead } = await handle.read(buffer, 0, length, start);
+          if (bytesRead === 0) return "";
+          let chunk = buffer.subarray(0, bytesRead).toString("utf8");
+          if (start > 0) {
+            const firstNewline = chunk.indexOf("\n");
+            if (firstNewline !== -1) chunk = chunk.slice(firstNewline + 1);
+          }
+          return chunk;
         },
         catch: () => "",
-      }).pipe(Effect.orElseSucceed(() => "")),
-    (handle) => Effect.promise(() => handle?.close().catch(() => undefined)),
-  );
-
-async function readTail(filePath: string): Promise<string> {
-  return Effect.runPromise(readTailEffect(filePath));
-}
+      }).pipe(Effect.orElseSucceed(() => ""));
+    },
+    (handle) =>
+      handle
+        ? Effect.promise(() => handle.close().catch(() => undefined))
+        : Effect.void,
+  ),
+);
 
 const readPreviousSessionPromptsEffect = Effect.fn("readPreviousSessionPrompts")(function*(
   sessionDir: string,
@@ -278,60 +289,50 @@ function setEditor(
     const editor = new PromptEditor(tui, theme, keybindings);
     setRequestEditorRender(() => editor.requestRenderNow());
     editor.modeLabelProvider = () => getCurrentMode();
-    editor.modeLabelColor = (text: string) => {
-      const mode = getCurrentMode();
-      const color = getModeBorderColor(mode);
-      return theme.fg(color, text);
+    editor.modeLabelColor = (text: string) => ctx.ui.theme.fg("dim", text);
+    const borderColor = (text: string) => {
+      const isBashMode = editor.getText().trimStart().startsWith("!");
+      if (isBashMode) return ctx.ui.theme.getBashModeBorderColor()(text);
+      return getModeBorderColor(ctx, pi, getCurrentMode())(text);
     };
 
-    editor.setHistory(history.map((entry) => entry.text));
+    editor.borderColor = borderColor;
+    editor.lockBorderColor();
+    for (const prompt of history) {
+      editor.addToHistory?.(prompt.text);
+    }
     return editor;
   });
 }
 
-export function registerPromptHistoryEditor(
-  pi: ExtensionAPI,
-  ctx: ExtensionContext,
-): void {
-  const currentPrompts = collectUserPromptsFromEntries(
-    ctx.sessionManager.getEntries(),
-  );
-  let lastHistory = buildHistoryList(currentPrompts, []);
+function getSessionDirForCwd(cwd: string): string {
+  const safePath = `--${cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`;
+  return path.join(getGlobalAgentDir(), "sessions", safePath);
+}
 
-  setEditor(pi, ctx, lastHistory);
+let loadCounter = 0;
+
+export function applyEditor(pi: ExtensionAPI, ctx: ExtensionContext): void {
+  if (!ctx.hasUI) return;
+
+  const sessionFile = ctx.sessionManager.getSessionFile();
+  const currentEntries = ctx.sessionManager.getBranch();
+  const currentPrompts = collectUserPromptsFromEntries(currentEntries);
+  const immediateHistory = buildHistoryList(currentPrompts, []);
+
+  const currentLoad = ++loadCounter;
+  const initialText = ctx.ui.getEditorText();
+  setEditor(pi, ctx, immediateHistory);
 
   void (async () => {
-    const sessionDir =
-      ctx.sessionManager.getSessionDir?.() ??
-      path.join(getGlobalAgentDir(), "sessions");
-    const sessionFile = ctx.sessionManager.getSessionFile();
     const previousPrompts = await readPreviousSessionPrompts(
-      sessionDir,
-      sessionFile,
+      getSessionDirForCwd(path.resolve(ctx.cwd)),
+      sessionFile ?? undefined,
     );
-    const nextHistory = buildHistoryList(currentPrompts, previousPrompts);
-    if (!historiesMatch(lastHistory, nextHistory)) {
-      lastHistory = nextHistory;
-      setEditor(pi, ctx, nextHistory);
-    }
+    if (currentLoad !== loadCounter) return;
+    if (ctx.ui.getEditorText() !== initialText) return;
+    const history = buildHistoryList(currentPrompts, previousPrompts);
+    if (historiesMatch(history, immediateHistory)) return;
+    setEditor(pi, ctx, history);
   })();
-
-  pi.on("session_tree", async () => {
-    const treePrompts = collectUserPromptsFromEntries(
-      ctx.sessionManager.getEntries(),
-    );
-    const sessionDir =
-      ctx.sessionManager.getSessionDir?.() ??
-      path.join(getGlobalAgentDir(), "sessions");
-    const sessionFile = ctx.sessionManager.getSessionFile();
-    const previousPrompts = await readPreviousSessionPrompts(
-      sessionDir,
-      sessionFile,
-    );
-    const nextHistory = buildHistoryList(treePrompts, previousPrompts);
-    if (!historiesMatch(lastHistory, nextHistory)) {
-      lastHistory = nextHistory;
-      setEditor(pi, ctx, nextHistory);
-    }
-  });
 }

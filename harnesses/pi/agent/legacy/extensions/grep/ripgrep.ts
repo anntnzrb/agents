@@ -1,9 +1,6 @@
 import path from "node:path";
-import { Effect, Schema } from "effect";
-import {
-  runLineStreamingProcessEffect,
-  type SubprocessExecutionError,
-} from "../_shared/line-process.js";
+import { Effect } from "effect";
+import { runLineStreamingProcessEffect } from "../_shared/line-process.js";
 import { toPosixRelative, type RawMatch, type TypeFilter } from "./logic.js";
 
 type MatchEvent = {
@@ -126,9 +123,9 @@ const resolveRipgrepPath = (
   };
 };
 
-export const runRipgrepLineModeEffect = <T>(
+export const runRipgrepLineModeEffect = Effect.fn("runRipgrepLineMode")(<T>(
   params: RipgrepLineParams<T>,
-): Effect.Effect<T[], SubprocessExecutionError> => {
+) => {
   const {
     command,
     rootAbsolute,
@@ -176,21 +173,22 @@ export const runRipgrepLineModeEffect = <T>(
       `grep timed out after ${Math.max(1, Math.round(ms / 1000))}s`,
     parseLine: (line) => parseLine(line, cwd, rootAbsolute),
   });
-};
+});
 
-export const runRipgrepFilesEffect = (
+export const runRipgrepFilesEffect = Effect.fn("runRipgrepFiles")((
   params: RipgrepResultParams,
-): Effect.Effect<FileHit[], SubprocessExecutionError> =>
+) =>
   runRipgrepLineModeEffect<FileHit>({
     ...params,
     modeArgs: ["--files-with-matches"],
     parseLine: (line, cwd, rootAbsolute) =>
       resolveRipgrepPath(cwd, rootAbsolute, line),
-  });
+  }),
+);
 
-export const runRipgrepCountsEffect = (
+export const runRipgrepCountsEffect = Effect.fn("runRipgrepCounts")((
   params: RipgrepResultParams,
-): Effect.Effect<CountHit[], SubprocessExecutionError> =>
+) =>
   runRipgrepLineModeEffect<CountHit>({
     ...params,
     modeArgs: ["--count-matches", "--with-filename"],
@@ -204,11 +202,12 @@ export const runRipgrepCountsEffect = (
         count,
       };
     },
-  });
+  }),
+);
 
-export const runRipgrepEffect = (
+export const runRipgrepEffect = Effect.fn("runRipgrep")((
   params: RipgrepMatchParams,
-): Effect.Effect<RawMatch[], SubprocessExecutionError> => {
+) => {
   const {
     command,
     rootAbsolute,
@@ -280,7 +279,7 @@ export const runRipgrepEffect = (
       };
     },
   });
-};
+});
 
 export const runRipgrepFiles = (params: RipgrepResultParams): Promise<FileHit[]> =>
   Effect.runPromise(runRipgrepFilesEffect(params));

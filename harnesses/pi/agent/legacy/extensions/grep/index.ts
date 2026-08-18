@@ -271,10 +271,10 @@ export default function grepExtension(pi: ExtensionAPI) {
       );
       const cwd = ctx.cwd;
       const deadline = Date.now() + timeoutMs;
-      let rgCommand = resolveSearchBinary("rg");
+      let rgCommand = await resolveSearchBinary("rg");
       if (!rgCommand) {
         await ensureRgViaNativeGrep(toolCallId, signal, onUpdate, cwd);
-        rgCommand = resolveSearchBinary("rg");
+        rgCommand = await resolveSearchBinary("rg");
         if (!rgCommand)
           throw new Error(
             "rg is unavailable after native Pi ensureTool fallback",

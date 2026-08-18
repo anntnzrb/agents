@@ -37,9 +37,9 @@ const processError = (
 ): SubprocessExecutionError =>
   new SubprocessExecutionError({ command, message, cause });
 
-export const runLineStreamingProcessEffect = <T>(
+export const runLineStreamingProcessEffect = Effect.fn("runLineStreamingProcess")(<T>(
   options: RunLineStreamingProcessOptions<T>,
-): Effect.Effect<T[], SubprocessExecutionError> => {
+) => {
   const {
     command,
     args,
@@ -162,7 +162,7 @@ export const runLineStreamingProcessEffect = <T>(
             ),
         }),
       );
-};
+});
 
 export function runLineStreamingProcess<T>(
   options: RunLineStreamingProcessOptions<T>,

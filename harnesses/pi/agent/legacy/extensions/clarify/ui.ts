@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { Effect, Schedule, type Fiber } from "effect";
+import { Effect, type Fiber } from "effect";
 
 import {
   Editor,
@@ -117,18 +117,38 @@ const toFinalAnswers = (
           ? { selectedOption: draft.selectedOption }
           : {}),
         ...(draft.note ? { note: draft.note } : {}),
+        ...(draft.recommended !== undefined
+          ? { recommended: draft.recommended }
+          : {}),
+        ...(draft.default !== undefined ? { default: draft.default } : {}),
+        ...(draft.timedOut ? { timedOut: true } : {}),
+        ...(draft.timeoutSeconds !== undefined
+          ? { timeoutSeconds: draft.timeoutSeconds }
+          : {}),
       },
     ];
   });
 
+const buildEditorTheme = (theme: Theme): EditorTheme => ({
+  borderColor: (text) => theme.fg("dim", text),
+  selectList: {
+    selectedPrefix: (text) => theme.fg("accent", text),
+    selectedText: (text) => theme.fg("accent", text),
+    description: (text) => theme.fg("muted", text),
+    scrollInfo: (text) => theme.fg("dim", text),
+    noMatch: (text) => theme.fg("warning", text),
+  },
+});
+
 class ClarifyComponent implements Component {
+  private readonly editor: Editor;
+  private readonly drafts = new Map<string, DraftAnswer>();
+  private readonly timerFiber: Fiber.Fiber<never, never>;
   private currentIndex = 0;
   private optionIndex = 0;
-  private drafts = new Map<string, DraftAnswer>();
   private showingConfirmation = false;
-  private editor: Editor;
-  private timeoutDeadline = 0;
-  private timerFiber: Fiber.Fiber<any, any>;
+  private timeoutStartedAt = Date.now();
+  private timeoutWindowSeconds = MIN_IDLE_TIMEOUT_SECONDS;
   private cachedWidth: number | undefined;
   private cachedLines: string[] | undefined;
   private suppressEditorChange = false;
@@ -139,7 +159,7 @@ class ClarifyComponent implements Component {
     private readonly theme: Theme,
     private readonly done: (result: ClarifyResult) => void,
   ) {
-    this.editor = new Editor(this.tui, this.theme);
+    this.editor = new Editor(tui, buildEditorTheme(theme));
     this.editor.disableSubmit = true;
     this.editor.onChange = () => {
       if (this.suppressEditorChange) return;
@@ -150,11 +170,15 @@ class ClarifyComponent implements Component {
     this.syncOptionWithDraft();
     this.loadDraftIntoEditor();
     this.restartTimeout();
-
-    const loop = Effect.sync(() => this.onTimerTick()).pipe(
-      Effect.repeat(Schedule.spaced(TIMER_TICK_MS)),
+    const tick = () => this.onTimerTick();
+    this.timerFiber = Effect.runFork(
+      Effect.gen(function*() {
+        while (true) {
+          yield* Effect.sleep(TIMER_TICK_MS);
+          yield* Effect.sync(tick);
+        }
+      }),
     );
-    this.timerFiber = Effect.runFork(loop);
   }
 
   dispose(): void {
@@ -181,238 +205,364 @@ class ClarifyComponent implements Component {
     return question ? getOptions(question) : [];
   }
 
+  private getDraft(questionId: string): DraftAnswer | undefined {
+    return this.drafts.get(questionId);
+  }
+
+  private getCurrentDraft(): DraftAnswer | undefined {
+    const question = this.getCurrentQuestion();
+    return question ? this.getDraft(question.id) : undefined;
+  }
+
+  private getProgressCounts(): { answered: number; total: number } {
+    return {
+      answered: this.questions.filter((question) =>
+        isAnswered(this.getDraft(question.id)),
+      ).length,
+      total: this.questions.length,
+    };
+  }
+
+  private getCurrentTimeoutBaseSeconds(): number | undefined {
+    const question = this.getCurrentQuestion();
+    if (!question?.timeoutSeconds) return undefined;
+    return Math.max(question.timeoutSeconds, MIN_IDLE_TIMEOUT_SECONDS);
+  }
+
+  private restartTimeout(windowSeconds?: number): void {
+    const baseSeconds = this.getCurrentTimeoutBaseSeconds();
+    if (baseSeconds === undefined) return;
+    this.timeoutWindowSeconds = Math.max(
+      baseSeconds,
+      windowSeconds ?? baseSeconds,
+    );
+    this.timeoutStartedAt = Date.now();
+  }
+
+  private extendTimeoutForInteraction(): void {
+    this.restartTimeout(ACTIVE_TIMEOUT_SECONDS);
+  }
+
+  private setEditorText(text: string): void {
+    this.suppressEditorChange = true;
+    try {
+      this.editor.setText(text);
+    } finally {
+      this.suppressEditorChange = false;
+    }
+  }
+
+  private loadDraftIntoEditor(): void {
+    this.setEditorText(
+      getEditorText(this.getCurrentQuestion(), this.getCurrentDraft()),
+    );
+  }
+
+  private createDraftFromSelection(
+    mode: ClarifyAnswer["mode"],
+  ): DraftAnswer | undefined {
+    const question = this.getCurrentQuestion();
+    if (!question) return undefined;
+
+    const selected = this.getCurrentOptions()[this.optionIndex];
+    const note = this.editor.getText().trim();
+
+    if (hasOptions(question) && selected) {
+      const metadata = {
+        mode,
+        selectedOption: selected.label,
+        ...(note ? { note } : {}),
+        ...(selected.recommended !== undefined
+          ? { recommended: selected.recommended }
+          : {}),
+        ...(selected.default !== undefined
+          ? { default: selected.default }
+          : {}),
+        ...(mode === "timeout"
+          ? {
+              timedOut: true,
+              timeoutSeconds: question.timeoutSeconds,
+            }
+          : {}),
+      };
+
+      if (selected.isOther) {
+        return {
+          answer: note || selected.label,
+          source: "other",
+          ...metadata,
+        };
+      }
+
+      return {
+        answer: selected.label,
+        source: "option",
+        ...metadata,
+      };
+    }
+
+    if (!note) return undefined;
+
+    return {
+      answer: note,
+      source: "text",
+      mode,
+      ...(mode === "timeout"
+        ? {
+            timedOut: true,
+            timeoutSeconds: question.timeoutSeconds,
+          }
+        : {}),
+    };
+  }
+
+  private saveCurrentDraft(mode: ClarifyAnswer["mode"] = "manual"): void {
+    const question = this.getCurrentQuestion();
+    if (!question) return;
+    const draft = this.createDraftFromSelection(mode);
+    if (!draft) {
+      this.drafts.delete(question.id);
+      return;
+    }
+    this.drafts.set(question.id, draft);
+  }
+
+  private navigateTo(
+    index: number,
+    interaction = false,
+    saveMode: ClarifyAnswer["mode"] = "manual",
+  ): void {
+    if (index < 0 || index >= this.questions.length) return;
+    this.saveCurrentDraft(saveMode);
+    this.currentIndex = index;
+    this.showingConfirmation = false;
+    this.syncOptionWithDraft();
+    this.loadDraftIntoEditor();
+    if (interaction) {
+      this.extendTimeoutForInteraction();
+    } else {
+      this.restartTimeout();
+    }
+    this.refresh();
+  }
+
   private syncOptionWithDraft(): void {
     const question = this.getCurrentQuestion();
-    if (!question || !hasOptions(question)) {
+    const draft = this.getCurrentDraft();
+    const options = this.getCurrentOptions();
+
+    if (!question || options.length === 0) {
       this.optionIndex = 0;
       return;
     }
 
-    const options = this.getCurrentOptions();
-    const draft = this.drafts.get(question.id);
-
-    if (draft?.selectedOption) {
-      const matchIndex = options.findIndex(
-        (opt) => opt.label === draft.selectedOption,
+    if (draft?.source === "option" && draft.selectedOption) {
+      const selectedIndex = options.findIndex(
+        (option) => option.label === draft.selectedOption,
       );
-      if (matchIndex >= 0) {
-        this.optionIndex = matchIndex;
-        return;
-      }
+      this.optionIndex = selectedIndex >= 0 ? selectedIndex : 0;
+      return;
     }
 
-    const rec = getRecommendedOption(question);
-    if (rec) {
-      const recIndex = options.findIndex((opt) => opt.label === rec.label);
-      if (recIndex >= 0) {
-        this.optionIndex = recIndex;
-        return;
-      }
+    if (draft?.source === "other") {
+      const otherIndex = options.findIndex((option) => option.isOther);
+      this.optionIndex = otherIndex >= 0 ? otherIndex : 0;
+      return;
     }
 
-    this.optionIndex = 0;
-  }
+    const recommended = getRecommendedOption(question);
+    if (!recommended) {
+      this.optionIndex = 0;
+      return;
+    }
 
-  private loadDraftIntoEditor(): void {
-    const question = this.getCurrentQuestion();
-    const draft = question ? this.drafts.get(question.id) : undefined;
-    const text = getEditorText(question, draft);
-    this.suppressEditorChange = true;
-    this.editor.setText(text);
-    this.suppressEditorChange = false;
-  }
-
-  private restartTimeout(): void {
-    const question = this.getCurrentQuestion();
-    const seconds =
-      question?.timeoutSeconds &&
-      question.timeoutSeconds >= MIN_IDLE_TIMEOUT_SECONDS
-        ? question.timeoutSeconds
-        : ACTIVE_TIMEOUT_SECONDS;
-    this.timeoutDeadline = Date.now() + seconds * 1000;
-  }
-
-  private extendTimeoutForInteraction(): void {
-    this.timeoutDeadline = Math.max(
-      this.timeoutDeadline,
-      Date.now() + ACTIVE_TIMEOUT_SECONDS * 1000,
+    const recommendedIndex = options.findIndex(
+      (option) => option.label === recommended.label,
     );
+    this.optionIndex = recommendedIndex >= 0 ? recommendedIndex : 0;
+  }
+
+  private submit(saveMode: ClarifyAnswer["mode"] = "manual"): void {
+    this.saveCurrentDraft(saveMode);
+    this.dispose();
+    this.done({
+      cancelled: false,
+      answers: toFinalAnswers(this.questions, this.drafts),
+    });
+  }
+
+  private cancel(): void {
+    this.saveCurrentDraft();
+    this.dispose();
+    this.done({
+      cancelled: true,
+      reason: "User cancelled clarification",
+      answers: toFinalAnswers(this.questions, this.drafts),
+    });
+  }
+
+  private moveToNextQuestion(): void {
+    if (this.currentIndex < this.questions.length - 1) {
+      this.navigateTo(this.currentIndex + 1, true);
+      return;
+    }
+    this.saveCurrentDraft();
+    this.showingConfirmation = true;
+    this.extendTimeoutForInteraction();
+    this.refresh();
+  }
+
+  private moveToPreviousQuestion(): void {
+    if (this.showingConfirmation) {
+      this.showingConfirmation = false;
+      this.extendTimeoutForInteraction();
+      this.refresh();
+      return;
+    }
+    this.navigateTo(this.currentIndex - 1, true);
+  }
+
+  private chooseOption(index: number): void {
+    const question = this.getCurrentQuestion();
+    if (!question) return;
+
+    this.optionIndex = index;
+    const selected = this.getCurrentOptions()[index];
+    if (!selected) return;
+
+    const draft = this.getCurrentDraft();
+    if (draft?.selectedOption === selected.label) {
+      this.setEditorText(draft.note ?? "");
+    } else {
+      this.setEditorText("");
+    }
+
+    this.extendTimeoutForInteraction();
+    this.saveCurrentDraft();
+    this.refresh();
+  }
+
+  private autoAnswerCurrentQuestion(): void {
+    const question = this.getCurrentQuestion();
+    if (!question || !hasOptions(question)) return;
+
+    if (isAnswered(this.getCurrentDraft())) {
+      this.moveToNextQuestion();
+      return;
+    }
+
+    const selected = getAutoSelectOption(question);
+    if (!selected) return;
+
+    const selectedIndex = this.getCurrentOptions().findIndex(
+      (option) => option.label === selected.label,
+    );
+    this.optionIndex = selectedIndex >= 0 ? selectedIndex : 0;
+    this.setEditorText("");
+    this.saveCurrentDraft("timeout");
+
+    if (this.currentIndex === this.questions.length - 1) {
+      this.showingConfirmation = true;
+      this.submit("timeout");
+      return;
+    }
+
+    this.navigateTo(this.currentIndex + 1, false, "timeout");
+  }
+
+  private getTimeLeftSeconds(): number | undefined {
+    const baseSeconds = this.getCurrentTimeoutBaseSeconds();
+    if (baseSeconds === undefined || this.showingConfirmation) return undefined;
+    const elapsedMs = Date.now() - this.timeoutStartedAt;
+    const remainingMs = Math.max(
+      0,
+      this.timeoutWindowSeconds * 1000 - elapsedMs,
+    );
+    return Math.ceil(remainingMs / 1000);
   }
 
   private onTimerTick(): void {
-    const remaining = Math.max(0, this.timeoutDeadline - Date.now());
-    if (remaining <= 0) {
-      this.applyTimeoutFallback();
-      this.submit();
+    const timeLeft = this.getTimeLeftSeconds();
+    if (timeLeft === undefined) return;
+    if (timeLeft <= 0) {
+      this.autoAnswerCurrentQuestion();
       return;
     }
     this.refresh();
   }
 
-  private applyTimeoutFallback(): void {
-    for (const question of this.questions) {
-      const existing = this.drafts.get(question.id);
-      if (existing && isAnswered(existing)) continue;
-
-      const auto = getAutoSelectOption(question);
-      if (auto) {
-        this.drafts.set(question.id, {
-          answer: auto.label,
-          source: "option",
-          mode: "timeout",
-          selectedOption: auto.label,
-          recommended: auto.recommended,
-          default: auto.default,
-          timedOut: true,
-        });
-      } else {
-        this.drafts.set(question.id, {
-          answer: "(no response)",
-          source: "freeform",
-          mode: "timeout",
-          timedOut: true,
-        });
-      }
-    }
-  }
-
-  private saveCurrentDraft(): void {
-    const question = this.getCurrentQuestion();
-    if (!question) return;
-
-    const options = this.getCurrentOptions();
-    const selected = options[this.optionIndex];
-    const editorText = this.editor.getText().trim();
-
-    if (!hasOptions(question)) {
-      this.drafts.set(question.id, {
-        answer: editorText,
-        source: "freeform",
-        mode: "interactive",
-      });
-      return;
-    }
-
-    if (selected?.isOther) {
-      this.drafts.set(question.id, {
-        answer: editorText || OTHER_LABEL,
-        source: "other",
-        mode: "interactive",
-        selectedOption: OTHER_LABEL,
-        note: editorText || undefined,
-      });
-      return;
-    }
-
-    if (selected) {
-      this.drafts.set(question.id, {
-        answer: selected.label,
-        source: "option",
-        mode: "interactive",
-        selectedOption: selected.label,
-        note: editorText || undefined,
-        recommended: selected.recommended,
-        default: selected.default,
-      });
-    }
-  }
-
-  private submit(): void {
-    this.dispose();
-    const answers = toFinalAnswers(this.questions, this.drafts);
-    this.done({ cancelled: false, answers });
-  }
-
-  private cancel(): void {
-    this.dispose();
-    this.done({ cancelled: true, answers: [] });
-  }
-
   handleInput(data: string): void {
-    if (matchesKey(data, Key.ctrl("c")) || matchesKey(data, "escape")) {
-      if (this.showingConfirmation) {
-        this.showingConfirmation = false;
-        this.refresh();
+    if (this.showingConfirmation) {
+      if (matchesKey(data, Key.enter) || data.toLowerCase() === "y") {
+        this.submit();
         return;
       }
+      if (
+        matchesKey(data, Key.escape) ||
+        matchesKey(data, Key.ctrl("c")) ||
+        data.toLowerCase() === "n" ||
+        matchesKey(data, Key.backspace)
+      ) {
+        this.moveToPreviousQuestion();
+        return;
+      }
+      return;
+    }
+
+    if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c"))) {
       this.cancel();
       return;
     }
 
-    if (this.showingConfirmation) {
-      if (matchesKey(data, "return") || data.toLowerCase() === "y") {
-        this.submit();
-        return;
-      }
-      if (matchesKey(data, "backspace") || data.toLowerCase() === "n") {
-        this.showingConfirmation = false;
-        this.refresh();
-        return;
-      }
+    if (matchesKey(data, Key.tab)) {
+      this.moveToNextQuestion();
       return;
     }
-
-    this.extendTimeoutForInteraction();
-
-    if (matchesKey(data, Key.up)) {
-      const options = this.getCurrentOptions();
-      if (options.length > 0) {
-        this.optionIndex =
-          (this.optionIndex - 1 + options.length) % options.length;
-        this.saveCurrentDraft();
-        this.refresh();
-      }
-      return;
-    }
-
-    if (matchesKey(data, Key.down)) {
-      const options = this.getCurrentOptions();
-      if (options.length > 0) {
-        this.optionIndex = (this.optionIndex + 1) % options.length;
-        this.saveCurrentDraft();
-        this.refresh();
-      }
-      return;
-    }
-
     if (matchesKey(data, Key.shift("tab"))) {
-      if (this.currentIndex > 0) {
-        this.saveCurrentDraft();
-        this.currentIndex -= 1;
-        this.syncOptionWithDraft();
-        this.loadDraftIntoEditor();
-        this.restartTimeout();
-        this.refresh();
-      }
+      this.moveToPreviousQuestion();
       return;
     }
 
-    if (matchesKey(data, "tab") || matchesKey(data, "return")) {
-      this.saveCurrentDraft();
-      if (this.currentIndex < this.questions.length - 1) {
-        this.currentIndex += 1;
-        this.syncOptionWithDraft();
-        this.loadDraftIntoEditor();
-        this.restartTimeout();
+    const question = this.getCurrentQuestion();
+    if (!question) return;
+    const options = this.getCurrentOptions();
+
+    if (hasOptions(question)) {
+      if (matchesKey(data, Key.up)) {
+        this.chooseOption(Math.max(0, this.optionIndex - 1));
+        return;
+      }
+      if (matchesKey(data, Key.down)) {
+        this.chooseOption(Math.min(options.length - 1, this.optionIndex + 1));
+        return;
+      }
+    }
+
+    if (matchesKey(data, Key.enter) && !matchesKey(data, Key.shift("enter"))) {
+      if (!hasOptions(question) && !this.editor.getText().trim()) {
         this.refresh();
         return;
       }
-
-      this.showingConfirmation = true;
-      this.refresh();
+      this.saveCurrentDraft("manual");
+      if (!this.getCurrentDraft()) {
+        this.refresh();
+        return;
+      }
+      this.moveToNextQuestion();
       return;
     }
 
     this.editor.handleInput(data);
+    this.extendTimeoutForInteraction();
     this.refresh();
-  }
-
-  private bold(text: string): string {
-    return this.theme.bold ? this.theme.bold(text) : text;
   }
 
   private dim(text: string): string {
     return this.theme.fg("dim", text);
+  }
+
+  private bold(text: string): string {
+    return this.theme.bold(text);
   }
 
   private accent(text: string): string {
@@ -427,54 +577,53 @@ class ClarifyComponent implements Component {
     return this.theme.fg("warning", text);
   }
 
-  private padLine(line: string, width: number): string {
-    const pad = Math.max(0, width - visibleWidth(line));
-    return line + " ".repeat(pad);
+  private muted(text: string): string {
+    return this.theme.fg("muted", text);
+  }
+
+  private padLine(text: string, width: number): string {
+    const length = visibleWidth(text);
+    return text + " ".repeat(Math.max(0, width - length));
   }
 
   private renderBoxLine(content: string, boxWidth: number): string {
-    const inner = truncateToWidth(content, Math.max(1, boxWidth - 4));
-    const pad = Math.max(0, boxWidth - 4 - visibleWidth(inner));
-    return `${this.dim("│")} ${inner}${" ".repeat(pad)} ${this.dim("│")}`;
+    const padded = `  ${content}`;
+    const rightPad = Math.max(0, boxWidth - visibleWidth(padded) - 2);
+    return `${this.dim("│")}${padded}${" ".repeat(rightPad)}${this.dim("│")}`;
   }
 
   private renderEmptyBoxLine(boxWidth: number): string {
-    return `${this.dim("│")}${" ".repeat(Math.max(1, boxWidth - 2))}${this.dim("│")}`;
+    return `${this.dim("│")}${" ".repeat(Math.max(0, boxWidth - 2))}${this.dim("│")}`;
+  }
+
+  private renderProgressBadge(index: number): string {
+    const question = this.questions[index];
+    if (!question) return "";
+    const answered = isAnswered(this.getDraft(question.id));
+    const current = index === this.currentIndex && !this.showingConfirmation;
+    const marker = current
+      ? this.accent("▸")
+      : answered
+        ? this.success("✓")
+        : this.dim("·");
+    return `${marker} ${index + 1}:${question.id}`;
   }
 
   private renderProgress(
     lines: string[],
-    _contentWidth: number,
+    contentWidth: number,
     boxWidth: number,
   ): void {
-    const parts = this.questions.map((q, i) => {
-      const draft = this.drafts.get(q.id);
-      const answered = isAnswered(draft);
-      const isCurrent = i === this.currentIndex;
+    const counts = this.getProgressCounts();
+    const summary = `${this.bold("Progress:")} ${counts.answered}/${counts.total} answered`;
+    lines.push(this.renderBoxLine(summary, boxWidth));
 
-      if (isCurrent) {
-        return this.bold(this.accent(`[${i + 1}]`));
-      }
-      if (answered) {
-        return this.success(`✓${i + 1}`);
-      }
-      return this.dim(`·${i + 1}`);
-    });
-
-    lines.push(this.renderBoxLine(parts.join("  "), boxWidth));
-  }
-
-  private renderWaiting(
-    lines: string[],
-    _contentWidth: number,
-    boxWidth: number,
-  ): void {
-    const seconds = Math.max(
-      0,
-      Math.ceil((this.timeoutDeadline - Date.now()) / 1000),
-    );
-    const text = `Waiting for user (${seconds}s remaining)`;
-    lines.push(this.renderBoxLine(this.dim(text), boxWidth));
+    const badges = this.questions
+      .map((_, index) => this.renderProgressBadge(index))
+      .join("  ");
+    for (const line of wrapTextWithAnsi(badges, contentWidth)) {
+      lines.push(this.renderBoxLine(line, boxWidth));
+    }
   }
 
   private renderQuestion(
@@ -482,15 +631,33 @@ class ClarifyComponent implements Component {
     contentWidth: number,
     boxWidth: number,
   ): void {
-    const q = this.getCurrentQuestion();
-    if (!q) return;
-
-    for (const line of wrapTextWithAnsi(
-      this.bold(q.question),
-      contentWidth,
-    )) {
+    const question = this.getCurrentQuestion();
+    if (!question) return;
+    const title = `${this.bold("Q:")} ${question.question}`;
+    for (const line of wrapTextWithAnsi(title, contentWidth)) {
       lines.push(this.renderBoxLine(line, boxWidth));
     }
+  }
+
+  private renderWaiting(
+    lines: string[],
+    contentWidth: number,
+    boxWidth: number,
+  ): void {
+    const question = this.getCurrentQuestion();
+    if (!question) return;
+
+    const timeLeft = this.getTimeLeftSeconds();
+    const waitingText =
+      timeLeft === undefined ? "Waiting..." : `Waiting... auto in ${timeLeft}s`;
+
+    lines.push(this.renderEmptyBoxLine(boxWidth));
+    lines.push(
+      this.renderBoxLine(
+        truncateToWidth(this.warning(waitingText), contentWidth),
+        boxWidth,
+      ),
+    );
   }
 
   private renderOptions(
@@ -498,30 +665,34 @@ class ClarifyComponent implements Component {
     contentWidth: number,
     boxWidth: number,
   ): void {
-    const options = this.getCurrentOptions();
-    if (options.length === 0) return;
-
+    const question = this.getCurrentQuestion();
+    if (!question || !hasOptions(question)) return;
     lines.push(this.renderEmptyBoxLine(boxWidth));
 
-    options.forEach((opt, idx) => {
-      const isSelected = idx === this.optionIndex;
-      const marker = isSelected ? this.accent("●") : this.dim("○");
-      let label = opt.label;
-      if (opt.recommended) label += ` ${this.dim("(recommended)")}`;
-      if (opt.default && !opt.recommended) label += ` ${this.dim("(default)")}`;
-
-      const fullLine = `${marker} ${isSelected ? this.bold(label) : label}`;
+    for (const [index, option] of this.getCurrentOptions().entries()) {
+      const prefix =
+        index === this.optionIndex ? this.accent(">") : this.dim("·");
+      const label = option.isOther ? `${option.label}…` : option.label;
+      const markers = [
+        option.recommended ? this.success("recommended") : "",
+        !option.recommended && option.default ? this.success("default") : "",
+      ].filter(Boolean);
+      const suffix =
+        markers.length > 0 ? ` ${this.dim(`[${markers.join(" · ")}]`)}` : "";
       lines.push(
-        this.renderBoxLine(truncateToWidth(fullLine, contentWidth), boxWidth),
+        this.renderBoxLine(
+          `${prefix} ${index + 1}. ${label}${suffix}`,
+          boxWidth,
+        ),
       );
-
-      if (opt.description) {
-        const descLine = `  ${this.dim(opt.description)}`;
-        for (const wrapped of wrapTextWithAnsi(descLine, contentWidth)) {
-          lines.push(this.renderBoxLine(wrapped, boxWidth));
-        }
+      if (!option.description) continue;
+      for (const line of wrapTextWithAnsi(
+        this.muted(option.description),
+        Math.max(16, contentWidth - 5),
+      )) {
+        lines.push(this.renderBoxLine(`    ${line}`, boxWidth));
       }
-    });
+    }
   }
 
   private renderEditor(
@@ -530,7 +701,7 @@ class ClarifyComponent implements Component {
     boxWidth: number,
   ): void {
     lines.push(this.renderEmptyBoxLine(boxWidth));
-    const answerPrefix = this.dim(
+    const answerPrefix = this.bold(
       getEditorLabel(
         this.getCurrentQuestion(),
         this.getCurrentOptions()[this.optionIndex],

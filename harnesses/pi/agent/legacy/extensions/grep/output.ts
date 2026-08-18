@@ -1,5 +1,5 @@
 import { promises as fs } from "node:fs";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 import type { RawMatch } from "./logic.js";
 
 export const GREP_MAX_LINE_LENGTH = 500;
@@ -15,28 +15,27 @@ const truncateLineForOutput = (
   };
 };
 
-const readFileLinesCachedEffect = (
+const readFileLinesCachedEffect = Effect.fn("readFileLinesCached")(function*(
   cache: Map<string, string[]>,
   absolutePath: string,
-): Effect.Effect<string[]> =>
-  Effect.gen(function*() {
-    const existing = cache.get(absolutePath);
-    if (existing) return existing;
-    const lines = yield* Effect.tryPromise({
-      try: () => fs.readFile(absolutePath, "utf8"),
-      catch: () => "",
-    }).pipe(
-      Effect.map((content) =>
-        content
-          .replace(/\r\n/g, "\n")
-          .replace(/\r/g, "\n")
-          .split("\n"),
-      ),
-      Effect.orElseSucceed(() => []),
-    );
-    cache.set(absolutePath, lines);
-    return lines;
-  });
+): Effect.fn.Return<string[]> {
+  const existing = cache.get(absolutePath);
+  if (existing) return existing;
+  const lines = yield* Effect.tryPromise({
+    try: () => fs.readFile(absolutePath, "utf8"),
+    catch: () => "",
+  }).pipe(
+    Effect.map((content) =>
+      content
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .split("\n"),
+    ),
+    Effect.orElseSucceed(() => []),
+  );
+  cache.set(absolutePath, lines);
+  return lines;
+});
 
 export const formatMatchesEffect = Effect.fn("formatMatches")(function*(
   matches: RawMatch[],

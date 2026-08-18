@@ -148,32 +148,31 @@ const getCompactionDetailsReserve = (settings: unknown): number | undefined => {
     : undefined;
 };
 
-const readJsonFileEffect = (path: string): Effect.Effect<unknown | undefined> =>
+const readJsonFileEffect = Effect.fn("readJsonFile")((path: string) =>
   Effect.tryPromise({
-    try: () => readFile(path, "utf8"),
+    try: async () => JSON.parse(await readFile(path, "utf8")) as unknown,
     catch: () => undefined,
-  }).pipe(
-    Effect.map((text) => (text ? JSON.parse(text) : undefined)),
-    Effect.orElseSucceed(() => undefined),
-  );
+  }).pipe(Effect.orElseSucceed(() => undefined)),
+);
 
-const readReserveTokensEffect = (cwd: string): Effect.Effect<number | undefined> =>
-  Effect.gen(function*() {
-    const homeDir = getHomeDir();
-    const globalSettingsPath = homeDir
-      ? join(homeDir, ".pi", "agent", "settings.json")
-      : undefined;
-    const projectSettingsPath = join(cwd, ".pi", "settings.json");
+const readReserveTokensEffect = Effect.fn("readReserveTokens")(function*(
+  cwd: string,
+): Effect.fn.Return<number | undefined> {
+  const homeDir = getHomeDir();
+  const globalSettingsPath = homeDir
+    ? join(homeDir, ".pi", "agent", "settings.json")
+    : undefined;
+  const projectSettingsPath = join(cwd, ".pi", "settings.json");
 
-    const globalJson = globalSettingsPath
-      ? yield* readJsonFileEffect(globalSettingsPath)
-      : undefined;
-    const projectJson = yield* readJsonFileEffect(projectSettingsPath);
+  const globalJson = globalSettingsPath
+    ? yield* readJsonFileEffect(globalSettingsPath)
+    : undefined;
+  const projectJson = yield* readJsonFileEffect(projectSettingsPath);
 
-    const globalReserve = getCompactionDetailsReserve(globalJson);
-    const projectReserve = getCompactionDetailsReserve(projectJson);
-    return projectReserve ?? globalReserve;
-  });
+  const globalReserve = getCompactionDetailsReserve(globalJson);
+  const projectReserve = getCompactionDetailsReserve(projectJson);
+  return projectReserve ?? globalReserve;
+});
 
 const getMessageFromEntry = (
   entry: unknown,
@@ -303,7 +302,7 @@ const buildHealthBadges = (
   return badges;
 };
 
-const readGitStatusEffect = (cwd: string): Effect.Effect<GitStatus> =>
+const readGitStatusEffect = Effect.fn("readGitStatus")((cwd: string) =>
   Effect.tryPromise({
     try: () =>
       new Promise<string>((resolve, reject) => {
@@ -316,7 +315,8 @@ const readGitStatusEffect = (cwd: string): Effect.Effect<GitStatus> =>
   }).pipe(
     Effect.map((output) => ({ isDirty: output.trim().length > 0 })),
     Effect.orElseSucceed(() => ({ isDirty: false })),
-  );
+  ),
+);
 
 const createGitStatusTracker = (
   cwd: string,
@@ -419,6 +419,7 @@ const isStaleExtensionError = (error: unknown): boolean =>
 export const __test = {
   calculatePollutionPercent,
   isStaleExtensionError,
+  readJsonFileEffect,
 };
 
 export default function footerExtension(pi: ExtensionAPI) {

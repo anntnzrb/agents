@@ -40,32 +40,28 @@ const lockIoError = (
 const getLockPath = (todosDir: string, id: string): string =>
   path.join(todosDir, `${id}.lock`);
 
-const bestEffort = <A>(operation: () => Promise<A>): Effect.Effect<A | undefined> =>
-  Effect.promise(async () => {
-    try {
-      return await operation();
-    } catch {
-      return undefined;
-    }
-  });
-
-const readLockInfoEffect = Effect.fn("readTodoLockInfo")((lockPath: string) =>
-  Effect.promise(async () => {
-    try {
-      return JSON.parse(await fs.readFile(lockPath, "utf8")) as LockInfo;
-    } catch {
-      return null;
-    }
-  }),
+const bestEffort = Effect.fn("bestEffort")(<A>(operation: () => Promise<A>) =>
+  Effect.tryPromise({
+    try: operation,
+    catch: () => undefined,
+  }).pipe(Effect.orElseSucceed(() => undefined)),
 );
 
-const removeLockEffect = (lockPath: string): Effect.Effect<void> =>
-  bestEffort(() => fs.unlink(lockPath)).pipe(Effect.asVoid);
+const readLockInfoEffect = Effect.fn("readTodoLockInfo")((lockPath: string) =>
+  Effect.tryPromise({
+    try: async () => JSON.parse(await fs.readFile(lockPath, "utf8")) as LockInfo,
+    catch: () => null,
+  }).pipe(Effect.orElseSucceed(() => null)),
+);
 
-const createLockFileEffect = (
+const removeLockEffect = Effect.fn("removeTodoLock")((lockPath: string) =>
+  bestEffort(() => fs.unlink(lockPath)).pipe(Effect.asVoid),
+);
+
+const createLockFileEffect = Effect.fn("createTodoLockFile")((
   lockPath: string,
   info: LockInfo,
-): Effect.Effect<void, TodoLockIoError> =>
+) =>
   Effect.acquireUseRelease(
     Effect.tryPromise({
       try: () => fs.open(lockPath, "wx"),
@@ -77,7 +73,8 @@ const createLockFileEffect = (
         catch: (cause) => lockIoError(lockPath, "Unable to write todo lock", cause),
       }),
     (handle) => Effect.promise(() => handle.close().catch(() => undefined)),
-  );
+  ),
+);
 
 export const acquireLockEffect = Effect.fn("acquireTodoLock")(function*(
   todosDir: string,

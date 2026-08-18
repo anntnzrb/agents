@@ -55,9 +55,7 @@ function getAgentDir(): string {
   return path.join(os.homedir(), ".pi", "agent");
 }
 
-const readFileIfExistsEffect = (
-  filePath: string,
-): Effect.Effect<{ path: string; content: string; bytes: number } | null> =>
+const readFileIfExistsEffect = Effect.fn("readFileIfExists")((filePath: string) =>
   Effect.tryPromise({
     try: () => fs.readFile(filePath),
     catch: () => null,
@@ -72,13 +70,8 @@ const readFileIfExistsEffect = (
         : null,
     ),
     Effect.orElseSucceed(() => null),
-  );
-
-async function readFileIfExists(
-  filePath: string,
-): Promise<{ path: string; content: string; bytes: number } | null> {
-  return Effect.runPromise(readFileIfExistsEffect(filePath));
-}
+  ),
+);
 
 export const loadProjectContextFilesEffect = Effect.fn("loadProjectContextFiles")(function*(
   cwd: string,

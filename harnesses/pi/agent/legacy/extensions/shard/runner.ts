@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import type { Message } from "@earendil-works/pi-ai";
 import type { InheritedCliArgs } from "./cli.js";
 import { buildPiArgs, formatModelArg, getPiInvocation } from "./cli.js";
@@ -18,6 +18,12 @@ const FORCE_KILL_DELAY_MS = 5000;
 const FINAL_DRAIN_DELAY_MS = 5000;
 const POST_EXIT_STDIO_IDLE_MS = 2000;
 const POST_EXIT_STDIO_HARD_MS = 8000;
+
+class ShardTaskError extends Schema.TaggedError<ShardTaskError>()("ShardTaskError", {
+  message: Schema.String,
+  cause: Schema.Unknown,
+}) {}
+
 const WATCHDOG_SCRIPT = String.raw`
 const { spawn, spawnSync } = require("node:child_process");
 const FORCE_KILL_DELAY_MS = 5000;
@@ -392,7 +398,11 @@ export const mapConcurrent = async <TIn, TOut>(
       items.map((item, index) =>
         Effect.tryPromise({
           try: () => fn(item, index),
-          catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+          catch: (cause) =>
+            new ShardTaskError({
+              message: cause instanceof Error ? cause.message : String(cause),
+              cause,
+            }),
         }),
       ),
       { concurrency: limit },

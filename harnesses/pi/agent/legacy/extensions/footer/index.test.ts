@@ -1,4 +1,8 @@
 import { describe, expect, mock, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Effect } from "effect";
 
 mock.module("@earendil-works/pi-coding-agent", () => ({
   VERSION: "0.0.0",
@@ -54,6 +58,17 @@ describe("footer helpers", () => {
   test("does not expose pi-goal-specific helpers", () => {
     expect("getLatestGoal" in __test).toBe(false);
     expect("buildGoalBadge" in __test).toBe(false);
+  });
+
+  test("treats malformed settings JSON as absent", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "footer-settings-"));
+    const path = join(dir, "settings.json");
+    try {
+      await writeFile(path, "{malformed", "utf8");
+      await expect(Effect.runPromise(__test.readJsonFileEffect(path))).resolves.toBeUndefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 

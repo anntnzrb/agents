@@ -23,6 +23,8 @@ export class PwshExecutionError extends Schema.TaggedError<PwshExecutionError>()
 const pwshError = (message: string, cause?: unknown): PwshExecutionError =>
   new PwshExecutionError({ message, cause });
 
+const LOOKUP_TIMEOUT_MS = 5000;
+
 const pwshSchema = Type.Object({
   command: Type.String({ description: "PowerShell command" }),
   timeout: Type.Optional(

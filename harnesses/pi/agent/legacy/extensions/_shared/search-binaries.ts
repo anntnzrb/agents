@@ -47,8 +47,9 @@ const managedCandidates = (name: string): string[] =>
     path.join(getAgentDir(), "bin", candidate),
   );
 
-const isRunnableEffect = (candidate: string): Effect.Effect<boolean> =>
-  Effect.gen(function*() {
+const isRunnableEffect = Effect.fn("isRunnable")(function*(
+  candidate: string,
+): Effect.fn.Return<boolean> {
     const fileStat = yield* Effect.tryPromise({
       try: () => stat(candidate),
       catch: () => undefined,
@@ -64,7 +65,7 @@ const isRunnableEffect = (candidate: string): Effect.Effect<boolean> =>
       Effect.map(() => true),
       Effect.orElseSucceed(() => false),
     );
-  });
+});
 
 export const resolveSearchBinaryEffect = Effect.fn("resolveSearchBinary")(function*(
   name: "fd" | "rg",
@@ -77,8 +78,8 @@ export const resolveSearchBinaryEffect = Effect.fn("resolveSearchBinary")(functi
   return yield* new SearchBinaryNotFoundError({ name, candidates });
 });
 
-export const resolveSearchBinary = (name: "fd" | "rg"): string | undefined =>
-  Effect.runSync(
+export const resolveSearchBinary = (name: "fd" | "rg"): Promise<string | undefined> =>
+  Effect.runPromise(
     resolveSearchBinaryEffect(name).pipe(
       Effect.orElseSucceed(() => undefined),
     ),

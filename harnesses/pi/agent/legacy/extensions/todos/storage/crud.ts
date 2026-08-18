@@ -35,70 +35,70 @@ export class TodoCrudError extends Schema.TaggedError<TodoCrudError>()(
 const crudError = (message: string, cause?: unknown): TodoCrudError =>
   new TodoCrudError({ message, cause });
 
-export const ensureTodosDirEffect = (todosDir: string): Effect.Effect<void, TodoCrudError> =>
+export const ensureTodosDirEffect = Effect.fn("ensureTodosDir")((todosDir: string) =>
   Effect.tryPromise({
     try: () => fs.mkdir(todosDir, { recursive: true }),
     catch: (cause) => crudError(`Failed to create todos directory ${todosDir}`, cause),
-  }).pipe(Effect.asVoid);
+  }).pipe(Effect.asVoid),
+);
 
 export const ensureTodosDir = (todosDir: string): Promise<void> =>
   Effect.runPromise(ensureTodosDirEffect(todosDir));
 
-export const readTodoFileEffect = (
+export const readTodoFileEffect = Effect.fn("readTodoFile")((
   filePath: string,
   idFallback: string,
-): Effect.Effect<TodoRecord, TodoCrudError> =>
+) =>
   Effect.tryPromise({
     try: () => fs.readFile(filePath, "utf8"),
     catch: (cause) => crudError(`Failed to read todo file ${filePath}`, cause),
-  }).pipe(
-    Effect.map((content) => parseTodoContent(content, idFallback)),
-  );
+  }).pipe(Effect.map((content) => parseTodoContent(content, idFallback))),
+);
 
 const readTodoFile = (
   filePath: string,
   idFallback: string,
 ): Promise<TodoRecord> => Effect.runPromise(readTodoFileEffect(filePath, idFallback));
 
-export const writeTodoFileEffect = (
+export const writeTodoFileEffect = Effect.fn("writeTodoFile")((
   filePath: string,
   todo: TodoRecord,
-): Effect.Effect<void, TodoCrudError> =>
+) =>
   Effect.tryPromise({
     try: () => fs.writeFile(filePath, serializeTodo(todo), "utf8"),
     catch: (cause) => crudError(`Failed to write todo file ${filePath}`, cause),
-  });
+  }),
+);
 
 const writeTodoFile = (
   filePath: string,
   todo: TodoRecord,
 ): Promise<void> => Effect.runPromise(writeTodoFileEffect(filePath, todo));
 
-export const generateTodoIdEffect = (todosDir: string): Effect.Effect<string, TodoCrudError> =>
-  Effect.gen(function*() {
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-      const id = crypto.randomBytes(4).toString("hex");
-      const todoPath = getTodoPath(todosDir, id);
-      const exists = yield* Effect.promise(async () => {
-        try {
-          await fs.access(todoPath);
-          return true;
-        } catch {
-          return false;
-        }
-      });
-      if (!exists) return id;
-    }
-    return yield* crudError("Failed to generate unique todo id");
-  });
+export const generateTodoIdEffect = Effect.fn("generateTodoId")(function*(
+  todosDir: string,
+): Effect.fn.Return<string, TodoCrudError> {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const id = crypto.randomBytes(4).toString("hex");
+    const todoPath = getTodoPath(todosDir, id);
+    const exists = yield* Effect.tryPromise({
+      try: () => fs.access(todoPath),
+      catch: () => false,
+    }).pipe(
+      Effect.as(true),
+      Effect.orElseSucceed(() => false),
+    );
+    if (!exists) return id;
+  }
+  return yield* crudError("Failed to generate unique todo id");
+});
 
 export const generateTodoId = (todosDir: string): Promise<string> =>
   Effect.runPromise(generateTodoIdEffect(todosDir));
 
-export const listTodosEffect = (
+export const listTodosEffect = Effect.fn("listTodos")(function*(
   todosDir: string,
-): Effect.Effect<TodoFrontMatter[], never> =>
-  Effect.gen(function*() {
+): Effect.fn.Return<TodoFrontMatter[], never> {
     const entries = yield* Effect.tryPromise({
       try: () => fs.readdir(todosDir),
       catch: () => [] as string[],
@@ -135,8 +135,8 @@ export const listTodosEffect = (
       });
     }
 
-    return sortTodos(todos);
-  });
+  return sortTodos(todos);
+});
 
 export const listTodos = (todosDir: string): Promise<TodoFrontMatter[]> =>
   Effect.runPromise(listTodosEffect(todosDir));

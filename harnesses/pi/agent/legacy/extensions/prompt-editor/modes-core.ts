@@ -62,13 +62,6 @@ async function getMtimeMs(filePath: string): Promise<number | null> {
   }
 }
 
-const sleepEffect = (ms: number): Effect.Effect<void> =>
-  Effect.sleep(ms);
-
-function sleep(ms: number): Promise<void> {
-  return Effect.runPromise(sleepEffect(ms));
-}
-
 function getLockPathForFile(filePath: string): string {
   return `${filePath}.lock`;
 }
@@ -82,11 +75,10 @@ export class FileLockError extends Schema.TaggedError<FileLockError>()(
   },
 ) {}
 
-const withFileLockEffect = <T, E>(
+const withFileLockEffect = Effect.fn("withFileLock")(function*<T, E>(
   filePath: string,
   fn: () => Effect.Effect<T, E>,
-): Effect.Effect<T, FileLockError | E> =>
-  Effect.gen(function*() {
+): Effect.fn.Return<T, FileLockError | E> {
     const lockPath = getLockPathForFile(filePath);
     yield* Effect.tryPromise({
       try: () => ensureDirForFile(lockPath),
@@ -165,7 +157,7 @@ const withFileLockEffect = <T, E>(
         });
       }
 
-      yield* sleepEffect(40 + Math.random() * 80);
+      yield* Effect.sleep(40 + Math.random() * 80);
     }
   });
 

@@ -90,14 +90,12 @@ export class WriteFileError extends Schema.TaggedError<WriteFileError>()(
   },
 ) {}
 
-const bestEffort = <A>(operation: () => Promise<A>): Effect.Effect<A | undefined> =>
-  Effect.promise(async () => {
-    try {
-      return await operation();
-    } catch {
-      return undefined;
-    }
-  });
+const bestEffort = Effect.fn("bestEffort")(<A>(operation: () => Promise<A>) =>
+  Effect.tryPromise({
+    try: operation,
+    catch: () => undefined,
+  }).pipe(Effect.orElseSucceed(() => undefined)),
+);
 
 const writeError = (
   filePath: string,
@@ -144,11 +142,11 @@ export const syncDirectoryEffect = Effect.fn("syncDirectory")(function*(
   ).pipe(Effect.ignore);
 });
 
-const writeTemporaryFile = (
+const writeTemporaryFile = Effect.fn("writeTemporaryFile")((
   tmpPath: string,
   content: string,
   mode: number | undefined,
-): Effect.Effect<void, WriteFileError> =>
+) =>
   Effect.acquireUseRelease(
     Effect.tryPromise({
       try: () => open(tmpPath, "wx", mode),
@@ -163,7 +161,8 @@ const writeTemporaryFile = (
         catch: (cause) => writeError(tmpPath, "Unable to write temporary file", cause),
       }),
     (handle) => Effect.promise(() => handle.close().catch(() => undefined)),
-  );
+  ),
+);
 
 export const atomicWriteFileEffect = Effect.fn("atomicWriteFile")(function*(
   filePath: string,
