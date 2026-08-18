@@ -43,6 +43,16 @@
 - Keep tactical bullets short by splitting distinct claims; do not enforce an arbitrary word-count target
 - Examples MUST use exact runnable syntax or clearly marked placeholders
 
+## Final authoring review
+
+Before handoff after any skill change:
+
+1. Load `technical-writing`. Apply its plain-language, sentence, ambiguity, naming, and document-mode checks to changed model-facing prose.
+2. Load `pstack-principles`. Read every leaf principle that matches the change; applying a principle from the index alone is forbidden. Use the principles to minimize the diff, keep boundaries explicit, remove unnecessary structure, and choose direct verification. In the handoff, name each applied principle and the decision it changed.
+3. Load `unslop`. Apply prose mode to changed model-facing text. Apply code mode only when the requested work includes bounded, behavior-preserving cleanup; never use cleanup as permission to change feature behavior or widen scope.
+4. Fix every applicable finding.
+5. Rerun `quick-validate`, executable checks, and `git diff --check` as required below.
+
 ## Tool and MCP prompt authoring
 
 - Tool prompts teach when and why to use a tool, non-obvious input grammar, cross-tool routing, output caveats, and failures the agent can correct
