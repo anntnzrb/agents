@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { delimiter } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import { Effect, Schema } from "effect";
 import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
@@ -10,6 +11,17 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "@sinclair/typebox";
+
+export class PwshExecutionError extends Schema.TaggedError<PwshExecutionError>()(
+  "PwshExecutionError",
+  {
+    message: Schema.String,
+    cause: Schema.optional(Schema.Unknown),
+  },
+) {}
+
+const pwshError = (message: string, cause?: unknown): PwshExecutionError =>
+  new PwshExecutionError({ message, cause });
 
 const LOOKUP_TIMEOUT_MS = 5000;
 
@@ -62,11 +74,8 @@ const withPathPrepended = (baseEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv => {
   };
 };
 
-// Cold-path: spawnSync for binary lookup is cached after first call.
-// Per AGENTS.md event-loop hygiene: acceptable because it runs once and is memoized.
 const lookupExecutableOnPath = (binary: string): string | undefined => {
   if (process.platform === "win32") {
-    // Cold-path: see above.
     const result = spawnSync("where", [binary], {
       encoding: "utf-8",
       timeout: LOOKUP_TIMEOUT_MS,
@@ -79,7 +88,6 @@ const lookupExecutableOnPath = (binary: string): string | undefined => {
     return candidates.find((candidate) => existsSync(candidate));
   }
 
-  // Cold-path: see above.
   const result = spawnSync("which", [binary], {
     encoding: "utf-8",
     timeout: LOOKUP_TIMEOUT_MS,
@@ -153,17 +161,15 @@ const createLocalPwshOperations = (): BashOperations => {
 
   return {
     exec: (command, cwd, { onData, signal, timeout, env }) => {
-      return new Promise((resolve, reject) => {
+      const effect = Effect.callback<{ exitCode: number }, PwshExecutionError>((resume) => {
         if (!existsSync(cwd)) {
-          reject(
-            new Error(
-              `Working directory does not exist: ${cwd}\nCannot execute PowerShell commands.`,
+          resume(
+            Effect.fail(
+              pwshError(
+                `Working directory does not exist: ${cwd}\nCannot execute PowerShell commands.`,
+              ),
             ),
           );
-          return;
-        }
-        if (signal?.aborted) {
-          reject(new Error("aborted"));
           return;
         }
 
@@ -184,21 +190,14 @@ const createLocalPwshOperations = (): BashOperations => {
           },
         );
 
-        let settled = false;
-        let timedOut = false;
-        let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
-
-        if (timeout && timeout > 0) {
-          timeoutTimer = setTimeout(() => {
-            timedOut = true;
-            child.kill("SIGTERM");
-          }, timeout * 1000);
-        }
-
+        let aborted = false;
         const onAbort = () => {
+          aborted = true;
           child.kill("SIGTERM");
         };
+
         signal?.addEventListener("abort", onAbort, { once: true });
+        if (signal?.aborted) onAbort();
 
         child.stdout?.on("data", (chunk: Buffer) => {
           onData(chunk);
@@ -208,27 +207,35 @@ const createLocalPwshOperations = (): BashOperations => {
         });
 
         child.on("error", (error: Error) => {
-          settled = true;
           signal?.removeEventListener("abort", onAbort);
-          if (timeoutTimer) clearTimeout(timeoutTimer);
-          reject(error);
+          resume(Effect.fail(pwshError(error.message, error)));
         });
 
         child.on("close", (code: number | null) => {
           signal?.removeEventListener("abort", onAbort);
-          if (timeoutTimer) clearTimeout(timeoutTimer);
-          if (settled) return;
-          if (timedOut) {
-            reject(new Error(`timeout:${timeout}`));
+          if (aborted) {
+            resume(Effect.fail(pwshError("aborted")));
             return;
           }
-          if (signal?.aborted) {
-            reject(new Error("aborted"));
-            return;
-          }
-          resolve({ exitCode: code ?? 1 });
+          resume(Effect.succeed({ exitCode: code ?? 1 }));
+        });
+
+        return Effect.sync(() => {
+          onAbort();
         });
       });
+
+      const timedEffect =
+        timeout && timeout > 0
+          ? effect.pipe(
+              Effect.timeoutOrElse({
+                duration: `${timeout} seconds`,
+                orElse: () => Effect.fail(pwshError(`timeout:${timeout}`)),
+              }),
+            )
+          : effect;
+
+      return Effect.runPromise(timedEffect);
     },
   };
 };

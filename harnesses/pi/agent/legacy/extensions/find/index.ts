@@ -284,10 +284,10 @@ export default function findExtension(pi: ExtensionAPI) {
       const deadline = Date.now() + timeoutMs;
       const cwd = ctx.cwd;
       const requestedCount = effectiveLimit + 1;
-      let fdCommand = resolveSearchBinary("fd");
+      let fdCommand = await resolveSearchBinary("fd");
       if (!fdCommand) {
         await ensureFdViaNativeFind(toolCallId, signal, onUpdate, cwd);
-        fdCommand = resolveSearchBinary("fd");
+        fdCommand = await resolveSearchBinary("fd");
         if (!fdCommand)
           throw new Error(
             "fd is unavailable after native Pi ensureTool fallback",

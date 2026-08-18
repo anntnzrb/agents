@@ -1,3 +1,4 @@
+import { Effect, Schema } from "effect";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import {
@@ -80,91 +81,130 @@ const writeSchema = {
 const sha256 = (content: Uint8Array): string =>
   createHash("sha256").update(content).digest("hex");
 
-type ExistingFileInfo = {
-  mode: number;
-  nlink: number;
-};
+export class WriteFileError extends Schema.TaggedError<WriteFileError>()(
+  "WriteFileError",
+  {
+    path: Schema.String,
+    message: Schema.String,
+    cause: Schema.optional(Schema.Unknown),
+  },
+) {}
 
-const getExistingFileInfo = async (
+const bestEffort = Effect.fn("bestEffort")(<A>(operation: () => Promise<A>) =>
+  Effect.tryPromise({
+    try: operation,
+    catch: () => undefined,
+  }).pipe(Effect.orElseSucceed(() => undefined)),
+);
+
+const writeError = (
   filePath: string,
-): Promise<ExistingFileInfo | undefined> => {
-  try {
-    const info = await stat(filePath);
-    return { mode: info.mode & 0o777, nlink: info.nlink };
-  } catch {
-    return undefined;
-  }
-};
+  operation: string,
+  cause: unknown,
+): WriteFileError =>
+  new WriteFileError({
+    path: filePath,
+    message: `${operation} ${filePath}: ${cause instanceof Error ? cause.message : String(cause)}`,
+    cause,
+  });
 
-const resolveWriteTarget = async (filePath: string): Promise<string> => {
-  try {
-    if (!(await lstat(filePath)).isSymbolicLink()) return filePath;
-  } catch {
-    return filePath;
-  }
-  try {
-    return await realpath(filePath);
-  } catch {
-    const linkTarget = await readlink(filePath);
-    return path.isAbsolute(linkTarget)
+export const resolveWriteTargetEffect = Effect.fn("resolveWriteTarget")(function*(
+  filePath: string,
+): Effect.fn.Return<string, never> {
+  const info = yield* bestEffort(() => lstat(filePath));
+  if (!info?.isSymbolicLink()) return filePath;
+
+  const resolved = yield* bestEffort(() => realpath(filePath));
+  if (resolved) return resolved;
+
+  const linkTarget = yield* bestEffort(() => readlink(filePath));
+  return linkTarget
+    ? path.isAbsolute(linkTarget)
       ? linkTarget
-      : path.resolve(path.dirname(filePath), linkTarget);
-  }
-};
+      : path.resolve(path.dirname(filePath), linkTarget)
+    : filePath;
+});
 
-const syncDirectory = async (dir: string): Promise<void> => {
-  let handle:
-    | { sync: () => Promise<void>; close: () => Promise<void> }
-    | undefined;
-  try {
-    handle = await open(dir, "r");
-    await handle.sync();
-  } catch {
-    // Best effort: some platforms/filesystems do not allow directory fsync.
-  } finally {
-    await handle?.close().catch(() => undefined);
-  }
-};
+export const syncDirectoryEffect = Effect.fn("syncDirectory")(function*(
+  dir: string,
+): Effect.fn.Return<void, never> {
+  yield* Effect.acquireUseRelease(
+    Effect.tryPromise({
+      try: () => open(dir, "r"),
+      catch: () => undefined,
+    }),
+    (handle) =>
+      Effect.tryPromise({
+        try: () => handle.sync(),
+        catch: () => undefined,
+      }),
+    (handle) => Effect.promise(() => handle.close().catch(() => undefined)),
+  ).pipe(Effect.ignore);
+});
 
-const atomicWriteFile = async (
+const writeTemporaryFile = Effect.fn("writeTemporaryFile")((
+  tmpPath: string,
+  content: string,
+  mode: number | undefined,
+) =>
+  Effect.acquireUseRelease(
+    Effect.tryPromise({
+      try: () => open(tmpPath, "wx", mode),
+      catch: (cause) => writeError(tmpPath, "Unable to open temporary file", cause),
+    }),
+    (handle) =>
+      Effect.tryPromise({
+        try: async () => {
+          await handle.writeFile(content, "utf8");
+          await handle.sync();
+        },
+        catch: (cause) => writeError(tmpPath, "Unable to write temporary file", cause),
+      }),
+    (handle) => Effect.promise(() => handle.close().catch(() => undefined)),
+  ),
+);
+
+export const atomicWriteFileEffect = Effect.fn("atomicWriteFile")(function*(
   filePath: string,
   content: string,
-): Promise<void> => {
-  const targetPath = await resolveWriteTarget(filePath);
+): Effect.fn.Return<void, WriteFileError> {
+  const targetPath = yield* resolveWriteTargetEffect(filePath);
   const dir = path.dirname(targetPath);
   const tmpPath = path.join(
     dir,
     `.pi-write-${Date.now()}-${randomBytes(6).toString("hex")}.tmp`,
   );
-  const existing = await getExistingFileInfo(targetPath);
-  let handle:
-    | {
-        writeFile: (value: string, encoding: string) => Promise<void>;
-        sync: () => Promise<void>;
-        close: () => Promise<void>;
-      }
-    | undefined;
+  const info = yield* bestEffort(() => stat(targetPath));
+  const existing = info
+    ? { mode: info.mode & 0o777, nlink: info.nlink }
+    : undefined;
 
   if (existing && existing.nlink > 1) {
-    await writeFile(targetPath, content, "utf8");
-    return;
+    return yield* Effect.tryPromise({
+      try: () => writeFile(targetPath, content, "utf8"),
+      catch: (cause) => writeError(targetPath, "Unable to write hardlinked file", cause),
+    });
   }
 
-  try {
-    handle = await open(tmpPath, "w", existing?.mode);
-    await handle.writeFile(content, "utf8");
-    await handle.sync();
-    await handle.close();
-    handle = undefined;
-    if (existing) await chmod(tmpPath, existing.mode).catch(() => undefined);
-    await rename(tmpPath, targetPath);
-    await syncDirectory(dir);
-  } catch (error) {
-    await handle?.close().catch(() => undefined);
-    await unlink(tmpPath).catch(() => undefined);
-    throw error;
-  }
-};
+  yield* Effect.acquireUseRelease(
+    Effect.succeed(tmpPath),
+    () =>
+      Effect.gen(function*() {
+        yield* writeTemporaryFile(tmpPath, content, existing?.mode);
+        if (existing) yield* bestEffort(() => chmod(tmpPath, existing.mode));
+        yield* Effect.tryPromise({
+          try: () => rename(tmpPath, targetPath),
+          catch: (cause) => writeError(targetPath, "Unable to replace file", cause),
+        });
+        yield* syncDirectoryEffect(dir);
+      }),
+    (temporaryPath) =>
+      Effect.promise(() => unlink(temporaryPath).catch(() => undefined)),
+  );
+});
+
+const atomicWriteFile = (filePath: string, content: string): Promise<void> =>
+  Effect.runPromise(atomicWriteFileEffect(filePath, content));
 
 type HardenedWriteOperations = {
   mkdir: (dir: string) => Promise<void>;

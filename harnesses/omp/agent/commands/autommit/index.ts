@@ -1,7 +1,8 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { Effect, Schema } from "effect";
 import type {
     CustomCommandFactory,
     ModelRegistry,
@@ -65,17 +66,37 @@ const PACKAGE_ROOT_HINTS = [
     process.argv[1] ? resolve(dirname(process.argv[1]), "..", "@oh-my-pi", "pi-coding-agent") : undefined,
 ].filter((path): path is string => Boolean(path));
 
-const locatePackageRoot = (): string => {
-    const packageRoot = PACKAGE_ROOT_HINTS.find(path => existsSync(resolve(path, "src", "index.ts")));
-    if (!packageRoot) {
-        throw new Error("Cannot locate OMP package sources; set PI_PACKAGE_DIR to the pi-coding-agent package root.");
+export class OmpPackageRootNotFoundError extends Schema.TaggedError<OmpPackageRootNotFoundError>()(
+    "OmpPackageRootNotFoundError",
+    {
+        message: Schema.String,
+    },
+) {}
+
+const locatePackageRootEffect = Effect.fn("locatePackageRoot")(function*(): Effect.fn.Return<
+    string,
+    OmpPackageRootNotFoundError
+> {
+    for (const path of PACKAGE_ROOT_HINTS) {
+        const check = yield* Effect.tryPromise({
+            try: () => access(resolve(path, "src", "index.ts")),
+            catch: () => false,
+        }).pipe(
+            Effect.as(true),
+            Effect.orElseSucceed(() => false),
+        );
+        if (check) return path;
     }
-    return packageRoot;
-};
+    return yield* new OmpPackageRootNotFoundError({
+        message: "Cannot locate OMP package sources; set PI_PACKAGE_DIR to the pi-coding-agent package root.",
+    });
+});
+
+const locatePackageRoot = (): Promise<string> => Effect.runPromise(locatePackageRootEffect());
 
 // OMP loads custom commands outside package module resolution, so hidden commit modules must be loaded by source path.
 const loadInternal = async <T>(relativePath: string): Promise<T> =>
-    (await import(pathToFileURL(resolve(locatePackageRoot(), "src", relativePath)).href)) as T;
+    (await import(pathToFileURL(resolve(await locatePackageRoot(), "src", relativePath)).href)) as T;
 const loadCommitInternals = async (git: CommitInternals["git"]): Promise<CommitInternals> => {
     const [tools, resolver, lockFiles, topoSort, validation, utils, diffParser] = await Promise.all([
         loadInternal<Pick<CommitInternals, "createCommitTools">>("commit/agentic/tools/index.ts"),
@@ -1103,19 +1124,19 @@ const applySplitProposal = async (
 ): Promise<AppliedCommitResult> => {
     const expected = await currentEvidence(cwd, internals);
     const { order, stagedDiff, zeroDiff } = await validateSplitPlan(api, cwd, plan, internals);
-    const worktree = mkdtempSync(join(tmpdir(), "autommit-worktree-"));
+    const worktree = await mkdtemp(join(tmpdir(), "autommit-worktree-"));
     let added = false;
     let patchDir: string | undefined;
     let primaryError: unknown;
     try {
-        patchDir = mkdtempSync(join(tmpdir(), "autommit-patch-"));
+        patchDir = await mkdtemp(join(tmpdir(), "autommit-patch-"));
         const patchPath = join(patchDir, ".autommit.patch");
         await internals.git.worktree.add(cwd, worktree, expected.before, { detach: true });
         added = true;
         for (const commitIndex of order) {
             const commit = plan.commits[commitIndex];
             if (!commit) throw new Error(`Split plan references missing commit ${commitIndex}.`);
-            writeFileSync(patchPath, buildCommitPatch(commit.changes, stagedDiff, zeroDiff, internals));
+            await writeFile(patchPath, buildCommitPatch(commit.changes, stagedDiff, zeroDiff, internals), "utf8");
             const applied = await api.exec("git", ["apply", "--index", "--unidiff-zero", patchPath], { cwd: worktree });
             if (applied.code !== 0) throw new Error(applied.stderr || "Unable to apply split commit patch.");
             await api.pi.commit(worktree, formatCommitMessage(commit.summary, commit.details));
@@ -1165,14 +1186,14 @@ const applySplitProposal = async (
             }
         } else {
             try {
-                rmSync(worktree, { recursive: true, force: true });
+                await rm(worktree, { recursive: true, force: true });
             } catch (error) {
                 cleanupFailures.push({ path: worktree, error });
             }
         }
         if (patchDir) {
             try {
-                rmSync(patchDir, { recursive: true, force: true });
+                await rm(patchDir, { recursive: true, force: true });
             } catch (error) {
                 cleanupFailures.push({ path: patchDir, error });
             }

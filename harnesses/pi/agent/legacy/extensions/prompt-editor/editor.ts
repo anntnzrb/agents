@@ -6,6 +6,7 @@ import type {
 import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { Effect } from "effect";
 
 import { getCurrentMode, getModeBorderColor } from "./modes-core.ts";
 import { setRequestEditorRender } from "./modes-state.ts";
@@ -129,72 +130,77 @@ function collectUserPromptsFromEntries(entries: Array<unknown>): PromptEntry[] {
   return prompts;
 }
 
-function getSessionDirForCwd(cwd: string): string {
-  const safePath = `--${cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`;
-  return path.join(getGlobalAgentDir(), "sessions", safePath);
-}
-
-async function readTail(
+const readTailEffect = Effect.fn("readTail")((
   filePath: string,
   maxBytes = 256 * 1024,
-): Promise<string> {
-  let fileHandle: fs.FileHandle | undefined;
-  try {
-    const stats = await fs.stat(filePath);
-    const size = stats.size;
-    const start = Math.max(0, size - maxBytes);
-    const length = size - start;
-    if (length <= 0) return "";
+) =>
+  Effect.acquireUseRelease(
+    Effect.tryPromise({
+      try: () => fs.open(filePath, "r"),
+      catch: () => undefined,
+    }).pipe(Effect.orElseSucceed(() => undefined)),
+    (handle) => {
+      if (!handle) return Effect.succeed("");
+      return Effect.tryPromise({
+        try: async () => {
+          const { size } = await handle.stat();
+          const start = Math.max(0, size - maxBytes);
+          const length = size - start;
+          if (length <= 0) return "";
 
-    const buffer = Buffer.alloc(length);
-    fileHandle = await fs.open(filePath, "r");
-    const { bytesRead } = await fileHandle.read(buffer, 0, length, start);
-    if (bytesRead === 0) return "";
-    let chunk = buffer.subarray(0, bytesRead).toString("utf8");
-    if (start > 0) {
-      const firstNewline = chunk.indexOf("\n");
-      if (firstNewline !== -1) chunk = chunk.slice(firstNewline + 1);
-    }
-    return chunk;
-  } catch {
-    return "";
-  } finally {
-    await fileHandle?.close();
-  }
-}
+          const buffer = Buffer.alloc(length);
+          const { bytesRead } = await handle.read(buffer, 0, length, start);
+          if (bytesRead === 0) return "";
+          let chunk = buffer.subarray(0, bytesRead).toString("utf8");
+          if (start > 0) {
+            const firstNewline = chunk.indexOf("\n");
+            if (firstNewline !== -1) chunk = chunk.slice(firstNewline + 1);
+          }
+          return chunk;
+        },
+        catch: () => "",
+      }).pipe(Effect.orElseSucceed(() => ""));
+    },
+    (handle) =>
+      handle
+        ? Effect.promise(() => handle.close().catch(() => undefined))
+        : Effect.void,
+  ),
+);
 
-async function loadPromptHistoryForCwd(
-  cwd: string,
+const readPreviousSessionPromptsEffect = Effect.fn("readPreviousSessionPrompts")(function*(
+  sessionDir: string,
   excludeSessionFile?: string,
-): Promise<PromptEntry[]> {
-  const sessionDir = getSessionDirForCwd(path.resolve(cwd));
+): Effect.fn.Return<PromptEntry[], never> {
+  const prompts: PromptEntry[] = [];
   const resolvedExclude = excludeSessionFile
     ? path.resolve(excludeSessionFile)
     : undefined;
-  const prompts: PromptEntry[] = [];
 
-  let entries: Dirent[] = [];
-  try {
-    entries = await fs.readdir(sessionDir, { withFileTypes: true });
-  } catch {
-    return prompts;
-  }
+  const entries = yield* Effect.tryPromise({
+    try: () => fs.readdir(sessionDir, { withFileTypes: true }),
+    catch: () => [] as Dirent[],
+  }).pipe(Effect.orElseSucceed(() => [] as Dirent[]));
 
-  const files = await Promise.all(
+  if (entries.length === 0) return prompts;
+
+  const fileStats = yield* Effect.all(
     entries
       .filter((entry) => entry.isFile() && entry.name.endsWith(".jsonl"))
-      .map(async (entry) => {
+      .map((entry) => {
         const filePath = path.join(sessionDir, entry.name);
-        try {
-          const stats = await fs.stat(filePath);
-          return { filePath, mtimeMs: stats.mtimeMs };
-        } catch {
-          return undefined;
-        }
+        return Effect.tryPromise({
+          try: async () => {
+            const stats = await fs.stat(filePath);
+            return { filePath, mtimeMs: stats.mtimeMs };
+          },
+          catch: () => undefined,
+        }).pipe(Effect.orElseSucceed(() => undefined));
       }),
+    { concurrency: "unbounded" },
   );
 
-  const sortedFiles = files
+  const sortedFiles = fileStats
     .filter((file): file is { filePath: string; mtimeMs: number } =>
       Boolean(file),
     )
@@ -204,16 +210,15 @@ async function loadPromptHistoryForCwd(
     if (resolvedExclude && path.resolve(file.filePath) === resolvedExclude)
       continue;
 
-    const tail = await readTail(file.filePath);
+    const tail = yield* readTailEffect(file.filePath);
     if (!tail) continue;
     const lines = tail.split("\n").filter(Boolean);
     for (const line of lines) {
-      let entry: unknown;
-      try {
-        entry = JSON.parse(line);
-      } catch {
-        continue;
-      }
+      const entry = yield* Effect.try({
+        try: () => JSON.parse(line),
+        catch: () => null,
+      }).pipe(Effect.orElseSucceed(() => null));
+
       if (!entry || typeof entry !== "object") continue;
       if (!("type" in entry) || entry.type !== "message") continue;
       if (!("message" in entry)) continue;
@@ -238,6 +243,13 @@ async function loadPromptHistoryForCwd(
   }
 
   return prompts;
+});
+
+function readPreviousSessionPrompts(
+  sessionDir: string,
+  excludeSessionFile?: string,
+): Promise<PromptEntry[]> {
+  return Effect.runPromise(readPreviousSessionPromptsEffect(sessionDir, excludeSessionFile));
 }
 
 function buildHistoryList(
@@ -293,6 +305,11 @@ function setEditor(
   });
 }
 
+function getSessionDirForCwd(cwd: string): string {
+  const safePath = `--${cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`;
+  return path.join(getGlobalAgentDir(), "sessions", safePath);
+}
+
 let loadCounter = 0;
 
 export function applyEditor(pi: ExtensionAPI, ctx: ExtensionContext): void {
@@ -308,8 +325,8 @@ export function applyEditor(pi: ExtensionAPI, ctx: ExtensionContext): void {
   setEditor(pi, ctx, immediateHistory);
 
   void (async () => {
-    const previousPrompts = await loadPromptHistoryForCwd(
-      ctx.cwd,
+    const previousPrompts = await readPreviousSessionPrompts(
+      getSessionDirForCwd(path.resolve(ctx.cwd)),
       sessionFile ?? undefined,
     );
     if (currentLoad !== loadCounter) return;

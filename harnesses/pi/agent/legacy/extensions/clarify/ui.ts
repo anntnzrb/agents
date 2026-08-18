@@ -1,7 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-
-declare const setInterval: (handler: () => void, timeout: number) => number;
-declare const clearInterval: (timer: number) => void;
+import { Effect, type Fiber } from "effect";
 
 import {
   Editor,
@@ -145,7 +143,7 @@ const buildEditorTheme = (theme: Theme): EditorTheme => ({
 class ClarifyComponent implements Component {
   private readonly editor: Editor;
   private readonly drafts = new Map<string, DraftAnswer>();
-  private readonly timer: number;
+  private readonly timerFiber: Fiber.Fiber<never, never>;
   private currentIndex = 0;
   private optionIndex = 0;
   private showingConfirmation = false;
@@ -172,11 +170,19 @@ class ClarifyComponent implements Component {
     this.syncOptionWithDraft();
     this.loadDraftIntoEditor();
     this.restartTimeout();
-    this.timer = setInterval(() => this.onTimerTick(), TIMER_TICK_MS);
+    const tick = () => this.onTimerTick();
+    this.timerFiber = Effect.runFork(
+      Effect.gen(function*() {
+        while (true) {
+          yield* Effect.sleep(TIMER_TICK_MS);
+          yield* Effect.sync(tick);
+        }
+      }),
+    );
   }
 
   dispose(): void {
-    clearInterval(this.timer);
+    this.timerFiber.interruptUnsafe();
   }
 
   private refresh(): void {

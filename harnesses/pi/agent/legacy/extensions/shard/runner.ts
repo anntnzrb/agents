@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { Effect, Schema } from "effect";
 import type { Message } from "@earendil-works/pi-ai";
 import type { InheritedCliArgs } from "./cli.js";
 import { buildPiArgs, formatModelArg, getPiInvocation } from "./cli.js";
@@ -17,6 +18,12 @@ const FORCE_KILL_DELAY_MS = 5000;
 const FINAL_DRAIN_DELAY_MS = 5000;
 const POST_EXIT_STDIO_IDLE_MS = 2000;
 const POST_EXIT_STDIO_HARD_MS = 8000;
+
+class ShardTaskError extends Schema.TaggedError<ShardTaskError>()("ShardTaskError", {
+  message: Schema.String,
+  cause: Schema.Unknown,
+}) {}
+
 const WATCHDOG_SCRIPT = String.raw`
 const { spawn, spawnSync } = require("node:child_process");
 const FORCE_KILL_DELAY_MS = 5000;
@@ -378,30 +385,29 @@ export const finalizeChildRun = (
   };
 };
 
-export const mapConcurrent = async <TIn, TOut>(
+export const mapConcurrent = <TIn, TOut>(
   items: readonly TIn[],
   concurrency: number,
   fn: (item: TIn, index: number) => Promise<TOut>,
 ): Promise<TOut[]> => {
-  if (items.length === 0) return [];
-
+  if (items.length === 0) return Promise.resolve([]);
   const limit = Math.max(1, Math.min(concurrency, items.length));
-  const results = new Array<TOut>(items.length);
-  let nextIndex = 0;
 
-  const workers = Array.from({ length: limit }, async () => {
-    while (true) {
-      const currentIndex = nextIndex;
-      nextIndex += 1;
-      if (currentIndex >= items.length) return;
-      const item = items[currentIndex];
-      if (item === undefined) return;
-      results[currentIndex] = await fn(item, currentIndex);
-    }
-  });
-
-  await Promise.all(workers);
-  return results;
+  return Effect.runPromise(
+    Effect.all(
+      items.map((item, index) =>
+        Effect.tryPromise({
+          try: () => fn(item, index),
+          catch: (cause) =>
+            new ShardTaskError({
+              message: cause instanceof Error ? cause.message : String(cause),
+              cause,
+            }),
+        }),
+      ),
+      { concurrency: limit },
+    ),
+  );
 };
 
 export const runChildTask = async (input: {

@@ -6,6 +6,7 @@ import type {
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";
+import { Effect } from "effect";
 
 export function formatUsd(cost: number): string {
   if (!Number.isFinite(cost) || cost <= 0) return "$0.00";
@@ -54,31 +55,34 @@ function getAgentDir(): string {
   return path.join(os.homedir(), ".pi", "agent");
 }
 
-async function readFileIfExists(
-  filePath: string,
-): Promise<{ path: string; content: string; bytes: number } | null> {
-  try {
-    const buf = await fs.readFile(filePath);
-    return {
-      path: filePath,
-      content: buf.toString("utf8"),
-      bytes: buf.byteLength,
-    };
-  } catch {
-    return null;
-  }
-}
+const readFileIfExistsEffect = Effect.fn("readFileIfExists")((filePath: string) =>
+  Effect.tryPromise({
+    try: () => fs.readFile(filePath),
+    catch: () => null,
+  }).pipe(
+    Effect.map((buf) =>
+      buf
+        ? {
+            path: filePath,
+            content: buf.toString("utf8"),
+            bytes: buf.byteLength,
+          }
+        : null,
+    ),
+    Effect.orElseSucceed(() => null),
+  ),
+);
 
-export async function loadProjectContextFiles(
+export const loadProjectContextFilesEffect = Effect.fn("loadProjectContextFiles")(function*(
   cwd: string,
-): Promise<Array<{ path: string; tokens: number; bytes: number }>> {
+): Effect.fn.Return<Array<{ path: string; tokens: number; bytes: number }>, never> {
   const out: Array<{ path: string; tokens: number; bytes: number }> = [];
   const seen = new Set<string>();
 
-  const loadFromDir = async (dir: string) => {
+  const loadFromDir = function*(dir: string) {
     for (const name of ["AGENTS.md", "CLAUDE.md"]) {
       const p = path.join(dir, name);
-      const f = await readFileIfExists(p);
+      const f = yield* readFileIfExistsEffect(p);
       if (f && !seen.has(f.path)) {
         seen.add(f.path);
         out.push({
@@ -91,7 +95,7 @@ export async function loadProjectContextFiles(
     }
   };
 
-  await loadFromDir(getAgentDir());
+  yield* loadFromDir(getAgentDir());
 
   const stack: string[] = [];
   let current = path.resolve(cwd);
@@ -102,9 +106,15 @@ export async function loadProjectContextFiles(
     current = parent;
   }
   stack.reverse();
-  for (const dir of stack) await loadFromDir(dir);
+  for (const dir of stack) yield* loadFromDir(dir);
 
   return out;
+});
+
+export function loadProjectContextFiles(
+  cwd: string,
+): Promise<Array<{ path: string; tokens: number; bytes: number }>> {
+  return Effect.runPromise(loadProjectContextFilesEffect(cwd));
 }
 
 export function normalizeSkillName(name: string): string {

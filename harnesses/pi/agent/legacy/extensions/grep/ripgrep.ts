@@ -1,5 +1,6 @@
 import path from "node:path";
-import { runLineStreamingProcess } from "../_shared/line-process.js";
+import { Effect } from "effect";
+import { runLineStreamingProcessEffect } from "../_shared/line-process.js";
 import { toPosixRelative, type RawMatch, type TypeFilter } from "./logic.js";
 
 type MatchEvent = {
@@ -122,9 +123,9 @@ const resolveRipgrepPath = (
   };
 };
 
-const runRipgrepLineMode = async <T>(
+export const runRipgrepLineModeEffect = Effect.fn("runRipgrepLineMode")(<T>(
   params: RipgrepLineParams<T>,
-): Promise<T[]> => {
+) => {
   const {
     command,
     rootAbsolute,
@@ -154,7 +155,7 @@ const runRipgrepLineMode = async <T>(
   });
   args.push(pattern, rootAbsolute);
 
-  return await runLineStreamingProcess<T>({
+  return runLineStreamingProcessEffect<T>({
     command,
     args,
     maxResults,
@@ -172,22 +173,23 @@ const runRipgrepLineMode = async <T>(
       `grep timed out after ${Math.max(1, Math.round(ms / 1000))}s`,
     parseLine: (line) => parseLine(line, cwd, rootAbsolute),
   });
-};
+});
 
-export const runRipgrepFiles = async (
+export const runRipgrepFilesEffect = Effect.fn("runRipgrepFiles")((
   params: RipgrepResultParams,
-): Promise<FileHit[]> =>
-  await runRipgrepLineMode<FileHit>({
+) =>
+  runRipgrepLineModeEffect<FileHit>({
     ...params,
     modeArgs: ["--files-with-matches"],
     parseLine: (line, cwd, rootAbsolute) =>
       resolveRipgrepPath(cwd, rootAbsolute, line),
-  });
+  }),
+);
 
-export const runRipgrepCounts = async (
+export const runRipgrepCountsEffect = Effect.fn("runRipgrepCounts")((
   params: RipgrepResultParams,
-): Promise<CountHit[]> =>
-  await runRipgrepLineMode<CountHit>({
+) =>
+  runRipgrepLineModeEffect<CountHit>({
     ...params,
     modeArgs: ["--count-matches", "--with-filename"],
     parseLine: (line, cwd, rootAbsolute) => {
@@ -200,11 +202,12 @@ export const runRipgrepCounts = async (
         count,
       };
     },
-  });
+  }),
+);
 
-export const runRipgrep = async (
+export const runRipgrepEffect = Effect.fn("runRipgrep")((
   params: RipgrepMatchParams,
-): Promise<RawMatch[]> => {
+) => {
   const {
     command,
     rootAbsolute,
@@ -238,7 +241,7 @@ export const runRipgrep = async (
   });
   args.push(pattern, rootAbsolute);
 
-  return await runLineStreamingProcess<RawMatch>({
+  return runLineStreamingProcessEffect<RawMatch>({
     command,
     args,
     maxResults: maxMatches,
@@ -276,4 +279,13 @@ export const runRipgrep = async (
       };
     },
   });
-};
+});
+
+export const runRipgrepFiles = (params: RipgrepResultParams): Promise<FileHit[]> =>
+  Effect.runPromise(runRipgrepFilesEffect(params));
+
+export const runRipgrepCounts = (params: RipgrepResultParams): Promise<CountHit[]> =>
+  Effect.runPromise(runRipgrepCountsEffect(params));
+
+export const runRipgrep = (params: RipgrepMatchParams): Promise<RawMatch[]> =>
+  Effect.runPromise(runRipgrepEffect(params));

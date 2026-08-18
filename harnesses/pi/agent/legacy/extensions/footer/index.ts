@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { Effect, Schedule } from "effect";
 import { VERSION } from "@earendil-works/pi-coding-agent";
 import type {
   ExtensionAPI,
@@ -147,33 +148,31 @@ const getCompactionDetailsReserve = (settings: unknown): number | undefined => {
     : undefined;
 };
 
-const readJsonFileAsync = async (
-  path: string,
-): Promise<unknown | undefined> => {
-  try {
-    const text = await readFile(path, "utf8");
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-};
+const readJsonFileEffect = Effect.fn("readJsonFile")((path: string) =>
+  Effect.tryPromise({
+    try: async () => JSON.parse(await readFile(path, "utf8")) as unknown,
+    catch: () => undefined,
+  }).pipe(Effect.orElseSucceed(() => undefined)),
+);
 
-const readReserveTokensAsync = async (
+const readReserveTokensEffect = Effect.fn("readReserveTokens")(function*(
   cwd: string,
-): Promise<number | undefined> => {
+): Effect.fn.Return<number | undefined> {
   const homeDir = getHomeDir();
   const globalSettingsPath = homeDir
     ? join(homeDir, ".pi", "agent", "settings.json")
     : undefined;
   const projectSettingsPath = join(cwd, ".pi", "settings.json");
-  const globalReserve = globalSettingsPath
-    ? getCompactionDetailsReserve(await readJsonFileAsync(globalSettingsPath))
+
+  const globalJson = globalSettingsPath
+    ? yield* readJsonFileEffect(globalSettingsPath)
     : undefined;
-  const projectReserve = getCompactionDetailsReserve(
-    await readJsonFileAsync(projectSettingsPath),
-  );
+  const projectJson = yield* readJsonFileEffect(projectSettingsPath);
+
+  const globalReserve = getCompactionDetailsReserve(globalJson);
+  const projectReserve = getCompactionDetailsReserve(projectJson);
   return projectReserve ?? globalReserve;
-};
+});
 
 const getMessageFromEntry = (
   entry: unknown,
@@ -303,28 +302,21 @@ const buildHealthBadges = (
   return badges;
 };
 
-const execFileAsync = (
-  file: string,
-  args: string[],
-  options: { cwd?: string },
-): Promise<string> =>
-  new Promise((resolve, reject) => {
-    execFile(file, args, { ...options, encoding: "utf8" }, (error, stdout) => {
-      if (error) reject(error);
-      else resolve(stdout);
-    });
-  });
-
-const readGitStatusAsync = async (cwd: string): Promise<GitStatus> => {
-  try {
-    const output = await execFileAsync("git", ["status", "--porcelain"], {
-      cwd,
-    });
-    return { isDirty: output.trim().length > 0 };
-  } catch {
-    return { isDirty: false };
-  }
-};
+const readGitStatusEffect = Effect.fn("readGitStatus")((cwd: string) =>
+  Effect.tryPromise({
+    try: () =>
+      new Promise<string>((resolve, reject) => {
+        execFile("git", ["status", "--porcelain"], { cwd, encoding: "utf8" }, (error, stdout) => {
+          if (error) reject(error);
+          else resolve(stdout);
+        });
+      }),
+    catch: () => "",
+  }).pipe(
+    Effect.map((output) => ({ isDirty: output.trim().length > 0 })),
+    Effect.orElseSucceed(() => ({ isDirty: false })),
+  ),
+);
 
 const createGitStatusTracker = (
   cwd: string,
@@ -334,29 +326,30 @@ const createGitStatusTracker = (
   let status: GitStatus = { isDirty: false };
   let disposed = false;
 
-  const refresh = async () => {
-    if (disposed) return;
-    try {
-      const nextStatus = await readGitStatusAsync(cwd);
-      if (nextStatus.isDirty === status.isDirty) return;
-      status = nextStatus;
-      onChange();
-    } catch {
-      // Git unavailable or not a repo — leave status unchanged.
-    }
-  };
+  const refreshEffect = readGitStatusEffect(cwd).pipe(
+    Effect.tap((nextStatus) =>
+      Effect.sync(() => {
+        if (disposed || nextStatus.isDirty === status.isDirty) return;
+        status = nextStatus;
+        onChange();
+      }),
+    ),
+  );
 
-  void refresh();
-  const dirtyCheckInterval = setInterval(() => {
-    void refresh();
-  }, DIRTY_CHECK_MS);
+  const loopEffect = refreshEffect.pipe(
+    Effect.repeat(Schedule.spaced(DIRTY_CHECK_MS)),
+  );
+
+  const fiber = Effect.runFork(loopEffect);
 
   return {
     getStatus: () => status,
-    refresh,
+    refresh() {
+      if (!disposed) Effect.runFork(refreshEffect);
+    },
     dispose() {
       disposed = true;
-      clearInterval(dirtyCheckInterval);
+      fiber.interruptUnsafe();
       unsubscribeBranch();
     },
   };
@@ -426,6 +419,7 @@ const isStaleExtensionError = (error: unknown): boolean =>
 export const __test = {
   calculatePollutionPercent,
   isStaleExtensionError,
+  readJsonFileEffect,
 };
 
 export default function footerExtension(pi: ExtensionAPI) {
@@ -434,7 +428,7 @@ export default function footerExtension(pi: ExtensionAPI) {
 
     const homeDir = getHomeDir();
     const sessionCwd = ctx.cwd;
-    const reserveTokens = await readReserveTokensAsync(sessionCwd);
+    const reserveTokens = await Effect.runPromise(readReserveTokensEffect(sessionCwd));
     let sessionCache:
       | {
           key: string;

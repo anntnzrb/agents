@@ -4,10 +4,6 @@ declare module "@earendil-works/pi-coding-agent" {
   };
 }
 
-declare module "node:fs" {
-  export function existsSync(path: string): boolean;
-}
-
 declare module "node:fs/promises" {
   type FileHandle = {
     writeFile: (content: string, encoding?: string) => Promise<void>;
@@ -40,7 +36,7 @@ declare module "node:child_process" {
   export function execFile(
     file: string,
     args: readonly string[],
-    options: { cwd?: string; maxBuffer?: number },
+    options: { cwd?: string; maxBuffer?: number; signal?: AbortSignal },
     callback: (error: Error | null, stdout: string, stderr: string) => void,
   ): void;
 }
@@ -50,13 +46,13 @@ declare module "node:util" {
     fn: (
       file: string,
       args: readonly string[],
-      options: { cwd?: string; maxBuffer?: number },
+      options: { cwd?: string; maxBuffer?: number; signal?: AbortSignal },
       callback: (error: Error | null, stdout: string, stderr: string) => void,
     ) => void,
   ): (
     file: string,
     args: readonly string[],
-    options: { cwd?: string; maxBuffer?: number },
+    options: { cwd?: string; maxBuffer?: number; signal?: AbortSignal },
   ) => Promise<{ stdout: string; stderr: string }>;
 }
 

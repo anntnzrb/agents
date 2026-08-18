@@ -247,6 +247,22 @@ describe("Autommit operation lock", () => {
     }
   });
 
+  test("does not fail or remove a lock replaced with malformed metadata", async () => {
+    const commonDir = await makeCommonDir();
+    const replacement = "{malformed";
+    try {
+      await expect(
+        withOperationLock(commonDir, async () => {
+          await writeFile(lockPath(commonDir), replacement, "utf8");
+          return "completed";
+        }),
+      ).resolves.toBe("completed");
+      await expect(readFile(lockPath(commonDir), "utf8")).resolves.toBe(replacement);
+    } finally {
+      await rm(commonDir, { recursive: true, force: true });
+    }
+  });
+
   test("releases the lock after a successful operation", async () => {
     const commonDir = await makeCommonDir();
     try {

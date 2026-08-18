@@ -5,6 +5,7 @@
 import crypto from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import fs from "node:fs/promises";
+import { Effect, Schema } from "effect";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { TodoFrontMatter, TodoRecord } from "../types.ts";
 import {
@@ -23,53 +24,107 @@ import {
 import { withTodoLock } from "./locks.ts";
 import { getTodoPath } from "./paths.ts";
 
-export const ensureTodosDir = async (todosDir: string): Promise<void> => {
-  await fs.mkdir(todosDir, { recursive: true });
-};
+export class TodoCrudError extends Schema.TaggedError<TodoCrudError>()(
+  "TodoCrudError",
+  {
+    message: Schema.String,
+    cause: Schema.optional(Schema.Unknown),
+  },
+) {}
 
-const readTodoFile = async (
+const crudError = (message: string, cause?: unknown): TodoCrudError =>
+  new TodoCrudError({ message, cause });
+
+export const ensureTodosDirEffect = Effect.fn("ensureTodosDir")((todosDir: string) =>
+  Effect.tryPromise({
+    try: () => fs.mkdir(todosDir, { recursive: true }),
+    catch: (cause) => crudError(`Failed to create todos directory ${todosDir}`, cause),
+  }).pipe(Effect.asVoid),
+);
+
+export const ensureTodosDir = (todosDir: string): Promise<void> =>
+  Effect.runPromise(ensureTodosDirEffect(todosDir));
+
+export const readTodoFileEffect = Effect.fn("readTodoFile")((
   filePath: string,
   idFallback: string,
-): Promise<TodoRecord> => {
-  const content = await fs.readFile(filePath, "utf8");
-  return parseTodoContent(content, idFallback);
-};
+) =>
+  Effect.tryPromise({
+    try: () => fs.readFile(filePath, "utf8"),
+    catch: (cause) => crudError(`Failed to read todo file ${filePath}`, cause),
+  }).pipe(Effect.map((content) => parseTodoContent(content, idFallback))),
+);
 
-const writeTodoFile = async (
+const readTodoFile = (
+  filePath: string,
+  idFallback: string,
+): Promise<TodoRecord> => Effect.runPromise(readTodoFileEffect(filePath, idFallback));
+
+export const writeTodoFileEffect = Effect.fn("writeTodoFile")((
   filePath: string,
   todo: TodoRecord,
-): Promise<void> => {
-  await fs.writeFile(filePath, serializeTodo(todo), "utf8");
-};
+) =>
+  Effect.tryPromise({
+    try: () => fs.writeFile(filePath, serializeTodo(todo), "utf8"),
+    catch: (cause) => crudError(`Failed to write todo file ${filePath}`, cause),
+  }),
+);
 
-export const generateTodoId = async (todosDir: string): Promise<string> => {
+const writeTodoFile = (
+  filePath: string,
+  todo: TodoRecord,
+): Promise<void> => Effect.runPromise(writeTodoFileEffect(filePath, todo));
+
+export const generateTodoIdEffect = Effect.fn("generateTodoId")(function*(
+  todosDir: string,
+): Effect.fn.Return<string, TodoCrudError> {
   for (let attempt = 0; attempt < 10; attempt += 1) {
     const id = crypto.randomBytes(4).toString("hex");
     const todoPath = getTodoPath(todosDir, id);
-    if (!existsSync(todoPath)) return id;
+    const exists = yield* Effect.tryPromise({
+      try: () => fs.access(todoPath),
+      catch: () => false,
+    }).pipe(
+      Effect.as(true),
+      Effect.orElseSucceed(() => false),
+    );
+    if (!exists) return id;
   }
-  throw new Error("Failed to generate unique todo id");
-};
+  return yield* crudError("Failed to generate unique todo id");
+});
 
-export const listTodos = async (
+export const generateTodoId = (todosDir: string): Promise<string> =>
+  Effect.runPromise(generateTodoIdEffect(todosDir));
+
+export const listTodosEffect = Effect.fn("listTodos")(function*(
   todosDir: string,
-): Promise<TodoFrontMatter[]> => {
-  let entries: string[] = [];
-  try {
-    entries = await fs.readdir(todosDir);
-  } catch {
-    return [];
-  }
+): Effect.fn.Return<TodoFrontMatter[], never> {
+    const entries = yield* Effect.tryPromise({
+      try: () => fs.readdir(todosDir),
+      catch: () => [] as string[],
+    }).pipe(Effect.orElseSucceed(() => [] as string[]));
 
-  const todos: TodoFrontMatter[] = [];
-  for (const entry of entries) {
-    if (!entry.endsWith(".md")) continue;
-    const id = entry.slice(0, -3);
-    const filePath = getTodoPath(todosDir, id);
-    try {
-      const content = await fs.readFile(filePath, "utf8");
-      const { frontMatter } = splitFrontMatter(content);
-      const parsed = parseFrontMatter(frontMatter, id);
+    const todos: TodoFrontMatter[] = [];
+    for (const entry of entries) {
+      if (!entry.endsWith(".md")) continue;
+      const id = entry.slice(0, -3);
+      const filePath = getTodoPath(todosDir, id);
+      const content = yield* Effect.tryPromise({
+        try: () => fs.readFile(filePath, "utf8"),
+        catch: () => undefined,
+      }).pipe(Effect.orElseSucceed(() => undefined));
+
+      if (!content) continue;
+      const parsed = yield* Effect.try({
+        try: () => {
+          const { frontMatter } = splitFrontMatter(content);
+          return parseFrontMatter(frontMatter, id);
+        },
+        catch: () => null,
+      }).pipe(Effect.orElseSucceed(() => null));
+
+      if (!parsed) continue;
+
       todos.push({
         id,
         title: parsed.title,
@@ -78,13 +133,13 @@ export const listTodos = async (
         created_at: parsed.created_at,
         assigned_to_session: parsed.assigned_to_session,
       });
-    } catch {
-      // ignore unreadable todo
     }
-  }
 
   return sortTodos(todos);
-};
+});
+
+export const listTodos = (todosDir: string): Promise<TodoFrontMatter[]> =>
+  Effect.runPromise(listTodosEffect(todosDir));
 
 export const listTodosSync = (todosDir: string): TodoFrontMatter[] => {
   let entries: string[] = [];

@@ -5,6 +5,7 @@
 // HERDR_INTEGRATION_VERSION=8
 // @ts-nocheck
 
+import { Effect, Semaphore } from "effect";
 import net from "node:net";
 import path from "node:path";
 
@@ -19,50 +20,73 @@ function enabled() {
   return HERDR_ENV === "1" && !!socketPath && !!paneId;
 }
 
-let requestQueue = Promise.resolve();
+const requestSemaphore = Semaphore.makeUnsafe(1);
+const backgroundFibers = new Set();
 
-function sendRequestAttempt(request: unknown, timeoutMs: number): Promise<boolean> {
-  if (!enabled()) {
-    return Promise.resolve(true);
-  }
+function runBackground(effect) {
+  const fiber = Effect.runFork(effect);
+  backgroundFibers.add(fiber);
+  fiber.addObserver(() => backgroundFibers.delete(fiber));
+  return fiber;
+}
 
-  return new Promise((resolve) => {
+function interruptBackgroundFibers() {
+  for (const fiber of backgroundFibers) fiber.interruptUnsafe();
+  backgroundFibers.clear();
+}
+
+const sendRequestAttemptEffect = Effect.fn("sendRequestAttempt")((request: unknown) => {
+  if (!enabled()) return Effect.succeed(true);
+
+  return Effect.callback<boolean>((resume) => {
     let done = false;
-    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const socket = net.createConnection(socketEndpoint!);
     const finish = (delivered: boolean) => {
       if (done) return;
       done = true;
-      if (timeout) {
-        clearTimeout(timeout);
-      }
       socket.destroy();
-      resolve(delivered);
+      resume(Effect.succeed(delivered));
     };
 
-    const socket = net.createConnection(socketEndpoint!);
     socket.on("error", () => finish(false));
-    socket.on("connect", () => socket.write(`${JSON.stringify(request)}\n`));
+    socket.on("connect", () => {
+      try {
+        socket.write(`${JSON.stringify(request)}\n`);
+      } catch {
+        finish(false);
+      }
+    });
     socket.on("data", () => finish(true));
     socket.on("end", () => finish(false));
-    timeout = setTimeout(() => finish(false), timeoutMs);
-    timeout.unref?.();
+
+    return Effect.sync(() => {
+      done = true;
+      socket.destroy();
+    });
   });
-}
+});
 
-async function sendRequestNow(request: unknown): Promise<void> {
-  if (await sendRequestAttempt(request, 500)) {
-    return;
-  }
-  await sendRequestAttempt(request, 1500);
-}
+const timeoutAsFalse = (duration: string) =>
+  Effect.timeoutOrElse({
+    duration,
+    orElse: () => Effect.succeed(false),
+  });
 
-function sendRequest(request: unknown): Promise<void> {
-  requestQueue = requestQueue.then(
-    () => sendRequestNow(request),
-    () => sendRequestNow(request),
-  );
-  return requestQueue;
-}
+const sendRequestNowEffect = Effect.fn("sendRequestNow")((request: unknown) =>
+  requestSemaphore.withPermit(
+    sendRequestAttemptEffect(request).pipe(
+      timeoutAsFalse("500 millis"),
+      Effect.flatMap((delivered) =>
+        delivered
+          ? Effect.void
+          : sendRequestAttemptEffect(request).pipe(
+              timeoutAsFalse("1500 millis"),
+              Effect.asVoid,
+            ),
+      ),
+    ),
+  ),
+);
 
 type AgentState = "working" | "blocked" | "idle";
 
@@ -140,13 +164,13 @@ function currentSessionRef(): Record<string, unknown> | undefined {
   return undefined;
 }
 
-function reportSession(sessionStartSource = "startup"): Promise<void> {
+const reportSessionEffect = Effect.fn("reportSession")((sessionStartSource = "startup") => {
   const sessionRef = currentSessionRef();
   if (!sessionRef) {
-    return Promise.resolve();
+    return Effect.void;
   }
 
-  return sendRequest({
+  return sendRequestNowEffect({
     id: `${source}:session:${Date.now()}:${Math.random().toString(36).slice(2)}`,
     method: "pane.report_agent_session",
     params: {
@@ -158,10 +182,18 @@ function reportSession(sessionStartSource = "startup"): Promise<void> {
       ...sessionRef,
     },
   });
+});
+
+function reportSession(sessionStartSource = "startup") {
+  return runBackground(reportSessionEffect(sessionStartSource));
 }
 
-function sendState(state: AgentState, message?: string, seq = nextReportSeq()): Promise<void> {
-  return sendRequest({
+const sendStateEffect = Effect.fn("sendState")((
+  state: AgentState,
+  message?: string,
+  seq = nextReportSeq(),
+) =>
+  sendRequestNowEffect({
     id: `${source}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
     method: "pane.report_agent",
     params: withSessionRef({
@@ -172,37 +204,40 @@ function sendState(state: AgentState, message?: string, seq = nextReportSeq()): 
       message,
       seq,
     }),
-  });
-}
+  }),
+);
 
-let sendInFlight = false;
+let stateDrainFiber;
 let queuedState: QueuedState | undefined;
+let shuttingDown = false;
+
+const drainStateQueueEffect = Effect.suspend(function drain() {
+  const next = queuedState;
+  queuedState = undefined;
+  return next
+    ? sendStateEffect(next.state, next.message, next.seq).pipe(
+        Effect.andThen(Effect.suspend(drain)),
+      )
+    : Effect.void;
+});
+
+function startStateDrain(): void {
+  if (stateDrainFiber || shuttingDown) return;
+  stateDrainFiber = runBackground(
+    drainStateQueueEffect.pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          stateDrainFiber = undefined;
+          if (queuedState && !shuttingDown) startStateDrain();
+        }),
+      ),
+    ),
+  );
+}
 
 function queueState(state: AgentState, message?: string): void {
   queuedState = { state, message, seq: nextReportSeq() };
-  if (!sendInFlight) {
-    void drainStateQueue();
-  }
-}
-
-async function drainStateQueue(): Promise<void> {
-  if (sendInFlight) {
-    return;
-  }
-
-  sendInFlight = true;
-  try {
-    while (queuedState) {
-      const next = queuedState;
-      queuedState = undefined;
-      await sendState(next.state, next.message, next.seq);
-    }
-  } finally {
-    sendInFlight = false;
-    if (queuedState) {
-      void drainStateQueue();
-    }
-  }
+  startStateDrain();
 }
 
 function lastAssistantMessage(messages: unknown[]): any | undefined {
@@ -251,21 +286,15 @@ export default function (pi) {
   let blockedMessage: string | undefined;
   let lastState: AgentState | undefined;
   let lastMessage: string | undefined;
-  let idleTimer: ReturnType<typeof setTimeout> | undefined;
-  let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  let idleFiber;
+  let retryFiber;
   let rootSession = false;
 
-  function clearTimer(timer: ReturnType<typeof setTimeout> | undefined) {
-    if (timer) {
-      clearTimeout(timer);
-    }
-  }
-
-  function clearPendingTimers() {
-    clearTimer(idleTimer);
-    clearTimer(retryTimer);
-    idleTimer = undefined;
-    retryTimer = undefined;
+  function clearPendingDelays() {
+    idleFiber?.interruptUnsafe();
+    retryFiber?.interruptUnsafe();
+    idleFiber = undefined;
+    retryFiber = undefined;
   }
 
   function clearFailureState() {
@@ -298,29 +327,39 @@ export default function (pi) {
   }
 
   function scheduleIdle() {
-    clearPendingTimers();
+    clearPendingDelays();
     clearFailureState();
-    idleTimer = setTimeout(() => {
-      idleTimer = undefined;
-      publishState();
-    }, idleDebounceMs);
-    idleTimer.unref?.();
+    idleFiber = runBackground(
+      Effect.sleep(idleDebounceMs).pipe(
+        Effect.andThen(
+          Effect.sync(() => {
+            idleFiber = undefined;
+            publishState();
+          }),
+        ),
+      ),
+    );
   }
 
   function holdForRetry(message: string) {
-    clearPendingTimers();
+    clearPendingDelays();
     retryHoldActive = true;
     failureBlocked = false;
     failureMessage = message;
     publishState();
 
-    retryTimer = setTimeout(() => {
-      retryTimer = undefined;
-      retryHoldActive = false;
-      failureBlocked = true;
-      publishState();
-    }, retryGraceMs);
-    retryTimer.unref?.();
+    retryFiber = runBackground(
+      Effect.sleep(retryGraceMs).pipe(
+        Effect.andThen(
+          Effect.sync(() => {
+            retryFiber = undefined;
+            retryHoldActive = false;
+            failureBlocked = true;
+            publishState();
+          }),
+        ),
+      ),
+    );
   }
 
   function activateRootSession(ctx: any, sessionStartSource = "startup"): boolean {
@@ -329,12 +368,12 @@ export default function (pi) {
     }
     rootSession = true;
     updateSessionRef(ctx);
-    void reportSession(sessionStartSource);
+    reportSession(sessionStartSource);
     return true;
   }
 
   function resetSessionState() {
-    clearPendingTimers();
+    clearPendingDelays();
     clearFailureState();
     agentActive = false;
     blockedCount = 0;
@@ -342,7 +381,7 @@ export default function (pi) {
   }
 
   function activateBlocked(message: string | undefined) {
-    clearPendingTimers();
+    clearPendingDelays();
     blockedCount += 1;
     blockedMessage = message;
     publishState();
@@ -390,8 +429,8 @@ export default function (pi) {
       return;
     }
     updateSessionRef(ctx);
-    void reportSession();
-    clearPendingTimers();
+    reportSession();
+    clearPendingDelays();
     clearFailureState();
     agentActive = true;
     publishState();
@@ -456,7 +495,11 @@ export default function (pi) {
 
   pi.on("session_shutdown", () => {
     if (rootSession) {
-      clearPendingTimers();
+      shuttingDown = true;
+      clearPendingDelays();
+      queuedState = undefined;
+      interruptBackgroundFibers();
+      stateDrainFiber = undefined;
     }
   });
 }

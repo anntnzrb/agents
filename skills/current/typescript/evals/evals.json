@@ -76,7 +76,7 @@
     },
     {
       "id": 7,
-      "prompt": "Review a TypeScript integration function that mixes async/await, nested try/catch blocks, callbacks, a lazy framework program, manually created Promises, and fire-and-forget cleanup. Preserve behavior while making the smallest maintainable correction; load framework-specific guidance if the lazy program belongs to one.",
+      "prompt": "Review a TypeScript integration function that mixes async/await, nested try/catch blocks, callbacks, a lazy framework program, manually created Promises, and fire-and-forget cleanup. Preserve behavior while making the smallest maintainable correction. Load framework-specific guidance if the lazy program belongs to one.",
       "expected_output": "Chooses one control-flow owner inside each function, moves conversions to explicit boundaries, and makes task and resource lifecycle observable.",
       "files": [],
       "expectations": [
@@ -86,6 +86,20 @@
         "Promises, callbacks, tasks, and resources have explicit completion, cancellation, and cleanup ownership",
         "The answer loads the matching framework skill for framework-specific APIs rather than inventing adapters",
         "The validation traces one representative input-to-output path and runs repository typecheck, tests, lint, and build as applicable"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Before editing a TypeScript patch that imports Effect, review its boundaries. Several functions are async only because they return Effect.runPromise. One async framework handler genuinely awaits host work before running an Effect. Remove accidental control-flow layers without breaking the host contract, then state what proves the patch is ready.",
+      "expected_output": "Loads Effect-specific guidance before editing, distinguishes Effect programs from host adapters, removes only redundant async wrappers, and validates both language and framework concerns.",
+      "files": [],
+      "expectations": [
+        "The workflow loads the Effect skill and its code-quality reference before editing TypeScript that imports Effect",
+        "Changed functions are classified as pure TypeScript, Effect programs, or host adapters with one owner for sequencing, errors, cancellation, and cleanup",
+        "Functions that only forward an existing Effect.runPromise result are not marked async",
+        "The genuine framework handler may remain async when the host contract and awaited host work require it",
+        "The answer does not move Effect runners into services or business logic merely to remove async syntax",
+        "Repository typecheck, tests, lint, Effect diagnostics, and a framework-specific structural review remain distinct readiness evidence"
       ]
     }
   ]

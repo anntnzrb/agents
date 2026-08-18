@@ -1,3 +1,4 @@
+import { Effect, Schema } from "effect";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -24,6 +25,33 @@ interface CatalogModule {
     content: string,
     path: string,
   ) => readonly OpenCodeCatalogModel[];
+}
+
+export class CatalogReadError extends Schema.TaggedError<CatalogReadError>()("CatalogReadError", {
+  path: Schema.String,
+  cause: Schema.optional(Schema.Unknown),
+}) {
+  override get message(): string {
+    return `read model catalog ${this.path}`;
+  }
+}
+
+export class CatalogImportError extends Schema.TaggedError<CatalogImportError>()("CatalogImportError", {
+  path: Schema.String,
+  cause: Schema.optional(Schema.Unknown),
+}) {
+  override get message(): string {
+    return `import model catalog client ${this.path}`;
+  }
+}
+
+export class CatalogParseError extends Schema.TaggedError<CatalogParseError>()("CatalogParseError", {
+  path: Schema.String,
+  cause: Schema.optional(Schema.Unknown),
+}) {
+  override get message(): string {
+    return `parse model catalog ${this.path}`;
+  }
 }
 
 const CATALOG_PATH = join(
@@ -62,24 +90,43 @@ function displayName(id: string, catalogName: string): string {
   return `${prefix} — ${title}`;
 }
 
+export const loadCatalogModule = Effect.fn("loadCatalogModule")(function*(): Effect.fn.Return<
+  CatalogModule,
+  CatalogImportError
+> {
+  return yield* Effect.tryPromise({
+    try: () => import(CATALOG_MODULE) as Promise<CatalogModule>,
+    catch: (cause) => new CatalogImportError({ path: CATALOG_MODULE, cause }),
+  });
+});
+
+export const readCatalogContent = Effect.fn("readCatalogContent")(function*(
+  path: string,
+): Effect.fn.Return<string, CatalogReadError> {
+  return yield* Effect.tryPromise({
+    try: () => readFile(path, "utf8"),
+    catch: (cause) => new CatalogReadError({ path, cause }),
+  });
+});
+
+export const updateOpenCodeConfig = Effect.fn("updateOpenCodeConfig")(function*(
+  config: OpenCodeConfig,
+): Effect.fn.Return<void, CatalogImportError | CatalogReadError | CatalogParseError> {
+  const provider = config.provider?.["cliproxy"];
+  if (!provider) {
+    return;
+  }
+  const { parseModelCatalog } = yield* loadCatalogModule();
+  const content = yield* readCatalogContent(CATALOG_PATH);
+  const catalog = yield* Effect.try({
+    try: () => parseModelCatalog(content, CATALOG_PATH),
+    catch: (cause) => new CatalogParseError({ path: CATALOG_PATH, cause }),
+  });
+  provider.models = mergeOpenCodeModels(catalog, provider.models ?? {});
+});
+
 export const CLIProxyCatalog = async () => ({
-  config: async (config: OpenCodeConfig) => {
-    const provider = config.provider?.["cliproxy"];
-    if (!provider) {
-      return;
-    }
-    const { parseModelCatalog } = (await import(CATALOG_MODULE)) as CatalogModule;
-    let content: string;
-    try {
-      content = await readFile(CATALOG_PATH, "utf8");
-    } catch (error) {
-      throw new Error(`read model catalog ${CATALOG_PATH}`, { cause: error });
-    }
-    provider.models = mergeOpenCodeModels(
-      parseModelCatalog(content, CATALOG_PATH),
-      provider.models ?? {},
-    );
-  },
+  config: (config: OpenCodeConfig) => Effect.runPromise(updateOpenCodeConfig(config)),
 });
 
 export function mergeOpenCodeModels(

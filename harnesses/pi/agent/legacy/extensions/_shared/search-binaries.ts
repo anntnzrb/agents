@@ -1,6 +1,19 @@
-import { accessSync, constants, existsSync } from "node:fs";
+import { access, constants, stat } from "node:fs/promises";
 import path from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { Effect, Schema } from "effect";
+
+export class SearchBinaryNotFoundError extends Schema.TaggedError<SearchBinaryNotFoundError>()(
+  "SearchBinaryNotFoundError",
+  {
+    name: Schema.String,
+    candidates: Schema.Array(Schema.String),
+  },
+) {
+  override get message(): string {
+    return `Unable to find executable for '${this.name}'`;
+  }
+}
 
 const pathKey = (): string =>
   Object.keys(process.env).find((key) => key.toLowerCase() === "path") ??
@@ -34,23 +47,40 @@ const managedCandidates = (name: string): string[] =>
     path.join(getAgentDir(), "bin", candidate),
   );
 
-const isRunnable = (candidate: string): boolean => {
-  if (!existsSync(candidate)) return false;
-  if (process.platform === "win32") return true;
-  try {
-    accessSync(candidate, constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-};
+const isRunnableEffect = Effect.fn("isRunnable")(function*(
+  candidate: string,
+): Effect.fn.Return<boolean> {
+    const fileStat = yield* Effect.tryPromise({
+      try: () => stat(candidate),
+      catch: () => undefined,
+    }).pipe(Effect.orElseSucceed(() => undefined));
 
-export const resolveSearchBinary = (name: "fd" | "rg"): string | undefined => {
-  for (const candidate of [
-    ...managedCandidates(name),
-    ...pathCandidates(name),
-  ]) {
-    if (isRunnable(candidate)) return candidate;
+    if (!fileStat) return false;
+    if (process.platform === "win32") return true;
+
+    return yield* Effect.tryPromise({
+      try: () => access(candidate, constants.X_OK),
+      catch: () => undefined,
+    }).pipe(
+      Effect.map(() => true),
+      Effect.orElseSucceed(() => false),
+    );
+});
+
+export const resolveSearchBinaryEffect = Effect.fn("resolveSearchBinary")(function*(
+  name: "fd" | "rg",
+): Effect.fn.Return<string, SearchBinaryNotFoundError> {
+  const candidates = [...managedCandidates(name), ...pathCandidates(name)];
+  for (const candidate of candidates) {
+    const runnable = yield* isRunnableEffect(candidate);
+    if (runnable) return candidate;
   }
-  return undefined;
-};
+  return yield* new SearchBinaryNotFoundError({ name, candidates });
+});
+
+export const resolveSearchBinary = (name: "fd" | "rg"): Promise<string | undefined> =>
+  Effect.runPromise(
+    resolveSearchBinaryEffect(name).pipe(
+      Effect.orElseSucceed(() => undefined),
+    ),
+  );

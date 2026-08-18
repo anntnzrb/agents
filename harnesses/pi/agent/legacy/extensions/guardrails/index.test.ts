@@ -10,6 +10,20 @@ writeFileSync(
   "---\nname: python\ndescription: Python test skill\n---\n# Python Skill\n",
 );
 
+const loadSkillsMock = () => ({
+  skills: [
+    {
+      name: "python",
+      description: "Python test skill",
+      filePath: skillPath,
+      baseDir: skillDir,
+      sourceInfo: {},
+      disableModelInvocation: true,
+    },
+  ],
+  diagnostics: [],
+});
+
 mock.module("@earendil-works/pi-coding-agent", () => ({
   VERSION: "0.0.0",
   DEFAULT_MAX_BYTES: 50 * 1024,
@@ -17,19 +31,7 @@ mock.module("@earendil-works/pi-coding-agent", () => ({
   formatSize: (bytes: number) => `${bytes}B`,
   keyHint: (_action: string, hint: string) => hint,
   getAgentDir: () => "/tmp/pi-agent",
-  loadSkills: () => ({
-    skills: [
-      {
-        name: "python",
-        description: "Python test skill",
-        filePath: skillPath,
-        baseDir: skillDir,
-        sourceInfo: {},
-        disableModelInvocation: true,
-      },
-    ],
-    diagnostics: [],
-  }),
+  loadSkills: loadSkillsMock,
   truncateHead: (content: string) => ({ content, truncated: false }),
   isToolCallEventType: () => false,
   createReadToolDefinition: () => ({ name: "read", renderShell: "self" }),
@@ -71,7 +73,10 @@ const setupGuardrailsHandler = (config: unknown) => {
     ui: { notify: (message: string) => notifications.push(message) },
   } as any;
 
-  createGuardrails(configPath)(pi);
+  createGuardrails(configPath, {
+    getAgentDir: () => "/tmp/pi-agent",
+    loadSkills: loadSkillsMock,
+  })(pi);
   return { handler, ctx, notifications, messages };
 };
 

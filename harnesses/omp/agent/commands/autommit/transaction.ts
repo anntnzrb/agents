@@ -1,4 +1,5 @@
-import { lstat, mkdir, open, rename, unlink, type FileHandle } from "node:fs/promises";
+import { Effect, Schema } from "effect";
+import { lstat, mkdir, open, rename, unlink } from "node:fs/promises";
 import { join, parse, resolve, sep } from "node:path";
 
 const AUTOMMIT_DIRECTORY = "autommit";
@@ -37,13 +38,47 @@ interface Paths {
     readonly lock: string;
 }
 
+export class AutommitPathError extends Schema.TaggedError<AutommitPathError>()("AutommitPathError", {
+    message: Schema.String,
+    target: Schema.String,
+    cause: Schema.optional(Schema.Unknown),
+}) {}
+
+export class AutommitReceiptError extends Schema.TaggedError<AutommitReceiptError>()("AutommitReceiptError", {
+    message: Schema.String,
+    cause: Schema.optional(Schema.Unknown),
+}) {}
+
+export class AutommitLockError extends Schema.TaggedError<AutommitLockError>()("AutommitLockError", {
+    message: Schema.String,
+    cause: Schema.optional(Schema.Unknown),
+}) {}
+
+export class AutommitOperationError extends Schema.TaggedError<AutommitOperationError>()("AutommitOperationError", {
+    message: Schema.String,
+    cause: Schema.optional(Schema.Unknown),
+}) {}
+
+type AutommitTransactionError =
+    | AutommitPathError
+    | AutommitReceiptError
+    | AutommitLockError
+    | AutommitOperationError;
+
 const isErrorCode = (error: unknown, code: string): boolean => {
     if (typeof error !== "object" || error === null || !("code" in error)) return false;
-    return error.code === code;
+    return (error as { code?: unknown }).code === code;
 };
 
-const pathError = (operation: string, target: string, error: unknown): Error =>
-    new Error(`${operation} ${target}: ${error instanceof Error ? error.message : String(error)}`);
+const pathError = (operation: string, target: string, cause: unknown): AutommitPathError =>
+    new AutommitPathError({
+        message: `${operation} ${target}: ${cause instanceof Error ? cause.message : String(cause)}`,
+        target,
+        cause,
+    });
+
+const pathFailure = (message: string, target: string): AutommitPathError =>
+    new AutommitPathError({ message, target });
 
 const validateCommonDir = (commonDir: string): string => {
     if (typeof commonDir !== "string" || commonDir.length === 0 || commonDir.includes("\0")) {
@@ -52,25 +87,18 @@ const validateCommonDir = (commonDir: string): string => {
     return resolve(commonDir);
 };
 
-/**
- * Walks every Autommit-controlled component below the supplied commonDir
- * without allowing lstat/stat to follow a directory symlink. The commonDir
- * itself is checked, while components before it are pre-existing filesystem
- * paths intentionally outside this check (for example, macOS's /var
- * symlink).
- */
-const ensureNoSymlinkPath = async (
+const ensureNoSymlinkPathEffect = Effect.fn("ensureNoSymlinkPath")(function*(
     target: string,
     allowMissingFinal: boolean,
     commonDir: string,
-): Promise<boolean> => {
+): Effect.fn.Return<boolean, AutommitPathError> {
     const absolute = resolve(target);
     const base = resolve(commonDir);
     const root = parse(absolute).root;
     const baseRoot = parse(base).root;
     const basePrefix = base.endsWith(sep) ? base : `${base}${sep}`;
     if (root !== baseRoot || (absolute !== base && !absolute.startsWith(basePrefix))) {
-        throw new Error(`Autommit path is outside Git commonDir: ${absolute}`);
+        return yield* pathFailure(`Autommit path is outside Git commonDir: ${absolute}`, absolute);
     }
 
     const relative = absolute === base ? "" : absolute.slice(base === baseRoot ? base.length : base.length + 1);
@@ -79,22 +107,29 @@ const ensureNoSymlinkPath = async (
 
     for (const component of components.length === 0 ? [""] : components) {
         if (component) current = join(current, component);
-        try {
-            const stats = await lstat(current);
-            if (stats.isSymbolicLink()) {
-                throw new Error(`Refusing symlink traversal for Autommit path: ${current}`);
+        const result = yield* Effect.tryPromise({
+            try: () => lstat(current),
+            catch: (error) => pathError("Unable to inspect Autommit path", current, error),
+        }).pipe(
+            Effect.map((stats) => ({ ok: true as const, stats })),
+            Effect.catch((error) => Effect.succeed({ ok: false as const, error })),
+        );
+
+        if (result.ok) {
+            if (result.stats.isSymbolicLink()) {
+                return yield* pathFailure(`Refusing symlink traversal for Autommit path: ${current}`, current);
             }
-        } catch (error) {
-            if (isErrorCode(error, "ENOENT")) {
+        } else {
+            const error = result.error;
+            if (isErrorCode(error.cause, "ENOENT")) {
                 if (allowMissingFinal && current === absolute) return false;
-                throw new Error(`Autommit path does not exist: ${current}`);
+                return yield* pathFailure(`Autommit path does not exist: ${current}`, current);
             }
-            if (error instanceof Error && error.message.startsWith("Refusing symlink traversal")) throw error;
-            throw pathError("Unable to inspect Autommit path", current, error);
+            return yield* error;
         }
     }
     return true;
-};
+});
 
 const makePaths = (commonDir: string): Paths => {
     const base = validateCommonDir(commonDir);
@@ -107,70 +142,107 @@ const makePaths = (commonDir: string): Paths => {
     };
 };
 
-const ensureCommonDirectory = async (paths: Paths): Promise<void> => {
-    if (!(await ensureNoSymlinkPath(paths.commonDir, false, paths.commonDir))) {
-        throw new Error(`Git commonDir does not exist: ${paths.commonDir}`);
-    }
-    const baseStats = await lstat(paths.commonDir).catch(error => {
-        throw pathError("Unable to inspect Git commonDir", paths.commonDir, error);
-    });
-    if (!baseStats.isDirectory()) throw new Error(`Git commonDir is not a directory: ${paths.commonDir}`);
-};
+const makePathsEffect = Effect.fn("makePaths")((commonDir: string) =>
+    Effect.try({
+        try: () => makePaths(commonDir),
+        catch: (error) => pathError("Invalid Git commonDir", String(commonDir), error),
+    }),
+);
 
-// Windows exposes directory handles but does not support flushing them: fsync reports EPERM.
+const ensureCommonDirectoryEffect = Effect.fn("ensureCommonDirectory")(function*(
+    paths: Paths,
+): Effect.fn.Return<void, AutommitPathError> {
+    const noSymlink = yield* ensureNoSymlinkPathEffect(paths.commonDir, false, paths.commonDir);
+    if (!noSymlink) {
+        return yield* pathFailure(`Git commonDir does not exist: ${paths.commonDir}`, paths.commonDir);
+    }
+    const baseStats = yield* Effect.tryPromise({
+        try: () => lstat(paths.commonDir),
+        catch: (error) => pathError("Unable to inspect Git commonDir", paths.commonDir, error),
+    });
+    if (!baseStats.isDirectory()) {
+        return yield* pathFailure(`Git commonDir is not a directory: ${paths.commonDir}`, paths.commonDir);
+    }
+});
+
 const isUnsupportedWindowsDirectorySyncError = (error: unknown): boolean =>
     process.platform === "win32" && isErrorCode(error, "EPERM");
 
-const syncDirectory = async (directory: string): Promise<void> => {
-    let handle: FileHandle;
-    try {
-        handle = await open(directory, "r");
-    } catch (error) {
-        throw pathError("Unable to open Autommit directory", directory, error);
-    }
-    try {
-        await handle.sync();
-    } catch (error) {
-        if (!isUnsupportedWindowsDirectorySyncError(error)) {
-            throw pathError("Unable to sync Autommit directory", directory, error);
-        }
-    } finally {
-        await handle.close();
-    }
-};
+const syncDirectoryEffect = Effect.fn("syncDirectory")((directory: string) =>
+    Effect.acquireUseRelease(
+        Effect.tryPromise({
+            try: () => open(directory, "r"),
+            catch: (error) => pathError("Unable to open Autommit directory", directory, error),
+        }),
+        (handle) =>
+            Effect.tryPromise({
+                try: () => handle.sync(),
+                catch: (error) => pathError("Unable to sync Autommit directory", directory, error),
+            }).pipe(
+                Effect.catch((error) =>
+                    isUnsupportedWindowsDirectorySyncError(error.cause)
+                        ? Effect.void
+                        : Effect.fail(error),
+                ),
+            ),
+        (handle) => Effect.promise(() => handle.close().catch(() => undefined)),
+    ),
+);
 
-const ensureAutommitDirectory = async (paths: Paths): Promise<void> => {
-    await ensureCommonDirectory(paths);
-    let created = false;
-    try {
-        await mkdir(paths.directory);
-        created = true;
-    } catch (error) {
-        if (!isErrorCode(error, "EEXIST")) throw pathError("Unable to create Autommit directory", paths.directory, error);
-    }
-    if (created) await syncDirectory(paths.commonDir);
-    if (!(await ensureNoSymlinkPath(paths.directory, false, paths.commonDir))) {
-        throw new Error(`Autommit directory does not exist: ${paths.directory}`);
-    }
-    const directoryStats = await lstat(paths.directory).catch(error => {
-        throw pathError("Unable to inspect Autommit directory", paths.directory, error);
-    });
-    if (!directoryStats.isDirectory()) throw new Error(`Autommit path is not a directory: ${paths.directory}`);
-};
+const ensureAutommitDirectoryEffect = Effect.fn("ensureAutommitDirectory")(function*(
+    paths: Paths,
+): Effect.fn.Return<void, AutommitPathError> {
+    yield* ensureCommonDirectoryEffect(paths);
+    const created = yield* Effect.tryPromise({
+        try: () => mkdir(paths.directory),
+        catch: (error) => pathError("Unable to create Autommit directory", paths.directory, error),
+    }).pipe(
+        Effect.as(true),
+        Effect.catch((error) =>
+            isErrorCode(error.cause, "EEXIST")
+                ? Effect.succeed(false)
+                : Effect.fail(error),
+        ),
+    );
 
-const existingAutommitDirectory = async (paths: Paths): Promise<boolean> => {
-    if (!(await ensureNoSymlinkPath(paths.commonDir, true, paths.commonDir))) return false;
-    const baseStats = await lstat(paths.commonDir).catch(error => {
-        throw pathError("Unable to inspect Git commonDir", paths.commonDir, error);
+    if (created) yield* syncDirectoryEffect(paths.commonDir);
+
+    const exists = yield* ensureNoSymlinkPathEffect(paths.directory, false, paths.commonDir);
+    if (!exists) {
+        return yield* pathFailure(`Autommit directory does not exist: ${paths.directory}`, paths.directory);
+    }
+    const directoryStats = yield* Effect.tryPromise({
+        try: () => lstat(paths.directory),
+        catch: (error) => pathError("Unable to inspect Autommit directory", paths.directory, error),
     });
-    if (!baseStats.isDirectory()) throw new Error(`Git commonDir is not a directory: ${paths.commonDir}`);
-    if (!(await ensureNoSymlinkPath(paths.directory, true, paths.commonDir))) return false;
-    const directoryStats = await lstat(paths.directory).catch(error => {
-        throw pathError("Unable to inspect Autommit directory", paths.directory, error);
+    if (!directoryStats.isDirectory()) {
+        return yield* pathFailure(`Autommit path is not a directory: ${paths.directory}`, paths.directory);
+    }
+});
+
+const existingAutommitDirectoryEffect = Effect.fn("existingAutommitDirectory")(function*(
+    paths: Paths,
+): Effect.fn.Return<boolean, AutommitPathError> {
+    const commonExists = yield* ensureNoSymlinkPathEffect(paths.commonDir, true, paths.commonDir);
+    if (!commonExists) return false;
+    const baseStats = yield* Effect.tryPromise({
+        try: () => lstat(paths.commonDir),
+        catch: (error) => pathError("Unable to inspect Git commonDir", paths.commonDir, error),
     });
-    if (!directoryStats.isDirectory()) throw new Error(`Autommit path is not a directory: ${paths.directory}`);
+    if (!baseStats.isDirectory()) {
+        return yield* pathFailure(`Git commonDir is not a directory: ${paths.commonDir}`, paths.commonDir);
+    }
+    const dirExists = yield* ensureNoSymlinkPathEffect(paths.directory, true, paths.commonDir);
+    if (!dirExists) return false;
+    const directoryStats = yield* Effect.tryPromise({
+        try: () => lstat(paths.directory),
+        catch: (error) => pathError("Unable to inspect Autommit directory", paths.directory, error),
+    });
+    if (!directoryStats.isDirectory()) {
+        return yield* pathFailure(`Autommit path is not a directory: ${paths.directory}`, paths.directory);
+    }
     return true;
-};
+});
 
 const validateString = (value: unknown, field: string): string => {
     if (
@@ -180,7 +252,9 @@ const validateString = (value: unknown, field: string): string => {
         value.trim().length === 0 ||
         /[\u0000-\u001f\u007f]/u.test(value)
     ) {
-        throw new Error(`Invalid Autommit receipt: ${field} must be a non-empty bounded string.`);
+        throw new AutommitReceiptError({
+            message: `Invalid Autommit receipt: ${field} must be a non-empty bounded string.`,
+        });
     }
     return value;
 };
@@ -195,11 +269,17 @@ const hasExactKeys = (value: JsonRecord, keys: readonly string[]): boolean => {
 
 const validateReceiptValue = (value: unknown): Receipt => {
     if (!isRecord(value) || Object.getPrototypeOf(value) !== Object.prototype || !hasExactKeys(value, RECEIPT_KEYS)) {
-        throw new Error("Invalid Autommit receipt: expected exactly version, state, ref, before, after, and indexTree.");
+        throw new AutommitReceiptError({
+            message: "Invalid Autommit receipt: expected exactly version, state, ref, before, after, and indexTree.",
+        });
     }
-    if (value.version !== 1) throw new Error("Invalid Autommit receipt: version must be 1.");
+    if (value.version !== 1) {
+        throw new AutommitReceiptError({ message: "Invalid Autommit receipt: version must be 1." });
+    }
     if (typeof value.state !== "string" || !(RECEIPT_STATES as readonly string[]).includes(value.state)) {
-        throw new Error("Invalid Autommit receipt: state must be prepared or committed.");
+        throw new AutommitReceiptError({
+            message: "Invalid Autommit receipt: state must be prepared or committed.",
+        });
     }
     return {
         version: 1,
@@ -215,7 +295,9 @@ const serializeReceipt = (receipt: Receipt): string => {
     const validated = validateReceiptValue(receipt);
     const serialized = `${JSON.stringify(validated)}\n`;
     if (Buffer.byteLength(serialized, "utf8") > MAX_JSON_BYTES) {
-        throw new Error(`Invalid Autommit receipt: serialized JSON exceeds ${MAX_JSON_BYTES} bytes.`);
+        throw new AutommitReceiptError({
+            message: `Invalid Autommit receipt: serialized JSON exceeds ${MAX_JSON_BYTES} bytes.`,
+        });
     }
     return serialized;
 };
@@ -228,33 +310,55 @@ const decodeUtf8 = (buffer: Buffer, target: string): string => {
     }
 };
 
-const readBoundedText = async (target: string, maxBytes: number): Promise<string> => {
-    let handle: FileHandle | undefined;
-    try {
-        handle = await open(target, "r");
-        const buffer = Buffer.alloc(maxBytes + 1);
-        const result = await handle.read(buffer, 0, buffer.length, 0);
-        if (result.bytesRead > maxBytes) {
-            throw new Error(`Autommit file exceeds the ${maxBytes}-byte limit: ${target}`);
-        }
-        return decodeUtf8(buffer.subarray(0, result.bytesRead), target);
-    } catch (error) {
-        if (error instanceof Error && error.message.startsWith("Autommit file exceeds")) throw error;
-        throw pathError("Unable to read Autommit file", target, error);
-    } finally {
-        if (handle) await handle.close().catch(() => {});
-    }
-};
+const readBoundedTextEffect = Effect.fn("readBoundedText")((
+    target: string,
+    maxBytes: number,
+) =>
+    Effect.acquireUseRelease(
+        Effect.tryPromise({
+            try: () => open(target, "r"),
+            catch: (error) => pathError("Unable to open Autommit file", target, error),
+        }),
+        (handle) =>
+            Effect.tryPromise({
+                try: async () => {
+                    const buffer = Buffer.alloc(maxBytes + 1);
+                    const result = await handle.read(buffer, 0, buffer.length, 0);
+                    if (result.bytesRead > maxBytes) {
+                        throw new AutommitReceiptError({
+                            message: `Autommit file exceeds the ${maxBytes}-byte limit: ${target}`,
+                        });
+                    }
+                    return decodeUtf8(buffer.subarray(0, result.bytesRead), target);
+                },
+                catch: (error) =>
+                    error instanceof AutommitReceiptError || error instanceof AutommitPathError
+                        ? error
+                        : pathError("Unable to read Autommit file", target, error),
+            }),
+        (handle) => Effect.promise(() => handle.close().catch(() => undefined)),
+    ),
+);
 
-const existingRegularFile = async (target: string, kind: string, commonDir: string): Promise<boolean> => {
-    if (!(await ensureNoSymlinkPath(target, true, commonDir))) return false;
-    const stats = await lstat(target).catch(error => {
-        throw pathError(`Unable to inspect Autommit ${kind}`, target, error);
+const existingRegularFileEffect = Effect.fn("existingRegularFile")(function*(
+    target: string,
+    kind: string,
+    commonDir: string,
+): Effect.fn.Return<boolean, AutommitPathError> {
+    const exists = yield* ensureNoSymlinkPathEffect(target, true, commonDir);
+    if (!exists) return false;
+    const stats = yield* Effect.tryPromise({
+        try: () => lstat(target),
+        catch: (error) => pathError(`Unable to inspect Autommit ${kind}`, target, error),
     });
-    if (stats.isSymbolicLink()) throw new Error(`Refusing symlink traversal for Autommit ${kind}: ${target}`);
-    if (!stats.isFile()) throw new Error(`Autommit ${kind} is not a regular file: ${target}`);
+    if (stats.isSymbolicLink()) {
+        return yield* pathFailure(`Refusing symlink traversal for Autommit ${kind}: ${target}`, target);
+    }
+    if (!stats.isFile()) {
+        return yield* pathFailure(`Autommit ${kind} is not a regular file: ${target}`, target);
+    }
     return true;
-};
+});
 
 const parseJson = (text: string, target: string): unknown => {
     try {
@@ -264,62 +368,115 @@ const parseJson = (text: string, target: string): unknown => {
     }
 };
 
-const readReceiptAt = async (paths: Paths): Promise<Receipt | null> => {
-    if (!(await existingAutommitDirectory(paths))) return null;
-    if (!(await existingRegularFile(paths.receipt, "receipt", paths.commonDir))) return null;
-    const text = await readBoundedText(paths.receipt, MAX_JSON_BYTES);
-    const receipt = validateReceiptValue(parseJson(text, paths.receipt));
-    if (!(await ensureNoSymlinkPath(paths.receipt, false, paths.commonDir))) {
-        throw new Error(`Autommit receipt disappeared while reading: ${paths.receipt}`);
+const readReceiptAtEffect = Effect.fn("readReceiptAt")(function*(
+    paths: Paths,
+): Effect.fn.Return<Receipt | null, AutommitPathError | AutommitReceiptError> {
+    const dirExists = yield* existingAutommitDirectoryEffect(paths);
+    if (!dirExists) return null;
+    const fileExists = yield* existingRegularFileEffect(paths.receipt, "receipt", paths.commonDir);
+    if (!fileExists) return null;
+
+    const text = yield* readBoundedTextEffect(paths.receipt, MAX_JSON_BYTES);
+    const receipt = yield* Effect.try({
+        try: () => validateReceiptValue(parseJson(text, paths.receipt)),
+        catch: (error) =>
+            error instanceof AutommitPathError || error instanceof AutommitReceiptError
+                ? error
+                : new AutommitReceiptError({ message: String(error), cause: error }),
+    });
+    const stillPresent = yield* ensureNoSymlinkPathEffect(paths.receipt, false, paths.commonDir);
+    if (!stillPresent) {
+        return yield* new AutommitReceiptError({
+            message: `Autommit receipt disappeared while reading: ${paths.receipt}`,
+        });
     }
     return receipt;
-};
+});
 
-export const readReceipt = async (commonDir: string): Promise<Receipt | null> => readReceiptAt(makePaths(commonDir));
+export const readReceipt = (commonDir: string): Promise<Receipt | null> =>
+    Effect.runPromise(makePathsEffect(commonDir).pipe(Effect.flatMap(readReceiptAtEffect)));
 
-export const writeReceipt = async (commonDir: string, receipt: Receipt): Promise<void> => {
-    const paths = makePaths(commonDir);
-    const serialized = serializeReceipt(receipt);
-    await ensureAutommitDirectory(paths);
-    await existingRegularFile(paths.receipt, "receipt", paths.commonDir);
+export const writeReceiptEffect = Effect.fn("writeReceipt")(function*(
+    commonDir: string,
+    receipt: Receipt,
+): Effect.fn.Return<void, AutommitPathError | AutommitReceiptError> {
+    const paths = yield* makePathsEffect(commonDir);
+    const serialized = yield* Effect.try({
+        try: () => serializeReceipt(receipt),
+        catch: (error) => error instanceof AutommitReceiptError
+            ? error
+            : new AutommitReceiptError({ message: String(error), cause: error }),
+    });
+    yield* ensureAutommitDirectoryEffect(paths);
+    yield* existingRegularFileEffect(paths.receipt, "receipt", paths.commonDir);
 
     const tempPath = join(paths.directory, `.${RECEIPT_FILENAME}.tmp-${makeToken()}`);
-    let handle: FileHandle | undefined;
-    try {
-        handle = await open(tempPath, "wx", 0o600);
-        await handle.writeFile(serialized, "utf8");
-        await handle.sync();
-        await handle.close();
-        handle = undefined;
-        await existingRegularFile(paths.receipt, "receipt", paths.commonDir);
-        await rename(tempPath, paths.receipt);
-        await syncDirectory(paths.directory);
-    } catch (error) {
-        throw pathError("Unable to write Autommit receipt", paths.receipt, error);
-    } finally {
-        if (handle) await handle.close().catch(() => {});
-        await unlink(tempPath).catch(() => {});
-    }
-};
-export const removeReceipt = async (commonDir: string): Promise<void> => {
-    const paths = makePaths(commonDir);
-    if (!(await existingAutommitDirectory(paths))) return;
-    if (!(await existingRegularFile(paths.receipt, "receipt", paths.commonDir))) return;
-    try {
-        await unlink(paths.receipt);
-    } catch (error) {
-        if (isErrorCode(error, "ENOENT")) return;
-        throw pathError("Unable to remove Autommit receipt", paths.receipt, error);
-    }
-    await syncDirectory(paths.directory);
-};
+
+    yield* Effect.acquireUseRelease(
+        Effect.succeed(tempPath),
+        () =>
+            Effect.gen(function*() {
+                yield* Effect.acquireUseRelease(
+                    Effect.tryPromise({
+                        try: () => open(tempPath, "wx", 0o600),
+                        catch: (error) => pathError("Unable to open Autommit receipt temp file", tempPath, error),
+                    }),
+                    (handle) =>
+                        Effect.tryPromise({
+                            try: async () => {
+                                await handle.writeFile(serialized, "utf8");
+                                await handle.sync();
+                            },
+                            catch: (error) => pathError("Unable to write Autommit receipt", paths.receipt, error),
+                        }),
+                    (handle) => Effect.promise(() => handle.close().catch(() => undefined)),
+                );
+                yield* existingRegularFileEffect(paths.receipt, "receipt", paths.commonDir);
+                yield* Effect.tryPromise({
+                    try: () => rename(tempPath, paths.receipt),
+                    catch: (error) => pathError("Unable to replace Autommit receipt", paths.receipt, error),
+                });
+                yield* syncDirectoryEffect(paths.directory);
+            }),
+        (path) => Effect.promise(() => unlink(path).catch(() => undefined)),
+    );
+});
+
+export const writeReceipt = (commonDir: string, receipt: Receipt): Promise<void> =>
+    Effect.runPromise(writeReceiptEffect(commonDir, receipt));
+
+export const removeReceiptEffect = Effect.fn("removeReceipt")(function*(
+    commonDir: string,
+): Effect.fn.Return<void, AutommitPathError> {
+    const paths = yield* makePathsEffect(commonDir);
+    const dirExists = yield* existingAutommitDirectoryEffect(paths);
+    if (!dirExists) return;
+    const fileExists = yield* existingRegularFileEffect(paths.receipt, "receipt", paths.commonDir);
+    if (!fileExists) return;
+
+    yield* Effect.tryPromise({
+        try: async () => {
+            try {
+                await unlink(paths.receipt);
+            } catch (error) {
+                if (!isErrorCode(error, "ENOENT")) throw error;
+            }
+        },
+        catch: (error) => pathError("Unable to remove Autommit receipt", paths.receipt, error),
+    });
+
+    yield* syncDirectoryEffect(paths.directory);
+});
+
+export const removeReceipt = (commonDir: string): Promise<void> =>
+    Effect.runPromise(removeReceiptEffect(commonDir));
+
+let operationCounter = 0;
 
 const makeToken = (): string => {
     operationCounter += 1;
     return `${process.pid}-${Date.now().toString(36)}-${operationCounter.toString(36)}-${Math.random().toString(36).slice(2)}`;
 };
-
-let operationCounter = 0;
 
 const lockJson = (owner: LockOwner): string => `${JSON.stringify(owner)}\n`;
 
@@ -339,53 +496,104 @@ const parseLockOwner = (value: unknown): LockOwner | null => {
     return { pid: value.pid, token: value.token };
 };
 
-const releaseOperationLock = async (paths: Paths, owner: LockOwner): Promise<void> => {
-    if (!(await existingRegularFile(paths.lock, "operation lock", paths.commonDir))) return;
-    let lock: LockOwner | null;
-    try {
-        lock = parseLockOwner(parseJson(await readBoundedText(paths.lock, MAX_LOCK_BYTES), paths.lock));
-    } catch {
-        return;
-    }
-    if (!lock || lock.pid !== owner.pid || lock.token !== owner.token) return;
-    if (!(await existingRegularFile(paths.lock, "operation lock", paths.commonDir))) return;
-    try {
-        await unlink(paths.lock);
-    } catch (error) {
-        if (!isErrorCode(error, "ENOENT")) throw pathError("Unable to release Autommit operation lock", paths.lock, error);
-    }
-};
+const releaseOperationLockEffect = Effect.fn("releaseOperationLock")(function*(
+    paths: Paths,
+    owner: LockOwner,
+): Effect.fn.Return<void, AutommitPathError> {
+    const isFile = yield* existingRegularFileEffect(paths.lock, "operation lock", paths.commonDir);
+    if (!isFile) return;
 
-export const withOperationLock = async <T>(commonDir: string, fn: () => Promise<T>): Promise<T> => {
-    const paths = makePaths(commonDir);
-    await ensureAutommitDirectory(paths);
-    const owner: LockOwner = { pid: process.pid, token: makeToken() };
-    const serialized = lockJson(owner);
-    if (Buffer.byteLength(serialized, "utf8") > MAX_LOCK_BYTES) {
-        throw new Error("Unable to acquire Autommit operation lock: lock metadata exceeds its size limit.");
-    }
+    const readAttempt = yield* readBoundedTextEffect(paths.lock, MAX_LOCK_BYTES).pipe(
+        Effect.flatMap((text) =>
+            Effect.try({
+                try: () => parseLockOwner(parseJson(text, paths.lock)),
+                catch: (error) =>
+                    error instanceof AutommitPathError
+                        ? error
+                        : pathError("Invalid Autommit operation lock", paths.lock, error),
+            }),
+        ),
+        Effect.orElseSucceed(() => null),
+    );
 
-    let handle: FileHandle | undefined;
-    try {
-        handle = await open(paths.lock, "wx", 0o600);
-        await handle.writeFile(serialized, "utf8");
-        await handle.sync();
-        await handle.close();
-        handle = undefined;
-    } catch (error) {
-        if (handle) await handle.close().catch(() => {});
-        if (handle) await unlink(paths.lock).catch(() => {});
-        if (isErrorCode(error, "EEXIST")) {
-            throw new Error(
-                `Autommit operation already in progress (lock: ${paths.lock}). Inspect the lock's PID; stale locks are never removed automatically.`,
-            );
+    if (!readAttempt || readAttempt.pid !== owner.pid || readAttempt.token !== owner.token) return;
+
+    const stillFile = yield* existingRegularFileEffect(paths.lock, "operation lock", paths.commonDir);
+    if (!stillFile) return;
+
+    yield* Effect.tryPromise({
+        try: async () => {
+            try {
+                await unlink(paths.lock);
+            } catch (error) {
+                if (!isErrorCode(error, "ENOENT")) throw error;
+            }
+        },
+        catch: (error) => pathError("Unable to release Autommit operation lock", paths.lock, error),
+    });
+});
+
+export const withOperationLockEffect = Effect.fn("withOperationLock")(function*<T, E>(
+    commonDir: string,
+    effectFn: () => Effect.Effect<T, E>,
+): Effect.fn.Return<T, AutommitTransactionError | E> {
+        const paths = yield* makePathsEffect(commonDir);
+        yield* ensureAutommitDirectoryEffect(paths);
+        const owner: LockOwner = { pid: process.pid, token: makeToken() };
+        const serialized = lockJson(owner);
+        if (Buffer.byteLength(serialized, "utf8") > MAX_LOCK_BYTES) {
+            return yield* new AutommitLockError({
+                message: "Unable to acquire Autommit operation lock: lock metadata exceeds its size limit.",
+            });
         }
-        throw pathError("Unable to acquire Autommit operation lock", paths.lock, error);
-    }
 
-    try {
-        return await fn();
-    } finally {
-        await releaseOperationLock(paths, owner);
-    }
-};
+        yield* Effect.acquireUseRelease(
+            Effect.tryPromise({
+                try: () => open(paths.lock, "wx", 0o600),
+                catch: (cause) => new AutommitLockError({
+                    message: `Unable to acquire Autommit operation lock: ${cause instanceof Error ? cause.message : String(cause)}`,
+                    cause,
+                }),
+            }),
+            (handle) =>
+                Effect.tryPromise({
+                    try: async () => {
+                        await handle.writeFile(serialized, "utf8");
+                        await handle.sync();
+                    },
+                    catch: (cause) => new AutommitLockError({
+                        message: `Unable to write Autommit operation lock: ${cause instanceof Error ? cause.message : String(cause)}`,
+                        cause,
+                    }),
+                }),
+            (handle) => Effect.promise(() => handle.close().catch(() => undefined)),
+        ).pipe(
+            Effect.catch((error) => {
+                if (isErrorCode(error.cause, "EEXIST")) {
+                    return Effect.fail(new AutommitLockError({
+                        message: `Autommit operation already in progress (lock: ${paths.lock}). Inspect the lock's PID; stale locks are never removed automatically.`,
+                    }));
+                }
+                return Effect.promise(() => unlink(paths.lock).catch(() => undefined)).pipe(
+                    Effect.andThen(Effect.fail(error)),
+                );
+            }),
+        );
+
+        return yield* Effect.acquireUseRelease(
+            Effect.succeed(owner),
+            () => effectFn(),
+            (o) => releaseOperationLockEffect(paths, o),
+        );
+    });
+
+export const withOperationLock = <T>(commonDir: string, fn: () => Promise<T>): Promise<T> =>
+    Effect.runPromise(
+        withOperationLockEffect(commonDir, () => Effect.tryPromise({
+            try: fn,
+            catch: (cause) => new AutommitOperationError({
+                message: cause instanceof Error ? cause.message : String(cause),
+                cause,
+            }),
+        })),
+    );

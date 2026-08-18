@@ -3,11 +3,7 @@ import type {
   ExtensionContext,
   Skill,
 } from "@earendil-works/pi-coding-agent";
-import {
-  getAgentDir,
-  isToolCallEventType,
-  loadSkills,
-} from "@earendil-works/pi-coding-agent";
+import * as piAgent from "@earendil-works/pi-coding-agent";
 import { statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -18,6 +14,18 @@ import { agentHintForBlock, agentHintForWarning } from "./hints.js";
 import { actionForCommand } from "./matcher.js";
 import { reasonForPath } from "./paths.js";
 import type { BlockAction, GuardrailsConfig, SkillBinding } from "./types.js";
+
+const { isToolCallEventType } = piAgent;
+
+type GuardrailsDependencies = {
+  readonly getAgentDir: () => string;
+  readonly loadSkills: (options: unknown) => { skills: Skill[] };
+};
+
+const defaultDependencies: GuardrailsDependencies = {
+  getAgentDir: () => piAgent.getAgentDir(),
+  loadSkills: (options) => piAgent.loadSkills(options as never),
+};
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const configPath = join(__dirname, "guardrails.jsonc");
@@ -80,10 +88,11 @@ const emitGuardrailWarning = (
 const findSkill = (
   ctx: ExtensionContext,
   skillName: string,
+  dependencies: GuardrailsDependencies,
 ): Skill | undefined =>
-  loadSkills({
+  dependencies.loadSkills({
     cwd: ctx.cwd,
-    agentDir: getAgentDir(),
+    agentDir: dependencies.getAgentDir(),
     skillPaths: [],
     includeDefaults: true,
   }).skills.find((skill) => skill.name === skillName);
@@ -106,12 +115,13 @@ const loadRequiredSkill = async (
   pi: ExtensionAPI,
   ctx: ExtensionContext,
   skillName: string | undefined,
+  dependencies: GuardrailsDependencies,
 ): Promise<SkillLoadState> => {
   if (!skillName) return { status: "not-required" };
   if (loadedSkills.has(skillName))
     return { status: "already-loaded", skillName };
 
-  const skill = findSkill(ctx, skillName);
+  const skill = findSkill(ctx, skillName, dependencies);
   if (!skill) {
     ctx.ui.notify(
       `Guardrails could not find required skill: ${skillName}`,
@@ -214,7 +224,10 @@ export const __test = {
   emitGuardrailWarning,
 };
 
-export function createGuardrails(path: string) {
+export function createGuardrails(
+  path: string,
+  dependencies: GuardrailsDependencies = defaultDependencies,
+) {
   return function guardrails(pi: ExtensionAPI): void {
     pi.on("session_start", () => {
       loadedSkills.clear();
@@ -241,6 +254,7 @@ export function createGuardrails(path: string) {
           pi,
           ctx,
           resolvedSkillName(action, configOrReason),
+          dependencies,
         );
         if (skillLoadState.status === "missing") {
           return {
@@ -281,6 +295,7 @@ export function createGuardrails(path: string) {
           pi,
           ctx,
           resolvedSkillName(action, configOrReason),
+          dependencies,
         );
         if (skillLoadState.status === "missing") {
           return {
