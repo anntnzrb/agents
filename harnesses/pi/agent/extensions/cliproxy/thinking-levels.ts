@@ -6,15 +6,14 @@ export function piThinkingLevelMap(
 ): Readonly<Record<PiThinkingLevel, string | null>> {
   const supported = new Set(efforts);
   const highest = efforts.at(-1) ?? null;
-  return Object.fromEntries(
-    PI_THINKING_LEVELS.map((level) => {
-      if (level === "off") {
-        return [level, supported.has("none") ? "none" : null];
-      }
-      if (level === "max") {
-        return [level, highest];
-      }
-      return [level, supported.has(level) ? level : null];
-    }),
-  ) as Record<PiThinkingLevel, string | null>;
+  const map: Record<PiThinkingLevel, string | null> = {
+    off: supported.has("none") ? "none" : null,
+    minimal: supported.has("minimal") ? "minimal" : null,
+    low: supported.has("low") ? "low" : null,
+    medium: supported.has("medium") ? "medium" : null,
+    high: supported.has("high") ? "high" : null,
+    xhigh: supported.has("xhigh") ? "xhigh" : null,
+    max: highest,
+  };
+  return map;
 }
