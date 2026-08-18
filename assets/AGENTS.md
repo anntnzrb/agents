@@ -10,12 +10,19 @@ Optimize signal: cut filler, redundancy, and non-value complexity. MUST get expl
 
 Stable locations, referenceable anytime:
 
-Repos: `~/repos/` — personal and external projects.
-Rice: `~/repos/rice/` — centralized system configurations for setting up machines.
-Agents: `~/.config/agents/` — centralized AI-agent (harness) configurations, including the sync script.
+Repos: `~/repos/`. Personal and external projects.
+Rice: `~/repos/rice/`. Centralized system configurations for setting up machines.
+Agents: `~/.config/agents/`. Centralized AI-agent configurations, including the sync script.
+Vendored sources: `~/src/vendored/`. Shared, read-only upstream source checkouts for agent research.
+
+## Vendored sources
+
+Use `~/src/vendored/<host>/<owner>/<repo>` for shared, read-only upstream source. Prefer it over guesses. The project's installed version remains authoritative.
+
+Needed clones and clean fast-forward updates are pre-approved. Clone with `--depth=1 --filter=blob:none --single-branch`. Never edit, import from, or add these checkouts to project Git. Use a temporary shallow clone instead of altering a dirty, diverged, or mismatched checkout.
 
 ## Preferences
 
 YAGNI and KISS: build only what the task needs; keep design simple; do not invent abstractions, configuration, compatibility shims, or ceremony for hypothetical futures.
 
-To inspect a remote Git repository, shallow-clone it into a temporary directory first, then inspect it locally.
+Use the shared cache for reusable dependency source. For one-off remote repository inspection, shallow-clone into a temporary directory.
