@@ -378,6 +378,23 @@ test("cliproxy_committed_source_keeps_sessions_sticky_and_retries_the_full_pool"
   assert.deepEqual(config["streaming"], { "bootstrap-retries": 1 });
 });
 
+test("cliproxy_codex_aliases_override_responses_reasoning_shape", () => {
+  const source = readFileSync(
+    join(REPOSITORY_ROOT, "assets", "cliproxyapi", "config.yaml.tmpl"),
+    "utf8",
+  );
+  const config = Bun.YAML.parse(source) as Record<string, any>;
+  const rules = config["payload"]["override"] as readonly Record<string, any>[];
+  const codexRules = rules.filter((rule) =>
+    rule["models"].some((model: Record<string, unknown>) => model["protocol"] === "codex"),
+  );
+
+  assert.deepEqual(
+    codexRules.map((rule) => rule["params"]),
+    [{ "reasoning.effort": "high" }, { "reasoning.effort": "max" }],
+  );
+});
+
 test("cliproxy_endpoint_publication_is_one_job_after_config_and_directory_copies", () => {
   const home = mkdtempSync(join(tmpdir(), "cliproxy-plan-test-"));
   try {
