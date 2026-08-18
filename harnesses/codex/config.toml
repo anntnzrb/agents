@@ -12,8 +12,9 @@ web_search = "live"
 # MODEL
 # -----------------------------------------------------------------------------
 
-model = "gpt-5.6-sol"
-review_model = "gpt-5.6-luna"
+model = "chatgpt/gpt-5.6-sol"
+model_provider = "cliproxy"
+review_model = "chatgpt/gpt-5.6-luna"
 model_reasoning_effort = "high"
 model_verbosity = "low"
 model_reasoning_summary = "detailed"
@@ -31,6 +32,11 @@ You are the primary coordinator. Prefer delegating substantial or independent wo
 Use direct commands and edits when they are the smallest or fastest in-scope path.
 When local read tools are unavailable, delegate filesystem inspection to the registered explorer agent.
 """
+
+[model_providers.cliproxy]
+name = "CLIProxyAPI"
+base_url = "${CLIPROXY_CLIENT_BASE_URL}"
+wire_api = "responses"
 
 [permissions.agent-workspace]
 extends = ":workspace"
@@ -144,7 +150,7 @@ enabled = true
 # number of workers a session may use over its lifetime. The hook's separate
 # lifetime spawn-attempt cap lives in hooks/orchestration.toml.
 max_concurrent_threads_per_session = 16
-default_subagent_model = "gpt-5.6-luna"
+default_subagent_model = "chatgpt/gpt-5.6-luna"
 default_subagent_reasoning_effort = "max"
 interrupt_message = true
 
