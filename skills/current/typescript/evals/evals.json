@@ -1,0 +1,78 @@
+{
+  "skill_name": "typescript",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a new TypeScript CLI that reads JSON records, validates them, and writes a summary. I have not selected a runtime or toolchain. Give me the project setup, scripts, compiler config, and validation plan.",
+      "expected_output": "Applies the user-owned Bun application policy with TypeScript 7, strict ESM, Oxlint, Oxfmt, and bun:test without adding frontend or unrelated dependencies.",
+      "files": [],
+      "expectations": [
+        "The answer selects Bun for runtime, package management, scripts, and tests",
+        "The answer requires the native Go-based TypeScript 7 or newer package and verifies the installed version",
+        "The answer uses native ESM and a strict no-emit compiler configuration",
+        "The answer selects Oxlint, Oxfmt, and bun:test",
+        "The answer does not invoke npm, pnpm, Yarn, Node.js, Vitest, Jest, ESLint, or Prettier, and does not propose Zod or Valibot"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "This existing library uses pnpm, TypeScript 5.6, NodeNext, ESLint, Vitest, and a checked-in pnpm lockfile. Fix one generic type error without migrating the project or changing its toolchain.",
+      "expected_output": "Preserves the existing repository toolchain and makes a narrow type fix instead of forcing the new-application defaults.",
+      "files": [],
+      "expectations": [
+        "The answer preserves pnpm, TypeScript 5.6, NodeNext, ESLint, Vitest, and the existing lockfile",
+        "The answer does not propose a Bun or TypeScript 7 migration",
+        "The answer makes or describes the smallest type-safe fix",
+        "The answer uses repository scripts or package-manager-native validation"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I want to add a Node-oriented SDK to a new Bun TypeScript service, but its Bun compatibility is unclear and its docs only show require(). Decide how to proceed.",
+      "expected_output": "Investigates exports and Bun compatibility before adoption, keeps ESM coherent, and reports the tradeoff instead of silently switching runtimes.",
+      "files": [],
+      "expectations": [
+        "The answer requires inspection or a compatibility probe before adopting the SDK",
+        "The answer does not silently switch from Bun to Node.js",
+        "The answer keeps native ESM and rejects copying require() blindly",
+        "The answer surfaces the compatibility decision or asks for approval when the SDK is unavoidable"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Start a new backend in TypeScript using Effect for validation, services, retries, and resource safety. Set up the stack and explain which skill policy owns each decision.",
+      "expected_output": "Routes TypeScript and Bun decisions through the TypeScript policy and Effect architecture through the Effect skill without duplicating or mixing ownership.",
+      "files": [],
+      "expectations": [
+        "The answer loads or references the Effect skill for Effect-specific architecture",
+        "The answer keeps Bun, TypeScript 7, ESM, Oxc, and bun:test under the TypeScript application policy",
+        "The answer does not substitute Zod, neverthrow, RxJS, an HTTP framework, or an ORM by default",
+        "The answer keeps dependencies minimal"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Review a fresh Bun TypeScript project's package.json and tsconfig plan before any code is written. Tell me the exact diagnostics, lint, format, and test gates you expect after implementation.",
+      "expected_output": "Provides the strict Bun application baseline and a complete, non-duplicated validation ladder.",
+      "files": [],
+      "expectations": [
+        "The answer includes bun install, explicit TypeScript diagnostics, Oxlint, Oxfmt check mode, and bun test",
+        "The answer distinguishes Bun transpilation from TypeScript type checking",
+        "The answer uses type module and strict ESM-oriented compiler settings",
+        "The answer does not add a second runtime, package manager, formatter, linter, or test runner"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "For a new Bun application, the native TypeScript package resolves to 7.0.2, but a required build integration declares TypeScript <7. I have not approved a downgrade or replacing the integration. What do you do?",
+      "expected_output": "Keeps TypeScript 7+ as the target, verifies the incompatibility, explains the options, and asks before any downgrade or tool replacement.",
+      "files": [],
+      "expectations": [
+        "The answer keeps native TypeScript 7+ as the default target",
+        "The answer verifies the integration's actual TypeScript constraint",
+        "The answer does not silently downgrade TypeScript",
+        "The answer presents the concrete compatibility tradeoff and asks for the material decision"
+      ]
+    }
+  ]
+}

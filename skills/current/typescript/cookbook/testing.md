@@ -2,6 +2,8 @@
 
 Use compile-time and runtime tests together. TypeScript proves program shape, not external data validity.
 
+For a new application covered by `references/bun-application.md`, use `bun:test`, Bun commands, and the application's chosen schema boundary. The Vitest, `tsd`, Zod, npm, and Node examples below apply only when an existing repository already owns those tools.
+
 ---
 
 ## Compiler Gate

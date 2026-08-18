@@ -32,11 +32,13 @@ Type-safe design. Runtime-aware config. One-shot validation. Minimal config chur
 ## Core Rules
 
 - Prefer repo scripts over raw commands
-- Respect existing package manager: `bun`, `pnpm`, `yarn`, `npm`
+- For a new user-owned backend, CLI, automation, infrastructure, service, or data-processing app with no approved alternate stack, read `references/bun-application.md` and use its Bun and native TypeScript 7+ defaults
+- Respect an existing repository's package manager and runtime unless the user requests migration; do not create a second lockfile
 - Inspect the nearest working implementation before designing; reuse an adequate existing helper, platform API, or installed dependency
-- Choose `moduleResolution` from runtime:
+- Choose `moduleResolution` from the runtime and package contract:
+  - New user-owned Bun applications -> `references/bun-application.md`
   - Bundlers (`vite`, `next`, frontend apps) -> `bundler`
-  - Node or Bun apps/libraries -> `NodeNext`
+  - Existing Node or Bun apps and published libraries -> preserve project config; otherwise use `NodeNext`
 - Prefer `interface` for extendable object contracts
 - Prefer `type` for unions, mapped types, template literal types, and helpers
 - Prefer `unknown` over `any`; validate at boundaries
@@ -49,7 +51,7 @@ Type-safe design. Runtime-aware config. One-shot validation. Minimal config chur
 - Give long-lived I/O explicit cancellation, timeout, and cleanup when the runtime or caller supports them
 - Do not add a dependency, abstraction, parser, normalization layer, or defensive branch without a concrete caller, boundary, or failure mode
 - Test observable behavior at the lowest layer that exposes the regression. Prefer real values, in-memory fakes, or wire-level fakes; mock unavailable external edges only
-- Treat a large file, parameter bundle, negative-name maze, redundant post-action check, or broad catch as a review trigger—not an automatic rewrite order
+- Treat a large file, parameter bundle, negative-name maze, redundant post-action check, or broad catch as a review trigger, not an automatic rewrite order
 - Use `rg` for repository discovery and `ast-grep` for structural search when it makes the question cheaper to answer
 - Keep tsconfig changes narrow. Do not strictify a repo unless asked
 - Use one-shot diagnostics. No watch servers for validation
@@ -66,6 +68,7 @@ Type-safe design. Runtime-aware config. One-shot validation. Minimal config chur
 
 - Pure React/Next render or bundle performance with no TS design issue: also load `react-best-practices`
 - Fresh library/framework API docs: load `research`, then `context7` or `grep-app`
+- Effect application architecture or APIs: also load `effect`
 
 ## Quick Start
 
@@ -75,21 +78,24 @@ Type-safe design. Runtime-aware config. One-shot validation. Minimal config chur
 if [ -f bun.lockb ] || [ -f bun.lock ]; then PM=bun;
 elif [ -f pnpm-lock.yaml ]; then PM=pnpm;
 elif [ -f yarn.lock ]; then PM=yarn;
-else PM=npm; fi
+elif [ -f package-lock.json ]; then PM=npm;
+else PM=unset; fi
 echo "$PM"
 ```
 
 ### Validation ladder
 
 - Run repo scripts first: `typecheck`, `test`, `lint`, `build`
-- Fallback typecheck: `npx tsc --noEmit`
-- Perf trace: `npx tsc --extendedDiagnostics --incremental false`
-- Resolution trace: `npx tsc --traceResolution`
+- Bun fallback: `bunx tsc --noEmit`
+- Bun performance trace: `bunx tsc --extendedDiagnostics --incremental false`
+- Bun resolution trace: `bunx tsc --traceResolution`
+- In an existing non-Bun repository, use its package-manager-native equivalent without changing the lockfile
 
 ## Required follow-up reads
 
 |Need|Read|When|
 |---|---|---|
+|New Bun TypeScript application policy|`references/bun-application.md`|Creating a user-owned backend, CLI, automation, infrastructure, service, or data-processing app without another approved stack|
 |Config, modules, migration, monorepos|`reference.md`|Scope includes toolchain/config|
 |Advanced type patterns|`cookbook/types.md`|Designing non-trivial types|
 |Type/runtime tests|`cookbook/testing.md`|Adding or debugging tests|

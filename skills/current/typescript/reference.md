@@ -5,19 +5,20 @@ Select `module`/`moduleResolution` by runtime, not fashion:
 
 |Target|`module`|`moduleResolution`|Notes|
 |---|---|---|---|
-|Vite / Next / frontend bundlers|`ESNext`|`bundler`|Bundler resolves aliases and extensionless imports|
-|Node / Bun apps|`NodeNext`|`NodeNext`|Match runtime semantics and package exports|
-|Published libraries|`NodeNext`|`NodeNext`|Keep build config separate from editor config|
+|New user-owned Bun application|`Preserve`|`bundler`|Use `references/bun-application.md`|
+|Vite / Next / frontend bundler|`ESNext`|`bundler`|The bundler resolves aliases and extensionless imports|
+|Existing Node / Bun app|Project config|Project config|Preserve working runtime semantics|
+|Published library|`NodeNext`|`NodeNext`|Keep build config separate from editor config|
 
-Bundler-first apps → `assets/tsconfig-bundler.json`; Node/Bun projects → `assets/tsconfig-nodenext.json`. Working project: do not casually change module mode.
+Bundler-first apps use `assets/tsconfig-bundler.json`. NodeNext projects use `assets/tsconfig-nodenext.json`. Do not casually change a working project's module mode.
 
 ## Validation order
 1. Existing repo scripts: `typecheck`, `test`, `lint`, `build`
-2. Compiler fallback: `npx tsc --noEmit`
-3. Resolution trace: `npx tsc --traceResolution`
-4. Perf trace: `npx tsc --extendedDiagnostics --incremental false`
+2. Bun compiler fallback: `bunx tsc --noEmit`
+3. Bun resolution trace: `bunx tsc --traceResolution`
+4. Bun performance trace: `bunx tsc --extendedDiagnostics --incremental false`
 
-Prefer package-manager-native script execution when the repo standardizes on it.
+For an existing non-Bun repository, use its package-manager-native equivalent without changing the lockfile. For a new user-owned Bun application, read `references/bun-application.md` before selecting config or tools.
 
 ## Strictness baseline
 Useful defaults:
@@ -72,8 +73,9 @@ Use project references when packages compile independently and share typed outpu
 If the monorepo already builds via a framework tool, do not introduce references just because they are theoretically cleaner.
 
 ## Lint / format choices
-Use Biome when speed matters, rules are mostly style and common correctness, and the repo wants a single-tool lint + format.
-Stay with ESLint when the repo already depends on type-aware rules, framework plugins matter, or custom rules or ecosystem plugins are central.
+Use Oxlint and Oxfmt for a new application covered by `references/bun-application.md`.
+
+In an existing repository, preserve its configured formatter and linter unless the user requests a migration. Biome fits repositories that already use a single fast lint-and-format tool. ESLint remains appropriate where existing type-aware rules, framework plugins, or custom rules are required.
 
 ## Library packaging
 Keep editor config and build config separate:
