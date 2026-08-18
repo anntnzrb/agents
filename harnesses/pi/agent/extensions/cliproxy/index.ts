@@ -1,7 +1,11 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { readFile } from "node:fs/promises";
+import type {
+  ExtensionAPI,
+  ProviderModelConfig,
+} from "@earendil-works/pi-coding-agent";
 import { piThinkingLevelMap } from "./thinking-levels.ts";
 
 interface CatalogModel {
@@ -21,7 +25,7 @@ interface CatalogModel {
 }
 
 interface CatalogModule {
-  readonly readModelCatalog: (path: string) => readonly CatalogModel[];
+  readonly parseModelCatalog: (content: string, path: string) => readonly CatalogModel[];
 }
 
 const CATALOG_PATH = join(
@@ -46,8 +50,14 @@ const CATALOG_MODULE = pathToFileURL(
 ).href;
 
 export default async function cliproxy(pi: ExtensionAPI): Promise<void> {
-  const { readModelCatalog } = (await import(CATALOG_MODULE)) as CatalogModule;
-  const models = readModelCatalog(CATALOG_PATH).map(piModel);
+  const { parseModelCatalog } = (await import(CATALOG_MODULE)) as CatalogModule;
+  let content: string;
+  try {
+    content = await readFile(CATALOG_PATH, "utf8");
+  } catch (error) {
+    throw new Error(`read model catalog ${CATALOG_PATH}`, { cause: error });
+  }
+  const models = parseModelCatalog(content, CATALOG_PATH).map(piModel);
 
   pi.registerProvider("cliproxy", {
     name: "CLIProxyAPI",
@@ -58,7 +68,7 @@ export default async function cliproxy(pi: ExtensionAPI): Promise<void> {
   });
 }
 
-function piModel(model: CatalogModel) {
+function piModel(model: CatalogModel): ProviderModelConfig {
   return {
     id: model.id,
     name: model.name,
