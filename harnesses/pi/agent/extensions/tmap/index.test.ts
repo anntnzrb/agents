@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "bun:test";
 import type { BeforeAgentStartEvent } from "@earendil-works/pi-coding-agent";
 import { applyTransform } from "./index.ts";
 
@@ -21,23 +20,23 @@ function transform(prompt: string, images?: Images) {
 
 test("maps one dot surrounded only by whitespace", () => {
   for (const prompt of [".", " .", ". ", " . ", "\t.\t", "\n.\n", "\n \t.\t \n", "\u00a0.\u00a0"]) {
-    assert.deepEqual(transform(prompt), CONTINUATION_RESULT, JSON.stringify(prompt));
+    expect(transform(prompt)).toEqual(CONTINUATION_RESULT);
   }
 });
 
 test("maps an image-free dot with an empty image list", () => {
-  assert.deepEqual(transform(" . ", []), CONTINUATION_RESULT);
+  expect(transform(" . ", [])).toEqual(CONTINUATION_RESULT);
 });
 
 test("does not map empty or whitespace-only messages", () => {
   for (const prompt of ["", " ", "\t", "\n", " \n\t "]) {
-    assert.equal(transform(prompt), undefined, JSON.stringify(prompt));
+    expect(transform(prompt)).toBe(undefined);
   }
 });
 
 test("does not map multiple dots or dots separated by whitespace", () => {
   for (const prompt of ["..", "...", " . . ", ".\n.", "\n.\n."]) {
-    assert.equal(transform(prompt), undefined, JSON.stringify(prompt));
+    expect(transform(prompt)).toBe(undefined);
   }
 });
 
@@ -53,13 +52,13 @@ test("does not map a dot embedded in ordinary text or a paragraph", () => {
     "Version 1.2 is installed.",
     "A quoted full stop: \".\"",
   ]) {
-    assert.equal(transform(prompt), undefined, prompt);
+    expect(transform(prompt)).toBe(undefined);
   }
 });
 
 test("leaves currently unmapped trigger candidates unchanged", () => {
   for (const prompt of ["!", " ! ", "?", "#", "@", "~"]) {
-    assert.equal(transform(prompt), undefined, prompt);
+    expect(transform(prompt)).toBe(undefined);
   }
 });
 
@@ -71,11 +70,11 @@ test("does not map a dot when the user attaches an image", () => {
   } satisfies NonNullable<Images>[number];
 
   for (const prompt of [".", " . ", "\n.\n"]) {
-    assert.equal(transform(prompt, [image]), undefined, prompt);
+    expect(transform(prompt, [image])).toBe(undefined);
   }
 });
 
 test("does not modify the system prompt for an unmapped message", () => {
-  assert.equal(transform("Keep going"), undefined);
-  assert.equal(transform("!"), undefined);
+  expect(transform("Keep going")).toBe(undefined);
+  expect(transform("!")).toBe(undefined);
 });
