@@ -13,7 +13,8 @@ Use matching project code, vendored source, installed declarations, and live doc
 
 ## Route the task
 
-- New or materially changed user-owned Effect code: read `references/application-engineering.md`; also load the TypeScript skill when project or toolchain decisions are in scope.
+- New or materially changed user-owned Effect code: read `references/application-engineering.md` and `references/code-quality.md`; also load the TypeScript skill when project or toolchain decisions are in scope.
+- Effect code review or refactoring: read `references/code-quality.md`; inspect matching project and vendored source before prescribing patterns.
 - Focused Effect API question without implementation: inspect project versions and vendored source, then use the live documentation workflow below.
 - Existing Effect repository: honor its pinned major version. Do not migrate or mix Effect majors without approval.
 
@@ -75,17 +76,21 @@ mcporter --config <agent-config-root>/assets/mcporter.jsonc list effect.<tool> -
 
 ## Engineering checks
 
-- Use `Effect.fn("name")` for named Effect functions and `Effect.gen` for local sequential composition.
-- Use `Schema.TaggedError` for expected errors in new v4 code.
+- Keep one control-flow owner: an Effect-returning function is not `async`; never use JavaScript `try/catch` around `yield*` or round-trip through Effect runners and Promises.
+- Use `Effect.fn("name")` for named Effect functions and `Effect.gen` for local sequential composition. Use `return yield*` for terminal Effects.
+- Wrap foreign throws, rejections, and callbacks once with the matching Effect constructor; preserve cancellation at the boundary.
+- Use `Schema.TaggedError` for expected errors in new v4 code. Translate once, recover by tag when possible, and never catch merely to log and rethrow.
 - Decode untrusted input once at the edge with the project's schema boundary; keep domain values typed thereafter.
-- Model expected failures in the Effect error channel with actionable context; do not hide them in defects or broad catches.
-- Make resource ownership, interruption, timeout, and cleanup explicit with scoped patterns.
-- Test observable success, failure, and interruption deterministically; prefer real or in-memory edges before mocks.
-- Add Layers, services, dependencies, or abstractions only for a concrete boundary or reuse need.
+- Keep pure logic pure. Add Layers, services, state primitives, dependencies, or abstractions only for a concrete capability, lifecycle, concurrency, or replacement need.
+- Compose and run at application or host boundaries; never leave Effects or fibers floating.
+- Make resource ownership, interruption, timeout, retry, and cleanup explicit with scoped Effect patterns.
+- Run TypeScript and `@effect/tsgo` diagnostics separately; fix Effect diagnostic findings instead of suppressing them without source-backed justification.
+- Test observable success, typed failure, interruption, and cleanup deterministically; prefer real or in-memory edges before mocks.
 
 ## Required follow-up reads
 
 |Need|Read|When|
 |---|---|---|
 |Bun, TypeScript 7, and Effect v4 application policy|`references/application-engineering.md`|Creating or materially changing user-owned Effect code|
+|Effect composition, errors, services, resources, and anti-slop review|`references/code-quality.md`|Creating, materially changing, refactoring, or reviewing Effect code|
 |Dated tool/package snapshot|`references/mcporter-tools.md`|Broad package coverage or targeted live-schema failure; not for a known recipe|

@@ -1,6 +1,6 @@
 # Effect application engineering
 
-Read this reference when creating or materially changing a user-owned Effect application. Also load the TypeScript skill and read `references/bun-application.md` from that skill. The TypeScript reference owns Bun, TypeScript 7, ESM, Oxc, and `bun:test`; this reference owns Effect.
+Read this reference when creating or materially changing a user-owned Effect application. Also read `code-quality.md`, load the TypeScript skill, and read `references/bun-application.md` from that skill. The TypeScript reference owns Bun, TypeScript 7, ESM, Oxc, and `bun:test`; this reference owns Effect.
 
 ## Version and source policy
 
@@ -74,11 +74,11 @@ Keep runtime-specific APIs behind Effect services and platform Layers. Keep doma
 
 Use `Effect.acquireRelease`, `Scope`, and scoped Layers for resources that must close. Make ownership, interruption, timeout, retry, and cleanup explicit.
 
-Use `Effect.tryPromise` or the current v4 constructor when wrapping Promise APIs. Pass cancellation signals through supported boundaries.
+Use `Effect.tryPromise` or the current v4 constructor when wrapping Promise APIs. Pass cancellation signals through supported boundaries. Do not make an Effect-returning function `async` or wrap a yielded Effect in JavaScript `try/catch`.
 
-Represent expected failures in the Effect error channel. Preserve actionable context. Do not use exceptions as the normal domain-error mechanism, hide expected failures as defects, or swallow failures in broad catches.
+Represent expected failures in the Effect error channel. Preserve actionable context. Translate external failures once; recover selectively by tag. Do not use exceptions as the normal domain-error mechanism, hide expected failures as defects, swallow failures in broad catches, or catch merely to log and rethrow.
 
-Do not leave Effects floating. Yield, compose, return, assign intentionally, or run every Effect. Do not call `Effect.runPromise`, `Effect.runSync`, or equivalent runners inside business logic.
+Do not leave Effects floating. Yield, compose, return, or intentionally assign every Effect; use `return yield*` for terminal Effects. Do not call `Effect.runPromise`, `Effect.runSync`, or equivalent runners inside business logic, and never bounce an Effect through a Promise and back into Effect.
 
 For a standalone Bun application, run the final program at the process boundary with the current `BunRuntime.runMain` API. A host framework such as Pi owns its process; follow that host's boundary policy instead of installing another main runtime.
 
@@ -153,7 +153,7 @@ Before coding:
 1. Define the requested outcome and acceptance criteria.
 2. Inspect the project versions, installed exports, declarations, and nearest working code.
 3. Inspect matching vendored Effect source, `LLMS.md`, `MIGRATION.md`, tests, and examples.
-4. Use live Effect v4 documentation for API questions.
+4. Read `code-quality.md` and use live Effect v4 documentation for API questions.
 5. State the smallest architecture, services, Layers, and dependencies for non-trivial work.
 6. Add or update a failing test first when the behavior has a cheap local test path.
 
@@ -165,8 +165,9 @@ While coding:
 4. Do not invent Effect APIs from memory.
 5. Preserve existing user changes and avoid unrelated files.
 6. Add no compatibility shim, fallback, abstraction, or package without a current caller or failure mode.
+7. Keep Effect sequencing, typed failures, concurrency, and resource ownership inside Effect; bridge foreign control flow once at the edge.
 
-After coding, run the TypeScript skill's gates plus:
+After coding, perform the mandatory review pass in `code-quality.md`, then run the TypeScript skill's gates plus:
 
 ```text
 bun run effect:diagnostics
