@@ -378,23 +378,91 @@ test("cliproxy_committed_source_keeps_sessions_sticky_and_retries_the_full_pool"
   assert.deepEqual(config["streaming"], { "bootstrap-retries": 1 });
 });
 
-test("cliproxy_codex_aliases_override_responses_reasoning_shape", () => {
+test("cliproxy_codex_aliases_preserve_reasoning_and_fast_service_tiers", () => {
   const source = readFileSync(
     join(REPOSITORY_ROOT, "assets", "cliproxyapi", "config.yaml.tmpl"),
     "utf8",
   );
   const config = Bun.YAML.parse(source) as Record<string, any>;
+  const aliases = config["oauth-model-alias"]["codex"] as readonly Record<string, any>[];
   const rules = config["payload"]["override"] as readonly Record<string, any>[];
   const codexRules = rules.filter((rule) =>
     rule["models"].some((model: Record<string, unknown>) => model["protocol"] === "codex"),
   );
 
   assert.deepEqual(
-    codexRules.map((rule) => rule["params"]),
-    [{ "reasoning.effort": "high" }, { "reasoning.effort": "max" }],
+    aliases.filter((alias) =>
+      [
+        "nnn-gpt-5.6-luna-max",
+        "nnn-gpt-5.6-luna-max-fast",
+        "nnn-gpt-5.6-terra-max",
+        "nnn-gpt-5.6-terra-max-fast",
+      ].includes(alias["alias"]),
+    ),
+    [
+      {
+        name: "gpt-5.6-luna",
+        alias: "nnn-gpt-5.6-luna-max",
+        "display-name": "[nnn] GPT-5.6 Luna (Max)",
+        fork: true,
+        "force-mapping": true,
+      },
+      {
+        name: "gpt-5.6-luna",
+        alias: "nnn-gpt-5.6-luna-max-fast",
+        "display-name": "[nnn] GPT-5.6 Luna (Max) (Fast)",
+        fork: true,
+        "force-mapping": true,
+      },
+      {
+        name: "gpt-5.6-terra",
+        alias: "nnn-gpt-5.6-terra-max",
+        "display-name": "[nnn] GPT-5.6 Terra (Max)",
+        fork: true,
+        "force-mapping": true,
+      },
+      {
+        name: "gpt-5.6-terra",
+        alias: "nnn-gpt-5.6-terra-max-fast",
+        "display-name": "[nnn] GPT-5.6 Terra (Max) (Fast)",
+        fork: true,
+        "force-mapping": true,
+      },
+    ],
+  );
+  assert.deepEqual(
+    codexRules.filter((rule) =>
+      ["gpt-5.6-luna", "gpt-5.6-terra"].includes(rule["models"][0]["name"]),
+    ),
+    [
+      {
+        models: [{ name: "gpt-5.6-luna", protocol: "codex" }],
+        params: { "reasoning.effort": "max" },
+      },
+      {
+        models: [{ name: "gpt-5.6-terra", protocol: "codex" }],
+        params: { "reasoning.effort": "max" },
+      },
+    ],
+  );
+  assert.deepEqual(
+    codexRules.filter((rule) =>
+      ["nnn-gpt-5.6-luna-max-fast", "nnn-gpt-5.6-terra-max-fast"].includes(
+        rule["models"][0]["name"],
+      ),
+    ),
+    [
+      {
+        models: [{ name: "nnn-gpt-5.6-luna-max-fast", protocol: "codex" }],
+        params: { service_tier: "fast" },
+      },
+      {
+        models: [{ name: "nnn-gpt-5.6-terra-max-fast", protocol: "codex" }],
+        params: { service_tier: "fast" },
+      },
+    ],
   );
 });
-
 test("cliproxy_custom_aliases_use provider-native model and payload shapes", () => {
   const source = readFileSync(
     join(REPOSITORY_ROOT, "assets", "cliproxyapi", "config.yaml.tmpl"),
