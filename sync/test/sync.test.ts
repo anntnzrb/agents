@@ -1277,6 +1277,23 @@ setInterval(() => {}, 1_000);
     });
   });
 
+  test("run_sync_omp_ignores_runtime_session_sources when inferring dependencies", async () => {
+    await withTempDir(async (root) => {
+      const syncEnv = makeSyncEnv(root);
+      const agentsRoot = join(root, ".config", "agents");
+
+      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(
+        join(agentsRoot, "harnesses", "omp", "agent", "config.yml"),
+        "interruptMode: immediate\n",
+      );
+      writeFile(join(root, ".omp", "agent", "sessions", "poison.ts"), 'import "#sqlite";\n');
+
+      assert.equal(await call<boolean>(runSync, syncEnv), true);
+      assert.equal(exists(join(root, ".omp", "agent", "package.json")), false);
+    });
+  });
+
   test("read_package_manifest_dedupes_sources", async () => {
     await withTempDir(async (root) => {
       const path = join(root, "packages.json");

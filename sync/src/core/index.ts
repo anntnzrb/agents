@@ -302,7 +302,7 @@ async function runSyncHook(
           }
           return true;
         }
-        const success = await installExtensionDeps(hook.root, hook.timeoutMs);
+        const success = await installExtensionDeps(hook.root, hook.sourceRoot, hook.timeoutMs);
         if (success) {
           recordExtensionHookState(hook, extensionHookState ?? prepareExtensionHookState(hook));
         } else {

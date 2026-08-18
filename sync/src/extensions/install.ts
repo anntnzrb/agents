@@ -65,9 +65,14 @@ const needsNodeInstall = async (packageDir: string): Promise<boolean> => {
 const chooseInstaller = async (): Promise<string[] | undefined> =>
   (await commandExists("bun")) ? ["bun", "install"] : undefined;
 
-export const installExtensionDeps = async (root: string, timeoutMs: number): Promise<boolean> => {
+export const installExtensionDeps = async (
+  root: string,
+  sourceRoot: string,
+  timeoutMs: number,
+): Promise<boolean> => {
   const results: boolean[] = [];
-  for (const packageDir of await iterExtensionPackages(root)) {
+  for (const sourcePackageDir of await iterExtensionPackages(sourceRoot)) {
+    const packageDir = path.join(root, path.relative(sourceRoot, sourcePackageDir));
     if (!(await needsNodeInstall(packageDir))) {
       results.push(true);
       continue;
@@ -82,7 +87,7 @@ export const installExtensionDeps = async (root: string, timeoutMs: number): Pro
 
     results.push(await runInstall(command, packageDir, timeoutMs));
   }
-  results.push(await installInferredImportPackages(root, timeoutMs));
+  results.push(await installInferredImportPackages(root, timeoutMs, sourceRoot));
   return results.every(Boolean);
 };
 

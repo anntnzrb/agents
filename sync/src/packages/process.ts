@@ -36,10 +36,11 @@ export const installPackageDeps = async (dir: string, timeoutMs: number): Promis
 export const installInferredImportPackages = async (
   dir: string,
   timeoutMs: number,
+  sourceDir: string = dir,
 ): Promise<boolean> => {
   let missing: string[];
   try {
-    missing = missingPackageRoots(dir);
+    missing = missingPackageRoots(sourceDir);
   } catch (error) {
     console.error(`sync: dependency scan failed in ${dir}: ${panicMessage(error)}`);
     return false;
