@@ -6,6 +6,7 @@ import type {
 import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { Effect } from "effect";
 
 import { getCurrentMode, getModeBorderColor } from "./modes-core.ts";
 import { setRequestEditorRender } from "./modes-state.ts";
@@ -129,72 +130,66 @@ function collectUserPromptsFromEntries(entries: Array<unknown>): PromptEntry[] {
   return prompts;
 }
 
-function getSessionDirForCwd(cwd: string): string {
-  const safePath = `--${cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`;
-  return path.join(getGlobalAgentDir(), "sessions", safePath);
+const readTailEffect = (filePath: string): Effect.Effect<string> =>
+  Effect.acquireUseRelease(
+    Effect.tryPromise({
+      try: () => fs.open(filePath, "r"),
+      catch: () => undefined,
+    }).pipe(Effect.orElseSucceed(() => undefined)),
+    (handle) =>
+      Effect.tryPromise({
+        try: async () => {
+          if (!handle) return "";
+          const stat = await handle.stat();
+          const size = stat.size;
+          if (size <= 0) return "";
+          const readSize = Math.min(size, 64 * 1024);
+          const buffer = Buffer.alloc(readSize);
+          await handle.read(buffer, 0, readSize, size - readSize);
+          return buffer.toString("utf8");
+        },
+        catch: () => "",
+      }).pipe(Effect.orElseSucceed(() => "")),
+    (handle) => Effect.promise(() => handle?.close().catch(() => undefined)),
+  );
+
+async function readTail(filePath: string): Promise<string> {
+  return Effect.runPromise(readTailEffect(filePath));
 }
 
-async function readTail(
-  filePath: string,
-  maxBytes = 256 * 1024,
-): Promise<string> {
-  let fileHandle: fs.FileHandle | undefined;
-  try {
-    const stats = await fs.stat(filePath);
-    const size = stats.size;
-    const start = Math.max(0, size - maxBytes);
-    const length = size - start;
-    if (length <= 0) return "";
-
-    const buffer = Buffer.alloc(length);
-    fileHandle = await fs.open(filePath, "r");
-    const { bytesRead } = await fileHandle.read(buffer, 0, length, start);
-    if (bytesRead === 0) return "";
-    let chunk = buffer.subarray(0, bytesRead).toString("utf8");
-    if (start > 0) {
-      const firstNewline = chunk.indexOf("\n");
-      if (firstNewline !== -1) chunk = chunk.slice(firstNewline + 1);
-    }
-    return chunk;
-  } catch {
-    return "";
-  } finally {
-    await fileHandle?.close();
-  }
-}
-
-async function loadPromptHistoryForCwd(
-  cwd: string,
+const readPreviousSessionPromptsEffect = Effect.fn("readPreviousSessionPrompts")(function*(
+  sessionDir: string,
   excludeSessionFile?: string,
-): Promise<PromptEntry[]> {
-  const sessionDir = getSessionDirForCwd(path.resolve(cwd));
+): Effect.fn.Return<PromptEntry[], never> {
+  const prompts: PromptEntry[] = [];
   const resolvedExclude = excludeSessionFile
     ? path.resolve(excludeSessionFile)
     : undefined;
-  const prompts: PromptEntry[] = [];
 
-  let entries: Dirent[] = [];
-  try {
-    entries = await fs.readdir(sessionDir, { withFileTypes: true });
-  } catch {
-    return prompts;
-  }
+  const entries = yield* Effect.tryPromise({
+    try: () => fs.readdir(sessionDir, { withFileTypes: true }),
+    catch: () => [] as Dirent[],
+  }).pipe(Effect.orElseSucceed(() => [] as Dirent[]));
 
-  const files = await Promise.all(
+  if (entries.length === 0) return prompts;
+
+  const fileStats = yield* Effect.all(
     entries
       .filter((entry) => entry.isFile() && entry.name.endsWith(".jsonl"))
-      .map(async (entry) => {
+      .map((entry) => {
         const filePath = path.join(sessionDir, entry.name);
-        try {
-          const stats = await fs.stat(filePath);
-          return { filePath, mtimeMs: stats.mtimeMs };
-        } catch {
-          return undefined;
-        }
+        return Effect.tryPromise({
+          try: async () => {
+            const stats = await fs.stat(filePath);
+            return { filePath, mtimeMs: stats.mtimeMs };
+          },
+          catch: () => undefined,
+        }).pipe(Effect.orElseSucceed(() => undefined));
       }),
+    { concurrency: "unbounded" },
   );
 
-  const sortedFiles = files
+  const sortedFiles = fileStats
     .filter((file): file is { filePath: string; mtimeMs: number } =>
       Boolean(file),
     )
@@ -204,16 +199,15 @@ async function loadPromptHistoryForCwd(
     if (resolvedExclude && path.resolve(file.filePath) === resolvedExclude)
       continue;
 
-    const tail = await readTail(file.filePath);
+    const tail = yield* readTailEffect(file.filePath);
     if (!tail) continue;
     const lines = tail.split("\n").filter(Boolean);
     for (const line of lines) {
-      let entry: unknown;
-      try {
-        entry = JSON.parse(line);
-      } catch {
-        continue;
-      }
+      const entry = yield* Effect.try({
+        try: () => JSON.parse(line),
+        catch: () => null,
+      }).pipe(Effect.orElseSucceed(() => null));
+
       if (!entry || typeof entry !== "object") continue;
       if (!("type" in entry) || entry.type !== "message") continue;
       if (!("message" in entry)) continue;
@@ -238,6 +232,13 @@ async function loadPromptHistoryForCwd(
   }
 
   return prompts;
+});
+
+async function readPreviousSessionPrompts(
+  sessionDir: string,
+  excludeSessionFile?: string,
+): Promise<PromptEntry[]> {
+  return Effect.runPromise(readPreviousSessionPromptsEffect(sessionDir, excludeSessionFile));
 }
 
 function buildHistoryList(
@@ -277,45 +278,60 @@ function setEditor(
     const editor = new PromptEditor(tui, theme, keybindings);
     setRequestEditorRender(() => editor.requestRenderNow());
     editor.modeLabelProvider = () => getCurrentMode();
-    editor.modeLabelColor = (text: string) => ctx.ui.theme.fg("dim", text);
-    const borderColor = (text: string) => {
-      const isBashMode = editor.getText().trimStart().startsWith("!");
-      if (isBashMode) return ctx.ui.theme.getBashModeBorderColor()(text);
-      return getModeBorderColor(ctx, pi, getCurrentMode())(text);
+    editor.modeLabelColor = (text: string) => {
+      const mode = getCurrentMode();
+      const color = getModeBorderColor(mode);
+      return theme.fg(color, text);
     };
 
-    editor.borderColor = borderColor;
-    editor.lockBorderColor();
-    for (const prompt of history) {
-      editor.addToHistory?.(prompt.text);
-    }
+    editor.setHistory(history.map((entry) => entry.text));
     return editor;
   });
 }
 
-let loadCounter = 0;
+export function registerPromptHistoryEditor(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+): void {
+  const currentPrompts = collectUserPromptsFromEntries(
+    ctx.sessionManager.getEntries(),
+  );
+  let lastHistory = buildHistoryList(currentPrompts, []);
 
-export function applyEditor(pi: ExtensionAPI, ctx: ExtensionContext): void {
-  if (!ctx.hasUI) return;
-
-  const sessionFile = ctx.sessionManager.getSessionFile();
-  const currentEntries = ctx.sessionManager.getBranch();
-  const currentPrompts = collectUserPromptsFromEntries(currentEntries);
-  const immediateHistory = buildHistoryList(currentPrompts, []);
-
-  const currentLoad = ++loadCounter;
-  const initialText = ctx.ui.getEditorText();
-  setEditor(pi, ctx, immediateHistory);
+  setEditor(pi, ctx, lastHistory);
 
   void (async () => {
-    const previousPrompts = await loadPromptHistoryForCwd(
-      ctx.cwd,
-      sessionFile ?? undefined,
+    const sessionDir =
+      ctx.sessionManager.getSessionDir?.() ??
+      path.join(getGlobalAgentDir(), "sessions");
+    const sessionFile = ctx.sessionManager.getSessionFile();
+    const previousPrompts = await readPreviousSessionPrompts(
+      sessionDir,
+      sessionFile,
     );
-    if (currentLoad !== loadCounter) return;
-    if (ctx.ui.getEditorText() !== initialText) return;
-    const history = buildHistoryList(currentPrompts, previousPrompts);
-    if (historiesMatch(history, immediateHistory)) return;
-    setEditor(pi, ctx, history);
+    const nextHistory = buildHistoryList(currentPrompts, previousPrompts);
+    if (!historiesMatch(lastHistory, nextHistory)) {
+      lastHistory = nextHistory;
+      setEditor(pi, ctx, nextHistory);
+    }
   })();
+
+  pi.on("session_tree", async () => {
+    const treePrompts = collectUserPromptsFromEntries(
+      ctx.sessionManager.getEntries(),
+    );
+    const sessionDir =
+      ctx.sessionManager.getSessionDir?.() ??
+      path.join(getGlobalAgentDir(), "sessions");
+    const sessionFile = ctx.sessionManager.getSessionFile();
+    const previousPrompts = await readPreviousSessionPrompts(
+      sessionDir,
+      sessionFile,
+    );
+    const nextHistory = buildHistoryList(treePrompts, previousPrompts);
+    if (!historiesMatch(lastHistory, nextHistory)) {
+      lastHistory = nextHistory;
+      setEditor(pi, ctx, nextHistory);
+    }
+  });
 }

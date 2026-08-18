@@ -1,5 +1,8 @@
 {
   "name": "@agents/pi-extensions",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "effect": "4.0.0-rc.110"
+  }
 }

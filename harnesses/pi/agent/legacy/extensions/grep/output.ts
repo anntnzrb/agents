@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import { Effect, Schema } from "effect";
 import type { RawMatch } from "./logic.js";
 
 export const GREP_MAX_LINE_LENGTH = 500;
@@ -14,30 +15,33 @@ const truncateLineForOutput = (
   };
 };
 
-const readFileLinesCached = async (
+const readFileLinesCachedEffect = (
   cache: Map<string, string[]>,
   absolutePath: string,
-): Promise<string[]> => {
-  const existing = cache.get(absolutePath);
-  if (existing) return existing;
-  try {
-    const content = await fs.readFile(absolutePath, "utf8");
-    const lines = content
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n")
-      .split("\n");
+): Effect.Effect<string[]> =>
+  Effect.gen(function*() {
+    const existing = cache.get(absolutePath);
+    if (existing) return existing;
+    const lines = yield* Effect.tryPromise({
+      try: () => fs.readFile(absolutePath, "utf8"),
+      catch: () => "",
+    }).pipe(
+      Effect.map((content) =>
+        content
+          .replace(/\r\n/g, "\n")
+          .replace(/\r/g, "\n")
+          .split("\n"),
+      ),
+      Effect.orElseSucceed(() => []),
+    );
     cache.set(absolutePath, lines);
     return lines;
-  } catch {
-    cache.set(absolutePath, []);
-    return [];
-  }
-};
+  });
 
-export const formatMatches = async (
+export const formatMatchesEffect = Effect.fn("formatMatches")(function*(
   matches: RawMatch[],
   contextLines: number,
-): Promise<{ output: string; linesTruncated: boolean }> => {
+): Effect.fn.Return<{ output: string; linesTruncated: boolean }, never> {
   if (matches.length === 0) return { output: "", linesTruncated: false };
   let linesTruncated = false;
   const outputLines: string[] = [];
@@ -53,7 +57,7 @@ export const formatMatches = async (
   }
 
   for (const match of matches) {
-    const lines = await readFileLinesCached(fileCache, match.absolutePath);
+    const lines = yield* readFileLinesCachedEffect(fileCache, match.absolutePath);
     if (lines.length === 0) {
       outputLines.push(
         `${match.displayPath}:${match.lineNumber}: (unable to read file)`,
@@ -75,4 +79,10 @@ export const formatMatches = async (
   }
 
   return { output: outputLines.join("\n"), linesTruncated };
-};
+});
+
+export const formatMatches = (
+  matches: RawMatch[],
+  contextLines: number,
+): Promise<{ output: string; linesTruncated: boolean }> =>
+  Effect.runPromise(formatMatchesEffect(matches, contextLines));

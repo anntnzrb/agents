@@ -5,6 +5,7 @@ import type {
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { Effect, Schema } from "effect";
 
 import {
   CUSTOM_MODE_NAME,
@@ -61,62 +62,130 @@ async function getMtimeMs(filePath: string): Promise<number | null> {
   }
 }
 
+const sleepEffect = (ms: number): Effect.Effect<void> =>
+  Effect.sleep(ms);
+
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return Effect.runPromise(sleepEffect(ms));
 }
 
 function getLockPathForFile(filePath: string): string {
   return `${filePath}.lock`;
 }
 
+export class FileLockError extends Schema.TaggedError<FileLockError>()(
+  "FileLockError",
+  {
+    path: Schema.String,
+    message: Schema.String,
+    cause: Schema.optional(Schema.Unknown),
+  },
+) {}
+
+const withFileLockEffect = <T, E>(
+  filePath: string,
+  fn: () => Effect.Effect<T, E>,
+): Effect.Effect<T, FileLockError | E> =>
+  Effect.gen(function*() {
+    const lockPath = getLockPathForFile(filePath);
+    yield* Effect.tryPromise({
+      try: () => ensureDirForFile(lockPath),
+      catch: (cause) =>
+        new FileLockError({
+          path: lockPath,
+          message: `Unable to create directory for lock: ${lockPath}`,
+          cause,
+        }),
+    });
+
+    const start = Date.now();
+    while (true) {
+      const openResult = yield* Effect.tryPromise({
+        try: async () => {
+          const handle = await fs.open(lockPath, "wx");
+          try {
+            await handle.writeFile(
+              JSON.stringify({
+                pid: process.pid,
+                createdAt: new Date().toISOString(),
+              }) + "\n",
+              "utf8",
+            );
+          } catch {
+            // ignore
+          }
+          return handle;
+        },
+        catch: (cause) =>
+          new FileLockError({
+            path: lockPath,
+            message: `Failed to open file lock for ${lockPath}`,
+            cause,
+          }),
+      }).pipe(
+        Effect.map((handle) => ({ ok: true as const, handle })),
+        Effect.catch((error) => Effect.succeed({ ok: false as const, error })),
+      );
+
+      if (openResult.ok) {
+        const handle = openResult.handle;
+        return yield* Effect.acquireUseRelease(
+          Effect.succeed(handle),
+          () => fn(),
+          (h) =>
+            Effect.promise(async () => {
+              await h.close().catch(() => {});
+              await fs.unlink(lockPath).catch(() => {});
+            }),
+        );
+      }
+
+      const error = openResult.error;
+      if (!isErrorCode(error.cause, "EEXIST")) {
+        return yield* error;
+      }
+
+      const stats = yield* Effect.tryPromise({
+        try: () => fs.stat(lockPath),
+        catch: () => undefined,
+      }).pipe(Effect.orElseSucceed(() => undefined));
+
+      if (stats && Date.now() - stats.mtimeMs > 30_000) {
+        yield* Effect.tryPromise({
+          try: () => fs.unlink(lockPath),
+          catch: () => undefined,
+        }).pipe(Effect.orElseSucceed(() => undefined));
+        continue;
+      }
+
+      if (Date.now() - start > 5_000) {
+        return yield* new FileLockError({
+          path: lockPath,
+          message: `Timed out waiting for lock: ${lockPath}`,
+        });
+      }
+
+      yield* sleepEffect(40 + Math.random() * 80);
+    }
+  });
+
 async function withFileLock<T>(
   filePath: string,
   fn: () => Promise<T>,
 ): Promise<T> {
-  const lockPath = getLockPathForFile(filePath);
-  await ensureDirForFile(lockPath);
-
-  const start = Date.now();
-  while (true) {
-    try {
-      const handle = await fs.open(lockPath, "wx");
-      try {
-        await handle.writeFile(
-          JSON.stringify({
-            pid: process.pid,
-            createdAt: new Date().toISOString(),
-          }) + "\n",
-          "utf8",
-        );
-      } catch {
-        // ignore
-      }
-
-      try {
-        return await fn();
-      } finally {
-        await handle.close().catch(() => {});
-        await fs.unlink(lockPath).catch(() => {});
-      }
-    } catch (error: unknown) {
-      if (!isErrorCode(error, "EEXIST")) throw error;
-
-      try {
-        const stats = await fs.stat(lockPath);
-        if (Date.now() - stats.mtimeMs > 30_000) {
-          await fs.unlink(lockPath);
-          continue;
-        }
-      } catch {
-        // ignore
-      }
-
-      if (Date.now() - start > 5_000) {
-        throw new Error(`Timed out waiting for lock: ${lockPath}`);
-      }
-      await sleep(40 + Math.random() * 80);
-    }
-  }
+  return Effect.runPromise(
+    withFileLockEffect(filePath, () =>
+      Effect.tryPromise({
+        try: fn,
+        catch: (cause) =>
+          new FileLockError({
+            path: filePath,
+            message: `Failed to execute locked action for ${filePath}`,
+            cause,
+          }),
+      }),
+    ),
+  );
 }
 
 function isErrorCode(error: unknown, code: string): boolean {

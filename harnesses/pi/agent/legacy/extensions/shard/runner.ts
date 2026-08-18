@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { Effect } from "effect";
 import type { Message } from "@earendil-works/pi-ai";
 import type { InheritedCliArgs } from "./cli.js";
 import { buildPiArgs, formatModelArg, getPiInvocation } from "./cli.js";
@@ -384,24 +385,19 @@ export const mapConcurrent = async <TIn, TOut>(
   fn: (item: TIn, index: number) => Promise<TOut>,
 ): Promise<TOut[]> => {
   if (items.length === 0) return [];
-
   const limit = Math.max(1, Math.min(concurrency, items.length));
-  const results = new Array<TOut>(items.length);
-  let nextIndex = 0;
 
-  const workers = Array.from({ length: limit }, async () => {
-    while (true) {
-      const currentIndex = nextIndex;
-      nextIndex += 1;
-      if (currentIndex >= items.length) return;
-      const item = items[currentIndex];
-      if (item === undefined) return;
-      results[currentIndex] = await fn(item, currentIndex);
-    }
-  });
-
-  await Promise.all(workers);
-  return results;
+  return Effect.runPromise(
+    Effect.all(
+      items.map((item, index) =>
+        Effect.tryPromise({
+          try: () => fn(item, index),
+          catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+        }),
+      ),
+      { concurrency: limit },
+    ),
+  );
 };
 
 export const runChildTask = async (input: {
