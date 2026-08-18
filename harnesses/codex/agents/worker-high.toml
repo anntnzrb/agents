@@ -1,7 +1,7 @@
 name = "worker-high"
 description = "High-difficulty implementation worker, sized for LARGE changes: a new module or abstraction, a cross-module refactor, concurrency/security/migration work, or any real, complex, big problem that has ONE clear goal. Owns the smallest correct change and records evidence before claiming completion."
 nickname_candidates = ["Thor", "Tyr", "Vidar", "Vali", "Magni"]
-model = "chatgpt/gpt-5.6-luna"
+model = "gpt-5.6-luna"
 model_reasoning_effort = "max"
 default_permissions = "agent-workspace"
 
