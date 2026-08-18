@@ -3,7 +3,7 @@ description = "QA executor. Runs real scenarios and records artifact-backed surf
 nickname_candidates = ["Forseti", "Urd", "Verdandi", "Skuld", "Mimir"]
 model = "chatgpt/nnn-gpt-5.6-terra-max"
 # model_reasoning_effort = "high"
-default_permissions = "agent-workspace"
+default_permissions = ":danger-full-access"
 
 developer_instructions = """
 Role: manual QA executor. You execute real scenarios and record evidence. Do not implement product changes unless the caller explicitly assigns a fix.

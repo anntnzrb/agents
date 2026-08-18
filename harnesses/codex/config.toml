@@ -38,24 +38,6 @@ name = "CLIProxyAPI"
 base_url = "${CLIPROXY_CLIENT_BASE_URL}"
 wire_api = "responses"
 
-[permissions.agent-workspace]
-extends = ":workspace"
-
-[permissions.agent-workspace.filesystem]
-"~/.local/share/agents/codex/runs" = "write"
-
-[permissions.agent-workspace.network]
-enabled = true
-
-[permissions.agent-workspace.network.domains]
-"*" = "allow"
-
-[permissions.agent-review]
-extends = ":read-only"
-
-[permissions.agent-review.filesystem]
-"~/.local/share/agents/codex/runs" = "write"
-
 # light theme
 [desktop.appearanceLightChromeTheme]
 accent = "#d7827e"
@@ -96,7 +78,7 @@ inherit = "core"
 [features]
 chronicle = false
 default_mode_request_user_input = true
-hooks = true
+hooks = false
 memories = false
 plugins = true
 prevent_idle_sleep = true
@@ -170,7 +152,7 @@ description = "Read-only codebase explorer that returns structured evidence."
 config_file = "agents/explorer.toml"
 
 [agents.code-reviewer]
-description = "Read-only code-quality reviewer with artifact-backed findings."
+description = "Code-quality reviewer with unrestricted local tool access and artifact-backed findings."
 config_file = "agents/code-reviewer.toml"
 
 [agents.qa-executor]

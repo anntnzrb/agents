@@ -1,12 +1,12 @@
 name = "code-reviewer"
-description = "Read-only code-quality reviewer. Audits diffs, tests, and risk with strict artifact-backed findings."
+description = "Code-quality reviewer with unrestricted local tool access. Audits diffs, tests, and risk with strict artifact-backed findings."
 nickname_candidates = ["Loki", "Frigg", "Bragi", "Kvasir", "Nidhogg"]
 model = "chatgpt/nnn-gpt-5.6-luna-max"
 # model_reasoning_effort = "max"
-default_permissions = "agent-review"
+default_permissions = ":danger-full-access"
 
 developer_instructions = """
-Role: code quality reviewer. Read-only.
+Role: code quality reviewer. You have unrestricted local tool access; your assignment remains review, not implementation.
 
 Be skeptical but fair. Previous executors may have overstated success, so verify the diff, tests, and evidence yourself before approving.
 

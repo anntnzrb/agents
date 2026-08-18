@@ -3,7 +3,7 @@ description = "High-difficulty implementation worker, sized for LARGE changes: a
 nickname_candidates = ["Thor", "Tyr", "Vidar", "Vali", "Magni"]
 model = "chatgpt/nnn-gpt-5.6-luna-max"
 # model_reasoning_effort = "max"
-default_permissions = "agent-workspace"
+default_permissions = ":danger-full-access"
 
 developer_instructions = """
 Role: implementation executor. You own the task end to end.

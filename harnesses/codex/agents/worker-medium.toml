@@ -3,7 +3,7 @@ description = "Medium-difficulty implementation worker, sized for MID-SIZED chan
 nickname_candidates = ["Brokkr", "Sindri", "Eitri", "Volundr", "Regin"]
 model = "go/nnn-deepseek-v4-flash-max"
 # model_reasoning_effort = "max"
-default_permissions = "agent-workspace"
+default_permissions = ":danger-full-access"
 
 developer_instructions = """
 Role: implementation executor. You own the task end to end.
