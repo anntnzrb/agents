@@ -731,7 +731,7 @@ setInterval(() => {}, 1_000);
       }>(buildSyncPlan, syncEnv);
 
       const packageHook = syncPlan.hooks.find((hook) => hook["kind"] === "PackageBootstrap");
-      const extensionHook = syncPlan.hooks.find((hook) => hook["kind"] === "ExtensionDeps");
+      const extensionHooks = syncPlan.hooks.filter((hook) => hook["kind"] === "ExtensionDeps");
 
       assert.ok(packageHook);
       assert.equal(
@@ -747,8 +747,14 @@ setInterval(() => {}, 1_000);
         join(root, ".local", "share", "agents", "pi-packages"),
       );
 
-      assert.ok(extensionHook);
-      assert.equal(extensionHook!["root"], join(root, ".pi", "agent", "extensions"));
+      assert.deepEqual(
+        extensionHooks.map((hook) => [(hook["harness"] as { id: string }).id, hook["root"]]),
+        [
+          ["opencode", join(root, ".config", "opencode")],
+          ["pi", join(root, ".pi", "agent", "extensions")],
+          ["omp", join(root, ".omp", "agent")],
+        ],
+      );
     });
   });
 

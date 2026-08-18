@@ -70,6 +70,12 @@ export const HARNESS_ADAPTERS = [
       package: "opencode-ai",
       bin: "opencode",
     },
+    hooks: [
+      {
+        kind: "ExtensionDeps",
+        rootDir: ".",
+      },
+    ],
   },
   {
     id: "pi",
@@ -103,6 +109,12 @@ export const HARNESS_ADAPTERS = [
       bin: "omp",
     },
     runtimeSubdir: "agent",
+    hooks: [
+      {
+        kind: "ExtensionDeps",
+        rootDir: ".",
+      },
+    ],
   },
 ] as const satisfies readonly HarnessAdapter[];
 
