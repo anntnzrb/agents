@@ -1,8 +1,12 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readModelCatalog } from "@runtime/model-catalog-client.ts";
+import {
+  parseModelCatalog,
+  type RuntimeCatalogModel,
+  readModelCatalog,
+} from "@runtime/model-catalog-client.ts";
 
 test("installed_runtime_model_catalog_client_validates_and_projects_catalog", () => {
   const root = mkdtempSync(join(tmpdir(), "agents-runtime-catalog-test-"));
@@ -52,7 +56,7 @@ test("installed_runtime_model_catalog_client_validates_and_projects_catalog", ()
       }),
     );
 
-    expect(readModelCatalog(path)).toEqual([
+    const expected: readonly RuntimeCatalogModel[] = [
       {
         id: "example/model",
         name: "Example",
@@ -83,7 +87,10 @@ test("installed_runtime_model_catalog_client_validates_and_projects_catalog", ()
         contextWindow: 128000,
         maxTokens: 32000,
       },
-    ]);
+    ];
+
+    expect(parseModelCatalog(readFileSync(path, "utf8"), path)).toEqual(expected);
+    expect(readModelCatalog(path)).toEqual(expected);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -20,9 +20,19 @@ export interface RuntimeCatalogModel {
 }
 
 export function readModelCatalog(path: string): readonly RuntimeCatalogModel[] {
+  let content: string;
+  try {
+    content = fs.readFileSync(path, "utf8");
+  } catch (error) {
+    throw new Error(`read model catalog ${path}`, { cause: error });
+  }
+  return parseModelCatalog(content, path);
+}
+
+export function parseModelCatalog(content: string, path: string): readonly RuntimeCatalogModel[] {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(fs.readFileSync(path, "utf8"));
+    parsed = JSON.parse(content);
   } catch (error) {
     throw new Error(`read model catalog ${path}`, { cause: error });
   }
