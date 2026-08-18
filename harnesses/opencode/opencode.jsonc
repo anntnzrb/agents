@@ -9,7 +9,7 @@
   "small_model": "cliproxy/antigravity/nnn-gemini-3.7-flash-medium",
 
   // main agent (build)
-  "model": "cliproxy/chatgpt/nnn-gpt-5.6-sol-high",
+  "model": "cliproxy/chatgpt/nnn-gpt-5.6-terra-max",
 
   /* **************************************************************************
    * PLUGINS
@@ -38,7 +38,7 @@
 
   "agent": {
     "build": {
-      "model": "cliproxy/chatgpt/nnn-gpt-5.6-sol-high",
+      "model": "cliproxy/chatgpt/nnn-gpt-5.6-terra-max",
       // "variant": "high",
       // "options": {
       //   "reasoningEffort": "high",
