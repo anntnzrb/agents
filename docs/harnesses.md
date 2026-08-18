@@ -28,7 +28,7 @@ Sync publishes `assets/AGENTS.md`, `skills/current/`, and shared asset directori
 Adapters can declare these hooks:
 
 - `PackageBootstrap` prepares packages from the adapter's source manifest and updates runtime settings.
-- `ExtensionDeps` installs dependencies for generated extensions when the hook inputs change.
+- `ExtensionDeps` installs dependencies for generated TypeScript extensions and plugins when the hook inputs change. Runtime imports belong in the generated root's committed `package.json`; the hook preserves its generated `node_modules` and lockfile while the source fingerprint is unchanged.
 
 ## CLIProxyAPI integration
 
