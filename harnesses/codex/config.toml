@@ -32,11 +32,6 @@ Use direct commands and edits when they are the smallest or fastest in-scope pat
 When local read tools are unavailable, delegate filesystem inspection to the registered explorer agent.
 """
 
-[model_providers.cliproxy]
-name = "CLIProxyAPI"
-base_url = "${CLIPROXY_CLIENT_BASE_URL}"
-wire_api = "responses"
-
 [permissions.agent-workspace]
 extends = ":workspace"
 
