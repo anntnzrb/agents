@@ -35,7 +35,7 @@ function interruptBackgroundFibers() {
   backgroundFibers.clear();
 }
 
-const sendRequestAttemptEffect = (request: unknown): Effect.Effect<boolean> => {
+const sendRequestAttemptEffect = Effect.fn("sendRequestAttempt")((request: unknown) => {
   if (!enabled()) return Effect.succeed(true);
 
   return Effect.callback<boolean>((resume) => {
@@ -64,7 +64,7 @@ const sendRequestAttemptEffect = (request: unknown): Effect.Effect<boolean> => {
       socket.destroy();
     });
   });
-};
+});
 
 const timeoutAsFalse = (duration: string) =>
   Effect.timeoutOrElse({
@@ -72,7 +72,7 @@ const timeoutAsFalse = (duration: string) =>
     orElse: () => Effect.succeed(false),
   });
 
-const sendRequestNowEffect = (request: unknown): Effect.Effect<void> =>
+const sendRequestNowEffect = Effect.fn("sendRequestNow")((request: unknown) =>
   requestSemaphore.withPermit(
     sendRequestAttemptEffect(request).pipe(
       timeoutAsFalse("500 millis"),
@@ -85,7 +85,8 @@ const sendRequestNowEffect = (request: unknown): Effect.Effect<void> =>
             ),
       ),
     ),
-  );
+  ),
+);
 
 type AgentState = "working" | "blocked" | "idle";
 
@@ -163,7 +164,7 @@ function currentSessionRef(): Record<string, unknown> | undefined {
   return undefined;
 }
 
-const reportSessionEffect = (sessionStartSource = "startup"): Effect.Effect<void> => {
+const reportSessionEffect = Effect.fn("reportSession")((sessionStartSource = "startup") => {
   const sessionRef = currentSessionRef();
   if (!sessionRef) {
     return Effect.void;
@@ -181,17 +182,17 @@ const reportSessionEffect = (sessionStartSource = "startup"): Effect.Effect<void
       ...sessionRef,
     },
   });
-};
+});
 
 function reportSession(sessionStartSource = "startup") {
   return runBackground(reportSessionEffect(sessionStartSource));
 }
 
-const sendStateEffect = (
+const sendStateEffect = Effect.fn("sendState")((
   state: AgentState,
   message?: string,
   seq = nextReportSeq(),
-): Effect.Effect<void> =>
+) =>
   sendRequestNowEffect({
     id: `${source}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
     method: "pane.report_agent",
@@ -203,7 +204,8 @@ const sendStateEffect = (
       message,
       seq,
     }),
-  });
+  }),
+);
 
 let stateDrainFiber;
 let queuedState: QueuedState | undefined;

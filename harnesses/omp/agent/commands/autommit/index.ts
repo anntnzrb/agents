@@ -78,14 +78,13 @@ const locatePackageRootEffect = Effect.fn("locatePackageRoot")(function*(): Effe
     OmpPackageRootNotFoundError
 > {
     for (const path of PACKAGE_ROOT_HINTS) {
-        const check = yield* Effect.promise(async () => {
-            try {
-                await access(resolve(path, "src", "index.ts"));
-                return true;
-            } catch {
-                return false;
-            }
-        });
+        const check = yield* Effect.tryPromise({
+            try: () => access(resolve(path, "src", "index.ts")),
+            catch: () => false,
+        }).pipe(
+            Effect.as(true),
+            Effect.orElseSucceed(() => false),
+        );
         if (check) return path;
     }
     return yield* new OmpPackageRootNotFoundError({
@@ -93,11 +92,11 @@ const locatePackageRootEffect = Effect.fn("locatePackageRoot")(function*(): Effe
     });
 });
 
-const locatePackageRoot = (): string => Effect.runSync(locatePackageRootEffect());
+const locatePackageRoot = (): Promise<string> => Effect.runPromise(locatePackageRootEffect());
 
 // OMP loads custom commands outside package module resolution, so hidden commit modules must be loaded by source path.
 const loadInternal = async <T>(relativePath: string): Promise<T> =>
-    (await import(pathToFileURL(resolve(locatePackageRoot(), "src", relativePath)).href)) as T;
+    (await import(pathToFileURL(resolve(await locatePackageRoot(), "src", relativePath)).href)) as T;
 const loadCommitInternals = async (git: CommitInternals["git"]): Promise<CommitInternals> => {
     const [tools, resolver, lockFiles, topoSort, validation, utils, diffParser] = await Promise.all([
         loadInternal<Pick<CommitInternals, "createCommitTools">>("commit/agentic/tools/index.ts"),

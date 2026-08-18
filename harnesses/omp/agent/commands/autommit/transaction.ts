@@ -142,11 +142,12 @@ const makePaths = (commonDir: string): Paths => {
     };
 };
 
-const makePathsEffect = (commonDir: string): Effect.Effect<Paths, AutommitPathError> =>
+const makePathsEffect = Effect.fn("makePaths")((commonDir: string) =>
     Effect.try({
         try: () => makePaths(commonDir),
         catch: (error) => pathError("Invalid Git commonDir", String(commonDir), error),
-    });
+    }),
+);
 
 const ensureCommonDirectoryEffect = Effect.fn("ensureCommonDirectory")(function*(
     paths: Paths,
@@ -503,7 +504,15 @@ const releaseOperationLockEffect = Effect.fn("releaseOperationLock")(function*(
     if (!isFile) return;
 
     const readAttempt = yield* readBoundedTextEffect(paths.lock, MAX_LOCK_BYTES).pipe(
-        Effect.map((text) => parseLockOwner(parseJson(text, paths.lock))),
+        Effect.flatMap((text) =>
+            Effect.try({
+                try: () => parseLockOwner(parseJson(text, paths.lock)),
+                catch: (error) =>
+                    error instanceof AutommitPathError
+                        ? error
+                        : pathError("Invalid Autommit operation lock", paths.lock, error),
+            }),
+        ),
         Effect.orElseSucceed(() => null),
     );
 
@@ -524,11 +533,10 @@ const releaseOperationLockEffect = Effect.fn("releaseOperationLock")(function*(
     });
 });
 
-export const withOperationLockEffect = <T, E>(
+export const withOperationLockEffect = Effect.fn("withOperationLock")(function*<T, E>(
     commonDir: string,
     effectFn: () => Effect.Effect<T, E>,
-): Effect.Effect<T, AutommitTransactionError | E> =>
-    Effect.gen(function*() {
+): Effect.fn.Return<T, AutommitTransactionError | E> {
         const paths = yield* makePathsEffect(commonDir);
         yield* ensureAutommitDirectoryEffect(paths);
         const owner: LockOwner = { pid: process.pid, token: makeToken() };
