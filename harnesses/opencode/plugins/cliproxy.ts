@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -19,7 +20,10 @@ export interface OpenCodeCatalogModel {
 }
 
 interface CatalogModule {
-  readonly readModelCatalog: (path: string) => readonly OpenCodeCatalogModel[];
+  readonly parseModelCatalog: (
+    content: string,
+    path: string,
+  ) => readonly OpenCodeCatalogModel[];
 }
 
 const CATALOG_PATH = join(
@@ -64,8 +68,17 @@ export const CLIProxyCatalog = async () => ({
     if (!provider) {
       return;
     }
-    const { readModelCatalog } = (await import(CATALOG_MODULE)) as CatalogModule;
-    provider.models = mergeOpenCodeModels(readModelCatalog(CATALOG_PATH), provider.models ?? {});
+    const { parseModelCatalog } = (await import(CATALOG_MODULE)) as CatalogModule;
+    let content: string;
+    try {
+      content = await readFile(CATALOG_PATH, "utf8");
+    } catch (error) {
+      throw new Error(`read model catalog ${CATALOG_PATH}`, { cause: error });
+    }
+    provider.models = mergeOpenCodeModels(
+      parseModelCatalog(content, CATALOG_PATH),
+      provider.models ?? {},
+    );
   },
 });
 
