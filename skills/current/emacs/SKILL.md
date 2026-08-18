@@ -1,6 +1,6 @@
 ---
 name: emacs
-description: Inspect, configure, debug, or automate Emacs, Emacs Lisp, init.el, packages, and runtime state.
+description: "Use when Emacs, Emacs Lisp, init.el, packages, keybindings, automation, or runtime state are involved."
 license: AGPL-3.0-or-later
 compatibility: Requires `emacsclient` and `uv`. Best with a running Emacs server. `info` preferred for manuals; `rg` recommended for installed docs/source lookup.
 metadata:

@@ -1,6 +1,6 @@
 ---
 name: java-oop-assignment
-description: Complete Java OOP/FOP assignments from PDF specifications with minimal compliant code.
+description: "Use when completing a Java OOP or FOP assignment from a PDF specification with minimal compliant code."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

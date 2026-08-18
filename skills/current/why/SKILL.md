@@ -1,6 +1,6 @@
 ---
 name: why
-description: "Use for 'why was this built this way': query git history, PRs, issues, and docs in parallel, then cite the evidence."
+description: "Use when the user asks why code was built a certain way and the answer requires Git, PR, issue, or doc history."
 license: AGPL-3.0-or-later
 ---
 

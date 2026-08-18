@@ -1,6 +1,6 @@
 ---
 name: typescript
-description: "Develop and debug TypeScript: TS 5.x, tsconfig, modules, toolchains, monorepos, types, and tests."
+description: "Use whenever TypeScript, TS, .ts files, tsconfig, Bun, Node.js, ESM, type errors, or TS tooling are involved."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

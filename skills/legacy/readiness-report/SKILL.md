@@ -1,6 +1,6 @@
 ---
 name: readiness-report
-description: Assess a codebase's readiness for autonomous AI development and identify maturity gaps.
+description: "Use when the user asks whether a codebase is ready for autonomous AI development or wants a maturity-gap report."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

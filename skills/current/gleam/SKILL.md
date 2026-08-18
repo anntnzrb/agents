@@ -1,6 +1,6 @@
 ---
 name: gleam
-description: Develop and debug Gleam, gleam.toml, BEAM/Erlang projects, TDD, and type-driven code.
+description: "Use when Gleam, gleam.toml, BEAM, Erlang interop, TDD, or type-driven Gleam code are involved."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

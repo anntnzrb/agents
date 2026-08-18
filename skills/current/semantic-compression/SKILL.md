@@ -1,6 +1,6 @@
 ---
 name: semantic-compression
-description: Compress prompts or documents aggressively while preserving meaning for LLM consumption.
+description: "Use when prompts or documents must be compressed aggressively while preserving meaning for an LLM."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

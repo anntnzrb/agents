@@ -1,6 +1,6 @@
 ---
 name: game-deals-live
-description: Find and verify PC game prices, editions, bundles, regional access, fees, taxes, and checkout totals.
+description: "Use when finding or verifying PC game prices, editions, bundles, regional access, fees, or checkout totals."
 license: AGPL-3.0-or-later
 compatibility: Requires `uv` and network access. Browser or web search is required for retailer and checkout verification.
 metadata:

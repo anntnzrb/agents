@@ -1,6 +1,6 @@
 ---
 name: effect
-description: "Use Effect TypeScript APIs and docs: effect-ts, @effect/*, fibers, layers, schemas, and RPC."
+description: "Use when Effect, effect-ts, Effect v4, @effect/*, Effect Schema, Layers, fibers, services, or runtimes appear."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

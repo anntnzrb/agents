@@ -1,6 +1,6 @@
 ---
 name: javascript
-description: "Implement and debug JavaScript in Node or browsers: modules, async, APIs, tests, and performance."
+description: "Use when JavaScript, Node.js, browser JS, modules, async behavior, APIs, tests, or performance are involved."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

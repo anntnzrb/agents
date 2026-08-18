@@ -1,6 +1,6 @@
 ---
 name: clojure
-description: Develop and debug Clojure, ClojureScript, deps.edn, REPL, spec, and functional code.
+description: "Use when Clojure, ClojureScript, deps.edn, REPL, spec, macros, or functional code are involved."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

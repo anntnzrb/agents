@@ -1,6 +1,6 @@
 ---
 name: unslop
-description: "For deslop, AI cleanup, or review: cut prose slop patterns; run bounded behavior-preserving code cleanup diffs."
+description: "Use when asked to deslop, remove AI writing patterns, clean prose, or perform bounded behavior-preserving code cleanup."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

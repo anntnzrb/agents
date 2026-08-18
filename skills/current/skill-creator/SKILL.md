@@ -1,6 +1,6 @@
 ---
 name: skill-creator
-description: Create, audit, refactor, validate, benchmark, or optimize skills and their trigger metadata.
+description: "Use when creating, auditing, refactoring, validating, benchmarking, packaging, or tuning a skill and its triggers."
 license: AGPL-3.0-or-later
 metadata:
   author: Anthropic

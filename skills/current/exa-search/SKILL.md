@@ -1,6 +1,6 @@
 ---
 name: exa-search
-description: Use Exa for deep web research, full-page retrieval, and source-backed synthesis.
+description: "Use when web research needs deep search, full-page retrieval, or source-backed synthesis through Exa."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

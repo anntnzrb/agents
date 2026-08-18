@@ -1,6 +1,6 @@
 ---
 name: mcporter
-description: Manage, authenticate, inspect, and call configured MCP servers with MCPorter.
+description: "Use when MCP servers must be discovered, authenticated, inspected, configured, or called through MCPorter."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

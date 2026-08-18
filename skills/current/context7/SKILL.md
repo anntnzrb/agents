@@ -1,6 +1,6 @@
 ---
 name: context7
-description: Fetch current library and API documentation through Context7 with MCPorter.
+description: "Use when current library or API documentation must be fetched through Context7 or MCPorter."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

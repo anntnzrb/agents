@@ -1,6 +1,6 @@
 ---
 name: brave-search
-description: Use Brave Search for quick, current web, image, video, or local-result lookups.
+description: "Use when a quick current web, image, video, news, or local-result search is needed."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

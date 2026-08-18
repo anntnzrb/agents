@@ -1,6 +1,6 @@
 ---
 name: herdr
-description: Use Herdr to control terminal panes, tabs, workspaces, commands, agents, and sessions only when explicitly requested.
+description: "Use only when the user explicitly asks Herdr to control panes, tabs, workspaces, commands, agents, or sessions."
 license: AGPL-3.0-or-later
 ---
 

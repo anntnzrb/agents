@@ -1,6 +1,6 @@
 ---
 name: autommit
-description: Run autommit or unattended atomic Git commits with staged-snapshot planning, splitting, recovery, and safe publication.
+description: "Use when the user asks for autommit, unattended commits, atomic commit splitting, recovery, or publication."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

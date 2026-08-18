@@ -1,6 +1,6 @@
 ---
 name: react-best-practices
-description: Write, review, or optimize React and Next.js performance, data fetching, bundles, and Server Actions security.
+description: "Use when React or Next.js performance, data fetching, bundles, rendering, or Server Actions security are involved."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

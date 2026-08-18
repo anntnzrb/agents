@@ -1,6 +1,6 @@
 ---
 name: darksouls3
-description: Spoiler-safe Dark Souls 3 help for builds, mechanics, routes, achievements, and PC mods.
+description: "Use for Dark Souls 3 builds, mechanics, routes, achievements, PC mods, or spoiler-safe help."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

@@ -1,6 +1,6 @@
 ---
 name: xml-surgeon
-description: Read and surgically edit XML with XPath, minimal formatting changes, and batch operations.
+description: "Use when XML must be read or edited with XPath, minimal formatting changes, or batch operations."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

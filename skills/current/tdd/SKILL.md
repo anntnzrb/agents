@@ -1,6 +1,6 @@
 ---
 name: tdd
-description: "For TDD requests or bugs with a cheap local test path: failing test first, then the smallest fix, then evidence."
+description: "Use when the user requests TDD or a bug has a cheap local failing-test path before the fix."
 license: AGPL-3.0-or-later
 ---
 

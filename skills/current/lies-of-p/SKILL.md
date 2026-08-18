@@ -1,6 +1,6 @@
 ---
 name: lies-of-p
-description: Deterministic Lies of P 1.12.0.0 and Overture platinum companion with spoiler-safe routes.
+description: "Use for Lies of P 1.12.0.0 or Overture builds, routes, platinum planning, mechanics, or spoiler-safe help."
 license: AGPL-3.0-or-later
 ---
 

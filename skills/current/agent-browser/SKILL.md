@@ -1,6 +1,6 @@
 ---
 name: agent-browser
-description: "Automate websites: browse, log in, fill forms, click, scrape, screenshot, or test web apps."
+description: "Use when a task needs website browsing, login, forms, clicks, scraping, screenshots, or web-app testing."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

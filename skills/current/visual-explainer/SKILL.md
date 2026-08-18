@@ -1,6 +1,6 @@
 ---
 name: visual-explainer
-description: Generate self-contained HTML visual explanations, diagrams, plan/diff reviews, and technical recaps.
+description: "Use when the user asks for a self-contained HTML visual explanation, diagram, plan review, diff review, or recap."
 license: AGPL-3.0-or-later
 compatibility: Requires a browser to view generated HTML files. Optional surf-cli for AI image generation.
 metadata:

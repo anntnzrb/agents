@@ -1,6 +1,6 @@
 ---
 name: flight-live
-description: Search live flights, compare date windows and fares, and rank travel options.
+description: "Use when the user asks to search live flights, compare dates or fares, or rank travel options."
 license: AGPL-3.0-or-later
 compatibility: Requires `uv` and `nix`. Uses bundled skill-local `scripts/cli.py`. Network access required.
 metadata:

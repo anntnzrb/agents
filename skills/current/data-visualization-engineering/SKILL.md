@@ -1,6 +1,6 @@
 ---
 name: data-visualization-engineering
-description: Engineer truthful, accessible, shareable data visualizations in web products and React applications.
+description: "Use when building or reviewing truthful, accessible data visualizations, charts, dashboards, or React visualizations."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

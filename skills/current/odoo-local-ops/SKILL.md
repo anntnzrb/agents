@@ -1,6 +1,6 @@
 ---
 name: odoo-local-ops
-description: Safely inspect and operate local Odoo 17 workspaces, databases, modules, and server actions.
+description: "Use when inspecting or operating local Odoo 17 workspaces, databases, modules, or server actions."
 license: AGPL-3.0-or-later
 ---
 

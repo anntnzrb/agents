@@ -1,6 +1,6 @@
 ---
 name: gh-discussions-answerer
-description: Find and answer unanswered GitHub Discussions for open-source contribution.
+description: "Use when finding and answering unanswered GitHub Discussions for open-source contribution."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

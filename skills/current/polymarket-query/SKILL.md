@@ -1,6 +1,6 @@
 ---
 name: polymarket-query
-description: Read official public Polymarket markets, events, CLOB prices/books, and aggregate data without account access.
+description: "Use when reading public Polymarket markets, events, CLOB prices, books, or aggregates without account access."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

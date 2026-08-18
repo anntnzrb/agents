@@ -1,6 +1,6 @@
 ---
 name: darksouls
-description: Spoiler-safe Dark Souls Remastered help for builds, mechanics, routes, mods, and read-only saves.
+description: "Use for Dark Souls Remastered builds, mechanics, routes, mods, saves, or spoiler-safe help."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

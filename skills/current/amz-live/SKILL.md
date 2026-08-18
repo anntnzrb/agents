@@ -1,6 +1,6 @@
 ---
 name: amz-live
-description: Search and compare Amazon products, prices, and recommendations with read-only catalog data.
+description: "Use when the user asks to search, compare, price, or recommend Amazon products from live catalog data."
 license: AGPL-3.0-or-later
 compatibility: Requires `uv`. Uses bundled skill-local `scripts/cli.py`. Network access required for live mode.
 metadata:

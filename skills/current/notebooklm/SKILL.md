@@ -1,6 +1,6 @@
 ---
 name: notebooklm
-description: Query NotebookLM notebooks and knowledge bases through the nlm CLI.
+description: "Use when the user asks to query a NotebookLM notebook or knowledge base through the nlm CLI."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

@@ -1,6 +1,6 @@
 ---
 name: research
-description: Route research, fact-checking, comparisons, and evidence gathering to the best available source.
+description: "Use when a task requires research, fact-checking, comparison, evidence gathering, or source selection."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

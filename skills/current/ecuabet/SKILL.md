@@ -1,6 +1,6 @@
 ---
 name: ecuabet
-description: Analyze an Ecuabet match URL or ID for live odds, EV, incidents, and feed health.
+description: "Use when given an Ecuabet match URL or ID for live odds, EV, incidents, or feed-health analysis."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

@@ -1,6 +1,6 @@
 ---
 name: deepswe-live
-description: Analyze published DeepSWE benchmark metrics and model-efficiency results with deterministic versioned JSON data.
+description: "Use when the user asks about published DeepSWE scores, metrics, versions, or model efficiency."
 license: AGPL-3.0-or-later
 compatibility: Requires uv; network is needed only for fetch.
 metadata:

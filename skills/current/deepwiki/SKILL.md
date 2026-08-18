@@ -1,6 +1,6 @@
 ---
 name: deepwiki
-description: Query public GitHub repository documentation and codebase questions through the configured DeepWiki MCP server.
+description: "Use when a public GitHub repository question needs DeepWiki documentation or codebase evidence."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

@@ -1,6 +1,6 @@
 ---
 name: swarm
-description: "Fan out N parallel workers across slices or races, then aggregate one report."
+description: "Use when a task should fan out across parallel workers, independent slices, races, or best-of attempts."
 license: AGPL-3.0-or-later
 ---
 

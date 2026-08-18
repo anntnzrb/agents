@@ -1,6 +1,6 @@
 ---
 name: technical-writing
-description: "For docs, RFCs, readmes, PR descriptions, commit messages: Diátaxis, Google style, STE, Global English."
+description: "Use for documentation, RFCs, READMEs, PR text, commit messages, or other developer-facing technical prose."
 license: AGPL-3.0-or-later
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: hunk
-description: "Control live Hunk diff reviews: inspect diffs, navigate hunks, reload content, and add inline comments."
+description: "Use when the user asks to inspect or control a live Hunk diff review, navigate hunks, or add inline comments."
 license: AGPL-3.0-or-later
 ---
 

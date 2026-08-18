@@ -1,6 +1,6 @@
 ---
 name: nix
-description: Develop and debug Nix, nixpkgs, flakes, NixOS, derivations, shells, and Home Manager.
+description: "Use when Nix, nixpkgs, flakes, NixOS, derivations, shells, or Home Manager are involved."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

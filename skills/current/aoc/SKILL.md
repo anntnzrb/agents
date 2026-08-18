@@ -1,6 +1,6 @@
 ---
 name: aoc
-description: Solve Advent of Code, algorithm, and competitive-programming puzzles.
+description: "Use for Advent of Code, algorithm puzzles, competitive programming, or puzzle-solution optimization."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

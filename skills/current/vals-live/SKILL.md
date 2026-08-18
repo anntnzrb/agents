@@ -1,6 +1,6 @@
 ---
 name: vals-live
-description: Discover and compare official Vals benchmarks, model variants, scores, quality, cost/test, latency, and uncertainty.
+description: "Use when the user asks to discover or compare official Vals benchmarks, model scores, cost, latency, or uncertainty."
 license: AGPL-3.0-or-later
 ---
 

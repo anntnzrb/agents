@@ -1,6 +1,6 @@
 ---
 name: mole
-description: Safely use Mole's `mo` CLI for macOS cleanup, analysis, history, status, and dry-run workflows; not Mole source code.
+description: "Use when the user asks to run Mole's mo CLI for macOS cleanup, analysis, history, status, or dry runs."
 license: AGPL-3.0-or-later
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: linear
-description: Manage Linear through MCPorter with compact tool routing and safe read or write calls.
+description: "Use when Linear issues or projects must be read or changed through MCPorter."
 license: AGPL-3.0-or-later
 compatibility: Requires MCPorter configuration and Linear authentication.
 ---

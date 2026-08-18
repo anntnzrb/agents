@@ -1,6 +1,6 @@
 ---
 name: reddit
-description: Browse, search, and retrieve Reddit posts, comments, subreddits, and user activity via JSON.
+description: "Use when Reddit posts, comments, subreddits, users, or community discussion must be searched or retrieved."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

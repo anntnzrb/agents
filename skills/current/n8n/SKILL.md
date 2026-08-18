@@ -1,6 +1,6 @@
 ---
 name: n8n
-description: Inspect and operate n8n workflows through its bundled REST CLI or targeted MCP tools.
+description: "Use when n8n workflows must be inspected or operated through the bundled REST CLI or targeted MCP tools."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

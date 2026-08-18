@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Create, split, stage, unstage, or polish precise Git commits and commit history.
+description: "Use when the user asks to create, split, stage, unstage, amend, or polish Git commits or history."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

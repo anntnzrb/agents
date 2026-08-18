@@ -1,6 +1,6 @@
 ---
 name: nix-clan-2605
-description: Use for Clan 26.05 inventory, services, vars, deployment, migrations, and NixOS workflow documentation.
+description: "Use when Clan 26.05 inventory, services, vars, deployment, migrations, or NixOS workflow docs are involved."
 license: AGPL-3.0-or-later
 metadata:
   upstream: https://git.clan.lol/clan/clan-core

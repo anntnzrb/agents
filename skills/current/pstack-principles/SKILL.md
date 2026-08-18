@@ -1,6 +1,6 @@
 ---
 name: pstack-principles
-description: "Apply before design, refactor, debug, or delegation: smallest change, correct types, verify real artifacts, root causes."
+description: "Use before design, refactoring, debugging, delegation, or verification where smallest-change discipline matters."
 license: AGPL-3.0-or-later
 ---
 

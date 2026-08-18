@@ -1,6 +1,6 @@
 ---
 name: ast-grep
-description: Perform read-only AST-aware code search with ast-grep/sg, including structural find-usages.
+description: "Use when code search needs AST structure, ast-grep, sg, structural matching, or read-only find-usages."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

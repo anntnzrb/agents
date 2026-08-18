@@ -1,6 +1,6 @@
 ---
 name: jira
-description: Search, triage, summarize, and create Jira tickets with the Atlassian CLI.
+description: "Use when Jira tickets must be searched, triaged, summarized, or created through the Atlassian CLI."
 license: AGPL-3.0-or-later
 compatibility: Requires the Atlassian CLI (acli) and Jira authentication.
 ---

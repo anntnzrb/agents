@@ -1,6 +1,6 @@
 ---
 name: grep-app
-description: Search public GitHub code with Grep.app for real-world API and configuration examples.
+description: "Use when public GitHub code examples or real-world API and configuration usage must be found through Grep.app."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

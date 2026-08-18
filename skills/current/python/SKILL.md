@@ -1,6 +1,6 @@
 ---
 name: python
-description: "Develop and debug Python: uv, typing, validation, APIs, async, tests, packaging, and .py projects."
+description: "Use when Python, .py files, uv, typing, validation, APIs, async code, tests, or packaging are involved."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

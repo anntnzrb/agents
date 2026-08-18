@@ -1,6 +1,6 @@
 ---
 name: how
-description: "Answers 'how does X work': walkthroughs before changes, placement/layering; critique mode on request."
+description: "Use when the user asks how something works, wants a walkthrough before changes, or requests design critique."
 license: AGPL-3.0-or-later
 ---
 

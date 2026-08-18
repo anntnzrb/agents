@@ -1,6 +1,6 @@
 ---
 name: recall
-description: "Rebuild recent work context from session search and live git/gh state; for 'recall my work on X', 'catch me up'."
+description: "Use when the user says recall my work, catch me up, or asks to reconstruct recent work from sessions and Git state."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

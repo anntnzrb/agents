@@ -1,6 +1,6 @@
 ---
 name: x-research
-description: Research public X/Twitter posts, timelines, searches, and conversations with bounded FxTwitter evidence.
+description: "Use when public X or Twitter posts, timelines, searches, or conversations require bounded evidence."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

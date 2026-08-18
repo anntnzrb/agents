@@ -1,6 +1,6 @@
 ---
 name: image-processing
-description: "Process web images with Pillow: resize, crop, trim, convert, optimize, thumbnail, or OG card."
+description: "Use when Pillow is needed for web-image resize, crop, trim, conversion, optimization, thumbnails, or OG cards."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
