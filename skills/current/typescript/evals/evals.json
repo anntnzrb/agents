@@ -73,6 +73,20 @@
         "The answer does not silently downgrade TypeScript",
         "The answer presents the concrete compatibility tradeoff and asks for the material decision"
       ]
+    },
+    {
+      "id": 7,
+      "prompt": "Review a TypeScript integration function that mixes async/await, nested try/catch blocks, callbacks, a lazy framework program, manually created Promises, and fire-and-forget cleanup. Preserve behavior while making the smallest maintainable correction; load framework-specific guidance if the lazy program belongs to one.",
+      "expected_output": "Chooses one control-flow owner inside each function, moves conversions to explicit boundaries, and makes task and resource lifecycle observable.",
+      "files": [],
+      "expectations": [
+        "The answer identifies which abstraction owns sequencing, errors, cancellation, and cleanup instead of interleaving all of them",
+        "The answer does not leave an async function that only constructs or returns a lazy framework or generator program",
+        "Nested catches are flattened to boundary-specific recovery or translation with the original cause preserved",
+        "Promises, callbacks, tasks, and resources have explicit completion, cancellation, and cleanup ownership",
+        "The answer loads the matching framework skill for framework-specific APIs rather than inventing adapters",
+        "The validation traces one representative input-to-output path and runs repository typecheck, tests, lint, and build as applicable"
+      ]
     }
   ]
 }

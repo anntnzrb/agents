@@ -24,8 +24,8 @@ Type-safe design. Runtime-aware config. One-shot validation. Minimal config chur
 1. DETECT    -> package manager, runtime, scripts, tsconfig
 2. MODEL     -> domain types, invariants, boundaries, public API surface
 3. ALIGN     -> module mode, imports, paths, build/test tooling
-4. IMPLEMENT -> smallest safe change; unknown over any; narrow assertions
-5. VALIDATE  -> repo scripts first; then typecheck, test, lint, build
+4. IMPLEMENT -> smallest safe change; one control-flow owner; narrow assertions
+5. VALIDATE  -> repo scripts first; trace one path; then typecheck, test, lint, build
 6. TUNE      -> profile type performance or tsconfig breadth only if still needed
 ```
 
@@ -47,11 +47,14 @@ Type-safe design. Runtime-aware config. One-shot validation. Minimal config chur
 - Model domain concepts separately when mixing them would be a bug. Use discriminated unions for meaningful states and exhaustively handle variants you own
 - Use `satisfies`, `as const`, discriminated unions, and type-only imports when they cut noise
 - Avoid assertion piles. Fix source types, exports, config first
-- Catch only to recover, translate, or add context; preserve the original cause and rethrow unknown failures. Never silence a `catch`
-- Give long-lived I/O explicit cancellation, timeout, and cleanup when the runtime or caller supports them
+- Keep one primary control-flow and error abstraction per function. Adapt between Promises, callbacks, generators, framework programs, and `Result` types once at an explicit boundary instead of interleaving them
+- Do not mark a function `async` when it only constructs or returns a lazy program. Do not accidentally return a Promise that contains another lazy program; if a host contract requires that shape, isolate it in an adapter
+- Catch only to recover, translate once, or add actionable context. Flatten nested catch ladders; preserve the original cause; never silence, log-and-rethrow, or use exceptions as ordinary branching
+- Give long-lived I/O explicit ownership, cancellation, timeout, and cleanup when the runtime or caller supports them. Do not leave Promises, tasks, subscriptions, or child processes floating
 - Do not add a dependency, abstraction, parser, normalization layer, or defensive branch without a concrete caller, boundary, or failure mode
 - Test observable behavior at the lowest layer that exposes the regression. Prefer real values, in-memory fakes, or wire-level fakes; mock unavailable external edges only
-- Treat a large file, parameter bundle, negative-name maze, redundant post-action check, or broad catch as a review trigger, not an automatic rewrite order
+- Treat a large file, parameter bundle, negative-name maze, redundant post-action check, mixed control-flow models, or broad catch as a review trigger, not an automatic rewrite order
+- Before handoff, trace one representative changed path from its input or event to observable output; review each changed `async`, `await`, `try`, `catch`, Promise constructor, assertion, and resource acquisition for a single clear owner
 - Use `rg` for repository discovery and `ast-grep` for structural search when it makes the question cheaper to answer
 - Keep tsconfig changes narrow. Do not strictify a repo unless asked
 - Use one-shot diagnostics. No watch servers for validation
