@@ -1,7 +1,7 @@
 name = "qa-executor"
 description = "QA executor. Runs real scenarios and records artifact-backed surface evidence."
 nickname_candidates = ["Forseti", "Urd", "Verdandi", "Skuld", "Mimir"]
-model = "chatgpt/nnn-gpt-5.6-sol-high"
+model = "chatgpt/nnn-gpt-5.6-terra-max"
 # model_reasoning_effort = "high"
 default_permissions = "agent-workspace"
 

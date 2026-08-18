@@ -12,9 +12,9 @@ web_search = "live"
 # MODEL
 # -----------------------------------------------------------------------------
 
-model = "chatgpt/nnn-gpt-5.6-sol-high"
+model = "chatgpt/nnn-gpt-5.6-terra-max"
 model_provider = "cliproxy"
-review_model = "chatgpt/nnn-gpt-5.6-sol-high"
+review_model = "chatgpt/nnn-gpt-5.6-terra-max"
 # model_reasoning_effort = "high"
 model_verbosity = "low"
 model_reasoning_summary = "detailed"
