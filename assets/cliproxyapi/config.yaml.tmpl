@@ -78,23 +78,23 @@ openai-compatibility:
     base-url: "https://api.cline.bot/api/v1"
     x-credential-pool: "cline-pass"
     models:
-      - name: "deepseek-v4-flash"
+      - name: "cline-pass/deepseek-v4-flash"
         alias: "nnn-deepseek-v4-flash-max"
         display-name: "[nnn] DeepSeek V4 Flash (Max)"
         force-mapping: true
-      - name: "deepseek-v4-pro"
+      - name: "cline-pass/deepseek-v4-pro"
         alias: "nnn-deepseek-v4-pro-max"
         display-name: "[nnn] DeepSeek V4 Pro (Max)"
         force-mapping: true
-      - name: "glm-5.3"
+      - name: "cline-pass/glm-5.3"
         alias: "nnn-glm-5.3-max"
         display-name: "[nnn] GLM 5.3 (Max)"
         force-mapping: true
-      - name: "kimi-k3"
+      - name: "cline-pass/kimi-k3"
         alias: "nnn-kimi-k3-max"
         display-name: "[nnn] Kimi K3 (Max)"
         force-mapping: true
-      - name: "qwen3.8-max"
+      - name: "cline-pass/qwen3.8-max"
         alias: "nnn-qwen3.8-max-xhigh"
         display-name: "[nnn] Qwen 3.8 Max (XHigh)"
         force-mapping: true
@@ -105,7 +105,7 @@ payload:
         - name: "gemini-3.7-flash-high"
           protocol: "antigravity"
       params:
-        "request.generationConfig.thinkingConfig.thinkingLevel": "medium"
+        "generationConfig.thinkingConfig.thinkingLevel": "medium"
     - models:
         - name: "gpt-5.6-sol"
           protocol: "codex"
@@ -118,10 +118,12 @@ payload:
         "reasoning.effort": "max"
     - models:
         - name: "deepseek-v4-flash"
+        - name: "cline-pass/deepseek-v4-flash"
       params:
         reasoning_effort: "high"
     - models:
         - name: "deepseek-v4-pro"
+        - name: "cline-pass/deepseek-v4-pro"
       params:
         reasoning_effort: "high"
     - models:
@@ -129,15 +131,15 @@ payload:
       params:
         reasoning_effort: "high"
     - models:
-        - name: "glm-5.3"
+        - name: "cline-pass/glm-5.3"
       params:
         reasoning_effort: "max"
     - models:
-        - name: "kimi-k3"
+        - name: "cline-pass/kimi-k3"
       params:
         reasoning_effort: "max"
     - models:
-        - name: "qwen3.8-max"
+        - name: "cline-pass/qwen3.8-max"
       params:
         reasoning_effort: "xhigh"
 

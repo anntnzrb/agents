@@ -55,7 +55,14 @@ export interface SourceModels {
   readonly unsupported: readonly UnsupportedCatalogModel[];
 }
 
+export interface CatalogAlias {
+  readonly id: string;
+  readonly sourceId: string;
+  readonly name?: string;
+}
+
 export interface GatewayCatalogOptions {
+  readonly aliases?: readonly CatalogAlias[];
   readonly modelsDev?: unknown;
   readonly managedPrefixes?: readonly string[];
   readonly richGatewayPayload?: unknown;
@@ -162,16 +169,15 @@ export function enrichGatewayModels(
     ]),
   );
   const managedPrefixes = new Set(options.managedPrefixes ?? []);
+  const gatewayIds = new Set<string>();
   for (const row of openAIDataRows(gatewayPayload, "CLIProxyAPI model catalog")) {
     const id = stringField(row, "id");
     const ownedBy = stringField(row, "owned_by");
-    if (
-      !id ||
-      !ownedBy ||
-      GENERATION_ONLY_MODEL_PATTERNS.some((pattern) => pattern.test(id)) ||
-      managedPrefixes.has(id.split("/", 1)[0] ?? "") ||
-      byId.has(id)
-    ) {
+    if (!id || !ownedBy || GENERATION_ONLY_MODEL_PATTERNS.some((pattern) => pattern.test(id))) {
+      continue;
+    }
+    gatewayIds.add(id);
+    if (managedPrefixes.has(id.split("/", 1)[0] ?? "") || byId.has(id)) {
       continue;
     }
     byId.set(
@@ -179,6 +185,22 @@ export function enrichGatewayModels(
       enrichWithRichGatewayModel(
         gatewayModel(id, ownedBy, row, options.modelsDev),
         richModels.get(id),
+      ),
+    );
+  }
+  for (const alias of options.aliases ?? []) {
+    if (byId.has(alias.id) || (!gatewayIds.has(alias.id) && !richModels.has(alias.id))) {
+      continue;
+    }
+    const source = byId.get(alias.sourceId);
+    if (!source) {
+      continue;
+    }
+    byId.set(
+      alias.id,
+      enrichWithRichGatewayModel(
+        { ...source, id: alias.id, ...(alias.name ? { name: alias.name } : {}) },
+        richModels.get(alias.id),
       ),
     );
   }

@@ -211,6 +211,62 @@ test("gateway_catalog_adds_oauth_models_without_overwriting_richer_models", () =
   });
 });
 
+test("gateway_catalog_clones_explicit_aliases under managed prefixes", () => {
+  const discovered = modelsForSource(
+    SOURCE,
+    { data: [{ id: "responses-next" }] },
+    {
+      example: {
+        npm: "@ai-sdk/openai",
+        models: { "responses-next": modelMetadata("Responses Next") },
+      },
+    },
+  ).models;
+
+  const merged = enrichGatewayModels(
+    discovered,
+    {
+      data: [
+        { id: "example/responses-next", owned_by: "example" },
+        { id: "example/nnn-responses-next-high", owned_by: "example" },
+      ],
+    },
+    {
+      aliases: [
+        {
+          id: "example/nnn-responses-next-high",
+          sourceId: "example/responses-next",
+          name: "[nnn] Responses Next (High)",
+        },
+      ],
+      managedPrefixes: ["example"],
+      richGatewayPayload: {
+        models: [
+          {
+            slug: "example/nnn-responses-next-high",
+            display_name: "[nnn] Responses Next (High)",
+            context_window: 400000,
+            supported_reasoning_levels: [{ effort: "high" }],
+          },
+        ],
+      },
+    },
+  );
+
+  expect(merged.map((model) => model.id)).toEqual([
+    "example/nnn-responses-next-high",
+    "example/responses-next",
+  ]);
+  expect(merged[0]).toMatchObject({
+    name: "[nnn] Responses Next (High)",
+    api: "openai-responses",
+    reasoning: true,
+    reasoningEfforts: ["high"],
+    contextWindow: 400000,
+    cost: discovered[0]?.cost,
+  });
+});
+
 test("gateway_catalog_cross_checks_live_reasoning_metadata", () => {
   const discovered = modelsForSource(
     SOURCE,

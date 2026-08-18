@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   legacyModelCatalogPath,
+  modelAliasesFromTemplate,
   renderCliProxyConfig,
   runtimeModelCatalogPath,
   syncClientModelCatalog,
@@ -25,6 +26,27 @@ const DEPLOYMENT: CliProxyDeployment = {
   listen: { host: "100.64.0.42", port: 9443 },
   client: { baseUrl: "https://gateway.example.test:9443/v1" },
 };
+
+test("cliproxy_template_exposes_custom_compatibility_aliases to the shared catalog", () => {
+  expect(
+    modelAliasesFromTemplate(`openai-compatibility:
+  - name: example-custom
+    prefix: example
+    models:
+      - name: responses-next
+        alias: nnn-responses-next-high
+        display-name: "[nnn] Responses Next (High)"
+      - name: unchanged
+        alias: unchanged
+`),
+  ).toEqual([
+    {
+      id: "example/nnn-responses-next-high",
+      sourceId: "example/responses-next",
+      name: "[nnn] Responses Next (High)",
+    },
+  ]);
+});
 
 test("cliproxy_renderer_synthesizes_protocol_profiles_from_model_sources", () => {
   const source = {

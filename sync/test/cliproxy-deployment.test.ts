@@ -395,6 +395,34 @@ test("cliproxy_codex_aliases_override_responses_reasoning_shape", () => {
   );
 });
 
+test("cliproxy_custom_aliases_use provider-native model and payload shapes", () => {
+  const source = readFileSync(
+    join(REPOSITORY_ROOT, "assets", "cliproxyapi", "config.yaml.tmpl"),
+    "utf8",
+  );
+  const config = Bun.YAML.parse(source) as Record<string, any>;
+  const profiles = config["openai-compatibility"] as readonly Record<string, any>[];
+  const cline = profiles.find((profile) => profile["name"] === "cline-pass-custom");
+  const rules = config["payload"]["override"] as readonly Record<string, any>[];
+  const antigravity = rules.find((rule) =>
+    rule["models"].some((model: Record<string, unknown>) => model["protocol"] === "antigravity"),
+  );
+
+  assert.deepEqual(
+    cline?.["models"].map((model: Record<string, unknown>) => model["name"]),
+    [
+      "cline-pass/deepseek-v4-flash",
+      "cline-pass/deepseek-v4-pro",
+      "cline-pass/glm-5.3",
+      "cline-pass/kimi-k3",
+      "cline-pass/qwen3.8-max",
+    ],
+  );
+  assert.deepEqual(antigravity?.["params"], {
+    "generationConfig.thinkingConfig.thinkingLevel": "medium",
+  });
+});
+
 test("cliproxy_endpoint_publication_is_one_job_after_config_and_directory_copies", () => {
   const home = mkdtempSync(join(tmpdir(), "cliproxy-plan-test-"));
   try {

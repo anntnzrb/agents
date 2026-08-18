@@ -8,6 +8,7 @@ import {
   cliProxyRichModelsUrl,
 } from "./cliproxy-deployment.ts";
 import type {
+  CatalogAlias,
   CatalogApi,
   CatalogModel,
   CliProxyModelMapping,
@@ -82,6 +83,7 @@ export async function syncCliProxyConfig(
     fs.rmSync(runtimeClientApiKeyPath(options.runtimeRoot), { force: true });
   }
   const sources = modelSourcesFromTemplate(template);
+  const aliases = modelAliasesFromTemplate(template);
   const discovery =
     sources.length === 0
       ? { sources: new Map<string, SourceModels>(), modelsDev: undefined }
@@ -102,6 +104,7 @@ export async function syncCliProxyConfig(
       sources,
       discovery.sources,
       discovery.modelsDev,
+      aliases,
       options,
     );
     removeLegacyModelCatalog(requireCacheRoot(options.cacheRoot));
@@ -113,7 +116,9 @@ export async function syncClientModelCatalog(
   deployment: CliProxyDeployment,
   options: CliProxyConfigSyncOptions = {},
 ): Promise<void> {
-  const sources = modelSourcesFromTemplate(readText(src, "CLIProxyAPI template"));
+  const template = readText(src, "CLIProxyAPI template");
+  const sources = modelSourcesFromTemplate(template);
+  const aliases = modelAliasesFromTemplate(template);
   const cacheRoot = requireCacheRoot(options.cacheRoot);
   const runtimeRoot = requireRuntimeRoot(options.runtimeRoot);
   fs.rmSync(runtimeClientApiKeyPath(runtimeRoot), { force: true });
@@ -162,6 +167,7 @@ export async function syncClientModelCatalog(
   writeModelCatalog(
     runtimeModelCatalogPath(runtimeRoot),
     enrichGatewayModels(externalModels, gatewayResult.payload, {
+      aliases,
       modelsDev: modelsDevResult.payload,
       managedPrefixes: sources.map((source) => source.prefix),
       richGatewayPayload: richGatewayResult.payload,
@@ -224,14 +230,72 @@ export function renderCliProxyConfig(
 }
 
 export function modelSourcesFromTemplate(template: string): readonly CliProxyModelSource[] {
+  return parseModelSources(parseTemplate(template)[MODEL_SOURCES_MARKER]);
+}
+
+export function modelAliasesFromTemplate(template: string): readonly CatalogAlias[] {
+  const compatibility = parseTemplate(template)["openai-compatibility"];
+  if (compatibility === undefined) {
+    return [];
+  }
+  if (!Array.isArray(compatibility)) {
+    throw new Error("invalid openai-compatibility: expected array");
+  }
+  const aliases: CatalogAlias[] = [];
+  const seen = new Set<string>();
+  for (const [profileIndex, rawProfile] of compatibility.entries()) {
+    const profile = expectRecord(rawProfile, `openai-compatibility[${profileIndex}]`);
+    const prefixValue = profile["prefix"];
+    const prefix =
+      prefixValue === undefined
+        ? ""
+        : requireNonEmptyString(prefixValue, `openai-compatibility[${profileIndex}].prefix`);
+    const models = profile["models"];
+    if (models === undefined) {
+      continue;
+    }
+    if (!Array.isArray(models)) {
+      throw new Error(`invalid openai-compatibility[${profileIndex}].models: expected array`);
+    }
+    for (const [modelIndex, rawModel] of models.entries()) {
+      const label = `openai-compatibility[${profileIndex}].models[${modelIndex}]`;
+      const model = expectRecord(rawModel, label);
+      const name = requireNonEmptyString(model["name"], `${label}.name`);
+      const alias = requireNonEmptyString(model["alias"], `${label}.alias`);
+      if (name === alias) {
+        continue;
+      }
+      const id = qualifyModelId(prefix, alias);
+      if (seen.has(id)) {
+        throw new Error(`duplicate CLIProxyAPI model alias: ${id}`);
+      }
+      seen.add(id);
+      const displayName =
+        model["display-name"] === undefined
+          ? undefined
+          : requireNonEmptyString(model["display-name"], `${label}.display-name`);
+      aliases.push({
+        id,
+        sourceId: qualifyModelId(prefix, name),
+        ...(displayName ? { name: displayName } : {}),
+      });
+    }
+  }
+  return aliases;
+}
+
+function parseTemplate(template: string): ConfigRecord {
   let parsed: unknown;
   try {
     parsed = Bun.YAML.parse(template);
   } catch (error) {
     throw new Error(`parse CLIProxyAPI template (${panicMessage(error)})`, { cause: error });
   }
-  const config = expectRecord(parsed, "CLIProxyAPI template root");
-  return parseModelSources(config[MODEL_SOURCES_MARKER]);
+  return expectRecord(parsed, "CLIProxyAPI template root");
+}
+
+function qualifyModelId(prefix: string, id: string): string {
+  return prefix && !id.startsWith(`${prefix}/`) ? `${prefix}/${id}` : id;
 }
 
 function runtimeClientApiKeyPath(runtimeRoot: string): string {
@@ -305,6 +369,7 @@ async function syncSharedModelCatalog(
   sources: readonly CliProxyModelSource[],
   discoveredSources: ReadonlyMap<string, SourceModels>,
   modelsDev: unknown,
+  aliases: readonly CatalogAlias[],
   options: CliProxyConfigSyncOptions,
 ): Promise<void> {
   const cacheRoot = requireCacheRoot(options.cacheRoot);
@@ -347,6 +412,7 @@ async function syncSharedModelCatalog(
   writeModelCatalog(
     runtimeModelCatalogPath(runtimeRoot),
     enrichGatewayModels(externalModels, gatewayPayload, {
+      aliases,
       modelsDev,
       managedPrefixes: sources.map((source) => source.prefix),
       richGatewayPayload,
