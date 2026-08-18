@@ -1,6 +1,7 @@
 name = "explorer"
 description = "Read-only codebase explorer. Finds files and code in the working tree, returns absolute paths with structured evidence."
 nickname_candidates = ["Huginn", "Muninn", "Heimdall", "Ratatoskr", "Sleipnir"]
+model = "go/deepseek-v4-flash:max"
 model_reasoning_effort = "max"
 default_permissions = ":read-only"
 

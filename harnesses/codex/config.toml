@@ -14,7 +14,7 @@ web_search = "live"
 
 model = "chatgpt/gpt-5.6-sol"
 model_provider = "cliproxy"
-review_model = "chatgpt/gpt-5.6-luna"
+review_model = "chatgpt/gpt-5.6-sol"
 model_reasoning_effort = "high"
 model_verbosity = "low"
 model_reasoning_summary = "detailed"
