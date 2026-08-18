@@ -135,6 +135,47 @@
         "The answer keeps all Effect ecosystem packages on one matching version and channel",
         "The answer preserves RC dependencies only for an existing project that pins them"
       ]
+    },
+    {
+      "id": 12,
+      "prompt": "Refactor an Effect v4 service method whose current implementation is an async function returning Effect.gen, wraps yield* calls in nested JavaScript try/catch blocks, calls Effect.runPromise inside the service, and catches every failure to log and return null. Keep behavior but make the control flow, typed errors, cancellation, and validation idiomatic.",
+      "expected_output": "Replaces mixed Promise and Effect control flow with one Effect program and preserves failures as typed, contextual errors.",
+      "files": [],
+      "expectations": [
+        "The answer inspects the pinned project version and matching Effect source, LLMS.md, diagnostics, tests, or examples before choosing APIs",
+        "The service method uses Effect.fn and is not async, with Effect.gen only for Effect sequencing",
+        "The answer removes JavaScript try/catch around yield* and removes Effect runners from service or business logic",
+        "Foreign Promise failures are wrapped once with Effect.tryPromise, mapped to Schema.TaggedError, and receive an AbortSignal when supported",
+        "Recovery is selective and semantic; the answer does not catch-log-return-null or log and rethrow at multiple layers",
+        "The validation plan includes TypeScript diagnostics, @effect/tsgo diagnostics, typed-failure tests, interruption, and cleanup where relevant"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "An existing Hono application is not Effect-native. Its async route handlers use one ManagedRuntime to execute Effect services. Review the boundary without banning all async functions or all JavaScript try/catch. Keep Effect internals idiomatic and the host adapter thin.",
+      "expected_output": "Allows foreign async control flow only at the Hono adapter while keeping services, failures, and lifecycle inside Effect.",
+      "files": [],
+      "expectations": [
+        "The answer permits async and await at the non-Effect Hono boundary instead of applying a blanket ban",
+        "The answer uses one long-lived ManagedRuntime and one final Effect-to-Promise bridge per host request path",
+        "Effect services do not call runners, return Promise of Effect, or use JavaScript try/catch around yielded failures",
+        "Unknown request data is decoded once at the boundary and expected domain failures remain typed until translated to HTTP responses",
+        "Runtime disposal and request cancellation are owned by the host boundary and tested"
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "Review a generated Effect v4 module that turned pure formatting helpers into Context services, constructs and provides Layers in every method, uses Promise.all and manual setTimeout retries inside Effect.gen, re-decodes the same payload in three layers, and suppresses Effect diagnostics. Make the smallest maintainable correction.",
+      "expected_output": "Removes unnecessary Effect architecture, restores one owner for dependencies and lifecycle, and uses source-backed Effect primitives only where their semantics are needed.",
+      "files": [],
+      "expectations": [
+        "Pure transformations become ordinary TypeScript functions rather than services or Layers",
+        "Only concrete external or replaceable capabilities remain Context services and Layers are composed outside per-call business logic",
+        "Effect concurrency and Schedule replace manual Promise and timer orchestration when concurrency or retry is actually required",
+        "Schema decoding occurs once at the external boundary and typed domain values flow downstream",
+        "Diagnostic suppressions are removed unless a matching upstream exception proves and documents the need",
+        "The answer traces one complete path and tests success, expected failures, interruption, and resource cleanup without unrelated rewrites"
+      ]
     }
   ]
 }
