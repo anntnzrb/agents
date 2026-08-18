@@ -13,6 +13,7 @@
 - `sync/test/`: tests sync behavior only; harness names and paths MAY appear as fixtures or adapter boundaries, but tests MUST NOT import harness implementations or assert harness-local behavior
 - `docs/`: sync application and repository-sync workflow documentation; adapter boundaries MAY be described, but harness-local behavior and configuration belong under `harnesses/`
 - Harness-specific tests and documentation stay beside their owning source under `harnesses/`
+- `harnesses/pi/agent/extensions/AGENTS.md`: engineering policy for active Pi extensions; read it before modifying those extensions
 - `harnesses/<harness>/`: directory presence opts into a supported harness; sync owns its internal adapter metadata
 - Agent config root: `~/.config/agents/`
 - Installed runtime root: `~/.local/share/agents/`
