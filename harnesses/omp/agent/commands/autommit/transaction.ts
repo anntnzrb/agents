@@ -547,14 +547,21 @@ export const withOperationLockEffect = Effect.fn("withOperationLock")(function*<
             });
         }
 
+        const lockHandle = yield* Effect.tryPromise({
+            try: () => open(paths.lock, "wx", 0o600),
+            catch: (cause) =>
+                isErrorCode(cause, "EEXIST")
+                    ? new AutommitLockError({
+                        message: `Autommit operation already in progress (lock: ${paths.lock}). Inspect the lock's PID; stale locks are never removed automatically.`,
+                    })
+                    : new AutommitLockError({
+                        message: `Unable to acquire Autommit operation lock: ${cause instanceof Error ? cause.message : String(cause)}`,
+                        cause,
+                    }),
+        });
+
         yield* Effect.acquireUseRelease(
-            Effect.tryPromise({
-                try: () => open(paths.lock, "wx", 0o600),
-                catch: (cause) => new AutommitLockError({
-                    message: `Unable to acquire Autommit operation lock: ${cause instanceof Error ? cause.message : String(cause)}`,
-                    cause,
-                }),
-            }),
+            Effect.succeed(lockHandle),
             (handle) =>
                 Effect.tryPromise({
                     try: async () => {
@@ -568,16 +575,11 @@ export const withOperationLockEffect = Effect.fn("withOperationLock")(function*<
                 }),
             (handle) => Effect.promise(() => handle.close().catch(() => undefined)),
         ).pipe(
-            Effect.catch((error) => {
-                if (isErrorCode(error.cause, "EEXIST")) {
-                    return Effect.fail(new AutommitLockError({
-                        message: `Autommit operation already in progress (lock: ${paths.lock}). Inspect the lock's PID; stale locks are never removed automatically.`,
-                    }));
-                }
-                return Effect.promise(() => unlink(paths.lock).catch(() => undefined)).pipe(
+            Effect.catch((error) =>
+                Effect.promise(() => unlink(paths.lock).catch(() => undefined)).pipe(
                     Effect.andThen(Effect.fail(error)),
-                );
-            }),
+                ),
+            ),
         );
 
         return yield* Effect.acquireUseRelease(
