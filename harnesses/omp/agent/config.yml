@@ -2,17 +2,17 @@
 # Models
 # =============================================================================
 modelRoles:
-  default: cliproxy/chatgpt/nnn-gpt-5.6-terra-max
+  default: cliproxy/antigravity/nnn-gemini-3.7-flash-medium
   task: cliproxy/chatgpt/nnn-gpt-5.6-luna-max
-  fast_worker: cliproxy/go/nnn-deepseek-v4-pro-max
+  fast_worker: cliproxy/cmd/nnn-deepseek-v4-pro-max
   good_worker: cliproxy/chatgpt/nnn-gpt-5.6-luna-max
 
   commit: cliproxy/antigravity/nnn-gemini-3.7-flash-medium
-  smol: cliproxy/go/nnn-deepseek-v4-flash-max
+  smol: cliproxy/cmd/nnn-deepseek-v4-flash-max
   tiny: cliproxy/antigravity/nnn-gemini-3.7-flash-medium
 
   plan: cliproxy/chatgpt/nnn-gpt-5.6-terra-max
-  advisor: cliproxy/go/nnn-deepseek-v4-pro-max
+  advisor: cliproxy/cmd/nnn-deepseek-v4-pro-max
   slow: cliproxy/chatgpt/nnn-gpt-5.6-terra-max
   vision: cliproxy/antigravity/nnn-gemini-3.7-flash-medium
 
