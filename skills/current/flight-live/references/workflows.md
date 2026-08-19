@@ -38,9 +38,9 @@ Use payload fields, not prose instincts:
 
 ## 3. User-facing answer pattern
 
-- **Option 1** — dates — effective price — nonstop/stops — why score wins
-- **Option 2** — same fields
-- **Option 3** — same fields
+- **Option 1**: dates; effective price; nonstop/stops; why score wins
+- **Option 2**: same fields
+- **Option 3**: same fields
 - caveats from `warnings`
 - next action from `decision.actions[0]`
 

@@ -1,10 +1,10 @@
 # Go Type Patterns
 
 Use Go's limited type system to recover compile-time safety. Four patterns:
-1. named types — primitive branding;
-2. smart constructors + unexported fields — parse, don't validate;
-3. sealed interfaces + `type switch` + `exhaustive` — sum types;
-4. constrained generics — bounded polymorphism (Go 1.18+).
+1. named types: primitive branding;
+2. smart constructors + unexported fields: parse, don't validate;
+3. sealed interfaces + `type switch` + `exhaustive`: sum types;
+4. constrained generics: bounded polymorphism (Go 1.18+).
 
 ## 1. Named types
 
@@ -24,8 +24,8 @@ oid := OrderID("o-456")
 
 GetUser(uid)              // ✅ OK
 GetUser(oid)              // ❌ cannot use oid (type OrderID) as UserID
-GetUser("u-123")          // ❌ untyped string literal — Go DOES catch this
-GetUser(UserID("u-123"))  // ✅ explicit conversion — accept it
+GetUser("u-123")          // ❌ untyped string literal; Go DOES catch this
+GetUser(UserID("u-123"))  // ✅ explicit conversion; accept it
 ```
 
 Use for IDs, opaque tokens, foreign keys, and units sharing a primitive. Explicit conversion defeats branding (`UserID(orderIDAsString)`); use smart constructors for constraints beyond internal identifiers. Named types provide cheap branding; constructors provide actual invariant protection.
@@ -45,7 +45,7 @@ Milliseconds and seconds cannot mix implicitly; convert explicitly.
 
 ## 2. Smart constructors + unexported fields
 
-For every domain value with invariants—email, URL, phone, currency, percentage, semver, constrained ID, time range, or a value validated in three places—hide fields and construct through validation. The zero value remains reachable.
+For every domain value with invariants; email, URL, phone, currency, percentage, semver, constrained ID, time range, or a value validated in three places; hide fields and construct through validation. The zero value remains reachable.
 
 ```go
 package domain
@@ -64,7 +64,7 @@ var (
 // Email is a parsed, lowercased, valid email address.
 // The zero value is invalid; construct via NewEmail.
 type Email struct {
-    raw string  // unexported — cannot be set from outside the package
+    raw string  // unexported; cannot be set from outside the package
 }
 
 func NewEmail(s string) (Email, error) {
@@ -83,7 +83,7 @@ func (e Email) MarshalJSON() ([]byte, error) {
     return []byte(`"` + e.raw + `"`), nil
 }
 
-// UnmarshalJSON is the parsing boundary — strict mode.
+// UnmarshalJSON is the parsing boundary: strict mode.
 func (e *Email) UnmarshalJSON(data []byte) error {
     if len(data) < 2 || data[0] != '"' || data[len(data)-1] != '"' {
         return ErrInvalidEmail
@@ -175,7 +175,7 @@ linters-settings:
     default-signifies-exhaustive: false
 ```
 
-Adding `event.Suspended` without updating `Render` becomes a lint error—the closest Go equivalent to Rust match exhaustiveness.
+Adding `event.Suspended` without updating `Render` becomes a lint error; the closest Go equivalent to Rust match exhaustiveness.
 
 Gotchas:
 - `sealed()` MUST be unexported; `Sealed()` permits external implementations.
@@ -214,10 +214,10 @@ func Join[T Stringer](items []T, sep string) string {
 ## 5. Type assertions
 
 ```go
-// Bad — panics on failure
+// Bad: panics on failure
 e := evt.(event.Created)
 
-// Good — comma-ok form, always
+// Good: comma-ok form, always
 if e, ok := evt.(event.Created); ok {
     // use e
 }
@@ -249,7 +249,7 @@ Do not use `any` in handler, service, or store signatures. `func Handle(payload 
 
 ## Sources
 
-- "Parse, don't validate" — Alexis King: https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/
+- "Parse, don't validate": Alexis King: https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/
 - exhaustive linter: https://github.com/nishanths/exhaustive
 - Generics constraints: https://go.dev/blog/intro-generics
 - cmp.Ordered: https://pkg.go.dev/cmp

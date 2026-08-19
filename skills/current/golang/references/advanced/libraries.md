@@ -78,7 +78,7 @@ type CreateUserReq struct {
     Username string `json:"username" binding:"required,alphanum,min=3,max=32"`
 }
 
-// Domain — once a value is of type Email it is provably valid
+// Domain: once a value is of type Email it is provably valid
 type Email struct{ raw string }
 func NewEmail(s string) (Email, error) {
     if !emailRegex.MatchString(s) { return Email{}, ErrInvalidEmail }
@@ -160,7 +160,7 @@ Measured hot-path bottleneck only: `goccy/go-json` (~3× faster, drop-in API):
 
 ```go
 import json "github.com/goccy/go-json"
-// drop-in replacement — same API
+// drop-in replacement: same API
 ```
 
 Production proxies doing thousands of RPS of JSON traversal: `bytedance/sonic` (~5× faster; requires amd64/arm64). For large-payload partial-tree mutation without full unmarshal, CLIProxyAPI uses `tidwall/gjson` + `tidwall/sjson`; this is a different optimization.

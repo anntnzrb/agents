@@ -1,6 +1,6 @@
 # Capability-page schema drift playbook
 
-Use when Artificial Analysis site changes break `coding`. Goal: small, evidence-backed compatibility repair—not a new scraper or plan-quota model.
+Use when Artificial Analysis site changes break `coding`. Goal: small, evidence-backed compatibility repair; not a new scraper or plan-quota model.
 
 ## 1. Classify failure
 
@@ -97,7 +97,7 @@ uvx ruff check --select ALL --ignore COM812,D203,D213 .
 uv run --script "$SKILLS_DIR/skill-creator/scripts/cli.py" quick-validate "$SKILLS_DIR/artificial-analysis-live"
 ```
 
-Do not run live smoke unless `RUN_LIVE_SMOKE=1` and the rotated credential is in the process environment. Successful gated smoke records only redacted source status, validator presence, hashes, parser/version, freshness, schema, shape, and diagnostics—never fixed counts, headers, or raw bodies.
+Do not run live smoke unless `RUN_LIVE_SMOKE=1` and the rotated credential is in the process environment. Successful gated smoke records only redacted source status, validator presence, hashes, parser/version, freshness, schema, shape, and diagnostics; never fixed counts, headers, or raw bodies.
 
 ## Escalation
 

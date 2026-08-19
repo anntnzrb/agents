@@ -61,7 +61,7 @@ Define authorization by request:
 - Change/build/fix: make requested in-scope local changes and run relevant non-destructive validation without asking first.
 - External writes, destructive actions, purchases, or material scope expansion: require confirmation.
 
-Specify safe local actions (for example, reading files, inspecting logs, searching, editing in-scope code, and non-destructive tests). Do not repeat “ask first,” since repetition can trigger unnecessary permission checks. For long-running work, identify the current layer—research, design, implementation, review, or external coordination—and prevent silent layer changes.
+Specify safe local actions (for example, reading files, inspecting logs, searching, editing in-scope code, and non-destructive tests). Do not repeat “ask first,” since repetition can trigger unnecessary permission checks. For long-running work, identify the current layer; research, design, implementation, review, or external coordination; and prevent silent layer changes.
 
 ## Tool routing
 Expose only task-relevant tools. Each description states purpose, when to use it, important return fields, and error behavior.

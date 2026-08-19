@@ -1,4 +1,4 @@
-# Data Processing — Polars + DuckDB
+# Data Processing: Polars + DuckDB
 
 ## The rule
 

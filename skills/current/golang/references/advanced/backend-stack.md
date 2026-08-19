@@ -1,4 +1,4 @@
-# HTTP Backend Stack — gin + slog + validator + pgx
+# HTTP Backend Stack: gin + slog + validator + pgx
 
 ## Index
 
@@ -180,7 +180,7 @@ func New(cfg config.Config, logger *slog.Logger, h *handlers.Handler) *Server {
     gin.SetMode(gin.ReleaseMode)
     r := gin.New()
 
-    // Middleware order matters — see "Middleware ordering" below.
+    // Middleware order matters: see "Middleware ordering" below.
     r.Use(
         middleware.RequestID(),     // 1. assign request_id first
         middleware.Recovery(logger), // 2. recovery wraps everything
@@ -239,7 +239,7 @@ Use `gin.New()`, not `gin.Default()`: `Default()` adds text-format `Logger()` an
 5. Auth is last cross-cutting middleware; admin-only per-route auth belongs on a sub-router with extra middleware.
 
 ```go
-// Public routes — no auth
+// Public routes: no auth
 api := r.Group("/api/v1")
 {
     api.POST("/auth/login", h.Login)
@@ -361,7 +361,7 @@ func CORS() gin.HandlerFunc {
 
 Explicit `OPTIONS` short-circuit: preflight MUST NOT go through Auth.
 
-## Handlers — canonical shape
+## Handlers: canonical shape
 
 ```go
 package handlers
@@ -449,7 +449,7 @@ func (h *Handler) StreamChat(c *gin.Context) {
     c.Header("Connection",    "keep-alive")
     c.Header("X-Accel-Buffering", "no") // disable nginx buffering
 
-    // 2. Obtain the flusher — REQUIRED for streaming
+    // 2. Obtain the flusher; REQUIRED for streaming
     flusher, ok := c.Writer.(http.Flusher)
     if !ok {
         httperr.Write(c, errors.New("streaming unsupported"))
@@ -472,7 +472,7 @@ func (h *Handler) StreamChat(c *gin.Context) {
             fmt.Fprintf(c.Writer, "data: %s\n\n", chunk)
             flusher.Flush()
         case err := <-errs:
-            // Error mid-stream — emit as SSE event and bail
+            // Error mid-stream: emit as SSE event and bail
             fmt.Fprintf(c.Writer, "event: error\ndata: %s\n\n", err.Error())
             flusher.Flush()
             return

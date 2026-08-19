@@ -1,18 +1,18 @@
-# Go 1.22–1.23 Cookbook
+# Go 1.22-1.23 Cookbook
 
 ## Loop variables (1.22+)
 
 Go ≤1.21 reuses loop variables across iterations, causing goroutine/closure bugs. Go 1.22+ gives each iteration its own variable; no `item := item` workaround.
 
 ```go
-// Before 1.22 — BUG: all goroutines see the last value
+// Before 1.22: BUG: all goroutines see the last value
 for _, item := range items {
     go func() {
         process(item) // wrong
     }()
 }
 
-// Go 1.22+ — correct without extra copy
+// Go 1.22+: correct without extra copy
 for _, item := range items {
     go func() {
         process(item) // each goroutine gets its own item

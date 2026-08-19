@@ -24,23 +24,23 @@ Production-confirmed restricted functional built-ins: `map`, `filter`, `reduce`,
 
 ## Python 3.10 under safe_eval
 
-- Small local helper without closure — supported; prefer named pure helpers for repeated transformations.
-- Function parameter/return annotations using visible built-ins — production-confirmed; use sparingly for helper contracts; UI has no static checker.
-- Variable annotation — forbidden; emits `SETUP_ANNOTATIONS`.
-- List/dict/set comprehension — production-confirmed; single-purpose and bounded.
-- Generator function/expression — production-confirmed; useful with `sum`, `all`, `any`; NEVER hide ORM queries inside.
-- `map`/`filter`/`reduce` — production-confirmed; prefer comprehension, `sum`, or clearer explicit loop; `reduce` MUST have initializer.
-- Ordered deduplication with `set` + `list` — production-confirmed; set gives O(1) membership, list preserves order.
-- Import-free decorator without closure — production-confirmed; only for a real local contract; imported and closure-producing decorators unavailable.
-- Simple walrus — production-confirmed; use only when it removes duplicate work without obscuring control flow.
-- Walrus in module-scope comprehension — forbidden; may emit blacklisted `STORE_GLOBAL`.
-- Dict merge `left|right` — production-confirmed; small copy-on-write dictionaries, not record mutation.
-- Self-documenting f-string — production-confirmed; useful for diagnostics, but compact JSON remains audit-output contract.
-- `match` on scalar literals plus wildcard — production-confirmed; use only when clearer than `if/elif`.
-- Sequence, mapping, or class structural patterns — forbidden; emit unsupported `MATCH_*`/`GET_LEN` opcodes.
-- Closure capturing outer local — forbidden; emits unsupported `LOAD_CLOSURE`/`LOAD_DEREF`; pass values explicitly.
-- Specific `try/except` — supported; catch only errors the snippet can handle; NEVER turn unknown failure into `ok`.
-- `with` — forbidden in audited allowlist; do not build transaction/context-manager patterns inside snippets.
+- Small local helper without closure: supported; prefer named pure helpers for repeated transformations.
+- Function parameter/return annotations using visible built-ins: production-confirmed; use sparingly for helper contracts; UI has no static checker.
+- Variable annotation: forbidden; emits `SETUP_ANNOTATIONS`.
+- List/dict/set comprehension: production-confirmed; single-purpose and bounded.
+- Generator function/expression: production-confirmed; useful with `sum`, `all`, `any`; NEVER hide ORM queries inside.
+- `map`/`filter`/`reduce`: production-confirmed; prefer comprehension, `sum`, or clearer explicit loop; `reduce` MUST have initializer.
+- Ordered deduplication with `set` + `list`: production-confirmed; set gives O(1) membership, list preserves order.
+- Import-free decorator without closure: production-confirmed; only for a real local contract; imported and closure-producing decorators unavailable.
+- Simple walrus: production-confirmed; use only when it removes duplicate work without obscuring control flow.
+- Walrus in module-scope comprehension: forbidden; may emit blacklisted `STORE_GLOBAL`.
+- Dict merge `left|right`: production-confirmed; small copy-on-write dictionaries, not record mutation.
+- Self-documenting f-string: production-confirmed; useful for diagnostics, but compact JSON remains audit-output contract.
+- `match` on scalar literals plus wildcard: production-confirmed; use only when clearer than `if/elif`.
+- Sequence, mapping, or class structural patterns: forbidden; emit unsupported `MATCH_*`/`GET_LEN` opcodes.
+- Closure capturing outer local: forbidden; emits unsupported `LOAD_CLOSURE`/`LOAD_DEREF`; pass values explicitly.
+- Specific `try/except`: supported; catch only errors the snippet can handle; NEVER turn unknown failure into `ok`.
+- `with`: forbidden in audited allowlist; do not build transaction/context-manager patterns inside snippets.
 
 Functional-first ≠ abstraction-first. Keep selection, ORM reads, writes, logging, and action return in an explicit imperative shell; use pure helpers/bounded comprehensions only for in-memory transformations. For ORM data, prefer vectorized recordset methods, `search_count`, and `read_group` over Python-level iteration.
 

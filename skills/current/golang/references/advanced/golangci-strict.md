@@ -1,6 +1,6 @@
 # Strict `.golangci.yml` (golangci-lint v2)
 
-The single source of truth for "is this Go code acceptable". Drop this in unmodified. **Every linter below is enabled deliberately — read the rationale before disabling one.**
+The single source of truth for "is this Go code acceptable". Drop this in unmodified. **Every linter below is enabled deliberately; read the rationale before disabling one.**
 
 `golangci-lint` v2 changed config schema (top-level `version: "2"`). All v1 configs are incompatible. The block below is v2.
 
@@ -17,24 +17,24 @@ run:
 linters:
   default: none
   enable:
-    # ── Correctness — bug catchers ───────────────────────────────
+    # ── Correctness: bug catchers ───────────────────────────────
     - govet              # stdlib vet, includes shadow, fieldalignment, nilness
-    - staticcheck        # SA1*-SA9* — the de facto Go correctness linter
+    - staticcheck        # SA1*-SA9*: the de facto Go correctness linter
     - errcheck           # unhandled errors. ZERO tolerance.
     - errorlint          # %w wrapping, errors.As vs type-assertion, errors.Is vs ==
-    - nilerr             # `return nil` after `err != nil` — classic bug
+    - nilerr             # `return nil` after `err != nil`: classic bug
     - nilnil             # returning `(nil, nil)` from a (*T, error) function
     - bodyclose          # http.Response.Body not closed
     - rowserrcheck       # sql.Rows.Err() not checked
     - sqlclosecheck      # sql.Rows / sql.Stmt not closed
     - contextcheck       # functions taking context.Context don't get context.Background()
-    - fatcontext         # context.WithValue() in a loop — leaks
-    - copyloopvar        # Go 1.22 loop-var capture — should now use the new semantics
+    - fatcontext         # context.WithValue() in a loop: leaks
+    - copyloopvar        # Go 1.22 loop-var capture: should now use the new semantics
     - intrange           # use `for i := range N` (Go 1.22+) instead of `for i := 0; i < N; i++`
     - usetesting         # use t.TempDir/t.Setenv over os.* in tests
     - testifylint        # require vs assert correctness, ObjectsAreEqual misuse
 
-    # ── Style / readability — kept narrow to avoid bikeshedding ─
+    # ── Style / readability: kept narrow to avoid bikeshedding ─
     - gofumpt            # stricter gofmt
     - goimports          # import grouping + local prefix
     - whitespace         # leading/trailing whitespace
@@ -44,7 +44,7 @@ linters:
     - ineffassign        # ineffective assignments
     - dupword            # duplicate words ("the the")
 
-    # ── Architecture — file size, complexity, dead code ─────────
+    # ── Architecture: file size, complexity, dead code ─────────
     - gocognit           # cognitive complexity per function (threshold 25)
     - gocyclo            # cyclomatic complexity per function (threshold 15)
     - funlen             # function length (90 lines, 60 statements)
@@ -54,7 +54,7 @@ linters:
     - revive             # extensible replacement for golint; selected rules below
     - unused             # unused vars/funcs/types
 
-    # ── Exhaustiveness — Go's weakest spot ──────────────────────
+    # ── Exhaustiveness: Go's weakest spot ──────────────────────
     - exhaustive         # type switch and enum-like const groups completeness
 
     # ── Security ────────────────────────────────────────────────
@@ -115,7 +115,7 @@ linters-settings:
   gosec:
     excludes:
       - G104        # handled by errcheck/errorlint
-      - G304        # file path provided as input — too noisy for CLIs
+      - G304        # file path provided as input: too noisy for CLIs
 
   sloglint:
     no-mixed-args: true       # all attr or all key-value, never mixed
@@ -194,24 +194,24 @@ formatters:
 |`errorlint`|`err == io.EOF` instead of `errors.Is(err, io.EOF)`; missing `%w` in `fmt.Errorf`|Once you wrap in middleware, `==` checks silently break. `errors.Is/As` is the only safe form.|
 |`nilerr` / `nilnil`|`return nil` after `err != nil`; `return nil, nil` from `(*T, error)`|Classic AI-generated bugs. Linter catches them mechanically.|
 |`bodyclose`|`defer resp.Body.Close()` missed|Single most common Go memory leak.|
-|`contextcheck`|`ctx := context.Background()` inside a function that received `ctx`|Breaks cancellation propagation — the entire reason ctx exists.|
+|`contextcheck`|`ctx := context.Background()` inside a function that received `ctx`|Breaks cancellation propagation: the entire reason ctx exists.|
 |`exhaustive`|`switch x.(type)` missing a sealed-interface variant|**Go's weakest type-system spot.** This linter is the closest thing to compiler-enforced exhaustiveness.|
 |`sloglint`|`slog.Info(...)` (global), mixed `Any`/typed attrs|Without this, structured logging silently degrades into string concatenation.|
-|`govet/shadow` strict|`err := ... ; if ... { err := ...; ... }` shadowing|Hides the real error from outer scope — extremely common.|
+|`govet/shadow` strict|`err := ... ; if ... { err := ...; ... }` shadowing|Hides the real error from outer scope: extremely common.|
 |`govet/fieldalignment`|Struct field order wasting memory|Cheap correctness signal. Disable per-file when JSON tag order matters for OpenAPI.|
 |`copyloopvar` + `intrange`|Pre-1.22 loop-var capture and old `for i := 0; i < N; i++`|The language modernized; the lint enforces it.|
 |`usetesting`|`os.Setenv` / `os.Mkdir` in tests instead of `t.Setenv` / `t.TempDir`|Avoids test isolation bugs.|
-|`gocognit` / `gocyclo` / `funlen`|Functions exceeding cognitive thresholds|Direct architectural signal — same purpose as the 250 LOC ceiling, at function granularity.|
-|`gosec`|CWE patterns — SQL injection, weak crypto, path traversal|Production must pass this.|
+|`gocognit` / `gocyclo` / `funlen`|Functions exceeding cognitive thresholds|Direct architectural signal: same purpose as the 250 LOC ceiling, at function granularity.|
+|`gosec`|CWE patterns: SQL injection, weak crypto, path traversal|Production must pass this.|
 |`testifylint`|`assert.Equal` where `require.Equal` was meant; `ObjectsAreEqual` misuse|Subtle test-correctness bugs.|
-|`perfsprint`|`fmt.Sprintf("%d", n)` instead of `strconv.Itoa(n)`|5–10x faster in tight loops, lints catch the lazy form.|
+|`perfsprint`|`fmt.Sprintf("%d", n)` instead of `strconv.Itoa(n)`|5-10x faster in tight loops, lints catch the lazy form.|
 
 ## `nolint` policy
 
 `//nolint:linter1,linter2 // <reason>` is permitted with **two hard rules**:
 
 1. **One linter at a time per directive.** No `//nolint:all`. No omitting the linter name
-2. **A reason after `//` is mandatory.** "Generated code", "false positive — protobuf imports", "OpenAPI field order" are acceptable. "Ignore" is not
+2. **A reason after `//` is mandatory.** "Generated code", "false positive; protobuf imports", "OpenAPI field order" are acceptable. "Ignore" is not
 
 The skill auto-rejects `//nolint` without a reason. So does `revive` if you enable its `nolint` rule.
 

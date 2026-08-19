@@ -1,4 +1,4 @@
-# Bootstrap — Project Layout, Toolchain, Taskfile, CI
+# Bootstrap: Project Layout, Toolchain, Taskfile, CI
 
 ## Index
 
@@ -37,7 +37,7 @@ go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
 ```
 
-## Project layout — canonical tree
+## Project layout: canonical tree
 
 ```
 myservice/
@@ -75,7 +75,7 @@ myservice/
 │   │   └── config.go
 │   └── obs/                   # observability: slog setup, otel, healthz
 │       └── logger.go
-├── pkg/                       # exportable libraries — only if you publish
+├── pkg/                       # exportable libraries; only if you publish
 │   └── …
 ├── proto/                     # *.proto definitions (Connect/gRPC projects)
 │   └── service.proto
@@ -95,7 +95,7 @@ Rules:
 - One package per directory.
 - One responsibility per package.
 
-## `Taskfile.yml` — entry point for every action
+## `Taskfile.yml`: entry point for every action
 
 `go-task/task` is the cross-platform YAML Make replacement.
 
@@ -247,7 +247,7 @@ coverage.html
 *.key
 ```
 
-## CI — minimal GitHub Actions
+## CI: minimal GitHub Actions
 
 `.github/workflows/ci.yml`:
 
@@ -293,7 +293,7 @@ jobs:
 
 CI order is format → lint → nilaway → test → build; fail fast on cheap checks.
 
-## `AGENTS.md` — agent-readable project facts
+## `AGENTS.md`: agent-readable project facts
 
 Every new project gets root `AGENTS.md`: machine-friendly, short, declarative, no marketing prose. Example:
 
@@ -303,21 +303,21 @@ Every new project gets root `AGENTS.md`: machine-friendly, short, declarative, n
 Go 1.23+ HTTP service for {one-line purpose}.
 
 ## Commands
-- `task` — fmt + lint + test
-- `task build` — produce ./bin/server
-- `task gen` — regenerate sqlc + mocks + proto
+- `task`: fmt + lint + test
+- `task build`: produce ./bin/server
+- `task gen`: regenerate sqlc + mocks + proto
 
 ## Architecture
-- `cmd/server/main.go` — entrypoint, ≤50 LOC
-- `internal/api/` — gin handlers + middleware
-- `internal/domain/` — smart-constructor types, no I/O
-- `internal/store/sqlc/` — generated; never hand-edit
+- `cmd/server/main.go`: entrypoint, ≤50 LOC
+- `internal/api/`: gin handlers + middleware
+- `internal/domain/`: smart-constructor types, no I/O
+- `internal/store/sqlc/`: generated; never hand-edit
 
 ## Conventions
 - `slog` for all logs; never `log.*`, never `fmt.Println`
 - `context.Context` first arg for every public function
 - Errors wrapped with `%w`; check with `errors.Is/As`
-- 250 pure LOC ceiling per file — split before adding lines
+- 250 pure LOC ceiling per file: split before adding lines
 ```
 
 `cmd/new-project.go` writes `AGENTS.md` with project-specific values filled in.
@@ -327,4 +327,4 @@ Go 1.23+ HTTP service for {one-line purpose}.
 - Go modules reference: https://go.dev/ref/mod
 - go-task: https://taskfile.dev
 - golangci-lint v2: https://golangci-lint.run/docs/configuration/
-- Standard project layout debate: https://go.dev/doc/modules/layout (NOT `golang-standards/project-layout` — community, not official)
+- Standard project layout debate: https://go.dev/doc/modules/layout (NOT `golang-standards/project-layout`; community, not official)

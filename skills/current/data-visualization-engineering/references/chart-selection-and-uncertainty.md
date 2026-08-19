@@ -19,7 +19,7 @@ Avoid pie/donut for many categories, dual axes that invite false equivalence, de
 
 Name the uncertainty type: sampling interval, model interval, measurement error, scenario range, missingness, or forecast horizon. Show intervals with a visible key and exact values on demand; do not imply an interval is a probability unless its semantics support that interpretation. Explain the denominator, confidence/credible level, method, and whether intervals account for clustering or multiple comparisons.
 
-Mark estimates, forecasts, targets, and observed data differently in text and/or stroke/fill—not color alone. Show missing periods as gaps or explicit missing markers. If uncertainty cannot be estimated, say so and identify the likely sources instead of inventing error bars.
+Mark estimates, forecasts, targets, and observed data differently in text and/or stroke/fill; not color alone. Show missing periods as gaps or explicit missing markers. If uncertainty cannot be estimated, say so and identify the likely sources instead of inventing error bars.
 
 ## Sources
 

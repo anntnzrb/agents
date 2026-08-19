@@ -1,6 +1,6 @@
 # Lies of P evaluation coverage
 
-The corpus contains exactly 96 sequential, unique, stateless scenarios. Each has 3–5 expectations and one exact CLI invocation.
+The corpus contains exactly 96 sequential, unique, stateless scenarios. Each has 3-5 expectations and one exact CLI invocation.
 
 | Allocation | Cases | Scope |
 |---|---:|---|

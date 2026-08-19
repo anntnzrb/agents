@@ -25,14 +25,14 @@ Recipes for input validation, boundary defense, and typed data flow in Go.
 **Solution**:
 
 ```go
-// Layer 1: raw input struct — matches the wire format exactly
+// Layer 1: raw input struct: matches the wire format exactly
 type userRequest struct {
     Name  string `json:"name"`
     Email string `json:"email"`
     Age   int    `json:"age"`
 }
 
-// Layer 2: domain type — validated, normalized, no surprises
+// Layer 2: domain type: validated, normalized, no surprises
 type User struct {
     Name  string
     Email string
@@ -57,7 +57,7 @@ func (r userRequest) toDomain() (*User, error) {
 }
 ```
 
-**Tip**: Never pass `map[string]any` or raw request structs into business logic. Parse, validate, convert — all at the edge.
+**Tip**: Never pass `map[string]any` or raw request structs into business logic. Parse, validate, convert; all at the edge.
 
 ---
 
@@ -112,11 +112,11 @@ func handleCreate(w http.ResponseWriter, r *http.Request) {
         return
     }
     if err := validate.Struct(req); err != nil {
-        // err is validator.ValidationErrors — extract field-level messages
+        // err is validator.ValidationErrors: extract field-level messages
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
     }
-    // req is now valid — convert to domain
+    // req is now valid: convert to domain
 }
 ```
 
@@ -152,7 +152,7 @@ func LoadConfig() (*Config, error) {
 }
 ```
 
-**Tip**: Validate at startup and exit immediately on failure. Never defer config validation — a misconfigured process should not start.
+**Tip**: Validate at startup and exit immediately on failure. Never defer config validation; a misconfigured process should not start.
 
 ---
 
@@ -209,7 +209,7 @@ type User struct {
     Email string
 }
 
-// Safe — returns empty string for nil receiver
+// Safe: returns empty string for nil receiver
 func (u *User) DisplayName() string {
     if u == nil {
         return "unknown"
@@ -217,7 +217,7 @@ func (u *User) DisplayName() string {
     return u.Name
 }
 
-// Unsafe — panics on nil. Only call when nil is logically impossible.
+// Unsafe: panics on nil. Only call when nil is logically impossible.
 func (u *User) EmailDomain() string {
     _, domain, _ := strings.Cut(u.Email, "@")
     return domain
@@ -255,7 +255,7 @@ func applyUpdate(u *User, req UpdateRequest) {
 }
 ```
 
-**Tip**: Use pointer fields for PATCH semantics only. For required fields in a CREATE endpoint, use plain values — absence is a validation error, not a semantic distinction.
+**Tip**: Use pointer fields for PATCH semantics only. For required fields in a CREATE endpoint, use plain values; absence is a validation error, not a semantic distinction.
 
 ---
 
@@ -285,7 +285,7 @@ func NewOrder(items []OrderItem) (*Order, error) {
     return &Order{items: items, total: total}, nil
 }
 
-// Methods trust the invariant — no defensive checks needed
+// Methods trust the invariant: no defensive checks needed
 func (o *Order) Total() int { return o.total }
 ```
 
@@ -367,5 +367,5 @@ func fetchRelease(ctx context.Context, tag string) (*githubRelease, error) {
 }
 ```
 
-**Tip**: Treat external API responses as untrusted input. Use `DisallowUnknownFields` and validate mandatory fields after decoding — APIs change silently.
+**Tip**: Treat external API responses as untrusted input. Use `DisallowUnknownFields` and validate mandatory fields after decoding; APIs change silently.
 

@@ -9,7 +9,7 @@ metadata:
 
 # Data Visualization Engineering
 
-Use this skill when building, reviewing, or repairing an analytical chart, dashboard, or interactive data view. Start with the user’s decision or claim—not a chart type, library, or visual style.
+Use this skill when building, reviewing, or repairing an analytical chart, dashboard, or interactive data view. Start with the user’s decision or claim; not a chart type, library, or visual style.
 
 ## Core workflow
 

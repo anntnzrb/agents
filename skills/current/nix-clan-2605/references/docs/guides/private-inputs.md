@@ -122,6 +122,6 @@ It shouldn't. Clan evaluates the flake on your workstation, so by the time the b
 
 ## Related
 
-- [Build Host](build-host.md) — when deploys run through a separate builder, and how the second SSH hop is authenticated.
-- [SSH Agent Forwarding](ssh-agent-forwarding.md) — why agent forwarding is not required for private inputs.
-- [NixOS Rebuild](nixos-rebuild.md) — using `nixos-rebuild` directly instead of `clan machines update`.
+- [Build Host](build-host.md): when deploys run through a separate builder, and how the second SSH hop is authenticated.
+- [SSH Agent Forwarding](ssh-agent-forwarding.md): why agent forwarding is not required for private inputs.
+- [NixOS Rebuild](nixos-rebuild.md): using `nixos-rebuild` directly instead of `clan machines update`.

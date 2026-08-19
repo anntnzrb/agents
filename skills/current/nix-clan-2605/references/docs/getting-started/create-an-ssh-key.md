@@ -25,8 +25,8 @@ Prompts:
 
 Created files:
 
-- `~/.ssh/id_ed25519` — private key; keep secret
-- `~/.ssh/id_ed25519.pub` — public key; share with target machines
+- `~/.ssh/id_ed25519`: private key; keep secret
+- `~/.ssh/id_ed25519.pub`: public key; share with target machines
 
 Verify both files exist:
 

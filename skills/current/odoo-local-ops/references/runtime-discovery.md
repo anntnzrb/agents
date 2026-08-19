@@ -4,8 +4,8 @@ Use when workspace/runtime discovery is ambiguous or fails.
 
 ## Runtime families
 
-- host runtime — classic local install, especially Windows; host PostgreSQL; `psql.exe`/`psql`
-- Compose runtime — Docker Compose Odoo stack; PostgreSQL `db` service
+- host runtime: classic local install, especially Windows; host PostgreSQL; `psql.exe`/`psql`
+- Compose runtime: Docker Compose Odoo stack; PostgreSQL `db` service
 
 ## Discovery targets
 
@@ -60,8 +60,8 @@ If unresolved, say so plainly; never guess. Inspection output should include pro
 
 ## Addons
 
-- Compose — derive addon paths from `.env` bind mounts.
-- host — prefer resolved-config addon paths.
+- Compose: derive addon paths from `.env` bind mounts.
+- host: prefer resolved-config addon paths.
 
 Normalize path separators and expand relative paths against workspace root. If paths are absent/incomplete, common workspace-relative directories are best-effort inspection aids only; mark fallback clearly, never as authoritative.
 
@@ -75,7 +75,7 @@ Host precedence:
 5. fail with a clear trace
 
 Compose:
-1. resolve Compose command — `docker compose`, then `docker-compose`
+1. resolve Compose command: `docker compose`, then `docker-compose`
 2. use Compose `db` service
 3. fail clearly if Docker Compose is unavailable
 

@@ -24,7 +24,7 @@ uv run --script <skill-dir>/scripts/cli.py show notebook.ipynb -c 5 -o
 
 ## Execute cell range
 
-Cells 3–7 example:
+Cells 3-7 example:
 
 ```bash
 # Execute cells 3 through 7

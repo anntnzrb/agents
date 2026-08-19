@@ -60,17 +60,17 @@ Default to `uv run --script <skill-dir>/scripts/cli.py` for Hammerspoon IPC. It 
 
 Prefer helper subcommands before custom Lua when they fit the task:
 
-- `status` — Hammerspoon runtime health, version, config directory
-- `doctor` — status plus Accessibility/MJConfigFile/CLI setup checks
-- `eval` — execute Lua through `hs` and print the result
-- `eval-file` — evaluate a Lua file safely without shell quoting
-- `reload` — trigger `hs.reload()`
-- `windows` — list all windows as JSON-safe summaries
-- `apps` — list running applications
-- `screens` — list displays
-- `hotkeys` — list registered hotkeys
-- `spoons` — list loaded Spoons
-- `config` — show config directory path
+- `status`: Hammerspoon runtime health, version, config directory
+- `doctor`: status plus Accessibility/MJConfigFile/CLI setup checks
+- `eval`: execute Lua through `hs` and print the result
+- `eval-file`: evaluate a Lua file safely without shell quoting
+- `reload`: trigger `hs.reload()`
+- `windows`: list all windows as JSON-safe summaries
+- `apps`: list running applications
+- `screens`: list displays
+- `hotkeys`: list registered hotkeys
+- `spoons`: list loaded Spoons
+- `config`: show config directory path
 
 Use raw `hs` CLI only when:
 
@@ -117,11 +117,11 @@ uv run --script <skill-dir>/scripts/cli.py lsp-config print
 
 These discover tools on PATH (`luacheck`, `stylua`, `busted`, `lua-language-server`). Missing tools return clear error messages with install guidance; they never silently succeed.
 
-- `lint` — runs `luacheck` with Hammerspoon globals (`hs`, `spoon`)
-- `fmt` — runs `stylua`, never formats implicitly
-- `test` — runs `busted` for pure Lua tests
-- `annotations` — reports whether Hammerspoon EmmyLua annotations appear generated
-- `lsp-config` — prints a suggested `.luarc.json` for Lua language server
+- `lint`: runs `luacheck` with Hammerspoon globals (`hs`, `spoon`)
+- `fmt`: runs `stylua`, never formats implicitly
+- `test`: runs `busted` for pure Lua tests
+- `annotations`: reports whether Hammerspoon EmmyLua annotations appear generated
+- `lsp-config`: prints a suggested `.luarc.json` for Lua language server
 
 ## Safe live-change pattern
 

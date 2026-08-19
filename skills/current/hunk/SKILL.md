@@ -15,9 +15,9 @@ Interactive terminal diff viewer; TUI user-owned. NEVER run `hunk diff`, `hunk s
 ## Session selection
 
 Most session commands accept:
-- `--repo <path>` — match loaded repository root; prefer this.
-- `<session-id>` — exact ID when multiple sessions share a repository.
-- No selector — auto-resolve only when one session exists.
+- `--repo <path>`: match loaded repository root; prefer this.
+- `<session-id>`: exact ID when multiple sessions share a repository.
+- No selector: auto-resolve only when one session exists.
 
 `reload` additionally accepts `--session-path <path>` (live Hunk window working directory) and `--source <path>` (directory for the replacement `diff`/`show` command). `--source` does not select a session; use it only when the selected session is not associated with the checkout. For a normal worktree, select with `--repo <worktree>`. Use `--session-path` only when session selection and reload source differ.
 

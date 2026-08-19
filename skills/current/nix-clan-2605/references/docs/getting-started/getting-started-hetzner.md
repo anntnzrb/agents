@@ -187,7 +187,7 @@ Install NixOS on the target machine by typing:
 clan machines install test-machine
 ```
 
-You will be asked whether you want to install — type `y`. You will also be prompted for a password; you can accept the defaults and press Enter.
+You will be asked whether you want to install; type `y`. You will also be prompted for a password; you can accept the defaults and press Enter.
 
 You will then be asked for a password to assign to the root login for the machine. You can either create one, or let Clan assign a random one.
 

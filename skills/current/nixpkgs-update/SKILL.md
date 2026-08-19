@@ -24,11 +24,11 @@ Exact referenced command syntax MUST survive delegation.
 
 `DISCOVER → FILTER → VALIDATE → SELECT → UPDATE → REPORT`
 
-1. **DISCOVER** — Query Repology API for outdated `nix_unstable` packages with User-Agent `nixpkgs-update/1.0`; collect `name`, `nixpkgs_version`, `newest_version`. Use exact Repology commands from either required reference.
-2. **FILTER** — Keep only packages in `pkgs/by-name/` of type Rust | Go, with `has_patches=false`, `complexity=simple`, patch/minor version bumps, and support for the current system. Rust requires `buildRustPackage`/`cargoHash`; Go requires `buildGoModule`/`vendorHash`. Reject major bumps and packages restricted from local testing.
-3. **VALIDATE** — Spawn one Explore agent per filtered candidate. Each inspects `pkgs/by-name/*/<package>/package.nix` for patches, complex install logic, overrides, complexity, and platform restrictions. Proceed only when `has_patches=false`, `complexity=simple`, and current-platform support.
-4. **SELECT** — Present only validated easy candidates in a multi-select table containing package, version bump, and type. Ask: `Which packages would you like to update? (enter numbers, e.g., 1,2)`.
-5. **UPDATE** — Work only from the nixpkgs checkout the user intends to contribute from. Create one worktree per selected package:
+1. **DISCOVER**: Query Repology API for outdated `nix_unstable` packages with User-Agent `nixpkgs-update/1.0`; collect `name`, `nixpkgs_version`, `newest_version`. Use exact Repology commands from either required reference.
+2. **FILTER**: Keep only packages in `pkgs/by-name/` of type Rust | Go, with `has_patches=false`, `complexity=simple`, patch/minor version bumps, and support for the current system. Rust requires `buildRustPackage`/`cargoHash`; Go requires `buildGoModule`/`vendorHash`. Reject major bumps and packages restricted from local testing.
+3. **VALIDATE**: Spawn one Explore agent per filtered candidate. Each inspects `pkgs/by-name/*/<package>/package.nix` for patches, complex install logic, overrides, complexity, and platform restrictions. Proceed only when `has_patches=false`, `complexity=simple`, and current-platform support.
+4. **SELECT**: Present only validated easy candidates in a multi-select table containing package, version bump, and type. Ask: `Which packages would you like to update? (enter numbers, e.g., 1,2)`.
+5. **UPDATE**: Work only from the nixpkgs checkout the user intends to contribute from. Create one worktree per selected package:
 
 ```bash
 git worktree add <temp-dir>/nixpkgs-<package>-<version> -b <package>-<version> master
@@ -46,7 +46,7 @@ Launch one agent per worktree; agents MUST not `git switch` in one shared repo. 
 8. Return PR URL or failure reason.
 
 Every long build/review command MUST use `timeout 600`. Use the full agent prompt, commit body, PR body, and cleanup commands from `references/update-workflow.md`.
-6. **REPORT** — Collect and display PR URLs/results:
+6. **REPORT**: Collect and display PR URLs/results:
 
 ```
 ## Update Results

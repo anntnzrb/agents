@@ -40,7 +40,7 @@ Patterns:
 - Add constraints → refactor logic.
 - Combine operations (chain transforms) → compose functions.
 
-Preparation: write Part 1 for extensibility; use parameters instead of hardcoded values; separate parsing from logic; don't delete Part 1 code—you may need to reference it.
+Preparation: write Part 1 for extensibility; use parameters instead of hardcoded values; separate parsing from logic; don't delete Part 1 code; you may need to reference it.
 
 ## When stuck
 1. Re-read the problem; something is likely misunderstood.

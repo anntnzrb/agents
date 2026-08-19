@@ -10,7 +10,7 @@ Fast coding decisions; load cookbooks for tutorials/deep patterns.
 - Before major tooling changes: update to latest minor patch.
 - Sources: `go.dev/doc/go1.26`, `endoflife.date/go`, `go.dev/doc/toolchain`.
 
-## Stable modern Go features (1.22–1.26)
+## Stable modern Go features (1.22-1.26)
 
 |Version|Feature|Since|
 |---|---|---|
@@ -24,16 +24,16 @@ Fast coding decisions; load cookbooks for tutorials/deep patterns.
 |1.24|Swiss Tables map implementation (~60% faster)|1.24|
 |1.24|`go.mod` `tool` directive (replaces tools.go)|1.24|
 |1.24|Build cache for `go run`/`go tool`|1.24|
-|1.24|`testing.B.Loop` — benchmark loop that doesn't prevent inlining|1.24|
-|1.25|`testing/synctest` stable — deterministic concurrent tests|1.25|
+|1.24|`testing.B.Loop`: benchmark loop that doesn't prevent inlining|1.24|
+|1.25|`testing/synctest` stable: deterministic concurrent tests|1.25|
 |1.25|Container-aware GOMAXPROCS|1.25|
 |1.25|go.mod `ignore` directive|1.25|
 |1.25|`go doc -http`|1.25|
 |1.25|New vet analyzers: waitgroup, hostport|1.25|
 |1.26|`new(expr)`: `p := new(Person{Name: "alice"})`|1.26|
-|1.26|`errors.AsType[T]()` — generic type-safe error extraction|1.26|
+|1.26|`errors.AsType[T]()`: generic type-safe error extraction|1.26|
 |1.26|Green Tea GC default (10-40% GC overhead reduction)|1.26|
-|1.26|`slog.NewMultiHandler` — fan-out logging|1.26|
+|1.26|`slog.NewMultiHandler`: fan-out logging|1.26|
 |1.26|Self-referential generic constraints|1.26|
 |1.26|`go fix` modernizers: auto-migrates old patterns|1.26|
 |1.26|`crypto/hpke` per RFC 9180|1.26|

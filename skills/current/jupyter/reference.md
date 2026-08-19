@@ -46,14 +46,14 @@ Markdown cell:
 
 ### Output types
 
-`stream`: `text` — stdout/stderr.
-`execute_result`: `data` — last expression's return value.
-`display_data`: `data` — explicit plots, HTML, etc.
-`error`: `ename`, `evalue`, `traceback` — exception information.
+`stream`: `text`; stdout/stderr.
+`execute_result`: `data`; last expression's return value.
+`display_data`: `data`; explicit plots, HTML, etc.
+`error`: `ename`, `evalue`, `traceback`; exception information.
 
 ### Data MIME types
 
-`text/plain` — text representation; `text/html` — tables/rich output; `image/png` — PNG, base64 encoded; `image/svg+xml` — SVG; `application/json` — JSON.
+`text/plain`; text representation; `text/html`; tables/rich output; `image/png`; PNG, base64 encoded; `image/svg+xml`; SVG; `application/json`; JSON.
 
 ## Execution model
 
@@ -74,10 +74,10 @@ Common kernel names:
 
 Clean notebooks:
 
-1. Clear outputs before commit — manageable diffs.
-2. Restart kernel regularly — avoid hidden-state bugs.
-3. Run all cells in order — verify end-to-end operation.
-4. Use markdown headers — navigation structure.
+1. Clear outputs before commit: manageable diffs.
+2. Restart kernel regularly: avoid hidden-state bugs.
+3. Run all cells in order: verify end-to-end operation.
+4. Use markdown headers: navigation structure.
 
 Reproducibility:
 

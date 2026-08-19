@@ -1,11 +1,11 @@
-# Go 1.24–1.26 Cookbook
+# Go 1.24-1.26 Cookbook
 
 ## Swiss Tables Maps (1.24)
 
 Go 1.24 replaced the map backend with Swiss Tables: better cache locality and faster lookups. No API change; existing map code benefits automatically after rebuilding with Go 1.24+. Hash-based iteration order may differ; NEVER depend on map iteration order.
 
 ```go
-// No API change — all existing map code benefits automatically
+// No API change: all existing map code benefits automatically
 m := make(map[string]int)
 m["key"] = 42
 v := m["key"] // faster under the hood
@@ -22,7 +22,7 @@ type MyMap[K comparable, V any] map[K]V
 // Go 1.24+: type alias preserves identity
 type Set[K comparable] = map[K]struct{}
 
-// Interchangeable — Set[string] IS map[string]struct{}
+// Interchangeable: Set[string] IS map[string]struct{}
 func Add[K comparable](s Set[K], k K) {
     s[k] = struct{}{}
 }
@@ -128,7 +128,7 @@ Not a Go 1.25 addition: available since Go 1.21. `slogtest.TestHandler` validate
 Go 1.25 detects cgroup v2 CPU limits automatically; `runtime.GOMAXPROCS` defaults to the container quota rather than host core count. Rebuild with Go 1.25+. It respects cgroup v2 `cpu.max`, including Kubernetes, Docker, and systemd cgroups; Dockerfiles no longer need `GOMAXPROCS=2` environment settings. Manual override remains available.
 
 ```go
-// Automatic — no code change needed
+// Automatic: no code change needed
 // In a container with 2 CPUs, GOMAXPROCS defaults to 2
 
 // Manual override still works
@@ -143,7 +143,7 @@ Go 1.26 adds `new(expr)`: allocate and initialize from one value expression. It 
 // Before 1.26
 u := &User{Name: "Alice", Age: 30}
 
-// Go 1.26: new(expr) — equivalent, may be clearer in some contexts
+// Go 1.26: new(expr): equivalent, may be clearer in some contexts
 u := new(User{Name: "Alice", Age: 30})
 
 // Works with any value expression
@@ -230,9 +230,9 @@ go fix ./...
 go fix -fix=loopvar,bnloop ./...
 
 # Available modernizers in 1.26:
-#   loopvar   — remove obsolete i := i workarounds
-#   bnloop    — convert for i := 0; i < b.N; i++ to b.Loop()
-#   tool      — migrate tools.go files to go.mod tool directive
-#   aserror   — convert errors.As patterns to errors.AsType
-#   new       — convert &T{...} to new(T{...}) where idiomatic
+#   loopvar  : remove obsolete i := i workarounds
+#   bnloop   : convert for i := 0; i < b.N; i++ to b.Loop()
+#   tool     : migrate tools.go files to go.mod tool directive
+#   aserror  : convert errors.As patterns to errors.AsType
+#   new      : convert &T{...} to new(T{...}) where idiomatic
 ```

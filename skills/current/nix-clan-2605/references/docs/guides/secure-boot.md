@@ -8,7 +8,7 @@ NixOS/Clan currently does not support [Secure Boot](https://wiki.gentoo.org/wiki
 
 ## Access UEFI/BIOS
 
-- Restart the computer; during restart, press the appropriate key to enter UEFI/BIOS settings. Press quickly and repeatedly if necessary—the entry window is brief.
+- Restart the computer; during restart, press the appropriate key to enter UEFI/BIOS settings. Press quickly and repeatedly if necessary; the entry window is brief.
 ::::admonition[The key depends on your laptop or motherboard manufacturer. Click to see a reference list:]{type=tip collapsible}
 
 |Manufacturer|UEFI/BIOS Key(s)|

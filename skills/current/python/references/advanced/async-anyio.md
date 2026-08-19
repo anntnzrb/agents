@@ -13,7 +13,7 @@ Read the section whose heading matches the task; use heading search before loadi
 
 AnyIO uses **structured concurrency** via task groups. A task group is an async context manager that guarantees all child tasks finish before the block exits.
 
-### `start_soon` — fire-and-forget
+### `start_soon`: fire-and-forget
 
 ```python
 import anyio
@@ -39,7 +39,7 @@ anyio.run(main)
 - `name` is optional, for introspection/debugging
 - No return value; exceptions propagate as `ExceptionGroup` on exit
 
-### `start` — wait for ready signal
+### `start`: wait for ready signal
 
 Use when a task must initialize before the caller proceeds (e.g., starting a server and then connecting to it).
 
@@ -71,7 +71,7 @@ run(main)
 - Use `start_soon` when you don't need to know when the task is ready
 - Use `start` when the task must signal readiness before you continue
 
-### `create_task` — retrieving return values (AnyIO 4.14+)
+### `create_task`: retrieving return values (AnyIO 4.14+)
 
 ```python
 async def add(x: int, y: int) -> int:
@@ -198,7 +198,7 @@ A task group contains its own `CancelScope`. If any child task raises an excepti
 
 Two context managers. Both create a `CancelScope` internally.
 
-### `fail_after` — raises on timeout
+### `fail_after`: raises on timeout
 
 ```python
 from anyio import fail_after, sleep, run
@@ -216,7 +216,7 @@ async def main() -> None:
 run(main)
 ```
 
-### `move_on_after` — silent timeout
+### `move_on_after`: silent timeout
 
 ```python
 from anyio import move_on_after, sleep, run

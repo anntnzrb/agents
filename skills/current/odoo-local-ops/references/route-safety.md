@@ -77,9 +77,9 @@ Do not infer production safety directly from route discovery.
 
 Keep these distinct:
 
-- DB inspection — current data
-- route inspection — likely code paths
-- route invocation — out of scope unless a future version explicitly adds it
+- DB inspection: current data
+- route inspection: likely code paths
+- route invocation: out of scope unless a future version explicitly adds it
 
 Write signals do not justify database mutation during investigation.
 

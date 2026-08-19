@@ -4,7 +4,7 @@ Typed errors, exhaustive matching, union returns, and resource safety.
 
 ---
 
-## Typed errors — no bare strings
+## Typed errors: no bare strings
 
 Error types carry structured data. Pattern matching works. Callers know exactly what can go wrong.
 
@@ -19,7 +19,7 @@ UserId = NewType("UserId", int)
 class UserNotFoundError(Exception):
     user_id: UserId
 
-    def __str__(self) -> str:  # REQUIRED — see note below
+    def __str__(self) -> str:  # REQUIRED; see note below
         return f"user {self.user_id} not found"
 
 
@@ -46,7 +46,7 @@ raise PermissionDeniedError(user_id=uid, required_role="admin")
 
 ---
 
-## Union returns — expected failures without exceptions
+## Union returns: expected failures without exceptions
 
 For failures that are **expected** (not found, validation error, permission denied), return a union instead of raising. Exceptions are for **unexpected** failures (network down, OOM, corrupted data).
 
@@ -109,7 +109,7 @@ def handle_result(result: GetUserResult) -> str:
 
 ---
 
-## Exhaustive match — every match needs a default
+## Exhaustive match: every match needs a default
 
 Every `match` statement ends with `case _: assert_never(x)`. No exceptions.
 
@@ -140,7 +140,7 @@ Add a new enum member? The type checker tells you every `match` that needs updat
 
 ---
 
-## Context managers — resource safety
+## Context managers: resource safety
 
 If it has `.close()`, `.shutdown()`, `.disconnect()`, or `.release()`, wrap it in `with`.
 
@@ -192,7 +192,7 @@ async with managed_connection("postgres://...") as conn:
 
 ---
 
-## Exception hierarchy — when you do raise
+## Exception hierarchy: when you do raise
 
 Keep exception hierarchies shallow and specific.
 
@@ -226,6 +226,6 @@ Callers catch `AppError` at the boundary, or specific subtypes where they can do
 
 ## Sources
 
-- Python docs: [typing — assert_never](https://docs.python.org/3/library/typing.html#typing.assert_never)
+- Python docs: [typing; assert_never](https://docs.python.org/3/library/typing.html#typing.assert_never)
 - Python docs: [contextlib](https://docs.python.org/3/library/contextlib.html)
 - Python docs: [match statement](https://docs.python.org/3/reference/compound_stmts.html#the-match-statement)

@@ -13,10 +13,10 @@ Where the language is weak, the linter bundle is the type checker and code patte
 1. **Parse, do not validate, at every boundary:** parse HTTP/RPC/CLI/config into a domain struct built only by `New*(...)` smart constructors; no validation inside the domain. See `data-modeling.md`.
 2. **`(T, error)` everywhere:** library code MUST NOT panic; NEVER use bare `_ = err`; wrap errors with `%w`; assert with `errors.Is`/`errors.As`; use typed error structs for caller-branchable errors. See `error-handling.md`.
 3. **Sealed variants:** model sum types with a sealed unexported method; dispatch with a `type switch`; let `exhaustive` check completeness. See `type-patterns.md`.
-4. **`context.Context` first:** always first parameter; NEVER call `context.Background()` in leaf functions; every goroutine needs context-driven shutdown; domain code MUST NOT call `time.Now()`—inject a clock. See `concurrency.md`.
+4. **`context.Context` first:** always first parameter; NEVER call `context.Background()` in leaf functions; every goroutine needs context-driven shutdown; domain code MUST NOT call `time.Now()`; inject a clock. See `concurrency.md`.
 5. **Generate external contracts:** use `sqlc` for DB, `oapi-codegen` for OpenAPI servers/clients, and `protoc-gen-go` + `protoc-gen-connect-go` for RPC; hand-written marshalling is a regression. See `sqlc-pgx.md`, `grpc-connect.md`.
 
-## Hard rules — tooling
+## Hard rules: tooling
 
 - Go version: **MUST 1.23+** (range-over-func, iter package, stable slog); NEVER `<1.22`.
 - Module: `go modules` + `go work` for monorepos; NEVER dep or GOPATH layouts.
@@ -47,22 +47,22 @@ gofumpt -l . && \
 
 A failing command means the change is not done. The bundle is intended for a clean-run guarantee; see `golangci-strict.md` for per-linter rationale and deliberate `nolint:` policy.
 
-## Hard rules — code references
+## Hard rules: code references
 
 Read the relevant reference for canonical patterns:
 
-- Types/data — `type-patterns.md`, `data-modeling.md`: branded named types, smart constructors with unexported fields, sealed sum types.
-- Errors — `error-handling.md`: sentinel vs typed struct, `errors.Is`/`errors.As`, `%w`, no library panics, `errorlint` ruleset.
-- Concurrency — `concurrency.md`: `context.Context`, `errgroup`, `sync.OnceValue`, `goleak`, `-race`, channel-selection rules.
-- HTTP backend — `backend-stack.md`: `gin` skeleton, middleware order, SSE/streaming with `http.Flusher`, structured `slog`, graceful shutdown; distilled from the CLIProxyAPI codebase, a real OpenAI/Gemini/Claude API proxy.
-- RPC — `grpc-connect.md`: Connect vs grpc-go, codegen, protovalidate, streaming.
-- DB — `sqlc-pgx.md`: compile-time-safe SQL with sqlc + pgx pool, goose migrations, CI testcontainers.
-- CLI — `cobra-stack.md`: cobra layout, slog, signal shutdown, fang-style colored help.
-- TUI — `bubbletea-v2.md`: v2 model, `SetVirtualCursor(false)` + `tea.View{Cursor}` for CJK IME, and why v1 breaks Korean/Japanese/Chinese input.
-- Testing — `testing.md`: table-driven tests, `require` vs `assert`, `autogold` snapshots, `gopter` property tests, integration `testcontainers`, `goleak` leak checks.
-- Bootstrap — `bootstrap.md`: `new-project.go`, `cmd/`/`internal/`/`pkg/` layout, Taskfile, CI.
-- Strict config — `golangci-strict.md`: canonical `.golangci.yml`, full linter whitelist, per-linter rationale.
-- One-liners — `one-liners.md`: `go run` scripts with `//go:build ignore`, `gorun`-style invocation.
+- Types/data: `type-patterns.md`, `data-modeling.md`: branded named types, smart constructors with unexported fields, sealed sum types.
+- Errors: `error-handling.md`: sentinel vs typed struct, `errors.Is`/`errors.As`, `%w`, no library panics, `errorlint` ruleset.
+- Concurrency: `concurrency.md`: `context.Context`, `errgroup`, `sync.OnceValue`, `goleak`, `-race`, channel-selection rules.
+- HTTP backend: `backend-stack.md`: `gin` skeleton, middleware order, SSE/streaming with `http.Flusher`, structured `slog`, graceful shutdown; distilled from the CLIProxyAPI codebase, a real OpenAI/Gemini/Claude API proxy.
+- RPC: `grpc-connect.md`: Connect vs grpc-go, codegen, protovalidate, streaming.
+- DB: `sqlc-pgx.md`: compile-time-safe SQL with sqlc + pgx pool, goose migrations, CI testcontainers.
+- CLI: `cobra-stack.md`: cobra layout, slog, signal shutdown, fang-style colored help.
+- TUI: `bubbletea-v2.md`: v2 model, `SetVirtualCursor(false)` + `tea.View{Cursor}` for CJK IME, and why v1 breaks Korean/Japanese/Chinese input.
+- Testing: `testing.md`: table-driven tests, `require` vs `assert`, `autogold` snapshots, `gopter` property tests, integration `testcontainers`, `goleak` leak checks.
+- Bootstrap: `bootstrap.md`: `new-project.go`, `cmd/`/`internal/`/`pkg/` layout, Taskfile, CI.
+- Strict config: `golangci-strict.md`: canonical `.golangci.yml`, full linter whitelist, per-linter rationale.
+- One-liners: `one-liners.md`: `go run` scripts with `//go:build ignore`, `gorun`-style invocation.
 
 ## 250 pure-LOC ceiling
 

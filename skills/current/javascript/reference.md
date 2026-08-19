@@ -4,16 +4,16 @@ Use for defaults, routing, or failure-mode triage before a deeper cookbook.
 
 ## Decision defaults
 
-- Existing ESM → stay ESM — format churn rarely fixes the issue.
-- Existing CJS → stay CJS unless interop pain is the task — blind mixing multiplies failure modes.
-- Greenfield Node app/library → prefer ESM — better modern-tooling and native-`import` alignment.
-- Browser/bundler app → write ESM source — bundler owns final output format.
-- Package shipping to mixed consumers → consider dual exports only when demand is real — dual mode adds surface area and testing burden.
-- Vite/bundler repo without a runner → prefer Vitest — zero-friction module story and fast watchless runs.
-- Existing Jest monorepo/ecosystem-heavy repo → stay on Jest — migration cost outweighs novelty value.
-- Large payloads/long-lived flows → prefer streams + cancellation — prevent memory spikes and hanging work.
-- Weird language behavior → check semantics before architecture — JS bugs often involve coercion, binding, or queue issues.
-- External I/O logic → use integration tests — unit mocks hide boundary breakage.
+- Existing ESM → stay ESM: format churn rarely fixes the issue.
+- Existing CJS → stay CJS unless interop pain is the task: blind mixing multiplies failure modes.
+- Greenfield Node app/library → prefer ESM: better modern-tooling and native-`import` alignment.
+- Browser/bundler app → write ESM source: bundler owns final output format.
+- Package shipping to mixed consumers → consider dual exports only when demand is real: dual mode adds surface area and testing burden.
+- Vite/bundler repo without a runner → prefer Vitest: zero-friction module story and fast watchless runs.
+- Existing Jest monorepo/ecosystem-heavy repo → stay on Jest: migration cost outweighs novelty value.
+- Large payloads/long-lived flows → prefer streams + cancellation: prevent memory spikes and hanging work.
+- Weird language behavior → check semantics before architecture: JS bugs often involve coercion, binding, or queue issues.
+- External I/O logic → use integration tests: unit mocks hide boundary breakage.
 
 ## Failure-mode router
 
@@ -52,7 +52,7 @@ For a local, reversible change, do not default to watch mode, dev servers, or br
 - In an otherwise CJS package, use `.mjs` only for file-level ESM.
 - `package.json#exports` hides deep imports by default; define subpath exports intentionally.
 - Use `createRequire(import.meta.url)` only at an interop edge; do not spread it through the codebase.
-- Use dynamic `import()` for optional, environment-specific, or heavy paths—not as a band-aid for unclear module boundaries.
+- Use dynamic `import()` for optional, environment-specific, or heavy paths: not as a band-aid for unclear module boundaries.
 - Circular imports usually indicate execution-order, not syntax, bugs; break cycles with smaller modules or dependency inversion.
 
 ## Testing rules
@@ -83,16 +83,16 @@ For a local, reversible change, do not default to watch mode, dev servers, or br
 
 ## Neighbor skills
 
-- `typescript` — load alongside this skill when types, declarations, or `tsconfig` dominate.
-- `react-best-practices` — load alongside this skill for React/Next render and bundle performance.
-- `research` → `context7` / `grep-app` — load for library-specific API work, not language mechanics.
+- `typescript`: load alongside this skill when types, declarations, or `tsconfig` dominate.
+- `react-best-practices`: load alongside this skill for React/Next render and bundle performance.
+- `research` → `context7` / `grep-app`: load for library-specific API work, not language mechanics.
 
 ## File map
 
-- `cookbook/semantics.md` — coercion, equality, scope, closures, `this`, prototypes.
-- `cookbook/patterns.md` — modern syntax, immutable updates, iterators, utility patterns.
-- `cookbook/async.md` — event loop, cancellation, queues, async iteration, streams.
-- `cookbook/modules.md` — ESM/CJS, `package.json`, exports, imports, tree shaking.
-- `cookbook/node.md` — fs, path/url, streams, workers, processes.
-- `cookbook/browser.md` — fetch, workers, storage, observers, perf APIs.
-- `cookbook/testing.md` — runner choice, mocks, timers, UI testing, fixtures.
+- `cookbook/semantics.md`: coercion, equality, scope, closures, `this`, prototypes.
+- `cookbook/patterns.md`: modern syntax, immutable updates, iterators, utility patterns.
+- `cookbook/async.md`: event loop, cancellation, queues, async iteration, streams.
+- `cookbook/modules.md`: ESM/CJS, `package.json`, exports, imports, tree shaking.
+- `cookbook/node.md`: fs, path/url, streams, workers, processes.
+- `cookbook/browser.md`: fetch, workers, storage, observers, perf APIs.
+- `cookbook/testing.md`: runner choice, mocks, timers, UI testing, fixtures.

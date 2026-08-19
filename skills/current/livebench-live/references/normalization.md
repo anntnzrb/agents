@@ -14,7 +14,7 @@ Model identity: `livebench:model:<slug>` + structured provider/variant identity.
 Every numeric object preserves `raw_value`, `normalized_value` or null, `unit`, `normalization`, `source_path`, `value_status`, `metric_semantics_status`, and source evidence. Bare numeric values lacking source unit/definition remain visible but comparison-blocked. Explicit percent signs/ratio metadata control conversion; malformed/non-finite values are never coerced; declared out-of-range values are never clamped. `N/A`, em dash, dash, empty/loading values, and source-marked `0.0%` placeholders → missing, not zero.
 
 ## Score formulas
-Observed table publishes subtask cells only. Per category, adapter derives `mean_available_subtask_values` from available mapped subtask values. Overall is separate derived `mean_of_category_averages`. Retain UI definition evidence `Overall — mean of category averages`. Never rename a source value to a generic pass metric.
+Observed table publishes subtask cells only. Per category, adapter derives `mean_available_subtask_values` from available mapped subtask values. Overall is separate derived `mean_of_category_averages`. Retain UI definition evidence `Overall; mean of category averages`. Never rename a source value to a generic pass metric.
 
 ## Cost formulas
 Published `cost_per_question` and `cost_per_successful_task` remain unchanged under `cost.published`, retaining CSV paths and denominator identity. When all task cost and `nq_<task>` inputs plus a selected score are available, selected-scope recomputation is separate under `cost.derived`:

@@ -241,8 +241,8 @@ Log back in, run `ls` in `documents`, and verify `welcome.md` is restored.
 
 ## Command reference
 
-`clan backups create <machine>` — immediate backup across all configured providers.
+`clan backups create <machine>`; immediate backup across all configured providers.
 
-`clan backups list <machine>` — list existing backups; optional `--provider` filters by provider.
+`clan backups list <machine>`; list existing backups; optional `--provider` filters by provider.
 
-`clan backups restore <machine> <provider> <name>` — restore a named backup. `<provider>` is the configured destination name; `<name>` comes from `clan backups list`.
+`clan backups restore <machine> <provider> <name>`; restore a named backup. `<provider>` is the configured destination name; `<name>` comes from `clan backups list`.

@@ -1,4 +1,4 @@
-# Modern Python 3.11–3.12
+# Modern Python 3.11-3.12
 Concurrency, typing, stdlib upgrades.
 
 ## Exception groups (3.11+)
@@ -49,7 +49,7 @@ with open("pyproject.toml", "rb") as f:
 data = tomllib.loads('[section]\nkey = "value"')
 ```
 
-Files MUST use binary mode (`"rb"`); `tomllib` is read-only—use `tomli_w` to write.
+Files MUST use binary mode (`"rb"`); `tomllib` is read-only; use `tomli_w` to write.
 
 ## Self type (3.11+)
 `Self` makes method returns refer to the current class, not the parent; especially useful for builder methods returning `self` for chaining.

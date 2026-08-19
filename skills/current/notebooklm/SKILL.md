@@ -13,7 +13,7 @@ metadata:
 
 ## Workflow
 
-1. **CLI** — Verify with `command -v nlm`; if absent, ask how user wants to install it.
+1. **CLI**: Verify with `command -v nlm`; if absent, ask how user wants to install it.
 2. **Auth**
    - Do not rely on parent-shell environment alone. Auth may be in `~/.nlm/env`, CLI/browser state, `NLM_AUTH_TOKEN`, or `NLM_COOKIES`.
    - `.env.example`: tracked template for local use or `~/.nlm/env`.
@@ -21,12 +21,12 @@ metadata:
    - If auth is missing, run `nlm auth --all --notebooks`.
    - If profiles are locked: `NLM_USE_ORIGINAL_PROFILE=1 nlm auth --all --notebooks --debug`.
    - If auth still fails, fail fast; ask user to complete browser login manually.
-3. **Notebook** — Run `nlm list` (recent notebooks); if no ID supplied, ask user to choose one.
+3. **Notebook**: Run `nlm list` (recent notebooks); if no ID supplied, ask user to choose one.
 4. **Interact**
    - Single headless question: `nlm generate-chat <notebook-id> "<prompt>"`.
    - Interactive: `nlm chat <notebook-id>`.
    - Transform sources: ask for source IDs, then use `summarize`, `explain`, `outline`, `faq`, `briefing-doc`, `timeline`, or `toc`.
-5. **Confirmations** — Always confirm before destructive operations: `rm`, `rm-source`, `rm-note`, `delete-artifact`, `audio-rm`. Confirm before privacy-impacting actions: `share` (public) and `share-private`.
+5. **Confirmations**: Always confirm before destructive operations: `rm`, `rm-source`, `rm-note`, `delete-artifact`, `audio-rm`. Confirm before privacy-impacting actions: `share` (public) and `share-private`.
 
 ## Quick commands
 

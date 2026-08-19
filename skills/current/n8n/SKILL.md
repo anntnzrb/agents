@@ -10,8 +10,8 @@ metadata:
 # n8n
 
 Routes: choose one; NEVER start either automatically.
-- Bundled REST CLI — author/administer through n8n REST.
-- Optional MCPorter — discover current endpoint tools/schemas.
+- Bundled REST CLI: author/administer through n8n REST.
+- Optional MCPorter: discover current endpoint tools/schemas.
 
 MCP catalog: instance state.
 - NEVER infer tools, arguments, or response fields.

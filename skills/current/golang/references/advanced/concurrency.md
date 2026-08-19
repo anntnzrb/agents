@@ -16,7 +16,7 @@ Scope: goroutines, context, errgroup, channels, locks, leak prevention.
 ## `context.Context`
 
 ```go
-// GOOD — ctx as first param, propagated through
+// GOOD: ctx as first param, propagated through
 func (s *UserService) Create(ctx context.Context, email Email) (User, error) {
     user, err := s.store.Insert(ctx, email)
     if err != nil {
@@ -28,7 +28,7 @@ func (s *UserService) Create(ctx context.Context, email Email) (User, error) {
     return user, nil
 }
 
-// BAD — creates a fresh ctx, breaks request cancellation
+// BAD: creates a fresh ctx, breaks request cancellation
 func (s *UserService) Create(email Email) (User, error) {
     ctx := context.Background()  // ← contextcheck linter rejects this
     // ...
@@ -40,7 +40,7 @@ func (s *UserService) Create(email Email) (User, error) {
 ### `context.Value`
 
 ```go
-// Typed key — never use a bare string
+// Typed key: never use a bare string
 type ctxKey struct{ name string }
 var requestIDKey = ctxKey{"request_id"}
 
@@ -55,7 +55,7 @@ func RequestID(ctx context.Context) string {
 ```
 
 - Keys: unexported struct types, never strings; prevents cross-package collisions.
-- `context.Value`: request-scoped metadata only — request ID, auth subject, trace span; NEVER application-scoped dependencies.
+- `context.Value`: request-scoped metadata only; request ID, auth subject, trace span; NEVER application-scoped dependencies.
 - Put loggers, DB pools, and config in the service struct, not `context.Value`.
 
 ### `WithTimeout` / `WithCancel`
@@ -78,7 +78,7 @@ import "golang.org/x/sync/errgroup"
 
 func FetchAll(ctx context.Context, urls []string) ([][]byte, error) {
     g, ctx := errgroup.WithContext(ctx)
-    g.SetLimit(8)  // concurrency cap — leave unbounded = production outage
+    g.SetLimit(8)  // concurrency cap; leave unbounded = production outage
 
     results := make([][]byte, len(urls))
     for i, u := range urls {
@@ -110,7 +110,7 @@ func FetchAll(ctx context.Context, urls []string) ([][]byte, error) {
   // after Wait, errors.Join(errs...)
   ```
 
-## Goroutine leaks — `goleak`
+## Goroutine leaks: `goleak`
 
 At the top of `*_test.go`:
 
@@ -142,7 +142,7 @@ goleak.VerifyTestMain(m,
 ### Direction
 
 ```go
-// GOOD — direction in signatures
+// GOOD: direction in signatures
 func produce(out chan<- Item)
 func consume(in <-chan Item)
 func pipeline(in <-chan Item, out chan<- Item)
@@ -221,7 +221,7 @@ Preferred to rare:
 
 ```
 Highest level (preferred)
-  channels (message passing — "share memory by communicating")
+  channels (message passing; "share memory by communicating")
   errgroup / wait group
 
   sync.RWMutex (many readers, occasional writer)
@@ -280,12 +280,12 @@ func handler() { cfg := loadConfig(); ... }
 Use typed `atomic.*` APIs (Go 1.19+), never old function-style APIs:
 
 ```go
-// Go 1.19+ — use the typed atomic.* family
+// Go 1.19+: use the typed atomic.* family
 var counter atomic.Int64
 counter.Add(1)
 n := counter.Load()
 
-// NEVER — the old function-style is type-unsafe
+// NEVER: the old function-style is type-unsafe
 atomic.AddInt64(&counter, 1)  // ← rejected
 ```
 

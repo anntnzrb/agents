@@ -79,12 +79,12 @@ async def roll_dice(sides: int) -> int:
 
 First parameter of `@agent.tool` functions. Carries:
 
-- `ctx.deps` — the dependency instance
-- `ctx.model` — the model being used
-- `ctx.usage` — token usage so far
-- `ctx.messages` — conversation history
-- `ctx.retry` / `ctx.max_retries` — current retry count
-- `ctx.agent` — the running agent instance
+- `ctx.deps`: the dependency instance
+- `ctx.model`: the model being used
+- `ctx.usage`: token usage so far
+- `ctx.messages`: conversation history
+- `ctx.retry` / `ctx.max_retries`: current retry count
+- `ctx.agent`: the running agent instance
 
 Use `@agent.tool_plain` when the tool does **not** need any of the above.
 
@@ -209,9 +209,9 @@ with capture_run_messages() as messages:
         print("Messages:", messages)
 ```
 
-- **`ModelRetry`** — raise from a tool, output validator, or capability hook to ask the model to retry
-- **`UnexpectedModelBehavior`** — raised when the retry limit is exceeded or the model API returns an unrecoverable error
-- **`capture_run_messages()`** — context manager that records all messages exchanged during a run for debugging
+- **`ModelRetry`**: raise from a tool, output validator, or capability hook to ask the model to retry
+- **`UnexpectedModelBehavior`**: raised when the retry limit is exceeded or the model API returns an unrecoverable error
+- **`capture_run_messages()`**: context manager that records all messages exchanged during a run for debugging
 
 ---
 

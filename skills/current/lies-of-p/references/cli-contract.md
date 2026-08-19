@@ -8,7 +8,7 @@ Output: deterministic UTF-8 text. `--json`: compact sorted-key JSON, formatting 
 
 `community`: reads `resources/community.json`; returns versioned, sourced weapon, amulet, and boss-wall records. Separates verified facts from sentiment, dissent, recommendation, context, and confidence; preferences ≠ mechanics. Without `--spoilers`, filters spoiler/DLC records.
 
-`compare`: accepts ≥1 candidate. Physical, elemental, and weight stats, plus `--motion`, MUST be nonnegative; `crit_percent`: 0–100; `--critical-multiplier`: ≥1; retained physical/elemental factors: 0–1. Invalid input → status 2.
+`compare`: accepts ≥1 candidate. Physical, elemental, and weight stats, plus `--motion`, MUST be nonnegative; `crit_percent`: 0-100; `--critical-multiplier`: ≥1; retained physical/elemental factors: 0-1. Invalid input → status 2.
 
 `displayed_ar = physical + elemental`  
 `adjusted_hit = (physical × physical_retained + elemental × elemental_retained) × motion`

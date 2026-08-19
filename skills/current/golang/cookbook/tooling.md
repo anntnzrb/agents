@@ -186,14 +186,14 @@ func TestService(t *testing.T) {
 }
 ```
 
-Use `defer ctrl.Finish()` to verify expected calls. Use `gomock.Any()` for irrelevant arguments. Prefer hand-written fakes for 1–2-method interfaces when mocks obscure intent.
+Use `defer ctrl.Finish()` to verify expected calls. Use `gomock.Any()` for irrelevant arguments. Prefer hand-written fakes for 1-2-method interfaces when mocks obscure intent.
 
 ## Hand-written fakes
 
 Prefer fakes over generated mocks when ordered expectations would make tests brittle; use generated mocks for call counts, argument values, and ordering on interfaces with 3+ methods. Use fakes for simple interfaces, stateful backends such as fake DBs, or when readability outweighs call-level verification.
 
 ```go
-// A hand-written fake — no generation, no expectation matching:
+// A hand-written fake: no generation, no expectation matching:
 type FakeUserRepo struct {
     users map[string]*User
     err   error
@@ -214,7 +214,7 @@ func (f *FakeUserRepo) Create(ctx context.Context, user *User) error {
     return nil
 }
 
-// Test — no EXPECT() setup, just populate state:
+// Test: no EXPECT() setup, just populate state:
 func TestService(t *testing.T) {
     fake := &FakeUserRepo{users: map[string]*User{
         "1": {ID: "1", Name: "Alice"},

@@ -66,24 +66,24 @@ Go 1.26 stable; golangci-lint v2; slog; typed errors; idiomatic concurrency; pra
 
 MUST load only references needed by the task:
 
-- `cookbook/modern.md` — modern features by Go version; new setup, version upgrade, feature discovery.
-- `cookbook/modern-1.22-1.23.md` — loop vars, ServeMux routing, range-over-func, rand/v2.
-- `cookbook/modern-1.24-1.26.md` — Swiss Tables, tool directive, synctest, new(expr), AsType.
-- `cookbook/concurrency.md` — concurrency, goroutines, channels; any goroutine/channel/errgroup/synctest task.
-- `cookbook/errors.md` — error wrapping, Is/As/AsType, Join, sentinels, custom types.
-- `cookbook/iterators.md` — iterators, range-over-func, `iter.Seq`/`Seq2`, stdlib iterator consumers, custom iterators.
-- `cookbook/generics.md` — generic types, constraints, when to avoid.
-- `cookbook/correctness.md` — JSON/API/CLI validation, typed boundaries, invariants, nil-safety.
-- `references/design-review.md` — design/review of types, states, ownership, or tests; semantic mix-ups, invalid states, over-abstraction, cleanup ambiguity, brittle tests.
-- `references/advanced/README.md`, then matching reference — opinionated stack recipes or deep implementation patterns for detailed backend, RPC, database, CLI, TUI, concurrency, or strict-tooling work; repository policy and existing tooling take precedence.
-- `references/advanced/engineering/code-smells.md` and `references/advanced/engineering/logging.md` — cross-language code-smell or logging review beyond Go-specific mechanics.
-- `cookbook/http-services.md` — HTTP services, routing, middleware; ServeMux, chi, middleware chains, graceful shutdown.
-- `cookbook/testing.md` — testing, table-driven tests, testify, benchmarks, fuzzing, integration setup.
-- `cookbook/patterns.md` — DI, options, interfaces; constructor injection, functional options, repository.
-- `cookbook/tooling.md` — lint, format, build, CI; golangci-lint config, gofumpt, buf, goreleaser, testcontainers.
-- `references/guide.md` — Go conventions, project layout, quick decisions; syntax, layout, anti-patterns, routing table, CLI reference.
-- `references/update-playbook.md` — update/audit this skill for new Go releases.
-- `references/sources.md` — source ledger for Go/tooling claims; auditing sources, release notes, or updating this skill.
+- `cookbook/modern.md`: modern features by Go version; new setup, version upgrade, feature discovery.
+- `cookbook/modern-1.22-1.23.md`: loop vars, ServeMux routing, range-over-func, rand/v2.
+- `cookbook/modern-1.24-1.26.md`: Swiss Tables, tool directive, synctest, new(expr), AsType.
+- `cookbook/concurrency.md`: concurrency, goroutines, channels; any goroutine/channel/errgroup/synctest task.
+- `cookbook/errors.md`: error wrapping, Is/As/AsType, Join, sentinels, custom types.
+- `cookbook/iterators.md`: iterators, range-over-func, `iter.Seq`/`Seq2`, stdlib iterator consumers, custom iterators.
+- `cookbook/generics.md`: generic types, constraints, when to avoid.
+- `cookbook/correctness.md`: JSON/API/CLI validation, typed boundaries, invariants, nil-safety.
+- `references/design-review.md`: design/review of types, states, ownership, or tests; semantic mix-ups, invalid states, over-abstraction, cleanup ambiguity, brittle tests.
+- `references/advanced/README.md`, then matching reference: opinionated stack recipes or deep implementation patterns for detailed backend, RPC, database, CLI, TUI, concurrency, or strict-tooling work; repository policy and existing tooling take precedence.
+- `references/advanced/engineering/code-smells.md` and `references/advanced/engineering/logging.md`: cross-language code-smell or logging review beyond Go-specific mechanics.
+- `cookbook/http-services.md`: HTTP services, routing, middleware; ServeMux, chi, middleware chains, graceful shutdown.
+- `cookbook/testing.md`: testing, table-driven tests, testify, benchmarks, fuzzing, integration setup.
+- `cookbook/patterns.md`: DI, options, interfaces; constructor injection, functional options, repository.
+- `cookbook/tooling.md`: lint, format, build, CI; golangci-lint config, gofumpt, buf, goreleaser, testcontainers.
+- `references/guide.md`: Go conventions, project layout, quick decisions; syntax, layout, anti-patterns, routing table, CLI reference.
+- `references/update-playbook.md`: update/audit this skill for new Go releases.
+- `references/sources.md`: source ledger for Go/tooling claims; auditing sources, release notes, or updating this skill.
 
 ## Must / Must Not
 
@@ -92,7 +92,7 @@ MUST load only references needed by the task:
 - MUST use `any`, not `interface{}`, and `os.ReadFile`, not `ioutil.ReadFile`.
 - MUST run `go mod tidy` after every dependency change.
 - MUST pass `context.Context` first; never store it in structs.
-- MUST define small (1–3 method) interfaces where consumed.
+- MUST define small (1-3 method) interfaces where consumed.
 - MUST NOT ignore returned errors (errcheck linter gate).
 - MUST NOT use archived `golang/mock`; use `uber-go/mock` or hand-written fakes.
 - MUST NOT use `src/` layout; module root is project root.

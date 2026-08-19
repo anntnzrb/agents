@@ -28,11 +28,11 @@ Bundled snapshot: Clan `clan-core`, branch `26.05`, commit `1ec96dde9a8e3244b32a
 
 ## Required follow-up reads
 
-- Every Clan request: `references/INDEX.md` — topic routing and snapshot rules; first read.
-- Creating or installing a Clan: `references/docs/getting-started/` — installation or first deployment.
+- Every Clan request: `references/INDEX.md`; topic routing and snapshot rules; first read.
+- Creating or installing a Clan: `references/docs/getting-started/`; installation or first deployment.
 - Prescribing inventory, services, vars, backups, or networking: matching `references/docs/guides/<topic>/`.
-- Upgrading or migrating: `references/docs/guides/migrations/` and `references/docs/releases/26-05.md` — migration or 26.05 release behavior.
-- Configuring encrypted disks: `references/docs/guides/disk-encryption.md` and `references/embeds/` — disk encryption and initrd SSH.
+- Upgrading or migrating: `references/docs/guides/migrations/` and `references/docs/releases/26-05.md`; migration or 26.05 release behavior.
+- Configuring encrypted disks: `references/docs/guides/disk-encryption.md` and `references/embeds/`; disk encryption and initrd SSH.
 - Generated CLI, options, `clan.core`, or official-service reference: pinned rendered URL in `references/INDEX.md`.
-- Refreshing to another release: `references/update-workflow.md` — snapshot updater.
-- Copying or redistributing text: `references/NOTICE.md` — copyright and redistribution terms.
+- Refreshing to another release: `references/update-workflow.md`; snapshot updater.
+- Copying or redistributing text: `references/NOTICE.md`; copyright and redistribution terms.

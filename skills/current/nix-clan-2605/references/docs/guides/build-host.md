@@ -142,6 +142,6 @@ An error like `a 'x86_64-linux' ... is required to build ..., but I am a 'aarch6
 
 ## Related
 
-- [SSH Agent Forwarding](ssh-agent-forwarding.md) — second-hop authentication.
-- [Private Flake Inputs](private-inputs.md) — private Git flake inputs without shipping credentials to the builder.
-- [NixOS Rebuild](nixos-rebuild.md) — direct `nixos-rebuild` instead of `clan machines update`.
+- [SSH Agent Forwarding](ssh-agent-forwarding.md): second-hop authentication.
+- [Private Flake Inputs](private-inputs.md): private Git flake inputs without shipping credentials to the builder.
+- [NixOS Rebuild](nixos-rebuild.md): direct `nixos-rebuild` instead of `clan machines update`.

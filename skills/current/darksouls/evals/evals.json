@@ -138,7 +138,7 @@
       "expectations": [
         "Uses only the documented soul-cost command and numeric arguments",
         "Rejects level 0 and level 714 instead of calculating or clamping them",
-        "States the accepted current and target level range as 1–713",
+        "States the accepted current and target level range as 1-713",
         "Explains that a target at or below current yields zero additional cost for valid inputs"
       ]
     },

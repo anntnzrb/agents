@@ -7,7 +7,7 @@ This directory contains static resource JSON copied from the GitHub repository:
 - License: GPL-3.0
 - Purpose: read-only Bloodborne userdata analysis for shadPS4/decrypted saves
 - Files copied: `offsets.json`, `bosses.json`, `items.json`, `weapons.json`, `armors.json`, `upgrades.json`
-- Save parser implementation (`bb_save.py`) is derived from reverse-engineering the Noxde editor's Rust source (`src-tauri/src/data_handling/` — `offsets.rs`, `upgrades.rs`, `slots.rs`, `inventory.rs`, `enums.rs`). This covers:
+- Save parser implementation (`bb_save.py`) is derived from reverse-engineering the Noxde editor's Rust source (`src-tauri/src/data_handling/`: `offsets.rs`, `upgrades.rs`, `slots.rs`, `inventory.rs`, `enums.rs`). This covers:
   - Stats: offsets relative to FACE marker and username block
   - Inventory: 16-byte slot records with item/armor/weapon type detection via byte markers (0xB0/0x40 for items, 0x10 for armor)
   - Boss flags: bitmask checks in the AOB region

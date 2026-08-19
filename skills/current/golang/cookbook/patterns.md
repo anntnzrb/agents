@@ -96,7 +96,7 @@ func NewUserService(repo UserRepository, logger *slog.Logger) *UserService {
     return &UserService{repo: repo, logger: logger}
 }
 
-// Interface defined at the consumer — not the implementation package
+// Interface defined at the consumer: not the implementation package
 type UserRepository interface {
     Get(ctx context.Context, id string) (*User, error)
     Save(ctx context.Context, user *User) error
@@ -236,10 +236,10 @@ func logMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
 
 ## Small Interfaces and Composition
 
-Prefer focused 1–2-method interfaces: larger interfaces weaken abstractions. Define them at the consumer; compose small interfaces into broader contracts at the call site. Depend only on what the handler needs.
+Prefer focused 1-2-method interfaces: larger interfaces weaken abstractions. Define them at the consumer; compose small interfaces into broader contracts at the call site. Depend only on what the handler needs.
 
 ```go
-// Small, focused interfaces — 1-2 methods each
+// Small, focused interfaces: 1-2 methods each
 type Reader interface {
     Read(p []byte) (n int, err error)
 }

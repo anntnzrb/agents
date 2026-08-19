@@ -23,7 +23,7 @@ Description:
 ```text
 Search across `platform.openai.com`, `developers.openai.com`, and `learn.chatgpt.com` docs. Use this
 whenever you are working with the OpenAI API (including the Responses API), OpenAI API SDKs, ChatGPT
-Apps SDK, or Codex. Results include URLs—**after `search`, use `fetch_openai_doc`** to read/quote
+Apps SDK, or Codex. Results include URLs; **after `search`, use `fetch_openai_doc`** to read/quote
 the exact markdown.
 ```
 
@@ -67,7 +67,7 @@ Description:
 List or browse pages from `platform.openai.com`, `developers.openai.com`, and `learn.chatgpt.com`
 that this server crawls (useful when you don’t know the right query yet or you’re paging through
 results). Use this whenever you are working with the OpenAI API (including the Responses API),
-OpenAI API SDKs, ChatGPT Apps SDK, or Codex. Results include URLs—**after `list`, use
+OpenAI API SDKs, ChatGPT Apps SDK, or Codex. Results include URLs; **after `list`, use
 `fetch_openai_doc`** on a result URL to get the full markdown.
 ```
 

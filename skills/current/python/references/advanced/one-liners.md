@@ -2,7 +2,7 @@
 
 Self-contained Python scripts declare dependencies and run without environment setup. The script IS its environment spec.
 
-**Rule: EVERY `.py` script—even throwaway—MUST use PEP 723 inline metadata plus the usage comment block.** No venv, `requirements.txt`, or `setup.py`.
+**Rule: EVERY `.py` script: even throwaway: MUST use PEP 723 inline metadata plus the usage comment block.** No venv, `requirements.txt`, or `setup.py`.
 
 ## Patterns
 
@@ -257,7 +257,7 @@ if __name__ == "__main__":
 
 ## Sources
 
-- PEP 723 — Inline script metadata: <https://peps.python.org/pep-0723/>
+- PEP 723: Inline script metadata: <https://peps.python.org/pep-0723/>
 - uv `run --script` docs: <https://docs.astral.sh/uv/guides/scripts/>
 - Original article: <https://www.cottongeeks.com/articles/2025-06-24-fun-with-uv-and-pep-723>
 - Simon Willison on one-shot Python tools: <https://simonwillison.net/2024/Dec/19/one-shot-python-tools/>

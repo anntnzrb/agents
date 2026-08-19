@@ -35,7 +35,7 @@ uv run --script <skill-dir>/scripts/cli.py report --version v1.12
 5. `latest` resolution: `DEEPSWE_DEFAULT_VERSION` > code default in `lib/deepswe/sources.py` (`v1.1` unless deliberately changed). Prefer the environment override for deployment-specific rollout; change the code default only when the repository default release should move.
 6. Update version-specific fixtures, expected values, examples, and evals only when they intentionally assert the old default. Do not rewrite historical snapshots or mix rows from releases.
 
-Explicit semantic versions—including future minor, patch, prerelease, and major versions—are accepted; major-only identifiers such as `v1` are not. Never infer a version from a homepage or silently map an unknown release to `latest`.
+Explicit semantic versions; including future minor, patch, prerelease, and major versions; are accepted; major-only identifiers such as `v1` are not. Never infer a version from a homepage or silently map an unknown release to `latest`.
 
 ## Cache/historical data
 

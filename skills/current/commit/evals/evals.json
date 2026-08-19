@@ -51,7 +51,7 @@
     },
     {
       "id": 5,
-      "prompt": "Figure out whether this repo wants manual changelog edits or release-note fragments before committing. If only heavy validation exists, do not guess—make me approve the tradeoff.",
+      "prompt": "Figure out whether this repo wants manual changelog edits or release-note fragments before committing. If only heavy validation exists, do not guess; make me approve the tradeoff.",
       "expected_output": "Detects changelog system type, applies the correct commit grouping rule, and escalates heavy or ambiguous validation with clarify instead of silently choosing.",
       "files": [],
       "expectations": [

@@ -1,6 +1,6 @@
 # Flake Parts
 
-Clan + flake-parts setup: 3 steps — add inputs; import Clan’s module; define clan and machines.
+Clan + flake-parts setup: 3 steps; add inputs; import Clan’s module; define clan and machines.
 
 ## 1. Add inputs
 

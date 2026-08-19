@@ -1,4 +1,4 @@
-# Database Stack — sqlc + pgx + goose + testcontainers
+# Database Stack: sqlc + pgx + goose + testcontainers
 
 ## Index
 
@@ -29,7 +29,7 @@ internal/store/
 │   ├── users.sql
 │   ├── orders.sql
 │   └── sessions.sql
-├── sqlc/                     # GENERATED — do not hand-edit
+├── sqlc/                     # GENERATED; do not hand-edit
 │   ├── db.go
 │   ├── models.go
 │   ├── users.sql.go
@@ -77,9 +77,9 @@ sql:
 
 Key choices:
 
-- `sql_package: "pgx/v5"` — generated code uses pgx directly, not `database/sql`. Faster, type-safer
-- `emit_interface: true` — generates a `Querier` interface. Lets stores accept either `*pgxpool.Pool` or `pgx.Tx` for transaction support
-- `emit_pointers_for_null_types: true` — nullable columns become `*T`, not `sql.NullString`. Cleaner mapping to domain types
+- `sql_package: "pgx/v5"`; generated code uses pgx directly, not `database/sql`. Faster, type-safer
+- `emit_interface: true`; generates a `Querier` interface. Lets stores accept either `*pgxpool.Pool` or `pgx.Tx` for transaction support
+- `emit_pointers_for_null_types: true`; nullable columns become `*T`, not `sql.NullString`. Cleaner mapping to domain types
 - `overrides` for `uuid` → `google/uuid.UUID` and `timestamptz` → `time.Time`
 
 ---
@@ -88,7 +88,7 @@ Key choices:
 
 ```sql
 -- internal/store/schema.sql
--- The CUMULATIVE schema sqlc parses. Not migrations — the end state.
+-- The CUMULATIVE schema sqlc parses. Not migrations; the end state.
 -- Regenerate from a fresh DB via `pg_dump --schema-only`, or hand-maintain.
 
 CREATE TABLE users (
@@ -133,11 +133,11 @@ DELETE FROM users WHERE id = $1;
 
 sqlc directives:
 
-- `:one` — exactly one row; returns `(T, error)`. Returns `pgx.ErrNoRows` on miss
-- `:many` — zero or more rows; returns `([]T, error)`
-- `:exec` — no rows returned; returns `error`
-- `:execrows` — returns `(int64, error)` with affected row count
-- `:batchone` / `:batchmany` / `:batchexec` — pgx batch mode for bulk operations
+- `:one`; exactly one row; returns `(T, error)`. Returns `pgx.ErrNoRows` on miss
+- `:many`; zero or more rows; returns `([]T, error)`
+- `:exec`; no rows returned; returns `error`
+- `:execrows`; returns `(int64, error)` with affected row count
+- `:batchone` / `:batchmany` / `:batchexec`; pgx batch mode for bulk operations
 
 Run `task gen:sqlc` (or `sqlc generate`). The generated file is committed; CI checks it is up-to-date.
 
@@ -146,7 +146,7 @@ Run `task gen:sqlc` (or `sqlc generate`). The generated file is committed; CI ch
 ## Generated code shape (`sqlc/users.sql.go`)
 
 ```go
-// GENERATED — do not edit
+// GENERATED: do not edit
 type User struct {
     ID        uuid.UUID
     Email     string
@@ -207,7 +207,7 @@ func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 
 ---
 
-## `store/user_store.go` — domain ↔ sqlc
+## `store/user_store.go`: domain ↔ sqlc
 
 ```go
 package store
@@ -276,11 +276,11 @@ func rowToDomain(r sqlc.User) (domain.User, error) {
 
 The wrapping is verbose. **That is the point.** sqlc rows are storage representations; domain types are business representations. Mapping them explicitly is where invariants are enforced.
 
-`pgx.ErrNoRows` becomes `domain.ErrUserNotFound` — callers never see storage-level errors.
+`pgx.ErrNoRows` becomes `domain.ErrUserNotFound`; callers never see storage-level errors.
 
 ---
 
-## Transactions — pgx.Tx satisfies the Querier interface
+## Transactions: pgx.Tx satisfies the Querier interface
 
 ```go
 func (s *UserStore) CreateWithProfile(
@@ -307,7 +307,7 @@ func (s *UserStore) CreateWithProfile(
 
 Pattern:
 
-- `defer tx.Rollback(ctx)` immediately after `Begin` — safe even after Commit (returns "tx closed", which we ignore via the unhandled return)
+- `defer tx.Rollback(ctx)` immediately after `Begin`: safe even after Commit (returns "tx closed", which we ignore via the unhandled return)
 - `q.WithTx(tx)` returns a `*Queries` bound to the tx
 - Last line: `tx.Commit(ctx)`
 
@@ -315,13 +315,13 @@ For nested transactions across multiple stores, accept a `Querier` parameter:
 
 ```go
 func (s *UserStore) CreateTx(ctx context.Context, q sqlc.Querier, u domain.User) (domain.User, error) {
-    // uses q instead of s.q — caller decides if it's pool or tx
+    // uses q instead of s.q: caller decides if it's pool or tx
 }
 ```
 
 ---
 
-## Migrations — goose
+## Migrations: goose
 
 ```bash
 goose -dir internal/store/migrations create create_users sql
@@ -367,7 +367,7 @@ Useful for tools that own their schema (CI runner, integration test setup).
 
 ---
 
-## Integration tests — testcontainers
+## Integration tests: testcontainers
 
 ```go
 package store_test
@@ -428,7 +428,7 @@ func TestUserStore_Create_returns_new_user(t *testing.T) {
 }
 ```
 
-testcontainers spins a real Postgres in Docker, runs migrations, hands you a pool. Tests are slow (~2s startup) but **real** — no fake that diverges from production.
+testcontainers spins a real Postgres in Docker, runs migrations, hands you a pool. Tests are slow (~2s startup) but **real**; no fake that diverges from production.
 
 For test suites with many cases, share one container across tests in the same package via `TestMain`:
 
@@ -446,7 +446,7 @@ func TestMain(m *testing.M) {
 }
 ```
 
-Each test then uses a transaction it rolls back at the end — fast and isolated.
+Each test then uses a transaction it rolls back at the end; fast and isolated.
 
 ---
 
@@ -455,7 +455,7 @@ Each test then uses a transaction it rolls back at the end — fast and isolated
 |Concern|gorm|sqlc + pgx|
 |---|---|---|
 |Type safety|runtime reflection; column-to-field via tags|compile-time-checked from SQL|
-|Performance|2–5x slower than pgx|pgx is the fastest Go pg driver|
+|Performance|2-5x slower than pgx|pgx is the fastest Go pg driver|
 |N+1 queries|encouraged by `Preload` API|explicit JOIN in `.sql`|
 |Migrations|AutoMigrate (unsafe in prod)|goose, explicit|
 |Debugging|"what query did it run?" requires logging|the query IS the source|

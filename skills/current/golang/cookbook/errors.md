@@ -99,7 +99,7 @@ if errors.As(err, &dnsErr) {
         fmt.Println("host not found")
     }
     if dnsErr.IsTemporary {
-        fmt.Println("temporary — retry")
+        fmt.Println("temporary; retry")
     }
 }
 
@@ -115,7 +115,7 @@ if errors.As(err, &dnsErr) {
 Extract a typed chain error directly, avoiding pointer-to-pointer:
 
 ```go
-// Go 1.26+ — returns the extracted value directly
+// Go 1.26+: returns the extracted value directly
 if dnsErr, ok := errors.AsType[*net.DNSError](err); ok {
     if dnsErr.IsNotFound {
         fmt.Println("host not found")

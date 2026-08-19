@@ -5,7 +5,7 @@ Base URL: `https://grep.app/api/search`; public searches require no auth.
 Environment: tracked template `.env.example`; optional override `GREP_APP_BASE_URL`.
 
 Parameters
-- Required: `q` — literal or regex pattern.
+- Required: `q`; literal or regex pattern.
 - Modifiers: `regexp=true` treats `q` as regex; `case=true` matches case; `words=true` whole-word-ish matching.
 - Filters: `f.repo=owner/repo`; `f.path=src/`; `f.lang=TypeScript`.
 

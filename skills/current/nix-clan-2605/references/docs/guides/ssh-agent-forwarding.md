@@ -164,9 +164,9 @@ Clan detects SSH authentication and host-key failures during deployment and prin
 
 ## Related
 
-- [Build Host](build-host.md) — when and how to set `deploy.buildHost` in the first place.
-- [Private Flake Inputs](private-inputs.md) — using private Git repositories as flake inputs without agent forwarding.
-- [NixOS Rebuild](nixos-rebuild.md) — using `nixos-rebuild` directly instead of `clan machines update`.
+- [Build Host](build-host.md): when and how to set `deploy.buildHost` in the first place.
+- [Private Flake Inputs](private-inputs.md): using private Git repositories as flake inputs without agent forwarding.
+- [NixOS Rebuild](nixos-rebuild.md): using `nixos-rebuild` directly instead of `clan machines update`.
 
 ## References
 

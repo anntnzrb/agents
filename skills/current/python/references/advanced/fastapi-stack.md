@@ -61,7 +61,7 @@ def get_settings() -> Settings:
     return Settings()  # type: ignore[call-arg]  # pydantic populates from env
 ```
 
-Wait — that comment violates the no-excuse rule. Use proper field defaults instead. Real version:
+Wait; that comment violates the no-excuse rule. Use proper field defaults instead. Real version:
 
 ```python
 class Settings(BaseSettings):

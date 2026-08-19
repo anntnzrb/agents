@@ -18,7 +18,7 @@ Typed errors, wrap chains, `errors.Is` / `errors.As`, no panic in libraries, res
 
 ---
 
-## Sentinel errors — for invariant programmatic checks
+## Sentinel errors: for invariant programmatic checks
 
 ```go
 package domain
@@ -52,7 +52,7 @@ if errors.Is(err, domain.ErrInvalidEmail) {
 
 ---
 
-## Typed errors — when you need structured data
+## Typed errors: when you need structured data
 
 When callers need fields off the error (the offending value, the failing field name, the upstream HTTP status):
 
@@ -92,16 +92,16 @@ if errors.As(err, &vErr) {
 
 ---
 
-## Wrapping — `%w` is mandatory
+## Wrapping: `%w` is mandatory
 
 ```go
-// BAD — drops context
+// BAD: drops context
 return err
 
-// BAD — drops the error chain (errors.Is/As stops working)
+// BAD: drops the error chain (errors.Is/As stops working)
 return fmt.Errorf("failed to save user: %v", err)
 
-// GOOD — preserves chain via %w
+// GOOD: preserves chain via %w
 return fmt.Errorf("save user %s: %w", userID, err)
 ```
 
@@ -115,7 +115,7 @@ api/handler:  "create user request: %w"
 
 Each frame adds one fact, not a duplicate. The top-level error message reads as a path: `create user request: validate inputs: email "foo": domain: invalid email`.
 
-### `errors.Join` — multiple errors at once
+### `errors.Join`: multiple errors at once
 
 ```go
 // Validate all fields, collect all errors
@@ -135,7 +135,7 @@ if len(errs) > 0 {
 
 ---
 
-## Panics — when allowed, when banned
+## Panics: when allowed, when banned
 
 **Banned**:
 
@@ -156,13 +156,13 @@ if len(errs) > 0 {
   // Use only with literals known at compile time:
   var defaultAPI = MustParseURL("https://api.example.com")
   ```
-- `default:` case of an exhaustive sealed-interface switch — see `type-patterns.md`
+- `default:` case of an exhaustive sealed-interface switch; see `type-patterns.md`
 
 The `revive` linter rule `error-return` will flag suspect panic sites; treat them as bugs.
 
 ---
 
-## `defer` for resources — the only safe pattern
+## `defer` for resources: the only safe pattern
 
 ```go
 func writeReport(path string) (err error) {
@@ -185,7 +185,7 @@ func writeReport(path string) (err error) {
 
 Key points:
 
-- `defer f.Close()` immediately after `os.Create` — never further down
+- `defer f.Close()` immediately after `os.Create`: never further down
 - Named return `(err error)` so the deferred close can mutate it on close failure
 - `bodyclose` linter catches missed `defer resp.Body.Close()` for HTTP responses
 - `sqlclosecheck` linter catches missed `defer rows.Close()` for SQL
@@ -208,7 +208,7 @@ When both the main operation AND `Close` can fail, `errors.Join` reports both wi
 
 ---
 
-## HTTP error responses — a single funnel
+## HTTP error responses: a single funnel
 
 Build one helper, route all handler errors through it:
 
@@ -246,7 +246,7 @@ func From(err error) *APIError {
     case errors.Is(err, ErrUnauthorized):
         return Unauthorized
     default:
-        // unknown — log full chain, return generic
+        // unknown: log full chain, return generic
         slog.Error("unmapped error", slog.Any("err", err))
         return Internal
     }
@@ -273,7 +273,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 ---
 
-## errgroup — error propagation across goroutines
+## errgroup: error propagation across goroutines
 
 ```go
 import "golang.org/x/sync/errgroup"
@@ -303,13 +303,13 @@ func fetchAll(ctx context.Context, urls []string) ([][]byte, error) {
 
 - `errgroup.WithContext` cancels remaining tasks on first error
 - `SetLimit` bounds concurrency
-- First non-nil error is returned; others are discarded — by design
+- First non-nil error is returned; others are discarded: by design
 
 See `concurrency.md` for the full pattern.
 
 ---
 
-## Logging errors — structured, once
+## Logging errors: structured, once
 
 ```go
 slog.ErrorContext(ctx, "save user failed",
@@ -320,7 +320,7 @@ slog.ErrorContext(ctx, "save user failed",
 
 **Log once, at the outermost frame.** Logging at every wrap site produces five log lines for one error.
 
-The `sloglint` linter enforces `slog.Any("err", err)` over `slog.String("err", err.Error())` — the former preserves the chain when handlers walk the value.
+The `sloglint` linter enforces `slog.Any("err", err)` over `slog.String("err", err.Error())`; the former preserves the chain when handlers walk the value.
 
 ---
 
@@ -339,7 +339,7 @@ The `sloglint` linter enforces `slog.Any("err", err)` over `slog.String("err", e
 The last bug deserves its own example:
 
 ```go
-// BUG — returns a non-nil error interface containing a nil concrete type
+// BUG: returns a non-nil error interface containing a nil concrete type
 func bad() error {
     var e *MyError = nil
     return e  // interface wraps nil pointer; errors == nil is FALSE
@@ -347,7 +347,7 @@ func bad() error {
 
 // Caller
 if err := bad(); err != nil {
-    // ← entered, but err.(*MyError) is nil — surprise panic
+    // ← entered, but err.(*MyError) is nil: surprise panic
 }
 ```
 

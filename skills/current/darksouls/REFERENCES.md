@@ -6,11 +6,11 @@ This file is loaded when a response needs provenance, currentness, guide-corpus 
 
 Use the narrowest source that can support the claim:
 
-1. **Observed deterministic kernel/catalog/frame-scanner output** — stable formulas, explicit catalog rows, and read-only local frame extraction. Treat unknowns as unknowns
-2. **Validated DSR read-only save mapping** — only fields that `ds1_save.py` identifies as supported from a defensible source and validation record
-3. **Official or primary sources** — product/platform facts, official manuals, published patch or support statements, and first-party release information
-4. **Fresh community references** — mechanics cross-checks, exact route/location/NPC/farming prose, calculators, mod releases, and compatibility pages. Cite the URL and check currentness for time-sensitive claims
-5. **Local transformed PSNProfiles guide corpus** — targeted platinum-walkthrough lookup only; spoiler-heavy, non-authoritative, non-save-backed, and not a substitute for source validation
+1. **Observed deterministic kernel/catalog/frame-scanner output**: stable formulas, explicit catalog rows, and read-only local frame extraction. Treat unknowns as unknowns
+2. **Validated DSR read-only save mapping**: only fields that `ds1_save.py` identifies as supported from a defensible source and validation record
+3. **Official or primary sources**: product/platform facts, official manuals, published patch or support statements, and first-party release information
+4. **Fresh community references**: mechanics cross-checks, exact route/location/NPC/farming prose, calculators, mod releases, and compatibility pages. Cite the URL and check currentness for time-sensitive claims
+5. **Local transformed PSNProfiles guide corpus**: targeted platinum-walkthrough lookup only; spoiler-heavy, non-authoritative, non-save-backed, and not a substitute for source validation
 
 When sources disagree, state which source says what, prefer the higher-ranked source for its allowed purpose, and avoid a confident synthesis that the evidence does not justify.
 

@@ -1,4 +1,4 @@
-# Bubbletea v2 — CJK/IME-safe TUI
+# Bubbletea v2: CJK/IME-safe TUI
 
 ## Use
 
@@ -168,7 +168,7 @@ rendered := titleStyle.Render("\u4e2d\u6587")
 
 `lipgloss/v2` width and padding account for CJK display width; v1 did too.
 
-## Model–Update–View
+## Model-Update-View
 
 ```
 +--------------------------------------------+
@@ -252,7 +252,7 @@ func TestModel_typing_cjk_keeps_cursor_in_position(t *testing.T) {
     m := initial()
     tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(80, 24))
 
-    // When — simulate typing two CJK wide characters
+    // When: simulate typing two CJK wide characters
     tm.Send(tea.KeyPressMsg{Code: '\u4e2d'})
     tm.Send(tea.KeyPressMsg{Code: '\u6587'})
 

@@ -44,6 +44,6 @@ The base array contains exactly these 43 official titles: **Lies of P**; **Real 
 
 ## Sources
 
-- PSNProfiles, [Lies of P Trophy Guide](https://psnprofiles.com/guide/22489-lies-of-p-trophy-guide), pp. 11–28, checked 2026-07-19; chapter boundaries and base missable timing
+- PSNProfiles, [Lies of P Trophy Guide](https://psnprofiles.com/guide/22489-lies-of-p-trophy-guide), pp. 11-28, checked 2026-07-19; chapter boundaries and base missable timing
 - PowerPyx, [Lies of P: Overture DLC Trophy Guide & Roadmap](https://www.powerpyx.com/lies-of-p-overture-dlc-trophy-guide-roadmap/), checked 2026-07-19; exact 11 titles, counts, missables, Rose Garden PNR and cleanup
 - NEOWIZ/P Round8, *Lies of P: Overture* official announcements and patch notes, checked 2026-07-19; DLC scope and version reconciliation

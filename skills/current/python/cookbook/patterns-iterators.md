@@ -148,7 +148,7 @@ Sort by the grouping key first: `groupby()` groups consecutive, not global, matc
 
 ## Itertools Recipes
 
-Common patterns—flattening, taking `n` items, and ordered uniqueness—are often more efficient than list-based approaches.
+Common patterns; flattening, taking `n` items, and ordered uniqueness; are often more efficient than list-based approaches.
 
 ```python
 from itertools import islice, chain

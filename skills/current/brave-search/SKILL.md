@@ -93,7 +93,7 @@ uv run --script <skill-dir>/scripts/cli.py summarize <summary-key> inline_refere
 |High-level command layout and behavior summary|`SKILL.md` (this file)|You need to know what the skill does at a glance|
 |Reference flows for human-style lookups|`references/flows.md`|You want a recipe for a multi-step lookup pattern|
 |Future refactor concerns, expectations, and regression traps|`references/future-refactor.md`|You are planning a larger refactor or changing output/error contracts|
-|Stale scaffolding that used to describe the old `search.ts` / `content.ts` helpers|`references/tooling.md`|Replaced by the compact CLI commands in this file — see "Quick start" above|
+|Stale scaffolding that used to describe the old `search.ts` / `content.ts` helpers|`references/tooling.md`|Replaced by the compact CLI commands in this file: see "Quick start" above|
 
 ## Validation
 

@@ -37,10 +37,10 @@ clan-site dev -b
 
 Pages live under `docs/src/`:
 
-- `docs/src/getting-started/` — install and quick-start guides.
-- `docs/src/guides/` — longer how-to pages, grouped by topic (`inventory/`, `services/`, `vars/`, and so on).
-- `docs/src/reference/` — generated CLI and option references; NEVER edit generated files manually.
-- `docs/src/concepts/`, `docs/src/decisions/` — conceptual explainers and architecture decision records.
+- `docs/src/getting-started/`: install and quick-start guides.
+- `docs/src/guides/`: longer how-to pages, grouped by topic (`inventory/`, `services/`, `vars/`, and so on).
+- `docs/src/reference/`: generated CLI and option references; NEVER edit generated files manually.
+- `docs/src/concepts/`, `docs/src/decisions/`: conceptual explainers and architecture decision records.
 
 A page is either one Markdown file (`flake-parts.md`) or a directory containing `index.md` (`nixpkgs-flake-input/index.md`). Use a directory for images or sub-pages shipped with the page.
 

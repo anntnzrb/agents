@@ -92,7 +92,7 @@ type UserRepo interface {
     Get(ctx context.Context, id domain.UserID) (domain.User, error)
 }
 
-// In-memory fake — production-quality, tested separately
+// In-memory fake: production-quality, tested separately
 type FakeUserRepo struct {
     mu    sync.RWMutex
     users map[domain.UserID]domain.User
@@ -133,13 +133,13 @@ clock.EXPECT().Now().Return(fixedTime).AnyTimes()
 
 ## E2E scenarios
 
-Use one narrative and one `Test_E2E_*` per user-visible outcome. `//go:build e2e` separates slow E2E from unit tests; run `go test -tags=e2e ./...`. Use real testcontainers DB, real gin engine, and real HTTP—no mocks—to catch integration bugs. Every E2E needs a bounded `context.WithTimeout` so CI cannot hang.
+Use one narrative and one `Test_E2E_*` per user-visible outcome. `//go:build e2e` separates slow E2E from unit tests; run `go test -tags=e2e ./...`. Use real testcontainers DB, real gin engine, and real HTTP; no mocks; to catch integration bugs. Every E2E needs a bounded `context.WithTimeout` so CI cannot hang.
 
 ```go
 //go:build e2e
 
 func Test_E2E_user_can_signup_then_login(t *testing.T) {
-    // Given — full server in a goroutine
+    // Given: full server in a goroutine
     ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
     defer cancel()
 
@@ -149,7 +149,7 @@ func Test_E2E_user_can_signup_then_login(t *testing.T) {
 
     client := server.Client()
 
-    // When — sign up
+    // When: sign up
     resp, err := client.Post(server.URL+"/api/v1/users",
         "application/json",
         strings.NewReader(`{"email":"a@b.com","username":"alice","password":"PassWord!23"}`),
@@ -157,7 +157,7 @@ func Test_E2E_user_can_signup_then_login(t *testing.T) {
     require.NoError(t, err)
     require.Equal(t, 201, resp.StatusCode)
 
-    // When — log in
+    // When: log in
     resp, err = client.Post(server.URL+"/api/v1/auth/login",
         "application/json",
         strings.NewReader(`{"email":"a@b.com","password":"PassWord!23"}`),
@@ -169,7 +169,7 @@ func Test_E2E_user_can_signup_then_login(t *testing.T) {
     require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
     require.NotEmpty(t, body.Token)
 
-    // Then — token works on protected endpoint
+    // Then: token works on protected endpoint
     req, _ := http.NewRequestWithContext(ctx, "GET", server.URL+"/api/v1/me", nil)
     req.Header.Set("Authorization", "Bearer "+body.Token)
     resp, err = client.Do(req)
@@ -225,7 +225,7 @@ import "pgregory.net/rapid"
 
 func Test_Email_NewEmail_then_String_roundtrips(t *testing.T) {
     rapid.Check(t, func(t *rapid.T) {
-        // Given — generate valid emails
+        // Given: generate valid emails
         local  := rapid.StringMatching(`[a-z]{3,10}`).Draw(t, "local")
         domain := rapid.StringMatching(`[a-z]{3,10}\.com`).Draw(t, "domain")
         raw    := local + "@" + domain
@@ -234,7 +234,7 @@ func Test_Email_NewEmail_then_String_roundtrips(t *testing.T) {
         e, err := domain.NewEmail(raw)
         require.NoError(t, err)
 
-        // Then — round-trip property
+        // Then: round-trip property
         e2, err := domain.NewEmail(e.String())
         require.NoError(t, err)
         require.Equal(t, e, e2)
@@ -270,7 +270,7 @@ func Test_GetUser_returns_user_for_existing_id(t *testing.T) {
 
 ```go
 func Test_Client_retries_on_500(t *testing.T) {
-    // Given — fake upstream
+    // Given: fake upstream
     var calls int
     srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         calls++
@@ -299,7 +299,7 @@ func Test_Client_retries_on_500(t *testing.T) {
 - NEVER `time.Sleep` in tests; delay means inject a Clock.
 - Run `go test -shuffle=on` in every CI run and `go test -count=1` to defeat cache.
 - Subscribe to events, never poll: prefer channels, callbacks, and `t.Cleanup`; await with bounds.
-- Use `t.Parallel()` only for tests sharing no state; large suites may speed up 4–8x.
+- Use `t.Parallel()` only for tests sharing no state; large suites may speed up 4-8x.
 - A 1-in-10 failure is a bug, not flake. Race detector + `-shuffle=on` + ordering hygiene catch >95% of “flake”.
 
 ## Benchmarks

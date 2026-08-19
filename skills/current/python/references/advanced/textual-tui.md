@@ -91,7 +91,7 @@ class CounterApp(App[None]):
 
 `reactive()` triggers `render()` (or `watch_<attr>` and `validate_<attr>` callbacks if defined). Use `recompose=True` if you need to call `compose()` again on change.
 
-## Async work — workers
+## Async work: workers
 
 NEVER block the event loop. For network/disk/CPU work, use `@work` (creates a worker) or `run_worker`.
 

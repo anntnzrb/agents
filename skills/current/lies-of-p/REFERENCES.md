@@ -8,7 +8,7 @@ Source roles: official patch notes + PowerPyx guides for high-impact version/tro
 - `psnprofiles_platinum_pdf`: independent platinum checklist cross-check
 - `powerpyx_base`, `powerpyx_overture`: base and Overture trophy/route references
 - `fextra_bosses`, `fextra_weapons`: boss, area, and weapon names
-- `youtube_1`–`youtube_6`: gameplay corroboration; video alone does not increase confidence
+- `youtube_1`-`youtube_6`: gameplay corroboration; video alone does not increase confidence
 - `reddit_403_attempts`: Reddit access attempts recorded; 403 means no claims copied
 - `github_repos`: repository search retained for provenance; no code/data copied
 - `context7_irrelevant`: irrelevant lookup retained for audit transparency

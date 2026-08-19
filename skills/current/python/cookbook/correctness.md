@@ -70,7 +70,7 @@ Choose the smallest gate matching project shape:
 
 |Project shape|Baseline gate|Add when needed|
 |---|---|---|
-|small library / CLI|`pyright` strict + `ruff` check/format + `pytest`|—|
+|small library / CLI|`pyright` strict + `ruff` check/format + `pytest`|:|
 |API or service with external input|baseline + boundary tests|schema fixtures for request/response shapes|
 |parser / transformer / serializer|baseline + boundary tests|targeted Hypothesis properties|
 |legacy codebase|strict on new code first|expand repo-wide once the debt is paid|

@@ -131,8 +131,8 @@ inventory.instances = {
 
 The above code uses both tags and names:
 
-- **By tag**: `roles.client.tags = [ "laptop" ]` — resolves to all machines with that tag
-- **By name**: `roles.server.machines."backup-server" = {}` — pinpoints a specific machine
+- **By tag**: `roles.client.tags = [ "laptop" ]`; resolves to all machines with that tag
+- **By name**: `roles.server.machines."backup-server" = {}`; pinpoints a specific machine
 
 You can also combine both approaches within the same role. If most of your backup clients are laptops but you also want to include one specific desktop, list both in the same role; Clan gathers all the machines from the tags and the names and treats them as one group.
 

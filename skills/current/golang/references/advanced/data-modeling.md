@@ -1,4 +1,4 @@
-# Data Modeling — Three Layers of Validation
+# Data Modeling: Three Layers of Validation
 
 ## Index
 
@@ -43,7 +43,7 @@ Each layer parses once, into the next layer's types. **A function in the domain 
 
 ---
 
-## Layer 1: HTTP boundary — `go-playground/validator/v10`
+## Layer 1: HTTP boundary: `go-playground/validator/v10`
 
 ```go
 package handlers
@@ -74,7 +74,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
         return
     }
 
-    // Cross into domain — single point of failure
+    // Cross into domain: single point of failure
     email, err := domain.NewEmail(req.Email)
     if err != nil {
         c.JSON(400, gin.H{"error": err.Error()})
@@ -103,7 +103,7 @@ func fieldErrors(vErr validator.ValidationErrors) map[string]string {
 }
 ```
 
-**Tag reference — the tags you actually use**:
+**Tag reference: the tags you actually use**:
 
 | Tag | Meaning |
 |---|---|
@@ -121,7 +121,7 @@ func fieldErrors(vErr validator.ValidationErrors) map[string]string {
 | `dive` | Apply rules to each element of slice/map |
 | `eqfield=Field` | Cross-field equality (e.g., password confirm) |
 
-### Custom validators — register at startup
+### Custom validators: register at startup
 
 ```go
 func init() {
@@ -140,7 +140,7 @@ Use sparingly. Most domain rules belong in smart constructors, not validators.
 
 ---
 
-## Layer 2: Domain — smart constructors
+## Layer 2: Domain: smart constructors
 
 Covered in detail in `type-patterns.md`. Recap:
 
@@ -173,7 +173,7 @@ func (u Username) String() string { return u.raw }
 
 ---
 
-## Layer 3: Storage — sqlc rows ↔ domain types
+## Layer 3: Storage: sqlc rows ↔ domain types
 
 sqlc generates row structs from `.sql` files. **Do not put validation tags on them.** Map between sqlc rows and domain types explicitly:
 
@@ -194,7 +194,7 @@ func (s *UserStore) Get(ctx context.Context, id domain.UserID) (domain.User, err
 func rowToUser(r sqlc.UserRow) (domain.User, error) {
     email, err := domain.NewEmail(r.Email)
     if err != nil {
-        // DB invariant broken — this is a programmer error, not a user error
+        // DB invariant broken: this is a programmer error, not a user error
         return domain.User{}, fmt.Errorf("db invariant: invalid email for user %s: %w", r.ID, err)
     }
     username, err := domain.NewUsername(r.Username)
@@ -256,10 +256,10 @@ The `exhaustive` linter on the switch + the `oneof` validation tag together cove
 
 ---
 
-## Enums — typed string consts, not iota
+## Enums: typed string consts, not iota
 
 ```go
-// GOOD — string-based, JSON-serializes correctly, debuggable
+// GOOD: string-based, JSON-serializes correctly, debuggable
 type Status string
 
 const (
@@ -292,7 +292,7 @@ Use the validator tag `binding:"oneof=pending active closed"` to enforce at the 
 
 ---
 
-## Nullable fields — `*T` vs sentinel
+## Nullable fields: `*T` vs sentinel
 
 Three choices, in order of preference:
 
@@ -301,14 +301,14 @@ Three choices, in order of preference:
 3. **`*T`**: only when you need to distinguish "not provided" from "set to zero" in a JSON payload (PATCH semantics)
 
 ```go
-// PATCH payload — `*string` discriminates absent vs empty
+// PATCH payload: `*string` discriminates absent vs empty
 type UpdateUserRequest struct {
     Email    *string `json:"email,omitempty"`
     Username *string `json:"username,omitempty"`
 }
 ```
 
-Avoid `*T` in domain types — it bloats every consumer with nil checks. Keep `*T` at the boundary, unwrap on the way in.
+Avoid `*T` in domain types; it bloats every consumer with nil checks. Keep `*T` at the boundary, unwrap on the way in.
 
 ---
 

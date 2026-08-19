@@ -157,7 +157,7 @@ func TestExample(t *testing.T) {
 }
 ```
 
-**Tip**: Prefer stdlib `if got != want` for new projects. Use testify only when the project already uses it — don't add testify to a project that doesn't already depend on it.
+**Tip**: Prefer stdlib `if got != want` for new projects. Use testify only when the project already uses it; don't add testify to a project that doesn't already depend on it.
 
 ---
 
@@ -182,7 +182,7 @@ func TestWithSetup(t *testing.T) {
 }
 ```
 
-**Tip**: Pattern: `require` for preconditions, `assert` for test assertions. `require` calls `t.Fatal` — the test stops immediately.
+**Tip**: Pattern: `require` for preconditions, `assert` for test assertions. `require` calls `t.Fatal`; the test stops immediately.
 
 ---
 
@@ -222,7 +222,7 @@ func TestService(t *testing.T) {
 }
 ```
 
-**Tip**: Call `AssertExpectations(t)` at the end to verify all expected calls were made. Define interfaces, mock the interface — never mock concrete types.
+**Tip**: Call `AssertExpectations(t)` at the end to verify all expected calls were made. Define interfaces, mock the interface; never mock concrete types.
 
 ---
 
@@ -310,7 +310,7 @@ func TestParallel(t *testing.T) {
 **Solution**:
 
 ```bash
-# Fail fast — stop on first test failure (Go 1.25+)
+# Fail fast: stop on first test failure (Go 1.25+)
 go test -failfast
 
 # Shuffle test order to detect inter-test dependencies
@@ -361,7 +361,7 @@ func TestProcessFile(t *testing.T) {
 }
 ```
 
-**Tip**: `t.TempDir()` creates a directory that is automatically removed when the test completes. `t.Cleanup` registrations run in LIFO order — the last registered cleanup runs first. Prefer `t.TempDir` over `os.MkdirTemp` + manual cleanup.
+**Tip**: `t.TempDir()` creates a directory that is automatically removed when the test completes. `t.Cleanup` registrations run in LIFO order; the last registered cleanup runs first. Prefer `t.TempDir` over `os.MkdirTemp` + manual cleanup.
 
 ---
 
@@ -387,7 +387,7 @@ func TestWithArtifacts(t *testing.T) {
 }
 ```
 
-**Tip**: `t.ArtifactDir()` always returns a per-test directory — no empty-string guard needed. When `-artifacts` is set with `go test`, the directory is preserved after the test; otherwise it is cleaned up automatically. Available since Go 1.26.
+**Tip**: `t.ArtifactDir()` always returns a per-test directory; no empty-string guard needed. When `-artifacts` is set with `go test`, the directory is preserved after the test; otherwise it is cleaned up automatically. Available since Go 1.26.
 
 ---
 

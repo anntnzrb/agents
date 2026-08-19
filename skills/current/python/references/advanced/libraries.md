@@ -1,10 +1,10 @@
-# Library Defaults — Decision Tree
+# Library Defaults: Decision Tree
 
 ## Index
 
 Use heading search; load only the task-matching section. Each domain lists the canonical 2026 choice, rationale, and usage. The skill MUST enforce these defaults unless the project's `pyproject.toml` explicitly says otherwise.
 
-## CLI — typer
+## CLI: typer
 
 `typer`: type-annotated CLI generation. `argparse`: 5x more code; `click`: ignores type annotations; `fire`: scale-breaking magic. Single-function script: `typer.run(main)`. Subcommands: `@app.command()`.
 
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     app()
 ```
 
-## Terminal output — rich
+## Terminal output: rich
 
 Use `rich` for structured output: tables, progress bars, syntax highlighting, tracebacks. Plain `print` MAY serve non-interactive log lines; prefer `rich.console.Console(stderr=True).log(...)` even there. Install rich tracebacks once at process start.
 
@@ -49,7 +49,7 @@ from rich.traceback import install
 install(show_locals=True)
 ```
 
-## HTTP client — [httpx2](https://github.com/pydantic/httpx2)
+## HTTP client: [httpx2](https://github.com/pydantic/httpx2)
 
 `httpx2`: Pydantic-stewarded, sync+async, HTTP/2-native, brotli+zstd decoding, typed; replaces `requests`, `aiohttp`, and original `httpx`.
 
@@ -59,7 +59,7 @@ Install exactly `httpx2[http2,brotli,zstd]`; always include all three extras. Ba
 import socket
 import httpx2
 
-# ── Production defaults — ALL ON, always. ──
+# ── Production defaults: ALL ON, always. ──
 _LIMITS = httpx2.Limits(
     max_connections=200, max_keepalive_connections=40, keepalive_expiry=30.0
 )
@@ -89,7 +89,7 @@ with httpx2.Client(
     users = response.json()
 ```
 
-## JSON — stdlib `json` (default) or `orjson` (hot paths)
+## JSON: stdlib `json` (default) or `orjson` (hot paths)
 
 Use stdlib `json` for cold paths/configs; use `orjson` when JSON is hot: cache layers, queue payloads, streaming responses, structured logs, or FastAPI raw `dict`/`list` responses. `orjson.dumps` returns `bytes`. For Pydantic v2, use `model_dump_json()`; pydantic-core (Rust) beats the `orjson + default=` bridge for Pydantic-shaped responses. FastAPI: `app = FastAPI(default_response_class=ORJSONResponse)`; Pydantic-typed responses correctly bypass it, while raw `dict`/`list` responses use orjson. See `references/orjson-stack.md` for the decision tree, flags, FastAPI, Redis/queue/logging patterns, and benchmark.
 
@@ -103,7 +103,7 @@ raw: bytes = orjson.dumps(
 )
 ```
 
-## Validation — pydantic v2
+## Validation: pydantic v2
 
 Use Pydantic v2 as the boundary validator for HTTP models, config (env vars via `pydantic-settings`), and anything entering from outside. Its Rust core is ~10x faster than v1. `@dataclass` is acceptable for internal records needing no validation; process-boundary data requires Pydantic.
 
@@ -130,7 +130,7 @@ user = User.model_validate({"id": 1, "email": "a@b.com", "name": "Alice"})
 print(user.model_dump_json(indent=2))
 ```
 
-## Async — anyio
+## Async: anyio
 
 Full reference: [async-anyio.md](async-anyio.md). Use anyio; NEVER `import asyncio` directly. Called third-party libraries MAY use asyncio internally.
 
@@ -152,7 +152,7 @@ async def main() -> None:
 anyio.run(main)
 ```
 
-## Web framework — fastapi
+## Web framework: fastapi
 
 Type-hint-driven HTTP framework; Pydantic models automatically become OpenAPI schemas. Full database stack: [fastapi-stack.md](fastapi-stack.md).
 
@@ -179,7 +179,7 @@ async def create_user(payload: CreateUser) -> User:
     return User(id=1, **payload.model_dump())
 ```
 
-## ORM — sqlalchemy 2.x async
+## ORM: sqlalchemy 2.x async
 
 Use SQLAlchemy 2.x async with modern declarative `MappedAsDataclass` and type annotations. Full FastAPI integration: [fastapi-stack.md](fastapi-stack.md).
 
@@ -204,7 +204,7 @@ engine = create_async_engine("postgresql+asyncpg://localhost/myapp")
 SessionFactory = async_sessionmaker(engine, expire_on_commit=False)
 ```
 
-## Database — postgres + asyncpg
+## Database: postgres + asyncpg
 
 New applications: Postgres. SQLite MAY be used for tests, but NEVER production. `asyncpg` is the fastest Python Postgres driver and is native to SQLAlchemy 2.x async and FastAPI's lifespan model. URL: `postgresql+asyncpg://user:pass@host:5432/db`.
 
@@ -215,23 +215,23 @@ uv add alembic
 uv run alembic init -t async migrations
 ```
 
-## TUI — textual
+## TUI: textual
 
 `textual`: rich, mouse-aware, mobile-style TUIs on the rich rendering engine. See [textual-tui.md](textual-tui.md).
 
-## AI agents — pydantic-ai
+## AI agents: pydantic-ai
 
 `pydantic-ai`: Pydantic-team agent framework; type-strict, structured outputs first-class, model-agnostic. See [pydantic-ai.md](pydantic-ai.md).
 
-## DataFrames — polars + numpy
+## DataFrames: polars + numpy
 
-Polars: 10–50x faster than pandas, real type system, lazy evaluation. Numpy remains for arrays. See [data-processing.md](data-processing.md).
+Polars: 10-50x faster than pandas, real type system, lazy evaluation. Numpy remains for arrays. See [data-processing.md](data-processing.md).
 
-## OLAP / SQL — duckdb
+## OLAP / SQL: duckdb
 
-DuckDB: analytical SQL engine; queries CSV/Parquet/JSON directly without loading into memory, joins/aggregations 3–4x faster than Polars, zero-copy Polars interchange via Arrow. See [data-processing.md](data-processing.md).
+DuckDB: analytical SQL engine; queries CSV/Parquet/JSON directly without loading into memory, joins/aggregations 3-4x faster than Polars, zero-copy Polars interchange via Arrow. See [data-processing.md](data-processing.md).
 
-## Tests — pytest
+## Tests: pytest
 
 Use `unittest` for stdlib-only code; otherwise pytest. Conventions: files `test_*.py`; functions `test_*`; fixtures `@pytest.fixture`; async fixtures use `@pytest.fixture` on async functions under bundled `pytest-anyio`; parametrization `@pytest.mark.parametrize`; async tests `@pytest.mark.anyio` from anyio's pytest plugin.
 
@@ -264,7 +264,7 @@ testpaths = ["tests"]
 addopts = ["-ra", "--strict-config", "--strict-markers"]
 ```
 
-## Settings / config — pydantic-settings
+## Settings / config: pydantic-settings
 
 Use `pydantic-settings` to load env vars and `.env` into a Pydantic model; it replaces ad-hoc `os.environ.get(...)`. The shown `Settings()` loads at import time and raises when required variables are missing.
 
@@ -284,7 +284,7 @@ class Settings(BaseSettings):
 settings = Settings()  # loads at import time; raises if any required var is missing
 ```
 
-## Logging — stdlib logging + rich handler
+## Logging: stdlib logging + rich handler
 
 Use stdlib `logging` with `rich.logging.RichHandler`; for production structured logs, use separate-dependency `structlog`, not a custom implementation.
 

@@ -1,4 +1,4 @@
-# RPC — Connect-Go (default) + grpc-go (fallback) + protovalidate
+# RPC: Connect-Go (default) + grpc-go (fallback) + protovalidate
 
 ## Index
 
@@ -23,7 +23,7 @@ Read the section whose heading matches the task; use heading search before loadi
 
 ---
 
-## Toolchain — Buf, not protoc
+## Toolchain: Buf, not protoc
 
 ```bash
 go install github.com/bufbuild/buf/cmd/buf@latest
@@ -32,7 +32,7 @@ go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
 go install github.com/bufbuild/protovalidate/cmd/protoc-gen-go-vtproto@latest
 ```
 
-Buf replaces `protoc` for everything: linting, breaking-change detection, codegen, formatting. The `protoc` toolchain is dead-letter walking — every modern proto project uses Buf.
+Buf replaces `protoc` for everything: linting, breaking-change detection, codegen, formatting. The `protoc` toolchain is dead-letter walking; every modern proto project uses Buf.
 
 ---
 
@@ -98,7 +98,7 @@ plugins:
       - paths=source_relative
 ```
 
-The `buf.build/...` plugin URIs use Buf's hosted remote registry — no local plugin installation needed.
+The `buf.build/...` plugin URIs use Buf's hosted remote registry; no local plugin installation needed.
 
 ---
 
@@ -162,11 +162,11 @@ message User {
 }
 ```
 
-`protovalidate` replaces the abandoned `protoc-gen-validate` — it is the official Buf-backed successor as of 2024, supported by Connect's interceptor pipeline.
+`protovalidate` replaces the abandoned `protoc-gen-validate`; it is the official Buf-backed successor as of 2024, supported by Connect's interceptor pipeline.
 
 ---
 
-## Server — Connect
+## Server: Connect
 
 ```go
 package main
@@ -230,11 +230,11 @@ func main() {
 }
 ```
 
-The handler is **just an `http.Handler`** — mount it in the same `http.ServeMux` as your REST routes if you want one binary serving both.
+The handler is **just an `http.Handler`**; mount it in the same `http.ServeMux` as your REST routes if you want one binary serving both.
 
 ---
 
-## Error mapping — Connect codes
+## Error mapping: Connect codes
 
 ```go
 func mapError(err error) error {
@@ -325,7 +325,7 @@ client := myservicev1connect.NewUserServiceClient(
     http.DefaultClient,
     "https://api.example.com",
     // Use connect.WithGRPC() if the server is grpc-go and you want strict gRPC framing.
-    // Default is Connect protocol — works with Connect or gRPC servers transparently.
+    // Default is Connect protocol: works with Connect or gRPC servers transparently.
 )
 
 res, err := client.CreateUser(ctx, connect.NewRequest(&myservicev1.CreateUserRequest{
@@ -368,7 +368,7 @@ The codegen is from `protoc-gen-go-grpc` (different binary from `protoc-gen-conn
 
 If your callers are all browsers, mobile apps, third-party developers, or the long tail of "things humans curl": **stay with REST + OpenAPI**. RPC's overhead is justified for service-to-service inside a single org. Outside that boundary, JSON over HTTP wins on debuggability.
 
-`oapi-codegen/oapi-codegen/v2` generates Go server stubs and clients from OpenAPI 3 — the REST equivalent of what Connect does for proto. Same parse-don't-validate boundary discipline, different wire format.
+`oapi-codegen/oapi-codegen/v2` generates Go server stubs and clients from OpenAPI 3; the REST equivalent of what Connect does for proto. Same parse-don't-validate boundary discipline, different wire format.
 
 ---
 

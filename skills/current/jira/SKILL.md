@@ -44,7 +44,7 @@ Resolve and verify site/account, project, metadata, target, and bounded duplicat
 Never invent an idempotency field or silently retry a non-idempotent write. Preserve original status and diagnostics; reconcile uncertain results with a fresh read/search. Report `created`, `failed`, `unknown`, or `skipped-duplicate` only when evidence supports it. Re-read every created issue/comment; report stable key/link only after verification. For multiple tickets, report each outcome and leave a resumable summary.
 
 ## Required reads
-`references/core.md`: CLI preflight, auth, target resolution, output, write safety — every route; always before mutation.
+`references/core.md`: CLI preflight, auth, target resolution, output, write safety; every route; always before mutation.
 `references/search.md`: Jira search/read.
 `references/triage.md`: explicit triage/duplicate investigation.
 `references/create-ticket.md`: one explicit create/open/file/make request.

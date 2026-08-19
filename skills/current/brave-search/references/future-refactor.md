@@ -31,7 +31,7 @@ Scope: read for larger skill refactors, not normal lookup.
 3. Live smoke tests behind an env flag; normal test runs never spend quota.
 4. Revisit summarizer only if Brave reliably returns `summarizer.key`; until then, legacy/experimental.
 5. Consider `--fields` or `fields=` only if compact defaults prove too rigid; no mini query language unless real callers need it.
-6. Normalize HTML in `description` only if downstream agent quality improves; do not strip useful emphasis blindly—measure first.
+6. Normalize HTML in `description` only if downstream agent quality improves; do not strip useful emphasis blindly: measure first.
 
 ## Regression traps
 - `payload.query` may be a dict in real Brave payloads but a string in tests; defensive type checks intentional.

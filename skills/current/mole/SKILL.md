@@ -38,11 +38,11 @@ Everything else is for humans.
 
 **Cleanup history**
 
-`mo history --json [--limit N]`, with N from 1–200, prints `logs` (paths to operation and deletion logs) and `sessions[]` containing `command`, `started_at`, `items`, `size`, and `actions` broken down into removed, trashed, skipped, and failed. Use the deletions log paths to answer whether Mole deleted a file; do not guess.
+`mo history --json [--limit N]`, with N from 1-200, prints `logs` (paths to operation and deletion logs) and `sessions[]` containing `command`, `started_at`, `items`, `size`, and `actions` broken down into removed, trashed, skipped, and failed. Use the deletions log paths to answer whether Mole deleted a file; do not guess.
 
 **Dry-run candidate paths**
 
-`mo clean --dry-run` prints a terminal summary and writes every candidate path to `~/.config/mole/clean-list.txt`. Read that file—not terminal output—to reason about or show the exact paths a real clean would remove. This file is clean-only: `mo purge --dry-run` and `mo installer --dry-run` print candidates in the terminal and write no file.
+`mo clean --dry-run` prints a terminal summary and writes every candidate path to `~/.config/mole/clean-list.txt`. Read that file; not terminal output; to reason about or show the exact paths a real clean would remove. This file is clean-only: `mo purge --dry-run` and `mo installer --dry-run` print candidates in the terminal and write no file.
 
 **System status**
 

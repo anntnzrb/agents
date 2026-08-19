@@ -36,13 +36,13 @@ agent-browser profiler stop ./trace.json
 
 `--categories`: comma-separated Chrome trace categories. Default categories include:
 
-- `devtools.timeline` — standard DevTools performance traces
-- `v8.execute` — JavaScript execution time
-- `blink` — renderer events
-- `blink.user_timing` — `performance.mark()` / `performance.measure()` calls
-- `latencyInfo` — input-to-latency tracking
-- `renderer.scheduler` — task scheduling and execution
-- `toplevel` — broad-spectrum basic events
+- `devtools.timeline`: standard DevTools performance traces
+- `v8.execute`: JavaScript execution time
+- `blink`: renderer events
+- `blink.user_timing`: `performance.mark()` / `performance.measure()` calls
+- `latencyInfo`: input-to-latency tracking
+- `renderer.scheduler`: task scheduling and execution
+- `toplevel`: broad-spectrum basic events
 
 `disabled-by-default-*` categories also included for detailed timeline, call stack, and V8 CPU profiling data.
 
@@ -99,7 +99,7 @@ Output: JSON file in Chrome Trace Event format.
 Load the output JSON in:
 
 - **Chrome DevTools**: Performance panel > Load profile (Ctrl+Shift+I > Performance)
-- **Perfetto UI**: https://ui.perfetto.dev/ — drag and drop the JSON file
+- **Perfetto UI**: https://ui.perfetto.dev/; drag and drop the JSON file
 - **Trace Viewer**: `chrome://tracing` in any Chromium browser
 
 ## Limitations

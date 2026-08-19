@@ -1,8 +1,8 @@
-# Logging — Cross-Language Methodology
+# Logging: Cross-Language Methodology
 
 Two legitimate readers: operator reconstructing an incident; developer reproducing a bug. A line serving neither costs storage, noise, and attention. Stack-agnostic: use destination-skill guidance only for greenfield defaults; existing project practice overrides it.
 
-## Rule 0 — discover practice first
+## Rule 0: discover practice first
 
 **BEFORE adding one log line, determine how the project logs.** Inspect logger initialization, wrapper modules, sibling call sites, and `AGENTS.md` / `CLAUDE.md`.
 
@@ -20,34 +20,34 @@ A new service gets exactly:
 1. One init module exporting a ready logger; only it knows the stage. Call sites never inspect `NODE_ENV`-style variables.
 2. Environment split: dev human-readable, pretty, colorized; prod structured, machine-parseable JSON to stdout. Same API; stage changes sink/format, never call sites.
 3. Threshold: dev `debug`; prod `info`; `LOG_LEVEL`-style environment override.
-4. The stack’s standard structured logger — repository choice or destination-skill greenfield guidance — never a hand-rolled logger.
+4. The stack’s standard structured logger: repository choice or destination-skill greenfield guidance; never a hand-rolled logger.
 5. Error-serialization proof: pass a real Error/exception through the PROD formatter and assert preserved type, message, and stack. Structured stacks have reserved-key contracts; violating one can yield `error: {}` instead of a stack trace. Write this one-line setup test.
 
-## Levels — consumer, not severity
+## Levels: consumer, not severity
 
 Choose a level by naming the consumer and its action. No named consumer → no line.
 
-- `error` — alerting wakes a human NOW; service failed at a user-visible operation and cannot recover itself.
-- `warn` — batch review through dashboards or weekly triage; request succeeded through an abnormal path such as retry, fallback, degraded mode, or suspicious data.
-- `info` — incident timeline; a necessary state transition such as session/job/connection creation, completion, or destruction.
-- `debug` — developer reproduces locally; detailed tracing; **does not exist in prod**.
+- `error`: alerting wakes a human NOW; service failed at a user-visible operation and cannot recover itself.
+- `warn`: batch review through dashboards or weekly triage; request succeeded through an abnormal path such as retry, fallback, degraded mode, or suspicious data.
+- `info`: incident timeline; a necessary state transition such as session/job/connection creation, completion, or destruction.
+- `debug`: developer reproduces locally; detailed tracing; **does not exist in prod**.
 
 `error` describes service failure, not request failure. A correctly handled 4xx is `warn` at most, or `info` for routine misses; reserve `error` for 5xx-class outcomes where the service could not do its job. A failure at `info` is invisible: messages saying “failed” require `warn` or `error`, never `info`.
 
-## Placement — decisions, not work
+## Placement: decisions, not work
 
 Log at:
 
-- boundaries — request in/response out, external calls and failures;
-- state transitions — session, job, connection create/complete/destroy;
-- decision points — retry, fallback, cache bypass, degraded mode;
+- boundaries: request in/response out, external calls and failures;
+- state transitions: session, job, connection create/complete/destroy;
+- decision points: retry, fallback, cache bypass, degraded mode;
 - the one place an error is finally handled.
 
 Never log inside pure functions, utilities, or private helpers; callers with context log outcomes.
 
 - One event, one line. Log where an error is handled; propagation-only layers stay silent. Log-and-rethrow at every layer duplicates one incident.
-- Returning an answer is not logging. Every path converting failure into a caller-facing signal — HTTP 5xx body, SSE error event, error string returned to an LLM as a tool result, or non-zero exit code — logs exactly once at its handling layer. With stacked conversion layers, mark the error logged using a symbol/flag on the error object so outer catch-alls skip it.
-- Expected validation feedback returned normally — including LLM-consumed tool output such as “string not found”, lint findings, or a sandbox-boundary notice — is response content, not an event. Log only underlying genuine I/O/subprocess failures and security rejections.
+- Returning an answer is not logging. Every path converting failure into a caller-facing signal; HTTP 5xx body, SSE error event, error string returned to an LLM as a tool result, or non-zero exit code; logs exactly once at its handling layer. With stacked conversion layers, mark the error logged using a symbol/flag on the error object so outer catch-alls skip it.
+- Expected validation feedback returned normally: including LLM-consumed tool output such as “string not found”, lint findings, or a sandbox-boundary notice; is response content, not an event. Log only underlying genuine I/O/subprocess failures and security rejections.
 - Put mechanical request/response logging in middleware once, never per handler. Exclude high-volume zero-signal paths such as health probes and metrics scrapes there as an exclusion set, not scattered `if` statements.
 
 No speculative logs. “Might need it later” is not a consumer. Evidence may be a debugging session slowed by invisible state, an incident postmortem, or an alert needing a field.

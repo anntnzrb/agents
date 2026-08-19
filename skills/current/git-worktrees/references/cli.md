@@ -128,7 +128,7 @@ release --lease-id ID --owner-token TOKEN --quiescent
 
 All arguments shown are required. Release is explicit cleanup, never an automatic finalizer. It requires the owner capability, caller quiescence attestation, and no active handoff.
 
-Before removal, the controller revalidates repository identity, provenance, target path, registration as a linked non-primary worktree, expected ref/mode, and clean status. It removes only with `git worktree remove <path>`—never force—then re-enumerates to confirm absence. Successful release retains a released lease tombstone.
+Before removal, the controller revalidates repository identity, provenance, target path, registration as a linked non-primary worktree, expected ref/mode, and clean status. It removes only with `git worktree remove <path>`; never force; then re-enumerates to confirm absence. Successful release retains a released lease tombstone.
 
 ## Safety boundary
 

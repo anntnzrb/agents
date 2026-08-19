@@ -382,13 +382,13 @@ if v, ok := cache.Load("key"); ok {
     // Use v.(YourType)
 }
 
-// LoadOrStore — atomic get-or-set
+// LoadOrStore: atomic get-or-set
 actual, loaded := cache.LoadOrStore("key", newValue)
 
 // Delete
 cache.Delete("key")
 
-// Range — iterate safely
+// Range: iterate safely
 cache.Range(func(key, value any) bool {
     fmt.Println(key, value)
     return true // Continue iteration

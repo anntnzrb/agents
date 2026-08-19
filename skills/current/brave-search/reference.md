@@ -35,12 +35,12 @@ Direct env vars still win:
 | Command | Default `count` | Additional default |
 | --- | --- | --- |
 | `web` | `5` | `result_filter=web` (skipped if `result_filter=` is passed or `raw=1`) |
-| `news` | `5` | — |
-| `local` | `5` | — |
-| `image` | `10` | — |
-| `video` | `10` | — |
+| `news` | `5` |: |
+| `local` | `5` |: |
+| `image` | `10` |: |
+| `video` | `10` |: |
 
-`count` is hard-capped at `1..20` (integer). Bad values are rejected with rc=2 before any network call. `raw=1` (or `raw` with no value) skips both defaults and the compact projection — the upstream bytes are streamed to stdout unchanged. `raw=0` and any other value is treated as the normal compact call.
+`count` is hard-capped at `1..20` (integer). Bad values are rejected with rc=2 before any network call. `raw=1` (or `raw` with no value) skips both defaults and the compact projection; the upstream bytes are streamed to stdout unchanged. `raw=0` and any other value is treated as the normal compact call.
 
 ### Web search
 
@@ -120,7 +120,7 @@ Use `raw=1` on an endpoint command to get the same upstream bytes for just that 
 
 ## Summarizer (legacy / experimental)
 
-Brave's legacy summarizer is a two-step flow that is no longer the recommended path — prefer the default compact endpoints for new work. The flow is kept reachable for backward raw access:
+Brave's legacy summarizer is a two-step flow that is no longer the recommended path; prefer the default compact endpoints for new work. The flow is kept reachable for backward raw access:
 
 1. Get a key from web search (with `summary=1`)
 2. Fetch the summary from `/summarizer/search`
@@ -165,7 +165,7 @@ HTTP errors and network failures emit a one-line compact JSON envelope on stderr
 - `error.body_truncated` is `true` when the upstream body was larger than the preview window
 - HTTP errors return rc=22; network/parse errors return rc=1
 
-Usage errors (missing args, bad count, missing API key) return rc=2 with a concise plain-text stderr message — not the compact error envelope.
+Usage errors (missing args, bad count, missing API key) return rc=2 with a concise plain-text stderr message; not the compact error envelope.
 
 ## Notes
 

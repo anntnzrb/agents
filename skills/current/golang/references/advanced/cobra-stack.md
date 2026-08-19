@@ -1,10 +1,10 @@
-# CLI Stack — cobra + slog + caarlos0/env + signal handling
+# CLI Stack: cobra + slog + caarlos0/env + signal handling
 
 ## Index
 
 Read the section whose heading matches the task; use heading search before loading unrelated detail.
 
-The canonical Go CLI skeleton. `cobra` is the de facto framework — Kubernetes, Docker CLI, Helm, GitHub CLI, gh, Hugo all use it. Use it.
+The canonical Go CLI skeleton. `cobra` is the de facto framework; Kubernetes, Docker CLI, Helm, GitHub CLI, gh, Hugo all use it. Use it.
 
 ---
 
@@ -31,7 +31,7 @@ mytool/
 │   ├── root.go              # rootCmd, persistent flags, slog setup
 │   ├── server.go            # `mytool server` subcommand
 │   ├── migrate.go           # `mytool migrate` subcommand
-│   └── version.go           # `mytool version` — auto-injected version
+│   └── version.go           # `mytool version`; auto-injected version
 ├── internal/
 │   ├── config/
 │   └── server/
@@ -174,7 +174,7 @@ func init() {
 }
 ```
 
-The subcommand is a thin shim — flags + log line + delegate to `internal/server`. Anything bigger violates the 250-LOC ceiling and belongs in `internal/`.
+The subcommand is a thin shim; flags + log line + delegate to `internal/server`. Anything bigger violates the 250-LOC ceiling and belongs in `internal/`.
 
 ---
 
@@ -203,7 +203,7 @@ Use cobra's argument validators (`cobra.ExactArgs`, `cobra.MaximumNArgs`, `cobra
 
 ---
 
-## Flag types — typed, not strings
+## Flag types: typed, not strings
 
 ```go
 // GOOD
@@ -211,7 +211,7 @@ serverCmd.Flags().DurationVar(&timeout, "timeout", 30*time.Second, "request time
 serverCmd.Flags().IntVar(&port, "port", 8080, "port")
 serverCmd.Flags().StringSliceVar(&hosts, "host", nil, "allowed hosts (repeatable)")
 
-// BAD — manual parsing
+// BAD: manual parsing
 serverCmd.Flags().StringVar(&timeoutStr, "timeout", "30s", "")
 // ...then later: time.ParseDuration(timeoutStr)
 ```
@@ -259,7 +259,7 @@ Precedence: **flag (if set) > env > default**. Document the env var in the flag 
 
 ---
 
-## Version subcommand — build-injected
+## Version subcommand: build-injected
 
 ```go
 // cmd/version.go
@@ -315,7 +315,7 @@ go build \
   -o bin/mytool ./
 ```
 
-The `debug.BuildInfo` fallback means a `go install`'d binary also has version info — no manual `-ldflags` needed.
+The `debug.BuildInfo` fallback means a `go install`'d binary also has version info; no manual `-ldflags` needed.
 
 ---
 
@@ -350,7 +350,7 @@ mytool completion zsh > "${fpath[1]}/_mytool"
 
 ---
 
-## Interactive prompts — `huh` from charm
+## Interactive prompts: `huh` from charm
 
 For prompts/forms (`Are you sure?`, "Pick an environment", multi-field forms):
 
@@ -396,7 +396,7 @@ p.Wait()
 
 ---
 
-## Output — JSON vs text
+## Output: JSON vs text
 
 Honor `--output json` for any CLI that scripts will parse:
 

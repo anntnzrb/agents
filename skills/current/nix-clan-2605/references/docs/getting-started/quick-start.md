@@ -92,7 +92,7 @@ sudo dd if=nixos-installer-x86_64-linux.iso of=/dev/<USB_DEVICE> bs=4M status=pr
 
 This writes the installer image to the USB drive. All existing data on the drive will be lost.
 
-Boot the target machine from the USB drive. Note the **installer IP address** shown on screen — the following steps pass it to `--target-host`. After installation the machine reboots and gets a different IP, which you'll configure later.
+Boot the target machine from the USB drive. Note the **installer IP address** shown on screen; the following steps pass it to `--target-host`. After installation the machine reboots and gets a different IP, which you'll configure later.
 
 :::admonition[No IP?]{type=tip}
 Press Ctrl+C, run `nmtui`, connect to WiFi, then Ctrl+D to return.

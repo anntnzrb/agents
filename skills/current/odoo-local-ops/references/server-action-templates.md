@@ -4,7 +4,7 @@ Templates are starting points: copy to `<temp-dir>/<task>.py`, edit there, then 
 
 ## Templates
 
-Shared required placeholders — `model name`, `domain`, `expected counts`, `target ids`, `excluded ids`, `fields to update`, `final invariant checks` — apply to:
+Shared required placeholders; `model name`, `domain`, `expected counts`, `target ids`, `excluded ids`, `fields to update`, `final invariant checks`; apply to:
 
 - `templates/server_action_audit_readonly.py.tmpl`: read-only audit; ends with `raise UserError(payload)`.
 - `templates/server_action_dry_run.py.tmpl`: no-write validation of target counts/distribution and JSON output before approval.

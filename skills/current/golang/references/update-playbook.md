@@ -81,8 +81,8 @@ Use only when the user asks to update, audit, refresh, or research the Go skill 
 
 Update in this order; earlier files feed later ones:
 
-1. `references/sources.md` — source ledger.
-2. `references/guide.md` — feature table, CLI reference, layout, tooling, routing.
-3. `cookbook/modern.md` + version files — language/runtime features.
-4. Topic cookbooks — domain-specific recipes.
-5. `SKILL.md` — routing table and triggers; last because it references everything else.
+1. `references/sources.md`: source ledger.
+2. `references/guide.md`: feature table, CLI reference, layout, tooling, routing.
+3. `cookbook/modern.md` + version files: language/runtime features.
+4. Topic cookbooks: domain-specific recipes.
+5. `SKILL.md`: routing table and triggers; last because it references everything else.

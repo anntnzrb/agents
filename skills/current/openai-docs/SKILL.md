@@ -40,7 +40,7 @@ Complex arguments SHOULD use `--args '<JSON object>'`.
 
 ### Documentation
 
-1. Compact query (2–6 terms): MUST use `search_openai_docs`
+1. Compact query (2-6 terms): MUST use `search_openai_docs`
 2. MUST fetch the best URL; `anchor` requires a known section
 3. MUST cite the narrow source before broadening search
 

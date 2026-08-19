@@ -2,7 +2,7 @@
 
 Production hygiene with throwaway ergonomics. Go scripts get the same strict lints, the same type discipline, the same 250 LOC ceiling. The difference: they live as single `.go` files invoked via `go run`, not as full modules.
 
-Python has PEP 723 + `uv run`. Rust has `rust-script`. **Go has `go run` directly** — no extra tooling needed.
+Python has PEP 723 + `uv run`. Rust has `rust-script`. **Go has `go run` directly**; no extra tooling needed.
 
 ---
 
@@ -12,7 +12,7 @@ A `.go` file with a `main` package, run directly:
 
 ```go
 //go:build ignore
-// fetch.go — fetch a URL and print body length.
+// fetch.go: fetch a URL and print body length.
 //
 // Usage:
 //   go run fetch.go <url>
@@ -44,7 +44,7 @@ func main() {
 
 Run: `go run fetch.go https://example.com`.
 
-The `//go:build ignore` directive keeps this file out of `go build ./...` — it is a script, not part of the module. Without that line, every `.go` file in the package gets compiled into your binary.
+The `//go:build ignore` directive keeps this file out of `go build ./...`; it is a script, not part of the module. Without that line, every `.go` file in the package gets compiled into your binary.
 
 ---
 
@@ -63,7 +63,7 @@ myproject/
         └── main.go
 ```
 
-Each `scripts/<name>/main.go` is its own `main` package. Invoke as `go run ./scripts/seed/`. Dependencies are shared with the parent module — no separate `go.mod`.
+Each `scripts/<name>/main.go` is its own `main` package. Invoke as `go run ./scripts/seed/`. Dependencies are shared with the parent module; no separate `go.mod`.
 
 This is the right pattern when:
 
@@ -124,11 +124,11 @@ Even a 30-line script follows the philosophy:
 
 ---
 
-## Pattern 4: Standalone tool with deps — temporary module
+## Pattern 4: Standalone tool with deps: temporary module
 
 Some scripts need deps the parent module does not have. Two options:
 
-### Option A — script in its own tiny module
+### Option A: script in its own tiny module
 
 ```bash
 mkdir /tmp/migrate-tool && cd $_
@@ -144,7 +144,7 @@ go run .
 
 Run, then delete `/tmp/migrate-tool`. Throwaway.
 
-### Option B — `gorun` (community tool)
+### Option B: `gorun` (community tool)
 
 ```bash
 go install github.com/erning/gorun@latest
@@ -164,7 +164,7 @@ chmod +x script.go
 ./script.go
 ```
 
-`gorun` parses the inline `go.mod` block, materializes a temp module, runs the script. Niche tool — only if you want the executable-script experience.
+`gorun` parses the inline `go.mod` block, materializes a temp module, runs the script. Niche tool; only if you want the executable-script experience.
 
 ---
 
@@ -177,7 +177,7 @@ If your script needs:
 - Help text more than a paragraph
 - Repeated invocations from CI
 
-... promote it to a real CLI tool via `cobra` — see `cobra-stack.md`. The boundary is fuzzy; trust your judgment, but **a 500-line "script" is not a script.**
+... promote it to a real CLI tool via `cobra`; see `cobra-stack.md`. The boundary is fuzzy; trust your judgment, but **a 500-line "script" is not a script.**
 
 ---
 

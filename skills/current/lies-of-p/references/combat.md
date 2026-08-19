@@ -27,7 +27,7 @@
 - Use acid only when available; otherwise physical damage, guard, perfect guard, and punish timing are the non-consumable fallback.
 
 ## Boss plans
-- All base and Overture encounters: same no-summon discipline—identify punishable recovery; preserve stamina; avoid greed during phase changes.
+- All base and Overture encounters: same no-summon discipline; identify punishable recovery; preserve stamina; avoid greed during phase changes.
 - Names, route order, and spoiler-sensitive counters belong in CLI spoiler-gated output.
 - Confidence recorded per corpus entry; unknown exact absorptions remain unknown.
 - Sources: `official_patch_1_12`, `fextra_bosses`, `fextra_weapons`, `powerpyx_base`, `powerpyx_overture` in `resources/source_registry.json`.

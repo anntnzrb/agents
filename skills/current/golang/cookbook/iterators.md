@@ -220,20 +220,20 @@ Skip for:
 Iterators are primarily a public-API concern. Do not refactor private loops unless iterators simplify the code.
 
 ```go
-// BAD — overhead for a trivial loop
+// BAD: overhead for a trivial loop
 for v := range slices.Values([]int{1, 2, 3}) {
     fmt.Println(v)
 }
 
-// GOOD — just range over the slice directly
+// GOOD: just range over the slice directly
 for _, v := range []int{1, 2, 3} {
     fmt.Println(v)
 }
 
-// BAD — wrapping a []byte for no reason
+// BAD: wrapping a []byte for no reason
 for b := range iterBytes(data) { ... }
 
-// GOOD — iterate directly
+// GOOD: iterate directly
 for _, b := range data { ... }
 ```
 

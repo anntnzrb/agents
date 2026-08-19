@@ -41,7 +41,7 @@ Clan can also be configured to be used with other secret store [backends](https:
 To get started, you'll need to create **your admin keypair**.
 
 :::admonition[Info]{type=info}
-Don't worry — if you've already made one before, this step won't change or overwrite it.
+Don't worry; if you've already made one before, this step won't change or overwrite it.
 :::
 
 ```bash

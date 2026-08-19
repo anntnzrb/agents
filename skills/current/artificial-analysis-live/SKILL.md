@@ -53,9 +53,9 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 
 ## Required follow-up reads
 
-- Command selection/reliability: `references/command-routing.md` — before choosing commands, using RPC, or relying on cache/fallback behavior.
-- Full command/flag usage: `README.md` — when fast-path commands are insufficient.
-- JSON envelopes, fields, reasoning metrics: `references/output-contract.md` — before consuming structured output or reasoning classifications.
-- Capability-page schema repair: `references/capability-schema-drift.md` — when `coding` fails after upstream drift.
-- Dedicated evaluation pages: `references/evaluation-pages.md` — when using `evaluation` or separating standalone pages from composite indexes.
-- Recovery: `references/troubleshooting.md` — for fetch, extraction, cache, freshness, or credential failures.
+- Command selection/reliability: `references/command-routing.md`; before choosing commands, using RPC, or relying on cache/fallback behavior.
+- Full command/flag usage: `README.md`; when fast-path commands are insufficient.
+- JSON envelopes, fields, reasoning metrics: `references/output-contract.md`; before consuming structured output or reasoning classifications.
+- Capability-page schema repair: `references/capability-schema-drift.md`; when `coding` fails after upstream drift.
+- Dedicated evaluation pages: `references/evaluation-pages.md`; when using `evaluation` or separating standalone pages from composite indexes.
+- Recovery: `references/troubleshooting.md`; for fetch, extraction, cache, freshness, or credential failures.

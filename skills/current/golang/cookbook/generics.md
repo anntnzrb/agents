@@ -246,7 +246,7 @@ Useful for plumbing layers such as a thin HTTP CRUD wrapper. For domain-rich rep
 func First[T any](s []T) T { return s[0] }
 
 // Inference works when the type arg appears in a regular parameter:
-first := First([]int{1, 2, 3}) // T inferred as int — no [int] needed
+first := First([]int{1, 2, 3}) // T inferred as int; no [int] needed
 
 // Inference does NOT work when T only appears in the return or in constraints:
 func Zero[T any]() T { var z T; return z }
