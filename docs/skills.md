@@ -88,6 +88,7 @@ The next sync removes the managed copy from harness homes. Sync does not publish
 ## Model-facing text
 
 - Treat skill bodies, loaded references, agent definitions, and tool descriptions as model-facing prompts.
+- In Markdown and other prose files, NEVER use U+2013 (en dash) or U+2014 (em dash) in prose, examples, or tool descriptions. Use a period, comma, colon, or semicolon instead. Do not alter code, regexes, sentinel values, or fixtures to enforce this.
 - Write dense, imperative prose. Keep one decision per bullet; delete ceremony, repetition, and predictable grammar.
 - Preserve negation, uncertainty, causality, conditions, quantities, temporal boundaries, permissions, proper nouns, and technical terms.
 - Use uppercase RFC 2119 keywords only for genuine requirements, prohibitions, or strong preferences. NEVER convert factual descriptions, schemas, code, or examples.
@@ -138,6 +139,7 @@ Before handoff after any skill change:
 3. Load `unslop`. Apply prose mode to changed model-facing text. Apply code mode only when the requested work includes bounded, behavior-preserving cleanup; never use cleanup as permission to change feature behavior or widen scope.
 4. Fix every applicable finding.
 5. Rerun `quick-validate`, executable checks, and `git diff --check` as required above.
+6. Scan the changed Markdown files for U+2013 or U+2014 with `rg -n '\x{2013}|\x{2014}' skills/current/<name> --glob '*.md'`. The scan must return no matches.
 
 ## Stop rules
 

@@ -142,7 +142,7 @@ hide_spawn_agent_metadata = false
 expose_spawn_agent_model_overrides = true
 
 # Orchestrator guidance: scope, decompose, delegate, synthesize, verify.
-root_agent_usage_hint_text = """You are the orchestrator only. Never edit files, never call apply_patch, and never run shell commands that mutate state directly. Decompose the task, plan, and delegate ALL concrete work to a registered implementation worker. You own scope, synthesis, integration, and verification — not execution."""
+root_agent_usage_hint_text = """You are the orchestrator only. Never edit files, never call apply_patch, and never run shell commands that mutate state directly. Decompose the task, plan, and delegate ALL concrete work to a registered implementation worker. You own scope, synthesis, integration, and verification; not execution."""
 
 # Worker (Luna) guidance: own all writes and changes; never re-delegate upward.
 subagent_developer_instructions = """You are an execution worker. Own every concrete change and write directly. Never re-delegate work back to the orchestrator. Only report scope, synthesis-level blockers, and verification evidence."""

@@ -17,7 +17,7 @@ Honor the caller's requested level:
 - `medium` (default) -> 1-2 waves, all clearly relevant files.
 - `very thorough` -> multiple waves, every plausible match across the repo, plus adjacent surfaces the caller might touch next.
 
-If a search returns no results, try at least one materially different strategy—broaden the pattern, search another path, inspect likely callers, or use structural search—before concluding that the target does not exist.
+If a search returns no results, try at least one materially different strategy; broaden the pattern, search another path, inspect likely callers, or use structural search; before concluding that the target does not exist.
 
 # Tool strategy
 Fire 3+ independent calls in the first action; cross-validate findings across tools; serialize only when one call's output strictly feeds the next.
