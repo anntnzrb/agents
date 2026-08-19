@@ -48,7 +48,7 @@ MUST read `reference.md` before REST work or credential troubleshooting.
 - Nonzero status MUST stop discovery.
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --status --quiet --no-oauth
+mcporter --config ~/.mcporter/mcporter.json list n8n --status --quiet --no-oauth
 ```
 
 After success:
@@ -56,9 +56,9 @@ After success:
 - MUST call only a discovered tool.
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --brief
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n.<DISCOVERED_TOOL> --schema --all-parameters
-mcporter --config <agent-config-root>/assets/mcporter.jsonc call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
+mcporter --config ~/.mcporter/mcporter.json list n8n --brief
+mcporter --config ~/.mcporter/mcporter.json list n8n.<DISCOVERED_TOOL> --schema --all-parameters
+mcporter --config ~/.mcporter/mcporter.json call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
 ```
 
 - MUST copy exact live tool/input schemas.
@@ -70,6 +70,6 @@ mcporter --config <agent-config-root>/assets/mcporter.jsonc call n8n.<DISCOVERED
 
 - REST auth, endpoints, environment lookup → `reference.md`; before REST work.
 - MCP prerequisites, safe status, discovery, failures → `references/mcporter.md`; MUST read before MCPorter work.
-- MCP transport definition → `<agent-config-root>/assets/mcporter.jsonc`; diagnose transport; MUST NOT print resolved secrets.
+- MCP transport definition → `~/.mcporter/mcporter.json`; diagnose transport; MUST NOT print resolved secrets.
 - Workflow authoring recipes → `cookbook/basics.md`; when a REST or MCP task matches.
 - End-to-end authoring sequence → `cookbook/blueprints.md`; when creating or iterating a workflow.

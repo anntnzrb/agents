@@ -4,7 +4,7 @@ Snapshot: Linear MCP / MCPorter 0.12.3, 2026-07-16; 47 tools. Live schemas overr
 
 Source command:
 ```text
-nix run github:numtide/llm-agents.nix#mcporter -- --config <agent-config-root>/assets/mcporter.jsonc list linear --schema
+nix run github:numtide/llm-agents.nix#mcporter -- --config ~/.mcporter/mcporter.json list linear --schema
 ```
 
 ## Schema conventions

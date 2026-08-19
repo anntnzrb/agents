@@ -44,8 +44,8 @@ nix run github:numtide/llm-agents.nix#mcporter --
 For known core-package requests, call the focused recipe directly:
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc call 'effect.effect-doc-links(libraries: ["effect"])'
-mcporter --config <agent-config-root>/assets/mcporter.jsonc call 'effect.effect-documentation(libraries: ["effect"])'
+mcporter --config ~/.mcporter/mcporter.json call 'effect.effect-doc-links(libraries: ["effect"])'
+mcporter --config ~/.mcporter/mcporter.json call 'effect.effect-documentation(libraries: ["effect"])'
 ```
 
 - MCP-resource clients SHOULD use `effect-doc-links`.
@@ -55,13 +55,13 @@ mcporter --config <agent-config-root>/assets/mcporter.jsonc call 'effect.effect-
 Before requesting unfamiliar ecosystem packages, inspect live resources:
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc resource effect
+mcporter --config ~/.mcporter/mcporter.json resource effect
 ```
 
 For unfamiliar, optional, or rejected tool arguments, inspect the targeted live schema and retry once:
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list effect.<tool> --schema
+mcporter --config ~/.mcporter/mcporter.json list effect.<tool> --schema
 ```
 
 - Live schema and resources MUST remain authoritative when inspected.

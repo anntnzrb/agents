@@ -13,14 +13,14 @@ Default retrieval budget per user question:
 Skip resolution when the user gives an exact Context7 ID:
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"/fastapi/fastapi","query":"dependency overrides lifespan testing"}'
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.query-docs --args '{"libraryId":"/fastapi/fastapi","query":"dependency overrides lifespan testing"}'
 ```
 
 Spend the retry on a better official name or discriminator, not random fishing:
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"libraryName":"Next.js","query":"app router middleware redirect unauthenticated users"}'
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"libraryName":"@opentelemetry/sdk-trace-base","query":"span processor exporter resource attributes"}'
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.resolve-library-id --args '{"libraryName":"Next.js","query":"app router middleware redirect unauthenticated users"}'
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.resolve-library-id --args '{"libraryName":"@opentelemetry/sdk-trace-base","query":"span processor exporter resource attributes"}'
 ```
 
 ## Shape the query
@@ -55,8 +55,8 @@ Selection is not “first row wins”:
 Names can collide across ecosystems. Add language, runtime, or package qualifiers:
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"libraryName":"zap","query":"Go sampling logger cores fields"}'
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"libraryName":"zap","query":"Zig HTTP server routes websocket"}'
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.resolve-library-id --args '{"libraryName":"zap","query":"Go sampling logger cores fields"}'
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.resolve-library-id --args '{"libraryName":"zap","query":"Zig HTTP server routes websocket"}'
 ```
 
 If two materially different IDs remain plausible after one retry, ask a targeted clarification.
@@ -66,9 +66,9 @@ If two materially different IDs remain plausible after one retry, ask a targeted
 Use known IDs directly:
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"/gin-gonic/gin","query":"middleware chaining context abort"}'
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"/haskell-servant/servant","query":"type-level API handlers hoist server"}'
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"/kubernetes-sigs/controller-runtime","query":"reconcile owner references predicates cache"}'
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.query-docs --args '{"libraryId":"/gin-gonic/gin","query":"middleware chaining context abort"}'
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.query-docs --args '{"libraryId":"/haskell-servant/servant","query":"type-level API handlers hoist server"}'
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.query-docs --args '{"libraryId":"/kubernetes-sigs/controller-runtime","query":"reconcile owner references predicates cache"}'
 ```
 
 For versions:
@@ -98,11 +98,11 @@ Use source URLs, code language, and surrounding documentation context to compare
 
 ```text
 # Resolve
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"libraryName":"<library>","query":"<api surface> <task/failure> <version/runtime>"}'
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.resolve-library-id --args '{"libraryName":"<library>","query":"<api surface> <task/failure> <version/runtime>"}'
 
 # Fetch
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"<selectedId>","query":"<api surface> <task/failure> <version/runtime>"}'
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.query-docs --args '{"libraryId":"<selectedId>","query":"<api surface> <task/failure> <version/runtime>"}'
 
 # Known ID
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"/org/project","query":"<api surface> <task/failure> <version/runtime>"}'
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.query-docs --args '{"libraryId":"/org/project","query":"<api surface> <task/failure> <version/runtime>"}'
 ```

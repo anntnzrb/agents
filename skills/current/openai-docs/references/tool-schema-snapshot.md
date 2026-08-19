@@ -11,7 +11,7 @@ Descriptions and input schemas below exact.
 Refresh when drift matters:
 
 ```text
-nix run github:numtide/llm-agents.nix#mcporter -- --config <agent-config-root>/assets/mcporter.jsonc list openai-docs.<tool> --schema
+nix run github:numtide/llm-agents.nix#mcporter -- --config ~/.mcporter/mcporter.json list openai-docs.<tool> --schema
 ```
 
 MUST inspect actual tool results.

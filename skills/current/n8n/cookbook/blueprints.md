@@ -20,14 +20,14 @@ uv run --script <skill-dir>/scripts/cli.py mcp-enable <WORKFLOW_ID>
 uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
 
 # 4) Confirm MCP health without printing transport details
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --status --quiet --no-oauth
+mcporter --config ~/.mcporter/mcporter.json list n8n --status --quiet --no-oauth
 
 # 5) Discover compact names, then inspect only the selected tool
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n --brief
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list n8n.<DISCOVERED_TOOL> --schema --all-parameters
+mcporter --config ~/.mcporter/mcporter.json list n8n --brief
+mcporter --config ~/.mcporter/mcporter.json list n8n.<DISCOVERED_TOOL> --schema --all-parameters
 
 # 6) Call only the inspected tool
-mcporter --config <agent-config-root>/assets/mcporter.jsonc call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
+mcporter --config ~/.mcporter/mcporter.json call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
 ```
 
 Before step 4, MUST read `../references/mcporter.md`. Workflow enablement MUST NOT imply any tool name or schema.

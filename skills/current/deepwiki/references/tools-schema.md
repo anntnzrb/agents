@@ -14,7 +14,7 @@ targeted-schema failure, or for broad comparison; live contracts MUST override i
 - Source command:
 
 ```text
-nix run github:numtide/llm-agents.nix#mcporter -- --config assets/mcporter.jsonc list deepwiki --schema --json
+nix run github:numtide/llm-agents.nix#mcporter -- --config ~/.mcporter/mcporter.json list deepwiki --schema --json
 ```
 
 The command above captured this broad snapshot. Runtime calls SHOULD use the
@@ -87,7 +87,7 @@ Exact input schema:
 Example:
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc call deepwiki.read_wiki_structure repoName=facebook/react
+mcporter --config ~/.mcporter/mcporter.json call deepwiki.read_wiki_structure repoName=facebook/react
 ```
 
 ## `read_wiki_contents`
@@ -125,7 +125,7 @@ Exact input schema:
 Example:
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc call deepwiki.read_wiki_contents repoName=facebook/react
+mcporter --config ~/.mcporter/mcporter.json call deepwiki.read_wiki_contents repoName=facebook/react
 ```
 
 `read_wiki_contents` may be large. SHOULD use structure or a narrow question
@@ -181,13 +181,13 @@ Exact input schema:
 Single-repository example:
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc call deepwiki.ask_question repoName=facebook/react question='Where is concurrent rendering implemented?'
+mcporter --config ~/.mcporter/mcporter.json call deepwiki.ask_question repoName=facebook/react question='Where is concurrent rendering implemented?'
 ```
 
 Multiple-repository example:
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc call deepwiki.ask_question --args '{"repoName":["facebook/react","vuejs/core"],"question":"How do their reactivity models differ?"}'
+mcporter --config ~/.mcporter/mcporter.json call deepwiki.ask_question --args '{"repoName":["facebook/react","vuejs/core"],"question":"How do their reactivity models differ?"}'
 ```
 
 The description limits repository lists to 10, but JSON Schema omits `maxItems`.
@@ -199,16 +199,16 @@ MUST respect the limit without claiming schema enforcement. MCPorter renders
 - If a known call reports a missing tool, MAY inspect the brief inventory:
 
   ```text
-  mcporter --config <agent-config-root>/assets/mcporter.jsonc list deepwiki --brief
+  mcporter --config ~/.mcporter/mcporter.json list deepwiki --brief
   ```
 
 - MUST inspect the selected tool's live schema:
 
   ```text
-  mcporter --config <agent-config-root>/assets/mcporter.jsonc list deepwiki.ask_question --schema
+  mcporter --config ~/.mcporter/mcporter.json list deepwiki.ask_question --schema
   ```
 
-- MUST resolve `<agent-config-root>` dynamically
+- MUST pass `--config ~/.mcporter/mcporter.json` (the generated MCPorter configuration)
 - If `mcporter` is absent, replace it with
   `nix run github:numtide/llm-agents.nix#mcporter --`; keep all arguments.
 - Live success MUST override this snapshot. On failure, MUST use only recorded

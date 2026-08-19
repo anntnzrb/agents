@@ -79,6 +79,6 @@ mcporter list <server> --status --no-oauth --exit-code
 |---|---|---|
 | Exact `list`, `call`, `resource`, `auth`, `vault`, `record`, or `replay` syntax | `references/core-cli.md` | Focused skill lacks the syntax, flags remain unclear, or live help is unavailable |
 | Exact generator, TypeScript emission, config, daemon, or bridge syntax | `references/admin-cli.md` | Before `generate-cli`, `inspect-cli`, `emit-ts`, `config`, `daemon`, or `serve` |
-| Local names, transports, and substitutions | `assets/mcporter.jsonc` | Before selecting a configured server |
+| Local names, transports, and substitutions | `~/.mcporter/mcporter.json` (generated from `tools/mcporter/mcporter.jsonc`) | Before selecting a configured server |
 | Tool input arguments/schema | `mcporter list <server>.<tool> --schema` | Inputs are unknown, optional inputs matter, a mutation is planned, or a call reports drift |
 | Server behavior | Focused skill/reference | When available |

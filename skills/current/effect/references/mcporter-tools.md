@@ -8,9 +8,9 @@ Refresh when drift matters:
 
 ```text
 mcporter --version
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list effect.effect-documentation --schema
-mcporter --config <agent-config-root>/assets/mcporter.jsonc list effect.effect-doc-links --schema
-mcporter --config <agent-config-root>/assets/mcporter.jsonc resource effect
+mcporter --config ~/.mcporter/mcporter.json list effect.effect-documentation --schema
+mcporter --config ~/.mcporter/mcporter.json list effect.effect-doc-links --schema
+mcporter --config ~/.mcporter/mcporter.json resource effect
 ```
 
 If `mcporter` is unavailable on PATH, replace its leading command with `nix run github:numtide/llm-agents.nix#mcporter --`.
@@ -49,7 +49,7 @@ Exact input schema:
 Example:
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc call 'effect.effect-documentation(libraries: ["effect", "@effect/rpc"])'
+mcporter --config ~/.mcporter/mcporter.json call 'effect.effect-documentation(libraries: ["effect", "@effect/rpc"])'
 ```
 
 ### `effect-doc-links`
@@ -82,13 +82,13 @@ Exact input schema:
 Example:
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc call 'effect.effect-doc-links(libraries: ["effect", "@effect/rpc"])'
+mcporter --config ~/.mcporter/mcporter.json call 'effect.effect-doc-links(libraries: ["effect", "@effect/rpc"])'
 ```
 
 Observed `effect-doc-links` output contained `effect-docs://...` text, but this is not a guaranteed response schema. Read a returned URI with:
 
 ```text
-mcporter --config <agent-config-root>/assets/mcporter.jsonc resource effect 'effect-docs://@effect-rpc'
+mcporter --config ~/.mcporter/mcporter.json resource effect 'effect-docs://@effect-rpc'
 ```
 
 ## Advertised package coverage

@@ -11,7 +11,7 @@ metadata:
 
 Use Context7 through the configured `context7` MCP server with MCPorter. This skill is read-only: no setup, installs, generated skills, persistent login flows, or configuration mutations.
 
-- MUST resolve `<agent-config-root>` and `<skill-dir>` dynamically; commands MUST work from any current directory
+- MUST resolve `<skill-dir>` dynamically; commands MUST work from any current directory
 - MUST invoke MCPorter through `uv run --script <skill-dir>/scripts/cli.py` so the launcher can load Context7 credentials or fall back to anonymous access
 
 ## Entry points
@@ -19,15 +19,15 @@ Use Context7 through the configured `context7` MCP server with MCPorter. This sk
 Primary:
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"query":"<user question>","libraryName":"<name>"}'
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"<libraryId>","query":"<user question>"}'
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.resolve-library-id --args '{"query":"<user question>","libraryName":"<name>"}'
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.query-docs --args '{"libraryId":"<libraryId>","query":"<user question>"}'
 ```
 
 These recipes encode the complete required inputs. Call them directly; do not list the server or inspect schemas first. If a call reports a missing tool or invalid input, inspect only that tool's live schema, correct the call, and retry once:
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc list context7.resolve-library-id --schema
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc list context7.query-docs --schema
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json list context7.resolve-library-id --schema
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json list context7.query-docs --schema
 ```
 
 Optional or unfamiliar inputs also require targeted schema inspection.
@@ -71,6 +71,6 @@ Keep Context7 retrieval calls to three per user question unless the user explici
 ## Quick examples
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.resolve-library-id --args '{"query":"hooks useState","libraryName":"React"}'
-uv run --script <skill-dir>/scripts/cli.py --config <agent-config-root>/assets/mcporter.jsonc call context7.query-docs --args '{"libraryId":"/reactjs/react.dev","query":"useState hook behavior"}'
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.resolve-library-id --args '{"query":"hooks useState","libraryName":"React"}'
+uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.query-docs --args '{"libraryId":"/reactjs/react.dev","query":"useState hook behavior"}'
 ```
