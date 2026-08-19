@@ -1,7 +1,7 @@
 {
   "workflows": {
     "crm": {
-      "database": "erptech_0804-crm",
+      "database": "erptech_0817-crm",
       "modules": [
         "budget",
         "budget_hr",
