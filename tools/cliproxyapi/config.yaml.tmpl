@@ -118,19 +118,19 @@ openai-compatibility:
     base-url: "https://api.commandcode.ai/provider/v1"
     x-credential-pool: "command-code"
     models:
-      - name: "cmd/deepseek-v4-flash"
+      - name: "deepseek/deepseek-v4-flash"
         alias: "nnn-deepseek-v4-flash-max"
         display-name: "[nnn] DeepSeek V4 Flash (Max)"
         force-mapping: true
-      - name: "cmd/deepseek-v4-pro"
+      - name: "deepseek/deepseek-v4-pro"
         alias: "nnn-deepseek-v4-pro-max"
         display-name: "[nnn] DeepSeek V4 Pro (Max)"
         force-mapping: true
-      - name: "cmd/glm-5.3"
+      - name: "zai-org/GLM-5.3"
         alias: "nnn-glm-5.3-max"
         display-name: "[nnn] GLM 5.3 (Max)"
         force-mapping: true
-      - name: "cmd/kimi-k3"
+      - name: "moonshotai/Kimi-K3"
         alias: "nnn-kimi-k3-max"
         display-name: "[nnn] Kimi K3 (Max)"
         force-mapping: true
@@ -170,13 +170,13 @@ payload:
     - models:
         - name: "deepseek-v4-flash"
         - name: "cline-pass/deepseek-v4-flash"
-        - name: "cmd/deepseek-v4-flash"
+        - name: "deepseek/deepseek-v4-flash"
       params:
         reasoning_effort: "high"
     - models:
         - name: "deepseek-v4-pro"
         - name: "cline-pass/deepseek-v4-pro"
-        - name: "cmd/deepseek-v4-pro"
+        - name: "deepseek/deepseek-v4-pro"
       params:
         reasoning_effort: "high"
     - models:
@@ -185,12 +185,12 @@ payload:
         reasoning_effort: "high"
     - models:
         - name: "cline-pass/glm-5.3"
-        - name: "cmd/glm-5.3"
+        - name: "zai-org/GLM-5.3"
       params:
         reasoning_effort: "max"
     - models:
         - name: "cline-pass/kimi-k3"
-        - name: "cmd/kimi-k3"
+        - name: "moonshotai/Kimi-K3"
       params:
         reasoning_effort: "max"
     - models:
@@ -216,6 +216,11 @@ x-model-sources:
     base-url: "https://api.cline.bot/api/v1"
     models-url: "https://api.cline.bot/api/v1/ai/cline/recommended-models"
     models-field: "clinePass"
+  - id: "command-code"
+    models-dev-provider: "openrouter"
+    credential-pool: "command-code"
+    prefix: "cmd"
+    base-url: "https://api.commandcode.ai/provider/v1"
 
 oauth-excluded-models:
   antigravity:

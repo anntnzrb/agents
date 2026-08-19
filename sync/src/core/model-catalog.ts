@@ -316,7 +316,7 @@ function apiForProvider(npm: string, shape: string | undefined): CatalogApi | un
   if (npm === "@ai-sdk/anthropic") {
     return "anthropic-messages";
   }
-  if (npm === "@ai-sdk/openai-compatible") {
+  if (npm === "@ai-sdk/openai-compatible" || npm === "@openrouter/ai-sdk-provider") {
     return "openai-completions";
   }
   return undefined;

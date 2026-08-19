@@ -9,10 +9,11 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import {
   legacyModelCatalogPath,
   modelAliasesFromTemplate,
+  modelSourcesFromTemplate,
   renderCliProxyConfig,
   runtimeModelCatalogPath,
   syncClientModelCatalog,
@@ -21,11 +22,33 @@ import {
 import type { CliProxyDeployment } from "@core/cliproxy-deployment.ts";
 import { modelsForSource } from "@core/model-catalog.ts";
 
+const REPOSITORY_ROOT = resolve(import.meta.dir, "../..");
+
 const DEPLOYMENT: CliProxyDeployment = {
   server: { hostname: "test-gateway" },
   listen: { host: "100.64.0.42", port: 9443 },
   client: { baseUrl: "https://gateway.example.test:9443/v1" },
 };
+
+test("cliproxy_committed_template_declares_command_code_and_resolvable_aliases", () => {
+  const template = readFileSync(
+    join(REPOSITORY_ROOT, "tools", "cliproxyapi", "config.yaml.tmpl"),
+    "utf8",
+  );
+
+  expect(modelSourcesFromTemplate(template)).toContainEqual({
+    id: "command-code",
+    modelsDevProvider: "openrouter",
+    credentialPool: "command-code",
+    prefix: "cmd",
+    baseUrl: "https://api.commandcode.ai/provider/v1",
+  });
+  expect(modelAliasesFromTemplate(template)).toContainEqual({
+    id: "cmd/nnn-deepseek-v4-flash-max",
+    sourceId: "cmd/deepseek/deepseek-v4-flash",
+    name: "[nnn] DeepSeek V4 Flash (Max)",
+  });
+});
 
 test("cliproxy_template_exposes_custom_compatibility_aliases to the shared catalog", () => {
   expect(

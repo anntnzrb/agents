@@ -354,7 +354,18 @@ test("cliproxy_deployment_is_the_only_committed_endpoint_value", () => {
   assert.match(template, /usage-statistics-enabled: true/);
   assert.match(template, /ws-auth: false/);
   assert.doesNotMatch(template, /api-keys:/);
-  assert.doesNotMatch(template, /openrouter/);
+  assert.doesNotMatch(template, /base-url: "https:\/\/openrouter\.ai/);
+  const config = Bun.YAML.parse(template) as Record<string, any>;
+  const commandCode = (config["x-model-sources"] as readonly Record<string, unknown>[]).find(
+    (source) => source["id"] === "command-code",
+  );
+  assert.deepEqual(commandCode, {
+    id: "command-code",
+    "models-dev-provider": "openrouter",
+    "credential-pool": "command-code",
+    prefix: "cmd",
+    "base-url": "https://api.commandcode.ai/provider/v1",
+  });
   assert.doesNotMatch(template, new RegExp(escapeRegExp(deployment.listen.host)));
 });
 
@@ -471,6 +482,7 @@ test("cliproxy_custom_aliases_use provider-native model and payload shapes", () 
   const config = Bun.YAML.parse(source) as Record<string, any>;
   const profiles = config["openai-compatibility"] as readonly Record<string, any>[];
   const cline = profiles.find((profile) => profile["name"] === "cline-pass-custom");
+  const commandCode = profiles.find((profile) => profile["name"] === "command-code-custom");
   const rules = config["payload"]["override"] as readonly Record<string, any>[];
   const antigravity = rules.find((rule) =>
     rule["models"].some((model: Record<string, unknown>) => model["protocol"] === "antigravity"),
@@ -484,6 +496,15 @@ test("cliproxy_custom_aliases_use provider-native model and payload shapes", () 
       "cline-pass/glm-5.3",
       "cline-pass/kimi-k3",
       "cline-pass/qwen3.8-max",
+    ],
+  );
+  assert.deepEqual(
+    commandCode?.["models"].map((model: Record<string, unknown>) => model["name"]),
+    [
+      "deepseek/deepseek-v4-flash",
+      "deepseek/deepseek-v4-pro",
+      "zai-org/GLM-5.3",
+      "moonshotai/Kimi-K3",
     ],
   );
   assert.deepEqual(antigravity?.["params"], {

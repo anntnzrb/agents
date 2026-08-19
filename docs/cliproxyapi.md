@@ -248,9 +248,9 @@ No harness reads `secrets.local.json`. The gateway accepts requests without a cl
 | Source ID | models.dev provider | Credential pool | Public prefix | Base URL | Model catalog |
 | --- | --- | --- | --- | --- | --- |
 | `opencode-go` | `opencode-go` | `opencode-go` | `go` | `https://opencode.ai/zen/go/v1` | `<base-url>/models`, field `data` |
-| `deepseek` | `deepseek` | `deepseek` | `deepseek` | `https://api.deepseek.com/v1` | `<base-url>/models`, field `data` |
 | `opencode-zen` | `opencode` | `opencode-zen` | `zen` | `https://opencode.ai/zen/v1` | `<base-url>/models`, field `data` |
 | `cline-pass` | `cline-pass` | `cline-pass` | `cline-pass` | `https://api.cline.bot/api/v1` | `https://api.cline.bot/api/v1/ai/cline/recommended-models`, field `clinePass` |
+| `command-code` | `openrouter` | `command-code` | `cmd` | `https://api.commandcode.ai/provider/v1` | `<base-url>/models`, field `data` |
 
 Each source accepts these fields:
 
@@ -274,9 +274,8 @@ The template sets `force-model-prefix: true`.
 | --- | --- | --- |
 | `go` | OpenCode Go subscription | `x-model-sources` template entry |
 | `zen` | OpenCode Zen | `x-model-sources` template entry |
-| `deepseek` | DeepSeek API | `x-model-sources` template entry |
 | `cline-pass` | ClinePass subscription | `x-model-sources` template entry |
-| `cmd` | Command Code GOAT subscription | `openai-compatibility` template entry |
+| `cmd` | Command Code GOAT subscription | `x-model-sources` template entry |
 | `chatgpt` | ChatGPT OAuth accounts | `prefix` field in `~/.cli-proxy-api/codex-*.json` |
 | `antigravity` | Google Antigravity OAuth accounts | `prefix` field in `~/.cli-proxy-api/antigravity-*.json` |
 | `grok` | XAI Grok OAuth accounts | `prefix` field in `~/.cli-proxy-api/xai-*.json` |

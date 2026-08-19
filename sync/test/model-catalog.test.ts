@@ -89,6 +89,42 @@ test("models_dev_metadata_routes_live_models_without_local model policies", () =
   });
 });
 
+test("openrouter_metadata_routes_command_code_models_through_chat_completions", () => {
+  const result = modelsForSource(
+    {
+      id: "command-code",
+      modelsDevProvider: "openrouter",
+      prefix: "cmd",
+      baseUrl: "https://api.commandcode.ai/provider/v1",
+    },
+    {
+      data: [
+        { id: "claude-sonnet-5", context_length: 1000000 },
+        { id: "deepseek/deepseek-v4-flash", context_length: 1000000 },
+      ],
+    },
+    {
+      openrouter: {
+        npm: "@openrouter/ai-sdk-provider",
+        models: {
+          "deepseek/deepseek-v4-flash": modelMetadata("DeepSeek V4 Flash"),
+        },
+      },
+    },
+  );
+
+  expect([...result.groups.keys()]).toEqual(["openai-completions"]);
+  expect(result.models).toMatchObject([
+    { id: "cmd/claude-sonnet-5", api: "openai-completions", contextWindow: 1000000 },
+    {
+      id: "cmd/deepseek/deepseek-v4-flash",
+      api: "openai-completions",
+      contextWindow: 1000000,
+    },
+  ]);
+  expect(result.unsupported).toEqual([]);
+});
+
 test("models_dev_shape_override_wins_over_npm_default", () => {
   const result = modelsForSource(
     SOURCE,
