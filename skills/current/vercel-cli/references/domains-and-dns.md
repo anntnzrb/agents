@@ -2,12 +2,12 @@
 
 ## Overview
 
-- `vercel domains` — manage domain ownership and project assignment
-- `vercel dns` — manage DNS records (when using Vercel nameservers)
-- `vercel alias` — map deployment URLs to custom domains
-- `vercel certs` — manage SSL certificates (usually auto-managed)
+- `vercel domains`: manage domain ownership and project assignment
+- `vercel dns`: manage DNS records (when using Vercel nameservers)
+- `vercel alias`: map deployment URLs to custom domains
+- `vercel certs`: manage SSL certificates (usually auto-managed)
 
-Most users only need `vercel alias` — domains and DNS are auto-configured when using Vercel nameservers.
+Most users only need `vercel alias`; domains and DNS are auto-configured when using Vercel nameservers.
 
 ## Typical Flow
 

@@ -3,14 +3,14 @@
 
 > **Precedence:** Repository instructions, the pinned Rust toolchain, target constraints, configured safety gates, and reproducible project evidence override this reference's preferred audit sequence. Record any unavailable tool or unsupported target explicitly.
 
-You are a UB hunter. Your job is to find, classify, prove, and eliminate every instance of undefined behavior in Rust code. **Miri is your primary weapon** — everything else supplements where Miri cannot reach.
+You are a UB hunter. Your job is to find, classify, prove, and eliminate every instance of undefined behavior in Rust code. **Miri is your primary weapon**; everything else supplements where Miri cannot reach.
 
 ## Core Philosophy
 
 1. **Miri first, always.** Before reading a single line of `unsafe`, run Miri. Before proposing a fix, run Miri. After applying a fix, run Miri. Miri is the oracle
 2. **Classify before fixing.** Every UB finding gets classified against the 14-category taxonomy (see [ub-taxonomy.md](ub-taxonomy.md)). This prevents misdiagnosis and ensures the fix targets the root cause, not a symptom
 3. **Prove the fix.** A fix is not done until Miri passes with full paranoia flags. If Miri cannot run the test (FFI, I/O), the fix is not done until the appropriate sanitizer passes
-4. **Bead handoff.** Each resolved UB instance is a "bead" — a discrete, documented, proven fix. Hand it off with: the UB category, the root cause, the fix, and the Miri proof
+4. **Bead handoff.** Each resolved UB instance is a "bead"; a discrete, documented, proven fix. Hand it off with: the UB category, the root cause, the fix, and the Miri proof
 
 ## The UB Taxonomy
 
@@ -63,18 +63,18 @@ You are a UB hunter. Your job is to find, classify, prove, and eliminate every i
 
 Run Miri with escalating strictness. **Do not skip any level.**
 
-**Level 1 — Default (Stacked Borrows):**
+**Level 1: Default (Stacked Borrows):**
 ```bash
 cargo +nightly miri test 2>&1
 ```
 
-**Level 2 — Strict Provenance + Symbolic Alignment:**
+**Level 2: Strict Provenance + Symbolic Alignment:**
 ```bash
 MIRIFLAGS="-Zmiri-strict-provenance -Zmiri-symbolic-alignment-check -Zmiri-backtrace=full" \
   cargo +nightly miri test 2>&1
 ```
 
-**Level 3 — Full Paranoia (the audit standard):**
+**Level 3: Full Paranoia (the audit standard):**
 ```bash
 MIRIFLAGS="\
   -Zmiri-strict-provenance \
@@ -85,7 +85,7 @@ MIRIFLAGS="\
   cargo +nightly miri test 2>&1
 ```
 
-**Level 4 — Tree Borrows (second model confirmation):**
+**Level 4: Tree Borrows (second model confirmation):**
 ```bash
 MIRIFLAGS="\
   -Zmiri-tree-borrows \
@@ -100,7 +100,7 @@ MIRIFLAGS="\
 **Interpret results:**
 - Fails at Level 1 → Definite UB. Fix immediately
 - Passes Level 1, fails Level 2 → Provenance or alignment UB. Fix
-- Passes Levels 1-3, fails Level 4 → Tree Borrows found something Stacked Borrows missed (unusual). Investigate — may be a Tree Borrows false positive, but usually indicates fragile aliasing
+- Passes Levels 1-3, fails Level 4 → Tree Borrows found something Stacked Borrows missed (unusual). Investigate; may be a Tree Borrows false positive, but usually indicates fragile aliasing
 - Passes all 4 → Miri-clean. Proceed to supplementary tools
 
 ### Phase 3: Supplementary Scans
@@ -128,7 +128,7 @@ For each UB finding:
 
 1. **Classify** against the 14-category taxonomy
 2. **Write the SAFETY comment** explaining what is wrong and what the fix must achieve
-3. **Apply the minimal fix.** Do not refactor — fix the UB and nothing else
+3. **Apply the minimal fix.** Do not refactor; fix the UB and nothing else
 4. **Run Miri (Level 3 minimum) on the specific test that triggered the UB.**
 5. **Run Miri (Level 3) on the full test suite** to check for regressions
 6. **Document the bead:**
@@ -137,7 +137,7 @@ For each UB finding:
    FILE: [path:line]
    ROOT CAUSE: [one sentence]
    FIX: [one sentence]
-   PROOF: Miri Level [N] pass — [command used]
+   PROOF: Miri Level [N] pass; [command used]
    ```
 
 ### Phase 5: Hardening (Post-Fix)
@@ -145,7 +145,7 @@ For each UB finding:
 After all beads are resolved:
 
 1. **Add Miri to CI** if not already present (see [miri-sanitizers-loom.md](miri-sanitizers-loom.md) for the GitHub Actions config)
-2. **Add `#[cfg(miri)]` regression tests** for each bead — these are the tests that originally caught the UB, locked in so it never returns
+2. **Add `#[cfg(miri)]` regression tests** for each bead; these are the tests that originally caught the UB, locked in so it never returns
 3. **Review SAFETY comments** on every remaining `unsafe` block. Each must name the specific invariant from the taxonomy
 4. **Run the full paranoia sweep one final time** to confirm clean
 
@@ -176,7 +176,7 @@ Every `unsafe` block requires a SAFETY comment within 5 lines above it. The comm
 3. **Name who/what guarantees** the invariant (caller contract, type system, runtime check)
 
 ```rust
-// SAFETY: [Category 4 — Uninitialized Memory]
+// SAFETY: [Category 4: Uninitialized Memory]
 // All N elements have been written to via `ptr::write` in the loop above.
 // The loop runs exactly `len` times, and `len` was validated against the
 // allocation size at line 42. MaybeUninit::assume_init is therefore sound.
@@ -184,10 +184,10 @@ unsafe { buf.assume_init() }
 ```
 
 Bad SAFETY comments that must be rejected:
-- `// SAFETY: we know this is safe` — Says nothing
-- `// SAFETY: this is fine because we tested it` — Testing does not prove absence of UB
-- `// SAFETY: the caller ensures correctness` — Which invariant? What is the contract?
-- No SAFETY comment at all — Immediate failure
+- `// SAFETY: we know this is safe`; Says nothing
+- `// SAFETY: this is fine because we tested it`; Testing does not prove absence of UB
+- `// SAFETY: the caller ensures correctness`; Which invariant? What is the contract?
+- No SAFETY comment at all: Immediate failure
 
 ## Audit Report Format
 
@@ -262,8 +262,8 @@ let recovered = std::ptr::with_exposed_provenance::<T>(addr);
 // BEFORE (unsound)
 unsafe impl Send for MyType {}
 
-// AFTER — if MyType truly needs Send, prove it:
-// SAFETY: [Category 9 — Send/Sync]
+// AFTER: if MyType truly needs Send, prove it:
+// SAFETY: [Category 9: Send/Sync]
 // MyType's only non-Send field is `*mut Buffer`. Access to the buffer
 // is guarded by `self.lock: Mutex<()>`, which provides the
 // happens-before guarantee required by Send.

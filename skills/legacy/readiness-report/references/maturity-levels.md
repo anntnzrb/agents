@@ -41,7 +41,7 @@ The bare minimum for any collaborative development.
 
 ### What's Missing
 
-Without L1, agents operate blind—no way to verify builds, run tests, or ensure code quality.
+Without L1, agents operate blind; no way to verify builds, run tests, or ensure code quality.
 
 ---
 

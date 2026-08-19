@@ -15,10 +15,10 @@ Read the section whose heading matches the task; use heading search before loadi
 | Package | Version | Source |
 |---------|---------|--------|
 | `hono` | `^4.12.5` | [peer dep of scalar](https://github.com/scalar/scalar/blob/8bcf8bf52a0da667d44eeec08648e3b1da044f97/integrations/hono/package.json#L66) |
-| `hono-openapi` | `^1.3.0` | [npm](https://registry.npmjs.org/hono-openapi) — published Mar 2, 2026 |
-| `@scalar/hono-api-reference` | `^0.10.11` | [npm](https://www.npmjs.com/package/@scalar/hono-api-reference) — published Apr 28, 2026 |
-| `@hono/swagger-ui` | `^0.6.1` | [npm](https://www.npmjs.com/package/@hono/swagger-ui) — published Apr 2026 |
-| `zod` | `^4.4.1` | [npm registry](https://registry.npmjs.org/zod) — latest stable v4 |
+| `hono-openapi` | `^1.3.0` | [npm](https://registry.npmjs.org/hono-openapi): published Mar 2, 2026 |
+| `@scalar/hono-api-reference` | `^0.10.11` | [npm](https://www.npmjs.com/package/@scalar/hono-api-reference): published Apr 28, 2026 |
+| `@hono/swagger-ui` | `^0.6.1` | [npm](https://www.npmjs.com/package/@hono/swagger-ui): published Apr 2026 |
+| `zod` | `^4.4.1` | [npm registry](https://registry.npmjs.org/zod): latest stable v4 |
 
 ### `package.json` dependency block
 
@@ -48,7 +48,7 @@ Read the section whose heading matches the task; use heading search before loadi
 
 ---
 
-## 2. Complete `app.ts` — Copy-Pasteable
+## 2. Complete `app.ts`; Copy-Pasteable
 
 ```typescript
 import { Hono } from 'hono'
@@ -58,7 +58,7 @@ import { swaggerUI } from '@hono/swagger-ui'
 import { z } from 'zod'
 
 // ───────────────────────────────────────────────────────────────
-// 1. Schema definitions (Zod v4 — Standard Schema native)
+// 1. Schema definitions (Zod v4; Standard Schema native)
 // ───────────────────────────────────────────────────────────────
 
 const QuerySchema = z.object({
@@ -287,7 +287,7 @@ export function validator<Schema extends StandardSchemaV1, ...>(
 }
 ```
 
-### `openAPIRouteHandler()` — serving the spec
+### `openAPIRouteHandler()`: serving the spec
 
 ```typescript
 app.get(
@@ -347,9 +347,9 @@ export {
 ### Mount path convention
 
 Common choices:
-- `/scalar` — matches the middleware name
-- `/docs` — generic documentation endpoint
-- `/openapi/ui` — nested under the OpenAPI prefix
+- `/scalar`: matches the middleware name
+- `/docs`: generic documentation endpoint
+- `/openapi/ui`: nested under the OpenAPI prefix
 
 ### Configuration options
 
@@ -398,7 +398,7 @@ app.get('/scalar', Scalar({
 }))
 ```
 
-**Evidence** — Scalar types define the full schema:
+**Evidence**: Scalar types define the full schema:
 - [Base configuration (themes, proxy, etc.)](https://github.com/scalar/scalar/blob/8bcf8bf52a0da667d44eeec08648e3b1da044f97/packages/types/src/api-reference/base-configuration.ts#L110-L129)
 - [HTML rendering configuration (`pageTitle`, `cdn`)](https://github.com/scalar/scalar/blob/8bcf8bf52a0da667d44eeec08648e3b1da044f97/packages/types/src/api-reference/html-rendering-configuration.ts#L8-L23)
 - [Source configuration (`url`, `content`)](https://github.com/scalar/scalar/blob/8bcf8bf52a0da667d44eeec08648e3b1da044f97/packages/types/src/api-reference/source-configuration.ts#L8-L55)
@@ -450,9 +450,9 @@ export { middleware as swaggerUI, SwaggerUI }
 ### Mount path convention
 
 Common choices:
-- `/swagger` — explicit
-- `/ui` — used in Hono official examples
-- `/docs` — generic
+- `/swagger`: explicit
+- `/ui`: used in Hono official examples
+- `/docs`: generic
 
 ### Configuration options
 
@@ -511,7 +511,7 @@ export default {
 }
 ```
 
-**Evidence** ([Hono Bun docs — Change port number](https://hono.dev/docs/getting-started/bun)):
+**Evidence** ([Hono Bun docs: Change port number](https://hono.dev/docs/getting-started/bun)):
 
 > ```ts
 > export default {
@@ -591,7 +591,7 @@ const zodV4DateOverride = (ctx: { ... }) => {
 
 ## 9. Real-World Example
 
-**NamesMT/starter-monorepo** — a public monorepo starter using `hono-openapi` + `@scalar/hono-api-reference` together:
+**NamesMT/starter-monorepo**: a public monorepo starter using `hono-openapi` + `@scalar/hono-api-reference` together:
 
 - File: [`apps/backend/src/openAPI.ts`](https://github.com/NamesMT/starter-monorepo/blob/main/apps/backend/src/openAPI.ts)
 - Pattern: mounts spec at `/openapi/spec.json` and Scalar UI at `/openapi/ui`
@@ -632,7 +632,7 @@ export function setupOpenAPI(app: Hono<any, any>, prefix = '/openapi') {
 ## 10. Common Pitfalls
 
 1. **Using `openAPISpecs` instead of `openAPIRouteHandler`**
-   Some docs (e.g. HONC) use `openAPISpecs` — this is **not** the current export name. The correct function is `openAPIRouteHandler` ([source](https://github.com/rhinobase/hono-openapi/blob/10f45a66ede3764b5e6065805fb60fd5df090466/src/index.ts#L1)).
+   Some docs (e.g. HONC) use `openAPISpecs`; this is **not** the current export name. The correct function is `openAPIRouteHandler` ([source](https://github.com/rhinobase/hono-openapi/blob/10f45a66ede3764b5e6065805fb60fd5df090466/src/index.ts#L1)).
 
 2. **Importing from `hono-openapi/zod`**
    There are **no subpath exports**. Always import from `hono-openapi` directly.
@@ -667,9 +667,9 @@ bun run --hot app.ts
 ```
 
 Endpoints after startup:
-- `GET /health` — health check
-- `GET /hello?name=world` — documented route
-- `POST /users` — validated JSON body route
-- `GET /openapi.json` — raw OpenAPI 3.1.0 spec
-- `GET /scalar` — Scalar API Reference UI
-- `GET /swagger` — Swagger UI
+- `GET /health`: health check
+- `GET /hello?name=world`: documented route
+- `POST /users`: validated JSON body route
+- `GET /openapi.json`: raw OpenAPI 3.1.0 spec
+- `GET /scalar`: Scalar API Reference UI
+- `GET /swagger`: Swagger UI

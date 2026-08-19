@@ -28,22 +28,22 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 
 ### The iron list
 
-1. **Readonly by default** — all `type`/`interface` properties are `readonly`. Arrays are `readonly T[]`. Mutable only when mutation is the documented purpose
-2. **Branded types for distinct IDs** — `type UserId = Brand<string, "UserId">`. Never pass raw `string` where a branded type exists
-3. **Exhaustive switch** — every `switch` on a discriminated union ends with `default: assertNever(x)`. No fall-through
-4. **No any** — `any` is banned in annotations, returns, and parameters. Use `unknown` and narrow
-5. **No type assertions** — `as any`, `as unknown` banned. `as const` and `satisfies` are fine
-6. **No non-null assertion** — `x!` is banned. Use narrowing or optional chaining (`x?.y`)
-7. **No @ts-ignore / @ts-expect-error** — fix the type
-8. **No enum** — use `as const` objects + literal union types
-9. **Zod at boundaries** — external input (API, user, file) → Zod schema. Internal → plain types
-10. **Typed errors** — Error subclasses with typed fields. No `throw new Error("bare string")` for domain errors. Use Result for expected failures within 1-2 call levels; throw for propagation across many layers
-11. **as const for constants** — module-level constant objects and arrays use `as const`
-12. **import type** — type-only imports use `import type`. Enforced by `verbatimModuleSyntax`
-13. **Named exports only** — no `export default`. Exception: framework requirement (Next.js pages, etc.)
-14. **No empty catch, no catch-and-swallow** — every `catch` block must either (a) narrow the error with `instanceof` and handle each case, or (b) re-throw. Empty catch blocks and `catch (e) { console.error(e) }` without narrowing or re-throw are banned — they hide bugs. At top-level boundaries (CLI entry, HTTP handler), opt out with `// no-excuse-ok: catch`
+1. **Readonly by default**: all `type`/`interface` properties are `readonly`. Arrays are `readonly T[]`. Mutable only when mutation is the documented purpose
+2. **Branded types for distinct IDs**: `type UserId = Brand<string, "UserId">`. Never pass raw `string` where a branded type exists
+3. **Exhaustive switch**: every `switch` on a discriminated union ends with `default: assertNever(x)`. No fall-through
+4. **No any**: `any` is banned in annotations, returns, and parameters. Use `unknown` and narrow
+5. **No type assertions**: `as any`, `as unknown` banned. `as const` and `satisfies` are fine
+6. **No non-null assertion**: `x!` is banned. Use narrowing or optional chaining (`x?.y`)
+7. **No @ts-ignore / @ts-expect-error**: fix the type
+8. **No enum**: use `as const` objects + literal union types
+9. **Zod at boundaries**: external input (API, user, file) → Zod schema. Internal → plain types
+10. **Typed errors**: Error subclasses with typed fields. No `throw new Error("bare string")` for domain errors. Use Result for expected failures within 1-2 call levels; throw for propagation across many layers
+11. **as const for constants**: module-level constant objects and arrays use `as const`
+12. **import type**: type-only imports use `import type`. Enforced by `verbatimModuleSyntax`
+13. **Named exports only**: no `export default`. Exception: framework requirement (Next.js pages, etc.)
+14. **No empty catch, no catch-and-swallow**: every `catch` block must either (a) narrow the error with `instanceof` and handle each case, or (b) re-throw. Empty catch blocks and `catch (e) { console.error(e) }` without narrowing or re-throw are banned; they hide bugs. At top-level boundaries (CLI entry, HTTP handler), opt out with `// no-excuse-ok: catch`
 
-### Data modeling — which construct, when
+### Data modeling: which construct, when
 
 | Situation | Use |
 |---|---|
@@ -61,27 +61,27 @@ Load `data-modeling.md` for the full decision flowchart and comparison.
 
 ### When readonly does not apply
 
-- **Framework state** (React `useState`, signals) — managed by framework
-- **Builder / accumulator** — object exists to be mutated (buffer, cache). Document why
-- **ORM mutations** — Drizzle insert/update objects
+- **Framework state** (React `useState`, signals): managed by framework
+- **Builder / accumulator**: object exists to be mutated (buffer, cache). Document why
+- **ORM mutations**: Drizzle insert/update objects
 
 ### Why empty/unhandled catch is banned
 
-In TypeScript, every `catch` receives `unknown`. The language gives you no type safety in catch blocks — you must earn it with `instanceof`. A bare `catch (e) { console.error(e) }` swallows `TypeError`, `RangeError`, and your domain errors identically. When a new error type appears, nothing warns you.
+In TypeScript, every `catch` receives `unknown`. The language gives you no type safety in catch blocks; you must earn it with `instanceof`. A bare `catch (e) { console.error(e) }` swallows `TypeError`, `RangeError`, and your domain errors identically. When a new error type appears, nothing warns you.
 
 ```typescript
-// BANNED — empty catch
+// BANNED: empty catch
 try { await fetchData() } catch {}
 try { await fetchData() } catch (e) { /* will fix later */ }
 
-// BANNED — catch-and-swallow (no narrowing, no rethrow)
+// BANNED: catch-and-swallow (no narrowing, no rethrow)
 try {
   const data = await api.get("/users")
 } catch (e) {
   console.error("failed", e)
 }
 
-// GOOD — narrow with instanceof
+// GOOD: narrow with instanceof
 try {
   const data = await api.get("/users")
 } catch (e) {
@@ -92,7 +92,7 @@ try {
   throw e  // unknown errors propagate
 }
 
-// GOOD — top-level boundary (only place catch-all is acceptable)
+// GOOD: top-level boundary (only place catch-all is acceptable)
 async function main(): Promise<void> {  // no-excuse-ok: catch
   try {
     await run()
@@ -118,7 +118,7 @@ async function main(): Promise<void> {  // no-excuse-ok: catch
 | Logging | `pino` | Structured JSON, fast |
 | CLI | `@clack/prompts` + `commander` | Interactive + parsing |
 
-## tsconfig — the one true config
+## tsconfig: the one true config
 
 For a new project, use its selected package manager and `tsc --init`, then load `tsconfig-strict.md` and adapt it to the runtime rather than relying on a bundled scaffold.
 
@@ -134,7 +134,7 @@ Key flags beyond `"strict": true`:
 
 ## Reference loading
 
-Load on demand — not all at once.
+Load on demand; not all at once.
 
 | Need | Load |
 |---|---|
@@ -151,14 +151,14 @@ Use the repository's configured formatter, linter, type checker, and test suite 
 
 | Rule ID | Catches | Opt-out |
 |---|---|---|
-| `no-any-assertion` | `as any` | None — redesign types |
-| `no-unknown-assertion` | `as unknown` | None — redesign types |
-| `no-ts-ignore` | `@ts-ignore` | None — fix the type |
-| `no-ts-expect-error` | `@ts-expect-error` | None — fix the type |
-| `no-enum` | `enum` declarations | None — use `as const` |
-| `no-non-null-assertion` | `x!` postfix | None — narrow or `?.` |
-| `no-throw-literal` | `throw "string"` / `throw 123` | None — throw Error subclass |
-| `no-mutable-export` | `export let` / `export var` | None — use `export const` |
+| `no-any-assertion` | `as any` | None: redesign types |
+| `no-unknown-assertion` | `as unknown` | None: redesign types |
+| `no-ts-ignore` | `@ts-ignore` | None: fix the type |
+| `no-ts-expect-error` | `@ts-expect-error` | None: fix the type |
+| `no-enum` | `enum` declarations | None: use `as const` |
+| `no-non-null-assertion` | `x!` postfix | None: narrow or `?.` |
+| `no-throw-literal` | `throw "string"` / `throw 123` | None: throw Error subclass |
+| `no-mutable-export` | `export let` / `export var` | None: use `export const` |
 | `no-any-annotation` | `: any` in parameter/return/variable types | `// no-excuse-ok: any` |
 | `no-explicit-any-return` | `(): any` or `(): Promise<any>` return types | `// no-excuse-ok: any` |
 | `empty-catch` | `catch { }` or `catch (e) { }` with empty body | `// no-excuse-ok: catch` |
@@ -177,7 +177,7 @@ Tests are strict too, with these exceptions (configure in `biome.jsonc` override
 | Access private members via bracket notation | Testing internals |
 | Skip readonly on test fixtures | Mutable setup/teardown |
 
-Tests still follow the iron list — branded types, typed errors, exhaustive switch.
+Tests still follow the iron list; branded types, typed errors, exhaustive switch.
 
 ## Existing codebases
 

@@ -8,7 +8,7 @@ Read the section whose heading matches the task; use heading search before loadi
 
 Production Rust in 2026. **Explicit allocation, compile-time proof, zero hidden cost.** Type-state-first, unsafe-banished-by-default, agent-proof.
 
-## Identity — What Kind of Rust You Write
+## Identity: What Kind of Rust You Write
 
 You write Rust that looks like a Zig programmer designed it and a Rust compiler enforces it. Every allocation is visible. Every cost is explicit. Every invariant is encoded in the type system. Every cleanup is deterministic. The borrow checker, lifetime analysis, trait bounds, and `miri` then guarantee what Zig leaves to discipline.
 
@@ -25,7 +25,7 @@ You write Rust that looks like a Zig programmer designed it and a Rust compiler 
 The two highest-leverage tools Rust gives a coding agent:
 
 1. **Bounded polymorphism** (traits). Real, machine-checked, composable constraints
-2. **Newtype-as-coordinate-space.** `Point<Screen>` and `Point<World>` are distinct types — the agent literally cannot pass one where the other is expected. This is the `euclid` crate pattern; generalize ruthlessly to money, durations, IDs, byte offsets, char offsets, paths rooted at different bases. Full patterns → [type-state.md](type-state.md)
+2. **Newtype-as-coordinate-space.** `Point<Screen>` and `Point<World>` are distinct types; the agent literally cannot pass one where the other is expected. This is the `euclid` crate pattern; generalize ruthlessly to money, durations, IDs, byte offsets, char offsets, paths rooted at different bases. Full patterns → [type-state.md](type-state.md)
 
 ---
 
@@ -37,7 +37,7 @@ The two highest-leverage tools Rust gives a coding agent:
 // WRONG
 let val = map.get("key").unwrap();
 
-// RIGHT — propagate or provide context
+// RIGHT: propagate or provide context
 let val = map.get("key").context("missing 'key' in config")?;
 ```
 
@@ -51,7 +51,7 @@ If `unsafe` is unavoidable, you have miri. Run it. Always. **Load [`../rust-ub/R
 cargo +nightly miri nextest run
 ```
 
-### 3. Explicit Allocation — Arena by Default in Hot Paths
+### 3. Explicit Allocation; Arena by Default in Hot Paths
 
 **Do not scatter `Box::new()` / `Vec::new()` across hot loops.** Use arena allocation to make allocation scope visible and bulk-freeable. Full recipes → [zero-cost-safety.md §1](zero-cost-safety.md).
 
@@ -66,25 +66,25 @@ fn parse_frame<'a>(arena: &'a Bump, raw: &[u8]) -> Frame<'a> {
 // Caller owns arena. Caller decides when memory dies. Zero individual frees.
 ```
 
-When arena is overkill (simple CLI, one-shot allocation), `Vec`/`String` are fine — but **function signatures still prefer borrows**:
+When arena is overkill (simple CLI, one-shot allocation), `Vec`/`String` are fine; but **function signatures still prefer borrows**:
 
 ```rust
-// WRONG — forces caller to allocate
+// WRONG: forces caller to allocate
 fn process(input: String) -> String { ... }
 
-// RIGHT — caller chooses allocation strategy
+// RIGHT: caller chooses allocation strategy
 fn process(input: &str) -> Cow<'_, str> { ... }
 
-// BEST for hot paths — zero allocation, caller provides buffer
+// BEST for hot paths: zero allocation, caller provides buffer
 fn process(input: &[u8], output: &mut [u8]) -> usize { ... }
 ```
 
-### 4. Compile-Time First — const fn Everything Const-Eligible
+### 4. Compile-Time First; const fn Everything Const-Eligible
 
 If a function CAN be `const fn`, it MUST be `const fn`. Full recipes → [zero-cost-safety.md §2](zero-cost-safety.md).
 
 ```rust
-// Lookup tables computed at compile time — zero runtime cost
+// Lookup tables computed at compile time: zero runtime cost
 const CRC_TABLE: [u32; 256] = {
     let mut table = [0u32; 256];
     let mut i = 0;
@@ -101,7 +101,7 @@ const CRC_TABLE: [u32; 256] = {
     table
 };
 
-// Compile-time assertions — catch violations at build time, not runtime
+// Compile-time assertions: catch violations at build time, not runtime
 const { assert!(std::mem::size_of::<Header>() == 12, "Header must be 12 bytes") };
 ```
 
@@ -115,7 +115,7 @@ struct RingBuffer<T, const N: usize> {
 }
 ```
 
-### 5. Scope Guards — Deterministic Cleanup on Every Path
+### 5. Scope Guards; Deterministic Cleanup on Every Path
 
 Zig's `errdefer` in Rust. Full recipes → [zero-cost-safety.md §5](zero-cost-safety.md).
 
@@ -136,7 +136,7 @@ fn deploy(artifact: &Path) -> Result<(), DeployError> {
 }
 ```
 
-### 6. Bit-Level Layout — zerocopy for Wire Formats
+### 6. Bit-Level Layout; zerocopy for Wire Formats
 
 Never hand-write `transmute` or pointer casts for parsing binary data. Full recipes → [zero-cost-safety.md §4](zero-cost-safety.md).
 
@@ -153,16 +153,16 @@ struct PacketHeader {
 }
 ```
 
-### 7. Exhaustive Match — No Wildcard on Enums You Control
+### 7. Exhaustive Match; No Wildcard on Enums You Control
 
 ```rust
-// WRONG — silently ignores new variants
+// WRONG: silently ignores new variants
 match status {
     Status::Ok => handle_ok(),
     _ => handle_error(),
 }
 
-// RIGHT — compiler forces update when variants change
+// RIGHT: compiler forces update when variants change
 match status {
     Status::Ok => handle_ok(),
     Status::NotFound => handle_not_found(),
@@ -170,7 +170,7 @@ match status {
 }
 ```
 
-For `#[non_exhaustive]` enums from external crates, the wildcard `_` is required — but add a `tracing::warn!` in the catch-all so you notice when new variants appear.
+For `#[non_exhaustive]` enums from external crates, the wildcard `_` is required; but add a `tracing::warn!` in the catch-all so you notice when new variants appear.
 
 ### 8. Type-State Over Runtime Checks
 
@@ -253,7 +253,7 @@ Run through this list after writing any Rust code. Every item links to its recip
 
 ---
 
-## Default Cargo.toml Dependencies — Zero-Cost Safety Stack
+## Default Cargo.toml Dependencies: Zero-Cost Safety Stack
 
 Every new project starts with these alongside the standard deps from [cargo-strict.md](cargo-strict.md):
 
@@ -281,16 +281,16 @@ zerocopy = { version = "0.8", features = ["derive"] }
 |---|---|
 | [zero-cost-safety.md](zero-cost-safety.md) | Arena, allocator, const fn, comptime, zero-alloc, bitfield, repr, scopeguard, errdefer, Zig-like patterns |
 | [type-state.md](type-state.md) | Newtype wrappers, type-state machines, branded IDs, phantom types |
-| [unsafe-discipline.md](unsafe-discipline.md) | Any `unsafe` block — SAFETY comments, safe wrappers, miri proof |
+| [unsafe-discipline.md](unsafe-discipline.md) | Any `unsafe` block: SAFETY comments, safe wrappers, miri proof |
 | [libraries.md](libraries.md) | Library selection, crate decision tree, dependency audit |
 | [cargo-strict.md](cargo-strict.md) | Project bootstrap, lint config, CI gate commands |
 | [async-tokio.md](async-tokio.md) | Async runtime, spawning, cancellation, `JoinSet`, `select!` |
-| [axum-stack.md](axum-stack.md) | HTTP services — axum + sqlx + tower + tracing |
-| [clap-stack.md](clap-stack.md) | CLI tools — clap derive + color-eyre + indicatif |
+| [axum-stack.md](axum-stack.md) | HTTP services: axum + sqlx + tower + tracing |
+| [clap-stack.md](clap-stack.md) | CLI tools: clap derive + color-eyre + indicatif |
 | [concurrency.md](concurrency.md) | Locks, atomics, channels, loom model checker |
 | [proptest-insta.md](proptest-insta.md) | Property tests, snapshot tests, round-trip invariants |
 | [one-liners.md](one-liners.md) | `rust-script` one-liners, disposable scripts, inline deps |
-| [../rust-ub/README.md](../rust-ub/README.md) | UB hunting — miri escalation, sanitizers, fuzzing |
+| [../rust-ub/README.md](../rust-ub/README.md) | UB hunting: miri escalation, sanitizers, fuzzing |
 | [../rust-ub/ub-taxonomy.md](../rust-ub/ub-taxonomy.md) | 14-category UB taxonomy with detection status |
 | [../rust-ub/miri-sanitizers-loom.md](../rust-ub/miri-sanitizers-loom.md) | Miri flags, ASAN/TSAN/MSAN, loom, cargo-fuzz |
 
@@ -318,6 +318,6 @@ const fn frobnicate<'a>(
 
 ## Activation
 
-This skill activates whenever you are writing or modifying any `.rs` file or `Cargo.toml`. One-off scripts get the strict treatment too — `rust-script` + the same lints, the same gates. Details → [one-liners.md](one-liners.md).
+This skill activates whenever you are writing or modifying any `.rs` file or `Cargo.toml`. One-off scripts get the strict treatment too; `rust-script` + the same lints, the same gates. Details → [one-liners.md](one-liners.md).
 
 **The promise:** production hygiene with throwaway ergonomics. Explicit allocation, compile-time proof, zero hidden cost, and **agent-proof safety at any volume**.

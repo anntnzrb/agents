@@ -1,6 +1,6 @@
 # Node Backends on Vercel
 
-Vercel supports Node.js backend frameworks as first-class apps. Express and Hono are the most common, but Fastify, Elysia, NestJS, H3, and Koa are also supported. Your app is the entrypoint — not the `api/` folder. No rewrites, no build scripts. Just export your app and deploy.
+Vercel supports Node.js backend frameworks as first-class apps. Express and Hono are the most common, but Fastify, Elysia, NestJS, H3, and Koa are also supported. Your app is the entrypoint; not the `api/` folder. No rewrites, no build scripts. Just export your app and deploy.
 
 ## Quick Start
 
@@ -16,7 +16,7 @@ vc deploy    # deploy
 
 1. Vercel detects the framework from `package.json` dependencies
 2. Finds your entrypoint file (must import the framework)
-3. Introspects your routes automatically — no `vercel.json` rewrites needed
+3. Introspects your routes automatically: no `vercel.json` rewrites needed
 4. Bundles and deploys as a single Lambda
 
 ## Entrypoint Detection
@@ -113,4 +113,4 @@ Most apps need zero configuration. Optional `vercel.json` settings:
 
 - **Putting routes in `api/` folder**: Your framework IS the app. Define routes in your app code, not as separate files in `api/`
 - **Adding `vercel.json` rewrites**: Routes are introspected automatically from your app. Rewrites are not needed
-- **Adding a `build` script**: Vercel handles TypeScript compilation and bundling. Don't add a build script for transpilation — it's not needed and can cause issues
+- **Adding a `build` script**: Vercel handles TypeScript compilation and bundling. Don't add a build script for transpilation; it's not needed and can cause issues

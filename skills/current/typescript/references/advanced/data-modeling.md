@@ -31,7 +31,7 @@ Is it structured data with named fields?
 
 ## Container reference
 
-### type alias — internal data
+### type alias: internal data
 
 The default for structured data inside your codebase. Zero runtime cost.
 
@@ -50,7 +50,7 @@ type Point = {
 
 All properties `readonly`. Mutable only when mutation is the documented purpose.
 
-### interface — contracts and extension
+### interface: contracts and extension
 
 Use when you need declaration merging or `extends`.
 
@@ -65,15 +65,15 @@ interface UserRepository extends Repository<User> {
 }
 ```
 
-### interface vs type — when to use which
+### interface vs type: when to use which
 
 | Use | When |
 |---|---|
 | `type` | Union types, intersections, mapped types, utility types, internal data shapes |
 | `interface` | Contracts that will be `implements`ed or `extends`ed, declaration merging needed |
-| **Default** | **`type` — unless you have a specific reason for `interface`** |
+| **Default** | **`type`: unless you have a specific reason for `interface`** |
 
-### Zod schema — trust boundary guardian
+### Zod schema: trust boundary guardian
 
 Use when data enters your system. Validates at runtime, infers types at compile time.
 
@@ -98,7 +98,7 @@ type UserResponse = z.infer<typeof UserResponseSchema>
 **The one rule**: data crosses a trust boundary → Zod. Everything else → plain type/interface.
 Never use Zod for internal-only data. The runtime validation cost and Zod coupling are unnecessary.
 
-### as const — fixed constants
+### as const: fixed constants
 
 Replaces `enum` entirely. Type-safe, tree-shakeable, no runtime overhead.
 
@@ -114,7 +114,7 @@ const STATUS = {
 type Status = (typeof STATUS)[keyof typeof STATUS]
 ```
 
-### Discriminated union — multiple outcomes
+### Discriminated union: multiple outcomes
 
 ```typescript
 type GetUserResult =
@@ -146,7 +146,7 @@ Each variant has a `kind` discriminant. TypeScript narrows on `switch (result.ki
 Every property is `readonly` unless mutation is the documented purpose.
 
 ```typescript
-// DEFAULT — readonly
+// DEFAULT: readonly
 type Config = {
   readonly apiUrl: string
   readonly timeout: number
@@ -163,7 +163,7 @@ type DeepReadonlyConfig = Readonly<Config>
 For mutable state (rare), document why:
 
 ```typescript
-/** Counter state — mutation is the entire purpose. */
+/** Counter state: mutation is the entire purpose. */
 type CounterState = {
   count: number  // intentionally mutable
 }
@@ -176,13 +176,13 @@ type CounterState = {
 Validate at the boundary. Inside the boundary, types are proof of validity.
 
 ```typescript
-// BAD — validate then pass raw data
+// BAD: validate then pass raw data
 function processEmail(email: string): void {
   if (!email.includes("@")) throw new Error("invalid")
   // still a raw string downstream
 }
 
-// GOOD — parse into typed value at boundary
+// GOOD: parse into typed value at boundary
 const EmailSchema = z.string().email().brand("Email")
 type Email = z.infer<typeof EmailSchema>
 

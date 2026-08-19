@@ -1,4 +1,4 @@
-# axum + sqlx + tracing + tower — HTTP API Stack
+# axum + sqlx + tracing + tower: HTTP API Stack
 
 ## Index
 
@@ -463,9 +463,9 @@ let app = router.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json
 
 ## Common mistakes
 
-1. **Forgetting `error_for_status()?` on outbound `reqwest`** — 4xx silently succeeds
-2. **Returning `Result<T, sqlx::Error>` from handlers** — leak DB details to clients. Always go through `AppError`
-3. **`Json<T>` extractor before validation** — invalid JSON returns axum's default 422 with no body shape. Wrap in a `ValidatedJson<T>` extractor that runs `validator` and returns `AppError`
-4. **Holding DB connections across `.await` on slow external calls** — exhausts the pool. Acquire late, release early
-5. **Skipping `tracing::instrument`** on handlers — losing per-request span correlation
-6. **No `RequestBodyLimitLayer`** — DoS surface. Default axum has no limit
+1. **Forgetting `error_for_status()?` on outbound `reqwest`**: 4xx silently succeeds
+2. **Returning `Result<T, sqlx::Error>` from handlers**; leak DB details to clients. Always go through `AppError`
+3. **`Json<T>` extractor before validation**: invalid JSON returns axum's default 422 with no body shape. Wrap in a `ValidatedJson<T>` extractor that runs `validator` and returns `AppError`
+4. **Holding DB connections across `.await` on slow external calls**: exhausts the pool. Acquire late, release early
+5. **Skipping `tracing::instrument`** on handlers; losing per-request span correlation
+6. **No `RequestBodyLimitLayer`**: DoS surface. Default axum has no limit

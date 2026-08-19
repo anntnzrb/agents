@@ -1,4 +1,4 @@
-# Library Defaults — Full Decision Tree
+# Library Defaults: Full Decision Tree
 
 ## Index
 
@@ -6,7 +6,7 @@ Read the section whose heading matches the task; use heading search before loadi
 
 The opinionated, audited-in-prod stack for 2026 Rust. Every entry has a one-line rationale and a canonical code snippet so the agent does not have to relearn each library's idioms.
 
-## Async runtime — `tokio`
+## Async runtime: `tokio`
 
 The default. Use `tokio` for new work. Multi-thread runtime unless you have a measured reason to go single-thread.
 
@@ -19,11 +19,11 @@ async fn main() -> anyhow::Result<()> {
 ```
 
 Avoid:
-- `async-std` — unmaintained, last release ages ago. crates.io download counts are misleading because of historical inertia
-- `smol` — fine for embedded-ish niches; outside that, the ecosystem is on tokio
+- `async-std`: unmaintained, last release ages ago. crates.io download counts are misleading because of historical inertia
+- `smol`: fine for embedded-ish niches; outside that, the ecosystem is on tokio
 - Mixing runtimes in one binary. Pick one and stay
 
-## Errors — `anyhow` (apps) + `thiserror` (libs)
+## Errors: `anyhow` (apps) + `thiserror` (libs)
 
 Application boundaries get `anyhow::Error` with `.context("...")` at every layer that adds meaning. Libraries expose `#[derive(thiserror::Error)]` enums with `#[non_exhaustive]`.
 
@@ -55,7 +55,7 @@ pub enum ParseError {
 
 `#[non_exhaustive]` on enums prevents downstream `match` from breaking when you add variants. `#[error(transparent)]` on a wrapper variant forwards Display + cause to the inner error.
 
-## CLI — `clap` with derive
+## CLI: `clap` with derive
 
 ```rust
 use clap::{Parser, Subcommand};
@@ -92,7 +92,7 @@ enum Command {
 
 Avoid `structopt` (deprecated, merged into clap), `argh` (less ergonomic), `pico-args` (only when binary size matters more than DX).
 
-## Logging — `tracing` + `tracing-subscriber`
+## Logging: `tracing` + `tracing-subscriber`
 
 Not `log` + `env_logger`. `tracing` supports spans (structured context that follows async tasks) and structured fields - `log` cannot.
 
@@ -126,7 +126,7 @@ async fn process_user(db: &Pool, user: &User) -> anyhow::Result<()> {
 
 Replace `println!` with `info!`/`warn!`/`error!`. Replace `eprintln!` with `tracing::error!`.
 
-## Error reporting (binaries) — `color-eyre`
+## Error reporting (binaries): `color-eyre`
 
 For binary `main()`, hook `color-eyre` to give pretty panics + nice `Result` printing:
 
@@ -140,7 +140,7 @@ fn main() -> color_eyre::Result<()> {
 
 Library code stays on `anyhow`/`thiserror`. `color-eyre` is purely a display layer for the binary.
 
-## Serialization — `serde` + `serde_json`
+## Serialization: `serde` + `serde_json`
 
 The default for any data crossing a process boundary (file, network, IPC, database column).
 
@@ -160,13 +160,13 @@ pub struct ApiResponse {
 `deny_unknown_fields` catches typos in inputs. `rename_all = "snake_case"` aligns with REST/JSON conventions while keeping idiomatic Rust field names. `#[serde(flatten)]` for forward-compatible extra fields.
 
 Alternatives:
-- `serde_yaml` (YAML — note: YAML's "deserialize anything" surface is a security trap; prefer JSON/TOML where possible)
+- `serde_yaml` (YAML: note: YAML's "deserialize anything" surface is a security trap; prefer JSON/TOML where possible)
 - `toml` (config files)
-- `rmp-serde` (MessagePack — binary, fast)
+- `rmp-serde` (MessagePack: binary, fast)
 - `ciborium` (CBOR)
 - `bincode 2` (binary, smaller; no serde required in v2 but interop fine)
 
-## HTTP client — `reqwest`
+## HTTP client: `reqwest`
 
 ```rust
 let client = reqwest::Client::builder()
@@ -188,7 +188,7 @@ let repo: Repo = client
 
 `error_for_status()?` turns 4xx/5xx into `Err`. Always include a User-Agent. `https_only(true)` is a soundness toggle - prevents accidental http:// downgrade.
 
-## Web framework — `axum`
+## Web framework: `axum`
 
 ```rust
 use axum::{Router, routing::get, extract::State, response::Json};
@@ -219,7 +219,7 @@ async fn main() -> anyhow::Result<()> {
 
 Avoid `actix-web` (legacy patterns, separate runtime model), `warp` (filter explosion in non-trivial apps), `rocket` (slow release cadence). Pair `axum` with `tower-http` for middleware (trace, compression, CORS, timeout, request-id).
 
-## Database — `sqlx` (compile-time checked SQL)
+## Database: `sqlx` (compile-time checked SQL)
 
 ```rust
 use sqlx::PgPool;
@@ -245,7 +245,7 @@ Avoid `diesel` (sync-first, heavy DSL), raw `tokio-postgres` (loses type checks)
 
 For migrations: `sqlx migrate add <name>` + `sqlx::migrate!("./migrations").run(&pool).await?`.
 
-## Time — `jiff`
+## Time: `jiff`
 
 The 2025+ choice. Single crate, sane defaults, civil time / instant / span distinction.
 
@@ -260,7 +260,7 @@ let span: Span = local - some_earlier.in_tz("Asia/Seoul")?;
 
 Avoid `chrono` (old API, generic-heavy, time zone story still painful), `time` crate (split ecosystem, weaker docs). `jiff` is the post-`chrono` consolidation.
 
-## UUID — `uuid` with v7
+## UUID: `uuid` with v7
 
 ```rust
 use uuid::Uuid;
@@ -271,7 +271,7 @@ let id = Uuid::now_v7();
 
 v4 is fine for nonces, v7 for primary keys (better index locality). Never v1 (leaks MAC). Cargo features: `uuid = { version = "1", features = ["v4", "v7", "serde"] }`.
 
-## DataFrames / analytics — `polars`
+## DataFrames / analytics: `polars`
 
 For columnar data, joins, group-by, lazy plans:
 
@@ -297,7 +297,7 @@ The Rust API mirrors the Python one. Use the lazy API by default; materialize wi
 
 Avoid raw `std::sync::mpsc` (sync only, fewer features), `crossbeam-channel` (good but heavier; use only if you need rendezvous semantics).
 
-## Coordinate spaces / 2D math — `euclid`
+## Coordinate spaces / 2D math: `euclid`
 
 ```rust
 use euclid::{Point2D, Size2D, default::Box2D};
@@ -315,7 +315,7 @@ let player: WorldPoint  = Point2D::new(3.5, 1.2);
 
 Generalize the pattern to your own domains (see `references/type-state.md`).
 
-## Property tests — `proptest`
+## Property tests: `proptest`
 
 ```rust
 use proptest::prelude::*;
@@ -332,7 +332,7 @@ proptest! {
 
 Avoid `quickcheck` (older, less ergonomic). proptest gives shrinking + regression corpus + integration with `criterion`.
 
-## Snapshot tests — `insta`
+## Snapshot tests: `insta`
 
 ```rust
 #[test]
@@ -347,9 +347,9 @@ fn serializes_well() {
 }
 ```
 
-`cargo insta review` (after `cargo install cargo-insta`) — interactive review of changed snapshots.
+`cargo insta review` (after `cargo install cargo-insta`); interactive review of changed snapshots.
 
-## Benchmarks — `criterion`
+## Benchmarks: `criterion`
 
 Stable Rust friendly (no nightly `#[bench]`).
 
@@ -367,11 +367,11 @@ criterion_main!(benches);
 
 Run with `cargo bench`. HTML reports under `target/criterion/`. Pair with `cargo bench -- --save-baseline main` then `--baseline main` for comparison.
 
-## Concurrency model — `loom`
+## Concurrency model: `loom`
 
 For lock-free or atomic-heavy code (channels, refcounts, hazard pointers). See `references/concurrency.md` for the full pattern.
 
-## Arena allocator — `bumpalo`
+## Arena allocator: `bumpalo`
 
 ```rust
 use bumpalo::Bump;
@@ -384,11 +384,11 @@ let s: &str = bump.alloc_str("hello");
 
 For parser nodes, AST construction, per-request scratch. Outperforms heap allocation for short-lived owned data by an order of magnitude.
 
-## Web client (browser, WASM-bound) — `gloo` ecosystem
+## Web client (browser, WASM-bound): `gloo` ecosystem
 
 If targeting WASM browser, use `gloo-net` for fetch and `gloo-storage` for localStorage; not `web-sys` directly unless you need DOM-level APIs.
 
-## Lazy statics — `std::sync::LazyLock` (since 1.80)
+## Lazy statics: `std::sync::LazyLock` (since 1.80)
 
 ```rust
 use std::sync::LazyLock;
@@ -397,7 +397,7 @@ static CONFIG: LazyLock<Config> = LazyLock::new(|| Config::load_from_env().unwra
 
 Avoid `lazy_static!` (macro-heavy, predates std), `once_cell` (now in std as `LazyLock`/`OnceLock`).
 
-## Hash maps — `std::collections::HashMap` + `ahash` for hot paths
+## Hash maps: `std::collections::HashMap` + `ahash` for hot paths
 
 ```rust
 use std::collections::HashMap;
@@ -411,7 +411,7 @@ let mut counters: FastMap<String, u64> = FastMap::default();
 
 For sorted iteration, use `BTreeMap`. For small keys with known small N, `Vec<(K, V)>` may beat both.
 
-## File I/O — `tokio::fs` (async) or `std::fs` (sync utility)
+## File I/O: `tokio::fs` (async) or `std::fs` (sync utility)
 
 ```rust
 let contents = tokio::fs::read_to_string("data.json").await?;

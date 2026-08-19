@@ -2,7 +2,7 @@
 
 ## Authentication
 
-Use `VERCEL_TOKEN` env var (not `--token` — it leaks in process listings). Use `--scope` if the token has access to multiple teams.
+Use `VERCEL_TOKEN` env var (not `--token`; it leaks in process listings). Use `--scope` if the token has access to multiple teams.
 
 Tracked template: `.env.example`
 
@@ -55,4 +55,4 @@ URL=$(vercel deploy --prod)   # stdout = URL, stderr = progress
 2. Always use `VERCEL_TOKEN` env var for auth
 3. Use `--scope` if the token has access to multiple teams
 4. Use `vercel build` + `vercel deploy --prebuilt` for deterministic builds
-5. If something goes wrong, check `.vercel/` — `project.json` vs `repo.json` is the most common issue
+5. If something goes wrong, check `.vercel/`: `project.json` vs `repo.json` is the most common issue

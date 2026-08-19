@@ -1,4 +1,4 @@
-# Bootstrap — Runtime, Package Manager, Tooling
+# Bootstrap: Runtime, Package Manager, Tooling
 
 When starting a new TypeScript project (or scripting against the world), the choice of runtime, package manager, framework, and toolchain compounds. The wrong default at minute zero costs hours every week. The right defaults for 2026:
 
@@ -37,7 +37,7 @@ Use Node when:
 
 `bunx` replaces `npx`. `bun create` scaffolds projects.
 
-## Package manager — pnpm > npm
+## Package manager: pnpm > npm
 
 If you must use Node, use pnpm. NEVER npm except in legacy projects you don't control.
 
@@ -64,7 +64,7 @@ rm -rf node_modules package-lock.json yarn.lock
 pnpm install
 ```
 
-## Backend framework — Hono
+## Backend framework: Hono
 
 Use Hono for any new HTTP service. It is:
 - Type-safe end-to-end (request/response types flow through middleware)
@@ -75,12 +75,12 @@ Use Hono for any new HTTP service. It is:
 When Hono → ALWAYS pair with `hono-openapi` + `@scalar/hono-api-reference` + `@hono/swagger-ui`. Full setup with copy-pasteable `app.ts`: [backend-hono.md](backend-hono.md).
 
 NEVER:
-- Express for new services. Express is the COBOL of Node — works, but writes itself out of every benchmark
+- Express for new services. Express is the COBOL of Node; works, but writes itself out of every benchmark
 - Fastify for new services. Hono ships with better TypeScript ergonomics
 - NestJS for new services. The Angular-flavoured DI/decorator stack is overkill for ~95% of services
 - Bare `Bun.serve` or `node:http` unless you have a specific reason. Lose middleware, routing, validation. Reinvent everything
 
-## Frontend tooling — Vite
+## Frontend tooling: Vite
 
 Vite for any frontend. Replaces webpack, parcel, rollup-as-app-bundler. Works with React, Vue, Svelte, Solid, Preact, vanilla.
 
@@ -91,7 +91,7 @@ bun install
 bun run dev
 ```
 
-## Lint + format — Biome
+## Lint + format: Biome
 
 Biome replaces ESLint + Prettier with one tool, written in Rust, ~30x faster.
 
@@ -115,9 +115,9 @@ Use ESLint only when:
 - You have an ESLint plugin Biome doesn't replicate (rare in 2026)
 - You're contributing to an existing ESLint project
 
-Never run both — pick one.
+Never run both; pick one.
 
-## Test runner — bun test or vitest
+## Test runner: bun test or vitest
 
 | Runner | Use when |
 |---|---|
@@ -156,7 +156,7 @@ NEVER Jest for a new project. Jest's CommonJS-first design fights every modern N
 }
 ```
 
-`verbatimModuleSyntax: true` enforces explicit `import type { ... }` for type-only imports — pairs with the no-excuse rule on type-only imports.
+`verbatimModuleSyntax: true` enforces explicit `import type { ... }` for type-only imports; pairs with the no-excuse rule on type-only imports.
 
 `noEmit: true` because `bun run` and `bun build` handle compilation. The `tsc` command becomes a typechecker only.
 

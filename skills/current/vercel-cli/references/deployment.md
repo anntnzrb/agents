@@ -12,7 +12,7 @@ vercel --target staging   # custom environment
 
 ## Prebuilt Deploy
 
-Build locally, deploy the output — avoids remote builds:
+Build locally, deploy the output; avoids remote builds:
 
 ```bash
 vercel build --prod
@@ -38,7 +38,7 @@ URL=$(vercel deploy --prod)
 
 ## Accessing Preview Deployments
 
-Use `vercel curl` — it handles deployment protection automatically:
+Use `vercel curl`; it handles deployment protection automatically:
 
 ```bash
 vercel curl /api/health --deployment $PREVIEW_URL
@@ -48,10 +48,10 @@ vercel curl /api/health --deployment $PREVIEW_URL
 
 ## Other Deploy Commands
 
-- `vercel redeploy <url>` — rebuild an existing deployment
-- `vercel promote <url>` — move a deployment to production without rebuilding
-- `vercel rollback <url>` — revert to a previous deployment
-- `vercel rolling-release` — gradual traffic shifting
+- `vercel redeploy <url>`: rebuild an existing deployment
+- `vercel promote <url>`: move a deployment to production without rebuilding
+- `vercel rollback <url>`: revert to a previous deployment
+- `vercel rolling-release`: gradual traffic shifting
 
 ## Workflows
 

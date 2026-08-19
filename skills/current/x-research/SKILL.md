@@ -47,7 +47,7 @@ Use `--summary` for routine output. It is a deterministic projection that preser
 
 ### Latest posts from a user
 
-Run one bounded page with `uv run --script skills/current/x-research/scripts/cli.py user-posts HANDLE --count COUNT --summary [--pretty]` (choose a concrete count from 1–100; omit `--pretty` for default compact output). Report the handle, count requested/returned, whether replies were included, cursor, and completeness. Use unflagged full output only when optional metrics or media are needed. Use `conversation` only when the user asks for a particular thread.
+Run one bounded page with `uv run --script skills/current/x-research/scripts/cli.py user-posts HANDLE --count COUNT --summary [--pretty]` (choose a concrete count from 1-100; omit `--pretty` for default compact output). Report the handle, count requested/returned, whether replies were included, cursor, and completeness. Use unflagged full output only when optional metrics or media are needed. Use `conversation` only when the user asks for a particular thread.
 
 ### Sample-scoped sentiment
 

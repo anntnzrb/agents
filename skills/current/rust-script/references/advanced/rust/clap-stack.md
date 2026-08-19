@@ -1,4 +1,4 @@
-# CLI Stack — clap + color-eyre + tracing + indicatif + dialoguer
+# CLI Stack: clap + color-eyre + tracing + indicatif + dialoguer
 
 ## Index
 
@@ -116,12 +116,12 @@ pub enum Mode { Debug, Release }
 
 Key clap derive patterns:
 
-- `env = "VAR"` — falls back to env var if flag not given
-- `global = true` — flag inherits to subcommands
-- `arg_required_else_help = true` — running with no args prints help instead of erroring
-- `value_enum` on an enum — case-insensitive parsing + auto-completion
-- `action = clap::ArgAction::Count` — `-v` is 1, `-vv` is 2, etc.
-- `conflicts_with` — incompatible flags
+- `env = "VAR"`: falls back to env var if flag not given
+- `global = true`: flag inherits to subcommands
+- `arg_required_else_help = true`: running with no args prints help instead of erroring
+- `value_enum` on an enum: case-insensitive parsing + auto-completion
+- `action = clap::ArgAction::Count`; `-v` is 1, `-vv` is 2, etc.
+- `conflicts_with`: incompatible flags
 
 ## Main + tracing init
 
@@ -181,7 +181,7 @@ Tracing on a CLI:
 - **Write to stderr.** stdout is for the tool's actual output (which the user might pipe). Logs and progress bars go to stderr
 - **Verbosity from `-v`, not from `RUST_LOG`.** Users expect `-v` on a CLI; `RUST_LOG` is a developer escape hatch (kept, but secondary)
 
-## Progress bars — `indicatif`
+## Progress bars: `indicatif`
 
 ```rust
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -230,7 +230,7 @@ let bars: Vec<_> = (0..workers).map(|i| {
 
 When stdout is not a terminal, indicatif silently disables animation. Force on/off with `pb.set_draw_target(ProgressDrawTarget::stdout())` / `hidden()`.
 
-## Interactive prompts — `dialoguer`
+## Interactive prompts: `dialoguer`
 
 ```rust
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, Password, Select, FuzzySelect, MultiSelect};

@@ -17,6 +17,8 @@ One skill, two modes. Both remove AI-generated slop; the artifact decides the mo
 
 ## Prose mode
 
+- NEVER use U+2013 (en dash) or U+2014 (em dash) in prose. Replace them with a period, comma, colon, or semicolon. Use ASCII `-` only for syntax, flags, identifiers, and true compound words, not as dash punctuation.
+
 1. Scan for the patterns in `references/slop-patterns.md`.
 2. Rewrite. Preserve meaning, match intended tone.
 3. Add soul (below).

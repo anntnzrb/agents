@@ -19,9 +19,9 @@ vercel inspect <url> --wait        # wait for completion
 vercel inspect <url> --logs        # show build logs
 ```
 
-## `vercel curl` — Access Preview Deployments
+## `vercel curl`: Access Preview Deployments
 
-**Use `vercel curl` to access preview deploys.** It handles deployment protection automatically — no need to disable protection or manage bypass secrets.
+**Use `vercel curl` to access preview deploys.** It handles deployment protection automatically; no need to disable protection or manage bypass secrets.
 
 ```bash
 vercel curl /api/health --deployment $PREVIEW_URL

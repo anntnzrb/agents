@@ -1,6 +1,6 @@
 # Advanced Commands
 
-## `vercel api` — Fallback for Missing CLI Commands
+## `vercel api`: Fallback for Missing CLI Commands
 
 **Use `vercel api` when a CLI command doesn't exist for what you need.** Full access to the Vercel REST API with automatic authentication.
 
@@ -16,7 +16,7 @@ Use `vercel api ls` to discover available endpoints.
 
 ## Other Commands
 
-- `vercel webhooks` — manage webhooks (create, ls, rm)
-- `vercel mcp` — set up MCP integration for AI agents
-- `vercel telemetry` — manage telemetry settings
-- `vercel upgrade` — upgrade the CLI
+- `vercel webhooks`: manage webhooks (create, ls, rm)
+- `vercel mcp`: set up MCP integration for AI agents
+- `vercel telemetry`: manage telemetry settings
+- `vercel upgrade`: upgrade the CLI

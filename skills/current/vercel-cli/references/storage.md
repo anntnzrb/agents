@@ -1,6 +1,6 @@
 # Blob Storage
 
-`vercel blob` manages Vercel Blob storage — simple file storage for uploading, listing, and deleting files.
+`vercel blob` manages Vercel Blob storage; simple file storage for uploading, listing, and deleting files.
 
 ```bash
 vercel blob put ./image.png                              # upload

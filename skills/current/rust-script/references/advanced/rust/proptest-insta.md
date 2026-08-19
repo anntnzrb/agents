@@ -19,7 +19,7 @@ Two test types every Rust project should have alongside unit tests. Proptest hun
 
 Use all three. They cover different bug classes.
 
-## Proptest — setup
+## Proptest: setup
 
 `Cargo.toml`:
 
@@ -64,7 +64,7 @@ proptest! {
 
 `proptest!` macro takes `(arg in strategy, ...)` pairs. Each strategy produces values; proptest runs the body with random samples, then shrinks failing cases to minimal forms.
 
-## Strategies — the value-generation language
+## Strategies: the value-generation language
 
 | Strategy | Produces |
 |---|---|
@@ -241,7 +241,7 @@ proptest-regressions/
 └── parse_color.txt   # commit this
 ```
 
-## Insta — setup
+## Insta: setup
 
 `Cargo.toml`:
 
@@ -260,7 +260,7 @@ Install the CLI:
 cargo install cargo-insta
 ```
 
-## Insta — basic snapshots
+## Insta: basic snapshots
 
 ```rust
 #[test]
@@ -272,7 +272,7 @@ fn renders_default_help() {
 
 First run: creates `src/snapshots/mycrate__renders_default_help.snap.new`. Run `cargo insta review`, press `a` to accept, the `.new` extension is dropped. Subsequent runs diff against the committed snapshot; mismatches fail the test.
 
-## Insta — typed snapshots
+## Insta: typed snapshots
 
 ```rust
 #[derive(Debug, serde::Serialize)]
@@ -305,7 +305,7 @@ Choose:
 - `assert_json_snapshot!` for structured data crossing process boundaries
 - `assert_yaml_snapshot!` when YAML is easier to read in diffs
 
-## Insta — redactions and filters
+## Insta: redactions and filters
 
 For values that change every run (timestamps, UUIDs, paths):
 

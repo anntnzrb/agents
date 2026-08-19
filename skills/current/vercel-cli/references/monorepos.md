@@ -53,7 +53,7 @@ Turborepo requires an explicit `build` task. Define it in `turbo.json`:
 }
 ```
 
-Vercel automatically generates the right build command — you don't need to configure it. If you need a manual override in `vercel.json`:
+Vercel automatically generates the right build command; you don't need to configure it. If you need a manual override in `vercel.json`:
 
 ```json
 {

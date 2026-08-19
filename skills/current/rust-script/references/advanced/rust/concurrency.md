@@ -10,10 +10,10 @@ Locks, atomics, channels, and the loom model checker. The decision tree that kee
 
 ```
 Highest level          tokio::sync::mpsc / broadcast / watch
-                       (message passing — default for new code)
+                       (message passing; default for new code)
 
                        Arc<Mutex<T>> / Arc<RwLock<T>>
-                       (shared mutable state — common, easy to get right)
+                       (shared mutable state; common, easy to get right)
 
                        parking_lot::{Mutex, RwLock, Condvar}
                        (faster sync locks, no poisoning)
@@ -55,7 +55,7 @@ Need to share state between tasks?
     └── UnsafeCell + atomics + loom-tested + miri-tested + a co-author
 ```
 
-## Atomics — when and how
+## Atomics: when and how
 
 Use atomics for:
 - Counters incremented from many threads (`AtomicU64`)
@@ -103,7 +103,7 @@ if READY.load(Ordering::Acquire) {
 }
 ```
 
-This is the canonical Release/Acquire pattern. **Use `OnceLock<Config>` instead** in new code — it encapsulates exactly this with safe API.
+This is the canonical Release/Acquire pattern. **Use `OnceLock<Config>` instead** in new code; it encapsulates exactly this with safe API.
 
 ## Std vs parking_lot vs tokio for locks
 
@@ -124,7 +124,7 @@ This is the canonical Release/Acquire pattern. **Use `OnceLock<Config>` instead*
 - Static init / app config → `OnceLock` or `LazyLock`
 - Avoid `std::sync::Mutex` for new code; the poisoning behavior is more annoying than useful and `parking_lot` is strictly faster
 
-### Common deadlock — async + sync mutex
+### Common deadlock: async + sync mutex
 
 ```rust
 let m = std::sync::Mutex::new(0u64);
@@ -149,7 +149,7 @@ Or switch to `tokio::sync::Mutex` whose guard is `Send` across awaits.
 
 ## Channels
 
-### Mpsc — the workhorse
+### Mpsc: the workhorse
 
 ```rust
 let (tx, mut rx) = tokio::sync::mpsc::channel::<Job>(256);
@@ -165,7 +165,7 @@ tx.send(Job::new()).await?;  // backpressure: awaits if full
 
 Capacity is the backpressure budget. **Never `unbounded_channel()`** unless you have a hard upper bound elsewhere; otherwise it is a slow-leak memory bomb.
 
-### Watch — latest-value pubsub
+### Watch: latest-value pubsub
 
 ```rust
 let (tx, mut rx) = tokio::sync::watch::channel(Config::default());
@@ -183,7 +183,7 @@ loop {
 
 Receivers see only the latest value (older updates are dropped). Perfect for config reload, leadership changes, "current time" propagation.
 
-### Broadcast — fanout queue
+### Broadcast: fanout queue
 
 ```rust
 let (tx, _) = tokio::sync::broadcast::channel::<Event>(1024);
@@ -197,7 +197,7 @@ while let Ok(event) = rx1.recv().await {
 
 Each subscriber has its own buffer. If a subscriber falls behind by more than the buffer size, it gets `RecvError::Lagged(n)` and skips messages. Decide explicitly: log + continue, or drop the subscriber and reconnect.
 
-### Oneshot — single value
+### Oneshot: single value
 
 ```rust
 let (tx, rx) = tokio::sync::oneshot::channel::<Response>();
@@ -228,7 +228,7 @@ Use cases:
 - "Max 3 DB connections doing writes."
 - "Max N tokio tasks running heavy CPU."
 
-A semaphore with `permits=1` is a mutex. Use the actual `Mutex` for that — clearer intent.
+A semaphore with `permits=1` is a mutex. Use the actual `Mutex` for that; clearer intent.
 
 ## Arc and Rc
 
@@ -273,7 +273,7 @@ async fn main() {
 
 `OnceLock` is `std::sync` and stable. `LazyLock` is in `std::sync` since 1.80. Avoid the older `once_cell` crate for new code.
 
-## Loom — model-checking lock-free code
+## Loom: model-checking lock-free code
 
 When `unsafe` participates in a concurrent algorithm, miri's single-thread model is insufficient. Loom exhaustively explores thread interleavings.
 
@@ -337,10 +337,10 @@ Loom explores every legal scheduling of the threads, including those a real sche
 - Doesn't catch UB inside `unsafe` blocks the way miri does. **Run both: miri for memory safety, loom for thread schedules.**
 - Doesn't handle `tokio` directly. Loom replaces stdlib's sync primitives; tokio's are independent
 
-## Send and Sync — what they mean
+## Send and Sync: what they mean
 
-- `T: Send` — `T` can be moved between threads safely
-- `T: Sync` — `&T` can be shared between threads safely
+- `T: Send`; `T` can be moved between threads safely
+- `T: Sync`; `&T` can be shared between threads safely
 
 These are auto-derived for composite types if all components implement them. Manual `unsafe impl Send/Sync` is required only for raw pointer types and FFI handles.
 
@@ -351,7 +351,7 @@ struct MyHandle { raw: *mut FfiObject }
 // is safe as long as concurrent use is externally synchronized. We do not
 // implement Sync because the FFI object is single-threaded once obtained.
 unsafe impl Send for MyHandle {}
-// Do NOT impl Sync — the FFI is not thread-safe.
+// Do NOT impl Sync: the FFI is not thread-safe.
 ```
 
 When the compiler complains that "T: Send is not satisfied", the cause is usually a raw pointer, an `Rc` (not `Arc`), or a `RefCell` (use `Mutex`).

@@ -25,7 +25,7 @@ Execute this task:
 - Task: <eval prompt>
 - Input files: <eval files if any, or "none">
 - Save outputs to: <workspace>/iteration-<N>/eval-<ID>/with_skill/outputs/
-- Outputs to save: <what the user cares about — e.g., "the .docx file", "the final CSV">
+- Outputs to save: <what the user cares about; e.g., "the .docx file", "the final CSV">
 ```
 
 **Baseline run** uses the same prompt and changes by context:
@@ -70,9 +70,9 @@ This is the only opportunity to capture timing data. It comes through the task n
 
 After all runs finish:
 
-1. **Grade each run** — spawn a grader subagent or grade inline. The grader reads `agents/grader.md` and evaluates each assertion against outputs. Save results to `grading.json` in each run directory. The `grading.json` expectations array MUST use exactly the fields `text`, `passed`, and `evidence`; the viewer depends on those exact names. For programmatically checkable assertions, write and run a script instead of eyeballing
+1. **Grade each run**: spawn a grader subagent or grade inline. The grader reads `agents/grader.md` and evaluates each assertion against outputs. Save results to `grading.json` in each run directory. The `grading.json` expectations array MUST use exactly the fields `text`, `passed`, and `evidence`; the viewer depends on those exact names. For programmatically checkable assertions, write and run a script instead of eyeballing
 
-2. **Aggregate into benchmark** — run the aggregation script from the skill-creator directory:
+2. **Aggregate into benchmark**: run the aggregation script from the skill-creator directory:
 
    ```bash
    uv run --script <skill-creator-path>/scripts/cli.py aggregate-benchmark <workspace>/iteration-N --skill-name <name>
@@ -80,7 +80,7 @@ After all runs finish:
 
    This produces `benchmark.json` and `benchmark.md` with pass_rate, time, and tokens for each configuration, including mean ± stddev and delta. If generating `benchmark.json` manually, see `references/schemas.md` for the exact viewer schema. Put each `with_skill` version before its baseline counterpart.
 
-3. **Do an analyst pass** — read the benchmark data before launching the viewer. Surface patterns aggregate stats can hide: non-discriminating assertions, high-variance evals, flaky tests, and time/token tradeoffs. See `agents/analyzer.md`, especially "Analyzing Benchmark Results"
+3. **Do an analyst pass**: read the benchmark data before launching the viewer. Surface patterns aggregate stats can hide: non-discriminating assertions, high-variance evals, flaky tests, and time/token tradeoffs. See `agents/analyzer.md`, especially "Analyzing Benchmark Results"
 
 4. **Launch the viewer** with qualitative outputs and quantitative data:
 
@@ -99,7 +99,7 @@ After all runs finish:
 
 Use `uv run --script <skill-creator-path>/scripts/cli.py generate-review` to create the viewer. NEVER write custom HTML.
 
-Tell the user: "I've opened the results in your browser. There are two tabs — 'Outputs' lets you click through each test case and leave feedback, 'Benchmark' shows the quantitative comparison. When you're done, come back here and let me know."
+Tell the user: "I've opened the results in your browser. There are two tabs; 'Outputs' lets you click through each test case and leave feedback, 'Benchmark' shows the quantitative comparison. When you're done, come back here and let me know."
 
 ### What the user sees in the viewer
 
@@ -181,7 +181,7 @@ Continue until:
 
 ## Related agent references
 
-- `agents/grader.md` — evaluate assertions against outputs
-- `agents/analyzer.md` — analyze benchmark and comparison results
-- `agents/comparator.md` — run blind A/B comparison when needed
-- `references/schemas.md` — exact JSON structures for `evals.json`, `eval_metadata.json`, `grading.json`, `benchmark.json`, and feedback payloads
+- `agents/grader.md`: evaluate assertions against outputs
+- `agents/analyzer.md`: analyze benchmark and comparison results
+- `agents/comparator.md`: run blind A/B comparison when needed
+- `references/schemas.md`: exact JSON structures for `evals.json`, `eval_metadata.json`, `grading.json`, `benchmark.json`, and feedback payloads

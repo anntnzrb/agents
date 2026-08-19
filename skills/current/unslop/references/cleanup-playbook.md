@@ -23,7 +23,7 @@ outside scope; record an out-of-scope concern under deferred risks.
 
 For each source file, identify observable exports, handlers, commands, or externally used classes.
 Locate existing coverage using repository conventions. Before editing weakly covered behavior, add
-the narrowest regression test that asserts output, effects, or errors—not implementation details.
+the narrowest regression test that asserts output, effects, or errors; not implementation details.
 Run relevant tests and require green. Prompts, `SKILL.md`, rules, and other prose have no behavioral
 seam: do not add phrase, word-count, or text-pinning tests unless a machine consumes that value.
 
@@ -31,10 +31,10 @@ seam: do not add phrase, word-count, or text-pinning tests unless a machine cons
 
 Evaluate each changed unit in this order:
 
-1. **Delete entirely** — the behavior is dead, speculative, or unnecessary
-2. **Reuse** — existing repository code already does the work
-3. **Use platform, standard library, or installed dependency** — replace a hand-rolled duplicate
-4. **Simplify in place** — only if it must remain
+1. **Delete entirely**: the behavior is dead, speculative, or unnecessary
+2. **Reuse**: existing repository code already does the work
+3. **Use platform, standard library, or installed dependency**: replace a hand-rolled duplicate
+4. **Simplify in place**: only if it must remain
 
 For a bug fix involving a shared function, inspect its callers. Prefer one root-cause repair at the
 shared seam over duplicated caller guards.
@@ -111,7 +111,7 @@ deletion-only, tautological, implementation-mirroring, constant-pinning, or pros
 
 ### 10. Oversized modules
 
-Treat source files over 250 pure lines—non-blank, non-comment—as an architectural concern. Before
+Treat source files over 250 pure lines; non-blank, non-comment; as an architectural concern. Before
 splitting, identify distinct responsibilities and show the user a concept-based split plan. Name
 new modules for their responsibility, not `utils`, `helpers`, `common`, or numbered fragments.
 Keep package initializers as re-exports only. Then rerun size measurement, tests, type checks, and

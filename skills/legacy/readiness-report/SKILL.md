@@ -110,7 +110,7 @@ See `references/maturity-levels.md` for detailed level requirements.
 
 - ✓ **Pass**: Criterion met (contributes to score)
 - ✗ **Fail**: Criterion not met (opportunity for improvement)
-- — **Skip**: Not applicable to this repository type (excluded from score)
+- **Skip**: Not applicable to this repository type (excluded from score)
 
 ### Priority Order
 

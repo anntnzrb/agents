@@ -19,16 +19,16 @@ uv run --script skills/current/vals-live/scripts/cli.py <command> [options]
 ```
 
 Canonical commands:
-- `catalog` — discover active, archived, version-linked benchmark entries; only listing command (no `benchmarks` alias).
-- `models` — discover model/provider/variant records.
-- `model --model <id-or-name>` — project one exact model.
-- `benchmark --benchmark <id-or-url>` — project one exact benchmark/version.
-- `compare --models <a,b,...> [--benchmarks <x,y,...>]` — compare compatible rows only.
-- `catalog-diff --left <snapshot> --right <snapshot>` — conservatively classify changes.
-- `diagnose` — expose extraction, transport, drift, value diagnostics.
-- `schema` — return stable contract without network access.
-- `refresh` — fetch and retain immutable source bytes.
-- `snapshot --snapshot <path>` — materialize/read explicit historical source snapshot.
+- `catalog`: discover active, archived, version-linked benchmark entries; only listing command (no `benchmarks` alias).
+- `models`: discover model/provider/variant records.
+- `model --model <id-or-name>`: project one exact model.
+- `benchmark --benchmark <id-or-url>`: project one exact benchmark/version.
+- `compare --models <a,b,...> [--benchmarks <x,y,...>]`: compare compatible rows only.
+- `catalog-diff --left <snapshot> --right <snapshot>`: conservatively classify changes.
+- `diagnose`: expose extraction, transport, drift, value diagnostics.
+- `schema`: return stable contract without network access.
+- `refresh`: fetch and retain immutable source bytes.
+- `snapshot --snapshot <path>`: materialize/read explicit historical source snapshot.
 Selectors MUST resolve to discovered source IDs, exact labels, or official URLs.
 
 ## Source and freshness
@@ -47,10 +47,10 @@ Comparisons require exact source benchmark/version or snapshot, release, metric 
 
 ## Required follow-up reads
 
-- Runtime source routing: `references/source-discovery.md` — before selecting a seed or selector.
-- Extraction precedence: `references/extraction.md` — when HTML/island/RSC/table data differs.
-- Values and semantic gates: `references/normalization.md` — before reporting or ranking a metric.
-- Cache and field lineage: `references/provenance.md` — when using refresh, stale, or snapshots.
-- Drift and catalog diff: `references/drift-handling.md` — when a catalog/page changes.
-- Dependencies and overlap: `references/overlap-model.md` — when comparing composites or coding benchmarks.
-- Fixture/eval expectations: `references/eval-notes.md` — when extending tests or source fixtures.
+- Runtime source routing: `references/source-discovery.md`; before selecting a seed or selector.
+- Extraction precedence: `references/extraction.md`; when HTML/island/RSC/table data differs.
+- Values and semantic gates: `references/normalization.md`; before reporting or ranking a metric.
+- Cache and field lineage: `references/provenance.md`; when using refresh, stale, or snapshots.
+- Drift and catalog diff: `references/drift-handling.md`; when a catalog/page changes.
+- Dependencies and overlap: `references/overlap-model.md`; when comparing composites or coding benchmarks.
+- Fixture/eval expectations: `references/eval-notes.md`; when extending tests or source fixtures.

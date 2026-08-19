@@ -1,4 +1,4 @@
-# Miri, Sanitizers, Loom, and Fuzzing — The UB Detection Arsenal
+# Miri, Sanitizers, Loom, and Fuzzing: The UB Detection Arsenal
 
 ## Index
 
@@ -8,11 +8,11 @@ Miri is the **primary weapon**. Everything else is supplementary for the gaps Mi
 
 ---
 
-## Miri — The First and Last Line of Defense
+## Miri: The First and Last Line of Defense
 
 ### What Miri Is
 
-Miri is an interpreter for Rust's MIR (Mid-level IR). It executes your test suite inside a virtual machine that tracks every byte of memory for validity, provenance, alignment, initialization, and aliasing. It is **deterministic** — same inputs, same result — and it can find UB that no amount of testing on real hardware will ever trigger.
+Miri is an interpreter for Rust's MIR (Mid-level IR). It executes your test suite inside a virtual machine that tracks every byte of memory for validity, provenance, alignment, initialization, and aliasing. It is **deterministic**; same inputs, same result; and it can find UB that no amount of testing on real hardware will ever trigger.
 
 ### Why Miri Is Non-Negotiable
 
@@ -20,7 +20,7 @@ Miri is an interpreter for Rust's MIR (Mid-level IR). It executes your test suit
 - Catches aliasing violations that compile and run correctly on every platform today but are UB that future compiler optimizations will exploit
 - Catches data races under a configurable scheduling model
 - Catches provenance violations that are impossible to observe on real hardware
-- **Zero false positives** — if Miri says it is UB, it is UB. Period
+- **Zero false positives**: if Miri says it is UB, it is UB. Period
 
 ### Installation
 
@@ -56,7 +56,7 @@ cargo +nightly miri test -- test_name
 cargo +nightly miri run
 ```
 
-### MIRIFLAGS — The Dial-Up Knobs
+### MIRIFLAGS: The Dial-Up Knobs
 
 These flags are set via the `MIRIFLAGS` environment variable. The agent should use ALL of the strictness flags during a UB audit.
 
@@ -66,7 +66,7 @@ These flags are set via the `MIRIFLAGS` environment variable. The agent should u
 # Default: Stacked Borrows (strict)
 cargo +nightly miri test
 
-# Tree Borrows (newer, more permissive — use as a second pass)
+# Tree Borrows (newer, more permissive: use as a second pass)
 MIRIFLAGS="-Zmiri-tree-borrows" cargo +nightly miri test
 ```
 
@@ -94,7 +94,7 @@ Catches alignment UB that happens to be aligned on your machine but is not guara
 # Increase preemption rate to stress-test race conditions
 MIRIFLAGS="-Zmiri-preemption-rate=0.5" cargo +nightly miri test
 
-# Disable preemption (sequential scheduling — fewer races found but deterministic)
+# Disable preemption (sequential scheduling: fewer races found but deterministic)
 MIRIFLAGS="-Zmiri-preemption-rate=0" cargo +nightly miri test
 ```
 
@@ -124,12 +124,12 @@ cargo +nightly miri test
 
 #### Isolation and I/O
 
-Miri runs in isolation by default — no file I/O, no network, no system calls. If your tests need the filesystem:
+Miri runs in isolation by default; no file I/O, no network, no system calls. If your tests need the filesystem:
 ```bash
 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
 ```
 
-Use sparingly — isolation is a feature, not a limitation. Tests that need I/O should have a separate `#[cfg(not(miri))]` path.
+Use sparingly; isolation is a feature, not a limitation. Tests that need I/O should have a separate `#[cfg(not(miri))]` path.
 
 ### Miri Limitations
 
@@ -188,7 +188,7 @@ fn test_with_miri_fallback() {
 
 ---
 
-## Sanitizers — Where Miri Cannot Reach
+## Sanitizers: Where Miri Cannot Reach
 
 Sanitizers are compiler instrumentation passes. They run your actual binary on real hardware with extra checks injected. Use them for FFI, I/O-heavy code, and integration tests.
 
@@ -236,14 +236,14 @@ RUSTFLAGS="-Zsanitizer=undefined" cargo +nightly test -Zbuild-std --target x86_6
 ### Sanitizer Limitations
 
 - Require nightly + `-Zbuild-std` (rebuilds the standard library with instrumentation)
-- MSAN requires ALL dependencies (including C libs) to be instrumented — practically hard
+- MSAN requires ALL dependencies (including C libs) to be instrumented: practically hard
 - Cannot catch aliasing violations (that is Miri's domain)
 - Significant runtime overhead (2-15x slower)
 - Linux has the best support; macOS works for ASAN; Windows support is minimal
 
 ---
 
-## Loom — Exhaustive Concurrency Testing
+## Loom: Exhaustive Concurrency Testing
 
 Loom explores all possible thread interleavings of a bounded concurrent program. It is mandatory for lock-free and wait-free primitives.
 
@@ -256,8 +256,8 @@ Loom explores all possible thread interleavings of a bounded concurrent program.
 
 ### When NOT to Use Loom
 
-- Code using only `Mutex`/`RwLock` from std or `parking_lot` — the locks are sound, your usage is the question, and Miri + TSAN cover that
-- Async code (loom does not model async runtimes — use `tokio::test` + Miri instead)
+- Code using only `Mutex`/`RwLock` from std or `parking_lot`: the locks are sound, your usage is the question, and Miri + TSAN cover that
+- Async code (loom does not model async runtimes: use `tokio::test` + Miri instead)
 
 ### Setup
 
@@ -333,7 +333,7 @@ cargo +nightly miri test -- concurrent_tests
 
 ---
 
-## Cargo-Fuzz — Property-Based UB Hunting
+## Cargo-Fuzz: Property-Based UB Hunting
 
 Fuzzing generates random inputs to maximize code coverage and find crashes, panics, and UB.
 

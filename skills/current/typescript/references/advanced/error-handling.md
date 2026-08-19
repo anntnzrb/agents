@@ -4,7 +4,7 @@ Typed errors, exhaustive matching, Result pattern, and resource safety.
 
 ---
 
-## Typed errors — no bare strings
+## Typed errors: no bare strings
 
 Error classes carry structured data. Callers know exactly what can go wrong.
 
@@ -37,11 +37,11 @@ throw new UserNotFoundError(userId)
 throw new PermissionDeniedError(userId, "admin")
 ```
 
-Always set `readonly name` explicitly — `instanceof` checks survive minification, but `error.name` is more reliable for logging and serialization.
+Always set `readonly name` explicitly; `instanceof` checks survive minification, but `error.name` is more reliable for logging and serialization.
 
 ---
 
-## Result pattern — expected failures without exceptions
+## Result pattern: expected failures without exceptions
 
 For failures that are **expected** (not found, validation), return a discriminated union instead of throwing.
 
@@ -107,11 +107,11 @@ const user = result.value  // narrowed to User
 
 ### Library or roll your own?
 
-Roll your own with the `Result`, `ok`, `err` above. It's 10 lines. Libraries like `neverthrow` add chaining (`.map`, `.andThen`) — use them only if you actually chain results frequently.
+Roll your own with the `Result`, `ok`, `err` above. It's 10 lines. Libraries like `neverthrow` add chaining (`.map`, `.andThen`); use them only if you actually chain results frequently.
 
 ---
 
-## Error cause — chain context
+## Error cause: chain context
 
 Use the `cause` option to chain errors without losing the original stack.
 
@@ -149,13 +149,13 @@ app.onError((error, c) => {
 ## Async error patterns
 
 ```typescript
-// Promise.allSettled — when partial failure is OK
+// Promise.allSettled: when partial failure is OK
 const results = await Promise.allSettled(urls.map(fetch))
 const successes = results
   .filter((r): r is PromiseFulfilledResult<Response> => r.status === "fulfilled")
   .map((r) => r.value)
 
-// AbortSignal — cancellation
+// AbortSignal: cancellation
 async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
   return fetch(url, { signal: AbortSignal.timeout(ms) })
 }

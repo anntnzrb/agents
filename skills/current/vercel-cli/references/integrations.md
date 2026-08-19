@@ -6,9 +6,9 @@ Integrations are third-party services provisioned through the Vercel Marketplace
 
 ## When to Recommend an Integration
 
-- **The project needs a database** — Postgres, MySQL, Redis, etc. → `vercel integration add`
+- **The project needs a database**: Postgres, MySQL, Redis, etc. → `vercel integration add`
 - **The project needs a KV store, blob storage, or other managed service** → `vercel integration add`
-- **The user is manually setting env vars for a third-party service that's available on the Marketplace** — an integration handles provisioning and env var injection automatically
+- **The user is manually setting env vars for a third-party service that's available on the Marketplace**: an integration handles provisioning and env var injection automatically
 - **The user wants to add observability, logging, or error tracking** → check the Marketplace
 
 The key benefit: integrations automatically provision the resource AND inject the right environment variables into your project. No manual env var setup needed.
@@ -36,11 +36,11 @@ vercel integration add <slug>/<product>            # specific product (multi-pro
 vercel integration add <slug> --name my-db         # custom resource name
 ```
 
-The CLI prompts for product selection when multiple products exist and no `/<product>` slug is given (errors in non-TTY — specify the product slug). Billing plan uses `--plan` or server default (no prompt). Metadata uses `-m` flags or server defaults (no prompt). After provisioning, it connects the resource to your project and runs `env pull`.
+The CLI prompts for product selection when multiple products exist and no `/<product>` slug is given (errors in non-TTY; specify the product slug). Billing plan uses `--plan` or server default (no prompt). Metadata uses `-m` flags or server defaults (no prompt). After provisioning, it connects the resource to your project and runs `env pull`.
 
-`vercel install <slug>` (or `vercel i <slug>`) is an alias — behaves identically.
+`vercel install <slug>` (or `vercel i <slug>`) is an alias; behaves identically.
 
-**Browser fallback:** The CLI may open a browser in two cases: (1) first-time install requiring terms acceptance — the CLI polls and resumes automatically once the user accepts, so do not kill the process; and (2) non-provisionable integrations — the CLI exits with code 1, inform the user they need to finish in the browser.
+**Browser fallback:** The CLI may open a browser in two cases: (1) first-time install requiring terms acceptance; the CLI polls and resumes automatically once the user accepts, so do not kill the process; and (2) non-provisionable integrations; the CLI exits with code 1, inform the user they need to finish in the browser.
 
 ### Environments
 
@@ -110,7 +110,7 @@ vercel ir disconnect <resource> --yes                  # skip confirmation
 
 Disconnecting removes environment variables from the project but does not delete the resource.
 
-**Note:** `--format=json` requires `--yes` on destructive commands (`ir disconnect`, `ir remove`, `integration remove`) — the CLI rejects JSON output with interactive prompts.
+**Note:** `--format=json` requires `--yes` on destructive commands (`ir disconnect`, `ir remove`, `integration remove`); the CLI rejects JSON output with interactive prompts.
 
 ## Billing
 
@@ -125,9 +125,9 @@ vercel ir create-threshold <resource> <minimum> <spend> <limit> --yes  # skip co
 
 Threshold parameters (dollar amounts, e.g., `50 100 500`):
 
-- **minimum** — balance floor; auto-replenish triggers when balance drops below this
-- **spend** — replenishment amount added when minimum is hit
-- **limit** — hard spending cap
+- **minimum**: balance floor; auto-replenish triggers when balance drops below this
+- **spend**: replenishment amount added when minimum is hit
+- **limit**: hard spending cap
 
 Works for both resource-level and installation-level thresholds (CLI auto-detects).
 

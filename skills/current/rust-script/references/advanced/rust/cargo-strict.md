@@ -22,7 +22,7 @@ rustup install nightly
 rustup component add miri rust-src --toolchain nightly
 ```
 
-## `Cargo.toml` — `[lints]` section
+## `Cargo.toml`: `[lints]` section
 
 ```toml
 [lints.rust]
@@ -93,7 +93,7 @@ exhaustive_structs = "warn"
 
 The `priority = -1` trick: group-level levels are weak; specific lints below them win. This lets us deny `unwrap_used` while still allowing `pedantic` group warnings instead of denies.
 
-## `Cargo.toml` — release profile
+## `Cargo.toml`: release profile
 
 ```toml
 [profile.release]
@@ -120,7 +120,7 @@ opt-level = 1
 overflow-checks = true
 ```
 
-## `Cargo.toml` — workspace level
+## `Cargo.toml`: workspace level
 
 ```toml
 [workspace]

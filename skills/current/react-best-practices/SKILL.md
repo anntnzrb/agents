@@ -29,14 +29,14 @@ React/Next.js performance-optimization guidance from Vercel Engineering. Apply t
 
 ## Category prefixes
 
-1. Eliminating Waterfalls — `async-`
-2. Bundle Size Optimization — `bundle-`
-3. Server-Side Performance — `server-`
-4. Client-Side Data Fetching — `client-`
-5. Re-render Optimization — `rerender-`
-6. Rendering Performance — `rendering-`
-7. JavaScript Performance — `js-`
-8. Advanced Patterns — `advanced-`
+1. Eliminating Waterfalls: `async-`
+2. Bundle Size Optimization: `bundle-`
+3. Server-Side Performance: `server-`
+4. Client-Side Data Fetching: `client-`
+5. Re-render Optimization: `rerender-`
+6. Rendering Performance: `rendering-`
+7. JavaScript Performance: `js-`
+8. Advanced Patterns: `advanced-`
 
 ## Use
 

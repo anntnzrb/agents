@@ -10,7 +10,7 @@ Vercel supports Bun as a runtime. To enable it, add `"bunVersion": "1.x"` to you
 
 That's it. Vercel will use Bun instead of Node.js to run your project.
 
-This works with any framework — backend apps (Express, Hono, Elysia), frontend frameworks, or anything else. Bun is used as the runtime, so Bun-specific APIs and features are available.
+This works with any framework; backend apps (Express, Hono, Elysia), frontend frameworks, or anything else. Bun is used as the runtime, so Bun-specific APIs and features are available.
 
 ## Example: Elysia with Bun
 

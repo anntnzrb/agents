@@ -2,7 +2,7 @@
 
 Production hygiene with throwaway ergonomics. Rust scripts get the same strict lints, the same miri rule when `unsafe` is touched, the same type discipline. The difference is dependency declaration lives inline.
 
-## `rust-script` — the recommended path
+## `rust-script`: the recommended path
 
 Install once:
 
@@ -244,7 +244,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-`cat logs.jsonl | ./filter-errors.rs` — filter JSON logs by `level == "error"`. Faster than `jq` for big files, type-safe.
+`cat logs.jsonl | ./filter-errors.rs`; filter JSON logs by `level == "error"`. Faster than `jq` for big files, type-safe.
 
 For numerics:
 

@@ -4,7 +4,7 @@ How to use TypeScript's type system to catch bugs at compile time.
 
 ---
 
-## Branded types — distinct primitives
+## Branded types: distinct primitives
 
 Same runtime type, different meaning. The compiler prevents mixing.
 
@@ -35,11 +35,11 @@ const UserIdSchema = z.string().uuid().brand("UserId")
 type UserId = z.infer<typeof UserIdSchema>
 ```
 
-**Use when**: IDs, indices, units of measurement — any pair where swapping is a bug.
+**Use when**: IDs, indices, units of measurement; any pair where swapping is a bug.
 
 ---
 
-## as const — literal types from values
+## as const: literal types from values
 
 Freezes a value to its narrowest possible type. The foundation for enum-free TypeScript.
 
@@ -60,18 +60,18 @@ type HttpStatus = (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS]  // 200 | 404 |
 
 ---
 
-## satisfies — validate without widening
+## satisfies: validate without widening
 
 Type-checks a value against a type while preserving the literal type. Best of both worlds.
 
 ```typescript
 type Config = Record<string, string | number>
 
-// BAD — widens to Record<string, string | number>
+// BAD: widens to Record<string, string | number>
 const config: Config = { api: "https://api.example.com", timeout: 30 }
-config.api  // string | number — lost the narrowing
+config.api  // string | number; lost the narrowing
 
-// GOOD — validates AND preserves literal types
+// GOOD: validates AND preserves literal types
 const config = {
   api: "https://api.example.com",
   timeout: 30,
@@ -84,7 +84,7 @@ config.timeout  // number (narrowed)
 
 ---
 
-## Discriminated unions — algebraic data types
+## Discriminated unions: algebraic data types
 
 Model every outcome as a type. Force the caller to handle all cases.
 
@@ -99,7 +99,7 @@ The `kind` field (or `type`, `status`, `_tag`) is the discriminant. TypeScript n
 
 ---
 
-## Exhaustive switch — assertNever
+## Exhaustive switch: assertNever
 
 Every switch on a discriminated union ends with a default that calls `assertNever`.
 
@@ -126,7 +126,7 @@ Add a new variant to `GetUserResult`? The compiler errors on the `assertNever` c
 
 ---
 
-## Narrowing — let the compiler follow your logic
+## Narrowing: let the compiler follow your logic
 
 TypeScript narrows types through `typeof`, `instanceof`, `in`, equality checks, and discriminants.
 
@@ -155,7 +155,7 @@ const clean = items.filter(isNonNull)  // number[]
 
 ---
 
-## import type — separate values from types
+## import type: separate values from types
 
 Always use `import type` for type-only imports. Enforced by `verbatimModuleSyntax`.
 
@@ -171,7 +171,7 @@ import { createUser, type User } from "./users"
 
 ---
 
-## Utility types — quick reference
+## Utility types: quick reference
 
 | Need | Use |
 |---|---|

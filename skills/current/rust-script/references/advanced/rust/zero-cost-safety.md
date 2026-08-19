@@ -1,20 +1,20 @@
-# Zero-Cost Safety — Zig Ergonomics in Rust
+# Zero-Cost Safety: Zig Ergonomics in Rust
 
 ## Index
 
 Read the section whose heading matches the task; use heading search before loading unrelated detail.
 
-Rust already owns memory safety. This reference adds the patterns that give you Zig's *ergonomic* safety — explicit allocation control, compile-time computation, zero-hidden-cost APIs, bit-level layout, and deterministic cleanup — without leaving the Rust toolchain.
+Rust already owns memory safety. This reference adds the patterns that give you Zig's *ergonomic* safety; explicit allocation control, compile-time computation, zero-hidden-cost APIs, bit-level layout, and deterministic cleanup; without leaving the Rust toolchain.
 
 **When to load this file:** arena, allocator, bumpalo, const fn, const generics, comptime, zero-alloc, no-alloc, slice-based API, `#[repr]`, packed struct, bitfield, scopeguard, errdefer, RAII cleanup, Zig-like patterns.
 
 ---
 
-## 1. Explicit Allocators — Arena Pattern
+## 1. Explicit Allocators; Arena Pattern
 
 Zig passes `allocator: Allocator` to every function. Rust's stable equivalent: arena crates that make allocation scope visible and bulk-freeable.
 
-### bumpalo — The Default Arena
+### bumpalo: The Default Arena
 
 ```rust
 use bumpalo::Bump;
@@ -35,7 +35,7 @@ drop(arena); // all arena memory freed, zero individual deallocations
 
 **When to use:** parsers, compilers, game frame allocators, request-scoped web handlers, any hot loop where individual `Box`/`Vec` alloc+free overhead matters.
 
-### typed-arena — Homogeneous Arena
+### typed-arena: Homogeneous Arena
 
 ```rust
 use typed_arena::Arena;
@@ -49,13 +49,13 @@ let root = node_arena.alloc(AstNode { kind: 0, children: vec![] });
 
 **When to use:** tree/graph structures where all nodes have the same type and same lifetime.
 
-### allocator_api (nightly) — Full Zig Parity
+### allocator_api (nightly): Full Zig Parity
 
 ```rust
 #![feature(allocator_api)]
 use std::alloc::Global;
 
-// Vec parameterized by allocator — exactly like Zig.
+// Vec parameterized by allocator: exactly like Zig.
 let v: Vec<u8, &Bump> = Vec::new_in(&arena);
 
 // Custom allocator for tracking, limiting, or redirecting allocation
@@ -86,11 +86,11 @@ tinyvec = { version = "1", features = ["alloc"] }
 
 ---
 
-## 2. Compile-Time Computation — const fn, const generics, proc macros
+## 2. Compile-Time Computation; const fn, const generics, proc macros
 
 Zig's `comptime` runs arbitrary code at compile time. Rust splits this across three mechanisms.
 
-### const fn — Compile-Time Pure Functions
+### const fn: Compile-Time Pure Functions
 
 ```rust
 const fn fibonacci(n: usize) -> usize {
@@ -115,7 +115,7 @@ const LOOKUP: [u8; 256] = {
 };
 ```
 
-**Stable since Rust 1.82:** `const fn` supports `match`, loops, `if`, references, mutable locals — nearly full Rust. Use `const { }` blocks (Rust 1.79+) for inline compile-time assertions.
+**Stable since Rust 1.82:** `const fn` supports `match`, loops, `if`, references, mutable locals; nearly full Rust. Use `const { }` blocks (Rust 1.79+) for inline compile-time assertions.
 
 ```rust
 fn process<const N: usize>(data: &[u8; N]) {
@@ -124,7 +124,7 @@ fn process<const N: usize>(data: &[u8; N]) {
 }
 ```
 
-### const generics — Type-Level Values
+### const generics: Type-Level Values
 
 ```rust
 struct Buffer<const N: usize> {
@@ -150,7 +150,7 @@ let small: Buffer<16> = Buffer::new();
 let large: Buffer<1024> = Buffer::new();
 ```
 
-### proc macros — Code Generation (Zig comptime type creation)
+### proc macros: Code Generation (Zig comptime type creation)
 
 When `const fn` is not enough (generating struct fields, impl blocks, or derive logic), proc macros fill the gap.
 
@@ -185,11 +185,11 @@ Need typenum-level arithmetic?       → typenum / generic-array (rare)
 
 ---
 
-## 3. Zero-Allocation API Design — No Hidden Costs
+## 3. Zero-Allocation API Design; No Hidden Costs
 
 Zig's philosophy: no operator overloading, no hidden allocation, every cost visible. Rust achieves this with discipline.
 
-### Slice-Based APIs — Caller Owns Memory
+### Slice-Based APIs: Caller Owns Memory
 
 ```rust
 // BAD: hidden allocation in return type
@@ -208,11 +208,11 @@ fn process(input: &[u8], output: &mut [u8]) -> usize {
 
 // GOOD: return borrowed data when possible
 fn find_token<'a>(input: &'a str) -> Option<&'a str> {
-    input.split_whitespace().next() // no allocation — borrows from input
+    input.split_whitespace().next() // no allocation; borrows from input
 }
 ```
 
-### try_* APIs — Fallible Allocation
+### try_* APIs: Fallible Allocation
 
 ```rust
 // Allocation can fail explicitly (like Zig's allocator returning error)
@@ -223,7 +223,7 @@ v.try_reserve(1_000_000)?; // returns Result, not panic
 let b = Box::try_new(42)?; // nightly, or use allocator_api
 ```
 
-### SmallVec / ArrayVec — Stack-First Collections
+### SmallVec / ArrayVec: Stack-First Collections
 
 ```rust
 use smallvec::SmallVec;
@@ -238,7 +238,7 @@ let mut buf: ArrayVec<u8, 64> = ArrayVec::new();
 buf.try_push(42).map_err(|_| "full")?; // returns error instead of panic
 ```
 
-### Cow — Defer Allocation Until Mutation
+### Cow: Defer Allocation Until Mutation
 
 ```rust
 use std::borrow::Cow;
@@ -269,7 +269,7 @@ Even in `std` code, the *mindset* applies: prefer `&[T]` over `Vec<T>` in functi
 ### Clippy Lints for Hidden Allocations
 
 ```toml
-# Cargo.toml — catch accidental allocations
+# Cargo.toml: catch accidental allocations
 [lints.clippy]
 # These warn on patterns that allocate when a borrow would suffice:
 unnecessary_to_owned = "warn"       # .to_string() / .to_vec() when borrow works
@@ -280,11 +280,11 @@ vec_init_then_push = "warn"         # Vec::new() + push instead of vec![]
 
 ---
 
-## 4. Bit-Level Layout — repr, Packed Structs, Bitfields
+## 4. Bit-Level Layout; repr, Packed Structs, Bitfields
 
 Zig: `packed struct` with bit-level field control. Rust matches with `#[repr]` attributes and bitfield crates.
 
-### #[repr(C)] — Guaranteed C-Compatible Layout
+### #[repr(C)]: Guaranteed C-Compatible Layout
 
 ```rust
 #[repr(C)]
@@ -298,7 +298,7 @@ struct Header {
 // Safe to transmute from/to byte arrays via zerocopy.
 ```
 
-### #[repr(C, packed)] — No Padding
+### #[repr(C, packed)]: No Padding
 
 ```rust
 #[repr(C, packed)]
@@ -340,7 +340,7 @@ impl WireHeader {
 }
 ```
 
-### bitfield — Bit-Level Flag Packing
+### bitfield: Bit-Level Flag Packing
 
 ```rust
 use bitfield::bitfield;
@@ -361,7 +361,7 @@ assert!(p.readable());
 assert_eq!(p.level(), 5);
 ```
 
-### modular-bitfield — Richer Bitfield API
+### modular-bitfield: Richer Bitfield API
 
 ```rust
 use modular_bitfield::prelude::*;
@@ -376,7 +376,7 @@ pub struct StatusWord {
 }
 ```
 
-### zerocopy — Safe Zero-Copy Parsing
+### zerocopy: Safe Zero-Copy Parsing
 
 ```rust
 use zerocopy::{FromBytes, IntoBytes, KnownLayout, Immutable, Ref};
@@ -405,11 +405,11 @@ bytemuck = { version = "1", features = ["derive"] }  # alternative to zerocopy
 
 ---
 
-## 5. Scope Guards — errdefer / Deterministic Cleanup
+## 5. Scope Guards; errdefer / Deterministic Cleanup
 
 Zig's `errdefer` runs cleanup only on error paths. Rust's `Drop` always runs, but `scopeguard` gives fine-grained control.
 
-### scopeguard — The errdefer Equivalent
+### scopeguard: The errdefer Equivalent
 
 ```rust
 use scopeguard::{defer, guard};
@@ -432,7 +432,7 @@ fn create_and_process(path: &str) -> std::io::Result<()> {
 }
 ```
 
-### defer! — Always-Run Cleanup (like Zig's defer)
+### defer!: Always-Run Cleanup (like Zig's defer)
 
 ```rust
 use scopeguard::defer;
@@ -473,7 +473,7 @@ impl Drop for TempFile {
 let tmp = TempFile::new("/tmp/scratch.dat")?;
 ```
 
-### The errdefer Pattern — Defuse on Success
+### The errdefer Pattern: Defuse on Success
 
 The key insight from Zig's `errdefer`: you want cleanup on error but NOT on success. In Rust:
 
@@ -526,6 +526,6 @@ All achievable within Rust's single toolchain. You get Zig's explicitness **plus
 - **Zero-alloc APIs** hurt readability when the function naturally produces owned data. Don't force `&mut [u8]` output buffers on a function that logically returns `String`
 - **`#[repr(packed)]`** only for wire formats and FFI. Never for regular domain types
 - **Scope guards** unnecessary when `Drop` on the value itself handles cleanup (e.g., `tempfile::NamedTempFile` already does this)
-- **`const fn`** everything? No — only when the value is genuinely needed at compile time or the function is trivially const-eligible. Don't contort logic just to be const
+- **`const fn`** everything? No; only when the value is genuinely needed at compile time or the function is trivially const-eligible. Don't contort logic just to be const
 
 The goal is **visible costs and explicit control**, not asceticism. Use `String` and `Vec` freely when they're the right tool. Reach for these patterns when allocation behavior matters for correctness or performance.

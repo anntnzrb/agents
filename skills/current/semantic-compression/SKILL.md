@@ -19,7 +19,7 @@ LLMs reconstruct grammar from content words. Remove predictable glue; keep seman
 
 ## Deletion Tiers
 
-**Tier 1 — always delete, even in fragments:**
+**Tier 1: always delete, even in fragments:**
 
 - Articles: a, an, the
 - Copulas: is, are, was, were, am, be, been, being
@@ -30,7 +30,7 @@ LLMs reconstruct grammar from content words. Remove predictable glue; keep seman
 - Infinitive `to` before verbs, unless it prevents noun/verb confusion
 - Conjunctions when list/contrast obvious: and, or, but
 
-**Tier 2 — delete unless meaning changes:**
+**Tier 2: delete unless meaning changes:**
 
 - Auxiliary verbs: have/has/had, do/does/did, will/would; retain when tense/aspect matters
 - Modal verbs: can/could/may/might/should; retain when obligation/permission/possibility critical; always retain must/must not
@@ -38,7 +38,7 @@ LLMs reconstruct grammar from content words. Remove predictable glue; keep seman
 - Relative pronouns: which, that, who, whom
 - Prepositions: of, for, to, in, on, at, by; retain for material, direction, agency, or disambiguation
 
-**Tier 3 — delete only when relation remains clear:**
+**Tier 3: delete only when relation remains clear:**
 
 - Prepositions: with/without, between/among, within, after/before, over/under, through
 - Redundant adverbs: "shout loudly" → "shout"

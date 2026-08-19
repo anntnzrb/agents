@@ -55,7 +55,7 @@ Read only the references needed for the current output:
 - Never use bare `<pre class="mermaid">`
 - Use the canonical `diagram-shell` pattern from `templates/mermaid-flowchart.html`: `.diagram-shell` > `.mermaid-wrap` > `.zoom-controls` + `.mermaid-viewport` > `.mermaid-canvas`
 - Every Mermaid diagram needs zoom in/out/reset/expand controls, Ctrl/Cmd+scroll zoom, drag panning, and click-to-expand
-- Prefer `flowchart TD` for complex diagrams. Use `LR` only for simple 3–4 node linear flows
+- Prefer `flowchart TD` for complex diagrams. Use `LR` only for simple 3-4 node linear flows
 - Use `<br/>` in quoted flowchart labels. Do not use escaped `\n` labels
 - Never define page-level `.node`; Mermaid uses it internally. Use namespaced page classes such as `.ve-card`
 - For 15+ elements, do not cram everything into one Mermaid diagram. Use the hybrid overview + cards pattern
@@ -63,7 +63,7 @@ Read only the references needed for the current output:
 ## Layout and style invariants
 
 - Use semantic HTML where it helps accessibility and copy/paste: `<table>`, headings, lists, `<details>`, captions
-- Use CSS custom properties for palette: `--bg`, `--surface`, `--border`, `--text`, `--text-dim`, and 3–5 accents
+- Use CSS custom properties for palette: `--bg`, `--surface`, `--border`, `--text`, `--text-dim`, and 3-5 accents
 - Pick a clear aesthetic direction before writing: blueprint, editorial, paper/ink, terminal, IDE-inspired, or data-dense
 - Avoid generic defaults: no body font that is only Inter, Roboto, Arial, Helvetica, or system-ui; no violet/fuchsia Tailwind-default accents as the main palette (`#8b5cf6`, `#7c3aed`, `#a78bfa`, `#d946ef`); no cyan+magenta+purple neon dashboard; no gradient-mesh blobs
 - Good font pair families: DM Sans + Fira Code; Instrument Serif + JetBrains Mono; IBM Plex Sans + IBM Plex Mono; Bricolage Grotesque + Fragment Mono; Plus Jakarta Sans + Azeret Mono

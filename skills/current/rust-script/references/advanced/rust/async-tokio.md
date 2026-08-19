@@ -233,10 +233,10 @@ Pattern: catch signal → cancel a token shared with the server → server's `se
 
 ## Concurrency primitives
 
-- `tokio::sync::Mutex` — async mutex. Use for state shared between async tasks. **Do not hold across `.await` without thinking** (you'll serialize the whole system)
-- `tokio::sync::RwLock` — async read-write lock. Same caveat
-- `parking_lot::Mutex` — sync mutex, faster than `std::sync::Mutex`, no poisoning. Use when the lock is held briefly and you do not need to `.await` while holding it
-- `tokio::sync::Semaphore` — bound concurrent operations. Perfect for "max 10 in-flight HTTP requests" or "max 3 DB writers"
+- `tokio::sync::Mutex`; async mutex. Use for state shared between async tasks. **Do not hold across `.await` without thinking** (you'll serialize the whole system)
+- `tokio::sync::RwLock`; async read-write lock. Same caveat
+- `parking_lot::Mutex`; sync mutex, faster than `std::sync::Mutex`, no poisoning. Use when the lock is held briefly and you do not need to `.await` while holding it
+- `tokio::sync::Semaphore`; bound concurrent operations. Perfect for "max 10 in-flight HTTP requests" or "max 3 DB writers"
 
 ```rust
 let sem = Arc::new(tokio::sync::Semaphore::new(10));
@@ -292,8 +292,8 @@ async fn time_travel() {
 
 ## When NOT to use async
 
-- Single-threaded CPU-heavy code that does no I/O — plain `fn` + `rayon` is simpler and often faster
-- Trivial scripts that do one HTTP call — `ureq` (sync) is simpler
+- Single-threaded CPU-heavy code that does no I/O: plain `fn` + `rayon` is simpler and often faster
+- Trivial scripts that do one HTTP call: `ureq` (sync) is simpler
 - FFI heavy code where the FFI side is sync
 
 Async pays off when you have many concurrent I/O operations or need cancellation as a first-class primitive.

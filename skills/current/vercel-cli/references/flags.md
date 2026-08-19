@@ -1,6 +1,6 @@
 # Feature Flags
 
-`vercel flags` manages [Vercel Flags](https://vercel.com/docs/flags/vercel-flags) — create, inspect, enable, disable, archive, and delete feature flags, plus manage SDK keys.
+`vercel flags` manages [Vercel Flags](https://vercel.com/docs/flags/vercel-flags); create, inspect, enable, disable, archive, and delete feature flags, plus manage SDK keys.
 
 ## Managing Flags
 
