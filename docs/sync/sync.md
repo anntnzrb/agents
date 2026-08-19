@@ -2,7 +2,7 @@
 
 Sync reconciles the repository at `~/.config/agents` with harness homes and installed runtime state on macOS and Linux. The public entrypoint is `sync/src/cli.ts` and requires an explicit Bun runner.
 
-A gateway host has an OS hostname that matches `server.hostname` in `assets/cliproxyapi/deployment.json`. Every other supported host is a client host.
+A gateway host has an OS hostname that matches `server.hostname` in `tools/cliproxyapi/deployment.json`. Every other supported host is a client host.
 
 ## Command syntax
 
@@ -11,7 +11,7 @@ A gateway host has an OS hostname that matches `server.hostname` in `assets/clip
 | `bun ./sync/src/cli.ts` | Runs a normal reconciliation |
 | `bun ./sync/src/cli.ts sync` | Runs the same normal reconciliation |
 | `bun ./sync/src/cli.ts sync --refresh-models` | Bypasses model-catalog freshness windows and rejects stale network data |
-| `bun ~/.local/share/agents/sync/src/cli.ts launch <harness> -- <arguments>` | Syncs when the source is available, prepares the harness package, and launches it |
+| `bun ~/.local/share/agents/sync/src/cli.ts launch <name> -- <arguments>` | Syncs when the source is available, prepares the harness or tool package, and launches it |
 
 Unknown commands and invalid arguments exit with status `2`. A manual sync exits with status `1` after a fatal reconciliation error.
 
@@ -23,7 +23,7 @@ A manual sync runs these stages in order:
 2. Remove stale top-level harness entries that earlier sync runs owned.
 3. Install the sync runtime and reconcile source files, shared assets, skills, and generated configuration.
 4. On the gateway host, prepare managed tools from the committed release manifest.
-5. Reconcile harness and managed-tool wrappers. Remove stale owned CLIProxyAPI wrappers on client hosts.
+5. Reconcile harness, tool, and managed-tool wrappers. Remove stale owned CLIProxyAPI wrappers on client hosts.
 6. Record managed harness entries.
 7. Run package-bootstrap and extension-dependency hooks.
 
@@ -48,7 +48,7 @@ A client host can operate without `secrets.local.json`. A launch-time sync treat
 
 ## CLIProxyAPI jobs
 
-The configuration job reads `assets/cliproxyapi/config.yaml.tmpl` and `assets/cliproxyapi/deployment.json`. When `secrets.local.json` exists, the job reads it. On the gateway host, it uses the file to render the server configuration and discover catalogs. On a client host, it uses the file for source discovery without writing the server configuration.
+The configuration job reads `tools/cliproxyapi/config.yaml.tmpl` and `tools/cliproxyapi/deployment.json`. When `secrets.local.json` exists, the job reads it. On the gateway host, it uses the file to render the server configuration and discover catalogs. On a client host, it uses the file for source discovery without writing the server configuration.
 
 On the gateway host, the job writes these private files with mode `0600`:
 
@@ -57,11 +57,11 @@ On the gateway host, the job writes these private files with mode `0600`:
 
 On a client host, the job never writes the server configuration. A client without local secrets builds the model catalog from the gateway `/v1/models` response, the rich gateway response, and [models.dev](https://models.dev/). A client with local secrets also discovers the configured API-key sources.
 
-Sync validates `assets/cliproxyapi/deployment.json` before reconciliation. It injects `listen.host` and `listen.port` into the generated gateway configuration. It uses `client.baseUrl` for model discovery and readiness checks.
+Sync validates `tools/cliproxyapi/deployment.json` before reconciliation. It injects `listen.host` and `listen.port` into the generated gateway configuration. It uses `client.baseUrl` for model discovery and readiness checks.
 
 The readiness job checks `client.baseUrl/models` without authentication on client hosts. The response must contain a non-empty `data` array. When the endpoint is unavailable, sync preserves the existing client configuration, model catalog, and harness endpoint files.
 
-The gateway host also receives `assets/cliproxyapi/panel.html` at `~/.cli-proxy-api/static/management.html`. Client hosts do not receive the panel.
+The gateway host also receives `tools/cliproxyapi/panel.html` at `~/.cli-proxy-api/static/management.html`. Client hosts do not receive the panel.
 
 Endpoint publication replaces every configured `${CLIPROXY_CLIENT_BASE_URL}` harness target as one transaction. Publication preserves the Codex-owned `[hooks.state]` and `[projects]` tables in `~/.codex/config.toml`. A write failure restores every target's previous content and mode.
 
@@ -90,7 +90,7 @@ Only sync reads the repository source directly. Harness configuration and runtim
 
 ## Managed CLIProxyAPI release
 
-`assets/cliproxyapi/release.json` selects the GitHub repository, version, platform archive, binary, and checksum. Sync downloads an archive only when the cached executable or its receipt does not match the manifest.
+`tools/cliproxyapi/release.json` selects the GitHub repository, version, platform archive, binary, and checksum. Sync downloads an archive only when the cached executable or its receipt does not match the manifest.
 
 The cache path has this form, where `<cache-home>` is `XDG_CACHE_HOME` or `~/.cache`:
 
@@ -107,3 +107,7 @@ Sync prepares the managed CLIProxyAPI binary and wrapper only on the gateway hos
 Harness wrappers run a best-effort sync before launch. A failed sync, an active sync lock, or an unavailable repository does not block a cached harness package.
 
 The launcher resolves the adapter's npm dist-tag and installs the resolved version into a versioned cache. The launcher keeps the current and previous known-good versions. If version resolution or a new package installation fails, the launcher uses the current valid cache. A first launch without a valid cache fails.
+
+## Tool launchers
+
+`TOOL_LAUNCHERS` in `sync/src/core/tool-launchers.ts` lists npm tools that sync launches like harnesses: a wrapper under `~/.local/bin/`, a versioned package cache, and a best-effort sync before launch. Tools have no harness home, instruction file, or skills. The current entry is `mcporter`; its wrapper passes the generated `~/.mcporter/mcporter.json` with `--config`.

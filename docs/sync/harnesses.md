@@ -14,7 +14,6 @@ Sync supports macOS and Linux. The current CLIProxyAPI release manifest supports
 | `launcher` | npm package, executable name, dist-tag, and smoke command |
 | `launcher.defaultArgs` | Arguments that sync places in the wrapper before caller arguments |
 | `instructionFile` | Harness instruction filename when it differs from `AGENTS.md` |
-| `assetRenames` | Destination names for shared assets |
 | `runtimeSubdir` | Subdirectory appended to the source and generated roots |
 | `compatManagedEntries` | Obsolete generated entries that sync can remove |
 | `hooks` | Package-bootstrap and extension-dependency jobs |
@@ -23,7 +22,7 @@ Without `runtimeSubdir`, the source root is `harnesses/<id>/` and the generated 
 
 ## Published configuration
 
-Sync publishes `assets/AGENTS.md`, `skills/current/`, and shared asset directories under `assets/` to every enabled harness. It excludes the repository-only `assets/cliproxyapi/` directory. The `instructionFile` and `assetRenames` fields control destination names.
+Sync publishes the repository's `HARNESS.md` as the harness instruction file (`AGENTS.md` unless the adapter sets `instructionFile`) and `skills/current/` as `skills/` to every enabled harness. Tool sources under `tools/` are repository-only and never published.
 
 Adapters can declare these hooks:
 
@@ -34,7 +33,7 @@ Adapters can declare these hooks:
 
 A harness uses CLIProxyAPI when its committed source defines a `cliproxy` provider. Sync does not inject a provider or manage client credentials. OpenCode, OMP, and Pi use the `keyless` placeholder in their CLIProxyAPI entries. Codex does not configure a client key. Sync probes the gateway without authorization.
 
-Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `assets/cliproxyapi/deployment.json`. Harness providers use a static placeholder key because their SDKs require a non-empty value. The gateway ignores that key.
+Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `tools/cliproxyapi/deployment.json`. Harness providers use a static placeholder key because their SDKs require a non-empty value. The gateway ignores that key.
 
 Harnesses can use native model discovery or read `~/.local/share/agents/model-catalog/catalog.json` through their runtime integration. Each harness owns its model-selector syntax and discovery adapter.
 

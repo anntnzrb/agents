@@ -1,6 +1,6 @@
 # Set up agent configuration
 
-Follow this tutorial on the gateway host, whose name matches `server.hostname` in `assets/cliproxyapi/deployment.json`. It creates the generated files, starts CLIProxyAPI, verifies the model endpoint, and starts a harness. A client host can run sync without local secrets; see [Sync reference](../sync/docs/sync.md) for that path.
+Follow this tutorial on the gateway host, whose name matches `server.hostname` in `tools/cliproxyapi/deployment.json`. It creates the generated files, starts CLIProxyAPI, verifies the model endpoint, and starts a harness. A client host can run sync without local secrets; see [Sync reference](sync/sync.md) for that path.
 
 Sync supports macOS and Linux. The managed CLIProxyAPI release supports macOS on ARM64 and Linux on x86_64.
 
@@ -100,7 +100,7 @@ Start the gateway in a separate terminal:
 cli-proxy-api
 ```
 
-The process uses the listener from `assets/cliproxyapi/deployment.json`. Keep it running for the remaining steps.
+The process uses the listener from `tools/cliproxyapi/deployment.json`. Keep it running for the remaining steps.
 
 ## Refresh the model catalog
 
@@ -117,7 +117,7 @@ The forced refresh updates provider catalogs, models.dev metadata, and the live 
 Query the model endpoint without authentication:
 
 ```bash
-CLIPROXY_BASE_URL="$(jq -r '.client.baseUrl' assets/cliproxyapi/deployment.json)"
+CLIPROXY_BASE_URL="$(jq -r '.client.baseUrl' tools/cliproxyapi/deployment.json)"
 curl -fsS "$CLIPROXY_BASE_URL/models" | \
 	jq -e '.data | type == "array" and length > 0'
 unset CLIPROXY_BASE_URL

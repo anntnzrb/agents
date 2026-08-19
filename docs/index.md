@@ -1,6 +1,6 @@
 # Agent configuration documentation
 
-Choose a page by the task you need to complete. Sync application documentation lives under `sync/docs/`; harness-local documentation lives beside its source under `harnesses/`.
+Choose a page by the task you need to complete. Sync application documentation lives under `docs/sync/`; harness-local documentation lives beside its source under `harnesses/`.
 
 ## Set up
 
@@ -12,11 +12,11 @@ Choose a page by the task you need to complete. Sync application documentation l
 
 ## Develop
 
-- [Develop the sync application](../sync/docs/development.md) runs checks and changes sync or harness integration.
-- [Manage shared skills](skills.md) changes, validates, publishes, and archives skills.
+- [Develop the sync application](sync/development.md) runs checks and changes sync or harness integration.
+- [Manage shared skills](skills.md) changes, validates, publishes, and archives skills; it is also the skill gate.
 
 ## Reference
 
 - [Repository layout](repository-layout.md) maps committed sources, local inputs, generated targets, and runtime state.
-- [Sync reference](../sync/docs/sync.md) lists commands, reconciliation stages, caches, and failure behavior.
-- [Harness adapter reference](../sync/docs/harnesses.md) defines adapter metadata, generated paths, model integration, and wrappers.
+- [Sync reference](sync/sync.md) lists commands, reconciliation stages, caches, and failure behavior.
+- [Harness adapter reference](sync/harnesses.md) defines adapter metadata, generated paths, model integration, and wrappers.

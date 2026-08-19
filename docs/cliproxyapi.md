@@ -1,12 +1,12 @@
 # CLIProxyAPI
 
-CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses that configure a `cliproxy` provider. `assets/cliproxyapi/deployment.json` is the only deployment-specific source. It selects the gateway host, listener, and client endpoint.
+CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses that configure a `cliproxy` provider. `tools/cliproxyapi/deployment.json` is the only deployment-specific source. It selects the gateway host, listener, and client endpoint.
 
 Use the procedures to change credentials, authenticate ChatGPT, run the gateway, and check model access. Use the reference sections for field definitions, catalog rules, and routing settings.
 
 ## Set the deployment
 
-Keep the gateway host and endpoint values in `assets/cliproxyapi/deployment.json`. [Deployment file](#deployment-file) defines the fields. Do not copy these values into harness sources or documentation.
+Keep the gateway host and endpoint values in `tools/cliproxyapi/deployment.json`. [Deployment file](#deployment-file) defines the fields. Do not copy these values into harness sources or documentation.
 
 To move the gateway, update `deployment.json`, start CLIProxyAPI on the new host, and run sync on the clients. A client keeps its existing generated configuration and harness endpoints until the new `/models` endpoint returns a non-empty `data` array.
 
@@ -20,7 +20,7 @@ chmod 600 secrets.local.json
 $EDITOR secrets.local.json
 ```
 
-Set every credential pool referenced by `assets/cliproxyapi/config.yaml.tmpl`. [Local secrets](#local-secrets) defines the file shape. The gateway accepts requests without a client key. Keep the listener on a trusted private interface.
+Set every credential pool referenced by `tools/cliproxyapi/config.yaml.tmpl`. [Local secrets](#local-secrets) defines the file shape. The gateway accepts requests without a client key. Keep the listener on a trusted private interface.
 
 Never commit `secrets.local.json` or files under `~/.cli-proxy-api/`.
 
@@ -93,25 +93,25 @@ On the configured gateway host, start CLIProxyAPI in the foreground:
 cli-proxy-api
 ```
 
-The managed wrapper supplies `--config ~/.cli-proxy-api/config.yaml`. Sync reads the listener and client endpoint from `assets/cliproxyapi/deployment.json`. Use a process manager when the gateway must survive logout or reboot.
+The managed wrapper supplies `--config ~/.cli-proxy-api/config.yaml`. Sync reads the listener and client endpoint from `tools/cliproxyapi/deployment.json`. Use a process manager when the gateway must survive logout or reboot.
 
 ## Open the control panel
 
-Open `http://<listen-host>:<listen-port>/management.html` with the values from `assets/cliproxyapi/deployment.json`.
+Open `http://<listen-host>:<listen-port>/management.html` with the values from `tools/cliproxyapi/deployment.json`.
 
-The panel uses `remote-management.secret-key` from `assets/cliproxyapi/config.yaml.tmpl`. Treat that value as a credential. Do not expose the panel through the public internet, Tailscale Funnel, or an untrusted LAN.
+The panel uses `remote-management.secret-key` from `tools/cliproxyapi/config.yaml.tmpl`. Treat that value as a credential. Do not expose the panel through the public internet, Tailscale Funnel, or an untrusted LAN.
 
-Do not make durable configuration changes in the control panel. Sync replaces the generated configuration from `assets/cliproxyapi/config.yaml.tmpl` and `secrets.local.json`.
+Do not make durable configuration changes in the control panel. Sync replaces the generated configuration from `tools/cliproxyapi/config.yaml.tmpl` and `secrets.local.json`.
 
 ## Rebuild the control-panel asset
 
-The repository pins a management-panel revision and applies `assets/cliproxyapi/panel.patch`. Rebuild the asset after adopting a new upstream revision:
+The repository pins a management-panel revision and applies `tools/cliproxyapi/panel.patch`. Rebuild the asset after adopting a new upstream revision:
 
 ```bash
-sh assets/cliproxyapi/panel.rebuild.sh
+sh tools/cliproxyapi/panel.rebuild.sh
 ```
 
-The script runs from any directory and requires `git` and `bun` on `PATH`. It writes `assets/cliproxyapi/panel.html`.
+The script runs from any directory and requires `git` and `bun` on `PATH`. It writes `tools/cliproxyapi/panel.html`.
 
 ## Scope models by origin
 
@@ -145,7 +145,7 @@ Sessions and configurations that reference an old unprefixed ID stop working aft
 Query the gateway without a client key:
 
 ```bash
-base_url="$(jq -r '.client.baseUrl' assets/cliproxyapi/deployment.json)"
+base_url="$(jq -r '.client.baseUrl' tools/cliproxyapi/deployment.json)"
 curl -fsS "$base_url/models" | \
 	jq -e '.data | type == "array" and length > 0'
 unset base_url
@@ -173,12 +173,12 @@ Back up `secrets.local.json` through an encrypted channel. Reauthenticate OAuth 
 
 | Artifact | Path |
 | --- | --- |
-| Portable configuration template | `assets/cliproxyapi/config.yaml.tmpl` |
-| Deployment endpoints | `assets/cliproxyapi/deployment.json` |
-| Release manifest and checksums | `assets/cliproxyapi/release.json` |
-| Control-panel asset | `assets/cliproxyapi/panel.html` |
-| Control-panel patch source | `assets/cliproxyapi/panel.patch` |
-| Control-panel rebuild script | `assets/cliproxyapi/panel.rebuild.sh` |
+| Portable configuration template | `tools/cliproxyapi/config.yaml.tmpl` |
+| Deployment endpoints | `tools/cliproxyapi/deployment.json` |
+| Release manifest and checksums | `tools/cliproxyapi/release.json` |
+| Control-panel asset | `tools/cliproxyapi/panel.html` |
+| Control-panel patch source | `tools/cliproxyapi/panel.patch` |
+| Control-panel rebuild script | `tools/cliproxyapi/panel.rebuild.sh` |
 | Local secrets | `secrets.local.json` |
 | Generated configuration | `~/.cli-proxy-api/config.yaml` |
 | Deployed control panel | `~/.cli-proxy-api/static/management.html` |
@@ -192,7 +192,7 @@ Sync prepares the managed binary and wrapper only on the gateway host. Client ho
 
 ## Deployment file
 
-`assets/cliproxyapi/deployment.json` contains these fields:
+`tools/cliproxyapi/deployment.json` contains these fields:
 
 | Field | Constraint | Meaning |
 | --- | --- | --- |
@@ -243,7 +243,7 @@ No harness reads `secrets.local.json`. The gateway accepts requests without a cl
 
 ## Model sources
 
-`x-model-sources` in `assets/cliproxyapi/config.yaml.tmpl` defines API-key providers without committing model IDs.
+`x-model-sources` in `tools/cliproxyapi/config.yaml.tmpl` defines API-key providers without committing model IDs.
 
 | Source ID | models.dev provider | Credential pool | Public prefix | Base URL | Model catalog |
 | --- | --- | --- | --- | --- | --- |
@@ -317,7 +317,7 @@ The generated model ID is `<prefix>/<alias>` for an `x-model-sources` entry. Oth
 
 ## Catalog caches
 
-Sync caches models.dev, provider, and gateway responses. See [Model-catalog caches](../sync/docs/sync.md#model-catalog-caches) for cache paths, freshness windows, and stale-data behavior.
+Sync caches models.dev, provider, and gateway responses. See [Model-catalog caches](sync/sync.md#model-catalog-caches) for cache paths, freshness windows, and stale-data behavior.
 
 ## Routing settings
 
@@ -340,7 +340,7 @@ Sync passes these values through to CLIProxyAPI. It does not derive or override 
 
 ## Control panel
 
-The control panel is available at `http://<listen-host>:<listen-port>/management.html`. Sync deploys the pinned `assets/cliproxyapi/panel.html` only on the gateway host.
+The control panel is available at `http://<listen-host>:<listen-port>/management.html`. Sync deploys the pinned `tools/cliproxyapi/panel.html` only on the gateway host.
 
 The template sets `remote-management.disable-auto-update-panel` to `true`. The pinned upstream revision includes OpenCode Go quota. The local patch adds ClinePass quota for 5-hour, weekly, and monthly windows.
 

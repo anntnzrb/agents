@@ -7,27 +7,26 @@ The repository separates committed sources, local inputs, generated targets, and
 | Path | Contents |
 | --- | --- |
 | `AGENTS.md` | Repository policy for contributors and agents |
-| `assets/` | Shared instructions, MCPorter configuration, repository-only CLIProxyAPI sources, and the skill gate |
+| `HARNESS.md` | Global harness-independent agent instructions; sync publishes it to every harness as its instruction file |
 | `skills/current/` | Shared skills published to enabled harnesses |
 | `skills/legacy/` | Archived skills excluded from sync |
 | `harnesses/<harness>/` | Harness-owned configuration, implementation, adjacent tests, and local documentation |
+| `tools/` | Managed-tool sources: CLIProxyAPI configuration and release manifest, MCPorter configuration |
 | `sync/` | The Bun and TypeScript sync application |
-| `docs/` | Sync application and repository-sync workflow documentation indexed by `docs/index.md` |
+| `docs/` | Repository workflow documentation indexed by `docs/index.md`; sync application documentation under `docs/sync/` |
 | `secrets.local.example.json` | Schema and placeholder values for local CLIProxyAPI secrets |
 
-### Shared assets
+### Tool sources
 
 | Path | Purpose |
 | --- | --- |
-| `assets/AGENTS.md` | Global harness-independent agent instructions |
-| `assets/mcporter.jsonc` | MCPorter configuration source |
-| `assets/cliproxyapi/config.yaml.tmpl` | CLIProxyAPI configuration template and model-source declarations |
-| `assets/cliproxyapi/deployment.json` | CLIProxyAPI listener and client endpoint values |
-| `assets/cliproxyapi/release.json` | Pinned release assets and SHA-256 checksums |
-| `assets/cliproxyapi/panel.html` | Pinned management panel asset |
-| `assets/cliproxyapi/panel.patch` | Management panel patch source |
-| `assets/cliproxyapi/panel.rebuild.sh` | Management panel rebuild script |
-| `assets/skills-gate.md` | Policy and validation commands for shared skills |
+| `tools/cliproxyapi/config.yaml.tmpl` | CLIProxyAPI configuration template and model-source declarations |
+| `tools/cliproxyapi/deployment.json` | CLIProxyAPI listener and client endpoint values |
+| `tools/cliproxyapi/release.json` | Pinned release assets and SHA-256 checksums |
+| `tools/cliproxyapi/panel.html` | Pinned management panel asset |
+| `tools/cliproxyapi/panel.patch` | Management panel patch source |
+| `tools/cliproxyapi/panel.rebuild.sh` | Management panel rebuild script |
+| `tools/mcporter/mcporter.jsonc` | MCPorter configuration source; rendered to `~/.mcporter/mcporter.json` |
 
 ### Harness sources
 
@@ -45,7 +44,6 @@ Each harness source starts under `harnesses/<id>/`. When an adapter defines `run
 | `sync/src/packages/` | Harness package bootstrap logic |
 | `sync/src/runtime/` | Filesystem, process, lock, and error boundaries |
 | `sync/test/` | Unit and process-level integration tests for sync behavior |
-| `sync/docs/` | Sync application documentation |
 
 ## Local inputs
 

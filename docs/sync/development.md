@@ -1,6 +1,6 @@
 # Develop the sync application
 
-The sync application is an isolated Bun and TypeScript project under `sync/`. See [Repository layout](../../docs/repository-layout.md) for the module map. For the shared-skill workflow, see [Manage shared skills](../../docs/skills.md).
+The sync application is an isolated Bun and TypeScript project under `sync/`. See [Repository layout](../repository-layout.md) for the module map. For the shared-skill workflow, see [Manage shared skills](../skills.md).
 
 ## Run sync from source
 
@@ -58,7 +58,7 @@ Keep tests of harness implementations and harness-local behavior beside their so
 4. Run the focused test.
 5. Run `bun run check`, `bun run typecheck`, and `bun test`.
 6. Run `git diff --check` from the repository root.
-7. Update the related page under `sync/docs/` when the change affects commands, paths, lifecycle, platforms, or generated behavior.
+7. Update the related page under `docs/sync/` when the change affects commands, paths, lifecycle, platforms, or generated behavior.
 
 Keep these contracts intact:
 
@@ -75,7 +75,7 @@ Keep these contracts intact:
 3. Inspect the generated root derived from the adapter's `homeSegments` and `runtimeSubdir` fields.
 4. Run the wrapper with `--version`.
 
-Keep harness-specific tests and documentation beside the owning source under `harnesses/`. Do not place them in `sync/test/`, `sync/docs/`, or `docs/`.
+Keep harness-specific tests and documentation beside the owning source under `harnesses/`. Do not place them in `sync/test/` or `docs/`.
 
 Do not edit a generated harness home. Sync replaces managed files on the next run.
 
