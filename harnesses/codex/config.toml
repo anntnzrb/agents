@@ -121,13 +121,6 @@ enabled-reasoning-efforts = ["low", "medium", "high", "xhigh", "max"]
 
 [agents]
 enabled = true
-# Active child threads at one time, excluding the primary agent. This is a
-# throughput/context budget, not the number of agent definitions or the total
-# number of workers a session may use over its lifetime. The hook's separate
-# lifetime spawn-attempt cap lives in hooks/orchestration.toml.
-max_concurrent_threads_per_session = 16
-default_subagent_model = "chatgpt/nnn-gpt-5.6-luna-max"
-# default_subagent_reasoning_effort = "max"
 interrupt_message = true
 
 # (see codex-rs issue #32031)
