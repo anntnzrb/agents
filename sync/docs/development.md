@@ -42,6 +42,14 @@ Add process-level integration coverage when a change creates a generated target 
 
 Keep tests of harness implementations and harness-local behavior beside their source under `harnesses/`.
 
+## Write useful tests
+
+- Test one behavior at the lowest layer that observes it. Do not repeat the same scenario in unit and process-level suites.
+- Test shared code once, beside the shared module. Do not copy identical tests into every consumer; a consumer test covers only its own wiring.
+- Assert observable behavior and contracts, not fixtures, mocks, or implementation details.
+- Add a test only when it can fail on a real regression. Delete tests that duplicate coverage or re-prove what another test already covers.
+- Keep skill and harness tests beside their owning source. `sync/test/` covers sync behavior only.
+
 ## Change sync behavior
 
 1. Find the owning module under `sync/src/`.
