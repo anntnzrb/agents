@@ -9,9 +9,10 @@
 - `skills/legacy/`: archived skills; repo-only, not synced
 - Other `assets/` entries: SSOT for shared agents and configuration
 - `harnesses/`: harness-specific configs, implementations, adjacent tests, and local documentation staged for sync
-- `sync/`: isolated TypeScript sync application; owns all JS/TS app config, launcher wrappers, dependencies, and `sync/test/`
-- `sync/test/`: tests sync behavior only; harness names and paths MAY appear as fixtures or adapter boundaries, but tests MUST NOT import harness implementations or assert harness-local behavior
-- `docs/`: sync application and repository-sync workflow documentation; adapter boundaries MAY be described, but harness-local behavior and configuration belong under `harnesses/`
+- `sync/`: isolated TypeScript sync application; owns all JS/TS app config, launcher wrappers, dependencies, `sync/test/`, and `sync/docs/`
+- `sync/test/`: tests sync behavior only; harness names and paths MAY appear as fixtures or adapter boundaries, but tests MUST NOT import harness implementations or assert harness-local behavior; skill and harness changes MUST NOT add tests here
+- `sync/docs/`: sync application documentation; adapter boundaries MAY be described, but harness-local behavior and configuration belong under `harnesses/`
+- `docs/`: repository setup, operation, and workflow documentation indexed by `docs/index.md`
 - Harness-specific tests and documentation stay beside their owning source under `harnesses/`
 - `harnesses/pi/agent/extensions/AGENTS.md`: engineering policy for active Pi extensions; read it before modifying those extensions
 - `harnesses/<harness>/`: directory presence opts into a supported harness; sync owns its internal adapter metadata
@@ -33,10 +34,16 @@ Skills are modified here, in the SSOT. Always run against skill gate: `./assets/
 
 Route documentation by owner:
 
-- For sync application behavior, setup, configuration, lifecycle, supported platforms, commands, generated paths, repository structure, and adapter boundaries, use `docs/`.
-- For behavior or configuration owned entirely by one harness, keep documentation beside the source under `harnesses/<harness>/`; do not add it to `docs/`.
+- Sync application behavior, commands, reconciliation, lifecycle, supported platforms, generated paths, and adapter boundaries: `sync/docs/`.
+- Repository setup, operation, and workflow documentation, including the repository layout: `docs/`.
+- Behavior or configuration owned entirely by one harness: beside the source under `harnesses/<harness>/`; never in `docs/` or `sync/docs/`.
 
-For changes routed to `docs/`:
+Boundaries:
+
+- A skill change MUST NOT add tests under `sync/test/` or documentation under `sync/docs/`. The skill's own files carry its documentation and validation commands.
+- A change under `harnesses/` MUST NOT update `docs/`, `sync/docs/`, or `sync/test/`. Adapter-contract changes in `sync/src/core/harness-adapters.ts` are sync changes and follow the sync workflow.
+
+For changes routed to `docs/` or `sync/docs/`:
 
 1. Read `docs/index.md` and every related page completely; follow their cross-references before editing.
 2. Update the relevant existing page in the same change. Create a new focused topic page only when no current page fits.
@@ -59,3 +66,4 @@ Documentation-only changes must still preserve navigation and factual accuracy. 
 Commits: 
 - For harness-specific changes use `<harness>: ...`; that is `pi: configure fallback model`
 - For generic changes: `docs:`, `sync:`, `skills(<skill>):`
+- Use `sync:` for everything under `sync/`, including `sync/docs/`; use `docs:` only for top-level `docs/`

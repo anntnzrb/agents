@@ -31,7 +31,7 @@ The repository separates committed sources, local inputs, generated targets, and
 
 ### Harness sources
 
-Each harness source starts under `harnesses/<id>/`. When an adapter defines `runtimeSubdir`, sync appends that subdirectory to the source root.
+Each harness source starts under `harnesses/<id>/`. When an adapter defines `runtimeSubdir`, sync appends that subdirectory to the source root. Directories outside that root, such as `harnesses/pi/legacy/`, stay repo-only and are never synced.
 
 `sync/src/core/harness-adapters.ts` defines the supported harness IDs, package launchers, generated homes, platforms, runtime subdirectories, and hooks. A matching directory under `harnesses/` enables that adapter on a supported platform.
 
@@ -45,6 +45,7 @@ Each harness source starts under `harnesses/<id>/`. When an adapter defines `run
 | `sync/src/packages/` | Harness package bootstrap logic |
 | `sync/src/runtime/` | Filesystem, process, lock, and error boundaries |
 | `sync/test/` | Unit and process-level integration tests for sync behavior |
+| `sync/docs/` | Sync application documentation |
 
 ## Local inputs
 

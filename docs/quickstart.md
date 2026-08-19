@@ -1,6 +1,6 @@
 # Set up agent configuration
 
-Follow this tutorial on the gateway host, whose name matches `server.hostname` in `assets/cliproxyapi/deployment.json`. It creates the generated files, starts CLIProxyAPI, verifies the model endpoint, and starts a harness. A client host can run sync without local secrets; see [Sync reference](sync.md) for that path.
+Follow this tutorial on the gateway host, whose name matches `server.hostname` in `assets/cliproxyapi/deployment.json`. It creates the generated files, starts CLIProxyAPI, verifies the model endpoint, and starts a harness. A client host can run sync without local secrets; see [Sync reference](../sync/docs/sync.md) for that path.
 
 Sync supports macOS and Linux. The managed CLIProxyAPI release supports macOS on ARM64 and Linux on x86_64.
 
@@ -48,7 +48,7 @@ Edit the secrets file:
 $EDITOR secrets.local.json
 ```
 
-Replace every `replace-me` value with an upstream provider API key. Use `weight: 1` when accounts have equal priority. The [CLIProxyAPI reference](cliproxyapi-reference.md#local-secrets) describes the file shape.
+Replace every `replace-me` value with an upstream provider API key. Use `weight: 1` when accounts have equal priority. The [CLIProxyAPI reference](cliproxyapi.md#local-secrets) describes the file shape.
 
 The repository ignores `secrets.local.json`. Keep the file out of Git and transfer it through an encrypted channel.
 
