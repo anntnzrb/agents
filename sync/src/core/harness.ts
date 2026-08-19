@@ -58,6 +58,7 @@ export class SyncEnv {
   readonly skillsHome: string;
   readonly harnessesHome: string;
   readonly mcporterHome: string;
+  readonly summarizeHome: string;
   readonly managedStateHome: string;
   readonly installTimeoutMs: number;
   readonly harnesses: readonly Harness[];
@@ -70,6 +71,7 @@ export class SyncEnv {
     skillsHome: string,
     harnessesHome: string,
     mcporterHome: string,
+    summarizeHome: string,
     managedStateHome: string,
     installTimeoutMs: number,
     harnesses: readonly Harness[],
@@ -81,6 +83,7 @@ export class SyncEnv {
     this.skillsHome = skillsHome;
     this.harnessesHome = harnessesHome;
     this.mcporterHome = mcporterHome;
+    this.summarizeHome = summarizeHome;
     this.managedStateHome = managedStateHome;
     this.installTimeoutMs = installTimeoutMs;
     this.harnesses = harnesses;
@@ -117,6 +120,7 @@ export class SyncEnv {
       path.join(agentsHome, "skills"),
       harnessesHome,
       path.join(home, ".mcporter"),
+      path.join(home, ".summarize"),
       path.join(home, MANAGED_STATE_SUBDIR),
       installTimeoutMs,
       discoverHarnesses(home, harnessesHome, platform),

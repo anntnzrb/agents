@@ -111,6 +111,17 @@ test("wrapper_destinations_render_unix_launchers", () => {
     );
     assert.equal(mcporterUnix?.content.includes(WRAPPER_MARKER), true);
 
+    const summarizeUnix = unix.find((entry) => entry.path.endsWith("/summarize"));
+    assert.equal(summarizeUnix?.path, join(home, ".local", "bin", "summarize"));
+    assert.equal(summarizeUnix?.content.includes("launch 'summarize'"), true);
+    assert.equal(
+      summarizeUnix?.content.includes(
+        "'--force-summary' '--timestamps' '--format' 'md' '--retries' '2' '--metrics' 'detailed'",
+      ),
+      true,
+    );
+    assert.equal(summarizeUnix?.content.includes(WRAPPER_MARKER), true);
+
     assert.equal(renderWrapper(unixEnv, unixEnv.harnesses[0]!), unix[0]!.content);
   });
 });

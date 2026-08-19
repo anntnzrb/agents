@@ -24,7 +24,7 @@ import {
   prepareManagedTools,
 } from "./managed-tools.ts";
 import { buildSyncPlan, type SyncHookPlan, type SyncPlan } from "./plan.ts";
-import { toolLauncher, toolLauncherDefaultArgs } from "./tool-launchers.ts";
+import { toolLauncher } from "./tool-launchers.ts";
 import { managedToolWrapperDestination, reconcileWrappers } from "./wrappers.ts";
 
 export { copyTree, isSymlink, rmEntry } from "@runtime/fs.ts";
@@ -277,7 +277,7 @@ export const launchMain = async (sourceName: string, args: readonly string[]): P
           ...(tool.distTag === undefined ? {} : { distTag: tool.distTag }),
           ...(tool.smokeCheck === undefined ? {} : { smokeCheck: tool.smokeCheck }),
         },
-        [...toolLauncherDefaultArgs(syncEnv, tool), ...args],
+        args,
       );
     }
     return await launchHarness(syncEnv, harness ?? unsupported(), args);

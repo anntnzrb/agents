@@ -336,6 +336,20 @@ test("tool_launcher_launch_uses_the_registered_npm_spec", async () => {
       calls.some((entry) => entry.command[0] === "npm" && entry.command.includes("mcporter@1.0.0")),
       true,
     );
+
+    const summarizeTool = toolLauncher("summarize")!;
+    assert.equal(summarizeTool.package, "@steipete/summarize");
+    assert.equal(summarizeTool.bin, "summarize");
+    assert.deepEqual(summarizeTool.defaultArgs, [
+      "--force-summary",
+      "--timestamps",
+      "--format",
+      "md",
+      "--retries",
+      "2",
+      "--metrics",
+      "detailed",
+    ]);
   });
 });
 

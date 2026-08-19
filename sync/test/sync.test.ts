@@ -796,6 +796,10 @@ setInterval(() => {}, 1_000);
 
       writeFile(join(root, ".config", "agents", "HARNESS.md"), "agent-instructions");
       writeFile(join(root, ".config", "agents", "tools", "mcporter", "mcporter.jsonc"), '{"x":1}');
+      writeFile(
+        join(root, ".config", "agents", "tools", "summarize", "config.json"),
+        '{"model":"fast"}',
+      );
       writeFile(join(root, ".config", "agents", "skills", "current", "skill.txt"), "skill-content");
       writeFile(
         join(root, ".config", "agents", "harnesses", "codex", "config.toml"),
@@ -848,6 +852,7 @@ setInterval(() => {}, 1_000);
       assert.equal(exists(join(root, ".omp", "agent", "config.yml")), true);
       assert.equal(exists(join(root, ".omp", "agent", "skills", "skill.txt")), true);
       assert.equal(exists(join(root, ".mcporter", "mcporter.json")), true);
+      assert.equal(exists(join(root, ".summarize", "config.json")), true);
       assert.equal(exists(join(root, ".pi", "agent", "auth.json")), true);
       assert.equal(exists(join(root, ".pi", "agent", "extensions", "stale.ts")), false);
       assert.equal(exists(join(root, ".omp", "agent", "skills", "stale.txt")), false);

@@ -264,6 +264,11 @@ function configJobs(
       kind: "File",
     },
     {
+      src: join(syncEnv.ssotHome, "tools", "summarize", "config.json"),
+      dst: join(syncEnv.summarizeHome, "config.json"),
+      kind: "File",
+    },
+    {
       src: join(syncEnv.ssotHome, CLI_PROXY_SOURCE_DIR, "config.yaml.tmpl"),
       dst: join(syncEnv.home, ".cli-proxy-api", "config.yaml"),
       kind: "CliProxyConfig",

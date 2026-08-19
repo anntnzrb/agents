@@ -49,6 +49,7 @@ test("integration_happy_path_matches_expected_outputs", () => {
     assert.equal(existsSync(join(home, ".omp", "agent", "skills", "skill.txt")), true);
     assert.equal(existsSync(join(home, ".omp", "agent", "skills", "legacy")), false);
     assert.equal(existsSync(join(home, ".mcporter", "mcporter.json")), true);
+    assert.equal(existsSync(join(home, ".summarize", "config.json")), true);
     const cliProxyConfig = Bun.YAML.parse(
       readFileSync(join(home, ".cli-proxy-api", "config.yaml"), "utf8"),
     ) as Record<string, any>;
@@ -236,8 +237,10 @@ function makeFixture(root: string): string {
   mkdirSync(join(home, ".codex"), { recursive: true });
   mkdirSync(join(home, ".config", "opencode"), { recursive: true });
   mkdirSync(join(home, ".mcporter"), { recursive: true });
+  mkdirSync(join(home, ".summarize"), { recursive: true });
   mkdirSync(join(home, ".config", "agents", "sync", "src"), { recursive: true });
   mkdirSync(join(home, ".config", "agents", "tools", "mcporter"), { recursive: true });
+  mkdirSync(join(home, ".config", "agents", "tools", "summarize"), { recursive: true });
   mkdirSync(join(home, ".config", "agents", "tools", "cliproxyapi"), { recursive: true });
 
   writeFixtureFiles(home);
@@ -250,6 +253,7 @@ function writeFixtureFiles(home: string): void {
   writeFileSync(join(home, ".config", "agents", "sync", "tsconfig.json"), "{}\n");
   writeFileSync(join(home, ".config", "agents", "HARNESS.md"), "agent-instructions");
   writeFileSync(join(home, ".config", "agents", "tools", "mcporter", "mcporter.jsonc"), '{"x":1}');
+  writeFileSync(join(home, ".config", "agents", "tools", "summarize", "config.json"), '{"x":1}');
   writeFileSync(
     join(home, ".config", "agents", "tools", "cliproxyapi", "config.yaml.tmpl"),
     `host: \${CLIPROXY_LISTEN_HOST}
@@ -437,6 +441,7 @@ function snapshotHome(home: string): SnapshotEntry[] {
     ".pi",
     ".omp",
     ".mcporter",
+    ".summarize",
     ".cli-proxy-api",
     ".local/share/agents/sync-managed",
     ".local/share/agents/pi-packages",

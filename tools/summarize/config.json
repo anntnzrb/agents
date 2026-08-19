@@ -1,0 +1,36 @@
+{
+  "cache": {
+    "enabled": true,
+    "maxMb": 1024,
+    "media": {
+      "enabled": true,
+      "maxMb": 4096,
+      "ttlDays": 14,
+      "verify": "size"
+    },
+    "ttlDays": 30
+  },
+  "env": {
+    "OPENAI_API_KEY": "keyless",
+    "OPENAI_BASE_URL": "http://munich.trex-gamut.ts.net:8317/v1"
+  },
+  "media": {
+    "embeddedVideo": "both",
+    "videoMode": "auto"
+  },
+  "model": "openai/antigravity/nnn-gemini-3.7-flash-medium",
+  "output": {
+    "language": "auto",
+    "length": "xxl"
+  },
+  "slides": {
+    "max": 20,
+    "sceneThreshold": 0.3
+  },
+  "speakers": {
+    "autoIdentify": true
+  },
+  "ui": {
+    "theme": "aurora"
+  }
+}

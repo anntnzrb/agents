@@ -7,6 +7,7 @@ export interface ToolLauncherSpec {
   readonly bin: string;
   readonly distTag?: string;
   readonly smokeCheck?: string;
+  readonly defaultArgs?: readonly string[];
   readonly configHomeSegments?: readonly string[];
 }
 
@@ -22,6 +23,21 @@ export const TOOL_LAUNCHERS = [
     bin: "mcporter",
     configHomeSegments: [".mcporter", "mcporter.json"],
   },
+  {
+    id: "summarize",
+    package: "@steipete/summarize",
+    bin: "summarize",
+    defaultArgs: [
+      "--force-summary",
+      "--timestamps",
+      "--format",
+      "md",
+      "--retries",
+      "2",
+      "--metrics",
+      "detailed",
+    ],
+  },
 ] as const satisfies readonly ToolLauncherSpec[];
 
 export const toolLauncher = (id: string): ToolLauncherSpec | undefined =>
@@ -30,7 +46,10 @@ export const toolLauncher = (id: string): ToolLauncherSpec | undefined =>
 export const toolLauncherDefaultArgs = (
   syncEnv: Pick<SyncEnv, "home">,
   tool: ToolLauncherSpec,
-): readonly string[] =>
-  tool.configHomeSegments === undefined
-    ? []
-    : ["--config", path.join(syncEnv.home, ...tool.configHomeSegments)];
+): readonly string[] => {
+  const configArgs =
+    tool.configHomeSegments === undefined
+      ? []
+      : ["--config", path.join(syncEnv.home, ...tool.configHomeSegments)];
+  return [...configArgs, ...(tool.defaultArgs ?? [])];
+};
