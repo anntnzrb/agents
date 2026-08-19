@@ -5,14 +5,12 @@
 - `HARNESS.md`: SSOT for global, harness-agnostic agent instructions; sync publishes it to every harness as its instruction file
 - `skills/current/`: SSOT for shared skills synced to every harness
 - `skills/legacy/`: archived skills; repo-only, not synced
-- `tools/`: repo-only managed-tool sources (CLIProxyAPI configuration and release manifest, MCPorter configuration); not synced to harness homes
-- `harnesses/`: harness-specific configs, implementations, adjacent tests, and local documentation staged for sync
+- `tools/`: repo-only managed-tool sources
 - `sync/`: isolated TypeScript sync application; owns all JS/TS app config, launcher wrappers, dependencies, and `sync/test/`
 - `sync/test/`: tests sync behavior only; harness names and paths MAY appear as fixtures or adapter boundaries, but tests MUST NOT import harness implementations or assert harness-local behavior; skill and harness changes MUST NOT add tests here
 - `docs/`: repository setup, operation, and workflow documentation indexed by `docs/index.md`
 - `docs/sync/`: sync application documentation; adapter boundaries MAY be described, but harness-local behavior and configuration belong under `harnesses/`
 - Harness-specific tests and documentation stay beside their owning source under `harnesses/`
-- `harnesses/pi/agent/extensions/AGENTS.md`: engineering policy for active Pi extensions; read it before modifying those extensions
 - `harnesses/<harness>/`: directory presence opts into a supported harness; sync owns its internal adapter metadata
 - Agent config root: `~/.config/agents/`
 - Installed runtime root: `~/.local/share/agents/`

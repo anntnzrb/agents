@@ -110,4 +110,4 @@ The launcher resolves the adapter's npm dist-tag and installs the resolved versi
 
 ## Tool launchers
 
-`TOOL_LAUNCHERS` in `sync/src/core/tool-launchers.ts` lists npm tools that sync launches like harnesses: a wrapper under `~/.local/bin/`, a versioned package cache, and a best-effort sync before launch. Tools have no harness home, instruction file, or skills. The current entry is `mcporter`; its wrapper passes the generated `~/.mcporter/mcporter.json` with `--config`.
+`TOOL_LAUNCHERS` in `sync/src/core/tool-launchers.ts` lists npm tools that sync launches like harnesses: a wrapper under `~/.local/bin/`, a versioned package cache, and a best-effort sync before launch. Tools have no harness home, instruction file, or skills.
