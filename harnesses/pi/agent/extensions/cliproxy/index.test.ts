@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-test("loads the installed catalog asynchronously and registers Pi models", async () => {
+test("resolves the live catalog asynchronously and registers Pi models", async () => {
   const home = await mkdtemp(join(tmpdir(), "pi-cliproxy-extension-test-"));
 
   try {
@@ -34,13 +34,13 @@ test("loads the installed catalog asynchronously and registers Pi models", async
     await writeFile(
       runtimeClientPath,
       `
-export function parseModelCatalog(content, path) {
-  if (typeof content !== "string") throw new Error("expected catalog text for " + path);
-  return JSON.parse(content).models;
-}
+import { readFile } from "node:fs/promises";
 
-export function readModelCatalog() {
-  throw new Error("the synchronous catalog reader must not be called");
+export async function resolveLiveModelCatalog({ catalogPath, baseUrl }) {
+  if (baseUrl !== "\${CLIPROXY_CLIENT_BASE_URL}") {
+    throw new Error("unexpected base URL: " + baseUrl);
+  }
+  return JSON.parse(await readFile(catalogPath, "utf8")).models;
 }
 `,
       "utf8",
