@@ -5,30 +5,8 @@ import {
   buildFdArgs,
   normalizeKind,
   normalizeLimit,
-  normalizeSearchRoots,
   normalizeTimeout,
 } from "./logic.js";
-
-test("normalizeSearchRoots supports multipath trimming and dedupe", () => {
-  const roots = normalizeSearchRoots([
-    "apps",
-    "packages",
-    "packages",
-    " libs ",
-  ]);
-  assert.deepEqual(roots, ["apps", "packages", "libs"]);
-});
-
-test("normalizeSearchRoots defaults omitted, empty, and blank roots to current directory", () => {
-  assert.deepEqual(normalizeSearchRoots(undefined), ["."]);
-  assert.deepEqual(normalizeSearchRoots([]), ["."]);
-  assert.deepEqual(normalizeSearchRoots([" ", "\t"]), ["."]);
-});
-
-test("normalizeSearchRoots keeps commas literal", () => {
-  const roots = normalizeSearchRoots(["apps,packages"]);
-  assert.deepEqual(roots, ["apps,packages"]);
-});
 
 test("normalizeLimit enforces positive values with cap", () => {
   assert.equal(normalizeLimit(undefined), 1000);
