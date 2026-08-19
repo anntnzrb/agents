@@ -276,6 +276,7 @@ The template sets `force-model-prefix: true`.
 | `zen` | OpenCode Zen | `x-model-sources` template entry |
 | `deepseek` | DeepSeek API | `x-model-sources` template entry |
 | `cline-pass` | ClinePass subscription | `x-model-sources` template entry |
+| `cmd` | Command Code GOAT subscription | `openai-compatibility` template entry |
 | `chatgpt` | ChatGPT OAuth accounts | `prefix` field in `~/.cli-proxy-api/codex-*.json` |
 | `antigravity` | Google Antigravity OAuth accounts | `prefix` field in `~/.cli-proxy-api/antigravity-*.json` |
 | `grok` | XAI Grok OAuth accounts | `prefix` field in `~/.cli-proxy-api/xai-*.json` |

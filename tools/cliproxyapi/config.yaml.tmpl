@@ -113,6 +113,27 @@ openai-compatibility:
         alias: "nnn-qwen3.8-max-xhigh"
         display-name: "[nnn] Qwen 3.8 Max (XHigh)"
         force-mapping: true
+  - name: "command-code-custom"
+    prefix: "cmd"
+    base-url: "https://api.commandcode.ai/provider/v1"
+    x-credential-pool: "command-code"
+    models:
+      - name: "cmd/deepseek-v4-flash"
+        alias: "nnn-deepseek-v4-flash-max"
+        display-name: "[nnn] DeepSeek V4 Flash (Max)"
+        force-mapping: true
+      - name: "cmd/deepseek-v4-pro"
+        alias: "nnn-deepseek-v4-pro-max"
+        display-name: "[nnn] DeepSeek V4 Pro (Max)"
+        force-mapping: true
+      - name: "cmd/glm-5.3"
+        alias: "nnn-glm-5.3-max"
+        display-name: "[nnn] GLM 5.3 (Max)"
+        force-mapping: true
+      - name: "cmd/kimi-k3"
+        alias: "nnn-kimi-k3-max"
+        display-name: "[nnn] Kimi K3 (Max)"
+        force-mapping: true
 
 payload:
   override:
@@ -149,11 +170,13 @@ payload:
     - models:
         - name: "deepseek-v4-flash"
         - name: "cline-pass/deepseek-v4-flash"
+        - name: "cmd/deepseek-v4-flash"
       params:
         reasoning_effort: "high"
     - models:
         - name: "deepseek-v4-pro"
         - name: "cline-pass/deepseek-v4-pro"
+        - name: "cmd/deepseek-v4-pro"
       params:
         reasoning_effort: "high"
     - models:
@@ -162,10 +185,12 @@ payload:
         reasoning_effort: "high"
     - models:
         - name: "cline-pass/glm-5.3"
+        - name: "cmd/glm-5.3"
       params:
         reasoning_effort: "max"
     - models:
         - name: "cline-pass/kimi-k3"
+        - name: "cmd/kimi-k3"
       params:
         reasoning_effort: "max"
     - models:
