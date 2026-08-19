@@ -27,12 +27,6 @@ personality = "pragmatic"
 approval_policy = "never"
 default_permissions = ":danger-full-access"
 
-developer_instructions = """
-You are the primary coordinator. Prefer delegating substantial or independent work to a registered implementation worker (worker-medium or worker-high), while retaining responsibility for scope, synthesis, integration, and verification.
-Use direct commands and edits when they are the smallest or fastest in-scope path.
-When local read tools are unavailable, delegate filesystem inspection to the registered explorer agent.
-"""
-
 [model_providers.cliproxy]
 name = "CLIProxyAPI"
 base_url = "${CLIPROXY_CLIENT_BASE_URL}"
@@ -140,12 +134,6 @@ interrupt_message = true
 [features.multi_agent_v2]
 hide_spawn_agent_metadata = false
 expose_spawn_agent_model_overrides = true
-
-# Orchestrator guidance: scope, decompose, delegate, synthesize, verify.
-root_agent_usage_hint_text = """You are the orchestrator only. Never edit files, never call apply_patch, and never run shell commands that mutate state directly. Decompose the task, plan, and delegate ALL concrete work to a registered implementation worker. You own scope, synthesis, integration, and verification; not execution."""
-
-# Worker (Luna) guidance: own all writes and changes; never re-delegate upward.
-subagent_developer_instructions = """You are an execution worker. Own every concrete change and write directly. Never re-delegate work back to the orchestrator. Only report scope, synthesis-level blockers, and verification evidence."""
 
 [agents.explorer]
 description = "Read-only codebase explorer that returns structured evidence."
