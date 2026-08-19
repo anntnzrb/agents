@@ -109,10 +109,10 @@ const ensureNoSymlinkPathEffect = Effect.fn("ensureNoSymlinkPath")(function*(
         if (component) current = join(current, component);
         const result = yield* Effect.tryPromise({
             try: () => lstat(current),
-            catch: (error) => pathError("Unable to inspect Autommit path", current, error),
+            catch: (error) => error,
         }).pipe(
             Effect.map((stats) => ({ ok: true as const, stats })),
-            Effect.catch((error) => Effect.succeed({ ok: false as const, error })),
+            Effect.catchAll((error) => Effect.succeed({ ok: false as const, error })),
         );
 
         if (result.ok) {
@@ -121,11 +121,11 @@ const ensureNoSymlinkPathEffect = Effect.fn("ensureNoSymlinkPath")(function*(
             }
         } else {
             const error = result.error;
-            if (isErrorCode(error.cause, "ENOENT")) {
+            if (isErrorCode(error, "ENOENT")) {
                 if (allowMissingFinal && current === absolute) return false;
                 return yield* pathFailure(`Autommit path does not exist: ${current}`, current);
             }
-            return yield* error;
+            return yield* pathError("Unable to inspect Autommit path", current, error);
         }
     }
     return true;
@@ -177,12 +177,12 @@ const syncDirectoryEffect = Effect.fn("syncDirectory")((directory: string) =>
         (handle) =>
             Effect.tryPromise({
                 try: () => handle.sync(),
-                catch: (error) => pathError("Unable to sync Autommit directory", directory, error),
+                catch: (error) => error,
             }).pipe(
-                Effect.catch((error) =>
-                    isUnsupportedWindowsDirectorySyncError(error.cause)
+                Effect.catchAll((error) =>
+                    isUnsupportedWindowsDirectorySyncError(error)
                         ? Effect.void
-                        : Effect.fail(error),
+                        : Effect.fail(pathError("Unable to sync Autommit directory", directory, error)),
                 ),
             ),
         (handle) => Effect.promise(() => handle.close().catch(() => undefined)),
@@ -195,13 +195,13 @@ const ensureAutommitDirectoryEffect = Effect.fn("ensureAutommitDirectory")(funct
     yield* ensureCommonDirectoryEffect(paths);
     const created = yield* Effect.tryPromise({
         try: () => mkdir(paths.directory),
-        catch: (error) => pathError("Unable to create Autommit directory", paths.directory, error),
+        catch: (error) => error,
     }).pipe(
         Effect.as(true),
-        Effect.catch((error) =>
-            isErrorCode(error.cause, "EEXIST")
+        Effect.catchAll((error) =>
+            isErrorCode(error, "EEXIST")
                 ? Effect.succeed(false)
-                : Effect.fail(error),
+                : Effect.fail(pathError("Unable to create Autommit directory", paths.directory, error)),
         ),
     );
 
