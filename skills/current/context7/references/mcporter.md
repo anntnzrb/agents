@@ -15,8 +15,8 @@ query-docs(libraryId: string, query: string)
 Do not discover these tools or inspect their schemas before ordinary calls. If a call reports a missing tool or invalid input, or optional inputs matter, inspect only the affected tool:
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json list context7.resolve-library-id --schema
-uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json list context7.query-docs --schema
+uv run --script <skill-dir>/scripts/cli.py list context7.resolve-library-id --schema
+uv run --script <skill-dir>/scripts/cli.py list context7.query-docs --schema
 ```
 
 Live schemas override this reference when inspected. Never load the whole server schema.
@@ -25,13 +25,13 @@ Live schemas override this reference when inspected. Never load the whole server
 Resolve a library:
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.resolve-library-id --args '{"query":"How to clean up useEffect with async operations","libraryName":"React"}'
+uv run --script <skill-dir>/scripts/cli.py call context7.resolve-library-id --args '{"query":"How to clean up useEffect with async operations","libraryName":"React"}'
 ```
 
 Fetch documentation:
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py --config ~/.mcporter/mcporter.json call context7.query-docs --args '{"libraryId":"/reactjs/react.dev","query":"How does useState batch updates?"}'
+uv run --script <skill-dir>/scripts/cli.py call context7.query-docs --args '{"libraryId":"/reactjs/react.dev","query":"How does useState batch updates?"}'
 ```
 
 Use `--args` JSON so punctuation, spaces, and structured values cannot be misparsed by the shell.

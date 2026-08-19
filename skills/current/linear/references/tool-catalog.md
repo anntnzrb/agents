@@ -2,9 +2,9 @@
 
 Snapshot: Linear MCP / MCPorter 0.12.3, 2026-07-16; 47 tools. Live schemas override this snapshot when inspected. Search only the relevant entity section or tool signature; NEVER load the whole catalog. Use it when the tool or exact recipe is unknown, or live discovery fails. A discovery failure MUST disclose possible snapshot drift. Input schemas do not define response fields; NEVER invent unobserved response fields.
 
-Source command:
+Refresh command:
 ```text
-nix run github:numtide/llm-agents.nix#mcporter -- --config ~/.mcporter/mcporter.json list linear --schema
+mcporter list linear --schema
 ```
 
 ## Schema conventions

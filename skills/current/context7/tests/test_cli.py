@@ -124,6 +124,28 @@ def test_keyless_strips_auth_header_before_forwarding(
     assert "anonymous access" in capsys.readouterr().err
 
 
+def test_keyless_default_config_is_stripped_before_forwarding(
+    cli: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Use a stripped managed config when callers omit --config."""
+    config = tmp_path / ".mcporter" / "mcporter.json"
+    config.parent.mkdir()
+    config.write_text(CONFIG_WITH_HEADER, encoding="utf-8")
+    monkeypatch.setattr(cli, "default_config_path", lambda: config)
+    forwarded: list[list[str]] = []
+    monkeypatch.setattr(cli, "run_mcporter", lambda args: forwarded.append(args) or 0)
+
+    assert cli.main(["list", "context7", "--brief"]) == 0
+
+    assert forwarded[0][0] == "--config"
+    rewritten = Path(forwarded[0][1])
+    assert rewritten != config
+    assert not rewritten.exists()
+    assert forwarded[0][2:] == ["list", "context7", "--brief"]
+
+
 def test_keyless_config_without_header_forwarded_unchanged(
     cli: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
@@ -165,6 +187,43 @@ def test_key_present_forwards_config_unchanged(
 
     assert exit_code == 0
     assert forwarded == [["--config", str(config), "list", "context7", "--brief"]]
+
+
+def test_run_mcporter_calls_the_managed_command(
+    cli: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Invoke MCPorter directly instead of selecting a runner fallback."""
+    captured: list[str] = []
+    expected_exit = 17
+
+    class Result:
+        returncode = expected_exit
+
+    def fake_run(command: list[str], **_: object) -> Result:
+        captured.extend(command)
+        return Result()
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+
+    assert cli.run_mcporter(["--version"]) == expected_exit
+    assert captured == ["mcporter", "--version"]
+
+
+def test_missing_mcporter_returns_127_without_a_runner_fallback(
+    cli: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Report the managed command as missing instead of starting another runner."""
+
+    def missing_run(*_args: object, **_kwargs: object) -> None:
+        raise FileNotFoundError
+
+    monkeypatch.setattr(cli.subprocess, "run", missing_run)
+
+    assert cli.run_mcporter(["--version"]) == cli.MISSING_EXECUTABLE_EXIT
+    assert capsys.readouterr().err == "mcporter not found\n"
 
 
 def test_main_forwards_arguments_after_loading_key(

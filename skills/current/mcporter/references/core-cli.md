@@ -7,12 +7,8 @@ Snapshot: MCPorter 0.12.3, captured 2026-07-16 from live `--help` output.
 
 ## Invocation and globals
 
-- Agents SHOULD invoke `mcporter` directly when available
-- Agents MUST use this Nix prefix otherwise:
-
-```text
-nix run github:numtide/llm-agents.nix#mcporter --
-```
+- Agents MUST invoke `mcporter` directly
+- Managed `mcporter` supplies `~/.mcporter/mcporter.json`
 
 Top-level syntax:
 
@@ -24,7 +20,7 @@ Global flags:
 
 |Flag|Meaning|
 |---|---|
-|`--config <path>`|Registry path; default reported by 0.12.3 is `./config/mcporter.json`.|
+|`--config <path>`|Override the managed registry.|
 |`--root <path>`|Working directory for stdio servers.|
 |`--log-level <debug\|info\|warn\|error>`|CLI logging level; default `warn`.|
 |`--oauth-timeout <ms>`|Browser OAuth wait; default `300000`.|

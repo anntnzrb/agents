@@ -31,13 +31,10 @@ References snapshot MCPorter 0.12.3 help captured 2026-07-16.
 
 ## Invocation
 
-Agents MUST use this fallback when `mcporter` is unavailable:
+Agents MUST call `mcporter` directly.
 
-```text
-nix run github:numtide/llm-agents.nix#mcporter -- <command>
-```
-
-- `--config <path>` MUST target only non-default registries
+- Managed `mcporter` supplies `~/.mcporter/mcporter.json`
+- `--config <path>` MUST target only an intentional alternate registry
 - Agents MUST inspect configuration before modifying it
 
 ## Minimal workflow

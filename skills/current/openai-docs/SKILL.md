@@ -11,12 +11,6 @@ license: AGPL-3.0-or-later
 - MUST ground answers in fetched documentation
 - NEVER invent undocumented behavior
 
-Missing `mcporter`: MUST use this Nix prefix:
-
-```text
-nix run github:numtide/llm-agents.nix#mcporter --
-```
-
 ## Call and recover
 
 - The known recipes below SHOULD be called directly without inventory or schema discovery

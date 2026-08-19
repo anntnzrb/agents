@@ -35,17 +35,11 @@ Treat vendored repositories as read-only references. Never import from them or e
 
 Effect API questions MUST also use live Effect documentation.
 
-Missing `mcporter`: MUST use this Nix prefix:
-
-```text
-nix run github:numtide/llm-agents.nix#mcporter --
-```
-
 For known core-package requests, call the focused recipe directly:
 
 ```text
-mcporter --config ~/.mcporter/mcporter.json call 'effect.effect-doc-links(libraries: ["effect"])'
-mcporter --config ~/.mcporter/mcporter.json call 'effect.effect-documentation(libraries: ["effect"])'
+mcporter call 'effect.effect-doc-links(libraries: ["effect"])'
+mcporter call 'effect.effect-documentation(libraries: ["effect"])'
 ```
 
 - MCP-resource clients SHOULD use `effect-doc-links`.
@@ -55,13 +49,13 @@ mcporter --config ~/.mcporter/mcporter.json call 'effect.effect-documentation(li
 Before requesting unfamiliar ecosystem packages, inspect live resources:
 
 ```text
-mcporter --config ~/.mcporter/mcporter.json resource effect
+mcporter resource effect
 ```
 
 For unfamiliar, optional, or rejected tool arguments, inspect the targeted live schema and retry once:
 
 ```text
-mcporter --config ~/.mcporter/mcporter.json list effect.<tool> --schema
+mcporter list effect.<tool> --schema
 ```
 
 - Live schema and resources MUST remain authoritative when inspected.

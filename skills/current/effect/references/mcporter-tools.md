@@ -8,12 +8,10 @@ Refresh when drift matters:
 
 ```text
 mcporter --version
-mcporter --config ~/.mcporter/mcporter.json list effect.effect-documentation --schema
-mcporter --config ~/.mcporter/mcporter.json list effect.effect-doc-links --schema
-mcporter --config ~/.mcporter/mcporter.json resource effect
+mcporter list effect.effect-documentation --schema
+mcporter list effect.effect-doc-links --schema
+mcporter resource effect
 ```
-
-If `mcporter` is unavailable on PATH, replace its leading command with `nix run github:numtide/llm-agents.nix#mcporter --`.
 
 Both tools require exactly one top-level `libraries` string array. Schemas declare no enum, minimum item count, uniqueness, or package validation; no output schema is exposed. NEVER invent response fields; MUST inspect the actual MCPorter result.
 
@@ -49,7 +47,7 @@ Exact input schema:
 Example:
 
 ```text
-mcporter --config ~/.mcporter/mcporter.json call 'effect.effect-documentation(libraries: ["effect", "@effect/rpc"])'
+mcporter call 'effect.effect-documentation(libraries: ["effect", "@effect/rpc"])'
 ```
 
 ### `effect-doc-links`
@@ -82,13 +80,13 @@ Exact input schema:
 Example:
 
 ```text
-mcporter --config ~/.mcporter/mcporter.json call 'effect.effect-doc-links(libraries: ["effect", "@effect/rpc"])'
+mcporter call 'effect.effect-doc-links(libraries: ["effect", "@effect/rpc"])'
 ```
 
 Observed `effect-doc-links` output contained `effect-docs://...` text, but this is not a guaranteed response schema. Read a returned URI with:
 
 ```text
-mcporter --config ~/.mcporter/mcporter.json resource effect 'effect-docs://@effect-rpc'
+mcporter resource effect 'effect-docs://@effect-rpc'
 ```
 
 ## Advertised package coverage

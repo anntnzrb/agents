@@ -11,12 +11,7 @@ metadata:
 
 Use MCPorter `deepwiki` for public GitHub repository docs and codebase Q&A.
 - NEVER assume native DeepWiki tools are mounted
-- MUST pass `--config ~/.mcporter/mcporter.json` (the generated MCPorter configuration)
-- Missing `mcporter`: MUST use the Nix fallback
-
-```text
-nix run github:numtide/llm-agents.nix#mcporter --
-```
+- Managed `mcporter` supplies the generated registry
 
 ## Required follow-up reads
 
@@ -29,15 +24,15 @@ nix run github:numtide/llm-agents.nix#mcporter --
 1. Select one of the three known tools and call it directly; do not list the server or inspect schemas first:
 
    ```text
-   mcporter --config ~/.mcporter/mcporter.json call deepwiki.ask_question --args '{"repoName":"owner/repo","question":"<question>"}'
-   mcporter --config ~/.mcporter/mcporter.json call deepwiki.read_wiki_structure repoName=owner/repo
-   mcporter --config ~/.mcporter/mcporter.json call deepwiki.read_wiki_contents repoName=owner/repo
+   mcporter call deepwiki.ask_question --args '{"repoName":"owner/repo","question":"<question>"}'
+   mcporter call deepwiki.read_wiki_structure repoName=owner/repo
+   mcporter call deepwiki.read_wiki_contents repoName=owner/repo
    ```
 
 2. If a call reports a missing tool or invalid input, inspect only that tool's live schema, correct the call, and retry once:
 
    ```text
-   mcporter --config ~/.mcporter/mcporter.json list deepwiki.<tool> --schema
+   mcporter list deepwiki.<tool> --schema
    ```
 
 3. Live success MUST override snapshot; NEVER infer absent response fields.

@@ -40,10 +40,10 @@ uv run --script <skill-dir>/scripts/cli.py activate <WORKFLOW_ID>
 **Solution**:
 
 ```text
-mcporter --config ~/.mcporter/mcporter.json list n8n --status --quiet --no-oauth
-mcporter --config ~/.mcporter/mcporter.json list n8n --brief
-mcporter --config ~/.mcporter/mcporter.json list n8n.<DISCOVERED_TOOL> --schema --all-parameters
-mcporter --config ~/.mcporter/mcporter.json call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
+mcporter list n8n --status --quiet --no-oauth
+mcporter list n8n --brief
+mcporter list n8n.<DISCOVERED_TOOL> --schema --all-parameters
+mcporter call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
 ```
 
 **Tip**: MUST read `../references/mcporter.md` first and use only live tool names

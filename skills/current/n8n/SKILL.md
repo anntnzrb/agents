@@ -42,13 +42,12 @@ MUST read `reference.md` before REST work or credential troubleshooting.
 ## Optional MCPorter route
 
 - MUST read `references/mcporter.md` first.
-- MUST use configured registry explicitly.
-- Missing `mcporter`: MUST use Nix fallback.
+- MUST use the managed registry.
 - MUST run quiet health gate first.
 - Nonzero status MUST stop discovery.
 
 ```text
-mcporter --config ~/.mcporter/mcporter.json list n8n --status --quiet --no-oauth
+mcporter list n8n --status --quiet --no-oauth
 ```
 
 After success:
@@ -56,9 +55,9 @@ After success:
 - MUST call only a discovered tool.
 
 ```text
-mcporter --config ~/.mcporter/mcporter.json list n8n --brief
-mcporter --config ~/.mcporter/mcporter.json list n8n.<DISCOVERED_TOOL> --schema --all-parameters
-mcporter --config ~/.mcporter/mcporter.json call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
+mcporter list n8n --brief
+mcporter list n8n.<DISCOVERED_TOOL> --schema --all-parameters
+mcporter call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
 ```
 
 - MUST copy exact live tool/input schemas.

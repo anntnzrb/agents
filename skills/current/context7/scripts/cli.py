@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -95,6 +94,11 @@ def stripped_config_text(config_path: Path) -> str | None:
     return stripped
 
 
+def default_config_path() -> Path:
+    """Return the registry path supplied by the managed MCPorter wrapper."""
+    return Path.home() / ".mcporter" / "mcporter.json"
+
+
 def keyless_config_path(config_path: str) -> Path:
     """Materialize a header-stripped copy of the config for anonymous access."""
     stripped = stripped_config_text(Path(config_path))
@@ -107,15 +111,17 @@ def keyless_config_path(config_path: str) -> Path:
 
 
 def forward_args(args: list[str]) -> tuple[list[str], list[Path]]:
-    """Rewrite --config to a header-stripped copy when running anonymously."""
+    """Rewrite the active config to a header-stripped copy for anonymous access."""
     if os.environ.get(API_KEY_ENV):
         return args, []
     result = list(args)
     cleanup: list[Path] = []
+    has_config = False
     index = 0
     while index < len(result):
         argument = result[index]
         if argument == CONFIG_FLAG and index + 1 < len(result):
+            has_config = True
             rewritten = keyless_config_path(result[index + 1])
             if rewritten != Path(result[index + 1]):
                 cleanup.append(rewritten)
@@ -123,35 +129,34 @@ def forward_args(args: list[str]) -> tuple[list[str], list[Path]]:
             index += 2
             continue
         if argument.startswith(f"{CONFIG_FLAG}="):
+            has_config = True
             rewritten = keyless_config_path(argument[len(CONFIG_FLAG) + 1 :])
             if rewritten != Path(argument[len(CONFIG_FLAG) + 1 :]):
                 cleanup.append(rewritten)
             result[index] = f"{CONFIG_FLAG}={rewritten}"
         index += 1
-    return result, cleanup
+    if has_config:
+        return result, cleanup
 
-
-def mcporter_command(args: list[str]) -> list[str] | None:
-    """Build the native MCPorter command or its Nix fallback."""
-    if executable := shutil.which("mcporter"):
-        return [executable, *args]
-    if executable := shutil.which("nix"):
-        return [
-            executable,
-            "run",
-            "github:numtide/llm-agents.nix#mcporter",
-            "--",
-            *args,
-        ]
-    return None
+    default_config = default_config_path()
+    rewritten = keyless_config_path(str(default_config))
+    if rewritten == default_config:
+        return result, cleanup
+    cleanup.append(rewritten)
+    return [CONFIG_FLAG, str(rewritten), *result], cleanup
 
 
 def run_mcporter(args: list[str]) -> int:
-    """Run MCPorter with inherited credentials and preserve its exit status."""
-    if (command := mcporter_command(args)) is None:
-        sys.stderr.write("mcporter not found and nix fallback unavailable\n")
+    """Run the managed MCPorter command and preserve its exit status."""
+    try:
+        return subprocess.run(  # noqa: S603
+            ["mcporter", *args],  # noqa: S607
+            check=False,
+            env=os.environ.copy(),
+        ).returncode
+    except FileNotFoundError:
+        sys.stderr.write("mcporter not found\n")
         return MISSING_EXECUTABLE_EXIT
-    return subprocess.run(command, check=False, env=os.environ.copy()).returncode  # noqa: S603
 
 
 def main(args: list[str] | None = None) -> int:

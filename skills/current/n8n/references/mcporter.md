@@ -36,13 +36,7 @@ arguments: the registry substitutes the bearer into a subprocess argument.
 MUST run this quiet exit-code gate:
 
 ```text
-mcporter --config ~/.mcporter/mcporter.json list n8n --status --quiet --no-oauth
-```
-
-If `mcporter` is unavailable on `PATH`, use:
-
-```text
-nix run github:numtide/llm-agents.nix#mcporter -- --config ~/.mcporter/mcporter.json list n8n --status --quiet --no-oauth
+mcporter list n8n --status --quiet --no-oauth
 ```
 
 Zero permits discovery. Nonzero MUST stop; it does not classify missing env,
@@ -56,8 +50,8 @@ MCPorter/supergateway pair can expose the bearer token.
 After gate success, MUST discover the compact inventory, select a tool, then inspect only its complete schema:
 
 ```text
-mcporter --config ~/.mcporter/mcporter.json list n8n --brief
-mcporter --config ~/.mcporter/mcporter.json list n8n.<DISCOVERED_TOOL> --schema --all-parameters
+mcporter list n8n --brief
+mcporter list n8n.<DISCOVERED_TOOL> --schema --all-parameters
 ```
 
 Discovery output is sensitive. MUST extract only needed names/schemas; MUST NOT
@@ -66,7 +60,7 @@ paste raw output into chat, issues, logs, or docs.
 MUST call only a returned tool with its exact input schema:
 
 ```text
-mcporter --config ~/.mcporter/mcporter.json call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
+mcporter call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
 ```
 
 Input schema MUST NOT imply output schema. Without one, response fields are
@@ -93,8 +87,7 @@ MUST NOT guess fields.
 Snapshot only; MUST refresh before use.
 
 - Date: 2026-07-16 (America/Guayaquil)
-- MCPorter version: 0.12.3 from
-  `github:numtide/llm-agents.nix#mcporter`.
+- MCPorter version: 0.12.3
 - Registry: SSOT `tools/mcporter/mcporter.jsonc` in the agents repository, rendered to `~/.mcporter/mcporter.json`, `n8n` stdio-to-streamable-HTTP bridge
 - Probe environment: `N8N_MCP_URL` and `N8N_MCP_TOKEN` were unset
 - `list n8n --schema` result: tools unavailable; the bridge had no HTTP target

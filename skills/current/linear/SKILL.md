@@ -56,15 +56,10 @@ mcporter call linear.list_users query='<name-or-email>' limit=50 --output json
 
 `--output json` selects rendering, not a response contract. Inspect returned issue records defensively for requested fields; input-schema discovery cannot validate output fields.
 
-Missing `mcporter`: MUST use this Nix prefix:
-
-```text
-nix run github:numtide/llm-agents.nix#mcporter --
-```
-
 ## Recovery
 
-- Missing SSOT config: MUST add `--config <path-to-mcporter.jsonc>`
+- Missing generated registry: MUST report the setup failure.
+- NEVER add or substitute a registry.
 - NEVER expose, copy, or log tokens
 
 ```text
