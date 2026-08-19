@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rebuild the pinned CLIProxyAPI management panel asset (assets/cliproxyapi/panel.html)
+# Rebuild the pinned CLIProxyAPI management panel asset (tools/cliproxyapi/panel.html)
 # from a pinned upstream revision plus the local ClinePass quota patch.
 # Run from anywhere; requires git and bun on PATH.
 set -eu

@@ -11,7 +11,7 @@ import {
   recordExtensionHookState,
 } from "./hook-state.ts";
 import { runJobsWithPreserve } from "./jobs.ts";
-import { launchHarness } from "./launcher.ts";
+import { launchHarness, launchNpmPackage } from "./launcher.ts";
 import {
   cleanManagedEntries,
   type ManagedSyncPlan,
@@ -24,6 +24,7 @@ import {
   prepareManagedTools,
 } from "./managed-tools.ts";
 import { buildSyncPlan, type SyncHookPlan, type SyncPlan } from "./plan.ts";
+import { toolLauncher, toolLauncherDefaultArgs } from "./tool-launchers.ts";
 import { managedToolWrapperDestination, reconcileWrappers } from "./wrappers.ts";
 
 export { copyTree, isSymlink, rmEntry } from "@runtime/fs.ts";
@@ -218,8 +219,8 @@ export const main = async (
 
 /**
  * Wrapper entrypoint: reconcile config first, then hand control to the
- * selected harness. Sync failures are soft here so an unavailable network or
- * broken optional hook cannot strand an otherwise cached agent binary.
+ * selected harness or tool. Sync failures are soft here so an unavailable
+ * network or broken optional hook cannot strand an otherwise cached binary.
  */
 export const launchMain = async (sourceName: string, args: readonly string[]): Promise<number> => {
   let syncEnv: SyncEnv;
@@ -235,8 +236,9 @@ export const launchMain = async (sourceName: string, args: readonly string[]): P
   const harness =
     syncEnv.harnesses.find((candidate) => candidate.sourceName === sourceName) ??
     (ssotAvailable ? undefined : supportedHarness(syncEnv.home, sourceName, syncEnv.platform));
-  if (!harness) {
-    err(`unsupported harness: ${sourceName}`);
+  const tool = harness ? undefined : toolLauncher(sourceName);
+  if (!harness && !tool) {
+    err(`unsupported launch target: ${sourceName}`);
     return 2;
   }
 
@@ -265,11 +267,28 @@ export const launchMain = async (sourceName: string, args: readonly string[]): P
   }
 
   try {
-    return await launchHarness(syncEnv, harness, args);
+    if (tool) {
+      return await launchNpmPackage(
+        syncEnv,
+        {
+          tool: tool.id,
+          package: tool.package,
+          bin: tool.bin,
+          ...(tool.distTag === undefined ? {} : { distTag: tool.distTag }),
+          ...(tool.smokeCheck === undefined ? {} : { smokeCheck: tool.smokeCheck }),
+        },
+        [...toolLauncherDefaultArgs(syncEnv, tool), ...args],
+      );
+    }
+    return await launchHarness(syncEnv, harness ?? unsupported(), args);
   } catch (error) {
     err(`launch failed: ${panicMessage(error)}`);
     return 1;
   }
+};
+
+const unsupported = (): never => {
+  throw new Error("unreachable: launch target checked above");
 };
 
 async function runSyncHooks(

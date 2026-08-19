@@ -32,7 +32,7 @@ function withTempHome<T>(fn: (home: string) => T | Promise<T>): Promise<T> {
 }
 
 function writeManifest(home: string, checksum = CHECKSUM): void {
-  const cliProxyAssets = join(home, ".config", "agents", "assets", "cliproxyapi");
+  const cliProxyAssets = join(home, ".config", "agents", "tools", "cliproxyapi");
   mkdirSync(cliProxyAssets, { recursive: true });
   writeFileSync(
     join(cliProxyAssets, "release.json"),

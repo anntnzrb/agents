@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { panicMessage } from "@runtime/errors.ts";
 import {
-  CLI_PROXY_ASSETS_DIR,
+  CLI_PROXY_SOURCE_DIR,
   type CliProxyDeployment,
   cliProxyModelsUrl,
 } from "./cliproxy-deployment.ts";
@@ -55,7 +55,7 @@ export async function prepareManagedTools(
   syncEnv: SyncEnv,
   runtime: ManagedToolRuntime = {},
 ): Promise<readonly PreparedManagedTool[]> {
-  const manifestPath = path.join(syncEnv.assetsHome, CLI_PROXY_ASSETS_DIR, RELEASE_FILE);
+  const manifestPath = path.join(syncEnv.ssotHome, CLI_PROXY_SOURCE_DIR, RELEASE_FILE);
   if (!fs.existsSync(manifestPath)) {
     return [];
   }

@@ -3,6 +3,7 @@ import path from "node:path";
 import { isErrno, panicMessage } from "@runtime/errors.ts";
 import type { Harness, SyncEnv } from "./harness.ts";
 import type { PreparedManagedTool } from "./managed-tools.ts";
+import { TOOL_LAUNCHERS, toolLauncherDefaultArgs } from "./tool-launchers.ts";
 
 export const UNIX_WRAPPER_DIR = [".local", "bin"] as const;
 export const WRAPPER_STATE_FILE = "wrappers.json";
@@ -42,8 +43,8 @@ export function wrapperPath(syncEnv: Pick<SyncEnv, "home">, harness: Harness): s
 
 export function wrapperDestinations(
   syncEnv: Pick<SyncEnv, "home" | "runtimeHome" | "harnesses">,
-): readonly HarnessWrapperDestination[] {
-  return syncEnv.harnesses.map((harness) => {
+): readonly WrapperDestination[] {
+  const harnessWrappers: HarnessWrapperDestination[] = syncEnv.harnesses.map((harness) => {
     const destination = wrapperPath(syncEnv, harness);
     return {
       harness,
@@ -51,11 +52,24 @@ export function wrapperDestinations(
       content: renderWrapper(syncEnv, harness),
     };
   });
+  const toolWrappers: WrapperDestination[] = TOOL_LAUNCHERS.map((tool) => ({
+    path: path.join(wrapperDirectory(syncEnv), tool.bin),
+    content: renderLaunchWrapper(syncEnv, tool.id, toolLauncherDefaultArgs(syncEnv, tool)),
+  }));
+  return [...harnessWrappers, ...toolWrappers];
 }
 
 export function renderWrapper(syncEnv: Pick<SyncEnv, "runtimeHome">, harness: Harness): string {
+  return renderLaunchWrapper(syncEnv, harness.sourceName, harness.launcher.defaultArgs);
+}
+
+function renderLaunchWrapper(
+  syncEnv: Pick<SyncEnv, "runtimeHome">,
+  sourceName: string,
+  defaultArgs: readonly string[],
+): string {
   const syncScript = path.join(syncEnv.runtimeHome, "sync", "src", "cli.ts");
-  const defaultArgs = harness.launcher.defaultArgs.map(shellQuote).join(" ");
+  const args = defaultArgs.map(shellQuote).join(" ");
   return [
     "#!/bin/sh",
     `# ${WRAPPER_MARKER}`,
@@ -64,7 +78,7 @@ export function renderWrapper(syncEnv: Pick<SyncEnv, "runtimeHome">, harness: Ha
     "  echo 'agents: sync runtime is missing; run sync from the agents repository' >&2",
     "  exit 127",
     "fi",
-    `exec bun ${shellQuote(syncScript)} launch ${shellQuote(harness.sourceName)} --${defaultArgs ? ` ${defaultArgs}` : ""} "$@"`,
+    `exec bun ${shellQuote(syncScript)} launch ${shellQuote(sourceName)} --${args ? ` ${args}` : ""} "$@"`,
     "",
   ].join("\n");
 }

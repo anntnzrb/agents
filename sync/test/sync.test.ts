@@ -761,7 +761,7 @@ setInterval(() => {}, 1_000);
   test("sync_plan_deploys_cliproxy_panel_asset_only_on_gateway_host", async () => {
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
-      const panelSrc = join(root, ".config", "agents", "assets", "cliproxyapi", "panel.html");
+      const panelSrc = join(root, ".config", "agents", "tools", "cliproxyapi", "panel.html");
       writeFile(panelSrc, "<html>panel</html>\n");
       const panelDst = join(".cli-proxy-api", "static", "management.html");
 
@@ -774,7 +774,7 @@ setInterval(() => {}, 1_000);
       assert.equal(panelJob?.src, panelSrc);
 
       writeFile(
-        join(root, ".config", "agents", "assets", "cliproxyapi", "deployment.json"),
+        join(root, ".config", "agents", "tools", "cliproxyapi", "deployment.json"),
         `${JSON.stringify({
           ...TEST_CLIPROXY_DEPLOYMENT,
           server: { hostname: "not-the-gateway.example.test" },
@@ -794,8 +794,8 @@ setInterval(() => {}, 1_000);
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
 
-      writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
-      writeFile(join(root, ".config", "agents", "assets", "mcporter.jsonc"), '{"x":1}');
+      writeFile(join(root, ".config", "agents", "HARNESS.md"), "agent-instructions");
+      writeFile(join(root, ".config", "agents", "tools", "mcporter", "mcporter.jsonc"), '{"x":1}');
       writeFile(join(root, ".config", "agents", "skills", "current", "skill.txt"), "skill-content");
       writeFile(
         join(root, ".config", "agents", "harnesses", "codex", "config.toml"),
@@ -867,7 +867,7 @@ setInterval(() => {}, 1_000);
       const syncEnv = makeSyncEnv(root);
       const agentsRoot = join(root, ".config", "agents");
 
-      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(agentsRoot, "HARNESS.md"), "agent-instructions");
       writeFile(join(agentsRoot, "skills", "current", "skill.txt"), "fresh-skill");
       writeFile(join(agentsRoot, "harnesses", "codex", "config.toml"), "fresh = true\n");
       writeFile(
@@ -902,7 +902,7 @@ setInterval(() => {}, 1_000);
       const syncEnv = makeSyncEnv(root);
       const agentsRoot = join(root, ".config", "agents");
 
-      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(agentsRoot, "HARNESS.md"), "agent-instructions");
       writeFile(join(agentsRoot, "skills", "current", "skill.txt"), "fresh-skill");
       writeFile(
         join(agentsRoot, "harnesses", "omp", "agent", "config.yml"),
@@ -929,7 +929,7 @@ setInterval(() => {}, 1_000);
       const syncEnv = makeSyncEnv(root);
       const agentsRoot = join(root, ".config", "agents");
 
-      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(agentsRoot, "HARNESS.md"), "agent-instructions");
       writeFile(join(root, ".pi", "agent", "legacy", "old.txt"), "stale");
       writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
 
@@ -946,7 +946,7 @@ setInterval(() => {}, 1_000);
       const codexConfig = join(agentsRoot, "harnesses", "codex", "config.toml");
       const skillsRoot = join(agentsRoot, "skills", "current");
 
-      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(agentsRoot, "HARNESS.md"), "agent-instructions");
       writeFile(join(skillsRoot, "skill.txt"), "fresh-skill");
       writeFile(codexConfig, "fresh = true\n");
 
@@ -1000,7 +1000,7 @@ setInterval(() => {}, 1_000);
       );
 
       writeFile(
-        join(agentsRoot, "assets", "cliproxyapi", "release.json"),
+        join(agentsRoot, "tools", "cliproxyapi", "release.json"),
         `${JSON.stringify(
           {
             repository,
@@ -1017,7 +1017,7 @@ setInterval(() => {}, 1_000);
         join(installDir, "receipt.json"),
         `${JSON.stringify({ repository, version, asset: assetName, sha256: checksum }, null, 2)}\n`,
       );
-      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(agentsRoot, "HARNESS.md"), "agent-instructions");
       writeFile(join(agentsRoot, "skills", "current", "skill.txt"), "fresh-skill");
       writeFile(join(agentsRoot, "harnesses", "codex", "config.toml"), "fresh = true\n");
 
@@ -1029,7 +1029,7 @@ setInterval(() => {}, 1_000);
         assert.equal(readText(wrappersStatePath).includes(wrapperPath), true);
 
         writeFile(
-          join(agentsRoot, "assets", "cliproxyapi", "deployment.json"),
+          join(agentsRoot, "tools", "cliproxyapi", "deployment.json"),
           `${JSON.stringify({
             server: { hostname: "different-gateway.example.test" },
             listen: { host: "100.64.0.42", port: 9443 },
@@ -1055,7 +1055,7 @@ setInterval(() => {}, 1_000);
       const syncEnv = makeSyncEnv(root);
       const agentsRoot = join(root, ".config", "agents");
 
-      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(agentsRoot, "HARNESS.md"), "agent-instructions");
       writeFile(join(agentsRoot, "skills", "current", "skill.txt"), "fresh-skill");
       writeFile(join(agentsRoot, "skills", "legacy", "old-skill.txt"), "legacy-skill");
 
@@ -1067,40 +1067,12 @@ setInterval(() => {}, 1_000);
     });
   });
 
-  test("run_sync_copies_generic_asset_dirs_and_cleans_stale_ones", async () => {
-    await withTempDir(async (root) => {
-      const syncEnv = makeSyncEnv(root);
-      const agentsRoot = join(root, ".config", "agents");
-
-      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
-      writeFile(join(agentsRoot, "assets", "prompts", "hello.txt"), "prompt-content");
-      writeFile(join(agentsRoot, "assets", "cliproxyapi", "panel.html"), "private-asset");
-
-      assert.equal(await call<boolean>(runSync, syncEnv), true);
-      assert.equal(exists(join(root, ".codex", "prompts", "hello.txt")), true);
-      assert.equal(exists(join(root, ".omp", "agent", "prompts", "hello.txt")), true);
-      assert.equal(exists(join(root, ".codex", "cliproxyapi")), false);
-      assert.equal(exists(join(root, ".omp", "agent", "cliproxyapi")), false);
-
-      rmSync(join(agentsRoot, "assets", "prompts"), {
-        recursive: true,
-        force: true,
-      });
-      writeFile(join(root, ".codex", "logs", "keep.txt"), "keep-me");
-
-      assert.equal(await call<boolean>(runSync, syncEnv), true);
-      assert.equal(exists(join(root, ".codex", "prompts")), false);
-      assert.equal(exists(join(root, ".omp", "agent", "prompts")), false);
-      assert.equal(exists(join(root, ".codex", "logs", "keep.txt")), true);
-    });
-  });
-
   test("run_sync_preserves_generated_extension_runtime_when_hook_inputs_match", async () => {
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
       const { fingerprintTree } = await import("@core/hook-state.ts");
 
-      writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(root, ".config", "agents", "HARNESS.md"), "agent-instructions");
       writeFile(
         join(
           root,
@@ -1159,7 +1131,7 @@ setInterval(() => {}, 1_000);
         "pi.extension-deps.json",
       );
 
-      writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(root, ".config", "agents", "HARNESS.md"), "agent-instructions");
       writeFile(join(sourceRoot, "context", "index.ts"), "export const live = true;\n");
       writeFile(join(root, ".pi", "agent", "auth.json"), '{"token":1}');
       writeFile(join(root, ".pi", "agent", "extensions", "package.json"), '{"name":"generated"}\n');
@@ -1213,7 +1185,7 @@ setInterval(() => {}, 1_000);
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
 
-      writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(root, ".config", "agents", "HARNESS.md"), "agent-instructions");
       writeFile(
         join(
           root,
@@ -1258,7 +1230,7 @@ setInterval(() => {}, 1_000);
       const syncEnv = makeSyncEnv(root);
       const agentsRoot = join(root, ".config", "agents");
 
-      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(agentsRoot, "HARNESS.md"), "agent-instructions");
       writeFile(
         join(agentsRoot, "harnesses", "omp", "agent", "config.yml"),
         "interruptMode: immediate\n",
@@ -1282,7 +1254,7 @@ setInterval(() => {}, 1_000);
       const syncEnv = makeSyncEnv(root);
       const agentsRoot = join(root, ".config", "agents");
 
-      writeFile(join(agentsRoot, "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(agentsRoot, "HARNESS.md"), "agent-instructions");
       writeFile(
         join(agentsRoot, "harnesses", "omp", "agent", "config.yml"),
         "interruptMode: immediate\n",
@@ -1450,7 +1422,7 @@ setInterval(() => {}, 1_000);
   test("run_sync_bootstraps_packages_and_patches_runtime_settings", async () => {
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
-      writeFile(join(root, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
+      writeFile(join(root, ".config", "agents", "HARNESS.md"), "agent-instructions");
       writeFile(join(root, ".pi", "agent", "settings.json"), "{}\n");
 
       const repos = join(root, "repos");
@@ -1598,7 +1570,7 @@ setInterval(() => {}, 1_000);
 
 function makeSyncEnv(root: string): any {
   writeFile(
-    join(root, ".config", "agents", "assets", "cliproxyapi", "deployment.json"),
+    join(root, ".config", "agents", "tools", "cliproxyapi", "deployment.json"),
     `${JSON.stringify(TEST_CLIPROXY_DEPLOYMENT)}\n`,
   );
   for (const id of ["codex", "opencode", "pi", "omp"]) {

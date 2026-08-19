@@ -3,7 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import { assertNever } from "@runtime/errors.ts";
 import {
-  type AssetRename,
   HARNESS_ADAPTERS,
   type HarnessAdapter,
   type HarnessHookSpec,
@@ -12,9 +11,10 @@ import {
   type HostPlatform,
 } from "./harness-adapters.ts";
 
-export type { AssetRename, HarnessId, HostPlatform } from "./harness-adapters.ts";
+export type { HarnessId, HostPlatform } from "./harness-adapters.ts";
 
-export const SOURCE_AGENT_FILE = "AGENTS.md";
+export const SOURCE_AGENT_FILE = "HARNESS.md";
+const DEFAULT_INSTRUCTION_FILE = "AGENTS.md";
 const INSTALL_TIMEOUT_SECONDS = 120;
 export const MANAGED_STATE_SUBDIR = ".local/share/agents/sync-managed";
 const DEFAULT_PACKAGE_CACHE_SUBDIR = ".local/share/agents/pi-packages";
@@ -46,7 +46,6 @@ export interface Harness {
   readonly home: string;
   readonly launcher: Required<HarnessLauncherSpec>;
   readonly instructionFile: string;
-  readonly assetRenames: readonly AssetRename[];
   readonly runtimeSubdir: string | undefined;
   readonly compatManagedEntries: readonly string[];
   readonly hooks: readonly HarnessHook[];
@@ -56,7 +55,6 @@ export class SyncEnv {
   readonly home: string;
   readonly ssotHome: string;
   readonly runtimeHome: string;
-  readonly assetsHome: string;
   readonly skillsHome: string;
   readonly harnessesHome: string;
   readonly mcporterHome: string;
@@ -69,7 +67,6 @@ export class SyncEnv {
     home: string,
     ssotHome: string,
     runtimeHome: string,
-    assetsHome: string,
     skillsHome: string,
     harnessesHome: string,
     mcporterHome: string,
@@ -81,7 +78,6 @@ export class SyncEnv {
     this.home = home;
     this.ssotHome = ssotHome;
     this.runtimeHome = runtimeHome;
-    this.assetsHome = assetsHome;
     this.skillsHome = skillsHome;
     this.harnessesHome = harnessesHome;
     this.mcporterHome = mcporterHome;
@@ -118,7 +114,6 @@ export class SyncEnv {
       home,
       agentsHome,
       runtimeHome,
-      path.join(agentsHome, "assets"),
       path.join(agentsHome, "skills"),
       harnessesHome,
       path.join(home, ".mcporter"),
@@ -147,8 +142,7 @@ export function buildHarness(spec: HarnessSpec): Harness {
       smokeCheck: spec.launcher.smokeCheck ?? "--version",
       defaultArgs: spec.launcher.defaultArgs ?? [],
     },
-    instructionFile: spec.instructionFile ?? SOURCE_AGENT_FILE,
-    assetRenames: spec.assetRenames ?? [],
+    instructionFile: spec.instructionFile ?? DEFAULT_INSTRUCTION_FILE,
     runtimeSubdir: spec.runtimeSubdir,
     compatManagedEntries: spec.compatManagedEntries ?? [],
     hooks: normalizeHooks(spec.hooks ?? []),
@@ -225,11 +219,6 @@ export const harnessInstructionTarget = (harness: Harness): string =>
   path.join(harnessRoot(harness), harness.instructionFile);
 
 export const harnessInstructionFileName = (harness: Harness): string => harness.instructionFile;
-
-export function harnessRenameAsset(harness: Harness, assetName: string): string {
-  const match = harness.assetRenames.find(([src]) => src === assetName);
-  return match ? match[1] : assetName;
-}
 
 export const harnessManagedStatePath = (harness: Harness, managedStateHome: string): string =>
   path.join(managedStateHome, `${harness.sourceName}.json`);

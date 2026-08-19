@@ -328,7 +328,7 @@ test("cliproxy_readiness_failure_preserves_endpoints", async () => {
 
 test("cliproxy_deployment_is_the_only_committed_endpoint_value", () => {
   const deployment = readCliProxyDeployment(
-    join(REPOSITORY_ROOT, "assets", "cliproxyapi", "deployment.json"),
+    join(REPOSITORY_ROOT, "tools", "cliproxyapi", "deployment.json"),
   );
   const sources = [
     join("harnesses", "codex", "config.toml"),
@@ -344,7 +344,7 @@ test("cliproxy_deployment_is_the_only_committed_endpoint_value", () => {
   }
 
   const template = readFileSync(
-    join(REPOSITORY_ROOT, "assets", "cliproxyapi", "config.yaml.tmpl"),
+    join(REPOSITORY_ROOT, "tools", "cliproxyapi", "config.yaml.tmpl"),
     "utf8",
   );
   assert.match(template, /host: "\$\{CLIPROXY_LISTEN_HOST\}"/);
@@ -360,7 +360,7 @@ test("cliproxy_deployment_is_the_only_committed_endpoint_value", () => {
 
 test("cliproxy_committed_source_keeps_sessions_sticky_and_retries_the_full_pool", () => {
   const source = readFileSync(
-    join(REPOSITORY_ROOT, "assets", "cliproxyapi", "config.yaml.tmpl"),
+    join(REPOSITORY_ROOT, "tools", "cliproxyapi", "config.yaml.tmpl"),
     "utf8",
   );
   const config = Bun.YAML.parse(source) as Record<string, any>;
@@ -380,7 +380,7 @@ test("cliproxy_committed_source_keeps_sessions_sticky_and_retries_the_full_pool"
 
 test("cliproxy_codex_aliases_preserve_reasoning_and_fast_service_tiers", () => {
   const source = readFileSync(
-    join(REPOSITORY_ROOT, "assets", "cliproxyapi", "config.yaml.tmpl"),
+    join(REPOSITORY_ROOT, "tools", "cliproxyapi", "config.yaml.tmpl"),
     "utf8",
   );
   const config = Bun.YAML.parse(source) as Record<string, any>;
@@ -465,7 +465,7 @@ test("cliproxy_codex_aliases_preserve_reasoning_and_fast_service_tiers", () => {
 });
 test("cliproxy_custom_aliases_use provider-native model and payload shapes", () => {
   const source = readFileSync(
-    join(REPOSITORY_ROOT, "assets", "cliproxyapi", "config.yaml.tmpl"),
+    join(REPOSITORY_ROOT, "tools", "cliproxyapi", "config.yaml.tmpl"),
     "utf8",
   );
   const config = Bun.YAML.parse(source) as Record<string, any>;
@@ -495,12 +495,9 @@ test("cliproxy_endpoint_publication_is_one_job_after_config_and_directory_copies
   const home = mkdtempSync(join(tmpdir(), "cliproxy-plan-test-"));
   try {
     const agents = join(home, ".config", "agents");
-    const assets = join(agents, "assets");
-    mkdirSync(join(assets, "cliproxyapi"), { recursive: true });
-    writeFileSync(
-      join(assets, "cliproxyapi", "deployment.json"),
-      `${JSON.stringify(DEPLOYMENT)}\n`,
-    );
+    const tools = join(agents, "tools");
+    mkdirSync(join(tools, "cliproxyapi"), { recursive: true });
+    writeFileSync(join(tools, "cliproxyapi", "deployment.json"), `${JSON.stringify(DEPLOYMENT)}\n`);
     for (const [harness, relativeRoot, relativeFile] of [
       ["codex", "", "config.toml"],
       ["opencode", "", "opencode.jsonc"],
@@ -513,10 +510,6 @@ test("cliproxy_endpoint_publication_is_one_job_after_config_and_directory_copies
     }
 
     const plan = buildSyncPlan(SyncEnv.fromHome(home, 1000, { platform: "linux" }));
-    assert.equal(
-      plan.jobs.some((job) => job.kind === "Dir" && job.src === join(assets, "cliproxyapi")),
-      false,
-    );
     const endpointJobs = plan.jobs.filter((job) => job.kind === "CliProxyEndpointTemplates");
     assert.equal(endpointJobs.length, 1);
     const endpointJob = endpointJobs[0];

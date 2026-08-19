@@ -91,7 +91,7 @@ test("integration_happy_path_matches_expected_outputs", () => {
 test("integration_missing_sources_remain_non_fatal", () => {
   withTempDir((root) => {
     const home = join(root, "ts-home");
-    mkdirSync(join(home, ".config", "agents", "assets"), { recursive: true });
+    mkdirSync(join(home, ".config", "agents"), { recursive: true });
     writeDeployment(home);
     const result = runSyncProcess(home);
 
@@ -214,7 +214,7 @@ function withTempDir<T>(fn: (root: string) => T): T {
 
 function makeFixture(root: string): string {
   const home = join(root, "ts-home");
-  mkdirSync(join(home, ".config", "agents", "assets"), { recursive: true });
+  mkdirSync(join(home, ".config", "agents"), { recursive: true });
   mkdirSync(join(home, ".config", "agents", "harnesses", "codex"), {
     recursive: true,
   });
@@ -237,6 +237,8 @@ function makeFixture(root: string): string {
   mkdirSync(join(home, ".config", "opencode"), { recursive: true });
   mkdirSync(join(home, ".mcporter"), { recursive: true });
   mkdirSync(join(home, ".config", "agents", "sync", "src"), { recursive: true });
+  mkdirSync(join(home, ".config", "agents", "tools", "mcporter"), { recursive: true });
+  mkdirSync(join(home, ".config", "agents", "tools", "cliproxyapi"), { recursive: true });
 
   writeFixtureFiles(home);
   return home;
@@ -246,10 +248,10 @@ function writeFixtureFiles(home: string): void {
   writeDeployment(home);
   writeFileSync(join(home, ".config", "agents", "sync", "src", "cli.ts"), "export {};\n");
   writeFileSync(join(home, ".config", "agents", "sync", "tsconfig.json"), "{}\n");
-  writeFileSync(join(home, ".config", "agents", "assets", "AGENTS.md"), "agent-instructions");
-  writeFileSync(join(home, ".config", "agents", "assets", "mcporter.jsonc"), '{"x":1}');
+  writeFileSync(join(home, ".config", "agents", "HARNESS.md"), "agent-instructions");
+  writeFileSync(join(home, ".config", "agents", "tools", "mcporter", "mcporter.jsonc"), '{"x":1}');
   writeFileSync(
-    join(home, ".config", "agents", "assets", "cliproxyapi", "config.yaml.tmpl"),
+    join(home, ".config", "agents", "tools", "cliproxyapi", "config.yaml.tmpl"),
     `host: \${CLIPROXY_LISTEN_HOST}
 port: \${CLIPROXY_LISTEN_PORT}
 remote-management:
@@ -340,11 +342,11 @@ function writeDeployment(
   serverHostname = hostname(),
   clientBaseUrl = "http://127.0.0.1:1/v1",
 ): void {
-  mkdirSync(join(home, ".config", "agents", "assets", "cliproxyapi"), {
+  mkdirSync(join(home, ".config", "agents", "tools", "cliproxyapi"), {
     recursive: true,
   });
   writeFileSync(
-    join(home, ".config", "agents", "assets", "cliproxyapi", "deployment.json"),
+    join(home, ".config", "agents", "tools", "cliproxyapi", "deployment.json"),
     `${JSON.stringify({
       server: { hostname: serverHostname },
       listen: { host: "100.64.0.42", port: 8317 },

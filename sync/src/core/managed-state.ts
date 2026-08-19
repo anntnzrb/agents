@@ -68,7 +68,7 @@ export function recordManagedEntries(plan: ManagedSyncPlan): boolean {
   return success;
 }
 
-export { assetDirNames, topLevelEntryNames } from "./plan.ts";
+export { topLevelEntryNames } from "./plan.ts";
 
 export function loadRecordedEntryNames(path: string): string[] {
   let content: string;

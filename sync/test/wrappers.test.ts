@@ -98,9 +98,18 @@ test("wrapper_destinations_render_unix_launchers", () => {
       true,
     );
     assert.equal(unix[0]?.content.includes(join(home, ".config", "agents")), false);
-    const deepseekUnix = unix.find((entry) => entry.harness.sourceName === "deepseek");
+    const deepseekUnix = unix.find((entry) => entry.path.endsWith("/dsh"));
     assert.equal(deepseekUnix?.path, join(home, ".local", "bin", "dsh"));
     assert.equal(deepseekUnix?.content.includes("launch 'deepseek'"), true);
+
+    const mcporterUnix = unix.find((entry) => entry.path.endsWith("/mcporter"));
+    assert.equal(mcporterUnix?.path, join(home, ".local", "bin", "mcporter"));
+    assert.equal(mcporterUnix?.content.includes("launch 'mcporter'"), true);
+    assert.equal(
+      mcporterUnix?.content.includes(`'--config' '${join(home, ".mcporter", "mcporter.json")}'`),
+      true,
+    );
+    assert.equal(mcporterUnix?.content.includes(WRAPPER_MARKER), true);
 
     assert.equal(renderWrapper(unixEnv, unixEnv.harnesses[0]!), unix[0]!.content);
   });
@@ -111,25 +120,25 @@ test("codex_wrapper defers sandbox and hook policies to config", () => {
     addHarnessSources(home);
     const unixEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
     const destinations = wrapperDestinations(unixEnv);
-    const codex = destinations.find((entry) => entry.harness.sourceName === "codex");
+    const codex = destinations.find((entry) => entry.path.endsWith("/codex"));
     assert.ok(codex, "codex wrapper destination exists");
     const bypassSandbox = codex.content.indexOf("--dangerously-bypass-approvals-and-sandbox");
     const bypassHookTrust = codex.content.indexOf("--dangerously-bypass-hook-trust");
     assert.equal(bypassSandbox, -1, "codex wrapper must not override agent permission profiles");
     assert.equal(bypassHookTrust, -1, "codex wrapper must not bypass hook trust");
     for (const entry of destinations) {
-      if (entry.harness.sourceName === "codex") {
+      if (entry.path.endsWith("/codex")) {
         continue;
       }
       assert.equal(
         entry.content.includes("--dangerously-bypass-approvals-and-sandbox"),
         false,
-        `${entry.harness.sourceName} wrapper carries codex yolo flags`,
+        `${entry.path} wrapper carries codex yolo flags`,
       );
       assert.equal(
         entry.content.includes("--dangerously-bypass-hook-trust"),
         false,
-        `${entry.harness.sourceName} wrapper carries codex hook-trust flag`,
+        `${entry.path} wrapper carries codex hook-trust flag`,
       );
     }
   });
@@ -168,7 +177,7 @@ test("wrapper_reconciliation_is_idempotent_and_removes_owned_stale_entries", () 
     assert.equal(after.ino, before.ino);
     assert.equal(readFileSync(codex.path, "utf8").includes(WRAPPER_MARKER), true);
 
-    const withoutOmp = destinations.filter((entry) => entry.harness.sourceName !== "omp");
+    const withoutOmp = destinations.filter((entry) => !entry.path.endsWith("/omp"));
     const result = reconcileWrapperFiles(syncEnv, withoutOmp);
     assert.equal(
       result.removed.some((entry) => entry.endsWith("/omp")),

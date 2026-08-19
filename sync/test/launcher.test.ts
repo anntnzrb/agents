@@ -16,9 +16,11 @@ import { SyncEnv } from "@core/harness.ts";
 import {
   type LauncherProcessResult,
   launchHarness,
+  launchNpmPackage,
   npmCacheLayout,
   prepareNpmPackage,
 } from "@core/launcher.ts";
+import { toolLauncher } from "@core/tool-launchers.ts";
 
 function withTempHome<T>(fn: (home: string) => T | Promise<T>): Promise<T> {
   const root = mkdtempSync(join(tmpdir(), "agents-launcher-test-"));
@@ -287,3 +289,56 @@ function writePackageManifest(root: string, packageName: string, version: string
     "utf8",
   );
 }
+
+test("tool_launcher_launch_uses_the_registered_npm_spec", async () => {
+  await withTempHome(async (home) => {
+    const tool = toolLauncher("mcporter")!;
+    const calls: Array<{ command: string[]; timeout: number | undefined; stdio: string }> = [];
+    const runtime = {
+      resolveVersion: async (): Promise<string> => "1.0.0",
+      run: async (
+        command: readonly string[],
+        _cwd: string | undefined,
+        timeout: number | undefined,
+        stdio: "pipe" | "inherit",
+      ): Promise<LauncherProcessResult> => {
+        calls.push({ command: [...command], timeout, stdio });
+        if (command[0] === "npm") {
+          const stage = command[3]!;
+          const executable = join(stage, "node_modules", ".bin", "mcporter");
+          mkdirSync(join(stage, "node_modules", ".bin"), { recursive: true });
+          writeFileSync(executable, "#!/bin/sh\nexit 0\n", "utf8");
+          chmodSync(executable, 0o755);
+          writePackageManifest(stage, "mcporter", "1.0.0");
+        }
+        return command[0]?.endsWith("mcporter") && command[1] === "list"
+          ? { exitCode: 3, stdout: "", stderr: "" }
+          : success();
+      },
+    };
+    const syncEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
+    assert.equal(tool.package, "mcporter");
+    assert.equal(tool.bin, "mcporter");
+    assert.equal(
+      await launchNpmPackage(
+        syncEnv,
+        { tool: tool.id, package: tool.package, bin: tool.bin },
+        ["list"],
+        runtime,
+      ),
+      3,
+    );
+    const launchCall = calls.at(-1)!;
+    assert.deepEqual(launchCall.command.slice(-1), ["list"]);
+    assert.equal(launchCall.timeout, undefined);
+    assert.equal(launchCall.stdio, "inherit");
+    assert.equal(
+      calls.some((entry) => entry.command[0] === "npm" && entry.command.includes("mcporter@1.0.0")),
+      true,
+    );
+  });
+});
+
+test("tool_launcher_lookup_rejects_unknown_ids", () => {
+  assert.equal(toolLauncher("codex"), undefined);
+});

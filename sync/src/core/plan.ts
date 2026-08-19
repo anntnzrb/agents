@@ -2,8 +2,8 @@ import fs from "node:fs";
 import { join, posix } from "node:path";
 import { assertNever, panicMessage } from "@runtime/errors.ts";
 import {
-  CLI_PROXY_ASSETS_DIR,
   CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER,
+  CLI_PROXY_SOURCE_DIR,
   type CliProxyDeployment,
   type CliProxyEndpointTarget,
   isCliProxyGatewayHost,
@@ -14,7 +14,6 @@ import {
   harnessInstructionFileName,
   harnessInstructionTarget,
   harnessManagedStatePath,
-  harnessRenameAsset,
   harnessRoot,
   harnessSourceRoot,
   SKILLS_DST_DIR,
@@ -113,12 +112,9 @@ export interface ExtensionDepsHookPlan {
 }
 
 export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
-  const assetNames = assetDirNames(syncEnv.assetsHome);
-  const harnesses = syncEnv.harnesses.map((harness) =>
-    buildHarnessPlan(syncEnv, harness, assetNames),
-  );
+  const harnesses = syncEnv.harnesses.map((harness) => buildHarnessPlan(syncEnv, harness));
   const cliProxyDeployment = readCliProxyDeployment(
-    join(syncEnv.assetsHome, CLI_PROXY_ASSETS_DIR, "deployment.json"),
+    join(syncEnv.ssotHome, CLI_PROXY_SOURCE_DIR, "deployment.json"),
   );
   const gatewayHost = isCliProxyGatewayHost(cliProxyDeployment);
   return {
@@ -126,7 +122,6 @@ export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
     jobs: [
       ...runtimeJobs(syncEnv),
       ...harnessDirJobs(harnesses),
-      ...assetJobs(syncEnv, harnesses, assetNames),
       ...skillsJobs(syncEnv, harnesses),
       ...instructionJobs(syncEnv, harnesses),
       ...configJobs(syncEnv, harnesses, cliProxyDeployment, gatewayHost),
@@ -155,23 +150,15 @@ function runtimeJobs(syncEnv: SyncEnv): Job[] {
   ];
 }
 
-export const assetDirNames = (root: string): string[] =>
-  dirEntryNames(root, true).filter((name) => name !== CLI_PROXY_ASSETS_DIR);
+export const topLevelEntryNames = (root: string): string[] => dirEntryNames(root);
 
-export const topLevelEntryNames = (root: string): string[] => dirEntryNames(root, false);
-
-function buildHarnessPlan(
-  syncEnv: SyncEnv,
-  harness: Harness,
-  assetNames: readonly string[],
-): HarnessPlan {
+function buildHarnessPlan(syncEnv: SyncEnv, harness: Harness): HarnessPlan {
   const root = harnessRoot(harness);
   const sourceRoot = harnessSourceRoot(harness, syncEnv.harnessesHome);
   const instructionTarget = harnessInstructionTarget(harness);
   const currentEntryNames = currentManagedEntryNames(
     harness,
     sourceRoot,
-    assetNames,
     skillsSourceExists(syncEnv),
   );
   const cleanupEntryNames = uniqueSorted([...currentEntryNames, ...harness.compatManagedEntries]);
@@ -190,7 +177,6 @@ function buildHarnessPlan(
 function currentManagedEntryNames(
   harness: Harness,
   sourceRoot: string,
-  assetNames: readonly string[],
   hasSkillsSource: boolean,
 ): string[] {
   const names = new Set<string>();
@@ -198,11 +184,8 @@ function currentManagedEntryNames(
   for (const entryName of topLevelEntryNames(sourceRoot)) {
     names.add(entryName);
   }
-  for (const assetName of assetNames) {
-    names.add(harnessRenameAsset(harness, assetName));
-  }
   if (hasSkillsSource) {
-    names.add(harnessRenameAsset(harness, SKILLS_DST_DIR));
+    names.add(SKILLS_DST_DIR);
   }
   return uniqueSorted([...names]);
 }
@@ -220,31 +203,11 @@ function harnessDirJobs(harnesses: readonly HarnessPlan[]): Job[] {
   });
 }
 
-function assetJobs(
-  syncEnv: SyncEnv,
-  harnesses: readonly HarnessPlan[],
-  assetNames: readonly string[],
-): Job[] {
-  const jobs: Job[] = [];
-  for (const assetName of assetNames) {
-    const assetPath = join(syncEnv.assetsHome, assetName);
-    for (const plan of harnesses) {
-      jobs.push({
-        src: assetPath,
-        dst: join(plan.root, harnessRenameAsset(plan.harness, assetName)),
-        kind: "Dir",
-        scope: "Tree",
-      });
-    }
-  }
-  return jobs;
-}
-
 function skillsJobs(syncEnv: SyncEnv, harnesses: readonly HarnessPlan[]): Job[] {
   const skillsSource = join(syncEnv.skillsHome, SKILLS_SOURCE_SUBDIR);
   return harnesses.map((plan) => ({
     src: skillsSource,
-    dst: join(plan.root, harnessRenameAsset(plan.harness, SKILLS_DST_DIR)),
+    dst: join(plan.root, SKILLS_DST_DIR),
     kind: "Dir",
     scope: "Tree",
   }));
@@ -256,7 +219,7 @@ function skillsSourceExists(syncEnv: SyncEnv): boolean {
 
 function instructionJobs(syncEnv: SyncEnv, harnesses: readonly HarnessPlan[]): Job[] {
   return harnesses.map((plan) => ({
-    src: join(syncEnv.assetsHome, SOURCE_AGENT_FILE),
+    src: join(syncEnv.ssotHome, SOURCE_AGENT_FILE),
     dst: plan.instructionTarget,
     kind: "File",
   }));
@@ -296,12 +259,12 @@ function configJobs(
       gatewayHost,
     },
     {
-      src: join(syncEnv.assetsHome, "mcporter.jsonc"),
+      src: join(syncEnv.ssotHome, "tools", "mcporter", "mcporter.jsonc"),
       dst: join(syncEnv.mcporterHome, "mcporter.json"),
       kind: "File",
     },
     {
-      src: join(syncEnv.assetsHome, CLI_PROXY_ASSETS_DIR, "config.yaml.tmpl"),
+      src: join(syncEnv.ssotHome, CLI_PROXY_SOURCE_DIR, "config.yaml.tmpl"),
       dst: join(syncEnv.home, ".cli-proxy-api", "config.yaml"),
       kind: "CliProxyConfig",
       secretsPath: join(syncEnv.home, ".config", "agents", "secrets.local.json"),
@@ -313,7 +276,7 @@ function configJobs(
     ...(gatewayHost
       ? [
           {
-            src: join(syncEnv.assetsHome, CLI_PROXY_ASSETS_DIR, "panel.html"),
+            src: join(syncEnv.ssotHome, CLI_PROXY_SOURCE_DIR, "panel.html"),
             dst: join(syncEnv.home, ".cli-proxy-api", "static", "management.html"),
             kind: "File",
           } satisfies Job,
@@ -376,7 +339,7 @@ function buildHookPlans(
 const extensionHookStatePath = (managedStateHome: string, harness: Harness): string =>
   join(managedStateHome, `${harness.sourceName}.extension-deps.json`);
 
-function dirEntryNames(root: string, dirsOnly: boolean): string[] {
+function dirEntryNames(root: string): string[] {
   if (!isDirectory(root)) {
     return [];
   }
@@ -388,14 +351,7 @@ function dirEntryNames(root: string, dirsOnly: boolean): string[] {
     throw new Error(`read ${root} (${panicMessage(error)})`, { cause: error });
   }
 
-  const names: string[] = [];
-  for (const entry of entries) {
-    if (dirsOnly && !entry.isDirectory()) {
-      continue;
-    }
-    names.push(entry.name);
-  }
-  return uniqueSorted(names);
+  return uniqueSorted(entries.map((entry) => entry.name));
 }
 
 const uniqueSorted = (names: readonly string[]): string[] => [...new Set(names)].toSorted();

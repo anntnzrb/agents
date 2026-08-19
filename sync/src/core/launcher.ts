@@ -199,26 +199,17 @@ export async function prepareNpmPackage(
   }
 }
 
-export async function launchHarness(
-  syncEnv: SyncEnv,
-  harness: Harness,
+export async function launchNpmPackage(
+  syncEnv: Pick<SyncEnv, "home" | "installTimeoutMs">,
+  spec: NpmPackageSpec,
   args: readonly string[],
   runtime: LauncherRuntime = {},
 ): Promise<number> {
-  const prepared = await prepareNpmPackage(
-    {
-      tool: harness.sourceName,
-      package: harness.launcher.package,
-      bin: harness.launcher.bin,
-      distTag: harness.launcher.distTag,
-      smokeCheck: harness.launcher.smokeCheck,
-    },
-    {
-      home: syncEnv.home,
-      timeoutMs: syncEnv.installTimeoutMs,
-      runtime,
-    },
-  );
+  const prepared = await prepareNpmPackage(spec, {
+    home: syncEnv.home,
+    timeoutMs: syncEnv.installTimeoutMs,
+    runtime,
+  });
   const result = await (runtime.run ?? runLauncherProcess)(
     [prepared.currentBin, ...args],
     undefined,
@@ -226,10 +217,30 @@ export async function launchHarness(
     "inherit",
   );
   if (result.timedOut) {
-    console.error(`sync: ${harness.sourceName} launch timed out`);
+    console.error(`sync: ${spec.tool} launch timed out`);
     return 124;
   }
   return result.exitCode;
+}
+
+export function launchHarness(
+  syncEnv: SyncEnv,
+  harness: Harness,
+  args: readonly string[],
+  runtime: LauncherRuntime = {},
+): Promise<number> {
+  return launchNpmPackage(
+    syncEnv,
+    {
+      tool: harness.sourceName,
+      package: harness.launcher.package,
+      bin: harness.launcher.bin,
+      distTag: harness.launcher.distTag,
+      smokeCheck: harness.launcher.smokeCheck,
+    },
+    args,
+    runtime,
+  );
 }
 
 async function resolveVersion(

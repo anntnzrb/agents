@@ -1,5 +1,4 @@
 export type HostPlatform = "darwin" | "linux";
-export type AssetRename = readonly [string, string];
 
 export interface HarnessLauncherSpec {
   readonly package: string;
@@ -27,7 +26,6 @@ export interface HarnessAdapter {
   readonly platforms: readonly HostPlatform[];
   readonly launcher: HarnessLauncherSpec;
   readonly instructionFile?: string;
-  readonly assetRenames?: readonly AssetRename[];
   readonly runtimeSubdir?: string;
   readonly compatManagedEntries?: readonly string[];
   readonly hooks?: readonly HarnessHookSpec[];
