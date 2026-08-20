@@ -29,34 +29,23 @@
     },
   },
 
+  /* **************************************************************************
+   * AGENTS
+   * ************************************************************************ */
+
   "default_agent": "build",
 
   "subagent_depth": 2,
 
   "agent": {
-    "build": {
-      "model": "cliproxy/chatgpt/nnn-gpt-5.6-terra-max",
-      // "variant": "high",
-      // "options": {
-      //   "reasoningEffort": "high",
-      // },
-      "description":
-        "Orchestrator Agent: executes tools and delegates exploration and analysis to subagents in parallel to keep the main context lean.",
-      "permission": {
-        "bash": { "*": "deny" },
-        "grep": { "*": "deny" },
-        "glob": { "*": "deny" },
-      },
-    },
     "plan": {
       "disable": true,
     },
+    "build": {
+      "description":
+        "Orchestrator Agent: executes tools and delegates exploration and analysis to subagents in parallel to keep the main context lean.",
+    },
     "general": {
-      "model": "cliproxy/go/nnn-deepseek-v4-flash-max",
-      // "variant": "max",
-      // "options": {
-      //   "reasoningEffort": "max",
-      // },
       "description":
         "General-purpose subagent for researching complex questions and executing multi-step tasks in a fresh, isolated context. Use this agent to delegate units of work in parallel; it returns only its final summary to the orchestrator, keeping the main session context clean.",
       "permission": {
@@ -64,11 +53,6 @@
       },
     },
     "explore": {
-      "model": "cliproxy/go/nnn-deepseek-v4-flash-max",
-      // "variant": "max",
-      // "options": {
-      //   "reasoningEffort": "max",
-      // },
       "description":
         "Fast, read-only subagent specialized for exploring codebases: find files by pattern, search code by keyword, answer codebase questions. Use it to delegate searches and keep the orchestrator context clean. Specify thoroughness: 'quick', 'medium', or 'very thorough'.",
       "permission": {
