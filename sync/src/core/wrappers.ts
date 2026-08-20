@@ -209,7 +209,12 @@ export function readWrapperState(statePath: string): WrapperState {
     const entries = decoded.entries.filter(
       (entry): entry is string => typeof entry === "string" && path.isAbsolute(entry),
     );
-    return { version: 1, entries: [...new Set(entries)].toSorted() };
+    return {
+      version: 1,
+      entries: [...new Set(entries)].toSorted((left, right) =>
+        left < right ? -1 : left > right ? 1 : 0,
+      ),
+    };
   } catch {
     console.error(
       `sync: warning: wrapper state parse failed, ignoring ${statePath} (invalid shape)`,
