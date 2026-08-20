@@ -8,6 +8,7 @@ providers:
     modelOverrides:
       antigravity/nnn-gemini-3.7-flash-medium: # exp
         contextWindow: 512000
+        input: [text, image]
       cmd/nnn-deepseek-v4-flash-max: # exp
         contextWindow: 512000
       cmd/nnn-deepseek-v4-pro-max: # exp
@@ -15,14 +16,19 @@ providers:
       # keep the gpt-5.6 aliases at the 272k operating point
       chatgpt/nnn-gpt-5.6-luna-max:
         contextWindow: 272000
+        input: [text, image]
       chatgpt/nnn-gpt-5.6-luna-max-fast:
         contextWindow: 272000
+        input: [text, image]
       chatgpt/nnn-gpt-5.6-sol-high:
         contextWindow: 272000
+        input: [text, image]
       chatgpt/nnn-gpt-5.6-terra-max:
         contextWindow: 272000
+        input: [text, image]
       chatgpt/nnn-gpt-5.6-terra-max-fast:
         contextWindow: 272000
+        input: [text, image]
   cline-api:
     baseUrl: https://api.cline.bot/api/v1
     apiKey: CLINE_API_KEY
