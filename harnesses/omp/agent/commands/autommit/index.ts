@@ -993,7 +993,6 @@ const buildCommitPatch = (
 ): string => {
     const regularFiles = new Map(internals.parseFileDiffs(stagedDiff).map(file => [file.filename, file]));
     const zeroFiles = new Map(internals.parseFileDiffs(zeroDiff).map(file => [file.filename, file]));
-    console.error("DEBUG regularFiles keys:", [...regularFiles.keys()], "stagedDiff length:", stagedDiff?.length, "looking for:", changes.map(c => c.path));
     const parts = changes.map(change => {
         const files = change.hunks.type === "lines" ? zeroFiles : regularFiles;
         const file = files.get(change.path);
