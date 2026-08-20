@@ -112,7 +112,7 @@ const ensureNoSymlinkPathEffect = Effect.fn("ensureNoSymlinkPath")(function*(
             catch: (error) => error,
         }).pipe(
             Effect.map((stats) => ({ ok: true as const, stats })),
-            Effect.catchAll((error) => Effect.succeed({ ok: false as const, error })),
+            Effect.catch((error) => Effect.succeed({ ok: false as const, error })),
         );
 
         if (result.ok) {
@@ -179,7 +179,7 @@ const syncDirectoryEffect = Effect.fn("syncDirectory")((directory: string) =>
                 try: () => handle.sync(),
                 catch: (error) => error,
             }).pipe(
-                Effect.catchAll((error) =>
+                Effect.catch((error) =>
                     isUnsupportedWindowsDirectorySyncError(error)
                         ? Effect.void
                         : Effect.fail(pathError("Unable to sync Autommit directory", directory, error)),
@@ -198,7 +198,7 @@ const ensureAutommitDirectoryEffect = Effect.fn("ensureAutommitDirectory")(funct
         catch: (error) => error,
     }).pipe(
         Effect.as(true),
-        Effect.catchAll((error) =>
+        Effect.catch((error) =>
             isErrorCode(error, "EEXIST")
                 ? Effect.succeed(false)
                 : Effect.fail(pathError("Unable to create Autommit directory", paths.directory, error)),

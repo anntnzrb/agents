@@ -988,18 +988,16 @@ export const selectPatch = (
     if (file.isBinary && selector.type !== "all") {
         throw new Error(`Cannot partially select binary file ${file.filename}.`);
     }
+    if (selector.type === "all") return file.content;
     const parsed: FileHunks = internals.parseFileHunks(file);
-    const hunks = selector.type === "all"
-        ? parsed.hunks
-        : selector.type === "indices"
-            ? parsed.hunks.filter(hunk => selector.indices.includes(hunk.index + 1))
-            : parsed.hunks.filter(hunk => {
-                const start = hunk.newStart;
-                const end = hunk.newLines === 0 ? start : start + hunk.newLines - 1;
-                return start <= selector.end && selector.start <= end;
-            });
+    const hunks = selector.type === "indices"
+        ? parsed.hunks.filter(hunk => selector.indices.includes(hunk.index + 1))
+        : parsed.hunks.filter(hunk => {
+            const start = hunk.newStart;
+            const end = hunk.newLines === 0 ? start : start + hunk.newLines - 1;
+            return start <= selector.end && selector.start <= end;
+        });
     if (hunks.length === 0) {
-        if (selector.type === "all") return file.content;
         throw new Error(`No changes selected for ${file.filename}.`);
     }
     const firstHunk = file.content.indexOf("\n@@");
