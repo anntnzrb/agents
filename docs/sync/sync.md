@@ -84,7 +84,7 @@ After catalog publication, sync removes the obsolete `~/.cache/agents/model-cata
 
 ## Installed runtime
 
-Sync copies `sync/src/` and `sync/tsconfig.json` to `~/.local/share/agents/sync/`. Generated wrappers execute this installed copy.
+Sync copies `sync/src/`, `sync/tsconfig.json`, `sync/package.json`, and `sync/bun.lock` to `~/.local/share/agents/sync/`, then runs `bun install --frozen-lockfile --production` there so the installed copy resolves its runtime dependencies. Generated wrappers execute this installed copy.
 
 Only sync reads the repository source directly. Harness configuration and runtime adapters read generated homes or files under `~/.local/share/agents`.
 

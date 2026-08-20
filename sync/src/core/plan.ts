@@ -28,7 +28,8 @@ export type JobKind =
   | "SecretTemplate"
   | "CliProxyReadiness"
   | "CliProxyEndpointTemplates"
-  | "CliProxyConfig";
+  | "CliProxyConfig"
+  | "BunInstall";
 
 export type Job =
   | {
@@ -68,6 +69,11 @@ export type Job =
       readonly gatewayHost?: boolean;
       readonly cacheRoot?: string;
       readonly runtimeRoot?: string;
+    }
+  | {
+      readonly kind: "BunInstall";
+      readonly root: string;
+      readonly timeoutMs: number;
     };
 
 export interface HarnessPlan {
@@ -135,7 +141,7 @@ export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
 function runtimeJobs(syncEnv: SyncEnv): Job[] {
   const sourceRoot = join(syncEnv.ssotHome, "sync");
   const runtimeRoot = join(syncEnv.runtimeHome, "sync");
-  return [
+  const jobs: Job[] = [
     {
       src: join(sourceRoot, "src"),
       dst: join(runtimeRoot, "src"),
@@ -147,7 +153,21 @@ function runtimeJobs(syncEnv: SyncEnv): Job[] {
       dst: join(runtimeRoot, "tsconfig.json"),
       kind: "File",
     },
+    {
+      src: join(sourceRoot, "package.json"),
+      dst: join(runtimeRoot, "package.json"),
+      kind: "File",
+    },
+    {
+      src: join(sourceRoot, "bun.lock"),
+      dst: join(runtimeRoot, "bun.lock"),
+      kind: "File",
+    },
   ];
+  if (fs.existsSync(join(sourceRoot, "bun.lock"))) {
+    jobs.push({ kind: "BunInstall", root: runtimeRoot, timeoutMs: syncEnv.installTimeoutMs });
+  }
+  return jobs;
 }
 
 export const topLevelEntryNames = (root: string): string[] => dirEntryNames(root);
