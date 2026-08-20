@@ -1,8 +1,13 @@
 import fs from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
-
 import { isErrno } from "@runtime/errors.ts";
+import { Schema } from "effect";
 import type { ExtensionDepsHookPlan } from "./plan.ts";
+
+const ExtensionHookStateSchema = Schema.Struct({
+  fingerprint: Schema.String,
+  generatedEntries: Schema.Array(Schema.String),
+});
 
 const GENERATED_EXTENSION_ENTRY_NAMES = [
   "package.json",
@@ -153,27 +158,21 @@ function loadExtensionHookState(path: string): LoadedExtensionHookState | undefi
     return undefined;
   }
 
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    warn(`hook state parse failed, ignoring ${path} (not an object)`);
+  let decoded: { readonly fingerprint: string; readonly generatedEntries: readonly string[] };
+  try {
+    decoded = Schema.decodeUnknownSync(ExtensionHookStateSchema)(parsed);
+  } catch {
+    warn(
+      `hook state parse failed, ignoring ${path} (${typeof parsed !== "object" || parsed === null || Array.isArray(parsed) ? "not an object" : "invalid shape"})`,
+    );
     return undefined;
   }
 
-  const fingerprint = (parsed as { fingerprint?: unknown }).fingerprint;
-  const generatedEntries = (parsed as { generatedEntries?: unknown }).generatedEntries;
-  if (typeof fingerprint !== "string" || !Array.isArray(generatedEntries)) {
-    warn(`hook state parse failed, ignoring ${path} (invalid shape)`);
-    return undefined;
-  }
-  if (!generatedEntries.every((entry) => typeof entry === "string")) {
-    warn(`hook state parse failed, ignoring ${path} (generated entries must be strings)`);
-    return undefined;
-  }
-
-  const normalizedGeneratedEntries = [...new Set(generatedEntries)].toSorted();
+  const normalizedGeneratedEntries = [...new Set(decoded.generatedEntries)].toSorted();
   const filteredGeneratedEntries = normalizedGeneratedEntries.filter(isGeneratedExtensionEntryName);
 
   return {
-    fingerprint,
+    fingerprint: decoded.fingerprint,
     generatedEntries: filteredGeneratedEntries,
     shouldRefreshState: filteredGeneratedEntries.length !== normalizedGeneratedEntries.length,
   };

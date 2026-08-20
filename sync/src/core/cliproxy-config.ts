@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { join } from "node:path";
 import { panicMessage, warn } from "@runtime/errors.ts";
+import { Schema } from "effect";
 import { type CachedJsonRequest, fetchCachedJson } from "./catalog-cache.ts";
 import {
   type CliProxyDeployment,
@@ -700,6 +701,34 @@ function credentialConfig(credential: Credential): ConfigRecord {
   };
 }
 
+const CredentialSchema = Schema.Struct({
+  apiKey: Schema.NonEmptyString,
+  weight: Schema.optionalKey(
+    Schema.Int.pipe(
+      Schema.check(
+        Schema.makeFilter((w: number) =>
+          w >= 1 && w <= MAX_CREDENTIAL_WEIGHT
+            ? undefined
+            : `expected integer from 1 to ${MAX_CREDENTIAL_WEIGHT}`,
+        ),
+      ),
+    ),
+  ),
+  proxyUrl: Schema.optionalKey(Schema.NonEmptyString),
+});
+
+const PoolNameSchema = Schema.NonEmptyString.pipe(
+  Schema.check(
+    Schema.makeFilter((name: string) =>
+      POOL_NAME_PATTERN.test(name) ? undefined : "invalid pool name",
+    ),
+  ),
+);
+
+const CliProxySecretsSchema = Schema.Struct({
+  CLIPROXY_CREDENTIAL_POOLS: Schema.Record(PoolNameSchema, Schema.NonEmptyArray(CredentialSchema)),
+});
+
 function readCliProxySecrets(path: string): CliProxySecrets {
   let parsed: unknown;
   try {
@@ -707,60 +736,22 @@ function readCliProxySecrets(path: string): CliProxySecrets {
   } catch (error) {
     throw new Error(`parse CLIProxyAPI secrets ${path} (${panicMessage(error)})`, { cause: error });
   }
-  const root = expectRecord(parsed, "CLIProxyAPI secrets");
-  const rawPools = expectRecord(root["CLIPROXY_CREDENTIAL_POOLS"], "CLIPROXY_CREDENTIAL_POOLS");
-  const pools: Record<string, readonly Credential[]> = {};
-  for (const [poolName, rawCredentials] of Object.entries(rawPools)) {
-    if (!POOL_NAME_PATTERN.test(poolName)) {
-      throw new Error(`invalid CLIProxyAPI credential pool name: ${poolName}`);
-    }
-    if (!Array.isArray(rawCredentials) || rawCredentials.length === 0) {
-      throw new Error(`invalid CLIProxyAPI credential pool ${poolName}: expected non-empty array`);
-    }
-    const credentials = rawCredentials.map((value, index) =>
-      parseCredential(value, `${poolName}[${index}]`),
-    );
-    rejectDuplicateCredentialKeys(poolName, credentials);
-    pools[poolName] = credentials;
-  }
-  if (Object.keys(pools).length === 0) {
-    throw new Error("invalid CLIPROXY_CREDENTIAL_POOLS: expected at least one pool");
-  }
-  return {
-    CLIPROXY_CREDENTIAL_POOLS: pools,
+  let decoded: {
+    readonly CLIPROXY_CREDENTIAL_POOLS: Readonly<Record<string, readonly Credential[]>>;
   };
-}
+  try {
+    decoded = Schema.decodeUnknownSync(CliProxySecretsSchema)(parsed);
+  } catch (error) {
+    throw new Error(`invalid CLIProxyAPI secrets ${path} (${panicMessage(error)})`, {
+      cause: error,
+    });
+  }
 
-function parseCredential(value: unknown, label: string): Credential {
-  const record = expectRecord(value, `CLIProxyAPI credential ${label}`);
-  const allowedFields = new Set(["apiKey", "weight", "proxyUrl"]);
-  for (const name of Object.keys(record)) {
-    if (!allowedFields.has(name)) {
-      throw new Error(`invalid CLIProxyAPI credential ${label}: unknown field ${name}`);
-    }
+  for (const [poolName, credentials] of Object.entries(decoded.CLIPROXY_CREDENTIAL_POOLS)) {
+    rejectDuplicateCredentialKeys(poolName, credentials);
   }
-  const apiKey = requireNonEmptyString(record["apiKey"], `${label}.apiKey`);
-  const weight = record["weight"];
-  if (
-    weight !== undefined &&
-    (typeof weight !== "number" ||
-      !Number.isInteger(weight) ||
-      weight <= 0 ||
-      weight > MAX_CREDENTIAL_WEIGHT)
-  ) {
-    throw new Error(
-      `invalid CLIProxyAPI credential ${label}.weight: expected integer from 1 to ${MAX_CREDENTIAL_WEIGHT}`,
-    );
-  }
-  const proxyUrl =
-    record["proxyUrl"] === undefined
-      ? undefined
-      : requireNonEmptyString(record["proxyUrl"], `${label}.proxyUrl`);
-  return {
-    apiKey,
-    ...(weight === undefined ? {} : { weight }),
-    ...(proxyUrl === undefined ? {} : { proxyUrl }),
-  };
+
+  return decoded;
 }
 
 function requirePool(

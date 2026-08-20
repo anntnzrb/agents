@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { panicMessage } from "@runtime/errors.ts";
+import { Schema } from "effect";
 import {
   CLI_PROXY_SOURCE_DIR,
   type CliProxyDeployment,
@@ -14,21 +15,45 @@ const COMPONENT_PATTERN = /^[A-Za-z0-9._-]+$/;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 
+const ReleaseAssetSchema = Schema.Struct({
+  name: Schema.NonEmptyString.pipe(
+    Schema.check(
+      Schema.makeFilter((s: string) =>
+        COMPONENT_PATTERN.test(s) ? undefined : "invalid component name",
+      ),
+    ),
+  ),
+  sha256: Schema.NonEmptyString.pipe(
+    Schema.check(
+      Schema.makeFilter((s: string) => (SHA256_PATTERN.test(s) ? undefined : "invalid sha256")),
+    ),
+  ),
+});
+
+const ReleaseManifestSchema = Schema.Struct({
+  repository: Schema.NonEmptyString.pipe(
+    Schema.check(
+      Schema.makeFilter((s: string) =>
+        REPOSITORY_PATTERN.test(s) ? undefined : "invalid repository",
+      ),
+    ),
+  ),
+  version: Schema.NonEmptyString.pipe(
+    Schema.check(
+      Schema.makeFilter((s: string) => (COMPONENT_PATTERN.test(s) ? undefined : "invalid version")),
+    ),
+  ),
+  binary: Schema.NonEmptyString.pipe(
+    Schema.check(
+      Schema.makeFilter((s: string) => (COMPONENT_PATTERN.test(s) ? undefined : "invalid binary")),
+    ),
+  ),
+  assets: Schema.Record(Schema.String, ReleaseAssetSchema),
+});
+
+type ReleaseManifest = typeof ReleaseManifestSchema.Type;
+
 type FetchImplementation = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
-
-type SupportedArch = "arm64" | "x64";
-
-interface ReleaseAsset {
-  readonly name: string;
-  readonly sha256: string;
-}
-
-interface ReleaseManifest {
-  readonly repository: string;
-  readonly version: string;
-  readonly binary: string;
-  readonly assets: Readonly<Record<string, ReleaseAsset>>;
-}
 
 export interface PreparedManagedTool {
   readonly name: string;
@@ -162,39 +187,11 @@ function readManifest(manifestPath: string): ReleaseManifest {
   } catch (error) {
     throw new Error(`parse ${manifestPath} (${panicMessage(error)})`, { cause: error });
   }
-  if (!isRecord(parsed)) {
-    throw new Error(`invalid release manifest: ${manifestPath}`);
+  try {
+    return Schema.decodeUnknownSync(ReleaseManifestSchema)(parsed);
+  } catch (error) {
+    throw new Error(`invalid release manifest: ${manifestPath}`, { cause: error });
   }
-  const repository = parsed["repository"];
-  const version = parsed["version"];
-  const binary = parsed["binary"];
-  const rawAssets = parsed["assets"];
-  if (
-    typeof repository !== "string" ||
-    !REPOSITORY_PATTERN.test(repository) ||
-    typeof version !== "string" ||
-    !COMPONENT_PATTERN.test(version) ||
-    typeof binary !== "string" ||
-    !COMPONENT_PATTERN.test(binary) ||
-    !isRecord(rawAssets)
-  ) {
-    throw new Error(`invalid release manifest: ${manifestPath}`);
-  }
-
-  const assets: Record<string, ReleaseAsset> = {};
-  for (const [platform, rawAsset] of Object.entries(rawAssets)) {
-    if (
-      !isRecord(rawAsset) ||
-      typeof rawAsset["name"] !== "string" ||
-      !COMPONENT_PATTERN.test(rawAsset["name"]) ||
-      typeof rawAsset["sha256"] !== "string" ||
-      !SHA256_PATTERN.test(rawAsset["sha256"])
-    ) {
-      throw new Error(`invalid release asset: ${platform}`);
-    }
-    assets[platform] = { name: rawAsset["name"], sha256: rawAsset["sha256"] };
-  }
-  return { repository, version, binary, assets };
 }
 
 async function downloadRelease(url: string, destination: string, timeoutMs: number): Promise<void> {
@@ -255,13 +252,9 @@ function installedToolMatches(executable: string, receiptPath: string, receipt: 
   }
 }
 
-function supportedArch(arch: NodeJS.Architecture): SupportedArch {
+function supportedArch(arch: NodeJS.Architecture): "arm64" | "x64" {
   if (arch === "arm64" || arch === "x64") {
     return arch;
   }
   throw new Error(`unsupported architecture: ${arch}`);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

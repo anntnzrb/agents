@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { isIPv6 } from "node:net";
 import { hostname as currentHostname } from "node:os";
 import { isErrno, panicMessage } from "@runtime/errors.ts";
+import { Schema } from "effect";
 import { syncTextFile } from "./secret-template.ts";
 
 const INVALID_LISTEN_HOST_PATTERN = /[\s/?#@]/;
@@ -63,31 +64,103 @@ export function readCliProxyDeployment(path: string): CliProxyDeployment {
   return parseCliProxyDeployment(parsed);
 }
 
+const ServerHostnameSchema = Schema.NonEmptyString.pipe(
+  Schema.check(
+    Schema.makeFilter((h: string) =>
+      h === h.trim() && !INVALID_SERVER_HOSTNAME_PATTERN.test(h)
+        ? undefined
+        : "expected a local OS hostname",
+    ),
+  ),
+);
+
+const ListenHostSchema = Schema.NonEmptyString.pipe(
+  Schema.check(
+    Schema.makeFilter((host: string) =>
+      host === host.trim() &&
+      !INVALID_LISTEN_HOST_PATTERN.test(host) &&
+      !host.includes("://") &&
+      !host.includes("[") &&
+      !host.includes("]") &&
+      !isUnspecifiedIpv4(host) &&
+      !isUnspecifiedIpv6(host)
+        ? undefined
+        : "expected a specific host or interface address",
+    ),
+  ),
+);
+
+const ListenPortSchema = Schema.Int.pipe(
+  Schema.check(
+    Schema.makeFilter((p: number) =>
+      p >= 1 && p <= 65535 ? undefined : "expected integer from 1 to 65535",
+    ),
+  ),
+);
+
+const ClientBaseUrlSchema = Schema.NonEmptyString.pipe(
+  Schema.check(
+    Schema.makeFilter((raw: string) => {
+      let parsed: URL;
+      try {
+        parsed = new URL(raw);
+      } catch {
+        return "expected URL";
+      }
+      if (
+        raw !== raw.trim() ||
+        INVALID_CLIENT_URL_DELIMITER_PATTERN.test(raw) ||
+        (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
+        parsed.username ||
+        parsed.password ||
+        parsed.search ||
+        parsed.hash ||
+        !parsed.hostname ||
+        parsed.pathname.replace(TRAILING_SLASH_PATTERN, "") !== "/v1"
+      ) {
+        return "expected an HTTP(S) /v1 endpoint without credentials, query, or fragment";
+      }
+      return undefined;
+    }),
+  ),
+);
+
+export const CliProxyDeploymentSchema = Schema.Struct({
+  server: Schema.Struct({
+    hostname: ServerHostnameSchema,
+  }),
+  listen: Schema.Struct({
+    host: ListenHostSchema,
+    port: ListenPortSchema,
+  }),
+  client: Schema.Struct({
+    baseUrl: ClientBaseUrlSchema,
+  }),
+});
+
 export function parseCliProxyDeployment(value: unknown): CliProxyDeployment {
   const root = expectRecord(value, "CLIProxyAPI deployment");
   rejectUnknownFields(root, ["server", "listen", "client"], "CLIProxyAPI deployment");
 
   const server = expectRecord(root["server"], "CLIProxyAPI deployment.server");
   rejectUnknownFields(server, ["hostname"], "CLIProxyAPI deployment.server");
-  const serverHostname = requireServerHostname(server["hostname"]);
 
   const listen = expectRecord(root["listen"], "CLIProxyAPI deployment.listen");
   rejectUnknownFields(listen, ["host", "port"], "CLIProxyAPI deployment.listen");
-  const host = requireListenHost(listen["host"]);
-  const port = listen["port"];
-  if (typeof port !== "number" || !Number.isSafeInteger(port) || port < 1 || port > 65535) {
-    throw new Error("invalid CLIProxyAPI deployment.listen.port: expected integer from 1 to 65535");
-  }
 
   const client = expectRecord(root["client"], "CLIProxyAPI deployment.client");
   rejectUnknownFields(client, ["baseUrl"], "CLIProxyAPI deployment.client");
-  const baseUrl = requireClientBaseUrl(client["baseUrl"]);
 
-  return {
-    server: { hostname: serverHostname },
-    listen: { host, port },
-    client: { baseUrl },
-  };
+  try {
+    const decoded = Schema.decodeUnknownSync(CliProxyDeploymentSchema)(value);
+    return {
+      server: { hostname: decoded.server.hostname },
+      listen: { host: decoded.listen.host, port: decoded.listen.port },
+      client: { baseUrl: decoded.client.baseUrl.replace(TRAILING_SLASH_PATTERN, "") },
+    };
+  } catch (error) {
+    throw new Error(`invalid CLIProxyAPI deployment (${panicMessage(error)})`, { cause: error });
+  }
 }
 
 export function isCliProxyGatewayHost(
@@ -252,62 +325,8 @@ function readPreservedTopLevelTail(path: string, topLevels: readonly string[]): 
   return existing.slice(separatorStart);
 }
 
-function requireListenHost(value: unknown): string {
-  const host = requireNonEmptyString(value, "CLIProxyAPI deployment.listen.host");
-  if (
-    host !== host.trim() ||
-    INVALID_LISTEN_HOST_PATTERN.test(host) ||
-    host.includes("://") ||
-    host.includes("[") ||
-    host.includes("]") ||
-    isUnspecifiedIpv4(host) ||
-    isUnspecifiedIpv6(host)
-  ) {
-    throw new Error(
-      "invalid CLIProxyAPI deployment.listen.host: expected a specific host or interface address",
-    );
-  }
-  return host;
-}
-
-function requireServerHostname(value: unknown): string {
-  const hostname = requireNonEmptyString(value, "CLIProxyAPI deployment.server.hostname");
-  if (hostname !== hostname.trim() || INVALID_SERVER_HOSTNAME_PATTERN.test(hostname)) {
-    throw new Error("invalid CLIProxyAPI deployment.server.hostname: expected a local OS hostname");
-  }
-  return hostname;
-}
-
 function isUnspecifiedIpv4(host: string): boolean {
   return IPV4_ZERO_PATTERN.test(host);
-}
-
-function requireClientBaseUrl(value: unknown): string {
-  const raw = requireNonEmptyString(value, "CLIProxyAPI deployment.client.baseUrl");
-  let parsed: URL;
-  try {
-    parsed = new URL(raw);
-  } catch (error) {
-    throw new Error("invalid CLIProxyAPI deployment.client.baseUrl: expected URL", {
-      cause: error,
-    });
-  }
-  if (
-    raw !== raw.trim() ||
-    INVALID_CLIENT_URL_DELIMITER_PATTERN.test(raw) ||
-    (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
-    parsed.username ||
-    parsed.password ||
-    parsed.search ||
-    parsed.hash ||
-    !parsed.hostname ||
-    parsed.pathname.replace(TRAILING_SLASH_PATTERN, "") !== "/v1"
-  ) {
-    throw new Error(
-      "invalid CLIProxyAPI deployment.client.baseUrl: expected an HTTP(S) /v1 endpoint without credentials, query, or fragment",
-    );
-  }
-  return raw.replace(TRAILING_SLASH_PATTERN, "");
 }
 
 function isUnspecifiedIpv6(host: string): boolean {
@@ -437,11 +456,4 @@ function rejectUnknownFields(
       throw new Error(`invalid ${label}: unknown field ${field}`);
     }
   }
-}
-
-function requireNonEmptyString(value: unknown, label: string): string {
-  if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`invalid ${label}: expected non-empty string`);
-  }
-  return value;
 }

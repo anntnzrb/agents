@@ -2,9 +2,12 @@ import fs from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { err, isErrno, panicMessage, warn } from "@runtime/errors.ts";
 import { rmEntry } from "@runtime/fs.ts";
+import { Schema } from "effect";
 
 import type { SyncEnv } from "./harness.ts";
 import { buildSyncPlan, isSafeManagedEntryName, type SyncPlan } from "./plan.ts";
+
+const RecordedEntriesSchema = Schema.Array(Schema.String);
 
 export interface ManagedSyncPlan {
   harnesses: ManagedHarnessPlan[];
@@ -89,17 +92,18 @@ export function loadRecordedEntryNames(path: string): string[] {
     return [];
   }
 
-  if (!Array.isArray(parsed)) {
-    warn(`managed state parse failed, ignoring ${path} (not an array)`);
-    return [];
-  }
-  if (!parsed.every((entryName) => typeof entryName === "string")) {
-    warn(`managed state parse failed, ignoring ${path} (entries must be strings)`);
+  let entries: readonly string[];
+  try {
+    entries = Schema.decodeUnknownSync(RecordedEntriesSchema)(parsed);
+  } catch {
+    warn(
+      `managed state parse failed, ignoring ${path} (${Array.isArray(parsed) ? "entries must be strings" : "not an array"})`,
+    );
     return [];
   }
 
   const safeNames = new Set<string>();
-  for (const entryName of parsed) {
+  for (const entryName of entries) {
     if (isSafeManagedEntryName(entryName)) {
       safeNames.add(entryName);
     } else {

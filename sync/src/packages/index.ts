@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { isErrno } from "@runtime/errors.ts";
+import { isErrno, panicMessage } from "@runtime/errors.ts";
+import { Schema, SchemaGetter } from "effect";
 
 import {
   installInferredImportPackages as installInferredImportPackagesImpl,
@@ -28,9 +29,18 @@ export {
   validatePackageForTests,
 } from "./validate.ts";
 
-export interface PackageManifest {
-  readonly packages: string[];
-}
+export const PackageManifestSchema = Schema.Struct({
+  packages: Schema.Array(Schema.NonEmptyString).pipe(
+    Schema.decodeTo(Schema.Array(Schema.String), {
+      decode: SchemaGetter.transform((pkgs) => [
+        ...new Set(pkgs.map((p) => p.trim()).filter((p) => p.length > 0)),
+      ]),
+      encode: SchemaGetter.passthrough(),
+    }),
+  ),
+});
+
+export type PackageManifest = typeof PackageManifestSchema.Type;
 
 export interface PackageBootstrapTarget {
   readonly manifestPath: string;
@@ -64,34 +74,11 @@ export function readPackageManifest(filePath: string): PackageManifest {
     throw new Error(`invalid JSON in ${filePath}: ${String(error)}`, { cause: error });
   }
 
-  if (!isRecord(value)) {
-    throw new Error(`${filePath} must contain a JSON object`);
+  try {
+    return Schema.decodeUnknownSync(PackageManifestSchema)(value);
+  } catch (error) {
+    throw new Error(`${filePath} (${panicMessage(error)})`, { cause: error });
   }
-  const packagesValue = value["packages"];
-  if (packagesValue === undefined) {
-    throw new Error(`${filePath} missing "packages" array`);
-  }
-  if (!Array.isArray(packagesValue)) {
-    throw new Error(`${filePath} field "packages" must be an array`);
-  }
-
-  const seen = new Set<string>();
-  const packages: string[] = [];
-  for (const entry of packagesValue) {
-    if (typeof entry !== "string") {
-      throw new Error(`${filePath} package entries must be strings`);
-    }
-    const source = entry.trim();
-    if (source.length === 0) {
-      throw new Error(`${filePath} package entries must not be empty`);
-    }
-    if (!seen.has(source)) {
-      seen.add(source);
-      packages.push(source);
-    }
-  }
-
-  return { packages };
 }
 
 export function patchRuntimeSettings(filePath: string, packagePaths: readonly string[]): void {

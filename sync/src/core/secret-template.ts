@@ -1,10 +1,21 @@
 import fs from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { isErrno, panicMessage } from "@runtime/errors.ts";
+import { Schema } from "effect";
 
 const PLACEHOLDER_PATTERN = /\$\{([^{}]+)\}/g;
 const SECRET_NAME_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 const OUTPUT_MODE = 0o600;
+
+const SecretKeySchema = Schema.NonEmptyString.pipe(
+  Schema.check(
+    Schema.makeFilter((name: string) =>
+      SECRET_NAME_PATTERN.test(name) ? undefined : "invalid secret entry",
+    ),
+  ),
+);
+
+const SecretsFileSchema = Schema.Record(SecretKeySchema, Schema.NonEmptyString);
 
 export function syncSecretTemplate(src: string, dst: string, secretsPath: string): void {
   const template = readText(src, "template");
@@ -74,15 +85,11 @@ function readSecrets(path: string): Readonly<Record<string, string>> {
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw new Error(`invalid secrets file: ${path} (expected object)`);
   }
-
-  const secrets: Record<string, string> = {};
-  for (const [name, value] of Object.entries(parsed)) {
-    if (!SECRET_NAME_PATTERN.test(name) || typeof value !== "string" || value.length === 0) {
-      throw new Error(`invalid secret entry: ${name}`);
-    }
-    secrets[name] = value;
+  try {
+    return Schema.decodeUnknownSync(SecretsFileSchema)(parsed);
+  } catch (error) {
+    throw new Error(`invalid secret entry: ${panicMessage(error)}`, { cause: error });
   }
-  return secrets;
 }
 
 function readText(path: string, label: string): string {
