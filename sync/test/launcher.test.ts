@@ -1,4 +1,4 @@
-import { test } from "bun:test";
+import { beforeEach, spyOn, test } from "bun:test";
 import assert from "node:assert/strict";
 import {
   chmodSync,
@@ -32,6 +32,10 @@ function withTempHome<T>(fn: (home: string) => T | Promise<T>): Promise<T> {
 function success(stdout = ""): LauncherProcessResult {
   return { exitCode: 0, stdout, stderr: "" };
 }
+
+beforeEach(() => {
+  spyOn(console, "error").mockImplementation(() => {});
+});
 
 test("npm_launcher_resolves_latest_and_caches_current_previous_without_network", async () => {
   await withTempHome(async (home) => {

@@ -1,4 +1,4 @@
-import { test } from "bun:test";
+import { beforeEach, spyOn, test } from "bun:test";
 import assert from "node:assert/strict";
 import {
   existsSync,
@@ -32,6 +32,10 @@ function withTempHome<T>(fn: (home: string) => T): T {
     rmSync(root, { recursive: true, force: true });
   }
 }
+
+beforeEach(() => {
+  spyOn(console, "error").mockImplementation(() => {});
+});
 
 function addHarnessSources(
   home: string,

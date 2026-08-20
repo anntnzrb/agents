@@ -1,4 +1,4 @@
-import { test } from "bun:test";
+import { beforeEach, spyOn, test } from "bun:test";
 import assert from "node:assert/strict";
 import {
   chmodSync,
@@ -32,6 +32,10 @@ const DEPLOYMENT = {
   client: { baseUrl: "https://gateway.example.test:9443/v1" },
 } as const;
 const fetchReady = async () => Response.json({ data: [{ id: "ready" }] });
+
+beforeEach(() => {
+  spyOn(console, "error").mockImplementation(() => {});
+});
 
 test("cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary", () => {
   assert.deepEqual(
