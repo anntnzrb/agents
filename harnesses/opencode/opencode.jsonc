@@ -43,18 +43,20 @@
     },
     "build": {
       "description":
-        "Orchestrator Agent: executes tools and delegates exploration and analysis to subagents in parallel to keep the main context lean.",
+        "Orchestrator Agent: executes tools and delegates exploration, wide searches, and analysis to subagents in parallel to keep the main context lean.",
+      "prompt":
+        "You are the orchestrator agent. Proactively delegate multi-file searches, open-ended codebase exploration, and heavy research to subagents ('explore' and 'general') in parallel to keep your primary context clean and efficient. Synthesize subagent findings to plan and execute precise file edits and commands.",
     },
     "general": {
       "description":
-        "General-purpose subagent for researching complex questions and executing multi-step tasks in a fresh, isolated context. Use this agent to delegate units of work in parallel; it returns only its final summary to the orchestrator, keeping the main session context clean.",
+        "Use proactively for researching complex questions, isolated investigations, and multi-step tasks in parallel. Returns only a concise final summary to keep the main session context clean.",
       "permission": {
         "task": { "*": "deny", "explore": "allow" },
       },
     },
     "explore": {
       "description":
-        "Fast, read-only subagent specialized for exploring codebases: find files by pattern, search code by keyword, answer codebase questions. Use it to delegate searches and keep the orchestrator context clean. Specify thoroughness: 'quick', 'medium', or 'very thorough'.",
+        "Use proactively for exploring codebases: pattern matching, structural search, keyword search, finding usages, and multi-file analysis. Specify thoroughness: 'quick', 'medium', or 'very thorough'.",
       "permission": {
         "edit": { "*": "deny" },
       },
@@ -65,7 +67,10 @@
    * PERMISSIONS
    * ************************************************************************ */
 
-  "permission": "allow",
+  "permission": {
+    "*": "allow",
+    "webfetch": "deny",
+  },
 
   /* **************************************************************************
    * SERVER
