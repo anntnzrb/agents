@@ -1,8 +1,8 @@
-import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { Effect, Schema } from "effect";
 import type {
     CustomCommandFactory,
     ModelRegistry,
@@ -66,37 +66,17 @@ const PACKAGE_ROOT_HINTS = [
     process.argv[1] ? resolve(dirname(process.argv[1]), "..", "@oh-my-pi", "pi-coding-agent") : undefined,
 ].filter((path): path is string => Boolean(path));
 
-export class OmpPackageRootNotFoundError extends Schema.TaggedError<OmpPackageRootNotFoundError>()(
-    "OmpPackageRootNotFoundError",
-    {
-        message: Schema.String,
-    },
-) {}
-
-const locatePackageRootEffect = Effect.fn("locatePackageRoot")(function*(): Effect.fn.Return<
-    string,
-    OmpPackageRootNotFoundError
-> {
-    for (const path of PACKAGE_ROOT_HINTS) {
-        const check = yield* Effect.tryPromise({
-            try: () => access(resolve(path, "src", "index.ts")),
-            catch: () => false,
-        }).pipe(
-            Effect.as(true),
-            Effect.orElseSucceed(() => false),
-        );
-        if (check) return path;
+const locatePackageRoot = (): string => {
+    const packageRoot = PACKAGE_ROOT_HINTS.find(path => existsSync(resolve(path, "src", "index.ts")));
+    if (!packageRoot) {
+        throw new Error("Cannot locate OMP package sources; set PI_PACKAGE_DIR to the pi-coding-agent package root.");
     }
-    return yield* new OmpPackageRootNotFoundError({
-        message: "Cannot locate OMP package sources; set PI_PACKAGE_DIR to the pi-coding-agent package root.",
-    });
-});
-
-const locatePackageRoot = (): Promise<string> => Effect.runPromise(locatePackageRootEffect());
+    return packageRoot;
+};
 
 // OMP loads custom commands outside package module resolution, so hidden commit modules must be loaded by source path.
 const loadInternal = async <T>(relativePath: string): Promise<T> =>
-    (await import(pathToFileURL(resolve(await locatePackageRoot(), "src", relativePath)).href)) as T;
+    (await import(pathToFileURL(resolve(locatePackageRoot(), "src", relativePath)).href)) as T;
 const loadCommitInternals = async (git: CommitInternals["git"]): Promise<CommitInternals> => {
     const [tools, resolver, lockFiles, topoSort, validation, utils, diffParser] = await Promise.all([
         loadInternal<Pick<CommitInternals, "createCommitTools">>("commit/agentic/tools/index.ts"),
@@ -541,7 +521,7 @@ const execRepoSplit = async (
     const changelogSet = new Set(changelogTargets);
     const errors: string[] = [];
     const warnings: string[] = [];
-    const diffText = await internals.git.diff(cwd, { cached: true });
+    const diffText = state.diffText ?? "";
     const parsedFiles = new Map(
         internals.parseFileDiffs(diffText).map(file => [file.filename, internals.parseFileHunks(file)] as const),
     );
@@ -827,7 +807,7 @@ const runCommitAgent = async (
 
     const stagedFiles = await stagedFilesOrStageAll(api.pi, cwd);
     if (stagedFiles.length === 0) throw new Error("No local changes to commit.");
-    const diffText = await api.pi.diff(cwd, { cached: true });
+    const diffText = (await api.exec("git", ["-c", "diff.mnemonicprefix=false", "diff", "--cached"], { cwd })).stdout;
     const contextFiles = await api.pi.discoverContextFiles(cwd);
     const phase: CommitPhaseState = { value: "propose" };
     const state: CommitAgentState = { diffText };
@@ -961,7 +941,7 @@ const validateSplitPlan = async (
     if (missingFiles.length > 0) {
         throw new Error(`Split plan missing staged files: ${missingFiles.join(", ")}`);
     }
-    const stagedDiff = await api.pi.diff(cwd, { cached: true, binary: true });
+    const stagedDiff = (await api.exec("git", ["-c", "diff.mnemonicprefix=false", "diff", "--cached", "--binary"], { cwd })).stdout;
     const parsedFiles = new Map(
         internals.parseFileDiffs(stagedDiff).map(file => [file.filename, internals.parseFileHunks(file)] as const),
     );
@@ -971,7 +951,7 @@ const validateSplitPlan = async (
     }
     const order = internals.computeDependencyOrder(plan.commits);
     if ("error" in order) throw new Error(order.error);
-    const zeroDiff = await api.exec("git", ["diff", "--cached", "--binary", "--unified=0"], { cwd });
+    const zeroDiff = await api.exec("git", ["-c", "diff.mnemonicprefix=false", "diff", "--cached", "--binary", "--unified=0"], { cwd });
     if (zeroDiff.code !== 0) throw new Error(zeroDiff.stderr || "Unable to read zero-context staged diff.");
     return {
         order,
@@ -1013,6 +993,7 @@ const buildCommitPatch = (
 ): string => {
     const regularFiles = new Map(internals.parseFileDiffs(stagedDiff).map(file => [file.filename, file]));
     const zeroFiles = new Map(internals.parseFileDiffs(zeroDiff).map(file => [file.filename, file]));
+    console.error("DEBUG regularFiles keys:", [...regularFiles.keys()], "stagedDiff length:", stagedDiff?.length, "looking for:", changes.map(c => c.path));
     const parts = changes.map(change => {
         const files = change.hunks.type === "lines" ? zeroFiles : regularFiles;
         const file = files.get(change.path);
@@ -1139,7 +1120,7 @@ const applySplitProposal = async (
             if (applied.code !== 0) throw new Error(applied.stderr || "Unable to apply split commit patch.");
             await api.pi.commit(worktree, formatCommitMessage(commit.summary, commit.details));
         }
-        const currentDiff = await api.pi.diff(cwd, { cached: true, binary: true });
+        const currentDiff = (await api.exec("git", ["-c", "diff.mnemonicprefix=false", "diff", "--cached", "--binary"], { cwd })).stdout;
         if (currentDiff !== stagedDiff) throw new Error("Staged snapshot changed during atomic commit preparation.");
         const finalHead = await internals.git.head.sha(worktree);
         if (!finalHead) throw new Error("Atomic split preparation did not create a commit.");

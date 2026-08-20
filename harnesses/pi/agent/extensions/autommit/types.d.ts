@@ -4,6 +4,10 @@ declare module "@earendil-works/pi-coding-agent" {
   };
 }
 
+declare module "node:fs" {
+  export function existsSync(path: string): boolean;
+}
+
 declare module "node:fs/promises" {
   type FileHandle = {
     writeFile: (content: string, encoding?: string) => Promise<void>;
