@@ -135,4 +135,4 @@ export const logCommandFailure = (
 };
 
 export const pickBunRunner = async (): Promise<"bun" | undefined> =>
-  (await commandExists("bun")) ? "bun" : undefined;
+  Bun.which("bun") ? "bun" : undefined;

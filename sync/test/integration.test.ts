@@ -1,6 +1,5 @@
 import { setDefaultTimeout, test } from "bun:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import {
   existsSync,
   lstatSync,
@@ -404,32 +403,31 @@ function initGitRepo(repoPath: string): void {
     ["git", "commit", "-m", "init"],
   ];
   for (const command of commands) {
-    const [cmd, ...args] = command;
-    const result = spawnSync(cmd!, args, {
+    const result = Bun.spawnSync(command, {
       cwd: repoPath,
-      encoding: "utf8",
-      stdio: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
     });
-    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.exitCode, 0, result.stderr.toString() || result.stdout.toString());
   }
 }
 
 function runSyncProcess(home: string): RunResult {
-  const result = spawnSync("bun", [TS_SYNC], {
+  const result = Bun.spawnSync(["bun", TS_SYNC], {
     cwd: SYNC_ROOT,
-    encoding: "utf8",
     env: {
-      ...process.env,
+      ...Bun.env,
       HOME: home,
-      PATH: process.env["PATH"] ?? "",
+      PATH: Bun.env["PATH"] ?? "",
     },
-    stdio: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
   });
 
   return {
-    exitCode: result.status ?? 1,
-    stdout: result.stdout ?? "",
-    stderr: result.stderr ?? "",
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
   };
 }
 

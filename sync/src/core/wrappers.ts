@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { isErrno, panicMessage } from "@runtime/errors.ts";
+import { Schema } from "effect";
 import type { Harness, SyncEnv } from "./harness.ts";
 import type { PreparedManagedTool } from "./managed-tools.ts";
 import { TOOL_LAUNCHERS, toolLauncherDefaultArgs } from "./tool-launchers.ts";
@@ -9,10 +10,12 @@ export const UNIX_WRAPPER_DIR = [".local", "bin"] as const;
 export const WRAPPER_STATE_FILE = "wrappers.json";
 export const WRAPPER_MARKER = "agents-managed-wrapper:v1";
 
-interface WrapperState {
-  readonly version: 1;
-  readonly entries: readonly string[];
-}
+const WrapperStateSchema = Schema.Struct({
+  version: Schema.Literal(1),
+  entries: Schema.Array(Schema.String),
+});
+
+type WrapperState = typeof WrapperStateSchema.Type;
 
 export interface WrapperDestination {
   readonly path: string;
@@ -193,7 +196,7 @@ export function readWrapperState(statePath: string): WrapperState {
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(content);
+    parsed = Bun.JSONC.parse(content);
   } catch (error) {
     console.error(
       `sync: warning: wrapper state parse failed, ignoring ${statePath} (${panicMessage(error)})`,
@@ -201,17 +204,18 @@ export function readWrapperState(statePath: string): WrapperState {
     return { version: 1, entries: [] };
   }
 
-  if (!isRecord(parsed) || parsed["version"] !== 1 || !Array.isArray(parsed["entries"])) {
+  try {
+    const decoded = Schema.decodeUnknownSync(WrapperStateSchema)(parsed);
+    const entries = decoded.entries.filter(
+      (entry): entry is string => typeof entry === "string" && path.isAbsolute(entry),
+    );
+    return { version: 1, entries: [...new Set(entries)].toSorted() };
+  } catch {
     console.error(
       `sync: warning: wrapper state parse failed, ignoring ${statePath} (invalid shape)`,
     );
     return { version: 1, entries: [] };
   }
-
-  const entries = parsed["entries"].filter(
-    (entry): entry is string => typeof entry === "string" && path.isAbsolute(entry),
-  );
-  return { version: 1, entries: [...new Set(entries)].toSorted() };
 }
 
 function writeWrapperState(statePath: string, state: WrapperState): void {
@@ -298,8 +302,4 @@ function removeWrapper(targetPath: string): void {
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -1,7 +1,5 @@
-import { test } from "bun:test";
+import { beforeEach, spyOn, test } from "bun:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import {
   chmodSync,
   existsSync,
@@ -224,6 +222,10 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
   };
 }
 
+beforeEach(() => {
+  spyOn(console, "error").mockImplementation(() => {});
+});
+
 async function withTempDir<T>(fn: (root: string) => T | Promise<T>): Promise<T> {
   const root = mkdtempSync(join(tmpdir(), "agents-tests-"));
   try {
@@ -256,12 +258,12 @@ function initGitRepo(path: string): void {
 }
 
 function runGit(cwd: string, args: string[]): void {
-  const result = spawnSync("git", args, {
+  const result = Bun.spawnSync(["git", ...args], {
     cwd,
-    encoding: "utf8",
-    stdio: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
   });
-  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(result.exitCode, 0, result.stderr.toString() || result.stdout.toString());
 }
 
 const readText = (path: string): string => readFileSync(path, "utf8");
@@ -623,20 +625,17 @@ console.log(String(result));
 `,
       );
 
-      const result = spawnSync("bun", [helper], {
+      const result = Bun.spawnSync(["bun", helper], {
         cwd: SYNC_ROOT,
-        encoding: "utf8",
-        stdio: "pipe",
-        timeout: 5000,
+        stdio: ["ignore", "pipe", "pipe"],
         env: {
-          ...process.env,
-          PATH: process.env["PATH"] ?? "",
+          ...Bun.env,
+          PATH: Bun.env["PATH"] ?? "",
         },
       });
 
-      assert.equal(result.error, undefined, result.stderr || result.stdout);
-      assert.equal(result.status, 0, result.stderr || result.stdout);
-      assert.equal(result.stdout.trim(), "false");
+      assert.equal(result.exitCode, 0, result.stderr.toString() || result.stdout.toString());
+      assert.equal(result.stdout.toString().trim(), "false");
     });
   });
 
@@ -658,20 +657,22 @@ console.log(String(exit));
 `,
       );
 
-      const result = spawnSync("bun", [helper], {
+      const result = Bun.spawnSync(["bun", helper], {
         cwd: SYNC_ROOT,
-        encoding: "utf8",
-        stdio: "pipe",
+        stdio: ["ignore", "pipe", "pipe"],
         env: {
-          ...process.env,
+          ...Bun.env,
           HOME: root,
-          PATH: process.env["PATH"] ?? "",
+          PATH: Bun.env["PATH"] ?? "",
         },
       });
 
-      assert.equal(result.status, 0, result.stderr || result.stdout);
-      assert.equal(result.stdout.trim(), "0");
-      assert.equal(result.stderr.includes("another sync is already running; skipping"), true);
+      assert.equal(result.exitCode, 0, result.stderr.toString() || result.stdout.toString());
+      assert.equal(result.stdout.toString().trim(), "0");
+      assert.equal(
+        result.stderr.toString().includes("another sync is already running; skipping"),
+        true,
+      );
     });
   });
 
@@ -686,19 +687,17 @@ setInterval(() => {}, 1_000);
 `,
       );
 
-      const result = spawnSync("bun", [helper], {
+      const result = Bun.spawnSync(["bun", helper], {
         cwd: SYNC_ROOT,
-        encoding: "utf8",
-        stdio: "pipe",
-        timeout: 5000,
+        stdio: ["ignore", "pipe", "pipe"],
         env: {
-          ...process.env,
-          PATH: process.env["PATH"] ?? "",
+          ...Bun.env,
+          PATH: Bun.env["PATH"] ?? "",
         },
       });
 
-      assert.equal(result.status, 124, result.stderr || result.stdout);
-      assert.equal(result.stderr.includes("timed out after 1s"), true);
+      assert.equal(result.exitCode, 124, result.stderr.toString() || result.stdout.toString());
+      assert.equal(result.stderr.toString().includes("timed out after 1s"), true);
     });
   });
 
@@ -984,7 +983,7 @@ setInterval(() => {}, 1_000);
       const version = "7.2.132";
       const repository = "router-for-me/CLIProxyAPI";
       const assetName = "CLIProxyAPI_fixture.tar.gz";
-      const checksum = createHash("sha256").update("fixture archive").digest("hex");
+      const checksum = new Bun.CryptoHasher("sha256").update("fixture archive").digest("hex");
       const installDir = join(
         root,
         "cache",

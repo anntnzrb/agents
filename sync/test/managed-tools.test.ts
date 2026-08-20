@@ -1,6 +1,10 @@
-import { test } from "bun:test";
+import { beforeEach, spyOn, test } from "bun:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+
+beforeEach(() => {
+  spyOn(console, "error").mockImplementation(() => {});
+});
+
 import {
   chmodSync,
   existsSync,
@@ -17,7 +21,7 @@ import { SyncEnv } from "@core/harness.ts";
 import { isCliProxyRunning, prepareManagedTools } from "@core/managed-tools.ts";
 
 const ARCHIVE = "fixture archive";
-const CHECKSUM = createHash("sha256").update(ARCHIVE).digest("hex");
+const CHECKSUM = new Bun.CryptoHasher("sha256").update(ARCHIVE).digest("hex");
 const DEPLOYMENT: CliProxyDeployment = {
   server: { hostname: "test-gateway" },
   listen: { host: "100.64.0.42", port: 9443 },
@@ -123,4 +127,22 @@ test("managed_tool_health_check_targets_deployment_client", async () => {
 
   assert.equal(healthy, true);
   assert.deepEqual(calls, ["https://gateway.example.test:9443/v1/models"]);
+});
+
+test("managed_tool_rejects_unsupported_arch_and_invalid_manifest", async () => {
+  await withTempHome(async (home) => {
+    writeManifest(home);
+    const syncEnv = SyncEnv.fromHome(home, 1000, { platform: "darwin" });
+    await assert.rejects(
+      prepareManagedTools(syncEnv, {
+        arch: "ia32" as any,
+        cacheHome: join(home, "cache"),
+      }),
+      /unsupported architecture/,
+    );
+
+    const manifestPath = join(home, ".config", "agents", "tools", "cliproxyapi", "release.json");
+    writeFileSync(manifestPath, "invalid json");
+    await assert.rejects(prepareManagedTools(syncEnv), /parse/);
+  });
 });

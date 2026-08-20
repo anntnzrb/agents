@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { extname, join } from "node:path";
+import { join } from "node:path";
 
 export const RESOURCE_KEYS = ["extensions", "skills", "prompts", "themes"] as const;
 
@@ -140,7 +140,7 @@ const isPatternEntry = (value: string): boolean =>
 function readJsonFile(path: string): unknown {
   const content = readFile(path);
   try {
-    return JSON.parse(content);
+    return Bun.JSONC.parse(content);
   } catch (error) {
     throw new Error(`parse ${path} (${String(error)})`, { cause: error });
   }
@@ -158,60 +158,24 @@ function packageSourceFiles(root: string): string[] {
   if (!isDirectory(root)) {
     return [];
   }
+  const glob = new Bun.Glob("**/*.{ts,js,mts,cts,mjs,cjs}");
   const files: string[] = [];
-  walk(root, files);
-  return files;
-}
-
-function walk(root: string, files: string[]): void {
-  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
-    const entryPath = join(root, entry.name);
-
-    if (entry.isDirectory()) {
-      if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === ".git") {
+  try {
+    for (const rel of glob.scanSync({ cwd: root, dot: false, followSymlinks: true })) {
+      if (
+        rel.startsWith("node_modules/") ||
+        rel.includes("/node_modules/") ||
+        rel.startsWith(".git/") ||
+        rel.includes("/.git/")
+      ) {
         continue;
       }
-      walk(entryPath, files);
-      continue;
+      files.push(join(root, rel));
     }
-
-    if (entry.isSymbolicLink()) {
-      try {
-        const metadata = fs.statSync(entryPath);
-        if (metadata.isDirectory()) {
-          if (
-            entry.name.startsWith(".") ||
-            entry.name === "node_modules" ||
-            entry.name === ".git"
-          ) {
-            continue;
-          }
-          walk(entryPath, files);
-        } else if (metadata.isFile() && isSourceFile(entryPath)) {
-          files.push(entryPath);
-        }
-      } catch {
-        // ignore broken links
-      }
-      continue;
-    }
-
-    if (entry.isFile() && isSourceFile(entryPath)) {
-      files.push(entryPath);
-    }
+  } catch {
+    return [];
   }
-}
-
-function isSourceFile(path: string): boolean {
-  const extension = extname(path);
-  return (
-    extension === ".ts" ||
-    extension === ".js" ||
-    extension === ".mts" ||
-    extension === ".cts" ||
-    extension === ".mjs" ||
-    extension === ".cjs"
-  );
+  return files;
 }
 
 function extractImportSpecifiers(content: string): string[] {
