@@ -88,7 +88,7 @@ export async function resolveLiveModelCatalog({ baseUrl }) {
       runnerPath,
       `
 import { CLIProxyCatalog } from ${JSON.stringify(
-        `${pathToFileURL(join(process.cwd(), "harnesses/opencode/plugins/cliproxy.ts")).href}?run=${Date.now()}`,
+        `${pathToFileURL(join(import.meta.dir, "cliproxy.ts")).href}?run=${Date.now()}`,
       )};
 
 const plugin = await CLIProxyCatalog();
