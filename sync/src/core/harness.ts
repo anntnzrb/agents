@@ -44,7 +44,9 @@ export interface Harness {
   readonly id: HarnessId;
   readonly sourceName: string;
   readonly home: string;
-  readonly launcher: Required<HarnessLauncherSpec>;
+  readonly launcher: Required<Omit<HarnessLauncherSpec, "env">> & {
+    readonly env?: Record<string, string>;
+  };
   readonly instructionFile: string;
   readonly runtimeSubdir: string | undefined;
   readonly compatManagedEntries: readonly string[];
@@ -135,6 +137,8 @@ export class SyncEnv {
 
 export function buildHarness(spec: HarnessSpec): Harness {
   assertPathComponent(spec.sourceName, "harness id");
+  const env =
+    typeof spec.launcher.env === "function" ? spec.launcher.env(spec.home) : spec.launcher.env;
   return {
     id: spec.id,
     sourceName: spec.sourceName,
@@ -145,6 +149,7 @@ export function buildHarness(spec: HarnessSpec): Harness {
       distTag: spec.launcher.distTag ?? "latest",
       smokeCheck: spec.launcher.smokeCheck ?? "--version",
       defaultArgs: spec.launcher.defaultArgs ?? [],
+      ...(env === undefined ? {} : { env }),
     },
     instructionFile: spec.instructionFile ?? DEFAULT_INSTRUCTION_FILE,
     runtimeSubdir: spec.runtimeSubdir,

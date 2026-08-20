@@ -15,6 +15,7 @@ export interface NpmPackageSpec {
   readonly bin: string;
   readonly distTag?: string;
   readonly smokeCheck?: string;
+  readonly env?: Record<string, string> | undefined;
 }
 
 export interface NpmCacheLayout {
@@ -215,6 +216,7 @@ export async function launchNpmPackage(
     undefined,
     undefined,
     "inherit",
+    spec.env,
   );
   if (result.timedOut) {
     console.error(`sync: ${spec.tool} launch timed out`);
@@ -237,6 +239,7 @@ export function launchHarness(
       bin: harness.launcher.bin,
       distTag: harness.launcher.distTag,
       smokeCheck: harness.launcher.smokeCheck,
+      ...(harness.launcher.env === undefined ? {} : { env: harness.launcher.env }),
     },
     args,
     runtime,
@@ -265,6 +268,7 @@ async function runLauncherProcess(
   cwd: string | undefined,
   timeoutMs: number | undefined,
   stdio: "pipe" | "inherit",
+  env?: Record<string, string>,
 ): Promise<LauncherProcessResult> {
   const signal = timeoutMs === undefined ? undefined : AbortSignal.timeout(timeoutMs);
   let subprocess:
@@ -273,6 +277,7 @@ async function runLauncherProcess(
   try {
     subprocess = Bun.spawn([...command], {
       ...(cwd === undefined ? {} : { cwd }),
+      env: { ...process.env, ...env },
       killSignal: "SIGKILL",
       ...(signal ? { signal } : {}),
       stdin: stdio === "pipe" ? "ignore" : "inherit",
