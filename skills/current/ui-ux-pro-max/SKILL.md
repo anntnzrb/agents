@@ -40,9 +40,12 @@ MUST use the bundled CLI; MUST NOT invoke internal Python files directly.
    `--page <name>` for an override.
 5. You MUST reuse established tokens and components before hardcoding values or adding
    variants.
-6. Implement the smallest coherent increment, then validate accessibility, touch,
+6. For Web Interface Guidelines compliance audits, fetch upstream rules when needed:
+   `https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md`
+   and report findings in terse `file:line` format.
+7. Implement the smallest coherent increment, then validate accessibility, touch,
    responsive layout, performance, contrast, reduced motion, and error states.
-7. Validation failure? You MUST inspect, fix, and retry before continuing
+8. Validation failure? You MUST inspect, fix, and retry before continuing
 
 ## Core constraints
 
