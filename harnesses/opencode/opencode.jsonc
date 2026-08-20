@@ -5,11 +5,8 @@
    * MODELS
    * ************************************************************************ */
 
-  // title, summary, and compaction utils
-  "small_model": "cliproxy/antigravity/nnn-gemini-3.7-flash-medium",
-
   // main agent (build)
-  "model": "cliproxy/chatgpt/nnn-gpt-5.6-terra-max",
+  "model": "cliproxy/antigravity/nnn-gemini-3.7-flash-medium",
 
   /* **************************************************************************
    * PLUGINS
