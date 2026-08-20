@@ -101,6 +101,10 @@ def _staged_files(cwd: Path) -> tuple[str, ...]:
 def _staged_diff(cwd: Path, *, zero_context: bool = False) -> str:
     arguments = [
         "-c",
+        "diff.mnemonicprefix=false",
+        "-c",
+        "diff.noprefix=false",
+        "-c",
         "core.quotePath=true",
         "diff",
         "--cached",

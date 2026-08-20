@@ -402,9 +402,9 @@ def _diff_filename(header: str, content: str) -> str:
         if line.startswith("+++ "):
             new_path = _decode_git_path(line.removeprefix("+++ "))
             if new_path != "/dev/null":
-                return new_path.removeprefix("b/")
+                return re.sub(r"^[a-z]/", "", new_path)
     if old_path and old_path != "/dev/null":
-        return old_path.removeprefix("a/")
+        return re.sub(r"^[a-z]/", "", old_path)
 
     remainder = header[len(prefix) :]
     if remainder.startswith('"'):
@@ -413,11 +413,11 @@ def _diff_filename(header: str, content: str) -> str:
             cursor += 1
         second, _ = _decode_git_path_token(remainder, cursor)
     else:
-        separator = remainder.rfind(" b/")
+        separator = remainder.rfind(" ")
         if separator < 0:
             raise AutommitError("invalid_diff", "Invalid Git diff paths.", 4)
         second = remainder[separator + 1 :]
-    return second.removeprefix("b/")
+    return re.sub(r"^[a-z]/", "", second)
 
 
 def parse_file_diffs(diff_text: str) -> tuple[ParsedFile, ...]:
