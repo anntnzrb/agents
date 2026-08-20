@@ -2,7 +2,7 @@
 
 import { launchMain, main } from "@core/index.ts";
 
-const args = process.argv.slice(2);
+const args = Bun.argv.slice(2);
 const command = args[0];
 
 if (command === "launch") {

@@ -67,7 +67,7 @@ export function renderSecretTemplate(
 function readSecrets(path: string): Readonly<Record<string, string>> {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readText(path, "secrets"));
+    parsed = Bun.JSONC.parse(readText(path, "secrets"));
   } catch (error) {
     throw new Error(`parse secrets ${path} (${panicMessage(error)})`, { cause: error });
   }

@@ -83,7 +83,7 @@ export function loadRecordedEntryNames(path: string): string[] {
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(content);
+    parsed = Bun.JSONC.parse(content);
   } catch (error) {
     warn(`managed state parse failed, ignoring ${path} (${panicMessage(error)})`);
     return [];

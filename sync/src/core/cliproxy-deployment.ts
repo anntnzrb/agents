@@ -54,7 +54,7 @@ export type CliProxyEndpointPublication = "published" | "skipped";
 export function readCliProxyDeployment(path: string): CliProxyDeployment {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(fs.readFileSync(path, "utf8"));
+    parsed = Bun.JSONC.parse(fs.readFileSync(path, "utf8"));
   } catch (error) {
     throw new Error(`parse CLIProxyAPI deployment ${path} (${panicMessage(error)})`, {
       cause: error,

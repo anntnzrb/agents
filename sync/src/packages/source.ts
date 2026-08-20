@@ -108,7 +108,7 @@ const isLocalPathSource = (source: string): boolean => path.isAbsolute(source);
 
 function fnv1a64(input: string): string {
   let hash = 0xcbf29ce484222325n;
-  for (const byte of Buffer.from(input, "utf8")) {
+  for (const byte of new TextEncoder().encode(input)) {
     hash ^= BigInt(byte);
     hash = (hash * 0x100000001b3n) & 0xffffffffffffffffn;
   }

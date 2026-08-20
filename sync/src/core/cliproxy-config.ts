@@ -703,7 +703,7 @@ function credentialConfig(credential: Credential): ConfigRecord {
 function readCliProxySecrets(path: string): CliProxySecrets {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readText(path, "CLIProxyAPI secrets"));
+    parsed = Bun.JSONC.parse(readText(path, "CLIProxyAPI secrets"));
   } catch (error) {
     throw new Error(`parse CLIProxyAPI secrets ${path} (${panicMessage(error)})`, { cause: error });
   }

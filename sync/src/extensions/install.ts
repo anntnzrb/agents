@@ -14,29 +14,18 @@ export const iterExtensionPackages = async (root: string): Promise<string[]> => 
 };
 
 const walkExtensionPackages = async (root: string): Promise<string[]> => {
+  const glob = new Bun.Glob("**/package.json");
   const packagesFound: string[] = [];
-
-  const visit = async (current: string): Promise<void> => {
-    const entries = await fs.readdir(current, { withFileTypes: true });
-    for (const entry of entries) {
-      const entryPath = path.join(current, entry.name);
-      if (entry.isSymbolicLink()) {
+  try {
+    for await (const match of glob.scan({ cwd: root, dot: false, followSymlinks: false })) {
+      if (match.includes("node_modules/")) {
         continue;
       }
-      if (entry.isDirectory()) {
-        if (entry.name === "node_modules") {
-          continue;
-        }
-        await visit(entryPath);
-        continue;
-      }
-      if (entry.isFile() && entry.name === "package.json") {
-        packagesFound.push(current);
-      }
+      packagesFound.push(path.dirname(path.join(root, match)));
     }
-  };
-
-  await visit(root);
+  } catch {
+    return [];
+  }
   return packagesFound;
 };
 

@@ -1,11 +1,9 @@
-import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { releaseSyncLock, type SyncLock, tryAcquireSyncLock } from "@runtime/lock.ts";
 import type { Harness, SyncEnv } from "./harness.ts";
 
 const DEFAULT_LAUNCH_TIMEOUT_MS = 120_000;
-const VERSION_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const COMPONENT_PATTERN = /^[A-Za-z0-9._-]+$/;
 const PACKAGE_PATTERN = /^(?:@[A-Za-z0-9._~-]+\/)?[A-Za-z0-9._~-]+$/;
 
@@ -63,11 +61,13 @@ export interface PreparedNpmPackage {
 export function npmCacheLayout(
   home: string,
   spec: Pick<NpmPackageSpec, "tool" | "package">,
-  cacheHome = process.env["XDG_CACHE_HOME"] || path.join(home, ".cache"),
+  cacheHome = Bun.env["XDG_CACHE_HOME"] ||
+    process.env["XDG_CACHE_HOME"] ||
+    path.join(home, ".cache"),
 ): NpmCacheLayout {
   requireComponent(spec.tool, "tool");
   const toolCache = path.join(cacheHome, "npm-tools", spec.tool);
-  const packageKey = createHash("sha256").update(spec.package).digest("hex").slice(0, 16);
+  const packageKey = new Bun.CryptoHasher("sha256").update(spec.package).digest("hex").slice(0, 16);
   const packageCache = path.join(toolCache, "packages", packageKey);
   return {
     toolCache,
@@ -398,8 +398,10 @@ function validateSpec(spec: NpmPackageSpec): void {
 }
 
 function validateResolvedVersion(version: string): string {
-  if (!VERSION_PATTERN.test(version)) {
-    throw new Error(`invalid resolved version: ${version}`);
+  try {
+    Bun.semver.order(version, "0.0.0");
+  } catch (error) {
+    throw new Error(`invalid resolved version: ${version}`, { cause: error });
   }
   return version;
 }

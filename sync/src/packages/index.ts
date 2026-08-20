@@ -59,7 +59,7 @@ export function readPackageManifest(filePath: string): PackageManifest {
 
   let value: unknown;
   try {
-    value = JSON.parse(content) as unknown;
+    value = Bun.JSONC.parse(content);
   } catch (error) {
     throw new Error(`invalid JSON in ${filePath}: ${String(error)}`, { cause: error });
   }
@@ -106,7 +106,7 @@ export function patchRuntimeSettings(filePath: string, packagePaths: readonly st
 
   let value: unknown;
   try {
-    value = JSON.parse(current);
+    value = Bun.JSONC.parse(current);
   } catch (error) {
     throw new Error(`parse ${filePath} (${String(error)})`, { cause: error });
   }

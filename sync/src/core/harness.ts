@@ -93,7 +93,7 @@ export class SyncEnv {
   }
 
   static fromSystem(): SyncEnv {
-    const homeCandidates = [process.env["HOME"], os.homedir()];
+    const homeCandidates = [Bun.env["HOME"], process.env["HOME"], os.homedir()];
     const home = homeCandidates.find(
       (candidate): candidate is string =>
         typeof candidate === "string" && candidate.trim().length > 0,

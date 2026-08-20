@@ -1,6 +1,5 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import {
   chmodSync,
   existsSync,
@@ -17,7 +16,7 @@ import { SyncEnv } from "@core/harness.ts";
 import { isCliProxyRunning, prepareManagedTools } from "@core/managed-tools.ts";
 
 const ARCHIVE = "fixture archive";
-const CHECKSUM = createHash("sha256").update(ARCHIVE).digest("hex");
+const CHECKSUM = new Bun.CryptoHasher("sha256").update(ARCHIVE).digest("hex");
 const DEPLOYMENT: CliProxyDeployment = {
   server: { hostname: "test-gateway" },
   listen: { host: "100.64.0.42", port: 9443 },

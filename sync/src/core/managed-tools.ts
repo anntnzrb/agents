@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { panicMessage } from "@runtime/errors.ts";
@@ -92,7 +91,10 @@ async function prepareCliProxy(
 
   const executableName = manifest.binary;
   const cacheHome =
-    runtime.cacheHome ?? process.env["XDG_CACHE_HOME"] ?? path.join(syncEnv.home, ".cache");
+    runtime.cacheHome ??
+    Bun.env["XDG_CACHE_HOME"] ??
+    process.env["XDG_CACHE_HOME"] ??
+    path.join(syncEnv.home, ".cache");
   const installDir = path.join(
     cacheHome,
     "github-tools",
@@ -156,7 +158,7 @@ async function prepareCliProxy(
 function readManifest(manifestPath: string): ReleaseManifest {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    parsed = Bun.JSONC.parse(fs.readFileSync(manifestPath, "utf8"));
   } catch (error) {
     throw new Error(`parse ${manifestPath} (${panicMessage(error)})`, { cause: error });
   }
@@ -234,7 +236,7 @@ async function extractRelease(
 }
 
 function verifyChecksum(archive: string, expected: string): void {
-  const actual = createHash("sha256").update(fs.readFileSync(archive)).digest("hex");
+  const actual = new Bun.CryptoHasher("sha256").update(fs.readFileSync(archive)).digest("hex");
   if (actual !== expected) {
     throw new Error(`checksum mismatch for ${path.basename(archive)}`);
   }

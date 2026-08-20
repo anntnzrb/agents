@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
@@ -82,7 +81,7 @@ export function clearExtensionHookState(statePath: string): void {
 }
 
 export function fingerprintTree(root: string): string {
-  const hash = createHash("sha256");
+  const hash = new Bun.CryptoHasher("sha256");
   if (!exists(root)) {
     hash.update("missing");
     return hash.digest("hex");
@@ -91,7 +90,11 @@ export function fingerprintTree(root: string): string {
   return hash.digest("hex");
 }
 
-function walkTree(root: string, current: string, hash: ReturnType<typeof createHash>): void {
+function walkTree(
+  root: string,
+  current: string,
+  hash: InstanceType<typeof Bun.CryptoHasher>,
+): void {
   const entries = fs
     .readdirSync(current, { withFileTypes: true })
     .toSorted((left, right) => left.name.localeCompare(right.name));
@@ -144,7 +147,7 @@ function loadExtensionHookState(path: string): LoadedExtensionHookState | undefi
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(content);
+    parsed = Bun.JSONC.parse(content);
   } catch (error) {
     warn(`hook state parse failed, ignoring ${path} (${String(error)})`);
     return undefined;
