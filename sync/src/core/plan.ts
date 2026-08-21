@@ -247,6 +247,7 @@ function instructionJobs(syncEnv: SyncEnv, harnesses: readonly HarnessPlan[]): J
 
 const CLIPROXY_ENDPOINT_TEMPLATE_PATHS: Partial<Record<Harness["id"], string>> = {
   codex: "config.toml",
+  grok: "config.toml",
   opencode: "opencode.jsonc",
   pi: join("extensions", "cliproxy", "index.ts"),
   omp: "models.yml",
