@@ -5,51 +5,263 @@ providers:
     api: openai-responses
     discovery:
       type: openai-models-list
-    modelOverrides:
-      antigravity/nnn-gemini-3.7-flash-medium: # exp
-        contextWindow: 512000
-        input: [text, image]
-      cmd/nnn-deepseek-v4-flash-max: # exp
-        contextWindow: 512000
-      cmd/nnn-deepseek-v4-pro-max: # exp
-        contextWindow: 512000
-      # keep the gpt-5.6 aliases at the 272k operating point
-      chatgpt/nnn-gpt-5.6-luna-max:
-        contextWindow: 272000
-        input: [text, image]
-      chatgpt/nnn-gpt-5.6-luna-max-fast:
-        contextWindow: 272000
-        input: [text, image]
-      chatgpt/nnn-gpt-5.6-sol-high:
-        contextWindow: 272000
-        input: [text, image]
-      chatgpt/nnn-gpt-5.6-terra-max:
-        contextWindow: 272000
-        input: [text, image]
-      chatgpt/nnn-gpt-5.6-terra-max-fast:
-        contextWindow: 272000
-        input: [text, image]
-  cline-api:
-    baseUrl: https://api.cline.bot/api/v1
-    apiKey: CLINE_API_KEY
+  cmd:
+    baseUrl: https://api.commandcode.ai/provider/v1
+    apiKey: COMMAND_CODE_API_KEY
     api: openai-completions
+    discovery:
+      type: openai-models-list
     models:
-      - id: deepseek/deepseek-v4-flash
-        name: DeepSeek V4 Flash (Cline Free)
-        maxTokens: 384000
+      - id: stealth/ox-alpha
+        name: Ox Alpha Free
+        reasoning: true
+        thinking:
+          mode: effort
+          efforts:
+            - medium
+          defaultLevel: medium
+        input: [text, image]
         cost:
-          input: 0.14
-          output: 0.28
-          cacheRead: 0.0028
+          input: 0
+          output: 0
+          cacheRead: 0
           cacheWrite: 0
+        contextWindow: 1048576
+        maxTokens: 131072
         compat:
-          supportsDeveloperRole: false
           supportsReasoningEffort: true
-          maxTokensField: max_tokens
-          supportsToolChoice: false
-          extraBody:
-            thinking:
-              type: enabled
+          thinkingFormat: openai
           reasoningContentField: reasoning_content
-          requiresReasoningContentForToolCalls: true
-          requiresAssistantContentForToolCalls: true
+          extraBody:
+            reasoning_effort: medium
+          reasoningEffortMap:
+            off: medium
+            minimal: medium
+            low: medium
+            medium: medium
+            high: medium
+            xhigh: medium
+            max: medium
+      - id: meta/muse-spark-1.2-contributor
+        name: Muse Spark 1.2 Contributor
+        reasoning: true
+        thinking:
+          mode: effort
+          efforts:
+            - max
+          defaultLevel: max
+        input: [text, image]
+        cost:
+          input: 0
+          output: 0
+          cacheRead: 0
+          cacheWrite: 0
+        contextWindow: 1048576
+        maxTokens: 131072
+        compat:
+          supportsReasoningEffort: true
+          thinkingFormat: openai
+          reasoningContentField: reasoning_content
+          extraBody:
+            reasoning_effort: max
+          reasoningEffortMap:
+            off: max
+            minimal: max
+            low: max
+            medium: max
+            high: max
+            xhigh: max
+            max: max
+    modelOverrides:
+      stealth/ox-alpha:
+        name: Ox Alpha Free
+        reasoning: true
+        thinking:
+          mode: effort
+          efforts:
+            - medium
+          defaultLevel: medium
+        compat:
+          supportsReasoningEffort: true
+          thinkingFormat: openai
+          reasoningContentField: reasoning_content
+          extraBody:
+            reasoning_effort: medium
+          reasoningEffortMap:
+            off: medium
+            minimal: medium
+            low: medium
+            medium: medium
+            high: medium
+            xhigh: medium
+            max: medium
+      ox-alpha:
+        name: Ox Alpha Free
+        reasoning: true
+        thinking:
+          mode: effort
+          efforts:
+            - medium
+          defaultLevel: medium
+        compat:
+          supportsReasoningEffort: true
+          thinkingFormat: openai
+          reasoningContentField: reasoning_content
+          extraBody:
+            reasoning_effort: medium
+          reasoningEffortMap:
+            off: medium
+            minimal: medium
+            low: medium
+            medium: medium
+            high: medium
+            xhigh: medium
+            max: medium
+      meta/muse-spark-1.2-contributor:
+        name: Muse Spark 1.2 Contributor
+        reasoning: true
+        thinking:
+          mode: effort
+          efforts:
+            - max
+          defaultLevel: max
+        compat:
+          supportsReasoningEffort: true
+          thinkingFormat: openai
+          reasoningContentField: reasoning_content
+          extraBody:
+            reasoning_effort: max
+          reasoningEffortMap:
+            off: max
+            minimal: max
+            low: max
+            medium: max
+            high: max
+            xhigh: max
+            max: max
+      muse-spark-1.2-contributor:
+        name: Muse Spark 1.2 Contributor
+        reasoning: true
+        thinking:
+          mode: effort
+          efforts:
+            - max
+          defaultLevel: max
+        compat:
+          supportsReasoningEffort: true
+          thinkingFormat: openai
+          reasoningContentField: reasoning_content
+          extraBody:
+            reasoning_effort: max
+          reasoningEffortMap:
+            off: max
+            minimal: max
+            low: max
+            medium: max
+            high: max
+            xhigh: max
+            max: max
+      meta/muse-spark-1.2:
+        name: Muse Spark 1.2
+        reasoning: true
+        thinking:
+          mode: effort
+          efforts:
+            - max
+          defaultLevel: max
+        compat:
+          supportsReasoningEffort: true
+          thinkingFormat: openai
+          reasoningContentField: reasoning_content
+          extraBody:
+            reasoning_effort: max
+          reasoningEffortMap:
+            off: max
+            minimal: max
+            low: max
+            medium: max
+            high: max
+            xhigh: max
+            max: max
+  zen:
+    baseUrl: https://opencode.ai/zen/v1
+    auth: none
+    api: openai-completions
+    discovery:
+      type: openai-models-list
+    models:
+      - id: muse-spark-1.2-contributor-free
+        name: Muse Spark 1.2 Contributor
+        reasoning: true
+        thinking:
+          mode: effort
+          efforts:
+            - max
+          defaultLevel: max
+        input: [text, image]
+        cost:
+          input: 0
+          output: 0
+          cacheRead: 0
+          cacheWrite: 0
+        contextWindow: 1048576
+        maxTokens: 131072
+        compat:
+          supportsReasoningEffort: true
+          thinkingFormat: openai
+          reasoningContentField: reasoning_content
+          extraBody:
+            reasoning_effort: max
+          reasoningEffortMap:
+            off: max
+            minimal: max
+            low: max
+            medium: max
+            high: max
+            xhigh: max
+            max: max
+    modelOverrides:
+      muse-spark-1.2-contributor-free:
+        name: Muse Spark 1.2 Contributor
+        reasoning: true
+        thinking:
+          mode: effort
+          efforts:
+            - max
+          defaultLevel: max
+        compat:
+          supportsReasoningEffort: true
+          thinkingFormat: openai
+          reasoningContentField: reasoning_content
+          extraBody:
+            reasoning_effort: max
+          reasoningEffortMap:
+            off: max
+            minimal: max
+            low: max
+            medium: max
+            high: max
+            xhigh: max
+            max: max
+      muse-spark-1.2:
+        name: Muse Spark 1.2
+        reasoning: true
+        thinking:
+          mode: effort
+          efforts:
+            - max
+          defaultLevel: max
+        compat:
+          supportsReasoningEffort: true
+          thinkingFormat: openai
+          reasoningContentField: reasoning_content
+          extraBody:
+            reasoning_effort: max
+          reasoningEffortMap:
+            off: max
+            minimal: max
+            low: max
+            medium: max
+            high: max
+            xhigh: max
+            max: max
