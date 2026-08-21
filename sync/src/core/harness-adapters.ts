@@ -58,6 +58,15 @@ export const HARNESS_ADAPTERS = [
     },
   },
   {
+    id: "grok",
+    homeSegments: [".grok"],
+    platforms: ["darwin", "linux"],
+    launcher: {
+      package: "@xai-official/grok",
+      bin: "grok",
+    },
+  },
+  {
     id: "opencode",
     homeSegments: [".config", "opencode"],
     platforms: ["darwin", "linux"],
