@@ -14,13 +14,12 @@ import re
 import shutil
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-
 ANSI_RE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 OSC_RE = re.compile(r"\x1b\][^\x07]*(?:\x07|\x1b\\)")
 HEADER_RE = re.compile(r"Web Search:\s*(?P<provider>.+?)\s+(?P<count>\d+)\s+sources?\b")
@@ -58,10 +57,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("query", nargs="+", help="search query words")
     parser.add_argument(
-        "--provider", help="OMP provider name; omit for automatic provider selection"
+        "--provider", help="explicit single OMP provider name"
     )
-    parser.add_argument("--recency", choices=("day", "week", "month", "year"))
-    parser.add_argument("--limit", type=positive_int, help="maximum number of sources")
+    parser.add_argument(
+        "--providers",
+        help="comma-separated list of providers to query concurrently (defaults to OMP's configured active providers)",
+    )
+    parser.add_argument(
+        "--single",
+        action="store_true",
+        help="force single-provider auto-fallback chain instead of parallel fan-out",
+    )
+    parser.add_argument(
+        "--recency",
+        choices=("day", "week", "month", "year"),
+        help="recency filter (day, week, month, year)",
+    )
+    parser.add_argument(
+        "--limit",
+        type=positive_int,
+        help="number of sources per provider (minimum 2; defaults to 2)",
+    )
     parser.add_argument(
         "--full",
         action="store_true",
@@ -170,6 +186,56 @@ def parse_search_output(  # noqa: C901, PLR0912
     }
 
 
+def extract_yaml_list(text: str, target_key: str) -> list[str]:
+    lines = text.splitlines()
+    in_section = False
+    in_key = False
+    items: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        if indent == 0 and stripped.startswith("providers:"):
+            in_section = True
+            continue
+        if in_section and indent == 0 and not stripped.startswith("providers:"):
+            in_section = False
+            in_key = False
+        if in_section:
+            if stripped.startswith(f"{target_key}:"):
+                in_key = True
+                continue
+            if in_key:
+                if stripped.startswith("- "):
+                    items.append(stripped[2:].strip())
+                elif indent <= 2 and not stripped.startswith("-"):
+                    in_key = False
+    return items
+
+
+def discover_active_omp_providers() -> list[str]:
+    candidates: list[Path] = []
+    if custom := os.environ.get("OMP_CONFIG_DIR"):
+        candidates.append(Path(custom).expanduser() / "config.yml")
+    candidates.append(Path.home() / ".omp" / "agent" / "config.yml")
+    candidates.append(Path.cwd() / "harnesses" / "omp" / "agent" / "config.yml")
+    candidates.append(Path.cwd() / ".omp" / "agent" / "config.yml")
+    candidates.append(Path.cwd() / ".omp" / "config.yml")
+
+    for path in candidates:
+        if path.is_file():
+            try:
+                content = path.read_text(encoding="utf-8")
+                order = extract_yaml_list(content, "webSearchOrder")
+                exclude = set(extract_yaml_list(content, "webSearchExclude"))
+                if active := [p for p in order if p not in exclude]:
+                    return active
+            except Exception:  # noqa: BLE001, S110
+                pass
+    return []
+
+
 def resolve_omp(binary: str | None) -> str | None:
     candidate = binary or os.environ.get("OMP_BIN")
     if candidate:
@@ -178,8 +244,6 @@ def resolve_omp(binary: str | None) -> str | None:
             return str(path)
         return shutil.which(candidate)
     return shutil.which("omp")
-
-
 def emit(payload: dict[str, object]) -> None:
     sys.stdout.write(
         json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n"
@@ -194,27 +258,27 @@ def failure_message(cleaned_stdout: str, stderr: str, return_code: int) -> str:
     return f"omp search exited with code {return_code}"
 
 
-def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901
-    args = build_parser().parse_args(argv)
-    fallback_query = " ".join(args.query)
-    binary = resolve_omp(args.omp_bin)
-    if binary is None:
-        sys.stderr.write(
-            "omp-search: required executable 'omp' was not found "
-            "on PATH or via OMP_BIN\n"
-        )
-        return 127
-
+def execute_single_search(  # noqa: C901, PLR0913
+    binary: str,
+    provider: str | None,
+    query_words: Sequence[str],
+    recency: str | None,
+    limit: int | None,
+    full: bool,
+    timeout: float,
+    include_raw: bool,
+) -> dict[str, object]:
+    fallback_query = " ".join(query_words)
     command = [binary, "search"]
-    if args.provider:
-        command.extend(("--provider", args.provider))
-    if args.recency:
-        command.extend(("--recency", args.recency))
-    if args.limit is not None:
-        command.extend(("--limit", str(args.limit)))
-    if not args.full:
+    if provider:
+        command.extend(("--provider", provider))
+    if recency:
+        command.extend(("--recency", recency))
+    if limit is not None:
+        command.extend(("--limit", str(limit)))
+    if not full:
         command.append("--compact")
-    command.extend(args.query)
+    command.extend(query_words)
 
     env = os.environ.copy()
     env["NO_COLOR"] = "1"
@@ -226,39 +290,39 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901
             check=False,
             capture_output=True,
             text=True,
-            timeout=args.timeout,
+            timeout=timeout,
         )
     except subprocess.TimeoutExpired as error:
         partial = strip_terminal_controls(error.stdout or "")
         payload: dict[str, object] = {
             "ok": False,
             "query": fallback_query,
-            "provider": args.provider,
+            "provider": provider,
             "answer": "",
             "sources": [],
             "truncated": False,
-            "compact": not args.full,
+            "compact": not full,
             "parsed": False,
             "error": {
                 "code": "timeout",
-                "message": f"omp search exceeded {args.timeout:g}s",
+                "message": f"omp search exceeded {timeout:g}s",
             },
             "exit_code": 124,
         }
-        if args.include_raw:
+        if include_raw:
             payload["raw"] = partial
-        emit(payload)
-        return 124
+        return payload
 
     parsed = parse_search_output(result.stdout, fallback_query)
     payload = {
         "ok": result.returncode == 0,
         "query": parsed["query"],
-        "provider": parsed["provider"] or args.provider,
+        "provider": parsed["provider"] or provider,
         "answer": parsed["answer"],
         "sources": parsed["sources"],
+        "sources_count": len(parsed["sources"]),
         "truncated": parsed["truncated"],
-        "compact": not args.full,
+        "compact": not full,
         "parsed": parsed["parsed"],
         "exit_code": result.returncode,
     }
@@ -266,16 +330,152 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901
         payload["error"] = {
             "code": "omp_search_failed",
             "message": failure_message(
-                parsed["cleaned_raw"], result.stderr, result.returncode
+                str(parsed.get("cleaned_raw") or ""), result.stderr, result.returncode
             ),
         }
     if result.stderr.strip():
         payload["diagnostics"] = redact(result.stderr.strip())[-2000:]
-    if args.include_raw:
-        payload["raw"] = parsed["cleaned_raw"]
-    emit(payload)
-    return result.returncode
+    if include_raw:
+        payload["raw"] = parsed.get("cleaned_raw") or ""
+    return payload
 
+
+def merge_parallel_results(  # noqa: C901
+    query: str,
+    results: Sequence[dict[str, object]],
+    compact: bool,
+) -> dict[str, object]:
+    successful = [r for r in results if r.get("ok")]
+    if not successful:
+        first_error = next((r.get("error") for r in results if r.get("error")), None)
+        return {
+            "ok": False,
+            "query": query,
+            "provider": "+".join(str(r.get("provider") or "unknown") for r in results),
+            "providers": [str(r.get("provider") or "unknown") for r in results],
+            "answer": "",
+            "sources": [],
+            "truncated": False,
+            "compact": compact,
+            "parsed": False,
+            "error": first_error
+            or {"code": "all_providers_failed", "message": "all parallel providers failed"},
+            "exit_code": 1,
+        }
+
+    merged_sources: list[dict[str, str | None]] = []
+    seen_sources: set[tuple[str, str]] = set()
+    answer_sections: list[str] = []
+    used_providers: list[str] = []
+
+    for r in successful:
+        prov = str(r.get("provider") or "Unknown")
+        used_providers.append(prov)
+        ans = str(r.get("answer") or "").strip()
+        if ans:
+            answer_sections.append(f"### [{prov}]\n{ans}")
+
+        raw_sources = r.get("sources")
+        if isinstance(raw_sources, list):
+            for src in raw_sources:
+                if isinstance(src, dict):
+                    title = str(src.get("title") or "").strip()
+                    domain = str(src.get("domain") or "").strip()
+                    key = (title.lower(), domain.lower())
+                    if key not in seen_sources:
+                        seen_sources.add(key)
+                        merged_sources.append(
+                            {
+                                "title": title,
+                                "domain": domain,
+                                "age": src.get("age"),
+                            }
+                        )
+
+    return {
+        "ok": True,
+        "query": query,
+        "provider": "+".join(used_providers),
+        "providers": used_providers,
+        "providers_count": len(used_providers),
+        "answer": "\n\n".join(answer_sections),
+        "sources": merged_sources,
+        "sources_count": len(merged_sources),
+        "truncated": any(bool(r.get("truncated")) for r in successful),
+        "compact": compact,
+        "parsed": True,
+        "exit_code": 0,
+    }
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    fallback_query = " ".join(args.query)
+    binary = resolve_omp(args.omp_bin)
+    if binary is None:
+        sys.stderr.write(
+            "omp-search: required executable 'omp' was not found "
+            "on PATH or via OMP_BIN\n"
+        )
+        return 127
+
+    provider_list: list[str | None] = []
+    if args.provider:
+        provider_list = [args.provider]
+    elif args.providers:
+        provider_list = [p.strip() for p in args.providers.split(",") if p.strip()]
+    elif args.single:
+        provider_list = [None]
+    else:
+        discovered = discover_active_omp_providers()
+        provider_list = list(discovered) if discovered else [None]
+    effective_limit = max(2, args.limit) if args.limit is not None else 2
+    if len(provider_list) == 1:
+        payload = execute_single_search(
+            binary=binary,
+            provider=provider_list[0],
+            query_words=args.query,
+            recency=args.recency,
+            limit=effective_limit,
+            full=args.full,
+            timeout=args.timeout,
+            include_raw=args.include_raw,
+        )
+        emit(payload)
+        return int(payload.get("exit_code") or 0)
+
+    results: list[dict[str, object]] = []
+    with ThreadPoolExecutor(max_workers=min(len(provider_list), 8)) as executor:
+        future_to_provider = {
+            executor.submit(
+                execute_single_search,
+                binary,
+                p,
+                args.query,
+                args.recency,
+                effective_limit,
+                args.full,
+                args.timeout,
+                args.include_raw,
+            ): p
+            for p in provider_list
+        }
+        for future in as_completed(future_to_provider):
+            try:
+                results.append(future.result())
+            except Exception as exc:  # noqa: BLE001
+                p_name = future_to_provider[future]
+                results.append(
+                    {
+                        "ok": False,
+                        "provider": p_name,
+                        "error": {"code": "exception", "message": str(exc)},
+                        "exit_code": 1,
+                    }
+                )
+
+    merged = merge_parallel_results(fallback_query, results, compact=not args.full)
+    emit(merged)
+    return int(merged.get("exit_code") or 0)
 
 if __name__ == "__main__":
     raise SystemExit(main())
