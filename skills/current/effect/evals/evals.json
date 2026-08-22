@@ -77,7 +77,7 @@
       "expected_output": "Uses the shared lightweight Effect checkout as read-only reference and keeps the project version authoritative.",
       "files": [],
       "expectations": [
-        "The answer uses ~/src/vendored/github.com/Effect-TS/effect",
+        "The answer uses the vendored Effect checkout or upstream repository",
         "The answer reads relevant implementation, tests, LLMS.md, and MIGRATION.md",
         "The answer treats the checkout as read-only and never imports from it",
         "The answer uses a depth-1 blob-filtered clone or clean fast-forward pull and does not switch, reset, clean, or fetch full tag history in the shared checkout",

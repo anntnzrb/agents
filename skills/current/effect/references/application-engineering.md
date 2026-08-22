@@ -20,11 +20,7 @@ Never mix Effect v3 and v4 packages, package names, imports, documentation, or e
 
 When maintaining an existing project, inspect its manifest, lockfile, imports, installed exports, and declarations first. Honor the pinned major version for the requested maintenance task. Do not migrate an existing v3 project to v4 without approval, and never use v4 guidance as if it applied to v3.
 
-Use the shared Effect checkout at:
-
-```text
-~/src/vendored/github.com/Effect-TS/effect
-```
+Inspect the shared vendored Effect source checkout under the configured vendored sources directory (or the upstream repository `Effect-TS/effect`).
 
 If the checkout is absent, clone it under the global vendored-source policy. If it is clean, fast-forward it before relying on current-main behavior. Read `LLMS.md`, `MIGRATION.md`, package manifests, implementation, tests, and examples relevant to the task. Prefer source patterns over guesses and fragmented web snippets.
 
