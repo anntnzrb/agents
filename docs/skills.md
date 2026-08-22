@@ -24,16 +24,32 @@ uvx ruff check --select ALL --ignore COM812,D203,D213 skills/current/<name>
 
 Run the smallest relevant test and type-check commands listed by the skill. For migrated library code, run the smallest relevant pytest/ruff/pyright gate with explicit `uv run --with ...` deps.
 
-## Validate an executable skill
+## Validate TypeScript and Bun files
 
-Executable skills use `scripts/cli.py` as their public entrypoint. Check the command after changing executable behavior:
+For a skill with TypeScript or Bun code, run the local test suite and compiler checks:
 
 ```bash
+bun test skills/current/<name>
+bunx tsc --project skills/current/<name>/tsconfig.json --noEmit
+```
+
+Run tests from the skill directory or repository root. Verify that TypeScript diagnostics return zero errors before handoff.
+
+## Validate an executable skill
+
+Executable skills use `scripts/cli.py` (Python) or `scripts/cli.ts` (TypeScript and Bun) as their public entrypoint. Check the command after changing executable behavior:
+
+```bash
+# Python executable skill
 uv run --script skills/current/<name>/scripts/cli.py --help
+
+# TypeScript and Bun executable skill
+bun skills/current/<name>/scripts/cli.ts --help
+
 git diff --check
 ```
 
-Do not add a shell wrapper. Put runtime dependencies in the PEP 723 metadata inside `scripts/cli.py`.
+Do not add a shell wrapper. For Python, put runtime dependencies in the PEP 723 metadata inside `scripts/cli.py`. For TypeScript and Bun, declare runtime dependencies in the skill's local `package.json`.
 
 ## Validate skill metadata
 
@@ -61,8 +77,18 @@ The next sync removes the managed copy from harness homes. Sync does not publish
 
 ## Skill package policy
 
+### Python skills
 - Public entrypoint: `scripts/cli.py`, invoked as `uv run --script <skill-dir>/scripts/cli.py ...`.
 - Put reusable code in `lib/<module>/`; make `scripts/cli.py` add `lib/` to `sys.path`.
+- Declare inline dependencies in `scripts/cli.py` using PEP 723 script metadata.
+
+### TypeScript and Bun skills
+- Public entrypoint: `scripts/cli.ts`, invoked as `bun <skill-dir>/scripts/cli.ts ...`.
+- Initialize the skill directory as an isolated package (`bun init` or local `package.json`) with pinned dependencies.
+- Organize internal modules using Node and Bun package subpath imports (`#*` in `package.json` and matching `paths` in `tsconfig.json`, such as `#models`, `#config`, `#executor`) to eliminate relative `../` directory traversals.
+- For Effect-based skills, use official Effect platform services (`FileSystem.FileSystem`, `Path.Path`, `effect/unstable/cli`), provide platform layers at the process entrypoint (`BunServices.layer`), and drive the top-level command with `BunRuntime.runMain`.
+
+### Documentation structure
 - Keep `SKILL.md` focused on when/how to use the skill; move bulk docs to `references/`.
 - Progressive disclosure standard:
   - `SKILL.md` is the entrypoint/router only: triggers, activation criteria, minimal workflow, tool/script routing, and follow-up reads.
@@ -114,19 +140,29 @@ The next sync removes the managed copy from harness homes. Sync does not publish
 
 ## Portability constraints
 
-- Bundled skill entrypoints use `scripts/cli.py`, not Bash/sh/PowerShell wrappers.
+- Bundled skill entrypoints use `scripts/cli.py` (Python) or `scripts/cli.ts` (TypeScript and Bun), not Bash/sh/PowerShell wrappers.
 - Skills do not include `*.sh` files.
 - Public docs avoid `source`, `./script`, shebang, or executable-bit assumptions.
-- Public run paths use `uv run --script`, not raw `python`, `python3`, `pip`, or `pip install`.
-- Per-skill `pyproject.toml` or `uv.lock` belongs only in package-style skills when the user explicitly asks for package semantics.
-- Docs use `<temp-dir>` and code uses `tempfile`; avoid POSIX-only paths like `/tmp`.
+- Public run paths use `uv run --script` for Python and `bun <skill-dir>/scripts/cli.ts` for TypeScript; do not invoke raw `python`, `python3`, `pip`, `node`, or `npm`.
+- Never bridge across repository directories with upward-traversing `tsconfig.json` path hacks.
+- Docs use `<temp-dir>` and code uses `tempfile` or platform temp directories; avoid POSIX-only paths like `/tmp`.
 
 ## Cross-platform code rules
 
+### Python code
 - Use `pathlib.Path`, `tempfile`, and explicit encodings.
 - Use `subprocess.run([...], shell=False)` and preserve child exit codes.
+
+### TypeScript and Effect code
+- Use `FileSystem.FileSystem` and `Path.Path` instead of `node:fs` or `node:path`.
+- When bridging timers into `Promise.race` or Effect promises, always unreference timer handles (`timer.unref?.()`) and clear them (`clearTimeout(timer)`) on settlement to prevent hanging the event loop.
+- When spawning non-interactive child processes, pass `stdin: "ignore"` to avoid blocking on standard input pipes.
+
+### Common exit code conventions
 - Print human errors to stderr.
-- Return `2` for usage/config/platform errors.
+- Return `0` for successful execution.
+- Return `2` for usage, configuration, or platform errors.
+- Return `124` when an outer execution timeout fires.
 - Return `127` for missing required external executables.
 - Platform-specific skills must fail clearly on unsupported OS instead of relying on shell failure.
 
