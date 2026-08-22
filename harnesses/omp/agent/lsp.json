@@ -1,0 +1,18 @@
+{
+  "servers": {
+    "typescript-language-server": {
+      "command": "typescript-language-server",
+      "args": ["--stdio"],
+      "fileTypes": [".ts", ".tsx", ".js", ".jsx"],
+      "rootMarkers": [".git", "package.json", "tsconfig.json", "jsconfig.json"],
+      "initOptions": {
+        "plugins": [
+          {
+            "name": "@effect/language-service",
+            "location": "node_modules/@effect/language-service"
+          }
+        ]
+      }
+    }
+  }
+}
