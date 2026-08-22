@@ -33,36 +33,18 @@ Treat vendored repositories as read-only references. Never import from them or e
 
 ## Use live Effect documentation
 
-Effect API questions MUST also use live Effect documentation.
+Effect API questions MUST use authoritative documentation sources.
 
-For known core-package requests, call the focused recipe directly:
+For targeted package and API documentation, query Context7 directly:
 
-```text
-mcporter call 'effect.effect-doc-links(libraries: ["effect"])'
-mcporter call 'effect.effect-documentation(libraries: ["effect"])'
+```bash
+bun x ctx7@latest docs /effect-ts/effect "<what to look up>"
 ```
 
-- MCP-resource clients SHOULD use `effect-doc-links`.
-- Requests that need documentation text MUST use `effect-documentation`.
-- Select only the packages relevant to the question.
-
-Before requesting unfamiliar ecosystem packages, inspect live resources:
-
-```text
-mcporter resource effect
-```
-
-For unfamiliar, optional, or rejected tool arguments, inspect the targeted live schema and retry once:
-
-```text
-mcporter list effect.<tool> --schema
-```
-
-- Live schema and resources MUST remain authoritative when inspected.
-- NEVER treat generated links as coverage or health evidence.
-- MUST inspect returned content despite MCPorter exit `0`.
-- MUST disclose embedded errors or broken resources.
-- Missing or unhealthy coverage: MUST use matching vendored source, `context7`, `gh`, or `research`.
+- For library resolution or sub-packages, use `bun x ctx7@latest library "Effect" "<topic>"`.
+- For official guides and API reference, consult <https://www.effect.website/docs>.
+- For implementation patterns, inspect vendored `Effect-TS/effect` source or upstream repository (`LLMS.md`, `MIGRATION.md`, tests).
+- Missing or unclear coverage: fall back to matching vendored source, `gh`, or `research`.
 
 ## Version safety
 
@@ -94,4 +76,3 @@ mcporter list effect.<tool> --schema
 |TypeScript host contracts and Promise boundaries|`../typescript/SKILL.md`|Implementing, refactoring, or reviewing Effect in TypeScript|
 |Bun, TypeScript 7, and Effect v4 application policy|`references/application-engineering.md`|Creating or materially changing user-owned Effect code|
 |Effect composition, errors, services, resources, and structural review|`references/code-quality.md`|Creating, materially changing, refactoring, or reviewing Effect code|
-|Dated tool/package snapshot|`references/mcporter-tools.md`|Broad package coverage or targeted live-schema failure. Do not read it for a known recipe|

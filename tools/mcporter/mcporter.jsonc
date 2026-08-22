@@ -13,11 +13,6 @@
       "description": "Linear MCP",
       "serverUrl": "https://mcp.linear.app/mcp",
     },
-    "effect": {
-      "description": "Effect MCP",
-      "command": "bun",
-      "args": ["x", "@niklaserik/effect-mcp"],
-    },
     "n8n": {
       "description": "n8n MCP",
       "command": "bun",

@@ -26,23 +26,22 @@
     },
     {
       "id": 3,
-      "prompt": "I'm using `@effect/opentelemetry` and want an API walkthrough. If the MCP doesn't cover it, don't bluff. Tell me what fallback source to use.",
-      "expected_output": "Recognizes unsupported MCP coverage and uses matching source or another authoritative fallback.",
+      "prompt": "I'm using `@effect/opentelemetry` and want an API walkthrough. If Context7 or docs lack coverage, don't bluff. Tell me what fallback source to use.",
+      "expected_output": "Recognizes unsupported documentation coverage and uses matching source or another authoritative fallback.",
       "files": [],
       "expectations": [
-        "The answer states that the package is outside current MCP coverage when live resources confirm that",
+        "The answer identifies when the package is outside immediate documentation coverage",
         "The answer falls back to matching vendored source, context7, gh, or research",
         "The answer avoids hallucinated `@effect/opentelemetry` APIs"
       ]
     },
     {
       "id": 4,
-      "prompt": "My app runs on Node and depends on `effect ^3.21.0` plus `@effect/platform-node ^0.106.0`. I need help wiring the runtime and filesystem layer. If MCP doesn't directly cover `@effect/platform-node`, handle that safely.",
-      "expected_output": "Honors the existing v3 project, avoids unsupported MCP requests, and does not mix v4 guidance into maintenance work.",
+      "prompt": "My app runs on Node and depends on `effect ^3.21.0` plus `@effect/platform-node ^0.106.0`. I need help wiring the runtime and filesystem layer. Handle that safely.",
+      "expected_output": "Honors the existing v3 project, avoids unsupported version mixes, and does not mix v4 guidance into maintenance work.",
       "files": [],
       "expectations": [
         "The answer identifies the project as Effect v3 and does not initiate a v4 migration",
-        "The workflow does not pass unsupported `@effect/platform-node` to an MCP tool",
         "The answer uses matching source or another authoritative fallback",
         "The answer does not apply v4-only package names or runtime APIs"
       ]
