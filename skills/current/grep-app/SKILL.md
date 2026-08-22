@@ -59,7 +59,7 @@ Pass Grep.app filters as query params:
   - usage errors mean local invocation is wrong
   - HTTP `429` means Grep.app rate-limited the request
   - other HTTP failures mean the service or endpoint responded with an error, not that the helper failed to initialize
-- If `429` appears, report it as rate limiting and either retry later or fall back to another research route such as `context7`, `gh`, or `exa-search`
+- If `429` appears, report it as rate limiting and either retry later or fall back to another research route such as `context7`, `gh`, or `firecrawl`
 
 ## Notes
 
