@@ -47,7 +47,7 @@ Read this when planning a larger Reddit skill refactor. Do not load it for norma
 
 ## Future refactor candidates
 
-1. Move shared env loading and HTTP error shaping into a small shared helper used by Reddit, Brave, Exa, and Grep.app
+1. Move shared env loading and HTTP error shaping into a small shared helper used by Reddit, Brave, and Grep.app
 2. Add fixture-based tests for successful Reddit listings, post/comment payloads, profile payloads, and blocked-page failures
 3. Add live smoke tests gated behind an env flag and documented as optional because Reddit often blocks automated egress
 4. Consider an OAuth-backed sibling mode only if the user explicitly needs authenticated/private/high-throughput access
