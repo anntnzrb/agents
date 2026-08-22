@@ -33,8 +33,19 @@ cd ~/.config/agents
 
 The shell is now in `~/.config/agents`.
 
-## Add local secrets
+## Configure shared environment variables
 
+Copy the shared environment template if `.env` does not exist yet, restrict access, and edit the file:
+
+```bash
+if [ ! -e .env ]; then cp .env.example .env; fi
+chmod 600 .env
+$EDITOR .env
+```
+
+The repository root `.env` provides default environment variables that `sync` forwards to child processes of launched harnesses. Parent-process environment variables override values in this file.
+
+## Add local secrets
 Copy the example and restrict access to the new file:
 
 ```bash

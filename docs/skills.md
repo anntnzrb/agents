@@ -11,7 +11,7 @@ Use `skills/current/` for skills that sync publishes to enabled harnesses. Use `
 5. Run `bun ./sync/src/cli.ts` from the repository root.
 6. Inspect the generated skill in one harness home.
 
-Keep development credentials in an ignored `.env` file. Commit an `.env.example` with placeholder names when users need to know the variables.
+Keep development credentials in the root ignored `.env` file (`.env.example` at the repository root lists the shared template variables).
 
 ## Validate Python files
 

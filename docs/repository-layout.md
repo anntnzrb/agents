@@ -15,6 +15,7 @@ The repository separates committed sources, local inputs, generated targets, and
 | `sync/` | The Bun and TypeScript sync application |
 | `docs/` | Repository workflow documentation indexed by `docs/index.md`; sync application documentation under `docs/sync/` |
 | `secrets.local.example.json` | Schema and placeholder values for local CLIProxyAPI secrets |
+| `.env.example` | Template and guidance for shared harness environment variables |
 
 ### Harness sources
 
@@ -36,6 +37,8 @@ Each harness source starts under `harnesses/<id>/`. When an adapter defines `run
 ## Local inputs
 
 `secrets.local.json` contains host-local CLIProxyAPI credentials. The repository ignores it. Create it from `secrets.local.example.json` and keep it outside Git.
+
+`.env` contains host-local default environment variables forwarded to launched harnesses. The repository ignores it. Create it from `.env.example` and restrict permissions with `chmod 600`.
 
 ## Generated targets
 
