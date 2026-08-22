@@ -16,7 +16,7 @@ Use this skill when an agent needs live web search through the installed OMP CLI
 Run the cross-platform wrapper; do not invoke a shell, source an environment file, or scrape OMP's terminal panel yourself:
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py "<query>"
+bun <skill-dir>/scripts/cli.ts "<query>"
 ```
 
 The wrapper locates `omp` on `PATH` or uses `OMP_BIN`, preserves the caller's working directory and OMP profile, and emits one JSON object to stdout.
@@ -30,6 +30,7 @@ The wrapper locates `omp` on `PATH` or uses `OMP_BIN`, preserves the caller's wo
 5. Accept the default compact answer for agent context efficiency; pass `--full` when the complete answer matters
 6. Preserve `ok`, `query`, `providers`, `providers_count`, `sources`, `sources_count`, `answer`, `exit_code`, and `error` in the caller's result. Do not expose environment values
 OMP loads its own dotenv/auth configuration. Never read, copy, print, or synthesize provider secrets in this skill. Query directives such as `site:`, `after:`, and `before:` may be included in the query.
+
 ## Output contract
 
 Success returns:
@@ -56,10 +57,11 @@ Failure returns the same query context with `ok: false`, an `error` object, and 
 ## Examples
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py "latest Bun JavaScript runtime release" --recency week --limit 3
-uv run --script <skill-dir>/scripts/cli.py "ancient history of the Antikythera mechanism" --providers exa,parallel
-uv run --script <skill-dir>/scripts/cli.py "current TypeScript release" --provider brave --full
+bun <skill-dir>/scripts/cli.ts "latest Bun JavaScript runtime release" --recency week --limit 3
+bun <skill-dir>/scripts/cli.ts "ancient history of the Antikythera mechanism" --providers exa,parallel
+bun <skill-dir>/scripts/cli.ts "current TypeScript release" --provider brave --full
 ```
+
 ## Runtime notes
 
 - The wrapper is non-interactive and uses argument arrays; never interpolate a query into shell syntax
@@ -70,6 +72,7 @@ uv run --script <skill-dir>/scripts/cli.py "current TypeScript release" --provid
 ## Validation
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py --help
+bun <skill-dir>/scripts/cli.ts --help
+bun test <skill-dir>/test/
 uv run --script <skill-creator-dir>/scripts/cli.py quick-validate <skill-dir>
 ```
