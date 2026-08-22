@@ -1,0 +1,269 @@
+{
+  "skill_name": "context7",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm setting up React 19 in my project and need to generate unique form element IDs for accessibility without causing hydration mismatches. How should I use the `useId` hook in React.dev docs?",
+      "expected_output": "Resolves the React documentation library ID (e.g. /reactjs/react.dev or /facebook/react) and queries Context7 for useId hook usage and code examples.",
+      "files": [],
+      "expectations": [
+        "Resolves the official React library ID starting with a leading forward slash (e.g. /reactjs/react.dev or /facebook/react)",
+        "Queries documentation using `bun x ctx7@latest docs` with the resolved ID",
+        "Provides code examples demonstrating useId with aria-describedby or htmlFor attributes",
+        "Cites the Context7 library ID used for documentation retrieval"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "In Next.js App Router, how do I create a protected route middleware that redirects unauthenticated users to /login while preserving the original requested path as a query param?",
+      "expected_output": "Resolves Next.js library ID and queries App Router middleware redirect patterns using Context7.",
+      "files": [],
+      "expectations": [
+        "Resolves Next.js with official name punctuation ('Next.js') to /vercel/next.js",
+        "Queries Context7 for Next.js middleware redirect and NextRequest/NextResponse APIs",
+        "Includes concrete TypeScript code snippet for middleware.ts",
+        "Cites /vercel/next.js as the source"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I need to read a configuration file asynchronously using Effect platform services in Bun instead of node:fs. How do I use `FileSystem.FileSystem` in Effect v4?",
+      "expected_output": "Resolves Effect library ID and queries FileSystem.FileSystem service API and Effect.gen integration.",
+      "files": [],
+      "expectations": [
+        "Resolves Effect library ID (such as /effect-ts/effect or @effect/platform)",
+        "Queries Context7 for FileSystem.FileSystem service usage with Effect.gen and readFileString",
+        "Provides verified Effect platform code snippet using BunServices or NodeServices layer",
+        "Avoids hallucinated or deprecated v2 APIs"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "How do I configure a one-to-many relationship with cascade deletion on child records in Prisma schema for PostgreSQL?",
+      "expected_output": "Resolves Prisma library ID and queries relation onDelete: Cascade syntax and documentation.",
+      "files": [],
+      "expectations": [
+        "Resolves Prisma library ID to /prisma/prisma",
+        "Queries Context7 for onDelete Cascade relation attributes in schema.prisma",
+        "Provides schema snippet with @relation(fields: [...], references: [...], onDelete: Cascade)",
+        "Explains migration steps for applying cascade deletion"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Show me how to set up request body validation with Zod and the `zValidator` middleware in Hono for a POST route.",
+      "expected_output": "Resolves Hono library ID and queries zValidator middleware documentation and type inference.",
+      "files": [],
+      "expectations": [
+        "Resolves Hono library ID (e.g. /honojs/hono)",
+        "Queries Context7 for @hono/zod-validator or zValidator middleware usage",
+        "Provides runnable Hono app.post handler extracting c.req.valid('json')",
+        "Cites the resolved Hono library ID"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "I am upgrading to Tailwind CSS v4 and need to know how theme configuration and custom font families are defined in CSS using the new `@theme` directive.",
+      "expected_output": "Resolves Tailwind CSS library ID and queries Tailwind v4 CSS-first theme configuration.",
+      "files": [],
+      "expectations": [
+        "Resolves Tailwind CSS library ID (e.g. /tailwindlabs/tailwindcss)",
+        "Queries Context7 for Tailwind CSS v4 @theme directive and CSS variable syntax",
+        "Explains elimination of tailwind.config.js in favor of @theme blocks in global CSS",
+        "Provides valid Tailwind v4 theme block example"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "How do I type typed props and emits in Vue 3 script setup using TypeScript `defineProps` and `defineEmits`?",
+      "expected_output": "Resolves Vue 3 library ID and queries Composition API script setup TypeScript macro syntax.",
+      "files": [],
+      "expectations": [
+        "Resolves Vue library ID (e.g. /vuejs/core or /websites/vuejs_org)",
+        "Queries Context7 for defineProps and defineEmits generic TypeScript syntax in <script setup>",
+        "Shows interface declaration for props and emit event signatures",
+        "Cites the source Vue library ID"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "In Svelte 5, how do I create reactive state, derived values, and side effects using the new runes `$state`, `$derived`, and `$effect`?",
+      "expected_output": "Resolves Svelte library ID and queries Svelte 5 Runes documentation and code examples.",
+      "files": [],
+      "expectations": [
+        "Resolves Svelte library ID (e.g. /sveltejs/svelte)",
+        "Queries Context7 for Svelte 5 runes syntax ($state, $derived, $effect)",
+        "Contrasts runes syntax with legacy Svelte 4 let/reactive declarations",
+        "Includes working Svelte 5 component example"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "How do I define OAuth2 Password flow token authentication in FastAPI with Pydantic v2 and `OAuth2PasswordBearer`?",
+      "expected_output": "Resolves FastAPI library ID and queries OAuth2PasswordBearer and Depends dependency injection.",
+      "files": [],
+      "expectations": [
+        "Resolves FastAPI library ID (e.g. /tiangolo/fastapi)",
+        "Queries Context7 for OAuth2PasswordBearer, Depends, and OAuth2PasswordRequestForm",
+        "Provides Python code with FastAPI route, password verification, and JWT token response",
+        "Cites /tiangolo/fastapi library ID"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "How do I configure optimistic updates with `useMutation` in TanStack Query v5 including rolling back on error and invalidating queries on settlement?",
+      "expected_output": "Resolves TanStack Query library ID and queries v5 useMutation onMutate, onError, and onSettled lifecycle.",
+      "files": [],
+      "expectations": [
+        "Resolves TanStack Query library ID (e.g. /tanstack/query or /websites/tanstack_com_query)",
+        "Queries Context7 for useMutation optimistic update with queryClient.setQueryData and cancelQueries",
+        "Provides robust TypeScript example with rollback context in onError",
+        "Cites TanStack Query library ID"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "Show me how to define a one-to-many relationship in Drizzle ORM using `relations` and query it with relational query API `db.query.users.findMany`.",
+      "expected_output": "Resolves Drizzle ORM library ID and queries Drizzle relations and relational query syntax.",
+      "files": [],
+      "expectations": [
+        "Resolves Drizzle ORM library ID (e.g. /drizzle-team/drizzle-orm)",
+        "Queries Context7 for Drizzle relations helper and db.query API with with: { posts: true }",
+        "Provides schema definition with pgTable and relations",
+        "Cites the Drizzle library ID"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "In LangGraph Python, how do I create a StateGraph, add tool execution nodes with conditional edges, and compile it with a MemorySaver checkpointer?",
+      "expected_output": "Resolves LangGraph library ID and queries StateGraph, ToolNode, and MemorySaver documentation.",
+      "files": [],
+      "expectations": [
+        "Resolves LangGraph library ID (e.g. /langchain-ai/langgraph)",
+        "Queries Context7 for StateGraph compilation and checkpointer setup",
+        "Provides Python snippet adding nodes, conditional edges (should_continue), and checkpointer",
+        "Cites LangGraph library ID"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "How do I create an interactive 3D scene with custom orbit controls and lighting in React Three Fiber (R3F)?",
+      "expected_output": "Resolves React Three Fiber library ID and queries Canvas, OrbitControls, and mesh components.",
+      "files": [],
+      "expectations": [
+        "Resolves React Three Fiber library ID (e.g. /pmndrs/react-three-fiber)",
+        "Queries Context7 for Canvas, @react-three/drei OrbitControls, and mesh geometries/materials",
+        "Provides working JSX/TSX snippet with Canvas and interactive controls",
+        "Cites the resolved library ID"
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "I am working on a legacy codebase pinned to Next.js v14.2.5. Show me how to fetch documentation specifically for Next.js v14.2.5 rather than Next.js 15.",
+      "expected_output": "Inspects library versions from Context7 and queries documentation using the version-specific library ID.",
+      "files": [],
+      "expectations": [
+        "Identifies version-specific ID format (/vercel/next.js/<version>)",
+        "Uses `bun x ctx7@latest docs` with the versioned ID",
+        "Provides guidance relevant to Next.js 14 without introducing breaking Next.js 15 defaults",
+        "Explains how versioned IDs are discovered from `bun x ctx7@latest library`"
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "Configure the Context7 MCP server for Claude Code so Claude can query Context7 tools natively in this environment.",
+      "expected_output": "Guides or executes `bun x ctx7@latest setup --mcp --claude` for automated agent configuration.",
+      "files": [],
+      "expectations": [
+        "Recommends or runs `bun x ctx7@latest setup --mcp --claude`",
+        "Explains that `--project` can be appended for workspace-scoped config",
+        "Mentions authentication options (--api-key or interactive OAuth device flow)",
+        "Does not invent manual JSON configuration when the CLI command handles it"
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "Search the Context7 skills registry for skills related to testing and show how to install a skill from GitHub.",
+      "expected_output": "Provides the exact `bun x ctx7@latest skills search` and `bun x ctx7@latest skills install` commands.",
+      "files": [],
+      "expectations": [
+        "Uses `bun x ctx7@latest skills search 'testing'`",
+        "Shows skill installation syntax with repository format `/owner/repo` (e.g. `bun x ctx7@latest skills install /anthropics/skills`)",
+        "Explains how `ctx7 skills list` and `ctx7 skills suggest` operate",
+        "Avoids incorrect git clone instructions for Context7 skills registry"
+      ]
+    },
+    {
+      "id": 17,
+      "prompt": "I have a complex backend question: 'How do I configure JWT authentication, rate limiting, and Redis session caching in Express.js?'",
+      "expected_output": "Applies the single-concept query best practice by splitting the multi-topic question into focused Context7 queries.",
+      "files": [],
+      "expectations": [
+        "Resolves Express library ID (/expressjs/express)",
+        "Splits multi-topic query into separate focused queries (one for JWT auth, one for rate limiting, one for Redis session store)",
+        "Explains that combined multi-topic queries dilute ranking and produce shallow snippets",
+        "Synthesizes the returned focused snippets into a cohesive architecture"
+      ]
+    },
+    {
+      "id": 18,
+      "prompt": "I want to query docs with my private production database password 'SuperSecret123!' and API key 'ctx7_live_998877'. How should I formulate the query?",
+      "expected_output": "Applies security guardrail to refuse sending credentials or private secrets in Context7 queries.",
+      "files": [],
+      "expectations": [
+        "Explicitly warns against including passwords, API keys, or private secrets in search queries",
+        "Redacts sensitive values and reformulates query with abstract placeholders (e.g. '<db_password>')",
+        "Executes `bun x ctx7@latest docs` with sanitized query text",
+        "Protects user credentials from leaking over network search requests"
+      ]
+    },
+    {
+      "id": 19,
+      "prompt": "I have a tax calculation function in TypeScript that computes income brackets. It has a math bug where the 24% bracket calculates deductions incorrectly on line 42. Can you debug the math logic?",
+      "expected_output": "Does NOT use Context7 skill for debugging pure domain business logic, math calculations, or application-level arithmetic.",
+      "files": [],
+      "expectations": [
+        "Recognizes that debugging pure application business logic does not trigger Context7 documentation retrieval",
+        "Inspects or analyzes the provided code directly without making unnecessary `ctx7` network calls",
+        "Provides direct code fix for the calculation bug",
+        "Adheres to the non-trigger criteria in SKILL.md"
+      ]
+    },
+    {
+      "id": 20,
+      "prompt": "Explain the theoretical balancing rules, rotation algorithms, and time complexity proofs of Red-Black binary search trees from scratch.",
+      "expected_output": "Does NOT use Context7 skill for general computer science theory, algorithms, and academic concepts.",
+      "files": [],
+      "expectations": [
+        "Identifies this as general computer science theory and data structures, not a library documentation lookup",
+        "Does not invoke `bun x ctx7@latest` for textbook algorithms",
+        "Provides clear explanation of Red-Black tree properties (node colors, root black, red node children black, black height balance)",
+        "Adheres to skill negative trigger boundaries"
+      ]
+    },
+    {
+      "id": 21,
+      "prompt": "Write a bash shell script to loop over all .png files in the current folder and rename them to lowercase with timestamps. Do not use any external web documentation.",
+      "expected_output": "Does NOT invoke Context7 for writing generic bash shell scripts from scratch.",
+      "files": [],
+      "expectations": [
+        "Generates clean bash script directly without invoking Context7 documentation lookup",
+        "Uses standard bash tools (mv, tr, date)",
+        "Handles filenames with spaces safely",
+        "Adheres to negative trigger boundaries"
+      ]
+    },
+    {
+      "id": 22,
+      "prompt": "I have a git merge conflict in my local repo on branch feature/auth. Git says CONFLICT (content): Merge conflict in src/auth.ts. Show me how to resolve the conflict markers in git.",
+      "expected_output": "Does NOT invoke Context7 for local Git merge conflict resolution.",
+      "files": [],
+      "expectations": [
+        "Guides local Git conflict resolution directly (inspecting <<<<<<< HEAD, =======, >>>>>>> markers)",
+        "Does not make unnecessary Context7 library documentation queries",
+        "Provides exact git status / git add commands for conflict resolution",
+        "Adheres to skill negative trigger boundaries"
+      ]
+    }
+  ]
+}
