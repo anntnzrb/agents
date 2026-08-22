@@ -24,10 +24,10 @@ Use this skill for explicit public X/Twitter post URLs or IDs, bounded user time
 Run from the repository root with the public entrypoint:
 
 ```text
-uv run --script skills/current/x-research/scripts/cli.py fetch TARGET [--provider fxtwitter] [--lang LANG] [--summary] [--pretty]
-uv run --script skills/current/x-research/scripts/cli.py user-posts HANDLE [--count 1..100] [--cursor CURSOR] [--include-replies] [--summary] [--pretty]
-uv run --script skills/current/x-research/scripts/cli.py search QUERY [--count 1..100] [--feed latest|top|media] [--cursor CURSOR] [--summary] [--pretty]
-uv run --script skills/current/x-research/scripts/cli.py conversation NUMERIC_ID [--ranking-mode likes|recency] [--cursor CURSOR] [--summary] [--pretty]
+bun skills/current/x-research/scripts/cli.ts fetch TARGET [--provider fxtwitter] [--lang LANG] [--summary] [--pretty]
+bun skills/current/x-research/scripts/cli.ts user-posts HANDLE [--count 1..100] [--cursor CURSOR] [--include-replies] [--summary] [--pretty]
+bun skills/current/x-research/scripts/cli.ts search QUERY [--count 1..100] [--feed latest|top|media] [--cursor CURSOR] [--summary] [--pretty]
+bun skills/current/x-research/scripts/cli.ts conversation NUMERIC_ID [--ranking-mode likes|recency] [--cursor CURSOR] [--summary] [--pretty]
 ```
 
 `fetch` accepts a numeric post ID or only an `https://x.com/.../status/<numeric-id>` or `https://twitter.com/.../status/<numeric-id>` URL, with an optional trailing slash. `user-posts` accepts a handle; replies are excluded unless `--include-replies` is explicit. Search whitespace is collapsed but the query's operators and text otherwise remain verbatim. No command automatically fetches another page.
@@ -47,15 +47,15 @@ Use `--summary` for routine output. It is a deterministic projection that preser
 
 ### Latest posts from a user
 
-Run one bounded page with `uv run --script skills/current/x-research/scripts/cli.py user-posts HANDLE --count COUNT --summary [--pretty]` (choose a concrete count from 1-100; omit `--pretty` for default compact output). Report the handle, count requested/returned, whether replies were included, cursor, and completeness. Use unflagged full output only when optional metrics or media are needed. Use `conversation` only when the user asks for a particular thread.
+Run one bounded page with `bun skills/current/x-research/scripts/cli.ts user-posts HANDLE --count COUNT --summary [--pretty]` (choose a concrete count from 1-100; omit `--pretty` for default compact output). Report the handle, count requested/returned, whether replies were included, cursor, and completeness. Use unflagged full output only when optional metrics or media are needed. Use `conversation` only when the user asks for a particular thread.
 
 ### Sample-scoped sentiment
 
-Run `uv run --script skills/current/x-research/scripts/cli.py search QUERY --count COUNT --feed latest --summary [--pretty]` (or `uv run --script skills/current/x-research/scripts/cli.py user-posts HANDLE --count COUNT --summary [--pretty]`) once with a fixed query and bounded count. Classify each returned post from its text as positive, negative, neutral, mixed, or unclear; cite its ID and URL; aggregate counts and confidence; label the result as a returned-sample observation, not public-opinion truth. Use unflagged full output only when optional metrics or media are needed.
+Run `bun skills/current/x-research/scripts/cli.ts search QUERY --count COUNT --feed latest --summary [--pretty]` (or `bun skills/current/x-research/scripts/cli.ts user-posts HANDLE --count COUNT --summary [--pretty]`) once with a fixed query and bounded count. Classify each returned post from its text as positive, negative, neutral, mixed, or unclear; cite its ID and URL; aggregate counts and confidence; label the result as a returned-sample observation, not public-opinion truth. Use unflagged full output only when optional metrics or media are needed.
 
 ### X-plus-web news exploration
 
-Run `uv run --script skills/current/x-research/scripts/cli.py search QUERY --count COUNT --feed latest --summary [--pretty]` for bounded X discovery/evidence, then use `web_search` and `read` for independent primary or credible sources. Use unflagged full output only when optional metrics or media are needed. Separate X evidence from independently verified claims, show timestamps and source roles, describe agreement/conflict, and retain uncertainty when either source set is incomplete.
+Run `bun skills/current/x-research/scripts/cli.ts search QUERY --count COUNT --feed latest --summary [--pretty]` for bounded X discovery/evidence, then use `web_search` and `read` for independent primary or credible sources. Use unflagged full output only when optional metrics or media are needed. Separate X evidence from independently verified claims, show timestamps and source roles, describe agreement/conflict, and retain uncertainty when either source set is incomplete.
 
 ## Required follow-up reads
 

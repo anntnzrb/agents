@@ -1,0 +1,26 @@
+{
+  "name": "@agents/skill-x-research",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#models": "./lib/models.ts",
+    "#provider": "./lib/provider.ts",
+    "#contracts": "./lib/contracts.ts",
+    "#summary": "./lib/summary.ts",
+    "#commands": "./lib/commands.ts"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "^4.0.0-rc.111",
+    "effect": "^4.0.0-rc.111"
+  },
+  "devDependencies": {
+    "@effect/tsgo": "^0.36.5",
+    "@types/bun": "^1.3.14",
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "bunx tsc --project tsconfig.json --noEmit",
+    "effect:diagnostics": "bunx @effect/tsgo diagnostics --project tsconfig.json"
+  }
+}
