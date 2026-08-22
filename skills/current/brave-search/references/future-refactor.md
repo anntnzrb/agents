@@ -11,7 +11,7 @@ Scope: read for larger skill refactors, not normal lookup.
 - CLI stdlib-only unless a future change proves the dependency pays for itself.
 
 ## Non-expectations
-- Not a full research synthesizer; Exa or a dedicated research skill owns deeper multi-source synthesis.
+- Not a full research synthesizer; dedicated research skills own deeper multi-source synthesis.
 - No eager result-page fetching: search returns candidates; page extraction belongs elsewhere unless the user explicitly asks for that scope.
 - No retries that hide quota/rate-limit failures while burning the user’s API budget.
 - No `search.ts` / `content.ts` parallel interface.
@@ -26,7 +26,7 @@ Scope: read for larger skill refactors, not normal lookup.
 - Conservative field projection: retain decision-changing fields; drop UI scaffolding, thumbnails, favicons, duplicate URL metadata, and provider layout hints.
 
 ## Future refactor candidates
-1. Shared env loading + HTTP error shaping helper for Brave, Reddit, Exa, and Grep.app.
+1. Shared env loading + HTTP error shaping helper for Brave, Reddit, and Grep.app.
 2. Fixture tests for each endpoint shape (`web`, `news`, `local`, `image`, `video`) using captured redacted payloads.
 3. Live smoke tests behind an env flag; normal test runs never spend quota.
 4. Revisit summarizer only if Brave reliably returns `summarizer.key`; until then, legacy/experimental.

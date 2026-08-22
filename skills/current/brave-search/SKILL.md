@@ -33,7 +33,7 @@ Keep `.env` beside this skill. Tracked template: `.env.example`.
 - Fast scoping / quick lookups
 - Recency-sensitive news checks
 - Image / video / local search
-- Lightweight web research before escalating to Exa
+- Lightweight web research before escalating to deeper extraction
 
 ## Quick start
 
@@ -82,7 +82,7 @@ uv run --script <skill-dir>/scripts/cli.py summarize <summary-key> inline_refere
 - Optional query params follow the main argument as `key=value` pairs.
 - `raw=1` skips defaults and compact projection; `raw=0` and every other value are ignored.
 - Useful params: `count=`, `freshness=`, `country=`, `search_lang=`, `ui_lang=`, `safesearch=`, `result_filter=` (web only).
-- Prefer Exa for deeper multi-source synthesis.
+- Prefer dedicated research or scraping tools for deeper multi-source synthesis.
 
 ## Need | Read | When
 
