@@ -13,6 +13,10 @@
     "test": "bun test",
     "test:integration": "bun test ./test/integration.test.ts"
   },
+  "dependencies": {
+    "@effect/platform-bun": "^4.0.0-rc.111",
+    "effect": "^4.0.0-rc.111"
+  },
   "devDependencies": {
     "@biomejs/biome": "2.5.8",
     "@effect/tsgo": "^0.36.5",
@@ -21,9 +25,5 @@
     "oxlint": "1.78.0",
     "oxlint-tsgolint": "7.0.2001",
     "typescript": "7.0.2"
-  },
-  "dependencies": {
-    "@effect/platform-bun": "^4.0.0-rc.111",
-    "effect": "^4.0.0-rc.111"
   }
 }

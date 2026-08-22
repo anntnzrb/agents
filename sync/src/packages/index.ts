@@ -23,11 +23,7 @@ export {
   githubSlugForTests,
   packageCacheDir,
 } from "./source.ts";
-export {
-  packageHasBuildScript,
-  packageIsHealthy,
-  validatePackageForTests,
-} from "./validate.ts";
+export { packageHasBuildScript, packageIsHealthy, validatePackageForTests } from "./validate.ts";
 
 export const PackageManifestSchema = Schema.Struct({
   packages: Schema.Array(Schema.NonEmptyString).pipe(
