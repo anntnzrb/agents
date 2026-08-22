@@ -56,3 +56,16 @@ Wrapper state lives at `~/.local/share/agents/sync-managed/wrappers.json`. Sync 
 Each harness has a versioned npm cache under `<cache-home>/npm-tools/`. `<cache-home>` is `XDG_CACHE_HOME` or `~/.cache`.
 
 The cache keeps the current and previous known-good package versions. Newly installed packages pass the adapter smoke command before promotion. Cached packages are checked for package identity and an executable before promotion.
+
+## Shared harness environment
+
+`sync` resolves shared environment variables from `.env` in the repository root (`~/.config/agents/.env`).
+
+- If `.env` is absent, `sync` continues with an empty default environment map.
+- Variables are decoded at the `SyncEnv` boundary using Effect `ConfigProvider.fromDotEnvContents` without variable expansion, preserving quoted and unquoted strings as well as literal variable syntax while omitting empty values.
+- Decoded variables are forwarded to child processes for all supported harnesses (`codex`, `deepseek`, `grok`, `opencode`, `pi`, and `omp`).
+- Precedence:
+  1. Explicit adapter overrides (`launcher.env`).
+  2. Parent-process environment variables inherited from the invoking environment.
+  3. Default values defined in `.env`.
+- Generated launch wrappers under `~/.local/bin/` do not embed `.env` values; they dynamically invoke the sync runtime on each launch.

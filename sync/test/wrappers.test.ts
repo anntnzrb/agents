@@ -130,6 +130,37 @@ test("wrapper_destinations_render_unix_launchers", () => {
   });
 });
 
+test("generated_wrappers_do_not_embed_root_env_values", () => {
+  withTempHome((home) => {
+    addHarnessSources(home);
+    const sentinelKey = "SECRET_SENTINEL_ROOT_ENV_KEY";
+    const sentinelVal = "super_secret_payload_12345";
+    const agentsHome = join(home, ".config", "agents");
+    writeFileSync(join(agentsHome, ".env"), `${sentinelKey}=${sentinelVal}\n`, "utf8");
+    const unixEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
+    assert.equal(unixEnv.rootEnv[sentinelKey], sentinelVal);
+
+    const destinations = wrapperDestinations(unixEnv);
+    for (const destination of destinations) {
+      assert.equal(
+        destination.content.includes(sentinelKey),
+        false,
+        `wrapper at ${destination.path} must not contain root env key`,
+      );
+      assert.equal(
+        destination.content.includes(sentinelVal),
+        false,
+        `wrapper at ${destination.path} must not contain root env value`,
+      );
+      assert.equal(
+        destination.content.includes("launch"),
+        true,
+        `wrapper at ${destination.path} must retain launch command`,
+      );
+    }
+  });
+});
+
 test("codex_wrapper defers sandbox and hook policies to config", () => {
   withTempHome((home) => {
     addHarnessSources(home);

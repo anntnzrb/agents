@@ -1,7 +1,8 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { assertNever } from "@runtime/errors.ts";
+import { assertNever, isErrno } from "@runtime/errors.ts";
+import { ConfigProvider, Effect, HashMap, Schema } from "effect";
 import {
   HARNESS_ADAPTERS,
   type HarnessAdapter,
@@ -65,6 +66,7 @@ export class SyncEnv {
   readonly installTimeoutMs: number;
   readonly harnesses: readonly Harness[];
   readonly platform: HostPlatform;
+  readonly rootEnv: Readonly<Record<string, string>>;
 
   constructor(
     home: string,
@@ -81,6 +83,7 @@ export class SyncEnv {
   ) {
     this.home = home;
     this.ssotHome = ssotHome;
+    this.rootEnv = Effect.runSync(loadRootEnv(path.join(ssotHome, ".env")));
     this.runtimeHome = runtimeHome;
     this.skillsHome = skillsHome;
     this.harnessesHome = harnessesHome;
@@ -134,6 +137,84 @@ export class SyncEnv {
     return this.harnesses.find((harness) => harness.id === id);
   }
 }
+
+export class RootEnvReadError extends Schema.TaggedError<RootEnvReadError>()("RootEnvReadError", {
+  path: Schema.String,
+  cause: Schema.Unknown,
+}) {
+  override get message(): string {
+    return `failed to read root environment file ${this.path}`;
+  }
+}
+
+const readRootEnvContent = (envPath: string): Effect.Effect<string | undefined, RootEnvReadError> =>
+  Effect.try({
+    try: () => readFileSync(envPath, "utf-8"),
+    catch: (cause) => ({ cause, isEnoent: isErrno(cause, "ENOENT") }),
+  }).pipe(
+    Effect.catchIf(
+      ({ isEnoent }) => isEnoent,
+      () => Effect.succeed(undefined),
+    ),
+    Effect.mapError(({ cause }) => new RootEnvReadError({ path: envPath, cause })),
+  );
+
+const collectEnvFromProvider = (
+  provider: ConfigProvider.ConfigProvider,
+  currentPath: readonly string[] = [],
+): Effect.Effect<HashMap.HashMap<string, string>, ConfigProvider.SourceError> =>
+  Effect.gen(function* () {
+    const node = yield* provider.load(currentPath);
+    if (!node) {
+      return HashMap.empty<string, string>();
+    }
+
+    let current = HashMap.empty<string, string>();
+    if (node.value !== undefined && currentPath.length > 0) {
+      current = HashMap.set(current, currentPath.join("_"), node.value);
+    } else if (node._tag === "Value" && currentPath.length > 0) {
+      current = HashMap.set(current, currentPath.join("_"), node.value);
+    }
+
+    const childSegments: readonly string[] =
+      node._tag === "Record"
+        ? Array.from(node.keys)
+        : node._tag === "Array"
+          ? Array.from({ length: node.length }, (_, i) => String(i))
+          : [];
+
+    if (childSegments.length === 0) {
+      return current;
+    }
+
+    const childMaps = yield* Effect.forEach(childSegments, (segment) =>
+      collectEnvFromProvider(provider, [...currentPath, segment]),
+    );
+
+    return childMaps.reduce((acc, childMap) => HashMap.union(acc, childMap), current);
+  });
+
+export const decodeRootEnv = (
+  content: string | undefined,
+): Effect.Effect<Readonly<Record<string, string>>, ConfigProvider.SourceError> =>
+  Effect.gen(function* () {
+    if (content === undefined) {
+      return Object.freeze({});
+    }
+
+    const provider = ConfigProvider.fromDotEnvContents(content, {
+      expandVariables: false,
+      preserveEmptyStrings: false,
+    });
+
+    const hashMap = yield* collectEnvFromProvider(provider);
+    return Object.freeze(Object.fromEntries(HashMap.toEntries(hashMap)));
+  });
+
+export const loadRootEnv = (
+  envPath: string,
+): Effect.Effect<Readonly<Record<string, string>>, RootEnvReadError | ConfigProvider.SourceError> =>
+  readRootEnvContent(envPath).pipe(Effect.andThen(decodeRootEnv));
 
 export function buildHarness(spec: HarnessSpec): Harness {
   assertPathComponent(spec.sourceName, "harness id");

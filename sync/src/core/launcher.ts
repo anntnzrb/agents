@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { releaseSyncLock, type SyncLock, tryAcquireSyncLock } from "@runtime/lock.ts";
+import { Record as EffectRecord } from "effect";
 import type { Harness, SyncEnv } from "./harness.ts";
 
 const DEFAULT_LAUNCH_TIMEOUT_MS = 120_000;
@@ -42,6 +43,7 @@ export interface LauncherRuntime {
     cwd: string | undefined,
     timeoutMs: number | undefined,
     stdio: "pipe" | "inherit",
+    env?: Record<string, string>,
   ) => Promise<LauncherProcessResult>;
 }
 
@@ -231,6 +233,15 @@ export function launchHarness(
   args: readonly string[],
   runtime: LauncherRuntime = {},
 ): Promise<number> {
+  const rootFiltered = EffectRecord.filter(
+    syncEnv.rootEnv,
+    (_value, key) => !Object.hasOwn(process.env, key),
+  );
+  const merged =
+    harness.launcher.env !== undefined
+      ? { ...rootFiltered, ...harness.launcher.env }
+      : rootFiltered;
+  const env = EffectRecord.size(merged) > 0 ? merged : undefined;
   return launchNpmPackage(
     syncEnv,
     {
@@ -239,7 +250,7 @@ export function launchHarness(
       bin: harness.launcher.bin,
       distTag: harness.launcher.distTag,
       smokeCheck: harness.launcher.smokeCheck,
-      ...(harness.launcher.env === undefined ? {} : { env: harness.launcher.env }),
+      ...(env === undefined ? {} : { env }),
     },
     args,
     runtime,

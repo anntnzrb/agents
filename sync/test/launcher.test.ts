@@ -284,6 +284,79 @@ test("interactive_harness_launch_is_unbounded_and_keeps_arguments", async () => 
   });
 });
 
+test("harness_launch_merges_root_env_parent_env_and_adapter_env_with_precedence", async () => {
+  const rootKeyOnly = "AGENTS_SYNC_TEST_ROOT_ONLY_VAR";
+  const parentKeyOverride = "AGENTS_SYNC_TEST_PARENT_OVERRIDE_VAR";
+  const adapterCollisionKey = "AGENTS_SYNC_TEST_ADAPTER_COLLISION_VAR";
+
+  const originalParentVal = process.env[parentKeyOverride];
+  process.env[parentKeyOverride] = "parent_value";
+
+  try {
+    await withTempHome(async (home) => {
+      const agentsHome = join(home, ".config", "agents");
+      mkdirSync(join(agentsHome, "harnesses", "codex"), { recursive: true });
+      writeFileSync(
+        join(agentsHome, ".env"),
+        [
+          `${rootKeyOnly}=root_default_val`,
+          `${parentKeyOverride}=root_ignored_val`,
+          `${adapterCollisionKey}=root_val_overridden_by_adapter`,
+        ].join("\n"),
+        "utf8",
+      );
+
+      let capturedEnv: Record<string, string> | undefined;
+      const runtime = {
+        resolveVersion: async (): Promise<string> => "1.0.0",
+        run: async (
+          command: readonly string[],
+          _cwd: string | undefined,
+          _timeout: number | undefined,
+          _stdio: "pipe" | "inherit",
+          env?: Record<string, string>,
+        ): Promise<LauncherProcessResult> => {
+          capturedEnv = env;
+          if (command[0] === "npm") {
+            const stage = command[3]!;
+            const executable = join(stage, "node_modules", ".bin", "codex");
+            mkdirSync(join(stage, "node_modules", ".bin"), { recursive: true });
+            writeFileSync(executable, "#!/bin/sh\nexit 0\n", "utf8");
+            chmodSync(executable, 0o755);
+            writePackageManifest(stage, "@openai/codex", "1.0.0");
+          }
+          return success();
+        },
+      };
+
+      const syncEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
+      const baseHarness = syncEnv.harnesses.find((candidate) => candidate.sourceName === "codex")!;
+      const harnessWithAdapterEnv = {
+        ...baseHarness,
+        launcher: {
+          ...baseHarness.launcher,
+          env: {
+            [adapterCollisionKey]: "adapter_wins",
+          },
+        },
+      };
+
+      await launchHarness(syncEnv, harnessWithAdapterEnv, [], runtime);
+
+      assert(capturedEnv !== undefined);
+      assert.equal(capturedEnv[rootKeyOnly], "root_default_val");
+      assert.equal(capturedEnv[parentKeyOverride], undefined);
+      assert.equal(capturedEnv[adapterCollisionKey], "adapter_wins");
+    });
+  } finally {
+    if (originalParentVal === undefined) {
+      delete process.env[parentKeyOverride];
+    } else {
+      process.env[parentKeyOverride] = originalParentVal;
+    }
+  }
+});
+
 function writePackageManifest(root: string, packageName: string, version: string): void {
   const packageDir = join(root, "node_modules", ...packageName.split("/"));
   mkdirSync(packageDir, { recursive: true });
