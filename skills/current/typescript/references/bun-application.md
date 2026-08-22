@@ -28,8 +28,20 @@ Do not invoke npm, pnpm, Yarn, Node.js, Deno, `ts-node`, `tsx`, or `nodemon` wit
 
 Use native ESM, modern imports, and `"type": "module"`. Do not use CommonJS or `require`.
 
-Before adopting a dependency, inspect its exports and runtime assumptions. Verify Bun compatibility when the package is Node-specific or compatibility is uncertain. Explain the tradeoff before adding an incompatible or uncertain dependency.
+When developing a self-contained CLI tool, skill, or service in a nested directory, initialize the directory as its own package (`bun init` or local `package.json`) with its own pinned dependencies. Never reach across unrelated repository or directory boundaries with upward-traversing `tsconfig.json` path hacks.
 
+Use package-level subpath imports (`#*` in `package.json` and matching `paths` in `tsconfig.json`) to organize internal modules across directories without relative `../` traversal ladders:
+
+```json
+{
+  "imports": {
+    "#models": "./lib/models.ts",
+    "#config": "./lib/config.ts"
+  }
+}
+```
+
+Before adopting a dependency, inspect its exports and runtime assumptions. Verify Bun compatibility when the package is Node-specific or compatibility is uncertain. Explain the tradeoff before adding an incompatible or uncertain dependency.
 ## TypeScript compiler
 
 Use the native Go-based `typescript` package at version 7 or newer. Install the requested current version, then verify the installed version instead of trusting a dist-tag:
