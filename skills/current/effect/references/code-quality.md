@@ -71,6 +71,8 @@ A narrow JavaScript `try/catch` can be valid in a non-Effect host adapter or aro
 - Use `Effect.acquireRelease`, `Effect.acquireUseRelease`, `Scope`, or scoped Layers for owned resources. Cleanup must run on success, failure, and interruption.
 - Keep fiber ownership explicit. Prefer scoped or supervised concurrency. Do not leave forked fibers or Promises running after their owner exits.
 - Use Effect concurrency operators instead of `Promise.all`, hand-built races, timers, or `AbortController` choreography inside Effect code.
+- When bridging external timers or `setTimeout` into `Promise.race` or Effect wrappers, always unreference the timer handle (`timer.unref?.()`) and immediately clear it (`clearTimeout(timer)`) when the operation settles. Active unreferenced timers keep the Node or Bun event loop open for the entire duration, silently stalling process exits.
+- When spawning non-interactive external child processes in Effect adapters, pass `stdin: "ignore"` (or `"null"`) to prevent spawned binaries from blocking on open standard input streams.
 - Use `Schedule` for retries, repetition, and polling. Retry only failures known to be retryable, bound the policy, and ensure the operation is safe to repeat.
 - Test interruption and cleanup whenever code owns a resource, background fiber, timeout, or cancellation bridge.
 

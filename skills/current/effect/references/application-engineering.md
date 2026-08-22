@@ -86,12 +86,28 @@ For a standalone Bun application, run the final program at the process boundary 
 
 Use `Context.Service` and `Layer` for databases, APIs, configuration, filesystems, clocks, queues, and other capabilities that tests or deployments replace. Add each service only for a concrete boundary or reuse need.
 
-For CLI applications, use the current v4 CLI modules:
+For CLI applications, use the current v4 CLI modules from `effect/unstable/cli`:
 
 ```ts
 import { Argument, Command, Flag } from "effect/unstable/cli"
-```
 
+const searchCommand = Command.make("search", {
+  query: Argument.string("query").pipe(
+    Argument.withDescription("Search query words"),
+    Argument.variadic({ min: 1 })
+  ),
+  provider: Flag.string("provider").pipe(
+    Flag.withDescription("Explicit provider name"),
+    Flag.optional
+  ),
+  limit: Flag.integer("limit").pipe(
+    Flag.withDescription("Source limit"),
+    Flag.withDefault(2)
+  )
+}, (config) => handleSearch(config)).pipe(
+  Command.withDescription("Search CLI tool")
+)
+```
 For HTTP applications, use the current v4 HTTP modules and Bun platform adapter:
 
 ```ts
@@ -130,9 +146,9 @@ Test:
 - concurrency behavior when relevant
 - configuration decoding
 - HTTP, CLI, SQL, or other boundaries that the application exposes
-
 Prefer test Layers, test services, `TestClock`, in-memory edges, and dependency replacement over global module mocking. Keep tests deterministic. Do not require live credentials unless the task explicitly requests an integration test.
 
+Effect platform services such as `FileSystem` and `Path` perform asynchronous operations (`exists`, `readFileString`). Attempting to drive them with `Effect.runSync` will fail. Always drive platform-dependent Effect programs with `await Effect.runPromise(...)` in test suites.
 ## Dependency exclusions
 
 Do not use old Effect package names or v3-only tutorials:
