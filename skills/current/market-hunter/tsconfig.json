@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleDetection": "force",
+    "moduleResolution": "bundler",
+    "paths": {
+      "#models": ["./lib/models.ts"],
+      "#registry": ["./lib/registry.ts"],
+      "#scoring": ["./lib/scoring.ts"],
+      "#adapters": ["./lib/adapters/index.ts"],
+      "#engine": ["./lib/engine.ts"]
+    },
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "types": ["bun"],
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "useUnknownInCatchVariables": true,
+    "noImplicitOverride": true,
+    "isolatedModules": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "erasableSyntaxOnly": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["lib/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"]
+}

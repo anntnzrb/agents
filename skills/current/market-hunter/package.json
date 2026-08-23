@@ -1,0 +1,25 @@
+{
+  "name": "@agents/skill-market-hunter",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#models": "./lib/models.ts",
+    "#registry": "./lib/registry.ts",
+    "#scoring": "./lib/scoring.ts",
+    "#adapters": "./lib/adapters/index.ts",
+    "#engine": "./lib/engine.ts"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "^4.0.0-rc.111",
+    "effect": "^4.0.0-rc.111",
+    "firecrawl": "^4.35.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.0",
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "bunx tsc --project tsconfig.json --noEmit"
+  }
+}
