@@ -158,7 +158,8 @@ bashInterceptor:
 eval:
   autoBackground:
     enabled: true
-  py: false
+  js: true
+  py: true
 
 python:
   kernelMode: session
