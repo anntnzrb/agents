@@ -2,7 +2,7 @@
   "cases": [
     {
       "id": 1,
-      "prompt": "I'm in my local Odoo runtime and the app is connecting to the wrong database. Use the bundled odoo-local-ops skill to inspect the environment and tell me which database is effectively in use.",
+      "prompt": "I'm in my local Odoo runtime and the app is connecting to the wrong database. Use the bundled odoo-ops skill to inspect the environment and tell me which database is effectively in use.",
       "expected_output": "Uses the bundled CLI to inspect runtime, reports the effective database source, and does not fall back to raw shell or psql commands.",
       "files": [],
       "expectations": [

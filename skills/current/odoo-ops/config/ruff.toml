@@ -1,0 +1,27 @@
+[lint]
+select = ["ALL"]
+ignore = [
+    "COM812", # missing-trailing-comma
+    "D203",   # one-blank-line-before-class
+    "D213",   # multi-line-summary-second-line
+    "ERA001", # commented-out-code
+    "CPY",    # flake8-copyright (no copyright header required)
+]
+
+[lint.per-file-ignores]
+"**/__manifest__.py" = ["B018", "D100"]
+"**/__init__.py" = ["F401"]
+"**/controllers/**" = ["ANN401"]
+"**/tests/**" = [
+    "ANN",
+    "D",
+    "DTZ011",
+    "E501",
+    "FBT002",
+    "FBT003",
+    "PLR0915",
+    "PT027",
+    "PT009",
+    "S101",
+    "SLF001",
+]

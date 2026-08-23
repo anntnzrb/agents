@@ -21,6 +21,15 @@
         "web_espol",
         "url_shortener",
         "template_editor"
+      ],
+      "lint_modules": [
+        "crm_espol",
+        "b2b",
+        "whatsapp_utils",
+        "whatsapp_bot",
+        "web_espol",
+        "url_shortener",
+        "template_editor"
       ]
     }
   }

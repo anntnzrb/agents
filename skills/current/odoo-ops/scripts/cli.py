@@ -1,17 +1,16 @@
 # /// script
 # requires-python = ">=3.10"
 # ///
-"""Cross-platform public dispatcher for Odoo Local Ops."""
+"""Public entrypoint and dispatcher for Odoo Ops."""
 
 from __future__ import annotations
 
 import sys
-
 import odooctl
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Delegate to odooctl while preserving its exit behavior."""
+    """Delegate directly to odooctl."""
     return odooctl.main(argv)
 
 
