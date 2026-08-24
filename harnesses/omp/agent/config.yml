@@ -12,7 +12,7 @@ modelRoles:
   commit: google-antigravity/gemini-3.7-flash:medium
   tiny: google-antigravity/gemini-3.7-flash:medium
   task: google-antigravity/gemini-3.7-flash:medium
-  advisor: google-antigravity/gemini-3.7-flash:medium
+  advisor: opencode-zen/x-preview-f-free:max
 
 modelRoleStorage: global
 defaultThinkingLevel: auto
@@ -250,7 +250,7 @@ doubleEscapeAction: tree
 treeFilterMode: no-tools
 
 advisor:
-  enabled: false
+  enabled: true
   syncBacklog: "off"
   immuneTurns: 3
 
