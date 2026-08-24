@@ -70,7 +70,7 @@ async function ensurePythonEnv(home = homedir()): Promise<void> {
     "venv",
     "--python",
     latest,
-    path.join(homedir(), ".omp", "python-env"),
+    path.join(home, ".omp", "python-env"),
   ]);
   if (!venv.success) {
     warn("failed to create python-env");
@@ -108,6 +108,7 @@ export async function runSync(
     readonly forceModelRefresh?: boolean;
   } = {},
 ): Promise<boolean> {
+  await ensurePythonEnv(syncEnv.home);
   let syncPlan: SyncPlan;
   let managedPlan: ManagedSyncPlan;
   let extensionHookStates: ReadonlyMap<string, ExtensionHookRuntimeState>;
@@ -188,7 +189,6 @@ export const main = async (
     err(panicMessage(error));
     return 1;
   }
-  await ensurePythonEnv();
 
   let lock: SyncLock | undefined;
   try {
@@ -231,7 +231,6 @@ export const launchMain = async (sourceName: string, args: readonly string[]): P
     return 1;
   }
 
-  await ensurePythonEnv();
   const ssotAvailable = existsSync(syncEnv.ssotHome);
   const harness =
     syncEnv.harnesses.find((candidate) => candidate.sourceName === sourceName) ??
