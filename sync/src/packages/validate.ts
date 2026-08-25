@@ -178,34 +178,21 @@ function packageSourceFiles(root: string): string[] {
   return files;
 }
 
-function extractImportSpecifiers(content: string): string[] {
-  const prefixes = [
-    'from "',
-    "from '",
-    'import "',
-    "import '",
-    'require("',
-    "require('",
-    'import("',
-    "import('",
-  ] as const;
+const IMPORT_EXPORT_FROM_PATTERN =
+  /(?:import|export)\s+(?:type\s+)?(?:[\s\w*$,{}]*?\s+from\s+)?["']([^"'\n]+)["']/g;
+const REQUIRE_IMPORT_CALL_PATTERN = /(?:require|import)\s*\(\s*["']([^"'\n]+)["']\s*\)/g;
+const VALID_PACKAGE_ROOT_PATTERN = /^(@[a-z0-9_.-]+\/)?[a-z0-9_.-]+$/i;
 
+export function extractImportSpecifiers(content: string): string[] {
   const specifiers: string[] = [];
-  for (const prefix of prefixes) {
-    const quote = prefix.at(-1) ?? '"';
-    let remainder = content;
-    while (true) {
-      const index = remainder.indexOf(prefix);
-      if (index < 0) {
-        break;
-      }
-      const afterPrefix = remainder.slice(index + prefix.length);
-      const end = afterPrefix.indexOf(quote);
-      if (end < 0) {
-        break;
-      }
-      specifiers.push(afterPrefix.slice(0, end));
-      remainder = afterPrefix.slice(end + 1);
+  for (const match of content.matchAll(IMPORT_EXPORT_FROM_PATTERN)) {
+    if (match[1]) {
+      specifiers.push(match[1]);
+    }
+  }
+  for (const match of content.matchAll(REQUIRE_IMPORT_CALL_PATTERN)) {
+    if (match[1]) {
+      specifiers.push(match[1]);
     }
   }
   return specifiers;
@@ -235,7 +222,7 @@ function packageRootFromSpecifier(specifier: string): string | null {
     root = trimmed.split("/")[0] ?? "";
   }
 
-  if (!/^(@[a-z0-9_.-]+\/)?[a-z0-9_.-]+$/i.test(root)) {
+  if (!VALID_PACKAGE_ROOT_PATTERN.test(root)) {
     return null;
   }
   return root;

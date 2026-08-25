@@ -35,6 +35,8 @@ let githubSlugForTests: any;
 let commandForTests: any;
 let cloneAttemptsForTests: any;
 let validatePackageForTests: any;
+let extractImportSpecifiers: any;
+let missingPackageRoots: any;
 let packageHasBuildScript: any;
 let buildSyncPlan: any;
 let harnessSourceRoot: any;
@@ -64,6 +66,8 @@ if (!runtime) {
     commandForTests,
     cloneAttemptsForTests,
     validatePackageForTests,
+    extractImportSpecifiers,
+    missingPackageRoots,
     packageHasBuildScript,
     buildSyncPlan,
     harnessSourceRoot,
@@ -208,6 +212,16 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
       packagesModule as Record<string, unknown>,
       "validatePackageForTests",
       "validate_package_for_tests",
+    ),
+    extractImportSpecifiers: pickFn(
+      packagesModule as Record<string, unknown>,
+      "extractImportSpecifiers",
+      "extract_import_specifiers",
+    ),
+    missingPackageRoots: pickFn(
+      packagesModule as Record<string, unknown>,
+      "missingPackageRoots",
+      "missing_package_roots",
     ),
     packageHasBuildScript: pickFn(
       packagesModule as Record<string, unknown>,
@@ -1267,6 +1281,42 @@ setInterval(() => {}, 1_000);
 
       assert.equal(await call<boolean>(runSync, syncEnv), true);
       assert.equal(exists(join(root, ".omp", "agent", "package.json")), false);
+    });
+  });
+
+  test("extract_import_specifiers_ignores_prose_and_string_literals", async () => {
+    const sample = `
+import fs from "node:fs";
+import { createCommitTools } from "@oh-my-pi/pi-coding-agent";
+export { helper } from "external-lib";
+const code = 'file.content.includes("rename from ")';
+const prose = "from lodash";
+const dynamic = await import("dynamic-pkg");
+const required = require("req-pkg");
+`;
+    const extracted = await call<string[]>(extractImportSpecifiers, sample);
+    assert.deepEqual(extracted, [
+      "node:fs",
+      "@oh-my-pi/pi-coding-agent",
+      "external-lib",
+      "dynamic-pkg",
+      "req-pkg",
+    ]);
+  });
+
+  test("missing_package_roots_ignores_invalid_package_names_in_source", async () => {
+    await withTempDir(async (root) => {
+      const srcDir = join(root, "src");
+      mkdirSync(srcDir, { recursive: true });
+      writeFileSync(
+        join(srcDir, "index.ts"),
+        `
+import { test } from "@oh-my-pi/pi-coding-agent";
+const check = file.content.includes("\\nrename from ") || file.content.startsWith("rename from ");
+`,
+      );
+      const missing = await call<string[]>(missingPackageRoots, root);
+      assert.deepEqual(missing, ["@oh-my-pi/pi-coding-agent"]);
     });
   });
 
