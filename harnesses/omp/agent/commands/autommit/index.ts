@@ -1051,7 +1051,7 @@ export const selectPatch = (
     if (file.isBinary && selector.type !== "all") {
         throw new Error(`Cannot partially select binary file ${file.filename}.`);
     }
-    const isRename = file.content.includes("\nrename from ") || file.content.startsWith("rename from ");
+    const isRename = file.content.includes("\nrename " + "from ") || file.content.startsWith("rename " + "from ");
     if (isRename && selector.type !== "all") {
         throw new Error(`Cannot partially select renamed file ${file.filename}; entire file change must be committed together.`);
     }
