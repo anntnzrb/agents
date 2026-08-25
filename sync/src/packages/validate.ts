@@ -224,18 +224,22 @@ function packageRootFromSpecifier(specifier: string): string | null {
   ) {
     return null;
   }
-
+  let root: string;
   if (trimmed.startsWith("@")) {
     const parts = trimmed.slice(1).split("/");
     if (parts.length < 2 || !parts[0] || !parts[1]) {
       return null;
     }
-    return `@${parts[0]}/${parts[1]}`;
+    root = `@${parts[0]}/${parts[1]}`;
+  } else {
+    root = trimmed.split("/")[0] ?? "";
   }
 
-  return trimmed.split("/")[0] ?? null;
+  if (!/^(@[a-z0-9_.-]+\/)?[a-z0-9_.-]+$/i.test(root)) {
+    return null;
+  }
+  return root;
 }
-
 const packageRootIsBuiltin = (packageRoot: string): boolean =>
   BUILTIN_PACKAGE_ROOTS.has(packageRoot);
 
