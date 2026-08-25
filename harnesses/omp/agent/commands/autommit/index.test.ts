@@ -100,4 +100,10 @@ describe("prepared commit tree verification", () => {
     expect(preparedCommitTreeMatchesIndex(preparedCommitTree, expectedIndexTree)).toBe(true);
     expect(preparedCommitTreeMatchesIndex(postCommitIndexTree, expectedIndexTree)).toBe(false);
   });
+
+  test("detects mismatch when prepared commit tree diverges from staged index", () => {
+    const expectedIndexTree = "a1b2c3d4e5f6";
+    const preparedCommitTree = "f6e5d4c3b2a1";
+    expect(preparedCommitTreeMatchesIndex(preparedCommitTree, expectedIndexTree)).toBe(false);
+  });
 });
