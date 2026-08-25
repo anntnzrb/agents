@@ -270,9 +270,76 @@ const formatCommitMessage = (
     return body.length > 0 ? `${summary.trim()}\n\n${body.join("\n")}` : summary.trim();
 };
 
+export const unquoteGitPath = (path: string): string => {
+    if (!path.startsWith('"') || !path.endsWith('"') || path.length < 2) {
+        return path;
+    }
+    const raw = path.slice(1, -1);
+    const bytes: number[] = [];
+    let i = 0;
+    while (i < raw.length) {
+        const c = raw[i];
+        if (c === "\\") {
+            i += 1;
+            if (i >= raw.length) {
+                bytes.push(0x5c);
+                break;
+            }
+            const next = raw[i];
+            if (next !== undefined && next >= "0" && next <= "7") {
+                let octal = next;
+                if (i + 1 < raw.length && raw[i + 1] !== undefined && raw[i + 1]! >= "0" && raw[i + 1]! <= "7") {
+                    octal += raw[i + 1];
+                    i += 1;
+                    if (i + 1 < raw.length && raw[i + 1] !== undefined && raw[i + 1]! >= "0" && raw[i + 1]! <= "7") {
+                        octal += raw[i + 1];
+                        i += 1;
+                    }
+                }
+                bytes.push(Number.parseInt(octal, 8));
+                i += 1;
+            } else if (next === "n") {
+                bytes.push(0x0a);
+                i += 1;
+            } else if (next === "t") {
+                bytes.push(0x09);
+                i += 1;
+            } else if (next === "r") {
+                bytes.push(0x0d);
+                i += 1;
+            } else if (next === "b") {
+                bytes.push(0x08);
+                i += 1;
+            } else if (next === "f") {
+                bytes.push(0x0c);
+                i += 1;
+            } else if (next === "v") {
+                bytes.push(0x0b);
+                i += 1;
+            } else if (next === "a") {
+                bytes.push(0x07);
+                i += 1;
+            } else if (next === '"') {
+                bytes.push(0x22);
+                i += 1;
+            } else if (next === "\\") {
+                bytes.push(0x5c);
+                i += 1;
+            } else {
+                bytes.push(raw.charCodeAt(i));
+                i += 1;
+            }
+        } else {
+            bytes.push(raw.charCodeAt(i));
+            i += 1;
+        }
+    }
+    return Buffer.from(bytes).toString("utf8");
+};
+
 const getStagedFiles = async (api: CommandAPI, cwd: string): Promise<string[]> => {
     const output = (await api.exec("git", ["-c", "core.quotepath=false", "diff", "--name-only", "--cached"], { cwd })).stdout;
-    return output.split("\n").map(line => line.trim()).filter(Boolean);
+    return output.split("\n").map(line => line.trim()).filter(Boolean).map(unquoteGitPath);
 };
 
 const stagedFilesOrStageAll = async (api: CommandAPI, cwd: string): Promise<string[]> => {
@@ -483,6 +550,16 @@ const validateHunkCoverage = (
     }
 
     const errors: string[] = [];
+    const filesByCommit = new Map<string, number>();
+    for (let cIdx = 0; cIdx < commits.length; cIdx += 1) {
+        for (const change of commits[cIdx].changes) {
+            const prev = filesByCommit.get(change.path);
+            if (prev !== undefined && prev !== cIdx) {
+                errors.push(`File ${change.path} is split across multiple commits (commit ${prev + 1} and ${cIdx + 1}); all changes to a file must be grouped in the same commit.`);
+            }
+            filesByCommit.set(change.path, cIdx);
+        }
+    }
     for (const [file, selections] of selectionsByFile) {
         for (let leftIndex = 0; leftIndex < selections.length; leftIndex += 1) {
             const left = selections[leftIndex];
@@ -521,7 +598,8 @@ const execRepoSplit = async (
     params: SplitCommitParams,
     changelogTargets: readonly string[],
 ) => {
-    const stagedFiles = state.overview?.files ?? (await internals.git.diff.changedFiles(cwd, { cached: true }));
+    const rawStagedFiles = state.overview?.files ?? (await internals.git.diff.changedFiles(cwd, { cached: true }));
+    const stagedFiles = rawStagedFiles.map(unquoteGitPath);
     const stagedSet = new Set(stagedFiles);
     const changelogSet = new Set(changelogTargets);
     const errors: string[] = [];
@@ -973,6 +1051,10 @@ export const selectPatch = (
     if (file.isBinary && selector.type !== "all") {
         throw new Error(`Cannot partially select binary file ${file.filename}.`);
     }
+    const isRename = file.content.includes("\nrename from ") || file.content.startsWith("rename from ");
+    if (isRename && selector.type !== "all") {
+        throw new Error(`Cannot partially select renamed file ${file.filename}; entire file change must be committed together.`);
+    }
     if (selector.type === "all") return file.content;
     const parsed: FileHunks = internals.parseFileHunks(file);
     const hunks = selector.type === "indices"
@@ -1122,7 +1204,16 @@ const applySplitProposal = async (
             await writeFile(patchPath, buildCommitPatch(commit.changes, stagedDiff, zeroDiff, internals), "utf8");
             const applied = await api.exec("git", ["-c", "core.quotepath=false", "apply", "--index", "--unidiff-zero", patchPath], { cwd: worktree });
             if (applied.code !== 0) throw new Error(applied.stderr || "Unable to apply split commit patch.");
-            await api.pi.commit(worktree, formatCommitMessage(commit.summary, commit.details));
+            const msgPath = join(patchDir, ".autommit.msg");
+            await writeFile(msgPath, formatCommitMessage(commit.summary, commit.details), "utf8");
+            const committed = await api.exec(
+                "git",
+                ["-c", "core.hooksPath=", "commit", "--no-verify", "-F", msgPath],
+                { cwd: worktree },
+            );
+            if (committed.code !== 0) {
+                throw new Error(committed.stderr || "Unable to commit split patch in worktree.");
+            }
         }
         const currentDiff = (await api.exec("git", ["-c", "core.quotepath=false", "-c", "diff.mnemonicprefix=false", "-c", "diff.noprefix=false", "diff", "--cached", "--binary", "--no-textconv"], { cwd })).stdout;
         if (currentDiff !== stagedDiff) throw new Error("Staged snapshot changed during atomic commit preparation.");
