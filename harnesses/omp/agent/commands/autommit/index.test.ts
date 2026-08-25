@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { consumeCompletedReceipt, preparedCommitTreeMatchesIndex, selectPatch } from "./index";
+import { consumeCompletedReceipt, preparedCommitTreeMatchesIndex, selectPatch, unquoteGitPath } from "./index";
 import { readReceipt, writeReceipt } from "./transaction";
 
 
@@ -86,7 +86,7 @@ describe("selectPatch", () => {
 
   test("rejects partial selection of metadata-only rename patches", () => {
     expect(() => selectPatch(file, { type: "indices", indices: [1] }, internals)).toThrow(
-      "No changes selected for new/path.txt.",
+      "Cannot partially select renamed file new/path.txt; entire file change must be committed together.",
     );
   });
 });
@@ -105,5 +105,24 @@ describe("prepared commit tree verification", () => {
     const expectedIndexTree = "a1b2c3d4e5f6";
     const preparedCommitTree = "f6e5d4c3b2a1";
     expect(preparedCommitTreeMatchesIndex(preparedCommitTree, expectedIndexTree)).toBe(false);
+  });
+});
+
+describe("unquoteGitPath", () => {
+  test("decodes octal-escaped UTF-8 paths from Git C-quoting", () => {
+    const octalQuoted = '"\\321\\202\\320\\265\\321\\201\\321\\202 \\321\\204\\320\\260\\320\\271\\320\\273 1.txt"';
+    expect(unquoteGitPath(octalQuoted)).toBe("тест файл 1.txt");
+  });
+
+  test("decodes special escapes and escaped quotes", () => {
+    expect(unquoteGitPath('"path/with/\\"quotes\\".txt"')).toBe('path/with/"quotes".txt');
+    expect(unquoteGitPath('"path/with/\\ttab.txt"')).toBe("path/with/\ttab.txt");
+    expect(unquoteGitPath('"path/with/\\nnewline.txt"')).toBe("path/with/\nnewline.txt");
+    expect(unquoteGitPath('"path\\\\with\\\\backslash.txt"')).toBe("path\\with\\backslash.txt");
+  });
+
+  test("passes unquoted paths through unchanged", () => {
+    expect(unquoteGitPath("plain/path.txt")).toBe("plain/path.txt");
+    expect(unquoteGitPath("тест.txt")).toBe("тест.txt");
   });
 });
