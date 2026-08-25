@@ -270,11 +270,16 @@ const formatCommitMessage = (
     return body.length > 0 ? `${summary.trim()}\n\n${body.join("\n")}` : summary.trim();
 };
 
-const stagedFilesOrStageAll = async (pi: PiAPI, cwd: string): Promise<string[]> => {
-    const stagedFiles = await pi.diff.changedFiles(cwd, { cached: true });
+const getStagedFiles = async (api: CommandAPI, cwd: string): Promise<string[]> => {
+    const output = (await api.exec("git", ["-c", "core.quotepath=false", "diff", "--name-only", "--cached"], { cwd })).stdout;
+    return output.split("\n").map(line => line.trim()).filter(Boolean);
+};
+
+const stagedFilesOrStageAll = async (api: CommandAPI, cwd: string): Promise<string[]> => {
+    const stagedFiles = await getStagedFiles(api, cwd);
     if (stagedFiles.length > 0) return stagedFiles;
-    await pi.stage.files(cwd);
-    return pi.diff.changedFiles(cwd, { cached: true });
+    await api.pi.stage.files(cwd);
+    return getStagedFiles(api, cwd);
 };
 type CommitTool = ReturnType<CommitInternals["createCommitTools"]>[number];
 
@@ -805,9 +810,9 @@ const runCommitAgent = async (
         throw new Error(`No API key available for commit model ${selected.model.provider}/${selected.model.id}.`);
     }
 
-    const stagedFiles = await stagedFilesOrStageAll(api.pi, cwd);
+    const stagedFiles = await stagedFilesOrStageAll(api, cwd);
     if (stagedFiles.length === 0) throw new Error("No local changes to commit.");
-    const diffText = (await api.exec("git", ["-c", "diff.mnemonicprefix=false", "diff", "--cached"], { cwd })).stdout;
+    const diffText = (await api.exec("git", ["-c", "core.quotepath=false", "-c", "diff.mnemonicprefix=false", "-c", "diff.noprefix=false", "diff", "--cached", "--no-textconv"], { cwd })).stdout;
     const contextFiles = await api.pi.discoverContextFiles(cwd);
     const phase: CommitPhaseState = { value: "propose" };
     const state: CommitAgentState = { diffText };
@@ -934,14 +939,14 @@ const validateSplitPlan = async (
     plan: SplitCommitPlan,
     internals: CommitInternals,
 ): Promise<{ readonly order: readonly number[]; readonly stagedDiff: string; readonly zeroDiff: string }> => {
-    const stagedFiles = await api.pi.diff.changedFiles(cwd, { cached: true });
+    const stagedFiles = await getStagedFiles(api, cwd);
     internals.assignLockFilesToPlan(plan, stagedFiles);
     const plannedFiles = new Set(plan.commits.flatMap(commit => commit.changes.map(change => change.path)));
     const missingFiles = stagedFiles.filter(file => !plannedFiles.has(file));
     if (missingFiles.length > 0) {
         throw new Error(`Split plan missing staged files: ${missingFiles.join(", ")}`);
     }
-    const stagedDiff = (await api.exec("git", ["-c", "diff.mnemonicprefix=false", "diff", "--cached", "--binary"], { cwd })).stdout;
+    const stagedDiff = (await api.exec("git", ["-c", "core.quotepath=false", "-c", "diff.mnemonicprefix=false", "-c", "diff.noprefix=false", "diff", "--cached", "--binary", "--no-textconv"], { cwd })).stdout;
     const parsedFiles = new Map(
         internals.parseFileDiffs(stagedDiff).map(file => [file.filename, internals.parseFileHunks(file)] as const),
     );
@@ -951,7 +956,7 @@ const validateSplitPlan = async (
     }
     const order = internals.computeDependencyOrder(plan.commits);
     if ("error" in order) throw new Error(order.error);
-    const zeroDiff = await api.exec("git", ["-c", "diff.mnemonicprefix=false", "diff", "--cached", "--binary", "--unified=0"], { cwd });
+    const zeroDiff = await api.exec("git", ["-c", "core.quotepath=false", "-c", "diff.mnemonicprefix=false", "-c", "diff.noprefix=false", "diff", "--cached", "--binary", "--unified=0", "--no-textconv"], { cwd });
     if (zeroDiff.code !== 0) throw new Error(zeroDiff.stderr || "Unable to read zero-context staged diff.");
     return {
         order,
@@ -1115,11 +1120,11 @@ const applySplitProposal = async (
             const commit = plan.commits[commitIndex];
             if (!commit) throw new Error(`Split plan references missing commit ${commitIndex}.`);
             await writeFile(patchPath, buildCommitPatch(commit.changes, stagedDiff, zeroDiff, internals), "utf8");
-            const applied = await api.exec("git", ["apply", "--index", "--unidiff-zero", patchPath], { cwd: worktree });
+            const applied = await api.exec("git", ["-c", "core.quotepath=false", "apply", "--index", "--unidiff-zero", patchPath], { cwd: worktree });
             if (applied.code !== 0) throw new Error(applied.stderr || "Unable to apply split commit patch.");
             await api.pi.commit(worktree, formatCommitMessage(commit.summary, commit.details));
         }
-        const currentDiff = (await api.exec("git", ["-c", "diff.mnemonicprefix=false", "diff", "--cached", "--binary"], { cwd })).stdout;
+        const currentDiff = (await api.exec("git", ["-c", "core.quotepath=false", "-c", "diff.mnemonicprefix=false", "-c", "diff.noprefix=false", "diff", "--cached", "--binary", "--no-textconv"], { cwd })).stdout;
         if (currentDiff !== stagedDiff) throw new Error("Staged snapshot changed during atomic commit preparation.");
         const finalHead = await internals.git.head.sha(worktree);
         if (!finalHead) throw new Error("Atomic split preparation did not create a commit.");
@@ -1205,7 +1210,7 @@ const applyState = async (
         throw new Error("Commit agent produced both single and split proposals; refusing to publish either.");
     }
     if (state.proposal) {
-        const stagedFiles = await api.pi.diff.changedFiles(cwd, { cached: true });
+        const stagedFiles = await getStagedFiles(api, cwd);
         if (stagedFiles.length === 0) throw new Error("No staged changes to commit.");
         const proposal = state.proposal;
         const plan: SplitCommitPlan = {
