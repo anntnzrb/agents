@@ -11,7 +11,8 @@
         "web_espol",
         "url_shortener",
         "template_editor",
-        "b2b"
+        "b2b",
+        "b2b_b2c"
       ],
       "test_modules": [
         "crm_espol",
@@ -20,7 +21,8 @@
         "whatsapp_bot",
         "web_espol",
         "url_shortener",
-        "template_editor"
+        "template_editor",
+        "b2b_b2c"
       ],
       "lint_modules": [
         "crm_espol",
@@ -29,7 +31,8 @@
         "whatsapp_bot",
         "web_espol",
         "url_shortener",
-        "template_editor"
+        "template_editor",
+        "b2b_b2c"
       ]
     }
   }
