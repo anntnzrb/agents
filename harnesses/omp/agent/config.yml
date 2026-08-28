@@ -179,7 +179,7 @@ astEdit:
   enabled: false
 
 debug:
-  enabled: false
+  enabled: true
 
 computer:
   enabled: true
