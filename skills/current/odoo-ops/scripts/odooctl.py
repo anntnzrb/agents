@@ -593,8 +593,7 @@ def cmd_dev(args: argparse.Namespace) -> int:
     ]
 
     if modules_str:
-        cmd.extend(["-u", modules_str])
-
+        cmd.extend(["-i", modules_str, "-u", modules_str])
     try:
         print(f"Starting Odoo 17 dev server on http://localhost:{DEFAULT_HTTP_PORT} (db: {profile.database})")
         print(f"Modules: {modules_str}")
@@ -667,8 +666,7 @@ def cmd_test(args: argparse.Namespace) -> int:
     ]
 
     if update_str:
-        cmd.extend(["-u", update_str])
-
+        cmd.extend(["-i", update_str, "-u", update_str])
     print(f"Running isolated Odoo unit tests for {target} (tags: {tags_str}, db: {db_to_use})...\n")
     proc = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = proc.stdout
