@@ -110,7 +110,7 @@ Use the kind requested by the user; run `herdr agent` for installed kinds/option
 herdr agent start reviewer --kind codex --pane <returned-pane-id> -- <agent-args...>
 ```
 
-`agent start` returns only after detecting the expected agent in the same pane and considering it ready for interactive input; default startup timeout: 30 seconds.
+`agent start` returns only after detecting the expected agent in the same pane and considering it ready for interactive input; default startup timeout: 30 seconds. If blocked during startup, it returns `agent_not_ready` immediately but keeps the name available for `agent read` and `agent send-keys`; wait until the agent is idle before prompting.
 
 Submit through the agent surface:
 
@@ -118,7 +118,7 @@ Submit through the agent surface:
 herdr agent prompt reviewer "Review the current diff and report only actionable findings." --wait --timeout 120000
 ```
 
-`agent prompt` atomically sends text plus encoded Enter and honors live bracketed-paste mode. For normal agent work, `--wait` waits for the first settled `idle`/`done`/`blocked` state; do not repeat these defaults with `--until`. A prompt sent from a non-working state must produce an observed lifecycle change within five seconds, else returns `agent_prompt_stalled`; this tracks lifecycle state, not an individual turn, so active-turn completion may satisfy it.
+`agent prompt` honors live bracketed-paste mode and sends text followed by encoded Enter after a short delay. It rejects an agent already waiting at an approval or question dialog with `agent_blocked` before sending any input; inspect the blocked UI and ask the user before answering. For normal agent work, `--wait` waits for the first settled `idle`/`done`/`blocked` state; do not repeat these defaults with `--until`. A prompt sent from a non-working state must produce an observed lifecycle change within five seconds, else returns `agent_prompt_stalled`; this tracks lifecycle state, not an individual turn, so active-turn completion may satisfy it.
 
 Use `--until` only for a state-specific workflow, such as waiting for an already-running agent to request input:
 
