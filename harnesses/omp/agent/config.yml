@@ -301,7 +301,8 @@ compaction:
     - remote
     - handoff
     - soft
-  thresholdPercent: 70
+  thresholdPercent: 60
+  keepRecentTokens: 25000
   handoffSaveToDisk: true
 
 snapcompact:
