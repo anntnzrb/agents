@@ -15,9 +15,9 @@ import {
   getRequestEditorRender,
   runtime,
   setCustomOverlay,
-} from "./modes-state.ts";
-import type { ModeName, ModeSpec, ModesFile } from "./modes-state.ts";
-import type { ModelSelectEvent, ThinkingLevel } from "./types.ts";
+} from "./modes-state.js";
+import type { ModeName, ModeSpec, ModesFile } from "./modes-state.js";
+import type { ModelSelectEvent, ThinkingLevel } from "./types.js";
 
 function expandUserPath(filePath: string): string {
   if (filePath === "~") return os.homedir();
@@ -27,7 +27,7 @@ function expandUserPath(filePath: string): string {
 }
 
 function getGlobalAgentDir(): string {
-  const env = process.env.PI_CODING_AGENT_DIR;
+  const env = process.env["PI_CODING_AGENT_DIR"];
   if (env) return expandUserPath(env);
   return path.join(os.homedir(), ".pi", "agent");
 }
@@ -222,15 +222,15 @@ function cloneModesFile(file: ModesFile): ModesFile {
 }
 
 type ModeSpecPatch = {
-  provider?: string | null;
-  modelId?: string | null;
-  thinkingLevel?: ThinkingLevel | null;
-  color?: string | null;
+  provider?: string | null | undefined;
+  modelId?: string | null | undefined;
+  thinkingLevel?: ThinkingLevel | null | undefined;
+  color?: string | null | undefined;
 };
 
 type ModesPatch = {
-  currentMode?: ModeName;
-  modes?: Record<ModeName, ModeSpecPatch | null>;
+  currentMode?: ModeName | undefined;
+  modes?: Record<ModeName, ModeSpecPatch | null> | undefined;
 };
 
 function computeModesPatch(
@@ -304,8 +304,8 @@ function applyModesPatch(target: ModesFile, patch: ModesPatch): void {
       continue;
     }
 
-    const targetSpec: Record<string, unknown> =
-      ((target.modes[mode] ??= {}) as Record<string, unknown>) ?? {};
+    const existing = target.modes[mode];
+    const targetSpec: Record<string, unknown> = (existing ?? (target.modes[mode] = {})) as Record<string, unknown>;
     for (const [key, value] of Object.entries(specPatch)) {
       if (value === null || value === undefined) {
         delete targetSpec[key];
@@ -336,10 +336,10 @@ function sanitizeModeSpec(spec: unknown): ModeSpec {
     unknown
   >;
   return {
-    provider: typeof obj.provider === "string" ? obj.provider : undefined,
-    modelId: typeof obj.modelId === "string" ? obj.modelId : undefined,
-    thinkingLevel: normalizeThinkingLevel(obj.thinkingLevel),
-    color: typeof obj.color === "string" ? obj.color : undefined,
+    provider: typeof obj["provider"] === "string" ? obj["provider"] : undefined,
+    modelId: typeof obj["modelId"] === "string" ? obj["modelId"] : undefined,
+    thinkingLevel: normalizeThinkingLevel(obj["thinkingLevel"]),
+    color: typeof obj["color"] === "string" ? obj["color"] : undefined,
   };
 }
 
@@ -353,7 +353,7 @@ function createDefaultModes(
   const base: ModeSpec = {
     provider: currentModel?.provider,
     modelId: currentModel?.id,
-    thinkingLevel: currentThinking,
+    thinkingLevel: normalizeThinkingLevel(currentThinking),
   };
 
   return {
@@ -391,7 +391,7 @@ function ensureDefaultModeEntries(
     const first = Object.keys(file.modes).find(
       (key) => key !== CUSTOM_MODE_NAME,
     );
-    file.currentMode = file.modes.default ? "default" : (first ?? "default");
+    file.currentMode = file.modes["default"] ? "default" : (first ?? "default");
   }
 }
 
@@ -404,10 +404,10 @@ async function loadModesFile(
     const raw = await fs.readFile(filePath, "utf8");
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const currentMode =
-      typeof parsed.currentMode === "string" ? parsed.currentMode : "default";
+      typeof parsed["currentMode"] === "string" ? (parsed["currentMode"] as string) : "default";
     const modesRaw =
-      parsed.modes && typeof parsed.modes === "object"
-        ? (parsed.modes as Record<string, unknown>)
+      parsed["modes"] && typeof parsed["modes"] === "object"
+        ? (parsed["modes"] as Record<string, unknown>)
         : {};
     const modes: Record<string, ModeSpec> = {};
     for (const [key, value] of Object.entries(modesRaw)) {
@@ -439,14 +439,15 @@ export function getModeBorderColor(
 
   if (spec?.color) {
     try {
-      theme.getFgAnsi(spec.color as never);
-      return (text: string) => theme.fg(spec.color as never, text);
+      theme.getFgAnsi?.(spec.color);
+      return (text: string) => theme.fg(spec.color as string, text);
     } catch {
       // fall through
     }
   }
 
-  return theme.getThinkingBorderColor(pi.getThinkingLevel());
+  const getThinking = theme.getThinkingBorderColor;
+  return getThinking ? getThinking(pi.getThinkingLevel()) : ((text: string) => text);
 }
 
 async function resolveModesPath(cwd: string): Promise<string> {
@@ -568,7 +569,7 @@ export function getCurrentSelectionSpec(pi: ExtensionAPI): ModeSpec {
   return {
     provider: currentModel.provider,
     modelId: currentModel.modelId,
-    thinkingLevel: pi.getThinkingLevel(),
+    thinkingLevel: normalizeThinkingLevel(pi.getThinkingLevel()),
   };
 }
 
@@ -700,7 +701,7 @@ export async function handleModelSelect(
   setCustomOverlay({
     provider: event.model.provider,
     modelId: event.model.id,
-    thinkingLevel: pi.getThinkingLevel(),
+    thinkingLevel: normalizeThinkingLevel(pi.getThinkingLevel()),
   });
 
   if (ctx.hasUI) {

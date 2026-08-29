@@ -6,9 +6,9 @@ import { Effect, Schema } from "effect";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { LOCK_TTL_MS } from "../constants.ts";
-import type { LockInfo } from "../types.ts";
-import { displayTodoId } from "../utils.ts";
+import { LOCK_TTL_MS } from "#todos/constants.js";
+import type { LockInfo } from "#todos/types.js";
+import { displayTodoId } from "#todos/utils.js";
 
 export class TodoLockError extends Schema.TaggedError<TodoLockError>()("TodoLockError", {
   id: Schema.String,

@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { ClarifyParamsSchema, type ClarifyResult } from "./models.js";
 import {
@@ -43,7 +43,7 @@ export default function clarifyExtension(pi: ExtensionAPI): void {
 
       const result = await ctx.ui.custom<ClarifyResult>(
         (tui, theme, _kb, done) =>
-          createClarifyComponent(questions, tui, theme, done),
+          createClarifyComponent(questions, tui, theme as Theme, done),
       );
 
       if (!result) {

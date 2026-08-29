@@ -1,16 +1,16 @@
-import type { ThinkingLevel } from "./types.ts";
+import type { ThinkingLevel } from "./types.js";
 
 export type ModeName = string;
 
 export type ModeSpec = {
-  provider?: string;
-  modelId?: string;
-  thinkingLevel?: ThinkingLevel;
+  provider?: string | undefined;
+  modelId?: string | undefined;
+  thinkingLevel?: ThinkingLevel | undefined;
   /**
    * Optional theme color token to use for the editor border.
    * If unset, the border color is derived from the current thinking level.
    */
-  color?: string;
+  color?: string | undefined;
 };
 
 export type ModesFile = {
@@ -58,7 +58,7 @@ export const runtime: ModeRuntime = {
 
 let requestEditorRender: (() => void) | undefined;
 let customOverlay: ModeSpec | null = null;
-let lastObservedModel: { provider?: string; modelId?: string } = {};
+let lastObservedModel: { provider?: string | undefined; modelId?: string | undefined } = {};
 
 export function getRequestEditorRender(): (() => void) | undefined {
   return requestEditorRender;
@@ -86,8 +86,8 @@ export function setLastObservedModel(
 }
 
 export function getLastObservedModel(): {
-  provider?: string;
-  modelId?: string;
+  provider?: string | undefined;
+  modelId?: string | undefined;
 } {
   return lastObservedModel;
 }

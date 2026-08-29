@@ -14,8 +14,8 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
-import { EMPTY_ANSWER_DEFAULT, SKIP_ANSWER_DEFAULT } from "./constants.ts";
-import type { ExtractedQuestion } from "./types.ts";
+import { EMPTY_ANSWER_DEFAULT, SKIP_ANSWER_DEFAULT } from "./constants.js";
+import type { ExtractedQuestion } from "./types.js";
 
 interface RenderLayout {
   width: number;
@@ -34,8 +34,8 @@ export class QnAComponent implements Component, Focusable {
   private onDone: (result: string | null) => void;
   private showingConfirmation = false;
 
-  private cachedWidth?: number;
-  private cachedLines?: string[];
+  private cachedWidth?: number | undefined;
+  private cachedLines?: string[] | undefined;
 
   private _focused = false;
   get focused(): boolean {
@@ -112,6 +112,7 @@ export class QnAComponent implements Component, Focusable {
     const parts: string[] = [];
     for (let i = 0; i < this.questions.length; i++) {
       const question = this.questions[i];
+      if (!question) continue;
       const answer = this.resolveAnswer(this.answers[i]);
       parts.push(`Q: ${question.question}`);
       if (question.context) {
@@ -315,6 +316,7 @@ export class QnAComponent implements Component, Focusable {
 
   private renderQuestion(lines: string[], layout: RenderLayout): void {
     const question = this.questions[this.currentIndex];
+    if (!question) return;
     const questionText = `${this.bold("Q:")} ${question.question}`;
     const wrappedQuestion = wrapTextWithAnsi(questionText, layout.contentWidth);
     for (const line of wrappedQuestion) {
@@ -341,10 +343,11 @@ export class QnAComponent implements Component, Focusable {
     const editorWidth = Math.max(1, layout.contentWidth - 7);
     const editorLines = this.editor.render(editorWidth);
     for (let i = 1; i < editorLines.length - 1; i++) {
+      const line = editorLines[i] ?? "";
       if (i === 1) {
-        this.pushBoxLine(lines, `${answerPrefix}${editorLines[i]}`, layout);
+        this.pushBoxLine(lines, `${answerPrefix}${line}`, layout);
       } else {
-        this.pushBoxLine(lines, `   ${editorLines[i]}`, layout);
+        this.pushBoxLine(lines, `   ${line}`, layout);
       }
     }
     this.pushEmptyBoxLine(lines, layout);

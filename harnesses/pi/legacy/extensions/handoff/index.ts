@@ -1,6 +1,7 @@
 import { complete, type Message } from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
+  ExtensionCommandContext,
   SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import {
@@ -41,7 +42,8 @@ type PromptGenerationInput = {
 
 const isMessageEntry = (
   entry: SessionEntry,
-): entry is SessionEntry & { type: "message" } => entry.type === "message";
+): entry is SessionEntry & { type: "message"; message: Message } =>
+  entry.type === "message" && entry.message !== undefined;
 
 const getMessages = (entries: readonly SessionEntry[]): readonly Message[] =>
   entries.filter(isMessageEntry).map((entry) => entry.message);
@@ -70,10 +72,10 @@ const getConversationText = (entries: readonly SessionEntry[]): string =>
   serializeConversation(convertToLlm(getMessages(entries)));
 
 const generateHandoffPrompt = async (
-  ctx: Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1],
+  ctx: ExtensionCommandContext,
   input: PromptGenerationInput,
 ): Promise<string | null> =>
-  ctx.ui.custom<string | null>((tui, theme, _keybindings, done) => {
+  ctx.ui.custom<string | null>((tui: unknown, theme: unknown, _keybindings: unknown, done: (result: string | null) => void) => {
     const loader = new BorderedLoader(
       tui,
       theme,
@@ -105,7 +107,7 @@ const generateHandoffPrompt = async (
       return response.content
         .filter(
           (part): part is { type: "text"; text: string } =>
-            part.type === "text",
+            part.type === "text" && typeof part.text === "string",
         )
         .map((part) => part.text)
         .join("\n");
@@ -124,7 +126,7 @@ const generateHandoffPrompt = async (
 export default function handoffExtension(pi: ExtensionAPI) {
   pi.registerCommand("handoff", {
     description: "Transfer context to a new focused session",
-    handler: async (args, ctx) => {
+    handler: async (args: string, ctx: ExtensionCommandContext) => {
       if (!ctx.hasUI) {
         ctx.ui.notify("handoff requires interactive mode", "error");
         return;
@@ -157,6 +159,11 @@ export default function handoffExtension(pi: ExtensionAPI) {
         return;
       }
 
+      if (!ctx.ui.editor) {
+        ctx.ui.notify("Editor is not available", "error");
+        return;
+      }
+
       const editedPrompt = await ctx.ui.editor(
         "Edit handoff prompt",
         generatedPrompt,
@@ -166,9 +173,10 @@ export default function handoffExtension(pi: ExtensionAPI) {
         return;
       }
 
-      const newSessionResult = await ctx.newSession({
-        parentSession: ctx.sessionManager.getSessionFile(),
-      });
+      const parentSession = ctx.sessionManager.getSessionFile?.();
+      const newSessionResult = await ctx.newSession(
+        parentSession ? { parentSession } : {},
+      );
       if (newSessionResult.cancelled) {
         ctx.ui.notify("New session cancelled", "info");
         return;

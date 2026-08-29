@@ -34,12 +34,13 @@ export const findLastAssistantText = (
 ): AssistantTextResult => {
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i];
-    if (entry.type !== "message") continue;
+    if (!entry || entry.type !== "message") continue;
     const msg = entry.message;
-    if (!("role" in msg) || msg.role !== "assistant") continue;
+    if (!msg || !("role" in msg) || msg.role !== "assistant") continue;
     if (msg.stopReason !== "stop") {
-      return { status: "incomplete", reason: msg.stopReason };
+      return { status: "incomplete", reason: msg.stopReason ?? "incomplete" };
     }
+    if (!msg.content) continue;
     const text = extractMessageText(msg.content);
     if (text) {
       return { status: "found", text };

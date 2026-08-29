@@ -7,22 +7,22 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import fs from "node:fs/promises";
 import { Effect, Schema } from "effect";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { TodoFrontMatter, TodoRecord } from "../types.ts";
+import type { TodoFrontMatter, TodoRecord } from "#todos/types.js";
 import {
   clearAssignmentIfClosed,
   displayTodoId,
   isTodoClosed,
   sortTodos,
   validateTodoId,
-} from "../utils.ts";
+} from "#todos/utils.js";
 import {
   parseFrontMatter,
   parseTodoContent,
   serializeTodo,
   splitFrontMatter,
-} from "./front-matter.ts";
-import { withTodoLock } from "./locks.ts";
-import { getTodoPath } from "./paths.ts";
+} from "./front-matter.js";
+import { withTodoLock } from "./locks.js";
+import { getTodoPath } from "./paths.js";
 
 export class TodoCrudError extends Schema.TaggedError<TodoCrudError>()(
   "TodoCrudError",

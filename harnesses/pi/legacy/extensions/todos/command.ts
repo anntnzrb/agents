@@ -13,20 +13,19 @@ import {
   TodoDeleteConfirmComponent,
   TodoDetailOverlayComponent,
   TodoSelectorComponent,
-} from "./components.ts";
+} from "./components.js";
 import {
   deleteTodo,
   ensureTodoExists,
   getTodoPath,
   getTodosDir,
   listTodos,
-  listTodosSync,
   releaseTodoAssignment,
   updateTodoStatus,
-} from "./storage/index.ts";
-import type { TodoFrontMatter, TodoMenuAction, TodoRecord } from "./types.ts";
-import { buildRefinePrompt, filterTodos, formatTodoId } from "./utils.ts";
-import { formatTodoList } from "./render.ts";
+} from "./storage/index.js";
+import type { TodoFrontMatter, TodoMenuAction, TodoRecord } from "./types.js";
+import { buildRefinePrompt, filterTodos, formatTodoId } from "./utils.js";
+import { formatTodoList } from "./render.js";
 
 /**
  * Build command argument completions.

@@ -28,15 +28,14 @@ import type {
   TodoMenuAction,
   TodoOverlayAction,
   TodoRecord,
-} from "./types.ts";
+} from "./types.js";
 import {
   filterTodos,
   formatTodoId,
   getTodoStatus,
-  getTodoTitle,
   isTodoClosed,
-} from "./utils.ts";
-import { renderAssignmentSuffix } from "./render.ts";
+} from "./utils.js";
+import { renderAssignmentSuffix } from "./render.js";
 
 export class TodoSelectorComponent extends Container implements Focusable {
   private searchInput: Input;

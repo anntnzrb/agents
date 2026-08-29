@@ -11,7 +11,7 @@ export interface TodoFrontMatter {
   tags: string[];
   status: string;
   created_at: string;
-  assigned_to_session?: string;
+  assigned_to_session?: string | undefined;
 }
 
 export interface TodoRecord extends TodoFrontMatter {
@@ -21,7 +21,7 @@ export interface TodoRecord extends TodoFrontMatter {
 export interface LockInfo {
   id: string;
   pid: number;
-  session?: string | null;
+  session?: string | null | undefined;
   created_at: string;
 }
 
@@ -89,8 +89,8 @@ export type TodoToolDetails =
   | {
       action: "list" | "list-all";
       todos: TodoFrontMatter[];
-      currentSessionId?: string;
-      error?: string;
+      currentSessionId?: string | undefined;
+      error?: string | undefined;
     }
   | {
       action:
@@ -101,6 +101,6 @@ export type TodoToolDetails =
         | "delete"
         | "claim"
         | "release";
-      todo: TodoRecord;
-      error?: string;
+      todo?: TodoRecord | undefined;
+      error?: string | undefined;
     };

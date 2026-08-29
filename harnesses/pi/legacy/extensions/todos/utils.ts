@@ -3,8 +3,8 @@
  */
 
 import { fuzzyMatch } from "@earendil-works/pi-tui";
-import { TODO_ID_PATTERN, TODO_ID_PREFIX } from "./constants.ts";
-import type { TodoFrontMatter } from "./types.ts";
+import { TODO_ID_PATTERN, TODO_ID_PREFIX } from "./constants.js";
+import type { TodoFrontMatter } from "./types.js";
 
 export const formatTodoId = (id: string): string => {
   return `${TODO_ID_PREFIX}${id}`;

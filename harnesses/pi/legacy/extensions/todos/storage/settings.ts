@@ -4,10 +4,10 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
-import { DEFAULT_TODO_SETTINGS, TODO_SETTINGS_NAME } from "../constants.ts";
-import type { TodoSettings } from "../types.ts";
-import { isTodoClosed } from "../utils.ts";
-import { parseFrontMatter, splitFrontMatter } from "./front-matter.ts";
+import { DEFAULT_TODO_SETTINGS, TODO_SETTINGS_NAME } from "#todos/constants.js";
+import type { TodoSettings } from "#todos/types.js";
+import { isTodoClosed } from "#todos/utils.js";
+import { parseFrontMatter, splitFrontMatter } from "./front-matter.js";
 
 const getTodoSettingsPath = (todosDir: string): string => {
   return path.join(todosDir, TODO_SETTINGS_NAME);

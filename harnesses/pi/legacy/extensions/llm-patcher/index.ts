@@ -59,7 +59,7 @@ export default function llmPatcherExtension(pi: ExtensionAPI) {
 
   const patchers = createPatchers(configResult.config);
 
-  pi.on("before_provider_request", (event) => {
+  pi.on("before_provider_request", (event: { payload: unknown }) => {
     const result = applyPatchers(event.payload, patchers);
     appendTrace(result);
     return result.changed ? result.payload : undefined;

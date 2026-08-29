@@ -2,8 +2,8 @@
  * Todo storage exports.
  */
 
-export { getTodoPath, getTodosDir, getTodosDirLabel } from "./paths.ts";
-export { readTodoSettings, garbageCollectTodos } from "./settings.ts";
+export { getTodoPath, getTodosDir, getTodosDirLabel } from "./paths.js";
+export { readTodoSettings, garbageCollectTodos } from "./settings.js";
 export {
   appendTodo,
   appendTodoBody,
@@ -13,9 +13,9 @@ export {
   ensureTodoExists,
   ensureTodosDir,
   generateTodoId,
+  getTodo,
   listTodos,
-  listTodosSync,
   releaseTodoAssignment,
   updateTodo,
   updateTodoStatus,
-} from "./crud.ts";
+} from "./crud.js";

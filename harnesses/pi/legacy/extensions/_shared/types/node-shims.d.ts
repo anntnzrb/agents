@@ -41,8 +41,9 @@ declare interface Buffer extends Uint8Array {
 interface BufferConstructor {
   readonly prototype: Buffer;
   from(
-    value: string | ArrayLike<number> | Uint8Array,
-    encoding?: string,
+    value: string | ArrayLike<number> | Uint8Array | ArrayBuffer | ArrayBufferLike,
+    byteOffsetOrEncoding?: string | number,
+    length?: number,
   ): Buffer;
   byteLength(value: string, encoding?: string): number;
   alloc(size: number): Buffer;
@@ -101,7 +102,14 @@ declare module "node:crypto" {
 }
 
 declare module "node:fs" {
-  export const constants: { X_OK: number };
+  export type Dirent = {
+    name: string;
+    isDirectory(): boolean;
+    isFile(): boolean;
+    isSymbolicLink(): boolean;
+    [key: string]: any;
+  };
+  export const constants: { X_OK: number; [key: string]: any };
   export function accessSync(path: string, mode?: number): void;
   export const promises: {
     readFile: {
@@ -113,12 +121,14 @@ declare module "node:fs" {
       }>;
       (path: string, encoding: string): Promise<string>;
     };
-    stat: (path: string) => Promise<{ isDirectory: () => boolean }>;
+    stat: (path: string) => Promise<{ isDirectory: () => boolean; [key: string]: any }>;
+    readdir: (path: string, options?: any) => Promise<any>;
+    access: (path: string, mode?: number) => Promise<void>;
   };
-  export function statSync(path: string): { mtimeMs: number; size: number };
+  export function statSync(path: string): { mtimeMs: number; size: number; [key: string]: any };
   export function existsSync(path: string): boolean;
-  export function readFileSync(path: string, encoding: string): string;
-  export function writeFileSync(path: string, content: string): void;
+  export function readFileSync(path: string, encoding?: string): any;
+  export function writeFileSync(path: string, content: string | Uint8Array, options?: any): void;
   export function appendFileSync(
     path: string,
     content: string,
@@ -129,6 +139,10 @@ declare module "node:fs" {
     options?: { recursive?: boolean },
   ): void;
   export function mkdtempSync(prefix: string): string;
+  export function readdirSync(path: string, options?: any): any;
+  export function readdir(path: string, options?: any, callback?: any): any;
+  export function unlinkSync(path: string): void;
+  export function rmdirSync(path: string, options?: any): void;
 }
 
 declare module "node:fs/promises" {
@@ -136,18 +150,29 @@ declare module "node:fs/promises" {
     writeFile: (content: string, encoding?: string) => Promise<void>;
     sync: () => Promise<void>;
     close: () => Promise<void>;
+    stat: () => Promise<{ mtimeMs: number; size: number; [key: string]: any }>;
+    read: (
+      buffer: Uint8Array,
+      offset?: number,
+      length?: number,
+      position?: number | null,
+    ) => Promise<{ bytesRead: number; buffer: Uint8Array }>;
+    [key: string]: any;
   };
 
+  export function access(path: string, mode?: number): Promise<void>;
   export function chmod(path: string, mode: number): Promise<void>;
+  export function copyFile(src: string, dest: string, mode?: number): Promise<void>;
   export function lstat(
     path: string,
-  ): Promise<{ isSymbolicLink: () => boolean }>;
+  ): Promise<{ isSymbolicLink: () => boolean; [key: string]: any }>;
   export function mkdir(path: string, options?: unknown): Promise<void>;
   export function open(
     path: string,
     flags: string,
     mode?: number,
   ): Promise<FileHandle>;
+  export function readdir(path: string, options?: any): Promise<any>;
   export function readFile(
     path: string,
   ): Promise<{ toString: (encoding?: string) => string; byteLength: number }>;
@@ -155,9 +180,19 @@ declare module "node:fs/promises" {
   export function readlink(path: string): Promise<string>;
   export function realpath(path: string): Promise<string>;
   export function rename(oldPath: string, newPath: string): Promise<void>;
+  export function rm(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void>;
   export function stat(
     path: string,
-  ): Promise<{ isDirectory: () => boolean; mode: number; nlink: number }>;
+  ): Promise<{
+    isDirectory: () => boolean;
+    isFile: () => boolean;
+    isSymbolicLink: () => boolean;
+    mode: number;
+    nlink: number;
+    mtimeMs: number;
+    size: number;
+    [key: string]: any;
+  }>;
   export function mkdtemp(prefix: string): Promise<string>;
   export function unlink(path: string): Promise<void>;
   export function writeFile(
@@ -167,14 +202,18 @@ declare module "node:fs/promises" {
   ): Promise<void>;
 
   const fsPromises: {
+    access: typeof access;
     chmod: typeof chmod;
+    copyFile: typeof copyFile;
     lstat: typeof lstat;
     mkdir: typeof mkdir;
     open: typeof open;
+    readdir: typeof readdir;
     readFile: typeof readFile;
     readlink: typeof readlink;
     realpath: typeof realpath;
     rename: typeof rename;
+    rm: typeof rm;
     stat: typeof stat;
     mkdtemp: typeof mkdtemp;
     unlink: typeof unlink;

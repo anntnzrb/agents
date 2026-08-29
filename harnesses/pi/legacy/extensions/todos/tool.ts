@@ -12,7 +12,7 @@ import {
   type TodoAction,
   type TodoRecord,
   type TodoToolDetails,
-} from "./types.ts";
+} from "./types.js";
 import {
   appendTodo,
   claimTodoAssignment,
@@ -25,22 +25,22 @@ import {
   listTodos,
   releaseTodoAssignment,
   updateTodo,
-} from "./storage/index.ts";
+} from "./storage/index.js";
 import {
   formatTodoId,
   normalizeTodoId,
   splitTodosByAssignment,
   validateTodoId,
-} from "./utils.ts";
+} from "./utils.js";
 import {
   appendExpandHint,
   renderTodoDetail,
   renderTodoList,
-} from "./render.ts";
+} from "./render.js";
 import {
   serializeTodoForAgent,
   serializeTodoListForAgent,
-} from "./serialize.ts";
+} from "./serialize.js";
 
 /**
  * Create the todo tool definition.

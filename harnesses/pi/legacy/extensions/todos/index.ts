@@ -3,15 +3,15 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createTodoTool } from "./tool.ts";
+import { createTodoTool } from "./tool.js";
 import {
   ensureTodosDir,
   garbageCollectTodos,
   getTodosDir,
   getTodosDirLabel,
   readTodoSettings,
-} from "./storage/index.ts";
-import { getTodoArgumentCompletions, runTodosCommand } from "./command.ts";
+} from "./storage/index.js";
+import { getTodoArgumentCompletions, runTodosCommand } from "./command.js";
 
 /**
  * Register the todo extension.

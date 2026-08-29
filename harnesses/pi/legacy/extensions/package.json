@@ -2,6 +2,10 @@
   "name": "@agents/pi-extensions",
   "private": true,
   "type": "module",
+  "imports": {
+    "#todos/*": "./todos/*",
+    "#_shared/*": "./_shared/*"
+  },
   "dependencies": {
     "effect": "4.0.0-rc.110"
   }

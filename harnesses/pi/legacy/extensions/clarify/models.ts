@@ -39,7 +39,7 @@ export const ClarifyQuestionSchema = Type.Object({
     }),
   ),
   timeoutSeconds: Type.Optional(
-    Type.Integer({
+    Type.Number({
       minimum: 1,
       description: "Auto-select timeout.",
     }),

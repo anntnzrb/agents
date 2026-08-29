@@ -4,13 +4,13 @@
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { keyHint } from "@earendil-works/pi-coding-agent";
-import type { TodoFrontMatter, TodoRecord } from "./types.ts";
+import type { TodoFrontMatter, TodoRecord } from "./types.js";
 import {
   formatTodoHeading,
   getTodoStatus,
   isTodoClosed,
   splitTodosByAssignment,
-} from "./utils.ts";
+} from "./utils.js";
 
 export const renderAssignmentSuffix = (
   theme: Theme,

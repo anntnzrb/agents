@@ -6,11 +6,11 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { ANSWER_MESSAGE_PREFIX } from "./constants.ts";
-import { findLastAssistantText } from "./assistant-text.ts";
-import { extractQuestions } from "./extraction.ts";
-import { QnAComponent } from "./qna-component.ts";
-import type { ActiveModel, ExtractedQuestion } from "./types.ts";
+import { ANSWER_MESSAGE_PREFIX } from "./constants.js";
+import { findLastAssistantText } from "./assistant-text.js";
+import { extractQuestions } from "./extraction.js";
+import { QnAComponent } from "./qna-component.js";
+import type { ActiveModel, ExtractedQuestion } from "./types.js";
 
 /**
  * Ensure UI and model are available for the /answer command.
@@ -117,7 +117,7 @@ const answerExtension = (pi: ExtensionAPI): void => {
   pi.registerCommand("answer", {
     description:
       "Extract questions from last assistant message into interactive Q&A",
-    handler: (_args, ctx) => answerHandler(pi, ctx),
+    handler: (_args: unknown, ctx: ExtensionContext) => answerHandler(pi, ctx),
   });
 };
 

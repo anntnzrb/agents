@@ -130,13 +130,13 @@ const toFinalAnswers = (
   });
 
 const buildEditorTheme = (theme: Theme): EditorTheme => ({
-  borderColor: (text) => theme.fg("dim", text),
+  borderColor: (text: string) => theme.fg("dim", text),
   selectList: {
-    selectedPrefix: (text) => theme.fg("accent", text),
-    selectedText: (text) => theme.fg("accent", text),
-    description: (text) => theme.fg("muted", text),
-    scrollInfo: (text) => theme.fg("dim", text),
-    noMatch: (text) => theme.fg("warning", text),
+    selectedPrefix: (text: string) => theme.fg("accent", text),
+    selectedText: (text: string) => theme.fg("accent", text),
+    description: (text: string) => theme.fg("muted", text),
+    scrollInfo: (text: string) => theme.fg("dim", text),
+    noMatch: (text: string) => theme.fg("warning", text),
   },
 });
 

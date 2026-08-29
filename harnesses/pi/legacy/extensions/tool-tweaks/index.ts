@@ -8,8 +8,8 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
+import { pipe } from "effect";
 
-type Tool = ReturnType<typeof createCodingTools>[number];
 type ToolArgs = Record<string, unknown>;
 const tools = (() => {
   // biome-ignore lint/correctness/noProcessGlobal: Node-only extension.
@@ -42,7 +42,8 @@ const trimTrailingBackslashes = (text: string): string =>
 
 const endsWithUnescapedQuote = (text: string): boolean => {
   const match = text.match(/(\\*)"$/);
-  return match ? match[1].length % 2 === 0 : false;
+  const group = match?.[1];
+  return group !== undefined ? group.length % 2 === 0 : false;
 };
 
 /** Truncate the args line to the max length. */
@@ -107,14 +108,16 @@ const colorizeArgs = (argsText: string, theme: Theme): string => {
   const colored = parts.map((part) => {
     const sepIndex = part.indexOf(": ");
     if (sepIndex < 0) {
-      return theme.fg("toolOutput", theme.italic(part));
+      const styledValue = theme.italic ? theme.italic(part) : part;
+      return theme.fg("toolOutput", styledValue);
     }
     const key = part.slice(0, sepIndex);
     const value = part.slice(sepIndex + 2);
+    const styledValue = theme.italic ? theme.italic(value) : value;
     return (
       theme.fg("accent", key) +
       theme.fg("muted", ": ") +
-      theme.fg("toolOutput", theme.italic(value))
+      theme.fg("toolOutput", styledValue)
     );
   });
   return (
@@ -145,7 +148,7 @@ const renderHiddenCall = (toolName: string, args: ToolArgs, theme: Theme) => {
 };
 
 /** Render a minimal pending indicator while the tool is running. */
-const renderHiddenResult = (isPartial: boolean, theme: Theme) =>
+const renderHiddenResult = (isPartial: boolean | undefined, theme: Theme) =>
   isPartial ? new Text(theme.fg("muted", "…"), 0, 0) : undefined;
 
 /** Register the tool output suppression renderers. */
@@ -160,8 +163,8 @@ const hideToolOutputExtension = (pi: ExtensionAPI): void => {
         `Use ${tool.name} exactly like the built-in tool; this extension only changes rendering.`,
       ],
       parameters: tool.parameters,
-      execute: (toolCallId, params, onUpdate, _ctx, signal) =>
-        tool.execute(toolCallId, params, signal, onUpdate),
+      execute: (toolCallId, params, signal, onUpdate, ctx) =>
+        tool.execute?.(toolCallId, params, signal, onUpdate, ctx),
       renderCall: (args, theme) =>
         renderHiddenCall(tool.name, args as ToolArgs, theme),
       renderResult: (_result, options, theme) =>

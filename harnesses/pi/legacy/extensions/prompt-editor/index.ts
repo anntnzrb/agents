@@ -3,11 +3,11 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 
-import { applyEditor } from "./editor.ts";
-import { handleModelSelect, restoreModeFromSelection } from "./modes-core.ts";
-import { cycleMode, handleModeCommand, selectModeUI } from "./modes-ui.ts";
-import { setLastObservedModel } from "./modes-state.ts";
-import type { ModelSelectEvent } from "./types.ts";
+import { applyEditor } from "./editor.js";
+import { handleModelSelect, restoreModeFromSelection } from "./modes-core.js";
+import { cycleMode, handleModeCommand, selectModeUI } from "./modes-ui.js";
+import { setLastObservedModel } from "./modes-state.js";
+import type { ModelSelectEvent } from "./types.js";
 
 export default function promptEditorExtension(pi: ExtensionAPI): void {
   pi.registerCommand("mode", {
@@ -17,14 +17,14 @@ export default function promptEditorExtension(pi: ExtensionAPI): void {
     },
   });
 
-  pi.registerShortcut("ctrl+shift+m", {
+  pi.registerShortcut?.("ctrl+shift+m", {
     description: "Select prompt mode",
     handler: async (ctx) => {
       await selectModeUI(pi, ctx);
     },
   });
 
-  pi.registerShortcut("ctrl+space", {
+  pi.registerShortcut?.("ctrl+space", {
     description: "Cycle prompt mode",
     handler: async (ctx) => {
       await cycleMode(pi, ctx);

@@ -31,7 +31,7 @@ export const normalizeQuestions = (
     question: normalizeText(question.question),
     options: (question.options ?? [])
       .map(normalizeOption)
-      .filter((option) => option.label.length > 0),
+      .filter((option: ClarifyOption) => option.label.length > 0),
     allowOther: question.allowOther !== false,
     timeoutSeconds: question.timeoutSeconds,
   }));

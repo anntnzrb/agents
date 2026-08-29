@@ -3,7 +3,7 @@
  */
 
 import path from "node:path";
-import { TODO_PATH_ENV, TODO_ROOT_DIR } from "../constants.ts";
+import { TODO_PATH_ENV, TODO_ROOT_DIR } from "#todos/constants.js";
 
 const safeCwdSegment = (cwd: string): string => {
   return `--${cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`;

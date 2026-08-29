@@ -2,8 +2,8 @@
  * Serialization helpers for tool output.
  */
 
-import type { TodoFrontMatter, TodoRecord } from "./types.ts";
-import { formatTodoId, splitTodosByAssignment } from "./utils.ts";
+import type { TodoFrontMatter, TodoRecord } from "./types.js";
+import { formatTodoId, splitTodosByAssignment } from "./utils.js";
 
 export const serializeTodoForAgent = (todo: TodoRecord): string => {
   const payload = { ...todo, id: formatTodoId(todo.id) };

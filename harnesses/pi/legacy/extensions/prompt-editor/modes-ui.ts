@@ -15,8 +15,8 @@ import {
   MODE_UI_CONFIGURE,
   runtime,
   THINKING_UNSET_LABEL,
-} from "./modes-state.ts";
-import type { ModeSpec } from "./modes-state.ts";
+} from "./modes-state.js";
+import type { ModeSpec } from "./modes-state.js";
 import {
   applyMode,
   ensureRuntime,
@@ -24,9 +24,9 @@ import {
   orderedModeNames,
   persistRuntime,
   storeSelectionIntoMode,
-} from "./modes-core.ts";
-import { getRequestEditorRender, setCustomOverlay } from "./modes-state.ts";
-import type { ThinkingLevel } from "./types.ts";
+} from "./modes-core.js";
+import { getRequestEditorRender, setCustomOverlay } from "./modes-state.js";
+import type { ThinkingLevel } from "./types.js";
 
 function isDefaultModeName(name: string): boolean {
   return name === "default";
@@ -336,7 +336,7 @@ async function pickModelForModeUI(
         settingsManager,
         ctx.modelRegistry as never,
         scopedModels as never,
-        (model) => done({ provider: model.provider, modelId: model.id }),
+        (model: any) => done({ provider: model.provider, modelId: model.id }),
         () => done(undefined),
       );
       return selector;

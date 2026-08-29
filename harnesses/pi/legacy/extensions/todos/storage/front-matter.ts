@@ -2,7 +2,7 @@
  * Front-matter parsing and serialization.
  */
 
-import type { TodoFrontMatter, TodoRecord } from "../types.ts";
+import type { TodoFrontMatter, TodoRecord } from "#todos/types.js";
 
 export const parseFrontMatter = (
   text: string,

@@ -1,4 +1,4 @@
 {
-  "extends": "../../../extensions/tsconfig.base.json",
-  "include": ["**/*.ts", "../../../extensions/_shared/types/**/*.d.ts"]
+  "extends": "../tsconfig.base.json",
+  "include": ["**/*.ts", "../_shared/types/**/*.d.ts"]
 }

@@ -3,6 +3,11 @@ declare module "@earendil-works/pi-coding-agent" {
   export type Theme = {
     fg: (token: string, text: string) => string;
     bold: (text: string) => string;
+    italic?: (text: string) => string;
+    getBashModeBorderColor?: () => (text: string) => string;
+    getThinkingBorderColor?: (level: unknown) => (text: string) => string;
+    getFgAnsi?: (color: string) => string;
+    [key: string]: unknown;
   };
 
   export type ToolRenderCallContext = {
@@ -25,49 +30,95 @@ declare module "@earendil-works/pi-coding-agent" {
     isPartial?: boolean;
   };
 
+  export type SessionMessage = {
+    role?: string;
+    stopReason?: string;
+    content?: readonly { type: string; text?: string }[] | { type: string; text?: string }[];
+    usage?: {
+      inputTokens?: number;
+      outputTokens?: number;
+      cacheRead?: number;
+      cacheWrite?: number;
+      cost?: number | { total?: number | string } | string;
+    };
+    [key: string]: unknown;
+  };
+
   export type SessionEntry = {
     type?: string;
     customType?: string;
     data?: unknown;
-    message?: {
-      role?: string;
-      usage?: {
-        inputTokens?: number;
-        outputTokens?: number;
-        cacheRead?: number;
-        cacheWrite?: number;
-        cost?: number | { total?: number | string } | string;
-      };
-    };
+    message?: SessionMessage;
+    [key: string]: unknown;
   };
 
   export type SessionManagerLike = {
     getEntries: () => SessionEntry[];
+    getBranch: () => SessionEntry[];
     getLeafId: () => string | null;
     getSessionId: () => string | null;
+    getSessionFile?: () => string | undefined;
+    [key: string]: unknown;
   };
 
-  export type ContextUsage = {
-    tokens: number;
-    contextWindow: number;
+  export type Model = {
+    id: string;
+    provider: string;
+    reasoning?: boolean | undefined;
+    [key: string]: unknown;
+  };
+  export type ModelAuth = {
+    ok: boolean;
+    apiKey?: string;
+    headers?: Record<string, string>;
+    error?: string;
+    [key: string]: unknown;
+  };
+
+  export type ModelRegistry = {
+    find: (provider: string, modelId: string) => Model | undefined;
+    getApiKeyAndHeaders: (model: Model | unknown) => Promise<ModelAuth>;
+    [key: string]: unknown;
   };
 
   export type ExtensionContext = {
     cwd: string;
     hasUI: boolean;
-    model?: unknown;
+    model?: Model;
+    modelRegistry: ModelRegistry;
     sessionManager: SessionManagerLike;
     ui: {
+      theme: Theme;
       notify: (message: string, level?: string) => void;
-      setFooter: (factory: (...args: any[]) => any) => void;
-      custom: <T>(factory: (...args: any[]) => T | Promise<T>) => Promise<T>;
-      select?: (
+      setFooter: (factory: (...args: unknown[]) => unknown) => void;
+      setWidget: (key: string, widget: unknown) => void;
+      setEditorComponent?: (factory: (tui: unknown, theme: Theme, keybindings: unknown) => unknown) => void;
+      setEditorText: (text: string) => void;
+      getEditorText?: () => string;
+      custom: <T>(
+        factory: (
+          tui: { requestRender: () => void; [key: string]: unknown },
+          theme: Theme,
+          kb: unknown,
+          done: (result: T) => void,
+        ) => unknown,
+      ) => Promise<T>;
+      select: (
         title: string,
         options: string[],
       ) => Promise<string | undefined>;
+      confirm: (title: string, message: string) => Promise<boolean>;
+      input: (title: string, placeholder?: string) => Promise<string | undefined>;
+      editor: (title: string, content: string) => Promise<string | undefined>;
+      [key: string]: unknown;
     };
+    hasPendingMessages: () => boolean;
+    navigateTree?: (targetId: string, options?: { summarize?: boolean }) => Promise<{ cancelled?: boolean; [key: string]: unknown }>;
+    waitForIdle?: () => Promise<void>;
+    newSession: (options?: { parentSession?: string }) => Promise<{ cancelled?: boolean; [key: string]: unknown }>;
     getContextUsage: () => ContextUsage | null;
     getSystemPrompt: () => string | null;
+    [key: string]: unknown;
   };
 
   export type ToolResultEvent = {
@@ -93,12 +144,12 @@ declare module "@earendil-works/pi-coding-agent" {
 
   export type RegisteredTool = {
     name: string;
-    label?: string;
-    description?: string;
-    promptSnippet?: string;
-    promptGuidelines?: string[];
+    label?: string | undefined;
+    description?: string | undefined;
+    promptSnippet?: string | undefined;
+    promptGuidelines?: string[] | undefined;
     parameters?: unknown;
-    renderShell?: "default" | "self";
+    renderShell?: "default" | "self" | undefined;
     renderCall?: (
       args: any,
       theme: Theme,
@@ -115,7 +166,7 @@ declare module "@earendil-works/pi-coding-agent" {
       input: any,
       signal: AbortSignal,
       onUpdate?: (partial: AgentToolResult) => void,
-      ctx: ExtensionContext,
+      ctx?: ExtensionContext,
     ) => Promise<any> | any;
   };
 
@@ -149,7 +200,29 @@ declare module "@earendil-works/pi-coding-agent" {
       handler: (event: any, ctx: ExtensionContext) => any,
     ) => void;
     registerTool: (tool: RegisteredTool) => void;
-    registerCommand: (name: string, command: any) => void;
+    registerCommand: (
+      name: string,
+      command:
+        | {
+            description?: string;
+            handler: (args: string, ctx: ExtensionContext) => unknown;
+            [key: string]: unknown;
+          }
+        | ((args: string, ctx: ExtensionContext) => unknown),
+    ) => void;
+    registerShortcut?: (
+      shortcut: string,
+      options:
+        | {
+            description?: string;
+            handler: (ctx: ExtensionContext) => unknown;
+            [key: string]: unknown;
+          }
+        | ((ctx: ExtensionContext) => unknown),
+    ) => void;
+    getThinkingLevel: () => string | undefined;
+    setThinkingLevel: (level: string) => void;
+    setModel: (model: Model) => Promise<boolean>;
     getActiveTools: () => string[];
     setActiveTools: (tools: string[]) => void;
     getAllTools: () => ToolInfo[];
@@ -168,7 +241,6 @@ declare module "@earendil-works/pi-coding-agent" {
         deliverAs?: "steer" | "followUp" | "nextTurn";
       },
     ) => void;
-    getThinkingLevel: () => string;
   };
 
   export type AgentToolContentPart = {
@@ -238,13 +310,67 @@ declare module "@earendil-works/pi-coding-agent" {
     includeDefaults: boolean;
   }): { skills: Skill[]; diagnostics: unknown[] };
   export function getMarkdownTheme(): unknown;
-  export const DynamicBorder: any;
+  export function convertToLlm(...args: unknown[]): unknown;
+  export function serializeConversation(...args: unknown[]): string;
+  export function compact(...args: unknown[]): Promise<{
+    summary?: string;
+    firstKeptEntryIndex?: number;
+    tokensBefore?: number;
+    [key: string]: unknown;
+  }>;
+  export type ToolDefinition = {
+    name: string;
+    description: string;
+    parameters: unknown;
+    execute: (...args: unknown[]) => unknown;
+    [key: string]: unknown;
+  };
+  export function createCodingTools(cwd: string): RegisteredTool[];
+  export function createReadOnlyTools(cwd: string): RegisteredTool[];
+  export function copyToClipboard(...args: unknown[]): Promise<boolean> | boolean | void;
+  export class CustomEditor {
+    constructor(tui: unknown, theme: Theme, keybindings: unknown);
+    tui: { requestRender: () => void; [key: string]: unknown };
+    theme: Theme;
+    borderColor?: ((text: string) => string) | undefined;
+    getText: () => string;
+    setText: (text: string) => void;
+    addToHistory?: ((text: string) => void) | undefined;
+    render(width: number): string[];
+    [key: string]: unknown;
+  }
+  export class DynamicBorder {
+    constructor(render?: (str: string) => string);
+    [key: string]: unknown;
+  }
   export const BorderedLoader: any;
   export const TreeSelectorComponent: any;
+  export class ModelSelectorComponent {
+    constructor(...args: unknown[]);
+    [key: string]: unknown;
+  }
+  export const SettingsManager: {
+    inMemory: () => unknown;
+    [key: string]: unknown;
+  };
 }
 
 declare module "@earendil-works/pi-ai" {
-  export function complete(...args: any[]): Promise<any>;
+  export function complete(
+    ...args: unknown[]
+  ): Promise<{
+    content: Array<{ type: string; text?: string; [key: string]: unknown }>;
+    stopReason?: string;
+    [key: string]: unknown;
+  }>;
+  export type Api = unknown;
+  export type Model<TApi = unknown> = {
+    id: string;
+    provider: string;
+    api?: TApi;
+    [key: string]: unknown;
+  };
+  export function StringEnum<T extends readonly string[]>(values: T): unknown;
   export type UserMessage = any;
   export type MessageContentPart = {
     type: string;
@@ -269,6 +395,8 @@ declare module "@earendil-works/pi-ai" {
     model?: string;
     stopReason?: string;
     errorMessage?: string;
+    timestamp?: number;
+    [key: string]: unknown;
   };
 }
 
@@ -281,9 +409,39 @@ declare module "@earendil-works/pi-tui" {
   export class Container {
     constructor(...args: any[]);
     addChild(child: any): void;
+    clear(): void;
     invalidate(): void;
     render(width: number): string[];
   }
+
+  export type SelectItem = {
+    value: string;
+    label: string;
+    description?: string;
+    [key: string]: unknown;
+  };
+
+  export class SelectList {
+    constructor(
+      items: SelectItem[] | unknown[],
+      maxVisible?: number,
+      options?: {
+        selectedPrefix?: (text: string) => string;
+        selectedText?: (text: string) => string;
+        description?: (text: string) => string;
+        scrollInfo?: (text: string) => string;
+        noMatch?: (text: string) => string;
+        [key: string]: unknown;
+      },
+    );
+    onSelect?: (item: SelectItem | any) => void;
+    onCancel?: () => void;
+    handleInput(data: string): void;
+    [key: string]: unknown;
+  }
+
+  export function getEditorKeybindings(...args: unknown[]): unknown;
+  export function fuzzyMatch(pattern: string, text: string): unknown;
 
   export class Markdown {
     constructor(...args: any[]);
@@ -291,6 +449,38 @@ declare module "@earendil-works/pi-tui" {
 
   export class Spacer {
     constructor(...args: any[]);
+  }
+
+  export interface Focusable {
+    focused: boolean;
+  }
+
+  export interface EditorTheme {
+    borderColor?: (text: string) => string;
+    selectList?: {
+      selectedBg?: (text: string) => string;
+      selectedFg?: (text: string) => string;
+      matchHighlight?: (text: string) => string;
+      itemSecondary?: (text: string) => string;
+      selectedPrefix?: (text: string) => string;
+      selectedText?: (text: string) => string;
+      description?: (text: string) => string;
+      scrollInfo?: (text: string) => string;
+      noMatch?: (text: string) => string;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  }
+
+  export class Editor {
+    constructor(tui: unknown, theme?: unknown);
+    focused: boolean;
+    disableSubmit: boolean;
+    onChange?: () => void;
+    getText(): string;
+    setText(text: string): void;
+    handleInput(data: string): void;
+    render(width: number): string[];
   }
 
   export const Key: any;
@@ -305,6 +495,7 @@ declare module "@earendil-works/pi-tui" {
     pad?: boolean,
   ): string;
   export function visibleWidth(text: string): number;
+  export function wrapTextWithAnsi(text: string, width: number): string[];
 }
 
 declare module "@sinclair/typebox" {
@@ -312,6 +503,7 @@ declare module "@sinclair/typebox" {
   export const Type: {
     String: (options?: unknown) => unknown;
     Number: (options?: unknown) => unknown;
+    Integer: (options?: unknown) => unknown;
     Boolean: (options?: unknown) => unknown;
     Array: (item: unknown, options?: unknown) => unknown;
     Object: (properties: Record<string, unknown>, options?: unknown) => unknown;

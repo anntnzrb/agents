@@ -5,8 +5,8 @@
 import { complete, type UserMessage } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { BorderedLoader } from "@earendil-works/pi-coding-agent";
-import { JSON_BLOCK_RE, SYSTEM_PROMPT } from "./constants.ts";
-import type { ActiveModel, ExtractionResult } from "./types.ts";
+import { JSON_BLOCK_RE, SYSTEM_PROMPT } from "./constants.js";
+import type { ActiveModel, ExtractionResult } from "./types.js";
 
 /**
  * Parse the JSON response from the LLM.
@@ -15,7 +15,7 @@ const parseExtractionResult = (text: string): ExtractionResult | null => {
   try {
     let jsonStr = text;
     const jsonMatch = text.match(JSON_BLOCK_RE);
-    if (jsonMatch) {
+    if (jsonMatch && jsonMatch[1]) {
       jsonStr = jsonMatch[1].trim();
     }
 

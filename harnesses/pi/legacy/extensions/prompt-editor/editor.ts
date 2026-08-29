@@ -7,9 +7,8 @@ import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Effect } from "effect";
-
-import { getCurrentMode, getModeBorderColor } from "./modes-core.ts";
-import { setRequestEditorRender } from "./modes-state.ts";
+import { getCurrentMode, getModeBorderColor } from "./modes-core.js";
+import { setRequestEditorRender } from "./modes-state.js";
 
 const MAX_HISTORY_ENTRIES = 100;
 const MAX_RECENT_PROMPTS = 30;
@@ -26,12 +25,12 @@ class PromptEditor extends CustomEditor {
   private borderColorOverride?: (text: string) => string;
 
   constructor(
-    tui: ConstructorParameters<typeof CustomEditor>[0],
-    theme: ConstructorParameters<typeof CustomEditor>[1],
-    keybindings: ConstructorParameters<typeof CustomEditor>[2],
+    tui: unknown,
+    theme: any,
+    keybindings: unknown,
   ) {
     super(tui, theme, keybindings);
-    delete (this as { borderColor?: (text: string) => string }).borderColor;
+    delete (this as { borderColor?: ((text: string) => string) | undefined }).borderColor;
     Object.defineProperty(this, "borderColor", {
       get: () => this.borderColorOverride ?? ((text: string) => text),
       set: (value: (text: string) => string) => {
@@ -151,7 +150,7 @@ const readTailEffect = Effect.fn("readTail")((
           const buffer = Buffer.alloc(length);
           const { bytesRead } = await handle.read(buffer, 0, length, start);
           if (bytesRead === 0) return "";
-          let chunk = buffer.subarray(0, bytesRead).toString("utf8");
+          let chunk = Buffer.from(buffer.buffer, buffer.byteOffset, bytesRead).toString("utf8");
           if (start > 0) {
             const firstNewline = chunk.indexOf("\n");
             if (firstNewline !== -1) chunk = chunk.slice(firstNewline + 1);
@@ -177,11 +176,10 @@ const readPreviousSessionPromptsEffect = Effect.fn("readPreviousSessionPrompts")
     ? path.resolve(excludeSessionFile)
     : undefined;
 
-  const entries = yield* Effect.tryPromise({
+  const entries = (yield* Effect.tryPromise({
     try: () => fs.readdir(sessionDir, { withFileTypes: true }),
     catch: () => [] as Dirent[],
-  }).pipe(Effect.orElseSucceed(() => [] as Dirent[]));
-
+  }).pipe(Effect.orElseSucceed(() => [] as Dirent[]))) as Dirent[];
   if (entries.length === 0) return prompts;
 
   const fileStats = yield* Effect.all(
@@ -285,14 +283,15 @@ function setEditor(
   ctx: ExtensionContext,
   history: PromptEntry[],
 ): void {
-  ctx.ui.setEditorComponent((tui, theme, keybindings) => {
+  ctx.ui.setEditorComponent?.((tui, theme, keybindings) => {
     const editor = new PromptEditor(tui, theme, keybindings);
     setRequestEditorRender(() => editor.requestRenderNow());
     editor.modeLabelProvider = () => getCurrentMode();
     editor.modeLabelColor = (text: string) => ctx.ui.theme.fg("dim", text);
     const borderColor = (text: string) => {
       const isBashMode = editor.getText().trimStart().startsWith("!");
-      if (isBashMode) return ctx.ui.theme.getBashModeBorderColor()(text);
+      const getBorder = ctx.ui.theme.getBashModeBorderColor;
+      if (isBashMode && getBorder) return getBorder()(text);
       return getModeBorderColor(ctx, pi, getCurrentMode())(text);
     };
 
@@ -315,13 +314,13 @@ let loadCounter = 0;
 export function applyEditor(pi: ExtensionAPI, ctx: ExtensionContext): void {
   if (!ctx.hasUI) return;
 
-  const sessionFile = ctx.sessionManager.getSessionFile();
+  const sessionFile = ctx.sessionManager.getSessionFile?.();
   const currentEntries = ctx.sessionManager.getBranch();
   const currentPrompts = collectUserPromptsFromEntries(currentEntries);
   const immediateHistory = buildHistoryList(currentPrompts, []);
 
   const currentLoad = ++loadCounter;
-  const initialText = ctx.ui.getEditorText();
+  const initialText = ctx.ui.getEditorText?.() ?? "";
   setEditor(pi, ctx, immediateHistory);
 
   void (async () => {
@@ -330,7 +329,7 @@ export function applyEditor(pi: ExtensionAPI, ctx: ExtensionContext): void {
       sessionFile ?? undefined,
     );
     if (currentLoad !== loadCounter) return;
-    if (ctx.ui.getEditorText() !== initialText) return;
+    if ((ctx.ui.getEditorText?.() ?? "") !== initialText) return;
     const history = buildHistoryList(currentPrompts, previousPrompts);
     if (historiesMatch(history, immediateHistory)) return;
     setEditor(pi, ctx, history);
