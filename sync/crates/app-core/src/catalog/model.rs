@@ -1472,8 +1472,8 @@ mod tests {
         assert_eq!(model.input, vec![InputModality::Text, InputModality::Image]);
         assert_eq!(model.context_window, 2_000_000);
         assert_eq!(model.max_tokens, 64_000);
-        assert_eq!(model.cost.input, 1.0);
-        assert_eq!(model.cost.output, 2.0);
+        assert_eq!(model.cost.input.to_bits(), 1.0_f64.to_bits());
+        assert_eq!(model.cost.output.to_bits(), 2.0_f64.to_bits());
     }
 
     #[test]
