@@ -11,7 +11,7 @@ A gateway host has an OS hostname that matches `server.hostname` in `tools/clipr
 | `bun ./sync/src/cli.ts` | Runs a normal reconciliation |
 | `bun ./sync/src/cli.ts sync` | Runs the same normal reconciliation |
 | `bun ./sync/src/cli.ts sync --refresh-models` | Bypasses model-catalog freshness windows and rejects stale network data |
-| `bun ~/.local/share/agents/sync/src/cli.ts launch <name> -- <arguments>` | Syncs when the source is available, prepares the harness or tool package, and launches it |
+| `bun ~/.local/share/agents/sync-current/src/cli.ts launch <name> -- <arguments>` | Syncs when the source is available, prepares the harness or tool package, and launches it |
 
 Unknown commands and invalid arguments exit with status `2`. A manual sync exits with status `1` after a fatal reconciliation error.
 
@@ -84,9 +84,9 @@ After catalog publication, sync removes the obsolete `~/.cache/agents/model-cata
 
 ## Installed runtime
 
-Sync copies `sync/src/`, `sync/tsconfig.json`, `sync/package.json`, and `sync/bun.lock` to `~/.local/share/agents/sync/`, then runs `bun install --frozen-lockfile --production` there so the installed copy resolves its runtime dependencies. Generated wrappers execute this installed copy.
+Sync copies `sync/src/`, `sync/tsconfig.json`, `sync/package.json`, and `sync/bun.lock` into a content-addressed release under `~/.local/share/agents/sync-releases/<releaseId>/`, then runs `bun install --frozen-lockfile --production` there so the installed copy resolves its runtime dependencies. A `~/.local/share/agents/sync-current` symlink always points to the most recently published release. Generated wrappers execute this installed copy.
 
-Only sync reads the repository source directly. Harness configuration and runtime adapters read generated homes or files under `~/.local/share/agents`.
+Releases are staged in `~/.local/share/agents/sync-releases/.stage-<pid>-<nonce>` before the release is complete. Sync prunes only complete, unreferenced releases after the `sync-current` link and wrapper publication succeed. Any legacy `~/.local/share/agents/sync/` mutable directory is removed after callers have migrated to `sync-current`.
 
 ## Managed CLIProxyAPI release
 

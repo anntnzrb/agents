@@ -48,7 +48,8 @@ Other jobs use fixed generated targets:
 
 | Path | Owner |
 | --- | --- |
-| `~/.local/share/agents/sync/` | Installed sync runtime |
+| `~/.local/share/agents/sync-releases/<releaseId>/` | Installed sync runtime releases |
+| `~/.local/share/agents/sync-current` | Symlink to the current installed sync runtime |
 | `~/.local/share/agents/model-catalog/catalog.json` | Shared model-catalog job |
 | `~/.local/share/agents/sync-managed/` | Managed ownership and hook state |
 | `~/.local/bin/` | Harness and managed-tool wrappers |
