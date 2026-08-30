@@ -1,0 +1,28 @@
+[package]
+name = "app-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+flate2.workspace = true
+hex.workspace = true
+json5.workspace = true
+libc.workspace = true
+regex.workspace = true
+reqwest.workspace = true
+semver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+sha2.workspace = true
+tar.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+toml_edit.workspace = true
+url.workspace = true
+walkdir.workspace = true
+
+[lints]
+workspace = true

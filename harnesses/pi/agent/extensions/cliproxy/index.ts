@@ -1,42 +1,17 @@
 import { Effect, Schema } from "effect";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 import type {
   ExtensionAPI,
   ProviderModelConfig,
 } from "@earendil-works/pi-coding-agent";
-import type * as AgentiumRuntime from "@anntnzrb/agentium/runtime/model-catalog-client";
+import {
+  resolveLiveModelCatalog,
+  type RuntimeCatalogModel as CatalogModel,
+} from "./model-catalog-client.ts";
 import { piThinkingLevelMap } from "./thinking-levels.ts";
 
-interface CatalogModel {
-  readonly id: string;
-  readonly name: string;
-  readonly reasoning: boolean;
-  readonly reasoningEfforts?: readonly string[];
-  readonly input: readonly ("text" | "image")[];
-  readonly cost: {
-    readonly input: number;
-    readonly output: number;
-    readonly cacheRead: number;
-    readonly cacheWrite: number;
-  };
-  readonly contextWindow: number;
-  readonly maxTokens: number;
-}
-
-interface CatalogModule {
-  readonly resolveLiveModelCatalog: typeof AgentiumRuntime.resolveLiveModelCatalog;
-}
-
-export class CatalogImportError extends Schema.TaggedError<CatalogImportError>()("CatalogImportError", {
-  path: Schema.String,
-  cause: Schema.optional(Schema.Unknown),
-}) {
-  override get message(): string {
-    return `import model catalog client ${this.path}`;
-  }
-}
+export type { CatalogModel };
 
 export class CatalogResolutionError extends Schema.TaggedError<CatalogResolutionError>()(
   "CatalogResolutionError",
@@ -60,36 +35,10 @@ const CATALOG_PATH = join(
   "catalog.json",
 );
 const CLIPROXY_BASE_URL = "${CLIPROXY_CLIENT_BASE_URL}";
-// Resolve the installed runtime from the generated harness dependency root.
-const CATALOG_MODULE = pathToFileURL(
-  join(
-    homedir(),
-    ".pi",
-    "agent",
-    "extensions",
-    "node_modules",
-    "@anntnzrb",
-    "agentium",
-    "dist",
-    "runtime",
-    "model-catalog-client.js",
-  ),
-);
-
-export const loadCatalogModule = Effect.fn("loadCatalogModule")(function*(): Effect.fn.Return<
-  CatalogModule,
-  CatalogImportError
-> {
-  return yield* Effect.tryPromise({
-    try: () => import(CATALOG_MODULE) as Promise<CatalogModule>,
-    catch: (cause) => new CatalogImportError({ path: CATALOG_MODULE.href, cause }),
-  });
-});
 
 export const registerCliProxyProvider = Effect.fn("registerCliProxyProvider")(function*(
   pi: ExtensionAPI,
-): Effect.fn.Return<void, CatalogImportError | CatalogResolutionError> {
-  const { resolveLiveModelCatalog } = yield* loadCatalogModule();
+): Effect.fn.Return<void, CatalogResolutionError> {
   const catalog = yield* Effect.tryPromise({
     try: () =>
       resolveLiveModelCatalog({

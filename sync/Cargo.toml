@@ -1,0 +1,94 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/app-core",
+    "crates/app",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+
+[workspace.metadata.crane]
+name = "agentium"
+
+[workspace.dependencies]
+app-core = { path = "crates/app-core" }
+clap = { version = "4.5", features = ["derive"] }
+color-eyre = "0.6"
+flate2 = "1"
+hex = "0.4"
+json5 = "0.4"
+libc = "0.2"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+semver = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+serde_yaml = "0.9"
+sha2 = "0.10"
+tar = "0.4"
+tempfile = "3"
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "process", "rt-multi-thread", "sync", "time"] }
+toml_edit = { version = "0.22", features = ["serde"] }
+url = "2"
+walkdir = "2"
+[workspace.lints.rust]
+rust_2018_idioms = { level = "deny", priority = -1 }
+rust_2021_compatibility = { level = "deny", priority = -1 }
+rust_2024_compatibility = { level = "deny", priority = -1 }
+future_incompatible = { level = "deny", priority = -1 }
+nonstandard_style = "deny"
+
+[workspace.lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+style = { level = "deny", priority = -1 }
+complexity = { level = "deny", priority = -1 }
+perf = { level = "deny", priority = -1 }
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+unwrap_used = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+arithmetic_side_effects = "deny"
+unreachable = "deny"
+unimplemented = "deny"
+unchecked_time_subtraction = "deny"
+todo = "deny"
+string_slice = "deny"
+panic_in_result_fn = "deny"
+panic = "deny"
+exit = "deny"
+as_conversions = "deny"
+manual_let_else = "deny"
+uninlined_format_args = "deny"
+match_like_matches_macro = "deny"
+manual_string_new = "deny"
+manual_range_contains = "deny"
+manual_flatten = "deny"
+manual_filter_map = "deny"
+manual_find_map = "deny"
+use_self = "deny"
+redundant_closure_for_method_calls = "deny"
+explicit_into_iter_loop = "deny"
+explicit_iter_loop = "deny"
+semicolon_if_nothing_returned = "deny"
+needless_borrow = "deny"
+needless_borrows_for_generic_args = "deny"
+
+[profile.dev]
+opt-level = 0
+debug = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true
