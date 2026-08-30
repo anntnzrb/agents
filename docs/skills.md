@@ -8,7 +8,7 @@ Use `skills/current/` for skills that sync publishes to enabled harnesses. Use `
 2. Edit `skills/current/<name>/`.
 3. Run the skill's focused tests.
 4. Run the validation that matches the changed files.
-5. Run `bun ./sync/src/cli.ts` from the repository root.
+5. Run `agentium sync` from the repository root.
 6. Inspect the generated skill in one harness home.
 
 Keep development credentials in the root ignored `.env` file (`.env.example` at the repository root lists the shared template variables).
@@ -70,7 +70,7 @@ Move the complete directory into `skills/legacy/`:
 
 ```bash
 mv skills/current/<name> skills/legacy/<name>
-bun ./sync/src/cli.ts
+agentium sync
 ```
 
 The next sync removes the managed copy from harness homes. Sync does not publish anything under `skills/legacy/`.

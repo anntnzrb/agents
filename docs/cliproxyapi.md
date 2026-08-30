@@ -52,7 +52,7 @@ For ClinePass, create a long-lived API key in **Settings > API Keys** at [app.cl
 Apply the change:
 
 ```bash
-bun ./sync/src/cli.ts sync --refresh-models
+agentium sync --refresh-models
 ```
 
 If the gateway is not running, run a normal sync first. Start the gateway, then run the forced refresh.
@@ -82,7 +82,7 @@ Do not run two gateways with the same active refresh token. Stop the old gateway
 After authentication, refresh the model catalog:
 
 ```bash
-bun ./sync/src/cli.ts sync --refresh-models
+agentium sync --refresh-models
 ```
 
 ## Start the gateway
@@ -135,7 +135,7 @@ done
 Restart the running gateway process after you edit the auth files. Then refresh the model catalog:
 
 ```bash
-bun ./sync/src/cli.ts sync --refresh-models
+agentium sync --refresh-models
 ```
 
 Sessions and configurations that reference an old unprefixed ID stop working after its prefix appears. Select the prefixed model again.
@@ -158,7 +158,7 @@ unset base_url
 Force every catalog request after an account or provider change:
 
 ```bash
-bun ./sync/src/cli.ts sync --refresh-models
+agentium sync --refresh-models
 ```
 
 The forced refresh bypasses freshness windows and rejects stale fallback data. Use a normal sync for routine launches so a transient provider failure can use a valid cache.

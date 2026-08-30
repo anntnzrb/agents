@@ -6,8 +6,7 @@
 - `skills/current/`: SSOT for shared skills synced to every harness
 - `skills/legacy/`: archived skills; repo-only, not synced
 - `tools/`: repo-only managed-tool sources
-- `sync/`: isolated TypeScript sync application; owns all JS/TS app config, launcher wrappers, dependencies, and `sync/test/`
-- `sync/test/`: tests sync behavior only; harness names and paths MAY appear as fixtures or adapter boundaries, but tests MUST NOT import harness implementations or assert harness-local behavior; skill and harness changes MUST NOT add tests here
+- `sync/`: native Rust sync application; owns the Cargo workspace, reconciliation engine, launcher wrappers, and runtime integration
 - `docs/`: repository setup, operation, and workflow documentation indexed by `docs/index.md`
 - `docs/sync/`: sync application documentation; adapter boundaries MAY be described, but harness-local behavior and configuration belong under `harnesses/`
 - Harness-specific tests and documentation stay beside their owning source under `harnesses/`
@@ -36,8 +35,8 @@ Route documentation by owner:
 
 Boundaries:
 
-- A skill change MUST NOT add tests under `sync/test/` or documentation under `docs/sync/`. The skill's own files carry its documentation and validation commands.
-- A change under `harnesses/` MUST NOT update `docs/` or `sync/test/`. Adapter-contract changes in `sync/src/core/harness-adapters.ts` are sync changes; they follow the sync workflow and MAY update `docs/sync/`.
+- A skill change MUST NOT add tests under `sync/` or documentation under `docs/sync/`. The skill's own files carry its documentation and validation commands.
+- A change under `harnesses/` MUST NOT update `docs/` or tests under `sync/`. Adapter-contract changes in `sync/crates/app-core/src/harness_adapters.rs` are sync changes; they follow the sync workflow and MAY update `docs/sync/`.
 
 For changes routed to `docs/`:
 
@@ -52,15 +51,16 @@ Documentation-only changes must still preserve navigation and factual accuracy. 
 
 ## Execution model
 
-- Every normal execution of the synchronization application MUST use the remotely distributed `@anntnzrb/agentium` release through the generated wrapper, never the local development implementation.
+- Every normal execution MUST use the locally installed native `agentium` binary through the generated wrapper.
 - The release artifact MUST consume the host's current harness and configuration inputs. Changes to those inputs MUST NOT require rebuilding or republishing the synchronization application.
-- The synchronization engine's runtime MUST require Bun only. It MUST NOT invoke development tooling or the `npm`, `git`, `gh`, `tar`, or `uv` executables. Harnesses and their hooks may have separate runtime requirements.
+- The synchronization engine is a standalone native executable. It MAY invoke Bun only for harness package and extension dependency boundaries. It MUST NOT invoke development tooling or the `npm`, `git`, `gh`, `tar`, or `uv` executables for its own orchestration.
 
 ## Sync Contract
 
-- Development entrypoint: `sync/src/cli.ts`
-- Operational entrypoint: the remotely distributed release artifact
-- Invoke the development entrypoint with an explicit Bun runner, e.g. `bun ./sync/src/cli.ts` from repo root
+- Source workspace: `sync/`
+- Development and operational entrypoint: `sync/crates/app/src/main.rs`
+- Build with `cargo build --manifest-path sync/Cargo.toml --package app`
+- Run the CLI with `cargo run --manifest-path sync/Cargo.toml --package app --`
 - NEVER add `bin/` shell trampolines for sync
 - Use TDD
 

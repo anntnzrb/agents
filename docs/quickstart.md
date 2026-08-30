@@ -2,18 +2,18 @@
 
 Follow this tutorial on the gateway host, whose name matches `server.hostname` in `tools/cliproxyapi/deployment.json`. It creates the generated files, starts CLIProxyAPI, verifies the model endpoint, and starts a harness.
 
-The sync engine also runs on client hosts. A client host needs Bun and the local `~/.config/agents/` configuration tree. It does not need the local sync source, `secrets.local.json`, Node, npm, Git, GitHub CLI, tar, or uv to run sync. See the [Sync reference](sync/sync.md#registry-runtime) for the client command.
+The sync engine also runs on client hosts. A client host needs the native `agentium` binary and the local `~/.config/agents/` configuration tree. It does not need the local sync source, `secrets.local.json`, Node, npm, Git, GitHub CLI, tar, or uv to run sync. See the [Sync reference](sync/sync.md#native-binary-runtime) for client host runtime details.
 
 Sync supports macOS and Linux. The managed CLIProxyAPI release supports macOS on ARM64 and Linux on x86_64.
 
 ## Install gateway setup commands
 
-The sync engine requires Bun. This tutorial also uses Git to clone the repository and `curl` and `jq` to verify the gateway.
+The native sync engine is distributed as the `agentium` binary. This tutorial also uses Git to clone the repository and `curl` and `jq` to verify the gateway. Bun remains necessary only if you launch harnesses or extensions that execute npm packages or Bun scripts.
 
 Confirm that each command is available:
 
 ```bash
-bun --version
+agentium --version
 git --version
 curl --version
 jq --version
@@ -23,12 +23,12 @@ Each command prints its version.
 
 ## Run sync on a client host
 
-Install Bun on a client host and keep the local `~/.config/agents/` configuration tree available. Do not install Node, npm, Git, GitHub CLI, tar, or uv for the sync engine.
+Install `agentium` on a client host (on `PATH`, at `~/.local/share/agentium/bin/agentium`, or via `AGENTIUM_BIN`) and keep the local `~/.config/agents/` configuration tree available. Do not install Node, npm, Git, GitHub CLI, tar, or uv for the sync engine.
 
-Run a generated harness wrapper, or invoke the published package directly:
+Run a generated harness wrapper, or invoke the binary directly:
 
 ```bash
-bun x @anntnzrb/agentium@latest launch <name> -- <arguments>
+agentium launch <name> -- <arguments>
 ```
 
 A client host can omit `secrets.local.json`. A harness package or configured hook may have separate runtime requirements.
@@ -79,7 +79,7 @@ The repository ignores `secrets.local.json`. Keep the file out of Git and transf
 Run sync from the repository root:
 
 ```bash
-bun x @anntnzrb/agentium@latest sync
+agentium sync
 ```
 
 The first gateway-host run may download the pinned CLIProxyAPI archive. Sync verifies its SHA-256 checksum and generates the runtime files. Sync can warn that CLIProxyAPI is not running yet.
@@ -129,7 +129,7 @@ The process uses the listener from `tools/cliproxyapi/deployment.json`. Keep it 
 Return to the repository root and force a complete refresh:
 
 ```bash
-bun x @anntnzrb/agentium@latest sync --refresh-models
+agentium sync --refresh-models
 ```
 
 The forced refresh updates provider catalogs, models.dev metadata, and the live CLIProxyAPI catalog. It fails instead of using stale network data.
@@ -149,7 +149,7 @@ unset CLIPROXY_BASE_URL
 
 ## Start a harness
 
-Choose an adapter whose source directory exists under `harnesses/` and whose `platforms` field includes your host. Read its `launcher.bin` value in `sync/src/core/harness-adapters.ts`, then run that wrapper command.
+Choose an adapter whose source directory exists under `harnesses/` and whose `platforms` field includes your host. Read its `launcher.bin` value in `sync/crates/app-core/src/harness_adapters.rs`, then run that wrapper command.
 
 The wrapper runs sync, prepares the cached harness package, forwards your arguments, and returns the harness exit status.
 
