@@ -1,26 +1,37 @@
 # Set up agent configuration
 
-Follow this tutorial on the gateway host, whose name matches `server.hostname` in `tools/cliproxyapi/deployment.json`. It creates the generated files, starts CLIProxyAPI, verifies the model endpoint, and starts a harness. A client host can run sync without local secrets; see [Sync reference](sync/sync.md) for that path.
+Follow this tutorial on the gateway host, whose name matches `server.hostname` in `tools/cliproxyapi/deployment.json`. It creates the generated files, starts CLIProxyAPI, verifies the model endpoint, and starts a harness.
+
+The sync engine also runs on client hosts. A client host needs Bun and the local `~/.config/agents/` configuration tree. It does not need the local sync source, `secrets.local.json`, Node, npm, Git, GitHub CLI, tar, or uv to run sync. See the [Sync reference](sync/sync.md#registry-runtime) for the client command.
 
 Sync supports macOS and Linux. The managed CLIProxyAPI release supports macOS on ARM64 and Linux on x86_64.
 
-## Install the required commands
+## Install gateway setup commands
 
-Install `bun`, `node`, `npm`, `git`, `tar`, `curl`, and `jq`.
+The sync engine requires Bun. This tutorial also uses Git to clone the repository and `curl` and `jq` to verify the gateway.
 
 Confirm that each command is available:
 
 ```bash
 bun --version
-node --version
-npm --version
 git --version
-tar --version
 curl --version
 jq --version
 ```
 
 Each command prints its version.
+
+## Run sync on a client host
+
+Install Bun on a client host and keep the local `~/.config/agents/` configuration tree available. Do not install Node, npm, Git, GitHub CLI, tar, or uv for the sync engine.
+
+Run a generated harness wrapper, or invoke the published package directly:
+
+```bash
+bun x @anntnzrb/agentium@latest launch <name> -- <arguments>
+```
+
+A client host can omit `secrets.local.json`. A harness package or configured hook may have separate runtime requirements.
 
 ## Clone the repository
 
@@ -68,7 +79,7 @@ The repository ignores `secrets.local.json`. Keep the file out of Git and transf
 Run sync from the repository root:
 
 ```bash
-bun ./sync/src/cli.ts
+bun x @anntnzrb/agentium@latest sync
 ```
 
 The first gateway-host run may download the pinned CLIProxyAPI archive. Sync verifies its SHA-256 checksum and generates the runtime files. Sync can warn that CLIProxyAPI is not running yet.
@@ -118,7 +129,7 @@ The process uses the listener from `tools/cliproxyapi/deployment.json`. Keep it 
 Return to the repository root and force a complete refresh:
 
 ```bash
-bun ./sync/src/cli.ts sync --refresh-models
+bun x @anntnzrb/agentium@latest sync --refresh-models
 ```
 
 The forced refresh updates provider catalogs, models.dev metadata, and the live CLIProxyAPI catalog. It fails instead of using stale network data.
