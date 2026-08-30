@@ -1,10 +1,5 @@
-import { beforeEach, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, type Mock, spyOn, test } from "bun:test";
 import assert from "node:assert/strict";
-
-beforeEach(() => {
-  spyOn(console, "error").mockImplementation(() => {});
-});
-
 import {
   chmodSync,
   existsSync,
@@ -27,6 +22,12 @@ const DEPLOYMENT: CliProxyDeployment = {
   listen: { host: "100.64.0.42", port: 9443 },
   client: { baseUrl: "https://gateway.example.test:9443/v1" },
 };
+
+let errorSpy: Mock<(...args: unknown[]) => void>;
+beforeEach(() => {
+  errorSpy = spyOn(console, "error").mockImplementation(() => {});
+});
+afterEach(() => errorSpy.mockRestore());
 
 function withTempHome<T>(fn: (home: string) => T | Promise<T>): Promise<T> {
   const home = mkdtempSync(join(tmpdir(), "agents-managed-tool-test-"));

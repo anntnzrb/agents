@@ -18,7 +18,6 @@ import {
   managedToolWrapperDestination,
   reconcileWrapperFiles,
   reconcileWrappers,
-  renderWrapper,
   WRAPPER_MARKER,
   WRAPPER_STATE_FILE,
   wrapperDestinations,
@@ -98,7 +97,9 @@ test("wrapper_destinations_render_unix_launchers", () => {
     assert.equal(unix[0]?.content.includes("exit 127"), true);
     assert.equal(unix[0]?.content.includes("sync runtime is missing"), true);
     assert.equal(
-      unix[0]?.content.includes(join(home, ".local", "share", "agents", "sync", "src", "cli.ts")),
+      unix[0]?.content.includes(
+        join(home, ".local", "share", "agents", "sync-current", "src", "cli.ts"),
+      ),
       true,
     );
     assert.equal(unix[0]?.content.includes(join(home, ".config", "agents")), false);
@@ -125,8 +126,6 @@ test("wrapper_destinations_render_unix_launchers", () => {
       true,
     );
     assert.equal(summarizeUnix?.content.includes(WRAPPER_MARKER), true);
-
-    assert.equal(renderWrapper(unixEnv, unixEnv.harnesses[0]!), unix[0]!.content);
   });
 });
 

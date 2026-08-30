@@ -28,7 +28,7 @@ export type HarnessHook =
       readonly kind: "PackageBootstrap";
       readonly manifestFile: string;
       readonly settingsFile: string;
-      readonly cacheSubdir: string;
+      readonly cacheSubdir?: string;
     }
   | {
       readonly kind: "ExtensionDeps";

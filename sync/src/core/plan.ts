@@ -29,7 +29,7 @@ export type JobKind =
   | "CliProxyReadiness"
   | "CliProxyEndpointTemplates"
   | "CliProxyConfig"
-  | "BunInstall";
+  | "SyncRuntimeInstall";
 
 export type Job =
   | {
@@ -71,10 +71,20 @@ export type Job =
       readonly runtimeRoot?: string;
     }
   | {
-      readonly kind: "BunInstall";
-      readonly root: string;
+      readonly kind: "SyncRuntimeInstall";
+      readonly sourceRoot: string;
+      readonly releasesRoot: string;
+      readonly currentLink: string;
       readonly timeoutMs: number;
     };
+
+export interface SyncRuntimeInstallJob {
+  readonly kind: "SyncRuntimeInstall";
+  readonly sourceRoot: string;
+  readonly releasesRoot: string;
+  readonly currentLink: string;
+  readonly timeoutMs: number;
+}
 
 export interface HarnessPlan {
   readonly harness: Harness;
@@ -140,34 +150,15 @@ export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
 
 function runtimeJobs(syncEnv: SyncEnv): Job[] {
   const sourceRoot = join(syncEnv.ssotHome, "sync");
-  const runtimeRoot = join(syncEnv.runtimeHome, "sync");
-  const jobs: Job[] = [
+  return [
     {
-      src: join(sourceRoot, "src"),
-      dst: join(runtimeRoot, "src"),
-      kind: "Dir",
-      scope: "Tree",
-    },
-    {
-      src: join(sourceRoot, "tsconfig.json"),
-      dst: join(runtimeRoot, "tsconfig.json"),
-      kind: "File",
-    },
-    {
-      src: join(sourceRoot, "package.json"),
-      dst: join(runtimeRoot, "package.json"),
-      kind: "File",
-    },
-    {
-      src: join(sourceRoot, "bun.lock"),
-      dst: join(runtimeRoot, "bun.lock"),
-      kind: "File",
+      kind: "SyncRuntimeInstall",
+      sourceRoot,
+      releasesRoot: join(syncEnv.runtimeHome, "sync-releases"),
+      currentLink: join(syncEnv.runtimeHome, "sync-current"),
+      timeoutMs: syncEnv.installTimeoutMs,
     },
   ];
-  if (fs.existsSync(join(sourceRoot, "bun.lock"))) {
-    jobs.push({ kind: "BunInstall", root: runtimeRoot, timeoutMs: syncEnv.installTimeoutMs });
-  }
-  return jobs;
 }
 
 export const topLevelEntryNames = (root: string): string[] => dirEntryNames(root);
@@ -212,13 +203,13 @@ function currentManagedEntryNames(
 
 function harnessDirJobs(harnesses: readonly HarnessPlan[]): Job[] {
   return harnesses.map((plan) => {
-    const endpointTemplatePath = cliProxyEndpointTemplatePath(plan);
+    const endpointTemplatePaths = cliProxyEndpointTemplatePaths(plan);
     return {
       src: plan.sourceRoot,
       dst: plan.root,
       kind: "Dir",
       scope: "Children",
-      ...(endpointTemplatePath === undefined ? {} : { preservePaths: [endpointTemplatePath] }),
+      ...(endpointTemplatePaths.length === 0 ? {} : { preservePaths: endpointTemplatePaths }),
     };
   });
 }
@@ -245,12 +236,12 @@ function instructionJobs(syncEnv: SyncEnv, harnesses: readonly HarnessPlan[]): J
   }));
 }
 
-const CLIPROXY_ENDPOINT_TEMPLATE_PATHS: Partial<Record<Harness["id"], string>> = {
-  codex: "config.toml",
-  grok: "config.toml",
-  opencode: "opencode.jsonc",
-  pi: join("extensions", "cliproxy", "index.ts"),
-  omp: "models.yml",
+const CLIPROXY_ENDPOINT_TEMPLATE_PATHS: Partial<Record<Harness["id"], readonly string[]>> = {
+  codex: ["config.toml"],
+  grok: ["config.toml"],
+  opencode: ["opencode.jsonc", join("plugins", "cliproxy.ts")],
+  pi: [join("extensions", "cliproxy", "index.ts")],
+  omp: ["models.yml"],
 };
 
 function configJobs(
@@ -260,18 +251,18 @@ function configJobs(
   gatewayHost: boolean,
 ): Job[] {
   const endpointTargets = harnesses.flatMap((plan): CliProxyEndpointTarget[] => {
-    const relativePath = cliProxyEndpointTemplatePath(plan);
-    if (relativePath === undefined) {
-      return [];
-    }
-    const sourcePath = join(plan.sourceRoot, relativePath);
-    return [
-      {
-        src: sourcePath,
-        dst: join(plan.root, relativePath),
-        ...(plan.harness.id === "codex" ? { preserveTopLevels: ["hooks.state", "projects"] } : {}),
-      },
-    ];
+    const relativePaths = cliProxyEndpointTemplatePaths(plan);
+    return relativePaths.map((relativePath) => {
+      const sourcePath = join(plan.sourceRoot, relativePath);
+      if (plan.harness.id === "codex" && relativePath === "config.toml") {
+        return {
+          src: sourcePath,
+          dst: join(plan.root, relativePath),
+          preserveTopLevels: ["hooks.state", "projects"] as const,
+        };
+      }
+      return { src: sourcePath, dst: join(plan.root, relativePath) };
+    });
   });
   return [
     {
@@ -316,16 +307,18 @@ function configJobs(
   ];
 }
 
-function cliProxyEndpointTemplatePath(plan: HarnessPlan): string | undefined {
-  const relativePath = CLIPROXY_ENDPOINT_TEMPLATE_PATHS[plan.harness.id];
-  if (relativePath === undefined) {
-    return undefined;
+function cliProxyEndpointTemplatePaths(plan: HarnessPlan): readonly string[] {
+  const relativePaths = CLIPROXY_ENDPOINT_TEMPLATE_PATHS[plan.harness.id];
+  if (relativePaths === undefined) {
+    return [];
   }
-  const sourcePath = join(plan.sourceRoot, relativePath);
-  return fs.existsSync(sourcePath) &&
-    fs.readFileSync(sourcePath, "utf8").includes(CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER)
-    ? relativePath
-    : undefined;
+  return relativePaths.filter((relativePath) => {
+    const sourcePath = join(plan.sourceRoot, relativePath);
+    return (
+      fs.existsSync(sourcePath) &&
+      fs.readFileSync(sourcePath, "utf8").includes(CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER)
+    );
+  });
 }
 
 function buildHookPlans(
@@ -342,7 +335,7 @@ function buildHookPlans(
           harness,
           manifestPath: join(sourceRoot, hook.manifestFile),
           runtimeSettingsPath: join(root, hook.settingsFile),
-          cacheRoot: join(syncEnv.home, hook.cacheSubdir),
+          cacheRoot: join(syncEnv.home, hook.cacheSubdir ?? ".local/share/agents/pi-packages"),
           timeoutMs: syncEnv.installTimeoutMs,
         };
       case "ExtensionDeps":
@@ -352,7 +345,7 @@ function buildHookPlans(
           jobRoot: root,
           root: join(root, hook.rootDir),
           sourceRoot: join(sourceRoot, hook.rootDir),
-          relativeRoot: hook.rootDir,
+          relativeRoot: hook.rootDir === "." ? "" : hook.rootDir,
           statePath: extensionHookStatePath(syncEnv.managedStateHome, harness),
           timeoutMs: syncEnv.installTimeoutMs,
         };

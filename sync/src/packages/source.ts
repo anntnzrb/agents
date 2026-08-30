@@ -49,6 +49,8 @@ export async function clonePackage(
   targetDir: string,
   timeoutMs: number,
 ): Promise<boolean> {
+  // clonePackageWithRunner removes the target directory between attempts and after
+  // every failure. We only call it with a private staging directory from stagingDirFor.
   return clonePackageWithRunner(source, targetDir, await commandExists("gh"), (command) =>
     runCommand(command, undefined, timeoutMs, "clone"),
   );
@@ -123,16 +125,23 @@ function withExtension(target: string, extension: string): string {
   return path.join(dir, `${stem}.${extension}`);
 }
 
-async function clonePackageWithRunner(
+export async function clonePackageWithRunner(
   source: string,
   targetDir: string,
   ghAvailable: boolean,
   runner: (command: readonly string[]) => Promise<boolean>,
 ): Promise<boolean> {
-  for (const command of cloneCommands(source, targetDir, ghAvailable)) {
+  const commands = cloneCommands(source, targetDir, ghAvailable);
+  let index = 0;
+  for (const command of commands) {
+    if (index > 0) {
+      rmEntry(targetDir);
+    }
+    index += 1;
     if (await runner(command)) {
       return true;
     }
+    rmEntry(targetDir);
   }
   return false;
 }

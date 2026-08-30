@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
+import { syncTextFile } from "@core/secret-template.ts";
 import { isErrno, panicMessage } from "@runtime/errors.ts";
 import { Schema, SchemaGetter } from "effect";
-
 import {
   installInferredImportPackages as installInferredImportPackagesImpl,
   installPackageDeps,
@@ -103,16 +103,18 @@ export function patchRuntimeSettings(filePath: string, packagePaths: readonly st
   const settings = isRecord(value) ? value : {};
   settings["packages"] = [...packagePaths];
 
-  const parent = path.dirname(filePath);
-  if (parent && parent !== ".") {
-    fs.mkdirSync(parent, { recursive: true });
+  let mode: number;
+  try {
+    const metadata = fs.lstatSync(filePath);
+    mode = metadata.isFile() ? metadata.mode & 0o777 : 0o600;
+  } catch (error) {
+    if (!isErrno(error, "ENOENT")) {
+      throw new Error(`lstat ${filePath} (${String(error)})`, { cause: error });
+    }
+    mode = 0o600;
   }
 
-  try {
-    fs.writeFileSync(filePath, `${JSON.stringify(settings, null, 2)}\n`);
-  } catch (error) {
-    throw new Error(`write ${filePath} (${String(error)})`, { cause: error });
-  }
+  syncTextFile(filePath, `${JSON.stringify(settings, null, 2)}\n`, mode);
 }
 
 async function ensurePackage(
@@ -132,6 +134,8 @@ async function ensurePackage(
   fs.mkdirSync(path.dirname(stagingDir), { recursive: true });
 
   try {
+    // clonePackage removes the staging directory between attempts and after failures;
+    // stagingDir is always a private staging path from stagingDirFor(finalDir).
     if (!(await clonePackage(source, stagingDir, timeoutMs))) {
       throw new Error("clone failed");
     }

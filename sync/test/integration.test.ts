@@ -1,6 +1,8 @@
 import { setDefaultTimeout, test } from "bun:test";
 import assert from "node:assert/strict";
 import {
+  copyFileSync,
+  cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -31,10 +33,10 @@ type SnapshotEntry = {
   content?: string;
 };
 
-test("integration_happy_path_matches_expected_outputs", () => {
-  withTempDir((root) => {
+test("integration_happy_path_matches_expected_outputs", async () => {
+  await withTempDir(async (root) => {
     const home = makeFixture(root);
-    const result = runSyncProcess(home);
+    const result = await runSyncProcess(home);
 
     assert.equal(result.exitCode, 0, result.stderr || result.stdout);
     assert.equal(existsSync(join(home, ".codex", "AGENTS.md")), true);
@@ -73,34 +75,37 @@ test("integration_happy_path_matches_expected_outputs", () => {
       assert.equal(content.includes("http://old-gateway.example.test/v1"), true, path);
       assert.equal(content.includes("CLIPROXY_CLIENT_BASE_URL"), false, path);
     }
-    assert.equal(
-      readFileSync(join(home, ".local", "share", "agents", "sync", "src", "cli.ts"), "utf8"),
-      "export {};\n",
-    );
+    const installedCli = join(home, ".local", "share", "agents", "sync-current", "src", "cli.ts");
+    assert.equal(existsSync(installedCli), true, installedCli);
+    const installedCliContent = readFileSync(installedCli, "utf8");
+    assert.equal(installedCliContent.length > 0, true, installedCli);
     assert.equal(existsSync(join(home, ".pi", "agent", "auth.json")), true);
     for (const command of ["codex", "dsh", "opencode", "pi", "omp"]) {
       const wrapper = join(home, ".local", "bin", command);
+      const wrapperText = readFileSync(wrapper, "utf8");
       assert.equal(existsSync(wrapper), true, wrapper);
-      assert.equal(readFileSync(wrapper, "utf8").includes("agents-managed-wrapper:v1"), true);
-      assert.equal(readFileSync(wrapper, "utf8").includes(".local/share/agents/sync"), true);
-      assert.equal(readFileSync(wrapper, "utf8").includes(".config/agents/sync"), false);
+      assert.equal(wrapperText.includes("agents-managed-wrapper:v1"), true);
+      assert.equal(wrapperText.includes(".local/share/agents/sync-current"), true);
+      assert.equal(wrapperText.includes(SYNC_ROOT), false);
+      assert.equal(wrapperText.includes(".config/agents/sync"), false);
     }
   });
 });
 
-test("integration_missing_sources_remain_non_fatal", () => {
-  withTempDir((root) => {
+test("integration_missing_runtime_sources_fails_sync", async () => {
+  await withTempDir(async (root) => {
     const home = join(root, "ts-home");
     mkdirSync(join(home, ".config", "agents"), { recursive: true });
     writeDeployment(home);
-    const result = runSyncProcess(home);
+    const result = await runSyncProcess(home);
 
-    assert.equal(result.exitCode, 0, result.stderr || result.stdout);
+    assert.equal(result.exitCode, 1, result.stderr || result.stdout);
+    assert.equal(result.stderr.includes("missing or unreadable runtime source"), true);
   });
 });
 
-test("integration_unavailable_client_preserves_all_cliproxy_artifacts", () => {
-  withTempDir((root) => {
+test("integration_unavailable_client_preserves_all_cliproxy_artifacts", async () => {
+  await withTempDir(async (root) => {
     const home = makeFixture(root);
     writeDeployment(home, "different-host", "http://127.0.0.1:1/v1");
 
@@ -123,7 +128,7 @@ test("integration_unavailable_client_preserves_all_cliproxy_artifacts", () => {
       mode: lstatSync(path).mode & 0o777,
     }));
 
-    const result = runSyncProcess(home);
+    const result = await runSyncProcess(home);
 
     assert.equal(result.exitCode, 0, result.stderr || result.stdout);
     assert.deepEqual(
@@ -136,8 +141,8 @@ test("integration_unavailable_client_preserves_all_cliproxy_artifacts", () => {
   });
 });
 
-test("integration_package_bootstrap_patches_settings_and_cache_paths", () => {
-  withTempDir((root) => {
+test("integration_package_bootstrap_patches_settings_and_cache_paths", async () => {
+  await withTempDir(async (root) => {
     const home = makeFixture(root);
     const sourceRepo = join(root, "repos", "source-pkg");
     const buildRepo = join(root, "repos", "build-pkg");
@@ -147,7 +152,7 @@ test("integration_package_bootstrap_patches_settings_and_cache_paths", () => {
       `${JSON.stringify({ packages: [sourceRepo, buildRepo] }, null, 2)}\n`,
     );
 
-    const result = runSyncProcess(home);
+    const result = await runSyncProcess(home);
 
     assert.equal(result.exitCode, 0, result.stderr || result.stdout);
     const settings = readFileSync(join(home, ".pi", "agent", "settings.json"), "utf8");
@@ -165,8 +170,8 @@ test("integration_package_bootstrap_patches_settings_and_cache_paths", () => {
   });
 });
 
-test("integration_invalid_package_json_fails_package_bootstrap", () => {
-  withTempDir((root) => {
+test("integration_invalid_package_json_fails_package_bootstrap", async () => {
+  await withTempDir(async (root) => {
     const home = makeFixture(root);
     const badRepo = join(root, "repos", "bad-pkg");
     mkdirSync(badRepo, { recursive: true });
@@ -178,20 +183,20 @@ test("integration_invalid_package_json_fails_package_bootstrap", () => {
       `${JSON.stringify({ packages: [badRepo] }, null, 2)}\n`,
     );
 
-    const result = runSyncProcess(home);
+    const result = await runSyncProcess(home);
 
     assert.notEqual(result.exitCode, 0);
     assert.equal(result.stderr.includes("package bootstrap failed for"), true);
   });
 });
 
-test("integration_repeated_runs_remain_idempotent", () => {
-  withTempDir((root) => {
+test("integration_repeated_runs_remain_idempotent", async () => {
+  await withTempDir(async (root) => {
     const home = makeFixture(root);
-    const first = runSyncProcess(home);
+    const first = await runSyncProcess(home);
     const endpointAfterFirst = lstatSync(join(home, ".codex", "config.toml"));
     const snapshotAfterFirst = snapshotHome(home);
-    const second = runSyncProcess(home);
+    const second = await runSyncProcess(home);
     const endpointAfterSecond = lstatSync(join(home, ".codex", "config.toml"));
     const snapshotAfterSecond = snapshotHome(home);
 
@@ -203,10 +208,82 @@ test("integration_repeated_runs_remain_idempotent", () => {
   });
 });
 
-function withTempDir<T>(fn: (root: string) => T): T {
+const FAKE_RUNTIME = `const args = process.argv.slice(2);
+console.log("mode=" + args[0]);
+console.log("sourceName=" + args[1]);
+console.log("separator=" + args[2]);
+for (let i = 3; i < args.length; i++) {
+  console.log("arg[" + (i - 3) + "]=" + args[i]);
+}
+process.exit(42);
+`;
+
+test("integration_wrapper_forwards_arguments_to_faked_runtime", async () => {
+  await withTempDir(async (root) => {
+    const home = makeFixture(root);
+    const syncResult = await runSyncProcess(home);
+    assert.equal(syncResult.exitCode, 0, syncResult.stderr || syncResult.stdout);
+
+    const wrapper = join(home, ".local", "bin", "codex");
+    const installedCli = join(home, ".local", "share", "agents", "sync-current", "src", "cli.ts");
+    assert.equal(existsSync(wrapper), true, wrapper);
+    assert.equal(existsSync(installedCli), true, installedCli);
+
+    const wrapperText = readFileSync(wrapper, "utf8");
+    assert.equal(wrapperText.includes("agents-managed-wrapper:v1"), true);
+    assert.equal(wrapperText.includes(".local/share/agents/sync-current"), true);
+    assert.equal(wrapperText.includes(SYNC_ROOT), false);
+    assert.equal(wrapperText.includes(".config/agents/sync"), false);
+
+    writeFileSync(installedCli, FAKE_RUNTIME);
+
+    // Real wall-clock timer: we are bounding an actual child process; fake timers cannot advance a real process to exit.
+    const child = Bun.spawn([wrapper, "--sentinel", "one", "two three"], {
+      cwd: home,
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+      killSignal: "SIGKILL",
+      env: {
+        ...Bun.env,
+        HOME: home,
+        XDG_CACHE_HOME: join(home, ".cache"),
+        PATH: Bun.env["PATH"] ?? "",
+      },
+    });
+
+    const timeout = setTimeout(() => {
+      try {
+        child.kill();
+      } catch {
+        // best effort
+      }
+    }, 30_000);
+    timeout.unref();
+    try {
+      const [stdout, stderr, exitCode] = await Promise.all([
+        new Response(child.stdout).text().catch(() => ""),
+        new Response(child.stderr).text().catch(() => ""),
+        child.exited,
+      ]);
+
+      assert.equal(exitCode, 42, stderr || stdout);
+      assert.equal(stdout.includes("mode=launch"), true, stdout);
+      assert.equal(stdout.includes("sourceName=codex"), true, stdout);
+      assert.equal(stdout.includes("separator=--"), true, stdout);
+      assert.equal(stdout.includes("arg[0]=--sentinel"), true, stdout);
+      assert.equal(stdout.includes("arg[1]=one"), true, stdout);
+      assert.equal(stdout.includes("arg[2]=two three"), true, stdout);
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
+});
+
+async function withTempDir<T>(fn: (root: string) => T | Promise<T>): Promise<T> {
   const root = mkdtempSync(join(tmpdir(), "agents-integration-"));
   try {
-    return fn(root);
+    return await fn(root);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -215,6 +292,12 @@ function withTempDir<T>(fn: (root: string) => T): T {
 function makeFixture(root: string): string {
   const home = join(root, "ts-home");
   mkdirSync(join(home, ".config", "agents"), { recursive: true });
+  const syncSource = join(home, ".config", "agents", "sync");
+  mkdirSync(syncSource, { recursive: true });
+  cpSync(join(SYNC_ROOT, "src"), join(syncSource, "src"), { recursive: true });
+  for (const file of ["package.json", "tsconfig.json", "bun.lock"]) {
+    copyFileSync(join(SYNC_ROOT, file), join(syncSource, file));
+  }
   mkdirSync(join(home, ".config", "agents", "harnesses", "codex"), {
     recursive: true,
   });
@@ -237,19 +320,15 @@ function makeFixture(root: string): string {
   mkdirSync(join(home, ".config", "opencode"), { recursive: true });
   mkdirSync(join(home, ".mcporter"), { recursive: true });
   mkdirSync(join(home, ".summarize"), { recursive: true });
-  mkdirSync(join(home, ".config", "agents", "sync", "src"), { recursive: true });
   mkdirSync(join(home, ".config", "agents", "tools", "mcporter"), { recursive: true });
   mkdirSync(join(home, ".config", "agents", "tools", "summarize"), { recursive: true });
   mkdirSync(join(home, ".config", "agents", "tools", "cliproxyapi"), { recursive: true });
-
   writeFixtureFiles(home);
   return home;
 }
 
 function writeFixtureFiles(home: string): void {
   writeDeployment(home);
-  writeFileSync(join(home, ".config", "agents", "sync", "src", "cli.ts"), "export {};\n");
-  writeFileSync(join(home, ".config", "agents", "sync", "tsconfig.json"), "{}\n");
   writeFileSync(join(home, ".config", "agents", "HARNESS.md"), "agent-instructions");
   writeFileSync(join(home, ".config", "agents", "tools", "mcporter", "mcporter.jsonc"), '{"x":1}');
   writeFileSync(join(home, ".config", "agents", "tools", "summarize", "config.json"), '{"x":1}');
@@ -412,23 +491,40 @@ function initGitRepo(repoPath: string): void {
   }
 }
 
-function runSyncProcess(home: string): RunResult {
-  const result = Bun.spawnSync(["bun", TS_SYNC], {
+async function runSyncProcess(home: string): Promise<RunResult> {
+  const child = Bun.spawn(["bun", TS_SYNC], {
     cwd: SYNC_ROOT,
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+    killSignal: "SIGKILL",
     env: {
       ...Bun.env,
       HOME: home,
+      XDG_CACHE_HOME: join(home, ".cache"),
       PATH: Bun.env["PATH"] ?? "",
     },
-    stdout: "pipe",
-    stderr: "pipe",
   });
 
-  return {
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  };
+  // Real wall-clock timer: we are bounding an actual sync child process; fake timers cannot advance a real process to exit.
+  const timeout = setTimeout(() => {
+    try {
+      child.kill();
+    } catch {
+      // best effort
+    }
+  }, 30_000);
+  timeout.unref();
+  try {
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(child.stdout).text().catch(() => ""),
+      new Response(child.stderr).text().catch(() => ""),
+      child.exited,
+    ]);
+    return { exitCode, stdout, stderr };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function snapshotHome(home: string): SnapshotEntry[] {

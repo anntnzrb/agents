@@ -7,9 +7,24 @@ type SourceContentCache = Map<string, { readonly metadata: fs.Stats; readonly co
 export function isSymlink(targetPath: string): boolean {
   try {
     return fs.lstatSync(targetPath).isSymbolicLink();
-  } catch {
-    return false;
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return false;
+    }
+    throw error;
   }
+}
+
+function resolveSourceEntry(src: string): fs.Stats {
+  const metadata = fs.lstatSync(src);
+  if (metadata.isSymbolicLink()) {
+    const targetMetadata = fs.statSync(src);
+    if (targetMetadata.isDirectory()) {
+      throw new Error(`refusing source directory symlink: ${src}`);
+    }
+    return targetMetadata;
+  }
+  return metadata;
 }
 
 export function rmEntry(targetPath: string): void {
@@ -32,13 +47,13 @@ export function rmEntry(targetPath: string): void {
 }
 
 export function copyTree(src: string, dst: string): void {
-  const metadata = fs.statSync(src);
-  if (!metadata.isDirectory()) {
-    fs.mkdirSync(path.dirname(dst), { recursive: true });
-    fs.copyFileSync(src, dst);
+  const metadata = resolveSourceEntry(src);
+  if (metadata.isDirectory()) {
+    copyTreeRecursive(src, dst);
     return;
   }
-  copyTreeRecursive(src, dst);
+  fs.mkdirSync(path.dirname(dst), { recursive: true });
+  fs.copyFileSync(src, dst);
 }
 
 export function syncManagedTree(
@@ -47,7 +62,7 @@ export function syncManagedTree(
   preservePaths: readonly string[] = [],
   sourceContentCache?: SourceContentCache,
 ): void {
-  const metadata = fs.statSync(src);
+  const metadata = resolveSourceEntry(src);
   if (!metadata.isDirectory()) {
     syncManagedFile(src, dst, metadata, sourceContentCache);
     return;
@@ -61,7 +76,7 @@ export function syncManagedChildren(
   preservePaths: readonly string[] = [],
   sourceContentCache?: SourceContentCache,
 ): void {
-  const metadata = fs.statSync(src);
+  const metadata = resolveSourceEntry(src);
   if (!metadata.isDirectory()) {
     syncManagedFile(src, dst, metadata, sourceContentCache);
     return;
@@ -70,18 +85,11 @@ export function syncManagedChildren(
 }
 
 function copyTreeRecursive(src: string, dst: string): void {
-  const metadata = fs.statSync(src);
-  if (!metadata.isDirectory()) {
-    fs.mkdirSync(path.dirname(dst), { recursive: true });
-    fs.copyFileSync(src, dst);
-    return;
-  }
-
   fs.mkdirSync(dst, { recursive: true });
   for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
     const childSrc = path.join(src, entry.name);
     const childDst = path.join(dst, entry.name);
-    const childMetadata = fs.statSync(childSrc);
+    const childMetadata = resolveSourceEntry(childSrc);
     if (childMetadata.isDirectory()) {
       copyTreeRecursive(childSrc, childDst);
     } else {
@@ -97,7 +105,7 @@ function syncManagedTreeRecursive(
   preservePaths: readonly string[],
   sourceContentCache?: SourceContentCache,
 ): void {
-  const metadata = fs.statSync(src);
+  const metadata = resolveSourceEntry(src);
   if (!metadata.isDirectory()) {
     syncManagedFile(src, dst, metadata, sourceContentCache);
     return;
@@ -115,7 +123,16 @@ function syncManagedTreeRecursive(
     if (preservePaths.includes(dstEntry.name)) {
       continue;
     }
-    rmEntry(path.join(dst, dstEntry.name));
+    const childDst = path.join(dst, dstEntry.name);
+    if (
+      preservesEntry(preservePaths, dstEntry.name) &&
+      dstEntry.isDirectory() &&
+      !dstEntry.isSymbolicLink()
+    ) {
+      pruneManagedTree(childDst, childPreserve(preservePaths, dstEntry.name));
+      continue;
+    }
+    rmEntry(childDst);
   }
 
   for (const srcEntry of srcEntries) {
@@ -125,7 +142,7 @@ function syncManagedTreeRecursive(
     const childSrc = path.join(src, srcEntry.name);
     const childDst = path.join(dst, srcEntry.name);
     const childPreservePaths = childPreserve(preservePaths, srcEntry.name);
-    const childMetadata = fs.statSync(childSrc);
+    const childMetadata = resolveSourceEntry(childSrc);
     if (childMetadata.isDirectory()) {
       syncManagedTreeRecursive(childSrc, childDst, childPreservePaths, sourceContentCache);
       continue;
@@ -140,13 +157,11 @@ function syncManagedChildrenRecursive(
   preservePaths: readonly string[],
   sourceContentCache?: SourceContentCache,
 ): void {
-  const metadata = fs.statSync(src);
+  const metadata = resolveSourceEntry(src);
   if (!metadata.isDirectory()) {
     syncManagedFile(src, dst, metadata, sourceContentCache);
     return;
   }
-
-  ensureDirectory(dst);
 
   for (const srcEntry of fs.readdirSync(src, { withFileTypes: true })) {
     if (preservePaths.includes(srcEntry.name)) {
@@ -155,7 +170,7 @@ function syncManagedChildrenRecursive(
     const childSrc = path.join(src, srcEntry.name);
     const childDst = path.join(dst, srcEntry.name);
     const childPreservePaths = childPreserve(preservePaths, srcEntry.name);
-    const childMetadata = fs.statSync(childSrc);
+    const childMetadata = resolveSourceEntry(childSrc);
     if (childMetadata.isDirectory()) {
       syncManagedTreeRecursive(childSrc, childDst, childPreservePaths, sourceContentCache);
       continue;
@@ -248,6 +263,27 @@ function childPreserve(preservePaths: readonly string[], childName: string): str
   return preservePaths
     .filter((candidate) => candidate.startsWith(prefix))
     .map((candidate) => candidate.slice(prefix.length));
+}
+
+const preservesEntry = (paths: readonly string[], name: string): boolean =>
+  paths.some((entry) => entry === name || entry.startsWith(`${name}/`));
+
+function pruneManagedTree(dst: string, preservePaths: readonly string[]): void {
+  for (const dstEntry of safeReadDir(dst)) {
+    if (preservePaths.includes(dstEntry.name)) {
+      continue;
+    }
+    const childDst = path.join(dst, dstEntry.name);
+    if (
+      preservesEntry(preservePaths, dstEntry.name) &&
+      dstEntry.isDirectory() &&
+      !dstEntry.isSymbolicLink()
+    ) {
+      pruneManagedTree(childDst, childPreserve(preservePaths, dstEntry.name));
+      continue;
+    }
+    rmEntry(childDst);
+  }
 }
 
 const normalizePreservePaths = (preservePaths: readonly string[]): string[] =>

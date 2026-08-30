@@ -2,73 +2,44 @@
 
 import { launchMain, main } from "@core/index.ts";
 import { BunRuntime, BunServices } from "@effect/platform-bun";
-import { Effect } from "effect";
-import { Argument, Command, Flag } from "effect/unstable/cli";
+import { Console, Effect, Exit } from "effect";
 
-const syncHandler = ({ refreshModels }: { readonly refreshModels: boolean }) =>
-  Effect.promise(async () => {
-    const exitCode = await main({ forceModelRefresh: refreshModels });
-    if (exitCode !== 0) {
-      process.exit(exitCode);
+const program = Effect.gen(function* () {
+  const rawArgs = Bun.argv.slice(2);
+
+  if (rawArgs[0] === "launch") {
+    const sourceName = rawArgs[1];
+    const separator = rawArgs[2];
+    if (!sourceName || (separator !== "--" && separator !== undefined)) {
+      yield* Console.error("sync: usage: launch NAME -- [ARGS...]");
+      return 2;
     }
-  });
-
-const syncCommand = Command.make(
-  "sync",
-  {
-    refreshModels: Flag.boolean("refresh-models").pipe(Flag.withDefault(false)),
-  },
-  syncHandler,
-);
-
-const launchCommand = Command.make(
-  "launch",
-  {
-    target: Argument.string("target"),
-  },
-  ({ target }) =>
-    Effect.promise(async () => {
-      const rawArgs = Bun.argv.slice(2);
-      const targetIndex = rawArgs.indexOf("launch");
-      const subArgs = targetIndex >= 0 ? rawArgs.slice(targetIndex + 2) : [];
-      const separatorIndex = subArgs.indexOf("--");
-      const forwardedArgs = separatorIndex >= 0 ? subArgs.slice(separatorIndex + 1) : subArgs;
-      const exitCode = await launchMain(target, forwardedArgs);
-      process.exit(exitCode);
-    }),
-);
-
-const rootCommand = Command.make(
-  "agents-sync",
-  {
-    refreshModels: Flag.boolean("refresh-models").pipe(Flag.withDefault(false)),
-  },
-  syncHandler,
-).pipe(Command.withSubcommands([syncCommand, launchCommand]));
-
-const rawArgs = Bun.argv.slice(2);
-
-// Fast-path trampoline launch:
-if (rawArgs[0] === "launch") {
-  const sourceName = rawArgs[1];
-  const separator = rawArgs[2];
-  if (!sourceName || (separator !== "--" && separator !== undefined)) {
-    console.error("sync: usage: launch NAME -- [ARGS...]");
-    process.exit(2);
+    return yield* Effect.promise(() => launchMain(sourceName, rawArgs.slice(separator ? 3 : 2)));
   }
-  process.exit(await launchMain(sourceName, rawArgs.slice(separator ? 3 : 2)));
-}
 
-// Effect-powered Sync CLI:
-if (rawArgs.length === 0 || rawArgs[0] === "sync" || rawArgs[0]?.startsWith("-")) {
   const cliArgs = rawArgs[0] === "sync" ? rawArgs.slice(1) : rawArgs;
   if (cliArgs.some((arg) => arg !== "--refresh-models" && !arg.startsWith("-"))) {
-    console.error("sync: usage: sync [--refresh-models]");
-    process.exit(2);
+    yield* Console.error("sync: usage: sync [--refresh-models]");
+    return 2;
   }
-  const program = Command.runWith(rootCommand, { version: "1.0.0" })(rawArgs);
-  BunRuntime.runMain(program.pipe(Effect.provide(BunServices.layer)));
-} else {
-  console.error(`sync: unknown command: ${rawArgs[0]}`);
-  process.exit(2);
-}
+
+  if (cliArgs.some((arg) => arg.startsWith("-") && arg !== "--refresh-models")) {
+    yield* Console.error("sync: usage: sync [--refresh-models]");
+    return 2;
+  }
+
+  const forceModelRefresh = cliArgs.includes("--refresh-models");
+  return yield* Effect.promise(() => main({ forceModelRefresh }));
+});
+
+BunRuntime.runMain(program.pipe(Effect.provide(BunServices.layer)), {
+  teardown: (exit, onExit) => {
+    if (Exit.isSuccess(exit) && typeof exit.value === "number") {
+      onExit(exit.value);
+    } else if (Exit.isFailure(exit)) {
+      onExit(1);
+    } else {
+      onExit(0);
+    }
+  },
+});

@@ -42,15 +42,6 @@ export const runInstall = async (
   return false;
 };
 
-const needsNodeInstall = async (packageDir: string): Promise<boolean> => {
-  const packageJson = await fs
-    .stat(path.join(packageDir, "package.json"))
-    .then((metadata) => metadata.isFile())
-    .catch(() => false);
-  const nodeModules = await fs.stat(path.join(packageDir, "node_modules")).catch(() => undefined);
-  return packageJson && !nodeModules;
-};
-
 const chooseInstaller = async (): Promise<string[] | undefined> =>
   (await commandExists("bun")) ? ["bun", "install"] : undefined;
 
@@ -59,18 +50,21 @@ export const installExtensionDeps = async (
   sourceRoot: string,
   timeoutMs: number,
 ): Promise<boolean> => {
+  const command = await chooseInstaller();
+  if (!command) {
+    console.error(`sync: bun is required for extension dependency install`);
+    return false;
+  }
+
   const results: boolean[] = [];
   for (const sourcePackageDir of await iterExtensionPackages(sourceRoot)) {
     const packageDir = path.join(root, path.relative(sourceRoot, sourcePackageDir));
-    if (!(await needsNodeInstall(packageDir))) {
+    const hasPackageJson = await fs
+      .stat(path.join(packageDir, "package.json"))
+      .then((metadata) => metadata.isFile())
+      .catch(() => false);
+    if (!hasPackageJson) {
       results.push(true);
-      continue;
-    }
-
-    const command = await chooseInstaller();
-    if (!command) {
-      console.error(`sync: bun is required for ${packageDir}`);
-      results.push(false);
       continue;
     }
 

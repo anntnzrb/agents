@@ -17,7 +17,7 @@ export const installPackageDeps = async (dir: string, timeoutMs: number): Promis
     .then((metadata) => metadata.isFile())
     .catch(() => false);
   if (!hasPackageJson) {
-    return true;
+    return await installInferredImportPackages(dir, timeoutMs);
   }
 
   const tool = await pickBunRunner();

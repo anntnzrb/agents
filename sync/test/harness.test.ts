@@ -1,4 +1,4 @@
-import { beforeEach, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, type Mock, spyOn, test } from "bun:test";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -7,18 +7,20 @@ import { join } from "node:path";
 import { loadRootEnv, RootEnvReadError, SyncEnv } from "@core/harness.ts";
 import { Effect, Result } from "effect";
 
-function withTempHome<T>(fn: (home: string) => T | Promise<T>): Promise<T> {
+async function withTempHome<T>(fn: (home: string) => T | Promise<T>): Promise<T> {
   const home = mkdtempSync(join(tmpdir(), "agents-sync-harness-test-"));
   try {
-    return Promise.resolve(fn(home));
+    return await fn(home);
   } finally {
     rmSync(home, { recursive: true, force: true });
   }
 }
 
+let errorSpy: Mock<(...args: unknown[]) => void>;
 beforeEach(() => {
-  spyOn(console, "error").mockImplementation(() => {});
+  errorSpy = spyOn(console, "error").mockImplementation(() => {});
 });
+afterEach(() => errorSpy.mockRestore());
 
 test("root_env_returns_empty_when_env_file_is_missing", async () => {
   await withTempHome((home) => {

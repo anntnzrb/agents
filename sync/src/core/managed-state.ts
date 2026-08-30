@@ -1,10 +1,10 @@
 import fs from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 import { err, isErrno, panicMessage, warn } from "@runtime/errors.ts";
 import { rmEntry } from "@runtime/fs.ts";
 import { Schema } from "effect";
-
-import type { SyncEnv } from "./harness.ts";
+import { buildHarness, harnessManagedStatePath, harnessRoot, type SyncEnv } from "./harness.ts";
+import { HARNESS_ADAPTERS } from "./harness-adapters.ts";
 import { buildSyncPlan, isSafeManagedEntryName, type SyncPlan } from "./plan.ts";
 
 const RecordedEntriesSchema = Schema.Array(Schema.String);
@@ -17,30 +17,68 @@ export interface ManagedHarnessPlan {
   statePath: string;
   cleanupPaths: string[];
   currentEntryNames: string[];
+  active: boolean;
 }
 
 export function planManagedEntries(syncEnv: SyncEnv): ManagedSyncPlan {
-  return planManagedEntriesForSyncPlan(buildSyncPlan(syncEnv));
+  return planManagedEntriesForSyncPlan(syncEnv, buildSyncPlan(syncEnv));
 }
 
-export function planManagedEntriesForSyncPlan(syncPlan: SyncPlan): ManagedSyncPlan {
-  return {
-    harnesses: syncPlan.harnesses.map((harnessPlan) => {
-      const currentEntryNames = [...harnessPlan.currentEntryNames];
-      const currentEntrySet = new Set(currentEntryNames);
-      const staleEntryNames = uniqueSorted([
-        ...harnessPlan.cleanupEntryNames,
-        ...loadRecordedEntryNames(harnessPlan.statePath),
-      ]).filter((entryName) => !currentEntrySet.has(entryName));
-      return {
-        statePath: harnessPlan.statePath,
-        cleanupPaths: staleEntryNames
-          .map((entry) => cleanupPath(harnessPlan.root, entry))
-          .filter((entry): entry is string => entry !== null),
-        currentEntryNames,
-      };
-    }),
-  };
+export function planManagedEntriesForSyncPlan(
+  syncEnv: SyncEnv,
+  syncPlan: SyncPlan,
+): ManagedSyncPlan {
+  const activeIds = new Set(syncPlan.harnesses.map((plan) => plan.harness.id));
+  const harnesses: ManagedHarnessPlan[] = syncPlan.harnesses.map((harnessPlan) => {
+    const currentEntryNames = [...harnessPlan.currentEntryNames];
+    const currentEntrySet = new Set(currentEntryNames);
+    const staleEntryNames = uniqueSorted([
+      ...harnessPlan.cleanupEntryNames,
+      ...loadRecordedEntryNames(harnessPlan.statePath),
+    ]).filter((entryName) => !currentEntrySet.has(entryName));
+    return {
+      statePath: harnessPlan.statePath,
+      cleanupPaths: staleEntryNames
+        .map((entry) => cleanupPath(harnessPlan.root, entry))
+        .filter((entry): entry is string => entry !== null),
+      currentEntryNames,
+      active: true,
+    };
+  });
+
+  for (const adapter of HARNESS_ADAPTERS) {
+    if (!adapter.platforms.includes(syncEnv.platform)) {
+      continue;
+    }
+    if (activeIds.has(adapter.id)) {
+      continue;
+    }
+
+    const harness = buildHarness({
+      ...adapter,
+      id: adapter.id,
+      sourceName: adapter.id,
+      home: join(syncEnv.home, ...adapter.homeSegments),
+    });
+    const statePath = harnessManagedStatePath(harness, syncEnv.managedStateHome);
+    if (!fs.existsSync(statePath)) {
+      continue;
+    }
+
+    const root = harnessRoot(harness);
+    const recorded = loadRecordedEntryNames(statePath);
+    const staleEntryNames = uniqueSorted([...harness.compatManagedEntries, ...recorded]).filter(
+      (entryName) => isSafeManagedEntryName(entryName),
+    );
+    harnesses.push({
+      statePath,
+      cleanupPaths: staleEntryNames.map((entryName) => join(root, entryName)),
+      currentEntryNames: [],
+      active: false,
+    });
+  }
+
+  return { harnesses };
 }
 
 export function cleanManagedEntries(plan: ManagedSyncPlan): boolean {
@@ -61,6 +99,15 @@ export function cleanManagedEntries(plan: ManagedSyncPlan): boolean {
 export function recordManagedEntries(plan: ManagedSyncPlan): boolean {
   let success = true;
   for (const harness of plan.harnesses) {
+    if (!harness.active) {
+      try {
+        fs.rmSync(harness.statePath, { force: true });
+      } catch (error) {
+        err(`managed state removal failed: ${harness.statePath} (${panicMessage(error)})`);
+        success = false;
+      }
+      continue;
+    }
     try {
       writeRecordedEntryNames(harness.statePath, harness.currentEntryNames);
     } catch (error) {
@@ -74,99 +121,39 @@ export function recordManagedEntries(plan: ManagedSyncPlan): boolean {
 export { topLevelEntryNames } from "./plan.ts";
 
 export function loadRecordedEntryNames(path: string): string[] {
-  let content: string;
   try {
-    content = fs.readFileSync(path, "utf8");
+    const content = fs.readFileSync(path, "utf8");
+    const parsed = Schema.decodeUnknownSync(RecordedEntriesSchema)(JSON.parse(content));
+    return uniqueSorted(parsed.filter((entry) => isSafeManagedEntryName(entry)));
   } catch (error) {
     if (isErrno(error, "ENOENT")) {
       return [];
     }
-    throw new Error(`read ${path} (${panicMessage(error)})`, { cause: error });
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = Bun.JSONC.parse(content);
-  } catch (error) {
-    warn(`managed state parse failed, ignoring ${path} (${panicMessage(error)})`);
+    warn(`ignoring malformed managed state ${path} (${panicMessage(error)})`);
     return [];
   }
-
-  let entries: readonly string[];
-  try {
-    entries = Schema.decodeUnknownSync(RecordedEntriesSchema)(parsed);
-  } catch {
-    warn(
-      `managed state parse failed, ignoring ${path} (${Array.isArray(parsed) ? "entries must be strings" : "not an array"})`,
-    );
-    return [];
-  }
-
-  const safeNames = new Set<string>();
-  for (const entryName of entries) {
-    if (isSafeManagedEntryName(entryName)) {
-      safeNames.add(entryName);
-    } else {
-      warn(`ignoring unsafe managed entry ${JSON.stringify(entryName)} in ${path}`);
-    }
-  }
-  return [...safeNames].toSorted();
 }
 
 export function writeRecordedEntryNames(path: string, entryNames: string[]): void {
-  const parent = dirname(path);
+  const payload = `${JSON.stringify(uniqueSorted(entryNames), null, 2)}\n`;
   try {
-    fs.mkdirSync(parent, { recursive: true });
-  } catch (error) {
-    throw new Error(`create ${parent} (${panicMessage(error)})`, { cause: error });
-  }
-
-  let content: string;
-  try {
-    content = `${JSON.stringify(entryNames, null, 2)}\n`;
-  } catch (error) {
-    throw new Error(`serialize ${path} (${panicMessage(error)})`, { cause: error });
-  }
-  try {
-    const existing = fs.lstatSync(path);
-    if (existing.isFile() && fs.readFileSync(path, "utf8") === content) {
+    const stat = fs.lstatSync(path);
+    if (stat.isFile() && !stat.isSymbolicLink() && fs.readFileSync(path, "utf8") === payload) {
       return;
     }
-  } catch (error) {
-    if (!isErrno(error, "ENOENT")) {
-      throw new Error(`read ${path} (${panicMessage(error)})`, { cause: error });
-    }
+  } catch {
+    // missing or unreadable: replace below
   }
-  const { tempPath, fd } = createTempStateFile(path);
+
+  const dir = dirname(path);
+  fs.mkdirSync(dir, { recursive: true });
+  const temp = `${path}.${process.pid}.tmp`;
   try {
-    try {
-      fs.writeFileSync(fd, content, "utf8");
-    } catch (error) {
-      throw new Error(`write ${tempPath} (${panicMessage(error)})`, { cause: error });
-    }
-    try {
-      fs.fsyncSync(fd);
-    } catch (error) {
-      throw new Error(`sync ${tempPath} (${panicMessage(error)})`, { cause: error });
-    }
-    try {
-      fs.closeSync(fd);
-    } catch {
-      // ignore
-    }
-    try {
-      fs.renameSync(tempPath, path);
-    } catch (error) {
-      throw new Error(`replace ${path} (${panicMessage(error)})`, { cause: error });
-    }
+    fs.writeFileSync(temp, payload);
+    fs.renameSync(temp, path);
   } catch (error) {
     try {
-      fs.closeSync(fd);
-    } catch {
-      // ignore
-    }
-    try {
-      fs.rmSync(tempPath, { force: true });
+      fs.rmSync(temp, { force: true });
     } catch {
       // ignore
     }
@@ -175,26 +162,13 @@ export function writeRecordedEntryNames(path: string, entryNames: string[]): voi
 }
 
 function cleanupPath(root: string, entryName: string): string | null {
-  const safeName = isSafeManagedEntryName(entryName) ? entryName : null;
-  return safeName ? join(root, safeName) : null;
-}
-
-function createTempStateFile(path: string): { tempPath: string; fd: number } {
-  const baseName = basename(path) || "managed-state.json";
-  const nonce = Date.now().toString(16);
-  for (let attempt = 0; attempt < 16; attempt += 1) {
-    const tempPath = join(dirname(path), `.${baseName}.${process.pid}.${nonce}-${attempt}.tmp`);
-    try {
-      const fd = fs.openSync(tempPath, "wx");
-      return { tempPath, fd };
-    } catch (error) {
-      if (!isErrno(error, "EEXIST")) {
-        throw new Error(`create ${tempPath} (${panicMessage(error)})`, { cause: error });
-      }
-    }
+  if (!isSafeManagedEntryName(entryName)) {
+    warn(`skipping unsafe recorded managed entry name: ${entryName}`);
+    return null;
   }
-
-  throw new Error(`create temporary managed state near ${path} (name collision)`);
+  return join(root, entryName);
 }
 
-const uniqueSorted = (names: readonly string[]): string[] => [...new Set(names)].toSorted();
+function uniqueSorted(names: readonly string[]): string[] {
+  return [...new Set(names)].toSorted();
+}

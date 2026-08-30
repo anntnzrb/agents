@@ -178,25 +178,17 @@ function packageSourceFiles(root: string): string[] {
   return files;
 }
 
-const IMPORT_EXPORT_FROM_PATTERN =
-  /(?:import|export)\s+(?:type\s+)?(?:[\s\w*$,{}]*?\s+from\s+)?["']([^"'\n]+)["']/g;
-const REQUIRE_IMPORT_CALL_PATTERN = /(?:require|import)\s*\(\s*["']([^"'\n]+)["']\s*\)/g;
-const VALID_PACKAGE_ROOT_PATTERN = /^(@[a-z0-9_.-]+\/)?[a-z0-9_.-]+$/i;
+const importScanner = new Bun.Transpiler({ loader: "ts" });
 
 export function extractImportSpecifiers(content: string): string[] {
-  const specifiers: string[] = [];
-  for (const match of content.matchAll(IMPORT_EXPORT_FROM_PATTERN)) {
-    if (match[1]) {
-      specifiers.push(match[1]);
-    }
-  }
-  for (const match of content.matchAll(REQUIRE_IMPORT_CALL_PATTERN)) {
-    if (match[1]) {
-      specifiers.push(match[1]);
-    }
-  }
-  return specifiers;
+  // Bun.Transpiler.scan tracks ESM imports and dynamic `import()` calls, but not
+  // CommonJS `require()` calls. Normalize `require("...")` calls so the scanner
+  // treats them as dynamic imports and ignores comments and strings for us.
+  const normalized = content.replace(/\brequire\s*\(/g, "import(");
+  return importScanner.scan(normalized).imports.map(({ path }) => path);
 }
+
+const VALID_PACKAGE_ROOT_PATTERN = /^(@[a-z0-9_.-]+\/)?[a-z0-9_.-]+$/i;
 
 function packageRootFromSpecifier(specifier: string): string | null {
   const trimmed = specifier.trim();

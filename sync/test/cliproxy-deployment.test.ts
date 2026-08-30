@@ -1,4 +1,4 @@
-import { beforeEach, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, type Mock, spyOn, test } from "bun:test";
 import assert from "node:assert/strict";
 import {
   chmodSync,
@@ -33,9 +33,11 @@ const DEPLOYMENT = {
 } as const;
 const fetchReady = async () => Response.json({ data: [{ id: "ready" }] });
 
+let errorSpy: Mock<(...args: unknown[]) => void>;
 beforeEach(() => {
-  spyOn(console, "error").mockImplementation(() => {});
+  errorSpy = spyOn(console, "error").mockImplementation(() => {});
 });
+afterEach(() => errorSpy.mockRestore());
 
 test("cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary", () => {
   assert.deepEqual(
@@ -337,6 +339,7 @@ test("cliproxy_deployment_is_the_only_committed_endpoint_value", () => {
   const sources = [
     join("harnesses", "codex", "config.toml"),
     join("harnesses", "opencode", "opencode.jsonc"),
+    join("harnesses", "opencode", "plugins", "cliproxy.ts"),
     join("harnesses", "pi", "agent", "extensions", "cliproxy", "index.ts"),
     join("harnesses", "omp", "agent", "models.yml"),
   ];
@@ -526,6 +529,7 @@ test("cliproxy_endpoint_publication_is_one_job_after_config_and_directory_copies
     for (const [harness, relativeRoot, relativeFile] of [
       ["codex", "", "config.toml"],
       ["opencode", "", "opencode.jsonc"],
+      ["opencode", "", join("plugins", "cliproxy.ts")],
       ["pi", "agent", join("extensions", "cliproxy", "index.ts")],
       ["omp", "agent", "models.yml"],
     ] as const) {
@@ -542,7 +546,7 @@ test("cliproxy_endpoint_publication_is_one_job_after_config_and_directory_copies
     if (endpointJob?.kind !== "CliProxyEndpointTemplates") {
       return;
     }
-    assert.equal(endpointJob.targets.length, 4);
+    assert.equal(endpointJob.targets.length, 5);
     const codexTarget = endpointJob.targets.find((target) =>
       target.dst.endsWith(join(".codex", "config.toml")),
     );
@@ -573,3 +577,29 @@ test("cliproxy_endpoint_publication_is_one_job_after_config_and_directory_copies
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+test("cliproxy_opencode_endpoint_removes_placeholder_and_injects_baseUrl", () => {
+  const home = mkdtempSync(join(tmpdir(), "cliproxy-opencode-test-"));
+  try {
+    const dstDir = join(home, ".config", "opencode");
+    mkdirSync(dstDir, { recursive: true });
+    const jsoncSrc = join(home, "opencode.jsonc.tmpl");
+    const tsSrc = join(home, "cliproxy.ts.tmpl");
+    writeFileSync(jsoncSrc, `const x = "${CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}";\n`);
+    writeFileSync(tsSrc, `const x = "${CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}";\n`);
+
+    syncCliProxyEndpointTemplate(jsoncSrc, join(dstDir, "opencode.jsonc"), DEPLOYMENT);
+    syncCliProxyEndpointTemplate(tsSrc, join(dstDir, "plugins", "cliproxy.ts"), DEPLOYMENT);
+
+    assert.equal(
+      readFileSync(join(dstDir, "opencode.jsonc"), "utf8"),
+      `const x = "${DEPLOYMENT.client.baseUrl}";\n`,
+    );
+    assert.equal(
+      readFileSync(join(dstDir, "plugins", "cliproxy.ts"), "utf8"),
+      `const x = "${DEPLOYMENT.client.baseUrl}";\n`,
+    );
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});

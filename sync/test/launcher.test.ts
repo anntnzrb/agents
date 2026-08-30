@@ -1,4 +1,4 @@
-import { beforeEach, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, type Mock, spyOn, test } from "bun:test";
 import assert from "node:assert/strict";
 import {
   chmodSync,
@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readlinkSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,12 +16,14 @@ import { join } from "node:path";
 import { SyncEnv } from "@core/harness.ts";
 import {
   type LauncherProcessResult,
+  type LauncherRuntime,
   launchHarness,
   launchNpmPackage,
   npmCacheLayout,
   prepareNpmPackage,
 } from "@core/launcher.ts";
 import { toolLauncher } from "@core/tool-launchers.ts";
+import type { RunProcessOptions } from "@runtime/process.ts";
 
 function withTempHome<T>(fn: (home: string) => T | Promise<T>): Promise<T> {
   const root = mkdtempSync(join(tmpdir(), "agents-launcher-test-"));
@@ -30,24 +33,21 @@ function withTempHome<T>(fn: (home: string) => T | Promise<T>): Promise<T> {
 }
 
 function success(stdout = ""): LauncherProcessResult {
-  return { exitCode: 0, stdout, stderr: "" };
+  return { exitCode: 0, stdout, stderr: "", timedOut: false };
 }
 
+let errorSpy: Mock<(...args: unknown[]) => void>;
 beforeEach(() => {
-  spyOn(console, "error").mockImplementation(() => {});
+  errorSpy = spyOn(console, "error").mockImplementation(() => {});
 });
+afterEach(() => errorSpy.mockRestore());
 
 test("npm_launcher_resolves_latest_and_caches_current_previous_without_network", async () => {
   await withTempHome(async (home) => {
     const calls: string[][] = [];
-    const runtime = {
-      resolveVersion: async (): Promise<string> => "1.2.3",
-      run: async (
-        command: readonly string[],
-        _cwd: string | undefined,
-        _timeoutMs: number | undefined,
-        _stdio: "pipe" | "inherit",
-      ): Promise<LauncherProcessResult> => {
+    const runtime: LauncherRuntime = {
+      resolveVersion: async () => "1.2.3",
+      run: async (command, _options): Promise<LauncherProcessResult> => {
         calls.push([...command]);
         if (command[0] === "npm") {
           const stage = command[3]!;
@@ -90,22 +90,22 @@ test("npm_launcher_rotates_previous_and_falls_back_to_last_known_good", async ()
     let version = "1.0.0";
     let failInstall = false;
     let failSmoke = false;
-    const runtime = {
-      resolveVersion: async (): Promise<string> => {
+    const runtime: LauncherRuntime = {
+      resolveVersion: async () => {
         if (version === "offline") {
           throw new Error("network unavailable");
         }
         return version;
       },
-      run: async (
-        command: readonly string[],
-        _cwd: string | undefined,
-        _timeoutMs: number | undefined,
-        _stdio: "pipe" | "inherit",
-      ): Promise<LauncherProcessResult> => {
+      run: async (command, _options): Promise<LauncherProcessResult> => {
         if (command[0] === "npm") {
           if (failInstall) {
-            return { exitCode: 1, stdout: "", stderr: "registry unavailable" };
+            return {
+              exitCode: 1,
+              stdout: "",
+              stderr: "registry unavailable",
+              timedOut: false,
+            };
           }
           const stage = command[3]!;
           const executable = join(stage, "node_modules", ".bin", "demo");
@@ -115,7 +115,7 @@ test("npm_launcher_rotates_previous_and_falls_back_to_last_known_good", async ()
           writePackageManifest(stage, "demo-package", version);
         }
         if (failSmoke && command[0]?.endsWith("demo") && command[1] === "--version") {
-          return { exitCode: 1, stdout: "", stderr: "smoke failed" };
+          return { exitCode: 1, stdout: "", stderr: "smoke failed", timedOut: false };
         }
         return success();
       },
@@ -194,16 +194,16 @@ test("npm_launcher_first_ever_resolution_failure_still_errors", async () => {
 
 test("npm_launcher_separates_cache_versions_when_a_harness_changes_package", async () => {
   await withTempHome(async (home) => {
-    let installs = 0;
     let offline = false;
-    const runtime = {
-      resolveVersion: async (): Promise<string> => {
+    let installs = 0;
+    const runtime: LauncherRuntime = {
+      resolveVersion: async () => {
         if (offline) {
           throw new Error("network unavailable");
         }
         return "1.0.0";
       },
-      run: async (command: readonly string[]): Promise<LauncherProcessResult> => {
+      run: async (command, _options): Promise<LauncherProcessResult> => {
         if (command[0] === "npm") {
           installs += 1;
           const stage = command[3]!;
@@ -251,15 +251,14 @@ test("npm_launcher_separates_cache_versions_when_a_harness_changes_package", asy
 test("interactive_harness_launch_is_unbounded_and_keeps_arguments", async () => {
   await withTempHome(async (home) => {
     const calls: Array<{ command: string[]; timeout: number | undefined; stdio: string }> = [];
-    const runtime = {
-      resolveVersion: async (): Promise<string> => "1.0.0",
-      run: async (
-        command: readonly string[],
-        _cwd: string | undefined,
-        timeout: number | undefined,
-        stdio: "pipe" | "inherit",
-      ): Promise<LauncherProcessResult> => {
-        calls.push({ command: [...command], timeout, stdio });
+    const runtime: LauncherRuntime = {
+      resolveVersion: async () => "1.0.0",
+      run: async (command, options): Promise<LauncherProcessResult> => {
+        calls.push({
+          command: [...command],
+          timeout: options.timeoutMs,
+          stdio: options.stdio ?? "pipe",
+        });
         if (command[0] === "npm") {
           const stage = command[3]!;
           const executable = join(stage, "node_modules", ".bin", "codex");
@@ -269,7 +268,7 @@ test("interactive_harness_launch_is_unbounded_and_keeps_arguments", async () => 
           writePackageManifest(stage, "@openai/codex", "1.0.0");
         }
         return command[0]?.endsWith("codex") && command[1] === "--help"
-          ? { exitCode: 7, stdout: "", stderr: "" }
+          ? { exitCode: 7, stdout: "", stderr: "", timedOut: false }
           : success();
       },
     };
@@ -306,17 +305,11 @@ test("harness_launch_merges_root_env_parent_env_and_adapter_env_with_precedence"
         "utf8",
       );
 
-      let capturedEnv: Record<string, string> | undefined;
-      const runtime = {
-        resolveVersion: async (): Promise<string> => "1.0.0",
-        run: async (
-          command: readonly string[],
-          _cwd: string | undefined,
-          _timeout: number | undefined,
-          _stdio: "pipe" | "inherit",
-          env?: Record<string, string>,
-        ): Promise<LauncherProcessResult> => {
-          capturedEnv = env;
+      let capturedEnv: RunProcessOptions["env"] | undefined;
+      const runtime: LauncherRuntime = {
+        resolveVersion: async () => "1.0.0",
+        run: async (command, options): Promise<LauncherProcessResult> => {
+          capturedEnv = options.env;
           if (command[0] === "npm") {
             const stage = command[3]!;
             const executable = join(stage, "node_modules", ".bin", "codex");
@@ -371,15 +364,14 @@ test("tool_launcher_launch_uses_the_registered_npm_spec", async () => {
   await withTempHome(async (home) => {
     const tool = toolLauncher("mcporter")!;
     const calls: Array<{ command: string[]; timeout: number | undefined; stdio: string }> = [];
-    const runtime = {
-      resolveVersion: async (): Promise<string> => "1.0.0",
-      run: async (
-        command: readonly string[],
-        _cwd: string | undefined,
-        timeout: number | undefined,
-        stdio: "pipe" | "inherit",
-      ): Promise<LauncherProcessResult> => {
-        calls.push({ command: [...command], timeout, stdio });
+    const runtime: LauncherRuntime = {
+      resolveVersion: async () => "1.0.0",
+      run: async (command, options): Promise<LauncherProcessResult> => {
+        calls.push({
+          command: [...command],
+          timeout: options.timeoutMs,
+          stdio: options.stdio ?? "pipe",
+        });
         if (command[0] === "npm") {
           const stage = command[3]!;
           const executable = join(stage, "node_modules", ".bin", "mcporter");
@@ -389,7 +381,7 @@ test("tool_launcher_launch_uses_the_registered_npm_spec", async () => {
           writePackageManifest(stage, "mcporter", "1.0.0");
         }
         return command[0]?.endsWith("mcporter") && command[1] === "list"
-          ? { exitCode: 3, stdout: "", stderr: "" }
+          ? { exitCode: 3, stdout: "", stderr: "", timedOut: false }
           : success();
       },
     };
@@ -432,4 +424,43 @@ test("tool_launcher_launch_uses_the_registered_npm_spec", async () => {
 
 test("tool_launcher_lookup_rejects_unknown_ids", () => {
   assert.equal(toolLauncher("codex"), undefined);
+});
+
+test("npm_launcher_rejects_unmanaged_conflict_for_current_and_previous", async () => {
+  await withTempHome(async (home) => {
+    const layout = npmCacheLayout(
+      home,
+      { tool: "demo", package: "demo-package" },
+      join(home, "cache"),
+    );
+    mkdirSync(layout.versionsDir, { recursive: true });
+    const versionDir = join(layout.versionsDir, "1.0.0");
+    mkdirSync(versionDir, { recursive: true });
+    const currentTarget = join("versions", "1.0.0");
+    symlinkSync(currentTarget, layout.currentLink, "dir");
+    writeFileSync(layout.previousLink, "real file");
+
+    const runtime: LauncherRuntime = {
+      resolveVersion: async () => "1.2.3",
+      run: async (command, _options): Promise<LauncherProcessResult> => {
+        if (command[0] === "npm") {
+          const stage = command[3]!;
+          const executable = join(stage, "node_modules", ".bin", "demo");
+          mkdirSync(join(stage, "node_modules", ".bin"), { recursive: true });
+          writeFileSync(executable, "#!/bin/sh\nexit 0\n", "utf8");
+          chmodSync(executable, 0o755);
+          writePackageManifest(stage, "demo-package", "1.2.3");
+        }
+        return success();
+      },
+    };
+
+    await assert.rejects(
+      prepareNpmPackage(
+        { tool: "demo", package: "demo-package", bin: "demo" },
+        { home, cacheHome: join(home, "cache"), runtime, timeoutMs: 1000 },
+      ),
+      /unmanaged conflict/,
+    );
+  });
 });

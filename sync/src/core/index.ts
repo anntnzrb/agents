@@ -1,5 +1,4 @@
 import { existsSync } from "node:fs";
-import { homedir } from "node:os";
 import path from "node:path";
 import { installExtensionDeps } from "@extensions/install.ts";
 import { bootstrapPackageTarget } from "@packages/index.ts";
@@ -10,7 +9,7 @@ import {
   prepareExtensionHookState,
   recordExtensionHookState,
 } from "./hook-state.ts";
-import { runJobsWithPreserve } from "./jobs.ts";
+import { removeLegacyRuntimeInstall, runJobsWithPreserve } from "./jobs.ts";
 import { launchHarness, launchNpmPackage } from "./launcher.ts";
 import {
   cleanManagedEntries,
@@ -35,44 +34,45 @@ import {
   type SyncLock,
   tryAcquireSyncLock as tryAcquireSyncLockImpl,
 } from "@runtime/lock.ts";
+import { commandExists, runProcess } from "@runtime/process.ts";
 
 const DEFAULT_SYNC_TIMEOUT_SECONDS = 15 * 60;
 const SYNC_LOCK_FILE = "sync.lock";
 
 export type { SyncLock } from "@runtime/lock.ts";
 
-async function ensurePythonEnv(home = homedir()): Promise<void> {
+async function ensurePythonEnv(home: string, timeoutMs: number): Promise<void> {
   const venvPython = path.join(home, ".omp", "python-env", "bin", "python");
   if (existsSync(venvPython)) {
     return;
   }
 
-  if (!Bun.which("uv")) {
+  if (!(await commandExists("uv"))) {
     warn("uv not found; skipping python-env bootstrap.");
     return;
   }
 
-  const install = Bun.spawnSync(["uv", "python", "install"]);
-  if (!install.success) {
+  const install = await runProcess(["uv", "python", "install"], { timeoutMs });
+  if (install.timedOut || install.exitCode !== 0) {
     warn("uv python install failed; skipping.");
     return;
   }
 
-  const find = Bun.spawnSync(["uv", "python", "find"], { stdout: "pipe" });
-  const latest = find.stdout?.toString().trim();
+  const find = await runProcess(["uv", "python", "find"], {
+    timeoutMs,
+    stdio: "pipe",
+  });
+  const latest = find.stdout.trim();
   if (!latest) {
     warn("uv python find returned empty; skipping.");
     return;
   }
 
-  const venv = Bun.spawnSync([
-    "uv",
-    "venv",
-    "--python",
-    latest,
-    path.join(home, ".omp", "python-env"),
-  ]);
-  if (!venv.success) {
+  const venv = await runProcess(
+    ["uv", "venv", "--python", latest, path.join(home, ".omp", "python-env")],
+    { timeoutMs },
+  );
+  if (venv.timedOut || venv.exitCode !== 0) {
     warn("failed to create python-env");
   }
 }
@@ -93,12 +93,13 @@ export function tryAcquireSyncLock(syncEnv: SyncEnv): SyncLock | undefined {
   return tryAcquireSyncLockImpl(syncEnv.managedStateHome, syncLockPath(syncEnv));
 }
 
-export function startSyncWatchdog(timeoutSeconds: number): void {
+export function startSyncWatchdog(timeoutSeconds: number): () => void {
   const timer = setTimeout(() => {
     err(`timed out after ${timeoutSeconds}s`);
     process.exit(124);
-  }, timeoutSeconds * 1000);
+  }, timeoutSeconds * 1_000);
   timer.unref();
+  return () => clearTimeout(timer);
 }
 
 export async function runSync(
@@ -108,13 +109,13 @@ export async function runSync(
     readonly forceModelRefresh?: boolean;
   } = {},
 ): Promise<boolean> {
-  await ensurePythonEnv(syncEnv.home);
+  await ensurePythonEnv(syncEnv.home, syncEnv.installTimeoutMs);
   let syncPlan: SyncPlan;
   let managedPlan: ManagedSyncPlan;
   let extensionHookStates: ReadonlyMap<string, ExtensionHookRuntimeState>;
   try {
     syncPlan = buildSyncPlan(syncEnv);
-    managedPlan = planManagedEntriesForSyncPlan(syncPlan);
+    managedPlan = planManagedEntriesForSyncPlan(syncEnv, syncPlan);
     extensionHookStates = prepareExtensionHookStates(syncPlan.hooks);
   } catch (error) {
     err(panicMessage(error));
@@ -159,6 +160,9 @@ export async function runSync(
       })
     : false;
 
+  const legacyCleanupSuccess =
+    baseSuccess && wrapperSuccess ? removeLegacyRuntimeInstall(syncEnv.runtimeHome) : true;
+
   const managedStateSuccess =
     baseSuccess && wrapperSuccess ? recordManagedEntries(managedPlan) : true;
   const hookSuccess =
@@ -167,7 +171,12 @@ export async function runSync(
       : true;
 
   const success =
-    baseSuccess && managedToolSuccess && wrapperSuccess && managedStateSuccess && hookSuccess;
+    baseSuccess &&
+    managedToolSuccess &&
+    wrapperSuccess &&
+    managedStateSuccess &&
+    hookSuccess &&
+    legacyCleanupSuccess;
   if (
     success &&
     options.warnManagedServices &&
@@ -204,14 +213,18 @@ export const main = async (
   }
 
   try {
-    startSyncWatchdog(syncTimeout());
-    const success = await runSync(syncEnv, {
-      warnManagedServices: true,
-      ...(options.forceModelRefresh === undefined
-        ? {}
-        : { forceModelRefresh: options.forceModelRefresh }),
-    });
-    return success ? 0 : 1;
+    const stopWatchdog = startSyncWatchdog(syncTimeout());
+    try {
+      const success = await runSync(syncEnv, {
+        warnManagedServices: true,
+        ...(options.forceModelRefresh === undefined
+          ? {}
+          : { forceModelRefresh: options.forceModelRefresh }),
+      });
+      return success ? 0 : 1;
+    } finally {
+      stopWatchdog();
+    }
   } finally {
     releaseSyncLockImpl(lock);
   }

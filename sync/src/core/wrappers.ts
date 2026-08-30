@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { isErrno, panicMessage } from "@runtime/errors.ts";
+import { err, isErrno, panicMessage, warn } from "@runtime/errors.ts";
 import { Schema } from "effect";
 import type { Harness, SyncEnv } from "./harness.ts";
 import type { PreparedManagedTool } from "./managed-tools.ts";
@@ -52,7 +52,12 @@ export function wrapperDestinations(
     return {
       harness,
       path: destination,
-      content: renderWrapper(syncEnv, harness),
+      content: renderLaunchWrapper(
+        syncEnv,
+        harness.sourceName,
+        harness.launcher.defaultArgs,
+        harness.launcher.env,
+      ),
     };
   });
   const toolWrappers: WrapperDestination[] = TOOL_LAUNCHERS.map((tool) => ({
@@ -62,22 +67,13 @@ export function wrapperDestinations(
   return [...harnessWrappers, ...toolWrappers];
 }
 
-export function renderWrapper(syncEnv: Pick<SyncEnv, "runtimeHome">, harness: Harness): string {
-  return renderLaunchWrapper(
-    syncEnv,
-    harness.sourceName,
-    harness.launcher.defaultArgs,
-    harness.launcher.env,
-  );
-}
-
 function renderLaunchWrapper(
   syncEnv: Pick<SyncEnv, "runtimeHome">,
   sourceName: string,
   defaultArgs: readonly string[],
   env?: Record<string, string>,
 ): string {
-  const syncScript = path.join(syncEnv.runtimeHome, "sync", "src", "cli.ts");
+  const syncScript = path.join(syncEnv.runtimeHome, "sync-current", "src", "cli.ts");
   const args = defaultArgs.map(shellQuote).join(" ");
   const envLines = env
     ? Object.entries(env).map(([key, value]) => `export ${key}=${shellQuote(value)}`)
@@ -122,12 +118,12 @@ export function reconcileWrappers(syncEnv: SyncEnv, runtime: WrapperRuntime = {}
     const result = reconcileWrapperFiles(syncEnv, desired);
     if (result.conflicts.length > 0) {
       for (const conflict of result.conflicts) {
-        console.error(`sync: warning: preserving unmanaged wrapper conflict: ${conflict}`);
+        warn(`preserving unmanaged wrapper conflict: ${conflict}`);
       }
     }
     return true;
   } catch (error) {
-    console.error(`sync: wrapper reconciliation failed: ${panicMessage(error)}`);
+    err(`wrapper reconciliation failed: ${panicMessage(error)}`);
     return false;
   }
 }
@@ -198,9 +194,7 @@ export function readWrapperState(statePath: string): WrapperState {
   try {
     parsed = Bun.JSONC.parse(content);
   } catch (error) {
-    console.error(
-      `sync: warning: wrapper state parse failed, ignoring ${statePath} (${panicMessage(error)})`,
-    );
+    warn(`wrapper state parse failed, ignoring ${statePath} (${panicMessage(error)})`);
     return { version: 1, entries: [] };
   }
 
@@ -216,9 +210,7 @@ export function readWrapperState(statePath: string): WrapperState {
       ),
     };
   } catch {
-    console.error(
-      `sync: warning: wrapper state parse failed, ignoring ${statePath} (invalid shape)`,
-    );
+    warn(`wrapper state parse failed, ignoring ${statePath} (invalid shape)`);
     return { version: 1, entries: [] };
   }
 }

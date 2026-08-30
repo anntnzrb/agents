@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
+import { err, isErrno, warn } from "@runtime/errors.ts";
 import { releaseSyncLock, type SyncLock, tryAcquireSyncLock } from "@runtime/lock.ts";
+import { type RunProcessOptions, runProcess } from "@runtime/process.ts";
 import { Record as EffectRecord } from "effect";
 import type { Harness, SyncEnv } from "./harness.ts";
 
@@ -29,7 +31,7 @@ export interface LauncherProcessResult {
   readonly exitCode: number;
   readonly stdout: string;
   readonly stderr: string;
-  readonly timedOut?: boolean;
+  readonly timedOut: boolean;
 }
 
 export interface LauncherRuntime {
@@ -40,10 +42,7 @@ export interface LauncherRuntime {
   ) => Promise<string>;
   readonly run?: (
     command: readonly string[],
-    cwd: string | undefined,
-    timeoutMs: number | undefined,
-    stdio: "pipe" | "inherit",
-    env?: Record<string, string>,
+    options: RunProcessOptions,
   ) => Promise<LauncherProcessResult>;
 }
 
@@ -92,14 +91,12 @@ export async function prepareNpmPackage(
   const lock = await acquireCacheLock(layout, timeoutMs);
   try {
     const runtime = options.runtime ?? {};
+    const run = runtime.run ?? runProcess;
     const distTag = spec.distTag ?? "latest";
     const cached = currentCachedPackage(layout, spec);
     let resolvedVersion: string;
     try {
-      const resolve =
-        runtime.resolveVersion ??
-        ((packageName: string, tag: string, timeout: number) =>
-          resolveVersion(packageName, tag, timeout));
+      const resolve = runtime.resolveVersion ?? resolveVersion;
       resolvedVersion = validateResolvedVersion(await resolve(spec.package, distTag, timeoutMs));
     } catch (error) {
       if (!cached) {
@@ -126,7 +123,7 @@ export async function prepareNpmPackage(
         }
 
         stageDir = fs.mkdtempSync(path.join(layout.versionsDir, ".stage."));
-        const install = await (runtime.run ?? runLauncherProcess)(
+        const install = await run(
           [
             "npm",
             "install",
@@ -139,9 +136,7 @@ export async function prepareNpmPackage(
             "--loglevel=error",
             `${spec.package}@${resolvedVersion}`,
           ],
-          undefined,
-          timeoutMs,
-          "pipe",
+          { timeoutMs, stdio: "pipe" },
         );
         if (install.timedOut || install.exitCode !== 0) {
           throw new Error(`npm install failed: ${detailFromResult(install)}`);
@@ -157,12 +152,11 @@ export async function prepareNpmPackage(
           );
         }
         if ((spec.smokeCheck ?? "--version") !== "-") {
-          const smoke = await (runtime.run ?? runLauncherProcess)(
-            [installedBin, spec.smokeCheck ?? "--version"],
-            stageDir,
+          const smoke = await run([installedBin, spec.smokeCheck ?? "--version"], {
+            cwd: stageDir,
             timeoutMs,
-            "pipe",
-          );
+            stdio: "pipe",
+          });
           if (smoke.timedOut || smoke.exitCode !== 0) {
             throw new Error(`installed package smoke check failed: ${detailFromResult(smoke)}`);
           }
@@ -213,15 +207,13 @@ export async function launchNpmPackage(
     timeoutMs: syncEnv.installTimeoutMs,
     runtime,
   });
-  const result = await (runtime.run ?? runLauncherProcess)(
-    [prepared.currentBin, ...args],
-    undefined,
-    undefined,
-    "inherit",
-    spec.env,
-  );
+  const run = runtime.run ?? runProcess;
+  const result = await run([prepared.currentBin, ...args], {
+    stdio: "inherit",
+    ...(spec.env !== undefined ? { env: spec.env } : {}),
+  });
   if (result.timedOut) {
-    console.error(`sync: ${spec.tool} launch timed out`);
+    err(`${spec.tool} launch timed out`);
     return 124;
   }
   return result.exitCode;
@@ -262,58 +254,14 @@ async function resolveVersion(
   distTag: string,
   timeoutMs: number,
 ): Promise<string> {
-  const result = await runLauncherProcess(
-    ["npm", "view", `${packageName}@${distTag}`, "version"],
-    undefined,
+  const result = await runProcess(["npm", "view", `${packageName}@${distTag}`, "version"], {
     timeoutMs,
-    "pipe",
-  );
+    stdio: "pipe",
+  });
   if (result.timedOut || result.exitCode !== 0) {
     throw new Error(`could not resolve ${packageName}@${distTag}`);
   }
   return result.stdout.replace(/[\r\n]+/g, "").trim();
-}
-
-async function runLauncherProcess(
-  command: readonly string[],
-  cwd: string | undefined,
-  timeoutMs: number | undefined,
-  stdio: "pipe" | "inherit",
-  env?: Record<string, string>,
-): Promise<LauncherProcessResult> {
-  const signal = timeoutMs === undefined ? undefined : AbortSignal.timeout(timeoutMs);
-  let subprocess:
-    | Bun.Subprocess<"pipe", "pipe", "inherit">
-    | Bun.Subprocess<"inherit", "inherit", "inherit">;
-  try {
-    subprocess = Bun.spawn([...command], {
-      ...(cwd === undefined ? {} : { cwd }),
-      env: { ...process.env, ...env },
-      killSignal: "SIGKILL",
-      ...(signal ? { signal } : {}),
-      stdin: stdio === "pipe" ? "ignore" : "inherit",
-      stdout: stdio,
-      stderr: stdio,
-    });
-  } catch (error) {
-    return {
-      exitCode: 127,
-      stdout: "",
-      stderr: String(error),
-    };
-  }
-
-  if (stdio === "inherit") {
-    const exitCode = await subprocess.exited;
-    return { exitCode, stdout: "", stderr: "", timedOut: signal?.aborted ?? false };
-  }
-
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(subprocess.stdout).text().catch(() => ""),
-    new Response(subprocess.stderr).text().catch(() => ""),
-    subprocess.exited,
-  ]);
-  return { exitCode, stdout, stderr, timedOut: signal?.aborted ?? false };
 }
 
 async function acquireCacheLock(layout: NpmCacheLayout, timeoutMs: number): Promise<SyncLock> {
@@ -348,9 +296,27 @@ function updateCurrentAndPrevious(layout: NpmCacheLayout, version: string): void
 function replaceLink(linkPath: string, target: string): void {
   const tempPath = `${linkPath}.${process.pid}.tmp`;
   fs.rmSync(tempPath, { recursive: true, force: true });
-  fs.symlinkSync(target, tempPath, "dir");
-  fs.rmSync(linkPath, { recursive: true, force: true });
-  fs.renameSync(tempPath, linkPath);
+  try {
+    fs.symlinkSync(target, tempPath, "dir");
+    try {
+      const metadata = fs.lstatSync(linkPath);
+      if (!metadata.isSymbolicLink()) {
+        throw new Error(`unmanaged conflict at ${linkPath}`);
+      }
+    } catch (error) {
+      if (!isErrno(error, "ENOENT")) {
+        throw error;
+      }
+    }
+    fs.renameSync(tempPath, linkPath);
+  } catch (error) {
+    try {
+      fs.rmSync(tempPath, { recursive: true, force: true });
+    } catch {
+      // ignore cleanup failure
+    }
+    throw error;
+  }
 }
 
 function pruneVersions(layout: NpmCacheLayout): void {
@@ -441,8 +407,8 @@ function currentCachedPackage(
 }
 
 function warnUsingCachedPackage(spec: NpmPackageSpec, version: string, error: unknown): void {
-  console.error(
-    `sync: warning: latest ${spec.package}@${spec.distTag ?? "latest"} unavailable (${detailFromError(error)}); using cached ${spec.tool}@${version}`,
+  warn(
+    `latest ${spec.package}@${spec.distTag ?? "latest"} unavailable (${detailFromError(error)}); using cached ${spec.tool}@${version}`,
   );
 }
 

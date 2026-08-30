@@ -96,7 +96,6 @@ export const HARNESS_ADAPTERS = [
         kind: "PackageBootstrap",
         manifestFile: "packages.json",
         settingsFile: "settings.json",
-        cacheSubdir: ".local/share/agents/pi-packages",
       },
       {
         kind: "ExtensionDeps",
