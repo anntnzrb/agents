@@ -208,28 +208,12 @@ async function extractRelease(
   entryName: string,
   timeoutMs: number,
 ): Promise<void> {
-  const tar = Bun.which("tar");
-  if (!tar) {
-    throw new Error("missing tar executable");
-  }
-  const signal = AbortSignal.timeout(timeoutMs);
-  const process = Bun.spawn([tar, "-xf", archive, "-C", destination, entryName], {
-    signal,
-    killSignal: "SIGKILL",
-    stdin: "ignore",
-    stdout: "ignore",
-    stderr: "pipe",
-  });
-  const [stderr, exitCode] = await Promise.all([
-    new Response(process.stderr).text().catch(() => ""),
-    process.exited,
-  ]);
-  if (signal.aborted) {
+  const startedAt = Date.now();
+  await new Bun.Archive(fs.readFileSync(archive)).extract(destination);
+  if (Date.now() - startedAt > timeoutMs) {
     throw new Error("archive extraction timed out");
   }
-  if (exitCode !== 0) {
-    throw new Error(`archive extraction failed: ${stderr.trim() || "unknown error"}`);
-  }
+  fs.chmodSync(path.join(destination, entryName), 0o755);
 }
 
 function verifyChecksum(archive: string, expected: string): void {
