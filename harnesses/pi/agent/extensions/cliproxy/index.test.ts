@@ -15,7 +15,7 @@ test("resolves the live catalog asynchronously and registers Pi models", async (
       ".local",
       "share",
       "agents",
-      "sync",
+      "sync-current",
       "src",
       "runtime",
       "model-catalog-client.ts",
