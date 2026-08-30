@@ -63,7 +63,7 @@ const CATALOG_MODULE = pathToFileURL(
     ".local",
     "share",
     "agents",
-    "sync",
+    "sync-current",
     "src",
     "runtime",
     "model-catalog-client.ts",

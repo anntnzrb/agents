@@ -58,7 +58,7 @@ test("loads live catalog models through the installed runtime resolver", async (
       ".local",
       "share",
       "agents",
-      "sync",
+      "sync-current",
       "src",
       "runtime",
       "model-catalog-client.ts",
