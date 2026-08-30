@@ -62,7 +62,9 @@ import {
   runPackageBuild,
 } from "@packages/process.ts";
 import {
-  clonePackage,
+  cloneAttemptsForTests,
+  commandForTests,
+  githubSlugForTests,
   packageCacheDir,
   replaceDirAtomically,
   rmEntry,
@@ -124,8 +126,9 @@ describe("runtime/process.ts & packages/process.ts", () => {
   test("commandExists and pickBunRunner", async () => {
     expect(await commandExists("bun")).toBe(true);
     expect(await commandExists("non_existent_binary_xyz_123")).toBe(false);
-    expect(await pickBunRunner()).toBe(process.execPath);
+    expect(await pickBunRunner()).toBe("bun");
   });
+
   test("runCommandOutcome missing command and execution", async () => {
     expect(await runCommandOutcome([], undefined, 1000)).toEqual({ _tag: "MissingCommand" });
     expect(await runCommandOutcome(["non_existent_binary_xyz_123"], undefined, 1000)).toEqual({
@@ -274,28 +277,22 @@ describe("packages/source.ts & packages/validate.ts", () => {
     });
   });
 
-  test("clonePackage downloads and extracts GitHub sources without a VCS executable", async () => {
-    await withTempDir(async (dir) => {
-      const archivePath = join(dir, "source.tar.gz");
-      await Bun.Archive.write(
-        archivePath,
-        { "repo-main/package.json": "{}" },
-        { compress: "gzip" },
-      );
-      const targetDir = join(dir, "package");
-      let requestedUrl = "";
-      const success = await clonePackage("https://github.com/owner/repo.git", targetDir, 1000, {
-        fetch: async (input) => {
-          requestedUrl =
-            typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-          return new Response(readFileSync(archivePath));
-        },
-      });
+  test("clonePackage, githubSlugForTests, commandForTests, cloneAttemptsForTests", async () => {
+    expect(githubSlugForTests("https://github.com/owner/repo.git")).toBe("owner/repo");
+    expect(githubSlugForTests("git@github.com:owner/repo.git")).toBe("owner/repo");
+    expect(githubSlugForTests("https://gitlab.com/owner/repo.git")).toBeNull();
 
-      expect(success).toBe(true);
-      expect(requestedUrl).toBe("https://codeload.github.com/owner/repo/tar.gz/HEAD");
-      expect(readFileSync(join(targetDir, "package.json"), "utf8")).toBe("{}");
-    });
+    const cmd = commandForTests("https://github.com/owner/repo", "/tmp/target");
+    expect(cmd[0]).toBe("gh");
+
+    const [success, attempts] = await cloneAttemptsForTests(
+      "https://github.com/owner/repo",
+      "/tmp/target",
+      true,
+      [false, true],
+    );
+    expect(success).toBe(true);
+    expect(attempts.length).toBe(2);
   });
 
   test("package validation and missing roots", async () => {
@@ -559,7 +556,7 @@ describe("core/launcher.ts", () => {
         {
           resolveVersion: async () => "1.0.0",
           run: async (cmd) => {
-            if (cmd[0] === process.execPath) {
+            if (cmd[0] === "npm") {
               const stage = cmd[3]!;
               mkdirSync(join(stage, "node_modules", ".bin"), { recursive: true });
               mkdirSync(join(stage, "node_modules", "demo-package"), { recursive: true });

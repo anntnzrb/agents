@@ -5,7 +5,7 @@ description: Verify a generated document against actual code and git history
 
 Load the visual-explainer skill and fact-check the document named by `$@`. If no
 argument is given, use the most recently modified HTML file in
-`~/.local/share/agentium/visual-explainer/diagrams/`.
+`~/.local/share/agents/visual-explainer/diagrams/`.
 
 ## Claim extraction
 

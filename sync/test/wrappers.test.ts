@@ -74,7 +74,7 @@ test("harness_ownership_ids_cannot_escape_the_wrapper_directory", () => {
   );
 });
 
-test("known_harnesses_resolve_without_ssot", () => {
+test("installed_runtime_resolves_known_harness_without_ssot", () => {
   withTempHome((home) => {
     assert.equal(existsSync(join(home, ".config", "agents")), false);
     const deepseek = supportedHarness(home, "deepseek", "linux");
@@ -94,10 +94,13 @@ test("wrapper_destinations_render_unix_launchers", () => {
     assert.equal(unix[0]?.path, join(home, ".local", "bin", "codex"));
     assert.equal(unix[0]?.content.startsWith("#!/bin/sh\n"), true);
     assert.equal(unix[0]?.content.includes(WRAPPER_MARKER), true);
-    assert.equal(unix[0]?.content.includes("bun x '@anntnzrb/agentium@latest'"), true);
     assert.equal(unix[0]?.content.includes("launch 'codex'"), true);
     assert.equal(unix[0]?.content.includes("exit 127"), true);
-    assert.equal(unix[0]?.content.includes("Bun is required"), true);
+    assert.equal(unix[0]?.content.includes("sync runtime is missing"), true);
+    assert.equal(
+      unix[0]?.content.includes(join(home, ".local", "share", "agents", "sync", "src", "cli.ts")),
+      true,
+    );
     assert.equal(unix[0]?.content.includes(join(home, ".config", "agents")), false);
     const deepseekUnix = unix.find((entry) => entry.path.endsWith("/dsh"));
     assert.equal(deepseekUnix?.path, join(home, ".local", "bin", "dsh"));

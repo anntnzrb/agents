@@ -134,4 +134,5 @@ export const logCommandFailure = (
   }
 };
 
-export const pickBunRunner = async (): Promise<string | undefined> => process.execPath || undefined;
+export const pickBunRunner = async (): Promise<"bun" | undefined> =>
+  Bun.which("bun") ? "bun" : undefined;

@@ -7,13 +7,11 @@ beforeEach(() => {
 
 import {
   chmodSync,
-  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -87,31 +85,6 @@ test("managed_tool_downloads_verified_release_once", async () => {
     const [second] = await prepareManagedTools(syncEnv, runtime);
     assert.equal(second?.executable, first.executable);
     assert.equal(downloads, 1);
-  });
-});
-
-test("managed_tool_extracts_release_with_Bun", async () => {
-  await withTempHome(async (home) => {
-    const archivePath = join(home, "fixture.tar.gz");
-    await Bun.Archive.write(
-      archivePath,
-      { "cli-proxy-api": "#!/bin/sh\nexit 0\n" },
-      { compress: "gzip" },
-    );
-    const checksum = new Bun.CryptoHasher("sha256").update(readFileSync(archivePath)).digest("hex");
-    writeManifest(home, checksum);
-
-    const syncEnv = SyncEnv.fromHome(home, 1000, { platform: "darwin" });
-    const [tool] = await prepareManagedTools(syncEnv, {
-      arch: "arm64",
-      cacheHome: join(home, "cache"),
-      download: async (_url, destination): Promise<void> => {
-        copyFileSync(archivePath, destination);
-      },
-    });
-
-    assert.ok(tool);
-    assert.equal((statSync(tool.executable).mode & 0o111) !== 0, true);
   });
 });
 

@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import { installExtensionDeps } from "@extensions/install.ts";
 import { bootstrapPackageTarget } from "@packages/index.ts";
@@ -38,8 +39,45 @@ import {
 const DEFAULT_SYNC_TIMEOUT_SECONDS = 15 * 60;
 const SYNC_LOCK_FILE = "sync.lock";
 
-export { err, panicMessage, warn } from "@runtime/errors.ts";
 export type { SyncLock } from "@runtime/lock.ts";
+
+async function ensurePythonEnv(home = homedir()): Promise<void> {
+  const venvPython = path.join(home, ".omp", "python-env", "bin", "python");
+  if (existsSync(venvPython)) {
+    return;
+  }
+
+  if (!Bun.which("uv")) {
+    warn("uv not found; skipping python-env bootstrap.");
+    return;
+  }
+
+  const install = Bun.spawnSync(["uv", "python", "install"]);
+  if (!install.success) {
+    warn("uv python install failed; skipping.");
+    return;
+  }
+
+  const find = Bun.spawnSync(["uv", "python", "find"], { stdout: "pipe" });
+  const latest = find.stdout?.toString().trim();
+  if (!latest) {
+    warn("uv python find returned empty; skipping.");
+    return;
+  }
+
+  const venv = Bun.spawnSync([
+    "uv",
+    "venv",
+    "--python",
+    latest,
+    path.join(home, ".omp", "python-env"),
+  ]);
+  if (!venv.success) {
+    warn("failed to create python-env");
+  }
+}
+
+export { err, panicMessage, warn } from "@runtime/errors.ts";
 
 export function parseTimeoutSeconds(value: string | undefined, defaultSeconds: number): number {
   const parsed = value ? Number.parseInt(value, 10) : Number.NaN;
@@ -70,6 +108,7 @@ export async function runSync(
     readonly forceModelRefresh?: boolean;
   } = {},
 ): Promise<boolean> {
+  await ensurePythonEnv(syncEnv.home);
   let syncPlan: SyncPlan;
   let managedPlan: ManagedSyncPlan;
   let extensionHookStates: ReadonlyMap<string, ExtensionHookRuntimeState>;
@@ -181,8 +220,7 @@ export const main = async (
 /**
  * Wrapper entrypoint: reconcile config first, then hand control to the
  * selected harness or tool. Sync failures are soft here so an unavailable
- * network or broken optional hook cannot strand an otherwise cached harness
- * package.
+ * network or broken optional hook cannot strand an otherwise cached binary.
  */
 export const launchMain = async (sourceName: string, args: readonly string[]): Promise<number> => {
   let syncEnv: SyncEnv;
@@ -224,7 +262,7 @@ export const launchMain = async (sourceName: string, args: readonly string[]): P
       warn("another sync is already running; continuing launch");
     }
   } else {
-    warn("agent configuration source is unavailable; continuing with registry package");
+    warn("agent configuration source is unavailable; continuing with installed runtime");
   }
 
   try {

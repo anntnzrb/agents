@@ -3,19 +3,14 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 
 import { rmEntry } from "@runtime/fs.ts";
+import { commandExists } from "@runtime/process.ts";
+import { runCommand } from "./process.ts";
 
 export { rmEntry } from "@runtime/fs.ts";
 
 const ALPHANUMERIC_PATTERN = /[A-Za-z0-9]/;
 const SOURCE_SEPARATOR_PATTERN = /[/:]/;
 const TRAILING_PATH_SEPARATOR_PATTERN = /\/+$/;
-
-export interface PackageSourceRuntime {
-  readonly fetch?: PackageFetch;
-  readonly extract?: (archive: Uint8Array, destination: string, timeoutMs: number) => Promise<void>;
-}
-
-type PackageFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 export function packageCacheDir(cacheRoot: string, source: string): string {
   const slug = sourceSlug(source);
@@ -53,54 +48,37 @@ export async function clonePackage(
   source: string,
   targetDir: string,
   timeoutMs: number,
-  runtime: PackageSourceRuntime = {},
 ): Promise<boolean> {
-  const normalizedSource = source.trim();
-  if (isLocalPathSource(normalizedSource)) {
-    try {
-      await fsp.cp(normalizedSource, targetDir, {
-        recursive: true,
-        errorOnExist: true,
-        force: false,
-      });
-      return true;
-    } catch {
-      return false;
-    }
-  }
+  return clonePackageWithRunner(source, targetDir, await commandExists("gh"), (command) =>
+    runCommand(command, undefined, timeoutMs, "clone"),
+  );
+}
 
-  const slug = githubRepoSlug(normalizedSource);
-  if (!slug) {
-    return false;
-  }
+export const githubSlugForTests = (source: string): string | null => githubRepoSlug(source);
 
-  try {
-    const response = await (runtime.fetch ?? fetch)(
-      `https://codeload.github.com/${slug}/tar.gz/HEAD`,
-      { signal: AbortSignal.timeout(timeoutMs) },
-    );
-    if (!response.ok) {
-      return false;
-    }
-
-    const parentDir = path.dirname(targetDir);
-    await fsp.mkdir(parentDir, { recursive: true });
-    const extractionDir = await fsp.mkdtemp(path.join(parentDir, ".source."));
-    try {
-      const archive = new Uint8Array(await response.arrayBuffer());
-      await (runtime.extract ?? extractArchive)(archive, extractionDir, timeoutMs);
-      const entries = await fsp.readdir(extractionDir, { withFileTypes: true });
-      if (entries.length !== 1 || !entries[0]?.isDirectory()) {
-        return false;
-      }
-      await fsp.rename(path.join(extractionDir, entries[0].name), targetDir);
-      return true;
-    } finally {
-      rmEntry(extractionDir);
-    }
-  } catch {
-    return false;
+export function commandForTests(source: string, targetDir: string): string[] {
+  const command = cloneCommands(source, targetDir, true)[0];
+  if (!command) {
+    throw new Error("missing clone command");
   }
+  return command;
+}
+
+export async function cloneAttemptsForTests(
+  source: string,
+  targetDir: string,
+  ghAvailable: boolean,
+  outcomes: readonly boolean[],
+): Promise<[boolean, string[][]]> {
+  const attempts: string[][] = [];
+  let index = 0;
+  const result = await clonePackageWithRunner(source, targetDir, ghAvailable, async (command) => {
+    attempts.push([...command]);
+    const outcome = outcomes[index] ?? false;
+    index += 1;
+    return outcome;
+  });
+  return [result, attempts];
 }
 
 function sourceSlug(source: string): string {
@@ -126,7 +104,7 @@ function sourceSlug(source: string): string {
 
 const localPathBasename = (source: string): string => path.basename(source);
 
-const isLocalPathSource = (source: string): boolean => path.isAbsolute(source) || exists(source);
+const isLocalPathSource = (source: string): boolean => path.isAbsolute(source);
 
 function fnv1a64(input: string): string {
   let hash = 0xcbf29ce484222325n;
@@ -145,36 +123,43 @@ function withExtension(target: string, extension: string): string {
   return path.join(dir, `${stem}.${extension}`);
 }
 
-async function extractArchive(
-  archive: Uint8Array,
-  destination: string,
-  timeoutMs: number,
-): Promise<void> {
-  const startedAt = Date.now();
-  await new Bun.Archive(archive).extract(destination);
-  if (Date.now() - startedAt > timeoutMs) {
-    throw new Error("archive extraction timed out");
+async function clonePackageWithRunner(
+  source: string,
+  targetDir: string,
+  ghAvailable: boolean,
+  runner: (command: readonly string[]) => Promise<boolean>,
+): Promise<boolean> {
+  for (const command of cloneCommands(source, targetDir, ghAvailable)) {
+    if (await runner(command)) {
+      return true;
+    }
   }
+  return false;
+}
+
+function cloneCommands(source: string, targetDir: string, ghAvailable: boolean): string[][] {
+  const commands: string[][] = [];
+  const slug = githubRepoSlug(source);
+  if (slug && ghAvailable) {
+    commands.push(["gh", "repo", "clone", slug, targetDir, "--", "--depth=1"]);
+  }
+  commands.push(["git", "clone", "--depth=1", source, targetDir]);
+  return commands;
 }
 
 function githubRepoSlug(source: string): string | null {
   const trimmed = source.trim();
   const normalized = trimmed.endsWith(".git") ? trimmed.slice(0, -4) : trimmed;
-  let repositoryPath: string;
-  if (normalized.startsWith("git@github.com:")) {
-    repositoryPath = normalized.slice("git@github.com:".length);
-  } else {
-    try {
-      const url = new URL(normalized);
-      if (url.hostname !== "github.com" && url.hostname !== "www.github.com") {
-        return null;
-      }
-      repositoryPath = url.pathname;
-    } catch {
-      return null;
-    }
+  if (normalized.startsWith("https://github.com/")) {
+    return splitOwnerRepo(normalized.slice("https://github.com/".length));
   }
-  return splitOwnerRepo(repositoryPath);
+  if (normalized.startsWith("http://github.com/")) {
+    return splitOwnerRepo(normalized.slice("http://github.com/".length));
+  }
+  if (normalized.startsWith("git@github.com:")) {
+    return splitOwnerRepo(normalized.slice("git@github.com:".length));
+  }
+  return null;
 }
 
 function splitOwnerRepo(rest: string): string | null {

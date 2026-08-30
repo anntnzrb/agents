@@ -183,7 +183,7 @@ Back up `secrets.local.json` through an encrypted channel. Reauthenticate OAuth 
 | Generated configuration | `~/.cli-proxy-api/config.yaml` |
 | Deployed control panel | `~/.cli-proxy-api/static/management.html` |
 | OAuth files | `~/.cli-proxy-api/*.json` |
-| Runtime model catalog | `~/.local/share/agentium/model-catalog/catalog.json` |
+| Runtime model catalog | `~/.local/share/agents/model-catalog/catalog.json` |
 | Managed command | `~/.local/bin/cli-proxy-api` |
 
 The release manifest contains macOS ARM64 and Linux x86_64 archives. Sync verifies the selected SHA-256 checksum and extracts only the manifest's executable.
@@ -291,7 +291,7 @@ Sync combines these catalog sources:
 3. The live CLIProxyAPI `/v1/models?client_version=0.144.1` response supplies names, modalities, context limits, reasoning levels, and the default effort.
 4. [models.dev](https://models.dev/) supplies protocol hints, compatibility fields, output limits, and published costs.
 
-The normalized output is `~/.local/share/agentium/model-catalog/catalog.json`. Model records are sorted by ID, and duplicate IDs fail publication. Each reasoning model keeps the discovered effort strings in order under `reasoningEfforts`. The catalog does not restrict them to a local enum.
+The normalized output is `~/.local/share/agents/model-catalog/catalog.json`. Model records are sorted by ID, and duplicate IDs fail publication. Each reasoning model keeps the discovered effort strings in order under `reasoningEfforts`. The catalog does not restrict them to a local enum.
 
 The rich gateway response overrides models.dev for live names, input modalities, context limits, reasoning efforts, and the default effort. The catalog keeps models.dev metadata for fields that the gateway does not return.
 

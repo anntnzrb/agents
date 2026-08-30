@@ -31,7 +31,9 @@ let writeRecordedEntryNames: any;
 let readPackageManifest: any;
 let patchRuntimeSettings: any;
 let packageCacheDir: any;
-let clonePackage: any;
+let githubSlugForTests: any;
+let commandForTests: any;
+let cloneAttemptsForTests: any;
 let validatePackageForTests: any;
 let extractImportSpecifiers: any;
 let missingPackageRoots: any;
@@ -60,7 +62,9 @@ if (!runtime) {
     readPackageManifest,
     patchRuntimeSettings,
     packageCacheDir,
-    clonePackage,
+    githubSlugForTests,
+    commandForTests,
+    cloneAttemptsForTests,
     validatePackageForTests,
     extractImportSpecifiers,
     missingPackageRoots,
@@ -189,7 +193,21 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
       "packageCacheDir",
       "package_cache_dir",
     ),
-    clonePackage: pickFn(packagesModule as Record<string, unknown>, "clonePackage"),
+    githubSlugForTests: pickFn(
+      packagesModule as Record<string, unknown>,
+      "githubSlugForTests",
+      "github_slug_for_tests",
+    ),
+    commandForTests: pickFn(
+      packagesModule as Record<string, unknown>,
+      "commandForTests",
+      "command_for_tests",
+    ),
+    cloneAttemptsForTests: pickFn(
+      packagesModule as Record<string, unknown>,
+      "cloneAttemptsForTests",
+      "clone_attempts_for_tests",
+    ),
     validatePackageForTests: pickFn(
       packagesModule as Record<string, unknown>,
       "validatePackageForTests",
@@ -243,6 +261,23 @@ function writeFile(path: string, content: string): void {
 function writeExecutable(path: string, script: string): void {
   writeFile(path, script);
   chmodSync(path, 0o755);
+}
+
+function initGitRepo(path: string): void {
+  runGit(path, ["init"]);
+  runGit(path, ["config", "user.name", "Test User"]);
+  runGit(path, ["config", "user.email", "test@example.com"]);
+  runGit(path, ["add", "."]);
+  runGit(path, ["commit", "-m", "init"]);
+}
+
+function runGit(cwd: string, args: string[]): void {
+  const result = Bun.spawnSync(["git", ...args], {
+    cwd,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  assert.equal(result.exitCode, 0, result.stderr.toString() || result.stdout.toString());
 }
 
 const readText = (path: string): string => readFileSync(path, "utf8");
@@ -722,7 +757,7 @@ setInterval(() => {}, 1_000);
       );
       assert.equal(
         packageHook!["cacheRoot"],
-        join(root, ".local", "share", "agentium", "pi-packages"),
+        join(root, ".local", "share", "agents", "pi-packages"),
       );
 
       assert.deepEqual(
@@ -937,7 +972,7 @@ setInterval(() => {}, 1_000);
       assert.equal(exists(join(root, ".codex", "config.toml")), true);
       assert.equal(exists(join(root, ".codex", "skills", "skill.txt")), true);
       assert.equal(
-        exists(join(root, ".local", "share", "agentium", "sync-managed", "codex.json")),
+        exists(join(root, ".local", "share", "agents", "sync-managed", "codex.json")),
         true,
       );
 
@@ -977,7 +1012,7 @@ setInterval(() => {}, 1_000);
         root,
         ".local",
         "share",
-        "agentium",
+        "agents",
         "sync-managed",
         "wrappers.json",
       );
@@ -1077,7 +1112,7 @@ setInterval(() => {}, 1_000);
         "module.exports = 1;\n",
       );
       writeFile(
-        join(root, ".local", "share", "agentium", "sync-managed", "pi.extension-deps.json"),
+        join(root, ".local", "share", "agents", "sync-managed", "pi.extension-deps.json"),
         `${JSON.stringify(
           {
             fingerprint: fingerprintTree(
@@ -1109,7 +1144,7 @@ setInterval(() => {}, 1_000);
         root,
         ".local",
         "share",
-        "agentium",
+        "agents",
         "sync-managed",
         "pi.extension-deps.json",
       );
@@ -1190,7 +1225,7 @@ setInterval(() => {}, 1_000);
         "module.exports = 1;\n",
       );
       writeFile(
-        join(root, ".local", "share", "agentium", "sync-managed", "pi.extension-deps.json"),
+        join(root, ".local", "share", "agents", "sync-managed", "pi.extension-deps.json"),
         `${JSON.stringify(
           {
             fingerprint: "stale",
@@ -1351,31 +1386,38 @@ const check = file.content.includes("\\nrename from ") || file.content.startsWit
     }
   });
 
-  test("github_package_source_downloads_without_a_vcs_executable", async () => {
+  test("github_clone_command_prefers_gh_when_available", async () => {
     await withTempDir(async (root) => {
       const target = join(root, "out");
-      let requestedUrl = "";
-      const success = await call<boolean>(
-        clonePackage,
+      const command = await call<string[]>(
+        commandForTests,
         "https://github.com/tintinweb/pi-supervisor",
         target,
-        1000,
-        {
-          fetch: async (input: string) => {
-            requestedUrl = input;
-            return new Response("archive");
-          },
-          extract: async (_archive: Uint8Array, destination: string) => {
-            const extracted = join(destination, "pi-supervisor-main");
-            mkdirSync(extracted, { recursive: true });
-            writeFileSync(join(extracted, "package.json"), "{}");
-          },
-        },
+      );
+      assert.equal(command[0], "gh");
+      assert.equal(
+        await call<string | null>(githubSlugForTests, "https://github.com/tintinweb/pi-supervisor"),
+        "tintinweb/pi-supervisor",
+      );
+    });
+  });
+
+  test("github_clone_falls_back_to_git_after_gh_failure", async () => {
+    await withTempDir(async (root) => {
+      const target = join(root, "out");
+      const [success, attempts] = await call<[boolean, string[][]]>(
+        cloneAttemptsForTests,
+        "https://github.com/tintinweb/pi-supervisor",
+        target,
+        true,
+        [false, true],
       );
 
       assert.equal(success, true);
-      assert.equal(requestedUrl, "https://codeload.github.com/tintinweb/pi-supervisor/tar.gz/HEAD");
-      assert.equal(readFileSync(join(target, "package.json"), "utf8"), "{}");
+      assert.equal(attempts.length, 2);
+      assert.equal(attempts[0]![0], "gh");
+      assert.equal(attempts[1]![0], "git");
+      assert.equal(attempts[1]![3], "https://github.com/tintinweb/pi-supervisor");
     });
   });
 
@@ -1451,6 +1493,7 @@ const check = file.content.includes("\\nrename from ") || file.content.startsWit
 `,
       );
       writeFile(join(sourceRepo, "src", "index.ts"), "export default {}\n");
+      initGitRepo(sourceRepo);
 
       const buildRepo = join(repos, "build-pkg");
       writeFile(
@@ -1465,6 +1508,7 @@ const check = file.content.includes("\\nrename from ") || file.content.startsWit
 }
 `,
       );
+      initGitRepo(buildRepo);
 
       writeFile(
         join(root, ".config", "agents", "harnesses", "pi", "agent", "packages.json"),
@@ -1482,7 +1526,7 @@ const check = file.content.includes("\\nrename from ") || file.content.startsWit
       const settings = readText(join(root, ".pi", "agent", "settings.json"));
       assert.equal(settings.includes("source-pkg"), true);
       assert.equal(settings.includes("build-pkg"), true);
-      assert.equal(exists(join(root, ".local", "share", "agentium", "pi-packages")), true);
+      assert.equal(exists(join(root, ".local", "share", "agents", "pi-packages")), true);
     });
   });
 
@@ -1493,7 +1537,7 @@ const check = file.content.includes("\\nrename from ") || file.content.startsWit
       assert.ok(harness);
 
       writeFile(
-        join(root, ".local", "share", "agentium", "sync-managed", "codex.json"),
+        join(root, ".local", "share", "agents", "sync-managed", "codex.json"),
         `[
   "good.txt",
   "..",
@@ -1506,7 +1550,7 @@ const check = file.content.includes("\\nrename from ") || file.content.startsWit
 
       const names = await call<string[]>(
         loadRecordedEntryNames,
-        join(root, ".local", "share", "agentium", "sync-managed", "codex.json"),
+        join(root, ".local", "share", "agents", "sync-managed", "codex.json"),
       );
       assert.deepEqual(names, ["good.txt"]);
 
@@ -1563,7 +1607,7 @@ const check = file.content.includes("\\nrename from ") || file.content.startsWit
   test("managed_state_malformed_json_is_recoverable", async () => {
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
-      const statePath = join(root, ".local", "share", "agentium", "sync-managed", "codex.json");
+      const statePath = join(root, ".local", "share", "agents", "sync-managed", "codex.json");
       writeFile(statePath, "{not valid json");
 
       const recovered = await call<string[]>(loadRecordedEntryNames, statePath);

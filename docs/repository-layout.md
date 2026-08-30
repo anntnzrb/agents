@@ -48,8 +48,9 @@ Other jobs use fixed generated targets:
 
 | Path | Owner |
 | --- | --- |
-| `~/.local/share/agentium/model-catalog/catalog.json` | Shared model-catalog job |
-| `~/.local/share/agentium/sync-managed/` | Managed ownership and hook state |
+| `~/.local/share/agents/sync/` | Installed sync runtime |
+| `~/.local/share/agents/model-catalog/catalog.json` | Shared model-catalog job |
+| `~/.local/share/agents/sync-managed/` | Managed ownership and hook state |
 | `~/.local/bin/` | Harness and managed-tool wrappers |
 
 Sync replaces managed content in these targets. Make durable changes in the matching committed source.

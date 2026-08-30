@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "@anntnzrb/agentium",
+      "name": "agents-sync",
       "dependencies": {
         "@effect/platform-bun": "^4.0.0-rc.111",
         "effect": "^4.0.0-rc.111",

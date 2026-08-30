@@ -59,6 +59,10 @@ test("integration_happy_path_matches_expected_outputs", () => {
     assert.equal(cliProxyConfig["codex-api-key"][0]["api-key"], "upstream-secret");
     assert.equal(cliProxyConfig["codex-api-key"][0]["x-credential-pool"], undefined);
     assert.equal(lstatSync(join(home, ".cli-proxy-api", "config.yaml")).mode & 0o777, 0o600);
+    assert.equal(
+      existsSync(join(home, ".local", "share", "agents", "cliproxyapi", "client-api-key")),
+      false,
+    );
     for (const path of [
       join(home, ".codex", "config.toml"),
       join(home, ".config", "opencode", "opencode.jsonc"),
@@ -69,13 +73,17 @@ test("integration_happy_path_matches_expected_outputs", () => {
       assert.equal(content.includes("http://old-gateway.example.test/v1"), true, path);
       assert.equal(content.includes("CLIPROXY_CLIENT_BASE_URL"), false, path);
     }
+    assert.equal(
+      readFileSync(join(home, ".local", "share", "agents", "sync", "src", "cli.ts"), "utf8"),
+      "export {};\n",
+    );
     assert.equal(existsSync(join(home, ".pi", "agent", "auth.json")), true);
     for (const command of ["codex", "dsh", "opencode", "pi", "omp"]) {
       const wrapper = join(home, ".local", "bin", command);
-      assert.equal(
-        readFileSync(wrapper, "utf8").includes("bun x '@anntnzrb/agentium@latest'"),
-        true,
-      );
+      assert.equal(existsSync(wrapper), true, wrapper);
+      assert.equal(readFileSync(wrapper, "utf8").includes("agents-managed-wrapper:v1"), true);
+      assert.equal(readFileSync(wrapper, "utf8").includes(".local/share/agents/sync"), true);
+      assert.equal(readFileSync(wrapper, "utf8").includes(".config/agents/sync"), false);
     }
   });
 });
@@ -97,9 +105,9 @@ test("integration_unavailable_client_preserves_all_cliproxy_artifacts", () => {
     writeDeployment(home, "different-host", "http://127.0.0.1:1/v1");
 
     const configPath = join(home, ".cli-proxy-api", "config.yaml");
-    const catalogPath = join(home, ".local", "share", "agentium", "model-catalog", "catalog.json");
+    const catalogPath = join(home, ".local", "share", "agents", "model-catalog", "catalog.json");
     mkdirSync(join(home, ".cli-proxy-api"), { recursive: true });
-    mkdirSync(join(home, ".local", "share", "agentium", "model-catalog"), { recursive: true });
+    mkdirSync(join(home, ".local", "share", "agents", "model-catalog"), { recursive: true });
     writeFileSync(configPath, "existing-server-config\n", { mode: 0o600 });
     writeFileSync(catalogPath, '{"models":[{"id":"existing"}]}\n', { mode: 0o600 });
 
@@ -145,9 +153,7 @@ test("integration_package_bootstrap_patches_settings_and_cache_paths", () => {
     const settings = readFileSync(join(home, ".pi", "agent", "settings.json"), "utf8");
     assert.equal(settings.includes("source-pkg"), true);
     assert.equal(settings.includes("build-pkg"), true);
-    const cacheSnapshot = snapshotSelected(
-      join(home, ".local", "share", "agentium", "pi-packages"),
-    );
+    const cacheSnapshot = snapshotSelected(join(home, ".local", "share", "agents", "pi-packages"));
     assert.equal(
       cacheSnapshot.some((entry) => entry.path.includes("source-pkg")),
       true,
@@ -165,6 +171,7 @@ test("integration_invalid_package_json_fails_package_bootstrap", () => {
     const badRepo = join(root, "repos", "bad-pkg");
     mkdirSync(badRepo, { recursive: true });
     writeFileSync(join(badRepo, "package.json"), "{not valid json");
+    initGitRepo(badRepo);
 
     writeFileSync(
       join(home, ".config", "agents", "harnesses", "pi", "agent", "packages.json"),
@@ -257,10 +264,6 @@ codex-api-key:
   - x-credential-pool: fixture
     prefix: fixture
 `,
-  );
-  writeFileSync(
-    join(home, ".config", "agents", "tools", "cliproxyapi", "panel.html"),
-    "<!doctype html><html><body>management panel</body></html>\n",
   );
   writeFileSync(
     join(home, ".config", "agents", "secrets.local.json"),
@@ -387,6 +390,26 @@ mkdirSync("dist", { recursive: true });
 writeFileSync("dist/index.js", "export default {}\\n");
 `,
   );
+  initGitRepo(sourceRepo);
+  initGitRepo(buildRepo);
+}
+
+function initGitRepo(repoPath: string): void {
+  const commands = [
+    ["git", "init"],
+    ["git", "config", "user.name", "Test User"],
+    ["git", "config", "user.email", "test@example.com"],
+    ["git", "add", "."],
+    ["git", "commit", "-m", "init"],
+  ];
+  for (const command of commands) {
+    const result = Bun.spawnSync(command, {
+      cwd: repoPath,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    assert.equal(result.exitCode, 0, result.stderr.toString() || result.stdout.toString());
+  }
 }
 
 function runSyncProcess(home: string): RunResult {
@@ -418,8 +441,8 @@ function snapshotHome(home: string): SnapshotEntry[] {
     ".mcporter",
     ".summarize",
     ".cli-proxy-api",
-    ".local/share/agentium/sync-managed",
-    ".local/share/agentium/pi-packages",
+    ".local/share/agents/sync-managed",
+    ".local/share/agents/pi-packages",
     ".local/bin",
   ];
   const entries: SnapshotEntry[] = [];

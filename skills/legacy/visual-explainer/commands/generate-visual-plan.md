@@ -23,4 +23,4 @@ Read relevant repo files before planning. Identify entry points, existing patter
 
 Use hierarchy: overview and architecture dominate; detailed file/test/reference sections stay compact or collapsible. Follow the skill’s Mermaid, table, overflow, and delivery rules.
 
-Write to `~/.local/share/agentium/visual-explainer/diagrams/` and open in browser.
+Write to `~/.local/share/agents/visual-explainer/diagrams/` and open in browser.

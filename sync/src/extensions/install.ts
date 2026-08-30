@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { installInferredImportPackages } from "@packages/process.ts";
 import { assertNever } from "@runtime/errors.ts";
-import { type CommandOutcome, pickBunRunner, runCommandOutcome } from "@runtime/process.ts";
+import { type CommandOutcome, commandExists, runCommandOutcome } from "@runtime/process.ts";
 
 export const iterExtensionPackages = async (root: string): Promise<string[]> => {
   const stat = await fs.stat(root).catch(() => undefined);
@@ -51,10 +51,8 @@ const needsNodeInstall = async (packageDir: string): Promise<boolean> => {
   return packageJson && !nodeModules;
 };
 
-const chooseInstaller = async (): Promise<string[] | undefined> => {
-  const bun = await pickBunRunner();
-  return bun ? [bun, "install"] : undefined;
-};
+const chooseInstaller = async (): Promise<string[] | undefined> =>
+  (await commandExists("bun")) ? ["bun", "install"] : undefined;
 
 export const installExtensionDeps = async (
   root: string,

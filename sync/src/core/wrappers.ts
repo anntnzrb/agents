@@ -9,7 +9,6 @@ import { TOOL_LAUNCHERS, toolLauncherDefaultArgs } from "./tool-launchers.ts";
 export const UNIX_WRAPPER_DIR = [".local", "bin"] as const;
 export const WRAPPER_STATE_FILE = "wrappers.json";
 export const WRAPPER_MARKER = "agents-managed-wrapper:v1";
-const SYNC_PACKAGE_SPEC = "@anntnzrb/agentium@latest";
 
 const WrapperStateSchema = Schema.Struct({
   version: Schema.Literal(1),
@@ -46,7 +45,7 @@ export function wrapperPath(syncEnv: Pick<SyncEnv, "home">, harness: Harness): s
 }
 
 export function wrapperDestinations(
-  syncEnv: Pick<SyncEnv, "home" | "harnesses">,
+  syncEnv: Pick<SyncEnv, "home" | "runtimeHome" | "harnesses">,
 ): readonly WrapperDestination[] {
   const harnessWrappers: HarnessWrapperDestination[] = syncEnv.harnesses.map((harness) => {
     const destination = wrapperPath(syncEnv, harness);
@@ -58,13 +57,14 @@ export function wrapperDestinations(
   });
   const toolWrappers: WrapperDestination[] = TOOL_LAUNCHERS.map((tool) => ({
     path: path.join(wrapperDirectory(syncEnv), tool.bin),
-    content: renderLaunchWrapper(tool.id, toolLauncherDefaultArgs(syncEnv, tool)),
+    content: renderLaunchWrapper(syncEnv, tool.id, toolLauncherDefaultArgs(syncEnv, tool)),
   }));
   return [...harnessWrappers, ...toolWrappers];
 }
 
-export function renderWrapper(_syncEnv: Pick<SyncEnv, "home">, harness: Harness): string {
+export function renderWrapper(syncEnv: Pick<SyncEnv, "runtimeHome">, harness: Harness): string {
   return renderLaunchWrapper(
+    syncEnv,
     harness.sourceName,
     harness.launcher.defaultArgs,
     harness.launcher.env,
@@ -72,10 +72,12 @@ export function renderWrapper(_syncEnv: Pick<SyncEnv, "home">, harness: Harness)
 }
 
 function renderLaunchWrapper(
+  syncEnv: Pick<SyncEnv, "runtimeHome">,
   sourceName: string,
   defaultArgs: readonly string[],
   env?: Record<string, string>,
 ): string {
+  const syncScript = path.join(syncEnv.runtimeHome, "sync", "src", "cli.ts");
   const args = defaultArgs.map(shellQuote).join(" ");
   const envLines = env
     ? Object.entries(env).map(([key, value]) => `export ${key}=${shellQuote(value)}`)
@@ -84,12 +86,12 @@ function renderLaunchWrapper(
     "#!/bin/sh",
     `# ${WRAPPER_MARKER}`,
     "set -eu",
-    `if ! command -v bun >/dev/null 2>&1; then`,
-    "  echo 'agents: Bun is required to run @anntnzrb/agentium' >&2",
+    `if [ ! -f ${shellQuote(syncScript)} ]; then`,
+    "  echo 'agents: sync runtime is missing; run sync from the agents repository' >&2",
     "  exit 127",
     "fi",
     ...envLines,
-    `exec bun x ${shellQuote(SYNC_PACKAGE_SPEC)} launch ${shellQuote(sourceName)} --${args ? ` ${args}` : ""} "$@"`,
+    `exec bun ${shellQuote(syncScript)} launch ${shellQuote(sourceName)} --${args ? ` ${args}` : ""} "$@"`,
     "",
   ].join("\n");
 }

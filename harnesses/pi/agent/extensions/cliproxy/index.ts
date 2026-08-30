@@ -6,7 +6,6 @@ import type {
   ExtensionAPI,
   ProviderModelConfig,
 } from "@earendil-works/pi-coding-agent";
-import type * as AgentiumRuntime from "@anntnzrb/agentium/runtime/model-catalog-client";
 import { piThinkingLevelMap } from "./thinking-levels.ts";
 
 interface CatalogModel {
@@ -26,7 +25,10 @@ interface CatalogModel {
 }
 
 interface CatalogModule {
-  readonly resolveLiveModelCatalog: typeof AgentiumRuntime.resolveLiveModelCatalog;
+  readonly resolveLiveModelCatalog: (options: {
+    readonly catalogPath: string;
+    readonly baseUrl: string;
+  }) => Promise<readonly CatalogModel[]>;
 }
 
 export class CatalogImportError extends Schema.TaggedError<CatalogImportError>()("CatalogImportError", {
@@ -55,26 +57,23 @@ const CATALOG_PATH = join(
   homedir(),
   ".local",
   "share",
-  "agentium",
+  "agents",
   "model-catalog",
   "catalog.json",
 );
 const CLIPROXY_BASE_URL = "${CLIPROXY_CLIENT_BASE_URL}";
-// Resolve the installed runtime from the generated harness dependency root.
 const CATALOG_MODULE = pathToFileURL(
   join(
     homedir(),
-    ".pi",
-    "agent",
-    "extensions",
-    "node_modules",
-    "@anntnzrb",
-    "agentium",
-    "dist",
+    ".local",
+    "share",
+    "agents",
+    "sync",
+    "src",
     "runtime",
-    "model-catalog-client.js",
+    "model-catalog-client.ts",
   ),
-);
+).href;
 
 export const loadCatalogModule = Effect.fn("loadCatalogModule")(function*(): Effect.fn.Return<
   CatalogModule,
@@ -82,7 +81,7 @@ export const loadCatalogModule = Effect.fn("loadCatalogModule")(function*(): Eff
 > {
   return yield* Effect.tryPromise({
     try: () => import(CATALOG_MODULE) as Promise<CatalogModule>,
-    catch: (cause) => new CatalogImportError({ path: CATALOG_MODULE.href, cause }),
+    catch: (cause) => new CatalogImportError({ path: CATALOG_MODULE, cause }),
   });
 });
 

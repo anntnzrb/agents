@@ -56,7 +56,7 @@ const visualExplainerParameters = {
     action: {
       type: "string",
       enum: ["prepare", "render"],
-      description: "Choose prepare to plan a visual explanation, or render to write complete HTML to ~/.local/share/agentium/visual-explainer/diagrams/.",
+      description: "Choose prepare to plan a visual explanation, or render to write complete HTML to ~/.local/share/agents/visual-explainer/diagrams/.",
     },
     topic: {
       type: "string",
@@ -267,7 +267,7 @@ async function renderVisualExplanation(params: VisualExplainerParams, signal?: A
   const filename = outputFilename(params.filename);
   assertHtmlDocument(params.html);
 
-  const outputDir = join(homedir(), ".local", "share", "agentium", "visual-explainer", "diagrams");
+  const outputDir = join(homedir(), ".local", "share", "agents", "visual-explainer", "diagrams");
   const outputPath = join(outputDir, filename);
   mkdirSync(outputDir, { recursive: true });
   if (lstatSync(outputDir).isSymbolicLink()) throw new Error(`${outputDir} must not be a symlink`);
@@ -303,13 +303,13 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool<typeof visualExplainerParameters, VisualExplainerDetails>({
     name: "visual_explainer",
     label: "Visual Explainer",
-    description: "Use with action=prepare after generating or reviewing a plan, architecture, diff, or substantial implementation when a visual explanation would help; use action=render after the complete HTML is ready to write it to ~/.local/share/agentium/visual-explainer/diagrams/ and optionally open it.",
+    description: "Use with action=prepare after generating or reviewing a plan, architecture, diff, or substantial implementation when a visual explanation would help; use action=render after the complete HTML is ready to write it to ~/.local/share/agents/visual-explainer/diagrams/ and optionally open it.",
     promptSnippet: "Plan or render visual-explainer HTML. Ask before action=prepare unless visuals were explicitly requested; use action=render as the final write/open step with complete HTML.",
     promptGuidelines: [
       "After generating or reviewing a plan, architecture, diff, or substantial implementation, consider offering a visual explanation if it would clarify the work for the user.",
       "Because visual explanations can consume many tokens, ask before calling visual_explainer with action=prepare unless the user explicitly requested a diagram, visual review, recap, or visual plan.",
       "If visual_explainer action=prepare recommends subagent scouting and the subagent tool is available, gather context first, then synthesize complete HTML and finish with visual_explainer action=render.",
-      "Use visual_explainer action=render only after generating a complete visual-explainer HTML document; pass a basename-style filename because it writes under ~/.local/share/agentium/visual-explainer/diagrams/.",
+      "Use visual_explainer action=render only after generating a complete visual-explainer HTML document; pass a basename-style filename because it writes under ~/.local/share/agents/visual-explainer/diagrams/.",
     ],
     parameters: visualExplainerParameters,
     executionMode: "sequential",

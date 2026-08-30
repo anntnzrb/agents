@@ -30,4 +30,4 @@ For each proposed change, verify whether referenced files/functions/types exist,
 
 Use current-vs-planned visual language. Include responsive nav. Follow the skill’s Mermaid, overflow, and evidence rules.
 
-Write to `~/.local/share/agentium/visual-explainer/diagrams/` and open in browser.
+Write to `~/.local/share/agents/visual-explainer/diagrams/` and open in browser.

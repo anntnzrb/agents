@@ -1,6 +1,6 @@
 # Sync reference
 
-Sync reconciles the repository at `~/.config/agents` with harness homes and managed state on macOS and Linux. The public source entrypoint is `sync/src/cli.ts` and requires an explicit Bun runner.
+Sync reconciles the repository at `~/.config/agents` with harness homes and installed runtime state on macOS and Linux. The public entrypoint is `sync/src/cli.ts` and requires an explicit Bun runner.
 
 A gateway host has an OS hostname that matches `server.hostname` in `tools/cliproxyapi/deployment.json`. Every other supported host is a client host.
 
@@ -11,7 +11,7 @@ A gateway host has an OS hostname that matches `server.hostname` in `tools/clipr
 | `bun ./sync/src/cli.ts` | Runs a normal reconciliation |
 | `bun ./sync/src/cli.ts sync` | Runs the same normal reconciliation |
 | `bun ./sync/src/cli.ts sync --refresh-models` | Bypasses model-catalog freshness windows and rejects stale network data |
-| `bun x @anntnzrb/agentium@latest launch <name> -- <arguments>` | Syncs when the source is available, prepares the harness or tool package, and launches it |
+| `bun ~/.local/share/agents/sync/src/cli.ts launch <name> -- <arguments>` | Syncs when the source is available, prepares the harness or tool package, and launches it |
 
 Unknown commands and invalid arguments exit with status `2`. A manual sync exits with status `1` after a fatal reconciliation error.
 
@@ -21,13 +21,13 @@ A manual sync runs these stages in order:
 
 1. Build the sync plan and managed cleanup plan.
 2. Remove stale top-level harness entries that earlier sync runs owned.
-3. Reconcile source files, shared assets, skills, and generated configuration.
+3. Install the sync runtime and reconcile source files, shared assets, skills, and generated configuration.
 4. On the gateway host, prepare managed tools from the committed release manifest.
 5. Reconcile harness, tool, and managed-tool wrappers. Remove stale owned CLIProxyAPI wrappers on client hosts.
 6. Record managed harness entries.
 7. Run package-bootstrap and extension-dependency hooks.
 
-The process lock is `~/.local/share/agentium/sync-managed/sync.lock`. A second manual sync reports the lock and exits with status `0` without changing targets. A watchdog ends a manual sync after 15 minutes with status `124`.
+The process lock is `~/.local/share/agents/sync-managed/sync.lock`. A second manual sync reports the lock and exits with status `0` without changing targets. A watchdog ends a manual sync after 15 minutes with status `124`.
 
 ## File reconciliation
 
@@ -53,7 +53,7 @@ The configuration job reads `tools/cliproxyapi/config.yaml.tmpl` and `tools/clip
 On the gateway host, the job writes these private files with mode `0600`:
 
 - `~/.cli-proxy-api/config.yaml`
-- `~/.local/share/agentium/model-catalog/catalog.json`
+- `~/.local/share/agents/model-catalog/catalog.json`
 
 On a client host, the job never writes the server configuration. A client without local secrets builds the model catalog from the gateway `/v1/models` response, the rich gateway response, and [models.dev](https://models.dev/). A client with local secrets also discovers the configured API-key sources.
 
@@ -82,13 +82,11 @@ Each cache entry records the request URL. Sync ignores a cache entry created for
 
 After catalog publication, sync removes the obsolete `~/.cache/agents/model-catalog/catalog.json` file.
 
-## Registry runtime
+## Installed runtime
 
-The sync engine is published as `@anntnzrb/agentium` and resolved with Bun's package runner. Generated wrappers call `bun x @anntnzrb/agentium@latest launch <name> -- <arguments>`.
+Sync copies `sync/src/`, `sync/tsconfig.json`, `sync/package.json`, and `sync/bun.lock` to `~/.local/share/agents/sync/`, then runs `bun install --frozen-lockfile --production` there so the installed copy resolves its runtime dependencies. Generated wrappers execute this installed copy.
 
-The package is cached by Bun. A machine needs Bun and either a cached package or network access to npm for the first launch. Sync reads the repository source at `~/.config/agents/` when it is available.
-
-The sync engine itself uses Bun for registry metadata, package installation, archive extraction, and local filesystem work. It does not invoke the `npm`, `git`, `gh`, `tar`, or `uv` executables. Package bootstrap accepts local source directories and GitHub repository sources; other VCS URLs are not supported by the Bun-only runtime. A harness package or one of its configured hooks may still require its own runtime or tools.
+Only sync reads the repository source directly. Harness configuration and runtime adapters read generated homes or files under `~/.local/share/agents`.
 
 ## Managed CLIProxyAPI release
 
@@ -100,7 +98,7 @@ The cache path has this form, where `<cache-home>` is `XDG_CACHE_HOME` or `~/.ca
 <cache-home>/github-tools/cliproxyapi/versions/<version>/<platform>-<architecture>/
 ```
 
-Sync verifies the SHA-256 checksum, extracts the named executable with Bun's archive API, writes a receipt, and generates a stable wrapper. The current manifest contains macOS ARM64 and Linux x86_64 assets.
+Sync verifies the SHA-256 checksum, extracts only the named executable, writes a receipt, and generates a stable wrapper. The current manifest contains macOS ARM64 and Linux x86_64 assets.
 
 Sync prepares the managed CLIProxyAPI binary and wrapper only on the gateway host. Client hosts remove a previously owned `cli-proxy-api` wrapper on the next sync.
 
@@ -108,7 +106,7 @@ Sync prepares the managed CLIProxyAPI binary and wrapper only on the gateway hos
 
 Harness wrappers run a best-effort sync before launch. A failed sync, an active sync lock, or an unavailable repository does not block a cached harness package.
 
-The launcher resolves the adapter's npm dist-tag over the npm registry HTTP API and installs the resolved version with the Bun package manager into a versioned cache. The launcher keeps the current and previous known-good versions. If version resolution or a new package installation fails, the launcher uses the current valid cache. A first launch without a valid cache fails.
+The launcher resolves the adapter's npm dist-tag and installs the resolved version into a versioned cache. The launcher keeps the current and previous known-good versions. If version resolution or a new package installation fails, the launcher uses the current valid cache. A first launch without a valid cache fails.
 
 ## Tool launchers
 

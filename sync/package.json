@@ -1,27 +1,8 @@
 {
-  "name": "@anntnzrb/agentium",
-  "version": "0.1.0",
+  "name": "agents-sync",
+  "private": true,
   "type": "module",
-  "exports": {
-    ".": "./dist/cli.js",
-    "./runtime/model-catalog-client": "./dist/runtime/model-catalog-client.js"
-  },
-  "imports": {
-    "#package.json": "./package.json"
-  },
-  "bin": {
-    "agentium": "./dist/cli.js"
-  },
-  "files": [
-    "dist"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/anntnzrb/agents.git",
-    "directory": "sync"
-  },
   "scripts": {
-    "build": "bun build ./src/cli.ts --outfile ./dist/cli.js --target bun && bun build ./src/runtime/model-catalog-client.ts --outfile ./dist/runtime/model-catalog-client.js --target bun",
     "check": "biome check --error-on-warnings . && oxlint .",
     "check:write": "biome check --write --error-on-warnings . && oxlint --fix .",
     "format": "biome format --write . && oxfmt .",
