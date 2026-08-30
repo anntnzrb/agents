@@ -50,10 +50,17 @@ For changes routed to `docs/`:
 
 Documentation-only changes must still preserve navigation and factual accuracy. Do not generate filler pages, duplicate existing guidance, or cargo-cult documentation templates.
 
+## Execution model
+
+- Every normal execution of the synchronization application MUST use the remotely distributed `@anntnzrb/agentium` release through the generated wrapper, never the local development implementation.
+- The release artifact MUST consume the host's current harness and configuration inputs. Changes to those inputs MUST NOT require rebuilding or republishing the synchronization application.
+- The synchronization engine's runtime MUST require Bun only. It MUST NOT invoke development tooling or the `npm`, `git`, `gh`, `tar`, or `uv` executables. Harnesses and their hooks may have separate runtime requirements.
+
 ## Sync Contract
 
-- Public sync entrypoint: `sync/src/cli.ts`
-- Invoke it with an explicit Bun runner, e.g. `bun ./sync/src/cli.ts` from repo root
+- Development entrypoint: `sync/src/cli.ts`
+- Operational entrypoint: the remotely distributed release artifact
+- Invoke the development entrypoint with an explicit Bun runner, e.g. `bun ./sync/src/cli.ts` from repo root
 - NEVER add `bin/` shell trampolines for sync
 - Use TDD
 

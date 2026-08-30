@@ -102,6 +102,12 @@ bun run build
 ```
 This bundles `sync/src/cli.ts` into `sync/dist/cli.js` and `sync/src/runtime/model-catalog-client.ts` into `sync/dist/runtime/model-catalog-client.js`. Local development commands continue to run from source via `bun ./sync/src/cli.ts`. Published wrappers resolve `@anntnzrb/agentium` from npm.
 
+## Runtime boundary
+
+Generated wrappers and normal harness invocations use the published package, not `sync/src/cli.ts` or a local development bundle. The published sync engine reads the current harness and configuration files from the host's `~/.config/agents/` tree, so those files can change without rebuilding the package.
+
+The sync engine requires Bun only. It uses Bun's HTTP, package-manager, filesystem, and archive APIs instead of invoking `npm`, `git`, `gh`, `tar`, or `uv`. A harness package or configured hook can have separate runtime requirements.
+
 ## Package release and publication
 
 The `@anntnzrb/agentium` package is published automatically to npm via the GitHub Actions workflow at `.github/workflows/publish-package.yml`.

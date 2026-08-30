@@ -45,7 +45,7 @@ Sync writes wrappers under `~/.local/bin/` and expects that directory on `PATH`.
 
 Each wrapper calls `bun x @anntnzrb/agentium@latest launch <name>`, prepares the cached harness npm package, forwards all arguments, and returns the harness exit status.
 
-The sync package is resolved from npm and cached by Bun. If Bun is unavailable, the wrapper exits with status `127`. If the package is neither cached nor reachable from npm, Bun reports the launch failure.
+The sync engine is resolved from npm and cached by Bun. The engine requires Bun, but not the local `sync/src` checkout or the npm, git, gh, tar, or uv executables. If the package is neither cached nor reachable from npm, Bun reports the launch failure.
 
 The wrapper command is `launcher.bin`. The wrapper passes the adapter `id` to the registry-backed sync package, so the command and source directory name can differ.
 

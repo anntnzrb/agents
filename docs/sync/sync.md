@@ -88,6 +88,8 @@ The sync engine is published as `@anntnzrb/agentium` and resolved with Bun's pac
 
 The package is cached by Bun. A machine needs Bun and either a cached package or network access to npm for the first launch. Sync reads the repository source at `~/.config/agents/` when it is available.
 
+The sync engine itself uses Bun for registry metadata, package installation, archive extraction, and local filesystem work. It does not invoke the `npm`, `git`, `gh`, `tar`, or `uv` executables. Package bootstrap accepts local source directories and GitHub repository sources; other VCS URLs are not supported by the Bun-only runtime. A harness package or one of its configured hooks may still require its own runtime or tools.
+
 ## Managed CLIProxyAPI release
 
 `tools/cliproxyapi/release.json` selects the GitHub repository, version, platform archive, binary, and checksum. Sync downloads an archive only when the cached executable or its receipt does not match the manifest.
@@ -98,7 +100,7 @@ The cache path has this form, where `<cache-home>` is `XDG_CACHE_HOME` or `~/.ca
 <cache-home>/github-tools/cliproxyapi/versions/<version>/<platform>-<architecture>/
 ```
 
-Sync verifies the SHA-256 checksum, extracts only the named executable, writes a receipt, and generates a stable wrapper. The current manifest contains macOS ARM64 and Linux x86_64 assets.
+Sync verifies the SHA-256 checksum, extracts the named executable with Bun's archive API, writes a receipt, and generates a stable wrapper. The current manifest contains macOS ARM64 and Linux x86_64 assets.
 
 Sync prepares the managed CLIProxyAPI binary and wrapper only on the gateway host. Client hosts remove a previously owned `cli-proxy-api` wrapper on the next sync.
 
@@ -106,7 +108,7 @@ Sync prepares the managed CLIProxyAPI binary and wrapper only on the gateway hos
 
 Harness wrappers run a best-effort sync before launch. A failed sync, an active sync lock, or an unavailable repository does not block a cached harness package.
 
-The launcher resolves the adapter's npm dist-tag and installs the resolved version into a versioned cache. The launcher keeps the current and previous known-good versions. If version resolution or a new package installation fails, the launcher uses the current valid cache. A first launch without a valid cache fails.
+The launcher resolves the adapter's npm dist-tag over the npm registry HTTP API and installs the resolved version with the Bun package manager into a versioned cache. The launcher keeps the current and previous known-good versions. If version resolution or a new package installation fails, the launcher uses the current valid cache. A first launch without a valid cache fails.
 
 ## Tool launchers
 
