@@ -38,6 +38,7 @@ export interface LauncherRuntime {
     distTag: string,
     timeoutMs: number,
   ) => Promise<string>;
+  readonly fetch?: FetchImplementation;
   readonly run?: (
     command: readonly string[],
     cwd: string | undefined,
@@ -46,6 +47,8 @@ export interface LauncherRuntime {
     env?: Record<string, string>,
   ) => Promise<LauncherProcessResult>;
 }
+
+type FetchImplementation = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 export interface PreparePackageOptions {
   readonly home: string;
@@ -99,7 +102,7 @@ export async function prepareNpmPackage(
       const resolve =
         runtime.resolveVersion ??
         ((packageName: string, tag: string, timeout: number) =>
-          resolveVersion(packageName, tag, timeout));
+          resolveVersion(packageName, tag, timeout, runtime.fetch));
       resolvedVersion = validateResolvedVersion(await resolve(spec.package, distTag, timeoutMs));
     } catch (error) {
       if (!cached) {
@@ -128,15 +131,13 @@ export async function prepareNpmPackage(
         stageDir = fs.mkdtempSync(path.join(layout.versionsDir, ".stage."));
         const install = await (runtime.run ?? runLauncherProcess)(
           [
-            "npm",
+            process.execPath,
             "install",
-            "--prefix",
+            "--cwd",
             stageDir,
             "--no-save",
-            "--no-package-lock",
-            "--no-audit",
-            "--no-fund",
-            "--loglevel=error",
+            "--no-progress",
+            "--no-summary",
             `${spec.package}@${resolvedVersion}`,
           ],
           undefined,
@@ -144,7 +145,7 @@ export async function prepareNpmPackage(
           "pipe",
         );
         if (install.timedOut || install.exitCode !== 0) {
-          throw new Error(`npm install failed: ${detailFromResult(install)}`);
+          throw new Error(`bun install failed: ${detailFromResult(install)}`);
         }
 
         const installedBin = packageBinPath(stageDir, spec.bin);
@@ -261,17 +262,44 @@ async function resolveVersion(
   packageName: string,
   distTag: string,
   timeoutMs: number,
+  fetchImpl: FetchImplementation = fetch,
 ): Promise<string> {
-  const result = await runLauncherProcess(
-    ["npm", "view", `${packageName}@${distTag}`, "version"],
-    undefined,
-    timeoutMs,
-    "pipe",
+  const response = await fetchImpl(
+    `https://registry.npmjs.org/${encodeURIComponent(packageName)}`,
+    {
+      headers: { accept: "application/vnd.npm.install-v1+json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    },
   );
-  if (result.timedOut || result.exitCode !== 0) {
-    throw new Error(`could not resolve ${packageName}@${distTag}`);
+  if (!response.ok) {
+    throw new Error(
+      `could not resolve ${packageName}@${distTag} (registry HTTP ${response.status})`,
+    );
   }
-  return result.stdout.replace(/[\r\n]+/g, "").trim();
+  const metadata: unknown = await response.json();
+  if (
+    typeof metadata !== "object" ||
+    metadata === null ||
+    Array.isArray(metadata) ||
+    !("dist-tags" in metadata)
+  ) {
+    throw new Error(`registry metadata has no dist-tags for ${packageName}`);
+  }
+  const distTags = metadata["dist-tags"];
+  if (typeof distTags !== "object" || distTags === null || Array.isArray(distTags)) {
+    throw new Error(`registry metadata has no dist-tags for ${packageName}`);
+  }
+  let version: unknown;
+  for (const [tag, candidate] of Object.entries(distTags)) {
+    if (tag === distTag) {
+      version = candidate;
+      break;
+    }
+  }
+  if (typeof version !== "string" || version.length === 0) {
+    throw new Error(`registry has no ${distTag} version for ${packageName}`);
+  }
+  return version;
 }
 
 async function runLauncherProcess(
@@ -324,7 +352,7 @@ async function acquireCacheLock(layout: NpmCacheLayout, timeoutMs: number): Prom
       return lock;
     }
     if (Date.now() - startedAt >= timeoutMs) {
-      throw new Error(`timed out waiting for npm cache lock: ${layout.lockFile}`);
+      throw new Error(`timed out waiting for package cache lock: ${layout.lockFile}`);
     }
     await Bun.sleep(25);
   }

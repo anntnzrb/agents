@@ -37,11 +37,17 @@ beforeEach(() => {
   spyOn(console, "error").mockImplementation(() => {});
 });
 
-test("npm_launcher_resolves_latest_and_caches_current_previous_without_network", async () => {
+test("npm_launcher_resolves_latest_through_registry_and_caches_current_previous", async () => {
   await withTempHome(async (home) => {
     const calls: string[][] = [];
+    const registryRequests: string[] = [];
     const runtime = {
-      resolveVersion: async (): Promise<string> => "1.2.3",
+      fetch: async (input: string | URL | Request): Promise<Response> => {
+        registryRequests.push(
+          typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+        );
+        return Response.json({ "dist-tags": { latest: "1.2.3" } });
+      },
       run: async (
         command: readonly string[],
         _cwd: string | undefined,
@@ -49,7 +55,7 @@ test("npm_launcher_resolves_latest_and_caches_current_previous_without_network",
         _stdio: "pipe" | "inherit",
       ): Promise<LauncherProcessResult> => {
         calls.push([...command]);
-        if (command[0] === "npm") {
+        if (command[0] === process.execPath) {
           const stage = command[3]!;
           const executable = join(stage, "node_modules", ".bin", "demo");
           mkdirSync(join(stage, "node_modules", ".bin"), { recursive: true });
@@ -75,13 +81,14 @@ test("npm_launcher_resolves_latest_and_caches_current_previous_without_network",
       calls.some((command) => command.includes("demo-package@1.2.3")),
       true,
     );
+    assert.deepEqual(registryRequests, ["https://registry.npmjs.org/demo-package"]);
 
     const second = await prepareNpmPackage(
       { tool: "demo", package: "demo-package", bin: "demo" },
       { home, cacheHome: join(home, "cache"), runtime, timeoutMs: 1000 },
     );
     assert.equal(second.currentBin, prepared.currentBin);
-    assert.equal(calls.filter((command) => command[0] === "npm").length, 1);
+    assert.equal(calls.filter((command) => command[0] === process.execPath).length, 1);
   });
 });
 
@@ -103,7 +110,7 @@ test("npm_launcher_rotates_previous_and_falls_back_to_last_known_good", async ()
         _timeoutMs: number | undefined,
         _stdio: "pipe" | "inherit",
       ): Promise<LauncherProcessResult> => {
-        if (command[0] === "npm") {
+        if (command[0] === process.execPath) {
           if (failInstall) {
             return { exitCode: 1, stdout: "", stderr: "registry unavailable" };
           }
@@ -204,7 +211,7 @@ test("npm_launcher_separates_cache_versions_when_a_harness_changes_package", asy
         return "1.0.0";
       },
       run: async (command: readonly string[]): Promise<LauncherProcessResult> => {
-        if (command[0] === "npm") {
+        if (command[0] === process.execPath) {
           installs += 1;
           const stage = command[3]!;
           const packageSpec = command.at(-1)!;
@@ -260,7 +267,7 @@ test("interactive_harness_launch_is_unbounded_and_keeps_arguments", async () => 
         stdio: "pipe" | "inherit",
       ): Promise<LauncherProcessResult> => {
         calls.push({ command: [...command], timeout, stdio });
-        if (command[0] === "npm") {
+        if (command[0] === process.execPath) {
           const stage = command[3]!;
           const executable = join(stage, "node_modules", ".bin", "codex");
           mkdirSync(join(stage, "node_modules", ".bin"), { recursive: true });
@@ -317,7 +324,7 @@ test("harness_launch_merges_root_env_parent_env_and_adapter_env_with_precedence"
           env?: Record<string, string>,
         ): Promise<LauncherProcessResult> => {
           capturedEnv = env;
-          if (command[0] === "npm") {
+          if (command[0] === process.execPath) {
             const stage = command[3]!;
             const executable = join(stage, "node_modules", ".bin", "codex");
             mkdirSync(join(stage, "node_modules", ".bin"), { recursive: true });
@@ -380,7 +387,7 @@ test("tool_launcher_launch_uses_the_registered_npm_spec", async () => {
         stdio: "pipe" | "inherit",
       ): Promise<LauncherProcessResult> => {
         calls.push({ command: [...command], timeout, stdio });
-        if (command[0] === "npm") {
+        if (command[0] === process.execPath) {
           const stage = command[3]!;
           const executable = join(stage, "node_modules", ".bin", "mcporter");
           mkdirSync(join(stage, "node_modules", ".bin"), { recursive: true });
@@ -410,7 +417,10 @@ test("tool_launcher_launch_uses_the_registered_npm_spec", async () => {
     assert.equal(launchCall.timeout, undefined);
     assert.equal(launchCall.stdio, "inherit");
     assert.equal(
-      calls.some((entry) => entry.command[0] === "npm" && entry.command.includes("mcporter@1.0.0")),
+      calls.some(
+        (entry) =>
+          entry.command[0] === process.execPath && entry.command.includes("mcporter@1.0.0"),
+      ),
       true,
     );
 
