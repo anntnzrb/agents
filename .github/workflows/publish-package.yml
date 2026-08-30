@@ -87,13 +87,18 @@ jobs:
           }
           PACKAGE_NAME="$(node -p "require('./metadata.json').name")"
           PACKAGE_VERSION="$(node -p "require('./metadata.json').version")"
+          NPM_METADATA_FILE="$(mktemp)"
           NPM_VIEW_ERROR="$(mktemp)"
-          trap 'rm -f "$NPM_VIEW_ERROR"' EXIT
+          trap 'rm -f "$NPM_METADATA_FILE" "$NPM_VIEW_ERROR"' EXIT
           PACKAGE_EXISTS=true
-          if CURRENT_LATEST="$(npm view "$PACKAGE_NAME" dist-tags.latest --silent 2>"$NPM_VIEW_ERROR")"; then
-            :
+          if npm view "$PACKAGE_NAME" --json --silent >"$NPM_METADATA_FILE" 2>"$NPM_VIEW_ERROR"; then
+            CURRENT_LATEST="$(node -e '
+              const fs = require("node:fs");
+              const metadata = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+              process.stdout.write(metadata["dist-tags"]?.latest ?? "");
+            ' "$NPM_METADATA_FILE")"
           else
-            NPM_VIEW_OUTPUT="$(<"$NPM_VIEW_ERROR")"
+            NPM_VIEW_OUTPUT="$(<"$NPM_VIEW_ERROR")$(<"$NPM_METADATA_FILE")"
             case "$NPM_VIEW_OUTPUT" in
               *E404*|*404*) PACKAGE_EXISTS=false; CURRENT_LATEST="" ;;
               *) printf '%s\n' "$NPM_VIEW_OUTPUT" >&2; exit 1 ;;
@@ -109,11 +114,12 @@ jobs:
             exit 0
           fi
           if [[ "$PACKAGE_EXISTS" == true ]]; then
-            if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --silent >/dev/null 2>"$NPM_VIEW_ERROR"; then
+            : >"$NPM_METADATA_FILE"
+            if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --json --silent >"$NPM_METADATA_FILE" 2>"$NPM_VIEW_ERROR"; then
               echo "Version $PACKAGE_VERSION already exists; treating this as a completed rerun."
               exit 0
             fi
-            NPM_VIEW_OUTPUT="$(<"$NPM_VIEW_ERROR")"
+            NPM_VIEW_OUTPUT="$(<"$NPM_VIEW_ERROR")$(<"$NPM_METADATA_FILE")"
             case "$NPM_VIEW_OUTPUT" in
               *E404*|*404*) ;;
               *) printf '%s\n' "$NPM_VIEW_OUTPUT" >&2; exit 1 ;;
