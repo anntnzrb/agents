@@ -12,7 +12,7 @@ The repository separates committed sources, local inputs, generated targets, and
 | `skills/legacy/` | Archived skills excluded from sync |
 | `harnesses/<harness>/` | Harness-owned configuration, implementation, adjacent tests, and local documentation |
 | `tools/` | Managed-tool sources |
-| `sync/` | The Cargo workspace for the native Agentium synchronization engine and launcher |
+| `sync/` | The Bun and TypeScript sync application |
 | `docs/` | Repository workflow documentation indexed by `docs/index.md`; sync application documentation under `docs/sync/` |
 | `secrets.local.example.json` | Schema and placeholder values for local CLIProxyAPI secrets |
 | `.env.example` | Template and guidance for shared harness environment variables |
@@ -21,15 +21,18 @@ The repository separates committed sources, local inputs, generated targets, and
 
 Each harness source starts under `harnesses/<id>/`. When an adapter defines `runtimeSubdir`, sync appends that subdirectory to the source root.
 
-`sync/crates/app-core/src/harness_adapters.rs` defines the supported harness IDs, package launchers, generated homes, platforms, runtime subdirectories, and hooks. A matching directory under `harnesses/` enables that adapter on a supported platform.
+`sync/src/core/harness-adapters.ts` defines the supported harness IDs, package launchers, generated homes, platforms, runtime subdirectories, and hooks. A matching directory under `harnesses/` enables that adapter on a supported platform.
 
 ### Sync application
 
 | Path | Purpose |
 | --- | --- |
-| `sync/Cargo.toml` | Cargo workspace root manifest |
-| `sync/crates/app/` | Native CLI binary crate (`agentium`) |
-| `sync/crates/app-core/` | Core library crate containing plans, jobs, adapters, wrappers, managed tools, launchers, and model catalog engine |
+| `sync/src/cli.ts` | Public command entrypoint |
+| `sync/src/core/` | Plans, jobs, adapters, wrappers, managed tools, and model catalogs |
+| `sync/src/extensions/` | Extension dependency hooks |
+| `sync/src/packages/` | Harness package bootstrap logic |
+| `sync/src/runtime/` | Filesystem, process, lock, and error boundaries |
+| `sync/test/` | Unit and process-level integration tests for sync behavior |
 
 ## Local inputs
 

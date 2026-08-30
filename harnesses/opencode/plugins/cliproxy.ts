@@ -1,12 +1,37 @@
 import { Effect, Schema } from "effect";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import {
-  resolveLiveModelCatalog,
-  type RuntimeCatalogModel as OpenCodeCatalogModel,
-} from "./model-catalog-client.ts";
+import { pathToFileURL } from "node:url";
+import type * as AgentiumRuntime from "@anntnzrb/agentium/runtime/model-catalog-client";
 
-export type { OpenCodeCatalogModel };
+export interface OpenCodeCatalogModel {
+  readonly id: string;
+  readonly name: string;
+  readonly reasoning: boolean;
+  readonly reasoningEfforts?: readonly string[];
+  readonly input: readonly ("text" | "image")[];
+  readonly cost: {
+    readonly input: number;
+    readonly output: number;
+    readonly cacheRead: number;
+    readonly cacheWrite: number;
+  };
+  readonly contextWindow: number;
+  readonly maxTokens: number;
+}
+
+interface CatalogModule {
+  readonly resolveLiveModelCatalog: typeof AgentiumRuntime.resolveLiveModelCatalog;
+}
+
+export class CatalogImportError extends Schema.TaggedError<CatalogImportError>()("CatalogImportError", {
+  path: Schema.String,
+  cause: Schema.optional(Schema.Unknown),
+}) {
+  override get message(): string {
+    return `import model catalog client ${this.path}`;
+  }
+}
 
 export class CatalogResolutionError extends Schema.TaggedError<CatalogResolutionError>()(
   "CatalogResolutionError",
@@ -30,6 +55,20 @@ const CATALOG_PATH = join(
   "catalog.json",
 );
 const CLIPROXY_BASE_URL = "${CLIPROXY_CLIENT_BASE_URL}";
+// Resolve the installed runtime from the generated harness dependency root.
+const CATALOG_MODULE = pathToFileURL(
+  join(
+    homedir(),
+    ".config",
+    "opencode",
+    "node_modules",
+    "@anntnzrb",
+    "agentium",
+    "dist",
+    "runtime",
+    "model-catalog-client.js",
+  ),
+).href;
 
 interface OpenCodeConfig {
   provider?: Record<string, { models?: Record<string, unknown> }>;
@@ -46,13 +85,24 @@ function displayName(id: string, catalogName: string): string {
   return `${prefix} — ${title}`;
 }
 
+export const loadCatalogModule = Effect.fn("loadCatalogModule")(function*(): Effect.fn.Return<
+  CatalogModule,
+  CatalogImportError
+> {
+  return yield* Effect.tryPromise({
+    try: () => import(CATALOG_MODULE) as Promise<CatalogModule>,
+    catch: (cause) => new CatalogImportError({ path: CATALOG_MODULE, cause }),
+  });
+});
+
 export const updateOpenCodeConfig = Effect.fn("updateOpenCodeConfig")(function*(
   config: OpenCodeConfig,
-): Effect.fn.Return<void, CatalogResolutionError> {
+): Effect.fn.Return<void, CatalogImportError | CatalogResolutionError> {
   const provider = config.provider?.["cliproxy"];
   if (!provider) {
     return;
   }
+  const { resolveLiveModelCatalog } = yield* loadCatalogModule();
   const catalog = yield* Effect.tryPromise({
     try: () =>
       resolveLiveModelCatalog({

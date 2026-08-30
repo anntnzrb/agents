@@ -1,6 +1,6 @@
 # Harness adapter reference
 
-`HARNESS_ADAPTERS` in `sync/crates/app-core/src/harness_adapters.rs` defines the adapters that sync understands. A matching directory under `harnesses/` enables an adapter when the current platform appears in its `platforms` field.
+`HARNESS_ADAPTERS` in `sync/src/core/harness-adapters.ts` defines the adapters that sync understands. A matching directory under `harnesses/` enables an adapter when the current platform appears in its `platforms` field.
 
 Sync supports macOS and Linux. The current CLIProxyAPI release manifest supports macOS ARM64 and Linux x86_64.
 
@@ -43,11 +43,11 @@ API-key model IDs use the prefix declared by `x-model-sources`. OAuth model IDs 
 
 Sync writes wrappers under `~/.local/bin/` and expects that directory on `PATH`.
 
-Each wrapper invokes the native `agentium` binary (`agentium launch <name> -- <arguments>`), prepares the cached harness package, forwards all arguments, and returns the harness exit status.
+Each wrapper calls `bun x @anntnzrb/agentium@latest launch <name>`, prepares the cached harness npm package, forwards all arguments, and returns the harness exit status.
 
-The wrapper resolves `agentium` by checking `AGENTIUM_BIN`, `~/.local/share/agentium/bin/agentium`, or `PATH`.
+The sync engine is resolved from npm and cached by Bun. The engine requires Bun, but not the local `sync/src` checkout or the npm, git, gh, tar, or uv executables. If the package is neither cached nor reachable from npm, Bun reports the launch failure.
 
-The wrapper command is `launcher.bin`. The wrapper passes the adapter `id` to `agentium launch`, so the command and source directory name can differ.
+The wrapper command is `launcher.bin`. The wrapper passes the adapter `id` to the registry-backed sync package, so the command and source directory name can differ.
 
 Wrapper state lives at `~/.local/share/agentium/sync-managed/wrappers.json`. Sync removes stale wrappers only when they contain its ownership marker and remain in an allowed wrapper directory. Sync preserves unmanaged conflicts and reports them.
 
@@ -62,10 +62,10 @@ The cache keeps the current and previous known-good package versions. Newly inst
 `sync` resolves shared environment variables from `.env` in the repository root (`~/.config/agents/.env`).
 
 - If `.env` is absent, `sync` continues with an empty default environment map.
-- Variables are decoded at the `SyncEnv` boundary from `.env` without variable expansion, preserving quoted and unquoted strings as well as literal variable syntax while omitting empty values.
+- Variables are decoded at the `SyncEnv` boundary using Effect `ConfigProvider.fromDotEnvContents` without variable expansion, preserving quoted and unquoted strings as well as literal variable syntax while omitting empty values.
 - Decoded variables are forwarded to child processes for all supported harnesses (`codex`, `deepseek`, `grok`, `opencode`, `pi`, and `omp`).
 - Precedence:
   1. Explicit adapter overrides (`launcher.env`).
   2. Parent-process environment variables inherited from the invoking environment.
   3. Default values defined in `.env`.
-- Generated launch wrappers under `~/.local/bin/` do not embed `.env` values; they invoke `agentium launch` dynamically on each launch.
+- Generated launch wrappers under `~/.local/bin/` do not embed `.env` values; they dynamically invoke the registry-backed sync package on each launch.

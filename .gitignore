@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 node_modules/
 bun.lock
+!sync/bun.lock
 package-lock.json
 skills/*/*/.env
 skills/*/*/.env.local
@@ -12,7 +13,3 @@ artifacts/
 secrets.local.json
 *.skill
 sync/dist/
-target/
-.direnv/
-result
-/.pre-commit-config.yaml

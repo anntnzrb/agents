@@ -1,6 +1,14 @@
 #!/bin/sh
 set -eu
 
+if [ ! -e sync/node_modules/.bin/biome ] ||
+  [ ! -e sync/node_modules/.bin/oxlint ] ||
+  [ ! -e sync/node_modules/.bin/tsc ]; then
+  printf '%s\n' "agents: bootstrapping pinned sync dependencies locally" >&2
+  (cd sync && bun install --frozen-lockfile)
+fi
+
 git diff --cached --check
-cargo fmt --manifest-path sync/Cargo.toml --all -- --check
-cargo clippy --locked --manifest-path sync/Cargo.toml --workspace --all-targets -- --deny warnings
+cd sync
+bun run check
+bun run typecheck

@@ -5,12 +5,23 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { resolveLiveModelCatalog } from "./model-catalog-client.ts";
 
-test("resolves catalog models asynchronously and registers Pi models", async () => {
+test("resolves the live catalog asynchronously and registers Pi models", async () => {
   const home = await mkdtemp(join(tmpdir(), "pi-cliproxy-extension-test-"));
 
   try {
+    const runtimeClientPath = join(
+      home,
+      ".pi",
+      "agent",
+      "extensions",
+      "node_modules",
+      "@anntnzrb",
+      "agentium",
+      "dist",
+      "runtime",
+      "model-catalog-client.js",
+    );
     const catalogPath = join(
       home,
       ".local",
@@ -20,7 +31,22 @@ test("resolves catalog models asynchronously and registers Pi models", async () 
       "catalog.json",
     );
     const runnerPath = join(home, "run-extension.ts");
+    await mkdir(dirname(runtimeClientPath), { recursive: true });
     await mkdir(dirname(catalogPath), { recursive: true });
+    await writeFile(
+      runtimeClientPath,
+      `
+import { readFile } from "node:fs/promises";
+
+export async function resolveLiveModelCatalog({ catalogPath, baseUrl }) {
+  if (baseUrl !== "\${CLIPROXY_CLIENT_BASE_URL}") {
+    throw new Error("unexpected base URL: " + baseUrl);
+  }
+  return JSON.parse(await readFile(catalogPath, "utf8")).models;
+}
+`,
+      "utf8",
+    );
     await writeFile(
       catalogPath,
       JSON.stringify({
@@ -121,55 +147,6 @@ process.stdout.write(JSON.stringify(registered[0]));
         ],
       },
     });
-  } finally {
-    await rm(home, { recursive: true, force: true });
-  }
-});
-
-test("resolveLiveModelCatalog falls back to local catalog on live network error", async () => {
-  const home = await mkdtemp(join(tmpdir(), "pi-model-catalog-test-"));
-  try {
-    const catalogPath = join(home, "catalog.json");
-    await writeFile(
-      catalogPath,
-      JSON.stringify({
-        version: 1,
-        models: [
-          {
-            id: "cliproxy/fallback",
-            name: "Fallback",
-            reasoning: false,
-            input: ["text"],
-            cost: { input: 0.5, output: 1.5, cacheRead: 0, cacheWrite: 0 },
-            contextWindow: 64000,
-            maxTokens: 4096,
-          },
-        ],
-      }),
-      "utf8",
-    );
-
-    const mockFetch: typeof fetch = async () => {
-      throw new Error("connection refused");
-    };
-
-    const models = await resolveLiveModelCatalog({
-      catalogPath,
-      baseUrl: "http://127.0.0.1:8080",
-      fetch: mockFetch,
-    });
-
-    expect(models).toEqual([
-      {
-        id: "cliproxy/fallback",
-        name: "Fallback",
-        reasoning: false,
-        input: ["text"],
-        cost: { input: 0.5, output: 1.5, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 64000,
-        maxTokens: 4096,
-      },
-    ]);
   } finally {
     await rm(home, { recursive: true, force: true });
   }

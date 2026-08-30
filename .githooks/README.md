@@ -9,14 +9,14 @@ Enable them once after cloning:
 git config --local core.hooksPath .githooks
 ```
 
-The Rust workspace has no local runtime dependency install. Run its checks
-directly from the repository root:
+Install the sync dependencies once per clone before committing:
 
 ```sh
-cargo fmt --manifest-path sync/Cargo.toml --all -- --check
-cargo clippy --locked --manifest-path sync/Cargo.toml --workspace --all-targets -- --deny warnings
-cargo test --locked --manifest-path sync/Cargo.toml --workspace
+cd sync && bun install --frozen-lockfile
 ```
 
-The hooks run these commands automatically. They never rewrite tracked source
-files.
+This creates only `sync/node_modules/`, using the versions pinned by
+`sync/bun.lock`; it does not install packages globally. The hooks perform this
+same frozen local bootstrap automatically when an isolated commit or push
+workflow does not contain the ignored `node_modules/` directory. They never
+rewrite tracked source files.
