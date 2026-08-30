@@ -1,135 +1,143 @@
-name: Publish package
+name: Publish Agentium
 
 on:
   push:
     branches:
       - main
+    tags:
+      - 'agentium-v*'
     paths:
       - 'sync/**'
       - '.github/workflows/publish-package.yml'
 
 concurrency:
-  group: publish-package-main
+  group: publish-agentium-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  agentium-check:
+    if: >-
+      github.ref == 'refs/heads/main' ||
+      startsWith(github.ref, 'refs/tags/agentium-v')
+    name: Check Agentium
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          node-version: 22
+          components: rustfmt, clippy
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-        working-directory: sync
-
-      - name: Run checks and tests
-        run: |
-          bun run check
-          bun run typecheck
-          bun test
-        working-directory: sync
-
-      - name: Build release artifact
+      - name: Validate tag version against Cargo metadata
+        if: startsWith(github.ref, 'refs/tags/agentium-v')
         run: |
           set -euo pipefail
-          PACKAGE_NAME="$(node -p "require('./package.json').name")"
-          PACKAGE_VERSION="0.1.${{ github.run_number }}"
-          npm version "$PACKAGE_VERSION" --no-git-tag-version
-          bun run build
-          mkdir -p release
-          npm pack --pack-destination release
-          printf '{"name":"%s","version":"%s"}\n' "$PACKAGE_NAME" "$PACKAGE_VERSION" > release/metadata.json
-        working-directory: sync
+          TAG_VERSION="${GITHUB_REF_NAME#agentium-v}"
+          CARGO_VERSION="$(cargo metadata --format-version 1 --manifest-path sync/Cargo.toml --no-deps | jq -r '.packages[] | select(.name == "app") | .version')"
+          echo "Tag version: $TAG_VERSION"
+          echo "Cargo version: $CARGO_VERSION"
+          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "Error: Tag version ($TAG_VERSION) does not match Cargo metadata version ($CARGO_VERSION)" >&2
+            exit 1
+          fi
+
+      - name: Check code formatting
+        run: cargo fmt --manifest-path sync/Cargo.toml --all -- --check
+
+      - name: Run Clippy lints
+        run: cargo clippy --locked --manifest-path sync/Cargo.toml --workspace --all-targets -- --deny warnings
+
+      - name: Run workspace tests
+        run: cargo test --locked --manifest-path sync/Cargo.toml --workspace
+
+  agentium-build:
+    if: startsWith(github.ref, 'refs/tags/agentium-v')
+    name: Build Agentium (${{ matrix.target }})
+    needs: agentium-check
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-14
+          - target: x86_64-apple-darwin
+            os: macos-13
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-24.04
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build release binary
+        run: cargo build --release --locked --manifest-path sync/Cargo.toml --package app --target ${{ matrix.target }}
+
+      - name: Package release artifact
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#agentium-v}"
+          STAGE_DIR="$(mktemp -d)"
+          cp "sync/target/${{ matrix.target }}/release/agentium" "$STAGE_DIR/agentium"
+          chmod +x "$STAGE_DIR/agentium"
+          mkdir -p dist
+          TARBALL="agentium-${VERSION}-${{ matrix.target }}.tar.gz"
+          tar -czf "dist/${TARBALL}" -C "$STAGE_DIR" agentium
+          cd dist
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "$TARBALL" > "${TARBALL}.sha256"
+          else
+            shasum -a 256 "$TARBALL" > "${TARBALL}.sha256"
+          fi
+          cd ..
+          rm "$STAGE_DIR/agentium"
+          rmdir "$STAGE_DIR"
 
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: package-release
-          path: sync/release
+          name: agentium-artifacts-${{ matrix.target }}
+          path: dist/
           retention-days: 1
 
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
+  agentium-release:
+    if: startsWith(github.ref, 'refs/tags/agentium-v')
+    name: Publish Agentium release
+    needs: [agentium-check, agentium-build]
+    runs-on: ubuntu-24.04
     permissions:
-      id-token: write
+      contents: write
     steps:
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Download release artifact
+      - name: Download all Agentium artifacts
         uses: actions/download-artifact@v4
         with:
-          name: package-release
-          path: release
+          pattern: agentium-artifacts-*
+          path: dist
+          merge-multiple: true
 
-      - name: Publish package
+      - name: Create or update GitHub Release
         run: |
           set -euo pipefail
-          test -n "${NODE_AUTH_TOKEN:-}" || {
-            echo "NPM_TOKEN repository secret is required" >&2
-            exit 1
-          }
-          PACKAGE_NAME="$(node -p "require('./metadata.json').name")"
-          PACKAGE_VERSION="$(node -p "require('./metadata.json').version")"
-          NPM_METADATA_FILE="$(mktemp)"
-          NPM_VIEW_ERROR="$(mktemp)"
-          trap 'rm -f "$NPM_METADATA_FILE" "$NPM_VIEW_ERROR"' EXIT
-          PACKAGE_EXISTS=true
-          if npm view "$PACKAGE_NAME" --json --silent >"$NPM_METADATA_FILE" 2>"$NPM_VIEW_ERROR"; then
-            CURRENT_LATEST="$(node -e '
-              const fs = require("node:fs");
-              const metadata = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-              process.stdout.write(metadata["dist-tags"]?.latest ?? "");
-            ' "$NPM_METADATA_FILE")"
+          VERSION="${GITHUB_REF_NAME#agentium-v}"
+          echo "Publishing Agentium release for $GITHUB_REF_NAME (version $VERSION)..."
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; uploading assets..."
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
           else
-            NPM_VIEW_OUTPUT="$(<"$NPM_VIEW_ERROR")$(<"$NPM_METADATA_FILE")"
-            case "$NPM_VIEW_OUTPUT" in
-              *E404*|*404*) PACKAGE_EXISTS=false; CURRENT_LATEST="" ;;
-              *) printf '%s\n' "$NPM_VIEW_OUTPUT" >&2; exit 1 ;;
-            esac
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --title "agentium $VERSION" \
+              --generate-notes
           fi
-          if [[ "$CURRENT_LATEST" == "undefined" || "$CURRENT_LATEST" == "null" ]]; then
-            CURRENT_LATEST=""
-          fi
-          CANDIDATE_PATCH="${PACKAGE_VERSION##*.}"
-          if [[ "$CURRENT_LATEST" =~ ^0\.1\.([0-9]+)$ ]] &&
-             (( 10#${BASH_REMATCH[1]} >= 10#$CANDIDATE_PATCH )); then
-            echo "Latest version $CURRENT_LATEST is already at or ahead of $PACKAGE_VERSION; skipping."
-            exit 0
-          fi
-          if [[ "$PACKAGE_EXISTS" == true ]]; then
-            : >"$NPM_METADATA_FILE"
-            if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --json --silent >"$NPM_METADATA_FILE" 2>"$NPM_VIEW_ERROR"; then
-              echo "Version $PACKAGE_VERSION already exists; treating this as a completed rerun."
-              exit 0
-            fi
-            NPM_VIEW_OUTPUT="$(<"$NPM_VIEW_ERROR")$(<"$NPM_METADATA_FILE")"
-            case "$NPM_VIEW_OUTPUT" in
-              *E404*|*404*) ;;
-              *) printf '%s\n' "$NPM_VIEW_OUTPUT" >&2; exit 1 ;;
-            esac
-          fi
-          if [[ -n "$CURRENT_LATEST" ]]; then
-            npm dist-tag add "${PACKAGE_NAME}@${CURRENT_LATEST}" previous
-          fi
-          PACKAGE_FILE="$(printf '%s\n' ./*.tgz)"
-          npm publish "$PACKAGE_FILE" --provenance --access public --tag latest
-        working-directory: release
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
