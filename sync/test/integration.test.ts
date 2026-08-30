@@ -59,10 +59,6 @@ test("integration_happy_path_matches_expected_outputs", () => {
     assert.equal(cliProxyConfig["codex-api-key"][0]["api-key"], "upstream-secret");
     assert.equal(cliProxyConfig["codex-api-key"][0]["x-credential-pool"], undefined);
     assert.equal(lstatSync(join(home, ".cli-proxy-api", "config.yaml")).mode & 0o777, 0o600);
-    assert.equal(
-      existsSync(join(home, ".local", "share", "agents", "cliproxyapi", "client-api-key")),
-      false,
-    );
     for (const path of [
       join(home, ".codex", "config.toml"),
       join(home, ".config", "opencode", "opencode.jsonc"),
@@ -73,17 +69,13 @@ test("integration_happy_path_matches_expected_outputs", () => {
       assert.equal(content.includes("http://old-gateway.example.test/v1"), true, path);
       assert.equal(content.includes("CLIPROXY_CLIENT_BASE_URL"), false, path);
     }
-    assert.equal(
-      readFileSync(join(home, ".local", "share", "agents", "sync", "src", "cli.ts"), "utf8"),
-      "export {};\n",
-    );
     assert.equal(existsSync(join(home, ".pi", "agent", "auth.json")), true);
     for (const command of ["codex", "dsh", "opencode", "pi", "omp"]) {
       const wrapper = join(home, ".local", "bin", command);
-      assert.equal(existsSync(wrapper), true, wrapper);
-      assert.equal(readFileSync(wrapper, "utf8").includes("agents-managed-wrapper:v1"), true);
-      assert.equal(readFileSync(wrapper, "utf8").includes(".local/share/agents/sync"), true);
-      assert.equal(readFileSync(wrapper, "utf8").includes(".config/agents/sync"), false);
+      assert.equal(
+        readFileSync(wrapper, "utf8").includes("bun x '@anntnzrb/agentium@latest'"),
+        true,
+      );
     }
   });
 });
@@ -105,9 +97,9 @@ test("integration_unavailable_client_preserves_all_cliproxy_artifacts", () => {
     writeDeployment(home, "different-host", "http://127.0.0.1:1/v1");
 
     const configPath = join(home, ".cli-proxy-api", "config.yaml");
-    const catalogPath = join(home, ".local", "share", "agents", "model-catalog", "catalog.json");
+    const catalogPath = join(home, ".local", "share", "agentium", "model-catalog", "catalog.json");
     mkdirSync(join(home, ".cli-proxy-api"), { recursive: true });
-    mkdirSync(join(home, ".local", "share", "agents", "model-catalog"), { recursive: true });
+    mkdirSync(join(home, ".local", "share", "agentium", "model-catalog"), { recursive: true });
     writeFileSync(configPath, "existing-server-config\n", { mode: 0o600 });
     writeFileSync(catalogPath, '{"models":[{"id":"existing"}]}\n', { mode: 0o600 });
 
@@ -153,7 +145,9 @@ test("integration_package_bootstrap_patches_settings_and_cache_paths", () => {
     const settings = readFileSync(join(home, ".pi", "agent", "settings.json"), "utf8");
     assert.equal(settings.includes("source-pkg"), true);
     assert.equal(settings.includes("build-pkg"), true);
-    const cacheSnapshot = snapshotSelected(join(home, ".local", "share", "agents", "pi-packages"));
+    const cacheSnapshot = snapshotSelected(
+      join(home, ".local", "share", "agentium", "pi-packages"),
+    );
     assert.equal(
       cacheSnapshot.some((entry) => entry.path.includes("source-pkg")),
       true,
@@ -264,6 +258,10 @@ codex-api-key:
   - x-credential-pool: fixture
     prefix: fixture
 `,
+  );
+  writeFileSync(
+    join(home, ".config", "agents", "tools", "cliproxyapi", "panel.html"),
+    "<!doctype html><html><body>management panel</body></html>\n",
   );
   writeFileSync(
     join(home, ".config", "agents", "secrets.local.json"),
@@ -441,8 +439,8 @@ function snapshotHome(home: string): SnapshotEntry[] {
     ".mcporter",
     ".summarize",
     ".cli-proxy-api",
-    ".local/share/agents/sync-managed",
-    ".local/share/agents/pi-packages",
+    ".local/share/agentium/sync-managed",
+    ".local/share/agentium/pi-packages",
     ".local/bin",
   ];
   const entries: SnapshotEntry[] = [];

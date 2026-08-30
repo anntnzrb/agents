@@ -55,13 +55,14 @@ test("loads live catalog models through the installed runtime resolver", async (
   try {
     const runtimeClientPath = join(
       home,
-      ".local",
-      "share",
-      "agents",
-      "sync",
-      "src",
+      ".config",
+      "opencode",
+      "node_modules",
+      "@anntnzrb",
+      "agentium",
+      "dist",
       "runtime",
-      "model-catalog-client.ts",
+      "model-catalog-client.js",
     );
     const runnerPath = join(home, "run-plugin.ts");
     await mkdir(dirname(runtimeClientPath), { recursive: true });
@@ -100,6 +101,7 @@ process.stdout.write(JSON.stringify(config.provider.cliproxy.models));
     );
 
     const child = spawn(process.execPath, [runnerPath], {
+      cwd: home,
       env: { ...process.env, HOME: home },
       stdio: ["ignore", "pipe", "pipe"],
     });

@@ -220,7 +220,8 @@ export const main = async (
 /**
  * Wrapper entrypoint: reconcile config first, then hand control to the
  * selected harness or tool. Sync failures are soft here so an unavailable
- * network or broken optional hook cannot strand an otherwise cached binary.
+ * network or broken optional hook cannot strand an otherwise cached harness
+ * package.
  */
 export const launchMain = async (sourceName: string, args: readonly string[]): Promise<number> => {
   let syncEnv: SyncEnv;
@@ -262,7 +263,7 @@ export const launchMain = async (sourceName: string, args: readonly string[]): P
       warn("another sync is already running; continuing launch");
     }
   } else {
-    warn("agent configuration source is unavailable; continuing with installed runtime");
+    warn("agent configuration source is unavailable; continuing with registry package");
   }
 
   try {

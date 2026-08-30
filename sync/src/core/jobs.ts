@@ -2,7 +2,6 @@ import fs from "node:fs";
 import { dirname } from "node:path";
 import { assertNever, err, panicMessage, warn } from "@runtime/errors.ts";
 import { copyTree, isSymlink, rmEntry, syncManagedChildren, syncManagedTree } from "@runtime/fs.ts";
-import { runCommand } from "@runtime/process.ts";
 import { syncClientModelCatalog, syncCliProxyConfig } from "./cliproxy-config.ts";
 import { isCliProxyTargetReady, publishCliProxyEndpointTemplates } from "./cliproxy-deployment.ts";
 import type { Job } from "./plan.ts";
@@ -165,13 +164,6 @@ async function runJob(
             : { quietModelRefresh: options.quietModelRefresh }),
         });
         return true;
-      case "BunInstall":
-        return await runCommand(
-          ["bun", "install", "--frozen-lockfile", "--production"],
-          job.root,
-          job.timeoutMs,
-          "runtime dependency install",
-        );
       default:
         return assertNever(job);
     }

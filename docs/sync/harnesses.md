@@ -35,7 +35,7 @@ A harness uses CLIProxyAPI when its committed source defines a `cliproxy` provid
 
 Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `tools/cliproxyapi/deployment.json`. Harness providers use a static placeholder key because their SDKs require a non-empty value. The gateway ignores that key.
 
-Harnesses can use native model discovery or read `~/.local/share/agents/model-catalog/catalog.json` through their runtime integration. Each harness owns its model-selector syntax and discovery adapter.
+Harnesses can use native model discovery or read `~/.local/share/agentium/model-catalog/catalog.json` through their runtime integration. Each harness owns its model-selector syntax and discovery adapter.
 
 API-key model IDs use the prefix declared by `x-model-sources`. OAuth model IDs use the prefix stored in the CLIProxyAPI auth files.
 
@@ -43,13 +43,13 @@ API-key model IDs use the prefix declared by `x-model-sources`. OAuth model IDs 
 
 Sync writes wrappers under `~/.local/bin/` and expects that directory on `PATH`.
 
-Each wrapper calls the installed sync runtime with `launch`, prepares the cached npm package, forwards all arguments, and returns the harness exit status.
+Each wrapper calls `bun x @anntnzrb/agentium@latest launch <name>`, prepares the cached harness npm package, forwards all arguments, and returns the harness exit status.
 
-When the installed sync runtime is missing, the wrapper prints a hint to run sync from the agents repository and exits with status `127`.
+The sync package is resolved from npm and cached by Bun. If Bun is unavailable, the wrapper exits with status `127`. If the package is neither cached nor reachable from npm, Bun reports the launch failure.
 
-The wrapper command is `launcher.bin`. The wrapper passes the adapter `id` to the installed runtime, so the command and source directory name can differ.
+The wrapper command is `launcher.bin`. The wrapper passes the adapter `id` to the registry-backed sync package, so the command and source directory name can differ.
 
-Wrapper state lives at `~/.local/share/agents/sync-managed/wrappers.json`. Sync removes stale wrappers only when they contain its ownership marker and remain in an allowed wrapper directory. Sync preserves unmanaged conflicts and reports them.
+Wrapper state lives at `~/.local/share/agentium/sync-managed/wrappers.json`. Sync removes stale wrappers only when they contain its ownership marker and remain in an allowed wrapper directory. Sync preserves unmanaged conflicts and reports them.
 
 ## Package cache
 
@@ -68,4 +68,4 @@ The cache keeps the current and previous known-good package versions. Newly inst
   1. Explicit adapter overrides (`launcher.env`).
   2. Parent-process environment variables inherited from the invoking environment.
   3. Default values defined in `.env`.
-- Generated launch wrappers under `~/.local/bin/` do not embed `.env` values; they dynamically invoke the sync runtime on each launch.
+- Generated launch wrappers under `~/.local/bin/` do not embed `.env` values; they dynamically invoke the registry-backed sync package on each launch.

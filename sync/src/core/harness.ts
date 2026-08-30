@@ -17,8 +17,8 @@ export type { HarnessId, HostPlatform } from "./harness-adapters.ts";
 export const SOURCE_AGENT_FILE = "HARNESS.md";
 const DEFAULT_INSTRUCTION_FILE = "AGENTS.md";
 const INSTALL_TIMEOUT_SECONDS = 120;
-export const MANAGED_STATE_SUBDIR = ".local/share/agents/sync-managed";
-const DEFAULT_PACKAGE_CACHE_SUBDIR = ".local/share/agents/pi-packages";
+export const MANAGED_STATE_SUBDIR = ".local/share/agentium/sync-managed";
+const DEFAULT_PACKAGE_CACHE_SUBDIR = ".local/share/agentium/pi-packages";
 export const SKILLS_DST_DIR = "skills";
 export const SKILLS_SOURCE_SUBDIR = "current";
 const PATH_COMPONENT_PATTERN = /^[A-Za-z0-9._-]+$/;
@@ -57,7 +57,7 @@ export interface Harness {
 export class SyncEnv {
   readonly home: string;
   readonly ssotHome: string;
-  readonly runtimeHome: string;
+  readonly dataHome: string;
   readonly skillsHome: string;
   readonly harnessesHome: string;
   readonly mcporterHome: string;
@@ -71,7 +71,7 @@ export class SyncEnv {
   constructor(
     home: string,
     ssotHome: string,
-    runtimeHome: string,
+    dataHome: string,
     skillsHome: string,
     harnessesHome: string,
     mcporterHome: string,
@@ -84,7 +84,7 @@ export class SyncEnv {
     this.home = home;
     this.ssotHome = ssotHome;
     this.rootEnv = Effect.runSync(loadRootEnv(path.join(ssotHome, ".env")));
-    this.runtimeHome = runtimeHome;
+    this.dataHome = dataHome;
     this.skillsHome = skillsHome;
     this.harnessesHome = harnessesHome;
     this.mcporterHome = mcporterHome;
@@ -115,13 +115,13 @@ export class SyncEnv {
     } = {},
   ): SyncEnv {
     const agentsHome = path.join(home, ".config", "agents");
-    const runtimeHome = path.join(home, ".local", "share", "agents");
+    const dataHome = path.join(home, ".local", "share", "agentium");
     const harnessesHome = path.join(agentsHome, "harnesses");
     const platform = options.platform ?? platformFromProcess();
     return new SyncEnv(
       home,
       agentsHome,
-      runtimeHome,
+      dataHome,
       path.join(agentsHome, "skills"),
       harnessesHome,
       path.join(home, ".mcporter"),

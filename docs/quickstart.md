@@ -78,7 +78,7 @@ Confirm that sync created the main artifacts:
 ```bash
 test -x ~/.local/bin/cli-proxy-api
 test -f ~/.cli-proxy-api/config.yaml
-test -f ~/.local/share/agents/model-catalog/catalog.json
+test -f ~/.local/share/agentium/model-catalog/catalog.json
 ```
 
 Each test exits with status `0` when the required path exists with the expected type and permissions.

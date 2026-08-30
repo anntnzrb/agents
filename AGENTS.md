@@ -13,7 +13,7 @@
 - Harness-specific tests and documentation stay beside their owning source under `harnesses/`
 - `harnesses/<harness>/`: directory presence opts into a supported harness; sync owns its internal adapter metadata
 - Agent config root: `~/.config/agents/`
-- Installed runtime root: `~/.local/share/agents/`
+- Agentium data root: `~/.local/share/agentium/`
 - Synced tool homes (`~/.codex`, `~/.claude`, etc.) and agent launch wrappers are generated targets
 - Make durable changes in this repository so sync does not overwrite them
 

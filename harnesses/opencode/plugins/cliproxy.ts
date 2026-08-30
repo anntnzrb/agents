@@ -2,6 +2,7 @@ import { Effect, Schema } from "effect";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import type * as AgentiumRuntime from "@anntnzrb/agentium/runtime/model-catalog-client";
 
 export interface OpenCodeCatalogModel {
   readonly id: string;
@@ -20,10 +21,7 @@ export interface OpenCodeCatalogModel {
 }
 
 interface CatalogModule {
-  readonly resolveLiveModelCatalog: (options: {
-    readonly catalogPath: string;
-    readonly baseUrl: string;
-  }) => Promise<readonly OpenCodeCatalogModel[]>;
+  readonly resolveLiveModelCatalog: typeof AgentiumRuntime.resolveLiveModelCatalog;
 }
 
 export class CatalogImportError extends Schema.TaggedError<CatalogImportError>()("CatalogImportError", {
@@ -52,21 +50,23 @@ const CATALOG_PATH = join(
   homedir(),
   ".local",
   "share",
-  "agents",
+  "agentium",
   "model-catalog",
   "catalog.json",
 );
 const CLIPROXY_BASE_URL = "${CLIPROXY_CLIENT_BASE_URL}";
+// Resolve the installed runtime from the generated harness dependency root.
 const CATALOG_MODULE = pathToFileURL(
   join(
     homedir(),
-    ".local",
-    "share",
-    "agents",
-    "sync",
-    "src",
+    ".config",
+    "opencode",
+    "node_modules",
+    "@anntnzrb",
+    "agentium",
+    "dist",
     "runtime",
-    "model-catalog-client.ts",
+    "model-catalog-client.js",
   ),
 ).href;
 

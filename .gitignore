@@ -12,3 +12,4 @@ artifacts/
 .env
 secrets.local.json
 *.skill
+sync/dist/

@@ -757,7 +757,7 @@ setInterval(() => {}, 1_000);
       );
       assert.equal(
         packageHook!["cacheRoot"],
-        join(root, ".local", "share", "agents", "pi-packages"),
+        join(root, ".local", "share", "agentium", "pi-packages"),
       );
 
       assert.deepEqual(
@@ -972,7 +972,7 @@ setInterval(() => {}, 1_000);
       assert.equal(exists(join(root, ".codex", "config.toml")), true);
       assert.equal(exists(join(root, ".codex", "skills", "skill.txt")), true);
       assert.equal(
-        exists(join(root, ".local", "share", "agents", "sync-managed", "codex.json")),
+        exists(join(root, ".local", "share", "agentium", "sync-managed", "codex.json")),
         true,
       );
 
@@ -1012,7 +1012,7 @@ setInterval(() => {}, 1_000);
         root,
         ".local",
         "share",
-        "agents",
+        "agentium",
         "sync-managed",
         "wrappers.json",
       );
@@ -1112,7 +1112,7 @@ setInterval(() => {}, 1_000);
         "module.exports = 1;\n",
       );
       writeFile(
-        join(root, ".local", "share", "agents", "sync-managed", "pi.extension-deps.json"),
+        join(root, ".local", "share", "agentium", "sync-managed", "pi.extension-deps.json"),
         `${JSON.stringify(
           {
             fingerprint: fingerprintTree(
@@ -1144,7 +1144,7 @@ setInterval(() => {}, 1_000);
         root,
         ".local",
         "share",
-        "agents",
+        "agentium",
         "sync-managed",
         "pi.extension-deps.json",
       );
@@ -1225,7 +1225,7 @@ setInterval(() => {}, 1_000);
         "module.exports = 1;\n",
       );
       writeFile(
-        join(root, ".local", "share", "agents", "sync-managed", "pi.extension-deps.json"),
+        join(root, ".local", "share", "agentium", "sync-managed", "pi.extension-deps.json"),
         `${JSON.stringify(
           {
             fingerprint: "stale",
@@ -1526,7 +1526,7 @@ const check = file.content.includes("\\nrename from ") || file.content.startsWit
       const settings = readText(join(root, ".pi", "agent", "settings.json"));
       assert.equal(settings.includes("source-pkg"), true);
       assert.equal(settings.includes("build-pkg"), true);
-      assert.equal(exists(join(root, ".local", "share", "agents", "pi-packages")), true);
+      assert.equal(exists(join(root, ".local", "share", "agentium", "pi-packages")), true);
     });
   });
 
@@ -1537,7 +1537,7 @@ const check = file.content.includes("\\nrename from ") || file.content.startsWit
       assert.ok(harness);
 
       writeFile(
-        join(root, ".local", "share", "agents", "sync-managed", "codex.json"),
+        join(root, ".local", "share", "agentium", "sync-managed", "codex.json"),
         `[
   "good.txt",
   "..",
@@ -1550,7 +1550,7 @@ const check = file.content.includes("\\nrename from ") || file.content.startsWit
 
       const names = await call<string[]>(
         loadRecordedEntryNames,
-        join(root, ".local", "share", "agents", "sync-managed", "codex.json"),
+        join(root, ".local", "share", "agentium", "sync-managed", "codex.json"),
       );
       assert.deepEqual(names, ["good.txt"]);
 
@@ -1607,7 +1607,7 @@ const check = file.content.includes("\\nrename from ") || file.content.startsWit
   test("managed_state_malformed_json_is_recoverable", async () => {
     await withTempDir(async (root) => {
       const syncEnv = makeSyncEnv(root);
-      const statePath = join(root, ".local", "share", "agents", "sync-managed", "codex.json");
+      const statePath = join(root, ".local", "share", "agentium", "sync-managed", "codex.json");
       writeFile(statePath, "{not valid json");
 
       const recovered = await call<string[]>(loadRecordedEntryNames, statePath);

@@ -12,19 +12,21 @@ test("resolves the live catalog asynchronously and registers Pi models", async (
   try {
     const runtimeClientPath = join(
       home,
-      ".local",
-      "share",
-      "agents",
-      "sync",
-      "src",
+      ".pi",
+      "agent",
+      "extensions",
+      "node_modules",
+      "@anntnzrb",
+      "agentium",
+      "dist",
       "runtime",
-      "model-catalog-client.ts",
+      "model-catalog-client.js",
     );
     const catalogPath = join(
       home,
       ".local",
       "share",
-      "agents",
+      "agentium",
       "model-catalog",
       "catalog.json",
     );
@@ -92,6 +94,7 @@ process.stdout.write(JSON.stringify(registered[0]));
     );
 
     const child = spawn(process.execPath, [runnerPath], {
+      cwd: home,
       env: { ...process.env, HOME: home },
       stdio: ["ignore", "pipe", "pipe"],
     });

@@ -28,8 +28,7 @@ export type JobKind =
   | "SecretTemplate"
   | "CliProxyReadiness"
   | "CliProxyEndpointTemplates"
-  | "CliProxyConfig"
-  | "BunInstall";
+  | "CliProxyConfig";
 
 export type Job =
   | {
@@ -69,11 +68,6 @@ export type Job =
       readonly gatewayHost?: boolean;
       readonly cacheRoot?: string;
       readonly runtimeRoot?: string;
-    }
-  | {
-      readonly kind: "BunInstall";
-      readonly root: string;
-      readonly timeoutMs: number;
     };
 
 export interface HarnessPlan {
@@ -126,7 +120,6 @@ export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
   return {
     harnesses,
     jobs: [
-      ...runtimeJobs(syncEnv),
       ...harnessDirJobs(harnesses),
       ...skillsJobs(syncEnv, harnesses),
       ...instructionJobs(syncEnv, harnesses),
@@ -136,38 +129,6 @@ export function buildSyncPlan(syncEnv: SyncEnv): SyncPlan {
     cliProxyDeployment,
     gatewayHost,
   };
-}
-
-function runtimeJobs(syncEnv: SyncEnv): Job[] {
-  const sourceRoot = join(syncEnv.ssotHome, "sync");
-  const runtimeRoot = join(syncEnv.runtimeHome, "sync");
-  const jobs: Job[] = [
-    {
-      src: join(sourceRoot, "src"),
-      dst: join(runtimeRoot, "src"),
-      kind: "Dir",
-      scope: "Tree",
-    },
-    {
-      src: join(sourceRoot, "tsconfig.json"),
-      dst: join(runtimeRoot, "tsconfig.json"),
-      kind: "File",
-    },
-    {
-      src: join(sourceRoot, "package.json"),
-      dst: join(runtimeRoot, "package.json"),
-      kind: "File",
-    },
-    {
-      src: join(sourceRoot, "bun.lock"),
-      dst: join(runtimeRoot, "bun.lock"),
-      kind: "File",
-    },
-  ];
-  if (fs.existsSync(join(sourceRoot, "bun.lock"))) {
-    jobs.push({ kind: "BunInstall", root: runtimeRoot, timeoutMs: syncEnv.installTimeoutMs });
-  }
-  return jobs;
 }
 
 export const topLevelEntryNames = (root: string): string[] => dirEntryNames(root);
@@ -297,7 +258,7 @@ function configJobs(
       deployment,
       gatewayHost,
       cacheRoot: join(syncEnv.home, ".cache", "agents", "model-catalog"),
-      runtimeRoot: syncEnv.runtimeHome,
+      runtimeRoot: syncEnv.dataHome,
     },
     ...(gatewayHost
       ? [

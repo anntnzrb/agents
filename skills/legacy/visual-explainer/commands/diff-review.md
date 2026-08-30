@@ -36,4 +36,4 @@ Use file paths, command outputs, or file:line evidence. Do not invent rationale 
 
 Use diff color language consistently: red removed/before, green added/after, amber modified/risk, blue neutral context. Use responsive section navigation for 4+ sections. Follow the skill’s Mermaid and overflow rules.
 
-Write to `~/.local/share/agents/visual-explainer/diagrams/` and open in browser.
+Write to `~/.local/share/agentium/visual-explainer/diagrams/` and open in browser.

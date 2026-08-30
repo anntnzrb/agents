@@ -6,12 +6,14 @@
     "moduleDetection": "force",
     "moduleResolution": "bundler",
     "paths": {
+      "#package.json": ["./package.json"],
       "@core/*": ["./src/core/*"],
       "@extensions/*": ["./src/extensions/*"],
       "@packages/*": ["./src/packages/*"],
       "@runtime/*": ["./src/runtime/*"]
     },
     "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
     "verbatimModuleSyntax": true,
     "types": ["bun"],
     "strict": true,

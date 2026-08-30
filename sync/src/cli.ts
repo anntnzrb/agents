@@ -4,6 +4,7 @@ import { launchMain, main } from "@core/index.ts";
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Effect } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
+import pkg from "#package.json" with { type: "json" };
 
 const syncHandler = ({ refreshModels }: { readonly refreshModels: boolean }) =>
   Effect.promise(async () => {
@@ -39,7 +40,7 @@ const launchCommand = Command.make(
 );
 
 const rootCommand = Command.make(
-  "agents-sync",
+  "agentium",
   {
     refreshModels: Flag.boolean("refresh-models").pipe(Flag.withDefault(false)),
   },
@@ -66,7 +67,7 @@ if (rawArgs.length === 0 || rawArgs[0] === "sync" || rawArgs[0]?.startsWith("-")
     console.error("sync: usage: sync [--refresh-models]");
     process.exit(2);
   }
-  const program = Command.runWith(rootCommand, { version: "1.0.0" })(rawArgs);
+  const program = Command.runWith(rootCommand, { version: pkg.version })(rawArgs);
   BunRuntime.runMain(program.pipe(Effect.provide(BunServices.layer)));
 } else {
   console.error(`sync: unknown command: ${rawArgs[0]}`);
