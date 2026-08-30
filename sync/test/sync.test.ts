@@ -31,9 +31,7 @@ let writeRecordedEntryNames: any;
 let readPackageManifest: any;
 let patchRuntimeSettings: any;
 let packageCacheDir: any;
-let githubSlugForTests: any;
-let commandForTests: any;
-let cloneAttemptsForTests: any;
+let clonePackage: any;
 let validatePackageForTests: any;
 let extractImportSpecifiers: any;
 let missingPackageRoots: any;
@@ -62,9 +60,7 @@ if (!runtime) {
     readPackageManifest,
     patchRuntimeSettings,
     packageCacheDir,
-    githubSlugForTests,
-    commandForTests,
-    cloneAttemptsForTests,
+    clonePackage,
     validatePackageForTests,
     extractImportSpecifiers,
     missingPackageRoots,
@@ -193,21 +189,7 @@ async function loadRuntime(): Promise<Record<string, unknown> | null> {
       "packageCacheDir",
       "package_cache_dir",
     ),
-    githubSlugForTests: pickFn(
-      packagesModule as Record<string, unknown>,
-      "githubSlugForTests",
-      "github_slug_for_tests",
-    ),
-    commandForTests: pickFn(
-      packagesModule as Record<string, unknown>,
-      "commandForTests",
-      "command_for_tests",
-    ),
-    cloneAttemptsForTests: pickFn(
-      packagesModule as Record<string, unknown>,
-      "cloneAttemptsForTests",
-      "clone_attempts_for_tests",
-    ),
+    clonePackage: pickFn(packagesModule as Record<string, unknown>, "clonePackage"),
     validatePackageForTests: pickFn(
       packagesModule as Record<string, unknown>,
       "validatePackageForTests",
@@ -261,23 +243,6 @@ function writeFile(path: string, content: string): void {
 function writeExecutable(path: string, script: string): void {
   writeFile(path, script);
   chmodSync(path, 0o755);
-}
-
-function initGitRepo(path: string): void {
-  runGit(path, ["init"]);
-  runGit(path, ["config", "user.name", "Test User"]);
-  runGit(path, ["config", "user.email", "test@example.com"]);
-  runGit(path, ["add", "."]);
-  runGit(path, ["commit", "-m", "init"]);
-}
-
-function runGit(cwd: string, args: string[]): void {
-  const result = Bun.spawnSync(["git", ...args], {
-    cwd,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  assert.equal(result.exitCode, 0, result.stderr.toString() || result.stdout.toString());
 }
 
 const readText = (path: string): string => readFileSync(path, "utf8");
@@ -1386,38 +1351,31 @@ const check = file.content.includes("\\nrename from ") || file.content.startsWit
     }
   });
 
-  test("github_clone_command_prefers_gh_when_available", async () => {
+  test("github_package_source_downloads_without_a_vcs_executable", async () => {
     await withTempDir(async (root) => {
       const target = join(root, "out");
-      const command = await call<string[]>(
-        commandForTests,
+      let requestedUrl = "";
+      const success = await call<boolean>(
+        clonePackage,
         "https://github.com/tintinweb/pi-supervisor",
         target,
-      );
-      assert.equal(command[0], "gh");
-      assert.equal(
-        await call<string | null>(githubSlugForTests, "https://github.com/tintinweb/pi-supervisor"),
-        "tintinweb/pi-supervisor",
-      );
-    });
-  });
-
-  test("github_clone_falls_back_to_git_after_gh_failure", async () => {
-    await withTempDir(async (root) => {
-      const target = join(root, "out");
-      const [success, attempts] = await call<[boolean, string[][]]>(
-        cloneAttemptsForTests,
-        "https://github.com/tintinweb/pi-supervisor",
-        target,
-        true,
-        [false, true],
+        1000,
+        {
+          fetch: async (input: string) => {
+            requestedUrl = input;
+            return new Response("archive");
+          },
+          extract: async (_archive: Uint8Array, destination: string) => {
+            const extracted = join(destination, "pi-supervisor-main");
+            mkdirSync(extracted, { recursive: true });
+            writeFileSync(join(extracted, "package.json"), "{}");
+          },
+        },
       );
 
       assert.equal(success, true);
-      assert.equal(attempts.length, 2);
-      assert.equal(attempts[0]![0], "gh");
-      assert.equal(attempts[1]![0], "git");
-      assert.equal(attempts[1]![3], "https://github.com/tintinweb/pi-supervisor");
+      assert.equal(requestedUrl, "https://codeload.github.com/tintinweb/pi-supervisor/tar.gz/HEAD");
+      assert.equal(readFileSync(join(target, "package.json"), "utf8"), "{}");
     });
   });
 
@@ -1493,7 +1451,6 @@ const check = file.content.includes("\\nrename from ") || file.content.startsWit
 `,
       );
       writeFile(join(sourceRepo, "src", "index.ts"), "export default {}\n");
-      initGitRepo(sourceRepo);
 
       const buildRepo = join(repos, "build-pkg");
       writeFile(
@@ -1508,7 +1465,6 @@ const check = file.content.includes("\\nrename from ") || file.content.startsWit
 }
 `,
       );
-      initGitRepo(buildRepo);
 
       writeFile(
         join(root, ".config", "agents", "harnesses", "pi", "agent", "packages.json"),

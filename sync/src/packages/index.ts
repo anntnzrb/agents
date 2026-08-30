@@ -17,12 +17,7 @@ import {
 } from "./source.ts";
 import { packageHasBuildScript, packageIsHealthy } from "./validate.ts";
 
-export {
-  cloneAttemptsForTests,
-  commandForTests,
-  githubSlugForTests,
-  packageCacheDir,
-} from "./source.ts";
+export { clonePackage, packageCacheDir } from "./source.ts";
 export {
   extractImportSpecifiers,
   missingPackageRoots,

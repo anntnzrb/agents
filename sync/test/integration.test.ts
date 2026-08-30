@@ -165,7 +165,6 @@ test("integration_invalid_package_json_fails_package_bootstrap", () => {
     const badRepo = join(root, "repos", "bad-pkg");
     mkdirSync(badRepo, { recursive: true });
     writeFileSync(join(badRepo, "package.json"), "{not valid json");
-    initGitRepo(badRepo);
 
     writeFileSync(
       join(home, ".config", "agents", "harnesses", "pi", "agent", "packages.json"),
@@ -388,26 +387,6 @@ mkdirSync("dist", { recursive: true });
 writeFileSync("dist/index.js", "export default {}\\n");
 `,
   );
-  initGitRepo(sourceRepo);
-  initGitRepo(buildRepo);
-}
-
-function initGitRepo(repoPath: string): void {
-  const commands = [
-    ["git", "init"],
-    ["git", "config", "user.name", "Test User"],
-    ["git", "config", "user.email", "test@example.com"],
-    ["git", "add", "."],
-    ["git", "commit", "-m", "init"],
-  ];
-  for (const command of commands) {
-    const result = Bun.spawnSync(command, {
-      cwd: repoPath,
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    assert.equal(result.exitCode, 0, result.stderr.toString() || result.stdout.toString());
-  }
 }
 
 function runSyncProcess(home: string): RunResult {
