@@ -48,11 +48,8 @@ export const shouldReviewAtomicity = (input: AtomicityProposalInput): boolean =>
 };
 
 export const buildAtomicityCriticPrompt = (input: AtomicityProposalInput, diffText: string): string => {
-    if (diffText.length > MAX_ATOMICITY_DIFF_CHARS) {
-        throw new RangeError(
-            `Atomicity critic diff exceeds the maximum of ${MAX_ATOMICITY_DIFF_CHARS} characters (received ${diffText.length} characters)`,
-        );
-    }
+    const truncated = diffText.length > MAX_ATOMICITY_DIFF_CHARS;
+    const renderedDiff = truncated ? diffText.slice(0, MAX_ATOMICITY_DIFF_CHARS) : diffText;
     const details = input.details.length === 0 ? "(none)" : input.details.map((detail, index) => `${index + 1}. ${detail}`).join("\n");
     return [
         "Review the following provisional proposal for atomicity.",
@@ -63,10 +60,15 @@ export const buildAtomicityCriticPrompt = (input: AtomicityProposalInput, diffTe
         `Details:\n${details}`,
         `Staged file count: ${input.stagedFileCount}`,
         `Changed hunk count: ${input.changedHunkCount}`,
-        "Exact cached diff (preserve this text exactly):",
-        "----- BEGIN EXACT CACHED DIFF -----",
-        diffText,
-        "----- END EXACT CACHED DIFF -----",
+        ...(truncated
+            ? [
+                `The cached diff exceeds the reviewable limit of ${MAX_ATOMICITY_DIFF_CHARS} characters and has been truncated to that length.`,
+            ]
+            : []),
+        "Cached diff (truncated if necessary):",
+        "----- BEGIN CACHED DIFF -----",
+        renderedDiff,
+        "----- END CACHED DIFF -----",
     ].join("\n");
 };
 

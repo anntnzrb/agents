@@ -172,8 +172,8 @@ describe("atomicity critic prompt", () => {
   test("accepts a diff exactly at the fixed character limit without changing it", () => {
     const diffText = "x".repeat(MAX_ATOMICITY_DIFF_CHARS);
     const prompt = buildAtomicityCriticPrompt(proposal(), diffText);
-    const startMarker = "----- BEGIN EXACT CACHED DIFF -----\n";
-    const endMarker = "\n----- END EXACT CACHED DIFF -----";
+    const startMarker = "----- BEGIN CACHED DIFF -----\n";
+    const endMarker = "\n----- END CACHED DIFF -----";
     const start = prompt.indexOf(startMarker) + startMarker.length;
     const end = prompt.indexOf(endMarker, start);
 
@@ -181,12 +181,15 @@ describe("atomicity critic prompt", () => {
     expect(prompt.slice(start, end)).toBe(diffText);
   });
 
-  test("rejects a diff over the fixed character limit with its exact size", () => {
+  test("truncates a diff over the fixed character limit and notes the limit", () => {
     const diffText = "x".repeat(MAX_ATOMICITY_DIFF_CHARS + 1);
+    const prompt = buildAtomicityCriticPrompt(proposal(), diffText);
 
-    expect(() => buildAtomicityCriticPrompt(proposal(), diffText)).toThrow(
-      new RegExp(`${diffText.length} characters`),
-    );
+    expect(prompt).toContain(String(MAX_ATOMICITY_DIFF_CHARS));
+    expect(prompt).toContain("truncated");
+    expect(prompt).toContain(diffText.slice(0, MAX_ATOMICITY_DIFF_CHARS));
+    expect(prompt).not.toContain(diffText);
   });
+
 });
 
