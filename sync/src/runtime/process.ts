@@ -124,7 +124,7 @@ export const runProcess = async (
     ...(options.cwd ? { cwd: options.cwd } : {}),
     env: childEnv,
     detached: true,
-    stdin: "ignore",
+    stdin: options.stdio === "inherit" ? "inherit" : "ignore",
     stdout: options.stdio ?? "pipe",
     stderr: options.stdio ?? "pipe",
   });

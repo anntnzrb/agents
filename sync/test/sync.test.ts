@@ -418,6 +418,16 @@ test("process_timeout_sleeping_fake_uv", async () => {
   });
 });
 
+test("process_inherit_preserves_terminal_stdin", async () => {
+  if (!process.stdin.isTTY) {
+    return;
+  }
+
+  const result = await runProcess(["sh", "-c", "test -t 0"], { stdio: "inherit" });
+
+  assert.equal(result.exitCode, 0);
+});
+
 test("process_timeout_kills_descendant_holding_stdout", async () => {
   await withTempDir(async (root) => {
     const fixture = join(root, "descendant.ts");
