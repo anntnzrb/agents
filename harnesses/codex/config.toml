@@ -12,10 +12,9 @@ web_search = "live"
 # MODEL
 # -----------------------------------------------------------------------------
 
-model = "chatgpt/nnn-gpt-5.6-terra-max-fast"
-model_provider = "cliproxy"
-review_model = "chatgpt/nnn-gpt-5.6-terra-max-fast"
-# model_reasoning_effort = "high"
+model = "gpt-5.6-luna"
+review_model = "gpt-5.6-luna"
+model_reasoning_effort = "max"
 model_verbosity = "low"
 model_reasoning_summary = "detailed"
 personality = "pragmatic"
@@ -26,11 +25,6 @@ personality = "pragmatic"
 
 approval_policy = "never"
 default_permissions = ":danger-full-access"
-
-[model_providers.cliproxy]
-name = "CLIProxyAPI"
-base_url = "${CLIPROXY_CLIENT_BASE_URL}"
-wire_api = "responses"
 
 # light theme
 [desktop.appearanceLightChromeTheme]
@@ -63,7 +57,7 @@ skill = "#1eff5a"
 
 [shell_environment_policy]
 # "all", "core", "none"
-inherit = "core"
+inherit = "all"
 
 # -----------------------------------------------------------------------------
 # FEATURES
@@ -129,7 +123,7 @@ hide_spawn_agent_metadata = false
 expose_spawn_agent_model_overrides = true
 
 [agents.explorer]
-description = "Read-only codebase explorer that returns structured evidence."
+description = "Codebase explorer with full local tool access that returns structured evidence."
 config_file = "agents/explorer.toml"
 
 [agents.code-reviewer]
