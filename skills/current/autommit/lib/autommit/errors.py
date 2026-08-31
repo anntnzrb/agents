@@ -1,4 +1,3 @@
-# ruff: noqa: CPY001, D107
 """Expected autommit failures and process exit codes."""
 
 from __future__ import annotations
