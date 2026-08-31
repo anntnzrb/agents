@@ -1,4 +1,3 @@
-# ruff: noqa: BLE001, C901, CPY001, D102, E501, EM101, PLR0912
 """Command-line boundary for the portable autommit protocol."""
 
 from __future__ import annotations
@@ -8,6 +7,8 @@ import json
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Never
+
+from expression import Error, Ok, Result
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -58,7 +59,9 @@ def build_parser() -> Parser:
     return parser
 
 
-def _prepare_arguments(values: Sequence[str]) -> argparse.Namespace:
+def _prepare_arguments(
+    values: Sequence[str],
+) -> Result[argparse.Namespace, AutommitError]:
     context: list[str] = []
     repository = "."
     passthrough = False
@@ -72,7 +75,7 @@ def _prepare_arguments(values: Sequence[str]) -> argparse.Namespace:
         elif value in {"--context", "--repo"}:
             index += 1
             if index >= len(values) or not values[index]:
-                raise AutommitError("usage_error", f"{value} requires a value")
+                return Error(AutommitError("usage_error", f"{value} requires a value"))
             if value == "--context":
                 context.append(values[index])
             else:
@@ -80,18 +83,18 @@ def _prepare_arguments(values: Sequence[str]) -> argparse.Namespace:
         elif value.startswith("--context="):
             item = value.removeprefix("--context=")
             if not item:
-                raise AutommitError("usage_error", "--context requires a value")
+                return Error(AutommitError("usage_error", "--context requires a value"))
             context.append(item)
         elif value.startswith("--repo="):
             repository = value.removeprefix("--repo=")
             if not repository:
-                raise AutommitError("usage_error", "--repo requires a value")
+                return Error(AutommitError("usage_error", "--repo requires a value"))
         elif value.startswith("-"):
-            raise AutommitError("usage_error", f"Unsupported option: {value}")
+            return Error(AutommitError("usage_error", f"Unsupported option: {value}"))
         else:
             context.append(value)
         index += 1
-    return argparse.Namespace(command="prepare", context=context, repo=repository)
+    return Ok(argparse.Namespace(command="prepare", context=context, repo=repository))
 
 
 def _schema() -> dict[str, object]:
@@ -157,9 +160,11 @@ def _emit(payload: dict[str, object], *, error: bool = False) -> None:
     stream.write(json.dumps(payload, separators=(",", ":"), ensure_ascii=False) + "\n")
 
 
-def _dispatch(arguments: argparse.Namespace) -> object:
+def _dispatch(
+    arguments: argparse.Namespace,
+) -> Result[object, AutommitError]:
     if arguments.command == "schema":
-        return _schema()
+        return Ok(_schema())
     cwd = Path(arguments.repo).resolve()
     if arguments.command == "prepare":
         return prepare(cwd, tuple(arguments.context))
@@ -177,7 +182,7 @@ def _dispatch(arguments: argparse.Namespace) -> object:
             arguments.plan_file,
             arguments.decision_file,
         )
-    raise AutommitError("usage_error", "Unknown command.")
+    return Error(AutommitError("usage_error", "Unknown command."))
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -189,7 +194,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         if command == "prepare" and not any(
             value in {"-h", "--help"} for value in values[1:]
         ):
-            arguments = _prepare_arguments(values[1:])
+            match _prepare_arguments(values[1:]):
+                case Result(tag="ok", ok=parsed_args):
+                    arguments = parsed_args
+                case Result(tag="error", error=err):
+                    _emit(_failure(command, err), error=True)
+                    return err.exit_code
+                case _:
+                    return 2
         else:
             arguments = parser.parse_args(values)
         command = arguments.command
@@ -201,7 +213,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         error = AutommitError("interrupted", "Autommit was interrupted.", 4)
         _emit(_failure(command, error), error=True)
         return error.exit_code
-    except Exception:
+    except Exception:  # noqa: BLE001
         error = AutommitError(
             "runtime_error",
             "Autommit failed unexpectedly; repository state was preserved.",
@@ -209,5 +221,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         _emit(_failure(command, error), error=True)
         return error.exit_code
-    _emit(_success(command, result))
-    return 0
+
+    match result:
+        case Result(tag="ok", ok=data):
+            _emit(_success(command, data))
+            return 0
+        case Result(tag="error", error=err):
+            _emit(_failure(command, err), error=True)
+            return err.exit_code
+        case _:
+            return 2

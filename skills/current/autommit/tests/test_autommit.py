@@ -1,4 +1,3 @@
-# ruff: noqa: CPY001, D102, INP001, PT009, S607
 """Behavioral tests for the portable autommit CLI."""
 
 from __future__ import annotations
@@ -6,12 +5,24 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
+
+from expression import Option, Result
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(SKILL_ROOT / "lib"))
+
+from autommit.git import run_git
+from autommit.proposal import (
+    normalize_atomicity_decision,
+    normalize_proposal,
+)
+from autommit.transaction import Receipt, read_receipt, write_receipt
+
 CLI = SKILL_ROOT / "scripts" / "cli.py"
 SCHEMA = "autommit/v1"
 
@@ -53,7 +64,7 @@ class AutommitCliTests(unittest.TestCase):
         cwd: Path | None = None,
         check: bool = True,
     ) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(  # noqa: S603
+        return subprocess.run(
             ["git", *args],
             cwd=cwd or self.repo,
             check=check,
@@ -67,7 +78,7 @@ class AutommitCliTests(unittest.TestCase):
         *args: str,
         expected_code: int = 0,
     ) -> dict[str, Any]:
-        completed = subprocess.run(  # noqa: S603
+        completed = subprocess.run(
             ["uv", "run", "--quiet", "--script", str(CLI), *args],
             cwd=self.repo,
             check=False,
@@ -125,7 +136,7 @@ class AutommitCliTests(unittest.TestCase):
         self.assertIn("apply", result["commands"])
         self.assertFalse((self.repo / ".git" / "autommit").exists())
 
-        completed = subprocess.run(  # noqa: S603
+        completed = subprocess.run(
             ["uv", "run", "--quiet", "--script", str(CLI), "--help"],
             cwd=self.repo,
             check=False,
@@ -359,7 +370,7 @@ class AutommitCliTests(unittest.TestCase):
 
     def test_context_options_match_the_pi_command_contract(self) -> None:
         (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
-        completed = subprocess.run(  # noqa: S603
+        completed = subprocess.run(
             [
                 "uv",
                 "run",
@@ -465,6 +476,115 @@ class AutommitCliTests(unittest.TestCase):
         )["result"]
         self.assertEqual(result["status"], "committed")
         self.assertEqual(self.git("show", f"HEAD:{filename}").stdout, "content\n")
+
+
+class AutommitFunctionalTests(unittest.TestCase):
+    """Unit tests for functional Result and Option types with Expression."""
+
+    def test_normalize_proposal_result(self) -> None:
+        valid_payload: dict[str, object] = {
+            "commits": [
+                {
+                    "summary": "feat: add feature",
+                    "details": ["some detail"],
+                    "changes": [
+                        {
+                            "path": "foo.py",
+                            "hunks": "all",
+                        }
+                    ],
+                }
+            ]
+        }
+        match normalize_proposal(valid_payload):
+            case Result(tag="ok", ok=proposal):
+                self.assertEqual(len(proposal.commits), 1)
+                self.assertEqual(proposal.commits[0].summary, "feat: add feature")
+            case _:
+                self.fail("Expected Ok(CommitProposal)")
+
+        invalid_payload: dict[str, object] = {"commits": []}
+        match normalize_proposal(invalid_payload):
+            case Result(tag="error", error=err):
+                self.assertEqual(err.code, "invalid_plan")
+            case _:
+                self.fail("Expected Error for empty commits")
+
+    def test_normalize_atomicity_decision_result(self) -> None:
+        valid_accept: dict[str, object] = {
+            "decision": "accept",
+            "concerns": cast("list[object]", []),
+            "rationale": "Looks good and cohesive.",
+        }
+        match normalize_atomicity_decision(valid_accept):
+            case Result(tag="ok", ok=decision):
+                self.assertEqual(decision.decision, "accept")
+            case _:
+                self.fail("Expected Ok for valid accept decision")
+
+        invalid_accept: dict[str, object] = {
+            "decision": "accept",
+            "concerns": ["concern 1", "concern 2"],
+            "rationale": "Cannot have concerns with accept.",
+        }
+        match normalize_atomicity_decision(invalid_accept):
+            case Result(tag="error", error=err):
+                self.assertEqual(err.code, "invalid_atomicity_decision")
+            case _:
+                self.fail("Expected Error for accept with concerns")
+
+    def test_run_git_result(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            match run_git(repo, "init", "-b", "main"):
+                case Result(tag="ok"):
+                    pass
+                case _:
+                    self.fail("Expected Ok from run_git init")
+
+            match run_git(repo, "non-existent-subcommand"):
+                case Result(tag="error", error=err):
+                    self.assertEqual(err.code, "git_error")
+                case _:
+                    self.fail("Expected Error from run_git invalid subcommand")
+
+    def test_receipt_option_result(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            common_dir = Path(temp_dir)
+            match read_receipt(common_dir):
+                case Result(tag="ok", ok=receipt_opt):
+                    match receipt_opt:
+                        case Option(tag="none"):
+                            pass
+                        case _:
+                            self.fail("Expected Nothing for absent receipt")
+                case _:
+                    self.fail("Expected Ok(Nothing)")
+
+            receipt = Receipt(
+                version=1,
+                state="prepared",
+                ref="refs/heads/main",
+                before="1" * 40,
+                after="2" * 40,
+                index_tree="3" * 40,
+            )
+            match write_receipt(common_dir, receipt):
+                case Result(tag="ok"):
+                    pass
+                case _:
+                    self.fail("Expected Ok from write_receipt")
+
+            match read_receipt(common_dir):
+                case Result(tag="ok", ok=receipt_opt):
+                    match receipt_opt:
+                        case Option(tag="some", some=read_back):
+                            self.assertEqual(read_back.ref, "refs/heads/main")
+                            self.assertEqual(read_back.after, "2" * 40)
+                        case _:
+                            self.fail("Expected Some(Receipt)")
+                case _:
+                    self.fail("Expected Ok(Some(Receipt))")
 
 
 if __name__ == "__main__":

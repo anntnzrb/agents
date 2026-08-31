@@ -1,7 +1,8 @@
-# ruff: noqa: CPY001
 # /// script
 # requires-python = ">=3.11"
-# dependencies = []
+# dependencies = [
+#     "expression>=5.7.0",
+# ]
 # ///
 """Run the harness-agnostic autommit CLI."""
 

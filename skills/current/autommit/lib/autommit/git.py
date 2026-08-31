@@ -1,4 +1,3 @@
-# ruff: noqa: CPY001, EM102, S607, TC003, TRY003
 """Small subprocess boundary for Git."""
 
 from __future__ import annotations
@@ -8,7 +7,9 @@ import subprocess
 from pathlib import Path
 from typing import Final
 
-from autommit.errors import GitError, GitMissingError
+from expression import Error, Ok, Result
+
+from autommit.errors import AutommitError, GitError, GitMissingError
 
 GIT_ENVIRONMENT: Final[dict[str, str]] = {
     "GIT_TERMINAL_PROMPT": "0",
@@ -16,10 +17,10 @@ GIT_ENVIRONMENT: Final[dict[str, str]] = {
 }
 
 
-def run_git(cwd: Path, *args: str) -> str:
-    """Run Git without a shell and return stdout."""
+def run_git(cwd: Path, *args: str) -> Result[str, AutommitError]:
+    """Run Git without a shell and return stdout wrapped in a Result."""
     try:
-        completed = subprocess.run(  # noqa: S603
+        completed = subprocess.run(
             ["git", *args],
             cwd=cwd,
             check=False,
@@ -29,21 +30,23 @@ def run_git(cwd: Path, *args: str) -> str:
             errors="surrogateescape",
             env={**os.environ, **GIT_ENVIRONMENT},
         )
-    except FileNotFoundError as error:
-        raise GitMissingError from error
+    except FileNotFoundError:
+        return Error(GitMissingError())
     if completed.returncode != 0:
         detail = completed.stderr.strip() or completed.stdout.strip()
         if not detail:
             detail = f"exit code {completed.returncode}"
         command = " ".join(("git", *args))
-        raise GitError(f"{command} failed: {detail}")
-    return completed.stdout
+        return Error(GitError(f"{command} failed: {detail}"))
+    return Ok(completed.stdout)
 
 
-def try_git(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def try_git(
+    cwd: Path, *args: str
+) -> Result[subprocess.CompletedProcess[str], AutommitError]:
     """Run Git when the caller needs to interpret a nonzero status."""
     try:
-        return subprocess.run(  # noqa: S603
+        completed = subprocess.run(
             ["git", *args],
             cwd=cwd,
             check=False,
@@ -53,5 +56,6 @@ def try_git(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
             errors="surrogateescape",
             env={**os.environ, **GIT_ENVIRONMENT},
         )
-    except FileNotFoundError as error:
-        raise GitMissingError from error
+    except FileNotFoundError:
+        return Error(GitMissingError())
+    return Ok(completed)
