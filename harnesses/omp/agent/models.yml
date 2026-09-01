@@ -13,7 +13,6 @@ providers:
       type: openai-models-list
   cmd:
     baseUrl: https://api.commandcode.ai/provider/v1
-    apiKey: COMMAND_CODE_API_KEY
     api: openai-completions
     discovery:
       type: openai-models-list
