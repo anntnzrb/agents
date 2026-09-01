@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: nix-clan-2605
 description: "Use when Clan 26.05 inventory, services, vars, deployment, migrations, or NixOS workflow docs are involved."
 license: AGPL-3.0-or-later

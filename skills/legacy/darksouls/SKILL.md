@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: darksouls
 description: "Use for Dark Souls Remastered builds, mechanics, routes, mods, saves, or spoiler-safe help."
 license: AGPL-3.0-or-later

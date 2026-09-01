@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: world-cup-forecast
 description: "Use when forecasting a World Cup match from current scores, odds, form, xG, players, or source disagreement."
 license: AGPL-3.0-or-later

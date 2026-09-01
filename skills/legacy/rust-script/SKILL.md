@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: rust-script
 description: "Use when creating or debugging a single-file Rust script with Cargo, rust-script, or an embedded manifest."
 license: AGPL-3.0-or-later

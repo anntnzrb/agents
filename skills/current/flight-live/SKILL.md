@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: flight-live
 description: "Use when the user asks to search live flights, compare dates or fares, or rank travel options."
 license: AGPL-3.0-or-later

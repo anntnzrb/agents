@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: polymarket-query
 description: "Use when reading public Polymarket markets, events, CLOB prices, books, or aggregates without account access."
 license: AGPL-3.0-or-later

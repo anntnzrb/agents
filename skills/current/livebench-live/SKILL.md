@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: livebench-live
 description: "Use when the user asks for official LiveBench releases, categories, tasks, model scores, or published costs."
 license: AGPL-3.0-or-later

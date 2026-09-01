@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: market-hunter
 description: "Search, compare, verify, and score AI subscriptions, licenses, and digital accounts across deal marketplaces."
 license: AGPL-3.0-or-later

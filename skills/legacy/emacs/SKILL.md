@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: emacs
 description: "Use when Emacs, Emacs Lisp, init.el, packages, keybindings, automation, or runtime state are involved."
 license: AGPL-3.0-or-later

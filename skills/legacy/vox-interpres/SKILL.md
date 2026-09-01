@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: vox-interpres
 description: "Use when audio needs tempo, key, section, energy, metadata, codec, or segment analysis."
 license: AGPL-3.0-or-later

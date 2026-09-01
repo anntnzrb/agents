@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: technical-writing
 description: "Use for documentation, RFCs, READMEs, PR text, commit messages, or other developer-facing technical prose."
 license: AGPL-3.0-or-later

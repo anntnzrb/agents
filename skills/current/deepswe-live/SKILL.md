@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: deepswe-live
 description: "Use when the user asks about published DeepSWE scores, metrics, versions, or model efficiency."
 license: AGPL-3.0-or-later

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: jupyter
 description: "Use when .ipynb files or Jupyter notebooks must be executed, inspected, validated, converted, or debugged."
 license: AGPL-3.0-or-later

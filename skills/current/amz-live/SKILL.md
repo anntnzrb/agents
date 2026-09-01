@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: amz-live
 description: "Use when the user asks to search, compare, price, or recommend Amazon products from live catalog data."
 license: AGPL-3.0-or-later

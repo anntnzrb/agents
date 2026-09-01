@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: vercel-cli
 description: "Use when Vercel projects, deployments, environments, domains, logs, integrations, or CI/CD must be operated."
 license: AGPL-3.0-or-later

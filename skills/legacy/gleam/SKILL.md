@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: gleam
 description: "Use when Gleam, gleam.toml, BEAM, Erlang interop, TDD, or type-driven Gleam code are involved."
 license: AGPL-3.0-or-later

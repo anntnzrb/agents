@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: how
 description: "Use when the user asks how something works, wants a walkthrough before changes, or requests design critique."
 license: AGPL-3.0-or-later

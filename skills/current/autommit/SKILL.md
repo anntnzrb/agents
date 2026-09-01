@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: autommit
 description: "Use when the user asks for autommit, unattended commits, atomic commit splitting, recovery, or publication."
 license: AGPL-3.0-or-later

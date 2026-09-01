@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: tdd
 description: "Use when the user requests TDD or a bug has a cheap local failing-test path before the fix."
 license: AGPL-3.0-or-later

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: odoo-ops
 description: "Use when running Odoo 17 dev server, test runner, linter/formatter, and inspecting workspaces or databases."
 license: AGPL-3.0-or-later

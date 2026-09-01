@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: unslop
 description: "Use when asked to deslop, remove AI writing patterns, clean prose, or perform bounded behavior-preserving code cleanup."
 license: AGPL-3.0-or-later

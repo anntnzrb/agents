@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: ast-grep
 description: "Use when code search needs AST structure, ast-grep, sg, structural matching, or read-only find-usages."
 license: AGPL-3.0-or-later

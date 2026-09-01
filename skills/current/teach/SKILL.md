@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: teach
 description: "Use when the user wants a plain explanation of a subsystem or change with how and why built together."
 license: AGPL-3.0-or-later

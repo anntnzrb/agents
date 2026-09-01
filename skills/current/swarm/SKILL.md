@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: swarm
 description: "Use when a task should fan out across parallel workers, independent slices, races, or best-of attempts."
 license: AGPL-3.0-or-later

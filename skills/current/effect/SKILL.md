@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: effect
 description: "Use when Effect, effect-ts, Effect v4, @effect/*, Effect Schema, Layers, fibers, services, or runtimes appear."
 license: AGPL-3.0-or-later

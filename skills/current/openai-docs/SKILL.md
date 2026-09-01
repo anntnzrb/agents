@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: openai-docs
 description: "Use when OpenAI or Codex APIs, models, configuration, or behavior require current official documentation."
 license: AGPL-3.0-or-later

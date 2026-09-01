@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: remove-ai-slops
 description: "Use when asked to deslop, review, or clean AI-generated code in a bounded diff without changing behavior."
 license: AGPL-3.0-or-later

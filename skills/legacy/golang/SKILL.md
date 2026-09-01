@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: golang
 description: "Use when Go, .go files, go.mod, concurrency, HTTP, CLIs, databases, errors, or Go tests are involved."
 license: AGPL-3.0-or-later

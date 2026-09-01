@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: semantic-compression
 description: "Use when prompts or documents must be compressed aggressively while preserving meaning for an LLM."
 license: AGPL-3.0-or-later

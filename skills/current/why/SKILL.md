@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: why
 description: "Use when the user asks why code was built a certain way and the answer requires Git, PR, issue, or doc history."
 license: AGPL-3.0-or-later

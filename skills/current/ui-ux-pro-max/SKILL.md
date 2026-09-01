@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: ui-ux-pro-max
 description: "Use when designing, building, reviewing, or improving web or mobile UI, UX, layout, accessibility, or components."
 license: AGPL-3.0-or-later

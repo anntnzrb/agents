@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: nixpkgs-update
 description: "Use when updating a nixpkgs package or contributing a package bump with nix-update or nixpkgs-review."
 license: AGPL-3.0-or-later

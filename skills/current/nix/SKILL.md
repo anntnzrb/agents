@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: nix
 description: "Use when Nix, nixpkgs, flakes, NixOS, derivations, shells, or Home Manager are involved."
 license: AGPL-3.0-or-later

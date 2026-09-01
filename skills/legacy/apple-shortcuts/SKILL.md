@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: apple-shortcuts
 description: "Use when Apple Shortcuts, Shortcuts.app, .shortcut files, signing, automation, or debugging are involved."
 license: AGPL-3.0-or-later

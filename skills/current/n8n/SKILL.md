@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: n8n
 description: "Use when n8n workflows must be inspected or operated through the bundled REST CLI or targeted MCP tools."
 license: AGPL-3.0-or-later

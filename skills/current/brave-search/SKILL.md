@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: brave-search
 description: "Use when a quick current web, image, video, news, or local-result search is needed."
 license: AGPL-3.0-or-later

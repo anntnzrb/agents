@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: web-design-guidelines
 description: "Use when auditing web UI code for design, UX, accessibility, or guideline compliance."
 license: AGPL-3.0-or-later

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: java-oop-assignment
 description: "Use when completing a Java OOP or FOP assignment from a PDF specification with minimal compliant code."
 license: AGPL-3.0-or-later

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: image-manipulation-image-magick
 description: "Use when ImageMagick is requested for image resizing, conversion, batch edits, thumbnails, or metadata inspection."
 license: AGPL-3.0-or-later

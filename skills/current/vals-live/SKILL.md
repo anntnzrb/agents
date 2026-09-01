@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: vals-live
 description: "Use when the user asks to discover or compare official Vals benchmarks, model scores, cost, latency, or uncertainty."
 license: AGPL-3.0-or-later

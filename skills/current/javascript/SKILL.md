@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: javascript
 description: "Use when JavaScript, Node.js, browser JS, modules, async behavior, APIs, tests, or performance are involved."
 license: AGPL-3.0-or-later

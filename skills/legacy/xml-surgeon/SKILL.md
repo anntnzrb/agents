@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: xml-surgeon
 description: "Use when XML must be read or edited with XPath, minimal formatting changes, or batch operations."
 license: AGPL-3.0-or-later

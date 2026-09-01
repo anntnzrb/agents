@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: recall
 description: "Use when the user says recall my work, catch me up, or asks to reconstruct recent work from sessions and Git state."
 license: AGPL-3.0-or-later

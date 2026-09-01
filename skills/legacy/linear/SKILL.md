@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: linear
 description: "Use when Linear issues or projects must be read or changed through MCPorter."
 license: AGPL-3.0-or-later

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: commit
 description: "Use when the user asks to create, split, stage, unstage, amend, or polish Git commits or history."
 license: AGPL-3.0-or-later

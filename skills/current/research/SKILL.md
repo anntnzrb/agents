@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: research
 description: "Use when a task requires research, fact-checking, comparison, evidence gathering, or source selection."
 license: AGPL-3.0-or-later

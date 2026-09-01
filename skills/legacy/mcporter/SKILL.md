@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: mcporter
 description: "Use when MCP servers must be discovered, authenticated, inspected, configured, or called through MCPorter."
 license: AGPL-3.0-or-later

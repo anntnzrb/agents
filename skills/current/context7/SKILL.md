@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: context7
 description: "Use when current library, SDK, or API documentation and code examples must be fetched. For up-to-date documentation."
 license: AGPL-3.0-or-later

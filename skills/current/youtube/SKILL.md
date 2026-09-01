@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: youtube
 description: "Use when a YouTube or media URL must be inspected, downloaded, converted, extracted, listed, or explored."
 license: AGPL-3.0-or-later

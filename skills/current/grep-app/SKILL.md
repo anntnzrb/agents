@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: grep-app
 description: "Use when public GitHub code examples or real-world API and configuration usage must be found through Grep.app."
 license: AGPL-3.0-or-later

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: skill-creator
 description: "Use when creating, auditing, refactoring, validating, benchmarking, packaging, or tuning a skill and its triggers."
 license: AGPL-3.0-or-later

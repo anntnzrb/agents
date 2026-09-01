@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: jira
 description: "Use when Jira tickets must be searched, triaged, summarized, or created through the Atlassian CLI."
 license: AGPL-3.0-or-later

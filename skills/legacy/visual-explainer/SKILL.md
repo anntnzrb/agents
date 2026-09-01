@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: visual-explainer
 description: "Use when the user asks for a self-contained HTML visual explanation, diagram, plan review, diff review, or recap."
 license: AGPL-3.0-or-later

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: herdr
 description: "Use only when the user explicitly asks Herdr to control panes, tabs, workspaces, commands, agents, or sessions."
 license: AGPL-3.0-or-later

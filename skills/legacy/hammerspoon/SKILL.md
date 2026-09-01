@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: hammerspoon
 description: "Use when Hammerspoon, hs.*, Lua hotkeys, macOS windows, automation, or runtime state are involved."
 license: AGPL-3.0-or-later

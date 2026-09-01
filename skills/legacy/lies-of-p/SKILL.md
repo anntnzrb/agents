@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: lies-of-p
 description: "Use for Lies of P 1.12.0.0 or Overture builds, routes, platinum planning, mechanics, or spoiler-safe help."
 license: AGPL-3.0-or-later

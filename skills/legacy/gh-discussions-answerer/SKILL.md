@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: gh-discussions-answerer
 description: "Use when finding and answering unanswered GitHub Discussions for open-source contribution."
 license: AGPL-3.0-or-later

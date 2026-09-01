@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: bloodborne
 description: "Use for Bloodborne builds, mechanics, weapons, routing, farming, progression, or spoiler-safe help."
 license: AGPL-3.0-or-later

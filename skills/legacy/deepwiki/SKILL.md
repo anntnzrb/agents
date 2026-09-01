@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: deepwiki
 description: "Use when a public GitHub repository question needs DeepWiki documentation or codebase evidence."
 license: AGPL-3.0-or-later

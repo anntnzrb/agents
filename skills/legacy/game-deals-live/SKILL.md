@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: game-deals-live
 description: "Use when finding or verifying PC game prices, editions, bundles, regional access, fees, or checkout totals."
 license: AGPL-3.0-or-later

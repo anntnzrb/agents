@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: x-research
 description: "Use when public X or Twitter posts, timelines, searches, or conversations require bounded evidence."
 license: AGPL-3.0-or-later

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: data-visualization-engineering
 description: "Use when building or reviewing truthful, accessible data visualizations, charts, dashboards, or React visualizations."
 license: AGPL-3.0-or-later
