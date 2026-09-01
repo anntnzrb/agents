@@ -290,7 +290,7 @@ def test_get_paste_success(
 
     monkeypatch.setattr(httpx.Client, "get", mock_get)
 
-    ret = main(["--get", "testkey"])
+    ret = main(["--get", "https://pastes.dev/testkey"])
     if ret != EXIT_SUCCESS:
         msg = f"expected exit code 0, got {ret}"
         raise AssertionError(msg)
@@ -309,4 +309,19 @@ def test_file_not_found(capsys: pytest.CaptureFixture[str]) -> None:
     captured = capsys.readouterr()
     if "file not found" not in captured.err:
         msg = f"expected 'file not found' in stderr, got {captured.err}"
+        raise AssertionError(msg)
+
+
+def test_no_input_guided_error(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Test guidance error when invoked interactively with no file or stdin."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    ret = main([])
+    if ret != EXIT_USAGE_ERROR:
+        msg = f"expected exit code 2, got {ret}"
+        raise AssertionError(msg)
+    captured = capsys.readouterr()
+    if "--help" not in captured.err or "no input provided" not in captured.err:
+        msg = f"expected --help guidance in stderr, got {captured.err}"
         raise AssertionError(msg)

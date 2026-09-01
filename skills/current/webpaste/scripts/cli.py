@@ -325,10 +325,38 @@ def get_content_type(language: str) -> str:
     return f"text/{canonical}"
 
 
+EPILOG_EXAMPLES: Final[str] = """
+examples:
+  # Upload a local file (auto-detects language from extension)
+  webpaste src/main.rs
+
+  # Pipe generated code or logs via stdin with language override
+  git diff | webpaste -l diff
+  cat query.sql | webpaste -l sql
+
+  # Structured JSON output for agents and automation
+  webpaste --json src/config.json
+
+  # Retrieve existing paste content by key
+  webpaste --get <KEY>
+
+  # Output direct raw content URL
+  webpaste --raw-url src/app.py
+
+supported languages:
+  plain, log, yaml, json, xml, ini, java, javascript, typescript,
+  python, kotlin, scala, cpp, csharp, shell, ruby, rust, sql, go,
+  lua, swift, c, html, css, scss, php, graphql, diff, dockerfile,
+  markdown, proto
+"""
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct command-line argument parser."""
     parser = argparse.ArgumentParser(
-        description="Upload code or text to pastes.dev / bytebin.",
+        description="Upload code or text to pastes.dev.",
+        epilog=EPILOG_EXAMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "file",
@@ -395,26 +423,30 @@ def read_input(
             return Err(AppError(f"file not found: {file_arg}", EXIT_USAGE_ERROR))
         return Ok((input_path.read_bytes(), input_path))
 
+    no_input_guide = (
+        "no input provided. Pass a file path or pipe content via stdin.\n"
+        "Run with --help for options and examples:\n"
+        "  webpaste src/server.ts\n"
+        "  git diff | webpaste -l diff\n"
+        "  webpaste --get <KEY>"
+    )
+
     if is_atty:
-        return Err(
-            AppError(
-                "no input provided (pass a file path or pipe stdin)",
-                EXIT_USAGE_ERROR,
-            )
-        )
+        return Err(AppError(no_input_guide, EXIT_USAGE_ERROR))
 
     stdin_bytes = sys.stdin.buffer.read()
     if not stdin_bytes:
-        return Err(AppError("cannot upload empty content", EXIT_USAGE_ERROR))
+        return Err(AppError(no_input_guide, EXIT_USAGE_ERROR))
 
     return Ok((stdin_bytes, None))
 
 
 def execute_fetch(
-    base_url: str, key: str, user_agent: str, timeout: float
+    base_url: str, raw_key: str, user_agent: str, timeout: float
 ) -> Result[str, AppError]:
     """Fetch existing paste content from bytebin."""
-    url = f"{base_url.rstrip('/')}/{key.strip()}"
+    key = raw_key.strip().rstrip("/").split("/")[-1]
+    url = f"{base_url.rstrip('/')}/{key}"
     headers = {"User-Agent": user_agent}
     try:
         with httpx.Client(timeout=timeout) as client:
