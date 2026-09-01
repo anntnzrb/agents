@@ -26,19 +26,19 @@ uv run --script <skill-dir>/scripts/cli.py [OPTIONS] [FILE]
 
 ```bash
 # Upload a file (language inferred from file extension)
-uv run --script <skill-dir>/scripts/cli.py src/server.ts
+webpaste src/server.ts
 
 # Pipe stdin with explicit language or shebang detection
-git diff | uv run --script <skill-dir>/scripts/cli.py -l diff
+git diff | webpaste -l diff
 
 # Upload with JSON output for machine consumers
-uv run --script <skill-dir>/scripts/cli.py --json src/config.json
+webpaste --json src/config.json
 
 # Fetch / read raw content of an existing paste by key
-uv run --script <skill-dir>/scripts/cli.py --get <key>
+webpaste --get <key>
 
 # Target a custom base URL
-uv run --script <skill-dir>/scripts/cli.py --base-url http://localhost:8080/data/ src/app.py
+webpaste --base-url http://localhost:8080/data/ src/app.py
 ```
 
 ## Options
