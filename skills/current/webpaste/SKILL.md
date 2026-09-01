@@ -1,12 +1,12 @@
 ---
-name: paste
+name: webpaste
 description: "Use to upload code, diffs, logs, or text to pastes.dev via CLI or stdin with automatic syntax highlighting."
 license: AGPL-3.0-or-later
 metadata:
-  author: anntnzrb
+  author: anonymous
 ---
 
-# Paste
+# Webpaste
 
 Upload code snippets, git diffs, command logs, or text files to https://pastes.dev.
 
@@ -50,6 +50,7 @@ uv run --script <skill-dir>/scripts/cli.py --base-url http://localhost:8080/data
 - `--raw-url`: Output direct raw content URL.
 - `--get <KEY>`: Fetch and print content of an existing paste.
 - `--base-url <URL>`: API base URL (default: `https://api.pastes.dev/`).
+- `--user-agent <UA>`: User-Agent header string (default: `webpaste-cli/0.1.0`).
 - `--timeout <SEC>`: Network timeout in seconds (default: 15).
 - `--no-gzip`: Disable request body compression.
 
