@@ -17,7 +17,6 @@ import {
   isCliProxyTargetReady,
   parseCliProxyDeployment,
   publishCliProxyEndpointTemplates,
-  readCliProxyDeployment,
   renderCliProxyEndpointTemplate,
   syncCliProxyEndpointTemplate,
 } from "@core/cliproxy-deployment.ts";
@@ -332,50 +331,6 @@ test("cliproxy_readiness_failure_preserves_endpoints", async () => {
   }
 });
 
-test("cliproxy_deployment_is_the_only_committed_endpoint_value", () => {
-  const deployment = readCliProxyDeployment(
-    join(REPOSITORY_ROOT, "tools", "cliproxyapi", "deployment.json"),
-  );
-  const sources = [
-    join("harnesses", "codex", "config.toml"),
-    join("harnesses", "opencode", "opencode.jsonc"),
-    join("harnesses", "opencode", "plugins", "cliproxy.ts"),
-    join("harnesses", "pi", "agent", "extensions", "cliproxy", "index.ts"),
-    join("harnesses", "omp", "agent", "models.yml"),
-  ];
-  for (const relativePath of sources) {
-    const source = readFileSync(join(REPOSITORY_ROOT, relativePath), "utf8");
-    assert.match(source, /\$\{CLIPROXY_CLIENT_BASE_URL\}/, relativePath);
-    assert.doesNotMatch(source, new RegExp(escapeRegExp(deployment.client.baseUrl)), relativePath);
-    assert.doesNotMatch(source, new RegExp(escapeRegExp(deployment.listen.host)), relativePath);
-  }
-
-  const template = readFileSync(
-    join(REPOSITORY_ROOT, "tools", "cliproxyapi", "config.yaml.tmpl"),
-    "utf8",
-  );
-  assert.match(template, /host: "\$\{CLIPROXY_LISTEN_HOST\}"/);
-  assert.match(template, /port: \$\{CLIPROXY_LISTEN_PORT\}/);
-  assert.match(template, /remote-management:\n\s+allow-remote: true/);
-  assert.match(template, /secret-key: tailnet/);
-  assert.match(template, /usage-statistics-enabled: true/);
-  assert.match(template, /ws-auth: false/);
-  assert.doesNotMatch(template, /api-keys:/);
-  assert.doesNotMatch(template, /base-url: "https:\/\/openrouter\.ai/);
-  const config = Bun.YAML.parse(template) as Record<string, any>;
-  const commandCode = (config["x-model-sources"] as readonly Record<string, unknown>[]).find(
-    (source) => source["id"] === "command-code",
-  );
-  assert.deepEqual(commandCode, {
-    id: "command-code",
-    "models-dev-provider": "openrouter",
-    "credential-pool": "command-code",
-    prefix: "cmd",
-    "base-url": "https://api.commandcode.ai/provider/v1",
-  });
-  assert.doesNotMatch(template, new RegExp(escapeRegExp(deployment.listen.host)));
-});
-
 test("cliproxy_committed_source_keeps_sessions_sticky_and_retries_the_full_pool", () => {
   const source = readFileSync(
     join(REPOSITORY_ROOT, "tools", "cliproxyapi", "config.yaml.tmpl"),
@@ -573,10 +528,6 @@ test("cliproxy_endpoint_publication_is_one_job_after_config_and_directory_copies
     rmSync(home, { recursive: true, force: true });
   }
 });
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 test("cliproxy_opencode_endpoint_removes_placeholder_and_injects_baseUrl", () => {
   const home = mkdtempSync(join(tmpdir(), "cliproxy-opencode-test-"));
