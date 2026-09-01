@@ -10,7 +10,7 @@
     "lint": "oxlint .",
     "sync": "bun run ./src/cli.ts",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
+    "test": "bun test --parallel",
     "test:integration": "bun test ./test/integration.test.ts"
   },
   "dependencies": {
