@@ -17,7 +17,14 @@ MAX_NAME_CHARS = 64
 MAX_COMPATIBILITY_CHARS = 500
 EXPECTED_ARG_COUNT = 2
 
-ALLOWED_PROPERTIES = {"name", "description", "license", "metadata", "compatibility"}
+ALLOWED_PROPERTIES = {
+    "name",
+    "description",
+    "license",
+    "metadata",
+    "compatibility",
+    "disable-model-invocation",
+}
 
 
 def _load_frontmatter(skill_md: Path) -> tuple[bool, str | dict[str, object]]:
