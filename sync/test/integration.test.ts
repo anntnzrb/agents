@@ -15,6 +15,7 @@ import {
 import { hostname, tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER } from "@core/cliproxy-deployment.ts";
+import { sharedToolCacheEnv } from "./support/cache-env.ts";
 
 const SYNC_ROOT = resolve(import.meta.dir, "..");
 const TS_SYNC = resolve(SYNC_ROOT, "src/cli.ts");
@@ -249,6 +250,7 @@ test("integration_wrapper_forwards_arguments_to_faked_runtime", async () => {
         HOME: home,
         XDG_CACHE_HOME: join(home, ".cache"),
         PATH: Bun.env["PATH"] ?? "",
+        ...sharedToolCacheEnv,
       },
     });
 
@@ -503,6 +505,7 @@ async function runSyncProcess(home: string): Promise<RunResult> {
       HOME: home,
       XDG_CACHE_HOME: join(home, ".cache"),
       PATH: Bun.env["PATH"] ?? "",
+      ...sharedToolCacheEnv,
     },
   });
 

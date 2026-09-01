@@ -39,6 +39,7 @@ import {
 } from "@packages/index.ts";
 import { isErrno } from "@runtime/errors.ts";
 import { runCommandOutcome, runProcess } from "@runtime/process.ts";
+import { seedRuntimeRelease, sharedToolCacheEnv } from "./support/cache-env.ts";
 
 const SYNC_ROOT = resolve(import.meta.dir, "..");
 const SRC_ROOT = join(SYNC_ROOT, "src");
@@ -552,6 +553,7 @@ console.log(String(exit));
         ...Bun.env,
         HOME: root,
         PATH: Bun.env["PATH"] ?? "",
+        ...sharedToolCacheEnv,
       },
     });
 
@@ -1499,6 +1501,7 @@ function makeSyncEnv(root: string, installTimeoutMs = 10_000): SyncEnv {
   for (const file of ["package.json", "tsconfig.json", "bun.lock"]) {
     copyFileSync(join(SYNC_ROOT, file), join(syncSource, file));
   }
+  seedRuntimeRelease(root);
   writeFile(
     join(agentsRoot, "tools", "cliproxyapi", "deployment.json"),
     `${JSON.stringify(TEST_CLIPROXY_DEPLOYMENT)}\n`,
