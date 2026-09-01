@@ -1,5 +1,5 @@
 # Copyright (c) 2026
-"""Unit tests for paste CLI."""
+"""Unit tests for webpaste CLI."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from skills.current.paste.scripts.cli import (
+from skills.current.webpaste.scripts.cli import (
     EXIT_SUCCESS,
     EXIT_USAGE_ERROR,
     Err,

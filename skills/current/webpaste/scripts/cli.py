@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 import httpx
 
 DEFAULT_BASE_URL: Final[str] = "https://api.pastes.dev/"
-DEFAULT_USER_AGENT: Final[str] = "paste-cli/0.1.0"
+DEFAULT_USER_AGENT: Final[str] = "webpaste-cli/0.1.0"
 DEFAULT_TIMEOUT: Final[float] = 15.0
 
 EXIT_SUCCESS: Final[int] = 0
