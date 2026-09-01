@@ -1,4 +1,10 @@
 providers:
+  google-antigravity:
+    modelOverrides:
+      gemini-3.7-flash:
+        contextWindow: 500000
+      gemini-3.7-flash:thinking:
+        contextWindow: 500000
   cliproxy:
     baseUrl: ${CLIPROXY_CLIENT_BASE_URL}
     apiKey: "keyless"
