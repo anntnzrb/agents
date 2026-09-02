@@ -49,7 +49,7 @@ bun skills/current/<name>/scripts/cli.ts --help
 git diff --check
 ```
 
-Do not add a shell wrapper. For Python, put runtime dependencies in the PEP 723 metadata inside `scripts/cli.py`. For TypeScript and Bun, declare runtime dependencies in the skill's local `package.json`.
+Do not add a shell wrapper. For Python, put runtime dependencies in the PyPA inline script metadata (PEP 723) inside `scripts/cli.py`. For TypeScript and Bun, declare runtime dependencies in the skill's local `package.json`.
 
 ## Validate skill metadata
 
@@ -80,7 +80,7 @@ The next sync removes the managed copy from harness homes. Sync does not publish
 ### Python skills
 - Public entrypoint: `scripts/cli.py`, invoked as `uv run --script <skill-dir>/scripts/cli.py ...`.
 - Put reusable code in `lib/<module>/`; make `scripts/cli.py` add `lib/` to `sys.path`.
-- Declare inline dependencies in `scripts/cli.py` using PEP 723 script metadata.
+- Declare inline dependencies in `scripts/cli.py` using PyPA inline script metadata (PEP 723 `# /// script` block).
 
 ### TypeScript and Bun skills
 - Public entrypoint: `scripts/cli.ts`, invoked as `bun <skill-dir>/scripts/cli.ts ...`.
@@ -97,6 +97,7 @@ The next sync removes the managed copy from harness homes. Sync does not publish
   - When bundled docs exist, `SKILL.md` MUST include a required follow-up reads table with columns: `Need`, `Read`, `When`.
   - Reference files over 300 lines MUST start with a table of contents or equivalent section index.
   - Do not place large always-loaded docs in skill-package `AGENTS.md`; use `references/` and route to them from `SKILL.md`.
+- In `SKILL.md`, define the exact runnable entrypoint under `## Public entrypoint`. Worked examples in `## Common calls` and CLI `--help` text SHOULD use clean shorthand (e.g. `<command> <args>`) to minimize noise.
 
 ## Metadata budget
 
@@ -146,6 +147,7 @@ The next sync removes the managed copy from harness homes. Sync does not publish
 - Public run paths use `uv run --script` for Python and `bun <skill-dir>/scripts/cli.ts` for TypeScript; do not invoke raw `python`, `python3`, `pip`, `node`, or `npm`.
 - Never bridge across repository directories with upward-traversing `tsconfig.json` path hacks.
 - Docs use `<temp-dir>` and code uses `tempfile` or platform temp directories; avoid POSIX-only paths like `/tmp`.
+- Skill scripts, default headers (e.g. `User-Agent`), and prompt templates MUST NOT contain personal usernames, machine hostnames, or private URLs.
 
 ## Cross-platform code rules
 
@@ -161,6 +163,7 @@ The next sync removes the managed copy from harness homes. Sync does not publish
 ### Common exit code conventions
 - Print human errors to stderr.
 - Return `0` for successful execution.
+- Return `1` for runtime, network, or external service errors.
 - Return `2` for usage, configuration, or platform errors.
 - Return `124` when an outer execution timeout fires.
 - Return `127` for missing required external executables.
