@@ -157,9 +157,9 @@ snapcompact:
 
 ttsr:
   enabled: true
-  repeatMode: once
+  repeatMode: after-gap
+  repeatGap: 40
   builtinRules: true
-
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. FILES & EDITING ENGINE (Tab: files)
 # -----------------------------------------------------------------------------
