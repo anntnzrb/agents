@@ -10,4 +10,18 @@ scope:
   - tool:bash
 interruptMode: never
 ---
-Use `eval` for orchestration, JSON/JSONL/session/transcript analysis, filesystem batch work, deterministic config rewrites, and multi-step scripts. Use the managed eval environment; missing imports are handled by the `eval-packages` recovery rule. Avoid heredocs, shell loops, inline interpreter snippets, raw pip/pip3, and quote-heavy Bash when `eval` can run the logic directly.
+Always load `skill://python` when working with `eval`. Use `eval` for orchestration, telemetry, batch filesystem ops, config rewrites, and multi-step tasks. Avoid heredocs, shell loops, inline interpreter one-liners, and quote-heavy Bash.
+
+Proactively select the optimal tool over manual Python loops or raw text munging:
+
+| Domain / Workload | Preferred Tool | Key Use Case |
+|---|---|---|
+| **Tabular Data & Log Metrics** | `polars` | Fast columnar filtering, group-by, aggregations, Excel reads (`fastexcel`) |
+| **Direct File SQL / OLAP** | `duckdb` | Zero-copy SQL over Parquet, JSONL, CSV, SQLite files without memory bloat |
+| **Fuzzy Matching & Search** | `rapidfuzz` | `process.extract()`, Levenshtein distance, typo tolerance, error clustering |
+| **Dependency Graphs & Blast Radius** | `networkx` | Architectures, import/call graphs, cycle detection, shortest paths |
+| **HTTP & API Fetching** | `httpx` | Async/sync REST requests and structured JSON payload retrieval |
+| **Syntax, AST & Diffs** | `ast` / `difflib` | AST inspection/transforms, unified diffs, sequence matching (stdlib) |
+| **Sequences & Buffers** | `itertools` / `collections` | Combinatorics, chunking, `Counter` histograms, `deque` buffers (stdlib) |
+
+Distill, filter, and structure data inside `eval` first to maximize token density and eliminate context noise.
