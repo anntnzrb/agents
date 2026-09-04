@@ -383,7 +383,7 @@ speechgen:
 # ─────────────────────────────────────────────────────────────────────────────
 
 task:
-  enabled: false
+  enabled: true
   showResolvedModelBadge: false
   eager: false
   batch: false
