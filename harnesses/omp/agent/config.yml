@@ -370,7 +370,7 @@ security:
   enabled: false
 
 inspect_image:
-  enabled: false
+  mode: auto
 
 generate_image:
   enabled: false
