@@ -24,4 +24,4 @@ Proactively select the optimal tool over manual Python loops or raw text munging
 | **Syntax, AST & Diffs** | `ast` / `difflib` | AST inspection/transforms, unified diffs, sequence matching (stdlib) |
 | **Sequences & Buffers** | `itertools` / `collections` | Combinatorics, chunking, `Counter` histograms, `deque` buffers (stdlib) |
 
-Distill, filter, and structure data inside `eval` first to maximize token density and eliminate context noise.
+Distill, filter, and structure data inside `eval` first to maximize token density and eliminate context noise. Define `@tool` functions in `eval` to expose custom typed capabilities directly to subagents via `task(tools=[...])`.
