@@ -2,11 +2,11 @@
 name: eval-orchestration
 description: Prefer eval for in-memory data distillation, OLAP, and complex algorithms; never proxy specialized harness tools
 condition:
-  - '\b(eval|JSON|jsonl|session|transcript|analy[sz]e|aggregate|count|batch|parse|rank(?:ing)?|leaderboard|benchmark|telemetry|metrics?|triage|diagnostics?|polars|duckdb|rapidfuzz|networkx|AST|fuzzy|cluster|excel|xlsx|pdf|parquet|csv|rewrite config|filesystem|data munging|multi-step script|script)\b'
-  - '\b(?:python|node|bun)\s+-[ce]\b|\bjq\b|\bawk\b|\bwhile\b|\bfor\s+\w+\s+in\b|<<[A-Za-z_]'
+  - '\b(?:eval|polars|duckdb|rapidfuzz|networkx|leaderboard|xlsx|parquet|data\s+munging)\b'
+  - '\b(?:python|node|bun)\s+-[ce]\b|\bjq\b|\bawk\b|\bwhile\s+(?:true\b|read\b|\[|:|getopts\b)|\bfor\s+\w+\s+in\s|<<[A-Za-z_]'
+  - '\b(?:subprocess\.(?:run|Popen|check_output|check_call)|os\.(?:system|popen|walk))\b|\.(?:read_text|write_text)\(|open\([^)\n]{0,40}[''"]'
 scope:
   - text
-  - thinking
   - tool:bash
 interruptMode: never
 ---

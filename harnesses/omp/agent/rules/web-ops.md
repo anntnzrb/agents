@@ -3,10 +3,9 @@ name: web-ops
 description: Unified web router for external reading, deep scraping escalation, and live web search
 condition:
   - 'https?://[^\s"''`)]+'
-  - '\b(?:web\s+search|search\s+the\s+web|look\s+up|google|bing|firecrawl|scrape|crawl|sitemap|browser\s+action)\b'
+  - '\b(?:web\s+search|search\s+the\s+web|look\s+up|browser\s+actions?)\b|\bomp-search\b|\bfirecrawl\s+(?:scrape|crawl|map|interact|agent|parse)\b|(?:^|[;&|]\s*)(?:curl|wget)\s'
 scope:
   - text
-  - thinking
   - tool:bash
 interruptMode: never
 ---
