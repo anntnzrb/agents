@@ -2,7 +2,7 @@
 name: eval-orchestration
 description: Prefer eval for scripts, parsing, JSON, transcripts, and batch analysis
 condition:
-  - '\b(JSON|jsonl|session|transcript|analy[sz]e|aggregate|count|batch|parse|rewrite config|filesystem|data munging|multi-step script|script)\b'
+  - '\b(eval|JSON|jsonl|session|transcript|analy[sz]e|aggregate|count|batch|parse|rank(?:ing)?|leaderboard|benchmark|telemetry|metrics?|triage|diagnostics?|polars|duckdb|rapidfuzz|networkx|AST|fuzzy|cluster|excel|xlsx|pdf|parquet|csv|rewrite config|filesystem|data munging|multi-step script|script)\b'
   - '\b(?:python|node|bun)\s+-[ce]\b|\bjq\b|\bawk\b|\bwhile\b|\bfor\s+\w+\s+in\b|<<[A-Za-z_]'
 scope:
   - text
@@ -16,8 +16,9 @@ Proactively select the optimal tool over manual Python loops or raw text munging
 
 | Domain / Workload | Preferred Tool | Key Use Case |
 |---|---|---|
-| **Tabular Data & Log Metrics** | `polars` | Fast columnar filtering, group-by, aggregations, Excel reads (`fastexcel`) |
+| **Tabular Data & Log Metrics** | `polars` / `fastexcel` | Fast columnar filtering, group-by, aggregations, Excel `.xlsx` reads |
 | **Direct File SQL / OLAP** | `duckdb` | Zero-copy SQL over Parquet, JSONL, CSV, SQLite files without memory bloat |
+| **PDF & Document Extraction** | `pymupdf` | High-speed text/table extraction (`find_tables()`), layout & page rendering |
 | **Fuzzy Matching & Search** | `rapidfuzz` | `process.extract()`, Levenshtein distance, typo tolerance, error clustering |
 | **Dependency Graphs & Blast Radius** | `networkx` | Architectures, import/call graphs, cycle detection, shortest paths |
 | **HTTP & API Fetching** | `httpx` | Async/sync REST requests and structured JSON payload retrieval |
