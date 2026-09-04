@@ -1,6 +1,6 @@
 ---
 name: eval-orchestration
-description: Prefer eval for scripts, parsing, JSON, transcripts, and batch analysis
+description: Prefer eval for in-memory data distillation, OLAP, and complex algorithms; never proxy specialized harness tools
 condition:
   - '\b(eval|JSON|jsonl|session|transcript|analy[sz]e|aggregate|count|batch|parse|rank(?:ing)?|leaderboard|benchmark|telemetry|metrics?|triage|diagnostics?|polars|duckdb|rapidfuzz|networkx|AST|fuzzy|cluster|excel|xlsx|pdf|parquet|csv|rewrite config|filesystem|data munging|multi-step script|script)\b'
   - '\b(?:python|node|bun)\s+-[ce]\b|\bjq\b|\bawk\b|\bwhile\b|\bfor\s+\w+\s+in\b|<<[A-Za-z_]'
@@ -10,7 +10,13 @@ scope:
   - tool:bash
 interruptMode: never
 ---
-Always load `skill://python` when working with `eval`. Use `eval` for orchestration, telemetry, batch filesystem ops, config rewrites, and multi-step tasks. Avoid heredocs, shell loops, inline interpreter one-liners, and quote-heavy Bash.
+Always load `skill://python` when working with `eval`. Use `eval` strictly for in-memory data distillation, OLAP queries, complex algorithms, and dynamic `@tool` orchestration. Avoid heredocs, shell loops, inline interpreter one-liners, and quote-heavy Bash.
+
+**Tool-First Boundary:** Never use `eval` as a proxy to circumvent specialized harness tools:
+- Use `read` (with line selectors) to inspect code/text — avoid `Path.read_text()` or `open().read()`.
+- Use `glob` / `grep` for discovery — avoid `os.walk()` or `re.search()` file loops.
+- Use `bash` for toolchains, builds, tests, git, and CLIs — avoid `subprocess.run()`.
+- Use `edit` / `write` for file mutations — avoid `open('w').write()`.
 
 Proactively select the optimal tool over manual Python loops or raw text munging:
 
