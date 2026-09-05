@@ -4,7 +4,6 @@
 # ///
 """Run the Artificial Analysis CLI without installing the skill package."""
 
-# ruff: noqa: CPY001, E402
 from __future__ import annotations
 
 import sys

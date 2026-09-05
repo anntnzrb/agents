@@ -1,14 +1,14 @@
 """Offline tests for the Artificial Analysis contract primitives."""
 
-# ruff: noqa: CPY001, D103, INP001, PLR2004, S101
 from __future__ import annotations
 
 import math
-from enum import Enum
+from enum import StrEnum
 from http import HTTPStatus
+from typing import cast
 
-import _path  # noqa: F401
 import pytest
+
 from artificial_analysis.contracts import (
     COMPARISON_ELIGIBILITIES,
     DIAGNOSTIC_SEVERITIES,
@@ -73,11 +73,13 @@ def test_numeric_evidence_keeps_independent_statuses_and_raw_values() -> None:
         raw_value="source-token",
         normalized_value=42,
         unit="count",
-        value_status="missing",
-        metric_semantics_status="unknown",
-        comparison_eligibility="blocked",
+        value_status=cast("ValueStatus", cast("object", "missing")),
+        metric_semantics_status=cast(
+            "MetricSemanticsStatus", cast("object", "unknown")
+        ),
+        comparison_eligibility=cast("ComparisonEligibility", cast("object", "blocked")),
         blocked_reasons=("PLACEHOLDER_VALUE", "PLACEHOLDER_VALUE"),
-        input_paths=(1, "$.rows[0].value"),
+        input_paths=cast("tuple[str, ...]", cast("object", (1, "$.rows[0].value"))),
     )
 
     assert evidence.normalized_value is None
@@ -106,17 +108,19 @@ def test_numeric_evidence_keeps_independent_statuses_and_raw_values() -> None:
 @pytest.mark.parametrize("value", [True, False, math.nan, math.inf, -math.inf, "42"])
 def test_numeric_evidence_rejects_unsafe_normalized_values(value: object) -> None:
     with pytest.raises((TypeError, ValueError)):
-        NumericEvidence(raw_value=value, normalized_value=value)
+        _ = NumericEvidence(
+            raw_value=value, normalized_value=cast("int | float | None", value)
+        )
 
 
 def test_compact_json_is_deterministic_finite_and_collision_safe() -> None:
-    class Marker(str, Enum):
+    class Marker(StrEnum):
         VALUE = "value"
 
     assert compact_json({"set": {"b", "a"}, "marker": Marker.VALUE}) == (
         '{"marker":"value","set":["a","b"]}'
     )
     with pytest.raises(ValueError, match="collision"):
-        compact_json({1: "integer key", "1": "string key"})
+        _ = compact_json({1: "integer key", "1": "string key"})
     with pytest.raises(ValueError, match=r"non-finite"):
-        compact_json({"value": math.nan})
+        _ = compact_json({"value": math.nan})

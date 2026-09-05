@@ -1,17 +1,25 @@
 """RSC and official API contract tests."""
 
-# ruff: noqa: CPY001, D101, D102, E501, INP001, PLR2004, S101, SLF001
+# ruff: noqa: E501
 from __future__ import annotations
 
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from artificial_analysis.diagnostics import Diagnostic
 from unittest.mock import patch
 
-import _path  # noqa: F401
 import pytest
+
 from artificial_analysis import cli
+from artificial_analysis.cli import (
+    _coding_namespace,  # pyright: ignore[reportPrivateUsage]
+    _coding_payload,  # pyright: ignore[reportPrivateUsage]
+)
 from artificial_analysis.rsc import (
     ExtractionError,
     FetchResult,
@@ -26,7 +34,7 @@ from artificial_analysis.rsc import (
 
 class TestRscExtraction(unittest.TestCase):
     def test_extract_lists_uses_alias_keys(self) -> None:
-        frames = [
+        frames: list[tuple[str, object]] = [
             (
                 "x",
                 {
@@ -55,7 +63,7 @@ class TestRscExtraction(unittest.TestCase):
         assert len(hosts_models) == 2
 
     def test_extract_lists_uses_structural_heuristics(self) -> None:
-        frames = [
+        frames: list[tuple[str, object]] = [
             (
                 "x",
                 {
@@ -98,7 +106,7 @@ class TestRscExtraction(unittest.TestCase):
         assert len(hosts_models) == 2
 
     def test_extract_lists_normalizes_current_rows_schema(self) -> None:
-        frames = [
+        frames: list[tuple[str, object]] = [
             (
                 "x",
                 {
@@ -176,7 +184,6 @@ class TestRscExtraction(unittest.TestCase):
                 },
             ),
         ]
-
         models, hosts, hosts_models = extract_lists(frames)
 
         assert len(models) == 2
@@ -187,19 +194,25 @@ class TestRscExtraction(unittest.TestCase):
         assert first["slug"] == "provider-one_model-a"
         assert first["name"] == "Provider One / Model A"
         assert first["host_api_id"] == "provider-one-api"
-        assert first["model"]["model_creator_id"] == "creator-a"
-        assert first["host"]["website_url"] == "https://provider-one.example"
+        first_model = cast("dict[str, object]", first["model"])
+        assert first_model["model_creator_id"] == "creator-a"
+        first_host = cast("dict[str, object]", first["host"])
+        assert first_host["website_url"] == "https://provider-one.example"
         assert first["context_window_tokens"] == 128000
         assert first["supports_function_calling"] is True
         assert first["price_1m_input_tokens"] == 0.25
         assert first["price_1m_output_tokens"] == 1.25
         assert first["price_1m_blended_3_to_1"] == 0.5
-        assert first["timescaleData"]["median_output_speed"] == 82.4
-        assert first["timescaleData"]["median_time_to_first_chunk"] == 0.37
-        assert first["end_to_end_response_time_metrics"]["total_time"] == 2.8
+        timescale = cast("dict[str, object]", first["timescaleData"])
+        assert timescale["median_output_speed"] == 82.4
+        assert timescale["median_time_to_first_chunk"] == 0.37
+        e2e = cast("dict[str, object]", first["end_to_end_response_time_metrics"])
+        assert e2e["total_time"] == 2.8
 
-        assert hosts_models[1]["slug"] == "provider-two_model-b"
-        assert hosts_models[1]["model"]["model_creator_id"] == "creator-b"
+        second = hosts_models[1]
+        assert second["slug"] == "provider-two_model-b"
+        second_model = cast("dict[str, object]", second["model"])
+        assert second_model["model_creator_id"] == "creator-b"
 
     def test_parse_next_payload_extracts_embedded_flight_frames(self) -> None:
         document = (
@@ -212,7 +225,7 @@ class TestRscExtraction(unittest.TestCase):
         assert rows == [{"name": "Model A", "score": 72.5}]
 
     def test_extract_evaluation_rows_selects_largest_recognizable_list(self) -> None:
-        frames = [
+        frames: list[tuple[str, object]] = [
             (
                 "0",
                 {
@@ -231,10 +244,12 @@ class TestRscExtraction(unittest.TestCase):
 
     def test_extract_evaluation_rows_rejects_unrelated_lists(self) -> None:
         with pytest.raises(ExtractionError, match="recognizable model rows"):
-            extract_evaluation_rows([("0", {"rows": [{"value": 1}]})])
+            _ = extract_evaluation_rows(
+                cast("list[tuple[str, object]]", [("0", {"rows": [{"value": 1}]})])
+            )
 
     def test_snapshot_slugs_accepts_aliases(self) -> None:
-        snapshot = {
+        snapshot: dict[str, object] = {
             "endpoints": [
                 {"slug": "provider-1_model-1", "host_id": "h1", "model_id": "m1"},
                 {"slug": "provider-1_model-2", "host_id": "h1", "model_id": "m2"},
@@ -253,7 +268,7 @@ class TestRscExtraction(unittest.TestCase):
                 "output_json": str(Path(temp_dir) / "coding.json"),
                 **options,
             }
-            args = cli._coding_namespace(options)
+            args = _coding_namespace(options)
             result = SimpleNamespace(
                 body="ignored",
                 fetched_at="2026-07-13T00:00:00+00:00",
@@ -263,7 +278,7 @@ class TestRscExtraction(unittest.TestCase):
                 patch.object(cli, "fetch_rsc", return_value=result),
                 patch.object(cli, "parse_json_frames", return_value=frames),
             ):
-                return cli._coding_payload(args)
+                return _coding_payload(args)
 
     @staticmethod
     def _current_row(
@@ -309,7 +324,7 @@ class TestRscExtraction(unittest.TestCase):
         return row
 
     def test_coding_payload_normalizes_legacy_default_data(self) -> None:
-        frames = [
+        frames: list[tuple[str, object]] = [
             (
                 "legacy",
                 {
@@ -355,17 +370,21 @@ class TestRscExtraction(unittest.TestCase):
 
         payload = self._coding_payload(frames)
 
-        assert payload["counts"]["matched_models"] == 2
-        row = payload["rows"][0]
+        counts = cast("dict[str, object]", payload["counts"])
+        assert counts["matched_models"] == 2
+        rows = cast("list[dict[str, object]]", payload["rows"])
+        row = rows[0]
         assert row["model_slug"] == "legacy-alpha"
         assert row["coding"] == 81.2
-        assert row["coding_token_counts"]["input_tokens"] == 500
-        assert row["coding_token_counts"]["output_tokens"] == 300
-        assert row["coding_eval_cost"]["total_cost"] == 1.25
-        assert row["coding_eval_cost"]["answer_cost"] == 0.5
+        token_counts = cast("dict[str, object]", row["coding_token_counts"])
+        assert token_counts["input_tokens"] == 500
+        assert token_counts["output_tokens"] == 300
+        eval_cost = cast("dict[str, object]", row["coding_eval_cost"])
+        assert eval_cost["total_cost"] == 1.25
+        assert eval_cost["answer_cost"] == 0.5
 
     def test_coding_payload_normalizes_current_models_task_metrics(self) -> None:
-        frames = [
+        frames: list[tuple[str, object]] = [
             (
                 "current",
                 {
@@ -379,20 +398,23 @@ class TestRscExtraction(unittest.TestCase):
 
         payload = self._coding_payload(frames)
 
-        assert payload["counts"]["matched_models"] == 2
-        row = payload["rows"][0]
+        counts = cast("dict[str, object]", payload["counts"])
+        assert counts["matched_models"] == 2
+        rows = cast("list[dict[str, object]]", payload["rows"])
+        row = rows[0]
         assert row["model_slug"] == "current-alpha"
         assert row["short_name"] == "Current Alpha"
         assert row["creator"] == "OpenAI"
         assert row["coding"] == 88.4
         assert row["is_reasoning"]
         assert row["release_date"] == "2026-07-01"
-        assert row["coding_task_metrics"]["output_tokens_per_task"] == {
+        task_metrics = cast("dict[str, object]", row["coding_task_metrics"])
+        assert task_metrics["output_tokens_per_task"] == {
             "output_tokens": 300,
             "answer_tokens": 200,
             "reasoning_tokens": 100,
         }
-        assert row["coding_task_metrics"]["cost_per_task_usd"] == {
+        assert task_metrics["cost_per_task_usd"] == {
             "total_cost": 1.25,
             "input_cost": 0.1,
             "non_cache_input_cost": 0.08,
@@ -402,10 +424,10 @@ class TestRscExtraction(unittest.TestCase):
             "reasoning_cost": 0.25,
             "answer_cost": 0.5,
         }
-        assert row["coding_task_metrics"]["time_per_task_seconds"] == 12.5
+        assert task_metrics["time_per_task_seconds"] == 12.5
 
     def test_coding_payload_retains_current_score_without_task_metrics(self) -> None:
-        frames = [
+        frames: list[tuple[str, object]] = [
             (
                 "current",
                 {
@@ -428,12 +450,14 @@ class TestRscExtraction(unittest.TestCase):
         ]
 
         payload = self._coding_payload(frames)
-        assert payload["counts"]["matched_models"] == 2
+        counts = cast("dict[str, object]", payload["counts"])
+        assert counts["matched_models"] == 2
 
-        row = payload["rows"][0]
+        rows = cast("list[dict[str, object]]", payload["rows"])
+        row = rows[0]
         assert row["model_slug"] == "score-only"
         assert row["coding"] == 77.7
-        metrics = row["coding_task_metrics"]
+        metrics = cast("dict[str, object]", row["coding_task_metrics"])
         assert metrics["output_tokens_per_task"] == {
             "output_tokens": None,
             "answer_tokens": None,
@@ -452,7 +476,7 @@ class TestRscExtraction(unittest.TestCase):
         assert metrics["time_per_task_seconds"] is None
 
     def test_coding_payload_rejects_unrelated_provider_snapshot(self) -> None:
-        frames = [
+        frames: list[tuple[str, object]] = [
             (
                 "providers",
                 {
@@ -472,13 +496,13 @@ class TestRscExtraction(unittest.TestCase):
             ),
         ]
 
-        with pytest.raises(cli.ExtractionError):
-            self._coding_payload(frames)
+        with pytest.raises(ExtractionError):
+            _ = self._coding_payload(frames)
 
     def test_coding_payload_filters_and_sorts_current_rows_deterministically(
         self,
     ) -> None:
-        frames = [
+        frames: list[tuple[str, object]] = [
             (
                 "current",
                 {
@@ -499,7 +523,8 @@ class TestRscExtraction(unittest.TestCase):
             limit=10,
         )
 
-        assert [row["model_slug"] for row in payload["rows"]] == [
+        rows = cast("list[dict[str, object]]", payload["rows"])
+        assert [row["model_slug"] for row in rows] == [
             "lab-beta",
             "lab-alpha",
         ]
@@ -536,37 +561,41 @@ class TestRscExtraction(unittest.TestCase):
             official_result=api_result,
             official_models=api,
         )
-        models = {model["slug"]: model for model in payload["models"]}
+        models: dict[str, dict[str, object]] = {
+            str(model["slug"]): model
+            for model in cast("list[dict[str, object]]", payload["models"])
+        }
         assert set(payload) == {"meta", "models", "hosts", "hosts_models"}
-        assert payload["meta"]["schema_version"] == 2
+        meta = cast("dict[str, object]", payload["meta"])
+        assert meta["schema_version"] == 2
         assert payload["hosts"] == [{"slug": "host", "name": "Host"}]
         assert set(models) == {"api-only", "shared"}
         assert models["shared"]["name"] == "API name"
         assert models["shared"]["coding_index"] == 42
         assert models["shared"]["intelligence_index"] == 11
-        assert models["shared"]["pricing"]["price_1m_blended_3_to_1"] == 3
-        endpoint = payload["hosts_models"][0]
+        pricing = cast("dict[str, object]", models["shared"]["pricing"])
+        assert pricing["price_1m_blended_3_to_1"] == 3
+        hosts_models_list = cast("list[dict[str, object]]", payload["hosts_models"])
+        endpoint = hosts_models_list[0]
         assert endpoint["model_slug"] == "shared"
         assert endpoint["price_1m_blended_7_to_2_to_1"] == 4
         assert "model" not in endpoint
-        assert (
-            payload["meta"]["sources"]["official_api"]["unmatched_rsc_model_slugs"]
-            == []
-        )
-        assert payload["meta"]["sources"]["rsc"]["unmatched_api_model_slugs"] == [
-            "api-only"
-        ]
+        sources = cast("dict[str, dict[str, object]]", meta["sources"])
+        assert sources["official_api"]["unmatched_rsc_model_slugs"] == []
+        assert sources["rsc"]["unmatched_api_model_slugs"] == ["api-only"]
 
     def test_official_model_envelope_validation_rejects_malformed_rows(self) -> None:
         with pytest.raises(ExtractionError, match="requires integer status"):
-            normalize_official_models('{"status":"200","prompt_options":{},"data":[]}')
+            _ = normalize_official_models(
+                '{"status":"200","prompt_options":{},"data":[]}'
+            )
         with pytest.raises(ExtractionError, match="require non-empty slug"):
-            normalize_official_models(
+            _ = normalize_official_models(
                 '{"status":200,"prompt_options":{},"data":[{"slug":"","name":"x","model_creator":{},"evaluations":{},"pricing":{}}]}',
             )
 
     def test_unknown_source_fields_collisions_and_structured_identity(self) -> None:
-        diagnostics: list[object] = []
+        diagnostics: list[Diagnostic] = []
         models = normalize_official_models(
             (
                 '{"status":200,"prompt_options":{},"data":['
@@ -577,15 +606,15 @@ class TestRscExtraction(unittest.TestCase):
             source_path="api.data",
             diagnostics=diagnostics,
         )
-        assert models[0]["raw_fields"]["newField"] == 1
-        assert models[0]["raw_fields"]["new_field"] == 1
-        assert models[0]["identity"]["model_slug"] == "model-a"
-        assert models[0]["raw_metadata"]["source_path"] == "api.data.data[0]"
-        assert any(
-            getattr(item, "code", None) == "DUPLICATE_SOURCE_FIELD"
-            for item in diagnostics
-        )
+        raw_fields = cast("dict[str, object]", models[0]["raw_fields"])
+        assert raw_fields["newField"] == 1
+        assert raw_fields["new_field"] == 1
+        identity = cast("dict[str, object]", models[0]["identity"])
+        assert identity["model_slug"] == "model-a"
+        raw_metadata = cast("dict[str, object]", models[0]["raw_metadata"])
+        assert raw_metadata["source_path"] == "api.data.data[0]"
+        assert any(item.code == "DUPLICATE_SOURCE_FIELD" for item in diagnostics)
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

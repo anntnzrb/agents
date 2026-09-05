@@ -8,7 +8,7 @@ import math
 from collections.abc import Mapping, Sequence
 from difflib import SequenceMatcher
 from numbers import Real
-from typing import Final
+from typing import Final, cast
 
 from .contracts import compact_json
 from .diagnostics import redact
@@ -43,9 +43,11 @@ def _safe(value: object) -> object:
     """Return a redacted, finite JSON projection for diff output."""
     value = redact(value)
     if isinstance(value, Mapping):
-        return {str(key): _safe(item) for key, item in value.items()}
+        mapping = cast("Mapping[str, object]", value)
+        return {str(key): _safe(item) for key, item in mapping.items()}
     if isinstance(value, (list, tuple)):
-        return [_safe(item) for item in value]
+        items = cast("list[object]", cast("object", value))
+        return [_safe(item) for item in items]
     if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
         return None
     if isinstance(value, (str, int, float, bool)) or value is None:
@@ -61,19 +63,37 @@ def _encoded(value: object) -> str:
 
 
 def _mapping(value: object) -> Mapping[str, object]:
-    return value if isinstance(value, Mapping) else {}
+    """Narrow an arbitrary value to a string-keyed mapping."""
+    if not isinstance(value, Mapping):
+        return {}
+    return cast("Mapping[str, object]", value)
 
 
 def _rows(
     snapshot: Mapping[str, object], names: Sequence[str]
 ) -> list[dict[str, object]]:
+    """Collect row mappings from the first present snapshot section."""
     for name in names:
-        value = snapshot.get(name)
-        if isinstance(value, Mapping):
-            value = list(value.values())
-        if isinstance(value, list):
-            return [dict(row) for row in value if isinstance(row, Mapping)]
+        section = snapshot.get(name)
+        if isinstance(section, Mapping):
+            mapping = cast("Mapping[str, object]", section)
+            section = list(mapping.values())
+        if isinstance(section, list):
+            entries = cast("list[object]", cast("object", section))
+            return [
+                cast("dict[str, object]", row)
+                for row in entries
+                if isinstance(row, Mapping)
+            ]
     return []
+
+
+def _nested_slug(value: object, fallback: object) -> object:
+    """Read a slug from a nested mapping or fall back to a flat value."""
+    if isinstance(value, Mapping):
+        mapping = cast("Mapping[str, object]", value)
+        return mapping.get("slug", fallback)
+    return fallback
 
 
 def _identity(kind: str, row: Mapping[str, object], index: int) -> str:
@@ -82,14 +102,8 @@ def _identity(kind: str, row: Mapping[str, object], index: int) -> str:
         if isinstance(value, str) and value.strip():
             return f"{kind}:{value.strip()}"
     if kind == "endpoint":
-        host = row.get("host")
-        model = row.get("model")
-        host_slug = (
-            host.get("slug") if isinstance(host, Mapping) else row.get("host_slug")
-        )
-        model_slug = (
-            model.get("slug") if isinstance(model, Mapping) else row.get("model_slug")
-        )
+        host_slug = _nested_slug(row.get("host"), row.get("host_slug"))
+        model_slug = _nested_slug(row.get("model"), row.get("model_slug"))
         if isinstance(host_slug, str) and isinstance(model_slug, str):
             return f"endpoint:{host_slug.strip()}:{model_slug.strip()}"
     # An anonymous record must not be merged by display name.  Its canonical
@@ -105,7 +119,8 @@ def _display_name(row: Mapping[str, object]) -> str | None:
             return value.strip()
     nested = row.get("model")
     if isinstance(nested, Mapping):
-        value = nested.get("name")
+        nested_mapping = cast("Mapping[str, object]", nested)
+        value = nested_mapping.get("name")
         if isinstance(value, str) and value.strip():
             return value.strip()
     return None
@@ -141,13 +156,15 @@ def _indexed(
 
 
 def _leaf_values(value: object, prefix: str = "") -> dict[str, object]:
+    """Flatten nested mappings to dotted-path leaf values."""
     if isinstance(value, Mapping):
+        mapping = cast("Mapping[str, object]", value)
         result: dict[str, object] = {}
-        if not value:
+        if not mapping:
             result[prefix] = {}
-        for key in sorted(value, key=str):
+        for key in sorted(mapping, key=str):
             path = f"{prefix}.{key}" if prefix else str(key)
-            result.update(_leaf_values(value[key], path))
+            result.update(_leaf_values(mapping[key], path))
         return result
     return {prefix: value}
 
@@ -181,12 +198,15 @@ def _metric_names(row: Mapping[str, object]) -> set[str]:
     names: set[str] = set()
     evidence = row.get("metric_evidence")
     if isinstance(evidence, Mapping):
-        names.update(str(key) for key in evidence)
+        mapping = cast("Mapping[str, object]", evidence)
+        names.update(str(key) for key in mapping)
     for path, value in _leaf_values(row).items():
         leaf = path.rsplit(".", 1)[-1]
         if leaf in _STRUCTURAL_KEYS or leaf in _STATUS_KEYS:
             continue
-        if isinstance(value, Real) and not isinstance(value, bool):
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, Real):
             names.add(path)
     return names
 
@@ -196,17 +216,26 @@ def _metric_value(row: Mapping[str, object], metric: str) -> object:
         return row[metric]
     current: object = row
     for piece in metric.split("."):
-        if not isinstance(current, Mapping) or piece not in current:
+        if not isinstance(current, Mapping):
             current = None
             break
-        current = current[piece]
+        mapping = cast(  # pyright: ignore[reportUnnecessaryCast]
+            "Mapping[str, object]", current
+        )
+        if piece not in mapping:
+            current = None
+            break
+        current = mapping[piece]
     if current is not None:
         return current
     evidence = row.get("metric_evidence")
     if isinstance(evidence, Mapping):
-        item = evidence.get(metric)
-        if isinstance(item, Mapping) and "normalized_value" in item:
-            return item.get("normalized_value")
+        evidence_mapping = cast("Mapping[str, object]", evidence)
+        item = evidence_mapping.get(metric)
+        if isinstance(item, Mapping):
+            item_mapping = cast("Mapping[str, object]", item)
+            if "normalized_value" in item_mapping:
+                return item_mapping.get("normalized_value")
     return None
 
 
@@ -245,15 +274,21 @@ def _metric_diff(
         left_evidence = _mapping(before.get("metric_evidence")).get(metric)
         right_evidence = _mapping(after.get("metric_evidence")).get(metric)
         if isinstance(left_evidence, Mapping) or isinstance(right_evidence, Mapping):
+            left_map: Mapping[str, object] = (
+                cast("Mapping[str, object]", left_evidence)
+                if isinstance(left_evidence, Mapping)
+                else {}
+            )
+            right_map: Mapping[str, object] = (
+                cast("Mapping[str, object]", right_evidence)
+                if isinstance(right_evidence, Mapping)
+                else {}
+            )
             left_status = {
-                key: left_evidence.get(key)
-                for key in _STATUS_KEYS
-                if isinstance(left_evidence, Mapping) and key in left_evidence
+                key: left_map.get(key) for key in _STATUS_KEYS if key in left_map
             }
             right_status = {
-                key: right_evidence.get(key)
-                for key in _STATUS_KEYS
-                if isinstance(right_evidence, Mapping) and key in right_evidence
+                key: right_map.get(key) for key in _STATUS_KEYS if key in right_map
             }
             if _encoded(left_status) != _encoded(right_status):
                 statuses.append(
@@ -287,11 +322,13 @@ def _metadata_change(
 
 
 def _diagnostics(snapshot: Mapping[str, object]) -> list[object]:
+    """Collect diagnostics payloads from a snapshot."""
     value = snapshot.get("diagnostics")
     if value is None:
         value = _mapping(snapshot.get("meta")).get("diagnostics")
     if isinstance(value, list):
-        return sorted((_safe(item) for item in value), key=_encoded)
+        items = cast("list[object]", cast("object", value))
+        return sorted((_safe(item) for item in items), key=_encoded)
     return []
 
 
@@ -473,7 +510,7 @@ def schema_aware_diff(
         ),
     }
     # Make the output finite and redact every branch, including identity names.
-    return _safe(result)  # type: ignore[return-value]
+    return cast("dict[str, object]", _safe(result))
 
 
 __all__ = ["schema_aware_diff"]

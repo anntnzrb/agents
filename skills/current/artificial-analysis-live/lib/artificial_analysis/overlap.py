@@ -10,15 +10,18 @@ strings, and it never changes a published value.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any
+from typing import cast
 
 OVERLAP_DOUBLE_COUNTING_RISK = "OVERLAP_DOUBLE_COUNTING_RISK"
 REQUIREMENTS_CLAIM_CERTAINTY = "requirements_claim"
 UNKNOWN_CERTAINTY = "unknown"
 
 
-def _as_mapping(value: object) -> Mapping[str, Any] | None:
-    return value if isinstance(value, Mapping) else None
+def _as_mapping(value: object) -> Mapping[str, object] | None:
+    """Narrow an arbitrary value to a string-keyed mapping."""
+    if not isinstance(value, Mapping):
+        return None
+    return cast("Mapping[str, object]", value)
 
 
 def _text(value: object) -> str | None:
@@ -124,6 +127,7 @@ def _claim_is_overlap(claim: object) -> bool:
 
 def _iter_claims(value: object) -> Iterable[object]:
     if isinstance(value, Mapping):
+        mapping = cast("Mapping[str, object]", value)
         for key in (
             "declared_overlaps",
             "overlap_claims",
@@ -133,7 +137,7 @@ def _iter_claims(value: object) -> Iterable[object]:
             "dependencies",
             "dependency_claims",
         ):
-            nested = value.get(key)
+            nested = mapping.get(key)
             if isinstance(nested, Sequence) and not isinstance(
                 nested, (str, bytes, bytearray)
             ):
@@ -141,7 +145,7 @@ def _iter_claims(value: object) -> Iterable[object]:
             elif isinstance(nested, Mapping):
                 yield nested
         # A single endpoint-pair claim is also accepted.
-        if _claim_endpoints(value) is not None:
+        if _claim_endpoints(mapping) is not None:
             yield value
     elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         yield from value

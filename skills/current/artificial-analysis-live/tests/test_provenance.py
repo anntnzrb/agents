@@ -1,14 +1,13 @@
 """Contract tests for the AA-local immutable artifact store."""
 
-# ruff: noqa: CPY001, INP001, D103, S101
-
 import hashlib
 import json
+import os
 from pathlib import Path
+from typing import cast
 
-import _path  # noqa: F401
 import pytest
-from artificial_analysis import provenance
+
 from artificial_analysis.diagnostics import REDACTED
 from artificial_analysis.provenance import (
     ArtifactIntegrityError,
@@ -39,8 +38,13 @@ def test_sidecar_index_and_immutable_manifest_are_written(store: ArtifactStore) 
     record = store.store("models", b"snapshot", {"scope": "public"})
     digest = str(record["sha256"])
     sidecar_path = store.root / "artifacts" / f"{digest}.meta.json"
-    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
-    index = json.loads(store.index_path.read_text(encoding="utf-8"))
+    sidecar = cast(
+        "dict[str, object]", json.loads(sidecar_path.read_text(encoding="utf-8"))
+    )
+    index = cast(
+        "dict[str, dict[str, str]]",
+        json.loads(store.index_path.read_text(encoding="utf-8")),
+    )
 
     assert sidecar == record
     assert index["models"]["sha256"] == digest
@@ -48,7 +52,10 @@ def test_sidecar_index_and_immutable_manifest_are_written(store: ArtifactStore) 
     manifest_path = store.root / "manifests" / f"{manifest['sha256']}.json"
     manifest_bytes = manifest_path.read_bytes()
     assert hashlib.sha256(manifest_bytes).hexdigest() == manifest["sha256"]
-    assert json.loads(manifest_bytes)["sources"]["models"]["sha256"] == digest
+    manifest_obj = cast(
+        "dict[str, dict[str, dict[str, str]]]", json.loads(manifest_bytes)
+    )
+    assert manifest_obj["sources"]["models"]["sha256"] == digest
     assert store.write_manifest() == manifest
 
 
@@ -57,16 +64,17 @@ def test_atomic_writes_use_replace_and_leave_no_temp_files(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     replaced: list[Path] = []
-    original_replace = provenance.os.replace
+    original_replace = os.replace
 
     def track_replace(
-        source: str | bytes | Path, destination: str | bytes | Path
+        source: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        destination: str | bytes | os.PathLike[str] | os.PathLike[bytes],
     ) -> None:
-        replaced.append(Path(destination))
+        replaced.append(Path(os.fsdecode(destination)))
         original_replace(source, destination)
 
-    monkeypatch.setattr(provenance.os, "replace", track_replace)
-    store.store("atomic", b"payload", {"kind": "test"})
+    monkeypatch.setattr(os, "replace", track_replace)
+    _ = store.store("atomic", b"payload", {"kind": "test"})
 
     assert {path.name for path in replaced} >= {
         "index.json",
@@ -94,7 +102,7 @@ def test_redaction_is_recursive_and_does_not_persist_credentials(
     sidecar_text = (
         store.root / "artifacts" / f"{record['sha256']}.meta.json"
     ).read_text(encoding="utf-8")
-    sidecar = json.loads(sidecar_text)
+    sidecar = cast("dict[str, object]", json.loads(sidecar_text))
 
     assert "top-secret" not in sidecar_text
     assert "nested-secret" not in sidecar_text
@@ -115,14 +123,14 @@ def test_tampered_or_missing_immutable_files_fail_closed(store: ArtifactStore) -
     raw_path = store.root / "artifacts" / f"{digest}.raw"
     sidecar_path = store.root / "artifacts" / f"{digest}.meta.json"
 
-    raw_path.write_bytes(b"changed")
+    _ = raw_path.write_bytes(b"changed")
     with pytest.raises(ArtifactIntegrityError):
-        store.load(artifact_hash=digest)
+        _ = store.load(artifact_hash=digest)
 
-    raw_path.write_bytes(b"untouched")
+    _ = raw_path.write_bytes(b"untouched")
     sidecar_path.unlink()
     with pytest.raises(ArtifactIntegrityError):
-        store.load(artifact_hash=digest)
+        _ = store.load(artifact_hash=digest)
 
 
 def test_immutable_artifact_does_not_overwrite_first_sidecar(
@@ -144,8 +152,8 @@ def test_legacy_promotion_keeps_caller_files_and_marks_record(
 ) -> None:
     legacy_raw = tmp_path / "legacy-response.bin"
     legacy_meta = tmp_path / "legacy-response.json"
-    legacy_raw.write_bytes(b"legacy bytes")
-    legacy_meta.write_text('{"source": "legacy"}', encoding="utf-8")
+    _ = legacy_raw.write_bytes(b"legacy bytes")
+    _ = legacy_meta.write_text('{"source": "legacy"}', encoding="utf-8")
 
     record = store.promote_legacy(
         "legacy",
@@ -159,4 +167,5 @@ def test_legacy_promotion_keeps_caller_files_and_marks_record(
     loaded_raw, loaded_record = store.load(source_key="legacy")
     assert loaded_raw == b"legacy bytes"
     assert loaded_record["legacy_unverified"] is True
-    assert loaded_record["metadata"]["api_key"] == REDACTED
+    loaded_meta = cast("dict[str, object]", loaded_record["metadata"])
+    assert loaded_meta["api_key"] == REDACTED

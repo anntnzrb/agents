@@ -1,6 +1,5 @@
 """Filter-script default regression tests."""
 
-# ruff: noqa: CPY001, D101, D102, D103, INP001, S101, PLR2004
 from __future__ import annotations
 
 import importlib.util
@@ -9,16 +8,32 @@ import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, cast
 
-import _path  # noqa: F401
 import pytest
 
 if TYPE_CHECKING:
-    from types import ModuleType
+    from collections.abc import Mapping
 
 
-def load_filter_agent_models() -> ModuleType:
+class FilterAgentModelsModule(Protocol):
+    DEFAULT_SNAPSHOT: Path
+
+    def ensure_default_snapshot_fresh(
+        self,
+        snapshot_path: Path,
+        raw: Mapping[str, object],
+    ) -> None: ...
+
+    def load_rows(
+        self,
+        snapshot_path: Path,
+        *,
+        diagnostics: list[dict[str, object]] | None = ...,
+    ) -> list[dict[str, object]]: ...
+
+
+def load_filter_agent_models() -> FilterAgentModelsModule:
     script_path = (
         Path(__file__).resolve().parents[1] / "scripts" / "filter_agent_models.py"
     )
@@ -31,7 +46,7 @@ def load_filter_agent_models() -> ModuleType:
         raise AssertionError(msg)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module
+    return cast("FilterAgentModelsModule", cast("object", module))
 
 
 class TestFilterAgentModelsDefaults(unittest.TestCase):
@@ -48,7 +63,7 @@ class TestFilterAgentModelsDefaults(unittest.TestCase):
 
     def test_default_snapshot_guard_rejects_stale_tmp_snapshot(self) -> None:
         module = load_filter_agent_models()
-        stale_snapshot = {
+        stale_snapshot: dict[str, object] = {
             "meta": {"fetched_at": (datetime.now(UTC) - timedelta(days=2)).isoformat()},
         }
 
@@ -60,7 +75,9 @@ class TestFilterAgentModelsDefaults(unittest.TestCase):
 
     def test_default_snapshot_guard_allows_explicit_stale_snapshot(self) -> None:
         module = load_filter_agent_models()
-        stale_snapshot = {"meta": {"fetched_at": "2000-01-01T00:00:00+00:00"}}
+        stale_snapshot: dict[str, object] = {
+            "meta": {"fetched_at": "2000-01-01T00:00:00+00:00"},
+        }
 
         module.ensure_default_snapshot_fresh(
             Path("fixtures/old-snapshot.json"),
@@ -71,7 +88,7 @@ class TestFilterAgentModelsDefaults(unittest.TestCase):
         module = load_filter_agent_models()
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "snapshot.json"
-            path.write_text(
+            _ = path.write_text(
                 json.dumps(
                     {
                         "meta": {"fetched_at": datetime.now(UTC).isoformat()},
@@ -95,9 +112,10 @@ class TestFilterAgentModelsDefaults(unittest.TestCase):
             rows = module.load_rows(path, diagnostics=diagnostics)
         assert rows[0]["slug"] == "canonical"
         assert rows[0]["omni"] == -999.0
-        assert rows[0]["raw_fields"]["newField"] is True
+        raw_fields = cast("dict[str, object]", rows[0].get("raw_fields"))
+        assert raw_fields["newField"] is True
         assert diagnostics[0]["code"] == "MISSING_MODEL_JOIN"
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

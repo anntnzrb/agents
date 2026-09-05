@@ -1,12 +1,11 @@
 """Credential redaction and immutable artifact safety tests."""
 
-# ruff: noqa: CPY001, INP001, PLR2004, S101, D103
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
-import _path  # noqa: F401
 from artificial_analysis.diagnostics import REDACTED, redact
 from artificial_analysis.provenance import ArtifactStore
 
@@ -35,12 +34,12 @@ def test_redaction_preserves_safe_metrics_and_public_url_shape() -> None:
         "headers": {"Authorization": "Bearer do-not-leak", "cookie": "sid=secret"},
         "api_key": "do-not-leak",
     }
-    redacted = redact(payload)
+    redacted = cast("dict[str, object]", redact(payload))
     encoded = json.dumps(redacted, sort_keys=True)
 
     assert redacted["score"] == 42.5
     assert redacted["output_tokens"] == 100
-    assert "tab=score" in redacted["source_url"]
+    assert "tab=score" in cast("str", redacted["source_url"])
     assert REDACTED in encoded
     assert "do-not-leak" not in encoded
     assert "sid=secret" not in encoded
@@ -48,7 +47,7 @@ def test_redaction_preserves_safe_metrics_and_public_url_shape() -> None:
 
 def test_artifact_store_manifest_is_immutable_and_redacted(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path / "cache")
-    store.store(
+    _ = store.store(
         "fixture-source",
         b'{"score":42.5}',
         {

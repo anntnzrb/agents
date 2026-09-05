@@ -1,9 +1,7 @@
 """Contract tests for diagnostic redaction and stable merging."""
 
-# ruff: noqa: CPY001, INP001, S101, D103
 from __future__ import annotations
 
-import _path  # noqa: F401
 from artificial_analysis.diagnostics import (
     REDACTED,
     Diagnostic,
@@ -141,7 +139,7 @@ def test_merge_diagnostics_deduplicates_in_first_seen_order() -> None:
         "first message",
         details={"a": 1, "b": 2},
     )
-    second = {
+    second: dict[object, object] = {
         "code": "second",
         "severity": "error",
         "stage": "validate",

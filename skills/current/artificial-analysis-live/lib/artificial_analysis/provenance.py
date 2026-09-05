@@ -16,7 +16,7 @@ import tempfile
 import threading
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import NoReturn, cast
 
 from .contracts import compact_json
 from .diagnostics import redact
@@ -28,8 +28,11 @@ def _raise_value(message: str) -> NoReturn:
     raise ValueError(message)
 
 
-def _raise_type(message: str) -> NoReturn:
-    raise TypeError(message)
+def _raise_type(message: str, *, cause: BaseException | None = None) -> NoReturn:
+    """Raise TypeError, chaining an optional cause."""
+    if cause is None:
+        raise TypeError(message)
+    raise TypeError(message) from cause
 
 
 def _raise_not_found(message: str) -> NoReturn:
@@ -66,14 +69,14 @@ class ArtifactStore:
     immutable files under ``manifests``.
     """
 
-    _write_lock = threading.RLock()
+    _write_lock: threading.RLock = threading.RLock()
 
     def __init__(self, root: str | os.PathLike[str]) -> None:
         """Initialize an artifact store rooted at ``root``."""
-        self.root = Path(root)
-        self.artifacts = self.root / "artifacts"
-        self.index_path = self.root / "index.json"
-        self.manifests = self.root / "manifests"
+        self.root: Path = Path(root)
+        self.artifacts: Path = self.root / "artifacts"
+        self.index_path: Path = self.root / "index.json"
+        self.manifests: Path = self.root / "manifests"
 
     @staticmethod
     def hash_bytes(raw: bytes | bytearray | memoryview) -> str:
@@ -85,7 +88,7 @@ class ArtifactStore:
         source_key: str,
         raw: bytes | bytearray | memoryview,
         metadata: Mapping[str, object] | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, object]:
         """Store ``raw`` once and index it under ``source_key``.
 
         Raw and sidecar files are immutable.  Repeating a write for an existing
@@ -100,7 +103,7 @@ class ArtifactStore:
         source_key: str,
         raw: bytes | bytearray | memoryview,
         metadata: Mapping[str, object] | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, object]:
         """Promote caller-owned legacy bytes without deleting the legacy copy.
 
         Promoted records are explicitly marked ``legacy_unverified``.  Existing
@@ -113,7 +116,7 @@ class ArtifactStore:
         self,
         source_key: str | None = None,
         artifact_hash: str | None = None,
-    ) -> tuple[bytes, dict[str, Any]]:
+    ) -> tuple[bytes, dict[str, object]]:
         """Load and verify an artifact by source key or SHA-256 hash.
 
         Exactly one selector is normally needed.  Supplying both is allowed only
@@ -134,11 +137,11 @@ class ArtifactStore:
         self,
         source_key: str | None,
         artifact_hash: str | None,
-    ) -> tuple[dict[str, Any] | None, str]:
+    ) -> tuple[dict[str, object] | None, str]:
         if source_key is None and artifact_hash is None:
             _raise_value("source_key or artifact_hash is required")
 
-        indexed: dict[str, Any] | None = None
+        indexed: dict[str, object] | None = None
         selected_hash: str | None = None
         if source_key is not None:
             _require_source_key(source_key)
@@ -146,7 +149,7 @@ class ArtifactStore:
             candidate = index.get(source_key)
             if not isinstance(candidate, Mapping):
                 _raise_not_found(f"source key not found: {source_key}")
-            indexed = _plain_mapping(candidate)
+            indexed = _plain_mapping(cast("Mapping[str, object]", candidate))
             selected_hash = _valid_hash(indexed.get("sha256"))
             if selected_hash is None:
                 _raise_integrity(f"invalid index entry for source: {source_key}")
@@ -175,8 +178,8 @@ class ArtifactStore:
 
     def write_manifest(
         self,
-        snapshot: Mapping[str, object] | None = None,
-    ) -> dict[str, Any]:
+        snapshot: object = None,
+    ) -> dict[str, object]:
         """Write an immutable JSON snapshot and return its plain metadata.
 
         With no argument, the current source index is snapshotted.  A supplied
@@ -188,11 +191,11 @@ class ArtifactStore:
         else:
             if not isinstance(snapshot, Mapping):
                 _raise_type("snapshot must be a mapping")
-            snapshot_value = snapshot
+            snapshot_value = cast("object", snapshot)
         payload_value = _plain_json({"sources": snapshot_value})
         if not isinstance(payload_value, dict):  # pragma: no cover - defensive
             _raise_integrity("manifest projection is not an object")
-        payload = compact_json(payload_value).encode("utf-8")
+        payload = compact_json(cast("object", payload_value)).encode("utf-8")
         digest = hashlib.sha256(payload).hexdigest()
         path = self.manifests / f"{digest}.json"
         with self._write_lock:
@@ -209,17 +212,20 @@ class ArtifactStore:
         self,
         source_key: str,
         raw_value: bytes | bytearray | memoryview,
-        metadata: Mapping[str, object] | None,
+        metadata: object,
         *,
         legacy_unverified: bool,
-    ) -> dict[str, Any]:
+    ) -> dict[str, object]:
         _require_source_key(source_key)
         if metadata is not None and not isinstance(metadata, Mapping):
             _raise_type("metadata must be a mapping")
         raw = _as_bytes(raw_value)
         digest = hashlib.sha256(raw).hexdigest()
         length = len(raw)
-        redacted_metadata = _plain_json({} if metadata is None else metadata)
+        if metadata is None:
+            redacted_metadata = _plain_json(dict[str, object]())
+        else:
+            redacted_metadata = _plain_json(cast("object", metadata))
         if not isinstance(redacted_metadata, dict):  # pragma: no cover - defensive
             _raise_integrity("metadata projection is not an object")
 
@@ -246,7 +252,7 @@ class ArtifactStore:
                     sidecar_path, "metadata sidecar"
                 )
                 self._verify_record(existing_record, digest, raw)
-                record = existing_record
+                record: dict[str, object] = existing_record
             else:
                 record = {
                     "source_key": source_key,
@@ -275,7 +281,7 @@ class ArtifactStore:
 
         return dict(record) | {"source_key": source_key}
 
-    def _read_index(self, *, required: bool) -> dict[str, Any]:
+    def _read_index(self, *, required: bool) -> dict[str, object]:
         if not self.index_path.exists():
             if required:
                 _raise_not_found("source index is missing")
@@ -285,14 +291,14 @@ class ArtifactStore:
         return self._read_json_object(self.index_path, "source index")
 
     @staticmethod
-    def _read_json_object(path: Path, label: str) -> dict[str, Any]:
+    def _read_json_object(path: Path, label: str) -> dict[str, object]:
         try:
-            value = json.loads(path.read_text(encoding="utf-8"))
+            value = cast("object", json.loads(path.read_text(encoding="utf-8")))
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             _raise_integrity(f"invalid {label}: {path}", cause=exc)
         if not isinstance(value, dict):
             _raise_integrity(f"invalid {label}: {path}")
-        return value
+        return cast("dict[str, object]", value)
 
     @staticmethod
     def _verify_record(record: Mapping[str, object], digest: str, raw: bytes) -> None:
@@ -341,14 +347,14 @@ def sha256_bytes(raw: bytes | bytearray | memoryview) -> str:
 
 
 def _as_bytes(value: bytes | bytearray | memoryview) -> bytes:
+    """Return the value as immutable bytes."""
     if isinstance(value, bytes):
         return value
-    if isinstance(value, (bytearray, memoryview)):
-        return bytes(value)
-    _raise_type("raw artifact must be bytes-like")
+    return bytes(value)
 
 
-def _require_source_key(source_key: str) -> None:
+def _require_source_key(source_key: object) -> None:
+    """Reject empty or non-string source keys."""
     if not isinstance(source_key, str) or not source_key:
         _raise_value("source_key must be a non-empty string")
 
@@ -366,16 +372,17 @@ def _plain_json(value: object) -> object:
     """Redact recursively, then round-trip to ordinary JSON values."""
     projected = redact(value)
     try:
-        return json.loads(compact_json(projected))
+        return cast("object", json.loads(compact_json(projected)))
     except (TypeError, ValueError, json.JSONDecodeError) as exc:
         _raise_type("metadata must be JSON-compatible after redaction", cause=exc)
 
 
-def _plain_mapping(value: Mapping[str, object]) -> dict[str, Any]:
+def _plain_mapping(value: Mapping[str, object]) -> dict[str, object]:
+    """Project a mapping to plain JSON-compatible values."""
     projected = _plain_json(value)
     if not isinstance(projected, dict):  # pragma: no cover - defensive
         _raise_integrity("mapping projection is not an object")
-    return projected
+    return cast("dict[str, object]", projected)
 
 
 def _relative(path: Path, root: Path) -> str:
@@ -398,7 +405,7 @@ def _atomic_write(path: Path, data: bytes, *, immutable: bool) -> None:
     temporary = Path(temporary_name)
     try:
         with os.fdopen(fd, "wb") as handle:
-            handle.write(data)
+            _ = handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
         # A caller cannot overwrite an immutable destination through this API.
@@ -407,7 +414,7 @@ def _atomic_write(path: Path, data: bytes, *, immutable: bool) -> None:
         if immutable and path.exists():
             _ensure_immutable(path, data)
             return
-        temporary.replace(path)
+        _ = temporary.replace(path)
         temporary = None
         _fsync_directory(path.parent)
     finally:
