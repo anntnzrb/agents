@@ -15,7 +15,7 @@ import {
 import { hostname, tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER } from "@core/cliproxy-deployment.ts";
-import { sharedToolCacheEnv } from "./support/cache-env.ts";
+import { PRISTINE_PATH, seedRuntimeRelease, sharedToolCacheEnv } from "./support/cache-env.ts";
 
 const SYNC_ROOT = resolve(import.meta.dir, "..");
 const TS_SYNC = resolve(SYNC_ROOT, "src/cli.ts");
@@ -249,7 +249,7 @@ test("integration_wrapper_forwards_arguments_to_faked_runtime", async () => {
         ...Bun.env,
         HOME: home,
         XDG_CACHE_HOME: join(home, ".cache"),
-        PATH: Bun.env["PATH"] ?? "",
+        PATH: PRISTINE_PATH,
         ...sharedToolCacheEnv,
       },
     });
@@ -325,6 +325,7 @@ function makeFixture(root: string): string {
   mkdirSync(join(home, ".config", "agents", "tools", "mcporter"), { recursive: true });
   mkdirSync(join(home, ".config", "agents", "tools", "summarize"), { recursive: true });
   mkdirSync(join(home, ".config", "agents", "tools", "cliproxyapi"), { recursive: true });
+  seedRuntimeRelease(home);
   writeFixtureFiles(home);
   return home;
 }
@@ -504,7 +505,7 @@ async function runSyncProcess(home: string): Promise<RunResult> {
       ...Bun.env,
       HOME: home,
       XDG_CACHE_HOME: join(home, ".cache"),
-      PATH: Bun.env["PATH"] ?? "",
+      PATH: PRISTINE_PATH,
       ...sharedToolCacheEnv,
     },
   });

@@ -2,6 +2,7 @@ import { afterAll } from "bun:test";
 import {
   copyFileSync,
   cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -34,7 +35,7 @@ const SYNC_ROOT = resolve(import.meta.dir, "..", "..");
 const RUNTIME_MANIFESTS = ["package.json", "tsconfig.json", "bun.lock"] as const;
 
 /** Captured at import, before any test can stub a tool onto PATH. */
-const PRISTINE_PATH = process.env["PATH"] ?? "";
+export const PRISTINE_PATH = process.env["PATH"] ?? "";
 
 /**
  * Every test that runs sync against a fresh HOME hits the SyncRuntimeInstall
@@ -109,11 +110,15 @@ function buildSharedRelease(): SharedRelease {
   });
 
   const releasesRoot = join(templateHome, ".local", "share", "agents", "sync-releases");
-  const id = readdirSync(releasesRoot, { withFileTypes: true }).find(
-    (entry) => entry.isDirectory() && !entry.name.startsWith(".stage-"),
-  )?.name;
+  const id = existsSync(releasesRoot)
+    ? readdirSync(releasesRoot, { withFileTypes: true }).find(
+        (entry) => entry.isDirectory() && !entry.name.startsWith(".stage-"),
+      )?.name
+    : undefined;
   if (id === undefined) {
-    throw new Error(`shared test release was not produced: ${built.stderr.toString()}`);
+    throw new Error(
+      `shared test release was not produced: ${built.stderr.toString() || built.stdout.toString()}`,
+    );
   }
   return { dir: join(releasesRoot, id), templateHome, id };
 }
