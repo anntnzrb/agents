@@ -1,6 +1,6 @@
 # Sync reference
 
-Sync reconciles the repository at `~/.config/agents` with harness homes and installed runtime state on macOS and Linux. The public entrypoint is `sync/src/cli.ts` and requires an explicit Bun runner.
+Sync reconciles the repository at `~/.config/agents` with harness homes and installed runtime state on macOS and Linux. The public entrypoint is `sync/src/sync/cli.py` (console script `sync`) and requires an explicit `uv` runner.
 
 A gateway host has an OS hostname that matches `server.hostname` in `tools/cliproxyapi/deployment.json`. Every other supported host is a client host.
 
@@ -8,9 +8,9 @@ A gateway host has an OS hostname that matches `server.hostname` in `tools/clipr
 
 | Invocation | Behavior |
 | --- | --- |
-| `bun ./sync/src/cli.ts` | Runs a normal reconciliation |
-| `bun ./sync/src/cli.ts sync` | Runs the same normal reconciliation |
-| `bun ~/.local/share/agents/sync-current/src/cli.ts launch <name> -- <arguments>` | Syncs when the source is available, prepares the harness or tool package, and launches it |
+| `uv run --project sync sync` | Runs a normal reconciliation |
+| `uv run --project sync sync sync` | Runs the same normal reconciliation |
+| `python3 ~/.local/share/agents/sync-current/src/sync/cli.py launch <name> -- <arguments>` | Syncs when the source is available, prepares the harness or tool package, and launches it |
 
 Unknown commands and invalid arguments exit with status `2`. A manual sync exits with status `1` after a fatal reconciliation error.
 
@@ -62,18 +62,18 @@ The gateway host also receives `tools/cliproxyapi/panel.html` at `~/.cli-proxy-a
 
 Endpoint publication replaces every configured `${CLIPROXY_CLIENT_BASE_URL}` harness target as one transaction. Publication preserves the Codex-owned `[hooks.state]` and `[projects]` tables in `~/.codex/config.toml`. A write failure restores every target's previous content and mode.
 
-The renderer parses and serializes YAML with Bun. It expands credential pools into native and compatibility profiles. The job writes generated files through a temporary file and an atomic rename.
+The renderer parses and serializes YAML with PyYAML. It expands credential pools into native and compatibility profiles. The job writes generated files through a temporary file and an atomic rename.
 ## Installed runtime
 
-Sync copies `sync/src/`, `sync/tsconfig.json`, `sync/package.json`, and `sync/bun.lock` into a content-addressed release under `~/.local/share/agents/sync-releases/<releaseId>/`, then runs `bun install --frozen-lockfile --production` there so the installed copy resolves its runtime dependencies. A `~/.local/share/agents/sync-current` symlink always points to the most recently published release. Generated wrappers execute this installed copy.
+Sync copies `sync/src/sync/`, `sync/pyproject.toml`, and `sync/uv.lock` into a content-addressed release under `~/.local/share/agents/sync-releases/<releaseId>/`, then runs `uv sync --frozen --no-dev` there so the installed copy resolves its runtime dependencies. A `~/.local/share/agents/sync-current` symlink always points to the most recently published release. Generated wrappers execute this installed copy.
 
 The `<releaseId>` is a SHA-256 digest computed over the runtime sources:
 
-- Traverses `sync/src/` recursively, ordering directory entries in deterministic UTF-16 code-unit order (`(a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)`).
+- Traverses `sync/src/sync/` recursively, ordering directory entries in deterministic Unicode code-point order.
 - Uses forward slashes (`/`) for all relative paths.
 - Subdirectories are hashed as `dir:<relativePath>\n` before recursive descent.
 - Regular files and symlinks pointing to regular files are hashed as `file:<relativePath>\n` followed by the file content bytes and a trailing `\n`. Directory symlinks are rejected.
-- Appends the file contents of `sync/package.json`, `sync/tsconfig.json`, and `sync/bun.lock` in sequence.
+- Appends the file contents of `sync/pyproject.toml` and `sync/uv.lock` in sequence.
 
 Releases are staged in `~/.local/share/agents/sync-releases/.stage-<pid>-<nonce>` before the release is complete. A failed or aborted installation job cleans up its private staging directory in a `finally` block, leaving active and previous releases intact. During post-sync pruning, sync prunes completed, unreferenced releases and safely cleans up stale `.stage-<pid>-<nonce>` directories whose creating PID is no longer alive or is older than the install timeout, without deleting unrecognized user directories or active releases. Package operations similarly use unique per-operation staging (`staging-<pid>-<timestamp>`) and backup (`backup-<pid>-<timestamp>`) paths, rolling back to previous directory content on failure and cleaning up temporary backups only upon successful completion. Any legacy `~/.local/share/agents/sync/` mutable directory is removed after callers have migrated to `sync-current`.
 ## Extension hook state
@@ -109,4 +109,4 @@ The launcher resolves the adapter's npm dist-tag and installs the resolved versi
 
 ## Tool launchers
 
-`TOOL_LAUNCHERS` in `sync/src/core/tool-launchers.ts` lists npm tools that sync launches like harnesses: a wrapper under `~/.local/bin/`, a versioned package cache, and a best-effort sync before launch. Tools have no harness home, instruction file, or skills.
+`TOOL_LAUNCHERS` in `sync/src/sync/core/tool_launchers.py` lists npm tools that sync launches like harnesses: a wrapper under `~/.local/bin/`, a versioned package cache, and a best-effort sync before launch. Tools have no harness home, instruction file, or skills.

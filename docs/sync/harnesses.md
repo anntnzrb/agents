@@ -1,6 +1,6 @@
 # Harness adapter reference
 
-`HARNESS_ADAPTERS` in `sync/src/core/harness-adapters.ts` defines the adapters that sync understands. A matching directory under `harnesses/` enables an adapter when the current platform appears in its `platforms` field.
+`HARNESS_ADAPTERS` in `sync/src/sync/core/harness_adapters.py` defines the adapters that sync understands. A matching directory under `harnesses/` enables an adapter when the current platform appears in its `platforms` field.
 
 Sync supports macOS and Linux. The current CLIProxyAPI release manifest supports macOS ARM64 and Linux x86_64.
 
@@ -27,7 +27,7 @@ Sync publishes the repository's `HARNESS.md` as the harness instruction file (`A
 Adapters can declare these hooks:
 
 - `PackageBootstrap` prepares packages from the adapter's source manifest and updates runtime settings.
-- `ExtensionDeps` installs dependencies for generated TypeScript extensions and plugins when the hook inputs change. Runtime imports belong in the generated root's committed `package.json`; the hook preserves its generated `node_modules` and lockfile while the source fingerprint is unchanged.
+- `ExtensionDeps` installs dependencies for generated extensions and plugins when the hook inputs change. Runtime imports belong in the generated root's committed `package.json`; the hook preserves its generated `node_modules` and lockfile while the source fingerprint is unchanged.
 
 ## CLIProxyAPI integration
 
@@ -40,7 +40,7 @@ Harnesses use their native model discovery or configured model definitions again
 
 Sync writes wrappers under `~/.local/bin/` and expects that directory on `PATH`.
 
-Each wrapper calls the installed sync runtime at `~/.local/share/agents/sync-current/src/cli.ts` with `launch`, prepares the cached npm package, forwards all arguments, and returns the harness exit status.
+Each wrapper calls the installed sync runtime at `~/.local/share/agents/sync-current/src/sync/cli.py` with `launch`, prepares the cached npm package, forwards all arguments, and returns the harness exit status.
 
 When the installed sync runtime is missing, the wrapper prints a hint to run sync from the agents repository and exits with status `127`.
 
@@ -59,7 +59,7 @@ The cache keeps the current and previous known-good package versions. Newly inst
 `sync` resolves shared environment variables from `.env` in the repository root (`~/.config/agents/.env`).
 
 - If `.env` is absent, `sync` continues with an empty default environment map.
-- Variables are decoded at the `SyncEnv` boundary using Effect `ConfigProvider.fromDotEnvContents` without variable expansion, preserving quoted and unquoted strings as well as literal variable syntax while omitting empty values.
+- Variables are decoded at the `SyncEnv` boundary with variable expansion disabled, preserving quoted and unquoted strings as well as literal variable syntax while omitting empty values.
 - Decoded variables are forwarded to child processes for all supported harnesses (`codex`, `deepseek`, `grok`, `opencode`, `pi`, and `omp`).
 - Precedence:
   1. Explicit adapter overrides (`launcher.env`).
