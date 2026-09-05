@@ -15,6 +15,7 @@ import { join, resolve } from "node:path";
 import { SyncEnv } from "@core/harness.ts";
 import { pruneUnreferencedReleases, runJobsWithPreserve } from "@core/jobs.ts";
 import { buildSyncPlan } from "@core/plan.ts";
+import { sharedToolCacheEnv } from "./support/cache-env.ts";
 
 const makeHome = (options: { gatewayHost?: boolean } = {}): string => {
   const home = mkdtempSync(join(tmpdir(), "runtime-install-test-"));
@@ -259,6 +260,7 @@ process.exit(ok ? 0 : 1);`,
           cwd: resolve(import.meta.dir, ".."),
           env: {
             ...Bun.env,
+            ...sharedToolCacheEnv,
             HOME: home,
           },
         },
@@ -270,7 +272,7 @@ process.exit(ok ? 0 : 1);`,
     } finally {
       rmSync(home, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 
   test("runSync prunes old releases after wrapper reconciliation succeeds and preserves unrecognized directories", async () => {
     const home = makeHome({ gatewayHost: false });
@@ -292,6 +294,7 @@ process.exit(ok ? 0 : 1);`,
           cwd: resolve(import.meta.dir, ".."),
           env: {
             ...Bun.env,
+            ...sharedToolCacheEnv,
             HOME: home,
           },
         },
@@ -328,6 +331,7 @@ process.exit(ok ? 0 : 1);`,
           cwd: resolve(import.meta.dir, ".."),
           env: {
             ...Bun.env,
+            ...sharedToolCacheEnv,
             HOME: home,
           },
         },
@@ -340,7 +344,7 @@ process.exit(ok ? 0 : 1);`,
     } finally {
       rmSync(home, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 
   test("runSync preserves previous releases when wrapper reconciliation fails", async () => {
     const home = makeHome({ gatewayHost: false });
@@ -362,6 +366,7 @@ process.exit(ok ? 0 : 1);`,
           cwd: resolve(import.meta.dir, ".."),
           env: {
             ...Bun.env,
+            ...sharedToolCacheEnv,
             HOME: home,
           },
         },
@@ -397,6 +402,7 @@ process.exit(ok ? 0 : 1);`,
           cwd: resolve(import.meta.dir, ".."),
           env: {
             ...Bun.env,
+            ...sharedToolCacheEnv,
             HOME: home,
           },
         },
@@ -409,5 +415,5 @@ process.exit(ok ? 0 : 1);`,
     } finally {
       rmSync(home, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 });
