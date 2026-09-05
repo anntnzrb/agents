@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import os
 import subprocess
@@ -136,8 +137,10 @@ class AutommitCliTests(unittest.TestCase):
         _ = path.write_text(json.dumps(value), encoding="utf-8")
         return path
 
-    def prepare(self, *context: str) -> _PrepareResult:
+    def prepare(self, *context: str, scope: str | None = None) -> _PrepareResult:
         arguments = ["prepare"]
+        if scope is not None:
+            arguments.extend(["--scope", scope])
         for value in context:
             arguments.extend(["--context", value])
         payload = self.cli(*arguments)
@@ -193,7 +196,7 @@ class AutommitCliTests(unittest.TestCase):
         _ = (self.repo / "tracked.txt").write_text(
             "staged\nunstaged\n", encoding="utf-8"
         )
-        result = self.prepare()
+        result = self.prepare(scope="staged")
         self.assertIn("+staged", result["diff"])
         self.assertNotIn("+unstaged", result["diff"])
         self.assertEqual(self.git("diff", "--name-only").stdout.strip(), "tracked.txt")
@@ -206,7 +209,7 @@ class AutommitCliTests(unittest.TestCase):
         _ = (self.repo / "tracked.txt").write_text(
             "staged\nunstaged\n", encoding="utf-8"
         )
-        prepared = self.prepare()
+        prepared = self.prepare(scope="staged")
         plan = self.write_json(
             "plan.json",
             self.whole_file_plan("tracked.txt", summary="Update tracked value"),
@@ -365,7 +368,7 @@ class AutommitCliTests(unittest.TestCase):
         )
         self.assertEqual(
             self.git("log", "-2", "--format=%s").stdout.splitlines(),
-            ["Change first line", "Change eleventh line"],
+            ["Change eleventh line", "Change first line"],
         )
 
     def test_apply_refuses_when_the_prepared_snapshot_changed(self) -> None:
@@ -511,8 +514,8 @@ class AutommitCliTests(unittest.TestCase):
         receipt = transaction_dir / "receipt.json"
         receipt.symlink_to(outside)
 
-        error = cast("_ErrorDetail", self.cli("prepare", expected_code=4)["error"])
-        self.assertEqual(error["code"], "unsafe_transaction_path")
+        error = cast("_ErrorDetail", self.cli("prepare", expected_code=2)["error"])
+        self.assertEqual(error["code"], "invalid_receipt_file")
         self.assertEqual(outside.read_text(encoding="utf-8"), "outside\n")
         self.assertTrue(receipt.is_symlink())
 
@@ -539,6 +542,157 @@ class AutommitCliTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "committed")
         self.assertEqual(self.git("show", f"HEAD:{filename}").stdout, "content\n")
+
+    def test_concurrent_worktrees_can_commit_independently(self) -> None:
+        worktree_path = self.temp_path / "other-worktree"
+        _ = self.git("worktree", "add", "-b", "feature-branch", str(worktree_path))
+        _ = (self.repo / "main_file.txt").write_text("main changes\n", encoding="utf-8")
+        _ = (worktree_path / "feature_file.txt").write_text(
+            "feature changes\n", encoding="utf-8"
+        )
+
+        prep_main = self.prepare()
+        prep_feat = cast(
+            "_PrepareResult",
+            self.cli("prepare", "--repo", str(worktree_path))["result"],
+        )
+
+        plan_main = self.write_json(
+            "main-plan.json",
+            self.whole_file_plan("main_file.txt", summary="Main commit"),
+        )
+        plan_feat = self.write_json(
+            "feat-plan.json",
+            self.whole_file_plan("feature_file.txt", summary="Feature commit"),
+        )
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            fut_main = executor.submit(
+                self.cli,
+                "apply",
+                "--snapshot",
+                prep_main["snapshot"],
+                "--plan-file",
+                str(plan_main),
+            )
+            fut_feat = executor.submit(
+                self.cli,
+                "apply",
+                "--snapshot",
+                prep_feat["snapshot"],
+                "--plan-file",
+                str(plan_feat),
+                "--repo",
+                str(worktree_path),
+            )
+            res_main = fut_main.result()
+            res_feat = fut_feat.result()
+
+        applied_main = cast("_ApplyResult", res_main["result"])
+        applied_feat = cast("_ApplyResult", res_feat["result"])
+
+        self.assertEqual(applied_main["status"], "committed")
+        self.assertEqual(applied_feat["status"], "committed")
+        self.assertEqual(
+            self.git("show", "HEAD:main_file.txt").stdout, "main changes\n"
+        )
+        completed_feat = subprocess.run(
+            ["git", "-C", str(worktree_path), "show", "HEAD:feature_file.txt"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.assertEqual(completed_feat.stdout, "feature changes\n")
+
+    def test_lines_selector_splits_added_file_cleanly(self) -> None:
+        added_content = "line1\nline2\nline3\nline4\n"
+        _ = (self.repo / "split_file.txt").write_text(added_content, encoding="utf-8")
+        prepared = self.prepare()
+        expected_tree = self.git("write-tree").stdout.strip()
+        plan = self.write_json(
+            "lines-plan.json",
+            {
+                "commits": [
+                    {
+                        "summary": "Add first half",
+                        "details": [],
+                        "changes": [
+                            {
+                                "path": "split_file.txt",
+                                "hunks": {"type": "lines", "start": 1, "end": 2},
+                            }
+                        ],
+                    },
+                    {
+                        "summary": "Add second half",
+                        "details": [],
+                        "changes": [
+                            {
+                                "path": "split_file.txt",
+                                "hunks": {"type": "lines", "start": 3, "end": 4},
+                            }
+                        ],
+                    },
+                ]
+            },
+        )
+        applied = cast(
+            "_ApplyResult",
+            self.cli(
+                "apply",
+                "--snapshot",
+                prepared["snapshot"],
+                "--plan-file",
+                str(plan),
+            )["result"],
+        )
+        self.assertEqual(len(applied["commits"]), 2)
+        self.assertEqual(
+            self.git("rev-parse", "HEAD^{tree}").stdout.strip(), expected_tree
+        )
+        self.assertEqual(self.git("show", "HEAD:split_file.txt").stdout, added_content)
+
+    def test_quoted_octal_utf8_path_decodes_and_commits_cleanly(self) -> None:
+        filename = "é_file.txt"
+        _ = (self.repo / filename).write_text(
+            "accented filename content\n", encoding="utf-8"
+        )
+        prepared = self.prepare()
+        plan = self.write_json(
+            "utf8-plan.json",
+            self.whole_file_plan(filename, summary="Add accented file"),
+        )
+        applied = cast(
+            "_ApplyResult",
+            self.cli(
+                "apply",
+                "--snapshot",
+                prepared["snapshot"],
+                "--plan-file",
+                str(plan),
+            )["result"],
+        )
+        self.assertEqual(applied["status"], "committed")
+        self.assertEqual(
+            self.git("show", f"HEAD:{filename}").stdout, "accented filename content\n"
+        )
+
+    def test_missing_required_keys_in_proposal_returns_invalid_plan(self) -> None:
+        _ = (self.repo / "test.txt").write_text("content\n", encoding="utf-8")
+        prepared = self.prepare()
+        plan = self.write_json("empty-plan.json", {})
+        error = cast(
+            "_ErrorDetail",
+            self.cli(
+                "validate-plan",
+                "--snapshot",
+                prepared["snapshot"],
+                "--plan-file",
+                str(plan),
+                expected_code=2,
+            )["error"],
+        )
+        self.assertEqual(error["code"], "invalid_plan")
 
 
 class AutommitFunctionalTests(unittest.TestCase):

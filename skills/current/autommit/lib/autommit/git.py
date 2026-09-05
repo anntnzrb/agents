@@ -19,8 +19,11 @@ GIT_ENVIRONMENT: Final[dict[str, str]] = {
 }
 
 
-def run_git(cwd: Path, *args: str) -> Result[str, AutommitError]:
+def run_git(
+    cwd: Path, *args: str, env: dict[str, str] | None = None
+) -> Result[str, AutommitError]:
     """Run Git without a shell and return stdout wrapped in a Result."""
+    merged_env = {**os.environ, **GIT_ENVIRONMENT, **(env or {})}
     try:
         completed = subprocess.run(
             ["git", *args],
@@ -30,7 +33,7 @@ def run_git(cwd: Path, *args: str) -> Result[str, AutommitError]:
             text=True,
             encoding="utf-8",
             errors="surrogateescape",
-            env={**os.environ, **GIT_ENVIRONMENT},
+            env=merged_env,
         )
     except FileNotFoundError:
         return Error(GitMissingError())

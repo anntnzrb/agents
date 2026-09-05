@@ -1,14 +1,10 @@
-"""Diff parsing, model-boundary validation, and patch selection."""
+"""Parse and validate untrusted LLM commit proposals."""
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, cast
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from typing import Literal, cast
 
 from expression import Error, Ok, Result
 
@@ -18,13 +14,12 @@ MAX_COMMITS = 16
 MAX_CHANGES_PER_COMMIT = 128
 MAX_DETAILS = 32
 MAX_SUMMARY_LENGTH = 512
-MAX_DETAIL_LENGTH = 2_000
-MAX_PATH_LENGTH = 4_096
-MAX_CONCERNS = 8
+MAX_DETAIL_LENGTH = 2048
+MAX_PATH_LENGTH = 4096
 MAX_CONCERN_LENGTH = 512
-MAX_RATIONALE_LENGTH = 2_000
-_MIN_SPLIT_CONCERNS = 2
-_MAX_OCTAL_DIGITS = 3
+MAX_RATIONALE_LENGTH = 2048
+_MIN_SPLIT_COMMITS = 27
+MAX_OCTAL_DIGITS = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +27,8 @@ class DiffHunk:
     """One 1-based hunk in a unified diff."""
 
     index: int
+    old_start: int
+    old_lines: int
     new_start: int
     new_lines: int
     content: str
@@ -39,7 +36,7 @@ class DiffHunk:
 
 @dataclass(frozen=True, slots=True)
 class ParsedFile:
-    """One file section in a Git diff."""
+    """Parsed file section in a Git diff."""
 
     filename: str
     is_binary: bool
@@ -49,34 +46,30 @@ class ParsedFile:
 
 @dataclass(frozen=True, slots=True)
 class AllSelector:
-    """Select an entire file diff."""
-
-    type: Literal["all"] = "all"
+    """Select an entire file change."""
 
 
 @dataclass(frozen=True, slots=True)
 class IndicesSelector:
-    """Select 1-based hunk indices."""
+    """Select 1-based hunk indices in a diff."""
 
     indices: tuple[int, ...]
-    type: Literal["indices"] = "indices"
 
 
 @dataclass(frozen=True, slots=True)
 class LinesSelector:
-    """Select an inclusive range of changed new-file lines."""
+    """Select 1-based inclusive new-file line ranges."""
 
     start: int
     end: int
-    type: Literal["lines"] = "lines"
 
 
-HunkSelector = AllSelector | IndicesSelector | LinesSelector
+type HunkSelector = AllSelector | IndicesSelector | LinesSelector
 
 
 @dataclass(frozen=True, slots=True)
 class CommitChange:
-    """One path and selector assigned to a commit."""
+    """One file or hunk selection inside a commit."""
 
     path: str
     hunks: HunkSelector
@@ -84,7 +77,7 @@ class CommitChange:
 
 @dataclass(frozen=True, slots=True)
 class CommitGroup:
-    """One proposed commit."""
+    """One atomic commit specification."""
 
     summary: str
     details: tuple[str, ...]
@@ -93,14 +86,14 @@ class CommitGroup:
 
 @dataclass(frozen=True, slots=True)
 class CommitProposal:
-    """The complete partition of a staged snapshot."""
+    """Normalized multi-commit plan."""
 
     commits: tuple[CommitGroup, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class AtomicityDecision:
-    """A critic's decision for a broad single-commit proposal."""
+    """Normalized critic verdict."""
 
     decision: Literal["accept", "split"]
     concerns: tuple[str, ...]
@@ -108,66 +101,51 @@ class AtomicityDecision:
 
 
 def _invalid(message: str) -> AutommitError:
-    return AutommitError("invalid_plan", f"Invalid autommit proposal: {message}")
+    return AutommitError("invalid_plan", message)
 
 
-def _mapping(value: object, field: str) -> Result[dict[str, object], AutommitError]:
+def _invalid_decision(message: str) -> AutommitError:
+    return AutommitError("invalid_atomicity_decision", message)
+
+
+def _mapping(value: object, label: str) -> Result[dict[str, object], AutommitError]:
     if not isinstance(value, dict):
-        return Error(_invalid(f"{field} must be an object"))
-    raw = cast("dict[object, object]", value)
-    if any(not isinstance(key, str) for key in raw):
-        return Error(_invalid(f"{field} keys must be strings"))
-    return Ok({key: item for key, item in raw.items() if isinstance(key, str)})
+        return Error(_invalid(f"{label} must be a JSON object"))
+    return Ok(cast("dict[str, object]", value))
 
 
 def _record(
-    value: object, field: str, keys: frozenset[str]
+    value: dict[str, object], label: str, allowed: frozenset[str]
 ) -> Result[dict[str, object], AutommitError]:
-    match _mapping(value, field):
-        case Result(tag="ok", ok=record):
-            if frozenset(record) != keys:
-                expected = ", ".join(sorted(keys))
-                return Error(_invalid(f"{field} must contain exactly: {expected}"))
-            return Ok(record)
-        case Result(error=err):
-            return Error(err)
+    keys = set(value.keys())
+    if not keys.issubset(allowed):
+        extra = ", ".join(sorted(keys - allowed))
+        return Error(_invalid(f"{label} contains unsupported keys: {extra}"))
+    return Ok(value)
 
 
-def _list(value: object, field: str) -> Result[list[object], AutommitError]:
+def _list(value: object, label: str) -> Result[list[object], AutommitError]:
     if not isinstance(value, list):
-        return Error(_invalid(f"{field} must be an array"))
+        return Error(_invalid(f"{label} must be an array"))
     return Ok(cast("list[object]", value))
 
 
-def _bounded_text(
-    value: object, field: str, maximum: int
-) -> Result[str, AutommitError]:
+def _str(value: object, label: str, max_len: int) -> Result[str, AutommitError]:
     if not isinstance(value, str):
-        return Error(_invalid(f"{field} must be a string"))
-    text = value.strip()
-    if not text or len(text) > maximum or re.search(r"[\x00-\x1f\x7f]", text):
-        return Error(_invalid(f"{field} must be non-empty, bounded text"))
-    return Ok(text)
+        return Error(_invalid(f"{label} must be a string"))
+    stripped = value.strip()
+    if not stripped:
+        return Error(_invalid(f"{label} must be a non-empty string"))
+    if len(stripped) > max_len:
+        return Error(_invalid(f"{label} exceeds length limit ({max_len} chars)"))
+    return Ok(stripped)
 
 
-def _normalize_path(value: object) -> Result[str, AutommitError]:
-    match _bounded_text(value, "change.path", MAX_PATH_LENGTH):
-        case Result(tag="ok", ok=path):
-            if (
-                path.startswith(("/", "\\"))
-                or "\\" in path
-                or path in {".", ".."}
-                or ".." in path.split("/")
-            ):
-                return Error(_invalid(f"unsupported change path: {path}"))
-            return Ok(path)
-        case Result(error=err):
-            return Error(err)
-
-
-def _integer(value: object, field: str, minimum: int = 1) -> Result[int, AutommitError]:
-    if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
-        return Error(_invalid(f"{field} must be an integer >= {minimum}"))
+def _integer(value: object, label: str) -> Result[int, AutommitError]:
+    if not isinstance(value, int) or isinstance(value, bool):
+        return Error(_invalid(f"{label} must be an integer"))
+    if value < 1:
+        return Error(_invalid(f"{label} must be at least 1"))
     return Ok(value)
 
 
@@ -177,12 +155,8 @@ def _normalize_selector(value: object) -> Result[HunkSelector, AutommitError]:
     match _mapping(value, "change.hunks"):
         case Result(tag="ok", ok=selector_mapping):
             selector_type = selector_mapping.get("type")
-            if selector_type == "all":
-                match _record(selector_mapping, "all selector", frozenset({"type"})):
-                    case Result(tag="ok"):
-                        return Ok(AllSelector())
-                    case Result(error=err):
-                        return Error(err)
+            if selector_type not in ("indices", "lines"):
+                return Error(_invalid("change.hunks type must be 'indices' or 'lines'"))
             if selector_type == "indices":
                 match _record(
                     selector_mapping,
@@ -190,13 +164,15 @@ def _normalize_selector(value: object) -> Result[HunkSelector, AutommitError]:
                     frozenset({"type", "indices"}),
                 ):
                     case Result(tag="ok", ok=selector):
+                        if "indices" not in selector:
+                            return Error(_invalid("indices selector requires indices"))
                         match _list(selector["indices"], "indices selector indices"):
                             case Result(tag="ok", ok=indices_items):
                                 if not indices_items:
                                     return Error(
                                         _invalid(
                                             "indices selector must contain "
-                                            + "a non-empty array"
+                                            "a non-empty array"
                                         )
                                     )
                                 indices: list[int] = []
@@ -222,6 +198,10 @@ def _normalize_selector(value: object) -> Result[HunkSelector, AutommitError]:
                     frozenset({"type", "start", "end"}),
                 ):
                     case Result(tag="ok", ok=selector):
+                        if "start" not in selector or "end" not in selector:
+                            return Error(
+                                _invalid("lines selector requires start and end")
+                            )
                         match _integer(selector["start"], "line selector start"):
                             case Result(tag="ok", ok=start):
                                 match _integer(selector["end"], "line selector end"):
@@ -230,7 +210,7 @@ def _normalize_selector(value: object) -> Result[HunkSelector, AutommitError]:
                                             return Error(
                                                 _invalid(
                                                     "line selectors "
-                                                    + "require start <= end"
+                                                    "require start <= end"
                                                 )
                                             )
                                         return Ok(LinesSelector(start, end))
@@ -247,143 +227,217 @@ def _normalize_selector(value: object) -> Result[HunkSelector, AutommitError]:
 
 def normalize_proposal(value: object) -> Result[CommitProposal, AutommitError]:
     """Validate and normalize an untrusted proposal JSON value."""
-    match _record(value, "proposal", frozenset({"commits"})):
-        case Result(tag="ok", ok=root):
-            match _list(root["commits"], "commits"):
-                case Result(tag="ok", ok=commits_items):
-                    if not 1 <= len(commits_items) <= MAX_COMMITS:
-                        return Error(
-                            _invalid(
-                                f"commits must contain between 1 and {MAX_COMMITS} "
-                                + "entries"
-                            )
-                        )
-                    commits: list[CommitGroup] = []
-                    for commit_index, raw_commit in enumerate(commits_items, start=1):
-                        match _mapping(raw_commit, f"commit {commit_index}"):
-                            case Result(tag="ok", ok=commit):
-                                allowed_keys = {"summary", "changes", "details"}
-                                if set(commit) - allowed_keys or not {
-                                    "summary",
-                                    "changes",
-                                } <= set(commit):
-                                    return Error(
-                                        _invalid(
-                                            f"commit {commit_index} must "
-                                            + "contain summary, "
-                                            + "changes, and optional details"
-                                        )
+    match _mapping(value, "proposal"):
+        case Result(tag="ok", ok=mapping_value):
+            match _record(mapping_value, "proposal", frozenset({"commits"})):
+                case Result(tag="ok", ok=root):
+                    if "commits" not in root:
+                        return Error(_invalid("proposal requires commits"))
+                    match _list(root["commits"], "commits"):
+                        case Result(tag="ok", ok=commits_items):
+                            if not 1 <= len(commits_items) <= MAX_COMMITS:
+                                return Error(
+                                    _invalid(
+                                        f"commits must contain between 1 and {MAX_COMMITS} "
+                                        "entries"
                                     )
-                                match _bounded_text(
-                                    commit["summary"],
-                                    f"commit {commit_index} summary",
-                                    MAX_SUMMARY_LENGTH,
-                                ):
-                                    case Result(tag="ok", ok=summary):
-                                        match _list(
-                                            commit.get("details", []),
-                                            f"commit {commit_index} details",
+                                )
+                            commits: list[CommitGroup] = []
+                            for commit_index, raw_commit in enumerate(
+                                commits_items, start=1
+                            ):
+                                match _mapping(raw_commit, f"commit {commit_index}"):
+                                    case Result(tag="ok", ok=commit_mapping):
+                                        match _record(
+                                            commit_mapping,
+                                            f"commit {commit_index}",
+                                            frozenset(
+                                                {"summary", "details", "changes"}
+                                            ),
                                         ):
-                                            case Result(tag="ok", ok=details_items):
-                                                if len(details_items) > MAX_DETAILS:
+                                            case Result(tag="ok", ok=commit):
+                                                if (
+                                                    "summary" not in commit
+                                                    or "changes" not in commit
+                                                ):
                                                     return Error(
                                                         _invalid(
-                                                            f"commit {commit_index} details must contain at most {MAX_DETAILS} items"  # noqa: E501 - validator message needs 4-way split at this nesting
+                                                            f"commit {commit_index} requires "
+                                                            "summary and changes"
                                                         )
                                                     )
-                                                details: list[str] = []
-                                                for (
-                                                    detail_index,
-                                                    detail,
-                                                ) in enumerate(details_items, start=1):
-                                                    match _bounded_text(
-                                                        detail,
-                                                        f"commit {commit_index} detail {detail_index}",  # noqa: E501 - validator message needs 3-way split at this nesting
-                                                        MAX_DETAIL_LENGTH,
-                                                    ):
-                                                        case Result(tag="ok", ok=txt):
-                                                            details.append(txt)
-                                                        case Result(error=err):
-                                                            return Error(err)
-                                                match _list(
-                                                    commit["changes"],
-                                                    f"commit {commit_index} changes",
+                                                match _str(
+                                                    commit["summary"],
+                                                    f"commit {commit_index} summary",
+                                                    MAX_SUMMARY_LENGTH,
                                                 ):
-                                                    case Result(
-                                                        tag="ok", ok=changes_items
-                                                    ):
-                                                        if (
-                                                            not 1
-                                                            <= len(changes_items)
-                                                            <= MAX_CHANGES_PER_COMMIT
-                                                        ):
-                                                            return Error(
-                                                                _invalid(
-                                                                    f"commit {commit_index} must contain between 1 and "  # noqa: E501 - validator message needs 4-way split at this nesting
-                                                                    + f"{MAX_CHANGES_PER_COMMIT} changes"  # noqa: E501 - validator message needs 4-way split at this nesting
-                                                                )
-                                                            )
-                                                        changes: list[CommitChange] = []
-                                                        seen_paths: set[str] = set()
-                                                        for raw_change in changes_items:
-                                                            match _record(
-                                                                raw_change,
-                                                                "commit "
-                                                                + f"{commit_index} "
-                                                                + "change",
-                                                                frozenset(
-                                                                    {
-                                                                        "path",
-                                                                        "hunks",
-                                                                    }
-                                                                ),
+                                                    case Result(tag="ok", ok=summary):
+                                                        details_list: list[str] = []
+                                                        if "details" in commit:
+                                                            match _list(
+                                                                commit["details"],
+                                                                f"commit {commit_index} details",
                                                             ):
                                                                 case Result(
                                                                     tag="ok",
-                                                                    ok=change,
+                                                                    ok=details_items,
                                                                 ):
-                                                                    match (
-                                                                        _normalize_path(
-                                                                            change[
-                                                                                "path"
-                                                                            ]
+                                                                    if (
+                                                                        len(
+                                                                            details_items
                                                                         )
+                                                                        > MAX_DETAILS
+                                                                    ):
+                                                                        return Error(
+                                                                            _invalid(
+                                                                                f"commit {commit_index} "
+                                                                                "details exceed maximum "
+                                                                                f"entries ({MAX_DETAILS})"
+                                                                            )
+                                                                        )
+                                                                    for (
+                                                                        detail_index,
+                                                                        raw_detail,
+                                                                    ) in enumerate(
+                                                                        details_items,
+                                                                        start=1,
+                                                                    ):
+                                                                        match _str(
+                                                                            raw_detail,
+                                                                            f"commit {commit_index} "
+                                                                            f"detail {detail_index}",
+                                                                            MAX_DETAIL_LENGTH,
+                                                                        ):
+                                                                            case Result(
+                                                                                tag="ok",
+                                                                                ok=detail,
+                                                                            ):
+                                                                                details_list.append(
+                                                                                    detail
+                                                                                )
+                                                                            case Result(
+                                                                                error=err
+                                                                            ):
+                                                                                return Error(
+                                                                                    err
+                                                                                )
+                                                                case Result(error=err):
+                                                                    return Error(err)
+                                                        match _list(
+                                                            commit["changes"],
+                                                            f"commit {commit_index} changes",
+                                                        ):
+                                                            case Result(
+                                                                tag="ok",
+                                                                ok=changes_items,
+                                                            ):
+                                                                if (
+                                                                    not 1
+                                                                    <= len(
+                                                                        changes_items
+                                                                    )
+                                                                    <= MAX_CHANGES_PER_COMMIT
+                                                                ):
+                                                                    return Error(
+                                                                        _invalid(
+                                                                            f"commit {commit_index} "
+                                                                            "changes must contain "
+                                                                            "between 1 and "
+                                                                            f"{MAX_CHANGES_PER_COMMIT} "
+                                                                            "entries"
+                                                                        )
+                                                                    )
+                                                                changes: list[
+                                                                    CommitChange
+                                                                ] = []
+                                                                for (
+                                                                    change_index,
+                                                                    raw_change,
+                                                                ) in enumerate(
+                                                                    changes_items,
+                                                                    start=1,
+                                                                ):
+                                                                    match _mapping(
+                                                                        raw_change,
+                                                                        f"commit {commit_index} "
+                                                                        f"change {change_index}",
                                                                     ):
                                                                         case Result(
                                                                             tag="ok",
-                                                                            ok=path,
+                                                                            ok=change_mapping,
                                                                         ):
-                                                                            if (
-                                                                                path
-                                                                                in seen_paths  # noqa: E501 - single token at deep nesting
+                                                                            match _record(
+                                                                                change_mapping,
+                                                                                f"commit {commit_index} "
+                                                                                f"change {change_index}",
+                                                                                frozenset(
+                                                                                    {
+                                                                                        "path",
+                                                                                        "hunks",
+                                                                                    }
+                                                                                ),
                                                                             ):
-                                                                                return Error(  # noqa: E501 - single token at deep nesting
-                                                                                    _invalid(
-                                                                                        f"commit {commit_index} lists {path} more than once"  # noqa: E501 - validator message needs 4-way split at this nesting
-                                                                                    )
-                                                                                )
-                                                                            seen_paths.add(
-                                                                                path
-                                                                            )
-                                                                            match _normalize_selector(  # noqa: E501 - single token at deep nesting
-                                                                                change[
-                                                                                    "hunks"
-                                                                                ]
-                                                                            ):
-                                                                                case Result(  # noqa: E501 - single token at deep nesting
+                                                                                case Result(
                                                                                     tag="ok",
-                                                                                    ok=selector,
+                                                                                    ok=change,
                                                                                 ):
-                                                                                    changes.append(
-                                                                                        CommitChange(
-                                                                                            path,
-                                                                                            selector,
+                                                                                    if (
+                                                                                        "path"
+                                                                                        not in change
+                                                                                        or "hunks"
+                                                                                        not in change
+                                                                                    ):
+                                                                                        return Error(
+                                                                                            _invalid(
+                                                                                                f"commit {commit_index} "
+                                                                                                f"change {change_index} "
+                                                                                                "requires path "
+                                                                                                "and hunks"
+                                                                                            )
                                                                                         )
-                                                                                    )
-                                                                                case Result(  # noqa: E501 - single token at deep nesting
+                                                                                    match _str(
+                                                                                        change[
+                                                                                            "path"
+                                                                                        ],
+                                                                                        f"commit {commit_index} "
+                                                                                        f"change {change_index} path",
+                                                                                        MAX_PATH_LENGTH,
+                                                                                    ):
+                                                                                        case Result(
+                                                                                            tag="ok",
+                                                                                            ok=path,
+                                                                                        ):
+                                                                                            match _normalize_selector(
+                                                                                                change[
+                                                                                                    "hunks"
+                                                                                                ]
+                                                                                            ):
+                                                                                                case Result(
+                                                                                                    tag="ok",
+                                                                                                    ok=selector,
+                                                                                                ):
+                                                                                                    changes.append(
+                                                                                                        CommitChange(
+                                                                                                            path,
+                                                                                                            selector,
+                                                                                                        )
+                                                                                                    )
+                                                                                                case Result(
+                                                                                                    error=err
+                                                                                                ):
+                                                                                                    return Error(
+                                                                                                        err
+                                                                                                    )
+                                                                                        case Result(
+                                                                                            error=err
+                                                                                        ):
+                                                                                            return Error(
+                                                                                                err
+                                                                                            )
+                                                                                case Result(
                                                                                     error=err
                                                                                 ):
-                                                                                    return Error(  # noqa: E501 - single token at deep nesting
+                                                                                    return Error(
                                                                                         err
                                                                                     )
                                                                         case Result(
@@ -394,208 +448,154 @@ def normalize_proposal(value: object) -> Result[CommitProposal, AutommitError]:
                                                                                     err
                                                                                 )
                                                                             )
-                                                                case Result(error=err):
-                                                                    return Error(err)
-                                                        commits.append(
-                                                            CommitGroup(
-                                                                summary,
-                                                                tuple(details),
-                                                                tuple(changes),
-                                                            )
-                                                        )
+                                                                commits.append(
+                                                                    CommitGroup(
+                                                                        summary,
+                                                                        tuple(
+                                                                            details_list
+                                                                        ),
+                                                                        tuple(changes),
+                                                                    )
+                                                                )
+                                                            case Result(error=err):
+                                                                return Error(err)
                                                     case Result(error=err):
                                                         return Error(err)
                                             case Result(error=err):
                                                 return Error(err)
                                     case Result(error=err):
                                         return Error(err)
-                            case Result(error=err):
-                                return Error(err)
-                    return Ok(CommitProposal(tuple(commits)))
+                            return Ok(CommitProposal(tuple(commits)))
+                        case Result(error=err):
+                            return Error(err)
                 case Result(error=err):
                     return Error(err)
         case Result(error=err):
             return Error(err)
 
 
-def read_json_file(path: Path, kind: str) -> Result[object, AutommitError]:
-    """Read one bounded UTF-8 JSON document."""
-    try:
-        size = path.stat().st_size
-        if size > 1024 * 1024:
-            return Error(
-                AutommitError("invalid_json", f"{kind} exceeds the 1 MiB limit.")
-            )
-        text = path.read_text(encoding="utf-8")
-    except OSError as error:
-        return Error(
-            AutommitError("invalid_json", f"Unable to read {kind} {path}: {error}")
-        )
-    try:
-        return Ok(cast("object", json.loads(text)))
-    except json.JSONDecodeError as error:
-        return Error(AutommitError("invalid_json", f"Invalid {kind} JSON: {error}"))
-
-
 def normalize_atomicity_decision(
     value: object,
 ) -> Result[AtomicityDecision, AutommitError]:
-    """Validate a critic result at the model boundary."""
-    match _record(
-        value,
-        "atomicity decision",
-        frozenset({"decision", "concerns", "rationale"}),
-    ):
-        case Result(tag="ok", ok=decision_record):
-            decision_value = decision_record["decision"]
-            concerns_value = decision_record["concerns"]
-            rationale_value = decision_record["rationale"]
-            if decision_value not in {"accept", "split"} or not isinstance(
-                decision_value, str
+    """Validate and normalize an untrusted critic decision JSON object."""
+    match _mapping(value, "decision"):
+        case Result(tag="ok", ok=decision_mapping):
+            match _record(
+                decision_mapping,
+                "decision",
+                frozenset({"decision", "concerns", "rationale"}),
             ):
-                return Error(
-                    AutommitError(
-                        "invalid_atomicity_decision",
-                        "Invalid atomicity decision value.",
-                    )
-                )
-            if not isinstance(concerns_value, list):
-                return Error(
-                    AutommitError(
-                        "invalid_atomicity_decision",
-                        "Invalid atomicity concerns.",
-                    )
-                )
-            concern_items = cast("list[object]", concerns_value)
-            if len(concern_items) > MAX_CONCERNS:
-                return Error(
-                    AutommitError(
-                        "invalid_atomicity_decision",
-                        "Invalid atomicity concerns.",
-                    )
-                )
-            concerns: list[str] = []
-            for concern in concern_items:
-                if not isinstance(concern, str):
-                    return Error(
-                        AutommitError(
-                            "invalid_atomicity_decision",
-                            "Invalid atomicity concern.",
+                case Result(tag="ok", ok=decision_obj):
+                    if (
+                        "decision" not in decision_obj
+                        or "rationale" not in decision_obj
+                    ):
+                        return Error(
+                            _invalid_decision(
+                                "decision object requires 'decision' and 'rationale'"
+                            )
                         )
-                    )
-                normalized = concern.strip()
-                if not normalized or len(normalized) > MAX_CONCERN_LENGTH:
-                    return Error(
-                        AutommitError(
-                            "invalid_atomicity_decision",
-                            "Invalid atomicity concern.",
+                    decision_kind = decision_obj["decision"]
+                    if decision_kind not in ("accept", "split"):
+                        return Error(
+                            _invalid_decision("decision must be 'accept' or 'split'")
                         )
-                    )
-                concerns.append(normalized)
-            if not isinstance(rationale_value, str):
-                return Error(
-                    AutommitError(
-                        "invalid_atomicity_decision",
-                        "Invalid atomicity rationale.",
-                    )
-                )
-            rationale = rationale_value.strip()
-            if not rationale or len(rationale) > MAX_RATIONALE_LENGTH:
-                return Error(
-                    AutommitError(
-                        "invalid_atomicity_decision",
-                        "Invalid atomicity rationale.",
-                    )
-                )
-            if decision_value == "accept" and concerns:
-                return Error(
-                    AutommitError(
-                        "invalid_atomicity_decision",
-                        "An accept decision cannot contain concerns.",
-                    )
-                )
-            if decision_value == "split" and (
-                len(concerns) < _MIN_SPLIT_CONCERNS
-                or len(set(concerns)) != len(concerns)
-            ):
-                return Error(
-                    AutommitError(
-                        "invalid_atomicity_decision",
-                        "A split decision requires at least two distinct concerns.",
-                    )
-                )
-            decision = cast("Literal['accept', 'split']", decision_value)
-            return Ok(AtomicityDecision(decision, tuple(concerns), rationale))
-        case _:
-            return Error(
-                AutommitError(
-                    "invalid_atomicity_decision",
-                    "Invalid atomicity decision: expected exactly "
-                    + "decision, concerns, and rationale.",
-                )
-            )
+                    match _str(
+                        decision_obj["rationale"], "rationale", MAX_RATIONALE_LENGTH
+                    ):
+                        case Result(tag="ok", ok=rationale):
+                            concerns_list: list[str] = []
+                            if "concerns" in decision_obj:
+                                match _list(decision_obj["concerns"], "concerns"):
+                                    case Result(tag="ok", ok=concerns_items):
+                                        for idx, raw_concern in enumerate(
+                                            concerns_items, start=1
+                                        ):
+                                            match _str(
+                                                raw_concern,
+                                                f"concern {idx}",
+                                                MAX_CONCERN_LENGTH,
+                                            ):
+                                                case Result(tag="ok", ok=concern):
+                                                    concerns_list.append(concern)
+                                                case Result(error=err):
+                                                    return Error(err)
+                                    case Result(error=err):
+                                        return Error(err)
+                            if decision_kind == "accept" and concerns_list:
+                                return Error(
+                                    _invalid_decision(
+                                        "decision 'accept' must not contain concerns"
+                                    )
+                                )
+                            if decision_kind == "split" and not concerns_list:
+                                return Error(
+                                    _invalid_decision(
+                                        "decision 'split' requires at least one concern"
+                                    )
+                                )
+                            return Ok(
+                                AtomicityDecision(
+                                    cast('Literal["accept", "split"]', decision_kind),
+                                    tuple(concerns_list),
+                                    rationale,
+                                )
+                            )
+                        case Result(error=err):
+                            return Error(err)
+                case Result(error=err):
+                    return Error(err)
+        case Result(error=err):
+            return Error(err)
 
 
-def _decode_git_path_token(value: str, start: int) -> tuple[str, int]:
-    if start >= len(value):
-        return "", start
-    if value[start] != '"':
-        end = value.find(" ", start)
-        if end < 0:
-            end = len(value)
-        return value[start:end], end
-    data = bytearray()
+def _decode_git_path_token(token: str, start: int) -> tuple[str, int]:
+    if token[start : start + 1] != '"':
+        end = token.find(" ", start)
+        return (token[start:], len(token)) if end < 0 else (token[start:end], end)
+
+    byte_buf = bytearray()
     index = start + 1
-    escapes = {
-        "a": 7,
-        "b": 8,
-        "t": 9,
-        "n": 10,
-        "v": 11,
-        "f": 12,
-        "r": 13,
-        "\\": 92,
-        '"': 34,
-    }
-    while index < len(value):
-        character = value[index]
-        if character == '"':
-            return data.decode("utf-8", errors="surrogateescape"), index + 1
-        if character != "\\":
-            data.extend(character.encode("utf-8", errors="surrogateescape"))
-            index += 1
-            continue
+    while index < len(token):
+        char = token[index]
+        if char == '"':
+            try:
+                decoded_path = byte_buf.decode("utf-8", errors="surrogateescape")
+            except UnicodeDecodeError as err:
+                raise AutommitError(
+                    "invalid_diff", f"Invalid UTF-8 in quoted path: {err}.", 4
+                ) from err
+            return decoded_path, index + 1
+        if char == "\\" and index + 1 < len(token):
+            escaped = token[index + 1]
+            if escaped in ('"', "\\"):
+                byte_buf.append(ord(escaped))
+                index += 2
+                continue
+            if escaped == "n":
+                byte_buf.append(ord("\n"))
+                index += 2
+                continue
+            if escaped == "t":
+                byte_buf.append(ord("\t"))
+                index += 2
+                continue
+            if escaped.isdigit():
+                octal = token[index + 1 : index + 1 + MAX_OCTAL_DIGITS]
+                byte_buf.append(int(octal, 8))
+                index += 1 + len(octal)
+                continue
+        byte_buf.extend(char.encode("utf-8", errors="surrogateescape"))
         index += 1
-        if index >= len(value):
-            break
-        escaped = value[index]
-        if escaped in escapes:
-            data.append(escapes[escaped])
-            index += 1
-            continue
-        if escaped in "01234567":
-            octal = escaped
-            while (
-                index < len(value)
-                and len(octal) < _MAX_OCTAL_DIGITS
-                and value[index] in "01234567"
-            ):
-                octal += value[index]
-                index += 1
-            data.append(int(octal, 8))
-            continue
-        data.extend(escaped.encode("utf-8", errors="surrogateescape"))
-        index += 1
-    raise AutommitError("invalid_diff", "Unterminated quoted path in Git diff.", 4)
+    raise AutommitError("invalid_diff", "Unterminated quoted Git path.", 4)
 
 
 def _decode_git_path(value: str) -> str:
-    if not value.startswith('"'):
-        return value.split("\t", 1)[0]
-    decoded, end = _decode_git_path_token(value, 0)
-    if value[end:] and not value[end:].startswith("\t"):
-        raise AutommitError("invalid_diff", "Unexpected text after quoted Git path.", 4)
-    return decoded
+    stripped = value.strip()
+    if stripped.startswith('"'):
+        path, _ = _decode_git_path_token(stripped, 0)
+        return path
+    return stripped
 
 
 def _diff_filename(header: str, content: str) -> str:
@@ -603,31 +603,31 @@ def _diff_filename(header: str, content: str) -> str:
     if not header.startswith(prefix):
         raise AutommitError("invalid_diff", "Invalid Git diff header.", 4)
 
-    old_path = ""
     for line in content.splitlines()[1:]:
         if line.startswith("rename to "):
             return _decode_git_path(line.removeprefix("rename to "))
-        if line.startswith("--- "):
-            old_path = _decode_git_path(line.removeprefix("--- "))
         if line.startswith("+++ "):
-            new_path = _decode_git_path(line.removeprefix("+++ "))
-            if new_path != "/dev/null":
-                return re.sub(r"^[a-z]/", "", new_path)
-    if old_path and old_path != "/dev/null":
-        return re.sub(r"^[a-z]/", "", old_path)
+            new_raw = line.removeprefix("+++ ")
+            if new_raw != "/dev/null":
+                return _decode_git_path(new_raw).removeprefix("b/")
+        if line.startswith("--- "):
+            old_raw = line.removeprefix("--- ")
+            if old_raw != "/dev/null":
+                return _decode_git_path(old_raw).removeprefix("a/")
 
     remainder = header[len(prefix) :]
     if remainder.startswith('"'):
         _, cursor = _decode_git_path_token(remainder, 0)
         while cursor < len(remainder) and remainder[cursor] == " ":
             cursor += 1
-        second, _ = _decode_git_path_token(remainder, cursor)
-    else:
-        separator = remainder.rfind(" ")
-        if separator < 0:
-            raise AutommitError("invalid_diff", "Invalid Git diff paths.", 4)
-        second = remainder[separator + 1 :]
-    return re.sub(r"^[a-z]/", "", second)
+        second_path, _ = _decode_git_path_token(remainder, cursor)
+        return second_path.removeprefix("b/")
+
+    separator = remainder.rfind(" ")
+    if separator < 0:
+        raise AutommitError("invalid_diff", "Invalid Git diff paths.", 4)
+    second = remainder[separator + 1 :]
+    return _decode_git_path(second).removeprefix("b/")
 
 
 def parse_file_diffs(diff_text: str) -> tuple[ParsedFile, ...]:
@@ -642,7 +642,7 @@ def parse_file_diffs(diff_text: str) -> tuple[ParsedFile, ...]:
             continue
         filename = _diff_filename(content[:header_end], content)
         hunk_matches = list(
-            re.finditer(r"(?m)^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@.*$", content)
+            re.finditer(r"(?m)^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@.*$", content)
         )
         hunks: list[DiffHunk] = []
         for hunk_index, match in enumerate(hunk_matches, start=1):
@@ -656,6 +656,8 @@ def parse_file_diffs(diff_text: str) -> tuple[ParsedFile, ...]:
                     hunk_index,
                     int(match.group(1)),
                     int(match.group(2)) if match.group(2) is not None else 1,
+                    int(match.group(3)),
+                    int(match.group(4)) if match.group(4) is not None else 1,
                     content[match.start() : hunk_end].rstrip("\n"),
                 )
             )
@@ -754,9 +756,9 @@ def validate_proposal_coverage(
             ):
                 errors.append(
                     "Overlapping hunk selections across commits: "
-                    + f"{filename} ({_describe_selector(left)} "
-                    + "overlaps another selection); "
-                    + "line ranges are inclusive and must be disjoint"
+                    f"{filename} ({_describe_selector(left)} "
+                    "overlaps another selection); "
+                    "line ranges are inclusive and must be disjoint"
                 )
                 break
         parsed = files_by_name.get(filename)
@@ -786,9 +788,94 @@ def validate_proposal_coverage(
             if not covered:
                 errors.append(
                     "Staged hunk missing from split plan: "
-                    + f"{filename} (hunk {hunk.index})"
+                    f"{filename} (hunk {hunk.index})"
                 )
     return tuple(dict.fromkeys(errors))
+
+
+def _build_lines_patch(
+    file: ParsedFile, selector: LinesSelector
+) -> Result[str, AutommitError]:
+    """Build a zero-context patch covering new lines [start, end]."""
+    # Lines selector is supported only for new-file additions (pure additions starting at -0,0)
+    # Check that all file hunks are new-file additions (old_lines == 0)
+    for hunk in file.hunks:
+        if hunk.old_lines != 0:
+            return Error(
+                AutommitError(
+                    "invalid_plan",
+                    (
+                        f"Lines selector cannot be used on existing file modification {file.filename}. "
+                        "Use indices or all selector instead."
+                    ),
+                )
+            )
+
+    selected_hunks: list[str] = []
+    for hunk in file.hunks:
+        hunk_end = (
+            hunk.new_start
+            if hunk.new_lines == 0
+            else hunk.new_start + hunk.new_lines - 1
+        )
+        if hunk.new_start <= selector.end and selector.start <= hunk_end:
+            # Preserve raw line terminators without splitlines() stripping \r
+            lines = hunk.content.split("\n")[1:]
+            overlapping_lines: list[str] = []
+            current_line = hunk.new_start
+            first_included_line: int | None = None
+            for line in lines:
+                # Check for \ No newline at end of file marker
+                if line.startswith("\\ No newline"):
+                    if overlapping_lines:
+                        overlapping_lines.append(line)
+                    continue
+                if selector.start <= current_line <= selector.end:
+                    if first_included_line is None:
+                        first_included_line = current_line
+                    overlapping_lines.append(line)
+                if line.startswith(("+", " ")):
+                    current_line += 1
+            if overlapping_lines and first_included_line is not None:
+                # Count only content lines (starting with + or space), not trailing no-newline markers
+                count = sum(
+                    1 for line in overlapping_lines if line.startswith(("+", " "))
+                )
+                header = (
+                    f"@@ -0,0 +{first_included_line},{count} @@"
+                    if count != 1
+                    else f"@@ -0,0 +{first_included_line} @@"
+                )
+                selected_hunks.append("\n".join((header, *overlapping_lines)))
+
+    if not selected_hunks:
+        return Error(
+            AutommitError(
+                "invalid_plan",
+                (
+                    f"No changes selected for {file.filename} in lines "
+                    f"{selector.start}-{selector.end}."
+                ),
+            )
+        )
+    first_hunk = file.content.find("\n@@")
+    file_header = file.content if first_hunk < 0 else file.content[:first_hunk]
+    if selector.start > 1:
+        diff_header = (
+            f"diff --git a/{file.filename} b/{file.filename}\n"
+            f"--- a/{file.filename}\n"
+            f"+++ b/{file.filename}"
+        )
+        adjusted_hunks: list[str] = []
+        for hunk_str in selected_hunks:
+            h_lines = hunk_str.split("\n")
+            if h_lines and h_lines[0].startswith("@@ -0,0"):
+                h_lines[0] = h_lines[0].replace(
+                    "@@ -0,0", f"@@ -{selector.start - 1},0"
+                )
+            adjusted_hunks.append("\n".join(h_lines))
+        return Ok("\n".join((diff_header, *adjusted_hunks)))
+    return Ok("\n".join((file_header, *selected_hunks)))
 
 
 def select_patch(
@@ -804,20 +891,9 @@ def select_patch(
         )
     if isinstance(selector, AllSelector):
         return Ok(file.content)
-    if isinstance(selector, IndicesSelector):
-        hunks = tuple(hunk for hunk in file.hunks if hunk.index in selector.indices)
-    else:
-        hunks = tuple(
-            hunk
-            for hunk in file.hunks
-            if hunk.new_start <= selector.end
-            and selector.start
-            <= (
-                hunk.new_start
-                if hunk.new_lines == 0
-                else hunk.new_start + hunk.new_lines - 1
-            )
-        )
+    if isinstance(selector, LinesSelector):
+        return _build_lines_patch(file, selector)
+    hunks = tuple(hunk for hunk in file.hunks if hunk.index in selector.indices)
     if not hunks:
         return Error(
             AutommitError("invalid_plan", f"No changes selected for {file.filename}.")
@@ -863,7 +939,7 @@ def requires_atomicity_review(
     staged_file_count: int,
     diff_text: str,
 ) -> bool:
-    """Match the Pi command's narrow-proposal critic bypass."""
+    """Match the narrow-proposal critic bypass."""
     if len(proposal.commits) != 1:
         return False
     group = proposal.commits[0]

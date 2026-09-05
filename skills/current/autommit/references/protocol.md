@@ -10,9 +10,9 @@ Use only:
 uv run --script <skill-dir>/scripts/cli.py <command> ...
 ```
 
-Success is one JSON line on stdout. Expected failure is one JSON line on stderr. Every payload has `schema:"autommit/v1"`, `ok`, `type`, `command`, and either `result` or `error`.
+Success is one JSON line on stdout. Expected failure is one JSON line on stderr. Every payload has `schema:"autommit/v1"`, `ok:true|false`, `command`, and either `result` or `error`.
 
-`--repo PATH` defaults to the current directory. Git is the only external executable. The CLI has no Python runtime dependencies.
+`--repo PATH` defaults to the current directory. Git is the only external executable.
 
 ## Commands
 
@@ -27,17 +27,17 @@ uv run --script <skill-dir>/scripts/cli.py schema
 ### `prepare`
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py prepare [context ...] [--context TEXT ...] [--repo PATH]
+uv run --script <skill-dir>/scripts/cli.py prepare [--scope all|staged] [context ...] [--context TEXT ...] [--repo PATH]
 ```
 
 Behavior:
 
-1. Resolve the Git common directory and acquire `.git/autommit/operation.lock` with exclusive creation.
+1. Resolve the worktree-local Git directory with `git rev-parse --absolute-git-dir` and acquire `<git-dir>/autommit/operation.lock` with exclusive creation. This allows concurrent autommit runs across distinct worktrees.
 2. Recover a durable prepared receipt before considering current changes.
-3. Inspect the staged paths. If at least one path is staged, leave the index and all unstaged work untouched. If none is staged, run `git add --all` once.
+3. In `all` scope (default), stage uncommitted changes with `git add --all`. In `staged` scope, operate strictly on existing staged changes without sweeping in unstaged work.
 4. Require a branch checkout with an existing `HEAD`.
 5. Bind the branch ref, `HEAD`, and index tree into `snapshot`.
-6. Return the exact cached binary diff, staged paths, changed-hunk count, composed context, recent subjects, and bounded root/nearest `AGENTS.md` evidence.
+6. Return the exact cached binary diff, staged paths, changed-hunk count, composed context, recent subjects, and repository context.
 
 Prepared result fields:
 
@@ -50,7 +50,7 @@ Prepared result fields:
 - `repository_context`: advisory naming/grouping evidence
 - `diff`: exact cached binary diff used for planning
 
-Recovery returns `status:recovered`, `message`, and `after`. Stop after recovery; do not reuse an earlier plan.
+Recovery returns `status:recovered`, `ref`, and `after`. Stop after recovery; do not reuse an earlier plan.
 
 ### `validate-plan`
 
@@ -70,21 +70,21 @@ The result includes `commit_count`, `staged_file_count`, `changed_hunk_count`, a
 uv run --script <skill-dir>/scripts/cli.py apply --snapshot SNAPSHOT --plan-file PATH [--decision-file PATH] [--repo PATH]
 ```
 
-A broad one-commit plan requires a valid decision file. `accept` requires zero concerns and a non-empty rationale. `split` requires at least two unique concerns and is rejected until the plan is replaced by a validated multi-commit plan.
+A broad one-commit plan requires a valid decision file. `accept` requires zero concerns and a non-empty rationale. `split` requires at least one concern and is rejected until the plan is replaced by a validated multi-commit plan.
 
 Apply behavior:
 
-1. Acquire the operation lock and recover any receipt.
+1. Acquire the worktree-local operation lock and recover any receipt.
 2. Recheck the snapshot and complete plan coverage.
 3. Build selected patches from the original staged diff.
-4. Apply commits bottom-up by selected new-file position in a detached temporary worktree. This preserves offsets for disjoint selectors.
+4. Apply commits in exact plan order in a detached temporary worktree.
 5. Commit from a temporary UTF-8 message file. Details become `- ` body bullets.
 6. Require the final commit tree to equal the prepared index tree exactly.
 7. Recheck the cached diff and snapshot.
-8. Fsync a prepared receipt, advance the branch with `git update-ref REF AFTER BEFORE`, verify branch/index evidence, then remove the receipt.
+8. Fsync a prepared receipt in the worktree-local directory, advance the branch with CAS (`git update-ref REF AFTER BEFORE`), verify branch/index evidence, then remove the receipt.
 9. Remove the temporary worktree. Never fall back to in-place commits.
 
-The original worktree index becomes clean relative to the new `HEAD`; unrelated unstaged work remains in place.
+The original worktree index becomes clean relative to the new `HEAD`; in `staged` scope, unrelated unstaged work remains in place.
 
 ## Plan Shape
 
@@ -112,12 +112,12 @@ Selectors:
 - `{"type":"indices","indices":[1]}`: unique positive 1-based regular-diff hunk indices
 - `{"type":"lines","start":1,"end":8}`: inclusive positive new-file line range, selected from the zero-context diff
 
-Use line selectors only when separate commits must own disjoint changed lines inside one generated/new file. Mixed selector types for one path overlap by definition.
+Use line selectors when separate commits must own disjoint changed lines inside one new or added file.
 
 ## Atomicity Shape
 
 ```json
-{"decision":"accept","concerns":[],"rationale":"The snapshot implements one behavior."}
+{"decision":"accept","concerns":[],"rationale":"The snapshot implements one cohesive behavior."}
 ```
 
 or:
@@ -138,6 +138,4 @@ Limits: at most 8 concerns; concern <=512 characters; rationale <=2,000 characte
 |4|Git, filesystem, cleanup, or unexpected runtime failure|Preserve state and inspect evidence|
 |127|Git executable unavailable|Install/fix Git before retrying|
 
-Locks are never broken automatically. A prepared receipt is durable recovery evidence, not garbage. Re-run `prepare` to recover it under the same branch and index state.
-
-The on-disk receipt remains compatible with the Pi extension: exact keys are `version`, `state`, `ref`, `before`, `after`, and `indexTree`.
+Locks are never broken automatically. A prepared receipt is durable recovery evidence. Re-run `prepare` to recover it under the same branch and index state.

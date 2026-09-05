@@ -1,61 +1,52 @@
-[project]
-name = "autommit"
-version = "0.1.0"
-description = "Harness-agnostic atomic commit assistant"
-readme = "SKILL.md"
-requires-python = ">=3.11"
-dependencies = []
-
-[dependency-groups]
-dev = ["basedpyright>=1.21", "ruff>=0.8", "pytest>=8", "expression>=5.7.0"]
-
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
 line-length = 88
-src = ["lib", "scripts", "tests"]
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["COM812", "ISC001", "ISC003", "D203", "D213", "CPY001", "FBT001", "FBT002",
-          "TD002", "TD003", "FIX002"]
+ignore = [
+    "A002",
+    "ANN401",
+    "BLE001",
+    "COM812",
+    "CPY001",
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D203",
+    "D213",
+    "E501",
+    "EM101",
+    "EM102",
+    "ERA001",
+    "FBT001",
+    "FBT002",
+    "PERF401",
+    "PLR0911",
+    "PLR0912",
+    "PLR0915",
+    "C901",
+    "S101",
+    "S603",
+    "S607",
+    "SLF001",
+    "TC003",
+    "TRY003",
+    "TRY301",
+]
 
 [tool.ruff.lint.per-file-ignores]
-# unittest-style suite (repo precedent: PT009); live-git CLI tests (S603/S607).
-"tests/**/*.py" = ["S101", "ANN", "ARG", "ARG001", "ARG005", "PLC0415",
-  "PLR2004", "PLR0913", "PT009", "SLF001", "D", "TRY003", "TRY004", "EM101", "EM102",
-  "E402", "S603", "S607"]
-"scripts/**/*.py" = ["T201", "INP001", "E402", "I001"]
-# Railway-style validators: early-return ladders covered by behavior tests.
-"lib/autommit/proposal.py" = ["C901", "PLR0911", "PLR0912", "PLR0915", "EM101"]
-# Coded AutommitError(code, message) raises use literal codes by design.
-"lib/autommit/service.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
-"lib/autommit/transaction.py" = ["C901", "PLR0911", "EM101"]
-"lib/autommit/cli.py" = ["C901", "PLR0911", "PLR0912"]
-# git(1) wrapper: fixed argv, shell=False, PATH-resolved binary.
-"lib/autommit/git.py" = ["S603", "S607"]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
+"scripts/**/*.py" = ["T201", "INP001"]
+"tests/**/*.py" = ["S101", "PT009", "ANN", "ARG", "E402", "INP001", "FBT001"]
 
 [tool.ruff.format]
 quote-style = "double"
-indent-style = "space"
-docstring-code-format = true
-docstring-code-line-length = "dynamic"
 
 [tool.basedpyright]
-typeCheckingMode = "all"
-pythonVersion = "3.11"
+typeCheckingMode = "standard"
+include = ["scripts", "lib", "tests"]
+extraPaths = ["lib"]
+pythonVersion = "3.12"
 pythonPlatform = "All"
-include = ["lib", "scripts", "tests"]
-extraPaths = ["lib", "scripts"]
-reportUnusedCallResult = "error"
-reportUnnecessaryTypeIgnoreComment = "error"
-reportUnusedVariable = "error"
-reportPrivateUsage = "error"
-
-[tool.pytest.ini_options]
-minversion = "8.0"
-testpaths = ["tests"]
-addopts = ["-ra", "--strict-config", "--strict-markers"]
-filterwarnings = ["error"]

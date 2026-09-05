@@ -6,15 +6,15 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Never, cast
+from typing import TYPE_CHECKING, Literal, NoReturn, cast
 
 from expression import Error, Ok, Result
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
 from autommit.errors import AutommitError
 from autommit.service import apply, prepare, validate_plan
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 SCHEMA = "autommit/v1"
 
@@ -22,11 +22,8 @@ SCHEMA = "autommit/v1"
 class Parser(argparse.ArgumentParser):
     """Map parse failures into the structured protocol."""
 
-    # typing.override needs 3.12+; this ignore marks the intentional override.
-    def error(self, message: str) -> Never:  # pyright: ignore[reportImplicitOverride]
-        """Map parse failures into the structured protocol."""
-        code = "usage_error"
-        raise AutommitError(code, message)
+    def error(self, message: str) -> NoReturn:
+        raise AutommitError("usage_error", message, 2)
 
 
 def build_parser() -> Parser:
@@ -39,13 +36,14 @@ def build_parser() -> Parser:
     commands = parser.add_subparsers(dest="command", required=True)
     _ = commands.add_parser("schema", help="Describe the JSON protocol.")
     prepare_parser = commands.add_parser(
-        "prepare",
-        help="Recover, stage if needed, and return planning evidence.",
+        "prepare", help="Recover, stage changes, and return exact planning evidence."
     )
     _ = prepare_parser.add_argument(
-        "context", nargs="*", help="Free-form planner context."
+        "--scope",
+        choices=["all", "staged"],
+        default="all",
+        help="Scope of changes to capture: all (default) or staged",
     )
-    _ = prepare_parser.add_argument("--context", action="append", default=[])
     _ = prepare_parser.add_argument("--repo", default=".", metavar="PATH")
     validate = commands.add_parser(
         "validate-plan", help="Validate a plan against a snapshot."
@@ -69,6 +67,7 @@ def _prepare_arguments(
 ) -> Result[argparse.Namespace, AutommitError]:
     context: list[str] = []
     repository = "."
+    scope_val: Literal["all", "staged"] = "all"
     passthrough = False
     index = 0
     while index < len(values):
@@ -77,14 +76,23 @@ def _prepare_arguments(
             context.append(value)
         elif value == "--":
             passthrough = True
-        elif value in {"--context", "--repo"}:
+        elif value in {"--context", "--repo", "--scope"}:
             index += 1
             if index >= len(values) or not values[index]:
                 return Error(AutommitError("usage_error", f"{value} requires a value"))
             if value == "--context":
                 context.append(values[index])
-            else:
+            elif value == "--repo":
                 repository = values[index]
+            elif value == "--scope":
+                arg_scope = values[index]
+                if arg_scope not in {"all", "staged"}:
+                    return Error(
+                        AutommitError(
+                            "usage_error", "--scope must be 'all' or 'staged'"
+                        )
+                    )
+                scope_val = cast('Literal["all", "staged"]', arg_scope)
         elif value.startswith("--context="):
             item = value.removeprefix("--context=")
             if not item:
@@ -94,12 +102,23 @@ def _prepare_arguments(
             repository = value.removeprefix("--repo=")
             if not repository:
                 return Error(AutommitError("usage_error", "--repo requires a value"))
+        elif value.startswith("--scope="):
+            raw_scope = value.removeprefix("--scope=")
+            if raw_scope not in {"all", "staged"}:
+                return Error(
+                    AutommitError("usage_error", "--scope must be 'all' or 'staged'")
+                )
+            scope_val = cast('Literal["all", "staged"]', raw_scope)
         elif value.startswith("-"):
             return Error(AutommitError("usage_error", f"Unsupported option: {value}"))
         else:
             context.append(value)
         index += 1
-    return Ok(argparse.Namespace(command="prepare", context=context, repo=repository))
+    return Ok(
+        argparse.Namespace(
+            command="prepare", context=context, repo=repository, scope=scope_val
+        )
+    )
 
 
 def _schema() -> dict[str, object]:
@@ -109,15 +128,14 @@ def _schema() -> dict[str, object]:
             "schema": "Describe this protocol without repository mutation.",
             "prepare": (
                 "Recover, stage only when the index is empty, "
-                + "and return exact planning evidence."
+                "and return exact planning evidence."
             ),
             "validate-plan": (
-                "Validate complete staged-diff coverage; "
-                + "optionally require a split."
+                "Validate complete staged-diff coverage; optionally require a split."
             ),
             "apply": (
                 "Prepare commits in a temporary worktree "
-                + "and publish the branch by compare-and-swap."
+                "and publish the branch by compare-and-swap."
             ),
         },
         "plan": {
@@ -129,41 +147,27 @@ def _schema() -> dict[str, object]:
                         {
                             "path": "staged path",
                             "hunks": "all | {type:indices,indices:[1]} | "
-                            + "{type:lines,start:1,end:2}",
+                            "{type:lines,start:1,end:2}",
                         }
                     ],
                 }
             ]
         },
-        "atomicity_decision": {
+        "decision": {
             "decision": "accept | split",
-            "concerns": [],
+            "concerns": ["optional concern"],
             "rationale": "non-empty string",
         },
-        "exit_codes": {
-            "0": "success",
-            "2": "usage, input, plan, or decision error",
-            "3": "safe refusal because concurrent or recovered state differs",
-            "4": "Git, filesystem, or runtime error",
-            "127": "Git executable unavailable",
-        },
     }
 
 
-def _success(command: str, result: object) -> dict[str, object]:
-    return {
-        "schema": SCHEMA,
-        "type": "response",
-        "ok": True,
-        "command": command,
-        "result": result,
-    }
+def _success(command: str, data: object) -> dict[str, object]:
+    return {"schema": SCHEMA, "ok": True, "command": command, "result": data}
 
 
 def _failure(command: str, error: AutommitError) -> dict[str, object]:
     return {
         "schema": SCHEMA,
-        "type": "error",
         "ok": False,
         "command": command,
         "error": {"code": error.code, "message": error.message},
@@ -172,9 +176,8 @@ def _failure(command: str, error: AutommitError) -> dict[str, object]:
 
 def _emit(payload: dict[str, object], *, error: bool = False) -> None:
     stream = sys.stderr if error else sys.stdout
-    _ = stream.write(
-        json.dumps(payload, separators=(",", ":"), ensure_ascii=False) + "\n"
-    )
+    stream.write(json.dumps(payload, separators=(",", ":")) + "\n")
+    stream.flush()
 
 
 def _config_str(arguments: argparse.Namespace, field: str) -> str:
@@ -212,7 +215,9 @@ def _dispatch(
     cwd = Path(repo).resolve()
     if command == "prepare":
         context = _config_str_list(arguments, "context")
-        return prepare(cwd, tuple(context))
+        raw_scope = getattr(arguments, "scope", "all")
+        scope: Literal["all", "staged"] = "staged" if raw_scope == "staged" else "all"
+        return prepare(cwd, tuple(context), scope=scope)
     if command == "validate-plan":
         return validate_plan(
             cwd,
@@ -258,7 +263,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         error = AutommitError("interrupted", "Autommit was interrupted.", 4)
         _emit(_failure(command, error), error=True)
         return error.exit_code
-    except Exception:  # noqa: BLE001
+    except Exception:
         error = AutommitError(
             "runtime_error",
             "Autommit failed unexpectedly; repository state was preserved.",

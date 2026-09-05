@@ -1,17 +1,16 @@
-"""Durable receipts and exclusive operation locking."""
+"""Durable receipts and exclusive operation locking scoped to the Git worktree."""
 
 from __future__ import annotations
 
 import json
 import os
-import secrets
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast
 
 if TYPE_CHECKING:
     from collections.abc import Generator
-    from pathlib import Path
 
 from expression import Error, Nothing, Ok, Option, Result, Some
 
@@ -31,7 +30,7 @@ _DELETE_ORD = 127
 class Receipt:
     """Publication evidence persisted before compare-and-swap."""
 
-    version: Literal[1]
+    version: int
     state: Literal["prepared", "committed"]
     ref: str
     before: str
@@ -39,35 +38,47 @@ class Receipt:
     index_tree: str
 
 
-def _paths(common_dir: Path) -> tuple[Path, Path, Path]:
-    directory = common_dir / AUTOMMIT_DIRECTORY
+def _paths(git_dir: Path) -> tuple[Path, Path, Path]:
+    directory = git_dir / AUTOMMIT_DIRECTORY
     return directory, directory / RECEIPT_FILENAME, directory / LOCK_FILENAME
 
 
-def _ensure_common_dir(common_dir: Path) -> Result[None, AutommitError]:
-    if common_dir.is_symlink() or not common_dir.is_dir():
+def _ensure_git_dir(git_dir: Path) -> Result[None, AutommitError]:
+    if git_dir.is_symlink() or not git_dir.is_dir():
         return Error(
             AutommitError(
-                "invalid_git_directory",
-                f"Git common directory is not a real directory: {common_dir}",
-                4,
+                "invalid_git_dir",
+                "Git directory must be a non-symlink directory.",
             )
         )
     return Ok(None)
 
 
-def _ensure_directory(common_dir: Path) -> Result[Path, AutommitError]:
-    match _ensure_common_dir(common_dir):
+def _ensure_directory(git_dir: Path) -> Result[Path, AutommitError]:
+    match _ensure_git_dir(git_dir):
         case Result(tag="ok"):
-            directory, _, _ = _paths(common_dir)
-            with suppress(FileExistsError):
-                directory.mkdir(mode=0o700)
+            directory, _, _ = _paths(git_dir)
+            if directory.is_symlink():
+                return Error(
+                    AutommitError(
+                        "invalid_directory",
+                        "Autommit state directory must not be a symlink.",
+                    )
+                )
+            try:
+                directory.mkdir(parents=True, exist_ok=True)
+            except OSError as error:
+                return Error(
+                    AutommitError(
+                        "directory_creation_failed",
+                        f"Unable to create autommit state directory: {error}.",
+                    )
+                )
             if directory.is_symlink() or not directory.is_dir():
                 return Error(
                     AutommitError(
-                        "unsafe_transaction_path",
-                        f"Refusing non-directory or symlink Autommit path: {directory}",
-                        4,
+                        "invalid_directory",
+                        "Autommit state directory must be a non-symlink directory.",
                     )
                 )
             return Ok(directory)
@@ -81,9 +92,11 @@ def _regular_file(path: Path, kind: str) -> Result[bool, AutommitError]:
     if path.is_symlink() or not path.is_file():
         return Error(
             AutommitError(
-                "unsafe_transaction_path",
-                f"Refusing non-regular or symlink Autommit {kind}: {path}",
-                4,
+                f"invalid_{kind}_file",
+                (
+                    f"Autommit {kind} file must be a regular file, "
+                    "not a symlink or directory."
+                ),
             )
         )
     return Ok(value=True)
@@ -92,18 +105,19 @@ def _regular_file(path: Path, kind: str) -> Result[bool, AutommitError]:
 def _bounded_string(value: object, field: str) -> Result[str, AutommitError]:
     if (
         not isinstance(value, str)
-        or not value.strip()
+        or not value
         or len(value) > MAX_STRING_LENGTH
         or any(
-            ord(character) < _MIN_PRINTABLE_ORD or ord(character) == _DELETE_ORD
-            for character in value
+            ord(char) < _MIN_PRINTABLE_ORD or ord(char) == _DELETE_ORD for char in value
         )
     ):
         return Error(
             AutommitError(
                 "invalid_receipt",
-                f"Invalid Autommit receipt: {field} must be non-empty bounded text.",
-                4,
+                (
+                    f"Autommit receipt field {field} must be a "
+                    "non-empty bounded printable string."
+                ),
             )
         )
     return Ok(value)
@@ -111,56 +125,44 @@ def _bounded_string(value: object, field: str) -> Result[str, AutommitError]:
 
 def _validate_receipt(value: object) -> Result[Receipt, AutommitError]:
     keys = {"version", "state", "ref", "before", "after", "indexTree"}
-    if not isinstance(value, dict):
+    if not isinstance(value, dict) or set(value.keys()) != keys:
         return Error(
             AutommitError(
                 "invalid_receipt",
-                "Invalid Autommit receipt: unexpected shape.",
-                4,
+                "Autommit receipt must contain the exact expected schema keys.",
             )
         )
-    raw = cast("dict[object, object]", value)
-    if any(not isinstance(key, str) for key in raw):
+    raw = cast("dict[str, object]", value)
+    if raw.get("version") != 1:
         return Error(
             AutommitError(
                 "invalid_receipt",
-                "Invalid Autommit receipt: unexpected shape.",
-                4,
+                "Unsupported Autommit receipt version.",
             )
         )
-    record = {key: item for key, item in raw.items() if isinstance(key, str)}
-    if set(record) != keys:
+    state = raw.get("state")
+    if state not in ("prepared", "committed"):
         return Error(
             AutommitError(
                 "invalid_receipt",
-                "Invalid Autommit receipt: unexpected shape.",
-                4,
+                "Autommit receipt state must be prepared or committed.",
             )
         )
-    if record["version"] != 1 or record["state"] not in {
-        "prepared",
-        "committed",
-    }:
-        return Error(
-            AutommitError(
-                "invalid_receipt",
-                "Invalid Autommit receipt version or state.",
-                4,
-            )
-        )
-    state = cast("Literal['prepared', 'committed']", record["state"])
-    match _bounded_string(record["ref"], "ref"):
+    match _bounded_string(raw.get("ref"), "ref"):
         case Result(tag="ok", ok=ref):
-            match _bounded_string(record["before"], "before"):
+            match _bounded_string(raw.get("before"), "before"):
                 case Result(tag="ok", ok=before):
-                    match _bounded_string(record["after"], "after"):
+                    match _bounded_string(raw.get("after"), "after"):
                         case Result(tag="ok", ok=after):
-                            match _bounded_string(record["indexTree"], "indexTree"):
+                            match _bounded_string(raw.get("indexTree"), "indexTree"):
                                 case Result(tag="ok", ok=index_tree):
                                     return Ok(
                                         Receipt(
                                             1,
-                                            state,
+                                            cast(
+                                                'Literal["prepared", "committed"]',
+                                                state,
+                                            ),
                                             ref,
                                             before,
                                             after,
@@ -178,59 +180,47 @@ def _validate_receipt(value: object) -> Result[Receipt, AutommitError]:
 
 
 def read_receipt(
-    common_dir: Path,
+    git_dir: Path,
 ) -> Result[Option[Receipt], AutommitError]:
     """Read and validate a pending receipt without following symlinks."""
-    directory, receipt_path, _ = _paths(common_dir)
-    if not directory.exists() and not directory.is_symlink():
-        return Ok(Nothing)
-    match _ensure_directory(common_dir):
+    match _ensure_git_dir(git_dir):
         case Result(tag="ok"):
+            _, receipt_path, _ = _paths(git_dir)
             match _regular_file(receipt_path, "receipt"):
-                case Result(tag="ok", ok=True):
+                case Result(tag="ok", ok=is_regular):
+                    if not is_regular:
+                        return Ok(Nothing)
                     try:
-                        data = receipt_path.read_bytes()
+                        with receipt_path.open("rb") as handle:
+                            content = handle.read(MAX_JSON_BYTES + 1)
                     except OSError as error:
                         return Error(
                             AutommitError(
                                 "receipt_io",
-                                f"Unable to read Autommit receipt: {error}",
-                                4,
+                                f"Unable to read Autommit receipt: {error}.",
                             )
                         )
-                    if len(data) > MAX_JSON_BYTES:
+                    if len(content) > MAX_JSON_BYTES:
                         return Error(
                             AutommitError(
-                                "invalid_receipt",
-                                "Autommit receipt exceeds 16 KiB.",
-                                4,
+                                "receipt_payload_too_large",
+                                "Autommit receipt payload exceeds size limit.",
                             )
                         )
                     try:
-                        value = cast("object", json.loads(data.decode("utf-8")))
+                        data: object = json.loads(content.decode("utf-8"))
                     except (UnicodeDecodeError, json.JSONDecodeError) as error:
                         return Error(
                             AutommitError(
                                 "invalid_receipt",
-                                f"Invalid Autommit receipt JSON: {error}",
-                                4,
+                                f"Autommit receipt is not valid JSON: {error}.",
                             )
                         )
-                    if receipt_path.is_symlink():
-                        return Error(
-                            AutommitError(
-                                "unsafe_transaction_path",
-                                "Autommit receipt became a symlink.",
-                                4,
-                            )
-                        )
-                    match _validate_receipt(value):
+                    match _validate_receipt(data):
                         case Result(tag="ok", ok=receipt):
                             return Ok(Some(receipt))
                         case Result(error=err):
                             return Error(err)
-                case Result(tag="ok", ok=False):
-                    return Ok(Nothing)
                 case Result(error=err):
                     return Error(err)
         case Result(error=err):
@@ -238,193 +228,142 @@ def read_receipt(
 
 
 def _sync_directory(directory: Path) -> Result[None, AutommitError]:
+    if os.name == "nt":
+        return Ok(None)
     try:
         descriptor = os.open(directory, os.O_RDONLY)
     except OSError as error:
-        if os.name == "nt":
-            return Ok(None)
         return Error(
             AutommitError(
-                "receipt_io",
-                f"Unable to open Autommit directory: {error}",
-                4,
+                "directory_sync_failed",
+                f"Unable to open Autommit directory for sync: {error}.",
             )
         )
     try:
         os.fsync(descriptor)
     except OSError as error:
-        if os.name != "nt":
-            return Error(
-                AutommitError(
-                    "receipt_io",
-                    f"Unable to sync Autommit directory: {error}",
-                    4,
-                )
+        return Error(
+            AutommitError(
+                "directory_sync_failed",
+                f"Unable to sync Autommit directory: {error}.",
             )
+        )
     finally:
-        os.close(descriptor)
+        with suppress(OSError):
+            os.close(descriptor)
     return Ok(None)
 
 
-def write_receipt(common_dir: Path, receipt: Receipt) -> Result[None, AutommitError]:
+def write_receipt(git_dir: Path, receipt: Receipt) -> Result[None, AutommitError]:
     """Atomically persist and fsync publication evidence."""
-    match _ensure_directory(common_dir):
+    match _ensure_directory(git_dir):
         case Result(tag="ok", ok=directory):
-            _, receipt_path, _ = _paths(common_dir)
-            match _regular_file(receipt_path, "receipt"):
-                case Result(tag="ok"):
-                    serialized_value = {
-                        "version": receipt.version,
-                        "state": receipt.state,
-                        "ref": receipt.ref,
-                        "before": receipt.before,
-                        "after": receipt.after,
-                        "indexTree": receipt.index_tree,
-                    }
-                    match _validate_receipt(serialized_value):
-                        case Result(tag="ok", ok=validated):
-                            serialized = (
-                                json.dumps(
-                                    {
-                                        "version": validated.version,
-                                        "state": validated.state,
-                                        "ref": validated.ref,
-                                        "before": validated.before,
-                                        "after": validated.after,
-                                        "indexTree": validated.index_tree,
-                                    },
-                                    separators=(",", ":"),
-                                )
-                                + "\n"
-                            ).encode()
-                            if len(serialized) > MAX_JSON_BYTES:
-                                return Error(
-                                    AutommitError(
-                                        "invalid_receipt",
-                                        "Autommit receipt exceeds 16 KiB.",
-                                        4,
-                                    )
-                                )
-                            temporary = (
-                                directory
-                                / f".{RECEIPT_FILENAME}.tmp-{secrets.token_hex(12)}"
-                            )
-                            try:
-                                descriptor = os.open(
-                                    temporary,
-                                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
-                                    0o600,
-                                )
-                                with os.fdopen(descriptor, "wb") as handle:
-                                    _ = handle.write(serialized)
-                                    handle.flush()
-                                    os.fsync(handle.fileno())
-                                match _regular_file(receipt_path, "receipt"):
-                                    case Result(tag="ok"):
-                                        _ = temporary.replace(receipt_path)
-                                        return _sync_directory(directory)
-                                    case Result(error=err):
-                                        return Error(err)
-                            except OSError as error:
-                                return Error(
-                                    AutommitError(
-                                        "receipt_io",
-                                        f"Unable to write Autommit receipt: {error}",
-                                        4,
-                                    )
-                                )
-                            finally:
-                                with suppress(FileNotFoundError):
-                                    temporary.unlink()
-                        case Result(error=err):
-                            return Error(err)
-                case Result(error=err):
-                    return Error(err)
+            _, receipt_path, _ = _paths(git_dir)
+            temp_path = directory / f"{RECEIPT_FILENAME}.tmp"
+            payload = json.dumps(
+                {
+                    "version": receipt.version,
+                    "state": receipt.state,
+                    "ref": receipt.ref,
+                    "before": receipt.before,
+                    "after": receipt.after,
+                    "indexTree": receipt.index_tree,
+                },
+                indent=2,
+            ).encode("utf-8")
+            try:
+                with open(
+                    temp_path,
+                    "wb",
+                    opener=lambda path, flags: os.open(
+                        path, flags | os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600
+                    ),
+                ) as handle:
+                    handle.write(payload)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                temp_path.replace(receipt_path)
+            except OSError as error:
+                return Error(
+                    AutommitError(
+                        "receipt_write_failed",
+                        f"Unable to persist Autommit receipt: {error}.",
+                    )
+                )
+            return _sync_directory(directory)
         case Result(error=err):
             return Error(err)
 
 
-def remove_receipt(common_dir: Path) -> Result[None, AutommitError]:
+def remove_receipt(git_dir: Path) -> Result[None, AutommitError]:
     """Remove a receipt idempotently and durably."""
-    directory, receipt_path, _ = _paths(common_dir)
-    if not directory.exists() and not directory.is_symlink():
-        return Ok(None)
-    match _ensure_directory(common_dir):
-        case Result(tag="ok"):
-            match _regular_file(receipt_path, "receipt"):
-                case Result(tag="ok", ok=True):
-                    try:
-                        receipt_path.unlink()
-                    except FileNotFoundError:
-                        return Ok(None)
-                    except OSError as error:
-                        return Error(
-                            AutommitError(
-                                "receipt_io",
-                                f"Unable to remove Autommit receipt: {error}",
-                                4,
-                            )
-                        )
-                    return _sync_directory(directory)
-                case Result(tag="ok", ok=False):
-                    return Ok(None)
-                case Result(error=err):
-                    return Error(err)
+    match _ensure_directory(git_dir):
+        case Result(tag="ok", ok=directory):
+            _, receipt_path, _ = _paths(git_dir)
+            try:
+                receipt_path.unlink(missing_ok=True)
+            except OSError as error:
+                return Error(
+                    AutommitError(
+                        "receipt_remove_failed",
+                        f"Unable to remove Autommit receipt: {error}.",
+                    )
+                )
+            return _sync_directory(directory)
         case Result(error=err):
             return Error(err)
 
 
 @contextmanager
-def operation_lock(common_dir: Path) -> Generator[None, None, None]:
-    """Serialize autommit operations; never guess whether an existing lock is stale."""
-    match _ensure_directory(common_dir):
+def operation_lock(git_dir: Path) -> Generator[None, None, None]:
+    """Serialize autommit operations for the target worktree; no stale lock guessing."""
+    match _ensure_directory(git_dir):
         case Result(tag="ok", ok=directory):
-            _, _, lock_path = _paths(common_dir)
-            owner = {"pid": os.getpid(), "token": secrets.token_urlsafe(24)}
-            serialized = (json.dumps(owner, separators=(",", ":")) + "\n").encode()
-            if len(serialized) > MAX_LOCK_BYTES:
-                raise AutommitError(
-                    "lock_error", "Autommit lock metadata exceeds 4 KiB.", 4
-                )
+            _, _, lock_path = _paths(git_dir)
+            descriptor: int | None = None
             try:
-                descriptor = os.open(
-                    lock_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600
-                )
-            except FileExistsError as error:
-                raise RefusalError(
-                    "operation_locked",
-                    f"Autommit operation already in progress (lock: {lock_path}). "
-                    + "Inspect its PID; stale locks are never removed automatically.",
-                ) from error
-            except OSError as error:
-                raise AutommitError(
-                    "lock_error", f"Unable to acquire Autommit lock: {error}", 4
-                ) from error
-            try:
-                with os.fdopen(descriptor, "wb") as handle:
-                    _ = handle.write(serialized)
-                    handle.flush()
-                    os.fsync(handle.fileno())
+                try:
+                    descriptor = os.open(
+                        lock_path,
+                        os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                        0o600,
+                    )
+                except FileExistsError:
+                    raise RefusalError(
+                        "operation_locked",
+                        (
+                            "Another Autommit process holds the operation "
+                            "lock for this worktree."
+                        ),
+                    ) from None
+                except OSError as error:
+                    raise AutommitError(
+                        "lock_failed",
+                        f"Unable to create Autommit operation lock: {error}.",
+                    ) from error
+                try:
+                    metadata = json.dumps(
+                        {"pid": os.getpid(), "command": "autommit"}
+                    ).encode("utf-8")
+                    os.write(descriptor, metadata)
+                    os.fsync(descriptor)
+                except OSError as error:
+                    raise AutommitError(
+                        "lock_write_failed",
+                        f"Unable to write Autommit lock payload: {error}.",
+                    ) from error
+                match _sync_directory(directory):
+                    case Result(tag="ok"):
+                        pass
+                    case Result(error=err):
+                        raise err
                 yield
             finally:
-                try:
-                    match _regular_file(lock_path, "operation lock"):
-                        case Result(tag="ok", ok=True):
-                            current = cast(
-                                "object",
-                                json.loads(lock_path.read_text(encoding="utf-8")),
-                            )
-                            if current == owner:
-                                lock_path.unlink()
-                                _ = _sync_directory(directory)
-                        case _:
-                            pass
-                except (
-                    OSError,
-                    UnicodeDecodeError,
-                    json.JSONDecodeError,
-                    AutommitError,
-                ):
-                    pass
+                if descriptor is not None:
+                    with suppress(OSError):
+                        os.close(descriptor)
+                    with suppress(OSError):
+                        lock_path.unlink(missing_ok=True)
+                    _ = _sync_directory(directory)
         case Result(error=err):
             raise err

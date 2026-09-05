@@ -7,24 +7,21 @@ import tempfile
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
+from typing import Literal
 
 from expression import Error, Nothing, Ok, Option, Result, Some
 
 from autommit.errors import AutommitError, RefusalError
 from autommit.git import run_git, try_git
 from autommit.proposal import (
-    AllSelector,
     AtomicityDecision,
     CommitGroup,
     CommitProposal,
-    IndicesSelector,
-    LinesSelector,
     build_commit_patch,
     changed_hunk_count,
     normalize_atomicity_decision,
     normalize_proposal,
     parse_file_diffs,
-    read_json_file,
     requires_atomicity_review,
     validate_proposal_coverage,
 )
@@ -50,33 +47,33 @@ class Evidence:
     index_tree: str
 
 
-def _common_dir(cwd: Path) -> Result[Path, AutommitError]:
-    match run_git(cwd, "rev-parse", "--git-common-dir"):
+def _git_dir(cwd: Path) -> Result[Path, AutommitError]:
+    """Resolve the worktree-local Git directory."""
+    match run_git(cwd, "rev-parse", "--absolute-git-dir"):
         case Result(tag="ok", ok=value_str):
             value = value_str.strip()
-            return Ok(
-                (cwd / value).resolve()
-                if not Path(value).is_absolute()
-                else Path(value).resolve()
-            )
+            return Ok(Path(value).resolve())
         case Result(error=err):
             return Error(err)
 
 
-def _current_evidence(cwd: Path) -> Result[Evidence, AutommitError]:
+def _current_evidence(
+    cwd: Path, *, index_file: Path | None = None
+) -> Result[Evidence, AutommitError]:
     match try_git(cwd, "symbolic-ref", "--quiet", "HEAD"):
-        case Result(tag="ok", ok=ref_result):
-            ref = ref_result.stdout.strip() if ref_result.returncode == 0 else ""
+        case Result(tag="ok", ok=symbolic_ref):
+            ref = symbolic_ref.stdout.strip() if symbolic_ref.returncode == 0 else ""
         case Result(error=err):
             return Error(err)
-    match run_git(cwd, "rev-parse", "HEAD"):
-        case Result(tag="ok", ok=before_str):
-            before = before_str.strip()
+    match try_git(cwd, "rev-parse", "HEAD"):
+        case Result(tag="ok", ok=head_rev):
+            before = head_rev.stdout.strip() if head_rev.returncode == 0 else ""
         case Result(error=err):
             return Error(err)
-    match run_git(cwd, "write-tree"):
-        case Result(tag="ok", ok=index_tree_str):
-            index_tree = index_tree_str.strip()
+    env = {"GIT_INDEX_FILE": str(index_file)} if index_file else None
+    match run_git(cwd, "write-tree", env=env):
+        case Result(tag="ok", ok=tree_out):
+            index_tree = tree_out.strip()
         case Result(error=err):
             return Error(err)
     if not ref or not before or not index_tree:
@@ -117,8 +114,11 @@ def _assert_snapshot(cwd: Path, snapshot: str) -> Result[Evidence, AutommitError
             return Error(err)
 
 
-def _staged_files(cwd: Path) -> Result[tuple[str, ...], AutommitError]:
-    match run_git(cwd, "diff", "--cached", "--name-only", "-z", "--"):
+def _staged_files(
+    cwd: Path, *, index_file: Path | None = None
+) -> Result[tuple[str, ...], AutommitError]:
+    env = {"GIT_INDEX_FILE": str(index_file)} if index_file else None
+    match run_git(cwd, "diff", "--cached", "--name-only", "-z", "--", env=env):
         case Result(tag="ok", ok=output):
             files = tuple(item for item in output.split("\0") if item)
             return Ok(files)
@@ -127,163 +127,194 @@ def _staged_files(cwd: Path) -> Result[tuple[str, ...], AutommitError]:
 
 
 def _staged_diff(
-    cwd: Path, *, zero_context: bool = False
+    cwd: Path, *, zero_context: bool = False, index_file: Path | None = None
 ) -> Result[str, AutommitError]:
     arguments = [
         "-c",
-        "diff.mnemonicprefix=false",
+        "core.quotepath=false",
+        "-c",
+        "diff.mnemonicPrefix=false",
         "-c",
         "diff.noprefix=false",
-        "-c",
-        "core.quotePath=true",
         "diff",
         "--cached",
         "--binary",
         "--no-ext-diff",
+        "--src-prefix=a/",
+        "--dst-prefix=b/",
     ]
     if zero_context:
         arguments.append("--unified=0")
-    arguments.append("--")
-    return run_git(cwd, *arguments)
+    arguments.extend(["--", "."])
+    env = {"GIT_INDEX_FILE": str(index_file)} if index_file else None
+    return run_git(cwd, *arguments, env=env)
 
 
-def _repository_policy(cwd: Path) -> Result[str, AutommitError]:
-    parts: list[str] = []
-    match run_git(cwd, "rev-parse", "--show-toplevel"):
-        case Result(tag="ok", ok=root_str):
-            root = Path(root_str.strip()).resolve()
+def _commit_exists(cwd: Path, sha: str) -> Result[bool, AutommitError]:
+    match try_git(cwd, "cat-file", "-e", f"{sha}^{{commit}}"):
+        case Result(tag="ok", ok=result):
+            return Ok(result.returncode == 0)
         case Result(error=err):
             return Error(err)
-    match try_git(cwd, "log", f"-{MAX_LOG_ENTRIES}", "--format=%s"):
-        case Result(tag="ok", ok=log_result):
-            if log_result.returncode == 0:
-                subjects = tuple(
-                    line.strip()
-                    for line in log_result.stdout.splitlines()
-                    if line.strip()
-                )
-                if subjects:
-                    parts.append(
-                        "Recent commit subjects (style evidence only):\n"
-                        + "\n".join(f"- {subject}" for subject in subjects)
-                    )
+
+
+def _tree_for_commit(cwd: Path, sha: str) -> Result[str, AutommitError]:
+    match run_git(cwd, "rev-parse", f"{sha}^{{tree}}"):
+        case Result(tag="ok", ok=tree):
+            return Ok(tree.strip())
         case Result(error=err):
             return Error(err)
-    candidates = [root / "AGENTS.md"]
-    resolved_cwd = cwd.resolve()
-    if resolved_cwd != root:
-        candidates.append(resolved_cwd / "AGENTS.md")
-    for candidate in candidates:
-        try:
-            data = candidate.read_bytes()
-        except FileNotFoundError:
-            continue
-        except OSError as error:
-            return Error(
-                AutommitError(
-                    "policy_io",
-                    f"Unable to read repository policy {candidate}: {error}",
-                    4,
-                )
-            )
-        bounded = data[:MAX_POLICY_FILE_BYTES].decode("utf-8", errors="replace")
-        if not bounded.strip():
-            continue
-        if len(data) > MAX_POLICY_FILE_BYTES:
-            bounded += "\n[policy file truncated]"
-        parts.append(f"Repository policy file {candidate}:\n{bounded}")
-    return Ok("\n\n".join(parts))
 
 
 def _cas_ref(
-    cwd: Path, ref: str, after: str, before: str
+    cwd: Path, ref: str, target: str, expected_before: str
 ) -> Result[None, AutommitError]:
-    match try_git(cwd, "update-ref", ref, after, before):
+    match try_git(cwd, "update-ref", ref, target, expected_before):
         case Result(tag="ok", ok=result):
-            if result.returncode != 0:
-                detail = (
-                    result.stderr.strip()
-                    or "Autommit branch changed during transaction."
+            if result.returncode == 0:
+                return Ok(None)
+            return Error(
+                RefusalError(
+                    "ref_conflict",
+                    f"Ref update failed via CAS ({expected_before} -> {target}): "
+                    f"{result.stderr.strip()}",
                 )
-                return Error(RefusalError("branch_changed", detail))
-            return Ok(None)
+            )
         case Result(error=err):
             return Error(err)
 
 
-def _assert_receipt_evidence(
-    cwd: Path,
-    receipt: Receipt,
-    expected_head: str,
-) -> Result[None, AutommitError]:
-    match _current_evidence(cwd):
-        case Result(tag="ok", ok=actual):
-            if actual.ref != receipt.ref:
-                return Error(
-                    RefusalError(
-                        "branch_changed",
-                        "Autommit branch changed during receipt recovery.",
-                    )
+def _repository_policy(cwd: Path) -> Result[str, AutommitError]:
+    policies: list[str] = []
+    candidates = (
+        cwd / "AGENTS.md",
+        cwd / "CLAUDE.md",
+        cwd / ".cursorrules",
+        cwd / "CONTRIBUTING.md",
+    )
+    for candidate in candidates:
+        if candidate.is_file() and not candidate.is_symlink():
+            try:
+                with candidate.open("rb") as handle:
+                    content = handle.read(MAX_POLICY_FILE_BYTES)
+                policies.append(
+                    f"## {candidate.name}\n" + content.decode("utf-8", "replace")
                 )
-            if actual.before != expected_head:
-                return Error(
-                    RefusalError(
-                        "head_changed",
-                        "Autommit HEAD changed during receipt recovery.",
-                    )
-                )
-            if actual.index_tree != receipt.index_tree:
-                return Error(
-                    RefusalError(
-                        "index_changed",
-                        "Autommit index changed during receipt recovery.",
-                    )
-                )
-            return Ok(None)
+            except OSError:
+                continue
+    match run_git(
+        cwd,
+        "log",
+        f"-{MAX_LOG_ENTRIES}",
+        "--format=### %h %s%n%b",
+        "--no-decorate",
+    ):
+        case Result(tag="ok", ok=log_output):
+            if log_output.strip():
+                policies.append("## Recent Commits\n" + log_output.strip())
         case Result(error=err):
             return Error(err)
+    return Ok("\n\n".join(policies))
 
 
 def _recover_receipt(
-    cwd: Path, common_dir: Path, receipt: Receipt
+    cwd: Path, git_dir: Path, receipt: Receipt
 ) -> Result[dict[str, object], AutommitError]:
     match _current_evidence(cwd):
-        case Result(tag="ok", ok=actual):
-            if actual.ref != receipt.ref or actual.index_tree != receipt.index_tree:
+        case Result(tag="ok", ok=evidence):
+            if evidence.ref != receipt.ref:
                 return Error(
                     RefusalError(
-                        "receipt_mismatch",
-                        "Prepared autommit receipt does not match "
-                        + "the current branch and index.",
+                        "recovery_conflict",
+                        f"Receipt is for branch {receipt.ref}, but checkout is on {evidence.ref}.",
                     )
                 )
-            if actual.before == receipt.before:
-                match _cas_ref(cwd, receipt.ref, receipt.after, receipt.before):
-                    case Result(tag="ok"):
-                        match _assert_receipt_evidence(cwd, receipt, receipt.after):
-                            case Result(tag="ok"):
-                                pass
-                            case Result(error=err):
-                                return Error(err)
-                    case Result(error=err):
-                        return Error(err)
-            elif actual.before != receipt.after:
+            if (
+                evidence.index_tree != receipt.index_tree
+                and evidence.before != receipt.after
+            ):
                 return Error(
                     RefusalError(
-                        "receipt_mismatch",
-                        "Prepared autommit receipt does not match "
-                        + "the current HEAD.",
+                        "recovery_conflict",
+                        "Index tree changed after prepared receipt was written.",
                     )
                 )
-            match remove_receipt(common_dir):
-                case Result(tag="ok"):
-                    return Ok(
-                        {
-                            "status": "recovered",
-                            "message": "Recovered prepared autommit transaction.",
-                            "after": receipt.after,
-                        }
+        case Result(error=err):
+            return Error(err)
+
+    match _commit_exists(cwd, receipt.after):
+        case Result(tag="ok", ok=commit_ok):
+            if not commit_ok:
+                return Error(
+                    AutommitError(
+                        "invalid_receipt",
+                        ("Receipt target commit object does not exist in repository."),
                     )
+                )
+            match _tree_for_commit(cwd, receipt.after):
+                case Result(tag="ok", ok=target_tree):
+                    if target_tree != receipt.index_tree:
+                        return Error(
+                            AutommitError(
+                                "invalid_receipt",
+                                (
+                                    "Receipt target commit does not match "
+                                    "staged index tree."
+                                ),
+                            )
+                        )
+                    match run_git(cwd, "rev-parse", receipt.ref):
+                        case Result(tag="ok", ok=current_ref_str):
+                            current_ref = current_ref_str.strip()
+                            if current_ref == receipt.after:
+                                match remove_receipt(git_dir):
+                                    case Result(tag="ok"):
+                                        return Ok(
+                                            {
+                                                "status": "recovered",
+                                                "recovered_state": (
+                                                    "already_committed"
+                                                ),
+                                                "ref": receipt.ref,
+                                                "after": receipt.after,
+                                            }
+                                        )
+                                    case Result(error=err):
+                                        return Error(err)
+                            if current_ref == receipt.before:
+                                match _cas_ref(
+                                    cwd,
+                                    receipt.ref,
+                                    receipt.after,
+                                    receipt.before,
+                                ):
+                                    case Result(tag="ok"):
+                                        match remove_receipt(git_dir):
+                                            case Result(tag="ok"):
+                                                return Ok(
+                                                    {
+                                                        "status": "recovered",
+                                                        "recovered_state": (
+                                                            "applied_cas"
+                                                        ),
+                                                        "ref": receipt.ref,
+                                                        "after": receipt.after,
+                                                    }
+                                                )
+                                            case Result(error=err):
+                                                return Error(err)
+                                    case Result(error=err):
+                                        return Error(err)
+                            return Error(
+                                RefusalError(
+                                    "recovery_conflict",
+                                    f"Cannot recover receipt: ref {receipt.ref} is at "
+                                    f"{current_ref}, expected {receipt.before} or "
+                                    f"{receipt.after}.",
+                                )
+                            )
+                        case Result(error=err):
+                            return Error(err)
                 case Result(error=err):
                     return Error(err)
         case Result(error=err):
@@ -291,21 +322,19 @@ def _recover_receipt(
 
 
 def _consume_or_recover(
-    cwd: Path, common_dir: Path
+    cwd: Path, git_dir: Path
 ) -> Result[Option[dict[str, object]], AutommitError]:
-    match read_receipt(common_dir):
+    match read_receipt(git_dir):
         case Result(tag="ok", ok=receipt_opt):
             match receipt_opt:
-                case Option(tag="none"):
-                    return Ok(Nothing)
                 case Option(tag="some", some=receipt):
                     if receipt.state == "committed":
-                        match remove_receipt(common_dir):
+                        match remove_receipt(git_dir):
                             case Result(tag="ok"):
                                 return Ok(Nothing)
                             case Result(error=err):
                                 return Error(err)
-                    match _recover_receipt(cwd, common_dir, receipt):
+                    match _recover_receipt(cwd, git_dir, receipt):
                         case Result(tag="ok", ok=recovered):
                             return Ok(Some(recovered))
                         case Result(error=err):
@@ -317,14 +346,17 @@ def _consume_or_recover(
 
 
 def prepare(
-    cwd: Path, context: tuple[str, ...]
+    cwd: Path,
+    context: tuple[str, ...],
+    *,
+    scope: Literal["staged", "all"] = "all",
 ) -> Result[dict[str, object], AutommitError]:
-    """Recover if needed, stage when appropriate, and expose exact planning evidence."""
-    match _common_dir(cwd):
-        case Result(tag="ok", ok=common_dir):
+    """Recover if needed, stage per scope, and expose exact planning evidence."""
+    match _git_dir(cwd):
+        case Result(tag="ok", ok=git_dir):
             try:
-                with operation_lock(common_dir):
-                    match _consume_or_recover(cwd, common_dir):
+                with operation_lock(git_dir):
+                    match _consume_or_recover(cwd, git_dir):
                         case Result(tag="ok", ok=recovered_opt):
                             match recovered_opt:
                                 case Option(tag="some", some=recovered):
@@ -335,16 +367,23 @@ def prepare(
                             return Error(err)
                     match _staged_files(cwd):
                         case Result(tag="ok", ok=staged):
-                            if not staged:
+                            if scope == "all":
                                 match run_git(cwd, "add", "--all"):
                                     case Result(tag="ok"):
                                         match _staged_files(cwd):
-                                            case Result(tag="ok", ok=staged_again):
-                                                staged = staged_again
+                                            case Result(tag="ok", ok=staged_all):
+                                                staged = staged_all
                                             case Result(error=err):
                                                 return Error(err)
                                     case Result(error=err):
                                         return Error(err)
+                            elif not staged:
+                                return Error(
+                                    AutommitError(
+                                        "no_staged_changes",
+                                        "No staged changes found to commit.",
+                                    )
+                                )
                             if not staged:
                                 return Error(
                                     AutommitError(
@@ -361,24 +400,32 @@ def prepare(
                                                     return Ok(
                                                         {
                                                             "status": "prepared",
-                                                            "snapshot": _snapshot_token(
-                                                                evidence
+                                                            "snapshot": (
+                                                                _snapshot_token(
+                                                                    evidence
+                                                                )
                                                             ),
                                                             "ref": evidence.ref,
-                                                            "before": evidence.before,
-                                                            "index_tree": evidence.index_tree,  # noqa: E501 - dict entry unsplittable at this nesting
+                                                            "before": (evidence.before),
+                                                            "index_tree": (
+                                                                evidence.index_tree
+                                                            ),
                                                             "staged_files": list(
                                                                 staged
                                                             ),
-                                                            "changed_hunk_count": changed_hunk_count(  # noqa: E501 - dict entry unsplittable at this nesting
-                                                                diff
+                                                            "changed_hunk_count": (
+                                                                changed_hunk_count(diff)
                                                             ),
-                                                            "context": "\n\n".join(
-                                                                value
-                                                                for value in context
-                                                                if value
+                                                            "context": (
+                                                                "\n\n".join(
+                                                                    value
+                                                                    for value in context
+                                                                    if value
+                                                                )
                                                             ),
-                                                            "repository_context": repo_context,  # noqa: E501 - dict entry unsplittable at this nesting
+                                                            "repository_context": (
+                                                                repo_context
+                                                            ),
                                                             "diff": diff,
                                                         }
                                                     )
@@ -394,6 +441,31 @@ def prepare(
                 return Error(error)
         case Result(error=err):
             return Error(err)
+
+
+def read_json_file(path: Path, kind: str) -> Result[object, AutommitError]:
+    """Read bounded JSON from a regular file."""
+    if not path.exists() or path.is_symlink() or not path.is_file():
+        return Error(
+            AutommitError(
+                "invalid_file",
+                f"Autommit {kind} file must be an existing regular file.",
+            )
+        )
+    try:
+        with path.open("rb") as handle:
+            content = handle.read(MAX_POLICY_FILE_BYTES)
+    except OSError as error:
+        return Error(AutommitError("file_io", f"Unable to read {kind} file: {error}."))
+    try:
+        data: object = json.loads(content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        return Error(
+            AutommitError(
+                "invalid_json", f"Autommit {kind} is not valid JSON: {error}."
+            )
+        )
+    return Ok(data)
 
 
 def _load_validated_plan(
@@ -478,51 +550,13 @@ def validate_plan(
             return Error(err)
 
 
-def _position_for_change(
-    group: CommitGroup,
-    staged_diff: str,
-    zero_context_diff: str,
-) -> int:
-    regular = {file.filename: file for file in parse_file_diffs(staged_diff)}
-    zero = {file.filename: file for file in parse_file_diffs(zero_context_diff)}
-    positions: list[int] = [0]
-    for change in group.changes:
-        files = zero if isinstance(change.hunks, LinesSelector) else regular
-        file = files.get(change.path)
-        if file is None or isinstance(change.hunks, AllSelector):
-            continue
-        if isinstance(change.hunks, IndicesSelector):
-            selected = tuple(
-                hunk for hunk in file.hunks if hunk.index in change.hunks.indices
-            )
-        else:
-            selected = tuple(
-                hunk
-                for hunk in file.hunks
-                if hunk.new_start <= change.hunks.end
-                and change.hunks.start <= hunk.new_start + max(1, hunk.new_lines) - 1
-            )
-        positions.extend(hunk.new_start for hunk in selected)
-    return max(positions)
-
-
 def _apply_order(
     proposal: CommitProposal,
-    staged_diff: str,
-    zero_context_diff: str,
+    _staged_diff: str,
+    _zero_context_diff: str,
 ) -> tuple[CommitGroup, ...]:
-    entries = (
-        (
-            group,
-            index,
-            _position_for_change(group, staged_diff, zero_context_diff),
-        )
-        for index, group in enumerate(proposal.commits)
-    )
-    return tuple(
-        group
-        for group, _, _ in sorted(entries, key=lambda entry: (-entry[2], entry[1]))
-    )
+    """Preserve model's planned semantic commit order without re-sorting by line position."""
+    return proposal.commits
 
 
 def _commit_message(group: CommitGroup) -> str:
@@ -542,8 +576,10 @@ def _require_atomicity_decision(
         return Error(
             AutommitError(
                 "atomicity_review_required",
-                "This broad single-commit proposal requires "
-                + "an atomicity decision file.",
+                (
+                    "This broad single-commit proposal requires "
+                    "an atomicity decision file."
+                ),
             )
         )
     match read_json_file(decision_file, "atomicity decision"):
@@ -556,10 +592,41 @@ def _require_atomicity_decision(
                             AutommitError(
                                 "atomicity_split_required",
                                 f"Atomicity critic requires a split: {concerns}. "
-                                + f"Rationale: {decision.rationale}",
+                                f"Rationale: {decision.rationale}",
                             )
                         )
                     return Ok(Some(decision))
+                case Result(error=err):
+                    return Error(err)
+        case Result(error=err):
+            return Error(err)
+
+
+def _assert_receipt_evidence(
+    cwd: Path, receipt: Receipt, final_head: str
+) -> Result[None, AutommitError]:
+    match _commit_exists(cwd, final_head):
+        case Result(tag="ok", ok=commit_ok):
+            if not commit_ok:
+                return Error(
+                    AutommitError(
+                        "missing_target_commit",
+                        "Created final commit object missing before ref update.",
+                    )
+                )
+            match _tree_for_commit(cwd, final_head):
+                case Result(tag="ok", ok=created_tree):
+                    if created_tree != receipt.index_tree:
+                        return Error(
+                            RefusalError(
+                                "tree_mismatch",
+                                (
+                                    "Prepared commit tree does not match "
+                                    "staged index tree."
+                                ),
+                            )
+                        )
+                    return Ok(None)
                 case Result(error=err):
                     return Error(err)
         case Result(error=err):
@@ -572,24 +639,26 @@ def apply(
     plan_file: Path,
     decision_file: Path | None,
 ) -> Result[dict[str, object], AutommitError]:
-    """Prepare commits off-branch, verify the final tree, then publish by CAS."""
-    match _common_dir(cwd):
-        case Result(tag="ok", ok=common_dir):
+    """Prepare commits off-branch, verify final tree, and publish by CAS."""
+    match _git_dir(cwd):
+        case Result(tag="ok", ok=git_dir):
             try:
-                with operation_lock(common_dir):
-                    match _consume_or_recover(cwd, common_dir):
-                        case Result(tag="ok", ok=recovered_opt):
-                            match recovered_opt:
-                                case Option(tag="some", some=recovered):
-                                    return Ok(recovered)
-                                case _:
-                                    pass
+                with operation_lock(git_dir):
+                    match _consume_or_recover(cwd, git_dir):
+                        case Result(tag="ok"):
+                            pass
                         case Result(error=err):
                             return Error(err)
                     match _load_validated_plan(cwd, snapshot, plan_file):
                         case Result(
                             tag="ok",
-                            ok=(expected, proposal, _, staged_diff, review),
+                            ok=(
+                                expected,
+                                proposal,
+                                _,
+                                staged_diff,
+                                review,
+                            ),
                         ):
                             match _require_atomicity_decision(review, decision_file):
                                 case Result(tag="ok"):
@@ -668,15 +737,13 @@ def apply(
                                                 case Result(error=err):
                                                     return Error(err)
                                             match run_git(
-                                                worktree,
-                                                "rev-parse",
-                                                "HEAD",
+                                                worktree, "rev-parse", "HEAD"
                                             ):
                                                 case Result(tag="ok", ok=head_sha):
                                                     created.append(
                                                         {
                                                             "sha": head_sha.strip(),
-                                                            "summary": group.summary,
+                                                            "summary": (group.summary),
                                                         }
                                                     )
                                                 case Result(error=err):
@@ -701,9 +768,10 @@ def apply(
                                             return Error(
                                                 RefusalError(
                                                     "tree_mismatch",
-                                                    "Prepared commit tree "
-                                                    + "does not match "
-                                                    + "the staged index.",
+                                                    (
+                                                        "Prepared commit tree does not "
+                                                        "match the staged index."
+                                                    ),
                                                 )
                                             )
                                         match _staged_diff(cwd):
@@ -712,9 +780,10 @@ def apply(
                                                     return Error(
                                                         RefusalError(
                                                             "snapshot_changed",
-                                                            "Staged snapshot "
-                                                            + "changed during atomic "
-                                                            + "commit preparation.",
+                                                            (
+                                                                "Staged snapshot changed "
+                                                                "during atomic commit preparation."
+                                                            ),
                                                         )
                                                     )
                                             case Result(error=err):
@@ -732,7 +801,7 @@ def apply(
                                             final_head,
                                             expected.index_tree,
                                         )
-                                        match write_receipt(common_dir, receipt):
+                                        match write_receipt(git_dir, receipt):
                                             case Result(tag="ok"):
                                                 pass
                                             case Result(error=err):
@@ -759,23 +828,24 @@ def apply(
                                                 pass
                                             case Result(error=err):
                                                 return Error(err)
-                                        match remove_receipt(common_dir):
+                                        match remove_receipt(git_dir):
                                             case Result(tag="ok"):
-                                                return Ok(
-                                                    {
-                                                        "status": "committed",
-                                                        "message": (
-                                                            f"Created "
-                                                            f"{len(created)} commit"
-                                                            f"{'s' if len(created) != 1 else ''} atomically."  # noqa: E501 - message needs 4-way split at this nesting
-                                                        ),
-                                                        "before": expected.before,
-                                                        "after": final_head,
-                                                        "commits": created,
-                                                    }
-                                                )
+                                                pass
                                             case Result(error=err):
-                                                return Error(err)
+                                                pass
+                                        return Ok(
+                                            {
+                                                "status": "committed",
+                                                "message": (
+                                                    f"Created {len(created)} commit"
+                                                    + ("s" if len(created) != 1 else "")
+                                                    + " atomically."
+                                                ),
+                                                "before": expected.before,
+                                                "after": final_head,
+                                                "commits": created,
+                                            }
+                                        )
                                     finally:
                                         if added:
                                             _ = try_git(

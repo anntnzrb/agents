@@ -9,9 +9,13 @@ metadata:
 
 # Autommit
 
-Create the smallest honest set of commits from the exact staged snapshot. Use the current harness model for planning and critique; use the bundled Python CLI for every Git mutation and safety check.
+Create the smallest honest set of commits from the current repository changes. Use the host harness model for planning and critique; use the bundled Python CLI for every Git mutation and safety check.
 
 An explicit request to `autommit`, automatically commit, or run the unattended atomic commit workflow authorizes local commit creation. It never authorizes push, force, reset, clean, stash, amend, or unrelated history edits.
+
+## Public entrypoints
+
+The primary entrypoint for autommit is the Python CLI at `scripts/cli.py`.
 
 ## Required follow-up reads
 
@@ -26,7 +30,7 @@ An explicit request to `autommit`, automatically commit, or run the unattended a
 2. Run `prepare` from the requested repository. Pass all user context in original order with positional text or repeated `--context` values:
 
    ```text
-   uv run --script <skill-dir>/scripts/cli.py prepare [context ...] [--context TEXT ...] [--repo PATH]
+   uv run --script <skill-dir>/scripts/cli.py prepare [--scope all|staged] [context ...] [--context TEXT ...] [--repo PATH]
    ```
 
 3. Parse the one-line JSON response. If `result.status` is `recovered`, report recovery and stop; a new run is required for remaining changes.
@@ -51,11 +55,11 @@ An explicit request to `autommit`, automatically commit, or run the unattended a
 
 ## Invariants
 
-- Let `prepare` stage all only when nothing is staged. When anything is staged, commit that snapshot as-is and preserve every unstaged change.
-- Cover every staged path and changed hunk exactly once overall. Never invent paths or omit staged metadata/binary changes.
+- By default (`--scope all`), stage all uncommitted working tree changes. In `--scope staged`, commit only existing staged changes and preserve every unstaged change.
+- Cover every captured path and changed hunk exactly once overall. Never invent paths or omit captured metadata/binary changes.
 - Keep implementation, tests, and callers for one externally observable behavior together.
 - Split independently reversible behavior. History and repository policy affect naming and grouping only; they are not atomicity criteria.
-- Keep 1-based hunk indices and inclusive new-file line ranges. Never mix selector types for the same path across commits.
+- Keep 1-based hunk indices and inclusive new-file line ranges.
 - Never bypass `validate-plan`, critic gating, snapshot binding, the operation lock, receipt recovery, temporary-worktree preparation, tree equality, or compare-and-swap publication.
 - Never remove a stale lock automatically. Preserve evidence and state on every refusal or failure.
 - Never replace this workflow with direct `git add`, `git commit`, or `git update-ref` commands.
