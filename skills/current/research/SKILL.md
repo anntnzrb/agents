@@ -48,6 +48,16 @@ Route each request to the right source class; return a source-backed answer with
 - X-plus-web news: use `x-research` for bounded X evidence, then an independent web route.
 - X results are bounded, unofficial evidence; never infer public-opinion truth, deletion, or suspension from a missing result.
 
+### Model benchmark comparisons
+
+- Use `artificial-analysis-live`, `deepswe-live`, `livebench-live`, and `vals-live` for their respective published results. Load only the sources needed for the question; use all four when the user requests that coverage.
+- Follow each owning skill for commands, credentials, extraction, and cache recovery. Never substitute a remembered workaround or silently fall back to stale data.
+- Preserve model, reasoning effort, provider, harness, configuration, benchmark version, task population, metric units, and freshness wherever published. Mark unknown fields and mismatches before comparing rows.
+- Separate published values from derived deltas, ratios, or rankings. Compare costs only when their units and workload assumptions align. Missing observations remain missing, not zero or proof of non-evaluation.
+- Do not deduplicate provider measurements solely by model or endpoint name. Do not average unrelated benchmark scales or declare a winner by source-count majority.
+- Report confidence intervals and sample limits. Interval overlap alone is not a significance test; agreement across boards does not establish independent evidence.
+- Explain disagreements using task relevance, configuration, methodology, and source quality. Preserve unresolved differences instead of forcing one ranking.
+
 ### Knowledge base
 
 - User-owned notebook sources and internal knowledge corpora: `notebooklm`.
