@@ -2,23 +2,22 @@
 name: eval-orchestration
 description: Prefer eval for in-memory data distillation, OLAP, and complex algorithms; never proxy specialized harness tools
 condition:
-  - '\b(?:eval|polars|duckdb|rapidfuzz|networkx|leaderboard|xlsx|parquet|data\s+munging)\b'
   - '\b(?:python|node|bun)\s+-[ce]\b|\bjq\b|\bawk\b|\bwhile\s+(?:true\b|read\b|\[|:|getopts\b)|\bfor\s+\w+\s+in\s|<<[A-Za-z_]'
   - '\b(?:subprocess\.(?:run|Popen|check_output|check_call)|os\.(?:system|popen|walk))\b|\.(?:read_text|write_text)\(|open\([^)\n]{0,40}[''"]'
 scope:
-  - text
+  - tool:eval
   - tool:bash
 interruptMode: never
 ---
 Always load `skill://python` when working with `eval`. Use `eval` strictly for in-memory data distillation, OLAP queries, complex algorithms, and dynamic `@tool` orchestration. Avoid heredocs, shell loops, inline interpreter one-liners, and quote-heavy Bash.
 
 **Tool-First Boundary:** Never use `eval` as a proxy to circumvent specialized harness tools:
-- Use `read` (with line selectors) to inspect code/text — avoid `Path.read_text()` or `open().read()`.
-- Use `glob` / `grep` for discovery — avoid `os.walk()` or `re.search()` file loops.
-- Use `bash` for toolchains, builds, tests, git, and CLIs — avoid `subprocess.run()`.
-- Use `edit` / `write` for file mutations — avoid `open('w').write()`.
+- Use `read` with line selectors to inspect code or text, not `Path.read_text()` or `open().read()`.
+- Use `glob` and `grep` for discovery, not filesystem walks or regex file loops inside `eval`.
+- Use `bash` for toolchains, builds, tests, git, and CLIs, not `subprocess.run()` inside `eval`.
+- Use `edit` and `write` for file mutations, not Python file writes.
 
-Proactively select the optimal tool over manual Python loops or raw text munging:
+Choose libraries for the analysis, not as substitutes for specialized tools. The table does not authorize HTTP fetching, document inspection, or filesystem discovery inside `eval`. Prefer `read` for supported document and database queries; use analytical engines only when the requested computation needs them.
 
 | Domain / Workload | Preferred Tool | Key Use Case |
 |---|---|---|
