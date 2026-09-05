@@ -17,7 +17,7 @@ import tempfile
 import threading
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 from .contracts import compact_json
 from .diagnostics import redact
@@ -47,14 +47,14 @@ class ArtifactStore:
     snapshots of that index.
     """
 
-    _write_lock = threading.RLock()
+    _write_lock: threading.RLock = threading.RLock()
 
     def __init__(self, root: str | os.PathLike[str]) -> None:
         """Initialize a cache rooted at ``root``."""
-        self.root = Path(root).expanduser()
-        self.artifacts = self.root / "artifacts"
-        self.index_path = self.root / "index.json"
-        self.manifests = self.root / "manifests"
+        self.root: Path = Path(root).expanduser()
+        self.artifacts: Path = self.root / "artifacts"
+        self.index_path: Path = self.root / "index.json"
+        self.manifests: Path = self.root / "manifests"
 
     @staticmethod
     def hash_bytes(raw: bytes | bytearray | memoryview) -> str:
@@ -66,7 +66,7 @@ class ArtifactStore:
         source_key: str,
         raw: bytes | bytearray | memoryview,
         metadata: Mapping[str, object] | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, object]:
         """Store ``raw`` once and index it under an explicit source identity.
 
         Raw bytes and their sidecar are first-writer-wins.  The source index is
@@ -80,7 +80,7 @@ class ArtifactStore:
         source_key: str,
         raw: bytes | bytearray | memoryview,
         metadata: Mapping[str, object] | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, object]:
         """Promote caller-owned legacy bytes without deleting that copy.
 
         The promoted record is marked ``legacy_unverified``.  This method only
@@ -93,7 +93,7 @@ class ArtifactStore:
         self,
         source_key: str | None = None,
         artifact_hash: str | None = None,
-    ) -> tuple[bytes, dict[str, Any]]:
+    ) -> tuple[bytes, dict[str, object]]:
         """Load and verify an artifact by source identity or SHA-256 hash.
 
         Missing entries and malformed immutable files raise a specific cache
@@ -104,7 +104,7 @@ class ArtifactStore:
             msg = "source_key or artifact_hash is required"
             raise ValueError(msg)
 
-        indexed: dict[str, Any] | None = None
+        indexed: dict[str, object] | None = None
         selected_hash: str | None = None
         safe_source_key: str | None = None
         if source_key is not None:
@@ -115,7 +115,7 @@ class ArtifactStore:
             if not isinstance(candidate, Mapping):
                 msg = f"source key not found: {source_key}"
                 raise ArtifactNotFoundError(msg)
-            indexed = _plain_mapping(candidate)
+            indexed = _plain_mapping(cast("Mapping[str, object]", candidate))
             selected_hash = _valid_hash(indexed.get("sha256"))
             if selected_hash is None:
                 msg = f"invalid index entry for source: {source_key}"
@@ -163,8 +163,8 @@ class ArtifactStore:
 
     def write_manifest(
         self,
-        snapshot: Mapping[str, object] | None = None,
-    ) -> dict[str, Any]:
+        snapshot: object = None,
+    ) -> dict[str, object]:
         """Write an immutable JSON snapshot and return its metadata.
 
         With no argument, the current source index is snapshotted.  A supplied
@@ -177,12 +177,12 @@ class ArtifactStore:
             if not isinstance(snapshot, Mapping):
                 msg = "snapshot must be a mapping"
                 raise TypeError(msg)
-            snapshot_value = snapshot
+            snapshot_value = cast("object", snapshot)
         payload_value = _plain_json({"sources": snapshot_value})
         if not isinstance(payload_value, dict):  # pragma: no cover - defensive
             msg = "manifest projection is not an object"
             raise ArtifactIntegrityError(msg)
-        payload = compact_json(payload_value).encode("utf-8")
+        payload = compact_json(cast("object", payload_value)).encode("utf-8")
         digest = hashlib.sha256(payload).hexdigest()
         path = self.manifests / f"{digest}.json"
         with self._write_lock:
@@ -199,10 +199,10 @@ class ArtifactStore:
         self,
         source_key: str,
         raw_value: bytes | bytearray | memoryview,
-        metadata: Mapping[str, object] | None,
+        metadata: object,
         *,
         legacy_unverified: bool,
-    ) -> dict[str, Any]:
+    ) -> dict[str, object]:
         _require_source_key(source_key)
         if metadata is not None and not isinstance(metadata, Mapping):
             msg = "metadata must be a mapping"
@@ -210,11 +210,15 @@ class ArtifactStore:
         raw = _as_bytes(raw_value)
         digest = hashlib.sha256(raw).hexdigest()
         length = len(raw)
-        redacted_metadata = _plain_json({} if metadata is None else metadata)
+        redacted_metadata = _plain_json(
+            cast("object", ({} if metadata is None else metadata))
+        )
         if not isinstance(redacted_metadata, dict):  # pragma: no cover - defensive
             msg = "metadata projection is not an object"
             raise ArtifactIntegrityError(msg)
-        _verify_declared_metadata(redacted_metadata, digest, length)
+        _verify_declared_metadata(
+            cast("Mapping[str, object]", redacted_metadata), digest, length
+        )
         safe_source_key = _safe_source_key(source_key)
 
         raw_path = self.artifacts / f"{digest}.raw"
@@ -242,7 +246,7 @@ class ArtifactStore:
                     sidecar_path, "metadata sidecar"
                 )
                 self._verify_record(existing_record, digest, raw)
-                record = existing_record
+                record: dict[str, object] = existing_record
             else:
                 record = {
                     "source_key": safe_source_key,
@@ -272,7 +276,7 @@ class ArtifactStore:
 
         return dict(record) | {"source_key": source_key}
 
-    def _read_index(self, *, required: bool) -> dict[str, Any]:
+    def _read_index(self, *, required: bool) -> dict[str, object]:
         if not self.index_path.exists():
             if required:
                 msg = "source index is missing"
@@ -284,16 +288,16 @@ class ArtifactStore:
         return self._read_json_object(self.index_path, "source index")
 
     @staticmethod
-    def _read_json_object(path: Path, label: str) -> dict[str, Any]:
+    def _read_json_object(path: Path, label: str) -> dict[str, object]:
         try:
-            value = json.loads(path.read_text(encoding="utf-8"))
+            value = cast("object", json.loads(path.read_text(encoding="utf-8")))
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             msg = f"invalid {label}: {path}"
             raise ArtifactIntegrityError(msg) from exc
         if not isinstance(value, dict):
             msg = f"invalid {label}: {path}"
             raise ArtifactIntegrityError(msg)
-        return value
+        return cast("dict[str, object]", value)
 
     @staticmethod
     def _verify_record(  # noqa: C901
@@ -316,7 +320,9 @@ class ArtifactStore:
         if not isinstance(metadata, Mapping):
             msg = f"metadata projection is invalid: {digest}"
             raise ArtifactIntegrityError(msg)
-        _verify_declared_metadata(metadata, digest, len(raw))
+        _verify_declared_metadata(
+            cast("Mapping[str, object]", metadata), digest, len(raw)
+        )
         source_key = record.get("source_key")
         if not isinstance(source_key, str) or not source_key:
             msg = f"metadata source key is invalid: {digest}"
@@ -374,13 +380,10 @@ def sha256_bytes(raw: bytes | bytearray | memoryview) -> str:
 def _as_bytes(value: bytes | bytearray | memoryview) -> bytes:
     if isinstance(value, bytes):
         return value
-    if isinstance(value, (bytearray, memoryview)):
-        return bytes(value)
-    msg = "raw artifact must be bytes-like"
-    raise TypeError(msg)
+    return bytes(value)
 
 
-def _require_source_key(source_key: str) -> None:
+def _require_source_key(source_key: object) -> None:
     if not isinstance(source_key, str) or not source_key:
         msg = "source_key must be a non-empty string"
         raise ValueError(msg)
@@ -424,18 +427,18 @@ def _plain_json(value: object) -> object:
     """Redact recursively and round-trip to ordinary JSON values."""
     projected = redact(value)
     try:
-        return json.loads(compact_json(projected))
+        return cast("object", json.loads(compact_json(projected)))
     except (TypeError, ValueError, json.JSONDecodeError) as exc:
         msg = "metadata must be JSON-compatible after redaction"
         raise TypeError(msg) from exc
 
 
-def _plain_mapping(value: Mapping[str, object]) -> dict[str, Any]:
+def _plain_mapping(value: Mapping[str, object]) -> dict[str, object]:
     projected = _plain_json(value)
     if not isinstance(projected, dict):  # pragma: no cover - defensive
         msg = "mapping projection is not an object"
         raise ArtifactIntegrityError(msg)
-    return projected
+    return cast("dict[str, object]", projected)
 
 
 def _relative(path: Path, root: Path) -> str:
@@ -466,7 +469,7 @@ def _atomic_write(path: Path, data: bytes, *, immutable: bool) -> None:
     temporary: Path | None = Path(temporary_name)
     try:
         with os.fdopen(fd, "wb") as handle:
-            handle.write(data)
+            _ = handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
         if immutable and path.exists():
@@ -474,7 +477,7 @@ def _atomic_write(path: Path, data: bytes, *, immutable: bool) -> None:
                 msg = f"immutable target differs: {path}"
                 raise ArtifactIntegrityError(msg)
             return
-        temporary.replace(path)
+        _ = temporary.replace(path)
         temporary = None
         try:
             directory_fd = os.open(path.parent, os.O_RDONLY)

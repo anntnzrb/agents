@@ -1,12 +1,15 @@
 """Pure, fixture-only analysis contract tests."""
-# ruff: noqa: CPY001, E501, INP001, PLR2004, S101
+# ruff: noqa: E501
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, cast
 
-import _path  # noqa: F401
+if TYPE_CHECKING:
+    from numbers import Real
+
 import pytest
+
 from deepswe.analysis import (
     build_report,
     derive_efficiency,
@@ -23,7 +26,7 @@ MIN_ATTEMPTED = 2
 HIGH_PASS_RATE = 0.95
 
 
-def metric_row(  # noqa: PLR0913
+def metric_row(
     config: str,
     *,
     pass_at_1: float | None,
@@ -33,7 +36,7 @@ def metric_row(  # noqa: PLR0913
     attempted: int = 10,
     effort: str = "high",
     harness: str = "fixture-harness",
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Build one representative published leaderboard row."""
     return {
         "model": "same-model",
@@ -87,7 +90,7 @@ def test_rank_preserves_identity_counts_and_published_fields_with_derived_ci_wid
         "limit": None,
     }
 
-    ranked = result["rows"]
+    ranked = cast("list[dict[str, object]]", result["rows"])
     assert isinstance(ranked, list)
     assert [row["config"] for row in ranked] == [
         "config-low-n",
@@ -113,11 +116,12 @@ def test_rank_preserves_identity_counts_and_published_fields_with_derived_ci_wid
         "ci_half",
     )
     assert ranked[0]["value_status"] == "published"
-    assert ranked[0]["derived"]["value_status"] == "derived"
+    ranked0_derived = cast("dict[str, object]", ranked[0]["derived"])
+    assert ranked0_derived["value_status"] == "derived"
     assert {field: ranked[0][field] for field in published_fields} == {
         field: ROWS[4][field] for field in published_fields
     }
-    assert ranked[0]["derived"]["ci_width"] == pytest.approx(0.2)
+    assert ranked0_derived["ci_width"] == pytest.approx(0.2)
     assert "ci_width" not in ranked[0]
     identity_rows = [
         metric_row(
@@ -138,7 +142,8 @@ def test_rank_preserves_identity_counts_and_published_fields_with_derived_ci_wid
         ),
     ]
     identity_result = rank_rows(identity_rows, "pass_at_1", "desc", limit=None)
-    assert {row["harness"] for row in identity_result["rows"]} == {
+    identity_rows_ranked = cast("list[dict[str, object]]", identity_result["rows"])
+    assert {row["harness"] for row in identity_rows_ranked} == {
         "harness-a",
         "harness-b",
     }
@@ -159,14 +164,22 @@ def test_rank_strict_duplicates_keep_raw_rows_but_block_conflicts() -> None:
     )
     assert result["strict_duplicates"] is True
     assert result["eligible_count"] == 0
-    ranked = result["rows"]
+    ranked = cast("list[dict[str, object]]", result["rows"])
     assert isinstance(ranked, list)
     assert [row["config"] for row in ranked] == ["same-config", "same-config"]
-    assert all(row["derived"]["rank"] is None for row in ranked)
     assert all(
-        "DUPLICATE_CONFLICT" in row["derived"]["blocked_reasons"] for row in ranked
+        cast("dict[str, object]", row["derived"])["rank"] is None for row in ranked
     )
-    assert result["duplicate_report"]["conflicting"][0]["count"] == 2
+    assert all(
+        "DUPLICATE_CONFLICT"
+        in cast(
+            "list[object]",
+            cast("dict[str, object]", row["derived"])["blocked_reasons"],
+        )
+        for row in ranked
+    )
+    dup_report = cast("dict[str, list[dict[str, object]]]", result["duplicate_report"])
+    assert dup_report["conflicting"][0]["count"] == 2
 
 
 def test_report_separates_raw_extrema_recommendations_and_pareto_nulls() -> None:
@@ -185,7 +198,8 @@ def test_report_separates_raw_extrema_recommendations_and_pareto_nulls() -> None
     }
     report = build_report(payload, limit=None)
     assert report["value_status"] == "derived"
-    assert report["recommendations"]["value_status"] == "derived"
+    recs = cast("dict[str, object]", report["recommendations"])
+    assert recs["value_status"] == "derived"
 
     assert report["counts"] == {
         "input": 5,
@@ -193,32 +207,51 @@ def test_report_separates_raw_extrema_recommendations_and_pareto_nulls() -> None
         "recommendations": 5,
         "pareto": 3,
     }
-    assert report["filters_applied"]["min_attempted"] is None
-    assert report["raw_extrema"]["pass_at_1"]["max"]["config"] == "config-low-n"
-    extrema_max = report["raw_extrema"]["pass_at_1"]["max"]
+    filters_applied = cast("dict[str, object]", report["filters_applied"])
+    assert filters_applied["min_attempted"] is None
+    raw_extrema = cast("dict[str, dict[str, dict[str, object]]]", report["raw_extrema"])
+    assert raw_extrema["pass_at_1"]["max"]["config"] == "config-low-n"
+    extrema_max = raw_extrema["pass_at_1"]["max"]
     assert extrema_max["value_status"] == "published"
-    assert extrema_max["derived"]["value_status"] == "derived"
-    assert report["raw_extrema"]["mean_cost_usd"]["min"]["config"] == "config-a"
-    pareto_configs = {row["config"] for row in report["pareto"]}
+    extrema_max_derived = cast("dict[str, object]", extrema_max["derived"])
+    assert extrema_max_derived["value_status"] == "derived"
+    assert raw_extrema["mean_cost_usd"]["min"]["config"] == "config-a"
+    pareto = cast("list[dict[str, object]]", report["pareto"])
+    pareto_configs = {row["config"] for row in pareto}
     assert "config-null" not in pareto_configs
     assert "config-c" not in pareto_configs
     assert {"config-a", "config-b", "config-low-n"} == pareto_configs
-    assert all(row["value_status"] == "published" for row in report["pareto"])
-    assert all(row["derived"]["value_status"] == "derived" for row in report["pareto"])
-    assert report["scope"]["benchmark_version"] == "v1.1"
-    assert report["scope"]["value_status"] == "derived"
-    assert report["provenance"]["url"] == "fixture://leaderboard"
+    assert all(row["value_status"] == "published" for row in pareto)
+    assert all(
+        cast("dict[str, object]", row["derived"])["value_status"] == "derived"
+        for row in pareto
+    )
+    scope = cast("dict[str, object]", report["scope"])
+    assert scope["benchmark_version"] == "v1.1"
+    assert scope["value_status"] == "derived"
+    provenance = cast("dict[str, object]", report["provenance"])
+    assert provenance["url"] == "fixture://leaderboard"
 
 
 def test_quality_thresholds_are_opt_in_and_visible() -> None:
     """Ensure quality thresholds alter eligibility only when explicitly supplied."""
     unfiltered = build_report(ROWS, min_attempted=None, limit=None)
-    filtered = build_report(ROWS, min_attempted=MIN_ATTEMPTED, limit=None)
-    assert unfiltered["counts"]["eligible"] == ROW_COUNT
-    assert filtered["counts"]["eligible"] == FILTERED_COUNT
-    filtered_configs = {row["config"] for row in filtered["recommendations"]["rows"]}
+    filtered = build_report(
+        ROWS,
+        min_attempted=cast("Real", cast("object", MIN_ATTEMPTED)),
+        limit=None,
+    )
+    unfiltered_counts = cast("dict[str, object]", unfiltered["counts"])
+    assert unfiltered_counts["eligible"] == ROW_COUNT
+    filtered_counts = cast("dict[str, object]", filtered["counts"])
+    assert filtered_counts["eligible"] == FILTERED_COUNT
+    filtered_recs = cast(
+        "dict[str, list[dict[str, object]]]", filtered["recommendations"]
+    )
+    filtered_configs = {row["config"] for row in filtered_recs["rows"]}
     assert "config-low-n" not in filtered_configs
-    assert filtered["filters_applied"]["min_attempted"] == MIN_ATTEMPTED
+    filtered_filters = cast("dict[str, object]", filtered["filters_applied"])
+    assert filtered_filters["min_attempted"] == MIN_ATTEMPTED
 
 
 def test_custom_pareto_axes_preserve_null_exclusion_and_identity() -> None:
@@ -246,17 +279,26 @@ def test_efficiency_utility_handles_zero_and_missing_denominators() -> None:
         ],
         ["cost_per_attempt=mean_cost_usd/n_attempted"],
     )
-    rows = {row["config"]: row for row in result["rows"]}
+    result_rows = cast("list[dict[str, object]]", result["rows"])
+    rows = {str(row["config"]): row for row in result_rows}
+    valid_derived = cast(
+        "dict[str, dict[str, dict[str, object]]]", rows["valid"]["derived"]
+    )
     assert (
-        rows["valid"]["derived"]["efficiency"]["cost_per_attempt"]["value"]
+        valid_derived["efficiency"]["cost_per_attempt"]["value"]
         == VALID_COST_PER_ATTEMPT
     )
-    assert (
-        rows["zero"]["derived"]["efficiency"]["cost_per_attempt"]["reason"]
-        == "zero_denominator"
+    zero_derived = cast(
+        "dict[str, dict[str, dict[str, object]]]", rows["zero"]["derived"]
     )
     assert (
-        rows["missing"]["derived"]["efficiency"]["cost_per_attempt"]["reason"]
+        zero_derived["efficiency"]["cost_per_attempt"]["reason"] == "zero_denominator"
+    )
+    missing_derived = cast(
+        "dict[str, dict[str, dict[str, object]]]", rows["missing"]["derived"]
+    )
+    assert (
+        missing_derived["efficiency"]["cost_per_attempt"]["reason"]
         == "missing_or_invalid_input"
     )
 
@@ -273,7 +315,8 @@ def test_report_adds_opt_in_analysis_sections() -> None:
         {"metric": "pass_at_1", "order": "desc"},
         {"metric": "mean_cost_usd", "order": "asc"},
     ]
-    assert report["efficiency"]["specs"][0]["name"] == "cost_per_attempt"
+    eff = cast("dict[str, list[dict[str, object]]]", report["efficiency"])
+    assert eff["specs"][0]["name"] == "cost_per_attempt"
 
 
 @pytest.mark.parametrize(
@@ -282,7 +325,13 @@ def test_report_adds_opt_in_analysis_sections() -> None:
 def test_negative_quality_thresholds_are_rejected(threshold_name: str) -> None:
     """Reject negative values for every quality threshold option."""
     with pytest.raises(ValueError, match="non-negative"):
-        rank_rows(ROWS, "pass_at_1", "desc", limit=None, **{threshold_name: -1})  # type: ignore[arg-type]
+        _ = rank_rows(
+            ROWS,
+            "pass_at_1",
+            "desc",
+            limit=None,
+            **{threshold_name: cast("Real", cast("object", -1))},
+        )
 
 
 def test_trial_defaults_exclude_other_scope_and_explicit_overrides_restore_visibility() -> (
@@ -317,7 +366,8 @@ def test_trial_defaults_exclude_other_scope_and_explicit_overrides_restore_visib
         {"id": "missing", "source": "deep-swe", "eval_scope": "full"},
     ]
     default = filter_trials(rows)
-    assert [row["id"] for row in default["rows"]] == ["included"]
+    default_rows = cast("list[dict[str, object]]", default["rows"])
+    assert [row["id"] for row in default_rows] == ["included"]
     assert default["filters_applied"] == {
         "source": "deep-swe",
         "eval_scope": "full",
@@ -325,7 +375,8 @@ def test_trial_defaults_exclude_other_scope_and_explicit_overrides_restore_visib
     }
 
     visible = filter_trials(rows, source=None, eval_scope=None, included_only=False)
-    assert [row["id"] for row in visible["rows"]] == [row["id"] for row in rows]
+    visible_rows = cast("list[dict[str, object]]", visible["rows"])
+    assert [row["id"] for row in visible_rows] == [row["id"] for row in rows]
     assert visible["filters_applied"] == {
         "source": None,
         "eval_scope": None,
@@ -341,16 +392,23 @@ def test_null_safe_ordering_and_invalid_analysis_inputs() -> None:
         "asc",
         limit=None,
     )
-    assert [row["config"] for row in result["rows"]] == ["ok"]
-    assert result["rows"][0]["derived"]["ci_width"] is None
+    result_rows = cast("list[dict[str, object]]", result["rows"])
+    assert [row["config"] for row in result_rows] == ["ok"]
+    row0_derived = cast("dict[str, object]", result_rows[0]["derived"])
+    assert row0_derived["ci_width"] is None
 
     with pytest.raises(TypeError, match="thresholds"):
-        rank_rows(ROWS, "pass_at_1", "desc", min_attempted="ten")  # type: ignore[arg-type]
+        _ = rank_rows(
+            ROWS,
+            "pass_at_1",
+            "desc",
+            min_attempted=cast("Real", cast("object", "ten")),
+        )
     with pytest.raises(ValueError, match="non-negative"):
-        rank_rows(ROWS, "pass_at_1", "desc", limit=-1)
+        _ = rank_rows(ROWS, "pass_at_1", "desc", limit=-1)
     with pytest.raises(TypeError, match="included_only"):
-        filter_trials([], included_only=1)  # type: ignore[arg-type]
+        _ = filter_trials([], included_only=cast("bool", cast("object", 1)))
 
 
 if __name__ == "__main__":
-    pytest.main([__file__])
+    _ = pytest.main([__file__])

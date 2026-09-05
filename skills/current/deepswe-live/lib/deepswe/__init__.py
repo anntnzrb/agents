@@ -1,5 +1,4 @@
 """CLI wiring for versioned DeepSWE benchmark metrics."""
-# ruff: noqa: CPY001
 
 from .cli import build_parser, main
 

@@ -1,5 +1,4 @@
 """Keep tests runnable from the repository root or this skill directory."""
-# ruff: noqa: CPY001, INP001
 
 import sys
 from pathlib import Path

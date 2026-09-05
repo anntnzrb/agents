@@ -1,21 +1,21 @@
 """Deterministic source/version/cache contract tests (no live network)."""
-# ruff: noqa: CPY001, INP001, RUF043, S101
+# ruff: noqa: RUF043
 
 from __future__ import annotations
 
 import hashlib
 import io
 import json
-from typing import TYPE_CHECKING, NoReturn, Self
+from email.message import Message
+from pathlib import Path
+from typing import TYPE_CHECKING, NoReturn, Self, cast, final
 from urllib.error import HTTPError, URLError
 
 if TYPE_CHECKING:
     from urllib.request import Request
 
-from pathlib import Path
-
-import _path  # noqa: F401
 import pytest
+
 from deepswe import sources
 
 LEADERBOARD = {
@@ -54,8 +54,15 @@ TRIALS = {
 }
 
 
+@final
 class Response:
     """Small urllib-compatible response fixture for transport tests."""
+
+    body: io.BytesIO
+    status: int
+    code: int
+    headers: dict[str, str]
+    final_url: str | None
 
     def __init__(
         self,
@@ -100,13 +107,17 @@ class Response:
         )
 
 
+@final
 class QueueOpener:
     """Queue deterministic responses for urllib transport calls."""
+
+    responses: list[object]
+    requests: list[Request]
 
     def __init__(self, *responses: object) -> None:
         """Initialize the response queue and captured request list."""
         self.responses = list(responses)
-        self.requests: list[Request] = []
+        self.requests = []
 
     def __call__(self, request: Request, timeout: float = 0) -> object:
         """Return the next response while recording the request."""
@@ -118,19 +129,24 @@ class QueueOpener:
         return response
 
 
+def _utc_now() -> str:
+    return "2026-07-25T05:00:00+00:00"
+
+
 def patch_urlopen(monkeypatch: pytest.MonkeyPatch, opener: QueueOpener) -> None:
     """Patch the source module's stdlib transport without touching the network."""
     monkeypatch.setattr(sources, "urlopen", opener)
-    monkeypatch.setattr(sources, "_utc_now", lambda: "2026-07-25T05:00:00+00:00")
+    monkeypatch.setattr(sources, "_utc_now", _utc_now)
 
 
 def artifact_meta(result: dict[str, object], filename: str) -> dict[str, object]:
     """Return one artifact metadata mapping from a fetch result."""
     artifacts = result.get("artifacts")
     assert isinstance(artifacts, dict), result
-    metadata = artifacts.get(filename)
+    artifacts_dict = cast("dict[str, object]", artifacts)
+    metadata = artifacts_dict.get(filename)
     assert isinstance(metadata, dict), result
-    return metadata
+    return cast("dict[str, object]", metadata)
 
 
 def test_resolve_latest_uses_one_configured_default(
@@ -176,7 +192,7 @@ def test_resolve_explicit_semver_and_reject_major_only_or_legacy() -> None:
     assert sources.resolve_version("v2.0")["version"] == "v2.0"
     for invalid in ("v1", "1", "latest-v1", "v0.9", ""):
         with pytest.raises(ValueError, match="version|legacy|empty"):
-            sources.resolve_version(invalid)
+            _ = sources.resolve_version(invalid)
 
 
 def test_fetch_records_url_version_headers_and_writes_fixture(
@@ -205,6 +221,7 @@ def test_fetch_records_url_version_headers_and_writes_fixture(
     )
     meta = artifact_meta(result, "leaderboard-live.json")
     assert meta["benchmark_version"] == "v1.1"
+    assert isinstance(meta["url"], str)
     assert meta["url"].endswith("/artifacts/v1.1/leaderboard-live.json")
     assert meta["etag"] == '"fixture-etag"'
     assert meta["last_modified"] == "Sat, 25 Jul 2026 03:13:49 GMT"
@@ -241,10 +258,16 @@ def test_fetch_stores_immutable_hash_refs_and_manifest(
     assert raw_path.read_bytes() == body
     assert sidecar_path.is_file()
     assert manifest_path.is_file()
-    index = json.loads((cache_dir / "index.json").read_text(encoding="utf-8"))
+    index = cast(
+        "dict[str, dict[str, object]]",
+        json.loads((cache_dir / "index.json").read_text(encoding="utf-8")),
+    )
     source_key = str(metadata["url"])
     assert index[source_key]["sha256"] == digest
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest = cast(
+        "dict[str, dict[str, dict[str, object]]]",
+        json.loads(manifest_path.read_text(encoding="utf-8")),
+    )
     assert manifest["sources"][source_key]["sha256"] == digest
     assert Path(str(metadata["cache_path"])).read_bytes() == body
     assert Path(str(metadata["local_path"])).read_bytes() == body
@@ -259,13 +282,13 @@ def test_304_rejects_tampered_immutable_bytes(
     cache_dir = tmp_path / "cache"
     first = sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
     metadata = artifact_meta(first, "leaderboard-live.json")
-    (cache_dir / str(metadata["raw_path"])).write_bytes(body + b"tampered")
+    _ = (cache_dir / str(metadata["raw_path"])).write_bytes(body + b"tampered")
     patch_urlopen(
         monkeypatch,
         QueueOpener(Response(b"", status=304, headers={"ETag": '"same"'})),
     )
     with pytest.raises(sources.SourceError) as exc_info:
-        sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
+        _ = sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
     assert exc_info.value.code == "cache_invalid"
 
 
@@ -276,14 +299,14 @@ def test_304_rejects_missing_immutable_index(
     body = json.dumps(LEADERBOARD).encode()
     patch_urlopen(monkeypatch, QueueOpener(Response(body, headers={"ETag": '"same"'})))
     cache_dir = tmp_path / "cache"
-    sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
+    _ = sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
     (cache_dir / "index.json").unlink()
     patch_urlopen(
         monkeypatch,
         QueueOpener(Response(b"", status=304, headers={"ETag": '"same"'})),
     )
     with pytest.raises(sources.SourceError, match="index"):
-        sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
+        _ = sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
 
 
 def test_304_rejects_missing_validator_after_legacy_promotion(
@@ -294,19 +317,19 @@ def test_304_rejects_missing_validator_after_legacy_promotion(
     cache_dir = tmp_path / "cache"
     legacy_path = cache_dir / "v1.1" / "leaderboard-live.json"
     legacy_path.parent.mkdir(parents=True)
-    legacy_path.write_bytes(body)
+    _ = legacy_path.write_bytes(body)
     legacy_metadata = {
         "benchmark": "DeepSWE",
         "benchmark_version": "v1.1",
         "artifact": "leaderboard-live.json",
         "url": "https://deepswe.datacurve.ai/artifacts/v1.1/leaderboard-live.json",
     }
-    legacy_path.with_name(legacy_path.name + ".meta.json").write_text(
+    _ = legacy_path.with_name(legacy_path.name + ".meta.json").write_text(
         json.dumps(legacy_metadata), encoding="utf-8"
     )
     patch_urlopen(monkeypatch, QueueOpener(Response(b"", status=304, headers={})))
     with pytest.raises(sources.SourceError, match="validator"):
-        sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
+        _ = sources.fetch_artifacts("v1.1", tmp_path / "out", cache_dir)
 
 
 def test_valid_legacy_cache_is_promoted_without_deleting_materialized_files(
@@ -317,7 +340,7 @@ def test_valid_legacy_cache_is_promoted_without_deleting_materialized_files(
     cache_dir = tmp_path / "cache"
     legacy_path = cache_dir / "v1.1" / "leaderboard-live.json"
     legacy_path.parent.mkdir(parents=True)
-    legacy_path.write_bytes(body)
+    _ = legacy_path.write_bytes(body)
     legacy_metadata = {
         "benchmark": "DeepSWE",
         "benchmark_version": "v1.1",
@@ -326,7 +349,7 @@ def test_valid_legacy_cache_is_promoted_without_deleting_materialized_files(
         "etag": '"legacy"',
     }
     legacy_meta_path = legacy_path.with_name(legacy_path.name + ".meta.json")
-    legacy_meta_path.write_text(json.dumps(legacy_metadata), encoding="utf-8")
+    _ = legacy_meta_path.write_text(json.dumps(legacy_metadata), encoding="utf-8")
     patch_urlopen(
         monkeypatch,
         QueueOpener(Response(b"", status=304, headers={"ETag": '"legacy"'})),
@@ -376,7 +399,7 @@ def test_response_url_path_mismatch_is_an_error(
         sources.SourceError,
         match=r"does not match requested v1\.1/leaderboard-live\.json",
     ) as exc_info:
-        sources.fetch_artifacts(
+        _ = sources.fetch_artifacts(
             "v1.1",
             tmp_path / "out",
             tmp_path / "cache",
@@ -446,7 +469,7 @@ def test_refresh_error_does_not_silently_return_last_good_cache(
     patch_urlopen(monkeypatch, opener)
     output_dir = tmp_path / "out"
     cache_dir = tmp_path / "cache"
-    sources.fetch_artifacts(
+    _ = sources.fetch_artifacts(
         "v1.1",
         output_dir,
         cache_dir,
@@ -456,7 +479,7 @@ def test_refresh_error_does_not_silently_return_last_good_cache(
     )
 
     with pytest.raises(sources.SourceError, match="offline"):
-        sources.fetch_artifacts(
+        _ = sources.fetch_artifacts(
             "v1.1",
             output_dir,
             cache_dir,
@@ -476,7 +499,7 @@ def test_allow_stale_is_explicit_and_labeled(
     patch_urlopen(monkeypatch, opener)
     output_dir = tmp_path / "out"
     cache_dir = tmp_path / "cache"
-    sources.fetch_artifacts(
+    _ = sources.fetch_artifacts(
         "v1.1",
         output_dir,
         cache_dir,
@@ -500,11 +523,13 @@ def test_http_error_304_reuses_cache(
 ) -> None:
     """Reuse cache data when urllib raises a 304 HTTPError."""
     body = json.dumps(LEADERBOARD).encode()
+    hdrs = Message()
+    hdrs.add_header("ETag", '"same"')
     not_modified = HTTPError(
         "https://deepswe.datacurve.ai/artifacts/v1.1/leaderboard-live.json",
         304,
         "Not Modified",
-        {"ETag": '"same"'},
+        hdrs,
         io.BytesIO(),
     )
     patch_urlopen(
@@ -513,7 +538,7 @@ def test_http_error_304_reuses_cache(
     )
     output_dir = tmp_path / "out"
     cache_dir = tmp_path / "cache"
-    sources.fetch_artifacts(
+    _ = sources.fetch_artifacts(
         "v1.1",
         output_dir,
         cache_dir,
@@ -537,11 +562,13 @@ def test_http_error_304_wrong_final_url_rejects_cached_artifact(
 ) -> None:
     """Reject cached data when a 304 response redirects incorrectly."""
     body = json.dumps(LEADERBOARD).encode()
+    hdrs = Message()
+    hdrs.add_header("ETag", '"same"')
     not_modified = HTTPError(
         "https://deepswe.datacurve.ai/downloads/leaderboard-live.json",
         304,
         "Not Modified",
-        {"ETag": '"same"'},
+        hdrs,
         io.BytesIO(),
     )
     patch_urlopen(
@@ -550,7 +577,7 @@ def test_http_error_304_wrong_final_url_rejects_cached_artifact(
     )
     output_dir = tmp_path / "out"
     cache_dir = tmp_path / "cache"
-    sources.fetch_artifacts(
+    _ = sources.fetch_artifacts(
         "v1.1",
         output_dir,
         cache_dir,
@@ -560,7 +587,7 @@ def test_http_error_304_wrong_final_url_rejects_cached_artifact(
     )
 
     with pytest.raises(sources.SourceError) as exc_info:
-        sources.fetch_artifacts(
+        _ = sources.fetch_artifacts(
             "v1.1",
             output_dir,
             cache_dir,
@@ -589,17 +616,20 @@ def test_trials_are_opt_in_and_malformed_payloads_are_errors(
         timeout=3,
         allow_stale=False,
     )
-    assert "trials.json" in result["artifacts"]
+    artifacts_map = cast("dict[str, object]", result["artifacts"])
+    assert "trials.json" in artifacts_map
 
     malformed = tmp_path / "malformed.json"
-    malformed.write_text("{not-json", encoding="utf-8")
+    _ = malformed.write_text("{not-json", encoding="utf-8")
     with pytest.raises(sources.SourceError, match="malformed JSON"):
-        sources.load_artifact(malformed)
+        _ = sources.load_artifact(malformed)
 
     wrong_shape = tmp_path / "wrong-shape.json"
-    wrong_shape.write_text(json.dumps({"rows": {"not": "a-list"}}), encoding="utf-8")
+    _ = wrong_shape.write_text(
+        json.dumps({"rows": {"not": "a-list"}}), encoding="utf-8"
+    )
     with pytest.raises(sources.SourceError, match="rows array"):
-        sources.load_artifact(wrong_shape)
+        _ = sources.load_artifact(wrong_shape)
 
 
 def test_http_304_without_cache_is_an_error(
@@ -608,7 +638,7 @@ def test_http_304_without_cache_is_an_error(
     """Reject a 304 response when no valid cache entry exists."""
     patch_urlopen(monkeypatch, QueueOpener(Response(b"", status=304)))
     with pytest.raises(sources.SourceError, match="304"):
-        sources.fetch_artifacts(
+        _ = sources.fetch_artifacts(
             "v1.1",
             tmp_path / "out",
             tmp_path / "cache",
@@ -628,7 +658,7 @@ def test_payload_version_mismatch_is_an_error(
         QueueOpener(Response(json.dumps(mismatched).encode())),
     )
     with pytest.raises(sources.SourceError, match=r"expected v1\.1"):
-        sources.fetch_artifacts(
+        _ = sources.fetch_artifacts(
             "v1.1",
             tmp_path / "out",
             tmp_path / "cache",
@@ -651,14 +681,14 @@ def test_strict_payload_validation_preserves_unknown_fields_and_rejects_future_s
         "rows": [{"model": "fixture", "x_extension": {"keep": True}}],
         "top_extension": ["keep"],
     }
-    path.write_text(json.dumps(payload), encoding="utf-8")
+    _ = path.write_text(json.dumps(payload), encoding="utf-8")
     assert sources.load_artifact(path) == payload
 
-    future = dict(payload)
+    future: dict[str, object] = dict(payload)
     future["schema_version"] = 2
-    path.write_text(json.dumps(future), encoding="utf-8")
+    _ = path.write_text(json.dumps(future), encoding="utf-8")
     with pytest.raises(sources.SourceError) as exc_info:
-        sources.load_artifact(path)
+        _ = sources.load_artifact(path)
     assert exc_info.value.code == "unsupported_schema"
 
 
@@ -678,10 +708,10 @@ def test_strict_payload_validation_reports_one_structural_error(
     """Malformed identity/shape payloads produce one stable source failure."""
     path = tmp_path / "v1.1" / "leaderboard-live.json"
     path.parent.mkdir(exist_ok=True)
-    path.write_text(json.dumps(payload), encoding="utf-8")
+    _ = path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(sources.SourceError, match=message):
-        sources.load_artifact(path)
+        _ = sources.load_artifact(path)
 
 
 if __name__ == "__main__":
-    pytest.main([__file__])
+    _ = pytest.main([__file__])

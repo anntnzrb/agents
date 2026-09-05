@@ -13,7 +13,7 @@ import math
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from decimal import Decimal, InvalidOperation
-from typing import Final
+from typing import Final, TypeGuard, cast
 
 from .provenance import value_evidence
 from .semantics import MetricSemantics, metric_semantics
@@ -26,7 +26,7 @@ _GROUPED_NUMERIC_RE: Final[re.Pattern[str]] = re.compile(
 )
 _NUMERIC_UNIT_RE: Final[re.Pattern[str]] = re.compile(
     r"^(?P<number>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
-    r"\s*(?P<unit>tokens?|token_count|usd|\$|count|ratio|fraction|%)$",
+    + r"\s*(?P<unit>tokens?|token_count|usd|\$|count|ratio|fraction|%)$",
     re.IGNORECASE,
 )
 _SENTINELS: Final[frozenset[str]] = frozenset(
@@ -192,7 +192,8 @@ def _marker_is_chart_zero(marker: object) -> bool:
         folded = marker.casefold().replace("-", "_")
         return "chart" in folded and ("zero" in folded or "placeholder" in folded)
     if isinstance(marker, Mapping):
-        for key, value in marker.items():
+        mapping = cast("Mapping[str, object]", marker)
+        for key, value in mapping.items():
             folded = str(key).casefold().replace("-", "_")
             if (
                 folded
@@ -324,7 +325,7 @@ def parse_numeric(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
     path = source_path or (f"$.{selected_field}" if selected_field else None)
     marker = source_marker
     if isinstance(source_marker, Mapping):
-        marker = dict(source_marker)
+        marker = dict(cast("Mapping[str, object]", source_marker))
     selected_unit = unit or (spec.unit if spec is not None else None)
 
     if raw_value is None:
@@ -571,18 +572,19 @@ def normalize_metric(  # noqa: PLR0913
     """Normalize one named DeepSWE metric into value evidence."""
     value = raw_value
     if isinstance(raw_value, Mapping):
+        mapping = cast("Mapping[str, object]", raw_value)
         for key in ("value", "raw_value", "score", "value_raw"):
-            if key in raw_value:
-                value = raw_value[key]
+            if key in mapping:
+                value = mapping.get(key)
                 break
         if unit is None:
-            candidate_unit = raw_value.get("unit") or raw_value.get("scale")
+            candidate_unit = mapping.get("unit") or mapping.get("scale")
             if isinstance(candidate_unit, str):
                 unit = candidate_unit.strip().casefold()
-        source_marker = raw_value.get(
-            "source_marker", raw_value.get("metadata", source_marker)
+        source_marker = mapping.get(
+            "source_marker", mapping.get("metadata", source_marker)
         )
-        chart_zero = chart_zero or raw_value.get("chart_zero") is True
+        chart_zero = chart_zero or mapping.get("chart_zero") is True
     return parse_numeric(
         value,
         metric=field,
@@ -610,7 +612,19 @@ def normalize_numeric(raw_value: object, **kwargs: object) -> dict[str, object]:
         "normalization",
     }
     options = {key: value for key, value in kwargs.items() if key in allowed}
-    return parse_numeric(raw_value, **options)  # type: ignore[arg-type]
+    return parse_numeric(
+        raw_value,
+        metric=cast("str | None", options.get("metric")),
+        field=cast("str | None", options.get("field")),
+        unit=cast("str | None", options.get("unit")),
+        source_path=cast("str | None", options.get("source_path")),
+        source_field=cast("str | None", options.get("source_field")),
+        source_marker=options.get("source_marker"),
+        chart_zero=cast("bool", options.get("chart_zero", False)),
+        value_status=cast("str", options.get("value_status", "published")),
+        blocked_reasons=cast("Iterable[object]", options.get("blocked_reasons", ())),
+        normalization=cast("str | None", options.get("normalization")),
+    )
 
 
 def _looks_like_metric(field: str, value: object) -> bool:
@@ -636,7 +650,7 @@ def _looks_like_metric(field: str, value: object) -> bool:
     )
 
 
-def _evidence_like(value: object) -> bool:
+def _evidence_like(value: object) -> TypeGuard[Mapping[str, object]]:
     return (
         isinstance(value, Mapping)
         and "normalized_value" in value
@@ -654,7 +668,8 @@ def normalize_row(
     metrics: dict[str, object] = {}
     existing_metrics = row.get("metrics")
     if isinstance(existing_metrics, Mapping):
-        for key, value in existing_metrics.items():
+        metrics_map = cast("Mapping[str, object]", existing_metrics)
+        for key, value in metrics_map.items():
             name = str(key)
             if _evidence_like(value):
                 metrics[name] = dict(value)
@@ -666,7 +681,9 @@ def normalize_row(
                 )
     existing_raw = row.get("raw_fields")
     raw_fields: dict[str, object] = (
-        dict(existing_raw) if isinstance(existing_raw, Mapping) else {}
+        dict(cast("Mapping[str, object]", existing_raw))
+        if isinstance(existing_raw, Mapping)
+        else {}
     )
     known_names = set(SEMANTIC_FIELDS)
     for key, value in row.items():
@@ -692,28 +709,25 @@ def normalize_row(
 # Kept as a tuple to make the candidate set explicit and avoid importing the
 # registry's mutable mapping into row code.
 SEMANTIC_FIELDS: Final[tuple[str, ...]] = tuple(
-    name
+    spec.field
     for name in (
-        metric_semantics(name).field
-        for name in (
-            "pass_rate",
-            "pass_at_1",
-            "pass_at_4",
-            "n_passed",
-            "n_attempted",
-            "n_tasks_attempted",
-            "n_tasks_passed_any",
-            "ci_passed",
-            "ci_attempted",
-            "ci_lo",
-            "ci_hi",
-            "ci_half",
-            "mean_output_tokens",
-            "mean_cost_usd",
-            "mean_agent_steps",
-        )
+        "pass_rate",
+        "pass_at_1",
+        "pass_at_4",
+        "n_passed",
+        "n_attempted",
+        "n_tasks_attempted",
+        "n_tasks_passed_any",
+        "ci_passed",
+        "ci_attempted",
+        "ci_lo",
+        "ci_hi",
+        "ci_half",
+        "mean_output_tokens",
+        "mean_cost_usd",
+        "mean_agent_steps",
     )
-    if name is not None
+    if (spec := metric_semantics(name)) is not None
 )
 
 
@@ -726,7 +740,6 @@ def normalize_rows(
     return [
         normalize_row(row, source_path=f"{source_path}[{index}]")
         for index, row in enumerate(rows)
-        if isinstance(row, Mapping)
     ]
 
 
@@ -771,9 +784,10 @@ def normalize_payload(  # noqa: C901
     if any(key in payload for key in ("model", "config", "pass_at_1", "trial_id")):
         return normalize_row(payload, source_path=source_path)
     result: dict[str, object] = dict(payload)
+    raw_metadata_value = payload.get("raw_metadata")
     raw_metadata: dict[str, object] = (
-        dict(payload.get("raw_metadata"))
-        if isinstance(payload.get("raw_metadata"), Mapping)
+        dict(cast("Mapping[str, object]", raw_metadata_value))
+        if isinstance(raw_metadata_value, Mapping)
         else {}
     )
     for key, value in payload.items():
@@ -791,19 +805,21 @@ def normalize_payload(  # noqa: C901
                     value, (str, bytes, bytearray)
                 ):
                     result[name] = normalize_rows(
-                        value,
+                        cast("Sequence[Mapping[str, object]]", value),
                         source_path=f"{source_path}.{name}",
                     )
                 elif isinstance(value, Mapping):
                     nested = normalize_payload(
-                        value, source_path=f"{source_path}.{name}"
+                        cast("Mapping[str, object]", value),
+                        source_path=f"{source_path}.{name}",
                     )
                     result[name] = nested
             elif name in {"data", "payload", "content", "json"} and isinstance(
                 value, Mapping
             ):
                 result[name] = normalize_payload(
-                    value, source_path=f"{source_path}.{name}"
+                    cast("Mapping[str, object]", value),
+                    source_path=f"{source_path}.{name}",
                 )
             continue
         raw_metadata[name] = value

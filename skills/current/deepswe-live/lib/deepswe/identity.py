@@ -11,7 +11,7 @@ from __future__ import annotations
 import copy
 import json
 from collections.abc import Iterable, Mapping
-from typing import Any
+from typing import TypedDict, cast
 
 IDENTITY_FIELDS: tuple[str, ...] = (
     "model",
@@ -44,7 +44,7 @@ def _row_signature(row: object) -> str:
         return repr(row)
 
 
-def canonical_identity(row: Mapping[str, Any]) -> tuple[Any, ...]:
+def canonical_identity(row: object) -> tuple[object, ...]:
     """Return the structured identity for one published row.
 
     Presence of *any* configuration tuple field is enough to select the full
@@ -55,22 +55,24 @@ def canonical_identity(row: Mapping[str, Any]) -> tuple[Any, ...]:
     if not isinstance(row, Mapping):
         msg = "DeepSWE row identity requires a mapping"
         raise TypeError(msg)
-
-    if any(field in row for field in IDENTITY_FIELDS):
-        return tuple(row.get(field) for field in IDENTITY_FIELDS)
+    mapping = cast("Mapping[str, object]", row)
+    if any(field in mapping for field in IDENTITY_FIELDS):
+        return tuple(mapping.get(field) for field in IDENTITY_FIELDS)
 
     for field in PUBLISHED_ID_FIELDS:
-        if field in row and row[field] is not None:
-            return ("published_id", field, row[field])
+        if field in mapping and mapping[field] is not None:
+            return ("published_id", field, mapping[field])
 
     # There is no published identity to use.  Keep the result tagged so it can
     # never be confused with a four-field configuration tuple.  The complete
     # row signature avoids making unrelated anonymous rows collide while still
     # allowing byte-identical anonymous rows to be diagnosed as duplicates.
-    return ("published_id", "row", _row_signature(row))
+    return ("published_id", "row", _row_signature(cast("object", row)))
 
 
-def identity_json(value: Mapping[str, Any] | tuple[Any, ...] | list[Any]) -> str:
+def identity_json(
+    value: Mapping[str, object] | tuple[object, ...] | list[object],
+) -> str:
     """Return the compact canonical JSON-array signature for an identity.
 
     Passing a row mapping is convenient at source boundaries; passing a tuple
@@ -103,8 +105,16 @@ def _diagnostic(  # noqa: PLR0913
     }
 
 
+class _Entry(TypedDict):
+    """One duplicate entry with its index, signature, and raw row."""
+
+    index: int
+    signature: str
+    row: object
+
+
 def classify_duplicates(
-    rows: Iterable[Mapping[str, Any]],
+    rows: Iterable[object],
 ) -> dict[str, list[dict[str, object]]]:
     """Classify duplicate identities without discarding source rows.
 
@@ -114,13 +124,14 @@ def classify_duplicates(
     are sorted by canonical identity/signature so classification does not
     depend on which duplicate was encountered first.
     """
-    materialized = list(rows)
     grouped: dict[str, dict[str, object]] = {}
+    materialized = list(rows)
     for index, row in enumerate(materialized):
         if not isinstance(row, Mapping):
             msg = "DeepSWE duplicate classification requires mappings"
             raise TypeError(msg)
-        identity = canonical_identity(row)
+        mapping = cast("Mapping[str, object]", row)
+        identity = canonical_identity(mapping)
         identity_signature = identity_json(identity)
         group = grouped.setdefault(
             identity_signature,
@@ -129,15 +140,16 @@ def classify_duplicates(
                 "entries": [],
             },
         )
-        entries = group["entries"]
-        if not isinstance(entries, list):
+        raw_entries = group["entries"]
+        if not isinstance(raw_entries, list):
             msg = "duplicate entries must be a list"
             raise TypeError(msg)
+        entries = cast("list[_Entry]", cast("object", raw_entries))
         entries.append(
             {
                 "index": index,
-                "signature": _row_signature(row),
-                "row": copy.deepcopy(dict(row)),
+                "signature": _row_signature(cast("object", row)),
+                "row": copy.deepcopy(dict(cast("Mapping[str, object]", row))),
             }
         )
 
@@ -146,10 +158,11 @@ def classify_duplicates(
     diagnostics: list[dict[str, object]] = []
     for identity_signature in sorted(grouped):
         group = grouped[identity_signature]
-        entries = group["entries"]
-        if not isinstance(entries, list):
+        raw_entries = group["entries"]
+        if not isinstance(raw_entries, list):
             msg = "duplicate entries must be a list"
             raise TypeError(msg)
+        entries = cast("list[_Entry]", cast("object", raw_entries))
         if len(entries) < DUPLICATE_MIN_COUNT:
             continue
         ordered_entries = sorted(

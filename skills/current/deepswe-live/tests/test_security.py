@@ -1,5 +1,4 @@
 """Security and metrics-only fixture checks for DeepSWE release artifacts."""
-# ruff: noqa: CPY001, INP001, S101
 
 from __future__ import annotations
 
@@ -9,19 +8,21 @@ import re
 import socket
 import urllib.request
 from pathlib import Path
+from typing import cast
 
-import _path  # noqa: F401
 import pytest
+
 from deepswe import cli
 from deepswe.diagnostics import redact
 from deepswe.provenance import artifact_evidence
 
 FIXTURES = Path(__file__).parent / "fixtures"
 _SECRET_TEXT = re.compile(
-    r"(?ix)(?:bearer\s+[A-Za-z0-9._~+/=-]+|"
-    r"(?:api[_-]?key|access[_-]?token|password|secret|authorization)\s*[:=]\s*"
-    r"(?!<redacted>)[^\s,}\"]+|"
-    r"-----BEGIN [^-\r\n]*PRIVATE KEY-----)"
+    r"""(?ix)
+    (?:bearer\s+[A-Za-z0-9._~+/=-]+
+    |(?:api[_-]?key|access[_-]?token|password|secret|authorization)\s*[:=]\s*(?!<redacted>)[^\s,}\"]+
+    |-----BEGIN [^-\r\n]*PRIVATE KEY-----)
+    """
 )
 _FORBIDDEN_CONTENT = re.compile(
     r"(?i)(?:task[-_ ]?body|exercise[-_ ]?body|trajectory[-_ ]?body)"
@@ -57,7 +58,7 @@ def test_redaction_removes_credentials_but_preserves_metrics_and_safe_urls() -> 
         "value": "tokens",
         "url": "https://deepswe.datacurve.ai/artifacts/v1.1/leaderboard-live.json",
     }
-    safe = redact(payload)
+    safe = cast("dict[str, object]", redact(payload))
     encoded = json.dumps(safe, sort_keys=True)
     for secret in (
         "fixture-secret-token",
@@ -68,6 +69,7 @@ def test_redaction_removes_credentials_but_preserves_metrics_and_safe_urls() -> 
         assert secret not in encoded
     assert safe["metric"] == "token_count"
     assert safe["value"] == "tokens"
+    assert isinstance(safe["url"], str)
     assert safe["url"].endswith("leaderboard-live.json")
     assert "keep=value" in str(safe["query"])
 
@@ -95,9 +97,9 @@ def test_provenance_redacts_nested_transport_metadata() -> None:
 def test_offline_guard_blocks_url_and_socket_calls() -> None:
     """The autouse policy rejects accidental transport in deterministic tests."""
     with pytest.raises(AssertionError, match="network access is disabled"):
-        urllib.request.urlopen("https://example.test")
+        _ = cast("object", urllib.request.urlopen("https://example.test"))
     with pytest.raises(AssertionError, match="network access is disabled"):
-        socket.create_connection(("example.test", 443))
+        _ = socket.create_connection(("example.test", 443))
 
 
 def test_phase6_fixtures_cover_evidence_and_schema_diff() -> None:
@@ -116,9 +118,11 @@ def test_phase6_fixtures_cover_evidence_and_schema_diff() -> None:
         )
         == 0
     )
-    diagnose = json.loads(diagnose_out.getvalue())
+    diagnose = cast("dict[str, object]", json.loads(diagnose_out.getvalue()))
     assert diagnose["ok"] is True
-    assert diagnose["data"]["scope"]["benchmark"] == "DeepSWE"
+    diagnose_data = cast("dict[str, object]", diagnose["data"])
+    diagnose_scope = cast("dict[str, object]", diagnose_data["scope"])
+    assert diagnose_scope["benchmark"] == "DeepSWE"
     assert "task-body" not in diagnose_out.getvalue()
 
     compare_out = io.StringIO()
@@ -138,6 +142,8 @@ def test_phase6_fixtures_cover_evidence_and_schema_diff() -> None:
         )
         == 0
     )
-    comparison = json.loads(compare_out.getvalue())
-    assert comparison["data"]["blocked"][0]["reason"] == "schema_mismatch"
-    assert comparison["data"]["changes"] == []
+    comparison = cast("dict[str, object]", json.loads(compare_out.getvalue()))
+    comparison_data = cast("dict[str, object]", comparison["data"])
+    comparison_blocked = cast("list[dict[str, object]]", comparison_data["blocked"])
+    assert comparison_blocked[0]["reason"] == "schema_mismatch"
+    assert comparison_data["changes"] == []

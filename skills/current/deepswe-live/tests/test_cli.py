@@ -1,17 +1,18 @@
 """CLI envelope tests use injected fixture payloads and never access the network."""
-# ruff: noqa: CPY001, E501, INP001, PLR2004, S101
+# ruff: noqa: E501
 
 from __future__ import annotations
 
 import io
 import json
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING, NoReturn, cast
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
-import _path  # noqa: F401
 import pytest
+
 from deepswe import cli
 
 EXPECTED_CHANGE_COUNT = 2
@@ -70,8 +71,8 @@ TRIALS = {
 
 
 def source_fixture(
-    *, leaderboard_stats: dict[str, Any] | None = None
-) -> dict[str, Any]:
+    *, leaderboard_stats: Mapping[str, object] | None = None
+) -> dict[str, object]:
     """Build a deterministic fetch envelope for CLI command tests."""
     metadata = {
         "benchmark": "DeepSWE",
@@ -81,9 +82,9 @@ def source_fixture(
         "etag": '"fixture"',
         "last_modified": "fixture-date",
     }
-    leaderboard = dict(LEADERBOARD)
+    leaderboard: dict[str, object] = dict(LEADERBOARD)
     if leaderboard_stats is not None:
-        leaderboard["stats"] = leaderboard_stats
+        leaderboard["stats"] = dict(leaderboard_stats)
     return {
         "benchmark": "DeepSWE",
         "benchmark_version": "v1.1",
@@ -105,16 +106,20 @@ def source_fixture(
 
 def invoke(
     monkeypatch: pytest.MonkeyPatch, argv: list[str], source: object = None
-) -> tuple[int, dict[str, Any], str]:
+) -> tuple[int, dict[str, object], str]:
     """Invoke the CLI with captured output and an optional source fixture."""
     if source is not None:
-        monkeypatch.setattr(cli, "fetch_artifacts", lambda *_args, **_kwargs: source)
+
+        def _fetch(*_args: object, **_kwargs: object) -> object:
+            return source
+
+        monkeypatch.setattr(cli, "fetch_artifacts", _fetch)
     stdout = io.StringIO()
     stderr = io.StringIO()
     code = cli.main(argv, stdout=stdout, stderr=stderr)
     lines = stdout.getvalue().splitlines()
     assert len(lines) == 1, stdout.getvalue()
-    envelope = json.loads(lines[0])
+    envelope = cast("dict[str, object]", json.loads(lines[0]))
     assert isinstance(envelope, dict)
     return code, envelope, stderr.getvalue()
 
@@ -127,7 +132,7 @@ def test_public_commands_keep_v1_compact_success_envelope(
     snapshot_dir.mkdir()
     left_path = snapshot_dir / "left.json"
     right_path = snapshot_dir / "right.json"
-    left_path.write_text(
+    _ = left_path.write_text(
         json.dumps(
             {
                 "benchmark": "DeepSWE",
@@ -137,7 +142,7 @@ def test_public_commands_keep_v1_compact_success_envelope(
         ),
         encoding="utf-8",
     )
-    right_path.write_text(
+    _ = right_path.write_text(
         json.dumps(
             {
                 "benchmark": "DeepSWE",
@@ -190,12 +195,14 @@ def test_report_success_is_one_json_envelope_with_scope_and_provenance(
     assert envelope["ok"] is True
     assert envelope["schema_version"] == 1
     assert envelope["command"] == "report"
-    scope = envelope["data"]["scope"]
+    data = cast("dict[str, object]", envelope["data"])
+    scope = cast("dict[str, object]", data["scope"])
     assert scope["benchmark"] == "DeepSWE"
     assert scope["benchmark_version"] == "v1.1"
     assert scope["value_status"] == "derived"
-    assert scope["filters_applied"]["quality_exclusion"] == "none"
-    provenance = envelope["data"]["provenance"]
+    scope_filters = cast("dict[str, object]", scope["filters_applied"])
+    assert scope_filters["quality_exclusion"] == "none"
+    provenance = cast("dict[str, object]", data["provenance"])
     assert provenance["url"] == "fixture://deepswe/v1.1"
     assert provenance["fetched_at"] == "2026-07-25T04:00:00Z"
 
@@ -209,16 +216,18 @@ def test_report_preserves_identity_tuple_and_sections(
     )
     assert code == 0
     assert diagnostics == ""
-    data = envelope["data"]
+    data = cast("dict[str, object]", envelope["data"])
     assert {"recommendations", "raw_extrema", "pareto"} <= data.keys()
-    row = data["recommendations"]["rows"][0]
+    recs = cast("dict[str, list[dict[str, object]]]", data["recommendations"])
+    row = recs["rows"][0]
     assert tuple(row[field] for field in IDENTITY_FIELDS) == (
         "fixture-model",
         "high",
         "fixture-harness",
         "fixture-config",
     )
-    assert row["derived"]["value_status"] == "derived"
+    row_derived = cast("dict[str, object]", row["derived"])
+    assert row_derived["value_status"] == "derived"
 
 
 def test_report_supports_custom_pareto_axes_and_efficiency(
@@ -242,16 +251,16 @@ def test_report_supports_custom_pareto_axes_and_efficiency(
     )
     assert code == 0
     assert diagnostics == ""
-    data = envelope["data"]
+    data = cast("dict[str, object]", envelope["data"])
     assert data["pareto_axes"] == [
         {"metric": "pass_at_1", "order": "desc"},
         {"metric": "mean_cost_usd", "order": "asc"},
     ]
+    eff = cast("dict[str, list[dict[str, object]]]", data["efficiency"])
+    eff_row0 = eff["rows"][0]
+    eff_derived = cast("dict[str, dict[str, dict[str, object]]]", eff_row0["derived"])
     assert (
-        data["efficiency"]["rows"][0]["derived"]["efficiency"]["cost_per_attempt"][
-            "value"
-        ]
-        == VALID_COST_PER_ATTEMPT
+        eff_derived["efficiency"]["cost_per_attempt"]["value"] == VALID_COST_PER_ATTEMPT
     )
 
 
@@ -266,7 +275,8 @@ def test_stats_prefers_artifact_provenance_over_wrapper(
     }
     source.update(wrapper_provenance)
     source["provenance"] = dict(wrapper_provenance)
-    source["artifacts"]["leaderboard-live.json"].update(
+    artifacts = cast("dict[str, dict[str, object]]", source["artifacts"])
+    artifacts["leaderboard-live.json"].update(
         {
             "url": "fixture://artifact/deepswe/v1.1/leaderboard-live.json",
             "fetched_at": "2026-07-25T06:00:00Z",
@@ -279,7 +289,8 @@ def test_stats_prefers_artifact_provenance_over_wrapper(
 
     assert code == 0
     assert diagnostics == ""
-    provenance = envelope["data"]["provenance"]
+    data = cast("dict[str, object]", envelope["data"])
+    provenance = cast("dict[str, object]", data["provenance"])
     assert provenance["url"] == "fixture://artifact/deepswe/v1.1/leaderboard-live.json"
     assert provenance["fetched_at"] == "2026-07-25T06:00:00Z"
 
@@ -294,12 +305,15 @@ def test_trials_success_exposes_default_filter_and_raw_status(
     assert code == 0
     assert diagnostics == ""
     assert envelope["ok"] is True
-    assert envelope["data"]["scope"]["value_status"] == "published_raw"
-    filters = envelope["data"]["scope"]["filters_applied"]
+    data = cast("dict[str, object]", envelope["data"])
+    scope = cast("dict[str, object]", data["scope"])
+    assert scope["value_status"] == "published_raw"
+    filters = cast("dict[str, object]", scope["filters_applied"])
     assert filters["source"] == "deep-swe"
     assert filters["eval_scope"] == "full"
     assert filters["included_in_score"] is True
-    assert envelope["data"]["rows"] == [TRIALS["rows"][0]]
+    trials_rows = cast("list[dict[str, object]]", TRIALS["rows"])
+    assert data["rows"] == [trials_rows[0]]
 
 
 def test_stats_over_published_leaderboard_rows_is_derived(
@@ -312,8 +326,10 @@ def test_stats_over_published_leaderboard_rows_is_derived(
     assert code == 0
     assert diagnostics == ""
     assert envelope["ok"] is True
-    assert envelope["data"]["scope"]["value_status"] == "derived"
-    assert envelope["data"]["row_count"] == len(LEADERBOARD["rows"])
+    data = cast("dict[str, object]", envelope["data"])
+    scope = cast("dict[str, object]", data["scope"])
+    assert scope["value_status"] == "derived"
+    assert data["row_count"] == len(LEADERBOARD["rows"])
 
 
 def test_stats_copies_published_leaderboard_stats_mapping(
@@ -334,9 +350,11 @@ def test_stats_copies_published_leaderboard_stats_mapping(
     assert code == 0
     assert diagnostics == ""
     assert envelope["ok"] is True
-    assert envelope["data"]["scope"]["value_status"] == "published"
-    assert envelope["data"]["row_count"] == published_stats["row_count"]
-    assert envelope["data"]["fields"] == published_stats["fields"]
+    data = cast("dict[str, object]", envelope["data"])
+    scope = cast("dict[str, object]", data["scope"])
+    assert scope["value_status"] == "published"
+    assert data["row_count"] == published_stats["row_count"]
+    assert data["fields"] == published_stats["fields"]
 
 
 def test_rank_accepts_zero_limit_with_empty_rows(
@@ -353,9 +371,11 @@ def test_rank_accepts_zero_limit_with_empty_rows(
     assert envelope["ok"] is True
     assert envelope["schema_version"] == 1
     assert envelope["command"] == "rank"
-    assert envelope["data"]["rows"] == []
-    assert envelope["data"]["count"] == 0
-    assert envelope["data"]["filters_applied"]["limit"] == 0
+    data = cast("dict[str, object]", envelope["data"])
+    assert data["rows"] == []
+    assert data["count"] == 0
+    filters = cast("dict[str, object]", data["filters_applied"])
+    assert filters["limit"] == 0
 
 
 def test_allow_stale_is_forwarded_only_when_explicit(
@@ -364,7 +384,7 @@ def test_allow_stale_is_forwarded_only_when_explicit(
     """Keep stale refresh opt-in at the public CLI boundary."""
     calls: list[dict[str, object]] = []
 
-    def capture_fetch(*_args: object, **kwargs: object) -> dict[str, Any]:
+    def capture_fetch(*_args: object, **kwargs: object) -> dict[str, object]:
         calls.append(kwargs)
         return source_fixture()
 
@@ -387,7 +407,7 @@ def test_snapshot_is_explicit_and_historical_without_fetch(
     snapshot_dir = tmp_path / "v1.1"
     snapshot_dir.mkdir()
     snapshot = snapshot_dir / "leaderboard.json"
-    snapshot.write_text(
+    _ = snapshot.write_text(
         json.dumps(
             {
                 "benchmark": "DeepSWE",
@@ -417,8 +437,10 @@ def test_snapshot_is_explicit_and_historical_without_fetch(
     assert code == 0
     assert diagnostics == ""
     assert envelope["ok"] is True
-    assert envelope["data"]["scope"]["benchmark_version"] == "v1.1"
-    provenance = envelope["data"]["provenance"]
+    data = cast("dict[str, object]", envelope["data"])
+    scope = cast("dict[str, object]", data["scope"])
+    assert scope["benchmark_version"] == "v1.1"
+    provenance = cast("dict[str, object]", data["provenance"])
     assert provenance["freshness"] == "snapshot"
     assert provenance["snapshot"] is True
 
@@ -429,7 +451,7 @@ def test_unversioned_snapshot_is_rejected_without_version_proof(
 ) -> None:
     """Reject snapshots lacking payload or path version evidence."""
     snapshot = tmp_path / "snapshot.json"
-    snapshot.write_text(
+    _ = snapshot.write_text(
         json.dumps({"benchmark": "DeepSWE", "rows": [{"model": "fixture-model"}]}),
         encoding="utf-8",
     )
@@ -478,13 +500,13 @@ def test_compare_keeps_delimiter_colliding_configuration_identities(
     ]
     left_path = tmp_path / "left.json"
     right_path = tmp_path / "right.json"
-    left_path.write_text(
+    _ = left_path.write_text(
         json.dumps(
             {"benchmark": "DeepSWE", "benchmark_version": "v1.1", "rows": left_rows}
         ),
         encoding="utf-8",
     )
-    right_path.write_text(
+    _ = right_path.write_text(
         json.dumps(
             {"benchmark": "DeepSWE", "benchmark_version": "v1.1", "rows": right_rows}
         ),
@@ -499,7 +521,8 @@ def test_compare_keeps_delimiter_colliding_configuration_identities(
     assert code == 0
     assert diagnostics == ""
     assert envelope["ok"] is True
-    changes = envelope["data"]["changes"]
+    data = cast("dict[str, object]", envelope["data"])
+    changes = cast("list[dict[str, object]]", data["changes"])
     assert len(changes) == EXPECTED_CHANGE_COUNT
     assert [change["config"] for change in changes] == [
         '["model","high","runner|config",""]',
@@ -526,8 +549,8 @@ def test_compare_uses_version_from_snapshot_path_when_payload_unversioned(
     }
     left_path = versioned_path / "left.json"
     right_path = versioned_path / "right.json"
-    left_path.write_text(json.dumps(payload), encoding="utf-8")
-    right_path.write_text(
+    _ = left_path.write_text(json.dumps(payload), encoding="utf-8")
+    _ = right_path.write_text(
         json.dumps({**payload, "rows": [{"model": "fixture-model", "pass_at_1": 2}]}),
         encoding="utf-8",
     )
@@ -539,8 +562,11 @@ def test_compare_uses_version_from_snapshot_path_when_payload_unversioned(
     assert code == 0
     assert diagnostics == ""
     assert envelope["ok"] is True
-    assert envelope["data"]["scope"]["benchmark_version"] == "v1.1"
-    assert envelope["data"]["changes"][0]["delta"] == 1
+    data = cast("dict[str, object]", envelope["data"])
+    scope = cast("dict[str, object]", data["scope"])
+    assert scope["benchmark_version"] == "v1.1"
+    changes = cast("list[dict[str, object]]", data["changes"])
+    assert changes[0]["delta"] == 1
 
 
 def test_error_is_json_only_on_stdout_and_diagnostics_stderr(
@@ -574,7 +600,8 @@ def test_usage_failure_still_uses_error_envelope(
     assert envelope["ok"] is False
     assert envelope["schema_version"] == 1
     assert envelope["command"] == "unknown"
-    assert envelope["error"]["code"] == "usage"
+    envelope_error = cast("dict[str, object]", envelope["error"])
+    assert envelope_error["code"] == "usage"
     assert diagnostics
 
 
@@ -584,25 +611,36 @@ def test_schema_is_json_only_and_declares_future_additive_contract(
     """Expose the additive command and envelope schema as JSON."""
     stdout = io.StringIO()
     stderr = io.StringIO()
-    monkeypatch.setattr(cli, "_now", lambda: "2026-07-25T05:00:00+00:00")
+
+    def _now() -> str:
+        return "2026-07-25T05:00:00+00:00"
+
+    monkeypatch.setattr(cli, "_now", _now)
     code = cli.main(["schema", "--version", "v1.1"], stdout=stdout, stderr=stderr)
-    envelope = json.loads(stdout.getvalue())
+    envelope = cast("dict[str, object]", json.loads(stdout.getvalue()))
     assert code == 0
     assert stderr.getvalue() == ""
     assert envelope["ok"] is True
-    schema = envelope["data"]["schema"]
+    data = cast("dict[str, object]", envelope["data"])
+    schema = cast("dict[str, object]", data["schema"])
     assert schema["commands"] == list(PUBLIC_COMMANDS)
-    assert schema["scope"]["value_status"] == ["published", "published_raw", "derived"]
-    assert schema["comparison"]["strict_compare"] == "--strict-compare"
-    assert schema["comparison"]["strict_semantics"] == "--strict-semantics"
-    assert schema["diagnostics"]["field"] == "diagnostics"
-    assert "comparison_eligibility" in schema["evidence"]["fields"]
-    assert schema["overlap"]["dependencies"] == []
-    assert envelope["data"]["scope"]["benchmark_version"] == "v1.1"
+    scope_schema = cast("dict[str, object]", schema["scope"])
+    assert scope_schema["value_status"] == ["published", "published_raw", "derived"]
+    comp_schema = cast("dict[str, object]", schema["comparison"])
+    assert comp_schema["strict_compare"] == "--strict-compare"
+    assert comp_schema["strict_semantics"] == "--strict-semantics"
+    diag_schema = cast("dict[str, object]", schema["diagnostics"])
+    assert diag_schema["field"] == "diagnostics"
+    ev_schema = cast("dict[str, object]", schema["evidence"])
+    assert "comparison_eligibility" in cast("list[object]", ev_schema["fields"])
+    overlap_schema = cast("dict[str, object]", schema["overlap"])
+    assert overlap_schema["dependencies"] == []
+    scope = cast("dict[str, object]", data["scope"])
+    assert scope["benchmark_version"] == "v1.1"
 
 
-def _write_compare_payload(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload), encoding="utf-8")
+def _write_compare_payload(path: Path, payload: Mapping[str, object]) -> None:
+    _ = path.write_text(json.dumps(payload), encoding="utf-8")
 
 
 def test_compare_duplicate_conflict_warns_legacy_and_blocks_strict(
@@ -654,10 +692,12 @@ def test_compare_duplicate_conflict_warns_legacy_and_blocks_strict(
     )
     assert code == 0
     assert diagnostics == ""
-    data = envelope["data"]
-    assert data["changes"][0]["before"] == 0.2
-    assert data["changes"][0]["after"] == 0.4
-    assert any(item["code"] == "DUPLICATE_CONFLICT" for item in data["warnings"])
+    data = cast("dict[str, object]", envelope["data"])
+    changes = cast("list[dict[str, object]]", data["changes"])
+    assert changes[0]["before"] == 0.2
+    assert changes[0]["after"] == 0.4
+    warnings = cast("list[dict[str, object]]", data["warnings"])
+    assert any(item["code"] == "DUPLICATE_CONFLICT" for item in warnings)
 
     code, envelope, diagnostics = invoke(
         monkeypatch,
@@ -665,10 +705,12 @@ def test_compare_duplicate_conflict_warns_legacy_and_blocks_strict(
     )
     assert code == 0
     assert diagnostics == ""
-    data = envelope["data"]
+    data = cast("dict[str, object]", envelope["data"])
     assert data["changes"] == []
-    assert data["blocked"][0]["reason"] == "duplicate_conflict"
-    assert any(item["code"] == "DUPLICATE_CONFLICT" for item in data["diagnostics"])
+    blocked = cast("list[dict[str, object]]", data["blocked"])
+    assert blocked[0]["reason"] == "duplicate_conflict"
+    diags = cast("list[dict[str, object]]", data["diagnostics"])
+    assert any(item["code"] == "DUPLICATE_CONFLICT" for item in diags)
 
 
 def test_strict_compare_blocks_schema_and_denominator_mismatch(
@@ -714,11 +756,11 @@ def test_strict_compare_blocks_schema_and_denominator_mismatch(
     right_path = tmp_path / "right.json"
     _write_compare_payload(left_path, left)
     _write_compare_payload(right_path, right)
-    monkeypatch.setattr(
-        cli,
-        "load_artifact",
-        lambda path: left if str(path) == str(left_path) else right,
-    )
+
+    def load_art_1(path: object) -> object:
+        return left if str(path) == str(left_path) else right
+
+    monkeypatch.setattr(cli, "load_artifact", load_art_1)
     code, envelope, diagnostics = invoke(
         monkeypatch,
         [
@@ -732,16 +774,18 @@ def test_strict_compare_blocks_schema_and_denominator_mismatch(
     )
     assert code == 0
     assert diagnostics == ""
-    data = envelope["data"]
+    data = cast("dict[str, object]", envelope["data"])
     assert data["changes"] == []
-    assert data["blocked"][0]["reason"] == "schema_mismatch"
-    assert data["diagnostics"][0]["code"] == "SCHEMA_DRIFT"
+    blocked = cast("list[dict[str, object]]", data["blocked"])
+    assert blocked[0]["reason"] == "schema_mismatch"
+    diags = cast("list[dict[str, object]]", data["diagnostics"])
+    assert diags[0]["code"] == "SCHEMA_DRIFT"
     right_semantic = {**right, "artifact_schema_version": 1}
-    monkeypatch.setattr(
-        cli,
-        "load_artifact",
-        lambda path: left if str(path) == str(left_path) else right_semantic,
-    )
+
+    def load_art_2(path: object) -> object:
+        return left if str(path) == str(left_path) else right_semantic
+
+    monkeypatch.setattr(cli, "load_artifact", load_art_2)
     code, envelope, diagnostics = invoke(
         monkeypatch,
         [
@@ -755,8 +799,9 @@ def test_strict_compare_blocks_schema_and_denominator_mismatch(
     )
     assert code == 0
     assert diagnostics == ""
-    data = envelope["data"]
-    assert data["blocked"][0]["reason"] == "denominator_mismatch"
+    data = cast("dict[str, object]", envelope["data"])
+    blocked = cast("list[dict[str, object]]", data["blocked"])
+    assert blocked[0]["reason"] == "denominator_mismatch"
 
 
 def test_diagnose_snapshot_is_offline_and_metrics_only(
@@ -765,7 +810,7 @@ def test_diagnose_snapshot_is_offline_and_metrics_only(
     """Diagnose snapshots without fetching or exposing row/task bodies."""
     path = tmp_path / "v1.1" / "leaderboard-live.json"
     path.parent.mkdir()
-    path.write_text(
+    _ = path.write_text(
         json.dumps(
             {
                 "benchmark": "DeepSWE",
@@ -793,10 +838,12 @@ def test_diagnose_snapshot_is_offline_and_metrics_only(
     )
     assert code == 0
     assert diagnostics == ""
-    data = envelope["data"]
+    data = cast("dict[str, object]", envelope["data"])
     assert "rows" not in data
-    assert data["summary"]["row_count"] == 1
-    assert data["summary"]["metrics"]["pass_at_1"]["max"] == 0.5
+    summary = cast("dict[str, object]", data["summary"])
+    assert summary["row_count"] == 1
+    summary_metrics = cast("dict[str, dict[str, object]]", summary["metrics"])
+    assert summary_metrics["pass_at_1"]["max"] == 0.5
     assert "task-body" not in json.dumps(envelope)
 
 
@@ -806,7 +853,7 @@ def test_diagnose_trials_is_explicit_and_body_free(
     """Only --trials selects the raw trial artifact, still returning summaries."""
     path = tmp_path / "v1.1" / "trials.json"
     path.parent.mkdir()
-    path.write_text(
+    _ = path.write_text(
         json.dumps(
             {
                 "benchmark": "DeepSWE",
@@ -829,10 +876,12 @@ def test_diagnose_trials_is_explicit_and_body_free(
     )
     assert code == 0
     assert diagnostics == ""
-    assert envelope["data"]["summary"]["artifact"] == "trials.json"
-    assert "rows" not in envelope["data"]
+    data = cast("dict[str, object]", envelope["data"])
+    summary = cast("dict[str, object]", data["summary"])
+    assert summary["artifact"] == "trials.json"
+    assert "rows" not in data
     assert "trial-body" not in json.dumps(envelope)
 
 
 if __name__ == "__main__":
-    pytest.main([__file__])
+    _ = pytest.main([__file__])

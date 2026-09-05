@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import json
 from collections.abc import Iterable, Mapping, Sequence
+from typing import cast
 
 _COMPONENT_FIELDS: tuple[str, ...] = (
     "canonical_component_id",
@@ -53,19 +54,35 @@ def _claims(value: object) -> list[Mapping[str, object]]:
     if value is None:
         return []
     if isinstance(value, Mapping):
-        dependencies = value.get("dependencies")
+        mapping = cast("Mapping[str, object]", value)
+        dependencies = mapping.get("dependencies")
         if isinstance(dependencies, Sequence) and not isinstance(
             dependencies, (str, bytes, bytearray)
         ):
-            return [item for item in dependencies if isinstance(item, Mapping)]
-        claims = value.get("claims")
+            items = dependencies
+            return [
+                cast("Mapping[str, object]", item)
+                for item in items
+                if isinstance(item, Mapping)
+            ]
+        claims = mapping.get("claims")
         if isinstance(claims, Sequence) and not isinstance(
             claims, (str, bytes, bytearray)
         ):
-            return [item for item in claims if isinstance(item, Mapping)]
-        return [value]
+            claim_items = claims
+            return [
+                cast("Mapping[str, object]", item)
+                for item in claim_items
+                if isinstance(item, Mapping)
+            ]
+        return [mapping]
     if isinstance(value, Iterable) and not isinstance(value, (str, bytes, bytearray)):
-        return [item for item in value if isinstance(item, Mapping)]
+        entries = value
+        return [
+            cast("Mapping[str, object]", item)
+            for item in entries
+            if isinstance(item, Mapping)
+        ]
     return []
 
 
@@ -108,18 +125,20 @@ def dependency_summary(claims: object = None) -> dict[str, object]:
     if claims is None:
         return {"dependencies": [], "independence_class": "unknown"}
     if isinstance(claims, Mapping):
-        dependencies_value = claims.get("dependencies")
-        dependencies = (
-            [
-                copy.deepcopy(item)
-                for item in dependencies_value
+        mapping = cast("Mapping[str, object]", claims)
+        dependencies_value = mapping.get("dependencies")
+        if isinstance(dependencies_value, Sequence) and not isinstance(
+            dependencies_value, (str, bytes, bytearray)
+        ):
+            entries = dependencies_value
+            dependencies = [
+                copy.deepcopy(cast("Mapping[str, object]", item))
+                for item in entries
                 if isinstance(item, Mapping)
             ]
-            if isinstance(dependencies_value, Sequence)
-            and not isinstance(dependencies_value, (str, bytes, bytearray))
-            else []
-        )
-        independence = claims.get("independence_class", "unknown")
+        else:
+            dependencies = []
+        independence = mapping.get("independence_class", "unknown")
         return {
             "dependencies": dependencies,
             "independence_class": independence
@@ -181,7 +200,7 @@ def detect_overlap(
                 "source": copy.deepcopy(left_source),
                 "certainty": "requirements_claim",
             }
-            warnings.setdefault(_json(warning), warning)
+            _ = warnings.setdefault(_json(warning), warning)
     return [warnings[key] for key in sorted(warnings)]
 
 

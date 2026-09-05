@@ -1,9 +1,7 @@
 """DeepSWE overlap-kernel contract tests."""
-# ruff: noqa: CPY001, D103, INP001, S101
 
 from __future__ import annotations
 
-import _path  # noqa: F401
 from deepswe.overlap import dependency_summary, detect_overlap
 
 

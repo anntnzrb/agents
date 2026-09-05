@@ -13,7 +13,7 @@ import json
 import math
 from collections.abc import Iterable, Mapping, Sequence
 from numbers import Real
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 from .identity import canonical_identity, identity_json
 
@@ -27,7 +27,7 @@ _SEMANTIC_FIELDS: tuple[str, ...] = (
 
 
 class _Observation(NamedTuple):
-    value: int | float | None
+    value: Real | None
     status: str
     reasons: tuple[str, ...]
     semantics: dict[str, object]
@@ -47,10 +47,6 @@ def _json(value: object) -> str:
         return repr(value)
 
 
-def _mapping(value: object) -> Mapping[str, object] | None:
-    return value if isinstance(value, Mapping) else None
-
-
 def _nested_candidates(
     snapshot: Mapping[str, object],
 ) -> Iterable[Mapping[str, object]]:
@@ -59,11 +55,12 @@ def _nested_candidates(
     for key in ("data", "metadata", "scope", "provenance", "artifact", "schema"):
         value = snapshot.get(key)
         if isinstance(value, Mapping):
-            yield value
+            nested_mapping = cast("Mapping[str, object]", value)
+            yield nested_mapping
             for nested_key in ("data", "metadata", "scope", "artifact", "schema"):
-                nested = value.get(nested_key)
+                nested = nested_mapping.get(nested_key)
                 if isinstance(nested, Mapping):
-                    yield nested
+                    yield cast("Mapping[str, object]", nested)
 
 
 def _declared_version(snapshot: Mapping[str, object]) -> str | None:
@@ -92,7 +89,8 @@ def _declared_schema(snapshot: Mapping[str, object]) -> str | int | float | None
                 values.append(value)
         artifact_schema = container.get("artifact_schema")
         if isinstance(artifact_schema, Mapping):
-            value = artifact_schema.get("version")
+            schema_map = cast("Mapping[str, object]", artifact_schema)
+            value = schema_map.get("version")
             if isinstance(value, (str, int, float)) and not isinstance(value, bool):
                 values.append(value)
     unique = {_json(value): value for value in values}
@@ -107,17 +105,30 @@ def _rows(snapshot: object) -> list[Mapping[str, object]]:
     if isinstance(snapshot, Sequence) and not isinstance(
         snapshot, (str, bytes, bytearray)
     ):
-        return [row for row in snapshot if isinstance(row, Mapping)]
+        entries = cast("list[object]", cast("object", snapshot))
+        return [
+            cast("Mapping[str, object]", row)
+            for row in entries
+            if isinstance(row, Mapping)
+        ]
     if not isinstance(snapshot, Mapping):
         msg = "snapshot must be a mapping or a sequence of row mappings"
         raise TypeError(msg)
-    rows = snapshot.get("rows")
-    if isinstance(rows, Sequence) and not isinstance(rows, (str, bytes, bytearray)):
-        return [row for row in rows if isinstance(row, Mapping)]
+    snapshot = cast("Mapping[str, object]", snapshot)
+    rows_value = snapshot.get("rows")
+    if isinstance(rows_value, Sequence) and not isinstance(
+        rows_value, (str, bytes, bytearray)
+    ):
+        row_entries = cast("list[object]", cast("object", rows_value))
+        return [
+            cast("Mapping[str, object]", row)
+            for row in row_entries
+            if isinstance(row, Mapping)
+        ]
     for key in ("data", "payload", "artifact", "leaderboard-live.json"):
         nested = snapshot.get(key)
         if isinstance(nested, Mapping):
-            found = _rows(nested)
+            found = _rows(cast("Mapping[str, object]", nested))
             if found:
                 return found
     # A lone row mapping is useful for pure-kernel callers and is harmless for
@@ -129,7 +140,7 @@ def _rows(snapshot: object) -> list[Mapping[str, object]]:
     return []
 
 
-def _numeric(value: object) -> int | float | None:
+def _numeric(value: object) -> Real | None:
     if isinstance(value, bool) or not isinstance(value, Real):
         return None
     try:
@@ -158,11 +169,14 @@ def _metric_entry(
 ) -> Mapping[str, object] | None:
     metrics = row.get("metrics")
     if isinstance(metrics, Mapping):
-        candidate = metrics.get(metric)
+        metrics_map = cast("Mapping[str, object]", metrics)
+        candidate = metrics_map.get(metric)
         if isinstance(candidate, Mapping):
-            return candidate
+            return cast("Mapping[str, object]", candidate)
     candidate = row.get(metric)
-    return candidate if isinstance(candidate, Mapping) else None
+    if not isinstance(candidate, Mapping):
+        return None
+    return cast("Mapping[str, object]", candidate)
 
 
 def _semantic_projection(value: Mapping[str, object] | None) -> dict[str, object]:
@@ -171,12 +185,14 @@ def _semantic_projection(value: Mapping[str, object] | None) -> dict[str, object
     result: dict[str, object] = {}
     nested = value.get("semantics")
     if isinstance(nested, Mapping):
-        for key, item in nested.items():
+        semantics = cast("Mapping[str, object]", nested)
+        for key, item in semantics.items():
             if key in _SEMANTIC_FIELDS or key in {"family", "comparator"}:
                 result[str(key)] = copy.deepcopy(item)
     nested = value.get("metric_semantics")
     if isinstance(nested, Mapping):
-        for key, item in nested.items():
+        metric_semantics_map = cast("Mapping[str, object]", nested)
+        for key, item in metric_semantics_map.items():
             if key in _SEMANTIC_FIELDS or key in {"family", "comparator"}:
                 result[str(key)] = copy.deepcopy(item)
     for key in _SEMANTIC_FIELDS:
@@ -194,15 +210,19 @@ def _snapshot_metric_semantics(
             candidate = container.get(key)
             if not isinstance(candidate, Mapping):
                 continue
-            if key == "metrics" or (
-                metric in candidate and isinstance(candidate.get(metric), Mapping)
-            ):
-                candidate = candidate.get(metric)
-            if not isinstance(candidate, Mapping):
-                continue
-            projection = _semantic_projection(candidate)
+            candidate_map = cast("Mapping[str, object]", candidate)
+            if key == "metrics":
+                nested = candidate_map.get(metric)
+                if not isinstance(nested, Mapping):
+                    continue
+                candidate_map = cast("Mapping[str, object]", nested)
+            else:
+                nested = candidate_map.get(metric)
+                if isinstance(nested, Mapping):
+                    candidate_map = cast("Mapping[str, object]", nested)
+            projection = _semantic_projection(candidate_map)
             for field, value in projection.items():
-                result.setdefault(field, value)
+                _ = result.setdefault(field, value)
     return result
 
 
@@ -229,7 +249,7 @@ def _observation(  # noqa: C901, PLR0911, PLR0912
     row: Mapping[str, object] | None, metric: str
 ) -> _Observation:
     if row is None:
-        return _Observation(None, "missing", ("missing_row",), {}, False)  # noqa: FBT003
+        return _Observation(None, "missing", ("missing_row",), {}, eligible=False)
 
     evidence = _metric_entry(row, metric)
     if evidence is not None:
@@ -253,27 +273,33 @@ def _observation(  # noqa: C901, PLR0911, PLR0912
         status = status_text
         if status not in reasons:
             reasons.append(status)
-        return _Observation(numeric, status, tuple(reasons), semantics, False)  # noqa: FBT003
+        return _Observation(numeric, status, tuple(reasons), semantics, eligible=False)
     if value is None:
         if "missing_value" not in reasons:
             reasons.append("missing_value")
-        return _Observation(None, "missing", tuple(reasons), semantics, False)  # noqa: FBT003
+        return _Observation(None, "missing", tuple(reasons), semantics, eligible=False)
     if numeric is None:
         if "unparsed_value" not in reasons:
             reasons.append("unparsed_value")
-        return _Observation(None, "unparsed", tuple(reasons), semantics, False)  # noqa: FBT003
+        return _Observation(None, "unparsed", tuple(reasons), semantics, eligible=False)
     if eligibility == "blocked":
         if not reasons:
             reasons.append("comparison_blocked")
-        return _Observation(numeric, "blocked", tuple(reasons), semantics, False)  # noqa: FBT003
+        return _Observation(
+            numeric, "blocked", tuple(reasons), semantics, eligible=False
+        )
     if eligibility not in (None, "eligible"):
         if not reasons:
             reasons.append(str(eligibility))
-        return _Observation(numeric, "blocked", tuple(reasons), semantics, False)  # noqa: FBT003
+        return _Observation(
+            numeric, "blocked", tuple(reasons), semantics, eligible=False
+        )
     if status_text == "blocked":
         if not reasons:
             reasons.append("comparison_blocked")
-        return _Observation(numeric, "blocked", tuple(reasons), semantics, False)  # noqa: FBT003
+        return _Observation(
+            numeric, "blocked", tuple(reasons), semantics, eligible=False
+        )
     return _Observation(numeric, "eligible", tuple(reasons), semantics, eligible=True)
 
 
@@ -394,7 +420,7 @@ def _global_block(
 def compare_snapshots(  # noqa: C901
     before: Mapping[str, object] | Sequence[Mapping[str, object]],
     after: Mapping[str, object] | Sequence[Mapping[str, object]],
-    metric: str = _DEFAULT_METRIC,
+    metric: object = _DEFAULT_METRIC,
 ) -> dict[str, object]:
     """Compare two same-release snapshots without imputing unavailable values.
 

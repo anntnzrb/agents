@@ -1,9 +1,9 @@
 """Offline tests for deterministic DeepSWE diagnostics and redaction."""
-# ruff: noqa: CPY001, D103, INP001, PLR2004, S101
 
 from __future__ import annotations
 
-import _path  # noqa: F401
+from typing import cast
+
 from deepswe.diagnostics import Diagnostic, merge_diagnostics, redact
 
 
@@ -19,12 +19,14 @@ def test_recursive_redaction_removes_secret_keys_and_query_credentials() -> None
     redacted = redact(value)
     assert isinstance(redacted, dict)
     assert redacted["authorization"] == "<redacted>"
-    nested = redacted["nested"]
+    nested = cast("list[object]", redacted["nested"])
     assert isinstance(nested, list)
-    assert nested[0]["api_key"] == "<redacted>"
-    assert nested[0]["safe"] == "metric latency"
+    item0 = cast("dict[str, object]", nested[0])
+    assert item0["api_key"] == "<redacted>"
+    assert item0["safe"] == "metric latency"
     assert nested[1] == ("https://example.test/report?token=<redacted>&metric=0.5")
-    assert redacted["headers"]["Cookie"] == "<redacted>"
+    headers = cast("dict[str, object]", redacted["headers"])
+    assert headers["Cookie"] == "<redacted>"
 
 
 def test_redaction_does_not_hide_metric_strings_or_safe_numerics() -> None:

@@ -9,7 +9,7 @@ DeepSWE leaderboard artifact and are used only when that artifact is selected.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, cast
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,9 +100,9 @@ def _ratio(field: str, metadata: dict[str, object]) -> MetricSemantics:
         minimum=0,
         maximum=1,
         comparator="max",
-        scope=metadata.get("scope"),  # type: ignore[arg-type]
-        denominator=metadata.get("denominator"),  # type: ignore[arg-type]
-        family=metadata.get("family"),  # type: ignore[arg-type]
+        scope=cast("str | None", metadata.get("scope")),
+        denominator=cast("str | None", metadata.get("denominator")),
+        family=cast("str | None", metadata.get("family")),
     )
 
 
@@ -113,9 +113,9 @@ def _count(field: str, metadata: dict[str, object]) -> MetricSemantics:
         minimum=0,
         maximum=None,
         comparator="max",
-        scope=metadata.get("scope"),  # type: ignore[arg-type]
-        denominator=metadata.get("denominator"),  # type: ignore[arg-type]
-        family=metadata.get("family"),  # type: ignore[arg-type]
+        scope=cast("str | None", metadata.get("scope")),
+        denominator=cast("str | None", metadata.get("denominator")),
+        family=cast("str | None", metadata.get("family")),
     )
 
 
@@ -162,7 +162,7 @@ METRIC_SEMANTICS: Final[dict[str, MetricSemantics]] = SEMANTIC_REGISTRY
 REGISTRY: Final[dict[str, MetricSemantics]] = SEMANTIC_REGISTRY
 
 
-def metric_semantics(field: str) -> MetricSemantics | None:
+def metric_semantics(field: object) -> MetricSemantics | None:
     """Return semantics for an exact published field name, if known."""
     if not isinstance(field, str):
         return None

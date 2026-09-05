@@ -4,7 +4,6 @@ The source layer deliberately knows only about the two published JSON artifacts.
 keeps HTTP/cache concerns here so callers can consume validated payloads without
 having to infer which release or URL was used.
 """
-# ruff: noqa: CPY001, FBT001, FBT002
 
 from __future__ import annotations
 
@@ -13,10 +12,10 @@ import json
 import os
 import re
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 from urllib import error as urllib_error
 from urllib import parse as urllib_parse
 from urllib import request as urllib_request
@@ -36,7 +35,7 @@ class _ResponseLike(Protocol):
     status: int
     headers: object
 
-    def read(self) -> bytes: ...
+    def read(self) -> bytes | str: ...
 
     def getcode(self) -> int: ...
 
@@ -49,8 +48,14 @@ def urlopen(
 ) -> _ResponseLike:
     """Open a request through the injectable stdlib transport."""
     if timeout is None:
-        return urllib_request.urlopen(request)  # noqa: S310
-    return urllib_request.urlopen(request, timeout=timeout)  # noqa: S310
+        return cast(
+            "_ResponseLike",
+            urllib_request.urlopen(request),  # noqa: S310 - injectable stdlib transport
+        )
+    return cast(
+        "_ResponseLike",
+        urllib_request.urlopen(request, timeout=timeout),  # noqa: S310 - injectable stdlib transport
+    )
 
 
 DEFAULT_VERSION = "v1.1"
@@ -68,16 +73,17 @@ ARTIFACT_NAMES = (LEADERBOARD_ARTIFACT, TRIALS_ARTIFACT)
 # components are accepted so a future release does not require source changes.
 _VERSION_RE = re.compile(
     r"^v(?P<major>0|[1-9][0-9]*)\."
-    r"(?P<minor>0|[1-9][0-9]*)"
-    r"(?:\.(?P<patch>0|[1-9][0-9]*))?"
-    r"(?:-(?P<pre>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
-    r"(?:\+(?P<build>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$",
+    + r"(?P<minor>0|[1-9][0-9]*)"
+    + r"(?:\.(?P<patch>0|[1-9][0-9]*))?"
+    + r"(?:-(?P<pre>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
+    + r"(?:\+(?P<build>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$",
 )
 _MAJOR_ONLY_RE = re.compile(r"^v?[0-9]+$")
 _ARTIFACT_PATH_RE = re.compile(
     r"/artifacts/(?P<version>[^/]+)/(?P<artifact>[^/?#]+)$",
 )
 _METADATA_SUFFIX = ".meta.json"
+_PAIR_LENGTH = 2
 
 JsonValue = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
 
@@ -94,8 +100,8 @@ class SourceError(ValueError):
     ) -> None:
         """Initialize an error with its stable code and optional HTTP status."""
         super().__init__(message)
-        self.code = code
-        self.status = status
+        self.code: str = code
+        self.status: int | None = status
 
 
 class VersionError(ValueError):
@@ -104,7 +110,7 @@ class VersionError(ValueError):
     def __init__(self, message: str, *, code: str = "invalid_version") -> None:
         """Initialize an error with its stable classification code."""
         super().__init__(message)
-        self.code = code
+        self.code: str = code
 
 
 def resolve_version(value: str | None) -> dict[str, object]:
@@ -251,7 +257,7 @@ def load_artifact(path: str | os.PathLike[str]) -> dict[str, object]:
     return payload
 
 
-def _fetch_one(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
+def _fetch_one(  # noqa: C901, PLR0913, PLR0915, PLR0917
     version: str,
     artifact_name: str,
     output_root: Path,
@@ -293,7 +299,7 @@ def _fetch_one(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
             _validate_response_url(response, version, artifact_name)
             response_headers = _response_headers(response)
             if status == HTTP_NOT_MODIFIED:
-                _validate_304(
+                cached = _validate_304(
                     cached,
                     response_headers,
                     conditional_request=conditional_request,
@@ -314,11 +320,8 @@ def _fetch_one(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
                 message = f"unexpected HTTP status {status} for {url}"
                 raise SourceError(message, code="http_error", status=status)
             body = response.read()
-            if isinstance(body, str):
-                body = body.encode("utf-8")
-            elif not isinstance(body, bytes):
-                body = bytes(body)
-            payload = _decode_payload(body, cache_path)
+            raw_body = body.encode("utf-8") if isinstance(body, str) else bytes(body)
+            payload = _decode_payload(raw_body, cache_path)
             _validate_payload(payload, artifact_name, version, cache_path)
             etag = _header(response_headers, "ETag")
             last_modified = _header(response_headers, "Last-Modified")
@@ -340,26 +343,27 @@ def _fetch_one(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
                 _store_immutable(
                     artifact_store,
                     source_key=url,
-                    raw=body,
+                    raw=raw_body,
                     metadata=metadata,
                 )
             )
-            _atomic_write(cache_path, body)
+            _atomic_write(cache_path, raw_body)
             _atomic_write_json(metadata_path, metadata)
-            _atomic_write(output_path, body)
+            _atomic_write(output_path, raw_body)
             return {**metadata, "data": payload}
         finally:
             close = getattr(response, "close", None)
             if callable(close):
-                close()
+                _ = close()
     except urllib_error.HTTPError as exc:
         status = int(exc.code)
+        _ = exc.close()
         _validate_response_url(exc, version, artifact_name)
         response_headers = _message_headers(exc.headers)
         # urllib may surface a conditional 304 as HTTPError rather than a normal
         # response.  Treat it exactly like a regular 304 response.
         if status == HTTP_NOT_MODIFIED:
-            _validate_304(
+            cached = _validate_304(
                 cached,
                 response_headers,
                 conditional_request=conditional_request,
@@ -418,7 +422,7 @@ def _validate_304(
     *,
     conditional_request: bool,
     artifact_name: str,
-) -> None:
+) -> _CachedArtifact:
     if cached is None:
         message = f"304 for {artifact_name} without a valid cache entry"
         raise SourceError(message, code="cache_missing", status=HTTP_NOT_MODIFIED)
@@ -445,6 +449,7 @@ def _validate_304(
     ):
         message = f"304 Last-Modified did not match cached {artifact_name}"
         raise SourceError(message, code="cache_invalid", status=HTTP_NOT_MODIFIED)
+    return cached
 
 
 def _metadata_validator(
@@ -500,11 +505,11 @@ class _CachedArtifact:
         immutable: Mapping[str, object] | None = None,
     ) -> None:
         """Store the cached payload and its filesystem metadata."""
-        self.payload = payload
-        self.raw = raw
-        self.metadata = metadata
-        self.path = path
-        self.immutable = dict(immutable or {})
+        self.payload: dict[str, object] = payload
+        self.raw: bytes = raw
+        self.metadata: Mapping[str, object] = metadata
+        self.path: Path = path
+        self.immutable: dict[str, object] = dict(immutable or {})
 
 
 def _read_cached(  # noqa: PLR0913, PLR0917
@@ -564,12 +569,14 @@ def _read_legacy_cached(
     if not cache_path.is_file() or not metadata_path.is_file():
         return None
     try:
-        metadata_value = json.loads(metadata_path.read_text(encoding="utf-8"))
+        metadata_value = cast(
+            "object", json.loads(metadata_path.read_text(encoding="utf-8"))
+        )
     except (OSError, UnicodeError, json.JSONDecodeError):
         return None
     if not isinstance(metadata_value, dict):
         return None
-    metadata: dict[str, object] = metadata_value
+    metadata = cast("dict[str, object]", metadata_value)
     if (
         metadata.get("benchmark_version") != version
         or metadata.get("artifact") != artifact_name
@@ -582,8 +589,8 @@ def _read_legacy_cached(
         _validate_payload(payload, artifact_name, version, cache_path)
     except (OSError, UnicodeError, SourceError, ValueError):
         return None
-    metadata.setdefault("row_count", len(payload["rows"]))
-    metadata.setdefault("status", metadata.get("http_status"))
+    _ = metadata.setdefault("row_count", len(cast("list[object]", payload["rows"])))
+    _ = metadata.setdefault("status", metadata.get("http_status"))
     return _CachedArtifact(payload, raw, metadata, cache_path)
 
 
@@ -620,7 +627,7 @@ def _read_immutable_cached(
     if not isinstance(nested, Mapping):
         message = f"immutable cache metadata is invalid for {url}"
         raise SourceError(message, code="cache_invalid")
-    metadata = dict(nested)
+    metadata = dict(cast("Mapping[str, object]", nested))
     if (
         metadata.get("benchmark_version") not in {None, version}
         or metadata.get("artifact") not in {None, artifact_name}
@@ -658,7 +665,10 @@ def _promote_legacy(  # noqa: PLR0913
         message = f"promoted cache payload is invalid for {url}: {exc}"
         raise SourceError(message, code="cache_invalid") from exc
     nested = persisted.get("metadata")
-    merged = dict(nested) if isinstance(nested, Mapping) else metadata
+    if isinstance(nested, Mapping):
+        merged = dict(cast("Mapping[str, object]", nested))
+    else:
+        merged = metadata
     immutable = _immutable_fields(record, manifest)
     merged.update(immutable)
     return _CachedArtifact(payload, raw, merged, cache_path, immutable)
@@ -766,10 +776,10 @@ def _materialize_cached(  # noqa: PLR0913
     if stale_reason is not None:
         metadata["stale_reason"] = stale_reason
     else:
-        metadata.pop("stale_reason", None)
+        _ = metadata.pop("stale_reason", None)
     if not stale and cached.immutable.get("legacy_unverified") is not True:
-        _atomic_write_json(_metadata_path(cached.path), metadata)
-    _atomic_write(output_path, cached.raw)
+        _ = _atomic_write_json(_metadata_path(cached.path), metadata)
+    _ = _atomic_write(output_path, cached.raw)
     return {**metadata, "data": cached.payload}
 
 
@@ -803,8 +813,8 @@ def _new_metadata(  # noqa: PLR0913
         "last_modified": last_modified,
         "Last-Modified": last_modified,
         "generated_at": generated_at if isinstance(generated_at, str) else None,
-        "row_count": len(payload["rows"]),
-        "n_rows": len(payload["rows"]),
+        "row_count": len(cast("list[object]", payload["rows"])),
+        "n_rows": len(cast("list[object]", payload["rows"])),
         "local_path": str(local_path),
         "cache_path": str(cache_path),
         "cache_reused": cache_reused,
@@ -815,15 +825,14 @@ def _new_metadata(  # noqa: PLR0913
 
 def _decode_payload(raw: bytes, path: Path) -> dict[str, object]:
     try:
-        decoded = json.loads(raw.decode("utf-8"))
+        decoded = cast("object", json.loads(raw.decode("utf-8")))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         message = f"malformed JSON artifact {path}: {exc}"
         raise SourceError(message, code="malformed_json") from exc
     if not isinstance(decoded, dict):
         message = f"artifact {path} must contain a JSON object"
         raise SourceError(message, code="invalid_artifact_shape")
-    payload: dict[str, object] = decoded
-    return payload
+    return cast("dict[str, object]", decoded)
 
 
 def _validate_payload(
@@ -834,7 +843,7 @@ def _validate_payload(
 ) -> None:
     """Validate an artifact through the source-local strict boundary."""
     try:
-        inspect_payload(
+        _ = inspect_payload(
             payload,
             artifact_name=artifact_name,
             expected_version=expected_version,
@@ -943,12 +952,15 @@ def _validate_response_url(
 
 
 def _response_status(response: object) -> int:
-    value = getattr(response, "status", None)
+    value = cast("object", getattr(response, "status", None))
     if value is None:
-        getcode = getattr(response, "getcode", None)
-        value = getcode() if callable(getcode) else None
+        raw_getcode = cast("object", getattr(response, "getcode", None))
+        value = raw_getcode() if callable(raw_getcode) else None
     if value is None:
         return HTTP_OK
+    if not isinstance(value, (int, float, str)):
+        message = "HTTP response had an invalid status"
+        raise SourceError(message, code="http_error")
     try:
         return int(value)
     except (TypeError, ValueError) as exc:
@@ -957,7 +969,7 @@ def _response_status(response: object) -> int:
 
 
 def _response_headers(response: object) -> Mapping[str, str]:
-    headers = getattr(response, "headers", None)
+    headers = cast("object", getattr(response, "headers", None))
     return _message_headers(headers)
 
 
@@ -965,11 +977,21 @@ def _message_headers(headers: object) -> Mapping[str, str]:
     if headers is None:
         return {}
     if isinstance(headers, Mapping):
-        return {str(key): str(value) for key, value in headers.items()}
-    items = getattr(headers, "items", None)
-    if callable(items):
-        return {str(key): str(value) for key, value in items()}
-    return {}
+        mapping = cast("Mapping[str, object]", headers)
+        return {str(key): str(value) for key, value in mapping.items()}
+    raw_items = cast("object", getattr(headers, "items", None))
+    if not callable(raw_items):
+        return {}
+    pairs = cast("Iterable[object]", raw_items())
+    result: dict[str, str] = {}
+    for pair in pairs:
+        if not isinstance(pair, Sequence):
+            continue
+        seq = cast("list[object]", cast("object", list(pair)))
+        if len(seq) != _PAIR_LENGTH:
+            continue
+        result[str(seq[0])] = str(seq[1])
+    return result
 
 
 def _header(headers: Mapping[str, str], name: str) -> str | None:
@@ -1004,10 +1026,10 @@ def _atomic_write(path: Path, data: bytes) -> None:
             delete=False,
         ) as handle:
             temporary = Path(handle.name)
-            handle.write(data)
+            _ = handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
-        temporary.replace(path)
+        _ = temporary.replace(path)
     except OSError as exc:
         message = f"unable to write {path}: {exc}"
         raise SourceError(message, code="cache_write_failed") from exc
