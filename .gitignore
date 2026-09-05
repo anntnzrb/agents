@@ -12,3 +12,8 @@ artifacts/
 .env
 secrets.local.json
 *.skill
+.venv/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+.firecrawl/
