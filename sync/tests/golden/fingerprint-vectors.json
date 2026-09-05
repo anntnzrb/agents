@@ -1,0 +1,1 @@
+{"missing_literal_sha256":"ffa63583dfa6706b87d284b86b0d693a161e4840aad2c5cf6b5d27c3b9621f7d","note":"sha256(b'missing'); tree vectors asserted live in test_hook_state.py with filesystem fixtures"}

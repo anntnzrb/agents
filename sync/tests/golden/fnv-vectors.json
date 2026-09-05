@@ -1,0 +1,1 @@
+{"cases":[{"input":"","fnv":"cbf29ce484222325"},{"input":"a","fnv":"af63dc4c8601ec8c"},{"input":"hello","fnv":"a430d84680aabd0b"},{"input":"https://github.com/owner/repo","fnv":"1ca10581fda0cb27"},{"input":"package","fnv":"53cf3eec39cf731b"}]}
