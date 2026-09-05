@@ -8,6 +8,7 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -26,17 +27,15 @@ import {
 import { buildSyncPlan, type Job } from "@core/plan.ts";
 import { iterExtensionPackages, runInstall } from "@extensions/install.ts";
 import {
-  cloneAttemptsForTests,
-  commandForTests,
   extractImportSpecifiers,
-  githubSlugForTests,
   missingPackageRoots,
   packageCacheDir,
   packageHasBuildScript,
+  packageIsHealthy,
   patchRuntimeSettings,
   readPackageManifest,
-  validatePackageForTests,
 } from "@packages/index.ts";
+import { clonePackageWithRunner } from "@packages/source.ts";
 import { isErrno } from "@runtime/errors.ts";
 import { runCommandOutcome, runProcess } from "@runtime/process.ts";
 import { seedRuntimeRelease, sharedToolCacheEnv } from "./support/cache-env.ts";
@@ -1274,23 +1273,38 @@ test("package_cache_dir_uses_basename_for_local_paths", async () => {
 test("github_clone_command_prefers_gh_when_available", async () => {
   await withTempDir(async (root) => {
     const target = join(root, "out");
-    const command = commandForTests("https://github.com/tintinweb/pi-supervisor", target);
-    assert.equal(command[0], "gh");
-    assert.equal(
-      githubSlugForTests("https://github.com/tintinweb/pi-supervisor"),
-      "tintinweb/pi-supervisor",
+    const attempts: string[][] = [];
+    await clonePackageWithRunner(
+      "https://github.com/tintinweb/pi-supervisor",
+      target,
+      true,
+      async (command) => {
+        attempts.push([...command]);
+        return true;
+      },
     );
+    assert.equal(attempts.length, 1);
+    assert.equal(attempts[0]![0], "gh");
+    assert.equal(attempts[0]![3], "tintinweb/pi-supervisor");
   });
 });
 
 test("github_clone_falls_back_to_git_after_gh_failure", async () => {
   await withTempDir(async (root) => {
     const target = join(root, "out");
-    const [success, attempts] = await cloneAttemptsForTests(
+    const attempts: string[][] = [];
+    const outcomes = [false, true];
+    let index = 0;
+    const success = await clonePackageWithRunner(
       "https://github.com/tintinweb/pi-supervisor",
       target,
       true,
-      [false, true],
+      async (command) => {
+        attempts.push([...command]);
+        const outcome = outcomes[index] ?? false;
+        index += 1;
+        return outcome;
+      },
     );
 
     assert.equal(success, true);
@@ -1313,11 +1327,11 @@ test("validate_package_dir_accepts_manifest_and_conventional_dirs", async () => 
 }`,
     );
     writeFile(join(manifestPkg, "src", "index.ts"), "export default {}\n");
-    assert.equal(validatePackageForTests(manifestPkg), true);
+    assert.equal(packageIsHealthy(manifestPkg), true);
 
     const conventionalPkg = join(root, "conventional-pkg");
     writeFile(join(conventionalPkg, "extensions", "index.ts"), "export default {}\n");
-    assert.equal(validatePackageForTests(conventionalPkg), true);
+    assert.equal(packageIsHealthy(conventionalPkg), true);
   });
 });
 
@@ -1336,10 +1350,10 @@ test("validate_package_dir_detects_missing_import_packages", async () => {
       join(pkg, "index.ts"),
       'import { Text } from "@earendil-works/pi-tui";\nexport default Text;\n',
     );
-    assert.equal(validatePackageForTests(pkg), false);
+    assert.equal(packageIsHealthy(pkg), false);
 
     writeFile(join(pkg, "node_modules", "@earendil-works", "pi-tui", "package.json"), "{}\n");
-    assert.equal(validatePackageForTests(pkg), true);
+    assert.equal(packageIsHealthy(pkg), true);
   });
 });
 
@@ -1348,7 +1362,7 @@ test("validate_package_dir_rejects_malformed_package_json", async () => {
     const pkg = join(root, "bad-pkg");
     writeFile(join(pkg, "package.json"), "{not valid json");
 
-    await assert.rejects(async () => validatePackageForTests(pkg));
+    assert.throws(() => packageIsHealthy(pkg));
     await assert.rejects(async () => packageHasBuildScript(pkg));
   });
 });
@@ -1491,6 +1505,65 @@ test("managed_state_malformed_json_is_recoverable", async () => {
 
     const plan = planManagedEntries(syncEnv);
     assert.ok(plan.harnesses.length > 0);
+  });
+});
+
+test("run_sync_prunes_older_complete_releases_after_wrapper_success_and_preserves_unrecognized_dirs", async () => {
+  await withTempDir(async (root) => {
+    const syncEnv = makeSyncEnv(root);
+    const releasesRoot = join(root, ".local", "share", "agents", "sync-releases");
+
+    const entries = readdirSync(releasesRoot);
+    assert.equal(entries.length, 1);
+    const currentReleaseId = entries[0];
+
+    const oldCompleteReleaseId = "0".repeat(64);
+    const oldCompleteDir = join(releasesRoot, oldCompleteReleaseId);
+    mkdirSync(join(oldCompleteDir, "src"), { recursive: true });
+    writeFile(join(oldCompleteDir, "src", "cli.ts"), "console.log('old');");
+    mkdirSync(join(oldCompleteDir, "node_modules"), { recursive: true });
+
+    const unrecognizedDir = join(releasesRoot, "unrecognized-custom-dir");
+    mkdirSync(unrecognizedDir, { recursive: true });
+    writeFile(join(unrecognizedDir, "test.txt"), "data");
+
+    const incompleteShaDir = join(releasesRoot, "1".repeat(64));
+    mkdirSync(incompleteShaDir, { recursive: true });
+    writeFile(join(incompleteShaDir, "incomplete.txt"), "no node_modules");
+
+    assert.equal(await runSync(syncEnv), true);
+
+    const remaining = readdirSync(releasesRoot);
+    assert.equal(remaining.includes(currentReleaseId!), true);
+    assert.equal(remaining.includes("unrecognized-custom-dir"), true);
+    assert.equal(remaining.includes("1".repeat(64)), true);
+    assert.equal(remaining.includes(oldCompleteReleaseId), false);
+  });
+});
+
+test("run_sync_preserves_previous_releases_if_wrapper_reconciliation_fails", async () => {
+  await withTempDir(async (root) => {
+    const syncEnv = makeSyncEnv(root);
+    const releasesRoot = join(root, ".local", "share", "agents", "sync-releases");
+
+    const entries = readdirSync(releasesRoot);
+    assert.equal(entries.length, 1);
+    const currentReleaseId = entries[0];
+
+    const oldCompleteReleaseId = "0".repeat(64);
+    const oldCompleteDir = join(releasesRoot, oldCompleteReleaseId);
+    mkdirSync(join(oldCompleteDir, "src"), { recursive: true });
+    writeFile(join(oldCompleteDir, "src", "cli.ts"), "console.log('old');");
+    mkdirSync(join(oldCompleteDir, "node_modules"), { recursive: true });
+
+    rmSafe(join(root, ".local", "bin"));
+    writeFile(join(root, ".local", "bin"), "blocking-file-not-dir");
+
+    assert.equal(await runSync(syncEnv), false);
+
+    const remaining = readdirSync(releasesRoot);
+    assert.equal(remaining.includes(oldCompleteReleaseId), true);
+    assert.equal(remaining.includes(currentReleaseId!), true);
   });
 });
 function makeSyncEnv(root: string, installTimeoutMs = 10_000): SyncEnv {
