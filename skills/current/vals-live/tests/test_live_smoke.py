@@ -1,5 +1,4 @@
 # Copyright 2026 Vals-live contributors.
-# ruff: noqa: D102,S101,INP001
 """Exercise opt-in live source smoke checks."""
 
 import io
@@ -8,8 +7,10 @@ import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import cast
 
 import pytest
+
 from vals_live.cli import main
 
 
@@ -25,12 +26,12 @@ class LiveSmokeTests(unittest.TestCase):
 
         code = main(["catalog"], stdout=out, stderr=err)
         assert code == 0, err.getvalue()
-        payload = json.loads(out.getvalue())
+        payload = cast("dict[str, object]", json.loads(out.getvalue()))
         assert payload["ok"]
         with TemporaryDirectory(prefix="vals-live-smoke-") as temp_dir:
             evidence = Path(temp_dir) / "vals"
             evidence.mkdir()
-            (evidence / "latest.json").write_text(
+            _ = (evidence / "latest.json").write_text(
                 json.dumps({"source": "vals", "payload": payload}, ensure_ascii=False),
                 encoding="utf-8",
             )

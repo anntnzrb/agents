@@ -4,10 +4,10 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 from .diagnostics import make
 from .identity import model_id, stable_id, variant_id
@@ -119,8 +119,8 @@ class _NumericContext:
 
 
 def _numeric_evidence(
-    context: _NumericContext, result: dict[str, Any], **kwargs: object
-) -> dict[str, Any]:
+    context: _NumericContext, result: dict[str, object], **kwargs: object
+) -> dict[str, object]:
     normalized_value = kwargs.get("normalized_value")
     unit = kwargs.get("unit")
     value_status = str(kwargs.get("value_status", "unknown"))
@@ -141,7 +141,7 @@ def _numeric_evidence(
 
 def _numeric_failure(
     context: _NumericContext, **kwargs: object
-) -> tuple[dict[str, Any], list[dict[str, object]]]:
+) -> tuple[dict[str, object], list[dict[str, object]]]:
     code = str(kwargs.get("code", "MALFORMED_PAYLOAD"))
     message = str(kwargs.get("message", "Numeric value could not be parsed."))
     unit = kwargs.get("unit")
@@ -152,12 +152,18 @@ def _numeric_failure(
     value_status = str(kwargs.get("value_status", "unparsed"))
     blocked_reason = str(kwargs.get("blocked_reason", code))
     candidates_value = kwargs.get("candidate_interpretations")
-    candidate_interpretations = (
-        candidates_value if isinstance(candidates_value, list) else None
+    candidate_interpretations: list[object] = (
+        list(cast("Sequence[object]", candidates_value))
+        if isinstance(candidates_value, (list, tuple))
+        else []
     )
     details_value = kwargs.get("details")
-    details = details_value if isinstance(details_value, Mapping) else None
-    result: dict[str, Any] = {
+    details = (
+        cast("Mapping[str, object]", details_value)
+        if isinstance(details_value, Mapping)
+        else None
+    )
+    result: dict[str, object] = {
         "raw_value": context.raw,
         "normalized_value": None,
         "unit": unit,
@@ -165,7 +171,7 @@ def _numeric_failure(
         "metric_semantics_status": (
             "ambiguous" if code == "NUMERIC_AMBIGUITY" else "invalid"
         ),
-        "candidate_interpretations": candidate_interpretations or [],
+        "candidate_interpretations": candidate_interpretations,
         "missing_reason": None,
         "source_path": context.source_path,
         "source_field": context.field,
@@ -173,7 +179,7 @@ def _numeric_failure(
         "comparison_eligibility": "blocked",
         "blocked_reasons": [blocked_reason],
     }
-    _numeric_evidence(
+    _ = _numeric_evidence(
         context,
         result,
         normalized_value=None,
@@ -198,8 +204,8 @@ def _numeric_placeholder(
     *,
     unit: object,
     message: str,
-) -> tuple[dict[str, Any], list[dict[str, object]]]:
-    result: dict[str, Any] = {
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    result: dict[str, object] = {
         "raw_value": context.raw,
         "normalized_value": None,
         "unit": unit,
@@ -213,7 +219,7 @@ def _numeric_placeholder(
         "comparison_eligibility": "blocked",
         "blocked_reasons": ["PLACEHOLDER_VALUE"],
     }
-    _numeric_evidence(
+    _ = _numeric_evidence(
         context,
         result,
         normalized_value=None,
@@ -278,7 +284,7 @@ def _numeric_success(
     number: float,
     unit: str,
     normalization: str | None,
-) -> tuple[dict[str, Any], list[dict[str, object]]]:
+) -> tuple[dict[str, object], list[dict[str, object]]]:
     semantics = (
         "known"
         if isinstance(context.definition, str) and context.definition.strip()
@@ -291,7 +297,7 @@ def _numeric_success(
         if semantics != "known"
         else []
     )
-    result: dict[str, Any] = {
+    result: dict[str, object] = {
         "raw_value": context.raw,
         "normalized_value": number,
         "unit": unit,
@@ -305,7 +311,7 @@ def _numeric_success(
         "comparison_eligibility": "eligible" if not blocked else "blocked",
         "blocked_reasons": blocked,
     }
-    _numeric_evidence(
+    _ = _numeric_evidence(
         context,
         result,
         normalized_value=number,
@@ -329,7 +335,7 @@ def _numeric_success(
 
 def normalize_numeric(
     raw: object, **kwargs: object
-) -> tuple[dict[str, Any], list[dict[str, object]]]:
+) -> tuple[dict[str, object], list[dict[str, object]]]:
     """Normalize only evidence-backed units; never coerce ambiguity or clamp values."""
     source_path_value = kwargs.get("source_path")
     field_value = kwargs.get("field")
@@ -352,7 +358,7 @@ def normalize_numeric(
 
 def _normalize_numeric(
     context: _NumericContext,
-) -> tuple[dict[str, Any], list[dict[str, object]]]:
+) -> tuple[dict[str, object], list[dict[str, object]]]:
     raw_text = context.raw.strip() if isinstance(context.raw, str) else context.raw
     lowered = raw_text.casefold() if isinstance(raw_text, str) else ""
     if lowered in _SENTINELS:
@@ -416,10 +422,12 @@ def _normalize_numeric(
 
 def _unwrap_metric(value: object) -> tuple[object, dict[str, object]]:
     if isinstance(value, Mapping):
-        metadata: dict[str, object] = dict(value)
+        val_map = cast("Mapping[str, object]", value)
+        metadata: dict[str, object] = dict(val_map)
         for key in ("value", "raw_value", "score", "accuracy", "value_raw"):
-            if key in value:
-                return value[key], metadata
+            if key in val_map:
+                return val_map[key], metadata
+        return cast("object", value), metadata
     return value, {}
 
 
@@ -467,7 +475,7 @@ class _RowContext:
 
 def _missing_row(
     row: Mapping[str, object], source_path: str
-) -> tuple[dict[str, Any], list[dict[str, object]]]:
+) -> tuple[dict[str, object], list[dict[str, object]]]:
     diagnostic = make(
         "MISSING_REQUIRED_IDENTITY",
         "A model identity was not published for this row.",
@@ -482,7 +490,7 @@ def _missing_row(
     }, [diagnostic]
 
 
-def _initial_result(context: _RowContext) -> dict[str, Any]:
+def _initial_result(context: _RowContext) -> dict[str, object]:
     row = context.row
     hint = context.benchmark_hint
     model_canonical, model_basis = model_id(
@@ -535,12 +543,12 @@ def _initial_result(context: _RowContext) -> dict[str, Any]:
             or (hint and hint.get("total_models") is not None)
             else None
         ),
-        "metrics": {},
-        "raw_fields": {},
-        "dependencies": [],
+        "metrics": cast("dict[str, object]", {}),
+        "raw_fields": cast("dict[str, object]", {}),
+        "dependencies": cast("list[object]", []),
         "independence_class": "unknown",
         "value_status": "published",
-        "source_evidence": [],
+        "source_evidence": cast("list[object]", []),
     }
 
 
@@ -567,9 +575,10 @@ def _metric_candidates(
     known_keys = set(_META_FIELDS)
     metric_container = row.get("metrics")
     if isinstance(metric_container, Mapping):
+        container_map = cast("Mapping[str, object]", metric_container)
         candidates.extend(
             (str(key), value, f"{context.source_path}.metrics.{key}")
-            for key, value in metric_container.items()
+            for key, value in container_map.items()
         )
         known_keys.add("metrics")
     for key, value in row.items():
@@ -578,12 +587,20 @@ def _metric_candidates(
         if (
             isinstance(value, Mapping)
             and key not in {"metadata", "raw_fields"}
-            and _has_metric_shape(value)
+            and _has_metric_shape(cast("Mapping[str, object]", value))
         ):
-            candidates.append((str(key), value, f"{context.source_path}.{key}"))
+            candidates.append(
+                (
+                    str(key),
+                    cast("Mapping[str, object]", value),
+                    f"{context.source_path}.{key}",
+                )
+            )
             known_keys.add(key)
         else:
-            candidates.append((str(key), value, f"{context.source_path}.{key}"))
+            candidates.append(
+                (str(key), cast("object", value), f"{context.source_path}.{key}")
+            )
     if not candidates and isinstance(row.get("score"), (int, float, str)):
         candidates.append(("score", row["score"], f"{context.source_path}.score"))
     source_zero = row.get("source_zero") is True or row.get("proven_zero") is True
@@ -612,7 +629,7 @@ def _candidate_metric(
     path: str,
     *,
     source_zero: bool,
-) -> tuple[str, object, dict[str, Any] | None, list[dict[str, object]], bool]:
+) -> tuple[str, object, dict[str, object] | None, list[dict[str, object]], bool]:
     field_name = field.rsplit(".", maxsplit=1)[-1].casefold()
     if _non_metric_field(field_name, value):
         return field, value, None, [], True
@@ -646,7 +663,7 @@ def _candidate_metric(
         artifact=context.artifact,
         extraction_method=context.document.extraction_method,
     )
-    metric = {
+    metric: dict[str, object] = {
         "family": field_name,
         "raw_label": field,
         "definition": definition,
@@ -663,17 +680,26 @@ def _candidate_metric(
 
 
 def _finalize_row(
-    result: dict[str, Any],
+    result: dict[str, object],
     row: Mapping[str, object],
     diagnostics: list[dict[str, object]],
 ) -> None:
-    if isinstance(row.get("raw_fields"), Mapping):
-        result["raw_fields"].update(dict(row["raw_fields"]))
-    if any(
-        item.get("value", {}).get("value_status") == "unparsed"
-        for item in result["metrics"].values()
-        if isinstance(item, Mapping)
-    ):
+    raw_fields_val = row.get("raw_fields")
+    if isinstance(raw_fields_val, Mapping):
+        raw_map = cast("dict[str, object]", result["raw_fields"])
+        raw_map.update(dict(cast("Mapping[str, object]", raw_fields_val)))
+    metrics_map = cast("dict[str, object]", result["metrics"])
+    has_unparsed = False
+    for item in metrics_map.values():
+        if isinstance(item, Mapping):
+            item_map = cast("Mapping[str, object]", item)
+            val_obj = item_map.get("value")
+            if isinstance(val_obj, Mapping):
+                val_map = cast("Mapping[str, object]", val_obj)
+                if val_map.get("value_status") == "unparsed":
+                    has_unparsed = True
+                    break
+    if has_unparsed:
         result["value_status"] = "unparsed"
     if diagnostics:
         result["warnings"] = diagnostics
@@ -686,7 +712,7 @@ def normalize_row(
     *,
     source_path: str = "$",
     benchmark_hint: Mapping[str, object] | None = None,
-) -> tuple[dict[str, Any], list[dict[str, object]]]:
+) -> tuple[dict[str, object], list[dict[str, object]]]:
     """Normalize one source row while preserving raw evidence and diagnostics."""
     model, benchmark, provider, variant = _row_identity(row)
     if not model:
@@ -730,10 +756,14 @@ def normalize_row(
             source_zero=source_zero,
         )
         if keep_raw:
-            result["raw_fields"][field] = value
+            raw_map = cast("dict[str, object]", result["raw_fields"])
+            raw_map[field] = value
         if metric is not None:
-            result["metrics"][field] = metric
-            result["source_evidence"].append(metric["value"]["source_evidence"])
+            metrics_map = cast("dict[str, object]", result["metrics"])
+            metrics_map[field] = metric
+            val_map = cast("Mapping[str, object]", metric["value"])
+            evidence_list = cast("list[object]", result["source_evidence"])
+            evidence_list.append(val_map["source_evidence"])
         diagnostics.extend(field_diags)
     _finalize_row(result, row, diagnostics)
     return result, diagnostics
@@ -746,9 +776,10 @@ def _iter_direct_rows(
         value = root.get(key)
         if not isinstance(value, list):
             continue
-        for index, item in enumerate(value):
+        items_seq = cast("Sequence[object]", value)
+        for index, item in enumerate(items_seq):
             if isinstance(item, Mapping):
-                yield item, f"{path}.{key}[{index}]", None
+                yield cast("Mapping[str, object]", item), f"{path}.{key}[{index}]", None
 
 
 def _iter_task_rows(
@@ -758,7 +789,8 @@ def _iter_task_rows(
     for task_name, task_rows in tasks.items():
         if not isinstance(task_rows, Mapping):
             continue
-        for model_name, metric in task_rows.items():
+        task_rows_map = cast("Mapping[str, object]", task_rows)
+        for model_name, metric in task_rows_map.items():
             row = by_model.setdefault(str(model_name), {"model": model_name})
             row[str(task_name)] = metric
     for model_name, row in by_model.items():
@@ -772,7 +804,7 @@ def _iter_nested(
     for key, value in root.items():
         if key in skipped or not isinstance(value, (Mapping, list)):
             continue
-        yield from iter_record_candidates(value, f"{path}.{key}")
+        yield from iter_record_candidates(cast("object", value), f"{path}.{key}")
 
 
 def iter_record_candidates(
@@ -780,26 +812,28 @@ def iter_record_candidates(
 ) -> Iterable[tuple[Mapping[str, object], str, Mapping[str, object] | None]]:
     """Find model rows in arbitrary JSON/decoded Astro nesting."""
     if isinstance(root, list):
-        for index, item in enumerate(root):
+        root_seq = cast("Sequence[object]", root)
+        for index, item in enumerate(root_seq):
             yield from iter_record_candidates(item, f"{path}[{index}]")
         return
     if not isinstance(root, Mapping):
         return
+    root_map = cast("Mapping[str, object]", root)
     row_keys = {"model", "model_name", "model_key", "model_slug"}
-    if any(key in root for key in row_keys):
-        yield root, path, None
-    yield from _iter_direct_rows(root, path)
-    tasks = root.get("tasks")
+    if any(key in root_map for key in row_keys):
+        yield root_map, path, None
+    yield from _iter_direct_rows(root_map, path)
+    tasks = root_map.get("tasks")
     if isinstance(tasks, Mapping):
-        yield from _iter_task_rows(tasks, path)
-    yield from _iter_nested(root, path)
+        yield from _iter_task_rows(cast("Mapping[str, object]", tasks), path)
+    yield from _iter_nested(root_map, path)
 
 
 def normalize_document_records(
     document: ParsedDocument, *, benchmark_hint: Mapping[str, object] | None = None
-) -> tuple[list[dict[str, Any]], list[dict[str, object]]]:
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     """Normalize every discoverable model row in a parsed document."""
-    records: list[dict[str, Any]] = []
+    records: list[dict[str, object]] = []
     diagnostics: list[dict[str, object]] = []
     seen_paths: set[str] = set()
     for row, path, hint in iter_record_candidates(document.root):

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -19,7 +19,7 @@ def compact(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
 
 
-def success(command: str, data: Mapping[str, Any]) -> dict[str, Any]:
+def success(command: str, data: Mapping[str, object]) -> dict[str, object]:
     """Build a successful stable command envelope."""
     return {
         "ok": True,
@@ -30,8 +30,8 @@ def success(command: str, data: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def failure(
-    command: str, code: str, message: str, details: Mapping[str, Any] | None = None
-) -> dict[str, Any]:
+    command: str, code: str, message: str, details: Mapping[str, object] | None = None
+) -> dict[str, object]:
     """Build a failed stable command envelope."""
     return {
         "ok": False,
@@ -51,11 +51,11 @@ class Diagnostic:
     message: str = ""
     source_path: str | None = None
     artifact_id: str | None = None
-    details: dict[str, Any] = field(default_factory=dict)
+    details: dict[str, object] = field(default_factory=dict)
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self) -> dict[str, object]:
         """Serialize this diagnostic for the public contract."""
-        value = {
+        value: dict[str, object] = {
             "code": self.code,
             "severity": self.severity,
             "stage": self.stage,
@@ -102,27 +102,27 @@ class RawArtifact:
 class ParsedDocument:
     """Represent one parsed source document and extraction lineage."""
 
-    root: Any
+    root: object
     document_kind: str
     extraction_method: str
-    source_paths: list[dict[str, Any]]
+    source_paths: list[dict[str, object]]
     artifact: RawArtifact
     parser: str = "vals.extraction"
     parser_version: str = "1"
-    unknown_fields: dict[str, Any] = field(default_factory=dict)
-    diagnostics: list[dict[str, Any]] = field(default_factory=list)
+    unknown_fields: dict[str, object] = field(default_factory=dict)
+    diagnostics: list[dict[str, object]] = field(default_factory=list)
 
 
 @dataclass
 class Catalog:
     """Hold discovered benchmark and model catalog populations."""
 
-    entries: list[dict[str, Any]] = field(default_factory=list)
-    active_selector_entries: list[dict[str, Any]] = field(default_factory=list)
-    all_detail_anchors: list[dict[str, Any]] = field(default_factory=list)
-    version_selector_entries: list[dict[str, Any]] = field(default_factory=list)
-    models: list[dict[str, Any]] = field(default_factory=list)
-    raw_metadata: dict[str, Any] = field(default_factory=dict)
+    entries: list[dict[str, object]] = field(default_factory=list)
+    active_selector_entries: list[dict[str, object]] = field(default_factory=list)
+    all_detail_anchors: list[dict[str, object]] = field(default_factory=list)
+    version_selector_entries: list[dict[str, object]] = field(default_factory=list)
+    models: list[dict[str, object]] = field(default_factory=list)
+    raw_metadata: dict[str, object] = field(default_factory=dict)
     diagnostics: list[Diagnostic] = field(default_factory=list)
 
 
@@ -135,12 +135,12 @@ class RequestContext:
     allow_stale: bool = False
     cache_dir: str | None = None
     release: str | None = None
-    selectors: dict[str, Any] = field(default_factory=dict)
+    selectors: dict[str, object] = field(default_factory=dict)
 
 
 def diagnostic_list(
-    items: list[Diagnostic] | list[Mapping[str, Any]],
-) -> list[dict[str, Any]]:
+    items: list[Diagnostic] | list[Mapping[str, object]],
+) -> list[dict[str, object]]:
     """Convert diagnostics to JSON-compatible dictionaries."""
     return [
         item.as_dict() if isinstance(item, Diagnostic) else dict(item) for item in items
@@ -155,9 +155,9 @@ def scope(
     release: str | None = None,
     model_variant: str | None = None,
     **extra: object,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Build the nearest-scope metadata projection."""
-    result: dict[str, Any] = {
+    result: dict[str, object] = {
         "source": source,
         "benchmark": benchmark,
         "benchmark_version": benchmark_version,

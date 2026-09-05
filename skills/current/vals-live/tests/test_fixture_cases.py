@@ -1,11 +1,12 @@
 # Copyright 2026 Vals-live contributors.
-# ruff: noqa: D102,S101,INP001
 """Exercise every numbered deterministic fixture case."""
 
 import json
 import unittest
+from typing import cast
 
 import pytest
+
 from _path import FIXTURES
 from vals_live.catalog_diff import diff
 from vals_live.contracts import ParsedDocument, RawArtifact
@@ -14,6 +15,18 @@ from vals_live.extraction import ExtractionError, extract_document
 from vals_live.normalization import normalize_document_records
 from vals_live.parsing import parse
 from vals_live.validation import validate_records
+
+
+def _root(document: ParsedDocument) -> dict[str, object]:
+    """Return the root object of a parsed fixture document."""
+    return cast("dict[str, object]", document.root)
+
+
+def _metric_value(row: dict[str, object], metric: str) -> dict[str, object]:
+    """Return the value object of one metric field."""
+    metrics = cast("dict[str, object]", row["metrics"])
+    field = cast("dict[str, object]", metrics[metric])
+    return cast("dict[str, object]", field["value"])
 
 
 class NumberedFixtureCases(unittest.TestCase):
@@ -42,14 +55,14 @@ class NumberedFixtureCases(unittest.TestCase):
 
     def test_03_new_category(self) -> None:
         document = self.json_doc("catalog/new-category.json")
-        assert "categories" in document.root
-        assert "Novel Category" in document.root["categories"]
+        assert "categories" in _root(document)
+        assert "Novel Category" in cast("list[object]", _root(document)["categories"])
 
     def test_04_new_score_column(self) -> None:
         rows, _ = normalize_document_records(
             self.json_doc("tables/new-score-column.json")
         )
-        assert "new_score" in rows[0]["raw_fields"]
+        assert "new_score" in cast("dict[str, object]", rows[0]["raw_fields"])
 
     def test_05_reordered_columns(self) -> None:
         rows, _ = normalize_document_records(
@@ -61,15 +74,21 @@ class NumberedFixtureCases(unittest.TestCase):
         catalog, rows, _diagnostics, _metadata = parse(
             self.json_doc("models/new-variant.json")
         )
-        assert len({row["model_variant_id"] for row in rows}) >= 2  # noqa: PLR2004
-        assert len(catalog.models) >= 2  # noqa: PLR2004
+        assert len({row["model_variant_id"] for row in rows}) >= 2
+        assert len(catalog.models) >= 2
 
     def test_07_rename(self) -> None:
-        left = json.loads(
-            (FIXTURES / "catalog/renamed-before.json").read_text(encoding="utf-8")
+        left = cast(
+            "object",
+            json.loads(
+                (FIXTURES / "catalog/renamed-before.json").read_text(encoding="utf-8")
+            ),
         )
-        right = json.loads(
-            (FIXTURES / "catalog/renamed-after.json").read_text(encoding="utf-8")
+        right = cast(
+            "object",
+            json.loads(
+                (FIXTURES / "catalog/renamed-after.json").read_text(encoding="utf-8")
+            ),
         )
         assert diff(left, right)["renamed"]
 
@@ -81,13 +100,13 @@ class NumberedFixtureCases(unittest.TestCase):
         rows, _ = normalize_document_records(
             self.json_doc("records/missing-optional.json")
         )
-        assert "cost_per_test" not in rows[0]["metrics"]
+        assert "cost_per_test" not in cast("dict[str, object]", rows[0]["metrics"])
 
     def test_10_placeholder_zero(self) -> None:
         rows, diagnostics = normalize_document_records(
             self.json_doc("values/placeholder-zero.json")
         )
-        assert rows[0]["metrics"]["accuracy"]["value"]["value_status"] == "missing"
+        assert _metric_value(rows[0], "accuracy")["value_status"] == "missing"
         assert "PLACEHOLDER_VALUE" in {item["code"] for item in diagnostics}
 
     def test_11_sentinels(self) -> None:
@@ -95,33 +114,32 @@ class NumberedFixtureCases(unittest.TestCase):
             self.json_doc("values/placeholder-sentinels.json")
         )
         assert all(
-            row["metrics"]["accuracy"]["value"]["value_status"] == "missing"
-            for row in rows
+            _metric_value(row, "accuracy")["value_status"] == "missing" for row in rows
         )
         assert (
             len([item for item in diagnostics if item["code"] == "PLACEHOLDER_VALUE"])
-            == 4  # noqa: PLR2004
+            == 4
         )
 
     def test_12_percent(self) -> None:
         rows, _ = normalize_document_records(
             self.json_doc("values/percentage-string.json")
         )
-        value = rows[0]["metrics"]["accuracy"]["value"]["normalized_value"]
-        assert value == 72.4  # noqa: PLR2004
+        value = _metric_value(rows[0], "accuracy")["normalized_value"]
+        assert value == 72.4
 
     def test_13_ratio_ambiguity(self) -> None:
         rows, diagnostics = normalize_document_records(
             self.json_doc("values/decimal-ratio.json")
         )
-        assert rows[0]["metrics"]["score"]["value"]["unit"] == "ratio"
+        assert _metric_value(rows[0], "score")["unit"] == "ratio"
         assert "NUMERIC_AMBIGUITY" in {item["code"] for item in diagnostics}
 
     def test_14_malformed(self) -> None:
         rows, diagnostics = normalize_document_records(
             self.json_doc("values/malformed-numeric.json")
         )
-        assert rows[1]["metrics"]["score"]["value"]["value_status"] == "unparsed"
+        assert _metric_value(rows[1], "score")["value_status"] == "unparsed"
         assert "MALFORMED_PAYLOAD" in {item["code"] for item in diagnostics}
 
     def test_15_duplicate(self) -> None:
@@ -140,17 +158,23 @@ class NumberedFixtureCases(unittest.TestCase):
         assert "MIXED_RELEASE" in {item["code"] for item in diagnostics}
 
     def test_17_etag_fixture_metadata(self) -> None:
-        payload = json.loads(
-            (FIXTURES / "transport/etag-200.json").read_text(encoding="utf-8")
+        payload = cast(
+            "dict[str, object]",
+            json.loads(
+                (FIXTURES / "transport/etag-200.json").read_text(encoding="utf-8")
+            ),
         )
         assert "etag" in payload
         assert "last_modified" in payload
 
     def test_18_404_fixture(self) -> None:
-        payload = json.loads(
-            (FIXTURES / "transport/release-404.json").read_text(encoding="utf-8")
+        payload = cast(
+            "dict[str, object]",
+            json.loads(
+                (FIXTURES / "transport/release-404.json").read_text(encoding="utf-8")
+            ),
         )
-        assert payload["http_status"] == 404  # noqa: PLR2004
+        assert payload["http_status"] == 404
 
     def test_19_embedded(self) -> None:
         artifact = RawArtifact(
@@ -188,7 +212,9 @@ class NumberedFixtureCases(unittest.TestCase):
 
     def test_23_unknown_category(self) -> None:
         document = self.json_doc("pages/unknown-category.json")
-        assert "Unmapped Future Category" in document.root["categories"]
+        assert "Unmapped Future Category" in cast(
+            "list[object]", _root(document)["categories"]
+        )
 
     def test_24_js_required(self) -> None:
         artifact = RawArtifact(
@@ -198,7 +224,7 @@ class NumberedFixtureCases(unittest.TestCase):
             content_type="text/html",
         )
         with pytest.raises(ExtractionError) as context:
-            extract_document(artifact)
+            _ = extract_document(artifact)
         assert context.value.code == "REQUIRES_RENDERED_SOURCE"
 
     def test_25_partial(self) -> None:
@@ -218,4 +244,4 @@ class NumberedFixtureCases(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

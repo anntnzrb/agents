@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Mapping
 from hashlib import sha256
+from typing import cast
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 _TRACKING = {
@@ -95,9 +97,10 @@ def snapshot_identity(raw: bytes) -> str:
 def release_identity(root: object, raw: bytes) -> tuple[str | None, str]:
     """Return source-defined release/version and always-available snapshot identity."""
     candidates: list[object] = []
-    if isinstance(root, dict):
+    if isinstance(root, Mapping):
+        root_map = cast("Mapping[str, object]", root)
         candidates.extend(
-            root[key]
+            root_map[key]
             for key in (
                 "release",
                 "release_id",
@@ -105,12 +108,13 @@ def release_identity(root: object, raw: bytes) -> tuple[str | None, str]:
                 "benchmark_version",
                 "version",
             )
-            if key in root
+            if key in root_map
         )
-        metadata = root.get("metadata")
-        if isinstance(metadata, dict):
+        metadata = root_map.get("metadata")
+        if isinstance(metadata, Mapping):
+            meta_map = cast("Mapping[str, object]", metadata)
             candidates.extend(
-                metadata[key]
+                meta_map[key]
                 for key in (
                     "release",
                     "release_id",
@@ -118,7 +122,7 @@ def release_identity(root: object, raw: bytes) -> tuple[str | None, str]:
                     "benchmark_version",
                     "version",
                 )
-                if key in metadata
+                if key in meta_map
             )
     for candidate in candidates:
         if isinstance(candidate, str) and candidate.strip():

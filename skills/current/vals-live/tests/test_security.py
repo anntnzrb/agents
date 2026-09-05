@@ -1,5 +1,4 @@
 # Copyright 2026 Vals-live contributors.
-# ruff: noqa: D102,S101,INP001
 """Exercise fixture and diagnostic credential redaction."""
 
 import json
@@ -11,7 +10,7 @@ from vals_live.diagnostics import redact
 
 _SECRET = re.compile(
     r"(?i)(authorization\s*[:=]|cookie\s*[:=]|bearer\s+"
-    r"[A-Za-z0-9._-]{8,}|-----BEGIN .*PRIVATE KEY-----)"
+    + r"[A-Za-z0-9._-]{8,}|-----BEGIN .*PRIVATE KEY-----)"
 )
 
 
@@ -42,4 +41,4 @@ class SecurityTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

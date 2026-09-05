@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Self
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from urllib.request import Request
 
 
 @dataclass
@@ -17,7 +17,7 @@ class Response:
 
     body: bytes = b""
     status: int = 200
-    headers: Mapping[str, str] | None = None
+    headers: dict[str, str] | None = None
     final_url: str = ""
 
     def __post_init__(self) -> None:
@@ -46,7 +46,7 @@ class Response:
 
     def getheader(self, name: str, default: str | None = None) -> str | None:
         """Return a header using HTTP case-insensitive matching."""
-        for key, value in self.headers.items():
+        for key, value in (self.headers or {}).items():
             if key.lower() == name.lower():
                 return value
         return default
@@ -55,12 +55,15 @@ class Response:
 class QueueOpener:
     """Queue deterministic responses without network access."""
 
+    responses: list[Response | BaseException]
+    requests: list[Request]
+
     def __init__(self, *responses: Response | BaseException) -> None:
         """Initialize the response queue and request capture."""
         self.responses = list(responses)
-        self.requests: list[object] = []
+        self.requests = []
 
-    def __call__(self, request: object, *, timeout: float = 30.0) -> Response:
+    def __call__(self, request: Request, *, timeout: float = 30.0) -> Response:
         """Record a request and return or raise its next queued result."""
         del timeout
         self.requests.append(request)

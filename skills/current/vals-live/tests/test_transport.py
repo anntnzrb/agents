@@ -1,5 +1,4 @@
 # Copyright 2026 Vals-live contributors.
-# ruff: noqa: D102,S101,INP001
 """Exercise deterministic conditional transport and cache policy."""
 
 import tempfile
@@ -7,6 +6,7 @@ import unittest
 from urllib.error import URLError
 
 import pytest
+
 from fakes.transport import QueueOpener, Response
 from vals_live import cache
 from vals_live.cache import CacheError, CacheStore, fetch
@@ -47,7 +47,7 @@ class TransportTests(unittest.TestCase):
                 assert first.body == second.body
                 assert second.cache_reused
                 headers = {
-                    str(key).lower(): value
+                    key.lower(): value
                     for key, value in opener.requests[1].headers.items()
                 }
                 assert headers.get("if-none-match") == '"x"'
@@ -73,13 +73,13 @@ class TransportTests(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory() as directory:
                 store = CacheStore(directory)
-                fetch(
+                _ = fetch(
                     "https://www.vals.ai/benchmarks",
                     discovered_from="fixture://vals",
                     cache=store,
                 )
                 with pytest.raises(CacheError) as context:
-                    fetch(
+                    _ = fetch(
                         "https://www.vals.ai/benchmarks",
                         discovered_from="fixture://vals",
                         cache=store,
@@ -101,7 +101,7 @@ class TransportTests(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory() as directory:
                 with pytest.raises(CacheError) as context:
-                    fetch(
+                    _ = fetch(
                         "https://www.vals.ai/benchmarks",
                         discovered_from="fixture://vals",
                         cache=CacheStore(directory),
@@ -112,4 +112,4 @@ class TransportTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

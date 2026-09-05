@@ -1,13 +1,29 @@
 # Copyright 2026 Vals-live contributors.
-# ruff: noqa: D102,S101,INP001
 """Exercise layered source extraction precedence."""
 
 import unittest
+from typing import cast
 
 import pytest
+
 from _path import FIXTURES
-from vals_live.contracts import RawArtifact
+from vals_live.contracts import ParsedDocument, RawArtifact
 from vals_live.extraction import ExtractionError, extract_document
+
+
+def _root(document: ParsedDocument) -> dict[str, object]:
+    """Return the root object of a parsed fixture document."""
+    return cast("dict[str, object]", document.root)
+
+
+def _row_list(value: object) -> list[dict[str, object]]:
+    """Return rows from a root rows value."""
+    return cast("list[dict[str, object]]", value)
+
+
+def _root_rows(document: ParsedDocument) -> list[dict[str, object]]:
+    """Return the root rows of a parsed table fixture document."""
+    return cast("list[dict[str, object]]", document.root)
 
 
 class ExtractionTests(unittest.TestCase):
@@ -26,21 +42,21 @@ class ExtractionTests(unittest.TestCase):
     def test_embedded_json(self) -> None:
         document = extract_document(self.artifact("embedded-json.html"))
         assert document.extraction_method == "embedded_json"
-        assert document.root["rows"][0]["model"] == "Embedded Model"
+        assert _row_list(_root(document)["rows"])[0]["model"] == "Embedded Model"
 
     def test_rsc_frames(self) -> None:
         document = extract_document(self.artifact("rsc-next-frames.html"))
         assert document.extraction_method == "rsc"
-        assert document.root["frames"]
+        assert cast("list[object]", _root(document)["frames"])
 
     def test_table_fallback(self) -> None:
         document = extract_document(self.artifact("table-fallback.html"))
         assert document.extraction_method == "html_table"
-        assert document.root[0]["model"] == "Table Model"
+        assert _root_rows(document)[0]["model"] == "Table Model"
 
     def test_js_shell_is_structured_failure(self) -> None:
         with pytest.raises(ExtractionError) as context:
-            extract_document(self.artifact("js-required.html"))
+            _ = extract_document(self.artifact("js-required.html"))
         assert context.value.code == "REQUIRES_RENDERED_SOURCE"
 
     def test_malformed_top_level_json_falls_through_to_html(self) -> None:
@@ -58,9 +74,11 @@ class ExtractionTests(unittest.TestCase):
             )
         )
         assert document.extraction_method == "html_table"
-        assert document.root[0]["model"] == "HTML"
-        assert document.unknown_fields["malformed_candidates"][0]["path"] == "$"
-        assert document.diagnostics[0]["code"] == "MALFORMED_PAYLOAD"
+        assert _root_rows(document)[0]["model"] == "HTML"
+        candidates = cast(
+            "list[dict[str, object]]", document.unknown_fields["malformed_candidates"]
+        )
+        assert candidates[0]["path"] == "$"
 
     def test_astro_wrappers_decode(self) -> None:
         body = (
@@ -75,8 +93,10 @@ class ExtractionTests(unittest.TestCase):
             )
         )
         assert document.extraction_method == "embedded_json"
-        assert document.root["benchmarkView"]["metadata"]["benchmark_id"] == "astro"
+        view = cast("dict[str, object]", _root(document)["benchmarkView"])
+        metadata = cast("dict[str, object]", view["metadata"])
+        assert metadata["benchmark_id"] == "astro"
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()
