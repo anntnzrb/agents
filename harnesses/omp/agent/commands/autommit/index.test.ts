@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { consumeCompletedReceipt, preparedCommitTreeMatchesIndex, selectPatch, unquoteGitPath } from "./index";
+import { consumeCompletedReceipt, emitTrace, preparedCommitTreeMatchesIndex, selectPatch, unquoteGitPath } from "./index";
 import { readReceipt, writeReceipt } from "./transaction";
 
 
@@ -124,5 +124,30 @@ describe("unquoteGitPath", () => {
   test("passes unquoted paths through unchanged", () => {
     expect(unquoteGitPath("plain/path.txt")).toBe("plain/path.txt");
     expect(unquoteGitPath("тест.txt")).toBe("тест.txt");
+  });
+});
+
+describe("emitTrace", () => {
+  test("does nothing when debug is disabled", () => {
+    expect(() => emitTrace(false, "test_event")).not.toThrow();
+  });
+
+  test("emits JSON trace when debug is enabled", () => {
+    const writes: string[] = [];
+    const originalWrite = process.stderr.write;
+    process.stderr.write = ((chunk: string) => {
+      writes.push(chunk);
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      emitTrace(true, "test_event", { foo: "bar" });
+      expect(writes.length).toBe(1);
+      const parsed = JSON.parse(writes[0]);
+      expect(parsed.event).toBe("test_event");
+      expect(parsed.foo).toBe("bar");
+      expect(typeof parsed.timestamp).toBe("string");
+    } finally {
+      process.stderr.write = originalWrite;
+    }
   });
 });

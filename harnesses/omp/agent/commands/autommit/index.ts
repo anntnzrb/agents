@@ -132,6 +132,7 @@ const MAX_RETRIES = 3;
 
 interface CommitOptions {
     readonly context: readonly string[];
+    readonly debug: boolean;
 }
 
 interface ParseState {
@@ -153,7 +154,10 @@ interface AppliedCommitResult {
 }
 
 const initialParseState: ParseState = {
-    options: { context: [] },
+    options: {
+        context: [],
+        debug: process.env.DEBUG === "1" || process.env.AUTOMMIT_DEBUG === "1",
+    },
     awaitingContext: false,
     passthrough: false,
 };
@@ -180,6 +184,9 @@ const reduceArgument = (state: ParseState, argument: string): ParseState => {
     if (argument === "--") {
         return { ...state, passthrough: true };
     }
+    if (argument === "--debug") {
+        return { ...state, options: { ...state.options, debug: true } };
+    }
     if (argument === "--context") return { ...state, awaitingContext: true };
     if (argument.startsWith("--context=")) {
         const value = argument.slice("--context=".length);
@@ -201,6 +208,15 @@ const parseArgs = (args: readonly string[]): ParseResult => {
 const composeContext = (options: CommitOptions): string =>
     [...options.context].filter(Boolean).join("\n\n");
 
+export const emitTrace = (enabled: boolean, event: string, data?: Record<string, unknown>): void => {
+    if (!enabled) return;
+    const entry = {
+        timestamp: new Date().toISOString(),
+        event,
+        ...data,
+    };
+    process.stderr.write(`${JSON.stringify(entry)}\n`);
+};
 const proposalExists = (state: CommitAgentState): boolean =>
     Boolean(state.proposal || state.splitProposal);
 type CommitPhase = "propose" | "forced-split" | "finalized";
@@ -948,8 +964,25 @@ const runCommitAgent = async (
         contextFiles,
         slashCommands: [],
     });
+    const isDebug = options.debug;
+    if (isDebug) {
+        session.subscribe(event => {
+            if (event.type === "tool_execution_start") {
+                emitTrace(true, "tool_start", { tool: event.toolName, toolCallId: event.toolCallId, args: event.args });
+            } else if (event.type === "tool_execution_end") {
+                emitTrace(true, "tool_end", { tool: event.toolName, toolCallId: event.toolCallId, result: event.result });
+            } else if (event.type === "message_end") {
+                const msg = event.message as { role?: string; errorMessage?: string; stopReason?: string } | undefined;
+                if (msg?.errorMessage) {
+                    emitTrace(true, "message_error", { error: msg.errorMessage });
+                }
+            }
+        });
+    }
+
     const promptAgent = async (attempt: number): Promise<void> => {
         if (proposalExists(state) || attempt >= MAX_RETRIES) return;
+        emitTrace(isDebug, "agent_prompt", { attempt, hasProposal: Boolean(state.proposal), hasSplitProposal: Boolean(state.splitProposal) });
         try {
             await session.prompt(
                 attempt === 0
