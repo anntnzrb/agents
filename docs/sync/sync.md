@@ -18,7 +18,7 @@ Unknown commands and invalid arguments exit with status `2`. A manual sync exits
 
 A manual sync runs these stages in order:
 
-1. Build the sync plan and managed cleanup plan.
+1. Build and validate the sync plan and managed cleanup plan before any bootstrap effects. Malformed input fails without managed writes. The `~/.omp/python-env` bootstrap runs only when the `omp` adapter is enabled.
 2. Remove stale top-level harness entries that earlier sync runs owned.
 3. Install the sync runtime and reconcile source files, shared assets, skills, and generated configuration.
 4. On the gateway host, prepare managed tools from the committed release manifest.
@@ -26,11 +26,11 @@ A manual sync runs these stages in order:
 6. Record managed harness entries.
 7. Run package-bootstrap and extension-dependency hooks.
 
-The process lock is `~/.local/share/agents/sync-managed/sync.lock`. A second manual sync reports the lock and exits with status `0` without changing targets. A watchdog ends a manual sync after 15 minutes with status `124`.
+The process lock is `~/.local/share/agents/sync-managed/sync.lock`. A second manual sync reports the lock and exits with status `0` without changing targets. A manual sync requests cancellation after 15 minutes, allows up to 30 seconds for process-group cleanup and stage `finally` blocks, then exits with status `124` (forced termination cannot promise Python-level cleanup). Pre-launch sync is similarly bounded and falls back to the cached package with a warning on expiry; the launched harness session is never killed by an expired sync timer.
 
 ## File reconciliation
 
-Sync compares file content and modes before replacement. An unchanged run leaves matching files in place.
+Sync compares file content and modes before replacement. An unchanged run leaves matching files in place (inode and mtime preserved). Secrets and new state files use mode `0600`; existing state files keep their regular-file mode; executable wrappers use `0755`. Subprocess stdout/stderr share a 10 MiB retained-byte limit; overflow terminates the process group and fails explicitly without parsing partial stdout. Package bootstrap publishes runtime settings only when every declared package resolves; partial failures leave settings bytes and mode untouched (an empty valid manifest deliberately publishes an empty list).
 
 Directory jobs use one of two scopes:
 

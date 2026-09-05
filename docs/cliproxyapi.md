@@ -52,7 +52,7 @@ For ClinePass, create a long-lived API key in **Settings > API Keys** at [app.cl
 Apply the change:
 
 ```bash
-bun ./sync/src/cli.ts sync
+uv run --project sync sync sync
 ```
 
 ## Authenticate ChatGPT
