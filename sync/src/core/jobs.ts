@@ -4,7 +4,7 @@ import { basename, dirname, join, relative } from "node:path";
 import { assertNever, err, panicMessage, warn } from "@runtime/errors.ts";
 import { isSymlink, rmEntry, syncManagedChildren, syncManagedTree } from "@runtime/fs.ts";
 import { runProcess } from "@runtime/process.ts";
-import { syncClientModelCatalog, syncCliProxyConfig } from "./cliproxy-config.ts";
+import { syncCliProxyConfig } from "./cliproxy-config.ts";
 import { isCliProxyTargetReady, publishCliProxyEndpointTemplates } from "./cliproxy-deployment.ts";
 import type { Job, SyncRuntimeInstallJob } from "./plan.ts";
 import { syncSecretTemplate } from "./secret-template.ts";
@@ -13,11 +13,6 @@ type SourceContentCache = Map<string, { readonly metadata: fs.Stats; readonly co
 
 export type { Job, JobKind } from "./plan.ts";
 
-export interface JobRunOptions {
-  readonly forceModelRefresh?: boolean;
-  readonly quietModelRefresh?: boolean;
-}
-
 interface JobRunState {
   cliProxyTargetReady: boolean | undefined;
 }
@@ -25,12 +20,11 @@ interface JobRunState {
 export async function runJobsWithPreserve(
   jobs: readonly Job[],
   preservePathsByDst: ReadonlyMap<string, readonly string[]> = new Map(),
-  options: JobRunOptions = {},
 ): Promise<boolean> {
   const sourceContentCache: SourceContentCache = new Map();
   const state: JobRunState = { cliProxyTargetReady: undefined };
   for (const job of jobs) {
-    if (!(await runJob(job, preservePathsByDst, sourceContentCache, options, state))) {
+    if (!(await runJob(job, preservePathsByDst, sourceContentCache, state))) {
       return false;
     }
   }
@@ -41,7 +35,6 @@ async function runJob(
   job: Job,
   preservePathsByDst: ReadonlyMap<string, readonly string[]>,
   sourceContentCache: SourceContentCache,
-  options: JobRunOptions,
   state: JobRunState,
 ): Promise<boolean> {
   try {
@@ -91,7 +84,7 @@ async function runJob(
         return true;
       }
       case "CliProxyConfig":
-        if (state.cliProxyTargetReady === false) {
+        if (state.cliProxyTargetReady === false || job.gatewayHost === false) {
           return true;
         }
         if (!fs.existsSync(job.src)) {
@@ -99,33 +92,10 @@ async function runJob(
           return true;
         }
         if (!fs.existsSync(job.secretsPath)) {
-          if (job.gatewayHost === false) {
-            await syncClientModelCatalog(job.src, job.deployment, {
-              ...(job.cacheRoot === undefined ? {} : { cacheRoot: job.cacheRoot }),
-              ...(job.runtimeRoot === undefined ? {} : { runtimeRoot: job.runtimeRoot }),
-              ...(options.forceModelRefresh === undefined
-                ? {}
-                : { forceModelRefresh: options.forceModelRefresh }),
-              ...(options.quietModelRefresh === undefined
-                ? {}
-                : { quietModelRefresh: options.quietModelRefresh }),
-            });
-            return true;
-          }
           warn(`missing local secrets ${job.secretsPath}; skipping ${job.dst}`);
           return true;
         }
-        await syncCliProxyConfig(job.src, job.dst, job.secretsPath, job.deployment, {
-          writeServerConfig: job.gatewayHost !== false,
-          ...(job.cacheRoot === undefined ? {} : { cacheRoot: job.cacheRoot }),
-          ...(job.runtimeRoot === undefined ? {} : { runtimeRoot: job.runtimeRoot }),
-          ...(options.forceModelRefresh === undefined
-            ? {}
-            : { forceModelRefresh: options.forceModelRefresh }),
-          ...(options.quietModelRefresh === undefined
-            ? {}
-            : { quietModelRefresh: options.quietModelRefresh }),
-        });
+        await syncCliProxyConfig(job.src, job.dst, job.secretsPath, job.deployment);
         return true;
       case "SyncRuntimeInstall":
         return await runSyncRuntimeInstallJob(job);

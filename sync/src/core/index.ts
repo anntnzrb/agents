@@ -106,7 +106,6 @@ export async function runSync(
   syncEnv: SyncEnv,
   options: {
     readonly warnManagedServices?: boolean;
-    readonly forceModelRefresh?: boolean;
   } = {},
 ): Promise<boolean> {
   await ensurePythonEnv(syncEnv.home, syncEnv.installTimeoutMs);
@@ -129,12 +128,6 @@ export async function runSync(
       baseSuccess = await runJobsWithPreserve(
         syncPlan.jobs,
         preservePathsByDst(extensionHookStates),
-        {
-          ...(options.forceModelRefresh === undefined
-            ? {}
-            : { forceModelRefresh: options.forceModelRefresh }),
-          quietModelRefresh: !options.warnManagedServices,
-        },
       );
     } catch (error) {
       err(panicMessage(error));
@@ -188,9 +181,7 @@ export async function runSync(
   return success;
 }
 
-export const main = async (
-  options: { readonly forceModelRefresh?: boolean } = {},
-): Promise<number> => {
+export const main = async (): Promise<number> => {
   let syncEnv: SyncEnv;
   try {
     syncEnv = SyncEnv.fromSystem();
@@ -217,9 +208,6 @@ export const main = async (
     try {
       const success = await runSync(syncEnv, {
         warnManagedServices: true,
-        ...(options.forceModelRefresh === undefined
-          ? {}
-          : { forceModelRefresh: options.forceModelRefresh }),
       });
       return success ? 0 : 1;
     } finally {

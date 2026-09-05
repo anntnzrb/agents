@@ -484,8 +484,6 @@ test("cliproxy_endpoint_publication_is_one_job_after_config_and_directory_copies
     for (const [harness, relativeRoot, relativeFile] of [
       ["codex", "", "config.toml"],
       ["opencode", "", "opencode.jsonc"],
-      ["opencode", "", join("plugins", "cliproxy.ts")],
-      ["pi", "agent", join("extensions", "cliproxy", "index.ts")],
       ["omp", "agent", "models.yml"],
     ] as const) {
       const sourceRoot = join(agents, "harnesses", harness, relativeRoot);
@@ -501,7 +499,7 @@ test("cliproxy_endpoint_publication_is_one_job_after_config_and_directory_copies
     if (endpointJob?.kind !== "CliProxyEndpointTemplates") {
       return;
     }
-    assert.equal(endpointJob.targets.length, 5);
+    assert.equal(endpointJob.targets.length, 3);
     const codexTarget = endpointJob.targets.find((target) =>
       target.dst.endsWith(join(".codex", "config.toml")),
     );

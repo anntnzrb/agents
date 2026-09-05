@@ -10,7 +10,6 @@ A gateway host has an OS hostname that matches `server.hostname` in `tools/clipr
 | --- | --- |
 | `bun ./sync/src/cli.ts` | Runs a normal reconciliation |
 | `bun ./sync/src/cli.ts sync` | Runs the same normal reconciliation |
-| `bun ./sync/src/cli.ts sync --refresh-models` | Bypasses model-catalog freshness windows and rejects stale network data |
 | `bun ~/.local/share/agents/sync-current/src/cli.ts launch <name> -- <arguments>` | Syncs when the source is available, prepares the harness or tool package, and launches it |
 
 Unknown commands and invalid arguments exit with status `2`. A manual sync exits with status `1` after a fatal reconciliation error.
@@ -48,40 +47,22 @@ A client host can operate without `secrets.local.json`. A launch-time sync treat
 
 ## CLIProxyAPI jobs
 
-The configuration job reads `tools/cliproxyapi/config.yaml.tmpl` and `tools/cliproxyapi/deployment.json`. When `secrets.local.json` exists, the job reads it. On the gateway host, it uses the file to render the server configuration and discover catalogs. On a client host, it uses the file for source discovery without writing the server configuration.
+The configuration job reads `tools/cliproxyapi/config.yaml.tmpl` and `tools/cliproxyapi/deployment.json`. When `secrets.local.json` exists, the job reads it. On the gateway host, it uses the file to render the server configuration. On a client host, it does not write the server configuration.
 
-On the gateway host, the job writes these private files with mode `0600`:
+On the gateway host, the job writes the private file with mode `0600`:
 
 - `~/.cli-proxy-api/config.yaml`
-- `~/.local/share/agents/model-catalog/catalog.json`
 
-On a client host, the job never writes the server configuration. A client without local secrets builds the model catalog from the gateway `/v1/models` response, the rich gateway response, and [models.dev](https://models.dev/). A client with local secrets also discovers the configured API-key sources.
+On a client host, the job never writes the server configuration.
 
-Sync validates `tools/cliproxyapi/deployment.json` before reconciliation. It injects `listen.host` and `listen.port` into the generated gateway configuration. It uses `client.baseUrl` for model discovery and readiness checks.
+Sync validates `tools/cliproxyapi/deployment.json` before reconciliation. It injects `listen.host` and `listen.port` into the generated gateway configuration.
 
-The readiness job checks `client.baseUrl/models` without authentication on client hosts. The response must contain a non-empty `data` array. When the endpoint is unavailable, sync preserves the existing client configuration, model catalog, and harness endpoint files.
-
+The readiness job checks `client.baseUrl/models` without authentication on client hosts. The response must contain a non-empty `data` array. When the endpoint is unavailable, sync preserves the existing harness endpoint files.
 The gateway host also receives `tools/cliproxyapi/panel.html` at `~/.cli-proxy-api/static/management.html`. Client hosts do not receive the panel.
 
 Endpoint publication replaces every configured `${CLIPROXY_CLIENT_BASE_URL}` harness target as one transaction. Publication preserves the Codex-owned `[hooks.state]` and `[projects]` tables in `~/.codex/config.toml`. A write failure restores every target's previous content and mode.
 
-The renderer parses and serializes YAML with Bun. It expands credential pools into the CLIProxyAPI profile selected by each model's provider metadata. The job writes generated files through a temporary file and an atomic rename.
-
-## Model-catalog caches
-
-The template declares provider endpoints, credential pools, public prefixes, and models.dev provider IDs under `x-model-sources`. Each source uses `<base-url>/models` and the top-level `data` array unless it sets `models-url` or `models-field`.
-
-| Catalog | Freshness window | Cache file |
-| --- | --- | --- |
-| models.dev | 1 hour | `~/.cache/agents/model-catalog/models-dev.json` |
-| Provider model catalog | 6 hours | `~/.cache/agents/model-catalog/source-<id>.json` |
-| CLIProxyAPI `/v1/models` | 1 hour | `~/.cache/agents/model-catalog/gateway.json` |
-| CLIProxyAPI rich `/v1/models` | 1 hour | `~/.cache/agents/model-catalog/gateway-rich.json` |
-
-Each cache entry records the request URL. Sync ignores a cache entry created for another URL. Expired entries use ETag revalidation when the server supplied an ETag. A normal sync accepts a stale entry after a refresh error. A launch-time sync suppresses stale-cache warnings. A forced refresh rejects stale data.
-
-After catalog publication, sync removes the obsolete `~/.cache/agents/model-catalog/catalog.json` file.
-
+The renderer parses and serializes YAML with Bun. It expands credential pools into native and compatibility profiles. The job writes generated files through a temporary file and an atomic rename.
 ## Installed runtime
 
 Sync copies `sync/src/`, `sync/tsconfig.json`, `sync/package.json`, and `sync/bun.lock` into a content-addressed release under `~/.local/share/agents/sync-releases/<releaseId>/`, then runs `bun install --frozen-lockfile --production` there so the installed copy resolves its runtime dependencies. A `~/.local/share/agents/sync-current` symlink always points to the most recently published release. Generated wrappers execute this installed copy.

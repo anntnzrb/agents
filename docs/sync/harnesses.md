@@ -35,10 +35,7 @@ A harness uses CLIProxyAPI when its committed source defines a `cliproxy` provid
 
 Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `tools/cliproxyapi/deployment.json`. Harness providers use a static placeholder key because their SDKs require a non-empty value. The gateway ignores that key.
 
-Harnesses can use native model discovery or read `~/.local/share/agents/model-catalog/catalog.json` through their runtime integration. Each harness owns its model-selector syntax and discovery adapter.
-
-API-key model IDs use the prefix declared by `x-model-sources`. OAuth model IDs use the prefix stored in the CLIProxyAPI auth files.
-
+Harnesses use their native model discovery or configured model definitions against the gateway endpoint.
 ## Launch wrappers
 
 Sync writes wrappers under `~/.local/bin/` and expects that directory on `PATH`.

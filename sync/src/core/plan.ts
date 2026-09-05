@@ -67,8 +67,6 @@ export type Job =
       readonly secretsPath: string;
       readonly deployment: CliProxyDeployment;
       readonly gatewayHost?: boolean;
-      readonly cacheRoot?: string;
-      readonly runtimeRoot?: string;
     }
   | {
       readonly kind: "SyncRuntimeInstall";
@@ -265,8 +263,7 @@ function instructionJobs(syncEnv: SyncEnv, harnesses: readonly HarnessPlan[]): J
 const CLIPROXY_ENDPOINT_TEMPLATE_PATHS: Partial<Record<Harness["id"], readonly string[]>> = {
   codex: ["config.toml"],
   grok: ["config.toml"],
-  opencode: ["opencode.jsonc", join("plugins", "cliproxy.ts")],
-  pi: [join("extensions", "cliproxy", "index.ts")],
+  opencode: ["opencode.jsonc"],
   omp: ["models.yml"],
 };
 
@@ -313,8 +310,6 @@ function configJobs(
       secretsPath: join(syncEnv.home, ".config", "agents", "secrets.local.json"),
       deployment,
       gatewayHost,
-      cacheRoot: join(syncEnv.home, ".cache", "agents", "model-catalog"),
-      runtimeRoot: syncEnv.runtimeHome,
     },
     ...(gatewayHost
       ? [

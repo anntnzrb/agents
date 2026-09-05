@@ -88,6 +88,10 @@ openai-compatibility:
         alias: "nnn-deepseek-v4-pro-max"
         display-name: "[nnn] DeepSeek V4 Pro (Max)"
         force-mapping: true
+  - name: "opencode-zen-custom"
+    prefix: "zen"
+    base-url: "https://opencode.ai/zen/v1"
+    x-credential-pool: "opencode-zen"
   - name: "cline-pass-custom"
     prefix: "cline-pass"
     base-url: "https://api.cline.bot/api/v1"
@@ -197,30 +201,6 @@ payload:
         - name: "cline-pass/qwen3.8-max"
       params:
         reasoning_effort: "xhigh"
-
-x-model-sources:
-  - id: "opencode-go"
-    models-dev-provider: "opencode-go"
-    credential-pool: "opencode-go"
-    prefix: "go"
-    base-url: "https://opencode.ai/zen/go/v1"
-  - id: "opencode-zen"
-    models-dev-provider: "opencode"
-    credential-pool: "opencode-zen"
-    prefix: "zen"
-    base-url: "https://opencode.ai/zen/v1"
-  - id: "cline-pass"
-    models-dev-provider: "cline-pass"
-    credential-pool: "cline-pass"
-    prefix: "cline-pass"
-    base-url: "https://api.cline.bot/api/v1"
-    models-url: "https://api.cline.bot/api/v1/ai/cline/recommended-models"
-    models-field: "clinePass"
-  - id: "command-code"
-    models-dev-provider: "openrouter"
-    credential-pool: "command-code"
-    prefix: "cmd"
-    base-url: "https://api.commandcode.ai/provider/v1"
 
 oauth-excluded-models:
   antigravity:

@@ -69,7 +69,6 @@ test("integration_happy_path_matches_expected_outputs", async () => {
     for (const path of [
       join(home, ".codex", "config.toml"),
       join(home, ".config", "opencode", "opencode.jsonc"),
-      join(home, ".pi", "agent", "extensions", "cliproxy", "index.ts"),
       join(home, ".omp", "agent", "models.yml"),
     ]) {
       const content = readFileSync(path, "utf8");
@@ -111,19 +110,15 @@ test("integration_unavailable_client_preserves_all_cliproxy_artifacts", async ()
     writeDeployment(home, "different-host", "http://127.0.0.1:1/v1");
 
     const configPath = join(home, ".cli-proxy-api", "config.yaml");
-    const catalogPath = join(home, ".local", "share", "agents", "model-catalog", "catalog.json");
     mkdirSync(join(home, ".cli-proxy-api"), { recursive: true });
-    mkdirSync(join(home, ".local", "share", "agents", "model-catalog"), { recursive: true });
     writeFileSync(configPath, "existing-server-config\n", { mode: 0o600 });
-    writeFileSync(catalogPath, '{"models":[{"id":"existing"}]}\n', { mode: 0o600 });
 
     const endpointPaths = [
       join(home, ".codex", "config.toml"),
       join(home, ".config", "opencode", "opencode.jsonc"),
-      join(home, ".pi", "agent", "extensions", "cliproxy", "index.ts"),
       join(home, ".omp", "agent", "models.yml"),
     ];
-    const activePaths = [configPath, catalogPath, ...endpointPaths];
+    const activePaths = [configPath, ...endpointPaths];
     const before = activePaths.map((path) => ({
       content: readFileSync(path, "utf8"),
       mode: lstatSync(path).mode & 0o777,
@@ -371,23 +366,7 @@ codex-api-key:
     join(home, ".config", "agents", "harnesses", "opencode", "opencode.jsonc"),
     `"baseURL": "${CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n`,
   );
-  mkdirSync(join(home, ".config", "agents", "harnesses", "pi", "agent", "extensions", "cliproxy"), {
-    recursive: true,
-  });
-  writeFileSync(
-    join(
-      home,
-      ".config",
-      "agents",
-      "harnesses",
-      "pi",
-      "agent",
-      "extensions",
-      "cliproxy",
-      "index.ts",
-    ),
-    `const baseUrl = "${CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}";\n`,
-  );
+
   writeFileSync(
     join(home, ".codex", "config.toml"),
     'base_url = "http://old-gateway.example.test/v1"\n',
@@ -396,11 +375,7 @@ codex-api-key:
     join(home, ".config", "opencode", "opencode.jsonc"),
     '"baseURL": "http://old-gateway.example.test/v1"\n',
   );
-  mkdirSync(join(home, ".pi", "agent", "extensions", "cliproxy"), { recursive: true });
-  writeFileSync(
-    join(home, ".pi", "agent", "extensions", "cliproxy", "index.ts"),
-    'const baseUrl = "http://old-gateway.example.test/v1";\n',
-  );
+
   writeFileSync(
     join(home, ".config", "agents", "harnesses", "deepseek", "cordis.patch.yml"),
     "[]\n",
