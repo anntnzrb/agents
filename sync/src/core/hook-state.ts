@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { isErrno } from "@runtime/errors.ts";
+import { isIgnoredSyncEntry } from "@runtime/fs.ts";
 import { Schema } from "effect";
 import type { ExtensionDepsHookPlan } from "./plan.ts";
 
@@ -196,7 +197,10 @@ function exists(targetPath: string): boolean {
 }
 
 const shouldSkipEntry = (entryName: string): boolean =>
-  entryName === "node_modules" || entryName === ".git" || entryName.startsWith(".");
+  entryName === "node_modules" ||
+  entryName === ".git" ||
+  entryName.startsWith(".") ||
+  isIgnoredSyncEntry(entryName);
 
 const normalizeRelativePath = (pathValue: string): string => pathValue.split(sep).join("/");
 

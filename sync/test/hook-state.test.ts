@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildHarness } from "@core/harness.ts";
 import { HARNESS_ADAPTERS } from "@core/harness-adapters.ts";
-import { fingerprintTree, prepareExtensionHookState } from "@core/hook-state.ts";
+import {
+  fingerprintTree,
+  prepareExtensionHookState,
+  recordExtensionHookState,
+} from "@core/hook-state.ts";
 
 const makeRoot = (): string => mkdtempSync(join(tmpdir(), "hook-state-test-"));
 
@@ -30,6 +34,23 @@ describe("fingerprintTree", () => {
       writeFileSync(join(root, "src", "a.ts"), "b");
       const second = fingerprintTree(root);
       expect(first).not.toBe(second);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("ignores python cache directories and compiled files", () => {
+    const root = makeRoot();
+    try {
+      mkdirSync(join(root, "src", "__pycache__"), { recursive: true });
+      writeFileSync(join(root, "src", "a.py"), "print(1)");
+      writeFileSync(join(root, "src", "__pycache__", "a.cpython-312.pyc"), "bytecode");
+      writeFileSync(join(root, "src", "compiled.pyo"), "bytecode");
+      const baseline = fingerprintTree(root);
+
+      writeFileSync(join(root, "src", "__pycache__", "a.cpython-312.pyc"), "mutated");
+      writeFileSync(join(root, "src", "compiled.pyo"), "mutated");
+      expect(fingerprintTree(root)).toBe(baseline);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -152,7 +173,6 @@ describe("prepareExtensionHookState", () => {
       const prepared = prepareExtensionHookState(hook);
       expect(prepared.shouldSkip).toBe(false);
 
-      const { recordExtensionHookState } = require("@core/hook-state.ts");
       recordExtensionHookState(hook, prepared);
 
       const updatedState = prepareExtensionHookState(hook);
