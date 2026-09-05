@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: odoo-ops
-description: "Use when running Odoo 17 dev server, test runner, linter/formatter, querying remote/production instances via read-only JSON-RPC, and inspecting workspaces or databases."
+description: "Odoo 17 dev server, test runner, lint/format, read-only JSON-RPC queries, workspace and database inspection."
 license: AGPL-3.0-or-later
 ---
 

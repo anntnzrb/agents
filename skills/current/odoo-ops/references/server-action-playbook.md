@@ -30,39 +30,46 @@ Server Actions created from the Odoo UI under Settings/Technical/Actions/Server 
 # safe_eval-compatible JSON helpers: no imports, no json.dumps.
 def esc(value):
     if value is None:
-        return 'null'
+        return "null"
     if value is False:
-        return 'false'
+        return "false"
     if value is True:
-        return 'true'
+        return "true"
     if isinstance(value, (int, float)):
         return str(value)
     text = str(value)
-    text = text.replace('\\', '\\\\').replace('"', '\\"')
-    text = text.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+    text = text.replace("\\", "\\\\").replace('"', '\\"')
+    text = text.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
     return '"' + text + '"'
 
+
 def pair(key, value):
-    return esc(key) + ':' + esc(value)
+    return esc(key) + ":" + esc(value)
+
 
 def obj(items):
-    return '{' + ','.join(items) + '}'
+    return "{" + ",".join(items) + "}"
+
 
 def arr(values):
-    return '[' + ','.join([esc(value) for value in values]) + ']'
+    return "[" + ",".join([esc(value) for value in values]) + "]"
+
 
 def m2o(value):
     if not value:
-        return 'null'
-    return obj([pair('id', value[0]), pair('name', value[1])])
+        return "null"
+    return obj([pair("id", value[0]), pair("name", value[1])])
+
 
 def group_obj(row, group_field):
     group_value = row.get(group_field)
-    return obj([
-        pair('key', group_value and group_value[0] or False),
-        pair('label', group_value and group_value[1] or False),
-        pair('count', row.get(group_field + '_count') or row.get('__count') or 0),
-    ])
+    return obj(
+        [
+            pair("key", group_value and group_value[0] or False),
+            pair("label", group_value and group_value[1] or False),
+            pair("count", row.get(group_field + "_count") or row.get("__count") or 0),
+        ]
+    )
 ```
 
 ## Output policy

@@ -48,12 +48,12 @@ Literal `match` only for genuine scalar dispatch:
 
 ```python
 match OUTPUT_MODE:
-    case 'audit':
-        output_kind = 'json'
-    case 'open_records':
-        output_kind = 'window_action'
+    case "audit":
+        output_kind = "json"
+    case "open_records":
+        output_kind = "window_action"
     case _:
-        raise UserError('unsupported_output_mode')
+        raise UserError("unsupported_output_mode")
 ```
 
 Do not turn a two-branch boolean check into `match`; modern-looking ceremony is not an improvement.
