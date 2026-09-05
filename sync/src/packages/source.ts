@@ -23,17 +23,26 @@ export function stagingDirFor(finalDir: string): string {
 }
 
 export async function replaceDirAtomically(src: string, dst: string): Promise<void> {
-  const backup = withExtension(dst, "backup");
+  const now = BigInt(Date.now()) * 1000000n;
+  const backup = withExtension(dst, `backup-${process.pid}-${now}`);
+  const legacyBackup = withExtension(dst, "backup");
+  if (exists(legacyBackup)) {
+    rmEntry(legacyBackup);
+  }
   rmEntry(backup);
+  let movedToBackup = false;
   if (exists(dst)) {
     await fsp.rename(dst, backup);
+    movedToBackup = true;
   }
 
   try {
     await fsp.rename(src, dst);
-    rmEntry(backup);
+    if (movedToBackup) {
+      rmEntry(backup);
+    }
   } catch (error) {
-    if (exists(backup)) {
+    if (movedToBackup && exists(backup)) {
       try {
         await fsp.rename(backup, dst);
       } catch {
@@ -54,33 +63,6 @@ export async function clonePackage(
   return clonePackageWithRunner(source, targetDir, await commandExists("gh"), (command) =>
     runCommand(command, undefined, timeoutMs, "clone"),
   );
-}
-
-export const githubSlugForTests = (source: string): string | null => githubRepoSlug(source);
-
-export function commandForTests(source: string, targetDir: string): string[] {
-  const command = cloneCommands(source, targetDir, true)[0];
-  if (!command) {
-    throw new Error("missing clone command");
-  }
-  return command;
-}
-
-export async function cloneAttemptsForTests(
-  source: string,
-  targetDir: string,
-  ghAvailable: boolean,
-  outcomes: readonly boolean[],
-): Promise<[boolean, string[][]]> {
-  const attempts: string[][] = [];
-  let index = 0;
-  const result = await clonePackageWithRunner(source, targetDir, ghAvailable, async (command) => {
-    attempts.push([...command]);
-    const outcome = outcomes[index] ?? false;
-    index += 1;
-    return outcome;
-  });
-  return [result, attempts];
 }
 
 function sourceSlug(source: string): string {
