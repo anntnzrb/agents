@@ -149,6 +149,9 @@ compaction:
   enabled: true
   midTurnEnabled: true
   asyncEnabled: true
+  idleEnabled: true
+  idleTimeoutSeconds: 60
+  idleThresholdTokens: 200000
   thresholdPercent: 85
   methodOrder:
     - shake
@@ -197,7 +200,8 @@ lsp:
 bash:
   enabled: true
   autoBackground:
-    enabled: false
+    enabled: true
+    thresholdMs: 5000
   direnv: auto
 
 shellMinimizer:
@@ -208,8 +212,7 @@ eval:
   js: false
   autoBackground:
     enabled: true
-    thresholdMs: 10000
-
+    thresholdMs: 5000
 python:
   kernelMode: session
 
