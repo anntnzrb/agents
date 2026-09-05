@@ -69,7 +69,11 @@ Exit codes: HTTP `22`; network `1`; validation `2` with concise stderr and no tr
 - If loading still fails, set `REDDIT_ENV_FILE` dynamically from the skill path; never hard-code a machine-specific directory.
 - Missing `REDDIT_USER_AGENT` after lookup is non-blocking because of the built-in default.
 - Distinguish env lookup, HTTP failure, and Reddit blocking; report the actual request failure, not missing credentials.
-- `network_security_block` means Reddit or an upstream proxy refused the request, not local configuration failure; switch `REDDIT_USER_AGENT` or egress before retrying.
+- `network_security_block` means Reddit or an upstream proxy refused that request, not local configuration failure. Record the route, failure, and date. Do not repeatedly retry the same blocked path or treat one failure as a permanent platform-wide ban.
+- When direct retrieval is blocked, use `research` to select an independent route. Use `omp-search` for bounded discovery by topic or exact thread title; follow its installed entrypoint and output contract.
+- Treat search snippets and news summaries as indirect evidence. The search provider's synthesized `answer` is not a verbatim Reddit comment. Quote only source text actually retrieved, with its attributable URL; do not reconstruct quotations from fragments.
+- Report the query, time window, observed sample, and unavailable comments. Never generalize a search-selected sample into public opinion. Check material factual claims against official sources.
+- For X evidence, use `x-research` and its bounded retrieval contract rather than importing a Reddit block assumption. Fallbacks do not authorize credential changes, installations, paid operations, or writes outside the user's scope.
 
 ## Aliases
 
