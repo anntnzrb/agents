@@ -12,6 +12,7 @@ dependencies = [
 ]
 [project.scripts]
 sync = "sync.cli:main_sync_entry"
+sync-gates = "sync.gates:main_gates_entry"
 
 [build-system]
 requires = ["hatchling>=1.27"]

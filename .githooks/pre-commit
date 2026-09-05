@@ -5,6 +5,4 @@ git diff --cached --check
 
 cd sync
 uv sync --frozen
-uv run --no-sync ruff check .
-uv run --no-sync ruff format --check .
-uv run --no-sync basedpyright
+uv run --no-sync sync-gates

@@ -10,20 +10,19 @@ From the repository root, use the public entrypoint:
 uv run --project sync sync
 ```
 
-Keep `sync/src/sync/cli.py` as the public entrypoint. Do not add a `bin/` shell trampoline.
+Keep `sync/src/sync/cli.py` as the public entrypoint. Do not add a `bin/` shell trampoline. Contributor gates live behind the dev-only `sync-gates` console script (`sync/src/sync/gates.py`), not the public CLI.
 
 ## Run the full checks
 
-Run the static checks and the test suite from `sync/`:
+Run the static checks and the test suite from `sync/` via the gate script:
 
 ```bash
 cd sync
 uv sync --frozen
-uv run ruff check .
-uv run ruff format --check .
-uv run basedpyright
-uv run pytest -n auto
+uv run sync-gates --tests
 ```
+
+Run only the static gates (ruff check, ruff format check, basedpyright) with `uv run sync-gates`. When iterating on one tool, invoke it directly (`uv run ruff check .`, `uv run basedpyright`, ...).
 
 `uv run pytest -n auto` already includes `tests/test_integration.py`. Run the explicit single-process integration command when you are iterating on process-level behavior:
 
@@ -62,13 +61,13 @@ Keep tests of harness implementations and harness-local behavior beside their so
 2. Add or update the focused test.
 3. Make the smallest implementation change.
 4. Run the focused test.
-5. Run `uv run ruff check .`, `uv run ruff format --check .`, `uv run basedpyright`, and `uv run pytest -n auto`.
+5. Run `uv run sync-gates --tests` (or the individual gates when iterating on one tool).
 6. Run `git diff --check` from the repository root.
 7. Update the related page under `docs/sync/` when the change affects commands, paths, lifecycle, platforms, or generated behavior.
 
 Keep these contracts intact:
 
-- Keep `sync/src/sync/cli.py` as the public entrypoint.
+- Keep `sync/src/sync/cli.py` as the public entrypoint (`sync-gates` is a contributor-only gate runner).
 - Keep wrapper generation inside the sync application.
 - Validate external files and network data at their boundary.
 - Keep filesystem operations safe to retry.

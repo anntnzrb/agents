@@ -25,6 +25,6 @@ reconcile this local virtual environment automatically on every invocation via
 `uv sync --frozen` to keep up with lock changes without rewriting tracked source
 files.
 
-Quality gates:
-- `pre-commit`: runs `git diff --cached --check`, followed by `ruff check .`, `ruff format --check .`, and `basedpyright`.
-- `pre-push`: runs the same Python gates (`ruff check .`, `ruff format --check .`, `basedpyright`) plus the full test suite (`pytest -n auto`).
+Quality gates (`sync-gates` console script, defined in `sync/src/sync/gates.py`):
+- `pre-commit`: runs `git diff --cached --check`, followed by `sync-gates` (ruff check, ruff format check, basedpyright).
+- `pre-push`: runs `sync-gates --tests`, which appends the full test suite (`pytest -n auto`) to the static gates.
