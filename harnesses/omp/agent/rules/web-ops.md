@@ -2,45 +2,16 @@
 name: web-ops
 description: Unified web router for external reading, deep scraping escalation, and live web search
 condition:
-  - 'https?://[^\s"''`)]+'
-  - '\b(?:web\s+search|search\s+the\s+web|look\s+up|browser\s+actions?)\b|\bomp-search\b|\bfirecrawl\s+(?:scrape|crawl|map|interact|agent|parse)\b|(?:^|[;&|]\s*)(?:curl|wget)\s'
+  - '\bomp-search(?:/scripts/cli\.ts)?\b|\bfirecrawl(?:-cli(?:@[^\s]+)?)?\s+(?:scrape|search|crawl|map|interact|agent|parse)\b|(?:^|[;&|]\s*)(?:curl|wget)\s'
 scope:
-  - text
   - tool:bash
 interruptMode: never
 ---
-# Web Operations & Routing Policy
+# Web operations routing
 
-Route external web queries through the narrowest and most efficient tool/skill:
-
----
-
-### 1. Web Search & Intelligence (`omp-search` skill)
-When the user asks to search the web, query live internet information, find recent releases, or look up facts:
-- **MUST** use the `omp-search` CLI wrapper via `bash`:
-  ```bash
-  omp-search "<query>" [--recency day|week|month|year] [--limit <N>]
-  # Or explicit provider selection
-  omp-search "<query>" --providers exa,parallel
-  ```
-- Emits structured JSON (`ok`, `answer`, `sources`, `providers`) with deduplicated and synthesized intelligence across configured providers.
-
----
-
-### 2. Standard Web Reading (Built-in `read` tool)
-When an explicit link or target URL is provided (`http://` or `https://`):
-- **Always try the built-in `read` tool first**.
-- Fast, runs in-process with zero subshell overhead, and includes native scrapers for `docs.rs`, GitHub, npm, PyPI, Twitter/X, crates.io, etc.
-
----
-
-### 3. Exhaustive & Interactive Web Tasks (`firecrawl` skill)
-Escalate to `firecrawl` CLI (via `bash`) **only** when `read` fails/gets blocked, or when the task demands complex browser interactions:
-- **`read` Fails / Blocked**: Anti-bot challenge, Cloudflare, 403/429, or unrendered JS SPA body -> `firecrawl scrape "<URL>" --only-main-content -o .firecrawl/page.md` (add `--wait-for <ms>` if needed).
-- **Target Site Known, Path Unknown**: Map routes first -> `firecrawl map "<URL>" --search "<term>" -o .firecrawl/urls.txt`, then scrape specific targets.
-- **Bulk Documentation / Section Crawl**: `firecrawl crawl "<URL>" --include-paths "/docs" --limit 50 --wait -o .firecrawl/crawl.json`.
-- **Browser Actions (Clicks, Forms, Auth)**: `firecrawl scrape "<URL>"` -> `firecrawl interact "<prompt>"` -> `firecrawl interact stop`.
-- **Autonomous Schema Extraction**: `firecrawl agent "<goal>" --urls "<URL>" --schema '<json>' --wait -o .firecrawl/res.json`.
-- **Local Document Parsing (PDF, DOCX, XLSX)**: `firecrawl parse "./doc.pdf" -o .firecrawl/doc.md`.
-
-*Output Rule: Always save Firecrawl outputs to `.firecrawl/` with `-o` to avoid flooding LLM context.*
+- For a named structured source or platform task, load its owning skill through `research`. Benchmark CLIs and `x-research` own their source contracts; do not replace them with generic scraping.
+- For an ordinary known page, try `read` first. For open-web discovery in OMP, load `omp-search` and use its documented `bun <skill-dir>/scripts/cli.ts` entrypoint through `bash`.
+- Load `firecrawl` when `read` is blocked or cannot render the source, or the task explicitly needs mapping, crawling, extraction, or browser interaction. Follow the skill's command and storage contract instead of guessing flags.
+- A blocked request is evidence about that route and environment, not a permanent platform ban. Use the owning skill's fallback; do not cycle through mirrors or repeatedly retry an unchanged blocked route.
+- Preserve source URLs, dates, scope, completeness, and uncertainty. Search-provider summaries are not verbatim source quotations. Corroborate material claims with primary sources where available.
+- Routing does not grant permission to install tools, change credentials, spend credits, write files, or submit forms. Respect the task's authorization and read-only constraints. If a route requires forbidden side effects, choose a permitted route or report the prerequisite.
