@@ -1,11 +1,19 @@
 # Copyright (c) 2026
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Self
+from typing import TYPE_CHECKING, Self, final
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
+@final
 class Response:
+    body: bytes
+    status: int
+    headers: dict[str, str]
+    final_url: str | None
+
     def __init__(
         self,
         body: bytes | str = b"",
@@ -35,12 +43,16 @@ class Response:
         return self.final_url or "fixture://response"
 
 
+@final
 class QueueOpener:
+    responses: list[Response | BaseException]
+    requests: list[object]
+
     def __init__(self, *responses: Response | BaseException) -> None:
         self.responses = list(responses)
-        self.requests: list[object] = []
+        self.requests = []
 
-    def __call__(self, request: object, timeout: float = 0.0) -> Response:  # noqa: ARG002
+    def __call__(self, request: object, timeout: float = 0.0) -> Response:
         self.requests.append(request)
         if not self.responses:
             message = "real or unexpected network request"

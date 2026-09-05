@@ -131,7 +131,7 @@ def duplicate_groups(rows: list[dict[str, object]]) -> DuplicateReport:
 
 def enforce_release(expected: str, values: list[str | None]) -> None:
     """Enforce release for the LiveBench adapter."""
-    mismatched = sorted({value for value in values if value != expected})
+    mismatched = sorted({value for value in values if value != expected}, key=str)
     if mismatched:
         raise_expected(
             "MIXED_RELEASE",

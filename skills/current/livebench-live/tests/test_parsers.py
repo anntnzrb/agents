@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 from hashlib import sha256
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from _path import SKILL_DIR
+if TYPE_CHECKING:
+    from pathlib import Path
+from tests._path import SKILL_DIR
+
 from livebench.contracts import RawArtifact
 from livebench.extraction import extract_artifact
 
@@ -30,12 +33,12 @@ def artifact(path: Path, kind: str = "catalog") -> RawArtifact:
         "2026-08-09T00:00:00Z",
         digest,
         len(body),
-        None,
-        "snapshot",
-        False,
-        True,
-        False,
-        None,
+        raw_bytes_ref=None,
+        freshness_mode="snapshot",
+        stale=False,
+        historical=True,
+        cache_reused=False,
+        generated_at=None,
     )
 
 
@@ -49,6 +52,8 @@ def test_extraction_precedence_embedded_before_html_table() -> None:
 def test_rsc_and_table_fallbacks_are_source_pathed() -> None:
     rsc, _ = extract_artifact(artifact(FIXTURES / "rsc-next-frames.html"))
     table, _ = extract_artifact(artifact(FIXTURES / "table-fallback.html"))
-    assert rsc is not None and rsc.extraction_method == "rsc_frame"
-    assert table is not None and table.extraction_method == "html_table"
+    assert rsc is not None
+    assert rsc.extraction_method == "rsc_frame"
+    assert table is not None
+    assert table.extraction_method == "html_table"
     assert rsc.source_paths[0].path.startswith("rsc-frame")

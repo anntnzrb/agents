@@ -9,7 +9,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast, override
 
 if TYPE_CHECKING:
     from .contracts import Diagnostic, RawArtifact
@@ -48,18 +48,21 @@ class _TableParser(HTMLParser):
         self._current: list[str] | None = None
         self._cell: list[str] | None = None
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:  # noqa: ARG002
+    @override
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         """Handle starttag for the LiveBench adapter."""
         if tag.lower() == "tr":
             self._current = []
         elif tag.lower() in {"th", "td"} and self._current is not None:
             self._cell = []
 
+    @override
     def handle_data(self, data: str) -> None:
         """Handle data for the LiveBench adapter."""
         if self._cell is not None:
             self._cell.append(data)
 
+    @override
     def handle_endtag(self, tag: str) -> None:
         """Handle endtag for the LiveBench adapter."""
         lowered = tag.lower()
@@ -88,7 +91,7 @@ def extract_artifact(  # noqa: C901, PLR0911, PLR0912
         or "json" in content_type
     ):
         try:
-            root = json.loads(body.decode("utf-8"))
+            root = cast("object", json.loads(body.decode("utf-8")))
         except (UnicodeDecodeError, json.JSONDecodeError):
             root = None
         if root is not None:
@@ -212,7 +215,7 @@ def _csv_rows(body: bytes) -> list[dict[str, object]]:
     if not reader.fieldnames:
         message = "CSV has no header"
         raise csv.Error(message)
-    fields = [field.strip() if field is not None else "" for field in reader.fieldnames]
+    fields = [field.strip() for field in reader.fieldnames]
     if any(not field for field in fields):
         message = "CSV contains an empty header"
         raise csv.Error(message)
@@ -253,11 +256,13 @@ def _rsc_frames(text: str) -> tuple[object, str] | None:
         for index, match in enumerate(pattern.finditer(text)):
             encoded = match.group(1)
             try:
-                decoded = json.loads(encoded)
+                decoded = cast("object", json.loads(encoded))
             except json.JSONDecodeError:
                 continue
-            if isinstance(decoded, list) and len(decoded) == 2:  # noqa: PLR2004
-                decoded = decoded[1]
+            if isinstance(decoded, list):
+                entries = cast("list[object]", cast("object", decoded))
+                if len(entries) == 2:  # noqa: PLR2004
+                    decoded = entries[1]
             if isinstance(decoded, str):
                 candidate = decoded.strip()
                 start = min(
@@ -270,11 +275,13 @@ def _rsc_frames(text: str) -> tuple[object, str] | None:
                 )
                 if start >= 0:
                     try:
-                        return json.loads(candidate[start:]), f"rsc-frame[{index}]"
+                        return cast(
+                            "object", json.loads(candidate[start:])
+                        ), f"rsc-frame[{index}]"
                     except json.JSONDecodeError:
                         continue
             elif isinstance(decoded, (dict, list)):
-                return decoded, f"rsc-frame[{index}]"
+                return cast("object", decoded), f"rsc-frame[{index}]"
     return None
 
 

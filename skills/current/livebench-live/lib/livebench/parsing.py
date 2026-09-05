@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import cast
 
 from .contracts import Diagnostic, RawArtifact, SkillError, raise_expected
 from .diagnostics import make_diagnostic
@@ -128,7 +129,7 @@ def parse_release_assets(
                 details={"unmapped_columns": unmapped_columns},
             )
         )
-    raw_fields = {
+    raw_fields: dict[str, object] = {
         "score_table": score_unknown,
         "cost_table": cost_unknown,
         "unmapped_score_columns": unmapped_columns,
@@ -152,25 +153,30 @@ def _rows_from_document(  # noqa: C901
 ) -> tuple[list[dict[str, object]], list[str], dict[str, object]]:
     root = document.root
     if isinstance(root, Mapping):
-        candidate = root.get("rows") or root.get("data") or root.get("models")
+        root_map = cast("Mapping[str, object]", root)
+        candidate = (
+            root_map.get("rows") or root_map.get("data") or root_map.get("models")
+        )
         if isinstance(candidate, list):
-            root = candidate
+            root = cast("list[object]", cast("object", candidate))
     if not isinstance(root, list):
         raise_expected(
             "MALFORMED_PAYLOAD",
             "Tabular payload must contain a list of rows.",
             {"artifact_kind": artifact.artifact_kind},
         )
+    entries = cast("list[object]", cast("object", root))
     rows: list[dict[str, object]] = []
     headers: list[str] = []
-    for index, row in enumerate(root):
+    for index, row in enumerate(entries):
         if not isinstance(row, Mapping):
             raise_expected(
                 "MALFORMED_PAYLOAD",
                 "Tabular payload contains a non-object row.",
                 {"row_index": index, "artifact_kind": artifact.artifact_kind},
             )
-        normalized = {str(key): value for key, value in row.items()}
+        row_map = cast("Mapping[str, object]", row)
+        normalized = {str(key): value for key, value in row_map.items()}
         if not headers:
             headers = list(normalized)
         for key in normalized:
@@ -195,17 +201,19 @@ def _rows_from_document(  # noqa: C901
 
 def _category_map(root: object, artifact: RawArtifact) -> dict[str, list[str]]:
     if isinstance(root, Mapping):
-        candidate = root.get("categories")
+        root_map = cast("Mapping[str, object]", root)
+        candidate = root_map.get("categories")
         if isinstance(candidate, Mapping):
-            root = candidate
+            root = cast("Mapping[str, object]", candidate)
     if not isinstance(root, Mapping):
         raise_expected(
             "MALFORMED_PAYLOAD",
             "Category payload must be an object mapping labels to task arrays.",
             {"source_url": artifact.source_url},
         )
+    root_map = cast("Mapping[str, object]", root)
     result: dict[str, list[str]] = {}
-    for raw_label, task_values in root.items():
+    for raw_label, task_values in root_map.items():
         label = str(raw_label)
         if not isinstance(task_values, Sequence) or isinstance(
             task_values, (str, bytes)
@@ -233,7 +241,10 @@ def parse_release_list(document: object) -> list[dict[str, object]]:
     """Parse a fixture or discovered bundle release list without an allow-list."""
     root = document
     if isinstance(root, Mapping):
-        root = root.get("releases") or root.get("data") or root.get("entries")
+        root_map = cast("Mapping[str, object]", root)
+        root = (
+            root_map.get("releases") or root_map.get("data") or root_map.get("entries")
+        )
     if not isinstance(root, Sequence) or isinstance(root, (str, bytes)):
         raise_expected(
             "MALFORMED_PAYLOAD",
@@ -245,14 +256,17 @@ def parse_release_list(document: object) -> list[dict[str, object]]:
         if isinstance(item, str):
             entries.append({"id": item, "date": item, "index": index})
         elif isinstance(item, Mapping):
-            release = {str(k): v for k, v in item.items()}
+            release = {
+                str(key): value
+                for key, value in cast("Mapping[str, object]", item).items()
+            }
             identifier = (
                 release.get("id") or release.get("release") or release.get("date")
             )
             if identifier is None or not str(identifier).strip():
                 continue
             release["id"] = str(identifier)
-            release.setdefault("date", str(identifier))
+            _ = release.setdefault("date", str(identifier))
             release["index"] = index
             entries.append(release)
     if not entries:

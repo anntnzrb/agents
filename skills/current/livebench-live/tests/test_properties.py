@@ -1,7 +1,10 @@
 # Copyright (c) 2026
 from __future__ import annotations
 
-from _path import SKILL_DIR
+from typing import cast
+
+from tests._path import SKILL_DIR
+
 from livebench.commands import load_context
 
 FIXTURES = SKILL_DIR / "tests" / "fixtures"
@@ -15,8 +18,11 @@ def test_arbitrary_category_and_task_names_flow_without_allow_list() -> None:
         allow_stale=False,
         timeout=1,
     )
-    assert "arbitrary-unicode-category-v2" in context.catalog["categories"]
-    assert "task_new_two" in context.catalog["columns"]["score_table"]
+    categories = cast("dict[str, object]", context.catalog["categories"])
+    assert "arbitrary-unicode-category-v2" in categories
+    columns = cast("dict[str, object]", context.catalog["columns"])
+    score_table = cast("dict[str, object]", columns["score_table"])
+    assert "task_new_two" in score_table
 
 
 def test_unknown_model_row_is_retained() -> None:
@@ -27,5 +33,7 @@ def test_unknown_model_row_is_retained() -> None:
         allow_stale=False,
         timeout=1,
     )
-    assert context.rows[0]["model"] == "new-model"
-    assert context.rows[0]["model_id"].startswith("livebench:model:")
+    row = context.rows[0]
+    assert row["model"] == "new-model"
+    model_id = cast("str", row["model_id"])
+    assert model_id.startswith("livebench:model:")

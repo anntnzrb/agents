@@ -4,11 +4,9 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
+from typing import cast
 
 from .contracts import Diagnostic, NumericValue, RawArtifact
 from .diagnostics import make_diagnostic
@@ -239,16 +237,17 @@ def value_dict(value: NumericValue) -> dict[str, object]:
     return value.as_dict()
 
 
-def _raw_fields(row: Mapping[str, object], known: set[str]) -> dict[str, object]:
-    return {str(key): value for key, value in row.items() if str(key) not in known}
-
-
 def attach_artifact_evidence(
     value: dict[str, object], artifact: RawArtifact, parser: str
 ) -> dict[str, object]:
     """Attach artifact evidence for the LiveBench adapter."""
     result = dict(value)
-    evidence = dict(result.get("source_evidence") or {})
+    raw_evidence = result.get("source_evidence")
+    evidence = (
+        dict(cast("Mapping[str, object]", raw_evidence))
+        if isinstance(raw_evidence, Mapping)
+        else {}
+    )
     evidence.update(artifact.provenance(parser=parser))
     evidence["source_path"] = result.get("source_path")
     evidence["raw_value"] = result.get("raw_value")
