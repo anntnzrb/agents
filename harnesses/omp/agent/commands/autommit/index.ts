@@ -30,18 +30,16 @@ import type {
     SplitCommitPlan,
 } from "@oh-my-pi/pi-coding-agent/commit/agentic/state";
 import type * as AgenticValidation from "@oh-my-pi/pi-coding-agent/commit/agentic/validation";
-import type { CommitType, ConventionalAnalysis, ConventionalDetail, FileDiff, FileHunks } from "@oh-my-pi/pi-coding-agent/commit/types";
-import type * as CommitUtils from "@oh-my-pi/pi-coding-agent/commit/utils";
+import type { ConventionalDetail, FileDiff, FileHunks } from "@oh-my-pi/pi-coding-agent/commit/types";
 import type { createCommitTools } from "@oh-my-pi/pi-coding-agent/commit/agentic/tools";
 import type { parseFileDiffs, parseFileHunks } from "@oh-my-pi/pi-coding-agent/commit/git/diff";
 import type { resolveRoleSelection, ScopedModel } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
 import type { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { assignLockFilesToPlan } from "@oh-my-pi/pi-coding-agent/commit/agentic/lock-files";
 import type { computeDependencyOrder } from "@oh-my-pi/pi-coding-agent/commit/agentic/topo-sort";
-import type * as Git from "@oh-my-pi/pi-coding-agent/utils/git";
+import type * as CommitUtils from "@oh-my-pi/pi-coding-agent/commit/utils";
 
 type CommandAPI = Parameters<CustomCommandFactory>[0];
-type PiAPI = CommandAPI["pi"];
 
 interface CommitInternals {
     readonly createCommitTools: typeof createCommitTools;
@@ -51,14 +49,9 @@ interface CommitInternals {
     readonly capDetails: typeof AgenticValidation.capDetails;
     readonly parseFileDiffs: typeof parseFileDiffs;
     readonly parseFileHunks: typeof parseFileHunks;
-    readonly normalizeDetails: typeof CommitUtils.normalizeDetails;
     readonly maxDetailItems: number;
-    readonly git: Pick<
-        typeof Git,
-        "repo" | "head" | "writeTree" | "worktree" | "log" | "commitDetails" | "diff" | "createHunkSelectionValidator"
-    >;
+    readonly normalizeDetails: typeof CommitUtils.normalizeDetails;
 }
-type RuntimeInternals = Pick<CommitInternals, "git">;
 
 const PACKAGE_ROOT_HINTS = [
     process.env.PI_PACKAGE_DIR,
@@ -77,7 +70,8 @@ const locatePackageRoot = (): string => {
 // OMP loads custom commands outside package module resolution, so hidden commit modules must be loaded by source path.
 const loadInternal = async <T>(relativePath: string): Promise<T> =>
     (await import(pathToFileURL(resolve(locatePackageRoot(), "src", relativePath)).href)) as T;
-const loadCommitInternals = async (git: CommitInternals["git"]): Promise<CommitInternals> => {
+
+const loadCommitInternals = async (): Promise<CommitInternals> => {
     const [tools, resolver, lockFiles, topoSort, validation, utils, diffParser] = await Promise.all([
         loadInternal<Pick<CommitInternals, "createCommitTools">>("commit/agentic/tools/index.ts"),
         loadInternal<Pick<CommitInternals, "resolveRoleSelection">>("config/model-resolver.ts"),
@@ -97,13 +91,10 @@ const loadCommitInternals = async (git: CommitInternals["git"]): Promise<CommitI
         capDetails: validation.capDetails,
         normalizeDetails: utils.normalizeDetails,
         maxDetailItems: validation.MAX_DETAIL_ITEMS,
-        git,
         parseFileDiffs: diffParser.parseFileDiffs,
         parseFileHunks: diffParser.parseFileHunks,
     };
 };
-
-
 const COMMIT_AGENT_SYSTEM_PROMPT = [
     "You are an unattended repository commit agent.",
     "Use only supplied commit tools. Never ask questions or wait for input.",
@@ -129,7 +120,6 @@ const COMMIT_AGENT_SYSTEM_PROMPT = [
     "Include issue references or trailers as exact details lines only when factual and required by repository policy.",
     "If a final response is emitted, keep it to one concise sentence with no proposal recap.",
 ].join("\n");
-
 
 const AGENT_USER_PROMPT = [
     "Generate the commit proposal for the current staged snapshot.",
@@ -258,7 +248,6 @@ const releaseProposalSlot = (
     }
 };
 
-
 const formatCommitMessage = (
     summary: string,
     details: readonly ConventionalDetail[],
@@ -345,9 +334,13 @@ const getStagedFiles = async (api: CommandAPI, cwd: string): Promise<string[]> =
 const stagedFilesOrStageAll = async (api: CommandAPI, cwd: string): Promise<string[]> => {
     const stagedFiles = await getStagedFiles(api, cwd);
     if (stagedFiles.length > 0) return stagedFiles;
-    await api.pi.stage.files(cwd);
+    // Former api.pi.stage.files(cwd) was `git add -A` in cwd; run it directly so
+    // staging no longer depends on vendor API surface.
+    const staged = await api.exec("git", ["add", "-A"], { cwd });
+    if (staged.code !== 0) throw new Error(staged.stderr || "Unable to stage local changes.");
     return getStagedFiles(api, cwd);
 };
+
 type CommitTool = ReturnType<CommitInternals["createCommitTools"]>[number];
 
 interface DetailInput {
@@ -360,8 +353,8 @@ interface ProposeCommitParams {
     readonly type: CommitType;
     readonly scope: string | null;
     readonly summary: string;
-    readonly details: DetailInput[];
-    readonly issue_refs: string[];
+    readonly details?: DetailInput[];
+    readonly issue_refs?: string[];
 }
 
 interface SplitCommitParams {
@@ -396,14 +389,13 @@ const responseResult = (response: object, maxDetailItems: number) => ({
 });
 
 const execRepoProposal = async (
-    cwd: string,
     state: CommitAgentState,
     internals: CommitInternals,
     params: ProposeCommitParams,
 ) => {
     const scope = params.scope?.trim() || null;
     const summary = params.summary.trim();
-    const details = internals.normalizeDetails(params.details);
+    const details = internals.normalizeDetails(params.details ?? []);
     const { details: cappedDetails, warnings } = internals.capDetails(details);
     const analysis: ConventionalAnalysis = {
         type: params.type,
@@ -436,11 +428,11 @@ const execRepoProposal = async (
     }
     return responseResult(response, internals.maxDetailItems);
 };
+
 const validateHunkSelectors = (
     commitIndex: number,
     changes: SplitCommitGroup["changes"],
     files: string[],
-    validateHunksForDiff: (changes: readonly FileChange[]) => Array<{ readonly message: string }>,
 ): { readonly errors: string[]; readonly warnings: string[] } => {
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -450,27 +442,22 @@ const validateHunkSelectors = (
         return { errors, warnings };
     }
     for (const change of changes) {
-        if (change.hunks.type === "indices") {
-            const invalid = change.hunks.indices.filter(
+        if (change.kind === "indices") {
+            const invalid = (change.indices ?? []).filter(
                 value => !Number.isFinite(value) || Math.floor(value) !== value || value < 1,
             );
             if (invalid.length > 0) errors.push(`${prefix}: invalid hunk indices for ${change.path}`);
             continue;
         }
-        if (change.hunks.type === "lines") {
-            const { start, end } = change.hunks;
-            if (!Number.isFinite(start) || !Number.isFinite(end)) {
+        if (change.kind === "lines") {
+            const { start, end } = change;
+            if (start === undefined || end === undefined || !Number.isFinite(start) || !Number.isFinite(end)) {
                 errors.push(`${prefix}: invalid line range for ${change.path}`);
                 continue;
             }
             if (Math.floor(start) !== start || Math.floor(end) !== end || start < 1 || end < start) {
                 errors.push(`${prefix}: invalid line range for ${change.path}`);
             }
-        }
-    }
-    if (errors.length === 0) {
-        for (const error of validateHunksForDiff(changes)) {
-            errors.push(`${prefix}: ${error.message}`);
         }
     }
     return { errors, warnings };
@@ -495,16 +482,188 @@ const validateDependencies = (commitIndex: number, dependencies: number[], total
     return errors;
 };
 
-type HunkSelector = FileChange["hunks"];
+const execRepoSplit = async (
+    state: CommitAgentState,
+    internals: CommitInternals,
+    stagedFiles: readonly string[],
+    parsedFiles: ReadonlyMap<string, FileHunks>,
+    params: SplitCommitParams,
+) => {
+    const stagedSet = new Set(stagedFiles);
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    if (!params.commits || params.commits.length < 2) {
+        errors.push("Split plan must contain at least two commits");
+    }
+    const commits: SplitCommitGroup[] = (params.commits ?? []).map((commit, index) => {
+        const scope = commit.scope?.trim() || null;
+        const summary = commit.summary.trim();
+        const details = internals.normalizeDetails(commit.details ?? []);
+        const detailResult = internals.capDetails(details);
+        warnings.push(...detailResult.warnings.map(warning => `Commit ${index + 1}: ${warning}`));
+        const issueRefs = commit.issue_refs ?? [];
+        const dependencies = (commit.dependencies ?? []).map(dep => Math.floor(dep));
+        const changes = commit.changes.map(change => ({
+            path: change.path,
+            kind: change.kind,
+            indices: change.indices,
+            start: change.start,
+            end: change.end,
+        }));
+        const files = changes.map(change => change.path);
+        errors.push(...validateSubject(summary).map(error => `Commit ${index + 1}: ${error}`));
+        const hunkValidation = validateHunkSelectors(index, changes, files);
+        warnings.push(...hunkValidation.warnings);
+        errors.push(...hunkValidation.errors);
+        errors.push(...validateDependencies(index, dependencies, (params.commits ?? []).length));
+        return {
+            changes,
+            type: commit.type,
+            scope,
+            summary,
+            details: detailResult.details,
+            issueRefs,
+            rationale: commit.rationale?.trim() || undefined,
+            dependencies,
+        };
+    });
+    for (const commit of commits) {
+        const seen = new Set<string>();
+        for (const change of commit.changes) {
+            const file = change.path;
+            if (!stagedSet.has(file)) {
+                errors.push(`File not staged: ${file}`);
+                continue;
+            }
+            if (seen.has(file)) {
+                errors.push(`File listed multiple times in commit ${commit.summary}: ${file}`);
+                continue;
+            }
+            seen.add(file);
+        }
+    }
+    const plannedFiles = new Set(commits.flatMap(commit => commit.changes.map(change => change.path)));
+    for (const file of stagedFiles) {
+        if (!plannedFiles.has(file)) errors.push(`Staged file missing from split plan: ${file}`);
+    }
+    errors.push(...validateHunkCoverage(stagedFiles, commits, parsedFiles));
+    const dependencyCheck = internals.computeDependencyOrder(commits);
+    if ("error" in dependencyCheck) errors.push(dependencyCheck.error);
+    const response: {
+        valid: boolean;
+        errors: string[];
+        warnings: string[];
+        proposal?: SplitCommitPlan;
+    } = { valid: errors.length === 0, errors, warnings };
+    if (response.valid) {
+        response.proposal = { commits, warnings };
+        state.splitProposal = response.proposal;
+    }
+    return responseResult(response, internals.maxDetailItems);
+};
+
+const mkRepoProposalTool = (
+    nativeTool: CommitTool,
+    state: CommitAgentState,
+    internals: CommitInternals,
+    phase: CommitPhaseState,
+    onResult?: (result: unknown) => void,
+): CommitTool => ({
+    ...nativeTool,
+    execute: async (_toolCallId, params, _onUpdate, ctx) => {
+        if (phase.value === "forced-split") {
+            const result = responseResult({
+                valid: false,
+                errors: ["Atomicity review requires a split_commit proposal; propose_commit is not allowed."],
+                warnings: [],
+            }, internals.maxDetailItems);
+            onResult?.(result);
+            return result;
+        }
+        if (!reserveProposalSlot(state, phase, "proposal")) {
+            const result = proposalAlreadyRecorded(internals);
+            onResult?.(result);
+            return result;
+        }
+        try {
+            const result = await execRepoProposal(state, internals, params as ProposeCommitParams);
+            if (state.proposal) {
+                phase.value = "finalized";
+                queueMicrotask(() => ctx?.abort?.());
+            } else {
+                releaseProposalSlot(state, phase, "proposal");
+            }
+            onResult?.(result);
+            return result;
+        } catch (error) {
+            releaseProposalSlot(state, phase, "proposal");
+            throw error;
+        }
+    },
+});
+
+const mkRepoSplitTool = (
+    nativeTool: CommitTool,
+    state: CommitAgentState,
+    internals: CommitInternals,
+    stagedFiles: readonly string[],
+    parsedFiles: ReadonlyMap<string, FileHunks>,
+    phase: CommitPhaseState,
+    onResult?: (result: unknown) => void,
+): CommitTool => ({
+    ...nativeTool,
+    execute: async (_toolCallId, params, _onUpdate, ctx) => {
+        const splitParams = params as SplitCommitParams;
+        if (phase.value === "finalized") {
+            const result = proposalAlreadyRecorded(internals);
+            onResult?.(result);
+            return result;
+        }
+        if (phase.value === "forced-split" && (!Array.isArray(splitParams?.commits) || splitParams.commits.length < 2)) {
+            const result = responseResult({
+                valid: false,
+                errors: ["Atomicity review requires a split plan with at least two commits."],
+                warnings: [],
+            }, internals.maxDetailItems);
+            onResult?.(result);
+            return result;
+        }
+        if (!reserveProposalSlot(state, phase, "splitProposal")) {
+            const result = proposalAlreadyRecorded(internals);
+            onResult?.(result);
+            return result;
+        }
+        try {
+            const result = await execRepoSplit(state, internals, stagedFiles, parsedFiles, splitParams);
+            if (state.splitProposal) {
+                phase.value = "finalized";
+                queueMicrotask(() => ctx?.abort?.());
+            } else {
+                releaseProposalSlot(state, phase, "splitProposal");
+            }
+            onResult?.(result);
+            return result;
+        } catch (error) {
+            releaseProposalSlot(state, phase, "splitProposal");
+            throw error;
+        }
+    },
+});
+
+type HunkSelector = FileChange;
 
 const selectionsOverlap = (left: HunkSelector, right: HunkSelector): boolean => {
-    if (left.type === "all" || right.type === "all") return true;
-    if (left.type === "indices" && right.type === "indices") {
-        const selected = new Set(left.indices);
-        return right.indices.some(index => selected.has(index));
+    if (left.kind === "all" || right.kind === "all") return true;
+    if (left.kind === "indices" && right.kind === "indices") {
+        const selected = new Set(left.indices ?? []);
+        return (right.indices ?? []).some(index => selected.has(index));
     }
-    if (left.type === "lines" && right.type === "lines") {
-        return left.start <= right.end && right.start <= left.end;
+    if (left.kind === "lines" && right.kind === "lines") {
+        const leftStart = left.start ?? 0;
+        const leftEnd = left.end ?? 0;
+        const rightStart = right.start ?? 0;
+        const rightEnd = right.end ?? 0;
+        return leftStart <= rightEnd && rightStart <= leftEnd;
     }
     return true;
 };
@@ -528,10 +687,12 @@ const selectorIntersectsHunk = (
     selector: HunkSelector,
     hunk: FileHunks["hunks"][number],
 ): boolean => {
-    if (selector.type === "all") return true;
-    if (selector.type === "indices") return selector.indices.includes(hunk.index + 1);
+    if (selector.kind === "all") return true;
+    if (selector.kind === "indices") return (selector.indices ?? []).includes(hunk.index + 1);
     const hunkEnd = hunk.newLines === 0 ? hunk.newStart : hunk.newStart + hunk.newLines - 1;
-    return hunk.newStart <= selector.end && selector.start <= hunkEnd;
+    const start = selector.start ?? 0;
+    const end = selector.end ?? 0;
+    return hunk.newStart <= end && start <= hunkEnd;
 };
 
 const validateHunkCoverage = (
@@ -545,7 +706,7 @@ const validateHunkCoverage = (
         for (const change of commit.changes) {
             if (!stagedSet.has(change.path)) continue;
             const prior = selectionsByFile.get(change.path) ?? [];
-            selectionsByFile.set(change.path, [...prior, change.hunks]);
+            selectionsByFile.set(change.path, [...prior, change]);
         }
     }
 
@@ -579,8 +740,8 @@ const validateHunkCoverage = (
         for (const hunk of parsed.hunks) {
             const changedLines = changedNewLines(hunk);
             const covered = changedLines.every(line => selections.some(selection =>
-                selection.type === "lines"
-                    ? selection.start <= line && line <= selection.end
+                selection.kind === "lines"
+                    ? (selection.start ?? 0) <= line && line <= (selection.end ?? 0)
                     : selectorIntersectsHunk(selection, hunk),
             ));
             if (!covered) {
@@ -590,163 +751,6 @@ const validateHunkCoverage = (
     }
     return errors;
 };
-
-const execRepoSplit = async (
-    cwd: string,
-    state: CommitAgentState,
-    internals: CommitInternals,
-    params: SplitCommitParams,
-    changelogTargets: readonly string[],
-) => {
-    const rawStagedFiles = state.overview?.files ?? (await internals.git.diff.changedFiles(cwd, { cached: true }));
-    const stagedFiles = rawStagedFiles.map(unquoteGitPath);
-    const stagedSet = new Set(stagedFiles);
-    const changelogSet = new Set(changelogTargets);
-    const errors: string[] = [];
-    const warnings: string[] = [];
-    const diffText = state.diffText ?? "";
-    const parsedFiles = new Map(
-        internals.parseFileDiffs(diffText).map(file => [file.filename, internals.parseFileHunks(file)] as const),
-    );
-    const validateHunksForDiff = internals.git.createHunkSelectionValidator(diffText);
-
-    const commits: SplitCommitGroup[] = params.commits.map((commit, index) => {
-        const scope = commit.scope?.trim() || null;
-        const summary = commit.summary.trim();
-        const detailInput = internals.normalizeDetails(commit.details ?? []);
-        const detailResult = internals.capDetails(detailInput);
-        warnings.push(...detailResult.warnings.map(warning => `Commit ${index + 1}: ${warning}`));
-        const issueRefs = commit.issue_refs ?? [];
-        const dependencies = commit.dependencies ?? [];
-        const changes = commit.changes.map(change => ({
-            path: change.path,
-            hunks: change.hunks,
-        }));
-        const files = changes.map(change => change.path);
-        errors.push(...validateSubject(summary).map(error => `Commit ${index + 1}: ${error}`));
-        const hunkValidation = validateHunkSelectors(index, changes, files, validateHunksForDiff);
-        warnings.push(...hunkValidation.warnings);
-        errors.push(...hunkValidation.errors);
-        errors.push(...validateDependencies(index, dependencies, params.commits.length));
-        return {
-            changes,
-            type: commit.type,
-            scope,
-            summary,
-            details: detailResult.details,
-            issueRefs,
-            rationale: commit.rationale?.trim() || undefined,
-            dependencies,
-        };
-    });
-    for (const commit of commits) {
-        const seen = new Set<string>();
-        for (const change of commit.changes) {
-            const file = change.path;
-            if (!stagedSet.has(file) && !changelogSet.has(file)) {
-                errors.push(`File not staged: ${file}`);
-                continue;
-            }
-            if (seen.has(file)) {
-                errors.push(`File listed multiple times in commit ${commit.summary}: ${file}`);
-                continue;
-            }
-            seen.add(file);
-        }
-    }
-    const plannedFiles = new Set(commits.flatMap(commit => commit.changes.map(change => change.path)));
-    for (const file of stagedFiles) {
-        if (!plannedFiles.has(file)) errors.push(`Staged file missing from split plan: ${file}`);
-    }
-    errors.push(...validateHunkCoverage(stagedFiles, commits, parsedFiles));
-    const dependencyCheck = internals.computeDependencyOrder(commits);
-    if ("error" in dependencyCheck) errors.push(dependencyCheck.error);
-    const response: {
-        valid: boolean;
-        errors: string[];
-        warnings: string[];
-        proposal?: SplitCommitPlan;
-    } = { valid: errors.length === 0, errors, warnings };
-    if (response.valid) {
-        response.proposal = { commits, warnings };
-        state.splitProposal = response.proposal;
-    }
-    return responseResult(response, internals.maxDetailItems);
-};
-const mkRepoProposalTool = (
-    nativeTool: CommitTool,
-    cwd: string,
-    state: CommitAgentState,
-    internals: CommitInternals,
-    phase: CommitPhaseState,
-): CommitTool => ({
-    ...nativeTool,
-    execute: async (_toolCallId, params, _onUpdate, ctx) => {
-        if (phase.value === "forced-split") {
-            return responseResult({
-                valid: false,
-                errors: ["Atomicity review requires a split_commit proposal; propose_commit is not allowed."],
-                warnings: [],
-            }, internals.maxDetailItems);
-        }
-        if (!reserveProposalSlot(state, phase, "proposal")) {
-            return proposalAlreadyRecorded(internals);
-        }
-        try {
-            const result = await execRepoProposal(cwd, state, internals, params as ProposeCommitParams);
-            if (state.proposal) {
-                phase.value = "finalized";
-                queueMicrotask(() => ctx.abort());
-            } else {
-                releaseProposalSlot(state, phase, "proposal");
-            }
-            return result;
-        } catch (error) {
-            releaseProposalSlot(state, phase, "proposal");
-            throw error;
-        }
-    },
-});
-
-const mkRepoSplitTool = (
-    nativeTool: CommitTool,
-    cwd: string,
-    state: CommitAgentState,
-    internals: CommitInternals,
-    changelogTargets: readonly string[],
-    phase: CommitPhaseState,
-): CommitTool => ({
-    ...nativeTool,
-    execute: async (_toolCallId, params, _onUpdate, ctx) => {
-        const splitParams = params as SplitCommitParams;
-        if (phase.value === "finalized") {
-            return proposalAlreadyRecorded(internals);
-        }
-        if (phase.value === "forced-split" && splitParams.commits.length < 2) {
-            return responseResult({
-                valid: false,
-                errors: ["Atomicity review requires a split plan with at least two commits."],
-                warnings: [],
-            }, internals.maxDetailItems);
-        }
-        if (!reserveProposalSlot(state, phase, "splitProposal")) {
-            return proposalAlreadyRecorded(internals);
-        }
-        try {
-            const result = await execRepoSplit(cwd, state, internals, splitParams, changelogTargets);
-            if (state.splitProposal) {
-                phase.value = "finalized";
-                queueMicrotask(() => ctx.abort());
-            } else {
-                releaseProposalSlot(state, phase, "splitProposal");
-            }
-            return result;
-        } catch (error) {
-            releaseProposalSlot(state, phase, "splitProposal");
-            throw error;
-        }
-    },
-});
 
 const buildAtomicityProposalInput = (
     proposal: NonNullable<CommitAgentState["proposal"]>,
@@ -772,19 +776,21 @@ const runAtomicityCritic = async (
     diffText: string,
 ): Promise<AtomicityDecision> => {
     let decision: AtomicityDecision | undefined;
-    const verdictParameterSchema = api.arktype
-        .type({
-            decision: "'accept' | 'split'",
-            concerns: api.arktype.type("string").atMostLength(512).matching(/\S/).array().atMostLength(8),
-            rationale: api.arktype.type("string").atMostLength(2_000).matching(/\S/),
-        })
-        .onUndeclaredKey("reject")
-        .narrow(value =>
-            (value.decision === "accept" && value.concerns.length === 0) ||
-            (value.decision === "split" &&
-                value.concerns.length >= 2 &&
-                new Set(value.concerns.map(concern => concern.trim())).size === value.concerns.length),
-        );
+    const verdictParameterSchema = api.arktype.type({
+        decision: "'accept' | 'split'",
+        concerns: api.arktype.type("string").atMostLength(512).matching(/\S/).array().atMostLength(8),
+        rationale: api.arktype.type("string").atMostLength(2_000).matching(/\S/),
+    }).onUndeclaredKey("reject").narrow((value, ctx) => {
+        if (value.decision === "accept" && value.concerns.length === 0) return true;
+        if (
+            value.decision === "split" &&
+            value.concerns.length >= 2 &&
+            new Set(value.concerns.map(concern => concern.trim())).size === value.concerns.length
+        ) {
+            return true;
+        }
+        return ctx.mustBe("a valid atomicity critic decision; 'accept' requires empty concerns; 'split' requires >=2 unique non-empty concerns");
+    });
     const verdictTool = {
         name: "atomicity_verdict",
         label: "Atomicity verdict",
@@ -818,7 +824,6 @@ const runAtomicityCritic = async (
             };
         },
     } as unknown as CommitTool;
-
     const { session } = await api.pi.createAgentSession({
         cwd,
         authStorage: modelRegistry.authStorage,
@@ -835,6 +840,7 @@ const runAtomicityCritic = async (
         enableMCP: false,
         hasUI: false,
         autoApprove: true,
+        spawns: "sonic",
         contextFiles: [],
         skills: [],
         promptTemplates: [],
@@ -842,35 +848,28 @@ const runAtomicityCritic = async (
         extensions: [],
         disableExtensionDiscovery: true,
     });
-
     const criticPrompt = buildAtomicityCriticPrompt(proposalInput, diffText);
     try {
         for (let attempt = 0; attempt < 2 && !decision; attempt += 1) {
-            try {
-                await session.prompt(
-                    attempt === 0
-                        ? criticPrompt
-                        : "Return exactly one valid atomicity_verdict tool call now. Prose is not a verdict; ambiguity must be reported as split.",
-                    {
-                        attribution: "agent",
-                        expandPromptTemplates: false,
-                        ...(attempt === 0 ? {} : { synthetic: true }),
-                    },
-                );
-            } catch (error) {
-                if (decision) break;
-                throw error;
-            }
+            await session.prompt(
+                attempt === 0
+                    ? criticPrompt
+                    : "Return exactly one valid atomicity_verdict tool call now. Prose is not a verdict; ambiguity must be reported as split.",
+                {
+                    attribution: "agent",
+                    expandPromptTemplates: false,
+                    ...(attempt === 0 ? {} : { synthetic: true }),
+                },
+            );
         }
-        if (!decision) throw new Error("Atomicity critic did not provide a valid verdict.");
-        return decision;
+    } catch (error) {
+        if (!decision) throw error;
     } finally {
         await session.dispose();
     }
+    if (!decision) throw new Error("Atomicity critic did not provide a valid verdict.");
+    return decision;
 };
-
-
-
 
 const runCommitAgent = async (
     api: CommandAPI,
@@ -879,7 +878,6 @@ const runCommitAgent = async (
     options: CommitOptions,
     internals: CommitInternals,
 ) => {
-
     const settings = await api.pi.Settings.init({ cwd });
     await modelRegistry.refresh();
     const selected = internals.resolveRoleSelection(["commit"], settings, modelRegistry.getAvailable());
@@ -890,10 +888,21 @@ const runCommitAgent = async (
 
     const stagedFiles = await stagedFilesOrStageAll(api, cwd);
     if (stagedFiles.length === 0) throw new Error("No local changes to commit.");
-    const diffText = (await api.exec("git", ["-c", "core.quotepath=false", "-c", "diff.mnemonicprefix=false", "-c", "diff.noprefix=false", "diff", "--cached", "--no-textconv"], { cwd })).stdout;
+    const diffText = (await api.exec("git", ["-c", "core.quotepath=false", "-c", "diff.mnemonicprefix=false", "-c", "diff.noprefix=false", "diff", "--src-prefix=a/", "--dst-prefix=b/", "--cached", "--no-textconv"], { cwd })).stdout;
     const contextFiles = await api.pi.discoverContextFiles(cwd);
     const phase: CommitPhaseState = { value: "propose" };
     const state: CommitAgentState = { diffText };
+    let lastValidationError: string | undefined;
+    const captureValidationResult = (result: unknown) => {
+        if (phase.value !== "forced-split") return;
+        const text = typeof (result as { content?: Array<{ text?: string }> })?.content?.[0]?.text === "string"
+            ? (result as { content?: Array<{ text?: string }> }).content![0]!.text!
+            : undefined;
+        if (text) {
+            lastValidationError = text;
+        }
+    };
+
     const nativeTools = internals.createCommitTools({
         cwd,
         authStorage: modelRegistry.authStorage,
@@ -909,11 +918,14 @@ const runCommitAgent = async (
     if (!nativeProposalTool || !nativeSplitTool) {
         throw new Error("Native commit proposal tools are unavailable.");
     }
+    const parsedFiles = new Map(
+        internals.parseFileDiffs(diffText).map(file => [file.filename, internals.parseFileHunks(file)] as const),
+    );
     const tools = nativeTools
         .filter(tool => !["propose_changelog", "propose_commit", "split_commit"].includes(tool.name))
         .concat([
-            mkRepoProposalTool(nativeProposalTool, cwd, state, internals, phase),
-            mkRepoSplitTool(nativeSplitTool, cwd, state, internals, [], phase),
+            mkRepoProposalTool(nativeProposalTool, state, internals, phase, captureValidationResult),
+            mkRepoSplitTool(nativeSplitTool, state, internals, stagedFiles, parsedFiles, phase, captureValidationResult),
         ]);
 
     const { session } = await api.pi.createAgentSession({
@@ -934,12 +946,8 @@ const runCommitAgent = async (
         autoApprove: true,
         spawns: "sonic",
         contextFiles,
-        disableExtensionDiscovery: true,
-        skills: [],
-        promptTemplates: [],
         slashCommands: [],
     });
-
     const promptAgent = async (attempt: number): Promise<void> => {
         if (proposalExists(state) || attempt >= MAX_RETRIES) return;
         try {
@@ -984,6 +992,7 @@ const runCommitAgent = async (
             throw new Error("Atomicity critic retry started with a stale split proposal.");
         }
         phase.value = "forced-split";
+        lastValidationError = undefined;
         const concerns = decision.concerns.map((concern, index) => `${index + 1}. ${concern}`).join("\n");
         const splitPrompt = [
             "The independent atomicity critic rejected the provisional single-commit proposal.",
@@ -1003,7 +1012,9 @@ const runCommitAgent = async (
         }
         if (!state.splitProposal || state.splitProposal.commits.length < 2) {
             state.splitProposal = undefined;
-            throw new Error("Atomicity critic required a split_commit proposal with at least two commits.");
+            const baseMessage = "Atomicity critic required a split_commit proposal with at least two commits.";
+            const message = lastValidationError ? `${baseMessage} ${lastValidationError}` : baseMessage;
+            throw new Error(message);
         }
         return state;
 
@@ -1011,6 +1022,7 @@ const runCommitAgent = async (
         await session.dispose();
     }
 };
+
 const validateSplitPlan = async (
     api: CommandAPI,
     cwd: string,
@@ -1024,7 +1036,7 @@ const validateSplitPlan = async (
     if (missingFiles.length > 0) {
         throw new Error(`Split plan missing staged files: ${missingFiles.join(", ")}`);
     }
-    const stagedDiff = (await api.exec("git", ["-c", "core.quotepath=false", "-c", "diff.mnemonicprefix=false", "-c", "diff.noprefix=false", "diff", "--cached", "--binary", "--no-textconv"], { cwd })).stdout;
+    const stagedDiff = (await api.exec("git", ["-c", "core.quotepath=false", "-c", "diff.mnemonicprefix=false", "-c", "diff.noprefix=false", "diff", "--src-prefix=a/", "--dst-prefix=b/", "--cached", "--binary", "--no-textconv"], { cwd })).stdout;
     const parsedFiles = new Map(
         internals.parseFileDiffs(stagedDiff).map(file => [file.filename, internals.parseFileHunks(file)] as const),
     );
@@ -1034,7 +1046,7 @@ const validateSplitPlan = async (
     }
     const order = internals.computeDependencyOrder(plan.commits);
     if ("error" in order) throw new Error(order.error);
-    const zeroDiff = await api.exec("git", ["-c", "core.quotepath=false", "-c", "diff.mnemonicprefix=false", "-c", "diff.noprefix=false", "diff", "--cached", "--binary", "--unified=0", "--no-textconv"], { cwd });
+    const zeroDiff = await api.exec("git", ["-c", "core.quotepath=false", "-c", "diff.mnemonicprefix=false", "-c", "diff.noprefix=false", "diff", "--src-prefix=a/", "--dst-prefix=b/", "--cached", "--binary", "--unified=0", "--no-textconv"], { cwd });
     if (zeroDiff.code !== 0) throw new Error(zeroDiff.stderr || "Unable to read zero-context staged diff.");
     return {
         order,
@@ -1045,24 +1057,26 @@ const validateSplitPlan = async (
 
 export const selectPatch = (
     file: FileDiff,
-    selector: HunkSelector,
-    internals: CommitInternals,
+    selector: FileChange,
+    internals: Pick<CommitInternals, "parseFileHunks">,
 ): string => {
-    if (file.isBinary && selector.type !== "all") {
+    if (file.isBinary && selector.kind !== "all") {
         throw new Error(`Cannot partially select binary file ${file.filename}.`);
     }
     const isRename = file.content.includes("\nrename " + "from ") || file.content.startsWith("rename " + "from ");
-    if (isRename && selector.type !== "all") {
+    if (isRename && selector.kind !== "all") {
         throw new Error(`Cannot partially select renamed file ${file.filename}; entire file change must be committed together.`);
     }
-    if (selector.type === "all") return file.content;
+    if (selector.kind === "all") return file.content;
     const parsed: FileHunks = internals.parseFileHunks(file);
-    const hunks = selector.type === "indices"
-        ? parsed.hunks.filter(hunk => selector.indices.includes(hunk.index + 1))
+    const hunks = selector.kind === "indices"
+        ? parsed.hunks.filter(hunk => (selector.indices ?? []).includes(hunk.index + 1))
         : parsed.hunks.filter(hunk => {
             const start = hunk.newStart;
             const end = hunk.newLines === 0 ? start : start + hunk.newLines - 1;
-            return start <= selector.end && selector.start <= end;
+            const selStart = selector.start ?? 0;
+            const selEnd = selector.end ?? 0;
+            return start <= selEnd && selStart <= end;
         });
     if (hunks.length === 0) {
         throw new Error(`No changes selected for ${file.filename}.`);
@@ -1081,10 +1095,10 @@ const buildCommitPatch = (
     const regularFiles = new Map(internals.parseFileDiffs(stagedDiff).map(file => [file.filename, file]));
     const zeroFiles = new Map(internals.parseFileDiffs(zeroDiff).map(file => [file.filename, file]));
     const parts = changes.map(change => {
-        const files = change.hunks.type === "lines" ? zeroFiles : regularFiles;
+        const files = change.kind === "lines" ? zeroFiles : regularFiles;
         const file = files.get(change.path);
         if (!file) throw new Error(`No staged diff found for ${change.path}.`);
-        return selectPatch(file, change.hunks, internals);
+        return selectPatch(file, change, internals);
     });
     return `${parts.join("\n")}\n`;
 };
@@ -1095,27 +1109,33 @@ interface PublicationEvidence {
     readonly indexTree: string;
 }
 
-const currentEvidence = async (
-    cwd: string,
-    internals: RuntimeInternals,
-): Promise<PublicationEvidence> => {
-    const head = await internals.git.head.resolve(cwd);
-    if (!head || head.kind !== "ref" || !head.ref || !head.commit) {
+const currentEvidence = async (api: CommandAPI, cwd: string): Promise<PublicationEvidence> => {
+    const symRef = await api.exec("git", ["symbolic-ref", "-q", "HEAD"], { cwd });
+    if (symRef.code !== 0 || !symRef.stdout.trim()) {
         throw new Error("Autommit requires a branch checkout with an existing HEAD.");
     }
+    const ref = symRef.stdout.trim();
+    const headCommit = await api.exec("git", ["rev-parse", "HEAD"], { cwd });
+    if (headCommit.code !== 0 || !headCommit.stdout.trim()) {
+        throw new Error("Autommit requires a branch checkout with an existing HEAD.");
+    }
+    const writeTree = await api.exec("git", ["write-tree"], { cwd });
+    if (writeTree.code !== 0 || !writeTree.stdout.trim()) {
+        throw new Error(writeTree.stderr || "Unable to write git index tree.");
+    }
     return {
-        ref: head.ref,
-        before: head.commit,
-        indexTree: await internals.git.writeTree(cwd),
+        ref,
+        before: headCommit.stdout.trim(),
+        indexTree: writeTree.stdout.trim(),
     };
 };
 
 const assertEvidence = async (
+    api: CommandAPI,
     cwd: string,
-    internals: RuntimeInternals,
     expected: PublicationEvidence,
 ): Promise<PublicationEvidence> => {
-    const actual = await currentEvidence(cwd, internals);
+    const actual = await currentEvidence(api, cwd);
     if (actual.ref !== expected.ref) throw new Error("Autommit branch changed during transaction.");
     if (actual.before !== expected.before) throw new Error("Autommit HEAD changed during transaction.");
     if (actual.indexTree !== expected.indexTree) throw new Error("Autommit index changed during transaction.");
@@ -1136,16 +1156,17 @@ const casRef = async (
 };
 
 const assertReceiptEvidence = async (
+    api: CommandAPI,
     cwd: string,
-    internals: RuntimeInternals,
     receipt: Receipt,
     expectedHead: string,
 ): Promise<void> => {
-    const actual = await currentEvidence(cwd, internals);
-    if (actual.ref !== receipt.ref) throw new Error("Autommit branch changed during receipt recovery.");
+    const actual = await currentEvidence(api, cwd);
+    if (actual.ref !== receipt.ref) throw new Error("Prepared autommit receipt has an unexpected branch.");
     if (actual.before !== expectedHead) throw new Error("Autommit HEAD changed during receipt recovery.");
     if (actual.indexTree !== receipt.indexTree) throw new Error("Autommit index changed during receipt recovery.");
 };
+
 export const preparedCommitTreeMatchesIndex = (
     preparedCommitTree: string,
     expectedIndexTree: string,
@@ -1160,19 +1181,19 @@ export const consumeCompletedReceipt = async (
     return null;
 };
 
-const recoverPreparedReceipt = async (
+export const recoverPreparedReceipt = async (
     api: CommandAPI,
     cwd: string,
     commonDir: string,
-    internals: RuntimeInternals,
     receipt: Receipt,
 ): Promise<AppliedCommitResult> => {
-    const actual = await currentEvidence(cwd, internals);
+    if (receipt.state === "committed") return { messages: [] };
+    const actual = await currentEvidence(api, cwd);
     if (actual.ref !== receipt.ref) throw new Error("Prepared autommit receipt has an unexpected branch.");
     if (actual.indexTree !== receipt.indexTree) throw new Error("Prepared autommit receipt has an unexpected index.");
     if (actual.before === receipt.before) {
         await casRef(api, cwd, receipt.ref, receipt.after, receipt.before);
-        await assertReceiptEvidence(cwd, internals, receipt, receipt.after);
+        await assertReceiptEvidence(api, cwd, receipt, receipt.after);
     } else if (actual.before !== receipt.after) {
         throw new Error("Prepared autommit receipt does not match the current HEAD.");
     }
@@ -1187,7 +1208,7 @@ const applySplitProposal = async (
     plan: SplitCommitPlan,
     internals: CommitInternals,
 ): Promise<AppliedCommitResult> => {
-    const expected = await currentEvidence(cwd, internals);
+    const expected = await currentEvidence(api, cwd);
     const { order, stagedDiff, zeroDiff } = await validateSplitPlan(api, cwd, plan, internals);
     const worktree = await mkdtemp(join(tmpdir(), "autommit-worktree-"));
     let added = false;
@@ -1196,7 +1217,10 @@ const applySplitProposal = async (
     try {
         patchDir = await mkdtemp(join(tmpdir(), "autommit-patch-"));
         const patchPath = join(patchDir, ".autommit.patch");
-        await internals.git.worktree.add(cwd, worktree, expected.before, { detach: true });
+        const addWorktree = await api.exec("git", ["worktree", "add", "--detach", worktree, expected.before], { cwd });
+        if (addWorktree.code !== 0) {
+            throw new Error(addWorktree.stderr || `Unable to add worktree at ${worktree}`);
+        }
         added = true;
         for (const commitIndex of order) {
             const commit = plan.commits[commitIndex];
@@ -1215,9 +1239,10 @@ const applySplitProposal = async (
                 throw new Error(committed.stderr || "Unable to commit split patch in worktree.");
             }
         }
-        const currentDiff = (await api.exec("git", ["-c", "core.quotepath=false", "-c", "diff.mnemonicprefix=false", "-c", "diff.noprefix=false", "diff", "--cached", "--binary", "--no-textconv"], { cwd })).stdout;
+        const currentDiff = (await api.exec("git", ["-c", "core.quotepath=false", "-c", "diff.mnemonicprefix=false", "-c", "diff.noprefix=false", "diff", "--src-prefix=a/", "--dst-prefix=b/", "--cached", "--binary", "--no-textconv"], { cwd })).stdout;
         if (currentDiff !== stagedDiff) throw new Error("Staged snapshot changed during atomic commit preparation.");
-        const finalHead = await internals.git.head.sha(worktree);
+        const headShaResult = await api.exec("git", ["-C", worktree, "rev-parse", "HEAD"], { cwd });
+        const finalHead = headShaResult.code === 0 ? headShaResult.stdout.trim() : "";
         if (!finalHead) throw new Error("Atomic split preparation did not create a commit.");
         const preparedTree = await api.exec("git", ["rev-parse", `${finalHead}^{tree}`], { cwd: worktree });
         if (preparedTree.code !== 0) {
@@ -1226,7 +1251,7 @@ const applySplitProposal = async (
         if (!preparedCommitTreeMatchesIndex(preparedTree.stdout.trim(), expected.indexTree)) {
             throw new Error("Prepared commit tree does not match the staged index.");
         }
-        await assertEvidence(cwd, internals, expected);
+        await assertEvidence(api, cwd, expected);
         const prepared: Receipt = {
             version: 1,
             state: "prepared",
@@ -1236,9 +1261,9 @@ const applySplitProposal = async (
             indexTree: expected.indexTree,
         };
         await writeReceipt(commonDir, prepared);
-        await assertEvidence(cwd, internals, expected);
+        await assertEvidence(api, cwd, expected);
         await casRef(api, cwd, expected.ref, finalHead, expected.before);
-        await assertReceiptEvidence(cwd, internals, prepared, finalHead);
+        await assertReceiptEvidence(api, cwd, prepared, finalHead);
         await removeReceipt(commonDir);
         return { messages: [`Created ${order.length} commit${order.length === 1 ? "" : "s"} atomically.`] };
     } catch (error) {
@@ -1248,15 +1273,16 @@ const applySplitProposal = async (
         const cleanupFailures: Array<{ readonly path: string; readonly error: unknown }> = [];
         if (added) {
             try {
-                const removed = await internals.git.worktree.tryRemove(cwd, worktree, { force: true });
-                if (!removed) {
-                    cleanupFailures.push({
-                        path: worktree,
-                        error: new Error(`Git worktree removal returned false for ${worktree}.`),
-                    });
+                const removed = await api.exec("git", ["worktree", "remove", "--force", worktree], { cwd });
+                if (removed.code !== 0) {
+                    await rm(worktree, { recursive: true, force: true });
                 }
             } catch (error) {
-                cleanupFailures.push({ path: worktree, error });
+                try {
+                    await rm(worktree, { recursive: true, force: true });
+                } catch (rmError) {
+                    cleanupFailures.push({ path: worktree, error: rmError });
+                }
             }
         } else {
             try {
@@ -1306,7 +1332,7 @@ const applyState = async (
         const proposal = state.proposal;
         const plan: SplitCommitPlan = {
             commits: [{
-                changes: stagedFiles.map(path => ({ path, hunks: { type: "all" as const } })),
+                changes: stagedFiles.map(path => ({ path, kind: "all" as const })),
                 type: proposal.analysis.type,
                 scope: proposal.analysis.scope,
                 summary: proposal.summary,
@@ -1340,23 +1366,22 @@ const factory: CustomCommandFactory = api => ({
         await ctx.waitForIdle();
         ctx.ui.setStatus("autommit", "Running direct local commit agent…");
         try {
-            const git = await loadInternal<CommitInternals["git"]>("utils/git.ts");
-            const repository = await git.repo.resolve(ctx.cwd);
-            if (!repository) {
+            const commonDirResult = await api.exec("git", ["rev-parse", "--git-common-dir"], { cwd: ctx.cwd });
+            if (commonDirResult.code !== 0) {
                 throw new Error("No Git repository found for the current directory.");
             }
-            const result = await withOperationLock(repository.commonDir, async () => {
+            const commonDir = resolve(ctx.cwd, commonDirResult.stdout.trim());
+            const result = await withOperationLock(commonDir, async () => {
                 const receipt = await consumeCompletedReceipt(
-                    repository.commonDir,
-                    await readReceipt(repository.commonDir),
+                    commonDir,
+                    await readReceipt(commonDir),
                 );
-                const runtimeInternals: RuntimeInternals = { git };
                 if (receipt?.state === "prepared") {
-                    return recoverPreparedReceipt(api, ctx.cwd, repository.commonDir, runtimeInternals, receipt);
+                    return recoverPreparedReceipt(api, ctx.cwd, commonDir, receipt);
                 }
-                const internals = await loadCommitInternals(git);
+                const internals = await loadCommitInternals();
                 const state = await runCommitAgent(api, ctx.cwd, ctx.modelRegistry, parsed, internals);
-                return applyState(api, ctx.cwd, repository.commonDir, state, internals);
+                return applyState(api, ctx.cwd, commonDir, state, internals);
             });
             report(ctx, { message: result.messages.join("\n"), type: "info" });
         } catch (error) {

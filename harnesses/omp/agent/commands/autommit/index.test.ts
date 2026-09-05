@@ -60,7 +60,7 @@ describe("consumeCompletedReceipt", () => {
 
 describe("selectPatch", () => {
   test("preserves metadata-only rename patches for whole-file selection", () => {
-    expect(selectPatch(file, { type: "all" }, internals)).toBe(renamePatch);
+    expect(selectPatch(file, { path: file.filename, kind: "all" }, internals)).toBe(renamePatch);
   });
 
   test("preserves exact file diff content for whole-file selection with hunks", () => {
@@ -81,11 +81,11 @@ describe("selectPatch", () => {
       deletions: 1,
       isBinary: false,
     };
-    expect(selectPatch(fileWithHunks, { type: "all" }, internals)).toBe(fileWithHunks.content);
+    expect(selectPatch(fileWithHunks, { path: fileWithHunks.filename, kind: "all" }, internals)).toBe(fileWithHunks.content);
   });
 
   test("rejects partial selection of metadata-only rename patches", () => {
-    expect(() => selectPatch(file, { type: "indices", indices: [1] }, internals)).toThrow(
+    expect(() => selectPatch(file, { path: file.filename, kind: "indices", indices: [1] }, internals)).toThrow(
       "Cannot partially select renamed file new/path.txt; entire file change must be committed together.",
     );
   });
