@@ -32,8 +32,10 @@ from sync.core.harness import (
 )
 from sync.core.hook_state import fingerprint_tree
 from sync.core.index import (
+    EXIT_TIMED_OUT,
     parse_timeout_seconds,
     run_sync,
+    run_sync_with_deadline,
     try_acquire_sync_lock,
 )
 from sync.core.jobs import run_jobs_with_preserve
@@ -66,6 +68,8 @@ from sync.packages.index import (
 from sync.packages.source import clone_package_with_runner
 from sync.runtime.lock import release_sync_lock
 from sync.runtime.process import (
+    MAX_OUTPUT_BYTES,
+    OutputLimit,
     RunProcessOptions,
     Success,
     TimedOut,
@@ -200,7 +204,7 @@ def test_run_jobs_with_preserve_renders_secret_template_idempotently(
     )
 
     jobs: list[Job] = [SecretTemplateJob(src=src, dst=dst, secrets_path=secrets_path)]
-    assert run_jobs_with_preserve(jobs) is True
+    assert asyncio.run(run_jobs_with_preserve(jobs)) is True
     assert (
         Path(dst).read_text(encoding="utf-8")
         == f"api-key: {json.dumps('quoted"value')}\n"
@@ -208,7 +212,7 @@ def test_run_jobs_with_preserve_renders_secret_template_idempotently(
     assert (Path(dst).lstat().st_mode & PERMISSION_MASK) == MODE_SECRET
 
     first = Path(dst).lstat()
-    assert run_jobs_with_preserve(jobs) is True
+    assert asyncio.run(run_jobs_with_preserve(jobs)) is True
     second = Path(dst).lstat()
     assert second.st_ino == first.st_ino
     assert second.st_mtime_ns == first.st_mtime_ns
@@ -230,7 +234,7 @@ def test_run_jobs_with_preserve_skips_secret_template_without_local_secrets(
             secrets_path=str(tmp_path / "missing-secrets.json"),
         )
     ]
-    assert run_jobs_with_preserve(jobs) is True
+    assert asyncio.run(run_jobs_with_preserve(jobs)) is True
     assert Path(dst).read_text(encoding="utf-8") == "keep\n"
 
 
@@ -246,7 +250,7 @@ def test_run_jobs_with_preserve_rejects_missing_template_secret(
     _write_file(Path(secrets_path), "{}\n")
 
     jobs: list[Job] = [SecretTemplateJob(src=src, dst=dst, secrets_path=secrets_path)]
-    assert run_jobs_with_preserve(jobs) is False
+    assert asyncio.run(run_jobs_with_preserve(jobs)) is False
     assert Path(dst).read_text(encoding="utf-8") == "keep\n"
 
 
@@ -298,7 +302,7 @@ def test_run_jobs_with_preserve_expands_cliproxy_credential_pools_idempotently(
             gateway_host=True,
         )
     ]
-    assert run_jobs_with_preserve(jobs) is True
+    assert asyncio.run(run_jobs_with_preserve(jobs)) is True
     config_raw = yaml.safe_load(Path(dst).read_text(encoding="utf-8"))
     assert _is_dict(config_raw)
     remote_mgmt = config_raw.get("remote-management")
@@ -330,7 +334,7 @@ def test_run_jobs_with_preserve_expands_cliproxy_credential_pools_idempotently(
     assert (Path(dst).lstat().st_mode & PERMISSION_MASK) == MODE_SECRET
 
     first = Path(dst).lstat()
-    assert run_jobs_with_preserve(jobs) is True
+    assert asyncio.run(run_jobs_with_preserve(jobs)) is True
     second = Path(dst).lstat()
     assert second.st_ino == first.st_ino
     assert second.st_mtime_ns == first.st_mtime_ns
@@ -374,7 +378,7 @@ def test_run_jobs_with_preserve_rejects_duplicate_cliproxy_credentials(
             gateway_host=True,
         )
     ]
-    assert run_jobs_with_preserve(jobs) is False
+    assert asyncio.run(run_jobs_with_preserve(jobs)) is False
     assert Path(dst).read_text(encoding="utf-8") == "keep\n"
 
 
@@ -400,9 +404,11 @@ def test_run_jobs_with_preserve_keeps_generated_extension_entries(
     )
 
     jobs: list[Job] = [DirJob(src=src, dst=dst)]
-    result = run_jobs_with_preserve(
-        jobs,
-        {dst: ["extensions/package.json", "extensions/node_modules"]},
+    result = asyncio.run(
+        run_jobs_with_preserve(
+            jobs,
+            {dst: ["extensions/package.json", "extensions/node_modules"]},
+        )
     )
     assert result is True
     assert (tmp_path / "dst" / "extensions" / "context" / "index.ts").exists()
@@ -431,7 +437,7 @@ def test_run_jobs_with_preserve_invalidates_cache_after_source_rewrite(
         DirJob(src=source_two, dst=source_one, scope="Children"),
         DirJob(src=source_one, dst=final_destination, scope="Tree"),
     ]
-    result = run_jobs_with_preserve(jobs)
+    result = asyncio.run(run_jobs_with_preserve(jobs))
     assert result is True
     assert (tmp_path / "final-destination" / "shared.txt").read_text(
         encoding="utf-8"
@@ -1819,3 +1825,180 @@ def test_run_sync_preserves_previous_releases_if_wrapper_reconciliation_fails(
     remaining = [e.name for e in releases_root.iterdir() if not e.name.startswith(".")]
     assert old_complete_release_id in remaining
     assert current_release_id in remaining
+
+
+def test_run_process_output_limit_overflow() -> None:
+    """Oversized stdout triggers explicit overflow, never success."""
+    code = f"import sys;sys.stdout.buffer.write(b'A' * {MAX_OUTPUT_BYTES + 1})"
+    result = asyncio.run(
+        run_process(
+            [sys.executable, "-c", code],
+            RunProcessOptions(timeout_ms=10000, stdio="pipe"),
+        )
+    )
+    assert result.output_limited is True
+    assert result.timed_out is False
+    assert len(result.stdout.encode("utf-8", errors="replace")) <= MAX_OUTPUT_BYTES
+    outcome = asyncio.run(
+        run_command_outcome(
+            [sys.executable, "-c", code],
+            timeout_ms=10000,
+        )
+    )
+    assert isinstance(outcome, OutputLimit)
+
+
+def test_run_process_exact_output_limit_allowed() -> None:
+    """Output at exactly the limit succeeds without overflow."""
+    code = f"import sys;sys.stdout.buffer.write(b'B' * {MAX_OUTPUT_BYTES})"
+    result = asyncio.run(
+        run_process(
+            [sys.executable, "-c", code],
+            RunProcessOptions(timeout_ms=20000, stdio="pipe"),
+        )
+    )
+    assert result.output_limited is False
+    assert result.timed_out is False
+    assert result.exit_code == 0
+    assert len(result.stdout.encode("utf-8", errors="replace")) == MAX_OUTPUT_BYTES
+
+
+def test_run_process_timeout_kills_process_group() -> None:
+    """Timeout terminates the owned group; descendant does not survive."""
+    code = (
+        "import subprocess,sys,time;"
+        "p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)']);"
+        "print(p.pid,flush=True);time.sleep(30)"
+    )
+    result = asyncio.run(
+        run_process(
+            [sys.executable, "-c", code],
+            RunProcessOptions(timeout_ms=800, stdio="pipe"),
+        )
+    )
+    assert result.timed_out is True
+    assert result.output_limited is False
+    child_pid = int(result.stdout.strip().split()[0])
+    deadline = time.monotonic() + 5.0
+    while True:
+        try:
+            os.kill(child_pid, 0)
+        except OSError:
+            break
+        if time.monotonic() > deadline:
+            pytest.fail("timed-out descendant still alive")
+        time.sleep(0.05)
+
+
+def test_run_process_inherit_stdio() -> None:
+    """Inherited stdio runs without capture and without overflow."""
+    result = asyncio.run(
+        run_process(
+            [sys.executable, "-c", "pass"],
+            RunProcessOptions(stdio="inherit"),
+        )
+    )
+    assert result.exit_code == 0
+    assert result.stdout == ""
+    assert result.stderr == ""
+    assert result.timed_out is False
+    assert result.output_limited is False
+
+
+def test_run_process_cancellation_kills_process_group(tmp_path: Path) -> None:
+    """Outer cancellation terminates the owned group and reaps the child."""
+    pid_file = tmp_path / "child.pid"
+    code = (
+        "import subprocess,sys,time;"
+        "p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)']);"
+        f"open({str(pid_file)!r},'w').write(str(p.pid));"
+        "print(p.pid,flush=True);time.sleep(30)"
+    )
+
+    async def _cancelled_run() -> str:
+        task = asyncio.create_task(
+            run_process(
+                [sys.executable, "-c", code],
+                RunProcessOptions(timeout_ms=10000, stdio="pipe"),
+            )
+        )
+        await asyncio.sleep(0.8)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            return "cancelled"
+        return "finished"
+
+    outcome = asyncio.run(_cancelled_run())
+    assert outcome == "cancelled"
+    child_pid = int(pid_file.read_text(encoding="utf-8").strip())
+    deadline = time.monotonic() + 5.0
+    while True:
+        try:
+            os.kill(child_pid, 0)
+        except OSError:
+            break
+        if time.monotonic() > deadline:
+            pytest.fail("cancelled descendant still alive")
+        time.sleep(0.05)
+
+
+def test_run_sync_with_deadline_returns_124_after_cleanup(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Manual deadline cancels sync first and returns 124 after cleanup."""
+    cleaned: list[str] = []
+
+    async def _slow_sync(_env: object, **_kwargs: object) -> bool:
+        try:
+            await asyncio.sleep(30)
+        except asyncio.CancelledError:
+            cleaned.append("cancelled")
+            raise
+        return True
+
+    def _short_timeout() -> int:
+        return 1
+
+    def _short_grace() -> int:
+        return 5
+
+    def _no_watchdog(_seconds: int) -> object:
+        def _cancel() -> None:
+            return None
+
+        return _cancel
+
+    monkeypatch.setattr("sync.core.index.run_sync", _slow_sync)
+    monkeypatch.setattr("sync.core.index.sync_timeout", _short_timeout)
+    monkeypatch.setattr("sync.core.index.CLEANUP_GRACE_SECONDS", _short_grace())
+    monkeypatch.setattr("sync.core.index.start_sync_watchdog", _no_watchdog)
+    env = _make_sync_env(tmp_path)
+    started = time.monotonic()
+    code = asyncio.run(run_sync_with_deadline(env))
+    elapsed = time.monotonic() - started
+    time_budget = 10.0
+    assert code == EXIT_TIMED_OUT
+    assert cleaned == ["cancelled"]
+    assert elapsed < time_budget
+
+
+def test_run_sync_malformed_plan_skips_python_env_bootstrap(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Malformed plan fails before any Python-env bootstrap writes."""
+    calls: list[str] = []
+
+    async def _no_bootstrap(_home: str, _timeout_ms: int) -> None:
+        calls.append("bootstrap")
+
+    def _bad_plan(_env: object) -> object:
+        message = "bad plan"
+        raise ValueError(message)
+
+    monkeypatch.setattr("sync.core.index.build_sync_plan", _bad_plan)
+    monkeypatch.setattr("sync.core.index.ensure_python_env", _no_bootstrap)
+    env = _make_sync_env(tmp_path)
+    assert asyncio.run(run_sync(env)) is False
+    assert calls == []

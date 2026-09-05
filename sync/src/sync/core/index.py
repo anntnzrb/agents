@@ -94,6 +94,7 @@ __all__ = [
 ]
 
 DEFAULT_SYNC_TIMEOUT_SECONDS: int = 15 * 60
+CLEANUP_GRACE_SECONDS: int = 30
 SYNC_LOCK_FILE: str = "sync.lock"
 EXIT_OK: int = 0
 EXIT_ERROR: int = 1
@@ -123,7 +124,7 @@ async def ensure_python_env(home: str, timeout_ms: int) -> None:
         ["uv", "python", "install"],
         RunProcessOptions(timeout_ms=timeout_ms),
     )
-    if install.timed_out or install.exit_code != 0:
+    if install.timed_out or install.output_limited or install.exit_code != 0:
         warn("uv python install failed; skipping.")
         return
 
@@ -132,7 +133,7 @@ async def ensure_python_env(home: str, timeout_ms: int) -> None:
         RunProcessOptions(timeout_ms=timeout_ms, stdio="pipe"),
     )
     latest = find.stdout.strip()
-    if not latest:
+    if find.output_limited or not latest:
         warn("uv python find returned empty; skipping.")
         return
 
@@ -141,7 +142,7 @@ async def ensure_python_env(home: str, timeout_ms: int) -> None:
         ["uv", "venv", "--python", latest, venv_target],
         RunProcessOptions(timeout_ms=timeout_ms),
     )
-    if venv.timed_out or venv.exit_code != 0:
+    if venv.timed_out or venv.output_limited or venv.exit_code != 0:
         warn("failed to create python-env")
 
 
@@ -197,8 +198,6 @@ async def run_sync(
     warn_managed_services: bool = False,
 ) -> bool:
     """Execute complete synchronization lifecycle in the strict plan order."""
-    await ensure_python_env(sync_env.home, sync_env.install_timeout_ms)
-
     try:
         sync_plan = build_sync_plan(sync_env)
         managed_plan = plan_managed_entries_for_sync_plan(sync_env, sync_plan)
@@ -207,11 +206,14 @@ async def run_sync(
         err(panic_message(error))
         return False
 
+    if any(plan.harness.id == "omp" for plan in sync_plan.harnesses):
+        await ensure_python_env(sync_env.home, sync_env.install_timeout_ms)
+
     cleanup_success = clean_managed_entries(managed_plan)
     base_success = False
     if cleanup_success:
         try:
-            base_success = run_jobs_with_preserve(
+            base_success = await run_jobs_with_preserve(
                 sync_plan.jobs,
                 preserve_paths_by_dst(extension_hook_states),
             )
@@ -291,6 +293,45 @@ def main() -> int:
     return asyncio.run(_async_main())
 
 
+async def run_sync_with_deadline(sync_env: SyncEnv) -> int:
+    """Run sync with cancellation-first deadline and grace backstop."""
+    stop_backstop = start_sync_watchdog(sync_timeout() + CLEANUP_GRACE_SECONDS)
+    sync_task = asyncio.create_task(run_sync(sync_env, warn_managed_services=True))
+    try:
+        async with asyncio.timeout(sync_timeout()):
+            success = await sync_task
+            return EXIT_OK if success else EXIT_ERROR
+    except TimeoutError:
+        err(f"timed out after {sync_timeout()}s")
+        sync_task.cancel()
+        try:
+            async with asyncio.timeout(CLEANUP_GRACE_SECONDS):
+                await sync_task
+        except TimeoutError:
+            pass
+        except asyncio.CancelledError:
+            if sync_task.done():
+                pass
+            else:
+                sync_task.cancel()
+                raise
+        if not sync_task.done():
+            os._exit(EXIT_TIMED_OUT)
+        if sync_task.cancelled():
+            return EXIT_TIMED_OUT
+        exc = sync_task.exception()
+        if exc is not None:
+            err(panic_message(exc))
+            return EXIT_ERROR
+        return EXIT_OK if sync_task.result() else EXIT_ERROR
+    except asyncio.CancelledError:
+        sync_task.cancel()
+        raise
+    finally:
+        if stop_backstop is not None:
+            stop_backstop()
+
+
 async def _async_main() -> int:
     try:
         sync_env = SyncEnv.from_system()
@@ -307,14 +348,8 @@ async def _async_main() -> int:
     if lock is None:
         err("another sync is already running; skipping")
         return EXIT_OK
-
     try:
-        stop_watchdog = start_sync_watchdog(sync_timeout())
-        try:
-            success = await run_sync(sync_env, warn_managed_services=True)
-            return EXIT_OK if success else EXIT_ERROR
-        finally:
-            stop_watchdog()
+        return await run_sync_with_deadline(sync_env)
     finally:
         release_sync_lock(lock)
 
@@ -334,7 +369,12 @@ async def _sync_before_launch(sync_env: SyncEnv) -> None:
 
     if lock is not None:
         try:
-            success = await run_sync(sync_env)
+            try:
+                async with asyncio.timeout(sync_timeout()):
+                    success = await run_sync(sync_env)
+            except TimeoutError:
+                warn("sync before launch timed out; continuing launch")
+                return
             if not success:
                 warn("continuing launch without completed sync")
         finally:
