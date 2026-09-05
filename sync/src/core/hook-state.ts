@@ -15,9 +15,12 @@ const GENERATED_EXTENSION_ENTRY_NAMES = [
   "bun.lock",
   "bun.lockb",
 ] as const;
-
-const GENERATED_EXTENSION_ENTRY_NAME_SET = new Set<string>(GENERATED_EXTENSION_ENTRY_NAMES);
-
+const GENERATED_EXTENSION_ENTRY_NAME_RECORD: Record<string, true> = {
+  "package.json": true,
+  node_modules: true,
+  "bun.lock": true,
+  "bun.lockb": true,
+};
 interface ExtensionHookStateFile {
   readonly fingerprint: string;
   readonly generatedEntries: readonly string[];
@@ -70,9 +73,7 @@ export function recordExtensionHookState(
 ): void {
   const state: ExtensionHookStateFile = {
     fingerprint: preparedState.fingerprint,
-    generatedEntries: GENERATED_EXTENSION_ENTRY_NAMES.filter((entryName) =>
-      exists(join(hook.root, entryName)),
-    ),
+    generatedEntries: findGeneratedExtensionEntries(hook.root),
   };
   writeHookStateFile(hook.statePath, state);
 }
@@ -202,8 +203,38 @@ const normalizeRelativePath = (pathValue: string): string => pathValue.split(sep
 const joinRelative = (left: string, right: string): string =>
   left.length === 0 ? right : `${left}/${right}`;
 
-const isGeneratedExtensionEntryName = (entryName: string): boolean =>
-  GENERATED_EXTENSION_ENTRY_NAME_SET.has(entryName);
+function findGeneratedExtensionEntries(root: string): string[] {
+  const results: string[] = [];
+  for (const entryName of GENERATED_EXTENSION_ENTRY_NAMES) {
+    if (exists(join(root, entryName))) {
+      results.push(entryName);
+    }
+  }
+
+  try {
+    for (const child of fs.readdirSync(root, { withFileTypes: true })) {
+      if (child.isDirectory() && !shouldSkipEntry(child.name)) {
+        for (const entryName of GENERATED_EXTENSION_ENTRY_NAMES) {
+          const relativePath = `${child.name}/${entryName}`;
+          if (exists(join(root, relativePath))) {
+            results.push(relativePath);
+          }
+        }
+      }
+    }
+  } catch {
+    // best effort
+  }
+
+  return [...new Set(results)];
+}
+
+const isGeneratedExtensionEntryName = (entryName: string): boolean => {
+  const baseName = entryName.includes("/")
+    ? entryName.slice(entryName.lastIndexOf("/") + 1)
+    : entryName;
+  return GENERATED_EXTENSION_ENTRY_NAME_RECORD[baseName] === true;
+};
 
 function warn(message: string): void {
   console.error(`sync: warning: ${message}`);

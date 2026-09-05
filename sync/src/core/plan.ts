@@ -173,6 +173,11 @@ function buildHarnessPlan(syncEnv: SyncEnv, harness: Harness): HarnessPlan {
     skillsSourceExists(syncEnv),
   );
   const cleanupEntryNames = uniqueSorted([...currentEntryNames, ...harness.compatManagedEntries]);
+  const skillHook = buildSkillHookPlan(syncEnv, harness, root);
+  const hooks = [
+    ...buildHookPlans(syncEnv, harness, root, sourceRoot),
+    ...(skillHook === undefined ? [] : [skillHook]),
+  ];
   return {
     harness,
     statePath: harnessManagedStatePath(harness, syncEnv.managedStateHome),
@@ -181,7 +186,28 @@ function buildHarnessPlan(syncEnv: SyncEnv, harness: Harness): HarnessPlan {
     instructionTarget,
     currentEntryNames,
     cleanupEntryNames,
-    hooks: buildHookPlans(syncEnv, harness, root, sourceRoot),
+    hooks,
+  };
+}
+
+function buildSkillHookPlan(
+  syncEnv: SyncEnv,
+  harness: Harness,
+  root: string,
+): ExtensionDepsHookPlan | undefined {
+  if (!skillsSourceExists(syncEnv)) {
+    return undefined;
+  }
+  const skillsSource = join(syncEnv.skillsHome, SKILLS_SOURCE_SUBDIR);
+  return {
+    kind: "ExtensionDeps",
+    harness,
+    jobRoot: join(root, SKILLS_DST_DIR),
+    root: join(root, SKILLS_DST_DIR),
+    sourceRoot: skillsSource,
+    relativeRoot: "",
+    statePath: join(syncEnv.managedStateHome, `${harness.sourceName}.skills-deps.json`),
+    timeoutMs: syncEnv.installTimeoutMs,
   };
 }
 

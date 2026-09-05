@@ -118,4 +118,51 @@ describe("prepareExtensionHookState", () => {
       rmSync(home, { recursive: true, force: true });
     }
   });
+  test("records and preserves nested package generated entries (e.g. skills)", () => {
+    const sourceRoot = makeRoot();
+    const home = makeRoot();
+    try {
+      mkdirSync(join(sourceRoot, "skill-a"), { recursive: true });
+      writeFileSync(join(sourceRoot, "skill-a", "package.json"), "{}");
+      mkdirSync(join(home, "skill-a", "node_modules", "dep"), { recursive: true });
+      writeFileSync(join(home, "skill-a", "package.json"), "{}");
+      writeFileSync(join(home, "skill-a", "bun.lock"), "");
+
+      const managedStateHome = join(home, ".local", "share", "agents", "sync-managed");
+      mkdirSync(managedStateHome, { recursive: true });
+      const adapter = HARNESS_ADAPTERS.find((a) => a.id === "omp")!;
+      const harness = buildHarness({
+        ...adapter,
+        id: adapter.id,
+        sourceName: adapter.id,
+        home,
+      });
+      const statePath = join(managedStateHome, "omp.skills-deps.json");
+      const hook = {
+        kind: "ExtensionDeps" as const,
+        harness,
+        jobRoot: join(home, "skills"),
+        root: home,
+        sourceRoot,
+        relativeRoot: "",
+        statePath,
+        timeoutMs: 1000,
+      };
+
+      const prepared = prepareExtensionHookState(hook);
+      expect(prepared.shouldSkip).toBe(false);
+
+      const { recordExtensionHookState } = require("@core/hook-state.ts");
+      recordExtensionHookState(hook, prepared);
+
+      const updatedState = prepareExtensionHookState(hook);
+      expect(updatedState.shouldSkip).toBe(true);
+      expect(updatedState.preservePaths).toContain("skill-a/node_modules");
+      expect(updatedState.preservePaths).toContain("skill-a/bun.lock");
+      expect(updatedState.preservePaths).toContain("skill-a/package.json");
+    } finally {
+      rmSync(sourceRoot, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
 });
