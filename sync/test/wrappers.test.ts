@@ -1,6 +1,7 @@
-import { beforeEach, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, type Mock, spyOn, test } from "bun:test";
 import assert from "node:assert/strict";
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -32,8 +33,12 @@ function withTempHome<T>(fn: (home: string) => T): T {
   }
 }
 
+let errorSpy: Mock<(...args: unknown[]) => void>;
 beforeEach(() => {
-  spyOn(console, "error").mockImplementation(() => {});
+  errorSpy = spyOn(console, "error").mockImplementation(() => {});
+});
+afterEach(() => {
+  errorSpy.mockRestore();
 });
 
 function addHarnessSources(
@@ -262,5 +267,39 @@ test("wrapper_reconciliation_preserves_unmanaged_conflicts", () => {
     );
     reconcileWrapperFiles(syncEnv, []);
     assert.equal(existsSync(outside), true);
+  });
+});
+
+test("existing_owned_wrapper_with_mode_0644_and_matching_content_is_updated_to_0755", () => {
+  withTempHome((home) => {
+    addHarnessSources(home);
+    const syncEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
+    assert.equal(reconcileWrappers(syncEnv), true);
+
+    const destination = wrapperDestinations(syncEnv)[0]!;
+    chmodSync(destination.path, 0o644);
+    assert.equal(statSync(destination.path).mode & 0o777, 0o644);
+
+    assert.equal(reconcileWrappers(syncEnv), true);
+    assert.equal(statSync(destination.path).mode & 0o777, 0o755);
+  });
+});
+
+test("wrapper_execution_in_isolated_home_where_sync_runtime_is_missing_returns_127", () => {
+  withTempHome((home) => {
+    addHarnessSources(home);
+    const syncEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
+    assert.equal(reconcileWrappers(syncEnv), true);
+
+    const destination = wrapperDestinations(syncEnv)[0]!;
+    const proc = Bun.spawnSync([destination.path], {
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { PATH: process.env["PATH"] ?? "", HOME: home },
+    });
+
+    assert.equal(proc.exitCode, 127);
+    const stderr = Buffer.from(proc.stderr).toString("utf8");
+    assert.equal(stderr.includes("agents: sync runtime is missing"), true);
   });
 });

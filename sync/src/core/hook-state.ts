@@ -104,7 +104,7 @@ function walkTree(
 ): void {
   const entries = fs
     .readdirSync(current, { withFileTypes: true })
-    .toSorted((left, right) => left.name.localeCompare(right.name));
+    .toSorted((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
 
   for (const entry of entries) {
     if (shouldSkipEntry(entry.name)) {
@@ -122,13 +122,14 @@ function walkTree(
       try {
         const metadata = fs.statSync(absolute);
         if (metadata.isDirectory()) {
-          hash.update(`dir:${relativePath}\n`);
-          walkTree(root, absolute, hash);
+          throw new Error(`refusing source directory symlink: ${absolute}`);
+        }
+      } catch (error) {
+        if (isErrno(error, "ENOENT")) {
+          hash.update(`broken:${relativePath}\n`);
           continue;
         }
-      } catch {
-        hash.update(`broken:${relativePath}\n`);
-        continue;
+        throw error;
       }
     }
     if (!entry.isFile() && !entry.isSymbolicLink()) {

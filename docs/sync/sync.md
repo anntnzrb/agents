@@ -67,8 +67,26 @@ The renderer parses and serializes YAML with Bun. It expands credential pools in
 
 Sync copies `sync/src/`, `sync/tsconfig.json`, `sync/package.json`, and `sync/bun.lock` into a content-addressed release under `~/.local/share/agents/sync-releases/<releaseId>/`, then runs `bun install --frozen-lockfile --production` there so the installed copy resolves its runtime dependencies. A `~/.local/share/agents/sync-current` symlink always points to the most recently published release. Generated wrappers execute this installed copy.
 
-Releases are staged in `~/.local/share/agents/sync-releases/.stage-<pid>-<nonce>` before the release is complete. Sync prunes only complete, unreferenced releases after the `sync-current` link and wrapper publication succeed. Any legacy `~/.local/share/agents/sync/` mutable directory is removed after callers have migrated to `sync-current`.
+The `<releaseId>` is a SHA-256 digest computed over the runtime sources:
 
+- Traverses `sync/src/` recursively, ordering directory entries in deterministic UTF-16 code-unit order (`(a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)`).
+- Uses forward slashes (`/`) for all relative paths.
+- Subdirectories are hashed as `dir:<relativePath>\n` before recursive descent.
+- Regular files and symlinks pointing to regular files are hashed as `file:<relativePath>\n` followed by the file content bytes and a trailing `\n`. Directory symlinks are rejected.
+- Appends the file contents of `sync/package.json`, `sync/tsconfig.json`, and `sync/bun.lock` in sequence.
+
+Releases are staged in `~/.local/share/agents/sync-releases/.stage-<pid>-<nonce>` before the release is complete. A failed or aborted installation job cleans up its private staging directory in a `finally` block, leaving active and previous releases intact. During post-sync pruning, sync prunes completed, unreferenced releases and safely cleans up stale `.stage-<pid>-<nonce>` directories whose creating PID is no longer alive or is older than the install timeout, without deleting unrecognized user directories or active releases. Package operations similarly use unique per-operation staging (`staging-<pid>-<timestamp>`) and backup (`backup-<pid>-<timestamp>`) paths, rolling back to previous directory content on failure and cleaning up temporary backups only upon successful completion. Any legacy `~/.local/share/agents/sync/` mutable directory is removed after callers have migrated to `sync-current`.
+## Extension hook state
+
+Extension dependency hooks compute a content fingerprint (`fingerprintTree`) of their source directory to skip redundant installation steps when dependencies and sources have not changed:
+
+- Produces a SHA-256 digest over the directory tree (or `"missing"` if the target path does not exist).
+- Traverses directory entries in deterministic Unicode code-point (code-unit) order.
+- Uses forward slashes (`/`) for all relative paths.
+- Subdirectories are hashed as `dir:<relativePath>\n` before recursive descent.
+- Regular files and symlinks to regular files are hashed as `file:<relativePath>\n` followed by file content bytes and a trailing `\n`.
+- Broken symlinks are hashed as `broken:<relativePath>\n`. Symlinks pointing to directories are rejected with a diagnostic error.
+- Ignored entries: skips `node_modules`, `.git`, hidden entries (names starting with `.`), and Python bytecode/caches (`__pycache__`, `*.pyc`, `*.pyo`).
 ## Managed CLIProxyAPI release
 
 `tools/cliproxyapi/release.json` selects the GitHub repository, version, platform archive, binary, and checksum. Sync downloads an archive only when the cached executable or its receipt does not match the manifest.

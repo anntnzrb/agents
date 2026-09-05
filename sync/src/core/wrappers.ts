@@ -250,6 +250,9 @@ function writeManagedWrapper(targetPath: string, content: string): "owned" | "co
       return "conflict";
     }
     if (fs.readFileSync(targetPath, "utf8") === content) {
+      if ((metadata.mode & 0o777) !== 0o755) {
+        fs.chmodSync(targetPath, 0o755);
+      }
       return "owned";
     }
   } catch (error) {

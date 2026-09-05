@@ -17,18 +17,12 @@ import {
 } from "./source.ts";
 import { packageHasBuildScript, packageIsHealthy } from "./validate.ts";
 
-export {
-  cloneAttemptsForTests,
-  commandForTests,
-  githubSlugForTests,
-  packageCacheDir,
-} from "./source.ts";
+export { packageCacheDir } from "./source.ts";
 export {
   extractImportSpecifiers,
   missingPackageRoots,
   packageHasBuildScript,
   packageIsHealthy,
-  validatePackageForTests,
 } from "./validate.ts";
 
 export const PackageManifestSchema = Schema.Struct({

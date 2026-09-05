@@ -119,7 +119,7 @@ async function runSyncRuntimeInstallJob(job: SyncRuntimeInstallJob): Promise<boo
   const releaseId = computeRuntimeReleaseId(requiredPaths);
   const releaseDir = join(job.releasesRoot, releaseId);
   if (isCompleteRelease(releaseDir)) {
-    return publishAndPrune(job, releaseDir);
+    return publishCurrentLink(job.currentLink, releaseDir);
   }
 
   const stage = createStage(job.releasesRoot);
@@ -139,22 +139,24 @@ async function runSyncRuntimeInstallJob(job: SyncRuntimeInstallJob): Promise<boo
 
     if (fs.existsSync(releaseDir)) {
       if (isCompleteRelease(releaseDir)) {
-        fs.rmSync(stage, { recursive: true, force: true });
-        return publishAndPrune(job, releaseDir);
+        return publishCurrentLink(job.currentLink, releaseDir);
       }
       fs.rmSync(releaseDir, { recursive: true, force: true });
     }
     fs.renameSync(stage, releaseDir);
   } catch (error) {
     err(`runtime install failed: ${panicMessage(error)}`);
-    try {
-      fs.rmSync(stage, { recursive: true, force: true });
-    } catch {
-      // ignore
-    }
     return false;
+  } finally {
+    if (fs.existsSync(stage)) {
+      try {
+        fs.rmSync(stage, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    }
   }
-  return publishAndPrune(job, releaseDir);
+  return publishCurrentLink(job.currentLink, releaseDir);
 }
 
 function validateRequiredSources(sourceRoot: string): RequiredPaths | false {
@@ -223,7 +225,7 @@ function computeRuntimeReleaseId(paths: RequiredPaths): string {
 function hashDirectoryInto(root: string, hasher: crypto.Hash, prefix: string = ""): void {
   for (const entry of fs
     .readdirSync(root, { withFileTypes: true })
-    .toSorted((left, right) => left.name.localeCompare(right.name))) {
+    .toSorted((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0))) {
     const absolute = join(root, entry.name);
     const relativePath = prefix.length === 0 ? entry.name : `${prefix}/${entry.name}`;
     if (entry.isSymbolicLink()) {
@@ -278,15 +280,7 @@ function createStage(releasesRoot: string): string {
   return stage;
 }
 
-function publishAndPrune(job: SyncRuntimeInstallJob, releaseDir: string): boolean {
-  if (!publishCurrentLink(job.currentLink, releaseDir)) {
-    return false;
-  }
-  pruneUnreferencedReleases(job.releasesRoot, releaseDir);
-  return true;
-}
-
-function publishCurrentLink(currentLink: string, releaseDir: string): boolean {
+export function publishCurrentLink(currentLink: string, releaseDir: string): boolean {
   const parent = dirname(currentLink);
   fs.mkdirSync(parent, { recursive: true });
   const temp = `${currentLink}.${process.pid}.tmp`;
@@ -307,8 +301,46 @@ function publishCurrentLink(currentLink: string, releaseDir: string): boolean {
   return true;
 }
 
-function pruneUnreferencedReleases(releasesRoot: string, currentReleaseDir: string): void {
-  const currentBase = basename(currentReleaseDir);
+const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/i;
+const STAGE_DIR_PATTERN = /^\.stage-(\d+)-([0-9a-f]+)$/i;
+
+function isProcessAlive(pid: number): boolean {
+  if (pid <= 0 || !Number.isInteger(pid)) {
+    return false;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "ESRCH") {
+      return false;
+    }
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "EPERM") {
+      return true;
+    }
+    return false;
+  }
+}
+
+export function pruneUnreferencedReleases(
+  releasesRoot: string,
+  currentReleaseDirOrLink: string,
+  timeoutMs: number = 120_000,
+): void {
+  if (!fs.existsSync(releasesRoot) || !fs.existsSync(currentReleaseDirOrLink)) {
+    return;
+  }
+  let currentBase: string;
+  try {
+    const resolved = fs.realpathSync(currentReleaseDirOrLink);
+    currentBase = basename(resolved);
+  } catch (error) {
+    warn(`failed to resolve current release link for pruning: ${panicMessage(error)}`);
+    return;
+  }
+  if (!SHA256_HEX_PATTERN.test(currentBase)) {
+    return;
+  }
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(releasesRoot, { withFileTypes: true });
@@ -317,17 +349,54 @@ function pruneUnreferencedReleases(releasesRoot: string, currentReleaseDir: stri
     return;
   }
   for (const entry of entries) {
-    if (entry.name.startsWith(".") || !entry.isDirectory() || entry.name === currentBase) {
+    if (entry.isSymbolicLink() || !entry.isDirectory()) {
+      continue;
+    }
+
+    const stageMatch = STAGE_DIR_PATTERN.exec(entry.name);
+    if (stageMatch?.[1]) {
+      const pid = parseInt(stageMatch[1], 10);
+      const stagePath = join(releasesRoot, entry.name);
+      let isStale = !isProcessAlive(pid);
+      if (!isStale) {
+        try {
+          const stat = fs.statSync(stagePath);
+          const ageMs = Date.now() - stat.mtimeMs;
+          if (ageMs > timeoutMs) {
+            isStale = true;
+          }
+        } catch {
+          // If stat fails, do not prune
+        }
+      }
+      if (isStale) {
+        try {
+          fs.rmSync(stagePath, { recursive: true, force: true });
+        } catch (error) {
+          warn(`failed to prune stale stage directory ${entry.name}: ${panicMessage(error)}`);
+        }
+      }
+      continue;
+    }
+
+    if (
+      entry.name.startsWith(".") ||
+      entry.name === currentBase ||
+      !SHA256_HEX_PATTERN.test(entry.name)
+    ) {
+      continue;
+    }
+    const releasePath = join(releasesRoot, entry.name);
+    if (!isCompleteRelease(releasePath)) {
       continue;
     }
     try {
-      fs.rmSync(join(releasesRoot, entry.name), { recursive: true, force: true });
+      fs.rmSync(releasePath, { recursive: true, force: true });
     } catch (error) {
       warn(`failed to prune unreferenced release ${entry.name}: ${panicMessage(error)}`);
     }
   }
 }
-
 export function removeLegacyRuntimeInstall(runtimeHome: string): boolean {
   const legacy = join(runtimeHome, "sync");
   try {

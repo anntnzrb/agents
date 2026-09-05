@@ -9,7 +9,11 @@ import {
   prepareExtensionHookState,
   recordExtensionHookState,
 } from "./hook-state.ts";
-import { removeLegacyRuntimeInstall, runJobsWithPreserve } from "./jobs.ts";
+import {
+  pruneUnreferencedReleases,
+  removeLegacyRuntimeInstall,
+  runJobsWithPreserve,
+} from "./jobs.ts";
 import { launchHarness, launchNpmPackage } from "./launcher.ts";
 import {
   cleanManagedEntries,
@@ -156,6 +160,13 @@ export async function runSync(
   const legacyCleanupSuccess =
     baseSuccess && wrapperSuccess ? removeLegacyRuntimeInstall(syncEnv.runtimeHome) : true;
 
+  if (baseSuccess && wrapperSuccess) {
+    pruneUnreferencedReleases(
+      path.join(syncEnv.runtimeHome, "sync-releases"),
+      path.join(syncEnv.runtimeHome, "sync-current"),
+      syncEnv.installTimeoutMs,
+    );
+  }
   const managedStateSuccess =
     baseSuccess && wrapperSuccess ? recordManagedEntries(managedPlan) : true;
   const hookSuccess =

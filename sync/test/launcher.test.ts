@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { SyncEnv } from "@core/harness.ts";
 import {
@@ -23,7 +23,6 @@ import {
   prepareNpmPackage,
 } from "@core/launcher.ts";
 import { toolLauncher } from "@core/tool-launchers.ts";
-import type { RunProcessOptions } from "@runtime/process.ts";
 
 function withTempHome<T>(fn: (home: string) => T | Promise<T>): Promise<T> {
   const root = mkdtempSync(join(tmpdir(), "agents-launcher-test-"));
@@ -284,70 +283,83 @@ test("interactive_harness_launch_is_unbounded_and_keeps_arguments", async () => 
 });
 
 test("harness_launch_merges_root_env_parent_env_and_adapter_env_with_precedence", async () => {
-  const rootKeyOnly = "AGENTS_SYNC_TEST_ROOT_ONLY_VAR";
-  const parentKeyOverride = "AGENTS_SYNC_TEST_PARENT_OVERRIDE_VAR";
-  const adapterCollisionKey = "AGENTS_SYNC_TEST_ADAPTER_COLLISION_VAR";
+  await withTempHome(async (home) => {
+    const proc = Bun.spawnSync(
+      [
+        process.execPath,
+        "-e",
+        `import assert from "node:assert/strict";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { SyncEnv } from "@core/harness.ts";
+import { launchHarness } from "@core/launcher.ts";
 
-  const originalParentVal = process.env[parentKeyOverride];
-  process.env[parentKeyOverride] = "parent_value";
+const rootKeyOnly = "AGENTS_SYNC_TEST_ROOT_ONLY_VAR";
+const parentKeyOverride = "AGENTS_SYNC_TEST_PARENT_OVERRIDE_VAR";
+const adapterCollisionKey = "AGENTS_SYNC_TEST_ADAPTER_COLLISION_VAR";
+const home = ${JSON.stringify(home)};
 
-  try {
-    await withTempHome(async (home) => {
-      const agentsHome = join(home, ".config", "agents");
-      mkdirSync(join(agentsHome, "harnesses", "codex"), { recursive: true });
-      writeFileSync(
-        join(agentsHome, ".env"),
-        [
-          `${rootKeyOnly}=root_default_val`,
-          `${parentKeyOverride}=root_ignored_val`,
-          `${adapterCollisionKey}=root_val_overridden_by_adapter`,
-        ].join("\n"),
-        "utf8",
-      );
+const agentsHome = join(home, ".config", "agents");
+mkdirSync(join(agentsHome, "harnesses", "codex"), { recursive: true });
+writeFileSync(
+  join(agentsHome, ".env"),
+  [
+    \`\${rootKeyOnly}=root_default_val\`,
+    \`\${parentKeyOverride}=root_ignored_val\`,
+    \`\${adapterCollisionKey}=root_val_overridden_by_adapter\`,
+  ].join("\\n"),
+  "utf8",
+);
 
-      let capturedEnv: RunProcessOptions["env"] | undefined;
-      const runtime: LauncherRuntime = {
-        resolveVersion: async () => "1.0.0",
-        run: async (command, options): Promise<LauncherProcessResult> => {
-          capturedEnv = options.env;
-          if (command[0] === "npm") {
-            const stage = command[3]!;
-            const executable = join(stage, "node_modules", ".bin", "codex");
-            mkdirSync(join(stage, "node_modules", ".bin"), { recursive: true });
-            writeFileSync(executable, "#!/bin/sh\nexit 0\n", "utf8");
-            chmodSync(executable, 0o755);
-            writePackageManifest(stage, "@openai/codex", "1.0.0");
-          }
-          return success();
-        },
-      };
-
-      const syncEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
-      const baseHarness = syncEnv.harnesses.find((candidate) => candidate.sourceName === "codex")!;
-      const harnessWithAdapterEnv = {
-        ...baseHarness,
-        launcher: {
-          ...baseHarness.launcher,
-          env: {
-            [adapterCollisionKey]: "adapter_wins",
-          },
-        },
-      };
-
-      await launchHarness(syncEnv, harnessWithAdapterEnv, [], runtime);
-
-      assert(capturedEnv !== undefined);
-      assert.equal(capturedEnv[rootKeyOnly], "root_default_val");
-      assert.equal(capturedEnv[parentKeyOverride], undefined);
-      assert.equal(capturedEnv[adapterCollisionKey], "adapter_wins");
-    });
-  } finally {
-    if (originalParentVal === undefined) {
-      delete process.env[parentKeyOverride];
-    } else {
-      process.env[parentKeyOverride] = originalParentVal;
+let capturedEnv;
+const runtime = {
+  resolveVersion: async () => "1.0.0",
+  run: async (command, options) => {
+    capturedEnv = options.env;
+    if (command[0] === "npm") {
+      const stage = command[3];
+      const executable = join(stage, "node_modules", ".bin", "codex");
+      mkdirSync(join(stage, "node_modules", ".bin"), { recursive: true });
+      writeFileSync(executable, "#!/bin/sh\\nexit 0\\n", "utf8");
+      chmodSync(executable, 0o755);
+      const pkgDir = join(stage, "node_modules", "@openai", "codex");
+      mkdirSync(pkgDir, { recursive: true });
+      writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ name: "@openai/codex", version: "1.0.0" }) + "\\n");
     }
-  }
+    return { exitCode: 0, stdout: "", stderr: "", timedOut: false };
+  },
+};
+
+const syncEnv = SyncEnv.fromHome(home, 1000, { platform: "linux" });
+const baseHarness = syncEnv.harnesses.find((candidate) => candidate.sourceName === "codex");
+const harnessWithAdapterEnv = {
+  ...baseHarness,
+  launcher: {
+    ...baseHarness.launcher,
+    env: {
+      [adapterCollisionKey]: "adapter_wins",
+    },
+  },
+};
+
+await launchHarness(syncEnv, harnessWithAdapterEnv, [], runtime);
+
+assert(capturedEnv !== undefined);
+assert.equal(capturedEnv[rootKeyOnly], "root_default_val");
+assert.equal(capturedEnv[parentKeyOverride], undefined);
+assert.equal(capturedEnv[adapterCollisionKey], "adapter_wins");`,
+      ],
+      {
+        cwd: resolve(import.meta.dir, ".."),
+        env: {
+          ...Bun.env,
+          HOME: home,
+          AGENTS_SYNC_TEST_PARENT_OVERRIDE_VAR: "parent_value",
+        },
+      },
+    );
+    assert.equal(proc.exitCode, 0);
+  });
 });
 
 function writePackageManifest(root: string, packageName: string, version: string): void {

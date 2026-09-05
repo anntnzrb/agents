@@ -91,3 +91,98 @@ Do not edit a generated harness home. Sync replaces managed files on the next ru
 Store launcher metadata in the adapter. Do not repeat package names, target homes, or hook rules in user configuration.
 
 Do not add a supported-harness roster to the documentation. `HARNESS_ADAPTERS` owns that list.
+
+## Parsing and format contracts
+
+Sync parses configuration, secrets, environment files, and extension/skill sources across several formats. All implementations must uphold these parsing contracts:
+
+### JavaScript and TypeScript import extraction
+
+- **Static and dynamic imports**: Extracts static ESM `import` statements, `export ... from` re-exports, dynamic `import()` expressions, and CommonJS `require()` calls.
+- **Require normalization**: `require("...")` calls are normalized so the scanner recognizes them as dynamic imports during AST traversal.
+- **Comment and string immunity**: Import and require statements inside single-line comments (`//`), multiline block comments (`/* ... */`), string literals (single or double quotes), and template literals (`` `...` ``) are ignored.
+- **Type-only erasure**: Type-only imports (`import type { ... }`) are stripped during transpilation/scanning and excluded from runtime dependency specifiers.
+- **Specifier classification**: Downstream package validation (`missingPackageRoots`) ignores relative paths (`.`, `./*`, `../*`), builtin modules (`node:*`, `bun:*`, `bun`), and `data:` URIs, validating only unresolved npm package roots and scoped package identifiers.
+
+### JSON with Comments (JSONC)
+
+- **Comment tolerance**: Accepts single-line (`//`) and multiline (`/* ... */`) comments across configuration files, manifests, and local secrets (`secrets.local.json`, `deployment.json`, `release-manifest.json`, hook states, wrapper state).
+- **Trailing comma tolerance**: Permits trailing commas in objects and arrays.
+
+### YAML
+
+- **Standard YAML mappings**: Parses and emits standard YAML configuration templates (e.g., CLIProxyAPI `config.yaml.tmpl`).
+- **Credential pool expansion**: Expands declared `x-credential-pool` markers into native credential profiles and compatibility provider blocks, merging shared profile attributes while enforcing pool reference completeness.
+
+### Dotenv (`.env`)
+
+- **Quoted string preservation**: Preserves single- and double-quoted values.
+- **Variable expansion disabled**: Literal `$VAR` or `${VAR}` sequences remain unexpanded (`expandVariables: false`).
+- **Empty key omission**: Keys with empty or unset values are omitted from the decoded environment map (`preserveEmptyStrings: false`).
+
+### Future Python implementation considerations
+
+When porting or implementing these parser contracts in Python (or another non-Bun runtime):
+
+- **Maintained AST parser**: Prefer a dedicated, maintained JS/TS AST parsing library (e.g., `tree-sitter-typescript` or Python bindings to `oxc`/`swc`/`esprima`) to retain comment/string immunity and AST-level import extraction.
+- **External scanning process**: Alternatively, invoke an external scanner subprocess (such as Bun, Node, or an `oxc` CLI binary) to perform scanner extraction and return structured JSON specifiers, avoiding naive regex matching that is prone to false positives inside comments or multi-line strings.
+
+## Behavioral migration oracle contract
+
+The integration test suite (`sync/test/integration.test.ts`) serves as an executable black-box specification and migration oracle for the sync system. Rather than testing internal TypeScript types, Effect combinators, or language-specific idioms, these scenarios assert observable system boundaries that any implementation—including a future Python rewrite—must satisfy.
+
+Any reimplementation of sync is compliant if and only if it satisfies all of the following black-box behavioral contracts:
+
+### 1. CLI syntax, help modes, and standard exit codes
+
+- **`0` (Success & Graceful Skip)**: Returned on successful synchronization, help inspection flags (`--help`, `-h`, `help`, `sync --help`, `launch --help`), and when a concurrent run gracefully skips due to lock contention.
+- **`1` (Runtime & Validation Failure)**: Returned on missing SSOT runtime source directories, invalid configuration schemas, unparseable deployment configurations, or hook execution failures.
+- **`2` (CLI Syntax Error)**: Returned when unrecognized commands, flags, or invalid argument separator syntax are passed (e.g., `sync launch` with no target, or `sync launch codex missing-separator`).
+- **`124` (Timeout)**: Returned when sync execution or launcher processes exceed configured deadlines.
+- **`127` (Missing Command / Missing Runtime)**: Returned when an unmanaged or missing command is executed, or when a generated launcher wrapper is invoked without a valid sync runtime.
+
+### 2. Missing source vs. malformed configuration
+
+- **Missing SSOT source tree**: When `.config/agents/sync` (or required source manifests) is absent or unreadable, sync fails fast with exit code `1` and emits a descriptive diagnostic to stderr (`missing or unreadable runtime source`).
+- **Malformed configuration**: When structured configuration files (such as `.config/agents/tools/cliproxyapi/deployment.json` or hook manifests) contain invalid JSON/YAML or fail schema decoding, sync fails with exit code `1` and logs a parse error identifying the offending file.
+
+### 3. Owned entry cleanup vs. unmanaged file preservation
+
+- **Pruning stale owned entries**: Stale managed files (entries recorded in previous state files or declared in harness adapters but removed from current SSOT) are automatically removed upon synchronization.
+- **Preserving unmanaged user files**: Files placed in harness homes or tool directories by users (e.g., `~/.omp/agent/logs/user.log`, `~/.local/bin/my-script`) that were never managed by sync are strictly preserved.
+- **Unmanaged wrapper conflicts**: If an unmanaged file already exists at a desired wrapper path (e.g., `~/.local/bin/codex`), sync preserves the unmanaged binary without overwriting it, records the conflict, and emits a warning on stderr (`preserving unmanaged wrapper conflict`).
+
+### 4. Repeated reconciliation and within-run idempotency
+
+- Successive sync runs against an unchanged source of truth must produce identical filesystem state.
+- Idempotent runs must not touch, rewrite, or churn existing matching files: destination file inode numbers (`ino`) and modification timestamps (`mtimeMs`) must remain stable.
+
+### 5. Transactional publication and failure recovery
+
+- When publishing endpoint configurations or rendered templates, sync verifies client endpoint readiness before modifying active harness configuration files.
+- If target endpoints are unreachable, existing files are preserved without partial overwrites or corruption.
+- In the event of a mid-publication failure, modified targets are rolled back to their pre-publication snapshots.
+- Once underlying failures are resolved, subsequent sync runs cleanly reconcile and publish all managed targets.
+
+### 6. Process lock contention and release
+
+- An exclusive non-blocking POSIX lock (`flock(LOCK_EX | LOCK_NB)` on `~/.local/share/agents/sync-managed/sync.lock`) guards synchronization.
+- If another sync process currently holds the lock, incoming runs exit cleanly with code `0` and write `another sync is already running; skipping` to stderr.
+- When the lock holder exits or terminates, the lock is immediately released and available for subsequent processes.
+
+### 7. Cached launch fallback and offline resilience
+
+- When invoking `sync launch <tool> [-- <args...>]`, the launcher attempts to resolve and stage packages from the registry.
+- If the remote package registry is unreachable or offline, the launcher falls back to the locally cached package (`~/.cache/npm-tools/<tool>/packages/<key>/current`), emits a diagnostic warning to stderr (`using cached <tool>@<version>`), and executes the cached executable with all forwarded arguments.
+
+### 8. Wrapper runtime isolation and diagnostic hints
+
+- Generated launch wrappers in `~/.local/bin/<harness>` delegate execution to the managed sync runtime (`~/.local/share/agents/sync-current/src/cli.ts`).
+- If the sync runtime is missing or removed, invoking the wrapper must immediately exit with status code `127` and output `agents: sync runtime is missing; run sync from the agents repository` to stderr.
+
+### 9. Environment variable precedence cascade
+
+Subprocess environments during launch are resolved according to strict hierarchical precedence:
+1. **Base defaults**: Loaded from `.config/agents/.env` in the SSOT.
+2. **Parent process environment**: Overrides values from `.env`.
+3. **Adapter overrides**: Configured in adapter launcher specifications (`harness.launcher.env`), taking precedence over both parent process environment and `.env`.

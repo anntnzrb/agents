@@ -257,7 +257,8 @@ export function syncCliProxyEndpointTemplate(
   }
   try {
     const rendered = renderCliProxyEndpointTemplate(template, deployment);
-    syncTextFile(dst, `${rendered}${readPreservedTopLevelTail(dst, preserveTopLevels)}`, mode);
+    const preserved = readPreservedTopLevels(dst, preserveTopLevels);
+    syncTextFile(dst, appendPreservedSections(rendered, preserved), mode);
   } catch (error) {
     throw new Error(
       `render CLIProxyAPI endpoint template ${src} -> ${dst} (${panicMessage(error)})`,
@@ -277,7 +278,7 @@ function existingFileMode(path: string): number | undefined {
   }
 }
 
-function readPreservedTopLevelTail(path: string, topLevels: readonly string[]): string {
+export function readPreservedTopLevels(path: string, topLevels: readonly string[]): string {
   if (topLevels.length === 0) {
     return "";
   }
@@ -290,35 +291,274 @@ function readPreservedTopLevelTail(path: string, topLevels: readonly string[]): 
     }
     throw error;
   }
+  return extractPreservedTopLevels(existing, topLevels);
+}
 
-  let firstHeader = -1;
-  for (const topLevel of topLevels) {
-    const header = `[${topLevel}`;
-    let offset = 0;
-    for (const line of existing.split(NEWLINE_SPLIT_PATTERN)) {
-      const trimmed = line.endsWith("\n")
-        ? line.slice(0, -1).replace(TRAILING_CR_PATTERN, "")
-        : line;
-      if (
-        trimmed.startsWith(header) &&
-        (trimmed[header.length] === "." || trimmed[header.length] === "]")
-      ) {
-        firstHeader = firstHeader < 0 ? offset : Math.min(firstHeader, offset);
-        break;
-      }
-      offset += line.length;
-    }
-  }
-  if (firstHeader < 0) {
+export function extractPreservedTopLevels(existing: string, topLevels: readonly string[]): string {
+  if (topLevels.length === 0) {
     return "";
   }
-  const separatorStart =
-    firstHeader >= 2 && existing.slice(firstHeader - 2, firstHeader) === "\r\n"
-      ? firstHeader - 2
-      : firstHeader >= 1 && existing[firstHeader - 1] === "\n"
-        ? firstHeader - 1
-        : firstHeader;
-  return existing.slice(separatorStart);
+  const parsedTopLevels = topLevels
+    .map((tl) => parseTomlKeyPath(tl))
+    .filter((segments): segments is string[] => segments !== null && segments.length > 0);
+  if (parsedTopLevels.length === 0) {
+    return "";
+  }
+
+  const lines = existing.split(NEWLINE_SPLIT_PATTERN);
+  interface TomlSection {
+    headerSegments: string[] | null;
+    lines: string[];
+  }
+  const sections: TomlSection[] = [];
+  let currentSection: TomlSection = { headerSegments: null, lines: [] };
+
+  for (const line of lines) {
+    const header = parseTomlTableHeader(line);
+    if (header !== null) {
+      if (currentSection.headerSegments !== null || currentSection.lines.length > 0) {
+        sections.push(currentSection);
+      }
+      currentSection = { headerSegments: header, lines: [line] };
+    } else {
+      currentSection.lines.push(line);
+    }
+  }
+  if (currentSection.headerSegments !== null || currentSection.lines.length > 0) {
+    sections.push(currentSection);
+  }
+
+  const preservedSections = sections.filter((section) => {
+    if (section.headerSegments === null) {
+      return false;
+    }
+    return parsedTopLevels.some(
+      (topLevelSegments) =>
+        section.headerSegments !== null &&
+        section.headerSegments.length >= topLevelSegments.length &&
+        topLevelSegments.every((seg, idx) => seg === section.headerSegments?.[idx]),
+    );
+  });
+
+  if (preservedSections.length === 0) {
+    return "";
+  }
+
+  return `${preservedSections.map((section) => section.lines.join("").trimEnd()).join("\n\n")}\n`;
+}
+
+export function appendPreservedSections(rendered: string, preserved: string): string {
+  if (preserved.length === 0) {
+    return rendered;
+  }
+  if (rendered.length === 0) {
+    return preserved;
+  }
+  if (rendered.endsWith("\n\n")) {
+    return `${rendered}${preserved}`;
+  }
+  if (rendered.endsWith("\n")) {
+    return `${rendered}\n${preserved}`;
+  }
+  return `${rendered}\n\n${preserved}`;
+}
+
+function parseTomlKeyPath(raw: string): string[] | null {
+  const segments: string[] = [];
+  let i = 0;
+  const len = raw.length;
+
+  while (i < len) {
+    while (i < len && (raw[i] === " " || raw[i] === "\t")) {
+      i++;
+    }
+    if (i >= len) {
+      break;
+    }
+
+    const char = raw[i];
+    if (char === '"') {
+      i++;
+      let value = "";
+      let closed = false;
+      while (i < len) {
+        const c = raw[i];
+        if (c === "\\") {
+          i++;
+          if (i >= len) {
+            return null;
+          }
+          const esc = raw[i];
+          if (esc === '"' || esc === "\\") {
+            value += esc;
+          } else if (esc === "n") {
+            value += "\n";
+          } else if (esc === "t") {
+            value += "\t";
+          } else if (esc === "r") {
+            value += "\r";
+          } else {
+            value += esc;
+          }
+          i++;
+        } else if (c === '"') {
+          closed = true;
+          i++;
+          break;
+        } else {
+          value += c;
+          i++;
+        }
+      }
+      if (!closed) {
+        return null;
+      }
+      segments.push(value);
+    } else if (char === "'") {
+      i++;
+      let value = "";
+      let closed = false;
+      while (i < len) {
+        const c = raw[i];
+        if (c === "'") {
+          closed = true;
+          i++;
+          break;
+        }
+        value += c;
+        i++;
+      }
+      if (!closed) {
+        return null;
+      }
+      segments.push(value);
+    } else {
+      let key = "";
+      while (i < len) {
+        const c = raw[i];
+        if (
+          c === "." ||
+          c === "]" ||
+          c === "[" ||
+          c === " " ||
+          c === "\t" ||
+          c === "#" ||
+          c === "\r" ||
+          c === "\n" ||
+          c === "="
+        ) {
+          break;
+        }
+        key += c;
+        i++;
+      }
+      if (key.length === 0) {
+        return null;
+      }
+      segments.push(key);
+    }
+
+    while (i < len && (raw[i] === " " || raw[i] === "\t")) {
+      i++;
+    }
+    if (i < len && raw[i] === ".") {
+      i++;
+      while (i < len && (raw[i] === " " || raw[i] === "\t")) {
+        i++;
+      }
+      if (i >= len) {
+        return null;
+      }
+    } else {
+      break;
+    }
+  }
+
+  while (i < len && (raw[i] === " " || raw[i] === "\t")) {
+    i++;
+  }
+  if (i < len) {
+    return null;
+  }
+
+  return segments.length > 0 ? segments : null;
+}
+
+function parseTomlTableHeader(line: string): string[] | null {
+  const trimmed = line.endsWith("\n")
+    ? line.slice(0, -1).replace(TRAILING_CR_PATTERN, "").trim()
+    : line.trim();
+
+  if (!trimmed.startsWith("[")) {
+    return null;
+  }
+
+  const isArray = trimmed.startsWith("[[");
+  const openBracketCount = isArray ? 2 : 1;
+
+  let i = openBracketCount;
+  const len = trimmed.length;
+  let inDoubleQuote = false;
+  let inSingleQuote = false;
+  let closeBracketIndex = -1;
+
+  while (i < len) {
+    const c = trimmed[i];
+    if (inDoubleQuote) {
+      if (c === "\\") {
+        i += 2;
+        continue;
+      }
+      if (c === '"') {
+        inDoubleQuote = false;
+      }
+      i++;
+      continue;
+    }
+    if (inSingleQuote) {
+      if (c === "'") {
+        inSingleQuote = false;
+      }
+      i++;
+      continue;
+    }
+
+    if (c === '"') {
+      inDoubleQuote = true;
+      i++;
+      continue;
+    }
+    if (c === "'") {
+      inSingleQuote = true;
+      i++;
+      continue;
+    }
+
+    if (isArray) {
+      if (c === "]" && i + 1 < len && trimmed[i + 1] === "]") {
+        closeBracketIndex = i;
+        break;
+      }
+    } else {
+      if (c === "]") {
+        closeBracketIndex = i;
+        break;
+      }
+    }
+    i++;
+  }
+
+  if (closeBracketIndex === -1) {
+    return null;
+  }
+
+  const rest = trimmed.slice(closeBracketIndex + openBracketCount).trim();
+  if (rest.length > 0 && !rest.startsWith("#")) {
+    return null;
+  }
+
+  const inner = trimmed.slice(openBracketCount, closeBracketIndex);
+  return parseTomlKeyPath(inner);
 }
 
 function isUnspecifiedIpv4(host: string): boolean {
