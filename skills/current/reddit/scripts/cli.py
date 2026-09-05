@@ -3,6 +3,7 @@
 # requires-python = ">=3.12"
 # dependencies = []
 # ///
+"""Browse and search Reddit via the public JSON API."""
 
 from __future__ import annotations
 
@@ -15,15 +16,29 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import urllib.response
 from collections import Counter
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, cast
 
-USAGE = "usage: reddit <browse|search|post|post-url|user|user-posts|user-comments|user-analysis|explain> ..."
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+USAGE = (
+    "usage: reddit <browse|search|post|post-url|user|user-posts|user-comments|"
+    + "user-analysis|explain> ..."
+)
 RAW_FLAG = "raw=1"
 
 PREVIEW_CAP = 500
 SELF_PREVIEW_CAP = 240
+_MIN_QUOTED_LEN = 2
+_MIN_POST_ARGS = 2
+
+JsonValue = (
+    dict[str, "JsonValue"] | Sequence["JsonValue"] | str | int | float | bool | None
+)
 
 NETWORK_SECURITY_MARKER = "blocked by network security"
 BROWSE_SORTS = frozenset({"hot", "new", "top", "rising", "controversial"})
@@ -44,6 +59,10 @@ LISTING_FIELDS: tuple[str, ...] = (
     "over_18",
     "is_self",
 )
+_UNKNOWN_TERM_DEFINITION = (
+    "Unknown term in the built-in glossary. "
+    + "Search Reddit or the web for current community usage."
+)
 
 COMMENT_FIELDS: tuple[str, ...] = (
     "id",
@@ -60,18 +79,18 @@ HTML_SCRIPT_RE = re.compile(r"<(script|style)[^>]*>.*?</\1>", re.DOTALL | re.IGN
 HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 GLOSSARY = {
-    "karma": "Score derived from upvotes on posts and comments. Usually split into post karma and comment karma.",
-    "cake day": "The anniversary of a Reddit account creation date, shown with a cake icon.",
-    "ama": "Ask Me Anything. A Q&A thread where a person invites questions from the community.",
-    "op": "Original Poster: the author of the post or sometimes the parent comment under discussion.",
+    "karma": "Score derived from upvotes on posts and comments. Usually split into post karma and comment karma.",  # noqa: E501 - glossary prose
+    "cake day": "The anniversary of a Reddit account creation date, shown with a cake icon.",  # noqa: E501 - glossary prose
+    "ama": "Ask Me Anything. A Q&A thread where a person invites questions from the community.",  # noqa: E501 - glossary prose
+    "op": "Original Poster: the author of the post or sometimes the parent comment under discussion.",  # noqa: E501 - glossary prose
     "tldr": "Too Long; Did Not Read. A short summary of a longer post or comment.",
-    "eli5": "Explain Like I Am Five. A request or community norm for simple, plain-language explanations.",
+    "eli5": "Explain Like I Am Five. A request or community norm for simple, plain-language explanations.",  # noqa: E501 - glossary prose
     "throwaway": "A temporary account, often created for privacy-sensitive posting.",
     "flair": "A label or badge attached to a post or username inside a subreddit.",
-    "nsfw": "Not Safe For Work. Content that may be explicit or inappropriate in some settings.",
-    "crosspost": "A repost of the same submission into another subreddit using the native crosspost flow.",
-    "shadowban": "A state where activity is hidden or heavily limited without an obvious visible ban message.",
-    "modmail": "Shared moderator inbox for communication between subreddit mods and users.",
+    "nsfw": "Not Safe For Work. Content that may be explicit or inappropriate in some settings.",  # noqa: E501 - glossary prose
+    "crosspost": "A repost of the same submission into another subreddit using the native crosspost flow.",  # noqa: E501 - glossary prose
+    "shadowban": "A state where activity is hidden or heavily limited without an obvious visible ban message.",  # noqa: E501 - glossary prose
+    "modmail": "Shared moderator inbox for communication between subreddit mods and users.",  # noqa: E501 - glossary prose
 }
 
 
@@ -79,6 +98,7 @@ GLOSSARY = {
 
 
 def parse_env_file(path: Path) -> bool:
+    """Load KEY=value pairs from an env file into the process environment."""
     if not path.is_file():
         return False
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -94,13 +114,18 @@ def parse_env_file(path: Path) -> bool:
         value = value.strip()
         if not key:
             continue
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        if (
+            len(value) >= _MIN_QUOTED_LEN
+            and value[0] == value[-1]
+            and value[0] in {"'", '"'}
+        ):
             value = value[1:-1]
         os.environ[key] = value
     return True
 
 
 def ancestor_env(skill_name: str) -> Path | None:
+    """Locate a skill .env file in the current directory or its ancestors."""
     here = Path.cwd().resolve()
     for directory in (here, *here.parents):
         candidate = directory / "skills" / skill_name / ".env"
@@ -110,6 +135,7 @@ def ancestor_env(skill_name: str) -> Path | None:
 
 
 def load_env() -> None:
+    """Load the Reddit user agent from env files unless already exported."""
     skill_dir = Path(__file__).resolve().parents[1]
     candidates: list[Path | None] = []
     if os.environ.get("REDDIT_ENV_FILE"):
@@ -129,6 +155,7 @@ def load_env() -> None:
 
 
 def pairs(items: list[str]) -> list[tuple[str, str]]:
+    """Split key=value arguments into pairs."""
     out: list[tuple[str, str]] = []
     for item in items:
         if "=" in item:
@@ -140,6 +167,7 @@ def pairs(items: list[str]) -> list[tuple[str, str]]:
 
 
 def alias_pair(pair: str) -> str:
+    """Rewrite a legacy option alias to its canonical key."""
     aliases = {
         "time=": "t=",
         "comment_limit=": "limit=",
@@ -153,6 +181,7 @@ def alias_pair(pair: str) -> str:
 
 
 def consume_raw_flag(args: list[str]) -> tuple[bool, list[str]]:
+    """Split the raw output flag from command arguments."""
     raw_mode = RAW_FLAG in args
     return raw_mode, [a for a in args if a != RAW_FLAG]
 
@@ -161,6 +190,7 @@ def split_limit_extra(
     args: list[str],
     default_limit: str,
 ) -> tuple[str, list[tuple[str, str]]]:
+    """Split an optional limit from extra key=value arguments."""
     limit = default_limit
     extra: list[tuple[str, str]] = []
     for raw in args:
@@ -175,12 +205,13 @@ def split_limit_extra(
 # ---------- output ----------
 
 
-def json_print(payload: Any) -> None:
+def json_print(payload: object) -> None:
+    """Print a payload as compact JSON."""
     print(json.dumps(payload, separators=(",", ":")))
 
 
 def _strip_html_preview(text: str) -> str:
-    """Return a text-only preview with HTML tags/entities removed and whitespace collapsed.
+    """Return a text-only preview with markup removed and whitespace collapsed.
 
     Used for compact error envelopes so the stderr line never leaks raw markup like
     ``<html>`` or stray ``&amp;`` from upstream block pages.
@@ -200,6 +231,7 @@ def emit_error(
     body: bytes,
     kind: str | None = None,
 ) -> None:
+    """Emit a compact error envelope to stderr."""
     body_bytes = len(body)
     text = body.decode("utf-8", errors="replace") if body else ""
     preview_text = _strip_html_preview(text)
@@ -207,27 +239,35 @@ def emit_error(
         kind = "network_security_block"
     truncated = len(preview_text) > PREVIEW_CAP
     preview = preview_text[:PREVIEW_CAP]
-    payload: dict[str, Any] = {
-        "error": {
-            "provider": "reddit",
-            "status": status,
-            "message": message,
-            "body_bytes": body_bytes,
-            "body_preview": preview,
-            "body_truncated": truncated,
-        },
+    error: dict[str, JsonValue] = {
+        "provider": "reddit",
+        "status": status,
+        "message": message,
+        "body_bytes": body_bytes,
+        "body_preview": preview,
+        "body_truncated": truncated,
     }
     if kind is not None:
-        payload["error"]["kind"] = kind
+        error["kind"] = kind
+    payload: dict[str, JsonValue] = {"error": error}
     print(json.dumps(payload, separators=(",", ":")), file=sys.stderr)
 
 
 def usage_error(message: str) -> int:
+    """Print a usage error and return the usage exit code."""
     print(message, file=sys.stderr)
     return 2
 
 
 # ---------- HTTP ----------
+
+
+def _read_http_error(exc: urllib.error.HTTPError) -> bytes:
+    """Read an HTTP error body and release the error response."""
+    try:
+        return exc.read()
+    finally:
+        exc.close()
 
 
 def request_get(
@@ -237,18 +277,20 @@ def request_get(
     *,
     raw: bool,
 ) -> tuple[int, bytes]:
+    """Fetch a URL and return its exit code and body."""
     if params:
         sep = "&" if "?" in url else "?"
         url = f"{url}{sep}{urllib.parse.urlencode(params)}"
     req = urllib.request.Request(url, headers={"User-Agent": user_agent})
     try:
-        with urllib.request.urlopen(req, timeout=60) as response:
+        opened = cast("object", urllib.request.urlopen(req, timeout=60))
+        with cast("urllib.response.addinfourl", opened) as response:
             body = response.read()
     except urllib.error.HTTPError as exc:
         emit_error(
             status=exc.code,
             message=f"Reddit returned HTTP {exc.code}",
-            body=exc.read(),
+            body=_read_http_error(exc),
         )
         return 22, b""
     except urllib.error.URLError as exc:
@@ -260,7 +302,7 @@ def request_get(
         )
         return 1, b""
     if raw:
-        sys.stdout.buffer.write(body)
+        _ = sys.stdout.buffer.write(body)
     return 0, body
 
 
@@ -268,12 +310,13 @@ def fetch_json(
     url: str,
     params: list[tuple[str, str]],
     user_agent: str,
-) -> tuple[int, Any]:
+) -> tuple[int, JsonValue]:
+    """Fetch a URL and decode its JSON body."""
     code, body = request_get(url, params, user_agent, raw=False)
     if code != 0:
         return code, None
     try:
-        return 0, json.loads(body)
+        return 0, cast("JsonValue", json.loads(body))
     except json.JSONDecodeError as exc:
         emit_error(
             status=None,
@@ -287,59 +330,69 @@ def fetch_json(
 # ---------- validation (testable hooks) ----------
 
 
-def normalize_term(term: str) -> str:
+def normalize_term(term: str | None) -> str:
+    """Normalize a glossary term."""
     if term is None:
-        raise ValueError("term must be non-empty")
+        msg = "term must be non-empty"
+        raise ValueError(msg)
     collapsed = WHITESPACE_RE.sub(" ", term).strip().lower()
     if not collapsed:
-        raise ValueError("term must be non-empty")
+        msg = "term must be non-empty"
+        raise ValueError(msg)
     return collapsed
 
 
 def validate_url(url: str) -> str:
+    """Validate an http(s) URL."""
     if not url or not HTTP_URL_RE.match(url.strip()):
-        raise ValueError("url must use http:// or https:// scheme")
+        msg = "url must use http:// or https:// scheme"
+        raise ValueError(msg)
     parsed = urllib.parse.urlparse(url.strip())
     if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
-        raise ValueError("url must use http:// or https:// scheme")
+        msg = "url must use http:// or https:// scheme"
+        raise ValueError(msg)
     return url.strip()
 
 
 def validate_time_range(value: str) -> str:
+    """Validate a time range value."""
     if value not in TIME_RANGES:
-        raise ValueError(
-            f"time_range must be one of {sorted(TIME_RANGES)} (got {value!r})",
-        )
+        msg = f"time_range must be one of {sorted(TIME_RANGES)} (got {value!r})"
+        raise ValueError(msg)
     return value
 
 
 def parse_subreddits(value: str) -> list[str]:
+    """Parse a subreddits= JSON list option."""
+    msg = "subreddits= must be a JSON list of non-empty strings"
     try:
-        parsed = json.loads(value)
+        parsed = cast("object", json.loads(value))
     except json.JSONDecodeError as exc:
-        raise ValueError(
-            "subreddits= must be a JSON list of non-empty strings",
-        ) from exc
+        raise ValueError(msg) from exc
     if not isinstance(parsed, list):
-        raise ValueError("subreddits= must be a JSON list of non-empty strings")
+        raise TypeError(msg)
+    items = cast("list[JsonValue]", parsed)
     out: list[str] = []
-    for item in parsed:
+    for item in items:
         if not isinstance(item, str):
-            raise ValueError("subreddits= must be a JSON list of non-empty strings")
+            raise TypeError(msg)
         stripped = item.strip()
         if not stripped:
-            raise ValueError("subreddits= must be a JSON list of non-empty strings")
+            raise ValueError(msg)
         out.append(stripped)
     return out
 
 
 def parse_non_negative_int(name: str, value: str) -> int:
+    """Parse a non-negative integer option."""
     try:
         parsed = int(value)
     except ValueError as exc:
-        raise ValueError(f"{name} must be an integer") from exc
+        msg = f"{name} must be an integer"
+        raise ValueError(msg) from exc
     if parsed < 0:
-        raise ValueError(f"{name} must be >= 0")
+        msg = f"{name} must be >= 0"
+        raise ValueError(msg)
     return parsed
 
 
@@ -351,29 +404,29 @@ def validate_browse_args(
     Returns (subreddit, sort, remaining_args). Raises ValueError on usage errors.
     """
     if not args:
-        raise ValueError("usage: reddit browse <subreddit> [sort] [key=value ...]")
+        msg = "usage: reddit browse <subreddit> [sort] [key=value ...]"
+        raise ValueError(msg)
     subreddit = args[0]
     rest = args[1:]
     if not rest:
         return subreddit, "hot", []
     if "=" not in rest[0]:
         if rest[0] not in BROWSE_SORTS:
-            raise ValueError(
-                f"browse sort must be one of {sorted(BROWSE_SORTS)} (got {rest[0]!r})",
-            )
+            msg = f"browse sort must be one of {sorted(BROWSE_SORTS)} (got {rest[0]!r})"
+            raise ValueError(msg)
         sort = rest[0]
         rest = rest[1:]
     else:
         sort = "hot"
     for item in rest:
         if "=" not in item:
-            raise ValueError(
-                f"unexpected positional argument after key=value: {item!r}",
-            )
+            msg = f"unexpected positional argument after key=value: {item!r}"
+            raise ValueError(msg)
     return subreddit, sort, rest
 
 
 def resolve_time(extra: list[tuple[str, str]]) -> str:
+    """Resolve the time range from extra arguments."""
     for key, value in extra:
         if key in {"t", "time"}:
             return value
@@ -381,6 +434,7 @@ def resolve_time(extra: list[tuple[str, str]]) -> str:
 
 
 def safe_int(value: str, default: int) -> int:
+    """Parse an int, returning a default on invalid input."""
     try:
         return int(value)
     except ValueError:
@@ -391,6 +445,7 @@ def safe_int(value: str, default: int) -> int:
 
 
 def compact_selftext(text: str | None) -> str | None:
+    """Compact selftext to a short preview."""
     if not text:
         return None
     text = WHITESPACE_RE.sub(" ", text).strip()
@@ -401,9 +456,10 @@ def compact_selftext(text: str | None) -> str | None:
     return text
 
 
-def compact_listing_result(data: dict[str, Any]) -> dict[str, Any]:
+def compact_listing_result(data: dict[str, JsonValue]) -> dict[str, JsonValue]:
+    """Compact a listing result to stable fields."""
     author = data.get("author")
-    out: dict[str, Any] = {
+    out: dict[str, JsonValue] = {
         "id": data.get("id"),
         "title": data.get("title"),
         "subreddit": data.get("subreddit"),
@@ -417,7 +473,8 @@ def compact_listing_result(data: dict[str, Any]) -> dict[str, Any]:
     flair = data.get("link_flair_text")
     if flair:
         out["flair"] = flair
-    preview = compact_selftext(data.get("selftext"))
+    selftext = data.get("selftext")
+    preview = compact_selftext(selftext if isinstance(selftext, str) else None)
     if preview:
         out["selftext_preview"] = preview
     if "over_18" in data:
@@ -427,7 +484,8 @@ def compact_listing_result(data: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def compact_comment(data: dict[str, Any], depth: int) -> dict[str, Any]:
+def compact_comment(data: dict[str, JsonValue], depth: int) -> dict[str, JsonValue]:
+    """Compact a comment to stable fields."""
     author = data.get("author")
     body = data.get("body")
     return {
@@ -441,7 +499,8 @@ def compact_comment(data: dict[str, Any], depth: int) -> dict[str, Any]:
     }
 
 
-def walk_comments(node: Any, depth: int, out: list[dict[str, Any]]) -> None:
+def walk_comments(node: JsonValue, depth: int, out: list[dict[str, JsonValue]]) -> None:
+    """Walk a comment tree in order, collecting compact comments."""
     if not isinstance(node, dict):
         return
     kind = node.get("kind")
@@ -450,8 +509,10 @@ def walk_comments(node: Any, depth: int, out: list[dict[str, Any]]) -> None:
     if kind == "Listing":
         data = node.get("data", {})
         if isinstance(data, dict):
-            for child in data.get("children", []):
-                walk_comments(child, depth, out)
+            children = data.get("children", [])
+            if isinstance(children, list):
+                for child in children:
+                    walk_comments(child, depth, out)
         return
     data = node.get("data")
     if not isinstance(data, dict):
@@ -463,23 +524,34 @@ def walk_comments(node: Any, depth: int, out: list[dict[str, Any]]) -> None:
         walk_comments(replies, depth + 1, out)
 
 
-def listing_children(payload: Any) -> list[dict[str, Any]]:
+def listing_children(payload: JsonValue | None) -> list[dict[str, JsonValue]]:
+    """Collect listing children from a payload."""
     if not isinstance(payload, dict):
         return []
     data = payload.get("data", {})
     if not isinstance(data, dict):
         return []
     children = data.get("children", [])
+    if not isinstance(children, list):
+        return []
     return [c for c in children if isinstance(c, dict)]
 
 
-def listing_data(payload: Any, limit: int, cutoff: float) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
+def listing_data(
+    payload: JsonValue, limit: int, cutoff: float
+) -> list[dict[str, JsonValue]]:
+    """Collect listing rows up to a limit and time cutoff."""
+    rows: list[dict[str, JsonValue]] = []
     for child in listing_children(payload):
-        data = child.get("data", {}) if isinstance(child, dict) else {}
+        data = child.get("data", {})
         if not isinstance(data, dict):
             continue
-        if cutoff and float(data.get("created_utc") or 0) < cutoff:
+        created_raw = data.get("created_utc")
+        if isinstance(created_raw, (int, str, float)):
+            created = float(created_raw)
+        else:
+            created = 0.0
+        if cutoff and created < cutoff:
             continue
         rows.append(data)
     return rows[:limit]
@@ -488,11 +560,12 @@ def listing_data(payload: Any, limit: int, cutoff: float) -> list[dict[str, Any]
 def compact_listing_envelope(
     *,
     kind: str,
-    meta: dict[str, Any],
-    payload: Any,
+    meta: dict[str, JsonValue],
+    payload: JsonValue,
     limit: int,
     cutoff: float = 0.0,
-) -> dict[str, Any]:
+) -> dict[str, JsonValue]:
+    """Build a compact listing envelope."""
     rows = listing_data(payload, limit, cutoff)
     return {
         "type": kind,
@@ -502,30 +575,34 @@ def compact_listing_envelope(
     }
 
 
-def compact_post_envelope(payload: Any) -> dict[str, Any]:
+def compact_post_envelope(payload: JsonValue) -> dict[str, JsonValue]:
+    """Build a compact post envelope with comments."""
     if not isinstance(payload, list) or not payload:
         return {"type": "post", "post": {}, "comments": []}
-    post_payload = payload[0] if len(payload) >= 1 else None
-    comments_payload = payload[1] if len(payload) >= 2 else None
+    post_payload = payload[0]
+    comments_payload = payload[1] if len(payload) > 1 else None
     post_children = listing_children(post_payload)
-    primary = (
-        post_children[0].get("data", {})
-        if post_children and isinstance(post_children[0].get("data"), dict)
-        else {}
-    )
-    post = compact_listing_result(primary) if primary else {}
-    comments: list[dict[str, Any]] = []
+    primary: dict[str, JsonValue] = {}
+    if post_children:
+        primary_data = post_children[0].get("data", {})
+        if isinstance(primary_data, dict):
+            primary = primary_data
+    post: dict[str, JsonValue] = compact_listing_result(primary) if primary else {}
+    comments: list[dict[str, JsonValue]] = []
     for child in listing_children(comments_payload):
         walk_comments(child, 0, comments)
     return {"type": "post", "post": post, "comments": comments}
 
 
-def compact_user_profile(payload: Any) -> dict[str, Any]:
-    data = payload.get("data", {}) if isinstance(payload, dict) else {}
+def compact_user_profile(payload: JsonValue) -> dict[str, JsonValue]:
+    """Compact a user profile to stable fields."""
+    data: JsonValue = payload.get("data", {}) if isinstance(payload, dict) else {}
     if not isinstance(data, dict):
         data = {}
-    link = int(data.get("link_karma") or 0)
-    comment = int(data.get("comment_karma") or 0)
+    link_raw = data.get("link_karma")
+    link = int(link_raw) if isinstance(link_raw, (int, str, float)) else 0
+    comment_raw = data.get("comment_karma")
+    comment = int(comment_raw) if isinstance(comment_raw, (int, str, float)) else 0
     return {
         "name": data.get("name"),
         "created_utc": data.get("created_utc"),
@@ -538,7 +615,8 @@ def compact_user_profile(payload: Any) -> dict[str, Any]:
     }
 
 
-def compact_user_envelope(username: str, payload: Any) -> dict[str, Any]:
+def compact_user_envelope(username: str, payload: JsonValue) -> dict[str, JsonValue]:
+    """Build a compact user envelope."""
     return {
         "type": "user",
         "user": username,
@@ -559,23 +637,18 @@ def explain_term(term: str) -> str:
     for candidate in candidates:
         if candidate in GLOSSARY:
             return GLOSSARY[candidate]
-    return (
-        "Unknown term in the built-in glossary. "
-        "Search Reddit or the web for current community usage."
-    )
+    return _UNKNOWN_TERM_DEFINITION
 
 
 def explain(term: str) -> int:
+    """Print the glossary definition for a term."""
     try:
         normalized = normalize_term(term)
     except ValueError as exc:
         return usage_error(f"reddit explain: {exc}")
     candidates = [normalized, normalized.replace("-", " ")]
     canonical = next((c for c in candidates if c in GLOSSARY), normalized)
-    definition = GLOSSARY.get(
-        canonical,
-        "Unknown term in the built-in glossary. Search Reddit or the web for current community usage.",
-    )
+    definition = GLOSSARY.get(canonical, _UNKNOWN_TERM_DEFINITION)
     json_print({"term": canonical, "definition": definition})
     return 0
 
@@ -584,6 +657,7 @@ def explain(term: str) -> int:
 
 
 def cutoff_for(range_name: str, now: float) -> float:
+    """Return the epoch cutoff for a time range."""
     return {
         "day": now - 86_400,
         "week": now - 604_800,
@@ -593,12 +667,28 @@ def cutoff_for(range_name: str, now: float) -> float:
     }[range_name]
 
 
+def _compact_analysis_comment(c: dict[str, JsonValue]) -> dict[str, JsonValue]:
+    """Compact one user-analysis comment row."""
+    author = c.get("author")
+    body = c.get("body")
+    return {
+        "id": c.get("id"),
+        "subreddit": c.get("subreddit"),
+        "author": None if author in (None, "[deleted]") else author,
+        "score": c.get("score"),
+        "body_preview": compact_selftext(body if isinstance(body, str) else None),
+        "permalink": c.get("permalink"),
+        "created_utc": c.get("created_utc"),
+    }
+
+
 def user_analysis(
     base_url: str,
     user_agent: str,
     username: str,
     args: list[str],
 ) -> int:
+    """Analyze a user's recent activity and emit a compact envelope."""
     posts_limit = 10
     comments_limit = 10
     time_range = "month"
@@ -626,11 +716,14 @@ def user_analysis(
             elif pair == RAW_FLAG:
                 continue
             else:
-                raise ValueError(f"unknown user-analysis argument: {pair!r}")
+                detail = f"{pair!r}"
+                return usage_error(
+                    "reddit user-analysis: unknown user-analysis argument: " + detail,
+                )
         except ValueError as exc:
             return usage_error(f"reddit user-analysis: {exc}")
 
-    fetched: list[Any] = []
+    fetched: list[JsonValue] = []
     for path, params in [
         (f"/user/{username}/about.json", []),
         (f"/user/{username}/submitted.json", [("limit", str(fetch_limit))]),
@@ -664,22 +757,7 @@ def user_analysis(
             "time_range": time_range,
             "profile": compact_user_profile(about),
             "posts": [compact_listing_result(p) for p in recent_posts],
-            "comments": [
-                {
-                    "id": c.get("id"),
-                    "subreddit": c.get("subreddit"),
-                    "author": (
-                        None
-                        if c.get("author") in (None, "[deleted]")
-                        else c.get("author")
-                    ),
-                    "score": c.get("score"),
-                    "body_preview": compact_selftext(c.get("body")),
-                    "permalink": c.get("permalink"),
-                    "created_utc": c.get("created_utc"),
-                }
-                for c in recent_comments
-            ],
+            "comments": [_compact_analysis_comment(c) for c in recent_comments],
             "top_subreddits": top_subreddits,
         },
     )
@@ -690,6 +768,7 @@ def user_analysis(
 
 
 def cmd_browse(base_url: str, user_agent: str, args: list[str]) -> int:
+    """Browse a subreddit listing."""
     raw_mode, args = consume_raw_flag(args)
     try:
         subreddit, sort, rest = validate_browse_args(args)
@@ -705,7 +784,7 @@ def cmd_browse(base_url: str, user_agent: str, args: list[str]) -> int:
     if code != 0 or raw_mode:
         return code
     try:
-        payload = json.loads(body)
+        payload = cast("JsonValue", json.loads(body))
     except json.JSONDecodeError as exc:
         emit_error(
             status=None,
@@ -729,38 +808,47 @@ def cmd_browse(base_url: str, user_agent: str, args: list[str]) -> int:
     return 0
 
 
-def cmd_search(base_url: str, user_agent: str, args: list[str]) -> int:
-    raw_mode, args = consume_raw_flag(args)
-    if not args:
-        return usage_error("usage: reddit search <query> [key=value ...]")
-    query = args[0]
+def _parse_search_args(
+    args: list[str],
+) -> tuple[str, str, str, str, str, list[str], list[tuple[str, str]]]:
+    """Parse search options, raising ValueError on usage errors."""
     sort = "relevance"
-    t = "all"
+    time_range = "all"
     limit = "10"
     author = ""
     flair = ""
     subreddits: list[str] = []
     extra: list[tuple[str, str]] = []
-    for pair in args[1:]:
-        try:
-            if pair.startswith("sort="):
-                sort = pair.removeprefix("sort=")
-            elif pair.startswith("t="):
-                t = pair.removeprefix("t=")
-            elif pair.startswith("time="):
-                t = pair.removeprefix("time=")
-            elif pair.startswith("limit="):
-                limit = pair.removeprefix("limit=")
-            elif pair.startswith("author="):
-                author = pair.removeprefix("author=")
-            elif pair.startswith("flair="):
-                flair = pair.removeprefix("flair=")
-            elif pair.startswith("subreddits="):
-                subreddits.extend(parse_subreddits(pair.removeprefix("subreddits=")))
-            else:
-                extra.extend(pairs([pair]))
-        except ValueError as exc:
-            return usage_error(f"reddit search: {exc}")
+    for pair in args:
+        if pair.startswith("sort="):
+            sort = pair.removeprefix("sort=")
+        elif pair.startswith("t="):
+            time_range = pair.removeprefix("t=")
+        elif pair.startswith("time="):
+            time_range = pair.removeprefix("time=")
+        elif pair.startswith("limit="):
+            limit = pair.removeprefix("limit=")
+        elif pair.startswith("author="):
+            author = pair.removeprefix("author=")
+        elif pair.startswith("flair="):
+            flair = pair.removeprefix("flair=")
+        elif pair.startswith("subreddits="):
+            subreddits.extend(parse_subreddits(pair.removeprefix("subreddits=")))
+        else:
+            extra.extend(pairs([pair]))
+    return sort, time_range, limit, author, flair, subreddits, extra
+
+
+def cmd_search(base_url: str, user_agent: str, args: list[str]) -> int:
+    """Run a subreddit-aware search."""
+    raw_mode, args = consume_raw_flag(args)
+    if not args:
+        return usage_error("usage: reddit search <query> [key=value ...]")
+    query = args[0]
+    try:
+        sort, t, limit, author, flair, subreddits, extra = _parse_search_args(args[1:])
+    except (ValueError, TypeError) as exc:
+        return usage_error(f"reddit search: {exc}")
     full_query = query
     for subreddit in subreddits:
         full_query += f" subreddit:{subreddit}"
@@ -770,14 +858,20 @@ def cmd_search(base_url: str, user_agent: str, args: list[str]) -> int:
         full_query += f' flair:"{flair}"'
     code, body = request_get(
         f"{base_url}/search.json",
-        [("q", full_query), ("sort", sort), ("t", t), ("limit", limit), *extra],
+        [
+            ("q", full_query),
+            ("sort", sort),
+            ("t", t),
+            ("limit", limit),
+            *extra,
+        ],
         user_agent,
         raw=raw_mode,
     )
     if code != 0 or raw_mode:
         return code
     try:
-        payload = json.loads(body)
+        payload = cast("JsonValue", json.loads(body))
     except json.JSONDecodeError as exc:
         emit_error(
             status=None,
@@ -798,8 +892,9 @@ def cmd_search(base_url: str, user_agent: str, args: list[str]) -> int:
 
 
 def cmd_post(base_url: str, user_agent: str, args: list[str]) -> int:
+    """Show a post with comments."""
     raw_mode, args = consume_raw_flag(args)
-    if len(args) < 2:
+    if len(args) < _MIN_POST_ARGS:
         return usage_error("usage: reddit post <subreddit> <post_id> [key=value ...]")
     limit, extra = split_limit_extra(args[2:], "20")
     code, body = request_get(
@@ -811,7 +906,7 @@ def cmd_post(base_url: str, user_agent: str, args: list[str]) -> int:
     if code != 0 or raw_mode:
         return code
     try:
-        payload = json.loads(body)
+        payload = cast("JsonValue", json.loads(body))
     except json.JSONDecodeError as exc:
         emit_error(
             status=None,
@@ -824,7 +919,8 @@ def cmd_post(base_url: str, user_agent: str, args: list[str]) -> int:
     return 0
 
 
-def cmd_post_url(base_url: str, user_agent: str, args: list[str]) -> int:
+def cmd_post_url(_base_url: str, user_agent: str, args: list[str]) -> int:
+    """Show a post from its URL."""
     raw_mode, args = consume_raw_flag(args)
     if not args:
         return usage_error("usage: reddit post-url <url> [key=value ...]")
@@ -845,7 +941,7 @@ def cmd_post_url(base_url: str, user_agent: str, args: list[str]) -> int:
     if code != 0 or raw_mode:
         return code
     try:
-        payload = json.loads(body)
+        payload = cast("JsonValue", json.loads(body))
     except json.JSONDecodeError as exc:
         emit_error(
             status=None,
@@ -859,6 +955,7 @@ def cmd_post_url(base_url: str, user_agent: str, args: list[str]) -> int:
 
 
 def cmd_user(base_url: str, user_agent: str, args: list[str]) -> int:
+    """Show a user profile."""
     raw_mode, args = consume_raw_flag(args)
     if not args:
         return usage_error("usage: reddit user <username>")
@@ -871,7 +968,7 @@ def cmd_user(base_url: str, user_agent: str, args: list[str]) -> int:
     if code != 0 or raw_mode:
         return code
     try:
-        payload = json.loads(body)
+        payload = cast("JsonValue", json.loads(body))
     except json.JSONDecodeError as exc:
         emit_error(
             status=None,
@@ -885,6 +982,7 @@ def cmd_user(base_url: str, user_agent: str, args: list[str]) -> int:
 
 
 def cmd_user_posts(base_url: str, user_agent: str, args: list[str]) -> int:
+    """Show recent posts by a user."""
     raw_mode, args = consume_raw_flag(args)
     if not args:
         return usage_error("usage: reddit user-posts <username> [key=value ...]")
@@ -898,7 +996,7 @@ def cmd_user_posts(base_url: str, user_agent: str, args: list[str]) -> int:
     if code != 0 or raw_mode:
         return code
     try:
-        payload = json.loads(body)
+        payload = cast("JsonValue", json.loads(body))
     except json.JSONDecodeError as exc:
         emit_error(
             status=None,
@@ -919,6 +1017,7 @@ def cmd_user_posts(base_url: str, user_agent: str, args: list[str]) -> int:
 
 
 def cmd_user_comments(base_url: str, user_agent: str, args: list[str]) -> int:
+    """Show recent comments by a user."""
     raw_mode, args = consume_raw_flag(args)
     if not args:
         return usage_error("usage: reddit user-comments <username> [key=value ...]")
@@ -932,7 +1031,7 @@ def cmd_user_comments(base_url: str, user_agent: str, args: list[str]) -> int:
     if code != 0 or raw_mode:
         return code
     try:
-        payload = json.loads(body)
+        payload = cast("JsonValue", json.loads(body))
     except json.JSONDecodeError as exc:
         emit_error(
             status=None,
@@ -955,7 +1054,27 @@ def cmd_user_comments(base_url: str, user_agent: str, args: list[str]) -> int:
 # ---------- main ----------
 
 
+def _run_user_analysis(base_url: str, user_agent: str, args: list[str]) -> int:
+    """Run user-analysis with usage validation."""
+    if not args:
+        return usage_error(
+            "usage: reddit user-analysis <username> "
+            + "[posts_limit=<n>] [comments_limit=<n>] "
+            + "[time_range=<day|week|month|year|all>] "
+            + "[top_subreddits_limit=<n>]",
+        )
+    return user_analysis(base_url, user_agent, args[0], args[1:])
+
+
+def _run_explain(_base_url: str, _user_agent: str, args: list[str]) -> int:
+    """Run explain with usage validation."""
+    if not args:
+        return usage_error("usage: reddit explain <term>")
+    return explain(args[0])
+
+
 def main(argv: list[str]) -> int:
+    """Route Reddit commands and preserve exit codes."""
     if not argv or argv[0] in {"-h", "--help"}:
         print(USAGE)
         return 0 if argv and argv[0] in {"-h", "--help"} else 2
@@ -965,36 +1084,22 @@ def main(argv: list[str]) -> int:
     user_agent = os.environ.get("REDDIT_USER_AGENT", "agents-reddit/1.0")
     cmd, args = argv[0], argv[1:]
 
-    if cmd == "browse":
-        return cmd_browse(base_url, user_agent, args)
-    if cmd == "search":
-        return cmd_search(base_url, user_agent, args)
-    if cmd == "post":
-        return cmd_post(base_url, user_agent, args)
-    if cmd == "post-url":
-        return cmd_post_url(base_url, user_agent, args)
-    if cmd == "user":
-        return cmd_user(base_url, user_agent, args)
-    if cmd == "user-posts":
-        return cmd_user_posts(base_url, user_agent, args)
-    if cmd == "user-comments":
-        return cmd_user_comments(base_url, user_agent, args)
-    if cmd == "user-analysis":
-        if not args:
-            return usage_error(
-                "usage: reddit user-analysis <username> "
-                "[posts_limit=<n>] [comments_limit=<n>] "
-                "[time_range=<day|week|month|year|all>] "
-                "[top_subreddits_limit=<n>]",
-            )
-        return user_analysis(base_url, user_agent, args[0], args[1:])
-    if cmd == "explain":
-        if not args:
-            return usage_error("usage: reddit explain <term>")
-        return explain(args[0])
-
-    print(USAGE, file=sys.stderr)
-    return 2
+    runners: dict[str, Callable[[str, str, list[str]], int]] = {
+        "browse": cmd_browse,
+        "search": cmd_search,
+        "post": cmd_post,
+        "post-url": cmd_post_url,
+        "user": cmd_user,
+        "user-posts": cmd_user_posts,
+        "user-comments": cmd_user_comments,
+        "user-analysis": _run_user_analysis,
+        "explain": _run_explain,
+    }
+    runner = runners.get(cmd)
+    if runner is None:
+        print(USAGE, file=sys.stderr)
+        return 2
+    return runner(base_url, user_agent, args)
 
 
 if __name__ == "__main__":

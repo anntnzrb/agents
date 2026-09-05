@@ -20,11 +20,33 @@ import io
 import json
 import urllib.error
 import urllib.request
+from http.client import HTTPMessage
 from pathlib import Path
+from typing import TYPE_CHECKING, Protocol, Self, TypedDict, cast
 
 import pytest
 
+if TYPE_CHECKING:
+    from types import ModuleType
+
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "cli.py"
+
+
+class _RedditCli(Protocol):
+    def main(self, argv: list[str]) -> int: ...
+
+
+class _ErrorDetail(TypedDict):
+    provider: str
+    status: int | None
+    kind: str
+    body_bytes: int
+    body_preview: str
+    body_truncated: bool
+
+
+class _ErrorEnvelope(TypedDict):
+    error: _ErrorDetail
 
 
 class FakeResponse:
@@ -34,16 +56,16 @@ class FakeResponse:
         self,
         body: bytes = b"",
         status: int = 200,
-        headers: dict | None = None,
-    ):
-        self._body = body
-        self.status = status
-        self.headers = headers or {}
+        headers: dict[str, str] | None = None,
+    ) -> None:
+        self._body: bytes = body
+        self.status: int = status
+        self.headers: dict[str, str] = headers or {}
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, exc_type, exc, tb):
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> bool:
         return False
 
     def read(self) -> bytes:
@@ -57,19 +79,17 @@ class CallRecorder:
         self,
         return_value: FakeResponse | None = None,
         side_effect: BaseException | None = None,
-    ):
-        self.calls: list[dict] = []
-        self.return_value = return_value
-        self.side_effect = side_effect
+    ) -> None:
+        self.calls: list[dict[str, object]] = []
+        self.return_value: FakeResponse | None = return_value
+        self.side_effect: BaseException | None = side_effect
 
-    def __call__(self, req, *args, **kwargs):
-        url = getattr(req, "full_url", str(req))
-        method = req.get_method() if hasattr(req, "get_method") else None
-        headers = (
-            {k: v for k, v in req.header_items()}
-            if hasattr(req, "header_items")
-            else {}
-        )
+    def __call__(
+        self, req: urllib.request.Request, *args: object, **kwargs: object
+    ) -> FakeResponse | None:
+        url = req.full_url
+        method = req.get_method()
+        headers = dict(req.header_items())
         self.calls.append(
             {
                 "url": url,
@@ -84,16 +104,17 @@ class CallRecorder:
         return self.return_value
 
 
-def _load_cli(module_name: str):
+def _load_cli(module_name: str) -> ModuleType:
     spec = importlib.util.spec_from_file_location(module_name, SCRIPT_PATH)
-    assert spec is not None and spec.loader is not None, f"cannot load {SCRIPT_PATH}"
+    assert spec is not None, f"cannot load {SCRIPT_PATH}"
+    assert spec.loader is not None, f"cannot load {SCRIPT_PATH}"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
 @pytest.fixture
-def reddit_cli(monkeypatch, tmp_path):
+def reddit_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _RedditCli:
     """Load the CLI with env loading neutralized so tests are deterministic."""
     monkeypatch.delenv("REDDIT_USER_AGENT", raising=False)
     monkeypatch.delenv("REDDIT_BASE_URL", raising=False)
@@ -102,10 +123,10 @@ def reddit_cli(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     cli = _load_cli("reddit_cli_under_test")
     monkeypatch.setattr(cli, "load_env", lambda: None)
-    return cli
+    return cast("_RedditCli", cast("object", cli))
 
 
-def _no_network_urlopen(monkeypatch) -> CallRecorder:
+def _no_network_urlopen(monkeypatch: pytest.MonkeyPatch) -> CallRecorder:
     """Install a urlopen stub that should never be called for validation failures."""
     recorder = CallRecorder(return_value=FakeResponse(body=b"{}"))
     monkeypatch.setattr(urllib.request, "urlopen", recorder)
@@ -117,15 +138,19 @@ def _no_network_urlopen(monkeypatch) -> CallRecorder:
 # ---------------------------------------------------------------------------
 
 
-def test_explain_normalizes_whitespace_and_hyphens(reddit_cli, capsys):
+def test_explain_normalizes_whitespace_and_hyphens(
+    reddit_cli: _RedditCli, capsys: pytest.CaptureFixture[str]
+) -> None:
     rc = reddit_cli.main(["explain", " cake-day "])
     captured = capsys.readouterr()
 
     assert rc == 0, f"unexpected stderr: {captured.err!r}"
-    parsed = json.loads(captured.out)
+    parsed = cast("dict[str, object]", json.loads(captured.out))
     assert parsed["term"] == "cake day", f"term not normalized; got {parsed!r}"
     # The definition should be the real one, not the "Unknown term" fallback.
-    assert "anniversary" in parsed["definition"].lower(), (
+    definition = parsed["definition"]
+    assert isinstance(definition, str)
+    assert "anniversary" in definition.lower(), (
         f"expected the cake-day definition; got {parsed!r}"
     )
 
@@ -135,7 +160,11 @@ def test_explain_normalizes_whitespace_and_hyphens(reddit_cli, capsys):
 # ---------------------------------------------------------------------------
 
 
-def test_explain_empty_term_returns_rc2(reddit_cli, capsys, monkeypatch):
+def test_explain_empty_term_returns_rc2(
+    reddit_cli: _RedditCli,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     recorder = _no_network_urlopen(monkeypatch)
     rc = reddit_cli.main(["explain", ""])
     captured = capsys.readouterr()
@@ -153,7 +182,11 @@ def test_explain_empty_term_returns_rc2(reddit_cli, capsys, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_post_url_not_a_url_returns_rc2(reddit_cli, capsys, monkeypatch):
+def test_post_url_not_a_url_returns_rc2(
+    reddit_cli: _RedditCli,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     recorder = _no_network_urlopen(monkeypatch)
     rc = reddit_cli.main(["post-url", "not-a-url"])
     captured = capsys.readouterr()
@@ -171,7 +204,11 @@ def test_post_url_not_a_url_returns_rc2(reddit_cli, capsys, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_search_invalid_subreddits_returns_rc2(reddit_cli, capsys, monkeypatch):
+def test_search_invalid_subreddits_returns_rc2(
+    reddit_cli: _RedditCli,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     recorder = _no_network_urlopen(monkeypatch)
     rc = reddit_cli.main(["search", "h1b", "subreddits=not-json"])
     captured = capsys.readouterr()
@@ -189,7 +226,11 @@ def test_search_invalid_subreddits_returns_rc2(reddit_cli, capsys, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_user_analysis_invalid_time_range_returns_rc2(reddit_cli, capsys, monkeypatch):
+def test_user_analysis_invalid_time_range_returns_rc2(
+    reddit_cli: _RedditCli,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     recorder = _no_network_urlopen(monkeypatch)
     rc = reddit_cli.main(["user-analysis", "spez", "time_range=invalid"])
     captured = capsys.readouterr()
@@ -207,17 +248,23 @@ def test_user_analysis_invalid_time_range_returns_rc2(reddit_cli, capsys, monkey
 # ---------------------------------------------------------------------------
 
 
-def test_http_403_block_emits_compact_json(reddit_cli, capsys, monkeypatch):
+def test_http_403_block_emits_compact_json(
+    reddit_cli: _RedditCli,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     html_body = (
         b"<!DOCTYPE html><html><head><title>Blocked</title></head>"
         b"<body><h1>Blocked by network security</h1>"
         b"<p>Please slow down and try again later.</p></body></html>"
     )
+    response_headers = HTTPMessage()
+    response_headers["Content-Type"] = "text/html"
     http_err = urllib.error.HTTPError(
         url="https://www.reddit.com/r/all/hot.json?limit=10",
         code=403,
         msg="Forbidden",
-        hdrs={"Content-Type": "text/html"},
+        hdrs=response_headers,
         fp=io.BytesIO(html_body),
     )
     recorder = CallRecorder(side_effect=http_err)
@@ -233,8 +280,8 @@ def test_http_403_block_emits_compact_json(reddit_cli, capsys, monkeypatch):
     )
     err_lines = [ln for ln in captured.err.splitlines() if ln.strip()]
     assert err_lines, "expected a non-empty stderr envelope"
-    envelope = json.loads(err_lines[-1])
-    err = envelope.get("error", envelope)
+    envelope = cast("_ErrorEnvelope", json.loads(err_lines[-1]))
+    err = envelope["error"]
     assert err.get("kind") == "network_security_block", f"bad kind: {err}"
     assert err.get("provider") == "reddit", f"bad provider: {err}"
     assert err.get("status") == 403, f"bad status: {err}"
@@ -248,8 +295,12 @@ def test_http_403_block_emits_compact_json(reddit_cli, capsys, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_compact_listing_keeps_useful_fields(reddit_cli, capsys, monkeypatch):
-    payload = {
+def test_compact_listing_keeps_useful_fields(
+    reddit_cli: _RedditCli,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload: dict[str, object] = {
         "data": {
             "children": [
                 {
@@ -303,26 +354,16 @@ def test_compact_listing_keeps_useful_fields(reddit_cli, capsys, monkeypatch):
     captured = capsys.readouterr()
 
     assert rc == 0, f"unexpected stderr: {captured.err!r}"
-    parsed = json.loads(captured.out)
-    if isinstance(parsed, list):
-        rows = parsed
-    else:
-        # CLI may wrap in {"posts": [...]} / {"results": [...]} / {"data": {...}}.
-        for key in ("posts", "results", "data", "children"):
-            if key in parsed:
-                inner = parsed[key]
-                if isinstance(inner, list):
-                    rows = inner
-                    break
-                if isinstance(inner, dict) and "children" in inner:
-                    rows = inner["children"]
-                    break
-        else:
-            pytest.fail(f"could not locate listing rows in stdout: {parsed!r}")
-    assert rows, f"expected non-empty listing; got: {parsed!r}"
-    first = rows[0]
-    if "data" in first and isinstance(first["data"], dict):
-        first = first["data"]
+    parsed = cast("list[object] | dict[str, object]", json.loads(captured.out))
+    # CLI may wrap in {"results": [...]}.
+    rows = parsed if isinstance(parsed, list) else parsed.get("results")
+    assert isinstance(rows, list), f"expected results list; got: {captured.out!r}"
+    assert rows, f"expected non-empty listing; got: {captured.out!r}"
+    first = cast("dict[str, object]", rows[0])
+    if "data" in first:
+        nested = first["data"]
+        if isinstance(nested, dict):
+            first = cast("dict[str, object]", nested)
 
     for kept in ("id", "title", "subreddit", "url"):
         assert kept in first, f"{kept!r} must be kept; got keys: {sorted(first)}"
