@@ -16,11 +16,7 @@ const IGNORED_SYNC_NAMES: Record<string, true> = {
 };
 
 export function isIgnoredSyncEntry(name: string): boolean {
-  return (
-    IGNORED_SYNC_NAMES[name] === true ||
-    name.endsWith(".pyc") ||
-    name.endsWith(".pyo")
-  );
+  return IGNORED_SYNC_NAMES[name] === true || name.endsWith(".pyc") || name.endsWith(".pyo");
 }
 
 export function isSymlink(targetPath: string): boolean {
