@@ -10,11 +10,13 @@ import re
 import shutil
 import subprocess
 import tempfile
-from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import date
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit, urlunsplit
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
 
 RELEASE_RE = re.compile(r"\d{2}\.\d{2}\Z")
 SHA_RE = re.compile(r"[0-9a-f]{40}\Z")
@@ -57,13 +59,13 @@ REFERENCE_OLD = (
 class UpdaterError(Exception):
     """A user-actionable updater failure."""
 
-    exit_code = 2
+    exit_code: int = 2
 
 
 class MissingGitError(UpdaterError):
     """Report that the git executable is unavailable."""
 
-    exit_code = 127
+    exit_code: int = 127
 
 
 class ConflictError(UpdaterError):
@@ -122,7 +124,9 @@ class Summary:
 
     def to_dict(self) -> dict[str, object]:
         """Return the summary in the public JSON-compatible shape."""
-        counts = dict.fromkeys(("added", "changed", "deleted", "unchanged"), 0)
+        counts: dict[str, int] = dict.fromkeys(
+            ("added", "changed", "deleted", "unchanged"), 0
+        )
         for delta in self.files:
             counts[delta.status] += 1
         return {
@@ -158,9 +162,11 @@ def _run_git(
             shell=False,
         )
     except FileNotFoundError as exc:
-        raise MissingGitError("git is required to fetch the target branch") from exc
+        msg = "git is required to fetch the target branch"
+        raise MissingGitError(msg) from exc
     except (OSError, UnicodeError) as exc:
-        raise UpdaterError(f"git {' '.join(args)} could not be executed") from exc
+        msg = f"git {' '.join(args)} could not be executed"
+        raise UpdaterError(msg) from exc
 
 
 def _git_checked(
@@ -169,7 +175,8 @@ def _git_checked(
     result = _run_git(args, cwd)
     if result.returncode != SUCCESS_RETURN_CODE:
         detail = (result.stderr or result.stdout).strip()
-        raise UpdaterError(f"git {' '.join(args)} failed: {detail or 'unknown error'}")
+        msg = f"git {' '.join(args)} failed: {detail or 'unknown error'}"
+        raise UpdaterError(msg)
     return result
 
 
@@ -184,51 +191,61 @@ def _resolve_commit(repo: str, branch: str) -> str:
         if len(row) >= MIN_GIT_ROW_FIELDS and row[1] == f"refs/heads/{branch}"
     ]
     if len(matches) != EXPECTED_SINGLE_MATCH or not SHA_RE.fullmatch(matches[0]):
-        raise UpdaterError(f"could not resolve exactly one SHA for branch {branch!r}")
+        msg = f"could not resolve exactly one SHA for branch {branch!r}"
+        raise UpdaterError(msg)
     return matches[0]
+
+
+def _check_symlinks(root: Path, label: str) -> None:
+    if root.is_symlink():
+        msg = f"{label} contains symlink: {root}"
+        raise UpdaterError(msg)
+    for path in root.rglob("*"):
+        if path.is_symlink():
+            msg = f"{label} contains symlink: {path}"
+            raise UpdaterError(msg)
 
 
 def _reject_symlinks(root: Path, label: str) -> None:
     try:
-        if root.is_symlink():
-            raise UpdaterError(f"{label} contains symlink: {root}")
-        for path in root.rglob("*"):
-            if path.is_symlink():
-                raise UpdaterError(f"{label} contains symlink: {path}")
+        _check_symlinks(root, label)
     except UpdaterError:
         raise
     except OSError as exc:
-        raise UpdaterError(f"could not inspect {label}: {root}") from exc
+        msg = f"could not inspect {label}: {root}"
+        raise UpdaterError(msg) from exc
 
 
 def _read_bytes(path: Path, label: str) -> bytes:
     try:
         return path.read_bytes()
     except OSError as exc:
-        raise UpdaterError(f"could not read {label}: {path}") from exc
+        msg = f"could not read {label}: {path}"
+        raise UpdaterError(msg) from exc
 
 
 def _read_text(path: Path, label: str) -> str:
     try:
         return path.read_text(encoding="utf-8")
     except UnicodeError as exc:
-        raise UpdaterError(f"{label} is not valid UTF-8: {path}") from exc
+        msg = f"{label} is not valid UTF-8: {path}"
+        raise UpdaterError(msg) from exc
     except OSError as exc:
-        raise UpdaterError(f"could not read {label}: {path}") from exc
+        msg = f"could not read {label}: {path}"
+        raise UpdaterError(msg) from exc
 
 
 def resolve_source(repo: str, branch: str, work_dir: Path) -> SourceInfo:
     """Resolve and clone one release branch into a temporary checkout."""
     commit = _resolve_commit(repo, branch)
     checkout = work_dir / "clan-core"
-    _git_checked(
+    _ = _git_checked(
         ["clone", "--depth", "1", "--no-tags", "--branch", branch, repo, str(checkout)]
     )
     head = _git_checked(["rev-parse", "HEAD"], checkout).stdout.strip()
     if head != commit:
-        raise UpdaterError(
-            f"branch {branch} moved while fetching; resolved {commit}, cloned {head}"
-        )
+        msg = f"branch {branch} moved while fetching; resolved {commit}, cloned {head}"
+        raise UpdaterError(msg)
     docs_root = checkout / "docs" / "src"
     embeds_root = checkout / "docs" / "embeds"
     license_path = checkout / "LICENSE.md"
@@ -236,11 +253,14 @@ def resolve_source(repo: str, branch: str, work_dir: Path) -> SourceInfo:
     _reject_symlinks(embeds_root, "fetched docs/embeds")
     _reject_symlinks(license_path, "fetched LICENSE.md")
     if not docs_root.is_dir():
-        raise UpdaterError("target checkout has no docs/src directory")
+        msg = "target checkout has no docs/src directory"
+        raise UpdaterError(msg)
     if not embeds_root.is_dir():
-        raise UpdaterError("target checkout has no docs/embeds directory")
+        msg = "target checkout has no docs/embeds directory"
+        raise UpdaterError(msg)
     if not license_path.is_file():
-        raise UpdaterError("target checkout has no LICENSE.md")
+        msg = "target checkout has no LICENSE.md"
+        raise UpdaterError(msg)
     return SourceInfo(repo, branch, commit, checkout)
 
 
@@ -251,7 +271,8 @@ def _sha256(path: Path) -> str:
             for chunk in iter(lambda: handle.read(1024 * 1024), b""):
                 digest.update(chunk)
     except OSError as exc:
-        raise UpdaterError(f"could not read file for hashing: {path}") from exc
+        msg = f"could not read file for hashing: {path}"
+        raise UpdaterError(msg) from exc
     return digest.hexdigest()
 
 
@@ -260,23 +281,30 @@ def _is_transient(relative: str) -> bool:
     return path.suffix == ".pyc" or bool(TRANSIENT_DIRS.intersection(path.parts))
 
 
+def _scan_tree_files(root: Path) -> dict[str, Path]:
+    if root.is_symlink():
+        msg = f"tree contains symlink: {root}"
+        raise UpdaterError(msg)
+    result: dict[str, Path] = {}
+    for path in root.rglob("*"):
+        if path.is_symlink():
+            msg = f"tree contains symlink: {path}"
+            raise UpdaterError(msg)
+        if path.is_file():
+            relative = path.relative_to(root).as_posix()
+            if not _is_transient(relative):
+                result[relative] = path
+    return result
+
+
 def _tree_files(root: Path) -> dict[str, Path]:
     try:
-        if root.is_symlink():
-            raise UpdaterError(f"tree contains symlink: {root}")
-        result: dict[str, Path] = {}
-        for path in root.rglob("*"):
-            if path.is_symlink():
-                raise UpdaterError(f"tree contains symlink: {path}")
-            if path.is_file():
-                relative = path.relative_to(root).as_posix()
-                if not _is_transient(relative):
-                    result[relative] = path
-        return result
+        return _scan_tree_files(root)
     except UpdaterError:
         raise
     except OSError as exc:
-        raise UpdaterError(f"could not inspect tree: {root}") from exc
+        msg = f"could not inspect tree: {root}"
+        raise UpdaterError(msg) from exc
 
 
 def _tree_digest(root: Path) -> str:
@@ -307,15 +335,10 @@ def _file_deltas(old_root: Path, new_root: Path) -> list[FileDelta]:
     return deltas
 
 
-def _frontmatter(text: str) -> tuple[str, str, int]:
-    parsed = _parse_frontmatter(text)
-    return parsed.branch, parsed.commit, parsed.end
-
-
-def _parse_frontmatter(text: str) -> _Frontmatter:
-    lines = text.splitlines(keepends=True)
+def _find_frontmatter_closing(lines: list[str]) -> int:
     if not lines or lines[0].rstrip("\r\n") != "---":
-        raise UpdaterError("SKILL.md has no YAML frontmatter")
+        msg = "SKILL.md has no YAML frontmatter"
+        raise UpdaterError(msg)
     closing = next(
         (
             index
@@ -325,8 +348,56 @@ def _parse_frontmatter(text: str) -> _Frontmatter:
         None,
     )
     if closing is None:
-        raise UpdaterError("SKILL.md frontmatter has no closing delimiter")
+        msg = "SKILL.md frontmatter has no closing delimiter"
+        raise UpdaterError(msg)
+    return closing
 
+
+def _scan_nested_field(
+    raw: str, index: int, metadata_active: bool, fields: dict[str, int]
+) -> None:
+    if not metadata_active or not raw.startswith("  ") or raw.startswith("   "):
+        msg = "SKILL.md frontmatter has malformed nested fields"
+        raise UpdaterError(msg)
+    key, separator, _ = raw[2:].partition(":")
+    if not separator or not key or key.strip() != key:
+        msg = "SKILL.md frontmatter has malformed metadata"
+        raise UpdaterError(msg)
+    field_name = f"metadata.{key}"
+    if key in {"branch", "commit", "retrieved"}:
+        if field_name in fields:
+            msg = f"SKILL.md frontmatter duplicates {field_name}"
+            raise UpdaterError(msg)
+        fields[field_name] = index
+
+
+def _scan_top_field(
+    raw: str, index: int, metadata_seen: bool, fields: dict[str, int]
+) -> tuple[bool, bool]:
+    key, separator, value = raw.partition(":")
+    if not separator or not key or key.strip() != key:
+        msg = "SKILL.md frontmatter has malformed fields"
+        raise UpdaterError(msg)
+    metadata_active = key == "metadata"
+    if metadata_active:
+        if metadata_seen:
+            msg = "SKILL.md frontmatter duplicates metadata"
+            raise UpdaterError(msg)
+        metadata_seen = True
+    if key in {"name", "description"}:
+        if key in fields:
+            msg = f"SKILL.md frontmatter duplicates {key}"
+            raise UpdaterError(msg)
+        fields[key] = index
+        if key == "description" and (
+            not value.strip() or value.strip()[0] in {"|", ">"}
+        ):
+            msg = "SKILL.md description must be a single-line value"
+            raise UpdaterError(msg)
+    return metadata_active, metadata_seen
+
+
+def _scan_frontmatter_fields(lines: list[str], closing: int) -> dict[str, int]:
     fields: dict[str, int] = {}
     metadata_seen = False
     metadata_active = False
@@ -335,34 +406,31 @@ def _parse_frontmatter(text: str) -> _Frontmatter:
         if not raw.strip() or raw.lstrip().startswith("#"):
             continue
         if raw[0].isspace():
-            if not metadata_active or not raw.startswith("  ") or raw.startswith("   "):
-                raise UpdaterError("SKILL.md frontmatter has malformed nested fields")
-            key, separator, _ = raw[2:].partition(":")
-            if not separator or not key or key.strip() != key:
-                raise UpdaterError("SKILL.md frontmatter has malformed metadata")
-            field_name = f"metadata.{key}"
-            if key in {"branch", "commit", "retrieved"}:
-                if field_name in fields:
-                    raise UpdaterError(f"SKILL.md frontmatter duplicates {field_name}")
-                fields[field_name] = index
-            continue
-        key, separator, value = raw.partition(":")
-        if not separator or not key or key.strip() != key:
-            raise UpdaterError("SKILL.md frontmatter has malformed fields")
-        metadata_active = key == "metadata"
-        if metadata_active:
-            if metadata_seen:
-                raise UpdaterError("SKILL.md frontmatter duplicates metadata")
-            metadata_seen = True
-        if key in {"name", "description"}:
-            if key in fields:
-                raise UpdaterError(f"SKILL.md frontmatter duplicates {key}")
-            fields[key] = index
-            if key == "description" and (
-                not value.strip() or value.strip()[0] in {"|", ">"}
-            ):
-                raise UpdaterError("SKILL.md description must be a single-line value")
+            _scan_nested_field(raw, index, metadata_active, fields)
+        else:
+            metadata_active, metadata_seen = _scan_top_field(
+                raw, index, metadata_seen, fields
+            )
+    return fields
 
+
+def _validate_frontmatter_description(
+    lines: list[str], desc_index: int, closing: int
+) -> None:
+    for line in lines[desc_index + 1 : closing]:
+        raw = line.rstrip("\r\n")
+        if raw and raw[0].isspace():
+            msg = "SKILL.md description must not be folded or multiline"
+            raise UpdaterError(msg)
+        if raw and not raw[0].isspace() and raw.partition(":")[0] == "metadata":
+            break
+        if raw and not raw[0].isspace() and ":" in raw:
+            break
+
+
+def _validate_frontmatter_values(
+    lines: list[str], fields: dict[str, int]
+) -> tuple[str, str, str]:
     required = (
         "name",
         "description",
@@ -372,31 +440,34 @@ def _parse_frontmatter(text: str) -> _Frontmatter:
     )
     missing = [field for field in required if field not in fields]
     if missing:
-        raise UpdaterError(f"SKILL.md frontmatter lacks {', '.join(missing)}")
+        msg = f"SKILL.md frontmatter lacks {', '.join(missing)}"
+        raise UpdaterError(msg)
 
     def value_for(field: str) -> str:
         line = lines[fields[field]].rstrip("\r\n")
         return line.partition(":")[2].strip()
 
-    description_index = fields["description"]
-    for line in lines[description_index + 1 : closing]:
-        raw = line.rstrip("\r\n")
-        if raw and raw[0].isspace():
-            raise UpdaterError("SKILL.md description must not be folded or multiline")
-        if raw and not raw[0].isspace() and raw.partition(":")[0] == "metadata":
-            break
-        if raw and not raw[0].isspace() and ":" in raw:
-            break
-
     branch = value_for("metadata.branch")
     commit = value_for("metadata.commit")
     retrieved = value_for("metadata.retrieved")
     if not RELEASE_RE.fullmatch(branch):
-        raise UpdaterError("SKILL.md metadata.branch is not a YY.MM release")
+        msg = "SKILL.md metadata.branch is not a YY.MM release"
+        raise UpdaterError(msg)
     if not SHA_RE.fullmatch(commit):
-        raise UpdaterError("SKILL.md metadata.commit is not a SHA-1")
+        msg = "SKILL.md metadata.commit is not a SHA-1"
+        raise UpdaterError(msg)
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", retrieved):
-        raise UpdaterError("SKILL.md metadata.retrieved is not an ISO date")
+        msg = "SKILL.md metadata.retrieved is not an ISO date"
+        raise UpdaterError(msg)
+    return branch, commit, retrieved
+
+
+def _parse_frontmatter(text: str) -> _Frontmatter:
+    lines = text.splitlines(keepends=True)
+    closing = _find_frontmatter_closing(lines)
+    fields = _scan_frontmatter_fields(lines, closing)
+    _validate_frontmatter_description(lines, fields.get("description", 0), closing)
+    branch, commit, retrieved = _validate_frontmatter_values(lines, fields)
     return _Frontmatter(
         branch, commit, retrieved, sum(map(len, lines[: closing + 1])), fields
     )
@@ -411,9 +482,7 @@ def _replace_frontmatter_line(lines: list[str], index: int, value: str) -> None:
 
 def _update_skill_body(
     body: str,
-    old_branch: str,
-    old_commit: str,
-    old_retrieved: str,
+    parsed: _Frontmatter,
     release: str,
     commit: str,
     retrieved: str,
@@ -433,9 +502,9 @@ def _update_skill_body(
         if snapshot_lines_left:
             lines[index] = (
                 lines[index]
-                .replace(f"`{old_branch}`", f"`{release}`")
-                .replace(f"`{old_commit}`", f"`{commit}`")
-                .replace(f"retrieved {old_retrieved}", f"retrieved {retrieved}")
+                .replace(f"`{parsed.branch}`", f"`{release}`")
+                .replace(f"`{parsed.commit}`", f"`{commit}`")
+                .replace(f"retrieved {parsed.retrieved}", f"retrieved {retrieved}")
             )
             snapshot_lines_left -= 1
         if "Follow the pinned `https://clan.lol/docs/" in raw:
@@ -453,11 +522,14 @@ def update_skill(
 ) -> tuple[str, str, str]:
     """Update validated SKILL metadata and known snapshot router lines."""
     if not RELEASE_RE.fullmatch(release):
-        raise UpdaterError("generated release is not a YY.MM value")
+        msg = "generated release is not a YY.MM value"
+        raise UpdaterError(msg)
     if not SHA_RE.fullmatch(commit):
-        raise UpdaterError("generated commit is not a SHA-1")
+        msg = "generated commit is not a SHA-1"
+        raise UpdaterError(msg)
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", retrieved):
-        raise UpdaterError("generated retrieved value is not an ISO date")
+        msg = "generated retrieved value is not an ISO date"
+        raise UpdaterError(msg)
     parsed = _parse_frontmatter(text)
     skill_name = f"nix-clan-{release.replace('.', '')}"
     description = (
@@ -465,7 +537,8 @@ def update_skill(
         "and NixOS workflow documentation."
     )
     if len(description) > MAX_DESCRIPTION_LENGTH:
-        raise UpdaterError("generated SKILL.md description exceeds 120 characters")
+        msg = "generated SKILL.md description exceeds 120 characters"
+        raise UpdaterError(msg)
     prefix_lines = text[: parsed.end].splitlines(keepends=True)
     _replace_frontmatter_line(prefix_lines, parsed.fields["name"], skill_name)
     _replace_frontmatter_line(prefix_lines, parsed.fields["description"], description)
@@ -477,9 +550,7 @@ def update_skill(
     prefix = "".join(prefix_lines)
     body = _update_skill_body(
         text[parsed.end :],
-        parsed.branch,
-        parsed.commit,
-        parsed.retrieved,
+        parsed,
         release,
         commit,
         retrieved,
@@ -496,14 +567,14 @@ def _index_fields(text: str) -> tuple[list[str], dict[str, int]]:
         if match:
             field = match.group(1)
             if field in fields:
-                raise UpdaterError(f"references/INDEX.md has duplicate {field} field")
+                msg = f"references/INDEX.md has duplicate {field} field"
+                raise UpdaterError(msg)
             fields[field] = index
     required = ("Branch", "Commit", "Retrieved", "Vendored")
     missing = [field for field in required if field not in fields]
     if missing:
-        raise UpdaterError(
-            f"references/INDEX.md lacks exactly one of: {', '.join(required)}"
-        )
+        msg = f"references/INDEX.md lacks exactly one of: {', '.join(required)}"
+        raise UpdaterError(msg)
     return lines, fields
 
 
@@ -511,7 +582,8 @@ def _backtick_field(lines: list[str], index: int, field: str) -> str:
     value = lines[index].rstrip("\r\n").partition(":")[2].strip()
     match = re.fullmatch(r"`([^`\r\n]+)`", value)
     if match is None:
-        raise UpdaterError(f"references/INDEX.md {field} must be wrapped in backticks")
+        msg = f"references/INDEX.md {field} must be wrapped in backticks"
+        raise UpdaterError(msg)
     return match.group(1)
 
 
@@ -536,13 +608,14 @@ def update_index(
     lines, fields = _index_fields(text)
     old_branch = _backtick_field(lines, fields["Branch"], "Branch")
     old_commit = _backtick_field(lines, fields["Commit"], "Commit")
-    _backtick_field(lines, fields["Retrieved"], "Retrieved")
+    _ = _backtick_field(lines, fields["Retrieved"], "Retrieved")
     vendored = lines[fields["Vendored"]].rstrip("\r\n").partition(":")[2].strip()
     if not vendored:
-        raise UpdaterError("references/INDEX.md Vendored field has no value")
+        msg = "references/INDEX.md Vendored field has no value"
+        raise UpdaterError(msg)
     if not RELEASE_RE.fullmatch(old_branch) or not SHA_RE.fullmatch(old_commit):
-        raise UpdaterError("references/INDEX.md snapshot metadata is malformed")
-
+        msg = "references/INDEX.md snapshot metadata is malformed"
+        raise UpdaterError(msg)
     title = re.compile(r"^# Clan \d{2}\.\d{2} Reference Index$")
     generated_section = False
     for index, line in enumerate(lines):
@@ -599,9 +672,10 @@ def update_notice(
 ) -> bytes:
     """Build provenance text followed by the upstream license bytes verbatim."""
     try:
-        license_bytes.decode("utf-8")
+        _ = license_bytes.decode("utf-8")
     except UnicodeError as exc:
-        raise UpdaterError("target LICENSE.md is not valid UTF-8") from exc
+        msg = "target LICENSE.md is not valid UTF-8"
+        raise UpdaterError(msg) from exc
     header = (
         "# Upstream Notice\n\n"
         f"- Upstream repository: `{repo}`\n"
@@ -617,12 +691,14 @@ def _source_docs(checkout: Path) -> tuple[list[Path], list[str]]:
     root = checkout / "docs" / "src"
     _reject_symlinks(root, "fetched docs/src")
     if not root.is_dir():
-        raise UpdaterError("target checkout has no docs/src directory")
+        msg = "target checkout has no docs/src directory"
+        raise UpdaterError(msg)
     excluded: list[str] = []
     files: list[Path] = []
     for path in sorted(root.rglob("*")):
         if path.is_symlink():
-            raise UpdaterError(f"fetched docs/src contains symlink: {path}")
+            msg = f"fetched docs/src contains symlink: {path}"
+            raise UpdaterError(msg)
         if not path.is_file():
             continue
         relative = path.relative_to(root).as_posix()
@@ -642,11 +718,13 @@ def _source_embeds(checkout: Path) -> tuple[list[Path], list[str]]:
     root = checkout / "docs" / "embeds"
     _reject_symlinks(root, "fetched docs/embeds")
     if not root.is_dir():
-        raise UpdaterError("target checkout has no docs/embeds directory")
+        msg = "target checkout has no docs/embeds directory"
+        raise UpdaterError(msg)
     excluded: list[str] = []
     for path in sorted(root.rglob("*")):
         if path.is_symlink():
-            raise UpdaterError(f"fetched docs/embeds contains symlink: {path}")
+            msg = f"fetched docs/embeds contains symlink: {path}"
+            raise UpdaterError(msg)
         if path.is_file() and path.name == "test.nix":
             excluded.append(path.relative_to(checkout).as_posix())
     files = [
@@ -726,7 +804,8 @@ def _toc_block(text: str) -> tuple[int, int, list[str]] | None:
             None,
         )
         if marker_end is None:
-            raise UpdaterError("updater TOC marker has no end marker")
+            msg = "updater TOC marker has no end marker"
+            raise UpdaterError(msg)
         return marker_start, marker_end + 1, lines[marker_start : marker_end + 1]
     heading = next(
         (
@@ -842,10 +921,7 @@ def _docs_route(target: str) -> tuple[str, str, str] | None:
     return route.strip("/"), parsed.query, parsed.fragment
 
 
-def _parse_markdown_link(line: str, index: int) -> tuple[int, int, int] | None:
-    start = index + 2
-    if start >= len(line):
-        return None
+def _parse_destination_bounds(line: str, start: int) -> tuple[int, int, int] | None:
     if line[start] == "<":
         destination_start = start + 1
         destination_end = line.find(">", destination_start)
@@ -865,43 +941,97 @@ def _parse_markdown_link(line: str, index: int) -> tuple[int, int, int] | None:
         destination_end = cursor
     if destination_end == destination_start:
         return None
+    return destination_start, destination_end, cursor
+
+
+def _skip_quoted_title(line: str, cursor: int, quote: str) -> int:
+    cursor += 1
+    while cursor < len(line):
+        if line[cursor] == "\\":
+            cursor += 2
+            continue
+        if line[cursor] == quote:
+            cursor += 1
+            break
+        cursor += 1
+    return cursor
+
+
+def _skip_parenthesized_title(line: str, cursor: int) -> int:
+    depth = 1
+    cursor += 1
+    while cursor < len(line) and depth:
+        if line[cursor] == "\\":
+            cursor += 2
+            continue
+        if line[cursor] == "(":
+            depth += 1
+        elif line[cursor] == ")":
+            depth -= 1
+        cursor += 1
+    return cursor
+
+
+def _skip_markdown_title(line: str, cursor: int) -> int:
+    if line[cursor] in {'"', "'"}:
+        return _skip_quoted_title(line, cursor, line[cursor])
+    if line[cursor] == "(":
+        return _skip_parenthesized_title(line, cursor)
+    while cursor < len(line) and line[cursor] != ")":
+        cursor += 1
+    return cursor
+
+
+def _parse_markdown_link(line: str, index: int) -> tuple[int, int, int] | None:
+    start = index + 2
+    if start >= len(line):
+        return None
+    bounds = _parse_destination_bounds(line, start)
+    if bounds is None:
+        return None
+    destination_start, destination_end, cursor = bounds
     while cursor < len(line) and line[cursor].isspace():
         cursor += 1
     if cursor >= len(line):
         return None
-    if line[cursor] == ")":
-        return destination_start, destination_end, cursor
-    if line[cursor] in {'"', "'"}:
-        quote = line[cursor]
-        cursor += 1
-        while cursor < len(line):
-            if line[cursor] == "\\":
-                cursor += 2
-                continue
-            if line[cursor] == quote:
-                cursor += 1
-                break
+    if line[cursor] != ")":
+        cursor = _skip_markdown_title(line, cursor)
+        while cursor < len(line) and line[cursor].isspace():
             cursor += 1
-    elif line[cursor] == "(":
-        depth = 1
-        cursor += 1
-        while cursor < len(line) and depth:
-            if line[cursor] == "\\":
-                cursor += 2
-                continue
-            if line[cursor] == "(":
-                depth += 1
-            elif line[cursor] == ")":
-                depth -= 1
-            cursor += 1
-    else:
-        while cursor < len(line) and line[cursor] != ")":
-            cursor += 1
-    while cursor < len(line) and line[cursor].isspace():
-        cursor += 1
     if cursor >= len(line) or line[cursor] != ")":
         return None
     return destination_start, destination_end, cursor
+
+
+def _resolve_markdown_route(
+    route_info: tuple[str, str, str],
+    source_relative: str,
+    copied: set[str],
+    release: str,
+) -> str:
+    route, query, fragment = route_info
+    if _generated(route):
+        replacement = f"https://clan.lol/docs/{release}/{route}"
+    else:
+        destination = next(
+            (
+                candidate
+                for candidate in _route_candidates(route)
+                if candidate in copied
+            ),
+            None,
+        )
+        if destination is None:
+            msg = f"unknown manual docs link in {source_relative}: /docs/{route}"
+            raise UpdaterError(msg)
+        replacement = posixpath.relpath(
+            destination, posixpath.dirname(source_relative) or "."
+        )
+    if query:
+        replacement += f"?{query}"
+    if fragment:
+        replacement += f"#{fragment}"
+    return replacement
 
 
 def _rewrite_markdown_line(
@@ -938,29 +1068,9 @@ def _rewrite_markdown_line(
                 output.append(line[index : close + 1])
                 index = close + 1
                 continue
-            route, query, fragment = route_info
-            if _generated(route):
-                replacement = f"https://clan.lol/docs/{release}/{route}"
-            else:
-                destination = next(
-                    (
-                        candidate
-                        for candidate in _route_candidates(route)
-                        if candidate in copied
-                    ),
-                    None,
-                )
-                if destination is None:
-                    raise UpdaterError(
-                        f"unknown manual docs link in {source_relative}: /docs/{route}"
-                    )
-                replacement = posixpath.relpath(
-                    destination, posixpath.dirname(source_relative) or "."
-                )
-            if query:
-                replacement += f"?{query}"
-            if fragment:
-                replacement += f"#{fragment}"
+            replacement = _resolve_markdown_route(
+                route_info, source_relative, copied, release
+            )
             output.append(line[index:destination_start])
             output.append(replacement)
             output.append(line[destination_end : close + 1])
@@ -1051,7 +1161,7 @@ def _pin_clan_urls(text: str, branch: str) -> str:
             fragment = f"#{fragment_value}"
         if suffix.startswith("?"):
             query = suffix[1:]
-            params = query.split("&") if query else []
+            params: list[str] = query.split("&") if query else []
             replaced = False
             for index, parameter in enumerate(params):
                 if parameter.startswith("ref="):
@@ -1085,12 +1195,12 @@ def _inline_embeds(text: str, embeds: dict[str, bytes]) -> str:
             index += 1
             continue
         if index + 1 >= len(lines) or lines[index + 1].strip() != "```":
-            raise UpdaterError(
-                f"embed fence {match.group('name')!r} is not an empty placeholder"
-            )
+            msg = f"embed fence {match.group('name')!r} is not an empty placeholder"
+            raise UpdaterError(msg)
         name = match.group("name")
         if name not in embeds:
-            raise UpdaterError(f"embed {name!r} is missing from docs/embeds")
+            msg = f"embed {name!r} is missing from docs/embeds"
+            raise UpdaterError(msg)
         eol = "\r\n" if line.endswith("\r\n") else "\n"
         rest = match.group("rest")
         label_match = re.search(r"(\[[^]]+\])", rest)
@@ -1099,7 +1209,8 @@ def _inline_embeds(text: str, embeds: dict[str, bytes]) -> str:
         try:
             embedded = embeds[name].decode("utf-8")
         except UnicodeError as exc:
-            raise UpdaterError(f"embed {name!r} is not valid UTF-8") from exc
+            msg = f"embed {name!r} is not valid UTF-8"
+            raise UpdaterError(msg) from exc
         output.append(embedded)
         if embedded and not embedded.endswith(("\n", "\r")):
             output.append(eol)
@@ -1122,66 +1233,94 @@ def _compatibility_patches(
         if REFERENCE_OLD in text:
             replacement = (
                 f"This bundled overview is from Clan `{release}`, `clan-core` commit\n"
-                f"`{commit}`. Generated option, `clan.core`,\n"
-                "CLI, and official-service pages are not vendored here; follow the "
-                "pinned\n"
-                "rendered routes:\n\n"
-                "- [CLI](/docs/reference/cli)\n"
-                "- [Clan options](/docs/reference/options/clan)\n"
-                "- [`clan.core`](/docs/reference/clan.core)\n"
-                "- [Official services](/docs/services/official/)\n\n"
-                "Do not invent local generated pages or substitute `main`/`latest`."
+                + f"`{commit}`. Generated option, `clan.core`,\n"
+                + "CLI, and official-service pages are not vendored here; follow the "
+                + "pinned\n"
+                + "rendered routes:\n\n"
+                + "- [CLI](/docs/reference/cli)\n"
+                + "- [Clan options](/docs/reference/options/clan)\n"
+                + "- [`clan.core`](/docs/reference/clan.core)\n"
+                + "- [Official services](/docs/services/official/)\n\n"
+                + "Do not invent local generated pages or substitute `main`/`latest`."
             )
             text = text.replace(REFERENCE_OLD, replacement, 1)
         elif "This bundled overview is from Clan" not in text:
             warnings.append(
                 "compatibility patch skipped: reference/index main-only guidance "
-                "changed upstream"
+                + "changed upstream"
             )
     return text
 
 
+@dataclass(frozen=True)
+class _TransformContext:
+    checkout: Path
+    copied: set[str]
+    embeds: dict[str, bytes]
+    release: str
+    branch: str
+    commit: str
+    warnings: list[str]
+
+
 def _transform_page(
     source_path: Path,
-    checkout: Path,
-    copied: set[str],
-    embeds: dict[str, bytes],
-    release: str,
-    branch: str,
-    commit: str,
+    context: _TransformContext,
     existing: bytes | None,
-    warnings: list[str],
 ) -> bytes:
-    relative = source_path.relative_to(checkout / "docs" / "src").as_posix()
+    relative = source_path.relative_to(context.checkout / "docs" / "src").as_posix()
     text = _read_text(source_path, "upstream Markdown")
-    text = _compatibility_patches(relative, text, release, commit, warnings)
-    text = text.replace("{{ version }}", release)
-    text = _pin_clan_urls(text, branch)
-    text = _inline_embeds(text, embeds)
-    text = _rewrite_markdown_links(text, relative, copied, release)
-    text = _pin_bare_docs_urls(text, release)
+    text = _compatibility_patches(
+        relative, text, context.release, context.commit, context.warnings
+    )
+    text = text.replace("{{ version }}", context.release)
+    text = _pin_clan_urls(text, context.branch)
+    text = _inline_embeds(text, context.embeds)
+    text = _rewrite_markdown_links(text, relative, context.copied, context.release)
+    text = _pin_bare_docs_urls(text, context.release)
     existing_text = None
     if existing is not None:
         try:
             existing_text = existing.decode("utf-8")
         except UnicodeError as exc:
-            raise UpdaterError(
-                f"existing Markdown is not valid UTF-8: {relative}"
-            ) from exc
+            msg = f"existing Markdown is not valid UTF-8: {relative}"
+            raise UpdaterError(msg) from exc
     text = _toc_for(text, existing_text)
     return text.encode("utf-8")
 
 
 def _write_if_changed(path: Path, data: bytes) -> None:
     if path.is_symlink():
-        raise UpdaterError(f"refusing to write through symlink: {path}")
+        msg = f"refusing to write through symlink: {path}"
+        raise UpdaterError(msg)
     try:
         if path.is_file() and path.read_bytes() == data:
             return
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
+        _ = path.write_bytes(data)
     except OSError as exc:
-        raise UpdaterError(f"could not write generated file: {path}") from exc
+        msg = f"could not write generated file: {path}"
+        raise UpdaterError(msg) from exc
+
+
+def _remove_stale_files(root: Path, keep: set[str]) -> None:
+    for path in sorted(root.rglob("*"), reverse=True):
+        if path.is_symlink():
+            msg = f"candidate tree contains symlink: {path}"
+            raise UpdaterError(msg)
+        if path.is_file() and path.relative_to(root).as_posix() not in keep:
+            path.unlink()
+
+
+def _prune_empty_dirs(root: Path) -> None:
+    for path in sorted(root.rglob("*"), reverse=True):
+        if path.is_dir():
+            try:
+                path.rmdir()
+            except OSError:
+                if any(path.iterdir()):
+                    continue
+                raise
 
 
 def _remove_stale(root: Path, keep: set[str]) -> None:
@@ -1189,23 +1328,13 @@ def _remove_stale(root: Path, keep: set[str]) -> None:
         return
     _reject_symlinks(root, "candidate tree")
     try:
-        for path in sorted(root.rglob("*"), reverse=True):
-            if path.is_symlink():
-                raise UpdaterError(f"candidate tree contains symlink: {path}")
-            if path.is_file() and path.relative_to(root).as_posix() not in keep:
-                path.unlink()
-        for path in sorted(root.rglob("*"), reverse=True):
-            if path.is_dir():
-                try:
-                    path.rmdir()
-                except OSError:
-                    if any(path.iterdir()):
-                        continue
-                    raise
+        _remove_stale_files(root, keep)
+        _prune_empty_dirs(root)
     except UpdaterError:
         raise
     except OSError as exc:
-        raise UpdaterError(f"could not remove stale files under: {root}") from exc
+        msg = f"could not remove stale files under: {root}"
+        raise UpdaterError(msg) from exc
 
 
 def build_candidate(
@@ -1214,7 +1343,7 @@ def build_candidate(
     """Copy and transform source material into an isolated candidate tree."""
     _reject_symlinks(source_dir, "source skill")
     try:
-        shutil.copytree(
+        _ = shutil.copytree(
             source_dir,
             candidate,
             ignore=shutil.ignore_patterns(
@@ -1222,7 +1351,8 @@ def build_candidate(
             ),
         )
     except (OSError, shutil.Error) as exc:
-        raise UpdaterError(f"could not copy source skill: {source_dir}") from exc
+        msg = f"could not copy source skill: {source_dir}"
+        raise UpdaterError(msg) from exc
     old_docs_root = candidate / "references" / "docs"
     if old_docs_root.is_dir():
         _reject_symlinks(old_docs_root, "candidate docs")
@@ -1247,19 +1377,22 @@ def build_candidate(
     _remove_stale(old_docs_root, copied)
     _remove_stale(old_embeds_root, set(embeds))
     warnings: list[str] = []
+    transform_context = _TransformContext(
+        checkout=target.checkout,
+        copied=copied,
+        embeds=embeds,
+        release=target.branch,
+        branch=target.branch,
+        commit=target.commit,
+        warnings=warnings,
+    )
     output_docs_root = candidate / "references" / "docs"
     for source_path in source_docs:
         relative = source_path.relative_to(target.checkout / "docs" / "src").as_posix()
         generated = _transform_page(
             source_path,
-            target.checkout,
-            copied,
-            embeds,
-            target.branch,
-            target.branch,
-            target.commit,
+            transform_context,
             old_docs.get(relative),
-            warnings,
         )
         _write_if_changed(output_docs_root / relative, generated)
     output_embeds_root = candidate / "references" / "embeds"
@@ -1271,9 +1404,9 @@ def build_candidate(
             output_embeds_root / relative, _read_bytes(source_path, "upstream embed")
         )
 
-    retrieved = date.today().isoformat()
     skill_path = candidate / "SKILL.md"
     skill_text = _read_text(skill_path, "SKILL.md")
+    retrieved = _parse_frontmatter(skill_text).retrieved
     updated_skill, _, _ = update_skill(
         skill_text, target.branch, target.commit, retrieved
     )
@@ -1298,27 +1431,123 @@ def build_candidate(
     )
 
 
+def _move_tree_contents(candidate: Path, target: Path) -> None:
+    for child in sorted(candidate.iterdir()):
+        destination = target / child.name
+        if os.path.lexists(destination):
+            msg = f"target path appeared during apply: {destination}"
+            raise ConflictError(msg)
+        if child.is_symlink():
+            msg = f"candidate tree contains symlink: {child}"
+            raise UpdaterError(msg)
+        if child.is_dir():
+            destination.mkdir()
+            _publish_candidate(child, destination)
+        else:
+            os.link(child, destination)
+            child.unlink()
+    candidate.rmdir()
+
+
 def _publish_candidate(candidate: Path, target: Path) -> None:
     if not target.is_dir() or target.is_symlink():
-        raise ConflictError(f"target directory reservation is invalid: {target}")
+        msg = f"target directory reservation is invalid: {target}"
+        raise ConflictError(msg)
     try:
-        for child in sorted(candidate.iterdir()):
-            destination = target / child.name
-            if os.path.lexists(destination):
-                raise ConflictError(f"target path appeared during apply: {destination}")
-            if child.is_symlink():
-                raise UpdaterError(f"candidate tree contains symlink: {child}")
-            if child.is_dir():
-                destination.mkdir()
-                _publish_candidate(child, destination)
-            else:
-                os.link(child, destination)
-                child.unlink()
-        candidate.rmdir()
+        _move_tree_contents(candidate, target)
     except (ConflictError, UpdaterError):
         raise
     except OSError as exc:
-        raise UpdaterError(f"could not publish candidate tree: {target}") from exc
+        msg = f"could not publish candidate tree: {target}"
+        raise UpdaterError(msg) from exc
+
+
+def _validate_source_dir(source_dir: Path) -> Path:
+    source_dir = source_dir.expanduser()
+    if source_dir.is_symlink():
+        msg = f"source skill contains symlink: {source_dir}"
+        raise UpdaterError(msg)
+    try:
+        source_dir = source_dir.resolve()
+    except OSError as exc:
+        msg = f"could not resolve source skill: {source_dir}"
+        raise UpdaterError(msg) from exc
+    if not source_dir.is_dir() or not (source_dir / "SKILL.md").is_file():
+        msg = f"source skill directory is invalid: {source_dir}"
+        raise UpdaterError(msg)
+    _reject_symlinks(source_dir, "source skill")
+    return source_dir
+
+
+def _resolve_target_dir(
+    source_dir: Path,
+    target_dir: Path | None,
+    skill_name: str,
+    apply: bool,
+) -> Path:
+    requested_target = (target_dir or source_dir.parent / skill_name).expanduser()
+    target_exists = os.path.lexists(requested_target)
+    try:
+        resolved = requested_target.resolve()
+    except OSError as exc:
+        msg = f"could not resolve target directory: {requested_target}"
+        raise UpdaterError(msg) from exc
+    if resolved.name != skill_name:
+        msg = f"target directory must be named {skill_name}"
+        raise UpdaterError(msg)
+    if resolved == source_dir and apply:
+        msg = "--apply cannot replace the source directory; use a sibling target"
+        raise ConflictError(msg)
+    if resolved != source_dir and target_exists:
+        msg = f"target directory already exists: {resolved}"
+        raise ConflictError(msg)
+    if not resolved.parent.is_dir():
+        msg = f"target parent directory does not exist: {resolved.parent}"
+        raise UpdaterError(msg)
+    return resolved
+
+
+def _reserve_target_dir(target_dir: Path) -> None:
+    try:
+        target_dir.mkdir()
+    except FileExistsError as exc:
+        msg = f"target directory already exists: {target_dir}"
+        raise ConflictError(msg) from exc
+    except OSError as exc:
+        msg = f"could not reserve target directory: {target_dir}"
+        raise UpdaterError(msg) from exc
+
+
+def _apply_candidate_tree(
+    repo: str,
+    branch: str,
+    target: SourceInfo,
+    candidate: Path,
+    target_dir: Path,
+) -> None:
+    latest = _resolve_commit(repo, branch)
+    if latest != target.commit:
+        msg = (
+            f"branch {branch} moved before apply; resolved "
+            + f"{target.commit}, now {latest}"
+        )
+        raise UpdaterError(msg)
+    if not os.path.lexists(target_dir) or target_dir.is_symlink():
+        msg = f"target reservation disappeared: {target_dir}"
+        raise ConflictError(msg)
+    _publish_candidate(candidate, target_dir)
+
+
+def _cleanup_reserved_dir(target_dir: Path) -> None:
+    try:
+        if (
+            target_dir.is_dir()
+            and not target_dir.is_symlink()
+            and not any(target_dir.iterdir())
+        ):
+            target_dir.rmdir()
+    except OSError:
+        pass
 
 
 def update(
@@ -1331,55 +1560,21 @@ def update(
 ) -> Summary:
     """Plan or apply a pinned release snapshot update."""
     if not RELEASE_RE.fullmatch(branch):
-        raise UpdaterError("--to-branch must match exactly YY.MM")
-    source_dir = source_dir.expanduser()
-    if source_dir.is_symlink():
-        raise UpdaterError(f"source skill contains symlink: {source_dir}")
-    try:
-        source_dir = source_dir.resolve()
-    except OSError as exc:
-        raise UpdaterError(f"could not resolve source skill: {source_dir}") from exc
-    if not source_dir.is_dir() or not (source_dir / "SKILL.md").is_file():
-        raise UpdaterError(f"source skill directory is invalid: {source_dir}")
-    _reject_symlinks(source_dir, "source skill")
+        msg = "--to-branch must match exactly YY.MM"
+        raise UpdaterError(msg)
+    validated_source = _validate_source_dir(source_dir)
     skill_name = f"nix-clan-{branch.replace('.', '')}"
-    requested_target = (target_dir or source_dir.parent / skill_name).expanduser()
-    target_exists = os.path.lexists(requested_target)
-    try:
-        target_dir = requested_target.resolve()
-    except OSError as exc:
-        raise UpdaterError(
-            f"could not resolve target directory: {requested_target}"
-        ) from exc
-    if target_dir.name != skill_name:
-        raise UpdaterError(f"target directory must be named {skill_name}")
-    if target_dir == source_dir and apply:
-        raise ConflictError(
-            "--apply cannot replace the source directory; use a sibling target"
-        )
-    if target_dir != source_dir and target_exists:
-        raise ConflictError(f"target directory already exists: {target_dir}")
-    if not target_dir.parent.is_dir():
-        raise UpdaterError(
-            f"target parent directory does not exist: {target_dir.parent}"
-        )
+    resolved_target = _resolve_target_dir(
+        validated_source, target_dir, skill_name, apply
+    )
 
     reserved = False
     if apply:
-        try:
-            target_dir.mkdir()
-            reserved = True
-        except FileExistsError as exc:
-            raise ConflictError(
-                f"target directory already exists: {target_dir}"
-            ) from exc
-        except OSError as exc:
-            raise UpdaterError(
-                f"could not reserve target directory: {target_dir}"
-            ) from exc
+        _reserve_target_dir(resolved_target)
+        reserved = True
 
     try:
-        temp_parent = str(target_dir.parent) if apply else None
+        temp_parent = str(resolved_target.parent) if apply else None
         with tempfile.TemporaryDirectory(
             prefix=".nix-clan-update-", dir=temp_parent
         ) as work:
@@ -1387,60 +1582,47 @@ def update(
             stage_root = Path(work) / "stage"
             candidate = stage_root / skill_name
             source_markdown, source_embeds, excluded, warnings = build_candidate(
-                source_dir,
+                validated_source,
                 target,
                 candidate,
             )
-            files = _file_deltas(source_dir, candidate)
+            files = _file_deltas(validated_source, candidate)
             summary = Summary(
                 branch=branch,
                 release=branch,
                 skill_name=skill_name,
                 commit=target.commit,
-                source_dir=str(source_dir),
-                target_dir=str(target_dir),
+                source_dir=str(validated_source),
+                target_dir=str(resolved_target),
                 applied=False,
                 source_markdown=source_markdown,
                 source_embeds=source_embeds,
                 excluded=excluded,
                 files=files,
                 warnings=warnings,
-                source_tree_sha256=_tree_digest(source_dir),
+                source_tree_sha256=_tree_digest(validated_source),
                 candidate_tree_sha256=_tree_digest(candidate),
             )
             if apply:
-                latest = _resolve_commit(repo, branch)
-                if latest != target.commit:
-                    raise UpdaterError(
-                        f"branch {branch} moved before apply; resolved "
-                        f"{target.commit}, now {latest}"
-                    )
-                if not os.path.lexists(target_dir) or target_dir.is_symlink():
-                    raise ConflictError(f"target reservation disappeared: {target_dir}")
-                _publish_candidate(candidate, target_dir)
+                _apply_candidate_tree(repo, branch, target, candidate, resolved_target)
                 reserved = False
                 summary.applied = True
             return summary
     except OSError as exc:
-        raise UpdaterError("filesystem failure during update") from exc
+        msg = "filesystem failure during update"
+        raise UpdaterError(msg) from exc
     finally:
         if reserved:
-            try:
-                if (
-                    target_dir.is_dir()
-                    and not target_dir.is_symlink()
-                    and not any(target_dir.iterdir())
-                ):
-                    target_dir.rmdir()
-            except OSError:
-                pass
+            _cleanup_reserved_dir(resolved_target)
 
 
 def render_summary(summary: Summary, as_json: bool) -> str:
     """Render a summary as JSON or human-readable CLI output."""
     if as_json:
         return json.dumps(summary.to_dict(), indent=2, sort_keys=True)
-    counts = dict.fromkeys(("added", "changed", "deleted", "unchanged"), 0)
+    counts: dict[str, int] = dict.fromkeys(
+        ("added", "changed", "deleted", "unchanged"), 0
+    )
     for delta in summary.files:
         counts[delta.status] += 1
     lines = [

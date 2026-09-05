@@ -138,6 +138,7 @@ Insert an endless sleep where execution should pause:
 
 ```python
 import time
+
 time.sleep(3600)  # Sleep for one hour
 ```
 
