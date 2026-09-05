@@ -1,17 +1,34 @@
 #!/usr/bin/env python3
-"""UI/UX Pro Max Core - BM25 search engine for UI/UX style guides"""
+"""UI/UX Pro Max Core - BM25 search engine for UI/UX style guides."""
 
 import csv
 import re
 from collections import defaultdict
 from math import log
 from pathlib import Path
+from typing import TypedDict, cast
 
 # ============ CONFIGURATION ============
-DATA_DIR = Path(__file__).parent.parent / "data"
 MAX_RESULTS = 3
+_MIN_TOKEN_LENGTH = 2
+DATA_DIR = Path(__file__).parent.parent / "data"
 
-CSV_CONFIG = {
+
+class _CsvConfig(TypedDict):
+    """CSV search/output column configuration for one domain."""
+
+    file: str
+    search_cols: list[str]
+    output_cols: list[str]
+
+
+class _StackConfig(TypedDict):
+    """CSV file configuration for one stack."""
+
+    file: str
+
+
+CSV_CONFIG: dict[str, _CsvConfig] = {
     "style": {
         "file": "styles.csv",
         "search_cols": [
@@ -249,7 +266,8 @@ CSV_CONFIG = {
     },
 }
 
-STACK_CONFIG = {
+
+STACK_CONFIG: dict[str, _StackConfig] = {
     "react": {"file": "stacks/react.csv"},
     "nextjs": {"file": "stacks/nextjs.csv"},
     "vue": {"file": "stacks/vue.csv"},
@@ -295,51 +313,52 @@ AVAILABLE_STACKS = list(STACK_CONFIG.keys())
 
 # ============ BM25 IMPLEMENTATION ============
 class BM25:
-    """BM25 ranking algorithm for text search"""
+    """BM25 ranking algorithm for text search."""
 
-    def __init__(self, k1=1.5, b=0.75):
-        self.k1 = k1
-        self.b = b
-        self.corpus = []
-        self.doc_lengths = []
-        self.avgdl = 0
-        self.idf = {}
-        self.doc_freqs = defaultdict(int)
-        self.N = 0
+    def __init__(self, k1: float = 1.5, b: float = 0.75) -> None:
+        """Configure BM25 saturation and length-normalization parameters."""
+        self.k1: float = k1
+        self.b: float = b
+        self.corpus: list[list[str]] = []
+        self.doc_lengths: list[int] = []
+        self.avgdl: float = 0
+        self.idf: dict[str, float] = {}
+        self.doc_freqs: defaultdict[str, int] = defaultdict(int)
+        self.num_docs: int = 0
 
-    def tokenize(self, text):
-        """Lowercase, split, remove punctuation, filter short words"""
+    def tokenize(self, text: str) -> list[str]:
+        """Lowercase, split, remove punctuation, filter short words."""
         text = re.sub(r"[^\w\s]", " ", str(text).lower())
-        return [w for w in text.split() if len(w) >= 2]
+        return [w for w in text.split() if len(w) >= _MIN_TOKEN_LENGTH]
 
-    def fit(self, documents):
-        """Build BM25 index from documents"""
+    def fit(self, documents: list[str]) -> None:
+        """Build BM25 index from documents."""
         self.corpus = [self.tokenize(doc) for doc in documents]
-        self.N = len(self.corpus)
-        if self.N == 0:
+        self.num_docs = len(self.corpus)
+        if self.num_docs == 0:
             return
         self.doc_lengths = [len(doc) for doc in self.corpus]
-        self.avgdl = sum(self.doc_lengths) / self.N
+        self.avgdl = sum(self.doc_lengths) / self.num_docs
 
         for doc in self.corpus:
-            seen = set()
+            seen: set[str] = set()
             for word in doc:
                 if word not in seen:
                     self.doc_freqs[word] += 1
                     seen.add(word)
 
         for word, freq in self.doc_freqs.items():
-            self.idf[word] = log((self.N - freq + 0.5) / (freq + 0.5) + 1)
+            self.idf[word] = log((self.num_docs - freq + 0.5) / (freq + 0.5) + 1)
 
-    def score(self, query):
-        """Score all documents against query"""
+    def score(self, query: str) -> list[tuple[int, float]]:
+        """Score all documents against query."""
         query_tokens = self.tokenize(query)
-        scores = []
+        scores: list[tuple[int, float]] = []
 
         for idx, doc in enumerate(self.corpus):
-            score = 0
+            score = 0.0
             doc_len = self.doc_lengths[idx]
-            term_freqs = defaultdict(int)
+            term_freqs: defaultdict[str, int] = defaultdict(int)
             for word in doc:
                 term_freqs[word] += 1
 
@@ -359,14 +378,20 @@ class BM25:
 
 
 # ============ SEARCH FUNCTIONS ============
-def _load_csv(filepath):
-    """Load CSV and return list of dicts"""
-    with open(filepath, encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load_csv(filepath: Path) -> list[dict[str, str | None]]:
+    """Load CSV and return list of dicts."""
+    with filepath.open(encoding="utf-8") as f:
+        return [cast("dict[str, str | None]", row) for row in csv.DictReader(f)]
 
 
-def _search_csv(filepath, search_cols, output_cols, query, max_results):
-    """Core search function using BM25"""
+def _search_csv(
+    filepath: Path,
+    search_cols: list[str],
+    output_cols: list[str],
+    query: str,
+    max_results: int,
+) -> list[dict[str, str | None]]:
+    """Core search function using BM25."""
     if not filepath.exists():
         return []
 
@@ -381,7 +406,7 @@ def _search_csv(filepath, search_cols, output_cols, query, max_results):
     ranked = bm25.score(query)
 
     # Get top results with score > 0
-    results = []
+    results: list[dict[str, str | None]] = []
     for idx, score in ranked[:max_results]:
         if score > 0:
             row = data[idx]
@@ -390,8 +415,8 @@ def _search_csv(filepath, search_cols, output_cols, query, max_results):
     return results
 
 
-def detect_domain(query):
-    """Auto-detect the most relevant domain from query"""
+def detect_domain(query: str) -> str:
+    """Auto-detect the most relevant domain from query."""
     query_lower = query.lower()
 
     domain_keywords = {
@@ -633,12 +658,14 @@ def detect_domain(query):
         )
         for domain, keywords in domain_keywords.items()
     }
-    best = max(scores, key=scores.get)
+    best = max(scores, key=lambda domain: scores[domain])
     return best if scores[best] > 0 else "style"
 
 
-def search(query, domain=None, max_results=MAX_RESULTS):
-    """Main search function with auto-domain detection"""
+def search(
+    query: str, domain: str | None = None, max_results: int = MAX_RESULTS
+) -> dict[str, object]:
+    """Main search function with auto-domain detection."""
     if domain is None:
         domain = detect_domain(query)
 
@@ -665,11 +692,14 @@ def search(query, domain=None, max_results=MAX_RESULTS):
     }
 
 
-def search_stack(query, stack, max_results=MAX_RESULTS):
-    """Search stack-specific guidelines"""
+def search_stack(
+    query: str, stack: str, max_results: int = MAX_RESULTS
+) -> dict[str, object]:
+    """Search stack-specific guidelines."""
     if stack not in STACK_CONFIG:
         return {
-            "error": f"Unknown stack: {stack}. Available: {', '.join(AVAILABLE_STACKS)}",
+            "error": f"Unknown stack: {stack}. "
+            + f"Available: {', '.join(AVAILABLE_STACKS)}",
         }
 
     filepath = DATA_DIR / STACK_CONFIG[stack]["file"]

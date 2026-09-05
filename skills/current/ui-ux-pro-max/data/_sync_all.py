@@ -1,5 +1,6 @@
-#!/usr/bin/env python3
+# ruff: noqa: INP001, T201
 """Sync colors.csv and ui-reasoning.csv with the updated products.csv (161 entries).
+
 - Remove deleted product types
 - Rename mismatched entries
 - Add new entries for missing product types
@@ -7,62 +8,113 @@
 - Renumber everything
 """
 
+from __future__ import annotations
+
 import csv
 import json
-import os
+from pathlib import Path
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+BASE = Path(__file__).resolve().parent
+
+SRGB_THRESHOLD = 0.03928
+SRGB_LINEAR_DIVISOR = 12.92
+SRGB_OFFSET = 0.055
+SRGB_DIVISOR = 1.055
+SRGB_GAMMA = 2.4
+LUM_R_COEFF = 0.2126
+LUM_G_COEFF = 0.7152
+LUM_B_COEFF = 0.0722
+RGB_MAX = 255.0
+DARK_LUMINANCE_THRESHOLD = 0.18
+ON_COLOR_LUMINANCE_THRESHOLD = 0.4
+DEFAULT_BLEND_FACTOR = 0.15
+SHIFT_OFFSET = 10
+MUTED_DARK_FACTOR = 0.08
+MUTED_LIGHT_FACTOR = 0.06
+BORDER_LIGHT_FACTOR = 0.12
 
 
 # ─── Color derivation helpers ────────────────────────────────────────────────
-def h2r(h):
-    h = h.lstrip("#")
-    return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))
+def h2r(h: str) -> tuple[int, int, int]:
+    """Convert hex color string to RGB tuple."""
+    clean_h = h.lstrip("#")
+    return (
+        int(clean_h[0:2], 16),
+        int(clean_h[2:4], 16),
+        int(clean_h[4:6], 16),
+    )
 
 
-def r2h(r, g, b):
-    return f"#{max(0, min(255, int(r))):02X}{max(0, min(255, int(g))):02X}{max(0, min(255, int(b))):02X}"
+def r2h(r: float, g: float, b: float) -> str:
+    """Convert RGB values to hex color string."""
+    r_clamped = max(0, min(255, int(r)))
+    g_clamped = max(0, min(255, int(g)))
+    b_clamped = max(0, min(255, int(b)))
+    return f"#{r_clamped:02X}{g_clamped:02X}{b_clamped:02X}"
 
 
-def lum(h):
-    r, g, b = [x / 255.0 for x in h2r(h)]
-    r, g, b = [
-        (x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4) for x in (r, g, b)
-    ]
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+def lum(h: str) -> float:
+    """Calculate relative luminance for a hex color."""
+    r_raw, g_raw, b_raw = (x / RGB_MAX for x in h2r(h))
+    r_lin, g_lin, b_lin = (
+        (
+            x / SRGB_LINEAR_DIVISOR
+            if x <= SRGB_THRESHOLD
+            else ((x + SRGB_OFFSET) / SRGB_DIVISOR) ** SRGB_GAMMA
+        )
+        for x in (r_raw, g_raw, b_raw)
+    )
+    return LUM_R_COEFF * r_lin + LUM_G_COEFF * g_lin + LUM_B_COEFF * b_lin
 
 
-def is_dark(bg):
-    return lum(bg) < 0.18
+def is_dark(bg: str) -> bool:
+    """Determine whether a background color is dark."""
+    return lum(bg) < DARK_LUMINANCE_THRESHOLD
 
 
-def on_color(bg):
-    return "#FFFFFF" if lum(bg) < 0.4 else "#0F172A"
+def on_color(bg: str) -> str:
+    """Return appropriate foreground color for a background color."""
+    return "#FFFFFF" if lum(bg) < ON_COLOR_LUMINANCE_THRESHOLD else "#0F172A"
 
 
-def blend(a, b, f=0.15):
+def blend(a: str, b: str, f: float = DEFAULT_BLEND_FACTOR) -> str:
+    """Blend two hex colors with a weight factor."""
     ra, ga, ba = h2r(a)
     rb, gb, bb = h2r(b)
     return r2h(ra + (rb - ra) * f, ga + (gb - ga) * f, ba + (bb - ba) * f)
 
 
-def shift(h, n):
+def shift(h: str, n: int) -> str:
+    """Shift RGB values by an offset."""
     r, g, b = h2r(h)
     return r2h(r + n, g + n, b + n)
 
 
-def derive_row(pt, pri, sec, acc, bg, notes=""):
+def derive_row(  # noqa: PLR0913, PLR0917
+    pt: str,
+    pri: str,
+    sec: str,
+    acc: str,
+    bg: str,
+    notes: str = "",
+) -> list[str]:
     """Generate full 16-token color row from 4 base colors."""
     dark = is_dark(bg)
     fg = "#FFFFFF" if dark else "#0F172A"
     on_pri = on_color(pri)
     on_sec = on_color(sec)
     on_acc = on_color(acc)
-    card = shift(bg, 10) if dark else "#FFFFFF"
+    card = shift(bg, SHIFT_OFFSET) if dark else "#FFFFFF"
     card_fg = "#FFFFFF" if dark else "#0F172A"
-    muted = blend(bg, pri, 0.08) if dark else blend("#FFFFFF", pri, 0.06)
+    muted = (
+        blend(bg, pri, MUTED_DARK_FACTOR)
+        if dark
+        else blend("#FFFFFF", pri, MUTED_LIGHT_FACTOR)
+    )
     muted_fg = "#94A3B8" if dark else "#64748B"
-    border = "rgba(255,255,255,0.08)" if dark else blend("#FFFFFF", pri, 0.12)
+    border = (
+        "rgba(255,255,255,0.08)" if dark else blend("#FFFFFF", pri, BORDER_LIGHT_FACTOR)
+    )
     destr = "#DC2626"
     on_destr = "#FFFFFF"
     ring = pri
@@ -89,7 +141,7 @@ def derive_row(pt, pri, sec, acc, bg, notes=""):
 
 
 # ─── Rename maps ─────────────────────────────────────────────────────────────
-COLOR_RENAMES = {
+COLOR_RENAMES: dict[str, str] = {
     "Quantum Computing": "Quantum Computing Interface",
     "Biohacking / Longevity": "Biohacking / Longevity App",
     "Autonomous Systems": "Autonomous Drone Fleet Manager",
@@ -97,7 +149,7 @@ COLOR_RENAMES = {
     "Spatial / Vision OS": "Spatial Computing OS / App",
     "Climate Tech": "Sustainable Energy / Climate Tech",
 }
-UI_RENAMES = {
+UI_RENAMES: dict[str, str] = {
     "Architecture/Interior": "Architecture / Interior",
     "Autonomous Drone Fleet": "Autonomous Drone Fleet Manager",
     "B2B SaaS Enterprise": "B2B Service",
@@ -123,7 +175,7 @@ UI_RENAMES = {
     "Wellness/Mental Health": "Mental Health App",
 }
 
-REMOVE_TYPES = {
+REMOVE_TYPES: set[str] = {
     "Service Landing Page",
     "Sustainability/ESG Platform",
     "Cleaning Service",
@@ -134,7 +186,7 @@ REMOVE_TYPES = {
 
 # ─── New color definitions: (primary, secondary, accent, bg, notes) ──────────
 # Grouped by category for clarity. Each tuple generates a full 16-token row.
-NEW_COLORS = {
+NEW_COLORS: dict[str, tuple[str, str, str, str, str]] = {
     # ── Old #97-#116 that never got colors ──
     "Todo & Task Manager": (
         "#2563EB",
@@ -647,15 +699,16 @@ NEW_COLORS = {
 
 
 # ─── 1. REBUILD colors.csv ───────────────────────────────────────────────────
-def rebuild_colors():
-    src = os.path.join(BASE, "colors.csv")
-    with open(src, newline="", encoding="utf-8") as f:
+def rebuild_colors() -> None:
+    """Rebuild colors.csv to align 1:1 with products.csv."""
+    src = BASE / "colors.csv"
+    with src.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        headers = reader.fieldnames
+        headers = list(reader.fieldnames or [])
         existing = list(reader)
 
     # Build lookup: Product Type -> row data
-    color_map = {}
+    color_map: dict[str, dict[str, str]] = {}
     for row in existing:
         pt = row.get("Product Type", "").strip()
         if not pt:
@@ -673,11 +726,11 @@ def rebuild_colors():
         color_map[pt] = row
 
     # Read products.csv to get the correct order
-    with open(os.path.join(BASE, "products.csv"), newline="", encoding="utf-8") as f:
+    with (BASE / "products.csv").open(newline="", encoding="utf-8") as f:
         products = list(csv.DictReader(f))
 
     # Build final rows in products.csv order
-    final_rows = []
+    final_rows: list[dict[str, str]] = []
     added = 0
     for i, prod in enumerate(products, 1):
         pt = prod["Product Type"]
@@ -688,7 +741,7 @@ def rebuild_colors():
         elif pt in NEW_COLORS:
             pri, sec, acc, bg, notes = NEW_COLORS[pt]
             new_row = derive_row(pt, pri, sec, acc, bg, notes)
-            d = dict(zip(headers, [str(i)] + new_row))
+            d = dict(zip(headers, [str(i), *new_row], strict=False))
             final_rows.append(d)
             added += 1
         else:
@@ -701,12 +754,12 @@ def rebuild_colors():
                 "#F8FAFC",
                 "Auto-generated default",
             )
-            d = dict(zip(headers, [str(i)] + new_row))
+            d = dict(zip(headers, [str(i), *new_row], strict=False))
             final_rows.append(d)
             added += 1
 
     # Write
-    with open(src, "w", newline="", encoding="utf-8") as f:
+    with src.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=headers)
         writer.writeheader()
         writer.writerows(final_rows)
@@ -717,16 +770,8 @@ def rebuild_colors():
 
 
 # ─── 2. REBUILD ui-reasoning.csv ─────────────────────────────────────────────
-def derive_ui_reasoning(prod):
-    """Generate ui-reasoning row from products.csv row."""
-    pt = prod["Product Type"]
-    style = prod.get("Primary Style Recommendation", "")
-    landing = prod.get("Landing Page Pattern", "")
-    color_focus = prod.get("Color Palette Focus", "")
-    considerations = prod.get("Key Considerations", "")
-    keywords = prod.get("Keywords", "")
-
-    # Typography mood derived from style
+def _derive_typography_mood(style: str) -> str:
+    """Derive typography mood description from style."""
     typo_map = {
         "Minimalism": "Professional + Clean hierarchy",
         "Glassmorphism": "Modern + Clear hierarchy",
@@ -749,24 +794,25 @@ def derive_ui_reasoning(prod):
         "Cyberpunk": "Terminal + Monospace + Neon",
         "Pixel": "Retro + Blocky + 8-bit",
     }
-    typo_mood = "Professional + Clear hierarchy"
     for key, val in typo_map.items():
         if key.lower() in style.lower():
-            typo_mood = val
-            break
+            return val
+    return "Professional + Clear hierarchy"
 
-    # Key effects from style
+
+def _derive_key_effects(style: str) -> str:
+    """Derive key effects description from style."""
     eff_map = {
         "Glassmorphism": "Backdrop blur (10-20px) + Translucent overlays",
         "Neumorphism": "Dual shadows (light+dark) + Soft press 150ms",
-        "Claymorphism": "Multi-layer shadows + Spring bounce + Soft press 200ms",
+        "Claymorphism": ("Multi-layer shadows + Spring bounce + Soft press 200ms"),
         "Brutalism": "No transitions + Hard borders + Instant feedback",
         "Dark Mode": "Subtle glow + Neon accents + High contrast",
-        "Flat Design": "Color shift hover + Fast 150ms transitions + No shadows",
+        "Flat Design": ("Color shift hover + Fast 150ms transitions + No shadows"),
         "Minimalism": "Subtle hover 200ms + Smooth transitions + Clean",
         "Motion-Driven": "Scroll animations + Parallax + Page transitions",
         "Micro-interactions": "Haptic feedback + Small 50-100ms animations",
-        "Vibrant": "Large section gaps 48px+ + Color shift hover + Scroll-snap",
+        "Vibrant": ("Large section gaps 48px+ + Color shift hover + Scroll-snap"),
         "Aurora": "Flowing gradients 8-12s + Color morphing",
         "AI-Native": "Typing indicator + Streaming text + Context reveal",
         "Organic": "Rounded 16-24px + Natural shadows + Flowing SVG",
@@ -775,43 +821,66 @@ def derive_ui_reasoning(prod):
         "Trust": "Clear focus rings + Badge hover + Metric pulse",
         "Accessible": "Focus rings 3-4px + ARIA + Reduced motion",
     }
-    key_effects = "Subtle hover (200ms) + Smooth transitions"
     for key, val in eff_map.items():
         if key.lower() in style.lower():
-            key_effects = val
-            break
+            return val
+    return "Subtle hover (200ms) + Smooth transitions"
 
-    # Decision rules
-    rules = {}
-    if "dark" in style.lower() or "oled" in style.lower():
+
+def _derive_decision_rules(style: str, landing: str, keywords: str) -> dict[str, str]:
+    """Derive decision rules dict from style, landing, and keywords."""
+    rules: dict[str, str] = {}
+    style_lower = style.lower()
+    landing_lower = landing.lower()
+    keywords_lower = keywords.lower()
+
+    if "dark" in style_lower or "oled" in style_lower:
         rules["if_light_mode_needed"] = "provide-theme-toggle"
-    if "glass" in style.lower():
+    if "glass" in style_lower:
         rules["if_low_performance"] = "fallback-to-flat"
-    if "conversion" in landing.lower():
+    if "conversion" in landing_lower:
         rules["if_conversion_focused"] = "add-urgency-colors"
-    if "social" in landing.lower():
+    if "social" in landing_lower:
         rules["if_trust_needed"] = "add-testimonials"
-    if "data" in keywords.lower() or "dashboard" in keywords.lower():
+    if "data" in keywords_lower or "dashboard" in keywords_lower:
         rules["if_data_heavy"] = "prioritize-data-density"
     if not rules:
         rules["if_ux_focused"] = "prioritize-clarity"
         rules["if_mobile"] = "optimize-touch-targets"
+    return rules
 
-    # Anti-patterns
-    anti_patterns = []
-    if "minimalism" in style.lower() or "minimal" in style.lower():
+
+def _derive_anti_patterns(style: str) -> str:
+    """Derive anti-patterns string from style."""
+    anti_patterns: list[str] = []
+    style_lower = style.lower()
+    if "minimalism" in style_lower or "minimal" in style_lower:
         anti_patterns.append("Excessive decoration")
-    if "dark" in style.lower():
+    if "dark" in style_lower:
         anti_patterns.append("Pure white backgrounds")
-    if "flat" in style.lower():
+    if "flat" in style_lower:
         anti_patterns.append("Complex shadows + 3D effects")
-    if "vibrant" in style.lower():
+    if "vibrant" in style_lower:
         anti_patterns.append("Muted colors + Low energy")
-    if "accessible" in style.lower():
+    if "accessible" in style_lower:
         anti_patterns.append("Color-only indicators")
     if not anti_patterns:
         anti_patterns = ["Inconsistent styling", "Poor contrast ratios"]
-    anti_str = " + ".join(anti_patterns[:2])
+    return " + ".join(anti_patterns[:2])
+
+
+def derive_ui_reasoning(prod: dict[str, str]) -> dict[str, str]:
+    """Generate ui-reasoning row from products.csv row."""
+    pt = prod["Product Type"]
+    style = prod.get("Primary Style Recommendation", "")
+    landing = prod.get("Landing Page Pattern", "")
+    color_focus = prod.get("Color Palette Focus", "")
+    keywords = prod.get("Keywords", "")
+
+    typo_mood = _derive_typography_mood(style)
+    key_effects = _derive_key_effects(style)
+    rules = _derive_decision_rules(style, landing, keywords)
+    anti_str = _derive_anti_patterns(style)
 
     return {
         "UI_Category": pt,
@@ -826,15 +895,16 @@ def derive_ui_reasoning(prod):
     }
 
 
-def rebuild_ui_reasoning():
-    src = os.path.join(BASE, "ui-reasoning.csv")
-    with open(src, newline="", encoding="utf-8") as f:
+def rebuild_ui_reasoning() -> None:
+    """Rebuild ui-reasoning.csv from products.csv."""
+    src = BASE / "ui-reasoning.csv"
+    with src.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        headers = reader.fieldnames
+        headers = list(reader.fieldnames or [])
         existing = list(reader)
 
     # Build lookup
-    ui_map = {}
+    ui_map: dict[str, dict[str, str]] = {}
     for row in existing:
         cat = row.get("UI_Category", "").strip()
         if not cat:
@@ -849,10 +919,10 @@ def rebuild_ui_reasoning():
             cat = new_name
         ui_map[cat] = row
 
-    with open(os.path.join(BASE, "products.csv"), newline="", encoding="utf-8") as f:
+    with (BASE / "products.csv").open(newline="", encoding="utf-8") as f:
         products = list(csv.DictReader(f))
 
-    final_rows = []
+    final_rows: list[dict[str, str]] = []
     added = 0
     for i, prod in enumerate(products, 1):
         pt = prod["Product Type"]
@@ -866,7 +936,7 @@ def rebuild_ui_reasoning():
             final_rows.append(row)
             added += 1
 
-    with open(src, "w", newline="", encoding="utf-8") as f:
+    with src.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=headers)
         writer.writeheader()
         writer.writerows(final_rows)
