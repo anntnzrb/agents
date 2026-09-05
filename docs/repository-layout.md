@@ -28,7 +28,7 @@ Each harness source starts under `harnesses/<id>/`. When an adapter defines `run
 | Path | Purpose |
 | --- | --- |
 | `sync/src/cli.ts` | Public command entrypoint |
-| `sync/src/core/` | Plans, jobs, adapters, wrappers, managed tools, and model catalogs |
+| `sync/src/core/` | Plans, jobs, adapters, wrappers, and managed tools |
 | `sync/src/extensions/` | Extension dependency hooks |
 | `sync/src/packages/` | Harness package bootstrap logic |
 | `sync/src/runtime/` | Filesystem, process, lock, and error boundaries |
@@ -50,7 +50,6 @@ Other jobs use fixed generated targets:
 | --- | --- |
 | `~/.local/share/agents/sync-releases/<releaseId>/` | Installed sync runtime releases |
 | `~/.local/share/agents/sync-current` | Symlink to the current installed sync runtime |
-| `~/.local/share/agents/model-catalog/catalog.json` | Shared model-catalog job |
 | `~/.local/share/agents/sync-managed/` | Managed ownership and hook state |
 | `~/.local/bin/` | Harness and managed-tool wrappers |
 
@@ -66,6 +65,5 @@ The main caches use these default paths. `XDG_CACHE_HOME` replaces `~/.cache` fo
 
 | Path | Contents |
 | --- | --- |
-| `~/.cache/agents/model-catalog/` | Cached models.dev, provider, and gateway responses |
 | `<cache-home>/github-tools/cliproxyapi/` | Verified CLIProxyAPI releases |
 | `<cache-home>/npm-tools/` | Versioned harness npm packages |

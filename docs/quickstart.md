@@ -78,9 +78,7 @@ Confirm that sync created the main artifacts:
 ```bash
 test -x ~/.local/bin/cli-proxy-api
 test -f ~/.cli-proxy-api/config.yaml
-test -f ~/.local/share/agents/model-catalog/catalog.json
 ```
-
 Each test exits with status `0` when the required path exists with the expected type and permissions.
 
 ## Authenticate a ChatGPT account
@@ -112,16 +110,6 @@ cli-proxy-api
 ```
 
 The process uses the listener from `tools/cliproxyapi/deployment.json`. Keep it running for the remaining steps.
-
-## Refresh the model catalog
-
-Return to the repository root and force a complete refresh:
-
-```bash
-bun ./sync/src/cli.ts sync --refresh-models
-```
-
-The forced refresh updates provider catalogs, models.dev metadata, and the live CLIProxyAPI catalog. It fails instead of using stale network data.
 
 ## Verify the gateway
 
