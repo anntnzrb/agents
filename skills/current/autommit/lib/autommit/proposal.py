@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Literal, cast
+from typing import TYPE_CHECKING, Literal, cast
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from expression import Error, Ok, Result
 
@@ -21,6 +23,8 @@ MAX_PATH_LENGTH = 4_096
 MAX_CONCERNS = 8
 MAX_CONCERN_LENGTH = 512
 MAX_RATIONALE_LENGTH = 2_000
+_MIN_SPLIT_CONCERNS = 2
+_MAX_OCTAL_DIGITS = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,8 +131,6 @@ def _record(
             return Ok(record)
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(_invalid(f"{field} must be an object"))
 
 
 def _list(value: object, field: str) -> Result[list[object], AutommitError]:
@@ -161,8 +163,6 @@ def _normalize_path(value: object) -> Result[str, AutommitError]:
             return Ok(path)
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(_invalid("change.path must be a string"))
 
 
 def _integer(value: object, field: str, minimum: int = 1) -> Result[int, AutommitError]:
@@ -183,8 +183,6 @@ def _normalize_selector(value: object) -> Result[HunkSelector, AutommitError]:
                         return Ok(AllSelector())
                     case Result(error=err):
                         return Error(err)
-                    case _:
-                        return Error(_invalid("invalid all selector"))
             if selector_type == "indices":
                 match _record(
                     selector_mapping,
@@ -197,7 +195,8 @@ def _normalize_selector(value: object) -> Result[HunkSelector, AutommitError]:
                                 if not indices_items:
                                     return Error(
                                         _invalid(
-                                            "indices selector must contain a non-empty array"
+                                            "indices selector must contain "
+                                            + "a non-empty array"
                                         )
                                     )
                                 indices: list[int] = []
@@ -207,8 +206,6 @@ def _normalize_selector(value: object) -> Result[HunkSelector, AutommitError]:
                                             indices.append(idx)
                                         case Result(error=err):
                                             return Error(err)
-                                        case _:
-                                            return Error(_invalid("invalid hunk index"))
                                 if len(set(indices)) != len(indices):
                                     return Error(
                                         _invalid("hunk indices must be unique")
@@ -216,12 +213,8 @@ def _normalize_selector(value: object) -> Result[HunkSelector, AutommitError]:
                                 return Ok(IndicesSelector(tuple(sorted(indices))))
                             case Result(error=err):
                                 return Error(err)
-                            case _:
-                                return Error(_invalid("indices must be an array"))
                     case Result(error=err):
                         return Error(err)
-                    case _:
-                        return Error(_invalid("invalid indices selector"))
             if selector_type == "lines":
                 match _record(
                     selector_mapping,
@@ -236,29 +229,20 @@ def _normalize_selector(value: object) -> Result[HunkSelector, AutommitError]:
                                         if end < start:
                                             return Error(
                                                 _invalid(
-                                                    "line selectors require start <= end"
+                                                    "line selectors "
+                                                    + "require start <= end"
                                                 )
                                             )
                                         return Ok(LinesSelector(start, end))
                                     case Result(error=err):
                                         return Error(err)
-                                    case _:
-                                        return Error(
-                                            _invalid("invalid line selector end")
-                                        )
                             case Result(error=err):
                                 return Error(err)
-                            case _:
-                                return Error(_invalid("invalid line selector start"))
                     case Result(error=err):
                         return Error(err)
-                    case _:
-                        return Error(_invalid("invalid lines selector"))
             return Error(_invalid("change.hunks must be all, indices, or lines"))
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(_invalid("change.hunks must be an object or 'all'"))
 
 
 def normalize_proposal(value: object) -> Result[CommitProposal, AutommitError]:
@@ -270,7 +254,8 @@ def normalize_proposal(value: object) -> Result[CommitProposal, AutommitError]:
                     if not 1 <= len(commits_items) <= MAX_COMMITS:
                         return Error(
                             _invalid(
-                                f"commits must contain between 1 and {MAX_COMMITS} entries"
+                                f"commits must contain between 1 and {MAX_COMMITS} "
+                                + "entries"
                             )
                         )
                     commits: list[CommitGroup] = []
@@ -284,7 +269,9 @@ def normalize_proposal(value: object) -> Result[CommitProposal, AutommitError]:
                                 } <= set(commit):
                                     return Error(
                                         _invalid(
-                                            f"commit {commit_index} must contain summary, changes, and optional details"
+                                            f"commit {commit_index} must "
+                                            + "contain summary, "
+                                            + "changes, and optional details"
                                         )
                                     )
                                 match _bounded_text(
@@ -301,7 +288,7 @@ def normalize_proposal(value: object) -> Result[CommitProposal, AutommitError]:
                                                 if len(details_items) > MAX_DETAILS:
                                                     return Error(
                                                         _invalid(
-                                                            f"commit {commit_index} details must contain at most {MAX_DETAILS} items"
+                                                            f"commit {commit_index} details must contain at most {MAX_DETAILS} items"  # noqa: E501 - validator message needs 4-way split at this nesting
                                                         )
                                                     )
                                                 details: list[str] = []
@@ -311,19 +298,13 @@ def normalize_proposal(value: object) -> Result[CommitProposal, AutommitError]:
                                                 ) in enumerate(details_items, start=1):
                                                     match _bounded_text(
                                                         detail,
-                                                        f"commit {commit_index} detail {detail_index}",
+                                                        f"commit {commit_index} detail {detail_index}",  # noqa: E501 - validator message needs 3-way split at this nesting
                                                         MAX_DETAIL_LENGTH,
                                                     ):
                                                         case Result(tag="ok", ok=txt):
                                                             details.append(txt)
                                                         case Result(error=err):
                                                             return Error(err)
-                                                        case _:
-                                                            return Error(
-                                                                _invalid(
-                                                                    "invalid detail text"
-                                                                )
-                                                            )
                                                 match _list(
                                                     commit["changes"],
                                                     f"commit {commit_index} changes",
@@ -338,8 +319,8 @@ def normalize_proposal(value: object) -> Result[CommitProposal, AutommitError]:
                                                         ):
                                                             return Error(
                                                                 _invalid(
-                                                                    f"commit {commit_index} must contain between 1 and "
-                                                                    f"{MAX_CHANGES_PER_COMMIT} changes"
+                                                                    f"commit {commit_index} must contain between 1 and "  # noqa: E501 - validator message needs 4-way split at this nesting
+                                                                    + f"{MAX_CHANGES_PER_COMMIT} changes"  # noqa: E501 - validator message needs 4-way split at this nesting
                                                                 )
                                                             )
                                                         changes: list[CommitChange] = []
@@ -347,7 +328,9 @@ def normalize_proposal(value: object) -> Result[CommitProposal, AutommitError]:
                                                         for raw_change in changes_items:
                                                             match _record(
                                                                 raw_change,
-                                                                f"commit {commit_index} change",
+                                                                "commit "
+                                                                + f"{commit_index} "
+                                                                + "change",
                                                                 frozenset(
                                                                     {
                                                                         "path",
@@ -372,22 +355,22 @@ def normalize_proposal(value: object) -> Result[CommitProposal, AutommitError]:
                                                                         ):
                                                                             if (
                                                                                 path
-                                                                                in seen_paths
+                                                                                in seen_paths  # noqa: E501 - single token at deep nesting
                                                                             ):
-                                                                                return Error(
+                                                                                return Error(  # noqa: E501 - single token at deep nesting
                                                                                     _invalid(
-                                                                                        f"commit {commit_index} lists {path} more than once"
+                                                                                        f"commit {commit_index} lists {path} more than once"  # noqa: E501 - validator message needs 4-way split at this nesting
                                                                                     )
                                                                                 )
                                                                             seen_paths.add(
                                                                                 path
                                                                             )
-                                                                            match _normalize_selector(
+                                                                            match _normalize_selector(  # noqa: E501 - single token at deep nesting
                                                                                 change[
                                                                                     "hunks"
                                                                                 ]
                                                                             ):
-                                                                                case Result(
+                                                                                case Result(  # noqa: E501 - single token at deep nesting
                                                                                     tag="ok",
                                                                                     ok=selector,
                                                                                 ):
@@ -397,17 +380,11 @@ def normalize_proposal(value: object) -> Result[CommitProposal, AutommitError]:
                                                                                             selector,
                                                                                         )
                                                                                     )
-                                                                                case Result(
+                                                                                case Result(  # noqa: E501 - single token at deep nesting
                                                                                     error=err
                                                                                 ):
-                                                                                    return Error(
+                                                                                    return Error(  # noqa: E501 - single token at deep nesting
                                                                                         err
-                                                                                    )
-                                                                                case _:
-                                                                                    return Error(
-                                                                                        _invalid(
-                                                                                            "invalid change selector"
-                                                                                        )
                                                                                     )
                                                                         case Result(
                                                                             error=err
@@ -417,20 +394,8 @@ def normalize_proposal(value: object) -> Result[CommitProposal, AutommitError]:
                                                                                     err
                                                                                 )
                                                                             )
-                                                                        case _:
-                                                                            return Error(
-                                                                                _invalid(
-                                                                                    "invalid change path"
-                                                                                )
-                                                                            )
                                                                 case Result(error=err):
                                                                     return Error(err)
-                                                                case _:
-                                                                    return Error(
-                                                                        _invalid(
-                                                                            "invalid change record"
-                                                                        )
-                                                                    )
                                                         commits.append(
                                                             CommitGroup(
                                                                 summary,
@@ -440,37 +405,17 @@ def normalize_proposal(value: object) -> Result[CommitProposal, AutommitError]:
                                                         )
                                                     case Result(error=err):
                                                         return Error(err)
-                                                    case _:
-                                                        return Error(
-                                                            _invalid(
-                                                                "changes must be an array"
-                                                            )
-                                                        )
                                             case Result(error=err):
                                                 return Error(err)
-                                            case _:
-                                                return Error(
-                                                    _invalid("details must be an array")
-                                                )
                                     case Result(error=err):
                                         return Error(err)
-                                    case _:
-                                        return Error(
-                                            _invalid("summary must be a string")
-                                        )
                             case Result(error=err):
                                 return Error(err)
-                            case _:
-                                return Error(_invalid("commit must be an object"))
                     return Ok(CommitProposal(tuple(commits)))
                 case Result(error=err):
                     return Error(err)
-                case _:
-                    return Error(_invalid("commits must be an array"))
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(_invalid("proposal must be an object"))
 
 
 def read_json_file(path: Path, kind: str) -> Result[object, AutommitError]:
@@ -487,7 +432,7 @@ def read_json_file(path: Path, kind: str) -> Result[object, AutommitError]:
             AutommitError("invalid_json", f"Unable to read {kind} {path}: {error}")
         )
     try:
-        return Ok(json.loads(text))
+        return Ok(cast("object", json.loads(text)))
     except json.JSONDecodeError as error:
         return Error(AutommitError("invalid_json", f"Invalid {kind} JSON: {error}"))
 
@@ -570,7 +515,8 @@ def normalize_atomicity_decision(
                     )
                 )
             if decision_value == "split" and (
-                len(concerns) < 2 or len(set(concerns)) != len(concerns)
+                len(concerns) < _MIN_SPLIT_CONCERNS
+                or len(set(concerns)) != len(concerns)
             ):
                 return Error(
                     AutommitError(
@@ -584,7 +530,8 @@ def normalize_atomicity_decision(
             return Error(
                 AutommitError(
                     "invalid_atomicity_decision",
-                    "Invalid atomicity decision: expected exactly decision, concerns, and rationale.",
+                    "Invalid atomicity decision: expected exactly "
+                    + "decision, concerns, and rationale.",
                 )
             )
 
@@ -628,8 +575,11 @@ def _decode_git_path_token(value: str, start: int) -> tuple[str, int]:
             continue
         if escaped in "01234567":
             octal = escaped
-            index += 1
-            while index < len(value) and len(octal) < 3 and value[index] in "01234567":
+            while (
+                index < len(value)
+                and len(octal) < _MAX_OCTAL_DIGITS
+                and value[index] in "01234567"
+            ):
                 octal += value[index]
                 index += 1
             data.append(int(octal, 8))
@@ -790,9 +740,11 @@ def validate_proposal_coverage(
                 )
                 continue
             selections_by_file.setdefault(change.path, []).append(change.hunks)
-    for filename in staged_files:
-        if filename not in selections_by_file:
-            errors.append(f"Staged file missing from split plan: {filename}")
+    errors.extend(
+        f"Staged file missing from split plan: {filename}"
+        for filename in staged_files
+        if filename not in selections_by_file
+    )
     files_by_name = {file.filename: file for file in parsed_files}
     for filename, selections in selections_by_file.items():
         for left_index, left in enumerate(selections):
@@ -802,8 +754,9 @@ def validate_proposal_coverage(
             ):
                 errors.append(
                     "Overlapping hunk selections across commits: "
-                    f"{filename} ({_describe_selector(left)} overlaps another selection); "
-                    "line ranges are inclusive and must be disjoint"
+                    + f"{filename} ({_describe_selector(left)} "
+                    + "overlaps another selection); "
+                    + "line ranges are inclusive and must be disjoint"
                 )
                 break
         parsed = files_by_name.get(filename)
@@ -832,7 +785,8 @@ def validate_proposal_coverage(
             )
             if not covered:
                 errors.append(
-                    f"Staged hunk missing from split plan: {filename} (hunk {hunk.index})"
+                    "Staged hunk missing from split plan: "
+                    + f"{filename} (hunk {hunk.index})"
                 )
     return tuple(dict.fromkeys(errors))
 
@@ -896,13 +850,6 @@ def build_commit_patch(
                 parts.append(patch_part)
             case Result(error=err):
                 return Error(err)
-            case _:
-                return Error(
-                    AutommitError(
-                        "invalid_plan",
-                        f"Failed to select patch for {change.path}.",
-                    )
-                )
     return Ok("\n".join(parts) + "\n")
 
 

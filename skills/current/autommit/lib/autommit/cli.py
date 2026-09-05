@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Never
+from typing import TYPE_CHECKING, Never, cast
 
 from expression import Error, Ok, Result
 
@@ -22,8 +22,11 @@ SCHEMA = "autommit/v1"
 class Parser(argparse.ArgumentParser):
     """Map parse failures into the structured protocol."""
 
-    def error(self, message: str) -> Never:
-        raise AutommitError("usage_error", message)
+    # typing.override needs 3.12+; this ignore marks the intentional override.
+    def error(self, message: str) -> Never:  # pyright: ignore[reportImplicitOverride]
+        """Map parse failures into the structured protocol."""
+        code = "usage_error"
+        raise AutommitError(code, message)
 
 
 def build_parser() -> Parser:
@@ -34,28 +37,30 @@ def build_parser() -> Parser:
         allow_abbrev=False,
     )
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("schema", help="Describe the JSON protocol.")
+    _ = commands.add_parser("schema", help="Describe the JSON protocol.")
     prepare_parser = commands.add_parser(
         "prepare",
         help="Recover, stage if needed, and return planning evidence.",
     )
-    prepare_parser.add_argument("context", nargs="*", help="Free-form planner context.")
-    prepare_parser.add_argument("--context", action="append", default=[])
-    prepare_parser.add_argument("--repo", default=".", metavar="PATH")
+    _ = prepare_parser.add_argument(
+        "context", nargs="*", help="Free-form planner context."
+    )
+    _ = prepare_parser.add_argument("--context", action="append", default=[])
+    _ = prepare_parser.add_argument("--repo", default=".", metavar="PATH")
     validate = commands.add_parser(
         "validate-plan", help="Validate a plan against a snapshot."
     )
-    validate.add_argument("--snapshot", required=True)
-    validate.add_argument("--plan-file", type=Path, required=True)
-    validate.add_argument("--require-split", action="store_true")
-    validate.add_argument("--repo", default=".", metavar="PATH")
+    _ = validate.add_argument("--snapshot", required=True)
+    _ = validate.add_argument("--plan-file", type=Path, required=True)
+    _ = validate.add_argument("--require-split", action="store_true")
+    _ = validate.add_argument("--repo", default=".", metavar="PATH")
     apply_parser = commands.add_parser(
         "apply", help="Create and atomically publish commits."
     )
-    apply_parser.add_argument("--snapshot", required=True)
-    apply_parser.add_argument("--plan-file", type=Path, required=True)
-    apply_parser.add_argument("--decision-file", type=Path)
-    apply_parser.add_argument("--repo", default=".", metavar="PATH")
+    _ = apply_parser.add_argument("--snapshot", required=True)
+    _ = apply_parser.add_argument("--plan-file", type=Path, required=True)
+    _ = apply_parser.add_argument("--decision-file", type=Path)
+    _ = apply_parser.add_argument("--repo", default=".", metavar="PATH")
     return parser
 
 
@@ -102,9 +107,18 @@ def _schema() -> dict[str, object]:
         "protocol": SCHEMA,
         "commands": {
             "schema": "Describe this protocol without repository mutation.",
-            "prepare": "Recover, stage only when the index is empty, and return exact planning evidence.",
-            "validate-plan": "Validate complete staged-diff coverage; optionally require a split.",
-            "apply": "Prepare commits in a temporary worktree and publish the branch by compare-and-swap.",
+            "prepare": (
+                "Recover, stage only when the index is empty, "
+                + "and return exact planning evidence."
+            ),
+            "validate-plan": (
+                "Validate complete staged-diff coverage; "
+                + "optionally require a split."
+            ),
+            "apply": (
+                "Prepare commits in a temporary worktree "
+                + "and publish the branch by compare-and-swap."
+            ),
         },
         "plan": {
             "commits": [
@@ -114,7 +128,8 @@ def _schema() -> dict[str, object]:
                     "changes": [
                         {
                             "path": "staged path",
-                            "hunks": "all | {type:indices,indices:[1]} | {type:lines,start:1,end:2}",
+                            "hunks": "all | {type:indices,indices:[1]} | "
+                            + "{type:lines,start:1,end:2}",
                         }
                     ],
                 }
@@ -157,30 +172,60 @@ def _failure(command: str, error: AutommitError) -> dict[str, object]:
 
 def _emit(payload: dict[str, object], *, error: bool = False) -> None:
     stream = sys.stderr if error else sys.stdout
-    stream.write(json.dumps(payload, separators=(",", ":"), ensure_ascii=False) + "\n")
+    _ = stream.write(
+        json.dumps(payload, separators=(",", ":"), ensure_ascii=False) + "\n"
+    )
+
+
+def _config_str(arguments: argparse.Namespace, field: str) -> str:
+    """Extract a required str option from parsed args."""
+    return cast("str", getattr(arguments, field))
+
+
+def _config_bool(arguments: argparse.Namespace, field: str) -> bool:
+    """Extract a required bool flag from parsed args."""
+    return cast("bool", getattr(arguments, field))
+
+
+def _config_path(arguments: argparse.Namespace, field: str) -> Path:
+    """Extract a required path option from parsed args."""
+    return cast("Path", getattr(arguments, field))
+
+
+def _optional_path(arguments: argparse.Namespace, field: str) -> Path | None:
+    """Extract an optional path option from parsed args."""
+    return cast("Path | None", getattr(arguments, field))
+
+
+def _config_str_list(arguments: argparse.Namespace, field: str) -> list[str]:
+    """Extract a required string-list option from parsed args."""
+    return cast("list[str]", getattr(arguments, field))
 
 
 def _dispatch(
     arguments: argparse.Namespace,
 ) -> Result[object, AutommitError]:
-    if arguments.command == "schema":
+    command = _config_str(arguments, "command")
+    if command == "schema":
         return Ok(_schema())
-    cwd = Path(arguments.repo).resolve()
-    if arguments.command == "prepare":
-        return prepare(cwd, tuple(arguments.context))
-    if arguments.command == "validate-plan":
+    repo = _config_str(arguments, "repo")
+    cwd = Path(repo).resolve()
+    if command == "prepare":
+        context = _config_str_list(arguments, "context")
+        return prepare(cwd, tuple(context))
+    if command == "validate-plan":
         return validate_plan(
             cwd,
-            arguments.snapshot,
-            arguments.plan_file,
-            require_split=arguments.require_split,
+            _config_str(arguments, "snapshot"),
+            _config_path(arguments, "plan_file"),
+            require_split=_config_bool(arguments, "require_split"),
         )
-    if arguments.command == "apply":
+    if command == "apply":
         return apply(
             cwd,
-            arguments.snapshot,
-            arguments.plan_file,
-            arguments.decision_file,
+            _config_str(arguments, "snapshot"),
+            _config_path(arguments, "plan_file"),
+            _optional_path(arguments, "decision_file"),
         )
     return Error(AutommitError("usage_error", "Unknown command."))
 
@@ -204,7 +249,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     return 2
         else:
             arguments = parser.parse_args(values)
-        command = arguments.command
+        command = _config_str(arguments, "command")
         result = _dispatch(arguments)
     except AutommitError as error:
         _emit(_failure(command, error), error=True)

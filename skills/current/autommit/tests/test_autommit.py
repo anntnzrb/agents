@@ -1,3 +1,4 @@
+# pyright: reportUninitializedInstanceVariable=false
 """Behavioral tests for the portable autommit CLI."""
 
 from __future__ import annotations
@@ -9,12 +10,12 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import Any, cast
+from typing import TypedDict, cast, final
 
 from expression import Option, Result
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(SKILL_ROOT / "lib"))
+_ = sys.path.insert(0, str(SKILL_ROOT / "lib"))
 
 from autommit.git import run_git
 from autommit.proposal import (
@@ -27,26 +28,56 @@ CLI = SKILL_ROOT / "scripts" / "cli.py"
 SCHEMA = "autommit/v1"
 
 
+class _AppliedCommit(TypedDict):
+    summary: str
+
+
+class _PrepareResult(TypedDict):
+    status: str
+    context: str
+    staged_files: list[str]
+    diff: str
+    snapshot: str
+
+
+class _ValidateResult(TypedDict):
+    requires_atomicity_review: bool
+
+
+class _ApplyResult(TypedDict):
+    status: str
+    commits: list[_AppliedCommit]
+
+
+class _ErrorDetail(TypedDict):
+    code: str
+    message: str
+
+
+@final
 class AutommitCliTests(unittest.TestCase):
     """Exercise autommit against disposable Git repositories."""
 
-    maxDiff = None
+    maxDiff: int | None = None
 
-    def setUp(self) -> None:
+    # typing.override needs 3.12+; this ignore marks the intentional override.
+    def setUp(self) -> None:  # pyright: ignore[reportImplicitOverride]
+        # unittest setUp initializes these instance variables.
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.temp_path = Path(self.temporary_directory.name)
         self.home = self.temp_path / "home"
         self.home.mkdir()
         self.repo = self.temp_path / "repo"
         self.repo.mkdir()
-        self.git("init", "-b", "main")
-        self.git("config", "user.email", "autommit@example.test")
-        self.git("config", "user.name", "Autommit Test")
-        (self.repo / "tracked.txt").write_text("base\n", encoding="utf-8")
-        self.git("add", "tracked.txt")
-        self.git("commit", "-m", "initial")
+        _ = self.git("init", "-b", "main")
+        _ = self.git("config", "user.email", "autommit@example.test")
+        _ = self.git("config", "user.name", "Autommit Test")
+        _ = (self.repo / "tracked.txt").write_text("base\n", encoding="utf-8")
+        _ = self.git("add", "tracked.txt")
+        _ = self.git("commit", "-m", "initial")
 
-    def tearDown(self) -> None:
+    # typing.override needs 3.12+; this ignore marks the intentional override.
+    def tearDown(self) -> None:  # pyright: ignore[reportImplicitOverride]
         self.temporary_directory.cleanup()
 
     def environment(self) -> dict[str, str]:
@@ -77,7 +108,7 @@ class AutommitCliTests(unittest.TestCase):
         self,
         *args: str,
         expected_code: int = 0,
-    ) -> dict[str, Any]:
+    ) -> dict[str, object]:
         completed = subprocess.run(
             ["uv", "run", "--quiet", "--script", str(CLI), *args],
             cwd=self.repo,
@@ -95,22 +126,22 @@ class AutommitCliTests(unittest.TestCase):
         stream = completed.stdout if expected_code == 0 else completed.stderr
         lines = stream.splitlines()
         self.assertEqual(len(lines), 1, completed)
-        payload = json.loads(lines[0])
+        payload = cast("dict[str, object]", json.loads(lines[0]))
         self.assertEqual(payload.get("schema"), SCHEMA)
         self.assertEqual(payload.get("ok"), expected_code == 0)
         return payload
 
     def write_json(self, name: str, value: object) -> Path:
         path = self.temp_path / name
-        path.write_text(json.dumps(value), encoding="utf-8")
+        _ = path.write_text(json.dumps(value), encoding="utf-8")
         return path
 
-    def prepare(self, *context: str) -> dict[str, Any]:
+    def prepare(self, *context: str) -> _PrepareResult:
         arguments = ["prepare"]
         for value in context:
             arguments.extend(["--context", value])
         payload = self.cli(*arguments)
-        result = payload["result"]
+        result = cast("_PrepareResult", payload["result"])
         self.assertEqual(result["status"], "prepared")
         return result
 
@@ -130,10 +161,11 @@ class AutommitCliTests(unittest.TestCase):
 
     def test_schema_and_help_are_available_without_repository_mutation(self) -> None:
         payload = self.cli("schema")
-        result = payload["result"]
+        result = cast("dict[str, object]", payload["result"])
         self.assertEqual(result["protocol"], SCHEMA)
-        self.assertIn("prepare", result["commands"])
-        self.assertIn("apply", result["commands"])
+        commands = cast("dict[str, object]", result["commands"])
+        self.assertIn("prepare", commands)
+        self.assertIn("apply", commands)
         self.assertFalse((self.repo / ".git" / "autommit").exists())
 
         completed = subprocess.run(
@@ -148,7 +180,7 @@ class AutommitCliTests(unittest.TestCase):
         self.assertIn("prepare", completed.stdout)
 
     def test_prepare_stages_all_only_when_the_index_is_empty(self) -> None:
-        (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
+        _ = (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
         result = self.prepare("keep formatting out", "split docs")
 
         self.assertEqual(result["context"], "keep formatting out\n\nsplit docs")
@@ -156,9 +188,11 @@ class AutommitCliTests(unittest.TestCase):
         self.assertIn("+changed", result["diff"])
         self.assertEqual(self.git("diff", "--name-only").stdout, "")
 
-        (self.repo / "tracked.txt").write_text("staged\n", encoding="utf-8")
-        self.git("add", "tracked.txt")
-        (self.repo / "tracked.txt").write_text("staged\nunstaged\n", encoding="utf-8")
+        _ = (self.repo / "tracked.txt").write_text("staged\n", encoding="utf-8")
+        _ = self.git("add", "tracked.txt")
+        _ = (self.repo / "tracked.txt").write_text(
+            "staged\nunstaged\n", encoding="utf-8"
+        )
         result = self.prepare()
         self.assertIn("+staged", result["diff"])
         self.assertNotIn("+unstaged", result["diff"])
@@ -167,31 +201,39 @@ class AutommitCliTests(unittest.TestCase):
     def test_apply_commits_exact_staged_snapshot_and_preserves_unstaged_work(
         self,
     ) -> None:
-        (self.repo / "tracked.txt").write_text("staged\n", encoding="utf-8")
-        self.git("add", "tracked.txt")
-        (self.repo / "tracked.txt").write_text("staged\nunstaged\n", encoding="utf-8")
+        _ = (self.repo / "tracked.txt").write_text("staged\n", encoding="utf-8")
+        _ = self.git("add", "tracked.txt")
+        _ = (self.repo / "tracked.txt").write_text(
+            "staged\nunstaged\n", encoding="utf-8"
+        )
         prepared = self.prepare()
         plan = self.write_json(
             "plan.json",
             self.whole_file_plan("tracked.txt", summary="Update tracked value"),
         )
 
-        validation = self.cli(
-            "validate-plan",
-            "--snapshot",
-            prepared["snapshot"],
-            "--plan-file",
-            str(plan),
-        )["result"]
+        validation = cast(
+            "_ValidateResult",
+            self.cli(
+                "validate-plan",
+                "--snapshot",
+                prepared["snapshot"],
+                "--plan-file",
+                str(plan),
+            )["result"],
+        )
         self.assertFalse(validation["requires_atomicity_review"])
 
-        applied = self.cli(
-            "apply",
-            "--snapshot",
-            prepared["snapshot"],
-            "--plan-file",
-            str(plan),
-        )["result"]
+        applied = cast(
+            "_ApplyResult",
+            self.cli(
+                "apply",
+                "--snapshot",
+                prepared["snapshot"],
+                "--plan-file",
+                str(plan),
+            )["result"],
+        )
         self.assertEqual(applied["status"], "committed")
         self.assertEqual(len(applied["commits"]), 1)
         self.assertEqual(applied["commits"][0]["summary"], "Update tracked value")
@@ -204,34 +246,40 @@ class AutommitCliTests(unittest.TestCase):
         self.assertEqual(self.git("diff", "--name-only").stdout.strip(), "tracked.txt")
 
     def test_broad_single_commit_requires_valid_atomicity_acceptance(self) -> None:
-        (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
-        (self.repo / "other.txt").write_text("other\n", encoding="utf-8")
-        self.git("add", "tracked.txt", "other.txt")
+        _ = (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
+        _ = (self.repo / "other.txt").write_text("other\n", encoding="utf-8")
+        _ = self.git("add", "tracked.txt", "other.txt")
         prepared = self.prepare()
         plan = self.write_json(
             "broad-plan.json",
             self.whole_file_plan("tracked.txt", "other.txt"),
         )
 
-        validation = self.cli(
-            "validate-plan",
-            "--snapshot",
-            prepared["snapshot"],
-            "--plan-file",
-            str(plan),
-        )["result"]
-        self.assertTrue(validation["requires_atomicity_review"])
-        split_error = self.cli(
-            "validate-plan",
-            "--snapshot",
-            prepared["snapshot"],
-            "--plan-file",
-            str(plan),
-            "--require-split",
-            expected_code=2,
+        validation = cast(
+            "_ValidateResult",
+            self.cli(
+                "validate-plan",
+                "--snapshot",
+                prepared["snapshot"],
+                "--plan-file",
+                str(plan),
+            )["result"],
         )
-        self.assertEqual(split_error["error"]["code"], "split_required")
-        self.cli(
+        self.assertTrue(validation["requires_atomicity_review"])
+        split_error = cast(
+            "_ErrorDetail",
+            self.cli(
+                "validate-plan",
+                "--snapshot",
+                prepared["snapshot"],
+                "--plan-file",
+                str(plan),
+                "--require-split",
+                expected_code=2,
+            )["error"],
+        )
+        self.assertEqual(split_error["code"], "split_required")
+        _ = self.cli(
             "apply",
             "--snapshot",
             prepared["snapshot"],
@@ -244,15 +292,18 @@ class AutommitCliTests(unittest.TestCase):
             "decision.json",
             {"decision": "accept", "concerns": [], "rationale": "One behavior."},
         )
-        applied = self.cli(
-            "apply",
-            "--snapshot",
-            prepared["snapshot"],
-            "--plan-file",
-            str(plan),
-            "--decision-file",
-            str(decision),
-        )["result"]
+        applied = cast(
+            "_ApplyResult",
+            self.cli(
+                "apply",
+                "--snapshot",
+                prepared["snapshot"],
+                "--plan-file",
+                str(plan),
+                "--decision-file",
+                str(decision),
+            )["result"],
+        )
         self.assertEqual(applied["status"], "committed")
 
     def test_split_plan_applies_bottom_up_and_matches_the_index_tree(self) -> None:
@@ -260,14 +311,14 @@ class AutommitCliTests(unittest.TestCase):
         changed_lines = original.splitlines()
         changed_lines[0] = "first changed"
         changed_lines[10] = "eleventh changed"
-        (self.repo / "tracked.txt").write_text(original, encoding="utf-8")
-        self.git("add", "tracked.txt")
-        self.git("commit", "-m", "expand fixture")
-        (self.repo / "tracked.txt").write_text(
+        _ = (self.repo / "tracked.txt").write_text(original, encoding="utf-8")
+        _ = self.git("add", "tracked.txt")
+        _ = self.git("commit", "-m", "expand fixture")
+        _ = (self.repo / "tracked.txt").write_text(
             "\n".join(changed_lines) + "\n",
             encoding="utf-8",
         )
-        self.git("add", "tracked.txt")
+        _ = self.git("add", "tracked.txt")
         prepared = self.prepare()
         expected_tree = self.git("write-tree").stdout.strip()
         plan = self.write_json(
@@ -298,13 +349,16 @@ class AutommitCliTests(unittest.TestCase):
             },
         )
 
-        applied = self.cli(
-            "apply",
-            "--snapshot",
-            prepared["snapshot"],
-            "--plan-file",
-            str(plan),
-        )["result"]
+        applied = cast(
+            "_ApplyResult",
+            self.cli(
+                "apply",
+                "--snapshot",
+                prepared["snapshot"],
+                "--plan-file",
+                str(plan),
+            )["result"],
+        )
         self.assertEqual(len(applied["commits"]), 2)
         self.assertEqual(
             self.git("rev-parse", "HEAD^{tree}").stdout.strip(), expected_tree
@@ -315,28 +369,31 @@ class AutommitCliTests(unittest.TestCase):
         )
 
     def test_apply_refuses_when_the_prepared_snapshot_changed(self) -> None:
-        (self.repo / "tracked.txt").write_text("first\n", encoding="utf-8")
-        self.git("add", "tracked.txt")
+        _ = (self.repo / "tracked.txt").write_text("first\n", encoding="utf-8")
+        _ = self.git("add", "tracked.txt")
         prepared = self.prepare()
         plan = self.write_json("plan.json", self.whole_file_plan("tracked.txt"))
-        (self.repo / "tracked.txt").write_text("second\n", encoding="utf-8")
-        self.git("add", "tracked.txt")
+        _ = (self.repo / "tracked.txt").write_text("second\n", encoding="utf-8")
+        _ = self.git("add", "tracked.txt")
 
-        payload = self.cli(
-            "apply",
-            "--snapshot",
-            prepared["snapshot"],
-            "--plan-file",
-            str(plan),
-            expected_code=3,
+        error = cast(
+            "_ErrorDetail",
+            self.cli(
+                "apply",
+                "--snapshot",
+                prepared["snapshot"],
+                "--plan-file",
+                str(plan),
+                expected_code=3,
+            )["error"],
         )
-        self.assertEqual(payload["error"]["code"], "snapshot_changed")
+        self.assertEqual(error["code"], "snapshot_changed")
         self.assertEqual(self.git("log", "-1", "--format=%s").stdout.strip(), "initial")
 
     def test_invalid_plan_cannot_omit_or_overlap_staged_changes(self) -> None:
-        (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
-        (self.repo / "other.txt").write_text("other\n", encoding="utf-8")
-        self.git("add", "tracked.txt", "other.txt")
+        _ = (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
+        _ = (self.repo / "other.txt").write_text("other\n", encoding="utf-8")
+        _ = self.git("add", "tracked.txt", "other.txt")
         prepared = self.prepare()
         plan = self.write_json(
             "invalid-plan.json",
@@ -356,20 +413,23 @@ class AutommitCliTests(unittest.TestCase):
             },
         )
 
-        payload = self.cli(
-            "validate-plan",
-            "--snapshot",
-            prepared["snapshot"],
-            "--plan-file",
-            str(plan),
-            expected_code=2,
+        error = cast(
+            "_ErrorDetail",
+            self.cli(
+                "validate-plan",
+                "--snapshot",
+                prepared["snapshot"],
+                "--plan-file",
+                str(plan),
+                expected_code=2,
+            )["error"],
         )
-        message = payload["error"]["message"]
+        message = error["message"]
         self.assertIn("other.txt", message)
         self.assertIn("Overlapping", message)
 
     def test_context_options_match_the_pi_command_contract(self) -> None:
-        (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
+        _ = (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
         completed = subprocess.run(
             [
                 "uv",
@@ -392,12 +452,12 @@ class AutommitCliTests(unittest.TestCase):
             env=self.environment(),
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        result = json.loads(completed.stdout)["result"]
+        result = cast("_PrepareResult", json.loads(completed.stdout)["result"])
         self.assertEqual(result["context"], "first\n\nsecond\n\nthird\n\n-literal")
 
     def test_recovers_a_prepared_pi_receipt_before_planning_new_work(self) -> None:
-        (self.repo / "tracked.txt").write_text("recovered\n", encoding="utf-8")
-        self.git("add", "tracked.txt")
+        _ = (self.repo / "tracked.txt").write_text("recovered\n", encoding="utf-8")
+        _ = self.git("add", "tracked.txt")
         before = self.git("rev-parse", "HEAD").stdout.strip()
         index_tree = self.git("write-tree").stdout.strip()
         after = self.git(
@@ -411,7 +471,7 @@ class AutommitCliTests(unittest.TestCase):
         transaction_dir = self.repo / ".git" / "autommit"
         transaction_dir.mkdir()
         receipt = transaction_dir / "receipt.json"
-        receipt.write_text(
+        _ = receipt.write_text(
             json.dumps(
                 {
                     "version": 1,
@@ -425,41 +485,41 @@ class AutommitCliTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-        result = self.cli("prepare")["result"]
+        result = cast("_PrepareResult", self.cli("prepare")["result"])
         self.assertEqual(result["status"], "recovered")
         self.assertEqual(self.git("rev-parse", "HEAD").stdout.strip(), after)
         self.assertFalse(receipt.exists())
 
     def test_never_removes_an_existing_operation_lock(self) -> None:
-        (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
+        _ = (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
         transaction_dir = self.repo / ".git" / "autommit"
         transaction_dir.mkdir()
         lock = transaction_dir / "operation.lock"
-        lock.write_text('{"pid":999999,"token":"stale"}\n', encoding="utf-8")
+        _ = lock.write_text('{"pid":999999,"token":"stale"}\n', encoding="utf-8")
 
-        payload = self.cli("prepare", expected_code=3)
-        self.assertEqual(payload["error"]["code"], "operation_locked")
+        error = cast("_ErrorDetail", self.cli("prepare", expected_code=3)["error"])
+        self.assertEqual(error["code"], "operation_locked")
         self.assertTrue(lock.exists())
 
     @unittest.skipIf(os.name == "nt", "symlink creation is not reliably available")
     def test_refuses_a_symlinked_receipt_without_touching_its_target(self) -> None:
-        (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
+        _ = (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
         transaction_dir = self.repo / ".git" / "autommit"
         transaction_dir.mkdir()
         outside = self.temp_path / "outside-receipt.json"
-        outside.write_text("outside\n", encoding="utf-8")
+        _ = outside.write_text("outside\n", encoding="utf-8")
         receipt = transaction_dir / "receipt.json"
         receipt.symlink_to(outside)
 
-        payload = self.cli("prepare", expected_code=4)
-        self.assertEqual(payload["error"]["code"], "unsafe_transaction_path")
+        error = cast("_ErrorDetail", self.cli("prepare", expected_code=4)["error"])
+        self.assertEqual(error["code"], "unsafe_transaction_path")
         self.assertEqual(outside.read_text(encoding="utf-8"), "outside\n")
         self.assertTrue(receipt.is_symlink())
 
     def test_commits_a_quoted_path_with_spaces(self) -> None:
         filename = "space name.txt"
-        (self.repo / filename).write_text("content\n", encoding="utf-8")
-        self.git("add", filename)
+        _ = (self.repo / filename).write_text("content\n", encoding="utf-8")
+        _ = self.git("add", filename)
         prepared = self.prepare()
         self.assertEqual(prepared["staged_files"], [filename])
         plan = self.write_json(
@@ -467,13 +527,16 @@ class AutommitCliTests(unittest.TestCase):
             self.whole_file_plan(filename, summary="Add spaced path"),
         )
 
-        result = self.cli(
-            "apply",
-            "--snapshot",
-            prepared["snapshot"],
-            "--plan-file",
-            str(plan),
-        )["result"]
+        result = cast(
+            "_ApplyResult",
+            self.cli(
+                "apply",
+                "--snapshot",
+                prepared["snapshot"],
+                "--plan-file",
+                str(plan),
+            )["result"],
+        )
         self.assertEqual(result["status"], "committed")
         self.assertEqual(self.git("show", f"HEAD:{filename}").stdout, "content\n")
 
@@ -588,4 +651,4 @@ class AutommitFunctionalTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

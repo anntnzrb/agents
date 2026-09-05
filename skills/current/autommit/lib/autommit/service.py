@@ -38,6 +38,7 @@ from autommit.transaction import (
 
 MAX_POLICY_FILE_BYTES = 32 * 1024
 MAX_LOG_ENTRIES = 8
+_MIN_SPLIT_COMMITS = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,10 +61,6 @@ def _common_dir(cwd: Path) -> Result[Path, AutommitError]:
             )
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(
-                AutommitError("git_error", "Failed to resolve git common dir.", 4)
-            )
 
 
 def _current_evidence(cwd: Path) -> Result[Evidence, AutommitError]:
@@ -72,22 +69,16 @@ def _current_evidence(cwd: Path) -> Result[Evidence, AutommitError]:
             ref = ref_result.stdout.strip() if ref_result.returncode == 0 else ""
         case Result(error=err):
             return Error(err)
-        case _:
-            ref = ""
     match run_git(cwd, "rev-parse", "HEAD"):
         case Result(tag="ok", ok=before_str):
             before = before_str.strip()
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(AutommitError("git_error", "Failed to rev-parse HEAD.", 4))
     match run_git(cwd, "write-tree"):
         case Result(tag="ok", ok=index_tree_str):
             index_tree = index_tree_str.strip()
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(AutommitError("git_error", "Failed to write-tree.", 4))
     if not ref or not before or not index_tree:
         return Error(
             AutommitError(
@@ -124,10 +115,6 @@ def _assert_snapshot(cwd: Path, snapshot: str) -> Result[Evidence, AutommitError
             return Ok(evidence)
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(
-                AutommitError("git_error", "Failed to get current evidence.", 4)
-            )
 
 
 def _staged_files(cwd: Path) -> Result[tuple[str, ...], AutommitError]:
@@ -137,8 +124,6 @@ def _staged_files(cwd: Path) -> Result[tuple[str, ...], AutommitError]:
             return Ok(files)
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(AutommitError("git_error", "Failed to get staged files.", 4))
 
 
 def _staged_diff(
@@ -169,8 +154,6 @@ def _repository_policy(cwd: Path) -> Result[str, AutommitError]:
             root = Path(root_str.strip()).resolve()
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(AutommitError("git_error", "Failed to find git toplevel.", 4))
     match try_git(cwd, "log", f"-{MAX_LOG_ENTRIES}", "--format=%s"):
         case Result(tag="ok", ok=log_result):
             if log_result.returncode == 0:
@@ -186,8 +169,6 @@ def _repository_policy(cwd: Path) -> Result[str, AutommitError]:
                     )
         case Result(error=err):
             return Error(err)
-        case _:
-            pass
     candidates = [root / "AGENTS.md"]
     resolved_cwd = cwd.resolve()
     if resolved_cwd != root:
@@ -228,8 +209,6 @@ def _cas_ref(
             return Ok(None)
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(AutommitError("git_error", "Failed to update ref.", 4))
 
 
 def _assert_receipt_evidence(
@@ -263,10 +242,6 @@ def _assert_receipt_evidence(
             return Ok(None)
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(
-                AutommitError("git_error", "Failed to get current evidence.", 4)
-            )
 
 
 def _recover_receipt(
@@ -278,7 +253,8 @@ def _recover_receipt(
                 return Error(
                     RefusalError(
                         "receipt_mismatch",
-                        "Prepared autommit receipt does not match the current branch and index.",
+                        "Prepared autommit receipt does not match "
+                        + "the current branch and index.",
                     )
                 )
             if actual.before == receipt.before:
@@ -289,25 +265,14 @@ def _recover_receipt(
                                 pass
                             case Result(error=err):
                                 return Error(err)
-                            case _:
-                                return Error(
-                                    AutommitError(
-                                        "git_error",
-                                        "Failed to assert receipt evidence.",
-                                        4,
-                                    )
-                                )
                     case Result(error=err):
                         return Error(err)
-                    case _:
-                        return Error(
-                            AutommitError("git_error", "Failed to CAS ref.", 4)
-                        )
             elif actual.before != receipt.after:
                 return Error(
                     RefusalError(
                         "receipt_mismatch",
-                        "Prepared autommit receipt does not match the current HEAD.",
+                        "Prepared autommit receipt does not match "
+                        + "the current HEAD.",
                     )
                 )
             match remove_receipt(common_dir):
@@ -321,16 +286,8 @@ def _recover_receipt(
                     )
                 case Result(error=err):
                     return Error(err)
-                case _:
-                    return Error(
-                        AutommitError("receipt_io", "Failed to remove receipt.", 4)
-                    )
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(
-                AutommitError("git_error", "Failed to get current evidence.", 4)
-            )
 
 
 def _consume_or_recover(
@@ -348,21 +305,15 @@ def _consume_or_recover(
                                 return Ok(Nothing)
                             case Result(error=err):
                                 return Error(err)
-                            case _:
-                                return Ok(Nothing)
                     match _recover_receipt(cwd, common_dir, receipt):
                         case Result(tag="ok", ok=recovered):
                             return Ok(Some(recovered))
                         case Result(error=err):
                             return Error(err)
-                        case _:
-                            return Ok(Nothing)
                 case _:
                     return Ok(Nothing)
         case Result(error=err):
             return Error(err)
-        case _:
-            return Ok(Nothing)
 
 
 def prepare(
@@ -382,8 +333,6 @@ def prepare(
                                     pass
                         case Result(error=err):
                             return Error(err)
-                        case _:
-                            pass
                     match _staged_files(cwd):
                         case Result(tag="ok", ok=staged):
                             if not staged:
@@ -394,24 +343,8 @@ def prepare(
                                                 staged = staged_again
                                             case Result(error=err):
                                                 return Error(err)
-                                            case _:
-                                                return Error(
-                                                    AutommitError(
-                                                        "git_error",
-                                                        "Failed to list staged files.",
-                                                        4,
-                                                    )
-                                                )
                                     case Result(error=err):
                                         return Error(err)
-                                    case _:
-                                        return Error(
-                                            AutommitError(
-                                                "git_error",
-                                                "Failed to stage all files.",
-                                                4,
-                                            )
-                                        )
                             if not staged:
                                 return Error(
                                     AutommitError(
@@ -433,11 +366,11 @@ def prepare(
                                                             ),
                                                             "ref": evidence.ref,
                                                             "before": evidence.before,
-                                                            "index_tree": evidence.index_tree,
+                                                            "index_tree": evidence.index_tree,  # noqa: E501 - dict entry unsplittable at this nesting
                                                             "staged_files": list(
                                                                 staged
                                                             ),
-                                                            "changed_hunk_count": changed_hunk_count(
+                                                            "changed_hunk_count": changed_hunk_count(  # noqa: E501 - dict entry unsplittable at this nesting
                                                                 diff
                                                             ),
                                                             "context": "\n\n".join(
@@ -445,56 +378,22 @@ def prepare(
                                                                 for value in context
                                                                 if value
                                                             ),
-                                                            "repository_context": repo_context,
+                                                            "repository_context": repo_context,  # noqa: E501 - dict entry unsplittable at this nesting
                                                             "diff": diff,
                                                         }
                                                     )
                                                 case Result(error=err):
                                                     return Error(err)
-                                                case _:
-                                                    return Error(
-                                                        AutommitError(
-                                                            "git_error",
-                                                            "Failed to read policy.",
-                                                            4,
-                                                        )
-                                                    )
                                         case Result(error=err):
                                             return Error(err)
-                                        case _:
-                                            return Error(
-                                                AutommitError(
-                                                    "git_error",
-                                                    "Failed to diff index.",
-                                                    4,
-                                                )
-                                            )
                                 case Result(error=err):
                                     return Error(err)
-                                case _:
-                                    return Error(
-                                        AutommitError(
-                                            "git_error",
-                                            "Failed to inspect checkout.",
-                                            4,
-                                        )
-                                    )
                         case Result(error=err):
                             return Error(err)
-                        case _:
-                            return Error(
-                                AutommitError(
-                                    "git_error", "Failed to get staged files.", 4
-                                )
-                            )
             except AutommitError as error:
                 return Error(error)
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(
-                AutommitError("git_error", "Failed to resolve git common dir.", 4)
-            )
 
 
 def _load_validated_plan(
@@ -539,42 +438,14 @@ def _load_validated_plan(
                                             )
                                         case Result(error=err):
                                             return Error(err)
-                                        case _:
-                                            return Error(
-                                                AutommitError(
-                                                    "git_error",
-                                                    "Failed to diff index.",
-                                                    4,
-                                                )
-                                            )
                                 case Result(error=err):
                                     return Error(err)
-                                case _:
-                                    return Error(
-                                        AutommitError(
-                                            "git_error",
-                                            "Failed to get staged files.",
-                                            4,
-                                        )
-                                    )
                         case Result(error=err):
                             return Error(err)
-                        case _:
-                            return Error(
-                                AutommitError(
-                                    "invalid_plan", "Failed to parse proposal.", 2
-                                )
-                            )
                 case Result(error=err):
                     return Error(err)
-                case _:
-                    return Error(
-                        AutommitError("invalid_json", "Failed to read plan JSON.", 2)
-                    )
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(AutommitError("git_error", "Failed to verify snapshot.", 3))
 
 
 def validate_plan(
@@ -587,7 +458,7 @@ def validate_plan(
     """Validate a model plan against the prepared snapshot."""
     match _load_validated_plan(cwd, snapshot, plan_file):
         case Result(tag="ok", ok=(_, proposal, staged, diff, review)):
-            if require_split and len(proposal.commits) < 2:
+            if require_split and len(proposal.commits) < _MIN_SPLIT_COMMITS:
                 return Error(
                     AutommitError(
                         "split_required",
@@ -605,8 +476,6 @@ def validate_plan(
             )
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(AutommitError("invalid_plan", "Failed to validate plan.", 2))
 
 
 def _position_for_change(
@@ -673,7 +542,8 @@ def _require_atomicity_decision(
         return Error(
             AutommitError(
                 "atomicity_review_required",
-                "This broad single-commit proposal requires an atomicity decision file.",
+                "This broad single-commit proposal requires "
+                + "an atomicity decision file.",
             )
         )
     match read_json_file(decision_file, "atomicity decision"):
@@ -685,26 +555,15 @@ def _require_atomicity_decision(
                         return Error(
                             AutommitError(
                                 "atomicity_split_required",
-                                f"Atomicity critic requires a split: {concerns}. Rationale: {decision.rationale}",
+                                f"Atomicity critic requires a split: {concerns}. "
+                                + f"Rationale: {decision.rationale}",
                             )
                         )
                     return Ok(Some(decision))
                 case Result(error=err):
                     return Error(err)
-                case _:
-                    return Error(
-                        AutommitError(
-                            "invalid_atomicity_decision",
-                            "Failed to normalize decision.",
-                            2,
-                        )
-                    )
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(
-                AutommitError("invalid_json", "Failed to read decision file.", 2)
-            )
 
 
 def apply(
@@ -727,8 +586,6 @@ def apply(
                                     pass
                         case Result(error=err):
                             return Error(err)
-                        case _:
-                            pass
                     match _load_validated_plan(cwd, snapshot, plan_file):
                         case Result(
                             tag="ok",
@@ -739,27 +596,11 @@ def apply(
                                     pass
                                 case Result(error=err):
                                     return Error(err)
-                                case _:
-                                    return Error(
-                                        AutommitError(
-                                            "atomicity_review_required",
-                                            "Invalid atomicity review.",
-                                            2,
-                                        )
-                                    )
                             match _staged_diff(cwd, zero_context=True):
                                 case Result(tag="ok", ok=zero_context_diff):
                                     pass
                                 case Result(error=err):
                                     return Error(err)
-                                case _:
-                                    return Error(
-                                        AutommitError(
-                                            "git_error",
-                                            "Failed to diff zero context.",
-                                            4,
-                                        )
-                                    )
                             created: list[dict[str, str]] = []
                             with tempfile.TemporaryDirectory(
                                 prefix="autommit-worktree-"
@@ -784,14 +625,6 @@ def apply(
                                                 added = True
                                             case Result(error=err):
                                                 return Error(err)
-                                            case _:
-                                                return Error(
-                                                    AutommitError(
-                                                        "git_error",
-                                                        "Failed to add worktree.",
-                                                        4,
-                                                    )
-                                                )
                                         for group in _apply_order(
                                             proposal,
                                             staged_diff,
@@ -803,20 +636,12 @@ def apply(
                                                 zero_context_diff,
                                             ):
                                                 case Result(tag="ok", ok=patch_content):
-                                                    patch.write_text(
+                                                    _ = patch.write_text(
                                                         patch_content,
                                                         encoding="utf-8",
                                                     )
                                                 case Result(error=err):
                                                     return Error(err)
-                                                case _:
-                                                    return Error(
-                                                        AutommitError(
-                                                            "invalid_plan",
-                                                            "Failed to build patch.",
-                                                            2,
-                                                        )
-                                                    )
                                             match run_git(
                                                 worktree,
                                                 "apply",
@@ -828,15 +653,7 @@ def apply(
                                                     pass
                                                 case Result(error=err):
                                                     return Error(err)
-                                                case _:
-                                                    return Error(
-                                                        AutommitError(
-                                                            "git_error",
-                                                            "Failed to apply patch.",
-                                                            4,
-                                                        )
-                                                    )
-                                            message.write_text(
+                                            _ = message.write_text(
                                                 _commit_message(group) + "\n",
                                                 encoding="utf-8",
                                             )
@@ -850,14 +667,6 @@ def apply(
                                                     pass
                                                 case Result(error=err):
                                                     return Error(err)
-                                                case _:
-                                                    return Error(
-                                                        AutommitError(
-                                                            "git_error",
-                                                            "Failed to commit in worktree.",
-                                                            4,
-                                                        )
-                                                    )
                                             match run_git(
                                                 worktree,
                                                 "rev-parse",
@@ -872,27 +681,11 @@ def apply(
                                                     )
                                                 case Result(error=err):
                                                     return Error(err)
-                                                case _:
-                                                    return Error(
-                                                        AutommitError(
-                                                            "git_error",
-                                                            "Failed to rev-parse HEAD.",
-                                                            4,
-                                                        )
-                                                    )
                                         match run_git(worktree, "rev-parse", "HEAD"):
                                             case Result(tag="ok", ok=final_head_str):
                                                 final_head = final_head_str.strip()
                                             case Result(error=err):
                                                 return Error(err)
-                                            case _:
-                                                return Error(
-                                                    AutommitError(
-                                                        "git_error",
-                                                        "Failed to rev-parse worktree HEAD.",
-                                                        4,
-                                                    )
-                                                )
                                         match run_git(
                                             worktree,
                                             "rev-parse",
@@ -904,19 +697,13 @@ def apply(
                                                 )
                                             case Result(error=err):
                                                 return Error(err)
-                                            case _:
-                                                return Error(
-                                                    AutommitError(
-                                                        "git_error",
-                                                        "Failed to rev-parse tree.",
-                                                        4,
-                                                    )
-                                                )
                                         if prepared_tree != expected.index_tree:
                                             return Error(
                                                 RefusalError(
                                                     "tree_mismatch",
-                                                    "Prepared commit tree does not match the staged index.",
+                                                    "Prepared commit tree "
+                                                    + "does not match "
+                                                    + "the staged index.",
                                                 )
                                             )
                                         match _staged_diff(cwd):
@@ -925,32 +712,18 @@ def apply(
                                                     return Error(
                                                         RefusalError(
                                                             "snapshot_changed",
-                                                            "Staged snapshot changed during atomic commit preparation.",
+                                                            "Staged snapshot "
+                                                            + "changed during atomic "
+                                                            + "commit preparation.",
                                                         )
                                                     )
                                             case Result(error=err):
                                                 return Error(err)
-                                            case _:
-                                                return Error(
-                                                    AutommitError(
-                                                        "git_error",
-                                                        "Failed to diff index.",
-                                                        4,
-                                                    )
-                                                )
                                         match _assert_snapshot(cwd, snapshot):
                                             case Result(tag="ok"):
                                                 pass
                                             case Result(error=err):
                                                 return Error(err)
-                                            case _:
-                                                return Error(
-                                                    AutommitError(
-                                                        "git_error",
-                                                        "Failed to verify snapshot.",
-                                                        3,
-                                                    )
-                                                )
                                         receipt = Receipt(
                                             1,
                                             "prepared",
@@ -964,27 +737,11 @@ def apply(
                                                 pass
                                             case Result(error=err):
                                                 return Error(err)
-                                            case _:
-                                                return Error(
-                                                    AutommitError(
-                                                        "receipt_io",
-                                                        "Failed to write receipt.",
-                                                        4,
-                                                    )
-                                                )
                                         match _assert_snapshot(cwd, snapshot):
                                             case Result(tag="ok"):
                                                 pass
                                             case Result(error=err):
                                                 return Error(err)
-                                            case _:
-                                                return Error(
-                                                    AutommitError(
-                                                        "git_error",
-                                                        "Failed to verify snapshot.",
-                                                        3,
-                                                    )
-                                                )
                                         match _cas_ref(
                                             cwd,
                                             expected.ref,
@@ -995,14 +752,6 @@ def apply(
                                                 pass
                                             case Result(error=err):
                                                 return Error(err)
-                                            case _:
-                                                return Error(
-                                                    AutommitError(
-                                                        "git_error",
-                                                        "Failed to CAS ref.",
-                                                        4,
-                                                    )
-                                                )
                                         match _assert_receipt_evidence(
                                             cwd, receipt, final_head
                                         ):
@@ -1010,22 +759,15 @@ def apply(
                                                 pass
                                             case Result(error=err):
                                                 return Error(err)
-                                            case _:
-                                                return Error(
-                                                    AutommitError(
-                                                        "git_error",
-                                                        "Failed to verify receipt evidence.",
-                                                        4,
-                                                    )
-                                                )
                                         match remove_receipt(common_dir):
                                             case Result(tag="ok"):
                                                 return Ok(
                                                     {
                                                         "status": "committed",
                                                         "message": (
-                                                            f"Created {len(created)} commit"
-                                                            f"{'s' if len(created) != 1 else ''} atomically."
+                                                            f"Created "
+                                                            f"{len(created)} commit"
+                                                            f"{'s' if len(created) != 1 else ''} atomically."  # noqa: E501 - message needs 4-way split at this nesting
                                                         ),
                                                         "before": expected.before,
                                                         "after": final_head,
@@ -1034,17 +776,9 @@ def apply(
                                                 )
                                             case Result(error=err):
                                                 return Error(err)
-                                            case _:
-                                                return Error(
-                                                    AutommitError(
-                                                        "receipt_io",
-                                                        "Failed to remove receipt.",
-                                                        4,
-                                                    )
-                                                )
                                     finally:
                                         if added:
-                                            try_git(
+                                            _ = try_git(
                                                 cwd,
                                                 "worktree",
                                                 "remove",
@@ -1053,15 +787,7 @@ def apply(
                                             )
                         case Result(error=err):
                             return Error(err)
-                        case _:
-                            return Error(
-                                AutommitError("invalid_plan", "Failed to load plan.", 2)
-                            )
             except AutommitError as error:
                 return Error(error)
         case Result(error=err):
             return Error(err)
-        case _:
-            return Error(
-                AutommitError("git_error", "Failed to resolve git common dir.", 4)
-            )
