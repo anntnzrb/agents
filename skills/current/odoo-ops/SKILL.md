@@ -25,12 +25,14 @@ uv run --script <skill-dir>/scripts/cli.py dev <workflow> [--pretty]
 ```
 
 ### 2. Test Runner (`test`)
-Runs a fast preliminary linter/formatter check, then executes an isolated headless test gauntlet.
+Executes unit tests in an isolated headless container with real-time log streaming, graceful cancellation, and automatic container cleanup.
 
 ```bash
-uv run --script <skill-dir>/scripts/cli.py test <workflow|module> [--pretty] [--skip-lint]
+uv run --script <skill-dir>/scripts/cli.py test <workflow|module> [--json]
 ```
-
+- Real-time output streaming (to stdout in human mode, to stderr in `--json` mode with clean structured payload on stdout).
+- Guaranteed container lifecycle management (preflight cleanup of stale test containers, graceful stop on Ctrl-C, and forced removal in `finally`).
+- Accurate pass/fail evaluation based on Odoo test result summaries, avoiding false positives on expected log errors.
 ### 3. Linter Gate (`lint`)
 Runs Ruff linter across workflow modules or single module with `<skill>/config/ruff.toml`.
 
