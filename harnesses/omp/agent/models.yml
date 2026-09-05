@@ -25,3 +25,16 @@ providers:
         compat:
           thinkingFormat: zai
           supportsDeveloperRole: false
+  openai-codex:
+    baseUrl: https://chatgpt.com/backend-api/codex
+    api: openai-codex-responses
+    auth: oauth
+    models:
+      - id: gpt-6-astra
+        name: GPT-6 Astra
+        contextWindow: 600000 # 600K window triggers auto-compaction at 85% (~510K tokens), preserving Astra's 100% recall zone
+        maxTokens: 131072
+        reasoning: true
+        input:
+          - text
+          - image
