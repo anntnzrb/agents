@@ -1,3 +1,5 @@
+"""Search-results page parsing for Amazon live search."""
+
 from __future__ import annotations
 
 import re
@@ -37,6 +39,7 @@ def parse_search_results(
     *,
     base_url: str = "https://www.amazon.com",
 ) -> list[SearchResult]:
+    """Parse search-result cards from a search page."""
     tree = HTMLParser(html)
     return [
         result

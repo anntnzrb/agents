@@ -1,9 +1,13 @@
+"""Protocol layer: loading, enrichment, serialization, and schemas."""
+
 from __future__ import annotations
 
-from collections.abc import Sequence
-from decimal import Decimal
 from pathlib import Path
-from typing import Literal, NotRequired, TypedDict, cast
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from decimal import Decimal
 
 from .client import AmazonSearchClient
 from .detail_parser import parse_product_detail
@@ -36,11 +40,15 @@ _SEARCH_RESULTS_CACHE: dict[tuple[str, int, int, str | None, str | None], list[S
 
 
 class SourcePayload(TypedDict):
+    """Result source descriptor."""
+
     mode: Literal["html", "live"]
     html_path: NotRequired[str]
 
 
 class QueryPayload(TypedDict):
+    """Echoed query parameters."""
+
     keywords: str
     page: int
     pages: int
@@ -49,6 +57,8 @@ class QueryPayload(TypedDict):
 
 
 class FiltersPayload(TypedDict):
+    """Applied result filters."""
+
     min_rating: float | None
     max_price: float | None
     badge: str | None
@@ -59,11 +69,15 @@ class FiltersPayload(TypedDict):
 
 
 class SummaryPayload(TypedDict):
+    """Result counts summary."""
+
     raw_result_count: int
     returned_result_count: int
 
 
 class EnrichmentPayload(TypedDict):
+    """Detail-enrichment outcome."""
+
     details: bool
     detail_limit: int | None
     attempted: int
@@ -71,10 +85,14 @@ class EnrichmentPayload(TypedDict):
 
 
 class RankedResultScorePayload(ResultScorePayload):
+    """Result score with ranking position."""
+
     rank: int
 
 
 class SerializedSearchResultPayload(SearchResultPayload, total=False):
+    """Serialized result with details and score."""
+
     details: ProductDetailPayload | None
     score: float
     reasons: list[str]
@@ -84,6 +102,8 @@ class SerializedSearchResultPayload(SearchResultPayload, total=False):
 
 
 class RankingPayload(TypedDict):
+    """Ranking run metadata."""
+
     mode: Literal["agent_value"]
     scored_count: int
     details_used: int
@@ -91,6 +111,8 @@ class RankingPayload(TypedDict):
 
 
 class SearchResultsPayload(TypedDict):
+    """Top-level LLM JSON envelope."""
+
     type: str
     version: str
     ok: bool
@@ -112,6 +134,7 @@ def load_results(
     amazon_sort: str | None,
     zip_code: str | None = None,
 ) -> list[SearchResult]:
+    """Load results from a local HTML file or live search."""
     if html_path:
         html = Path(html_path).read_text(encoding="utf-8")
         return parse_search_results(html)
@@ -135,6 +158,7 @@ def enrich_results(
     details: bool,
     detail_limit: int | None,
 ) -> tuple[dict[str, ProductDetail], int]:
+    """Fetch product details for filtered results."""
     if not details:
         return {}, 0
 
@@ -178,6 +202,7 @@ def search_and_filter(
     int,
     dict[str, ResultScore],
 ]:
+    """Run the full load, filter, enrich, and score pipeline."""
     raw_results = load_results(
         query=query,
         html_path=html_path,
@@ -237,6 +262,7 @@ def build_llm_json(
     scoring: bool = False,
     scores_by_asin: dict[str, ResultScore] | None = None,
 ) -> SearchResultsPayload:
+    """Build the LLM-first JSON envelope for results."""
     if html_path is not None:
         source: SourcePayload = {"mode": "html", "html_path": html_path}
     else:
@@ -299,6 +325,7 @@ def serialize_results(
     details_by_asin: dict[str, ProductDetail] | None = None,
     scores_by_asin: dict[str, ResultScore] | None = None,
 ) -> list[SerializedSearchResultPayload]:
+    """Serialize results with optional details and scores."""
     details_by_asin = details_by_asin or {}
     scores_by_asin = scores_by_asin or {}
     serialized: list[SerializedSearchResultPayload] = []
@@ -326,6 +353,7 @@ def serialize_results(
 
 
 def get_schema_document() -> dict[str, object]:
+    """Return the machine-readable capability document."""
     return {
         "type": SCHEMA_TYPE,
         "version": PROTOCOL_VERSION,

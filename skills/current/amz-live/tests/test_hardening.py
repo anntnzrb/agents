@@ -1,19 +1,37 @@
+from __future__ import annotations
+
 import json
 from decimal import Decimal
 from io import StringIO
 from pathlib import Path
+from typing import TYPE_CHECKING, TypedDict, cast
+
+if TYPE_CHECKING:
+    import pytest
+
+    from amz_live.models import ProductDetailPayload
 
 import httpx
 
 from amz_live.cli import main
 from amz_live.client import AmazonSearchClient
-from amz_live.models import SearchResult
+from amz_live.models import SearchQuery, SearchResult
 from amz_live.protocol import load_results
 
 SEARCH_FIXTURE_PATH = Path(__file__).parent / "fixtures" / "search_results_fragment.html"
 
 
-def test_scoring_demotes_usb_a_mismatch_for_usb_c_to_usb_c_query(monkeypatch) -> None:
+class _EnrichedResult(TypedDict):
+    asin: str
+    score: float
+    reasons: list[str]
+    details: ProductDetailPayload
+    signal_scores: dict[str, float]
+
+
+def test_scoring_demotes_usb_a_mismatch_for_usb_c_to_usb_c_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     results = [
         SearchResult(
             asin="USBA1",
@@ -33,7 +51,10 @@ def test_scoring_demotes_usb_a_mismatch_for_usb_c_to_usb_c_query(monkeypatch) ->
         ),
     ]
 
-    monkeypatch.setattr("amz_live.protocol.load_results", lambda **kwargs: results)
+    def fake_load_results(**_kwargs: object) -> list[SearchResult]:
+        return results
+
+    monkeypatch.setattr("amz_live.protocol.load_results", fake_load_results)
 
     stdout = StringIO()
     exit_code = main(
@@ -47,7 +68,7 @@ def test_scoring_demotes_usb_a_mismatch_for_usb_c_to_usb_c_query(monkeypatch) ->
 
     assert exit_code == 0
 
-    payload = json.loads(stdout.getvalue())
+    payload = cast("list[_EnrichedResult]", json.loads(stdout.getvalue()))
     assert [item["asin"] for item in payload] == ["USBC1", "USBA1"]
     assert payload[0]["score"] > payload[1]["score"]
 
@@ -70,10 +91,14 @@ def test_client_fetch_html_reuses_lightweight_cache_for_same_url() -> None:
     assert calls == [url]
 
 
-def test_protocol_load_results_reuses_cached_search_html(monkeypatch, search_html: str) -> None:
+def test_protocol_load_results_reuses_cached_search_html(
+    monkeypatch: pytest.MonkeyPatch, search_html: str
+) -> None:
     calls: list[tuple[str, int, int]] = []
 
-    def fake_search_pages(self, query, *, pages=1):
+    def fake_search_pages(
+        _self: AmazonSearchClient, query: SearchQuery, *, pages: int = 1
+    ) -> list[SearchResult]:
         calls.append((query.keywords, query.page, pages))
         from amz_live.parser import parse_search_results
 
@@ -103,7 +128,9 @@ def test_protocol_load_results_reuses_cached_search_html(monkeypatch, search_htm
     assert calls == [("usb c to usb c braided cable", 1, 1)]
 
 
-def test_scoring_output_includes_merchant_trust_from_detail_page(monkeypatch) -> None:
+def test_scoring_output_includes_merchant_trust_from_detail_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     merchant_html = """
     <html>
       <body>
@@ -134,10 +161,17 @@ def test_scoring_output_includes_merchant_trust_from_detail_page(monkeypatch) ->
         ),
     ]
 
-    monkeypatch.setattr("amz_live.protocol.load_results", lambda **kwargs: results)
+    def fake_load_results(**_kwargs: object) -> list[SearchResult]:
+        return results
+
+    monkeypatch.setattr("amz_live.protocol.load_results", fake_load_results)
+
+    def fake_fetch_product_page(_self: AmazonSearchClient, _url: str) -> str:
+        return merchant_html
+
     monkeypatch.setattr(
         "amz_live.client.AmazonSearchClient.fetch_product_page",
-        lambda self, url: merchant_html,
+        fake_fetch_product_page,
         raising=False,
     )
 
@@ -154,7 +188,7 @@ def test_scoring_output_includes_merchant_trust_from_detail_page(monkeypatch) ->
 
     assert exit_code == 0
 
-    payload = json.loads(stdout.getvalue())
+    payload = cast("list[_EnrichedResult]", json.loads(stdout.getvalue()))
     details = payload[0]["details"]
     assert details["ships_from"] == "Amazon.com"
     assert details["sold_by"] == "Amazon.com"

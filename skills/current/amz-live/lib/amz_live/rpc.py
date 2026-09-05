@@ -1,3 +1,5 @@
+"""JSONL RPC interface for Amazon live search."""
+
 from __future__ import annotations
 
 import json
@@ -16,16 +18,22 @@ RequestId = str | int | float | None
 
 
 class PingPayload(TypedDict):
+    """Ping response payload."""
+
     ok: bool
     version: str
 
 
 class RpcErrorPayload(TypedDict):
+    """RPC error detail."""
+
     code: str
     message: str
 
 
 class RpcSuccessResponse(TypedDict):
+    """Successful RPC response envelope."""
+
     type: Literal["response"]
     command: str
     success: Literal[True]
@@ -34,6 +42,8 @@ class RpcSuccessResponse(TypedDict):
 
 
 class RpcErrorResponse(TypedDict):
+    """Failed RPC response envelope."""
+
     type: Literal["response"]
     command: str
     success: Literal[False]
@@ -45,19 +55,21 @@ RpcResponse = RpcSuccessResponse | RpcErrorResponse
 
 
 def run_rpc(*, stdin: TextIO, stdout: TextIO) -> int:
+    """Serve JSONL RPC requests until stdin closes."""
     for raw_line in stdin:
         line = _strip_jsonl_line(raw_line)
         if line == "":
             continue
         response = handle_rpc_line(line)
-        stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
-        stdout.flush()
+        _ = stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
+        _ = stdout.flush()
     return 0
 
 
 def handle_rpc_line(line: str) -> RpcResponse:
+    """Handle one JSONL RPC request line."""
     try:
-        parsed = json.loads(line)
+        parsed = cast("object", json.loads(line))
     except json.JSONDecodeError:
         return _error_response(
             command="unknown",
@@ -76,7 +88,7 @@ def handle_rpc_line(line: str) -> RpcResponse:
     request_id = _read_request_id(request.get("id"))
     try:
         command = _read_command(request)
-    except ValueError as exc:
+    except (ValueError, TypeError) as exc:
         return _error_response(
             command="unknown",
             code="invalid_request",
@@ -107,7 +119,7 @@ def handle_rpc_line(line: str) -> RpcResponse:
                     message=f"Unknown command: {command}",
                     request_id=request_id,
                 )
-    except ValueError as exc:
+    except (ValueError, TypeError) as exc:
         return _error_response(
             command=command,
             code="invalid_request",
@@ -227,12 +239,14 @@ def _read_command(request: Mapping[str, object]) -> str:
     preferred_command = request.get("type")
     if preferred_command is not None:
         if not isinstance(preferred_command, str) or not preferred_command:
-            raise ValueError("Request object must include a string type.")
+            msg = "Request object must include a string type."
+            raise ValueError(msg)
         return preferred_command
 
     legacy_command = request.get("command")
     if not isinstance(legacy_command, str) or not legacy_command:
-        raise ValueError("Request object must include a string type.")
+        msg = "Request object must include a string type."
+        raise ValueError(msg)
     return legacy_command
 
 
@@ -243,13 +257,15 @@ def _strip_jsonl_line(raw_line: str) -> str:
 def _read_request_id(value: object | None) -> RequestId:
     if value is None or isinstance(value, (str, int, float)):
         return value
-    raise ValueError("id must be a string, number, or null")
+    msg = "id must be a string, number, or null"
+    raise ValueError(msg)
 
 
 def _require_string(request: Mapping[str, object], key: str) -> str:
     value = request.get(key)
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{key} must be a non-empty string")
+        msg = f"{key} must be a non-empty string"
+        raise ValueError(msg)
     return value.strip()
 
 
@@ -258,7 +274,8 @@ def _read_optional_string(request: Mapping[str, object], key: str) -> str | None
     if value is None:
         return None
     if not isinstance(value, str):
-        raise ValueError(f"{key} must be a string")
+        msg = f"{key} must be a string"
+        raise TypeError(msg)
     value = value.strip()
     return value or None
 
@@ -268,7 +285,8 @@ def _read_optional_bool(request: Mapping[str, object], key: str) -> bool | None:
     if value is None:
         return None
     if not isinstance(value, bool):
-        raise ValueError(f"{key} must be a boolean")
+        msg = f"{key} must be a boolean"
+        raise TypeError(msg)
     return value
 
 
@@ -304,9 +322,11 @@ def _read_int(
 
     value = request[key]
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(f"{key} must be an integer")
+        msg = f"{key} must be an integer"
+        raise TypeError(msg)
     if value < minimum:
-        raise ValueError(f"{key} must be >= {minimum}")
+        msg = f"{key} must be >= {minimum}"
+        raise ValueError(msg)
     return value
 
 
@@ -315,7 +335,8 @@ def _read_optional_number(request: Mapping[str, object], key: str) -> float | No
     if value is None:
         return None
     if isinstance(value, bool) or not isinstance(value, int | float):
-        raise ValueError(f"{key} must be a number")
+        msg = f"{key} must be a number"
+        raise TypeError(msg)
     return float(value)
 
 
@@ -326,12 +347,13 @@ def _read_terms(request: Mapping[str, object], key: str) -> list[str]:
     if isinstance(value, str):
         return [value]
     if not isinstance(value, Sequence) or isinstance(value, bytes | bytearray):
-        raise ValueError(f"{key} must be a string or array of strings")
+        msg = f"{key} must be a string or array of strings"
+        raise TypeError(msg)
 
-    value = cast("Sequence[object]", value)
     terms: list[str] = []
     for item in value:
         if not isinstance(item, str):
-            raise ValueError(f"{key} must contain only strings")
+            msg = f"{key} must contain only strings"
+            raise TypeError(msg)
         terms.append(item)
     return terms

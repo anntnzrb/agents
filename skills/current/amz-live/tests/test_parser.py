@@ -13,6 +13,8 @@ def test_parse_search_results_extracts_expected_fields(search_html: str) -> None
     first = results[0]
     assert first.title.startswith("LISEN USB C to USB C Cable")
     assert first.url.startswith("https://www.amazon.com/")
+    assert first.price is not None
+    assert first.rating is not None
     assert float(first.price) == 8.99
     assert float(first.rating) == 4.6
     assert first.review_count == 7233
@@ -23,6 +25,8 @@ def test_parse_search_results_uses_primary_price_not_more_buying_choices(search_
     results = parse_search_results(search_html)
 
     amazon_basics = next(result for result in results if result.asin == "B07CWC39TL")
+    assert amazon_basics.price is not None
+    assert amazon_basics.rating is not None
     assert float(amazon_basics.price) == 7.99
     assert float(amazon_basics.rating) == 4.5
     assert amazon_basics.review_count == 22038
@@ -43,6 +47,8 @@ def test_parse_search_results_skips_placeholder_title_links_for_sponsored_cards(
         "https://www.amazon.com/javascript:void(0)",
         "https://www.amazon.com/#",
     }
+    assert sponsored.price is not None
+    assert sponsored.rating is not None
     assert float(sponsored.price) == 7.84
     assert float(sponsored.rating) == 4.5
     assert sponsored.review_count == 54722

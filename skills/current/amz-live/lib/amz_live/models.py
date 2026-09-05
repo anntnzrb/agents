@@ -1,8 +1,12 @@
+"""Typed domain models for Amazon live search."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from decimal import Decimal
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from decimal import Decimal
 
 
 class AmazonLiveSearchError(RuntimeError):
@@ -18,6 +22,8 @@ class AmazonClientError(AmazonLiveSearchError):
 
 
 class ProductDetailPayload(TypedDict):
+    """Serialized product-detail payload."""
+
     brand: str | None
     availability_text: str | None
     delivery_text: str | None
@@ -27,6 +33,8 @@ class ProductDetailPayload(TypedDict):
 
 
 class SearchResultPayload(TypedDict):
+    """Serialized search-result payload."""
+
     asin: str
     title: str
     url: str
@@ -46,20 +54,24 @@ class SearchQuery:
     zip_code: str | None = None
 
     def __post_init__(self) -> None:
+        """Validate and normalize query fields."""
         keywords = self.keywords.strip()
         amazon_sort = self.amazon_sort.strip() if self.amazon_sort else None
         zip_code = self.zip_code.strip() if self.zip_code else None
 
         if not keywords:
-            raise ValueError("keywords must not be empty")
+            msg = "keywords must not be empty"
+            raise ValueError(msg)
         if self.page < 1:
-            raise ValueError("page must be >= 1")
+            msg = "page must be >= 1"
+            raise ValueError(msg)
 
         object.__setattr__(self, "keywords", keywords)
         object.__setattr__(self, "amazon_sort", amazon_sort)
         object.__setattr__(self, "zip_code", zip_code)
 
     def to_params(self) -> dict[str, str]:
+        """Render query fields as Amazon search params."""
         params = {"k": self.keywords, "page": str(self.page)}
         if self.amazon_sort:
             params["s"] = self.amazon_sort
@@ -80,6 +92,7 @@ class ProductDetail:
     bullet_points: tuple[str, ...] = field(default_factory=tuple)
 
     def to_dict(self) -> ProductDetailPayload:
+        """Serialize to a plain payload dict."""
         return {
             "brand": self.brand,
             "availability_text": self.availability_text,
@@ -103,6 +116,7 @@ class SearchResult:
     badges: tuple[str, ...] = field(default_factory=tuple)
 
     def to_dict(self) -> SearchResultPayload:
+        """Serialize to a plain payload dict."""
         return {
             "asin": self.asin,
             "title": self.title,

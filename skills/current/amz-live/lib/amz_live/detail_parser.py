@@ -1,3 +1,5 @@
+"""Product-detail page parsing for Amazon live search."""
+
 from __future__ import annotations
 
 import re
@@ -6,8 +8,11 @@ from selectolax.parser import HTMLParser
 
 from .models import ProductDetail
 
+_MIN_TABLE_CELLS = 2
+
 
 def parse_product_detail(html: str) -> ProductDetail:
+    """Parse a product-detail page into normalized data."""
     tree = HTMLParser(html)
     merchant_fields = _extract_merchant_fields(tree)
     return ProductDetail(
@@ -29,7 +34,7 @@ def parse_product_detail(html: str) -> ProductDetail:
 def _extract_brand(tree: HTMLParser) -> str | None:
     for row in tree.css("#productOverview_feature_div tr"):
         cells = [_clean_text(cell.text(separator=" ", strip=True)) for cell in row.css("td")]
-        if len(cells) >= 2 and cells[0].casefold() == "brand":
+        if len(cells) >= _MIN_TABLE_CELLS and cells[0].casefold() == "brand":
             return cells[1]
 
     byline = _extract_text(tree, ("#bylineInfo",))
@@ -67,7 +72,7 @@ def _extract_merchant_fields(tree: HTMLParser) -> dict[str, str]:
             for node in row.css(".tabular-buybox-text")
         ]
         texts = [text for text in texts if text]
-        if len(texts) < 2:
+        if len(texts) < _MIN_TABLE_CELLS:
             continue
         label = texts[0].casefold().rstrip(":")
         if label in {"ships from", "sold by"}:
