@@ -41,9 +41,7 @@ include = ["src", "tests"]
 reportUnknownVariableType = true
 reportUnknownMemberType = true
 reportUnknownArgumentType = true
-reportAny = true
 reportUnnecessaryTypeIgnoreComment = true
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-n auto -q"
