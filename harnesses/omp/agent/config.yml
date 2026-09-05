@@ -149,6 +149,7 @@ compaction:
   enabled: true
   midTurnEnabled: true
   asyncEnabled: true
+  thresholdPercent: 85
   methodOrder:
     - shake
     - snapcompact
