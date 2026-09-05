@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 from flight_live.models import PlannerOffer, ResolvedPlace, SearchRequest
 from flight_live.protocol import get_schema_document, search_flights
 from flight_live.providers import parse_kiwi_price_buttons
+
+if TYPE_CHECKING:
+    import pytest
 
 _FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -27,7 +31,9 @@ def test_kiwi_parser_extracts_expected_shapes() -> None:
     assert offers[0].source == "kiwi_web_scrape"
 
 
-def test_search_protocol_with_monkeypatched_scraper(monkeypatch) -> None:
+def test_search_protocol_with_monkeypatched_scraper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     request = SearchRequest(
         origin="Guayaquil",
         destination="Miami",
@@ -37,7 +43,9 @@ def test_search_protocol_with_monkeypatched_scraper(monkeypatch) -> None:
         planner_limit=5,
     )
 
-    def fake_resolve(query: str, *, locale: str, client=None) -> ResolvedPlace:
+    def fake_resolve(
+        query: str, *, locale: str, client: object | None = None
+    ) -> ResolvedPlace:
         del locale, client
         code = "GYE" if "guayaquil" in query.lower() else "MIA"
         return ResolvedPlace(
@@ -72,7 +80,7 @@ def test_search_protocol_with_monkeypatched_scraper(monkeypatch) -> None:
         ),
     ]
 
-    def fake_planner(**kwargs):
+    def fake_planner(**kwargs: object) -> list[PlannerOffer]:
         del kwargs
         return offers
 
@@ -93,5 +101,12 @@ def test_schema_has_expected_rpc_commands() -> None:
 
     assert schema["type"] == "flight-live.schema"
     assert schema["version"] == "1"
-    assert sorted(schema["rpc"]["commands"]) == ["get_schema", "ping", "search"]
-    assert schema["capabilities"]["credentials"]["required"] == []
+    rpc = cast("dict[str, object]", schema["rpc"])
+    assert sorted(cast("list[str]", rpc["commands"])) == [
+        "get_schema",
+        "ping",
+        "search",
+    ]
+    capabilities = cast("dict[str, object]", schema["capabilities"])
+    credentials = cast("dict[str, object]", capabilities["credentials"])
+    assert credentials["required"] == []

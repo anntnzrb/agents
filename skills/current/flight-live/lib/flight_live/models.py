@@ -1,8 +1,12 @@
+"""Domain models for flight-live search requests and results."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from datetime import date
 
 TripType = Literal["oneway", "roundtrip"]
 CabinClass = Literal["economy", "premium_economy", "business", "first"]
@@ -18,6 +22,8 @@ class MissingExecutableError(FlightLiveError):
 
 @dataclass(slots=True, frozen=True)
 class ResolvedPlace:
+    """A place query resolved to an IATA code."""
+
     query: str
     iata: str
     name: str | None
@@ -26,6 +32,8 @@ class ResolvedPlace:
 
 @dataclass(slots=True)
 class PlannerOffer:
+    """One raw planner offer before scoring."""
+
     origin: str
     destination: str
     depart_date: date
@@ -38,11 +46,14 @@ class PlannerOffer:
 
     @property
     def nonstop(self) -> bool:
+        """Whether the offer has no transfers."""
         return self.transfers == 0
 
 
 @dataclass(slots=True)
 class FlightOption:
+    """One scored flight option presented to the caller."""
+
     origin: str
     destination: str
     depart_date: date
@@ -58,13 +69,16 @@ class FlightOption:
 
     @property
     def nonstop(self) -> bool:
+        """Whether the option has no transfers."""
         return self.transfers == 0
 
     @property
     def effective_price(self) -> float:
+        """Price used for ranking."""
         return self.price
 
     def to_dict(self) -> dict[str, object]:
+        """Serialize the option to a JSON-compatible mapping."""
         return {
             "origin": self.origin,
             "destination": self.destination,
@@ -87,6 +101,8 @@ class FlightOption:
 
 @dataclass(slots=True, frozen=True)
 class SearchRequest:
+    """Validated flight search parameters."""
+
     origin: str
     destination: str
     depart_start: date

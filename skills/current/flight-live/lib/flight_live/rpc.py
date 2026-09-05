@@ -1,9 +1,11 @@
+"""JSON-RPC request handling for flight-live."""
+
 from __future__ import annotations
 
 import json
 from collections.abc import Mapping
 from datetime import date
-from typing import Literal, NotRequired, TextIO, TypedDict, cast
+from typing import Literal, NotRequired, TextIO, TypedDict, cast, overload
 
 from .models import FlightLiveError, SearchRequest
 from .protocol import PROTOCOL_VERSION, get_schema_document, search_flights
@@ -12,11 +14,15 @@ RequestId = str | int | float | None
 
 
 class RpcErrorPayload(TypedDict):
+    """Error detail object in an RPC response."""
+
     code: str
     message: str
 
 
 class RpcSuccessResponse(TypedDict):
+    """Successful RPC response envelope."""
+
     type: Literal["response"]
     command: str
     success: Literal[True]
@@ -25,6 +31,8 @@ class RpcSuccessResponse(TypedDict):
 
 
 class RpcErrorResponse(TypedDict):
+    """Error RPC response envelope."""
+
     type: Literal["response"]
     command: str
     success: Literal[False]
@@ -36,19 +44,21 @@ RpcResponse = RpcSuccessResponse | RpcErrorResponse
 
 
 def run_rpc(*, stdin: TextIO, stdout: TextIO) -> int:
+    """Serve JSON-RPC requests from stdin to stdout."""
     for raw_line in stdin:
         line = raw_line.strip()
         if line == "":
             continue
         response = handle_rpc_line(line)
-        stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
+        _ = stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
         stdout.flush()
     return 0
 
 
 def handle_rpc_line(line: str) -> RpcResponse:
+    """Handle one JSON-RPC request line."""
     try:
-        payload = json.loads(line)
+        payload = cast("object", json.loads(line))
     except json.JSONDecodeError:
         return _error_response(
             command="unknown",
@@ -77,34 +87,8 @@ def handle_rpc_line(line: str) -> RpcResponse:
         )
 
     try:
-        match command:
-            case "ping":
-                return _success_response(
-                    command="ping",
-                    data={"ok": True, "version": PROTOCOL_VERSION},
-                    request_id=request_id,
-                )
-            case "get_schema":
-                return _success_response(
-                    command="get_schema",
-                    data=get_schema_document(),
-                    request_id=request_id,
-                )
-            case "search":
-                req = _parse_search_request(request)
-                return _success_response(
-                    command="search",
-                    data=search_flights(req),
-                    request_id=request_id,
-                )
-            case _:
-                return _error_response(
-                    command=command,
-                    code="unknown_command",
-                    message=f"Unknown command: {command}",
-                    request_id=request_id,
-                )
-    except ValueError as exc:
+        return _dispatch_command(command, request, request_id)
+    except (ValueError, TypeError) as exc:
         return _error_response(
             command=command,
             code="invalid_request",
@@ -118,6 +102,40 @@ def handle_rpc_line(line: str) -> RpcResponse:
             message=str(exc),
             request_id=request_id,
         )
+
+
+def _dispatch_command(
+    command: str, request: Mapping[str, object], request_id: RequestId
+) -> RpcResponse:
+    """Dispatch one parsed RPC command."""
+    match command:
+        case "ping":
+            return _success_response(
+                command="ping",
+                data={"ok": True, "version": PROTOCOL_VERSION},
+                request_id=request_id,
+            )
+        case "get_schema":
+            return _success_response(
+                command="get_schema",
+                data=get_schema_document(),
+                request_id=request_id,
+            )
+        case "search":
+            req = _parse_search_request(request)
+            return _success_response(
+                command="search",
+                data=search_flights(req),
+                request_id=request_id,
+            )
+        case _:
+            message = f"Unknown command: {command}"
+            return _error_response(
+                command=command,
+                code="unknown_command",
+                message=message,
+                request_id=request_id,
+            )
 
 
 def _parse_search_request(request: Mapping[str, object]) -> SearchRequest:
@@ -173,25 +191,29 @@ def _read_command(request: Mapping[str, object]) -> str:
     if preferred is not None:
         if isinstance(preferred, str) and preferred.strip() != "":
             return preferred.strip()
-        raise ValueError("Request object must include a string type.")
+        message = "Request object must include a string type."
+        raise ValueError(message)
 
     legacy = request.get("command")
     if isinstance(legacy, str) and legacy.strip() != "":
         return legacy.strip()
-    raise ValueError("Request object must include a string type.")
+    message = "Request object must include a string type."
+    raise ValueError(message)
 
 
 def _read_request_id(value: object | None) -> RequestId:
     if value is None or isinstance(value, (str, int, float)):
         return value
-    raise ValueError("id must be a string, number, or null")
+    message = "id must be a string, number, or null"
+    raise ValueError(message)
 
 
 def _require_str(request: Mapping[str, object], key: str) -> str:
     value = request.get(key)
     if isinstance(value, str) and value.strip() != "":
         return value.strip()
-    raise ValueError(f"{key} must be a non-empty string")
+    message = f"{key} must be a non-empty string"
+    raise ValueError(message)
 
 
 def _require_date(request: Mapping[str, object], key: str, fallback_key: str) -> date:
@@ -199,11 +221,13 @@ def _require_date(request: Mapping[str, object], key: str, fallback_key: str) ->
     if raw is None:
         raw = request.get(fallback_key)
     if not isinstance(raw, str) or raw.strip() == "":
-        raise ValueError(f"{key} must be an ISO date string")
+        message = f"{key} must be an ISO date string"
+        raise ValueError(message)
     try:
         return date.fromisoformat(raw.strip())
     except ValueError as exc:
-        raise ValueError(f"{key} must be an ISO date string") from exc
+        message = f"{key} must be an ISO date string"
+        raise ValueError(message) from exc
 
 
 def _read_choice(
@@ -220,10 +244,12 @@ def _read_choice(
     if value is None:
         return default
     if not isinstance(value, str):
-        raise ValueError(f"{key} must be a string")
+        message = f"{key} must be a string"
+        raise TypeError(message)
     clean = value.strip()
     if clean not in choices:
-        raise ValueError(f"{key} must be one of: {', '.join(sorted(choices))}")
+        message = f"{key} must be one of: {', '.join(sorted(choices))}"
+        raise ValueError(message)
     return clean
 
 
@@ -240,7 +266,8 @@ def _read_str(
     if value is None:
         return default
     if not isinstance(value, str):
-        raise ValueError(f"{key} must be a string")
+        message = f"{key} must be a string"
+        raise TypeError(message)
     clean = value.strip()
     return clean or default
 
@@ -258,7 +285,8 @@ def _read_bool(
     if value is None:
         return default
     if not isinstance(value, bool):
-        raise ValueError(f"{key} must be a boolean")
+        message = f"{key} must be a boolean"
+        raise TypeError(message)
     return value
 
 
@@ -275,10 +303,29 @@ def _read_float(
     if value is None:
         return default
     if isinstance(value, bool) or not isinstance(value, int | float):
-        raise ValueError(f"{key} must be a number")
+        message = f"{key} must be a number"
+        raise TypeError(message)
     return float(value)
 
 
+@overload
+def _read_int(
+    request: Mapping[str, object],
+    key: str,
+    fallback_key: str,
+    *,
+    default: int,
+    minimum: int,
+) -> int: ...
+@overload
+def _read_int(
+    request: Mapping[str, object],
+    key: str,
+    fallback_key: str,
+    *,
+    default: None,
+    minimum: int,
+) -> int | None: ...
 def _read_int(
     request: Mapping[str, object],
     key: str,
@@ -293,9 +340,11 @@ def _read_int(
     if value is None:
         return default
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(f"{key} must be an integer")
+        message = f"{key} must be an integer"
+        raise TypeError(message)
     if value < minimum:
-        raise ValueError(f"{key} must be >= {minimum}")
+        message = f"{key} must be >= {minimum}"
+        raise ValueError(message)
     return value
 
 

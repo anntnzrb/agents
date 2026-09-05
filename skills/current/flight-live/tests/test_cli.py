@@ -2,11 +2,20 @@ from __future__ import annotations
 
 import json
 from io import StringIO
+from typing import TYPE_CHECKING, cast
 
 from flight_live.cli import main
 
+if TYPE_CHECKING:
+    import pytest
 
-def test_cli_json_output(monkeypatch, capsys) -> None:
+    from flight_live.models import SearchRequest
+    from flight_live.protocol import SearchPayload
+
+
+def test_cli_json_output(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     fake_payload = {
         "type": "flight-live.search_results",
         "version": "1",
@@ -35,7 +44,11 @@ def test_cli_json_output(monkeypatch, capsys) -> None:
         ],
     }
 
-    monkeypatch.setattr("flight_live.cli.search_flights", lambda request: fake_payload)
+    def fake_search(request: SearchRequest) -> SearchPayload:
+        del request
+        return cast("SearchPayload", cast("object", fake_payload))
+
+    monkeypatch.setattr("flight_live.cli.search_flights", fake_search)
 
     exit_code = main(
         [
@@ -52,18 +65,20 @@ def test_cli_json_output(monkeypatch, capsys) -> None:
     )
 
     assert exit_code == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert len(payload) == 1
-    assert payload[0]["origin"] == "SFO"
+    results = cast("list[object]", json.loads(capsys.readouterr().out))
+    assert len(results) == 1
+    first = cast("dict[str, object]", results[0])
+    assert first["origin"] == "SFO"
 
 
-def test_cli_schema_output(capsys) -> None:
+def test_cli_schema_output(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(["--schema"])
 
     assert exit_code == 0
-    payload = json.loads(capsys.readouterr().out)
+    payload = cast("dict[str, object]", json.loads(capsys.readouterr().out))
     assert payload["type"] == "flight-live.schema"
-    assert payload["rpc"]["request_command_field"] == "type"
+    rpc = cast("dict[str, object]", payload["rpc"])
+    assert rpc["request_command_field"] == "type"
 
 
 def test_cli_rpc_ping_round_trip() -> None:
@@ -73,7 +88,7 @@ def test_cli_rpc_ping_round_trip() -> None:
     exit_code = main(["--mode", "rpc"], stdin=stdin, stdout=stdout)
 
     assert exit_code == 0
-    response = json.loads(stdout.getvalue().strip())
+    response = cast("object", json.loads(stdout.getvalue().strip()))
     assert response == {
         "id": "p-1",
         "type": "response",

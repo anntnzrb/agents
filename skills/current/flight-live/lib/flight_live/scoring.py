@@ -1,8 +1,16 @@
+"""Score and rank flight options for flight-live."""
+
 from __future__ import annotations
 
-from datetime import date
+from typing import TYPE_CHECKING
 
-from .models import FlightOption
+if TYPE_CHECKING:
+    from datetime import date
+
+    from .models import FlightOption
+
+
+_WEEKEND_START_WEEKDAY = 4
 
 
 def rank_options(
@@ -11,6 +19,7 @@ def rank_options(
     max_budget: float | None,
     prefer_nonstop: bool,
 ) -> list[FlightOption]:
+    """Score options in place and return them ranked best-first."""
     for option in options:
         score, reasons, hints = _score_option(
             option,
@@ -58,6 +67,8 @@ def _score_option(
             score -= 0.16
             reasons.append("weekend_departure_penalty")
             hints.append("Weekend departure penalty applied; try Tue-Thu.")
+        case _:
+            pass
 
     if option.return_date is not None and _is_weekendish(option.return_date):
         score -= 0.08
@@ -80,4 +91,4 @@ def _price_anchor(price: float) -> float:
 
 
 def _is_weekendish(day: date) -> bool:
-    return day.weekday() >= 4
+    return day.weekday() >= _WEEKEND_START_WEEKDAY

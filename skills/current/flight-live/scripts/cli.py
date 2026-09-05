@@ -2,6 +2,8 @@
 # requires-python = ">=3.11,<3.15"
 # dependencies = []
 # ///
+"""PEP 723 entry point for the flight-live CLI."""
+
 from __future__ import annotations
 
 import os
@@ -24,7 +26,7 @@ def _load_simple_env(path: Path) -> None:
         if not key or any(char.isspace() for char in key):
             continue
         value = value.strip().strip('"').strip("'")
-        os.environ.setdefault(key, value)
+        _ = os.environ.setdefault(key, value)
 
 
 _load_simple_env(SKILL_DIR / ".env")
