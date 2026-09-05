@@ -8,29 +8,55 @@ Use `skills/current/` for skills that sync publishes to enabled harnesses. Use `
 2. Edit `skills/current/<name>/`.
 3. Run the skill's focused tests.
 4. Run the validation that matches the changed files.
-5. Run `bun ./sync/src/cli.ts` from the repository root.
+5. Run `uv run --project sync sync` from the repository root.
 6. Inspect the generated skill in one harness home.
 
 Keep development credentials in the root ignored `.env` file (`.env.example` at the repository root lists the shared template variables).
 
-## Validate Python files
+## Validate Python skills (standard)
 
-Every Python skill carries a standalone `pyproject.toml` (no workspace, no shared config, no parent-directory dependencies) and passes all six gates from its own directory:
+All new skills and changed Python skills use the central code-gate runner in `skill-creator`. The runner executes Ruff format-check, Ruff strict linting (ALL with the sync exclusion set), Basedpyright in standard type-checking mode, and optionally pytest. Dependency environments for Basedpyright and pytest are derived automatically from the PEP 723 block in `scripts/cli.py`.
+
+Run static checks (Ruff format-check, Ruff lint, Basedpyright):
 
 ```bash
-uvx ruff format --check .
-uvx ruff check .
-uv run --group dev basedpyright
-uv run --group dev pytest
+uv run --script skills/current/skill-creator/scripts/cli.py gates skills/current/<name>
 ```
 
-Start from `skills/current/python/references/advanced/pyproject-strict.md`: pinned dev tools (`basedpyright`, `ruff`, `pytest`), ruff `ALL` with narrow ignores, basedpyright `all` with unused-result/variable/private-usage as errors, pytest strict config with `filterwarnings` as errors. Keep `requires-python` and the ruff target / basedpyright version in sync with the skill's declared floor. Per-file ignores stay narrow (tests get assertion flexibility, scripts get CLI flexibility); production code gets no blanket suppression. A `noqa` or `pyright: ignore` needs a trailing reason naming why the checker cannot express the invariant. Never exclude production modules, propagate `Any` past a boundary, or silence a diagnostic without re-running the skill's tests.
+Run static checks and the skill's test suite:
 
-Gates five and six are the executable check below (run `--help` plus one safe invocation from the skill directory) and the metadata check (`quick-validate` from `skill-creator`, plus `git diff --check`).
+```bash
+uv run --script skills/current/skill-creator/scripts/cli.py gates skills/current/<name> --tests
+```
 
-## Validate TypeScript and Bun files
+Each Python skill provides a `pyproject.toml` containing tool configuration only (no runtime dependencies):
 
-For a skill with TypeScript or Bun code, run the local test suite and compiler checks:
+```toml
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["A002", "ANN401", "BLE001", "COM812", "D203", "D213", "EM101", "EM102", "ERA001", "PERF401", "PLR0911", "PLR0912", "S101", "S603", "S607", "SLF001", "TRY003", "TRY301"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**/*.py" = ["T201"]
+"tests/**/*.py" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
+include = ["scripts", "lib", "tests"]
+pythonVersion = "3.12"
+pythonPlatform = "All"
+```
+
+## Validate TypeScript and Bun skills (legacy / grandfathered)
+
+TypeScript is grandfathered for existing skills (`market-hunter`, `omp-search`, `x-research`). New skills MUST use Python and `uv`. For changes to existing TypeScript skills, run the local test suite and compiler checks:
 
 ```bash
 bun test skills/current/<name>
@@ -38,7 +64,6 @@ bunx tsc --project skills/current/<name>/tsconfig.json --noEmit
 ```
 
 Run tests from the skill directory or repository root. Verify that TypeScript diagnostics return zero errors before handoff.
-
 ## Validate an executable skill
 
 Executable skills use `scripts/cli.py` (Python) or `scripts/cli.ts` (TypeScript and Bun) as their public entrypoint. Check the command after changing executable behavior:
@@ -74,7 +99,7 @@ Move the complete directory into `skills/legacy/`:
 
 ```bash
 mv skills/current/<name> skills/legacy/<name>
-bun ./sync/src/cli.ts
+uv run --project sync sync
 ```
 
 The next sync removes the managed copy from harness homes. Sync does not publish anything under `skills/legacy/`.

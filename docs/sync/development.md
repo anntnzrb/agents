@@ -1,39 +1,44 @@
 # Develop the sync application
 
-The sync application is an isolated Bun and TypeScript project under `sync/`. See [Repository layout](../repository-layout.md) for the module map. For the shared-skill workflow, see [Manage shared skills](../skills.md).
+The sync application is an isolated Python (uv) project under `sync/`. See [Repository layout](../repository-layout.md) for the module map. For the shared-skill workflow, see [Manage shared skills](../skills.md).
 
 ## Run sync from source
 
 From the repository root, use the public entrypoint:
 
 ```bash
-bun ./sync/src/cli.ts
+uv run --project sync sync
 ```
 
-Keep `sync/src/cli.ts` as the public entrypoint. Do not add a `bin/` shell trampoline.
+Keep `sync/src/sync/cli.py` as the public entrypoint. Do not add a `bin/` shell trampoline. Contributor gates live behind the dev-only `sync-gates` console script (`sync/src/sync/gates.py`), not the public CLI.
 
 ## Run the full checks
 
-Run the static checks and the test suite from `sync/`:
+Run the static checks and the test suite from `sync/` via the gate script:
 
 ```bash
 cd sync
-bun run check
-bun run typecheck
-bun test
-bun run test:integration
+uv sync --frozen
+uv run sync-gates --tests
 ```
 
-`bun test` already includes `test/integration.test.ts`. Run the explicit integration command when you are iterating on process-level behavior.
+Run only the static gates (ruff check, ruff format check, basedpyright) with `uv run sync-gates`. When iterating on one tool, invoke it directly (`uv run ruff check .`, `uv run basedpyright`, ...).
+
+`uv run pytest -n auto` already includes `tests/test_integration.py`. Run the explicit single-process integration command when you are iterating on process-level behavior:
+
+```bash
+cd sync
+uv run pytest tests/test_integration.py -q -o addopts=""
+```
 
 ## Run a focused test
 
-Pass the test file to Bun:
+Pass the test file to pytest:
 
 ```bash
 cd sync
-bun test ./test/managed-tools.test.ts
-bun test ./test/wrappers.test.ts
+uv run pytest tests/test_managed_tools.py
+uv run pytest tests/test_wrappers.py
 ```
 
 Add the narrowest regression test that covers the changed sync contract.
@@ -48,21 +53,21 @@ Keep tests of harness implementations and harness-local behavior beside their so
 - Test shared code once, beside the shared module. Do not copy identical tests into every consumer; a consumer test covers only its own wiring.
 - Assert observable behavior and contracts, not fixtures, mocks, or implementation details.
 - Add a test only when it can fail on a real regression. Delete tests that duplicate coverage or re-prove what another test already covers.
-- Keep skill and harness tests beside their owning source. `sync/test/` covers sync behavior only.
+- Keep skill and harness tests beside their owning source. `sync/tests/` covers sync behavior only.
 
 ## Change sync behavior
 
-1. Find the owning module under `sync/src/`.
+1. Find the owning module under `sync/src/sync/`.
 2. Add or update the focused test.
 3. Make the smallest implementation change.
 4. Run the focused test.
-5. Run `bun run check`, `bun run typecheck`, and `bun test`.
+5. Run `uv run sync-gates --tests` (or the individual gates when iterating on one tool).
 6. Run `git diff --check` from the repository root.
 7. Update the related page under `docs/sync/` when the change affects commands, paths, lifecycle, platforms, or generated behavior.
 
 Keep these contracts intact:
 
-- Keep `sync/src/cli.ts` as the public entrypoint.
+- Keep `sync/src/sync/cli.py` as the public entrypoint (`sync-gates` is a contributor-only gate runner).
 - Keep wrapper generation inside the sync application.
 - Validate external files and network data at their boundary.
 - Keep filesystem operations safe to retry.
@@ -71,17 +76,17 @@ Keep these contracts intact:
 ## Change harness configuration
 
 1. Edit the matching source under `harnesses/`.
-2. Run `bun ./sync/src/cli.ts` from the repository root.
+2. Run `uv run --project sync sync` from the repository root.
 3. Inspect the generated root derived from the adapter's `homeSegments` and `runtimeSubdir` fields.
 4. Run the wrapper with `--version`.
 
-Keep harness-specific tests and documentation beside the owning source under `harnesses/`. Do not place them in `sync/test/` or `docs/`.
+Keep harness-specific tests and documentation beside the owning source under `harnesses/`. Do not place them in `sync/tests/` or `docs/`.
 
 Do not edit a generated harness home. Sync replaces managed files on the next run.
 
 ## Add a harness adapter
 
-1. Add the adapter to `sync/src/core/harness-adapters.ts`.
+1. Add the adapter to `sync/src/sync/core/harness_adapters.py`.
 2. Add its source directory under `harnesses/<harness>/`.
 3. Add wrapper tests for every supported platform.
 4. Add integration coverage for generated files and hooks.
@@ -102,7 +107,11 @@ Sync parses configuration, secrets, environment files, and extension/skill sourc
 - **Require normalization**: `require("...")` calls are normalized so the scanner recognizes them as dynamic imports during AST traversal.
 - **Comment and string immunity**: Import and require statements inside single-line comments (`//`), multiline block comments (`/* ... */`), string literals (single or double quotes), and template literals (`` `...` ``) are ignored.
 - **Type-only erasure**: Type-only imports (`import type { ... }`) are stripped during transpilation/scanning and excluded from runtime dependency specifiers.
-- **Specifier classification**: Downstream package validation (`missingPackageRoots`) ignores relative paths (`.`, `./*`, `../*`), builtin modules (`node:*`, `bun:*`, `bun`), and `data:` URIs, validating only unresolved npm package roots and scoped package identifiers.
+- **Specifier classification**: Downstream package validation (`missing_package_roots`) ignores relative paths (`.`, `./*`, `../*`), builtin modules (`node:*`, `bun:*`, `bun`), and `data:` URIs, validating only unresolved npm package roots and scoped package identifiers.
+
+### Python scanner note
+
+The Python implementation (`sync/src/sync/packages/validate.py`) performs import scanning with a comment/string-stripping state machine plus targeted patterns instead of a full JS/TS AST library. Any change to the scanner must preserve comment/string immunity: add adversarial cases (comments, multiline strings, template literals, type-only imports) to `sync/tests/test_package_validate.py`.
 
 ### JSON with Comments (JSONC)
 
@@ -116,22 +125,18 @@ Sync parses configuration, secrets, environment files, and extension/skill sourc
 
 ### Dotenv (`.env`)
 
-- **Quoted string preservation**: Preserves single- and double-quoted values.
 - **Variable expansion disabled**: Literal `$VAR` or `${VAR}` sequences remain unexpanded (`expandVariables: false`).
 - **Empty key omission**: Keys with empty or unset values are omitted from the decoded environment map (`preserveEmptyStrings: false`).
 
-### Future Python implementation considerations
+### Python scanner note
 
-When porting or implementing these parser contracts in Python (or another non-Bun runtime):
+The Python implementation (`src/sync/packages/validate.py`) performs import scanning with a comment/string-stripping state machine plus targeted patterns instead of a full JS/TS AST library. Any change to the scanner must preserve comment/string immunity: add adversarial cases (comments, multiline strings, template literals, type-only imports) to `tests/test_package_validate.py`.
 
-- **Maintained AST parser**: Prefer a dedicated, maintained JS/TS AST parsing library (e.g., `tree-sitter-typescript` or Python bindings to `oxc`/`swc`/`esprima`) to retain comment/string immunity and AST-level import extraction.
-- **External scanning process**: Alternatively, invoke an external scanner subprocess (such as Bun, Node, or an `oxc` CLI binary) to perform scanner extraction and return structured JSON specifiers, avoiding naive regex matching that is prone to false positives inside comments or multi-line strings.
+## Behavioral contract
 
-## Behavioral migration oracle contract
+The integration test suite (`sync/tests/test_integration.py`) serves as the executable black-box specification for the sync system. Rather than testing internals, these scenarios assert observable system boundaries.
 
-The integration test suite (`sync/test/integration.test.ts`) serves as an executable black-box specification and migration oracle for the sync system. Rather than testing internal TypeScript types, Effect combinators, or language-specific idioms, these scenarios assert observable system boundaries that any implementation—including a future Python rewrite—must satisfy.
-
-Any reimplementation of sync is compliant if and only if it satisfies all of the following black-box behavioral contracts:
+Sync is compliant if and only if it satisfies all of the following black-box behavioral contracts:
 
 ### 1. CLI syntax, help modes, and standard exit codes
 
@@ -155,7 +160,7 @@ Any reimplementation of sync is compliant if and only if it satisfies all of the
 ### 4. Repeated reconciliation and within-run idempotency
 
 - Successive sync runs against an unchanged source of truth must produce identical filesystem state.
-- Idempotent runs must not touch, rewrite, or churn existing matching files: destination file inode numbers (`ino`) and modification timestamps (`mtimeMs`) must remain stable.
+- Idempotent runs must not touch, rewrite, or churn existing matching files: destination file inode numbers (`ino`) and modification timestamps (`mtime`) must remain stable.
 
 ### 5. Transactional publication and failure recovery
 
@@ -177,7 +182,7 @@ Any reimplementation of sync is compliant if and only if it satisfies all of the
 
 ### 8. Wrapper runtime isolation and diagnostic hints
 
-- Generated launch wrappers in `~/.local/bin/<harness>` delegate execution to the managed sync runtime (`~/.local/share/agents/sync-current/src/cli.ts`).
+- Generated launch wrappers in `~/.local/bin/<harness>` delegate execution to the managed sync runtime (`~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli`).
 - If the sync runtime is missing or removed, invoking the wrapper must immediately exit with status code `127` and output `agents: sync runtime is missing; run sync from the agents repository` to stderr.
 
 ### 9. Environment variable precedence cascade

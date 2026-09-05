@@ -1,8 +1,8 @@
 #!/usr/bin/env -S uv run --script
+# Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
 # /// script
 # requires-python = ">=3.12"
 # dependencies = ["PyYAML>=6.0"]
-# ///
 """Skill Packager - Creates a distributable .skill file of a skill folder.
 
 Usage:
@@ -11,7 +11,8 @@ Usage:
 
 Example:
     uv run --script <skill-dir>/scripts/cli.py package skills/public/my-skill
-    uv run --script <skill-dir>/scripts/cli.py package skills/public/my-skill ./dist
+    uv run --script <skill-dir>/scripts/cli.py package skills/public/my-skill
+        ./dist
 
 """
 
@@ -19,19 +20,14 @@ import fnmatch
 import sys
 import zipfile
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
-
-if TYPE_CHECKING:
-    import io
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from typing import Final
 
 from scripts.quick_validate import validate_skill
 
-if hasattr(sys.stdout, "reconfigure"):
-    cast("io.TextIOWrapper", sys.stdout).reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    cast("io.TextIOWrapper", sys.stderr).reconfigure(encoding="utf-8", errors="replace")
+if reconfigure_stdout := getattr(sys.stdout, "reconfigure", None):
+    reconfigure_stdout(encoding="utf-8", errors="replace")
+if reconfigure_stderr := getattr(sys.stderr, "reconfigure", None):
+    reconfigure_stderr(encoding="utf-8", errors="replace")
 
 # Patterns to exclude when packaging skills.
 EXCLUDE_DIRS = {"__pycache__", "node_modules"}
@@ -39,7 +35,6 @@ EXCLUDE_GLOBS = {"*.pyc"}
 EXCLUDE_FILES = {".DS_Store"}
 # Directories excluded only at the skill root (not when nested deeper).
 ROOT_EXCLUDE_DIRS = {"evals"}
-_MIN_ARGV = 2
 
 
 def should_exclude(rel_path: Path) -> bool:
@@ -63,12 +58,12 @@ def package_skill(
     """Package a skill folder into a .skill file.
 
     Args:
-        skill_path: Path to the skill folder
+        skill_path: Path to the skill folder.
         output_dir: Optional output directory for the .skill file
-            (defaults to current directory)
+            (defaults to current directory).
 
     Returns:
-        Path to the created .skill file, or None if error
+        Path to the created .skill file, or None if error.
 
     """
     skill_path = Path(skill_path).resolve()
@@ -98,7 +93,14 @@ def package_skill(
     print(f"✅ {message}\n")
 
     # Determine output location
-    skill_filename = _resolve_output_path(skill_path.name, output_dir)
+    skill_name = skill_path.name
+    if output_dir:
+        output_path = Path(output_dir).resolve()
+        output_path.mkdir(parents=True, exist_ok=True)
+    else:
+        output_path = Path.cwd()
+
+    skill_filename = output_path / f"{skill_name}.skill"
 
     # Create the .skill file (zip format)
     try:
@@ -113,44 +115,29 @@ def package_skill(
                     continue
                 zipf.write(file_path, arcname)
                 print(f"  Added: {arcname}")
-    except Exception as e:  # noqa: BLE001 - packaging reports any zip/IO failure as a clean error by contract
+    except Exception as e:
         print(f"❌ Error creating .skill file: {e}")
         return None
-    else:
-        print(f"\n✅ Successfully packaged skill to: {skill_filename}")
-        return skill_filename
+
+    print(f"\n✅ Successfully packaged skill to: {skill_filename}")
+    return skill_filename
 
 
-def _resolve_output_path(skill_name: str, output_dir: str | Path | None) -> Path:
-    """Resolve the .skill output file path, creating directories."""
-    if output_dir:
-        output_path = Path(output_dir).resolve()
-        output_path.mkdir(parents=True, exist_ok=True)
-    else:
-        output_path = Path.cwd()
-    return output_path / f"{skill_name}.skill"
+_MIN_ARGV_LEN: Final[int] = 2
+_PACKAGE_CLI = "uv run --script <skill-dir>/scripts/cli.py package"
 
 
 def main() -> None:
-    """Run the skill packager command-line interface."""
-    if len(sys.argv) < _MIN_ARGV:
-        print(
-            "Usage: uv run --script <skill-dir>/scripts/cli.py "
-            + "package <path/to/skill-folder> [output-directory]",
-        )
+    """Package a skill from command-line arguments."""
+    if len(sys.argv) < _MIN_ARGV_LEN:
+        print(f"Usage: {_PACKAGE_CLI} <path/to/skill-folder> [output-directory]")
         print("\nExample:")
-        print(
-            "  uv run --script <skill-dir>/scripts/cli.py "
-            + "package skills/public/my-skill",
-        )
-        print(
-            "  uv run --script <skill-dir>/scripts/cli.py "
-            + "package skills/public/my-skill ./dist",
-        )
+        print(f"  {_PACKAGE_CLI} skills/public/my-skill")
+        print(f"  {_PACKAGE_CLI} skills/public/my-skill ./dist")
         sys.exit(1)
 
     skill_path = sys.argv[1]
-    output_dir = sys.argv[2] if len(sys.argv) > _MIN_ARGV else None
+    output_dir = sys.argv[2] if len(sys.argv) > _MIN_ARGV_LEN else None
 
     print(f"📦 Packaging skill: {skill_path}")
     if output_dir:

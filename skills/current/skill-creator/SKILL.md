@@ -53,12 +53,11 @@ uv run --script <skill-dir>/scripts/cli.py ...
 
 Useful commands:
 
-```bash
 uv run --script <skill-dir>/scripts/cli.py aggregate-benchmark <workspace>/iteration-N --skill-name <name>
+uv run --script <skill-dir>/scripts/cli.py gates <path-to-skill-folder> [--tests]
 uv run --script <skill-dir>/scripts/cli.py generate-review <workspace>/iteration-N --skill-name <name>
 uv run --script <skill-dir>/scripts/cli.py package <path-to-skill-folder>
 uv run --script <skill-dir>/scripts/cli.py quick-validate <path-to-skill-folder>
-```
 
 Read `references/eval-workflow.md` for aggregate/review usage; `references/packaging.md` for package validation and handoff.
 

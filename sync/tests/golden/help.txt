@@ -1,0 +1,18 @@
+sync — Reconcile AI agent configurations, skills, and harness environments from SSOT.
+
+Usage:
+  sync [sync]
+  sync launch <name> [-- <args...>]
+  sync -h | --help | help
+
+Commands:
+  sync (default)
+    Reconciles harness configurations, instruction files (HARNESS.md),
+    skills, tools, secrets, and generated launch wrappers (~/.local/bin).
+
+  launch <name> [-- <args...>]
+    Runs best-effort reconciliation, prepares the harness or tool package,
+    and executes it with any forwarded arguments.
+
+Options:
+  -h, --help, help    Show this help message.

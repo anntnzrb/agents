@@ -1,0 +1,54 @@
+[project]
+name = "agents-sync"
+version = "0.1.0"
+description = "Reconcile AI agent configurations, skills, and harness environments from SSOT"
+requires-python = ">=3.12"
+readme = "README.md"
+dependencies = [
+  "pydantic>=2.10.0",
+  "pyyaml>=6.0.1",
+  "python-dotenv>=1.0.1",
+  "httpx>=0.28.1",
+]
+[project.scripts]
+sync = "sync.cli:main_sync_entry"
+sync-gates = "sync.gates:main_gates_entry"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sync"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["COM812", "COM819", "D203", "D206", "D213", "D300", "E111", "E114", "E117", "ISC002", "Q000", "Q001", "Q002", "Q003", "Q004", "W191"]
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+# Intentionally infallible health probe: any failure means "not running".
+"src/sync/core/managed_tools.py" = ["BLE001"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.basedpyright]
+typeCheckingMode = "all"
+include = ["src", "tests"]
+pythonVersion = "3.12"
+pythonPlatform = "All"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-n auto -q"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3.0",
+  "pytest-xdist>=3.6.0",
+  "ruff>=0.9.0",
+  "basedpyright>=1.39.0",
+]

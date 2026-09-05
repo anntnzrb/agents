@@ -4,22 +4,19 @@ This is the isolated sync application.
 
 ## Scope
 
-- `./package.json`: sync app scripts and dependencies
-- `./tsconfig.json`: sync app TypeScript config
-- `./bun.lock`: sync app lockfile
-- `./biome.jsonc`: sync-scoped formatting, linting, and import organization
-- `./.oxlintrc.jsonc`: sync-scoped semantic and type-aware linting
-- `./src/`: application code
-- `./test/`: sync-specific tests
+- `./pyproject.toml`: sync app metadata, dependencies, and tool config (ruff, basedpyright, pytest)
+- `./uv.lock`: sync app lockfile
+- `./src/sync/`: application code
+- `./tests/`: sync-specific tests (plus `tests/golden/` frozen behavior fixtures)
 - `../docs/sync/`: sync application documentation
 
 ## Contracts
 
 - Keep behavior changes deliberate.
-- Public callable entrypoint is `src/cli.ts`; wrappers/tooling invoke it with an explicit Bun runner.
+- Public callable entrypoint is `src/sync/cli.py` (console script `sync`); wrappers/tooling invoke it via `uv run --project sync sync` from the repo root or `uv run sync` from `sync/`. `src/sync/gates.py` (console script `sync-gates`) is a contributor-only gate runner, not a public entrypoint.
 - Sync supports macOS and Linux only.
-- A supported `../harnesses/<harness>/` directory opts into that harness; `src/core/harness-adapters.ts` owns internal launch and sync metadata.
-- Use layer aliases for cross-boundary imports. Keep same-directory imports relative.
+- A supported `../harnesses/<harness>/` directory opts into that harness; `src/sync/core/harness_adapters.py` owns internal launch and sync metadata.
+- Use absolute imports (`from sync.core...`) across package boundaries.
 - Sync owns generated launch wrappers under `~/.local/bin` and assumes that directory is on `PATH`.
 
 ## Managed Tool Contract
@@ -33,14 +30,14 @@ This is the isolated sync application.
 
 - The normalized model catalog and its cache are harness-agnostic.
 - Prefer each harness's native remote-model discovery over generated per-harness catalogs.
-- Do not add per-harness model serializers or a `src/harnesses/` materialization layer.
+- Do not add per-harness model serializers or a per-harness materialization layer under `src/sync/`.
 - Live provider catalogs decide availability; models.dev supplies metadata and protocol hints.
 
 ## Launch Wrapper Contract
 
 - A manual sync creates or reconciles wrappers before returning.
-- Sync installs its runtime under `~/.local/share/agents/sync/`.
-- Generated wrappers call `bun ~/.local/share/agents/sync/src/cli.ts launch <harness> -- ...`; launch performs a best-effort sync when the SSOT is available, then resolves and runs the cached npm binary.
+- Sync installs its runtime under `~/.local/share/agents/sync-releases/<releaseId>/` with a `sync-current` symlink to the latest release.
+- Generated wrappers call `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli launch <harness> -- ...`; launch performs a best-effort sync when the SSOT is available, then resolves and runs the cached npm binary.
 - Runtime consumers must read installed state under `~/.local/share/agents/`, not files under the SSOT.
 - Launch-time sync failures are warnings; cached harness launch remains available.
 - Wrapper ownership is marker- and state-based. Stale generated wrappers are removed only when still owned; unmanaged conflicts are preserved.
@@ -48,13 +45,31 @@ This is the isolated sync application.
 
 ## Validation
 
-Run from repo root when sync code or tests change:
+Sync contributor gates are enforced via Python/uv tooling and automated git hooks (`pre-commit` and `pre-push`). Git hooks never rewrite tracked source files and run under POSIX `sh` with `set -eu`. Every hook invocation reconciles dependencies with `uv sync --frozen` before executing gates with `--no-sync`.
 
-- `bun ./sync/src/cli.ts`
-- `cd ./sync && bun run check`
-- `cd ./sync && bun run typecheck`
-- `cd ./sync && bun test`
-- `cd ./sync && bun run test:integration`
+### Validation Commands
+
+From repo root:
+- Quick CLI smoke test: `uv run --project sync sync --help`
+- Run all sync gates: `(cd sync && uv sync --frozen && uv run --no-sync sync-gates --tests)`
+
+From `sync/` directory:
+- Bootstrap/reconcile venv: `uv sync --frozen`
+- All gates (static checks plus tests): `uv run --no-sync sync-gates --tests`
+- Static gates only (ruff check, ruff format check, basedpyright): `uv run --no-sync sync-gates`
+- Individual tools when iterating: `uv run --no-sync ruff check .`, `uv run --no-sync ruff format --check .`, `uv run --no-sync basedpyright`, `uv run --no-sync pytest -n auto`
+
+### Hook Contracts
+
+- **`pre-commit`**: Runs `git diff --cached --check`, then changes into `sync/` and executes `uv sync --frozen` followed by `uv run --no-sync sync-gates` (ruff check, ruff format check, basedpyright).
+- **`pre-push`**: Executes `uv sync --frozen` followed by `uv run --no-sync sync-gates --tests`, which appends the full test suite (`uv run --no-sync pytest -n auto`) to the static gates. No separate duplicate integration run is needed because `pytest -n auto` covers the full suite including integration tests.
+
+### Code Quality and Typing Policies
+
+- Use strict typing; validate external data at boundaries and avoid `Any`.
+- Keep lint, formatting, and type checks clean using the committed configuration in `pyproject.toml`.
+- Fix underlying problems rather than weakening gates or adding unjustified suppressions.
+- Use TDD for behavior changes; keep tests deterministic, isolated, and focused on observable contracts.
 
 ## Stop Rules
 

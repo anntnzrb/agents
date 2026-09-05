@@ -1,4 +1,5 @@
 #!/usr/bin/env -S uv run --script
+# Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
 """Run trigger evaluation for a skill description.
 
 Tests whether a skill's description causes Claude to trigger (read the skill)
@@ -13,22 +14,39 @@ import subprocess
 import sys
 import time
 import uuid
-from concurrent.futures import Future, ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.utils import parse_skill_md
 
 
-class StreamState:
-    """State for stream event detection during single query execution."""
+@dataclass(frozen=True, slots=True)
+class QueryConfig:
+    """Fixed context for a single trigger-eval query run."""
 
-    def __init__(self) -> None:
-        """Initialize stream tracking state."""
-        self.pending_tool_name: str | None = None
-        self.accumulated_json: str = ""
+    skill_name: str
+    skill_description: str
+    timeout: int
+    project_root: str
+    model: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class EvalParams:
+    """Full eval-set run configuration."""
+
+    eval_set: list[dict]
+    skill_name: str
+    description: str
+    num_workers: int
+    timeout: int
+    project_root: Path
+    runs_per_query: int = 1
+    trigger_threshold: float = 0.5
+    model: str | None = None
 
 
 def find_project_root() -> Path:
@@ -44,214 +62,146 @@ def find_project_root() -> Path:
     return current
 
 
-def _handle_content_block_start(
-    cb: object,
-    state: StreamState,
-) -> bool | None:
-    """Handle content_block_start event."""
-    if isinstance(cb, dict):
-        cb_dict = cast("dict[str, object]", cb)
-        if cb_dict.get("type") == "tool_use":
-            tool_name = cb_dict.get("name")
-            if tool_name in ("Skill", "Read"):
-                state.pending_tool_name = str(tool_name)
-                state.accumulated_json = ""
-            else:
+class _StreamTracker:
+    """Accumulate stream-event state while watching for the probe skill."""
+
+    def __init__(self) -> None:
+        """Initialize empty tracking state."""
+        self.pending_tool_name: str | None = None
+        self.accumulated_json = ""
+
+    def feed(self, event: dict, clean_name: str) -> bool | None:
+        """Feed one stream event; True/False on decision, None to continue."""
+        if event.get("type") != "stream_event":
+            return None
+        se = event.get("event", {})
+        se_type = se.get("type", "")
+        if se_type == "content_block_start":
+            return self._block_started(se)
+        if se_type == "content_block_delta" and self.pending_tool_name:
+            return self._block_delta(se, clean_name)
+        if se_type in ("content_block_stop", "message_stop"):
+            return self._block_stopped(se_type, clean_name)
+        return None
+
+    def _block_started(self, se: dict) -> bool | None:
+        """Track a content block start; False on an unrelated tool call."""
+        cb = se.get("content_block", {})
+        if cb.get("type") != "tool_use":
+            return None
+        tool_name = cb.get("name", "")
+        if tool_name in ("Skill", "Read"):
+            self.pending_tool_name = tool_name
+            self.accumulated_json = ""
+            return None
+        return False
+
+    def _block_delta(self, se: dict, clean_name: str) -> bool | None:
+        """Accumulate partial input JSON; True once the probe name appears."""
+        delta = se.get("delta", {})
+        if delta.get("type") != "input_json_delta":
+            return None
+        self.accumulated_json += delta.get("partial_json", "")
+        if clean_name in self.accumulated_json:
+            return True
+        return None
+
+    def _block_stopped(self, se_type: str, clean_name: str) -> bool | None:
+        """Decide at block/message stop; None when nothing was pending."""
+        if not self.pending_tool_name:
+            if se_type == "message_stop":
                 return False
-    return None
+            return None
+        return clean_name in self.accumulated_json
 
 
-def _handle_content_block_delta(
-    delta: object,
-    state: StreamState,
-    clean_name: str,
-) -> bool | None:
-    """Handle content_block_delta event."""
-    if isinstance(delta, dict):
-        delta_dict = cast("dict[str, object]", delta)
-        if delta_dict.get("type") == "input_json_delta":
-            partial = delta_dict.get("partial_json")
-            if isinstance(partial, str):
-                state.accumulated_json += partial
-                if clean_name in state.accumulated_json:
-                    return True
-    return None
-
-
-def _handle_stream_event(
-    event_data: dict[str, object],
-    state: StreamState,
-    clean_name: str,
-) -> bool | None:
-    """Process a stream_event object and return trigger decision or None."""
-    se = event_data.get("event")
-    if not isinstance(se, dict):
+def _check_assistant_message(event: dict, clean_name: str) -> bool | None:
+    """Check a full assistant message for probe-skill tool use."""
+    if event.get("type") != "assistant":
         return None
-    se_dict = cast("dict[str, object]", se)
-    se_type = se_dict.get("type")
-
-    if se_type == "content_block_start":
-        return _handle_content_block_start(se_dict.get("content_block"), state)
-    if se_type == "content_block_delta" and state.pending_tool_name:
-        return _handle_content_block_delta(se_dict.get("delta"), state, clean_name)
-    if se_type in ("content_block_stop", "message_stop"):
-        if state.pending_tool_name:
-            return clean_name in state.accumulated_json
-        if se_type == "message_stop":
-            return False
-
-    return None
-
-
-def _handle_assistant_event(
-    event_data: dict[str, object],
-    clean_name: str,
-) -> bool | None:
-    """Process an assistant event and return trigger decision or None."""
-    message = event_data.get("message")
-    if not isinstance(message, dict):
-        return None
-    message_dict = cast("dict[str, object]", message)
-    content = message_dict.get("content")
-    if not isinstance(content, list):
-        return None
-    content_list = cast("list[object]", content)
-    for content_item in content_list:
-        if not isinstance(content_item, dict):
+    message = event.get("message", {})
+    for content_item in message.get("content", []):
+        if content_item.get("type") != "tool_use":
             continue
-        item_dict = cast("dict[str, object]", content_item)
-        if item_dict.get("type") != "tool_use":
-            continue
-        tool_name = str(item_dict.get("name", ""))
-        tool_input = item_dict.get("input")
-        input_dict = (
-            cast("dict[str, object]", tool_input)
-            if isinstance(tool_input, dict)
-            else {}
-        )
-        is_skill = tool_name == "Skill" and clean_name in str(
-            input_dict.get("skill", "")
-        )
-        is_read = tool_name == "Read" and clean_name in str(
-            input_dict.get("file_path", "")
-        )
-        return is_skill or is_read
+        tool_name = content_item.get("name", "")
+        tool_input = content_item.get("input", {})
+        skill_hit = tool_name == "Skill" and clean_name in tool_input.get("skill", "")
+        read_hit = tool_name == "Read" and clean_name in tool_input.get("file_path", "")
+        return skill_hit or read_hit
     return None
 
 
-def _process_stream_line(
-    line: str,
-    state: StreamState,
-    clean_name: str,
-    current_triggered: bool,
-) -> tuple[bool | None, bool]:
-    """Process a single JSON stream line.
-
-    Returns:
-        A tuple of (decision_or_none, updated_triggered).
-    """
+def _handle_stream_line(
+    line: str, tracker: _StreamTracker, clean_name: str
+) -> bool | None:
+    """Parse one stream line; True/False on decision, None to continue."""
+    text = line.strip()
+    if not text:
+        return None
     try:
-        raw_event = cast("object", json.loads(line))
+        event = json.loads(text)
     except json.JSONDecodeError:
-        return None, current_triggered
-
-    if not isinstance(raw_event, dict):
-        return None, current_triggered
-
-    event_dict = cast("dict[str, object]", raw_event)
-    event_type = event_dict.get("type")
-
-    if event_type == "stream_event":
-        decision = _handle_stream_event(event_dict, state, clean_name)
-        if decision is not None:
-            return decision, current_triggered
-    elif event_type == "assistant":
-        decision = _handle_assistant_event(event_dict, clean_name)
-        if decision is not None:
-            return decision, decision
-    elif event_type == "result":
-        return current_triggered, current_triggered
-
-    return None, current_triggered
+        return None
+    if event.get("type") == "result":
+        return False
+    decision = tracker.feed(event, clean_name)
+    if decision is not None:
+        return decision
+    return _check_assistant_message(event, clean_name)
 
 
-def _create_skill_command_file(
-    project_root: str,
-    skill_name: str,
-    skill_description: str,
-    clean_name: str,
-) -> Path:
-    """Create temporary skill command file in project .claude/commands/."""
-    project_commands_dir = Path(project_root) / ".claude" / "commands"
-    command_file = project_commands_dir / f"{clean_name}.md"
-    project_commands_dir.mkdir(parents=True, exist_ok=True)
+def _command_content(skill_name: str, skill_description: str) -> str:
+    """Render the probe command file content."""
     # Use YAML block scalar to avoid breaking on quotes in description
     indented_desc = "\n  ".join(skill_description.split("\n"))
-    command_content = (
-        f"---\n"
-        f"description: |\n"
+    return (
+        "---\n"
+        "description: |\n"
         f"  {indented_desc}\n"
-        f"---\n\n"
+        "---\n\n"
         f"# {skill_name}\n\n"
         f"This skill handles: {skill_description}\n"
     )
-    _ = command_file.write_text(command_content, encoding="utf-8")
-    return command_file
 
 
-def _read_subprocess_stream(
-    process: subprocess.Popen[bytes],
-    timeout: int,
-    clean_name: str,
+def _watch_stream(
+    process: subprocess.Popen[bytes], clean_name: str, timeout: int
 ) -> bool:
-    """Read stream output from claude process until timeout or completion."""
+    """Watch claude -p stream output until the trigger decision is known."""
     stdout = process.stdout
     if stdout is None:
         return False
-
-    triggered = False
+    tracker = _StreamTracker()
     start_time = time.time()
     buffer = ""
-    state = StreamState()
-
-    while time.time() - start_time < timeout:
-        if process.poll() is not None:
-            remaining = cast("bytes", stdout.read())
-            if remaining:
-                buffer += remaining.decode("utf-8", errors="replace")
-            break
-        ready, _, _ = select.select([stdout], [], [], 1.0)
-        if not ready:
-            continue
-
-        chunk: bytes = os.read(stdout.fileno(), 8192)
-        if not chunk:
-            break
-        buffer += chunk.decode("utf-8", errors="replace")
-
-        while "\n" in buffer:
-            line, buffer = buffer.split("\n", 1)
-            line = line.strip()
-            if not line:
+    try:
+        while time.time() - start_time < timeout:
+            if process.poll() is not None:
+                remaining = stdout.read()
+                if remaining:
+                    buffer += remaining.decode("utf-8", errors="replace")
+                break
+            ready, _, _ = select.select([stdout], [], [], 1.0)
+            if not ready:
                 continue
+            chunk = os.read(stdout.fileno(), 8192)
+            if not chunk:
+                break
+            buffer += chunk.decode("utf-8", errors="replace")
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                decision = _handle_stream_line(line, tracker, clean_name)
+                if decision is not None:
+                    return decision
+    finally:
+        # Clean up process on any exit path (return, exception, timeout)
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+    return False
 
-            early_return, triggered = _process_stream_line(
-                line, state, clean_name, triggered
-            )
-            if early_return is not None:
-                return early_return
 
-    return triggered
-
-
-def run_single_query(  # noqa: PLR0913, PLR0917 - Preserved helper signature for executor
-    query: str,
-    skill_name: str,
-    skill_description: str,
-    timeout: int,
-    project_root: str,
-    model: str | None = None,
-) -> bool:
+def run_single_query(query: str, config: QueryConfig) -> bool:
     """Run a single query and return whether the skill was triggered.
 
     Creates a command file in .claude/commands/ so it appears in Claude's
@@ -261,12 +211,16 @@ def run_single_query(  # noqa: PLR0913, PLR0917 - Preserved helper signature for
     full assistant message, which only arrives after tool execution.
     """
     unique_id = uuid.uuid4().hex[:8]
-    clean_name = f"{skill_name}-skill-{unique_id}"
-    command_file = _create_skill_command_file(
-        project_root, skill_name, skill_description, clean_name
-    )
+    clean_name = f"{config.skill_name}-skill-{unique_id}"
+    project_commands_dir = Path(config.project_root) / ".claude" / "commands"
+    command_file = project_commands_dir / f"{clean_name}.md"
 
     try:
+        project_commands_dir.mkdir(parents=True, exist_ok=True)
+        command_file.write_text(
+            _command_content(config.skill_name, config.skill_description)
+        )
+
         cmd = [
             "claude",
             "-p",
@@ -276,86 +230,72 @@ def run_single_query(  # noqa: PLR0913, PLR0917 - Preserved helper signature for
             "--verbose",
             "--include-partial-messages",
         ]
-        if model:
-            cmd.extend(["--model", model])
+        if config.model:
+            cmd.extend(["--model", config.model])
 
         # Remove CLAUDECODE env var to allow nesting claude -p inside a
         # Claude Code session. The guard is for interactive terminal conflicts;
         # programmatic subprocess usage is safe.
         env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
 
-        process = subprocess.Popen(  # noqa: S603 - Trusted command list for claude CLI evaluation
+        # Fixed argv, no shell: query/model come from local eval files.
+        process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
-            cwd=project_root,
+            cwd=config.project_root,
             env=env,
         )
-
-        try:
-            return _read_subprocess_stream(process, timeout, clean_name)
-        finally:
-            # Clean up process on any exit path (return, exception, timeout)
-            if process.poll() is None:
-                process.kill()
-                _ = process.wait()
+        return _watch_stream(process, clean_name, config.timeout)
     finally:
         if command_file.exists():
             command_file.unlink()
 
 
-def run_eval(  # noqa: PLR0913, PLR0917 - Preserved public function signature
-    eval_set: list[dict[str, object]],
-    skill_name: str,
-    description: str,
-    num_workers: int,
-    timeout: int,
-    project_root: Path,
-    runs_per_query: int = 1,
-    trigger_threshold: float = 0.5,
-    model: str | None = None,
-) -> dict[str, object]:
+def run_eval(params: EvalParams) -> dict:
     """Run the full eval set and return results."""
-    results: list[dict[str, object]] = []
+    results = []
+    query_config = QueryConfig(
+        skill_name=params.skill_name,
+        skill_description=params.description,
+        timeout=params.timeout,
+        project_root=str(params.project_root),
+        model=params.model,
+    )
 
-    with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        future_to_info: dict[Future[bool], tuple[dict[str, object], int]] = {}
-        for item in eval_set:
-            query_str = str(item["query"])
-            for run_idx in range(runs_per_query):
+    with ProcessPoolExecutor(max_workers=params.num_workers) as executor:
+        future_to_info = {}
+        for item in params.eval_set:
+            for run_idx in range(params.runs_per_query):
                 future = executor.submit(
                     run_single_query,
-                    query_str,
-                    skill_name,
-                    description,
-                    timeout,
-                    str(project_root),
-                    model,
+                    item["query"],
+                    query_config,
                 )
                 future_to_info[future] = (item, run_idx)
 
         query_triggers: dict[str, list[bool]] = {}
-        query_items: dict[str, dict[str, object]] = {}
+        query_items: dict[str, dict] = {}
         for future in as_completed(future_to_info):
             item, _ = future_to_info[future]
-            query = str(item["query"])
+            query = item["query"]
             query_items[query] = item
             if query not in query_triggers:
                 query_triggers[query] = []
             try:
                 query_triggers[query].append(future.result())
-            except Exception as e:  # noqa: BLE001 - Query execution failure in worker process
+            except Exception as e:
                 print(f"Warning: query failed: {e}", file=sys.stderr)
                 query_triggers[query].append(False)
 
     for query, triggers in query_triggers.items():
         item = query_items[query]
         trigger_rate = sum(triggers) / len(triggers)
-        should_trigger = bool(item.get("should_trigger", False))
+        should_trigger = item["should_trigger"]
         if should_trigger:
-            did_pass = trigger_rate >= trigger_threshold
+            did_pass = trigger_rate >= params.trigger_threshold
         else:
-            did_pass = trigger_rate < trigger_threshold
+            did_pass = trigger_rate < params.trigger_threshold
         results.append(
             {
                 "query": query,
@@ -367,12 +307,12 @@ def run_eval(  # noqa: PLR0913, PLR0917 - Preserved public function signature
             },
         )
 
-    passed = sum(1 for r in results if bool(r["pass"]))
+    passed = sum(1 for r in results if r["pass"])
     total = len(results)
 
     return {
-        "skill_name": skill_name,
-        "description": description,
+        "skill_name": params.skill_name,
+        "description": params.description,
         "results": results,
         "summary": {
             "total": total,
@@ -383,116 +323,94 @@ def run_eval(  # noqa: PLR0913, PLR0917 - Preserved public function signature
 
 
 def main() -> None:
-    """Run trigger evaluation CLI."""
+    """Run trigger evaluation from command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Run trigger evaluation for a skill description",
     )
-    _ = parser.add_argument(
-        "--eval-set", required=True, help="Path to eval set JSON file"
-    )
-    _ = parser.add_argument(
-        "--skill-path", required=True, help="Path to skill directory"
-    )
-    _ = parser.add_argument(
+    parser.add_argument("--eval-set", required=True, help="Path to eval set JSON file")
+    parser.add_argument("--skill-path", required=True, help="Path to skill directory")
+    parser.add_argument(
         "--description",
         default=None,
         help="Override description to test",
     )
-    _ = parser.add_argument(
+    parser.add_argument(
         "--num-workers",
         type=int,
         default=10,
         help="Number of parallel workers",
     )
-    _ = parser.add_argument(
+    parser.add_argument(
         "--timeout",
         type=int,
         default=30,
         help="Timeout per query in seconds",
     )
-    _ = parser.add_argument(
+    parser.add_argument(
         "--runs-per-query",
         type=int,
         default=3,
         help="Number of runs per query",
     )
-    _ = parser.add_argument(
+    parser.add_argument(
         "--trigger-threshold",
         type=float,
         default=0.5,
         help="Trigger rate threshold",
     )
-    _ = parser.add_argument(
+    parser.add_argument(
         "--model",
         default=None,
         help="Model to use for claude -p (default: user's configured model)",
     )
-    _ = parser.add_argument(
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Print progress to stderr",
     )
+    args = parser.parse_args()
 
-    args_map = cast("dict[str, object]", vars(parser.parse_args()))
-
-    eval_set_path = Path(str(args_map["eval_set"]))
-    raw_eval_set = cast("object", json.loads(eval_set_path.read_text(encoding="utf-8")))
-    if not isinstance(raw_eval_set, list):
-        msg = "Eval set must be a JSON list"
-        raise TypeError(msg)
-    eval_set = cast("list[dict[str, object]]", raw_eval_set)
-    skill_path = Path(str(args_map["skill_path"]))
+    eval_set = json.loads(Path(args.eval_set).read_text())
+    skill_path = Path(args.skill_path)
 
     if not (skill_path / "SKILL.md").exists():
         print(f"Error: No SKILL.md found at {skill_path}", file=sys.stderr)
         sys.exit(1)
 
     name, original_description, _ = parse_skill_md(skill_path)
-    description = (
-        str(args_map["description"])
-        if args_map.get("description") is not None
-        else original_description
-    )
-    num_workers = int(str(args_map["num_workers"]))
-    timeout = int(str(args_map["timeout"]))
-    runs_per_query = int(str(args_map["runs_per_query"]))
-    trigger_threshold = float(str(args_map["trigger_threshold"]))
-    model = str(args_map["model"]) if args_map.get("model") is not None else None
-    verbose = bool(args_map.get("verbose", False))
-
+    description = args.description or original_description
     project_root = find_project_root()
 
-    if verbose:
+    if args.verbose:
         print(f"Evaluating: {description}", file=sys.stderr)
 
     output = run_eval(
-        eval_set=eval_set,
-        skill_name=name,
-        description=description,
-        num_workers=num_workers,
-        timeout=timeout,
-        project_root=project_root,
-        runs_per_query=runs_per_query,
-        trigger_threshold=trigger_threshold,
-        model=model,
+        EvalParams(
+            eval_set=eval_set,
+            skill_name=name,
+            description=description,
+            num_workers=args.num_workers,
+            timeout=args.timeout,
+            project_root=project_root,
+            runs_per_query=args.runs_per_query,
+            trigger_threshold=args.trigger_threshold,
+            model=args.model,
+        )
     )
 
-    if verbose:
-        summary = cast("dict[str, int]", output["summary"])
+    if args.verbose:
+        summary = output["summary"]
         print(
             f"Results: {summary['passed']}/{summary['total']} passed",
             file=sys.stderr,
         )
-        results_list = cast("list[dict[str, object]]", output["results"])
-        for r in results_list:
-            status = "PASS" if bool(r["pass"]) else "FAIL"
+        for r in output["results"]:
+            status = "PASS" if r["pass"] else "FAIL"
             rate_str = f"{r['triggers']}/{r['runs']}"
-            query_preview = str(r["query"])[:70]
-            print(
-                f"  [{status}] rate={rate_str} expected={r['should_trigger']}: "
-                + query_preview,
-                file=sys.stderr,
-            )
+            expected = r["should_trigger"]
+            query = r["query"][:70]
+            detail = f"[{status}] rate={rate_str} expected={expected}: {query}"
+            print(f"  {detail}", file=sys.stderr)
 
     print(json.dumps(output, indent=2))
 

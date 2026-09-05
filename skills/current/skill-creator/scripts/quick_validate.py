@@ -9,7 +9,6 @@
 import re
 import sys
 from pathlib import Path
-from typing import cast
 
 import yaml
 
@@ -28,26 +27,26 @@ ALLOWED_PROPERTIES = {
 }
 
 
-def _load_frontmatter(skill_md: Path) -> tuple[dict[str, object] | None, str]:
-    """Load and parse the SKILL.md frontmatter, returning (mapping, error)."""
+def _load_frontmatter(skill_md: Path) -> tuple[bool, str | dict[str, object]]:
+    """Load and parse the SKILL.md frontmatter as a dictionary."""
     if not skill_md.exists():
-        return None, "SKILL.md not found"
+        return False, "SKILL.md not found"
 
     content = skill_md.read_text(encoding="utf-8")
     if not content.startswith("---"):
-        return None, "No YAML frontmatter found"
+        return False, "No YAML frontmatter found"
 
     match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
     if not match:
-        return None, "Invalid frontmatter format"
+        return False, "Invalid frontmatter format"
 
     try:
-        frontmatter = cast("object", yaml.safe_load(match.group(1)))
+        frontmatter = yaml.safe_load(match.group(1))
     except yaml.YAMLError as exc:
-        return None, f"Invalid YAML in frontmatter: {exc}"
+        return False, f"Invalid YAML in frontmatter: {exc}"
     if not isinstance(frontmatter, dict):
-        return None, "Frontmatter must be a YAML dictionary"
-    return cast("dict[str, object]", frontmatter), ""
+        return False, "Frontmatter must be a YAML dictionary"
+    return True, frontmatter
 
 
 def _validate_name(name: object) -> tuple[bool, str]:
@@ -127,10 +126,9 @@ def _validate_compatibility(compatibility: object) -> tuple[bool, str]:
 def validate_skill(skill_path: str | Path) -> tuple[bool, str]:
     """Validate a skill directory, returning (is_valid, message)."""
     skill_md = Path(skill_path) / "SKILL.md"
-    frontmatter, error = _load_frontmatter(skill_md)
-    if frontmatter is None:
-        return False, error
-
+    loaded, frontmatter = _load_frontmatter(skill_md)
+    if not loaded or not isinstance(frontmatter, dict):
+        return False, str(frontmatter)
     unexpected = set(frontmatter.keys()) - ALLOWED_PROPERTIES
     if unexpected:
         keys = ", ".join(sorted(unexpected))

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
 """Shared utilities for skill-creator scripts."""
 
 from pathlib import Path
@@ -9,8 +10,7 @@ def parse_skill_md(skill_path: Path) -> tuple[str, str, str]:
     lines = content.split("\n")
 
     if lines[0].strip() != "---":
-        message = "SKILL.md missing frontmatter (no opening ---)"
-        raise ValueError(message)
+        raise ValueError("SKILL.md missing frontmatter (no opening ---)")
 
     end_idx = None
     for i, line in enumerate(lines[1:], start=1):
@@ -19,8 +19,7 @@ def parse_skill_md(skill_path: Path) -> tuple[str, str, str]:
             break
 
     if end_idx is None:
-        message = "SKILL.md missing frontmatter (no closing ---)"
-        raise ValueError(message)
+        raise ValueError("SKILL.md missing frontmatter (no closing ---)")
 
     name = ""
     description = ""

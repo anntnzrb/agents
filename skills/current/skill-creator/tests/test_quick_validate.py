@@ -39,12 +39,14 @@ def run_validate(target: Path) -> subprocess.CompletedProcess[str]:
 
 
 def test_valid_skill_passes(tmp_path: Path) -> None:
+    """Valid fixture skill passes quick validation."""
     result = run_validate(write_skill(tmp_path / "ok", _VALID_FRONTMATTER))
     assert result.returncode == 0
     assert "Skill is valid!" in result.stdout
 
 
 def test_missing_skill_md_fails(tmp_path: Path) -> None:
+    """Missing SKILL.md fails quick validation."""
     target = tmp_path / "empty"
     target.mkdir(parents=True, exist_ok=True)
     result = run_validate(target)
@@ -53,11 +55,13 @@ def test_missing_skill_md_fails(tmp_path: Path) -> None:
 
 
 def test_missing_frontmatter_fails(tmp_path: Path) -> None:
+    """Missing frontmatter fails quick validation."""
     result = run_validate(write_skill(tmp_path / "bare", "# No frontmatter\n"))
     assert result.returncode == 1
 
 
 def test_long_description_fails(tmp_path: Path) -> None:
+    """Overlong description fails quick validation."""
     frontmatter = "---\nname: fixture-skill\ndescription: " + "x" * 121 + "\n---\n"
     result = run_validate(write_skill(tmp_path / "long", frontmatter))
     assert result.returncode == 1
@@ -65,6 +69,7 @@ def test_long_description_fails(tmp_path: Path) -> None:
 
 
 def test_bad_name_fails(tmp_path: Path) -> None:
+    """Non-kebab-case name fails quick validation."""
     frontmatter = "---\nname: Not_Kebab\ndescription: Fixture.\n---\n"
     result = run_validate(write_skill(tmp_path / "name", frontmatter))
     assert result.returncode == 1
@@ -72,6 +77,7 @@ def test_bad_name_fails(tmp_path: Path) -> None:
 
 
 def test_unexpected_key_fails(tmp_path: Path) -> None:
+    """Unexpected frontmatter key fails quick validation."""
     frontmatter = _VALID_FRONTMATTER.replace("---\n", "---\nbogus: 1\n", 1)
     result = run_validate(write_skill(tmp_path / "key", frontmatter))
     assert result.returncode == 1

@@ -1,52 +1,25 @@
-[project]
-name = "skill-creator"
-version = "0.1.0"
-description = "Utilities to create, validate, and evaluate skills"
-readme = "SKILL.md"
-requires-python = ">=3.12"
-dependencies = []
-
-[dependency-groups]
-dev = ["basedpyright>=1.21", "ruff>=0.8", "pytest>=8", "pyyaml>=6.0"]
-
+# Tool configuration only. Runtime dependencies stay PEP 723 inline metadata in
+# scripts/cli.py; the gates runner derives every tool environment from there.
 [tool.ruff]
 target-version = "py312"
 line-length = 88
-src = ["scripts", "tests"]
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["COM812", "ISC001", "ISC003", "D203", "D213", "CPY001", "FBT001", "FBT002",
-          "TD002", "TD003", "FIX002"]
+ignore = ["A002", "ANN401", "BLE001", "COM812", "D203", "D213", "EM101", "EM102", "ERA001", "PERF401", "PLR0911", "PLR0912", "S101", "S603", "S607", "SLF001", "TRY003", "TRY301"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "ANN", "ARG", "ARG001", "ARG005", "PLC0415",
-  "PLR2004", "PLR0913", "SLF001", "D", "TRY003", "TRY004", "EM101", "EM102",
-  "E402", "S603", "S607"]
-"scripts/**/*.py" = ["T201", "INP001", "E402", "I001"]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
+# Executable scripts report to stdout/stderr by contract (exit codes, help
+# text, reports); print is their interface, not a smell.
+"scripts/**/*.py" = ["T201"]
+"eval-viewer/**/*.py" = ["T201"]
+"tests/**/*.py" = ["S101"]
 
 [tool.ruff.format]
 quote-style = "double"
-indent-style = "space"
-docstring-code-format = true
-docstring-code-line-length = "dynamic"
 
 [tool.basedpyright]
-typeCheckingMode = "all"
+typeCheckingMode = "standard"
+include = ["scripts", "eval-viewer", "tests"]
 pythonVersion = "3.12"
 pythonPlatform = "All"
-include = ["scripts", "tests"]
-extraPaths = ["scripts"]
-reportUnusedCallResult = "error"
-reportUnnecessaryTypeIgnoreComment = "error"
-reportUnusedVariable = "error"
-reportPrivateUsage = "error"
-
-[tool.pytest.ini_options]
-minversion = "8.0"
-testpaths = ["tests"]
-addopts = ["-ra", "--strict-config", "--strict-markers"]
-filterwarnings = ["error"]

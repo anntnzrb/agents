@@ -21,18 +21,18 @@ The repository separates committed sources, local inputs, generated targets, and
 
 Each harness source starts under `harnesses/<id>/`. When an adapter defines `runtimeSubdir`, sync appends that subdirectory to the source root.
 
-`sync/src/core/harness-adapters.ts` defines the supported harness IDs, package launchers, generated homes, platforms, runtime subdirectories, and hooks. A matching directory under `harnesses/` enables that adapter on a supported platform.
+`sync/src/sync/core/harness_adapters.py` defines the supported harness IDs, package launchers, generated homes, platforms, runtime subdirectories, and hooks. A matching directory under `harnesses/` enables that adapter on a supported platform.
 
 ### Sync application
 
 | Path | Purpose |
 | --- | --- |
-| `sync/src/cli.ts` | Public command entrypoint |
-| `sync/src/core/` | Plans, jobs, adapters, wrappers, and managed tools |
-| `sync/src/extensions/` | Extension dependency hooks |
-| `sync/src/packages/` | Harness package bootstrap logic |
-| `sync/src/runtime/` | Filesystem, process, lock, and error boundaries |
-| `sync/test/` | Unit and process-level integration tests for sync behavior |
+| `sync/src/sync/cli.py` (`sync` console script) | Public command entrypoint |
+| `sync/src/sync/core/` | Plans, jobs, adapters, wrappers, and managed tools |
+| `sync/src/sync/extensions/` | Extension dependency hooks |
+| `sync/src/sync/packages/` | Harness package bootstrap logic |
+| `sync/src/sync/runtime/` | Filesystem, JSONC, process, lock, and error boundaries |
+| `sync/tests/` | Unit and process-level integration tests for sync behavior |
 
 ## Local inputs
 

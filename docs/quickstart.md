@@ -6,11 +6,15 @@ Sync supports macOS and Linux. The managed CLIProxyAPI release supports macOS on
 
 ## Install the required commands
 
-Install `bun`, `node`, `npm`, `git`, `tar`, `curl`, and `jq`.
+Sync itself requires Python 3.12+ via `uv`. Managed packages and extensions additionally use `bun`, `node`, and `npm`.
+
+Install `uv`, `python3`, `bun`, `node`, `npm`, `git`, `tar`, `curl`, and `jq`.
 
 Confirm that each command is available:
 
 ```bash
+uv --version
+python3 --version
 bun --version
 node --version
 npm --version
@@ -68,7 +72,7 @@ The repository ignores `secrets.local.json`. Keep the file out of Git and transf
 Run sync from the repository root:
 
 ```bash
-bun ./sync/src/cli.ts
+uv run --project sync sync
 ```
 
 The first gateway-host run may download the pinned CLIProxyAPI archive. Sync verifies its SHA-256 checksum and generates the runtime files. Sync can warn that CLIProxyAPI is not running yet.
@@ -126,7 +130,7 @@ unset CLIPROXY_BASE_URL
 
 ## Start a harness
 
-Choose an adapter whose source directory exists under `harnesses/` and whose `platforms` field includes your host. Read its `launcher.bin` value in `sync/src/core/harness-adapters.ts`, then run that wrapper command.
+Choose an adapter whose source directory exists under `harnesses/` and whose `platforms` field includes your host. Read its `launcher.bin` value in `sync/src/sync/core/harness_adapters.py`, then run that wrapper command.
 
 The wrapper runs sync, prepares the cached harness package, forwards your arguments, and returns the harness exit status.
 
