@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import hashlib
 import os
@@ -10,7 +11,6 @@ import re
 import secrets
 import shutil
 import stat
-import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,16 +40,19 @@ from sync.core.secret_template import sync_secret_template
 from sync.runtime.errors import assert_never, err, panic_message, warn
 from sync.runtime.fs import (
     SourceContentCache,
+    is_identical_file,
     is_symlink,
     rm_entry,
     sync_managed_children,
     sync_managed_tree,
 )
+from sync.runtime.process import RunProcessOptions, run_process
 
 SHA256_HEX_PATTERN = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
 STAGE_DIR_PATTERN = re.compile(r"^\.stage-(\d+)-([0-9a-f]+)$", re.IGNORECASE)
 DEFAULT_PRUNE_TIMEOUT_MS = 120_000
 MIN_INSTALL_TIMEOUT_MS = 1000
+MAX_DETAIL_CHARS: int = 2000
 
 
 @dataclass(slots=True)
@@ -76,7 +79,7 @@ class RequiredPaths:
     uv_lock: str
 
 
-def run_jobs_with_preserve(
+async def run_jobs_with_preserve(
     jobs: Sequence[Job],
     preserve_paths_by_dst: Mapping[str, Sequence[str]] | None = None,
 ) -> bool:
@@ -86,7 +89,7 @@ def run_jobs_with_preserve(
     source_content_cache: SourceContentCache = {}
     state = JobRunState()
     for job in jobs:
-        if not _run_job(job, preserve_paths_by_dst, source_content_cache, state):
+        if not await _run_job(job, preserve_paths_by_dst, source_content_cache, state):
             return False
     return True
 
@@ -156,7 +159,7 @@ def _run_cliproxy_config_job(job: CliProxyConfigJob, state: JobRunState) -> bool
     return True
 
 
-def _run_job(
+async def _run_job(
     job: Job,
     preserve_paths_by_dst: Mapping[str, Sequence[str]],
     source_content_cache: SourceContentCache,
@@ -177,7 +180,7 @@ def _run_job(
             case CliProxyConfigJob():
                 success = _run_cliproxy_config_job(job, state)
             case SyncRuntimeInstallJob():
-                success = _run_sync_runtime_install_job(job)
+                success = await _run_sync_runtime_install_job(job)
             case _:
                 assert_never(job)
     except (OSError, RuntimeError, ValueError, TypeError) as error:
@@ -187,38 +190,25 @@ def _run_job(
         return success
 
 
-def _execute_uv_sync(stage: str, release_id: str, timeout_ms: int) -> None:
-    timeout_seconds = max(timeout_ms, MIN_INSTALL_TIMEOUT_MS) / 1000.0
+async def _execute_uv_sync(stage: str, release_id: str, timeout_ms: int) -> None:
     uv_bin = shutil.which("uv") or "uv"
-    try:
-        install = subprocess.run(  # noqa: S603
-            [uv_bin, "sync", "--frozen", "--no-dev", "--no-editable"],
-            cwd=stage,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-            check=False,
-        )
-        timed_out = False
-    except subprocess.TimeoutExpired as exc:
-        timed_out = True
-        stdout = (
-            exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-        )
-        stderr = (
-            exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-        )
-        install = subprocess.CompletedProcess(
-            [uv_bin, "sync", "--frozen", "--no-dev", "--no-editable"],
-            returncode=-1,
-            stdout=stdout,
-            stderr=stderr,
-        )
-
-    if timed_out or install.returncode != 0:
+    install = await run_process(
+        [uv_bin, "sync", "--frozen", "--no-dev", "--no-editable"],
+        RunProcessOptions(
+            timeout_ms=float(max(timeout_ms, MIN_INSTALL_TIMEOUT_MS)),
+            stdio="pipe",
+        ),
+        cwd=stage,
+    )
+    if install.output_limited:
+        message = "runtime dependency install failed: output limit exceeded"
+        raise RuntimeError(message)
+    if install.timed_out or install.exit_code != 0:
         stderr_text = install.stderr.strip() if install.stderr else ""
         stdout_text = install.stdout.strip() if install.stdout else ""
         detail = stderr_text or stdout_text or "unknown error"
+        if len(detail) > MAX_DETAIL_CHARS:
+            detail = f"{detail[:MAX_DETAIL_CHARS]}…[truncated]"
         message = f"runtime dependency install failed: {detail}"
         raise RuntimeError(message)
 
@@ -231,12 +221,12 @@ def _execute_uv_sync(stage: str, release_id: str, timeout_ms: int) -> None:
         raise RuntimeError(message)
 
 
-def _run_sync_runtime_install_job(job: SyncRuntimeInstallJob) -> bool:
+async def _run_sync_runtime_install_job(job: SyncRuntimeInstallJob) -> bool:
     required_paths = _validate_required_sources(job.source_root)
     if required_paths is None:
         return False
 
-    Path(job.releases_root).mkdir(parents=True, exist_ok=True)
+    await asyncio.to_thread(Path(job.releases_root).mkdir, parents=True, exist_ok=True)
 
     release_id = _compute_runtime_release_id(required_paths)
     release_dir = str(Path(job.releases_root) / release_id)
@@ -246,17 +236,17 @@ def _run_sync_runtime_install_job(job: SyncRuntimeInstallJob) -> bool:
     stage = _create_stage(job.releases_root)
     try:
         _copy_runtime_inputs(required_paths, stage, {})
-        _execute_uv_sync(stage, release_id, job.timeout_ms)
-        if Path(release_dir).exists():
+        await _execute_uv_sync(stage, release_id, job.timeout_ms)
+        if await asyncio.to_thread(Path(release_dir).exists):
             if _is_complete_release(release_dir):
                 return publish_current_link(job.current_link, release_dir)
             rm_entry(release_dir)
-        Path(stage).rename(release_dir)
+        await asyncio.to_thread(Path(stage).rename, release_dir)
     except (OSError, RuntimeError, ValueError, TypeError) as error:
         err(f"runtime install failed: {panic_message(error)}")
         return False
     finally:
-        if Path(stage).exists():
+        if await asyncio.to_thread(Path(stage).exists):
             with contextlib.suppress(OSError):
                 rm_entry(stage)
 
@@ -593,7 +583,11 @@ def _sync_item(src: str, dst: str) -> bool:
             err(f"missing source: {src}")
             return True
 
-        if files_match(src, dst):
+        try:
+            src_stat = Path(src).stat()
+        except OSError:
+            src_stat = None
+        if src_stat is not None and is_identical_file(src, src_stat, dst):
             return True
 
         Path(dst).parent.mkdir(parents=True, exist_ok=True)
@@ -614,35 +608,11 @@ def _is_directory_like(path: str) -> bool:
         return False
 
 
-def files_match(src: str, dst: str) -> bool:
-    """Return True if src and dst regular files have identical size, mode, content."""
-    try:
-        if is_symlink(dst):
-            return False
-        src_p = Path(src)
-        dst_p = Path(dst)
-        src_stat = src_p.stat()
-        dst_stat = dst_p.stat()
-        if not stat.S_ISREG(src_stat.st_mode) or not stat.S_ISREG(dst_stat.st_mode):
-            return False
-        if src_stat.st_size != dst_stat.st_size or (src_stat.st_mode & 0o777) != (
-            dst_stat.st_mode & 0o777
-        ):
-            return False
-        if src_stat.st_size == 0:
-            return True
-        with src_p.open("rb") as f_src, dst_p.open("rb") as f_dst:
-            return f_src.read() == f_dst.read()
-    except OSError:
-        return False
-
-
 __all__ = [
     "DEFAULT_PRUNE_TIMEOUT_MS",
     "MIN_INSTALL_TIMEOUT_MS",
     "JobRunState",
     "RequiredPaths",
-    "files_match",
     "prune_unreferenced_releases",
     "publish_current_link",
     "remove_legacy_runtime_install",

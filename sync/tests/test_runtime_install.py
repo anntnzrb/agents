@@ -117,7 +117,7 @@ def test_publishes_current_link_and_installs_dependencies(
     seed_source_root(home)
     _, job = get_runtime_install_job(home)
 
-    ok = run_jobs_with_preserve([job])
+    ok = asyncio.run(run_jobs_with_preserve([job]))
     assert ok is True
 
     current_link = Path(home) / ".local" / "share" / "agents" / "sync-current"
@@ -140,7 +140,7 @@ def test_fails_and_leaves_current_link_untouched_when_lockfile_is_missing(
     (Path(home) / ".config" / "agents" / "sync" / "uv.lock").unlink()
     _, job = get_runtime_install_job(home)
 
-    ok = run_jobs_with_preserve([job])
+    ok = asyncio.run(run_jobs_with_preserve([job]))
     assert ok is False
     assert not Path(job.current_link).exists()
 
@@ -156,7 +156,7 @@ def test_fails_and_removes_stage_on_broken_pyproject_toml(
     )
     _, job = get_runtime_install_job(home)
 
-    ok = run_jobs_with_preserve([job])
+    ok = asyncio.run(run_jobs_with_preserve([job]))
     assert ok is False
     assert not Path(job.current_link).exists()
 
@@ -177,7 +177,7 @@ def test_installs_new_release_and_updates_current_link_without_pruning_previous_
     source_root = seed_source_root(home)
     _, job = get_runtime_install_job(home)
 
-    ok = run_jobs_with_preserve([job])
+    ok = asyncio.run(run_jobs_with_preserve([job]))
     assert ok is True
     first_releases = read_dir_names(job.releases_root)
     assert len(first_releases) == 1
@@ -189,7 +189,7 @@ def test_installs_new_release_and_updates_current_link_without_pruning_previous_
     cli_path.write_text('print("updated")\n', encoding="utf-8")
 
     _, job2 = get_runtime_install_job(home)
-    ok2 = run_jobs_with_preserve([job2])
+    ok2 = asyncio.run(run_jobs_with_preserve([job2]))
     assert ok2 is True
     second_releases = read_dir_names(job2.releases_root)
     assert len(second_releases) == EXPECTED_TWO_RELEASES_COUNT
@@ -207,7 +207,7 @@ def test_runtime_installation_cleans_up_temporary_stage_on_install_failure(
         f.write('\n[project.dependencies]\nnonexistent-pkg-xyz = "99.99.99"\n')
 
     _, job = get_runtime_install_job(home)
-    success = run_jobs_with_preserve([job])
+    success = asyncio.run(run_jobs_with_preserve([job]))
     assert success is False
 
     releases_path = Path(job.releases_root)
@@ -224,7 +224,7 @@ def test_prune_unreferenced_releases_cleans_complete_unreferenced_and_stale_stag
     home = make_home(tmp_path)
     source_root = seed_source_root(home)
     _, job = get_runtime_install_job(home)
-    run_jobs_with_preserve([job])
+    asyncio.run(run_jobs_with_preserve([job]))
 
     first_release_name = read_dir_names(job.releases_root)[0]
 
@@ -235,7 +235,7 @@ def test_prune_unreferenced_releases_cleans_complete_unreferenced_and_stale_stag
     cli_path.write_text('print("updated")\n', encoding="utf-8")
 
     _, job2 = get_runtime_install_job(home)
-    run_jobs_with_preserve([job2])
+    asyncio.run(run_jobs_with_preserve([job2]))
 
     releases_path = Path(job.releases_root)
     unrecognized_dir = releases_path / "custom-unrecognized-dir"
@@ -321,7 +321,7 @@ def test_runtime_install_fails_loudly_when_source_subdir_is_unreadable(
     unreadable_dir.chmod(0o000)
     try:
         _, job = get_runtime_install_job(home)
-        ok = run_jobs_with_preserve([job])
+        ok = asyncio.run(run_jobs_with_preserve([job]))
         assert ok is False
         assert not Path(job.current_link).exists()
     finally:

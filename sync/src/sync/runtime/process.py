@@ -8,12 +8,12 @@ import contextlib
 import os
 import signal
 import stat
-from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from pydantic import TypeAdapter, ValidationError
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 from sync.runtime.errors import assert_never, err
 
@@ -21,6 +21,7 @@ __all__ = [
     "CommandOutcome",
     "Failure",
     "MissingCommand",
+    "OutputLimit",
     "ProcessResult",
     "RunProcessOptions",
     "Success",
@@ -38,6 +39,8 @@ EXIT_GENERAL_ERROR: int = 1
 EXIT_MISSING_COMMAND: int = 127
 MILLISECONDS_PER_SECOND: float = 1000.0
 TIMEOUT_MIN_SECONDS: float = 0.0
+MAX_OUTPUT_BYTES: int = 10 * 1024 * 1024
+MAX_DETAIL_CHARS: int = 2000
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,27 +92,31 @@ class TimedOut:
         return "TimedOut"
 
 
-type CommandOutcome = Success | MissingCommand | Failure | TimedOut
+@dataclass(frozen=True, slots=True)
+class OutputLimit:
+    """Command output exceeded the retained-byte limit."""
+
+    detail: str
+    _tag: Literal["OutputLimit"] = "OutputLimit"
+
+    @property
+    def tag(self) -> Literal["OutputLimit"]:
+        """Discriminator tag for outcome."""
+        return "OutputLimit"
+
+
+type CommandOutcome = Success | MissingCommand | Failure | TimedOut | OutputLimit
 
 
 @dataclass(frozen=True, slots=True)
 class ProcessResult:
-    """Captured result of a finished or timed-out child process."""
+    """Captured result of a finished, timed-out, or output-limited child process."""
 
     exit_code: int
     stdout: str
     stderr: str
     timed_out: bool
-
-    @property
-    def exitCode(self) -> int:  # noqa: N802
-        """CamelCase alias for compatibility with TS callers."""
-        return self.exit_code
-
-    @property
-    def timedOut(self) -> bool:  # noqa: N802
-        """CamelCase alias for compatibility with TS callers."""
-        return self.timed_out
+    output_limited: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,11 +130,10 @@ class RunProcessOptions:
 
 
 def _detail_from_output(stdout: str, stderr: str) -> str:
-    if stderr.strip():
-        return stderr.strip()
-    if stdout.strip():
-        return stdout.strip()
-    return "unknown error"
+    detail = stderr.strip() or stdout.strip() or "unknown error"
+    if len(detail) > MAX_DETAIL_CHARS:
+        return f"{detail[:MAX_DETAIL_CHARS]}…[truncated]"
+    return detail
 
 
 def _has_path_separator(command: str) -> bool:
@@ -208,49 +214,8 @@ async def command_exists(
     return resolved is not None
 
 
-def _parse_mapping_options(
-    options: Mapping[str, object],
-    cwd: str | Path | None,
-    env: Mapping[str, str | None] | None,
-    timeout_ms: float | None,
-    stdio: Literal["pipe", "inherit"],
-) -> tuple[
-    str | Path | None,
-    Mapping[str, str | None] | None,
-    float | None,
-    Literal["pipe", "inherit"],
-]:
-    eff_cwd = cwd
-    eff_env = env
-    eff_timeout = timeout_ms
-    eff_stdio = stdio
-
-    opt_cwd = options.get("cwd")
-    if isinstance(opt_cwd, (str, Path)):
-        eff_cwd = opt_cwd
-    opt_env = options.get("env")
-    if isinstance(opt_env, Mapping):
-        try:
-            validated_env = TypeAdapter(dict[object, object]).validate_python(opt_env)
-            eff_env = {
-                k: v
-                for k, v in validated_env.items()
-                if isinstance(k, str) and (isinstance(v, str) or v is None)
-            }
-        except ValidationError:
-            pass
-    opt_timeout = options.get("timeout_ms", options.get("timeoutMs"))
-    if isinstance(opt_timeout, (int, float)):
-        eff_timeout = float(opt_timeout)
-    opt_stdio = options.get("stdio")
-    if opt_stdio in ("inherit", "pipe"):
-        eff_stdio = opt_stdio
-
-    return eff_cwd, eff_env, eff_timeout, eff_stdio
-
-
 def _parse_run_options(
-    options: RunProcessOptions | Mapping[str, object] | None,
+    options: RunProcessOptions | None,
     cwd: str | Path | None,
     env: Mapping[str, str | None] | None,
     timeout_ms: float | None,
@@ -270,9 +235,6 @@ def _parse_run_options(
         eff_stdio = options.stdio if options.stdio != "pipe" else stdio
         return eff_cwd, eff_env, eff_timeout, eff_stdio
 
-    if isinstance(options, Mapping):
-        return _parse_mapping_options(options, cwd, env, timeout_ms, stdio)
-
     return cwd, env, timeout_ms, stdio
 
 
@@ -289,38 +251,163 @@ def _build_process_env(
     return resolved_env
 
 
+def _kill_process_group(proc: asyncio.subprocess.Process) -> None:
+    """Terminate the owned process group; best effort, never raises."""
+    with contextlib.suppress(OSError):
+        os.killpg(proc.pid, signal.SIGKILL)
+        return
+    with contextlib.suppress(OSError):
+        proc.kill()
+
+
+async def _reap_process(proc: asyncio.subprocess.Process) -> None:
+    """Wait for the direct child to exit; suppresses close races."""
+    with contextlib.suppress(OSError):
+        await proc.wait()
+
+
+_READ_CHUNK_SIZE: int = 65536
+
+
+async def _drain_one_stream(
+    stream: asyncio.StreamReader,
+    chunks: list[bytes],
+    state: dict[str, int | bool],
+    proc: asyncio.subprocess.Process,
+) -> None:
+    """Drain one pipe, enforcing the shared retained-byte limit."""
+    while True:
+        try:
+            data = await stream.read(_READ_CHUNK_SIZE)
+        except OSError:
+            return
+        if not data:
+            return
+        total = int(state["total"])
+        overflow = bool(state["overflow"])
+        if overflow:
+            continue
+        if total + len(data) > MAX_OUTPUT_BYTES:
+            allowed = MAX_OUTPUT_BYTES - total
+            if allowed > 0:
+                chunks.append(data[:allowed])
+            state["total"] = MAX_OUTPUT_BYTES
+            state["overflow"] = True
+            _kill_process_group(proc)
+            continue
+        chunks.append(data)
+        state["total"] = total + len(data)
+
+
+async def _discard_stream(stream: asyncio.StreamReader) -> None:
+    """Drain and discard all bytes from a stream to EOF."""
+    while True:
+        try:
+            data = await stream.read(_READ_CHUNK_SIZE)
+        except OSError:
+            return
+        if not data:
+            return
+
+
+async def _discard_and_reap_pipes(proc: asyncio.subprocess.Process) -> None:
+    """Drain and discard pipe output concurrently with process reaping."""
+    stdout = proc.stdout
+    stderr = proc.stderr
+    if stdout is None and stderr is None:
+        await _reap_process(proc)
+        return
+    with contextlib.suppress(OSError):
+        async with asyncio.TaskGroup() as tg:
+            if stdout is not None:
+                tg.create_task(_discard_stream(stdout))
+            if stderr is not None:
+                tg.create_task(_discard_stream(stderr))
+            tg.create_task(_reap_process(proc))
+
+
+async def _drain_pipes(
+    proc: asyncio.subprocess.Process,
+    stdout_chunks: list[bytes],
+    stderr_chunks: list[bytes],
+    shared: dict[str, int | bool],
+) -> None:
+    """Drain both pipes and wait for exit; callers handle timeouts."""
+    stdout = proc.stdout
+    stderr = proc.stderr
+    if stdout is None or stderr is None:
+        await proc.wait()
+        return
+    async with asyncio.TaskGroup() as tg:
+        tg.create_task(_drain_one_stream(stdout, stdout_chunks, shared, proc))
+        tg.create_task(_drain_one_stream(stderr, stderr_chunks, shared, proc))
+        tg.create_task(proc.wait())
+
+
 async def _communicate_subprocess(
     proc: asyncio.subprocess.Process,
     timeout_ms: float | None,
-) -> tuple[bytes | None, bytes | None, bool]:
+) -> tuple[bytes | None, bytes | None, bool, bool]:
+    if proc.stdout is None or proc.stderr is None:
+        if timeout_ms is None:
+            try:
+                await proc.wait()
+            except asyncio.CancelledError:
+                _kill_process_group(proc)
+                await _reap_process(proc)
+                raise
+            return None, None, False, False
+        timeout_sec = max(
+            timeout_ms / MILLISECONDS_PER_SECOND,
+            TIMEOUT_MIN_SECONDS,
+        )
+        try:
+            async with asyncio.timeout(timeout_sec):
+                await proc.wait()
+                return None, None, False, False
+        except TimeoutError:
+            _kill_process_group(proc)
+            await _reap_process(proc)
+            return None, None, True, False
+        except asyncio.CancelledError:
+            _kill_process_group(proc)
+            await _reap_process(proc)
+            raise
+    stdout_chunks: list[bytes] = []
+    stderr_chunks: list[bytes] = []
+    shared: dict[str, int | bool] = {"total": 0, "overflow": False}
     if timeout_ms is None:
-        stdout_raw, stderr_raw = await proc.communicate()
-        return stdout_raw, stderr_raw, False
-
+        try:
+            await _drain_pipes(proc, stdout_chunks, stderr_chunks, shared)
+        except asyncio.CancelledError:
+            _kill_process_group(proc)
+            await _discard_and_reap_pipes(proc)
+            raise
+        overflow = bool(shared["overflow"])
+        return b"".join(stdout_chunks), b"".join(stderr_chunks), False, overflow
     timeout_sec = max(
         timeout_ms / MILLISECONDS_PER_SECOND,
         TIMEOUT_MIN_SECONDS,
     )
     try:
         async with asyncio.timeout(timeout_sec):
-            stdout_raw, stderr_raw = await proc.communicate()
-            return stdout_raw, stderr_raw, False
+            await _drain_pipes(proc, stdout_chunks, stderr_chunks, shared)
     except TimeoutError:
-        try:
-            os.killpg(proc.pid, signal.SIGKILL)
-        except OSError:
-            with contextlib.suppress(OSError):
-                proc.kill()
-        try:
-            stdout_raw, stderr_raw = await proc.communicate()
-        except OSError:
-            stdout_raw, stderr_raw = b"", b""
-        return stdout_raw, stderr_raw, True
+        _kill_process_group(proc)
+        await _discard_and_reap_pipes(proc)
+        overflow = bool(shared["overflow"])
+        return b"".join(stdout_chunks), b"".join(stderr_chunks), True, overflow
+    except asyncio.CancelledError:
+        _kill_process_group(proc)
+        await _discard_and_reap_pipes(proc)
+        raise
+    overflow = bool(shared["overflow"])
+    return b"".join(stdout_chunks), b"".join(stderr_chunks), False, overflow
 
 
 async def run_process(  # noqa: PLR0913
     command: Sequence[str],
-    options: RunProcessOptions | Mapping[str, object] | None = None,
+    options: RunProcessOptions | None = None,
     *,
     cwd: str | Path | None = None,
     env: Mapping[str, str | None] | None = None,
@@ -361,7 +448,9 @@ async def run_process(  # noqa: PLR0913
         start_new_session=True,
     )
 
-    stdout_raw, stderr_raw, timed_out = await _communicate_subprocess(proc, eff_timeout)
+    stdout_raw, stderr_raw, timed_out, output_limited = await _communicate_subprocess(
+        proc, eff_timeout
+    )
     exit_code = proc.returncode if proc.returncode is not None else EXIT_GENERAL_ERROR
     stdout_text = (
         stdout_raw.decode("utf-8", errors="replace") if stdout_raw is not None else ""
@@ -375,6 +464,7 @@ async def run_process(  # noqa: PLR0913
         stdout=stdout_text,
         stderr=stderr_text,
         timed_out=timed_out,
+        output_limited=output_limited,
     )
 
 
@@ -390,6 +480,10 @@ async def run_command_outcome(
         timeout_ms=timeout_ms if timeout_ms > 0 else None,
         stdio="pipe",
     )
+    if result.output_limited:
+        return OutputLimit(
+            detail=f"output limit exceeded ({MAX_OUTPUT_BYTES} bytes retained)"
+        )
     if result.timed_out:
         return TimedOut()
     if (
@@ -434,5 +528,7 @@ def log_command_failure(
             err(f"{action} failed: {cmd_str} ({detail})")
         case TimedOut():
             err(f"{action} timed out: {cmd_str}")
+        case OutputLimit(detail=detail):
+            err(f"{action} output limit exceeded: {cmd_str} ({detail})")
         case _ as unreachable:
             assert_never(unreachable)

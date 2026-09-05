@@ -53,6 +53,7 @@ PACKAGE_KEY_LENGTH: int = 16
 MILLISECONDS_PER_SECOND: float = 1000.0
 EXEC_PERM_MASK: int = 0o111
 EXIT_TIMED_OUT: int = 124
+MAX_DETAIL_CHARS: int = 2000
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,7 +193,7 @@ async def _install_staged_package(
         install_cmd,
         RunProcessOptions(timeout_ms=timeout_ms, stdio="pipe"),
     )
-    if install.timed_out or install.exit_code != 0:
+    if install.timed_out or install.output_limited or install.exit_code != 0:
         detail = _detail_from_result(install)
         message = f"npm install failed: {detail}"
         raise RuntimeError(message)
@@ -217,7 +218,7 @@ async def _install_staged_package(
                 stdio="pipe",
             ),
         )
-        if smoke.timed_out or smoke.exit_code != 0:
+        if smoke.timed_out or smoke.output_limited or smoke.exit_code != 0:
             detail = _detail_from_result(smoke)
             message = f"installed package smoke check failed: {detail}"
             raise RuntimeError(message)
@@ -372,7 +373,7 @@ async def launch_npm_package(
             env=spec.env,
         ),
     )
-    if result.timed_out:
+    if result.timed_out or result.output_limited:
         err(f"{spec.tool} launch timed out")
         return EXIT_TIMED_OUT
     return result.exit_code
@@ -421,7 +422,7 @@ async def resolve_version(
             stdio="pipe",
         ),
     )
-    if result.timed_out or result.exit_code != 0:
+    if result.timed_out or result.output_limited or result.exit_code != 0:
         message = f"could not resolve {package_name}@{dist_tag}"
         raise RuntimeError(message)
     return result.stdout.replace("\r", "").replace("\n", "").strip()
@@ -639,4 +640,7 @@ def is_executable(target_path: str) -> bool:
 
 
 def _detail_from_result(result: ProcessResult) -> str:
-    return result.stderr.strip() or result.stdout.strip() or "unknown error"
+    detail = result.stderr.strip() or result.stdout.strip() or "unknown error"
+    if len(detail) > MAX_DETAIL_CHARS:
+        return f"{detail[:MAX_DETAIL_CHARS]}…[truncated]"
+    return detail

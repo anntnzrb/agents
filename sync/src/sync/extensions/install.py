@@ -14,6 +14,7 @@ from sync.runtime.process import (
     CommandOutcome,
     Failure,
     MissingCommand,
+    OutputLimit,
     Success,
     TimedOut,
     command_exists,
@@ -120,5 +121,7 @@ def log_install_failure(
             err(f"deps install failed in {package_dir}: {cmd_name} ({detail})")
         case TimedOut():
             err(f"deps install timed out in {package_dir}: {cmd_name}")
+        case OutputLimit():
+            err(f"deps install output limit exceeded in {package_dir}: {cmd_name}")
         case _:
             assert_never(outcome)
