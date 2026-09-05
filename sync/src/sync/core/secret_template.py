@@ -58,7 +58,7 @@ def sync_secret_template(
 
     try:
         sync_private_text_file(dst_str, content)
-    except Exception as error:
+    except (OSError, ValueError, RuntimeError) as error:
         message = (
             f"render secret template {src_str} -> {dst_str} ({panic_message(error)})"
         )
@@ -75,9 +75,10 @@ def _read_text(path: str, label: str) -> str:
 
 def _read_secrets(path: str) -> dict[str, str]:
     raw_text = _read_text(path, "secrets")
+    cleaned = strip_jsonc(raw_text)
     try:
-        parsed: object = json.loads(strip_jsonc(raw_text))
-    except Exception as error:
+        parsed: object = json.loads(cleaned)  # pyright: ignore[reportAny]
+    except (ValueError, TypeError) as error:
         message = f"parse secrets {path} ({panic_message(error)})"
         raise RuntimeError(message) from error
 

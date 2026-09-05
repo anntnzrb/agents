@@ -112,7 +112,7 @@ def test_missing_package_roots_reports_only_real_package_roots(
     """missing_package_roots reports only uninstalled package roots."""
     skills_dir = tmp_path / "skills"
     skills_dir.mkdir(parents=True, exist_ok=True)
-    (skills_dir / "main.ts").write_text(
+    main_source = (
         'import chalk from "chalk/subpath";\n'
         'import { helper } from "@scoped/pkg/deep/path";\n'
         'import fs from "node:fs";\n'
@@ -123,9 +123,9 @@ def test_missing_package_roots_reports_only_real_package_roots(
         'import "../parent";\n'
         'import ".";\n'
         'import "data:text/javascript,console.log(1)";\n'
-        'const x = require("some-pkg");\n',
-        encoding="utf-8",
+        'const x = require("some-pkg");\n'
     )
+    _ = (skills_dir / "main.ts").write_text(main_source, encoding="utf-8")
 
     assert missing_package_roots(str(tmp_path)) == [
         "@scoped/pkg",
@@ -188,9 +188,9 @@ def test_package_is_healthy_propagates_corrupt_package_json(
 ) -> None:
     """package_is_healthy propagates parse error with path diagnostics."""
     pkg_json = tmp_path / "package.json"
-    pkg_json.write_text("{corrupt json", encoding="utf-8")
+    _ = pkg_json.write_text("{corrupt json", encoding="utf-8")
     with pytest.raises(ValueError, match=f"parse {pkg_json}"):
-        package_is_healthy(str(tmp_path))
+        _ = package_is_healthy(str(tmp_path))
 
 
 def test_package_has_build_script_propagates_corrupt_package_json(
@@ -198,9 +198,9 @@ def test_package_has_build_script_propagates_corrupt_package_json(
 ) -> None:
     """package_has_build_script propagates parse error with path diagnostics."""
     pkg_json = tmp_path / "package.json"
-    pkg_json.write_text("{corrupt json", encoding="utf-8")
+    _ = pkg_json.write_text("{corrupt json", encoding="utf-8")
     with pytest.raises(ValueError, match=f"parse {pkg_json}"):
-        package_has_build_script(str(tmp_path))
+        _ = package_has_build_script(str(tmp_path))
 
 
 def test_missing_package_roots_propagates_unreadable_source_file(
@@ -210,9 +210,9 @@ def test_missing_package_roots_propagates_unreadable_source_file(
     skills_dir = tmp_path / "skills"
     skills_dir.mkdir(parents=True, exist_ok=True)
     bad_file = skills_dir / "invalid.ts"
-    bad_file.write_bytes(b"\xff\xfe\x00\x00")
+    _ = bad_file.write_bytes(b"\xff\xfe\x00\x00")
     with pytest.raises(ValueError, match=f"read {bad_file}"):
-        missing_package_roots(str(tmp_path))
+        _ = missing_package_roots(str(tmp_path))
 
 
 def test_package_is_healthy_propagates_unreadable_source_file(
@@ -222,6 +222,6 @@ def test_package_is_healthy_propagates_unreadable_source_file(
     skills_dir = tmp_path / "skills"
     skills_dir.mkdir(parents=True, exist_ok=True)
     bad_file = skills_dir / "invalid.ts"
-    bad_file.write_bytes(b"\xff\xfe\x00\x00")
+    _ = bad_file.write_bytes(b"\xff\xfe\x00\x00")
     with pytest.raises(ValueError, match=f"read {bad_file}"):
-        package_is_healthy(str(tmp_path))
+        _ = package_is_healthy(str(tmp_path))

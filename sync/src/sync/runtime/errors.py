@@ -42,14 +42,14 @@ def panic_message(payload: object) -> str:
 
 def err(message: str) -> None:
     """Write an error message to stderr with 'sync: ' prefix."""
-    sys.stderr.write(f"sync: {message}\n")
-    sys.stderr.flush()
+    _ = sys.stderr.write(f"sync: {message}\n")
+    _ = sys.stderr.flush()
 
 
 def warn(message: str) -> None:
     """Write a warning message to stderr with 'sync: warning: ' prefix."""
-    sys.stderr.write(f"sync: warning: {message}\n")
-    sys.stderr.flush()
+    _ = sys.stderr.write(f"sync: warning: {message}\n")
+    _ = sys.stderr.flush()
 
 
 def is_errno(error: object, code: str) -> bool:
@@ -61,7 +61,8 @@ def is_errno(error: object, code: str) -> bool:
         for err_type, codes in _OS_ERROR_CODE_MAP.items():
             if isinstance(error, err_type) and code in codes:
                 return True
-    return getattr(error, "code", None) == code
+    error_code: object = getattr(error, "code", None)
+    return error_code == code
 
 
 def assert_never(value: Never) -> NoReturn:

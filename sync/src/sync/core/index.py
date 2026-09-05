@@ -56,7 +56,7 @@ from sync.packages.index import (
     PackageBootstrapTarget,
     bootstrap_package_target,
 )
-from sync.runtime.errors import assert_never, err, panic_message, warn
+from sync.runtime.errors import err, panic_message, warn
 from sync.runtime.fs import copy_tree, is_symlink, rm_entry
 from sync.runtime.lock import (
     SyncLock,
@@ -303,7 +303,7 @@ async def run_sync_with_deadline(sync_env: SyncEnv) -> int:
             return EXIT_OK if success else EXIT_ERROR
     except TimeoutError:
         err(f"timed out after {sync_timeout()}s")
-        sync_task.cancel()
+        _ = sync_task.cancel()
         try:
             async with asyncio.timeout(CLEANUP_GRACE_SECONDS):
                 await sync_task
@@ -313,7 +313,7 @@ async def run_sync_with_deadline(sync_env: SyncEnv) -> int:
             if sync_task.done():
                 pass
             else:
-                sync_task.cancel()
+                _ = sync_task.cancel()
                 raise
         if not sync_task.done():
             os._exit(EXIT_TIMED_OUT)
@@ -325,7 +325,7 @@ async def run_sync_with_deadline(sync_env: SyncEnv) -> int:
             return EXIT_ERROR
         return EXIT_OK if sync_task.result() else EXIT_ERROR
     except asyncio.CancelledError:
-        sync_task.cancel()
+        _ = sync_task.cancel()
         raise
     finally:
         if stop_backstop is not None:
@@ -421,10 +421,11 @@ async def _async_launch_main(
     if ssot_available:
         await _sync_before_launch(sync_env)
     else:
-        warn(
+        message = (
             "agent configuration source is unavailable; "
             "continuing with installed runtime"
         )
+        warn(message)
 
     try:
         if tool is not None:
@@ -500,8 +501,6 @@ async def run_sync_hook(
                 else:
                     clear_extension_hook_state(hook.state_path)
                 return success
-            case _:
-                assert_never(hook)
     except (OSError, RuntimeError, ValueError, TypeError) as error:
         if hook.kind == "ExtensionDeps":
             clear_extension_hook_state(hook.state_path)

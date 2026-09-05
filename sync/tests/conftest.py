@@ -60,18 +60,18 @@ def _cleanup_shared_caches() -> None:
     shutil.rmtree(SHARED_CACHE_DIR, ignore_errors=True)
 
 
-atexit.register(_cleanup_shared_caches)
+_ = atexit.register(_cleanup_shared_caches)
 
 
 def _build_shared_release() -> SharedRelease:
     template_home = Path(tempfile.mkdtemp(prefix="agents-shared-release-"))
     source = template_home / ".config" / "agents" / "sync"
     source.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(SYNC_ROOT / "src", source / "src")
+    _ = shutil.copytree(SYNC_ROOT / "src", source / "src")
     for filename in ("pyproject.toml", "uv.lock", "README.md"):
         file_path = SYNC_ROOT / filename
         if file_path.is_file():
-            shutil.copyfile(file_path, source / filename)
+            _ = shutil.copyfile(file_path, source / filename)
 
     # Sync aborts on a missing deployment manifest before reaching the
     # runtime install job, so create a minimal dummy manifest.
@@ -82,7 +82,7 @@ def _build_shared_release() -> SharedRelease:
         "listen": {"host": "100.64.0.42", "port": 8317},
         "client": {"baseUrl": "http://127.0.0.1:1/v1"},
     }
-    (tools / "deployment.json").write_text(
+    _ = (tools / "deployment.json").write_text(
         f"{json.dumps(deployment)}\n",
         encoding="utf-8",
     )
@@ -133,7 +133,7 @@ def seed_runtime_release(home: Path) -> None:
     release = _RELEASE_CACHE.release
     target = home / ".local" / "share" / "agents" / "sync-releases" / release.id
     target.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(release.dir / "src", target / "src", dirs_exist_ok=True)
+    _ = shutil.copytree(release.dir / "src", target / "src", dirs_exist_ok=True)
     for filename in (
         "pyproject.toml",
         "uv.lock",
@@ -142,7 +142,7 @@ def seed_runtime_release(home: Path) -> None:
     ):
         file_path = release.dir / filename
         if file_path.is_file():
-            shutil.copyfile(file_path, target / filename)
+            _ = shutil.copyfile(file_path, target / filename)
     venv_dir = release.dir / ".venv"
     target_venv = target / ".venv"
     if venv_dir.is_dir() and not target_venv.exists():

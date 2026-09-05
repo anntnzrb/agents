@@ -271,7 +271,7 @@ def _cleanup_dir(path: str) -> None:
 
 
 def _replace_dir(src: str, dest: str) -> None:
-    Path(src).replace(dest)
+    _ = Path(src).replace(dest)
 
 
 def _path_exists(path: str) -> bool:
@@ -476,7 +476,7 @@ def replace_link(link_path: str, target: str) -> None:
                 raise RuntimeError(message)
         except FileNotFoundError:
             pass
-        temp_path.replace(link_p)
+        _ = temp_path.replace(link_p)
     except Exception:
         with contextlib.suppress(OSError):
             if temp_path.is_symlink() or temp_path.exists():
@@ -585,10 +585,11 @@ def warn_using_cached_package(
     """Log a warning that latest package is unavailable and cache is being used."""
     dist_tag = spec.dist_tag if spec.dist_tag is not None else "latest"
     detail = _detail_from_error(error)
-    warn(
+    message = (
         f"latest {spec.package}@{dist_tag} unavailable ({detail}); "
         f"using cached {spec.tool}@{version}"
     )
+    warn(message)
 
 
 def _detail_from_error(error: object) -> str:
@@ -614,7 +615,7 @@ def installed_package_matches(
         if not manifest_path.exists():
             return False
         with manifest_path.open(encoding="utf-8") as f:
-            data: object = json.load(f)
+            data: object = json.load(f)  # pyright: ignore[reportAny]
         raw_dict = TypeAdapter(dict[str, object]).validate_python(data)
         return bool(
             raw_dict.get("name") == spec.package and raw_dict.get("version") == version

@@ -62,7 +62,7 @@ def test_harnesses_are_discovered_from_known_harness_directories(
     (tmp_path / ".config" / "agents" / "harnesses" / "unrelated").mkdir(
         parents=True, exist_ok=True
     )
-    (tmp_path / ".config" / "agents" / "harnesses" / "pi").write_text(
+    _ = (tmp_path / ".config" / "agents" / "harnesses" / "pi").write_text(
         "not a directory", encoding="utf-8"
     )
 
@@ -75,7 +75,7 @@ def test_harnesses_are_discovered_from_known_harness_directories(
 def test_harness_ownership_ids_cannot_escape_the_wrapper_directory() -> None:
     """Validate that harness IDs cannot contain directory traversal characters."""
     with pytest.raises(ValueError, match="invalid harness id"):
-        build_harness(
+        _ = build_harness(
             HarnessSpec(
                 id="codex",
                 source_name="../codex",
@@ -179,7 +179,7 @@ def test_generated_wrappers_do_not_embed_root_env_values(
     sentinel_key = "SECRET_SENTINEL_ROOT_ENV_KEY"
     sentinel_val = "super_secret_payload_12345"
     agents_home = Path(home, ".config", "agents")
-    (agents_home / ".env").write_text(
+    _ = (agents_home / ".env").write_text(
         f"{sentinel_key}={sentinel_val}\n", encoding="utf-8"
     )
     unix_env = SyncEnv.from_home(home, DEFAULT_SYNC_TIMEOUT_MS, platform="linux")
@@ -280,7 +280,7 @@ def test_wrapper_reconciliation_preserves_unmanaged_conflicts(
     destination = wrapper_destinations(sync_env)[0]
     dest_path = Path(destination.path)
     dest_path.parent.mkdir(parents=True, exist_ok=True)
-    dest_path.write_text("#!/bin/sh\necho user-owned\n", encoding="utf-8")
+    _ = dest_path.write_text("#!/bin/sh\necho user-owned\n", encoding="utf-8")
 
     assert reconcile_wrappers(sync_env) is True
     assert dest_path.read_text(encoding="utf-8") == "#!/bin/sh\necho user-owned\n"
@@ -288,12 +288,12 @@ def test_wrapper_reconciliation_preserves_unmanaged_conflicts(
     assert destination.path not in state_file.read_text(encoding="utf-8")
 
     outside = tmp_path / "outside-wrapper"
-    outside.write_text(f"# {WRAPPER_MARKER}\n", encoding="utf-8")
-    state_file.write_text(
+    _ = outside.write_text(f"# {WRAPPER_MARKER}\n", encoding="utf-8")
+    _ = state_file.write_text(
         f"{json.dumps({'version': 1, 'entries': [str(outside)]})}\n",
         encoding="utf-8",
     )
-    reconcile_wrapper_files(sync_env, [])
+    _ = reconcile_wrapper_files(sync_env, [])
     assert outside.exists()
 
 
@@ -343,7 +343,7 @@ def test_is_managed_wrapper_handles_non_utf8_binary_content(
 ) -> None:
     """Test is_managed_wrapper returns False for non-UTF8 binary files."""
     binary_file = tmp_path / "binary_script"
-    binary_file.write_bytes(b"\x80\xff\xfe\x00\x01\x80")
+    _ = binary_file.write_bytes(b"\x80\xff\xfe\x00\x01\x80")
     assert is_managed_wrapper(str(binary_file)) is False
 
 
@@ -353,7 +353,7 @@ def test_write_managed_wrapper_preserves_non_utf8_binary_file_as_conflict(
     """Test write_managed_wrapper flags non-UTF8 binary file as conflict."""
     binary_dest = tmp_path / "codex"
     payload = b"\x80\xff\xfe\x00\x01\x80"
-    binary_dest.write_bytes(payload)
+    _ = binary_dest.write_bytes(payload)
     status = write_managed_wrapper(str(binary_dest), "#!/bin/sh\n")
     assert status == "conflict"
     assert binary_dest.read_bytes() == payload
@@ -371,7 +371,7 @@ def test_wrapper_reconciliation_preserves_non_utf8_conflict_with_warning(
     dest_path = Path(destination.path)
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     payload = b"\x80\xff\xfe\x00\x01\x80"
-    dest_path.write_bytes(payload)
+    _ = dest_path.write_bytes(payload)
 
     assert reconcile_wrappers(sync_env) is True
     assert dest_path.read_bytes() == payload
@@ -389,7 +389,7 @@ def test_read_wrapper_state_strict_validation(
     state_file = tmp_path / "wrappers.json"
 
     # 1. Valid state with absolute paths and relative paths filtered out
-    state_file.write_text(
+    _ = state_file.write_text(
         json.dumps(
             {
                 "version": 1,
@@ -402,7 +402,7 @@ def test_read_wrapper_state_strict_validation(
     assert state == WrapperState(version=1, entries=["/bin/codex"])
 
     # 2. Version skew (version=2) must be discarded
-    state_file.write_text(
+    _ = state_file.write_text(
         json.dumps({"version": 2, "entries": ["/bin/codex"]}),
         encoding="utf-8",
     )
@@ -411,7 +411,7 @@ def test_read_wrapper_state_strict_validation(
     assert "invalid shape" in capsys.readouterr().err
 
     # 3. Missing version must be discarded
-    state_file.write_text(
+    _ = state_file.write_text(
         json.dumps({"entries": ["/bin/codex"]}),
         encoding="utf-8",
     )
@@ -420,7 +420,7 @@ def test_read_wrapper_state_strict_validation(
     assert "invalid shape" in capsys.readouterr().err
 
     # 4. Non-string entry must be discarded
-    state_file.write_text(
+    _ = state_file.write_text(
         json.dumps({"version": 1, "entries": [123, "/bin/codex"]}),
         encoding="utf-8",
     )
@@ -429,7 +429,7 @@ def test_read_wrapper_state_strict_validation(
     assert "invalid shape" in capsys.readouterr().err
 
     # 5. Non-list entries must be discarded
-    state_file.write_text(
+    _ = state_file.write_text(
         json.dumps({"version": 1, "entries": "not-a-list"}),
         encoding="utf-8",
     )
@@ -438,7 +438,7 @@ def test_read_wrapper_state_strict_validation(
     assert "invalid shape" in capsys.readouterr().err
 
     # 6. Non-UTF8 state file must be discarded
-    state_file.write_bytes(b"\x80\xff\xfe\x00")
+    _ = state_file.write_bytes(b"\x80\xff\xfe\x00")
     state = read_wrapper_state(str(state_file))
     assert state == WrapperState(version=1, entries=[])
     assert "wrapper state parse failed, ignoring" in capsys.readouterr().err

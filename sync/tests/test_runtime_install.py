@@ -37,11 +37,11 @@ def make_home(tmp_path: Path, *, gateway_host: bool = True) -> str:
         "listen": {"host": "127.0.0.1", "port": 9443},
         "client": {"baseUrl": "http://127.0.0.1:9443/v1"},
     }
-    (tools / "cliproxyapi" / "deployment.json").write_text(
+    _ = (tools / "cliproxyapi" / "deployment.json").write_text(
         f"{json.dumps(deployment)}\n", encoding="utf-8"
     )
-    (tools / "mcporter" / "mcporter.jsonc").write_text("{}\n", encoding="utf-8")
-    (tools / "summarize" / "config.json").write_text("{}\n", encoding="utf-8")
+    _ = (tools / "mcporter" / "mcporter.jsonc").write_text("{}\n", encoding="utf-8")
+    _ = (tools / "summarize" / "config.json").write_text("{}\n", encoding="utf-8")
 
     return home
 
@@ -55,12 +55,12 @@ def seed_source_root(home: str, cli_content: str = 'print("ok")\n') -> str:
     src_dst = source_root / "src"
     if src_dst.exists():
         shutil.rmtree(src_dst)
-    shutil.copytree(repo_sync / "src", src_dst)
+    _ = shutil.copytree(repo_sync / "src", src_dst)
 
     for filename in ("pyproject.toml", "uv.lock", "README.md"):
         src_file = repo_sync / filename
         if src_file.exists():
-            shutil.copyfile(
+            _ = shutil.copyfile(
                 src_file,
                 source_root / filename,
             )
@@ -68,7 +68,7 @@ def seed_source_root(home: str, cli_content: str = 'print("ok")\n') -> str:
     cli_path = source_root / "src" / "sync" / "cli.py"
     if not cli_path.parent.exists():
         cli_path = source_root / "src" / "cli.py"
-    cli_path.write_text(cli_content, encoding="utf-8")
+    _ = cli_path.write_text(cli_content, encoding="utf-8")
 
     return str(source_root)
 
@@ -100,7 +100,7 @@ def read_dir_names(root: str) -> list[str]:
 def test_plan_includes_the_job_with_new_runtime_paths(tmp_path: Path) -> None:
     """Test that buildSyncPlan emits a SyncRuntimeInstallJob with correct paths."""
     home = make_home(tmp_path)
-    seed_source_root(home)
+    _ = seed_source_root(home)
     sync_env, job = get_runtime_install_job(home)
 
     assert job.source_root == str(Path(sync_env.ssot_home) / "sync")
@@ -114,7 +114,7 @@ def test_publishes_current_link_and_installs_dependencies(
 ) -> None:
     """Test that SyncRuntimeInstall creates release and publishes symlink."""
     home = make_home(tmp_path)
-    seed_source_root(home)
+    _ = seed_source_root(home)
     _, job = get_runtime_install_job(home)
 
     ok = asyncio.run(run_jobs_with_preserve([job]))
@@ -136,7 +136,7 @@ def test_fails_and_leaves_current_link_untouched_when_lockfile_is_missing(
 ) -> None:
     """Test that installation fails when uv.lock is absent."""
     home = make_home(tmp_path)
-    seed_source_root(home)
+    _ = seed_source_root(home)
     (Path(home) / ".config" / "agents" / "sync" / "uv.lock").unlink()
     _, job = get_runtime_install_job(home)
 
@@ -150,8 +150,8 @@ def test_fails_and_removes_stage_on_broken_pyproject_toml(
 ) -> None:
     """Test that installation fails and cleans up stage on broken pyproject.toml."""
     home = make_home(tmp_path)
-    seed_source_root(home)
-    (Path(home) / ".config" / "agents" / "sync" / "pyproject.toml").write_text(
+    _ = seed_source_root(home)
+    _ = (Path(home) / ".config" / "agents" / "sync" / "pyproject.toml").write_text(
         "{ broken toml\n", encoding="utf-8"
     )
     _, job = get_runtime_install_job(home)
@@ -186,7 +186,7 @@ def test_installs_new_release_and_updates_current_link_without_pruning_previous_
     cli_path = source_path / "src" / "sync" / "cli.py"
     if not cli_path.exists():
         cli_path = source_path / "src" / "cli.py"
-    cli_path.write_text('print("updated")\n', encoding="utf-8")
+    _ = cli_path.write_text('print("updated")\n', encoding="utf-8")
 
     _, job2 = get_runtime_install_job(home)
     ok2 = asyncio.run(run_jobs_with_preserve([job2]))
@@ -204,7 +204,7 @@ def test_runtime_installation_cleans_up_temporary_stage_on_install_failure(
     source_root = seed_source_root(home)
 
     with (Path(source_root) / "pyproject.toml").open("a", encoding="utf-8") as f:
-        f.write('\n[project.dependencies]\nnonexistent-pkg-xyz = "99.99.99"\n')
+        _ = f.write('\n[project.dependencies]\nnonexistent-pkg-xyz = "99.99.99"\n')
 
     _, job = get_runtime_install_job(home)
     success = asyncio.run(run_jobs_with_preserve([job]))
@@ -224,7 +224,7 @@ def test_prune_unreferenced_releases_cleans_complete_unreferenced_and_stale_stag
     home = make_home(tmp_path)
     source_root = seed_source_root(home)
     _, job = get_runtime_install_job(home)
-    asyncio.run(run_jobs_with_preserve([job]))
+    _ = asyncio.run(run_jobs_with_preserve([job]))
 
     first_release_name = read_dir_names(job.releases_root)[0]
 
@@ -232,31 +232,33 @@ def test_prune_unreferenced_releases_cleans_complete_unreferenced_and_stale_stag
     cli_path = source_path / "src" / "sync" / "cli.py"
     if not cli_path.exists():
         cli_path = source_path / "src" / "cli.py"
-    cli_path.write_text('print("updated")\n', encoding="utf-8")
+    _ = cli_path.write_text('print("updated")\n', encoding="utf-8")
 
     _, job2 = get_runtime_install_job(home)
-    asyncio.run(run_jobs_with_preserve([job2]))
+    _ = asyncio.run(run_jobs_with_preserve([job2]))
 
     releases_path = Path(job.releases_root)
     unrecognized_dir = releases_path / "custom-unrecognized-dir"
     unrecognized_dir.mkdir(parents=True, exist_ok=True)
-    (unrecognized_dir / "data.txt").write_text("preserve-me", encoding="utf-8")
+    _ = (unrecognized_dir / "data.txt").write_text("preserve-me", encoding="utf-8")
 
     stage_dotfile = releases_path / ".stage-test-keep"
     stage_dotfile.mkdir(parents=True, exist_ok=True)
-    (stage_dotfile / "tmp.txt").write_text("stage-temp", encoding="utf-8")
+    _ = (stage_dotfile / "tmp.txt").write_text("stage-temp", encoding="utf-8")
 
     incomplete_sha_dir = releases_path / ("a" * 64)
     incomplete_sha_dir.mkdir(parents=True, exist_ok=True)
-    (incomplete_sha_dir / "incomplete.txt").write_text("incomplete", encoding="utf-8")
+    _ = (incomplete_sha_dir / "incomplete.txt").write_text(
+        "incomplete", encoding="utf-8"
+    )
 
     dead_pid_stage = releases_path / ".stage-99999999-deadbeef12345678"
     dead_pid_stage.mkdir(parents=True, exist_ok=True)
-    (dead_pid_stage / "pyproject.toml").write_text("{}", encoding="utf-8")
+    _ = (dead_pid_stage / "pyproject.toml").write_text("{}", encoding="utf-8")
 
     live_pid_stage = releases_path / f".stage-{os.getpid()}-livebeef12345678"
     live_pid_stage.mkdir(parents=True, exist_ok=True)
-    (live_pid_stage / "pyproject.toml").write_text("{}", encoding="utf-8")
+    _ = (live_pid_stage / "pyproject.toml").write_text("{}", encoding="utf-8")
 
     prune_unreferenced_releases(job2.releases_root, job2.current_link)
 
@@ -284,7 +286,7 @@ def test_remove_legacy_runtime_install_removes_legacy_directory(
     runtime_home = str(Path(home) / ".local" / "share" / "agents")
     legacy = Path(runtime_home) / "sync"
     (legacy / "src").mkdir(parents=True, exist_ok=True)
-    (legacy / "src" / "cli.py").write_text('print("legacy")\n', encoding="utf-8")
+    _ = (legacy / "src" / "cli.py").write_text('print("legacy")\n', encoding="utf-8")
 
     ok = remove_legacy_runtime_install(runtime_home)
     assert ok is True
@@ -298,8 +300,8 @@ def test_run_sync_removes_the_legacy_mutable_runtime_after_current_link_and_wrap
     home = make_home(tmp_path, gateway_host=False)
     legacy = Path(home) / ".local" / "share" / "agents" / "sync"
     (legacy / "src").mkdir(parents=True, exist_ok=True)
-    (legacy / "src" / "cli.py").write_text('print("legacy")\n', encoding="utf-8")
-    seed_source_root(home)
+    _ = (legacy / "src" / "cli.py").write_text('print("legacy")\n', encoding="utf-8")
+    _ = seed_source_root(home)
 
     sync_env = SyncEnv.from_home(home, TEST_TIMEOUT_MS, platform="linux")
     ok = asyncio.run(run_sync(sync_env))
@@ -317,7 +319,7 @@ def test_runtime_install_fails_loudly_when_source_subdir_is_unreadable(
     source_root = seed_source_root(home)
     unreadable_dir = Path(source_root) / "src" / "unreadable"
     unreadable_dir.mkdir(parents=True, exist_ok=True)
-    (unreadable_dir / "file.py").write_text("content\n", encoding="utf-8")
+    _ = (unreadable_dir / "file.py").write_text("content\n", encoding="utf-8")
     unreadable_dir.chmod(0o000)
     try:
         _, job = get_runtime_install_job(home)

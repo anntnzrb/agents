@@ -60,17 +60,17 @@ def _replace_dir_atomically_sync(src: str, dst: str) -> None:
 
     moved_to_backup = False
     if _exists(dst):
-        Path(dst).replace(backup)
+        _ = Path(dst).replace(backup)
         moved_to_backup = True
 
     try:
-        Path(src).replace(dst)
+        _ = Path(src).replace(dst)
         if moved_to_backup:
             rm_entry(backup)
     except Exception:
         if moved_to_backup and _exists(backup):
             with contextlib.suppress(OSError):
-                Path(backup).replace(dst)
+                _ = Path(backup).replace(dst)
         raise
 
 

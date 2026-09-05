@@ -91,7 +91,7 @@ def test_cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary() -> No
             ValueError,
             match="specific host or interface address",
         ):
-            parse_cliproxy_deployment(
+            _ = parse_cliproxy_deployment(
                 {
                     "server": {"hostname": "test-gateway"},
                     "listen": {"host": host, "port": 9443},
@@ -103,7 +103,7 @@ def test_cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary() -> No
         ValueError,
         match=r"HTTP\(S\) /v1 endpoint",
     ):
-        parse_cliproxy_deployment(
+        _ = parse_cliproxy_deployment(
             {
                 "server": {"hostname": "test-gateway"},
                 "listen": {"host": "100.64.0.42", "port": 9443},
@@ -115,7 +115,7 @@ def test_cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary() -> No
         ValueError,
         match=r"HTTP\(S\) /v1 endpoint",
     ):
-        parse_cliproxy_deployment(
+        _ = parse_cliproxy_deployment(
             {
                 "server": {"hostname": "test-gateway"},
                 "listen": {"host": "100.64.0.42", "port": 9443},
@@ -131,7 +131,7 @@ def test_cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary() -> No
             ValueError,
             match=r"HTTP\(S\) /v1 endpoint",
         ):
-            parse_cliproxy_deployment(
+            _ = parse_cliproxy_deployment(
                 {
                     "server": {"hostname": "test-gateway"},
                     "listen": {"host": "100.64.0.42", "port": 9443},
@@ -143,7 +143,7 @@ def test_cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary() -> No
         ValueError,
         match="unknown field typo",
     ):
-        parse_cliproxy_deployment(
+        _ = parse_cliproxy_deployment(
             {
                 "server": {"hostname": "test-gateway"},
                 "listen": {"host": "100.64.0.42", "port": 9443, "typo": True},
@@ -156,7 +156,7 @@ def test_cliproxy_endpoint_template_renders_idempotently(tmp_path: Path) -> None
     """Test template rendering idempotency, mode preservation, and errors."""
     src = tmp_path / "source.toml"
     dst = tmp_path / "generated" / "config.toml"
-    src.write_text(
+    _ = src.write_text(
         f'base_url = "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n',
         encoding="utf-8",
     )
@@ -176,7 +176,7 @@ def test_cliproxy_endpoint_template_renders_idempotently(tmp_path: Path) -> None
         ValueError,
         match="missing CLIProxyAPI endpoint placeholder",
     ):
-        render_cliproxy_endpoint_template("base_url = local\n", DEPLOYMENT)
+        _ = render_cliproxy_endpoint_template("base_url = local\n", DEPLOYMENT)
 
 
 def test_cliproxy_target_readiness_requires_a_nonempty_models_payload() -> None:
@@ -213,12 +213,12 @@ def test_cliproxy_endpoint_publication_requires_a_keyless_ready_target(
     """Test endpoint publication skips unready targets without mutating destination."""
     src = tmp_path / "source.toml"
     dst = tmp_path / "generated" / "config.toml"
-    src.write_text(
+    _ = src.write_text(
         f'base_url = "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n',
         encoding="utf-8",
     )
     (tmp_path / "generated").mkdir(parents=True, exist_ok=True)
-    dst.write_text('base_url = "old"\n', encoding="utf-8")
+    _ = dst.write_text('base_url = "old"\n', encoding="utf-8")
     dst.chmod(0o600)
 
     recorded_headers: dict[str, str] = {}
@@ -254,21 +254,21 @@ def test_cliproxy_endpoint_publication_rolls_back_all_targets_after_a_write_fail
     dst_one = tmp_path / "generated" / "one.toml"
     dst_two = tmp_path / "generated" / "two.toml"
 
-    src_one.write_text(
+    _ = src_one.write_text(
         f'base_url = "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n',
         encoding="utf-8",
     )
-    src_two.write_text(
+    _ = src_two.write_text(
         f'base_url = "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n',
         encoding="utf-8",
     )
     (tmp_path / "generated").mkdir(parents=True, exist_ok=True)
-    dst_one.write_text("old\n", encoding="utf-8")
+    _ = dst_one.write_text("old\n", encoding="utf-8")
     dst_one.chmod(0o600)
     dst_two.mkdir()  # Directory causes write failure
 
     with pytest.raises(RuntimeError):
-        publish_cliproxy_endpoint_templates(
+        _ = publish_cliproxy_endpoint_templates(
             [
                 CliProxyEndpointTarget(src=str(src_one), dst=str(dst_one)),
                 CliProxyEndpointTarget(src=str(src_two), dst=str(dst_two)),
@@ -287,7 +287,7 @@ def test_cliproxy_endpoint_replacement_preserves_codex_owned_tail(
     """Test preservation of user-owned tables across repeated publish calls."""
     src = tmp_path / "source.toml"
     dst = tmp_path / "generated" / "config.toml"
-    src.write_text(
+    _ = src.write_text(
         f'base_url = "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n',
         encoding="utf-8",
     )
@@ -301,7 +301,7 @@ def test_cliproxy_endpoint_replacement_preserves_codex_owned_tail(
         src.read_text(encoding="utf-8"),
         DEPLOYMENT,
     )
-    dst.write_text(f"{rendered}{owned_tail}", encoding="utf-8")
+    _ = dst.write_text(f"{rendered}{owned_tail}", encoding="utf-8")
     dst.chmod(0o600)
 
     targets = [
@@ -325,7 +325,7 @@ def test_cliproxy_endpoint_replacement_preserves_codex_owned_tail(
     assert dst.stat().st_mode & 0o777 == MODE_600
     first_stat = dst.stat()
 
-    publish_cliproxy_endpoint_templates(
+    _ = publish_cliproxy_endpoint_templates(
         targets,
         DEPLOYMENT,
         CliProxyEndpointSyncOptions(fetch=fetch_ready),
@@ -343,19 +343,19 @@ def test_cliproxy_endpoint_preserves_owned_tables_without_stale_managed_tails(
     dst = tmp_path / "generated" / "config.toml"
     (tmp_path / "generated").mkdir(parents=True, exist_ok=True)
 
-    src.write_text(
+    src_content = (
         f'base_url = "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n\n'
-        '[general]\nmode = "new_fast"\n\n[model]\nname = "gpt-5.6-luna"\n',
-        encoding="utf-8",
+        '[general]\nmode = "new_fast"\n\n[model]\nname = "gpt-5.6-luna"\n'
     )
-    dst.write_text(
+    _ = src.write_text(src_content, encoding="utf-8")
+    dst_content = (
         'base_url = "https://old.gateway.test:9443/v1"\n\n'
         '[general]\nmode = "old_fast"\nlegacy_flag = true\n\n'
         '[hooks.state."orchestrator"]\nspawn_count = 3\n\n'
         '[model]\nname = "old-model-name"\ntemperature = 0.2\n\n'
-        '[projects."~/work/example"]\nmodel = "gpt-5.6-sol"\n',
-        encoding="utf-8",
+        '[projects."~/work/example"]\nmodel = "gpt-5.6-sol"\n'
     )
+    _ = dst.write_text(dst_content, encoding="utf-8")
     dst.chmod(0o600)
 
     targets = [
@@ -387,7 +387,7 @@ def test_cliproxy_endpoint_preserves_owned_tables_without_stale_managed_tails(
     assert dst.stat().st_mode & 0o777 == MODE_600
     first_stat = dst.stat()
 
-    publish_cliproxy_endpoint_templates(
+    _ = publish_cliproxy_endpoint_templates(
         targets,
         DEPLOYMENT,
         CliProxyEndpointSyncOptions(fetch=fetch_ready),
@@ -470,7 +470,7 @@ def test_cliproxy_custom_aliases_use_provider_native_model_and_payload_shapes() 
     source = (REPOSITORY_ROOT / "tools" / "cliproxyapi" / "config.yaml.tmpl").read_text(
         encoding="utf-8"
     )
-    config: object = yaml.safe_load(source)
+    config: object = yaml.safe_load(source)  # pyright: ignore[reportAny]
     assert _is_obj_dict(config)
 
     profiles = config.get("openai-compatibility")
@@ -546,11 +546,11 @@ def test_cliproxy_opencode_endpoint_removes_placeholder_and_injects_base_url(
     dst_dir.mkdir(parents=True, exist_ok=True)
     jsonc_src = tmp_path / "opencode.jsonc.tmpl"
     ts_src = tmp_path / "cliproxy.ts.tmpl"
-    jsonc_src.write_text(
+    _ = jsonc_src.write_text(
         f'const x = "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}";\n',
         encoding="utf-8",
     )
-    ts_src.write_text(
+    _ = ts_src.write_text(
         f'const x = "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}";\n',
         encoding="utf-8",
     )

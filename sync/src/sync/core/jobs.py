@@ -214,7 +214,7 @@ async def _execute_uv_sync(stage: str, release_id: str, timeout_ms: int) -> None
 
     marker_path = Path(stage) / ".release-complete"
     with marker_path.open("w", encoding="utf-8") as marker_file:
-        marker_file.write(f"{release_id}\n")
+        _ = marker_file.write(f"{release_id}\n")
 
     if not _is_complete_release(stage):
         message = "runtime install did not produce a complete release"
@@ -241,7 +241,7 @@ async def _run_sync_runtime_install_job(job: SyncRuntimeInstallJob) -> bool:
             if _is_complete_release(release_dir):
                 return publish_current_link(job.current_link, release_dir)
             rm_entry(release_dir)
-        await asyncio.to_thread(Path(stage).rename, release_dir)
+        _ = await asyncio.to_thread(Path(stage).rename, release_dir)
     except (OSError, RuntimeError, ValueError, TypeError) as error:
         err(f"runtime install failed: {panic_message(error)}")
         return False
@@ -294,10 +294,11 @@ def _is_regular_readable(
             err(f"missing or unreadable runtime source {label}: {target_path}")
             return False
     except OSError as error:
-        err(
+        message = (
             f"missing or unreadable runtime source {label}: {target_path} "
             f"({panic_message(error)})"
         )
+        err(message)
         return False
     else:
         return True
@@ -351,17 +352,17 @@ def _copy_runtime_inputs(
     sync_managed_tree(paths.src_dir, stage_src, (), source_content_cache)
     stage_pyproject = str(stage_path / "pyproject.toml")
     stage_uv_lock = str(stage_path / "uv.lock")
-    shutil.copyfile(paths.pyproject_toml, stage_pyproject)
+    _ = shutil.copyfile(paths.pyproject_toml, stage_pyproject)
     shutil.copymode(paths.pyproject_toml, stage_pyproject)
-    shutil.copyfile(paths.uv_lock, stage_uv_lock)
+    _ = shutil.copyfile(paths.uv_lock, stage_uv_lock)
     shutil.copymode(paths.uv_lock, stage_uv_lock)
     source_readme = Path(paths.pyproject_toml).parent / "README.md"
     stage_readme = stage_path / "README.md"
     if source_readme.is_file():
-        shutil.copyfile(source_readme, stage_readme)
+        _ = shutil.copyfile(source_readme, stage_readme)
         shutil.copymode(source_readme, stage_readme)
     else:
-        stage_readme.write_text("", encoding="utf-8")
+        _ = stage_readme.write_text("", encoding="utf-8")
 
 
 def _is_complete_release(release_dir: str) -> bool:
@@ -399,7 +400,7 @@ def publish_current_link(current_link: str, release_dir: str) -> bool:
         rm_entry(str(temp))
         target = os.path.relpath(release_dir, str(parent))
         temp.symlink_to(target)
-        temp.replace(current_link)
+        _ = temp.replace(current_link)
     except (OSError, RuntimeError) as error:
         err(f"failed to publish current link {current_link}: {panic_message(error)}")
         with contextlib.suppress(OSError):
@@ -445,10 +446,11 @@ def _prune_stage_dir(
         try:
             rm_entry(stage_path)
         except (OSError, RuntimeError) as error:
-            warn(
+            message = (
                 f"failed to prune stale stage directory {entry_name}: "
                 f"{panic_message(error)}"
             )
+            warn(message)
 
 
 def _prune_unreferenced_release(
@@ -483,10 +485,11 @@ def prune_unreferenced_releases(
         resolved = Path(current_release_dir_or_link).resolve()
         current_base = resolved.name
     except OSError as error:
-        warn(
-            f"failed to resolve current release link for pruning: "
+        message = (
+            "failed to resolve current release link for pruning: "
             f"{panic_message(error)}"
         )
+        warn(message)
         return
 
     if not SHA256_HEX_PATTERN.match(current_base):
@@ -592,7 +595,7 @@ def _sync_item(src: str, dst: str) -> bool:
 
         Path(dst).parent.mkdir(parents=True, exist_ok=True)
         rm_entry(dst)
-        shutil.copyfile(src, dst)
+        _ = shutil.copyfile(src, dst)
         shutil.copymode(src, dst)
     except (OSError, RuntimeError) as error:
         err(f"copy failed: {src} -> {dst} ({panic_message(error)})")

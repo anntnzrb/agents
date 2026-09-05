@@ -60,12 +60,12 @@ def _is_help_flag(arg: str | None) -> bool:
 
 def _out(text: str) -> None:
     """Write a help message to stdout (``print`` is banned by T201)."""
-    sys.stdout.write(text + "\n")
+    _ = sys.stdout.write(text + "\n")
 
 
 def _err(text: str) -> None:
     """Write a usage error to stderr."""
-    sys.stderr.write(text + "\n")
+    _ = sys.stderr.write(text + "\n")
 
 
 def _run_launch(args: list[str]) -> int:

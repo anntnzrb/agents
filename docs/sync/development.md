@@ -21,7 +21,7 @@ cd sync
 uv sync --frozen
 uv run ruff check .
 uv run ruff format --check .
-uv run pyright
+uv run basedpyright
 uv run pytest -n auto
 ```
 
@@ -62,7 +62,7 @@ Keep tests of harness implementations and harness-local behavior beside their so
 2. Add or update the focused test.
 3. Make the smallest implementation change.
 4. Run the focused test.
-5. Run `uv run ruff check .`, `uv run ruff format --check .`, `uv run pyright`, and `uv run pytest -n auto`.
+5. Run `uv run ruff check .`, `uv run ruff format --check .`, `uv run basedpyright`, and `uv run pytest -n auto`.
 6. Run `git diff --check` from the repository root.
 7. Update the related page under `docs/sync/` when the change affects commands, paths, lifecycle, platforms, or generated behavior.
 

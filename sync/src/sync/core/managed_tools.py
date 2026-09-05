@@ -16,13 +16,13 @@ import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     from sync.core.harness import SyncEnv
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from sync.core.cliproxy_deployment import (
     CLI_PROXY_SOURCE_DIR,
@@ -50,7 +50,7 @@ _TIMEOUT_POSITIONAL_ARITY = 2
 class ReleaseAsset(BaseModel):
     """Pinned release asset metadata for a platform."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     name: str = Field(pattern=COMPONENT_PATTERN)
     sha256: str = Field(pattern=SHA256_PATTERN)
@@ -59,7 +59,7 @@ class ReleaseAsset(BaseModel):
 class ReleaseManifest(BaseModel):
     """Release manifest describing a downloadable external tool."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     repository: str = Field(pattern=REPOSITORY_PATTERN)
     version: str = Field(pattern=COMPONENT_PATTERN)
@@ -118,14 +118,14 @@ def read_manifest(manifest_path: str | Path) -> ReleaseManifest:
     try:
         raw_text = path.read_text(encoding="utf-8")
         clean_text = strip_jsonc(raw_text)
-        parsed: object = json.loads(clean_text)
-    except Exception as exc:
+        parsed: object = json.loads(clean_text)  # pyright: ignore[reportAny]
+    except (OSError, ValueError, TypeError) as exc:
         message = f"parse {path} ({panic_message(exc)})"
         raise RuntimeError(message) from exc
 
     try:
         return ReleaseManifest.model_validate(parsed)
-    except Exception as exc:
+    except ValidationError as exc:
         message = f"invalid release manifest: {path}"
         raise RuntimeError(message) from exc
 
@@ -136,7 +136,7 @@ def download_release(url: str, destination: str | Path, timeout_ms: int) -> None
     timeout_sec = timeout_ms / MS_PER_SECOND
     try:
         response = httpx.get(url, timeout=timeout_sec, follow_redirects=True)
-    except Exception as exc:
+    except (httpx.HTTPError, OSError, ValueError, TypeError) as exc:
         message = f"download failed ({panic_message(exc)})"
         raise RuntimeError(message) from exc
 
@@ -145,7 +145,7 @@ def download_release(url: str, destination: str | Path, timeout_ms: int) -> None
         raise RuntimeError(message)
 
     try:
-        dest_path.write_bytes(response.content)
+        _ = dest_path.write_bytes(response.content)
     except OSError as exc:
         message = f"download failed ({panic_message(exc)})"
         raise RuntimeError(message) from exc
@@ -181,19 +181,16 @@ def extract_release(
         )
         future.result(timeout=timeout_sec)
     except (TimeoutError, concurrent.futures.TimeoutError) as exc:
-        executor.shutdown(wait=False, cancel_futures=True)
         message = "archive extraction timed out"
         raise TimeoutError(message) from exc
     except KeyError as exc:
-        executor.shutdown(wait=False, cancel_futures=True)
         message = f"archive extraction failed: missing entry {entry_name}"
         raise RuntimeError(message) from exc
-    except Exception as exc:
-        executor.shutdown(wait=False, cancel_futures=True)
+    except (OSError, tarfile.TarError) as exc:
         message = f"archive extraction failed: {panic_message(exc)}"
         raise RuntimeError(message) from exc
-    else:
-        executor.shutdown(wait=False)
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 def verify_checksum(archive: str | Path, expected: str) -> None:
@@ -309,8 +306,8 @@ def prepare_cli_proxy(
             extract_fn(str(archive_path), str(stage_path), executable_name, timeout_ms)
             archive_path.unlink(missing_ok=True)
             _ensure_staged_executable(stage_path, executable_name)
-            (stage_path / "receipt.json").write_text(receipt, encoding="utf-8")
-            stage_path.replace(install_dir)
+            _ = (stage_path / "receipt.json").write_text(receipt, encoding="utf-8")
+            _ = stage_path.replace(install_dir)
         except Exception as exc:
             shutil.rmtree(stage_dir, ignore_errors=True)
             message = f"install CLIProxyAPI {manifest.version} ({panic_message(exc)})"
@@ -389,9 +386,9 @@ def is_cli_proxy_running(
         url = cliproxy_models_url(deployment)
         timeout_sec = timeout_ms / MS_PER_SECOND
         if fetch_impl is not None:
-            _invoke_fetch(fetch_impl, url, timeout_sec, timeout_ms)
+            _ = _invoke_fetch(fetch_impl, url, timeout_sec, timeout_ms)
         else:
-            httpx.get(url, timeout=timeout_sec)
+            _ = httpx.get(url, timeout=timeout_sec)
     except Exception:
         return False
     else:

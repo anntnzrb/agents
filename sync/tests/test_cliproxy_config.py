@@ -71,7 +71,7 @@ openai-compatibility:
     }
 
     rendered = render_cliproxy_config(template, secrets, DEPLOYMENT)
-    parsed: object = yaml.safe_load(rendered)
+    parsed: object = yaml.safe_load(rendered)  # pyright: ignore[reportAny]
     assert isinstance(parsed, dict)
     assert parsed["host"] == "100.64.0.42"
     assert parsed["port"] == EXPECTED_PORT
@@ -118,7 +118,7 @@ codex-api-key:
         ValueError,
         match="unreferenced CLIProxyAPI credential pool: unused-pool",
     ):
-        render_cliproxy_config(template, secrets, DEPLOYMENT)
+        _ = render_cliproxy_config(template, secrets, DEPLOYMENT)
 
 
 def test_cliproxy_render_config_rejects_x_model_sources() -> None:
@@ -133,7 +133,7 @@ x-model-sources:
         ValueError,
         match="unsupported CLIProxyAPI template field: x-model-sources",
     ):
-        render_cliproxy_config(template, secrets, DEPLOYMENT)
+        _ = render_cliproxy_config(template, secrets, DEPLOYMENT)
 
 
 def test_committed_template_renders_with_example_secrets() -> None:
@@ -142,11 +142,12 @@ def test_committed_template_renders_with_example_secrets() -> None:
     secrets_path = REPOSITORY_ROOT / "secrets.local.example.json"
 
     template = template_path.read_text(encoding="utf-8")
-    secrets: object = json.loads(secrets_path.read_text(encoding="utf-8"))
+    secrets_text = secrets_path.read_text(encoding="utf-8")
+    secrets: object = json.loads(secrets_text)  # pyright: ignore[reportAny]
     assert _is_obj_dict(secrets)
 
     rendered = render_cliproxy_config(template, secrets, DEPLOYMENT)
-    parsed: object = yaml.safe_load(rendered)
+    parsed: object = yaml.safe_load(rendered)  # pyright: ignore[reportAny]
     assert isinstance(parsed, dict)
     assert parsed["host"] == "100.64.0.42"
     assert parsed["port"] == EXPECTED_PORT
@@ -169,7 +170,7 @@ codex-api-key:
         ValueError,
         match="missing CLIProxyAPI credential pool: missing-pool",
     ):
-        render_cliproxy_config(template, secrets, DEPLOYMENT)
+        _ = render_cliproxy_config(template, secrets, DEPLOYMENT)
 
 
 def test_cliproxy_sync_writes_private_config_file(tmp_path: Path) -> None:
@@ -179,7 +180,7 @@ def test_cliproxy_sync_writes_private_config_file(tmp_path: Path) -> None:
     secrets_path = tmp_path / "secrets.json"
     (tmp_path / "runtime").mkdir(parents=True, exist_ok=True)
 
-    src.write_text(
+    _ = src.write_text(
         """host: ${CLIPROXY_LISTEN_HOST}
 port: ${CLIPROXY_LISTEN_PORT}
 remote-management:
@@ -189,7 +190,7 @@ codex-api-key:
 """,
         encoding="utf-8",
     )
-    secrets_path.write_text(
+    _ = secrets_path.write_text(
         json.dumps(
             {
                 "CLIPROXY_CREDENTIAL_POOLS": {
@@ -205,7 +206,8 @@ codex-api-key:
 
     assert dst.exists()
     assert dst.stat().st_mode & 0o777 == PRIVATE_FILE_MODE
-    parsed: object = yaml.safe_load(dst.read_text(encoding="utf-8"))
+    rendered_text = dst.read_text(encoding="utf-8")
+    parsed: object = yaml.safe_load(rendered_text)  # pyright: ignore[reportAny]
     assert isinstance(parsed, dict)
     assert parsed["host"] == "100.64.0.42"
     assert parsed["port"] == EXPECTED_PORT
@@ -224,7 +226,7 @@ codex-api-key:
     secrets: dict[str, object] = {"CLIPROXY_CREDENTIAL_POOLS": {}}
 
     rendered = render_cliproxy_config(template, secrets, DEPLOYMENT)
-    parsed: object = yaml.safe_load(rendered)
+    parsed: object = yaml.safe_load(rendered)  # pyright: ignore[reportAny]
     assert isinstance(parsed, dict)
     assert parsed["codex-api-key"] == [
         {"api-key": "static-upstream-key", "weight": 1, "prefix": "static-prefix"}
@@ -262,4 +264,4 @@ port: ${{CLIPROXY_LISTEN_PORT}}
     secrets: dict[str, object] = {"CLIPROXY_CREDENTIAL_POOLS": {}}
 
     with pytest.raises(ValueError, match=expected_match):
-        render_cliproxy_config(template, secrets, DEPLOYMENT)
+        _ = render_cliproxy_config(template, secrets, DEPLOYMENT)

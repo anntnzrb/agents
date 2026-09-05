@@ -74,7 +74,7 @@ def try_acquire_sync_lock(
 
     try:
         os.ftruncate(fd, TRUNCATE_SIZE)
-        os.lseek(fd, FILE_START_OFFSET, os.SEEK_SET)
+        _ = os.lseek(fd, FILE_START_OFFSET, os.SEEK_SET)
     except OSError as error:
         with contextlib.suppress(OSError):
             os.close(fd)
@@ -83,7 +83,7 @@ def try_acquire_sync_lock(
 
     try:
         pid_payload = f"pid={os.getpid()}\n".encode()
-        os.write(fd, pid_payload)
+        _ = os.write(fd, pid_payload)
         os.fsync(fd)
     except OSError as error:
         with contextlib.suppress(OSError):

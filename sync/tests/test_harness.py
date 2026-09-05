@@ -47,7 +47,7 @@ def test_root_env_parses_dotenv_contents_with_expected_precedence_and_literals(
         "COMMAND_CODE_API_KEY=",
         "API_KEY=12345",
     ]
-    (agents_home / ".env").write_text("\n".join(env_lines), encoding="utf-8")
+    _ = (agents_home / ".env").write_text("\n".join(env_lines), encoding="utf-8")
 
     sync_env = SyncEnv.from_home(str(tmp_path), TEST_TIMEOUT_MS, platform="linux")
     assert sync_env.root_env == {
@@ -70,7 +70,7 @@ def test_root_env_throws_when_reading_env_fails_with_non_enoent_error(
     bad_env_path.mkdir(parents=True, exist_ok=True)
 
     with pytest.raises(RootEnvReadError) as exc_info:
-        SyncEnv.from_home(str(tmp_path), TEST_TIMEOUT_MS, platform="linux")
+        _ = SyncEnv.from_home(str(tmp_path), TEST_TIMEOUT_MS, platform="linux")
 
     assert "failed to read root environment file" in str(exc_info.value)
     assert str(bad_env_path) in str(exc_info.value)
@@ -85,7 +85,7 @@ def test_load_root_env_returns_tagged_error_when_reading_fails(
     bad_env_path.mkdir(parents=True, exist_ok=True)
 
     with pytest.raises(RootEnvReadError) as exc_info:
-        load_root_env(str(bad_env_path))
+        _ = load_root_env(str(bad_env_path))
 
     assert exc_info.value.path == str(bad_env_path)
     assert "failed to read root environment file" in str(exc_info.value)

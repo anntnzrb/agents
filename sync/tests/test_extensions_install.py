@@ -28,15 +28,15 @@ def test_iter_extension_packages_finds_nested_package_jsons(
     """iter_extension_packages finds package.json dirs excluding node_modules."""
     ext1 = tmp_path / "ext1"
     ext1.mkdir(parents=True, exist_ok=True)
-    (ext1 / "package.json").write_text("{}", encoding="utf-8")
+    _ = (ext1 / "package.json").write_text("{}", encoding="utf-8")
 
     ext2 = tmp_path / "nested" / "ext2"
     ext2.mkdir(parents=True, exist_ok=True)
-    (ext2 / "package.json").write_text("{}", encoding="utf-8")
+    _ = (ext2 / "package.json").write_text("{}", encoding="utf-8")
 
     ignored = tmp_path / "node_modules" / "ignored"
     ignored.mkdir(parents=True, exist_ok=True)
-    (ignored / "package.json").write_text("{}", encoding="utf-8")
+    _ = (ignored / "package.json").write_text("{}", encoding="utf-8")
 
     packages = asyncio.run(iter_extension_packages(str(tmp_path)))
     assert sorted(packages) == [str(ext1), str(ext2)]
@@ -60,7 +60,7 @@ fi
 echo "unexpected $*" >&2
 exit 1
 """
-    fake_bun.write_text(script, encoding="utf-8")
+    _ = fake_bun.write_text(script, encoding="utf-8")
     fake_bun.chmod(_EXECUTABLE_MODE)
 
     current_path = os.environ.get("PATH", "")
@@ -69,7 +69,7 @@ exit 1
     ext = tmp_path / "ext"
     ext.mkdir(parents=True, exist_ok=True)
     (ext / "node_modules").mkdir(parents=True, exist_ok=True)
-    (ext / "package.json").write_text(
+    _ = (ext / "package.json").write_text(
         json.dumps({"name": "ext", "dependencies": {"chalk": "^5"}}) + "\n",
         encoding="utf-8",
     )
@@ -90,15 +90,15 @@ def test_iter_extension_packages_skips_hidden_directories(
     """iter_extension_packages ignores directories starting with a dot."""
     visible = tmp_path / "visible_ext"
     visible.mkdir(parents=True, exist_ok=True)
-    (visible / "package.json").write_text("{}", encoding="utf-8")
+    _ = (visible / "package.json").write_text("{}", encoding="utf-8")
 
     hidden = tmp_path / ".hidden_ext"
     hidden.mkdir(parents=True, exist_ok=True)
-    (hidden / "package.json").write_text("{}", encoding="utf-8")
+    _ = (hidden / "package.json").write_text("{}", encoding="utf-8")
 
     nested_hidden = tmp_path / "visible_ext" / ".nested_dot" / "pkg"
     nested_hidden.mkdir(parents=True, exist_ok=True)
-    (nested_hidden / "package.json").write_text("{}", encoding="utf-8")
+    _ = (nested_hidden / "package.json").write_text("{}", encoding="utf-8")
 
     packages = asyncio.run(iter_extension_packages(str(tmp_path)))
     assert packages == [str(visible)]

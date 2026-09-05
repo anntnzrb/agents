@@ -282,8 +282,9 @@ def read_wrapper_state(state_path: str) -> WrapperState:
         message = f"read {state_path} ({panic_message(error)})"
         raise RuntimeError(message) from error
 
+    cleaned = strip_jsonc(content)
     try:
-        parsed: object = json.loads(strip_jsonc(content))
+        parsed: object = json.loads(cleaned)  # pyright: ignore[reportAny]
     except (json.JSONDecodeError, ValueError, TypeError) as error:
         message = panic_message(error)
         warn(f"wrapper state parse failed, ignoring {state_path} ({message})")
@@ -347,11 +348,11 @@ def write_managed_wrapper(
     temp_path = Path(f"{target_path}.{os.getpid()}.tmp")
     try:
         with temp_path.open("w", encoding="utf-8") as f:
-            f.write(content)
+            _ = f.write(content)
             f.flush()
             os.fsync(f.fileno())
         temp_path.chmod(WRAPPER_FILE_MODE)
-        temp_path.replace(target)
+        _ = temp_path.replace(target)
     except OSError as error:
         with contextlib.suppress(OSError):
             if temp_path.exists():

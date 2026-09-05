@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
-from sync.runtime.errors import assert_never, err
+from sync.runtime.errors import err
 
 __all__ = [
     "CommandOutcome",
@@ -195,7 +195,7 @@ async def resolve_executable(
     if env is not None:
         for key, value in env.items():
             if value is None:
-                effective_env.pop(key, None)
+                _ = effective_env.pop(key, None)
             else:
                 effective_env[key] = value
 
@@ -245,7 +245,7 @@ def _build_process_env(
     if effective_env is not None:
         for key, value in effective_env.items():
             if value is None:
-                resolved_env.pop(key, None)
+                _ = resolved_env.pop(key, None)
             else:
                 resolved_env[key] = value
     return resolved_env
@@ -263,16 +263,24 @@ def _kill_process_group(proc: asyncio.subprocess.Process) -> None:
 async def _reap_process(proc: asyncio.subprocess.Process) -> None:
     """Wait for the direct child to exit; suppresses close races."""
     with contextlib.suppress(OSError):
-        await proc.wait()
+        _ = await proc.wait()
 
 
 _READ_CHUNK_SIZE: int = 65536
 
 
+@dataclass(slots=True)
+class _StreamDrainState:
+    """Shared retained-byte budget for both drain tasks."""
+
+    total: int = 0
+    overflow: bool = False
+
+
 async def _drain_one_stream(
     stream: asyncio.StreamReader,
     chunks: list[bytes],
-    state: dict[str, int | bool],
+    state: _StreamDrainState,
     proc: asyncio.subprocess.Process,
 ) -> None:
     """Drain one pipe, enforcing the shared retained-byte limit."""
@@ -283,20 +291,18 @@ async def _drain_one_stream(
             return
         if not data:
             return
-        total = int(state["total"])
-        overflow = bool(state["overflow"])
-        if overflow:
+        if state.overflow:
             continue
-        if total + len(data) > MAX_OUTPUT_BYTES:
-            allowed = MAX_OUTPUT_BYTES - total
+        if state.total + len(data) > MAX_OUTPUT_BYTES:
+            allowed = MAX_OUTPUT_BYTES - state.total
             if allowed > 0:
                 chunks.append(data[:allowed])
-            state["total"] = MAX_OUTPUT_BYTES
-            state["overflow"] = True
+            state.total = MAX_OUTPUT_BYTES
+            state.overflow = True
             _kill_process_group(proc)
             continue
         chunks.append(data)
-        state["total"] = total + len(data)
+        state.total = state.total + len(data)
 
 
 async def _discard_stream(stream: asyncio.StreamReader) -> None:
@@ -320,28 +326,28 @@ async def _discard_and_reap_pipes(proc: asyncio.subprocess.Process) -> None:
     with contextlib.suppress(OSError):
         async with asyncio.TaskGroup() as tg:
             if stdout is not None:
-                tg.create_task(_discard_stream(stdout))
+                _ = tg.create_task(_discard_stream(stdout))
             if stderr is not None:
-                tg.create_task(_discard_stream(stderr))
-            tg.create_task(_reap_process(proc))
+                _ = tg.create_task(_discard_stream(stderr))
+            _ = tg.create_task(_reap_process(proc))
 
 
 async def _drain_pipes(
     proc: asyncio.subprocess.Process,
     stdout_chunks: list[bytes],
     stderr_chunks: list[bytes],
-    shared: dict[str, int | bool],
+    shared: _StreamDrainState,
 ) -> None:
     """Drain both pipes and wait for exit; callers handle timeouts."""
     stdout = proc.stdout
     stderr = proc.stderr
     if stdout is None or stderr is None:
-        await proc.wait()
+        _ = await proc.wait()
         return
     async with asyncio.TaskGroup() as tg:
-        tg.create_task(_drain_one_stream(stdout, stdout_chunks, shared, proc))
-        tg.create_task(_drain_one_stream(stderr, stderr_chunks, shared, proc))
-        tg.create_task(proc.wait())
+        _ = tg.create_task(_drain_one_stream(stdout, stdout_chunks, shared, proc))
+        _ = tg.create_task(_drain_one_stream(stderr, stderr_chunks, shared, proc))
+        _ = tg.create_task(proc.wait())
 
 
 async def _communicate_subprocess(
@@ -351,7 +357,7 @@ async def _communicate_subprocess(
     if proc.stdout is None or proc.stderr is None:
         if timeout_ms is None:
             try:
-                await proc.wait()
+                _ = await proc.wait()
             except asyncio.CancelledError:
                 _kill_process_group(proc)
                 await _reap_process(proc)
@@ -363,7 +369,7 @@ async def _communicate_subprocess(
         )
         try:
             async with asyncio.timeout(timeout_sec):
-                await proc.wait()
+                _ = await proc.wait()
                 return None, None, False, False
         except TimeoutError:
             _kill_process_group(proc)
@@ -375,7 +381,7 @@ async def _communicate_subprocess(
             raise
     stdout_chunks: list[bytes] = []
     stderr_chunks: list[bytes] = []
-    shared: dict[str, int | bool] = {"total": 0, "overflow": False}
+    shared = _StreamDrainState()
     if timeout_ms is None:
         try:
             await _drain_pipes(proc, stdout_chunks, stderr_chunks, shared)
@@ -383,7 +389,7 @@ async def _communicate_subprocess(
             _kill_process_group(proc)
             await _discard_and_reap_pipes(proc)
             raise
-        overflow = bool(shared["overflow"])
+        overflow = shared.overflow
         return b"".join(stdout_chunks), b"".join(stderr_chunks), False, overflow
     timeout_sec = max(
         timeout_ms / MILLISECONDS_PER_SECOND,
@@ -395,13 +401,13 @@ async def _communicate_subprocess(
     except TimeoutError:
         _kill_process_group(proc)
         await _discard_and_reap_pipes(proc)
-        overflow = bool(shared["overflow"])
+        overflow = shared.overflow
         return b"".join(stdout_chunks), b"".join(stderr_chunks), True, overflow
     except asyncio.CancelledError:
         _kill_process_group(proc)
         await _discard_and_reap_pipes(proc)
         raise
-    overflow = bool(shared["overflow"])
+    overflow = shared.overflow
     return b"".join(stdout_chunks), b"".join(stderr_chunks), False, overflow
 
 
@@ -530,5 +536,3 @@ def log_command_failure(
             err(f"{action} timed out: {cmd_str}")
         case OutputLimit(detail=detail):
             err(f"{action} output limit exceeded: {cmd_str} ({detail})")
-        case _ as unreachable:
-            assert_never(unreachable)

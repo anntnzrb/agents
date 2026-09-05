@@ -60,7 +60,7 @@ def write_manifest(home: Path, checksum: str = EXPECTED_CHECKSUM) -> None:
         },
     }
     manifest_path = manifest_dir / "release.json"
-    manifest_path.write_text(f"{json.dumps(manifest_payload)}\n", encoding="utf-8")
+    _ = manifest_path.write_text(f"{json.dumps(manifest_payload)}\n", encoding="utf-8")
 
 
 def test_managed_tool_downloads_verified_release_once(tmp_path: Path) -> None:
@@ -78,7 +78,7 @@ def test_managed_tool_downloads_verified_release_once(tmp_path: Path) -> None:
         _ = timeout_ms
         downloads += 1
         assert "/releases/download/v7.2.132/" in url
-        Path(destination).write_bytes(ARCHIVE_CONTENT)
+        _ = Path(destination).write_bytes(ARCHIVE_CONTENT)
 
     def mock_extract(
         archive: str,
@@ -89,7 +89,7 @@ def test_managed_tool_downloads_verified_release_once(tmp_path: Path) -> None:
         _ = (archive, timeout_ms)
         assert entry_name == "cli-proxy-api"
         executable = Path(destination) / entry_name
-        executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        _ = executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
         executable.chmod(EXECUTABLE_MODE)
 
     runtime = ManagedToolRuntime(
@@ -124,7 +124,7 @@ def test_managed_tool_rejects_checksum_mismatch(tmp_path: Path) -> None:
     )
 
     def mock_download(_url: str, destination: str, _timeout_ms: int) -> None:
-        Path(destination).write_bytes(ARCHIVE_CONTENT)
+        _ = Path(destination).write_bytes(ARCHIVE_CONTENT)
 
     runtime = ManagedToolRuntime(
         arch="arm64",
@@ -133,7 +133,7 @@ def test_managed_tool_rejects_checksum_mismatch(tmp_path: Path) -> None:
     )
 
     with pytest.raises(RuntimeError, match=r"checksum mismatch"):
-        prepare_managed_tools(sync_env, runtime)
+        _ = prepare_managed_tools(sync_env, runtime)
 
 
 def test_managed_tool_rejects_platform_without_pinned_asset(
@@ -152,7 +152,7 @@ def test_managed_tool_rejects_platform_without_pinned_asset(
     )
 
     with pytest.raises(RuntimeError, match=r"no release asset for linux-arm64"):
-        prepare_managed_tools(sync_env, runtime)
+        _ = prepare_managed_tools(sync_env, runtime)
 
 
 def test_managed_tool_health_check_targets_deployment_client() -> None:
@@ -188,14 +188,14 @@ def test_managed_tool_rejects_unsupported_arch_and_invalid_manifest(
     )
 
     with pytest.raises(RuntimeError, match=r"unsupported architecture"):
-        prepare_managed_tools(sync_env, runtime)
+        _ = prepare_managed_tools(sync_env, runtime)
 
     manifest_path = (
         tmp_path / ".config" / "agents" / "tools" / "cliproxyapi" / "release.json"
     )
-    manifest_path.write_text("invalid json", encoding="utf-8")
+    _ = manifest_path.write_text("invalid json", encoding="utf-8")
     with pytest.raises(RuntimeError, match=r"parse"):
-        prepare_managed_tools(sync_env)
+        _ = prepare_managed_tools(sync_env)
 
 
 def test_extract_release_enforces_timeout(
@@ -205,7 +205,7 @@ def test_extract_release_enforces_timeout(
     """extract_release raises TimeoutError when extraction exceeds deadline."""
     archive_path = tmp_path / "test.tar.gz"
     entry_file = tmp_path / "dummy.txt"
-    entry_file.write_text("dummy", encoding="utf-8")
+    _ = entry_file.write_text("dummy", encoding="utf-8")
     with tarfile.open(archive_path, "w:gz") as tar:
         tar.add(entry_file, arcname="dummy.txt")
 
@@ -267,10 +267,10 @@ def test_installed_tool_matches_handles_undecodable_receipt(
 ) -> None:
     """installed_tool_matches returns False when receipt is not valid UTF-8."""
     executable = tmp_path / "bin"
-    executable.write_text("#!/bin/sh\n", encoding="utf-8")
+    _ = executable.write_text("#!/bin/sh\n", encoding="utf-8")
     executable.chmod(EXECUTABLE_MODE)
     receipt_path = tmp_path / "receipt.json"
-    receipt_path.write_bytes(b"\xff\xfe\x00\x00corrupt")
+    _ = receipt_path.write_bytes(b"\xff\xfe\x00\x00corrupt")
 
     matches = installed_tool_matches(executable, receipt_path, "expected receipt")
     assert matches is False
@@ -289,7 +289,7 @@ def test_managed_tool_recovers_from_corrupted_receipt(tmp_path: Path) -> None:
     def mock_download(_url: str, destination: str, _timeout_ms: int) -> None:
         nonlocal downloads
         downloads += 1
-        Path(destination).write_bytes(ARCHIVE_CONTENT)
+        _ = Path(destination).write_bytes(ARCHIVE_CONTENT)
 
     def mock_extract(
         _archive: str,
@@ -298,7 +298,7 @@ def test_managed_tool_recovers_from_corrupted_receipt(tmp_path: Path) -> None:
         _timeout_ms: int,
     ) -> None:
         executable = Path(destination) / entry_name
-        executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        _ = executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
         executable.chmod(EXECUTABLE_MODE)
 
     runtime = ManagedToolRuntime(
@@ -308,7 +308,7 @@ def test_managed_tool_recovers_from_corrupted_receipt(tmp_path: Path) -> None:
         extract=mock_extract,
     )
 
-    prepare_managed_tools(sync_env, runtime)
+    _ = prepare_managed_tools(sync_env, runtime)
     assert downloads == 1
 
     install_dir = (
@@ -321,7 +321,7 @@ def test_managed_tool_recovers_from_corrupted_receipt(tmp_path: Path) -> None:
         / "darwin-arm64"
     )
     receipt_path = install_dir / "receipt.json"
-    receipt_path.write_bytes(b"\x80\x81corrupt_bytes")
+    _ = receipt_path.write_bytes(b"\x80\x81corrupt_bytes")
 
     tools = prepare_managed_tools(sync_env, runtime)
     assert len(tools) == 1

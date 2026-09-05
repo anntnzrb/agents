@@ -25,7 +25,7 @@ def test_manifestless_conventional_package_with_no_imports_needs_no_install(
     """Conventional package directory without external imports completes cleanly."""
     skills_sub = tmp_path / "skills" / "sub"
     skills_sub.mkdir(parents=True, exist_ok=True)
-    (skills_sub / "noop.ts").write_text("const x = 1;\n", encoding="utf-8")
+    _ = (skills_sub / "noop.ts").write_text("const x = 1;\n", encoding="utf-8")
 
     result = asyncio.run(install_package_deps(str(tmp_path), _TIMEOUT_MS))
     assert result is True
@@ -51,7 +51,7 @@ fi
 echo "unexpected $*" >&2
 exit 1
 """
-    fake_bun.write_text(script, encoding="utf-8")
+    _ = fake_bun.write_text(script, encoding="utf-8")
     fake_bun.chmod(_EXECUTABLE_MODE)
 
     current_path = os.environ.get("PATH", "")
@@ -59,7 +59,7 @@ exit 1
 
     skills_dir = tmp_path / "skills"
     skills_dir.mkdir(parents=True, exist_ok=True)
-    (skills_dir / "main.ts").write_text('import "some-pkg";\n', encoding="utf-8")
+    _ = (skills_dir / "main.ts").write_text('import "some-pkg";\n', encoding="utf-8")
 
     result = asyncio.run(install_package_deps(str(tmp_path), _TIMEOUT_MS))
     assert result is True
@@ -77,7 +77,7 @@ def test_install_package_deps_fails_when_source_file_is_corrupt(
     skills_dir = tmp_path / "skills"
     skills_dir.mkdir(parents=True, exist_ok=True)
     bad_file = skills_dir / "invalid.ts"
-    bad_file.write_bytes(b"\xff\xfe\x00\x00")
+    _ = bad_file.write_bytes(b"\xff\xfe\x00\x00")
 
     result = asyncio.run(install_package_deps(str(tmp_path), _TIMEOUT_MS))
     assert result is False

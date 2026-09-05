@@ -119,7 +119,7 @@ def copy_tree(
         _copy_tree_recursive(src_str, dst_str)
         return
     Path(dst_str).parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src_str, dst_str)
+    _ = shutil.copy2(src_str, dst_str)
 
 
 def _copy_tree_recursive(src: str, dst: str) -> None:
@@ -135,7 +135,7 @@ def _copy_tree_recursive(src: str, dst: str) -> None:
                 _copy_tree_recursive(child_src, child_dst)
             else:
                 Path(child_dst).parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(child_src, child_dst)
+                _ = shutil.copy2(child_src, child_dst)
 
 
 def _get_dst_metadata(dst_str: str) -> os.stat_result | None:
@@ -213,7 +213,7 @@ def _sync_managed_file(
 
     Path(dst).parent.mkdir(parents=True, exist_ok=True)
     rm_entry(dst)
-    shutil.copy2(src, dst)
+    _ = shutil.copy2(src, dst)
 
 
 def _ensure_directory(dst: str) -> None:
@@ -487,7 +487,7 @@ def sync_text_file(
         os.fsync(fd)
         os.close(fd)
         closed = True
-        Path(temp_path).replace(dst_str)
+        _ = Path(temp_path).replace(dst_str)
     except Exception:
         if not closed:
             with contextlib.suppress(OSError):

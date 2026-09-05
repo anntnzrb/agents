@@ -8,7 +8,7 @@ import json
 import stat
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, ClassVar, TypeGuard
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -55,23 +55,30 @@ __all__ = [
 _DEFAULT_FILE_MODE = 0o600
 
 
+def _is_obj_list(val: object) -> TypeGuard[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_obj_dict(val: object) -> TypeGuard[dict[str, object]]:
+    return isinstance(val, dict)
+
+
 class PackageManifest(BaseModel):
     """Manifest describing package bootstrap sources."""
 
-    model_config = ConfigDict(frozen=True, extra="ignore")
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="ignore")
 
     packages: list[str]
 
     @field_validator("packages", mode="before")
     @classmethod
     def _normalize_packages(cls, value: object) -> list[str]:
-        if not isinstance(value, list):
+        if not _is_obj_list(value):
             message = "packages must be a list"
             raise TypeError(message)
-        raw_items = cast("list[object]", value)
         result: list[str] = []
         seen: set[str] = set()
-        for item in raw_items:
+        for item in value:
             if not isinstance(item, str):
                 message = "package source must be a string"
                 raise TypeError(message)
@@ -106,7 +113,7 @@ def read_package_manifest(file_path: str) -> PackageManifest:
         raise ValueError(message) from error
 
     try:
-        data = json.loads(strip_jsonc(content))
+        data: object = json.loads(strip_jsonc(content))  # pyright: ignore[reportAny]
     except (ValueError, TypeError) as error:
         message = f"invalid JSON in {file_path}: {error}"
         raise ValueError(message) from error
@@ -129,14 +136,12 @@ def patch_runtime_settings(file_path: str, package_paths: Sequence[str]) -> None
             raise ValueError(message) from error
 
     try:
-        value = json.loads(strip_jsonc(current))
+        value: object = json.loads(strip_jsonc(current))  # pyright: ignore[reportAny]
     except (ValueError, TypeError) as error:
         message = f"parse {file_path} ({error})"
         raise ValueError(message) from error
 
-    raw_dict: dict[object, object] = (
-        cast("dict[object, object]", value) if isinstance(value, dict) else {}
-    )
+    raw_dict: dict[str, object] = dict(value) if _is_obj_dict(value) else {}
     settings: dict[str, object] = {str(k): v for k, v in raw_dict.items()}
     settings["packages"] = list(package_paths)
 

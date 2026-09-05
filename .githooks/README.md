@@ -26,5 +26,5 @@ reconcile this local virtual environment automatically on every invocation via
 files.
 
 Quality gates:
-- `pre-commit`: runs `git diff --cached --check`, followed by `ruff check .`, `ruff format --check .`, and `pyright`.
-- `pre-push`: runs the same Python gates (`ruff check .`, `ruff format --check .`, `pyright`) plus the full test suite (`pytest -n auto`).
+- `pre-commit`: runs `git diff --cached --check`, followed by `ruff check .`, `ruff format --check .`, and `basedpyright`.
+- `pre-push`: runs the same Python gates (`ruff check .`, `ruff format --check .`, `basedpyright`) plus the full test suite (`pytest -n auto`).

@@ -4,7 +4,7 @@ This is the isolated sync application.
 
 ## Scope
 
-- `./pyproject.toml`: sync app metadata, dependencies, and tool config (ruff, pyright, pytest)
+- `./pyproject.toml`: sync app metadata, dependencies, and tool config (ruff, basedpyright, pytest)
 - `./uv.lock`: sync app lockfile
 - `./src/sync/`: application code
 - `./tests/`: sync-specific tests (plus `tests/golden/` frozen behavior fixtures)
@@ -51,20 +51,20 @@ Sync contributor gates are enforced via Python/uv tooling and automated git hook
 
 From repo root:
 - Quick CLI smoke test: `uv run --project sync sync --help`
-- Run all sync gates: `(cd sync && uv sync --frozen && uv run --no-sync ruff check . && uv run --no-sync ruff format --check . && uv run --no-sync pyright && uv run --no-sync pytest -n auto)`
+- Run all sync gates: `(cd sync && uv sync --frozen && uv run --no-sync ruff check . && uv run --no-sync ruff format --check . && uv run --no-sync basedpyright && uv run --no-sync pytest -n auto)`
 
 From `sync/` directory:
 - Bootstrap/reconcile venv: `uv sync --frozen`
 - Lint: `uv run --no-sync ruff check .`
 - Format check: `uv run --no-sync ruff format --check .`
-- Type check: `uv run --no-sync pyright`
+- Type check: `uv run --no-sync basedpyright`
 - Test suite: `uv run --no-sync pytest -n auto`
-- All-in-one gate: `uv sync --frozen && uv run --no-sync ruff check . && uv run --no-sync ruff format --check . && uv run --no-sync pyright && uv run --no-sync pytest -n auto`
+- All-in-one gate: `uv sync --frozen && uv run --no-sync ruff check . && uv run --no-sync ruff format --check . && uv run --no-sync basedpyright && uv run --no-sync pytest -n auto`
 
 ### Hook Contracts
 
-- **`pre-commit`**: Runs `git diff --cached --check`, then changes into `sync/` and executes `uv sync --frozen`, `uv run --no-sync ruff check .`, `uv run --no-sync ruff format --check .`, and `uv run --no-sync pyright`.
-- **`pre-push`**: Executes the same Python gates (`uv sync --frozen`, Ruff lint/format check, Pyright) followed by `uv run --no-sync pytest -n auto`. No separate duplicate integration run is needed because `pytest -n auto` covers the full suite including integration tests.
+- **`pre-commit`**: Runs `git diff --cached --check`, then changes into `sync/` and executes `uv sync --frozen`, `uv run --no-sync ruff check .`, `uv run --no-sync ruff format --check .`, and `uv run --no-sync basedpyright`.
+- **`pre-push`**: Executes the same Python gates (`uv sync --frozen`, Ruff lint/format check, Basedpyright) followed by `uv run --no-sync pytest -n auto`. No separate duplicate integration run is needed because `pytest -n auto` covers the full suite including integration tests.
 
 ### Code Quality and Typing Policies
 

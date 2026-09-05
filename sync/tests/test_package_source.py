@@ -6,7 +6,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeGuard
 
 import pytest
 
@@ -20,12 +20,29 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+def _is_obj_dict(val: object) -> TypeGuard[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeGuard[list[object]]:
+    return isinstance(val, list)
+
+
 def test_fnv1a64_matches_golden_vectors() -> None:
     """Verify fnv1a64 produces expected 16-hex hashes against golden vectors."""
     vectors_path = Path(__file__).parent / "golden" / "fnv-vectors.json"
-    data = json.loads(vectors_path.read_text(encoding="utf-8"))
-    for case in data["cases"]:
-        assert fnv1a64(case["input"]) == case["fnv"]
+    vectors_text = vectors_path.read_text(encoding="utf-8")
+    data: object = json.loads(vectors_text)  # pyright: ignore[reportAny]
+    assert _is_obj_dict(data)
+    cases = data["cases"]
+    assert _is_obj_list(cases)
+    for case in cases:
+        assert _is_obj_dict(case)
+        raw_input = case["input"]
+        raw_fnv = case["fnv"]
+        assert isinstance(raw_input, str)
+        assert isinstance(raw_fnv, str)
+        assert fnv1a64(raw_input) == raw_fnv
 
 
 def test_gh_fallback_removes_partial_files_and_leaves_expected_checkout(
@@ -43,9 +60,9 @@ def test_gh_fallback_removes_partial_files_and_leaves_expected_checkout(
         target.mkdir(parents=True, exist_ok=True)
         if first:
             first = False
-            (target / "partial.txt").write_text("partial", encoding="utf-8")
+            _ = (target / "partial.txt").write_text("partial", encoding="utf-8")
             return False
-        (target / "expected.txt").write_text("expected", encoding="utf-8")
+        _ = (target / "expected.txt").write_text("expected", encoding="utf-8")
         return True
 
     async def run_test() -> None:
@@ -76,7 +93,7 @@ def test_final_failure_removes_all_partial_state(
     async def runner(command: Sequence[str]) -> bool:
         attempts.append(list(command))
         target.mkdir(parents=True, exist_ok=True)
-        (target / "partial.txt").write_text("partial", encoding="utf-8")
+        _ = (target / "partial.txt").write_text("partial", encoding="utf-8")
         return False
 
     async def run_test() -> None:
@@ -102,13 +119,13 @@ def test_replace_dir_atomically_cleans_up_backup_directories_on_success(
     dst = tmp_path / "my-package"
     src = tmp_path / "my-package.staging-123-456"
     dst.mkdir(parents=True, exist_ok=True)
-    (dst / "file.txt").write_text("old-version", encoding="utf-8")
+    _ = (dst / "file.txt").write_text("old-version", encoding="utf-8")
     src.mkdir(parents=True, exist_ok=True)
-    (src / "file.txt").write_text("new-version", encoding="utf-8")
+    _ = (src / "file.txt").write_text("new-version", encoding="utf-8")
 
     legacy_backup = tmp_path / "my-package.backup"
     legacy_backup.mkdir(parents=True, exist_ok=True)
-    (legacy_backup / "file.txt").write_text("legacy", encoding="utf-8")
+    _ = (legacy_backup / "file.txt").write_text("legacy", encoding="utf-8")
 
     asyncio.run(replace_dir_atomically(str(src), str(dst)))
 
@@ -127,7 +144,7 @@ def test_replace_dir_atomically_restores_previous_content_on_failure(
     dst = tmp_path / "my-package"
     non_existent_src = tmp_path / "non-existent-src"
     dst.mkdir(parents=True, exist_ok=True)
-    (dst / "file.txt").write_text("preserved-content", encoding="utf-8")
+    _ = (dst / "file.txt").write_text("preserved-content", encoding="utf-8")
 
     with pytest.raises(FileNotFoundError):
         asyncio.run(replace_dir_atomically(str(non_existent_src), str(dst)))

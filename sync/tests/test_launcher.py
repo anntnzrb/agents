@@ -54,7 +54,9 @@ def _write_package_manifest(
     pkg_dir = Path(root, "node_modules", *package_name.split("/"))
     pkg_dir.mkdir(parents=True, exist_ok=True)
     manifest = {"name": package_name, "version": version}
-    (pkg_dir / "package.json").write_text(f"{json.dumps(manifest)}\n", encoding="utf-8")
+    _ = (pkg_dir / "package.json").write_text(
+        f"{json.dumps(manifest)}\n", encoding="utf-8"
+    )
 
 
 def _setup_stage_binary(
@@ -66,7 +68,7 @@ def _setup_stage_binary(
     """Set up simulated binary and package manifest in npm stage."""
     exe = Path(stage, "node_modules", ".bin", bin_name)
     exe.parent.mkdir(parents=True, exist_ok=True)
-    exe.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    _ = exe.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     exe.chmod(MODE_EXECUTABLE)
     _write_package_manifest(stage, package_name, version)
 
@@ -226,7 +228,7 @@ def test_npm_launcher_first_ever_resolution_failure_still_errors(
     )
 
     with pytest.raises(RuntimeError, match="network unavailable"):
-        asyncio.run(prepare_npm_package(spec, options))
+        _ = asyncio.run(prepare_npm_package(spec, options))
 
 
 def test_npm_launcher_separates_cache_versions_when_a_harness_changes_package(
@@ -365,7 +367,7 @@ def test_harness_launch_merges_root_env_parent_env_and_adapter_env_with_preceden
             f"{adapter_collision_key}=root_val_overridden_by_adapter",
         ]
     )
-    (agents_home / ".env").write_text(f"{env_content}\n", encoding="utf-8")
+    _ = (agents_home / ".env").write_text(f"{env_content}\n", encoding="utf-8")
 
     code = f"""
 import asyncio
@@ -524,7 +526,7 @@ def test_npm_launcher_rejects_unmanaged_conflict_for_current_and_previous(
     version_dir = Path(layout.versions_dir) / "1.0.0"
     version_dir.mkdir(parents=True, exist_ok=True)
     Path(layout.current_link).symlink_to(Path("versions") / "1.0.0")
-    Path(layout.previous_link).write_text("real file", encoding="utf-8")
+    _ = Path(layout.previous_link).write_text("real file", encoding="utf-8")
 
     async def mock_resolve(_pkg: str, _tag: str, _timeout: int) -> str:
         return "1.2.3"
@@ -550,4 +552,4 @@ def test_npm_launcher_rejects_unmanaged_conflict_for_current_and_previous(
     )
 
     with pytest.raises(RuntimeError, match="unmanaged conflict"):
-        asyncio.run(prepare_npm_package(spec, options))
+        _ = asyncio.run(prepare_npm_package(spec, options))

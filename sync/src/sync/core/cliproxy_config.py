@@ -6,10 +6,10 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, TypeGuard
+from typing import TYPE_CHECKING, ClassVar, Final, TypeGuard
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -40,7 +40,7 @@ OWNED_COMPATIBILITY_FIELDS: Final[tuple[str, ...]] = ("api-key-entries",)
 class Credential(BaseModel):
     """Single upstream API credential within a pool."""
 
-    model_config = ConfigDict(
+    model_config: ClassVar[ConfigDict] = ConfigDict(
         extra="forbid",
         frozen=True,
         strict=True,
@@ -59,7 +59,7 @@ class Credential(BaseModel):
 class CliProxySecrets(BaseModel):
     """Collection of named credential pools for CLIProxyAPI."""
 
-    model_config = ConfigDict(
+    model_config: ClassVar[ConfigDict] = ConfigDict(
         extra="forbid",
         frozen=True,
         strict=True,
@@ -210,8 +210,8 @@ def render_cliproxy_config(
 ) -> str:
     """Render CLIProxyAPI configuration YAML from template, secrets, and deployment."""
     try:
-        parsed: object = yaml.safe_load(template)
-    except Exception as error:
+        parsed: object = yaml.safe_load(template)  # pyright: ignore[reportAny]
+    except yaml.YAMLError as error:
         msg = f"parse CLIProxyAPI template ({panic_message(error)})"
         raise RuntimeError(msg) from error
 
@@ -273,14 +273,14 @@ def read_cliproxy_secrets(path: str | Path) -> CliProxySecrets:
 
     try:
         stripped = strip_jsonc(text)
-        parsed: object = json.loads(stripped)
-    except Exception as error:
+        parsed: object = json.loads(stripped)  # pyright: ignore[reportAny]
+    except (ValueError, TypeError) as error:
         msg = f"parse CLIProxyAPI secrets {path_obj} ({panic_message(error)})"
         raise RuntimeError(msg) from error
 
     try:
         return CliProxySecrets.model_validate(parsed)
-    except Exception as error:
+    except ValidationError as error:
         msg = f"invalid CLIProxyAPI secrets {path_obj} ({panic_message(error)})"
         raise RuntimeError(msg) from error
 
@@ -305,6 +305,6 @@ def sync_cliproxy_config(
     content = render_cliproxy_config(template, secrets, deployment)
     try:
         sync_private_text_file(dst_p, content)
-    except Exception as error:
+    except (OSError, ValueError, RuntimeError) as error:
         msg = f"render CLIProxyAPI config {src_p} -> {dst_p} ({panic_message(error)})"
         raise RuntimeError(msg) from error

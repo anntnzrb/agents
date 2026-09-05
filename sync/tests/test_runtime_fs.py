@@ -36,7 +36,7 @@ def test_is_symlink(tmp_path: Path) -> None:
     link = tmp_path / "link"
     missing = tmp_path / "missing"
 
-    file.write_text("hello", encoding="utf-8")
+    _ = file.write_text("hello", encoding="utf-8")
     link.symlink_to(file)
 
     assert is_symlink(link) is True
@@ -49,7 +49,7 @@ def test_is_symlink(tmp_path: Path) -> None:
         locked.chmod(0o000)
         try:
             with pytest.raises(PermissionError):
-                is_symlink(locked / "x")
+                _ = is_symlink(locked / "x")
         finally:
             locked.chmod(0o755)
 
@@ -61,9 +61,9 @@ def test_rm_entry(tmp_path: Path) -> None:
     link = tmp_path / "link"
     missing = tmp_path / "missing"
 
-    file.write_text("hello", encoding="utf-8")
+    _ = file.write_text("hello", encoding="utf-8")
     (sub / "nested").mkdir(parents=True)
-    (sub / "nested" / "child.txt").write_text("child", encoding="utf-8")
+    _ = (sub / "nested" / "child.txt").write_text("child", encoding="utf-8")
     link.symlink_to(file)
 
     rm_entry(link)
@@ -87,8 +87,8 @@ def test_copy_tree(tmp_path: Path) -> None:
     cyclic = tmp_path / "cyclic"
 
     (src / "sub").mkdir(parents=True)
-    (src / "file1.txt").write_text("hello", encoding="utf-8")
-    (src / "sub" / "file2.txt").write_text("world", encoding="utf-8")
+    _ = (src / "file1.txt").write_text("hello", encoding="utf-8")
+    _ = (src / "sub" / "file2.txt").write_text("world", encoding="utf-8")
 
     copy_tree(src, dst)
     assert (dst / "file1.txt").read_text(encoding="utf-8") == "hello"
@@ -112,23 +112,25 @@ def test_sync_managed_children(tmp_path: Path) -> None:
     dst = tmp_path / "dst"
 
     src.mkdir()
-    (src / "child.txt").write_text("child", encoding="utf-8")
-    (src / "preserved_child.txt").write_text("src_version", encoding="utf-8")
+    _ = (src / "child.txt").write_text("child", encoding="utf-8")
+    _ = (src / "preserved_child.txt").write_text("src_version", encoding="utf-8")
     (src / ".venv").mkdir()
     (src / ".venv" / "bin").mkdir()
-    (src / ".venv" / "bin" / "python").write_text("python", encoding="utf-8")
+    _ = (src / ".venv" / "bin" / "python").write_text("python", encoding="utf-8")
     (src / "__pycache__").mkdir()
-    (src / "__pycache__" / "cached.pyc").write_text("bytecode", encoding="utf-8")
-    (src / "ignored.pyc").write_text("bytecode", encoding="utf-8")
+    _ = (src / "__pycache__" / "cached.pyc").write_text("bytecode", encoding="utf-8")
+    _ = (src / "ignored.pyc").write_text("bytecode", encoding="utf-8")
 
     (src / "sub").mkdir()
-    (src / "sub" / "file.txt").write_text("sub content", encoding="utf-8")
+    _ = (src / "sub" / "file.txt").write_text("sub content", encoding="utf-8")
 
     dst.mkdir()
-    (dst / "preserved_child.txt").write_text("dst_preserved", encoding="utf-8")
-    (dst / "unrelated_root.txt").write_text("unrelated root content", encoding="utf-8")
+    _ = (dst / "preserved_child.txt").write_text("dst_preserved", encoding="utf-8")
+    _ = (dst / "unrelated_root.txt").write_text(
+        "unrelated root content", encoding="utf-8"
+    )
     (dst / "sub").mkdir()
-    (dst / "sub" / "stale.txt").write_text("stale in subdir", encoding="utf-8")
+    _ = (dst / "sub" / "stale.txt").write_text("stale in subdir", encoding="utf-8")
 
     sync_managed_children(
         src,
@@ -154,13 +156,13 @@ def test_sync_managed_tree_preserves_paths(tmp_path: Path) -> None:
     dst = tmp_path / "dst"
 
     (src / "sub").mkdir(parents=True)
-    (src / "file1.txt").write_text("hello", encoding="utf-8")
-    (src / "sub" / "file3.txt").write_text("world", encoding="utf-8")
+    _ = (src / "file1.txt").write_text("hello", encoding="utf-8")
+    _ = (src / "sub" / "file3.txt").write_text("world", encoding="utf-8")
 
     (dst / "preserved").mkdir(parents=True)
-    (dst / "preserved" / "nested.txt").write_text("keep", encoding="utf-8")
-    (dst / "preserved" / "stale.txt").write_text("delete", encoding="utf-8")
-    (dst / "other.txt").write_text("delete", encoding="utf-8")
+    _ = (dst / "preserved" / "nested.txt").write_text("keep", encoding="utf-8")
+    _ = (dst / "preserved" / "stale.txt").write_text("delete", encoding="utf-8")
+    _ = (dst / "other.txt").write_text("delete", encoding="utf-8")
 
     sync_managed_tree(src, dst, ["preserved/nested.txt"])
 
@@ -178,10 +180,10 @@ def test_sync_managed_tree_removes_destination_symlinks(tmp_path: Path) -> None:
     external = tmp_path / "external"
 
     src.mkdir()
-    (src / "file1.txt").write_text("hello", encoding="utf-8")
+    _ = (src / "file1.txt").write_text("hello", encoding="utf-8")
 
     external.mkdir()
-    (external / "untouched.txt").write_text("untouched", encoding="utf-8")
+    _ = (external / "untouched.txt").write_text("untouched", encoding="utf-8")
 
     dst.mkdir()
     (dst / "link").symlink_to(external, target_is_directory=True)
@@ -202,7 +204,7 @@ def test_sync_managed_tree_throws_inaccessible_source(tmp_path: Path) -> None:
     dst = tmp_path / "dst"
 
     src.mkdir()
-    (src / "file1.txt").write_text("hello", encoding="utf-8")
+    _ = (src / "file1.txt").write_text("hello", encoding="utf-8")
     src.chmod(0o000)
     try:
         with pytest.raises(PermissionError):
@@ -232,28 +234,30 @@ def test_sync_managed_tree_ignores_artifacts(tmp_path: Path) -> None:
     dst = tmp_path / "dst"
 
     (src / ".venv" / "bin").mkdir(parents=True)
-    (src / ".venv" / "bin" / "python").write_text("bin", encoding="utf-8")
+    _ = (src / ".venv" / "bin" / "python").write_text("bin", encoding="utf-8")
     (src / "node_modules" / "pkg").mkdir(parents=True)
-    (src / "node_modules" / "pkg" / "index.js").write_text("mod", encoding="utf-8")
+    _ = (src / "node_modules" / "pkg" / "index.js").write_text("mod", encoding="utf-8")
     (src / "__pycache__").mkdir(parents=True)
-    (src / "__pycache__" / "mod.cpython-314.pyc").write_text("pyc", encoding="utf-8")
+    _ = (src / "__pycache__" / "mod.cpython-314.pyc").write_text(
+        "pyc", encoding="utf-8"
+    )
     (src / ".pytest_cache" / "v").mkdir(parents=True)
-    (src / ".pytest_cache" / "v" / "cache").write_text("c", encoding="utf-8")
+    _ = (src / ".pytest_cache" / "v" / "cache").write_text("c", encoding="utf-8")
     (src / ".ruff_cache" / "cached").mkdir(parents=True)
-    (src / ".ruff_cache" / "cached" / "c").write_text("c", encoding="utf-8")
+    _ = (src / ".ruff_cache" / "cached" / "c").write_text("c", encoding="utf-8")
     (src / ".hypothesis" / "data").mkdir(parents=True)
-    (src / ".hypothesis" / "data" / "h").write_text("h", encoding="utf-8")
-    (src / ".DS_Store").write_text("ds_store", encoding="utf-8")
-    (src / "module.pyc").write_text("compiled", encoding="utf-8")
-    (src / "module.pyo").write_text("optimized", encoding="utf-8")
-    (src / "native.pyd").write_text("windows native binary", encoding="utf-8")
-    (src / "real_file.txt").write_text("valid content", encoding="utf-8")
+    _ = (src / ".hypothesis" / "data" / "h").write_text("h", encoding="utf-8")
+    _ = (src / ".DS_Store").write_text("ds_store", encoding="utf-8")
+    _ = (src / "module.pyc").write_text("compiled", encoding="utf-8")
+    _ = (src / "module.pyo").write_text("optimized", encoding="utf-8")
+    _ = (src / "native.pyd").write_text("windows native binary", encoding="utf-8")
+    _ = (src / "real_file.txt").write_text("valid content", encoding="utf-8")
 
     # Seed destination with stale junk
     (dst / ".venv").mkdir(parents=True)
-    (dst / ".venv" / "old").write_text("stale", encoding="utf-8")
+    _ = (dst / ".venv" / "old").write_text("stale", encoding="utf-8")
     (dst / "node_modules").mkdir(parents=True)
-    (dst / "node_modules" / "old").write_text("stale", encoding="utf-8")
+    _ = (dst / "node_modules" / "old").write_text("stale", encoding="utf-8")
 
     sync_managed_tree(src, dst)
 
@@ -292,9 +296,9 @@ def test_is_identical_file(tmp_path: Path) -> None:
     f2 = tmp_path / "f2.txt"
     f3 = tmp_path / "f3.txt"
 
-    f1.write_text("hello", encoding="utf-8")
-    f2.write_text("hello", encoding="utf-8")
-    f3.write_text("world", encoding="utf-8")
+    _ = f1.write_text("hello", encoding="utf-8")
+    _ = f2.write_text("hello", encoding="utf-8")
+    _ = f3.write_text("world", encoding="utf-8")
 
     stat1 = f1.stat()
     assert is_identical_file(f1, stat1, f2) is True
@@ -359,7 +363,7 @@ def test_strip_jsonc() -> None:
     # Line count preserved
     assert cleaned.count("\n") == input_text.count("\n")
 
-    parsed = json.loads(cleaned)
+    parsed: object = json.loads(cleaned)  # pyright: ignore[reportAny]
     assert parsed == {
         "key": "value",
         "url": "http://example.com//test",
@@ -383,19 +387,19 @@ def test_secret_template_rendering_and_sync(tmp_path: Path) -> None:
 
     # Invalid placeholder format
     with pytest.raises(ValueError, match="invalid secret placeholder:"):
-        render_secret_template("${invalid-name}", {"invalid-name": "val"})
+        _ = render_secret_template("${invalid-name}", {"invalid-name": "val"})
 
     # Missing secret
     with pytest.raises(ValueError, match="missing secret:"):
-        render_secret_template("${MISSING_KEY}", {})
+        _ = render_secret_template("${MISSING_KEY}", {})
 
     # sync_secret_template end to end
     tmpl_file = tmp_path / "tmpl.json"
     secrets_file = tmp_path / "secrets.jsonc"
     dst_file = tmp_path / "out.json"
 
-    tmpl_file.write_text(template, encoding="utf-8")
-    secrets_file.write_text(
+    _ = tmpl_file.write_text(template, encoding="utf-8")
+    _ = secrets_file.write_text(
         '{\n  // secrets\n  "SECRET_KEY": "val",\n}\n',
         encoding="utf-8",
     )

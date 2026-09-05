@@ -12,7 +12,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeGuard
 
 import yaml
 
@@ -34,6 +34,15 @@ FAKED_RUNTIME_EXIT_CODE = 42
 CLIPROXY_PORT = 8317
 CONFIG_FILE_MODE = 0o600
 PERMISSION_MASK = 0o777
+
+
+def _is_obj_dict(val: object) -> TypeGuard[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeGuard[list[object]]:
+    return isinstance(val, list)
+
 
 OFFLINE_NPM_ENV: dict[str, str] = {
     "npm_config_fetch_retries": "0",
@@ -167,7 +176,7 @@ def write_deployment(
         "listen": {"host": "100.64.0.42", "port": 8317},
         "client": {"baseUrl": client_base_url},
     }
-    (tools / "deployment.json").write_text(
+    _ = (tools / "deployment.json").write_text(
         f"{json.dumps(deployment)}\n",
         encoding="utf-8",
     )
@@ -176,19 +185,17 @@ def write_deployment(
 def write_fixture_files(home: Path) -> None:
     """Populate home directory with standard SSOT configurations and targets."""
     write_deployment(home)
-    (home / ".config" / "agents" / "HARNESS.md").write_text(
+    _ = (home / ".config" / "agents" / "HARNESS.md").write_text(
         "agent-instructions",
         encoding="utf-8",
     )
-    (home / ".config" / "agents" / "tools" / "mcporter" / "mcporter.jsonc").write_text(
-        '{"x":1}', encoding="utf-8"
-    )
-    (home / ".config" / "agents" / "tools" / "summarize" / "config.json").write_text(
-        '{"x":1}', encoding="utf-8"
-    )
-    (
-        home / ".config" / "agents" / "tools" / "cliproxyapi" / "config.yaml.tmpl"
-    ).write_text(
+    _ = (
+        home / ".config" / "agents" / "tools" / "mcporter" / "mcporter.jsonc"
+    ).write_text('{"x":1}', encoding="utf-8")
+    _ = (
+        home / ".config" / "agents" / "tools" / "summarize" / "config.json"
+    ).write_text('{"x":1}', encoding="utf-8")
+    template_content = (
         "host: ${CLIPROXY_LISTEN_HOST}\n"
         "port: ${CLIPROXY_LISTEN_PORT}\n"
         "remote-management:\n"
@@ -196,10 +203,12 @@ def write_fixture_files(home: Path) -> None:
         "  secret-key: tailnet\n"
         "codex-api-key:\n"
         "  - x-credential-pool: fixture\n"
-        "    prefix: fixture\n",
-        encoding="utf-8",
+        "    prefix: fixture\n"
     )
-    (home / ".config" / "agents" / "secrets.local.json").write_text(
+    _ = (
+        home / ".config" / "agents" / "tools" / "cliproxyapi" / "config.yaml.tmpl"
+    ).write_text(template_content, encoding="utf-8")
+    _ = (home / ".config" / "agents" / "secrets.local.json").write_text(
         json.dumps(
             {
                 "CLIPROXY_CREDENTIAL_POOLS": {
@@ -212,49 +221,53 @@ def write_fixture_files(home: Path) -> None:
     )
     skills_current = home / ".config" / "agents" / "skills" / "current"
     skills_current.mkdir(parents=True, exist_ok=True)
-    (skills_current / "skill.txt").write_text("skill-content", encoding="utf-8")
+    _ = (skills_current / "skill.txt").write_text("skill-content", encoding="utf-8")
 
     skills_legacy = home / ".config" / "agents" / "skills" / "legacy"
     skills_legacy.mkdir(parents=True, exist_ok=True)
-    (skills_legacy / "old.txt").write_text("legacy-content", encoding="utf-8")
+    _ = (skills_legacy / "old.txt").write_text("legacy-content", encoding="utf-8")
 
-    (home / ".config" / "agents" / "harnesses" / "codex" / "config.toml").write_text(
+    _ = (
+        home / ".config" / "agents" / "harnesses" / "codex" / "config.toml"
+    ).write_text(
         f'base_url = "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n',
         encoding="utf-8",
     )
-    (
+    _ = (
         home / ".config" / "agents" / "harnesses" / "opencode" / "opencode.jsonc"
     ).write_text(
         f'"baseURL": "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n',
         encoding="utf-8",
     )
-    (home / ".codex" / "config.toml").write_text(
+    _ = (home / ".codex" / "config.toml").write_text(
         'base_url = "http://old-gateway.example.test/v1"\n',
         encoding="utf-8",
     )
-    (home / ".config" / "opencode" / "opencode.jsonc").write_text(
+    _ = (home / ".config" / "opencode" / "opencode.jsonc").write_text(
         '"baseURL": "http://old-gateway.example.test/v1"\n',
         encoding="utf-8",
     )
-    (
+    _ = (
         home / ".config" / "agents" / "harnesses" / "deepseek" / "cordis.patch.yml"
     ).write_text("[]\n", encoding="utf-8")
-    (
+    _ = (
         home / ".config" / "agents" / "harnesses" / "omp" / "agent" / "config.yml"
     ).write_text("theme:\n  dark: graphite\n", encoding="utf-8")
-    (
+    _ = (
         home / ".config" / "agents" / "harnesses" / "omp" / "agent" / "models.yml"
     ).write_text(
         f"baseUrl: {CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}\n",
         encoding="utf-8",
     )
-    (home / ".omp" / "agent" / "models.yml").write_text(
+    _ = (home / ".omp" / "agent" / "models.yml").write_text(
         "baseUrl: http://old-gateway.example.test/v1\n",
         encoding="utf-8",
     )
-    (home / ".pi" / "agent" / "auth.json").write_text('{"token":1}', encoding="utf-8")
-    (home / ".pi" / "agent" / "settings.json").write_text("{}\n", encoding="utf-8")
-    (home / ".omp" / "agent" / "logs" / "keep.txt").write_text(
+    _ = (home / ".pi" / "agent" / "auth.json").write_text(
+        '{"token":1}', encoding="utf-8"
+    )
+    _ = (home / ".pi" / "agent" / "settings.json").write_text("{}\n", encoding="utf-8")
+    _ = (home / ".omp" / "agent" / "logs" / "keep.txt").write_text(
         "keep-me", encoding="utf-8"
     )
 
@@ -286,11 +299,11 @@ def make_fixture(root: Path) -> Path:
 
     sync_source = home / ".config" / "agents" / "sync"
     sync_source.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(SYNC_ROOT / "src", sync_source / "src")
+    _ = shutil.copytree(SYNC_ROOT / "src", sync_source / "src")
     for filename in ("pyproject.toml", "uv.lock", "README.md"):
         f = SYNC_ROOT / filename
         if f.is_file():
-            shutil.copyfile(f, sync_source / filename)
+            _ = shutil.copyfile(f, sync_source / filename)
 
     seed_runtime_release(home)
     write_fixture_files(home)
@@ -316,12 +329,12 @@ def seed_cached_npm_package(
     pkg_dir = version_dir / "node_modules" / Path(pkg_name)
     bin_dir.mkdir(parents=True, exist_ok=True)
     pkg_dir.mkdir(parents=True, exist_ok=True)
-    (pkg_dir / "package.json").write_text(
+    _ = (pkg_dir / "package.json").write_text(
         json.dumps({"name": pkg_name, "version": version}),
         encoding="utf-8",
     )
     executable = bin_dir / bin_name
-    executable.write_text(script_content, encoding="utf-8")
+    _ = executable.write_text(script_content, encoding="utf-8")
     executable.chmod(0o755)
     current_link = pkg_cache / "current"
     if current_link.is_symlink() or current_link.exists():
@@ -353,15 +366,15 @@ def setup_package_repos(source_repo: Path, build_repo: Path) -> None:
     """Initialize test package repositories for pi package bootstrapping."""
     (source_repo / "src").mkdir(parents=True, exist_ok=True)
     (build_repo / "src").mkdir(parents=True, exist_ok=True)
-    (source_repo / "package.json").write_text(
+    _ = (source_repo / "package.json").write_text(
         json.dumps({"pi": {"extensions": ["./src/index.ts"]}}, indent=2) + "\n",
         encoding="utf-8",
     )
-    (source_repo / "src" / "index.ts").write_text(
+    _ = (source_repo / "src" / "index.ts").write_text(
         "export default {}\n",
         encoding="utf-8",
     )
-    (build_repo / "package.json").write_text(
+    _ = (build_repo / "package.json").write_text(
         json.dumps(
             {
                 "scripts": {"build": "bun run build.ts"},
@@ -372,12 +385,12 @@ def setup_package_repos(source_repo: Path, build_repo: Path) -> None:
         + "\n",
         encoding="utf-8",
     )
-    (build_repo / "build.ts").write_text(
+    build_script = (
         'import { mkdirSync, writeFileSync } from "node:fs";\n'
         'mkdirSync("dist", { recursive: true });\n'
-        'writeFileSync("dist/index.js", "export default {}\\n");\n',
-        encoding="utf-8",
+        'writeFileSync("dist/index.js", "export default {}\\n");\n'
     )
+    _ = (build_repo / "build.ts").write_text(build_script, encoding="utf-8")
     init_git_repo(source_repo)
     init_git_repo(build_repo)
 
@@ -497,7 +510,7 @@ def test_integration_malformed_config_fails_sync_exit_1(
 ) -> None:
     """Test sync fails with exit code 1 on malformed JSON deployment config."""
     home = make_fixture(tmp_path)
-    (
+    _ = (
         home / ".config" / "agents" / "tools" / "cliproxyapi" / "deployment.json"
     ).write_text("{ invalid json syntax\n", encoding="utf-8")
 
@@ -530,19 +543,21 @@ def test_integration_happy_path_matches_expected_outputs(
     assert (home / ".mcporter" / "mcporter.json").is_file()
     assert (home / ".summarize" / "config.json").is_file()
 
-    raw_config: object = yaml.safe_load(
-        (home / ".cli-proxy-api" / "config.yaml").read_text(encoding="utf-8")
-    )
-    assert isinstance(raw_config, dict)
-    config = cast("dict[str, object]", raw_config)
-    assert config["host"] == "100.64.0.42"
-    assert config["port"] == CLIPROXY_PORT
-    remote_mgmt = cast("dict[str, object]", config["remote-management"])
-    assert remote_mgmt["secret-key"] == "tailnet"
-    assert "api-keys" not in config
-    codex_keys = cast("list[dict[str, object]]", config["codex-api-key"])
-    assert codex_keys[0]["api-key"] == "upstream-secret"
-    assert "x-credential-pool" not in codex_keys[0]
+    config_text = (home / ".cli-proxy-api" / "config.yaml").read_text(encoding="utf-8")
+    raw_config: object = yaml.safe_load(config_text)  # pyright: ignore[reportAny]
+    assert _is_obj_dict(raw_config)
+    assert raw_config["host"] == "100.64.0.42"
+    assert raw_config["port"] == CLIPROXY_PORT
+    remote_raw = raw_config["remote-management"]
+    assert _is_obj_dict(remote_raw)
+    assert remote_raw["secret-key"] == "tailnet"
+    assert "api-keys" not in raw_config
+    keys_raw = raw_config["codex-api-key"]
+    assert _is_obj_list(keys_raw)
+    first_key = keys_raw[0]
+    assert _is_obj_dict(first_key)
+    assert first_key["api-key"] == "upstream-secret"
+    assert "x-credential-pool" not in first_key
     assert (
         home / ".cli-proxy-api" / "config.yaml"
     ).stat().st_mode & PERMISSION_MASK == CONFIG_FILE_MODE
@@ -609,11 +624,11 @@ def test_integration_owned_entry_cleanup_and_unmanaged_file_preservation(
     home = make_fixture(tmp_path)
 
     unmanaged_log = home / ".omp" / "agent" / "logs" / "custom-user.log"
-    unmanaged_log.write_text("user-log-content\n", encoding="utf-8")
+    _ = unmanaged_log.write_text("user-log-content\n", encoding="utf-8")
 
     unmanaged_bin = home / ".local" / "bin" / "user-tool"
     unmanaged_bin.parent.mkdir(parents=True, exist_ok=True)
-    unmanaged_bin.write_text("#!/bin/sh\necho 'user-tool'\n", encoding="utf-8")
+    _ = unmanaged_bin.write_text("#!/bin/sh\necho 'user-tool'\n", encoding="utf-8")
     unmanaged_bin.chmod(0o755)
 
     first_result = run_sync_process(home)
@@ -636,7 +651,7 @@ def test_integration_owned_entry_cleanup_and_unmanaged_file_preservation(
     assert unmanaged_bin.is_file()
 
     unmanaged_codex = home / ".local" / "bin" / "codex"
-    unmanaged_codex.write_text("#!/bin/sh\necho 'custom-codex'\n", encoding="utf-8")
+    _ = unmanaged_codex.write_text("#!/bin/sh\necho 'custom-codex'\n", encoding="utf-8")
     unmanaged_codex.chmod(0o755)
 
     third_result = run_sync_process(home)
@@ -760,7 +775,7 @@ def test_integration_environment_variable_precedence_dot_env_vs_parent(
 ) -> None:
     """Test parent environment variables override values defined in .env file."""
     home = make_fixture(tmp_path)
-    (home / ".config" / "agents" / ".env").write_text(
+    _ = (home / ".config" / "agents" / ".env").write_text(
         "BASE_FROM_DOTENV=dotenv_val\nOVERRIDE_VAR=dotenv_val\n",
         encoding="utf-8",
     )
@@ -768,15 +783,18 @@ def test_integration_environment_variable_precedence_dot_env_vs_parent(
     sync_result = run_sync_process(home)
     assert sync_result.exit_code == 0, sync_result.stderr or sync_result.stdout
 
-    seed_cached_npm_package(
-        home,
-        {"tool": "codex", "package": "@openai/codex", "bin": "codex"},
-        "0.1.0",
+    fake_bin_script = (
         "#!/bin/sh\n"
         'echo "BASE_FROM_DOTENV=$BASE_FROM_DOTENV"\n'
         'echo "OVERRIDE_VAR=$OVERRIDE_VAR"\n'
         'echo "PARENT_ONLY_VAR=$PARENT_ONLY_VAR"\n'
-        "exit 0\n",
+        "exit 0\n"
+    )
+    seed_cached_npm_package(
+        home,
+        {"tool": "codex", "package": "@openai/codex", "bin": "codex"},
+        "0.1.0",
+        fake_bin_script,
     )
 
     launch_result = run_sync_process(
@@ -804,7 +822,7 @@ def test_integration_unavailable_client_preserves_all_cliproxy_artifacts(
 
     config_path = home / ".cli-proxy-api" / "config.yaml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text("existing-server-config\n", encoding="utf-8")
+    _ = config_path.write_text("existing-server-config\n", encoding="utf-8")
     config_path.chmod(0o600)
 
     endpoint_paths = [
@@ -846,7 +864,7 @@ def test_integration_package_bootstrap_patches_settings_and_cache_paths(
         home / ".config" / "agents" / "harnesses" / "pi" / "agent" / "packages.json"
     )
     pkgs_json.parent.mkdir(parents=True, exist_ok=True)
-    pkgs_json.write_text(
+    _ = pkgs_json.write_text(
         json.dumps({"packages": [str(source_repo), str(build_repo)]}, indent=2) + "\n",
         encoding="utf-8",
     )
@@ -872,14 +890,14 @@ def test_integration_invalid_package_json_fails_package_bootstrap(
     home = make_fixture(tmp_path)
     bad_repo = tmp_path / "repos" / "bad-pkg"
     bad_repo.mkdir(parents=True, exist_ok=True)
-    (bad_repo / "package.json").write_text("{not valid json", encoding="utf-8")
+    _ = (bad_repo / "package.json").write_text("{not valid json", encoding="utf-8")
     init_git_repo(bad_repo)
 
     pkgs_json = (
         home / ".config" / "agents" / "harnesses" / "pi" / "agent" / "packages.json"
     )
     pkgs_json.parent.mkdir(parents=True, exist_ok=True)
-    pkgs_json.write_text(
+    _ = pkgs_json.write_text(
         json.dumps({"packages": [str(bad_repo)]}, indent=2) + "\n",
         encoding="utf-8",
     )
@@ -922,7 +940,7 @@ def test_integration_wrapper_forwards_arguments_to_faked_runtime(
     fake_bin = venv_dir / "bin"
     fake_bin.mkdir(parents=True, exist_ok=True)
     fake_python = fake_bin / "python"
-    fake_python.write_text(
+    fake_python_script = (
         "#!/bin/sh\n"
         'if [ "$1" = "-m" ]; then shift 2; fi\n'
         'echo "mode=$1"\n'
@@ -934,9 +952,9 @@ def test_integration_wrapper_forwards_arguments_to_faked_runtime(
         '  echo "arg[$i]=$arg"\n'
         "  i=$((i + 1))\n"
         "done\n"
-        "exit 42\n",
-        encoding="utf-8",
+        "exit 42\n"
     )
+    _ = fake_python.write_text(fake_python_script, encoding="utf-8")
     fake_python.chmod(0o755)
 
     result = run_wrapper(

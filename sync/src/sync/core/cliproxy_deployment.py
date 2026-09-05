@@ -14,10 +14,10 @@ import urllib.parse
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, Literal, TypeGuard
+from typing import ClassVar, Final, Literal, TypeGuard
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from sync.runtime.errors import is_errno, panic_message
 from sync.runtime.fs import sync_text_file
@@ -117,7 +117,9 @@ def is_unspecified_ipv6(host: str) -> bool:
 class ServerConfig(BaseModel):
     """Server hostname configuration."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        extra="forbid", frozen=True, strict=True
+    )
     hostname: str
 
     @field_validator("hostname")
@@ -132,7 +134,9 @@ class ServerConfig(BaseModel):
 class ListenConfig(BaseModel):
     """Network listen address and port configuration."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        extra="forbid", frozen=True, strict=True
+    )
     host: str
     port: int = Field(ge=MIN_PORT, le=MAX_PORT)
 
@@ -157,7 +161,7 @@ class ListenConfig(BaseModel):
 class ClientConfig(BaseModel):
     """Client endpoint base URL configuration."""
 
-    model_config = ConfigDict(
+    model_config: ClassVar[ConfigDict] = ConfigDict(
         extra="forbid",
         frozen=True,
         strict=True,
@@ -180,7 +184,7 @@ class ClientConfig(BaseModel):
             raise ValueError(msg)
         try:
             parsed = urllib.parse.urlsplit(raw)
-        except Exception as err:
+        except ValueError as err:
             msg = "expected URL"
             raise ValueError(msg) from err
         if (
@@ -203,7 +207,7 @@ class ClientConfig(BaseModel):
 class CliProxyDeployment(BaseModel):
     """Full CLIProxyAPI deployment specification."""
 
-    model_config = ConfigDict(
+    model_config: ClassVar[ConfigDict] = ConfigDict(
         extra="forbid",
         frozen=True,
         strict=True,
@@ -277,7 +281,7 @@ def parse_cliproxy_deployment(value: object) -> CliProxyDeployment:
 
     try:
         return CliProxyDeployment.model_validate(value)
-    except Exception as error:
+    except ValidationError as error:
         msg = f"invalid CLIProxyAPI deployment ({panic_message(error)})"
         raise ValueError(msg) from error
 
@@ -291,8 +295,8 @@ def read_cliproxy_deployment(path: str | Path) -> CliProxyDeployment:
         msg = f"read CLIProxyAPI deployment {path_obj} ({panic_message(error)})"
         raise RuntimeError(msg) from error
     try:
-        parsed: object = json.loads(strip_jsonc(text))
-    except Exception as error:
+        parsed: object = json.loads(strip_jsonc(text))  # pyright: ignore[reportAny]
+    except (ValueError, TypeError) as error:
         msg = f"parse CLIProxyAPI deployment {path_obj} ({panic_message(error)})"
         raise RuntimeError(msg) from error
     return parse_cliproxy_deployment(parsed)
@@ -344,7 +348,7 @@ def is_cliproxy_target_ready(
             resp = httpx.get(url, headers=headers, timeout=timeout_sec)
         if not resp.is_success:
             return False
-        payload: object = resp.json()
+        payload: object = resp.json()  # pyright: ignore[reportAny]
         if not _is_obj_dict(payload):
             return False
         data = payload.get("data")
@@ -638,7 +642,7 @@ def sync_cliproxy_endpoint_template(
             append_preserved_sections(rendered, preserved),
             mode,
         )
-    except Exception as error:
+    except (OSError, ValueError, RuntimeError) as error:
         msg = (
             f"render CLIProxyAPI endpoint template {src_p} -> {dst_p} "
             f"({panic_message(error)})"
@@ -658,64 +662,80 @@ class CliProxyEndpointTarget:
 CliProxyEndpointPublication = Literal["published", "skipped"]
 
 
-@dataclass(frozen=True)
-class EndpointTargetSnapshot:
-    """Filesystem state snapshot of an endpoint destination before sync."""
+@dataclass(frozen=True, slots=True)
+class MissingEndpointTarget:
+    """Endpoint destination did not exist before sync."""
 
     path: Path
-    kind: Literal["missing", "file", "symlink", "other"]
-    content: str | None = None
-    mode: int | None = None
-    link: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class FileEndpointTarget:
+    """Endpoint destination held a regular file before sync."""
+
+    path: Path
+    content: str
+    mode: int
+
+
+@dataclass(frozen=True, slots=True)
+class SymlinkEndpointTarget:
+    """Endpoint destination held a symlink before sync."""
+
+    path: Path
+    link: str
+
+
+@dataclass(frozen=True, slots=True)
+class OtherEndpointTarget:
+    """Endpoint destination held a non-file, non-symlink entry before sync."""
+
+    path: Path
+
+
+EndpointTargetSnapshot = (
+    MissingEndpointTarget
+    | FileEndpointTarget
+    | SymlinkEndpointTarget
+    | OtherEndpointTarget
+)
 
 
 def _snapshot_endpoint_target(path: Path) -> EndpointTargetSnapshot:
     try:
         st = path.lstat()
         if stat.S_ISLNK(st.st_mode):
-            return EndpointTargetSnapshot(
-                path=path,
-                kind="symlink",
-                link=str(path.readlink()),
-            )
+            return SymlinkEndpointTarget(path=path, link=str(path.readlink()))
         if not stat.S_ISREG(st.st_mode):
-            return EndpointTargetSnapshot(path=path, kind="other")
-        return EndpointTargetSnapshot(
+            return OtherEndpointTarget(path=path)
+        return FileEndpointTarget(
             path=path,
-            kind="file",
             content=path.read_text(encoding="utf-8"),
             mode=st.st_mode & 0o777,
         )
     except FileNotFoundError:
-        return EndpointTargetSnapshot(path=path, kind="missing")
+        return MissingEndpointTarget(path=path)
     except OSError as error:
         if is_errno(error, "ENOENT"):
-            return EndpointTargetSnapshot(path=path, kind="missing")
+            return MissingEndpointTarget(path=path)
         raise
 
 
 def _restore_single_snapshot(snapshot: EndpointTargetSnapshot) -> None:
-    match snapshot.kind:
-        case "missing":
+    match snapshot:
+        case MissingEndpointTarget(path=path):
             with contextlib.suppress(OSError):
-                if snapshot.path.is_symlink() or snapshot.path.is_file():
-                    snapshot.path.unlink(missing_ok=True)
-                elif snapshot.path.is_dir():
-                    shutil.rmtree(snapshot.path, ignore_errors=True)
-        case "file":
-            sync_text_file(
-                snapshot.path,
-                snapshot.content if snapshot.content is not None else "",
-                snapshot.mode if snapshot.mode is not None else DEFAULT_FILE_MODE,
-            )
-        case "symlink":
-            if snapshot.link is None:
-                msg = f"missing endpoint symlink target: {snapshot.path}"
-                raise RuntimeError(msg)
+                if path.is_symlink() or path.is_file():
+                    path.unlink(missing_ok=True)
+                elif path.is_dir():
+                    shutil.rmtree(path, ignore_errors=True)
+        case FileEndpointTarget(path=path, content=content, mode=mode):
+            sync_text_file(path, content, mode)
+        case SymlinkEndpointTarget(path=path, link=link):
             with contextlib.suppress(OSError):
-                snapshot.path.unlink(missing_ok=True)
-            snapshot.path.symlink_to(snapshot.link)
-        case "other":
+                path.unlink(missing_ok=True)
+            path.symlink_to(link)
+        case OtherEndpointTarget():
             pass
 
 

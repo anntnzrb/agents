@@ -73,7 +73,7 @@ def _cleanup_path(root: str, entry_name: str) -> str | None:
 
 
 def _parse_managed_entry_names(content: str) -> list[str]:
-    parsed: object = json.loads(content)
+    parsed: object = json.loads(content)  # pyright: ignore[reportAny]
     if not isinstance(parsed, list):
         message = "expected array of strings"
         raise TypeError(message)
@@ -224,10 +224,11 @@ def record_managed_entries(plan: ManagedSyncPlan) -> bool:
             try:
                 Path(harness.state_path).unlink(missing_ok=True)
             except OSError as error:
-                err(
+                message = (
                     f"managed state removal failed: {harness.state_path} "
                     f"({panic_message(error)})"
                 )
+                err(message)
                 success = False
             continue
         try:

@@ -276,7 +276,7 @@ def load_extension_hook_state(path: str) -> _LoadedExtensionHookState | None:
 
     try:
         cleaned = strip_jsonc(raw_content)
-        parsed: object = json.loads(cleaned)
+        parsed: object = json.loads(cleaned)  # pyright: ignore[reportAny]
     except (json.JSONDecodeError, UnicodeDecodeError, ValueError, TypeError) as error:
         warn(f"hook state parse failed, ignoring {path} ({error})")
         return None

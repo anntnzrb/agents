@@ -117,7 +117,7 @@ def _test_cliproxy_deployment() -> CliProxyDeployment:
 def _write_file(path: Path, content: str) -> None:
     """Write text content to path, creating parent directories if needed."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    _ = path.write_text(content, encoding="utf-8")
 
 
 def _is_gone(pid: int) -> bool:
@@ -133,21 +133,21 @@ def _is_gone(pid: int) -> bool:
 def _init_git_repo(path: Path) -> None:
     """Initialize a mock git repository with one commit."""
     git_bin = shutil.which("git") or "git"
-    asyncio.run(run_process([git_bin, "init"], cwd=path))
-    asyncio.run(
+    _ = asyncio.run(run_process([git_bin, "init"], cwd=path))
+    _ = asyncio.run(
         run_process(
             [git_bin, "config", "user.name", "Test User"],
             cwd=path,
         )
     )
-    asyncio.run(
+    _ = asyncio.run(
         run_process(
             [git_bin, "config", "user.email", "test@example.com"],
             cwd=path,
         )
     )
-    asyncio.run(run_process([git_bin, "add", "."], cwd=path))
-    asyncio.run(run_process([git_bin, "commit", "-m", "init"], cwd=path))
+    _ = asyncio.run(run_process([git_bin, "add", "."], cwd=path))
+    _ = asyncio.run(run_process([git_bin, "commit", "-m", "init"], cwd=path))
 
 
 def _make_sync_env(
@@ -162,16 +162,16 @@ def _make_sync_env(
     repo_sync = Path(__file__).resolve().parent.parent
     src_dst = sync_source / "src"
     if not src_dst.exists():
-        shutil.copytree(repo_sync / "src", src_dst)
+        _ = shutil.copytree(repo_sync / "src", src_dst)
     for filename in ("pyproject.toml", "uv.lock", "README.md"):
         src_file = repo_sync / filename
         dst_file = sync_source / filename
         if src_file.exists() and not dst_file.exists():
-            shutil.copyfile(src_file, dst_file)
+            _ = shutil.copyfile(src_file, dst_file)
 
     deployment_file = agents_root / "tools" / "cliproxyapi" / "deployment.json"
     deployment_file.parent.mkdir(parents=True, exist_ok=True)
-    deployment_file.write_text(
+    _ = deployment_file.write_text(
         f"{
             json.dumps(
                 {
@@ -261,8 +261,7 @@ def test_run_jobs_with_preserve_expands_cliproxy_credential_pools_idempotently(
     src = str(tmp_path / "config.yaml.tmpl")
     dst = str(tmp_path / "config.yaml")
     secrets_path = str(tmp_path / "secrets.local.json")
-    _write_file(
-        Path(src),
+    template_content = (
         "remote-management:\n"
         "  allow-remote: true\n"
         "  secret-key: tailnet\n"
@@ -273,8 +272,9 @@ def test_run_jobs_with_preserve_expands_cliproxy_credential_pools_idempotently(
         "openai-compatibility:\n"
         "  - x-credential-pool: deepseek\n"
         "    name: deepseek\n"
-        "    base-url: https://deepseek.example/v1\n",
+        "    base-url: https://deepseek.example/v1\n"
     )
+    _write_file(Path(src), template_content)
     _write_file(
         Path(secrets_path),
         f"{
@@ -303,7 +303,8 @@ def test_run_jobs_with_preserve_expands_cliproxy_credential_pools_idempotently(
         )
     ]
     assert asyncio.run(run_jobs_with_preserve(jobs)) is True
-    config_raw = yaml.safe_load(Path(dst).read_text(encoding="utf-8"))
+    rendered_text = Path(dst).read_text(encoding="utf-8")
+    config_raw: object = yaml.safe_load(rendered_text)  # pyright: ignore[reportAny]
     assert _is_dict(config_raw)
     remote_mgmt = config_raw.get("remote-management")
     assert _is_dict(remote_mgmt)
@@ -565,7 +566,7 @@ def test_process_timeout_kills_descendant_holding_stdout(
     """Verify timeout terminates entire process tree holding standard output."""
     pids_file = tmp_path / "pids.txt"
     fixture = tmp_path / "descendant.py"
-    fixture.write_text(
+    _ = fixture.write_text(
         f"""import os, subprocess, time
 pids_file = {str(pids_file)!r}
 parent_pid = os.getpid()
@@ -617,7 +618,7 @@ def test_run_install_force_kills_term_trapping_process(
     trapped.chmod(MODE_EXECUTABLE)
 
     helper = tmp_path / "term_helper.py"
-    helper.write_text(
+    _ = helper.write_text(
         f"""import asyncio
 from sync.extensions.install import run_install
 
@@ -670,7 +671,7 @@ def test_main_reports_lock_contention_and_skips(
     assert lock is not None
     try:
         helper = home / "lock_contender.py"
-        helper.write_text(
+        _ = helper.write_text(
             """import sys
 from sync.cli import main
 sys.exit(main())
@@ -695,7 +696,7 @@ sys.exit(main())
 def test_watchdog_exits_124_on_global_timeout(tmp_path: Path) -> None:
     """Verify watchdog timer terminates process with exit code 124 on expiry."""
     helper = tmp_path / "watchdog_helper.py"
-    helper.write_text(
+    _ = helper.write_text(
         """import time
 from sync.core.index import start_sync_watchdog
 start_sync_watchdog(1)
@@ -719,7 +720,7 @@ def test_watchdog_can_be_cancelled_so_host_outlives_short_timeout(
 ) -> None:
     """Verify cancelling watchdog prevents premature process termination."""
     helper = tmp_path / "watchdog_cancel.py"
-    helper.write_text(
+    _ = helper.write_text(
         """import time
 from sync.core.index import start_sync_watchdog
 stop = start_sync_watchdog(1)
@@ -816,7 +817,7 @@ def test_sync_plan_deploys_cliproxy_panel_asset_only_on_gateway_host(
     deployment_path = (
         home / ".config" / "agents" / "tools" / "cliproxyapi" / "deployment.json"
     )
-    deployment_path.write_text(
+    _ = deployment_path.write_text(
         f"{
             json.dumps(
                 {
@@ -1313,7 +1314,8 @@ def test_run_sync_drops_legacy_npm_extension_state_entries_without_reinstall(
         seeded_home / ".pi" / "agent" / "extensions" / "npm-shrinkwrap.json"
     ).exists()
 
-    state_raw = json.loads(state_path.read_text(encoding="utf-8"))
+    state_text = state_path.read_text(encoding="utf-8")
+    state_raw: object = json.loads(state_text)  # pyright: ignore[reportAny]
     assert _is_dict(state_raw)
     assert state_raw.get("generatedEntries") == ["package.json", "node_modules"]
 
@@ -1450,12 +1452,12 @@ def test_missing_package_roots_ignores_invalid_package_names_in_source(
     """Verify invalid package name patterns in comments/strings are ignored."""
     src_dir = tmp_path / "src"
     src_dir.mkdir(parents=True, exist_ok=True)
-    (src_dir / "index.ts").write_text(
+    index_source = (
         '\nimport { test } from "@oh-my-pi/pi-coding-agent";\n'
         'const check = file.content.includes("\\nrename from ") || '
-        'file.content.startsWith("rename from ");\n',
-        encoding="utf-8",
+        'file.content.startsWith("rename from ");\n'
     )
+    _ = (src_dir / "index.ts").write_text(index_source, encoding="utf-8")
     missing = missing_package_roots(str(tmp_path))
     assert missing == ["@oh-my-pi/pi-coding-agent"]
 
@@ -1463,7 +1465,7 @@ def test_missing_package_roots_ignores_invalid_package_names_in_source(
 def test_read_package_manifest_dedupes_sources(tmp_path: Path) -> None:
     """Verify read_package_manifest eliminates duplicate package URLs."""
     manifest_path = tmp_path / "packages.json"
-    manifest_path.write_text(
+    _ = manifest_path.write_text(
         f"{
             json.dumps(
                 {
@@ -1485,12 +1487,13 @@ def test_read_package_manifest_dedupes_sources(tmp_path: Path) -> None:
 def test_patch_runtime_settings_preserves_other_keys(tmp_path: Path) -> None:
     """Verify updating packages array in settings.json preserves existing keys."""
     path = tmp_path / "settings.json"
-    path.write_text(
+    _ = path.write_text(
         '{\n  "theme": "dark",\n  "defaultModel": "gpt-5.4"\n}\n',
         encoding="utf-8",
     )
     patch_runtime_settings(str(path), [str(tmp_path / "pkg")])
-    settings_raw = json.loads(path.read_text(encoding="utf-8"))
+    settings_text = path.read_text(encoding="utf-8")
+    settings_raw: object = json.loads(settings_text)  # pyright: ignore[reportAny]
     assert _is_dict(settings_raw)
     assert settings_raw.get("theme") == "dark"
     assert settings_raw.get("packages") == [str(tmp_path / "pkg")]
@@ -1530,7 +1533,7 @@ def test_github_clone_command_prefers_gh_when_available(
         attempts.append(list(command))
         return True
 
-    asyncio.run(
+    _ = asyncio.run(
         clone_package_with_runner(
             "https://github.com/tintinweb/pi-supervisor",
             target,
@@ -1622,9 +1625,9 @@ def test_validate_package_dir_rejects_malformed_package_json(
     _write_file(pkg / "package.json", "{not valid json")
 
     with pytest.raises(ValueError, match=r"parse .*package\.json"):
-        package_is_healthy(str(pkg))
+        _ = package_is_healthy(str(pkg))
     with pytest.raises(ValueError, match=r"parse .*package\.json"):
-        package_has_build_script(str(pkg))
+        _ = package_has_build_script(str(pkg))
 
 
 def test_run_sync_bootstraps_packages_and_patches_runtime_settings(
@@ -1648,12 +1651,12 @@ def test_run_sync_bootstraps_packages_and_patches_runtime_settings(
     _init_git_repo(source_repo)
 
     build_repo = repos / "build-pkg"
-    _write_file(
-        build_repo / "package.json",
+    package_json = (
         '{\n  "scripts": {\n    "build": "mkdir -p dist && '
         "printf 'export default {}\\n' > dist/index.js\"\n  },\n"
-        '  "pi": {\n    "extensions": ["./dist/index.js"]\n  }\n}\n',
+        '  "pi": {\n    "extensions": ["./dist/index.js"]\n  }\n}\n'
     )
+    _write_file(build_repo / "package.json", package_json)
     _init_git_repo(build_repo)
 
     _write_file(
@@ -1684,11 +1687,11 @@ def test_managed_state_helpers_match_safe_entry_rules(home: Path) -> None:
     assert harness is not None
 
     state_file = home / ".local" / "share" / "agents" / "sync-managed" / "codex.json"
-    _write_file(
-        state_file,
+    state_content = (
         '[\n  "good.txt",\n  "..",\n  "/tmp/escape",\n  "nested/path",\n  '
-        '"../outside",\n  "good.txt"\n]',
+        '"../outside",\n  "good.txt"\n]'
     )
+    _write_file(state_file, state_content)
 
     names = load_recorded_entry_names(str(state_file))
     assert names == ["good.txt"]
@@ -1763,22 +1766,24 @@ def test_run_sync_prunes_older_complete_releases(
     old_complete_release_id = "0" * 64
     old_complete_dir = releases_root / old_complete_release_id
     (old_complete_dir / "src" / "sync").mkdir(parents=True, exist_ok=True)
-    (old_complete_dir / "src" / "sync" / "cli.py").write_text(
+    _ = (old_complete_dir / "src" / "sync" / "cli.py").write_text(
         "print('old')\n", encoding="utf-8"
     )
     (old_complete_dir / ".venv" / "bin").mkdir(parents=True, exist_ok=True)
-    (old_complete_dir / ".venv" / "bin" / "python").write_text(
+    _ = (old_complete_dir / ".venv" / "bin" / "python").write_text(
         "#!/bin/sh\nexit 0\n", encoding="utf-8"
     )
     (old_complete_dir / ".release-complete").touch()
 
     unrecognized_dir = releases_root / "unrecognized-custom-dir"
     unrecognized_dir.mkdir(parents=True, exist_ok=True)
-    (unrecognized_dir / "test.txt").write_text("data", encoding="utf-8")
+    _ = (unrecognized_dir / "test.txt").write_text("data", encoding="utf-8")
 
     incomplete_sha_dir = releases_root / ("1" * 64)
     incomplete_sha_dir.mkdir(parents=True, exist_ok=True)
-    (incomplete_sha_dir / "incomplete.txt").write_text("no marker", encoding="utf-8")
+    _ = (incomplete_sha_dir / "incomplete.txt").write_text(
+        "no marker", encoding="utf-8"
+    )
 
     assert asyncio.run(run_sync(sync_env)) is True
 
@@ -1803,11 +1808,11 @@ def test_run_sync_preserves_previous_releases_if_wrapper_reconciliation_fails(
     old_complete_release_id = "0" * 64
     old_complete_dir = releases_root / old_complete_release_id
     (old_complete_dir / "src" / "sync").mkdir(parents=True, exist_ok=True)
-    (old_complete_dir / "src" / "sync" / "cli.py").write_text(
+    _ = (old_complete_dir / "src" / "sync" / "cli.py").write_text(
         "print('old')\n", encoding="utf-8"
     )
     (old_complete_dir / ".venv" / "bin").mkdir(parents=True, exist_ok=True)
-    (old_complete_dir / ".venv" / "bin" / "python").write_text(
+    _ = (old_complete_dir / ".venv" / "bin" / "python").write_text(
         "#!/bin/sh\nexit 0\n", encoding="utf-8"
     )
     (old_complete_dir / ".release-complete").touch()
@@ -1923,7 +1928,7 @@ def test_run_process_cancellation_kills_process_group(tmp_path: Path) -> None:
             )
         )
         await asyncio.sleep(0.8)
-        task.cancel()
+        _ = task.cancel()
         try:
             await task
         except asyncio.CancelledError:

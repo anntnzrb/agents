@@ -105,7 +105,7 @@ def _write_empty_package_json(target_dir: str) -> bool:
         return True
 
     try:
-        package_json_path.write_text(_EMPTY_PACKAGE_JSON, encoding="utf-8")
+        _ = package_json_path.write_text(_EMPTY_PACKAGE_JSON, encoding="utf-8")
     except OSError as error:
         err(f"write {target_dir}/package.json ({panic_message(error)})")
         return False

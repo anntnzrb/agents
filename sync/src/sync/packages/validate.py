@@ -7,7 +7,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import cast
+from typing import TypeGuard
 
 from sync.runtime.jsonc import strip_jsonc
 
@@ -109,6 +109,14 @@ _SOURCE_EXTENSIONS: tuple[str, ...] = (
 _MIN_SCOPED_PARTS = 2
 
 
+def _is_obj_dict(val: object) -> TypeGuard[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeGuard[list[object]]:
+    return isinstance(val, list)
+
+
 def package_is_healthy(target_dir: str) -> bool:
     """Return True if package dir contains valid resources and no missing imports."""
     if not _is_directory(target_dir):
@@ -119,12 +127,10 @@ def package_is_healthy(target_dir: str) -> bool:
     package_json_path = str(Path(target_dir) / "package.json")
     if _is_file(package_json_path):
         package_json = _read_json_file(package_json_path)
-        if isinstance(package_json, dict):
-            raw_pkg = cast("dict[str, object]", package_json)
-            pi = raw_pkg.get("pi")
-            if isinstance(pi, dict):
-                raw_pi = cast("dict[str, object]", pi)
-                validated = _validate_pi_manifest(target_dir, raw_pi)
+        if _is_obj_dict(package_json):
+            pi = package_json.get("pi")
+            if _is_obj_dict(pi):
+                validated = _validate_pi_manifest(target_dir, pi)
                 if validated is not None:
                     return validated
 
@@ -139,10 +145,9 @@ def package_has_build_script(target_dir: str) -> bool:
 
     package_json = _read_json_file(package_json_path)
 
-    if not isinstance(package_json, dict):
+    if not _is_obj_dict(package_json):
         return False
-    raw_pkg = cast("dict[str, object]", package_json)
-    scripts = raw_pkg.get("scripts")
+    scripts = package_json.get("scripts")
     return isinstance(scripts, dict) and "build" in scripts
 
 
@@ -351,7 +356,7 @@ def _handle_template_brace(
         return idx + 1
     if ch == "}":
         if template_stack[-1] == 0:
-            template_stack.pop()
+            _ = template_stack.pop()
             return _scan_template_tail(content, idx + 1, template_stack)
         template_stack[-1] -= 1
         tokens.append(("PUNCT", "}"))
@@ -500,10 +505,9 @@ def _validate_pi_manifest(target_dir: str, pi: dict[str, object]) -> bool | None
     has_entries = False
     for key in RESOURCE_KEYS:
         entries = pi.get(key)
-        if not isinstance(entries, list):
+        if not _is_obj_list(entries):
             continue
-        raw_entries = cast("list[object]", entries)
-        for entry in raw_entries:
+        for entry in entries:
             if not isinstance(entry, str):
                 continue
             if _is_pattern_entry(entry):
@@ -529,7 +533,7 @@ def _read_file(path: str) -> str:
 def _read_json_file(path: str) -> object:
     content = _read_file(path)
     try:
-        return json.loads(strip_jsonc(content))
+        return json.loads(strip_jsonc(content))  # pyright: ignore[reportAny]
     except (ValueError, TypeError) as error:
         message = f"parse {path} ({error})"
         raise ValueError(message) from error
