@@ -191,4 +191,48 @@ describe("runtime/fs.ts", () => {
       expect(readdirSync(dst).length).toBe(0);
     });
   });
+  test("syncManagedTree ignores transient artifact entries and prunes them from destination", async () => {
+    await withTempDir(async (dir) => {
+      const src = join(dir, "src");
+      const dst = join(dir, "dst");
+
+      mkdirSync(join(src, ".venv", "bin"), { recursive: true });
+      writeFileSync(join(src, ".venv", "bin", "python"), "bin");
+      mkdirSync(join(src, "node_modules", "pkg"), { recursive: true });
+      writeFileSync(join(src, "node_modules", "pkg", "index.js"), "module");
+      mkdirSync(join(src, "__pycache__"), { recursive: true });
+      writeFileSync(join(src, "__pycache__", "mod.cpython-314.pyc"), "pyc");
+      mkdirSync(join(src, ".pytest_cache"), { recursive: true });
+      writeFileSync(join(src, ".pytest_cache", "v"), "cache");
+      mkdirSync(join(src, ".ruff_cache"), { recursive: true });
+      writeFileSync(join(src, ".ruff_cache", "cached"), "cache");
+      mkdirSync(join(src, ".hypothesis"), { recursive: true });
+      writeFileSync(join(src, ".hypothesis", "data"), "hypothesis");
+      writeFileSync(join(src, ".DS_Store"), "ds_store");
+      writeFileSync(join(src, "module.pyc"), "compiled");
+      writeFileSync(join(src, "module.pyo"), "optimized");
+      writeFileSync(join(src, "native.pyd"), "windows native binary");
+      writeFileSync(join(src, "real_file.txt"), "valid content");
+
+      // Seed destination with stale junk
+      mkdirSync(join(dst, ".venv"), { recursive: true });
+      writeFileSync(join(dst, ".venv", "old"), "stale");
+      mkdirSync(join(dst, "node_modules"), { recursive: true });
+      writeFileSync(join(dst, "node_modules", "old"), "stale");
+
+      syncManagedTree(src, dst);
+
+      expect(readFileSync(join(dst, "real_file.txt"), "utf8")).toBe("valid content");
+      expect(readFileSync(join(dst, "native.pyd"), "utf8")).toBe("windows native binary");
+      expect(existsSync(join(dst, ".venv"))).toBe(false);
+      expect(existsSync(join(dst, "node_modules"))).toBe(false);
+      expect(existsSync(join(dst, "__pycache__"))).toBe(false);
+      expect(existsSync(join(dst, ".pytest_cache"))).toBe(false);
+      expect(existsSync(join(dst, ".ruff_cache"))).toBe(false);
+      expect(existsSync(join(dst, ".hypothesis"))).toBe(false);
+      expect(existsSync(join(dst, ".DS_Store"))).toBe(false);
+      expect(existsSync(join(dst, "module.pyc"))).toBe(false);
+      expect(existsSync(join(dst, "module.pyo"))).toBe(false);
+    });
+  });
 });

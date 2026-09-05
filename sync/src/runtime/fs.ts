@@ -4,6 +4,25 @@ import { isErrno } from "./errors.ts";
 
 type SourceContentCache = Map<string, { readonly metadata: fs.Stats; readonly content: Buffer }>;
 
+const IGNORED_SYNC_NAMES: Record<string, true> = {
+  ".venv": true,
+  node_modules: true,
+  __pycache__: true,
+  ".pytest_cache": true,
+  ".ruff_cache": true,
+  ".hypothesis": true,
+  ".DS_Store": true,
+  ".git": true,
+};
+
+export function isIgnoredSyncEntry(name: string): boolean {
+  return (
+    IGNORED_SYNC_NAMES[name] === true ||
+    name.endsWith(".pyc") ||
+    name.endsWith(".pyo")
+  );
+}
+
 export function isSymlink(targetPath: string): boolean {
   try {
     return fs.lstatSync(targetPath).isSymbolicLink();
@@ -87,6 +106,9 @@ export function syncManagedChildren(
 function copyTreeRecursive(src: string, dst: string): void {
   fs.mkdirSync(dst, { recursive: true });
   for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    if (isIgnoredSyncEntry(entry.name)) {
+      continue;
+    }
     const childSrc = path.join(src, entry.name);
     const childDst = path.join(dst, entry.name);
     const childMetadata = resolveSourceEntry(childSrc);
@@ -113,7 +135,9 @@ function syncManagedTreeRecursive(
 
   ensureDirectory(dst);
 
-  const srcEntries = fs.readdirSync(src, { withFileTypes: true });
+  const srcEntries = fs
+    .readdirSync(src, { withFileTypes: true })
+    .filter((entry) => !isIgnoredSyncEntry(entry.name));
   const srcNames = new Set(srcEntries.map((entry) => entry.name));
 
   for (const dstEntry of safeReadDir(dst)) {
@@ -164,7 +188,7 @@ function syncManagedChildrenRecursive(
   }
 
   for (const srcEntry of fs.readdirSync(src, { withFileTypes: true })) {
-    if (preservePaths.includes(srcEntry.name)) {
+    if (isIgnoredSyncEntry(srcEntry.name) || preservePaths.includes(srcEntry.name)) {
       continue;
     }
     const childSrc = path.join(src, srcEntry.name);
