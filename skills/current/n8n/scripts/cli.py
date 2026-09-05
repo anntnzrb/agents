@@ -22,7 +22,7 @@ def _run_script(args: list[str]) -> int:
     old_argv = sys.argv[:]
     sys.argv = [str(TARGET), *args]
     try:
-        runpy.run_path(str(TARGET), run_name="__main__")
+        _ = runpy.run_path(str(TARGET), run_name="__main__")
     except SystemExit as exc:
         code = exc.code
         if code is None:
@@ -37,6 +37,7 @@ def _run_script(args: list[str]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run n8nctl with optional argument overrides."""
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0] in {"-h", "--help"}:
         print("usage: cli.py [n8nctl-args...]\n")
