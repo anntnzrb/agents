@@ -156,7 +156,10 @@ def _expand_native_credential_section(
             msg = f"invalid {label}: expected object"
             raise TypeError(msg)
         profile: dict[str, object] = dict(raw_item)
-        pool_marker_val = profile.get(POOL_MARKER)
+        if POOL_MARKER not in profile:
+            result.append(profile)
+            continue
+        pool_marker_val = profile[POOL_MARKER]
         pool_name = _validate_pool_marker(pool_marker_val, label)
         _reject_owned_fields(profile, label, OWNED_NATIVE_FIELDS)
         credentials = _require_pool(pool_name, pools)
@@ -181,10 +184,10 @@ def _expand_compatibility_section(
             msg = f"invalid {label}: expected object"
             raise TypeError(msg)
         profile: dict[str, object] = dict(raw_item)
-        pool_marker_val = profile.get(POOL_MARKER)
-        if pool_marker_val is None:
+        if POOL_MARKER not in profile:
             result.append(profile)
             continue
+        pool_marker_val = profile[POOL_MARKER]
         pool_name = _validate_pool_marker(pool_marker_val, label)
         _reject_owned_fields(profile, label, OWNED_COMPATIBILITY_FIELDS)
         credentials = _require_pool(pool_name, pools)

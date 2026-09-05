@@ -323,10 +323,7 @@ def _compute_runtime_release_id(paths: RequiredPaths) -> str:
 
 
 def _hash_directory_into(root: str, hasher: Hasher, prefix: str = "") -> None:
-    try:
-        entries = sorted(Path(root).iterdir(), key=lambda entry: entry.name)
-    except OSError:
-        return
+    entries = sorted(Path(root).iterdir(), key=lambda entry: entry.name)
 
     for entry in entries:
         relative_path = entry.name if len(prefix) == 0 else f"{prefix}/{entry.name}"

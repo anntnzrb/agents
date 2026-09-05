@@ -5,7 +5,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tarfile
+import time
 from pathlib import Path
+from typing import Final
 
 import pytest
 
@@ -18,6 +21,8 @@ from sync.core.cliproxy_deployment import (
 from sync.core.harness import SyncEnv
 from sync.core.managed_tools import (
     ManagedToolRuntime,
+    extract_release,
+    installed_tool_matches,
     is_cli_proxy_running,
     prepare_managed_tools,
 )
@@ -29,6 +34,8 @@ TEST_PORT = 9443
 HEALTH_CHECK_TIMEOUT_MS = 500
 INSTALL_TIMEOUT_MS = 1000
 EXECUTABLE_MODE = 0o755
+EXPECTED_FETCH_TIMEOUT_SEC: Final[float] = 1.5
+EXPECTED_REINSTALL_DOWNLOADS: Final[int] = 2
 
 DEPLOYMENT = CliProxyDeployment(
     server=ServerConfig(hostname="test-gateway"),
@@ -189,3 +196,133 @@ def test_managed_tool_rejects_unsupported_arch_and_invalid_manifest(
     manifest_path.write_text("invalid json", encoding="utf-8")
     with pytest.raises(RuntimeError, match=r"parse"):
         prepare_managed_tools(sync_env)
+
+
+def test_extract_release_enforces_timeout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """extract_release raises TimeoutError when extraction exceeds deadline."""
+    archive_path = tmp_path / "test.tar.gz"
+    entry_file = tmp_path / "dummy.txt"
+    entry_file.write_text("dummy", encoding="utf-8")
+    with tarfile.open(archive_path, "w:gz") as tar:
+        tar.add(entry_file, arcname="dummy.txt")
+
+    def slow_extract(
+        _archive_path: Path,
+        _dest_path: Path,
+        _entry_name: str,
+    ) -> None:
+        time.sleep(0.1)
+
+    monkeypatch.setattr("sync.core.managed_tools._do_extract_tar", slow_extract)
+
+    dest = tmp_path / "dest"
+    dest.mkdir(parents=True, exist_ok=True)
+    with pytest.raises(TimeoutError, match=r"archive extraction timed out"):
+        extract_release(archive_path, dest, "dummy.txt", timeout_ms=10)
+
+
+def test_managed_tool_health_check_passes_timeout_to_fetch_impl() -> None:
+    """is_cli_proxy_running passes timeout budget to injected fetch_impl."""
+    captured: dict[str, object] = {}
+
+    def mock_fetch(url: str, timeout: float) -> object:
+        captured["url"] = url
+        captured["timeout"] = timeout
+        return object()
+
+    healthy = is_cli_proxy_running(
+        DEPLOYMENT,
+        timeout_ms=1500,
+        fetch_impl=mock_fetch,
+    )
+    assert healthy is True
+    assert captured["url"] == "https://gateway.example.test:9443/v1/models"
+    assert captured["timeout"] == EXPECTED_FETCH_TIMEOUT_SEC
+
+
+def test_managed_tool_health_check_infallible_on_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """is_cli_proxy_running returns False on any Exception without raising."""
+
+    def exploding_fetch(_url: str) -> object:
+        message = "unexpected error in fetch"
+        raise TypeError(message)
+
+    assert is_cli_proxy_running(DEPLOYMENT, fetch_impl=exploding_fetch) is False
+
+    def exploding_url(_dep: CliProxyDeployment) -> str:
+        message = "cannot build models url"
+        raise ValueError(message)
+
+    monkeypatch.setattr("sync.core.managed_tools.cliproxy_models_url", exploding_url)
+    assert is_cli_proxy_running(DEPLOYMENT) is False
+
+
+def test_installed_tool_matches_handles_undecodable_receipt(
+    tmp_path: Path,
+) -> None:
+    """installed_tool_matches returns False when receipt is not valid UTF-8."""
+    executable = tmp_path / "bin"
+    executable.write_text("#!/bin/sh\n", encoding="utf-8")
+    executable.chmod(EXECUTABLE_MODE)
+    receipt_path = tmp_path / "receipt.json"
+    receipt_path.write_bytes(b"\xff\xfe\x00\x00corrupt")
+
+    matches = installed_tool_matches(executable, receipt_path, "expected receipt")
+    assert matches is False
+
+
+def test_managed_tool_recovers_from_corrupted_receipt(tmp_path: Path) -> None:
+    """Corrupted non-UTF8 receipt is treated as cache miss and triggers reinstall."""
+    write_manifest(tmp_path)
+    sync_env = SyncEnv.from_home(
+        str(tmp_path),
+        INSTALL_TIMEOUT_MS,
+        platform="darwin",
+    )
+    downloads = 0
+
+    def mock_download(_url: str, destination: str, _timeout_ms: int) -> None:
+        nonlocal downloads
+        downloads += 1
+        Path(destination).write_bytes(ARCHIVE_CONTENT)
+
+    def mock_extract(
+        _archive: str,
+        destination: str,
+        entry_name: str,
+        _timeout_ms: int,
+    ) -> None:
+        executable = Path(destination) / entry_name
+        executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        executable.chmod(EXECUTABLE_MODE)
+
+    runtime = ManagedToolRuntime(
+        arch="arm64",
+        cache_home=str(tmp_path / "cache"),
+        download=mock_download,
+        extract=mock_extract,
+    )
+
+    prepare_managed_tools(sync_env, runtime)
+    assert downloads == 1
+
+    install_dir = (
+        tmp_path
+        / "cache"
+        / "github-tools"
+        / "cliproxyapi"
+        / "versions"
+        / "7.2.132"
+        / "darwin-arm64"
+    )
+    receipt_path = install_dir / "receipt.json"
+    receipt_path.write_bytes(b"\x80\x81corrupt_bytes")
+
+    tools = prepare_managed_tools(sync_env, runtime)
+    assert len(tools) == 1
+    assert downloads == EXPECTED_REINSTALL_DOWNLOADS

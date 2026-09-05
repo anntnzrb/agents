@@ -82,3 +82,23 @@ exit 1
     calls = [line for line in log_file.read_text(encoding="utf-8").split("\n") if line]
     assert len(calls) == 1
     assert f"{ext} install" in calls[0]
+
+
+def test_iter_extension_packages_skips_hidden_directories(
+    tmp_path: Path,
+) -> None:
+    """iter_extension_packages ignores directories starting with a dot."""
+    visible = tmp_path / "visible_ext"
+    visible.mkdir(parents=True, exist_ok=True)
+    (visible / "package.json").write_text("{}", encoding="utf-8")
+
+    hidden = tmp_path / ".hidden_ext"
+    hidden.mkdir(parents=True, exist_ok=True)
+    (hidden / "package.json").write_text("{}", encoding="utf-8")
+
+    nested_hidden = tmp_path / "visible_ext" / ".nested_dot" / "pkg"
+    nested_hidden.mkdir(parents=True, exist_ok=True)
+    (nested_hidden / "package.json").write_text("{}", encoding="utf-8")
+
+    packages = asyncio.run(iter_extension_packages(str(tmp_path)))
+    assert packages == [str(visible)]

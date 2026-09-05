@@ -210,3 +210,56 @@ codex-api-key:
     assert parsed["host"] == "100.64.0.42"
     assert parsed["port"] == EXPECTED_PORT
     assert parsed["codex-api-key"] == [{"api-key": "upstream"}]
+
+
+def test_cliproxy_render_config_passes_through_static_native_entry() -> None:
+    """Test that native credential entries without pool marker pass through."""
+    template = """host: ${CLIPROXY_LISTEN_HOST}
+port: ${CLIPROXY_LISTEN_PORT}
+codex-api-key:
+  - api-key: static-upstream-key
+    weight: 1
+    prefix: static-prefix
+"""
+    secrets: dict[str, object] = {"CLIPROXY_CREDENTIAL_POOLS": {}}
+
+    rendered = render_cliproxy_config(template, secrets, DEPLOYMENT)
+    parsed: object = yaml.safe_load(rendered)
+    assert isinstance(parsed, dict)
+    assert parsed["codex-api-key"] == [
+        {"api-key": "static-upstream-key", "weight": 1, "prefix": "static-prefix"}
+    ]
+
+
+@pytest.mark.parametrize(
+    ("section_yaml", "expected_match"),
+    [
+        (
+            "openai-compatibility:\n  - name: c1\n    x-credential-pool: null",
+            (
+                r"invalid openai-compatibility\[0\]\.x-credential-pool: "
+                r"expected non-empty string"
+            ),
+        ),
+        (
+            "codex-api-key:\n  - x-credential-pool: null",
+            (
+                r"invalid codex-api-key\[0\]\.x-credential-pool: "
+                r"expected non-empty string"
+            ),
+        ),
+    ],
+)
+def test_cliproxy_render_config_rejects_null_credential_pool_marker(
+    section_yaml: str,
+    expected_match: str,
+) -> None:
+    """Test error when an entry explicitly sets x-credential-pool to null."""
+    template = f"""host: ${{CLIPROXY_LISTEN_HOST}}
+port: ${{CLIPROXY_LISTEN_PORT}}
+{section_yaml}
+"""
+    secrets: dict[str, object] = {"CLIPROXY_CREDENTIAL_POOLS": {}}
+
+    with pytest.raises(ValueError, match=expected_match):
+        render_cliproxy_config(template, secrets, DEPLOYMENT)

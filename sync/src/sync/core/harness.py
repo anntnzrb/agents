@@ -355,7 +355,7 @@ def platform_from_process() -> HostPlatform:
 
 def assert_path_component(value: str, label: str) -> None:
     """Validate that a path segment is safe and matches PATH_COMPONENT_PATTERN."""
-    if not PATH_COMPONENT_PATTERN.match(value) or value in (".", ".."):
+    if not PATH_COMPONENT_PATTERN.fullmatch(value) or value in (".", ".."):
         message = f"invalid {label}: {value}"
         raise ValueError(message)
 

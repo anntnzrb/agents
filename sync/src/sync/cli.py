@@ -74,7 +74,7 @@ def _run_launch(args: list[str]) -> int:
         _out(LAUNCH_HELP_TEXT)
         return EXIT_OK
     match args:
-        case [name]:
+        case [name] if name:
             return launch_main(name, [])
         case [name, "--", *forwarded] if name and not _is_help_flag(name):
             return launch_main(name, forwarded)

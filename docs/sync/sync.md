@@ -65,11 +65,11 @@ Endpoint publication replaces every configured `${CLIPROXY_CLIENT_BASE_URL}` har
 The renderer parses and serializes YAML with PyYAML. It expands credential pools into native and compatibility profiles. The job writes generated files through a temporary file and an atomic rename.
 ## Installed runtime
 
-Sync copies `sync/src/sync/`, `sync/pyproject.toml`, and `sync/uv.lock` into a content-addressed release under `~/.local/share/agents/sync-releases/<releaseId>/`, then runs `uv sync --frozen --no-dev` there so the installed copy resolves its runtime dependencies. A `~/.local/share/agents/sync-current` symlink always points to the most recently published release. Generated wrappers execute this installed copy.
+Sync copies `sync/src/`, `sync/pyproject.toml`, and `sync/uv.lock` into a content-addressed release under `~/.local/share/agents/sync-releases/<releaseId>/`, then runs `uv sync --frozen --no-dev` there so the installed copy resolves its runtime dependencies. A `~/.local/share/agents/sync-current` symlink always points to the most recently published release. Generated wrappers execute this installed copy.
 
 The `<releaseId>` is a SHA-256 digest computed over the runtime sources:
 
-- Traverses `sync/src/sync/` recursively, ordering directory entries in deterministic Unicode code-point order.
+- Traverses `sync/src/` recursively, ordering directory entries in deterministic Unicode code-point order.
 - Uses forward slashes (`/`) for all relative paths.
 - Subdirectories are hashed as `dir:<relativePath>\n` before recursive descent.
 - Regular files and symlinks pointing to regular files are hashed as `file:<relativePath>\n` followed by the file content bytes and a trailing `\n`. Directory symlinks are rejected.

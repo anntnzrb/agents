@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import hashlib
+import inspect
 import json
 import os
 import platform
@@ -42,6 +44,7 @@ EXECUTABLE_MODE = 0o755
 RECEIPT_INDENT = 2
 HTTP_OK = 200
 MS_PER_SECOND = 1000.0
+_TIMEOUT_POSITIONAL_ARITY = 2
 
 
 class ReleaseAsset(BaseModel):
@@ -77,7 +80,7 @@ class PreparedManagedTool:
 
 type DownloadFn = Callable[[str, str, int], None]
 type ExtractFn = Callable[[str, str, str, int], None]
-type FetchImpl = Callable[[str], object]
+type FetchImpl = Callable[..., object]
 
 
 @dataclass(frozen=True)
@@ -148,6 +151,16 @@ def download_release(url: str, destination: str | Path, timeout_ms: int) -> None
         raise RuntimeError(message) from exc
 
 
+def _do_extract_tar(
+    archive_path: Path,
+    dest_path: Path,
+    entry_name: str,
+) -> None:
+    with tarfile.open(archive_path, mode="r:*") as tar:
+        member = tar.getmember(entry_name)
+        tar.extract(member, path=dest_path, filter="data")
+
+
 def extract_release(
     archive: str | Path,
     destination: str | Path,
@@ -155,19 +168,32 @@ def extract_release(
     timeout_ms: int,
 ) -> None:
     """Extract a single entry from a tarball archive to destination directory."""
-    _ = timeout_ms
     archive_path = Path(archive)
     dest_path = Path(destination)
+    timeout_sec = max(0.0, timeout_ms / MS_PER_SECOND)
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     try:
-        with tarfile.open(archive_path, mode="r:*") as tar:
-            member = tar.getmember(entry_name)
-            tar.extract(member, path=dest_path, filter="data")
+        future = executor.submit(
+            _do_extract_tar,
+            archive_path,
+            dest_path,
+            entry_name,
+        )
+        future.result(timeout=timeout_sec)
+    except (TimeoutError, concurrent.futures.TimeoutError) as exc:
+        executor.shutdown(wait=False, cancel_futures=True)
+        message = "archive extraction timed out"
+        raise TimeoutError(message) from exc
     except KeyError as exc:
+        executor.shutdown(wait=False, cancel_futures=True)
         message = f"archive extraction failed: missing entry {entry_name}"
         raise RuntimeError(message) from exc
     except Exception as exc:
+        executor.shutdown(wait=False, cancel_futures=True)
         message = f"archive extraction failed: {panic_message(exc)}"
         raise RuntimeError(message) from exc
+    else:
+        executor.shutdown(wait=False)
 
 
 def verify_checksum(archive: str | Path, expected: str) -> None:
@@ -193,7 +219,7 @@ def installed_tool_matches(
         if not is_regular or not has_exec_bit:
             return False
         return receipt_path.read_text(encoding="utf-8") == receipt
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return False
 
 
@@ -324,20 +350,49 @@ def prepare_managed_tools(
     return [prepare_cli_proxy(sync_env, manifest_path, runtime)]
 
 
+def _invoke_fetch(
+    fetch_impl: FetchImpl,
+    url: str,
+    timeout_sec: float,
+    timeout_ms: int,
+) -> object:
+    """Invoke fetch implementation with timeout according to its signature."""
+    try:
+        sig = inspect.signature(fetch_impl)
+        params = list(sig.parameters.values())
+        param_names = {p.name for p in params}
+        has_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params)
+        if "timeout_ms" in param_names:
+            return fetch_impl(url, timeout_ms=timeout_ms)
+        if "timeout" in param_names or has_var_kw:
+            return fetch_impl(url, timeout=timeout_sec)
+        if len(params) >= _TIMEOUT_POSITIONAL_ARITY and params[1].kind in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        ):
+            return fetch_impl(url, timeout_sec)
+        return fetch_impl(url)
+    except (ValueError, TypeError):
+        try:
+            return fetch_impl(url, timeout=timeout_sec)
+        except TypeError:
+            return fetch_impl(url)
+
+
 def is_cli_proxy_running(
     deployment: CliProxyDeployment,
     timeout_ms: int = DEFAULT_HEALTH_TIMEOUT_MS,
     fetch_impl: FetchImpl | None = None,
 ) -> bool:
     """Check if the CLIProxyAPI daemon is reachable via its health endpoint."""
-    url = cliproxy_models_url(deployment)
-    timeout_sec = timeout_ms / MS_PER_SECOND
     try:
+        url = cliproxy_models_url(deployment)
+        timeout_sec = timeout_ms / MS_PER_SECOND
         if fetch_impl is not None:
-            fetch_impl(url)
+            _invoke_fetch(fetch_impl, url, timeout_sec, timeout_ms)
         else:
             httpx.get(url, timeout=timeout_sec)
-    except (httpx.HTTPError, OSError, ValueError, RuntimeError):
+    except Exception:
         return False
     else:
         return True

@@ -180,12 +180,13 @@ def test_cliproxy_endpoint_template_renders_idempotently(tmp_path: Path) -> None
 
 
 def test_cliproxy_target_readiness_requires_a_nonempty_models_payload() -> None:
-    """Test target readiness check requires HTTP 200 with non-empty data array."""
+    """Test target readiness check requires HTTP 2xx with non-empty data array."""
     test_cases = [
         (httpx.Response(204), False),
         (httpx.Response(200, json={"status": "ok"}), False),
         (httpx.Response(200, json={"data": []}), False),
         (httpx.Response(200, json={"data": [{"id": "ready"}]}), True),
+        (httpx.Response(201, json={"data": [{"id": "ready"}]}), True),
     ]
 
     for response, expected in test_cases:
@@ -194,6 +195,16 @@ def test_cliproxy_target_readiness_requires_a_nonempty_models_payload() -> None:
             CliProxyEndpointSyncOptions(fetch=_make_fake_fetch(response)),
         )
         assert ready is expected
+
+
+def test_cliproxy_target_readiness_accepts_201_with_data() -> None:
+    """Test target readiness check accepts HTTP 201 response with data array."""
+    response = httpx.Response(201, json={"data": [{"id": "ready"}]})
+    ready = is_cliproxy_target_ready(
+        DEPLOYMENT,
+        CliProxyEndpointSyncOptions(fetch=_make_fake_fetch(response)),
+    )
+    assert ready is True
 
 
 def test_cliproxy_endpoint_publication_requires_a_keyless_ready_target(

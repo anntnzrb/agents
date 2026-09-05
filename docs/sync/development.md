@@ -110,6 +110,10 @@ Sync parses configuration, secrets, environment files, and extension/skill sourc
 - **Type-only erasure**: Type-only imports (`import type { ... }`) are stripped during transpilation/scanning and excluded from runtime dependency specifiers.
 - **Specifier classification**: Downstream package validation (`missing_package_roots`) ignores relative paths (`.`, `./*`, `../*`), builtin modules (`node:*`, `bun:*`, `bun`), and `data:` URIs, validating only unresolved npm package roots and scoped package identifiers.
 
+### Python scanner note
+
+The Python implementation (`sync/src/sync/packages/validate.py`) performs import scanning with a comment/string-stripping state machine plus targeted patterns instead of a full JS/TS AST library. Any change to the scanner must preserve comment/string immunity: add adversarial cases (comments, multiline strings, template literals, type-only imports) to `sync/tests/test_package_validate.py`.
+
 ### JSON with Comments (JSONC)
 
 - **Comment tolerance**: Accepts single-line (`//`) and multiline (`/* ... */`) comments across configuration files, manifests, and local secrets (`secrets.local.json`, `deployment.json`, `release-manifest.json`, hook states, wrapper state).
@@ -122,7 +126,6 @@ Sync parses configuration, secrets, environment files, and extension/skill sourc
 
 ### Dotenv (`.env`)
 
-- **Quoted string preservation**: Preserves single- and double-quoted values.
 - **Variable expansion disabled**: Literal `$VAR` or `${VAR}` sequences remain unexpanded (`expandVariables: false`).
 - **Empty key omission**: Keys with empty or unset values are omitted from the decoded environment map (`preserveEmptyStrings: false`).
 

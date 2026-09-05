@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Final, TypeGuard
 
+import pytest
 import yaml
 
 from sync.core.cliproxy_deployment import (
@@ -31,7 +32,6 @@ from sync.core.harness import (
 )
 from sync.core.hook_state import fingerprint_tree
 from sync.core.index import (
-    main,
     parse_timeout_seconds,
     run_sync,
     try_acquire_sync_lock,
@@ -76,7 +76,6 @@ from sync.runtime.process import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    import pytest
 
 MODE_EXECUTABLE: Final[int] = 0o755
 MODE_SECRET: Final[int] = 0o600
@@ -579,7 +578,7 @@ time.sleep(10)
     result = asyncio.run(
         run_process(
             [sys.executable, "-u", str(fixture)],
-            RunProcessOptions(timeout_ms=500, stdio="pipe"),
+            RunProcessOptions(timeout_ms=1000, stdio="pipe"),
         )
     )
     elapsed_ms = (time.perf_counter() - started_at) * 1000.0
@@ -611,8 +610,25 @@ def test_run_install_force_kills_term_trapping_process(
     )
     trapped.chmod(MODE_EXECUTABLE)
 
-    result = asyncio.run(run_install([str(trapped)], str(tmp_path), 100))
-    assert result is False
+    helper = tmp_path / "term_helper.py"
+    helper.write_text(
+        f"""import asyncio
+from sync.extensions.install import run_install
+
+result = asyncio.run(run_install([{str(trapped)!r}], {str(tmp_path)!r}, 100))
+print(str(result).lower())
+""",
+        encoding="utf-8",
+    )
+
+    result = asyncio.run(
+        run_process(
+            [sys.executable, str(helper)],
+            RunProcessOptions(timeout_ms=10_000),
+        )
+    )
+    assert result.exit_code == 0
+    assert result.stdout.strip() == "false"
 
 
 def test_python_bootstrap_times_out_sleeping_fake_uv(
@@ -641,17 +657,31 @@ def test_python_bootstrap_times_out_sleeping_fake_uv(
 
 def test_main_reports_lock_contention_and_skips(
     home: Path,
-    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Verify concurrent sync invocation skips execution and returns zero."""
+    """Verify concurrent sync from second OS process skips execution."""
     sync_env = _make_sync_env(home)
     lock = try_acquire_sync_lock(sync_env)
     assert lock is not None
     try:
-        exit_code = main()
-        assert exit_code == 0
-        stderr = capsys.readouterr().err
-        assert "another sync is already running; skipping" in stderr
+        helper = home / "lock_contender.py"
+        helper.write_text(
+            """import sys
+from sync.cli import main
+sys.exit(main())
+""",
+            encoding="utf-8",
+        )
+        result = asyncio.run(
+            run_process(
+                [sys.executable, str(helper)],
+                RunProcessOptions(
+                    timeout_ms=10_000,
+                    env={"HOME": str(home)},
+                ),
+            )
+        )
+        assert result.exit_code == 0
+        assert "another sync is already running; skipping" in result.stderr
     finally:
         release_sync_lock(lock)
 
@@ -1581,12 +1611,14 @@ def test_validate_package_dir_detects_missing_import_packages(
 def test_validate_package_dir_rejects_malformed_package_json(
     tmp_path: Path,
 ) -> None:
-    """Verify malformed package.json safely fails health and build script checks."""
+    """Verify malformed package.json raises ValueError on health and build checks."""
     pkg = tmp_path / "bad-pkg"
     _write_file(pkg / "package.json", "{not valid json")
 
-    assert package_is_healthy(str(pkg)) is False
-    assert package_has_build_script(str(pkg)) is False
+    with pytest.raises(ValueError, match=r"parse .*package\.json"):
+        package_is_healthy(str(pkg))
+    with pytest.raises(ValueError, match=r"parse .*package\.json"):
+        package_has_build_script(str(pkg))
 
 
 def test_run_sync_bootstraps_packages_and_patches_runtime_settings(

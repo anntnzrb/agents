@@ -48,7 +48,6 @@ DEFAULT_FILE_MODE: Final[int] = 0o644
 IPV6_GROUPS_COUNT: Final[int] = 8
 IPV4_PARTS_COUNT: Final[int] = 4
 MAX_IPV4_OCTET: Final[int] = 255
-HTTP_OK: Final[int] = 200
 BARE_KEY_DELIMITERS: Final[frozenset[str]] = frozenset(
     (".", "]", "[", " ", "\t", "#", "\r", "\n", "=")
 )
@@ -342,7 +341,7 @@ def is_cliproxy_target_ready(
             resp = opts.fetch(url, headers=headers, timeout=timeout_sec)
         else:
             resp = httpx.get(url, headers=headers, timeout=timeout_sec)
-        if resp.status_code != HTTP_OK:
+        if not resp.is_success:
             return False
         payload: object = resp.json()
         if not _is_obj_dict(payload):

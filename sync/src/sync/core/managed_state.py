@@ -24,9 +24,9 @@ from sync.core.harness import (
     harness_root,
 )
 from sync.core.harness_adapters import HARNESS_ADAPTERS
-from sync.core.plan import build_sync_plan
+from sync.core.plan import build_sync_plan, top_level_entry_names
 from sync.runtime.errors import err, panic_message, warn
-from sync.runtime.fs import is_ignored_sync_entry, rm_entry
+from sync.runtime.fs import rm_entry
 
 __all__ = [
     "ManagedHarnessPlan",
@@ -71,20 +71,6 @@ def is_safe_managed_entry_name(entry_name: str) -> bool:
     )
 
 
-def top_level_entry_names(root: str | os.PathLike[str]) -> list[str]:
-    """Return filtered entry names in a directory, ignoring internal sync paths."""
-    try:
-        entries = [
-            entry.name
-            for entry in os.scandir(root)
-            if not is_ignored_sync_entry(entry.name)
-        ]
-    except OSError:
-        return []
-    else:
-        return entries
-
-
 def unique_sorted(names: Iterable[str]) -> list[str]:
     """Return unique strings sorted in ascending code-point order."""
     return sorted(set(names))
@@ -119,7 +105,7 @@ def load_recorded_entry_names(path: str | os.PathLike[str]) -> list[str]:
         content = Path(path_str).read_text(encoding="utf-8")
     except FileNotFoundError:
         return []
-    except OSError as error:
+    except (OSError, UnicodeDecodeError) as error:
         warn(f"ignoring malformed managed state {path_str} ({panic_message(error)})")
         return []
 

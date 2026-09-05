@@ -38,7 +38,9 @@ def _walk_extension_packages_sync(root: str) -> list[str]:
     packages_found: list[str] = []
     try:
         for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
-            dirnames[:] = [d for d in dirnames if d != "node_modules"]
+            dirnames[:] = [
+                d for d in dirnames if d != "node_modules" and not d.startswith(".")
+            ]
             if "package.json" in filenames:
                 packages_found.append(dirpath)
     except OSError:

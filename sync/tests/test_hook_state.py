@@ -17,15 +17,26 @@ from sync.core.harness_adapters import HARNESS_ADAPTERS
 from sync.core.hook_state import (
     clear_extension_hook_state,
     fingerprint_tree,
+    load_extension_hook_state,
     prepare_extension_hook_state,
     record_extension_hook_state,
 )
+from sync.core.managed_state import (
+    load_recorded_entry_names,
+    top_level_entry_names,
+)
 from sync.core.plan import ExtensionDepsHookPlan
+from sync.core.secret_template import (
+    render_secret_template,
+    strip_jsonc,
+    sync_text_file,
+)
 
 _MISSING_SHA256: Final[str] = (
     "ffa63583dfa6706b87d284b86b0d693a161e4840aad2c5cf6b5d27c3b9621f7d"
 )
 SHA256_HEX_LENGTH: Final[int] = 64
+EXPECTED_PRIVATE_MODE: Final[int] = 0o600
 
 
 def test_fingerprint_tree_missing_source_root_matches_golden(
@@ -143,9 +154,17 @@ def test_fingerprint_tree_records_broken_symlinks_without_failing(
     assert len(fp1) == SHA256_HEX_LENGTH
     assert fingerprint_tree(tmp_path) == fp1
 
+    expected_fp1 = hashlib.sha256(b"broken:broken_link\n").hexdigest()
+    assert fp1 == expected_fp1
+
     (tmp_path / "broken_link_2").symlink_to(tmp_path / "nonexistent2")
     fp2 = fingerprint_tree(tmp_path)
     assert fp2 != fp1
+
+    expected_fp2 = hashlib.sha256(
+        b"broken:broken_link\nbroken:broken_link_2\n"
+    ).hexdigest()
+    assert fp2 == expected_fp2
 
 
 def test_fingerprint_tree_regular_files_and_normal_subdirs_fingerprint_identically(
@@ -169,15 +188,23 @@ def test_fingerprint_tree_regular_files_and_normal_subdirs_fingerprint_identical
 def test_fingerprint_tree_fingerprints_symlinks_to_regular_files(
     tmp_path: Path,
 ) -> None:
-    """Symlinks to regular files are hashed identically to regular files."""
+    """Symlinks to regular files track target content changes."""
     target_file = tmp_path / "target.txt"
     target_file.write_text("target content", encoding="utf-8")
+    fp_without_link = fingerprint_tree(tmp_path)
+
     (tmp_path / "link.txt").symlink_to(target_file)
 
     fp = fingerprint_tree(tmp_path)
     assert isinstance(fp, str)
     assert len(fp) == SHA256_HEX_LENGTH
     assert fingerprint_tree(tmp_path) == fp
+    assert fp != fp_without_link
+
+    target_file.write_text("mutated target content", encoding="utf-8")
+    fp_mutated = fingerprint_tree(tmp_path)
+    assert fp_mutated != fp
+    assert fp_mutated != fp_without_link
 
 
 def test_fingerprint_tree_sorts_directory_entries_with_mixed_case_and_non_ascii_names(
@@ -434,3 +461,173 @@ def test_prepare_extension_hook_state_corrupt_state(tmp_path: Path) -> None:
     state = prepare_extension_hook_state(hook)
     assert state.should_skip is False
     assert state.fingerprint == fingerprint_tree(source_root)
+
+
+def test_prepare_extension_hook_state_branches(tmp_path: Path) -> None:
+    """Hook state handles invalid shape, stale entries, missing file, and JSONC."""
+    source_root = tmp_path / "source"
+    home = tmp_path / "home"
+    source_root.mkdir(parents=True)
+    home.mkdir(parents=True)
+    (source_root / "src").mkdir(parents=True)
+    (source_root / "src" / "index.ts").write_text(
+        "export const x = 1;", encoding="utf-8"
+    )
+    fp = fingerprint_tree(source_root)
+
+    adapter = next(a for a in HARNESS_ADAPTERS if a.id == "opencode")
+    harness = build_harness(
+        HarnessSpec(
+            id=adapter.id,
+            source_name=adapter.id,
+            home=str(home),
+            launcher=adapter.launcher,
+            instruction_file=adapter.instruction_file,
+            runtime_subdir=adapter.runtime_subdir,
+            compat_managed_entries=adapter.compat_managed_entries,
+            hooks=adapter.hooks,
+        )
+    )
+    state_path = home / "state.json"
+    hook = ExtensionDepsHookPlan(
+        harness=harness,
+        job_root=str(home),
+        root=str(home),
+        source_root=str(source_root),
+        relative_root="",
+        state_path=str(state_path),
+        timeout_ms=1000,
+    )
+
+    # 1. Missing state file
+    missing_state = prepare_extension_hook_state(hook)
+    assert missing_state.should_skip is False
+    assert missing_state.should_refresh_state is False
+    assert missing_state.generated_entries == []
+
+    # 2. Wrong shape (JSON array)
+    state_path.write_text("[1, 2, 3]", encoding="utf-8")
+    array_state = prepare_extension_hook_state(hook)
+    assert array_state.should_skip is False
+
+    # 3. Wrong shape (missing generatedEntries / invalid types)
+    state_path.write_text(
+        json.dumps({"fingerprint": 123, "generatedEntries": []}), encoding="utf-8"
+    )
+    bad_type_state = prepare_extension_hook_state(hook)
+    assert bad_type_state.should_skip is False
+
+    # 4. JSONC comments in state file
+    (home / "package.json").write_text("{}", encoding="utf-8")
+    jsonc_payload = f"""// leading comment
+    /* block comment */
+    {{
+      "fingerprint": "{fp}",
+      "generatedEntries": [
+        "package.json",
+      ],
+    }}"""
+    state_path.write_text(jsonc_payload, encoding="utf-8")
+    jsonc_state = prepare_extension_hook_state(hook)
+    assert jsonc_state.should_skip is True
+    assert jsonc_state.preserve_paths == ["package.json"]
+
+    # 5. Non-generated entries filtered and should_refresh_state set to True
+    (home / "custom.txt").write_text("custom", encoding="utf-8")
+    mixed_payload = json.dumps(
+        {
+            "fingerprint": fp,
+            "generatedEntries": ["package.json", "custom.txt", "unrelated.ts"],
+        }
+    )
+    state_path.write_text(mixed_payload, encoding="utf-8")
+    filtered_state = prepare_extension_hook_state(hook)
+    assert filtered_state.should_skip is True
+    assert filtered_state.generated_entries == ["package.json"]
+    assert filtered_state.preserve_paths == ["package.json"]
+    assert filtered_state.should_refresh_state is True
+
+
+def test_strip_jsonc_trailing_comma_string_aware() -> None:
+    """strip_jsonc removes trailing commas without modifying commas in strings."""
+    jsonc_input = """{
+        // comment before key
+        "message": "hello, } world",
+        "nested": {
+            "key, ] test": "value, }", /* block comment */
+        },
+        "list": [
+            "item, } 1",
+            "item, ] 2",
+        ],
+    }"""
+    cleaned = strip_jsonc(jsonc_input)
+    parsed = json.loads(cleaned)
+    assert parsed["message"] == "hello, } world"
+    assert parsed["nested"]["key, ] test"] == "value, }"
+    assert parsed["list"] == ["item, } 1", "item, ] 2"]
+
+
+def test_load_state_ignores_invalid_unicode_decode_error(tmp_path: Path) -> None:
+    """load_recorded_entry_names and load_extension_hook_state handle invalid UTF-8."""
+    bad_managed_state = tmp_path / "bad_managed.json"
+    bad_managed_state.write_bytes(b"\x80\xff\xfe\x00not-utf8")
+
+    entries = load_recorded_entry_names(bad_managed_state)
+    assert entries == []
+
+    bad_hook_state = tmp_path / "bad_hook.json"
+    bad_hook_state.write_bytes(b"\x80\xff\xfe\x00not-utf8")
+
+    hook_state = load_extension_hook_state(str(bad_hook_state))
+    assert hook_state is None
+
+
+def test_fingerprint_tree_propagates_oserror_when_not_enoent(tmp_path: Path) -> None:
+    """fingerprint_tree propagates EACCES/ENOTDIR instead of swallowing them."""
+    file_path = tmp_path / "regular_file.txt"
+    file_path.write_text("not a directory", encoding="utf-8")
+
+    with pytest.raises(NotADirectoryError):
+        fingerprint_tree(file_path)
+
+    unreadable_dir = tmp_path / "unreadable"
+    unreadable_dir.mkdir()
+    (unreadable_dir / "child.txt").write_text("inner", encoding="utf-8")
+    unreadable_dir.chmod(0o000)
+    try:
+        with pytest.raises(PermissionError):
+            fingerprint_tree(unreadable_dir)
+    finally:
+        unreadable_dir.chmod(0o755)
+
+
+def test_render_secret_template_preserves_non_ascii_unicode_bytes() -> None:
+    """render_secret_template produces unescaped UTF-8 matching JSON.stringify."""
+    template = '{"secret": ${SECRET_VAL}, "plain": "ok"}'
+    unicode_value = "clé_secrète_🔑_日本語"
+    rendered = render_secret_template(template, {"SECRET_VAL": unicode_value})
+    assert f'"{unicode_value}"' in rendered
+    assert "\\u" not in rendered
+
+    parsed = json.loads(rendered)
+    assert parsed["secret"] == unicode_value
+    assert parsed["plain"] == "ok"
+
+
+def test_top_level_entry_names_reexported_from_plan(tmp_path: Path) -> None:
+    """managed_state.top_level_entry_names behaves identically to plan export."""
+    (tmp_path / "alpha").mkdir()
+    (tmp_path / "beta.txt").write_text("content", encoding="utf-8")
+    names = top_level_entry_names(str(tmp_path))
+    assert names == ["alpha", "beta.txt"]
+
+
+def test_sync_text_file_loops_os_write_completely(tmp_path: Path) -> None:
+    """sync_text_file writes full content atomically with correct mode."""
+    target = tmp_path / "subdir" / "output.txt"
+    payload = "long text payload with multi-byte unicode: 🚀 — " * 100
+    sync_text_file(target, payload, mode=EXPECTED_PRIVATE_MODE)
+    assert target.exists()
+    assert (target.stat().st_mode & 0o777) == EXPECTED_PRIVATE_MODE
+    assert target.read_text(encoding="utf-8") == payload

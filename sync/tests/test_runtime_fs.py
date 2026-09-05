@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import stat
 from typing import TYPE_CHECKING
@@ -18,6 +19,7 @@ from sync.core.secret_template import (
     sync_secret_template,
 )
 from sync.runtime.fs import (
+    CachedSourceContent,
     copy_tree,
     is_identical_file,
     is_ignored_sync_entry,
@@ -108,15 +110,45 @@ def test_copy_tree(tmp_path: Path) -> None:
 
 
 def test_sync_managed_children(tmp_path: Path) -> None:
-    """sync_managed_children copies only children."""
+    """sync_managed_children copies children, preserves paths, and prunes subdirs."""
     src = tmp_path / "src"
     dst = tmp_path / "dst"
 
     src.mkdir()
     (src / "child.txt").write_text("child", encoding="utf-8")
+    (src / "preserved_child.txt").write_text("src_version", encoding="utf-8")
+    (src / ".venv").mkdir()
+    (src / ".venv" / "bin").mkdir()
+    (src / ".venv" / "bin" / "python").write_text("python", encoding="utf-8")
+    (src / "__pycache__").mkdir()
+    (src / "__pycache__" / "cached.pyc").write_text("bytecode", encoding="utf-8")
+    (src / "ignored.pyc").write_text("bytecode", encoding="utf-8")
 
-    sync_managed_children(src, dst)
+    (src / "sub").mkdir()
+    (src / "sub" / "file.txt").write_text("sub content", encoding="utf-8")
+
+    dst.mkdir()
+    (dst / "preserved_child.txt").write_text("dst_preserved", encoding="utf-8")
+    (dst / "unrelated_root.txt").write_text("unrelated root content", encoding="utf-8")
+    (dst / "sub").mkdir()
+    (dst / "sub" / "stale.txt").write_text("stale in subdir", encoding="utf-8")
+
+    sync_managed_children(
+        src,
+        dst,
+        preserve_paths=["preserved_child.txt"],
+    )
+
     assert (dst / "child.txt").read_text(encoding="utf-8") == "child"
+    assert (dst / "preserved_child.txt").read_text(encoding="utf-8") == "dst_preserved"
+    assert not (dst / ".venv").exists()
+    assert not (dst / "__pycache__").exists()
+    assert not (dst / "ignored.pyc").exists()
+    assert (dst / "sub" / "file.txt").read_text(encoding="utf-8") == "sub content"
+    assert not (dst / "sub" / "stale.txt").exists()
+    assert (dst / "unrelated_root.txt").read_text(encoding="utf-8") == (
+        "unrelated root content"
+    )
 
 
 def test_sync_managed_tree_preserves_paths(tmp_path: Path) -> None:
@@ -258,7 +290,7 @@ def test_is_ignored_sync_entry() -> None:
 
 
 def test_is_identical_file(tmp_path: Path) -> None:
-    """is_identical_file compares size, mode, and byte content."""
+    """is_identical_file compares size, mode, and byte content with caching."""
     f1 = tmp_path / "f1.txt"
     f2 = tmp_path / "f2.txt"
     f3 = tmp_path / "f3.txt"
@@ -274,6 +306,39 @@ def test_is_identical_file(tmp_path: Path) -> None:
     # Mode difference
     f2.chmod(0o777)
     assert is_identical_file(f1, stat1, f2) is False
+    f2.chmod(0o644)
+
+    # Missing destination
+    assert is_identical_file(f1, stat1, tmp_path / "missing.txt") is False
+
+    # Symlink destination returns False
+    symlink_dst = tmp_path / "symlink_dst.txt"
+    symlink_dst.symlink_to(f1)
+    assert is_identical_file(f1, stat1, symlink_dst) is False
+
+    # Directory destination returns False
+    dir_dst = tmp_path / "dir_dst"
+    dir_dst.mkdir()
+    assert is_identical_file(f1, stat1, dir_dst) is False
+
+    # Source directory returns False
+    dir_stat = dir_dst.stat()
+    assert is_identical_file(dir_dst, dir_stat, f1) is False
+
+    # Empty file returns True without reading content
+    empty1 = tmp_path / "empty1.txt"
+    empty2 = tmp_path / "empty2.txt"
+    empty1.touch()
+    empty2.touch()
+    empty_stat = empty1.stat()
+    assert is_identical_file(empty1, empty_stat, empty2) is True
+
+    # Cache path populates and reuses cached content
+    cache: dict[str, CachedSourceContent] = {}
+    assert is_identical_file(f1, stat1, f2, cache) is True
+    assert str(f1) in cache
+    assert cache[str(f1)].content == b"hello"
+    assert is_identical_file(f1, stat1, f2, cache) is True
 
 
 def test_strip_jsonc() -> None:
@@ -296,6 +361,21 @@ def test_strip_jsonc() -> None:
     assert '"url": "http://example.com//test"' in cleaned
     # Line count preserved
     assert cleaned.count("\n") == input_text.count("\n")
+
+    parsed = json.loads(cleaned)
+    assert parsed == {
+        "key": "value",
+        "url": "http://example.com//test",
+        "nested": [1, 2],
+    }
+
+    trailing_sample = '{"a": 1, "b": [2, 3,], "msg": "hello, world,",}'
+    stripped_trailing = strip_jsonc(trailing_sample)
+    assert json.loads(stripped_trailing) == {
+        "a": 1,
+        "b": [2, 3],
+        "msg": "hello, world,",
+    }
 
 
 def test_secret_template_rendering_and_sync(tmp_path: Path) -> None:

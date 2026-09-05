@@ -68,3 +68,16 @@ exit 1
     assert len(calls) == 1
     assert "add --no-save some-pkg" in calls[0]
     assert package_is_healthy(str(tmp_path)) is True
+
+
+def test_install_package_deps_fails_when_source_file_is_corrupt(
+    tmp_path: Path,
+) -> None:
+    """install_package_deps returns False when dependency scan fails on corrupt file."""
+    skills_dir = tmp_path / "skills"
+    skills_dir.mkdir(parents=True, exist_ok=True)
+    bad_file = skills_dir / "invalid.ts"
+    bad_file.write_bytes(b"\xff\xfe\x00\x00")
+
+    result = asyncio.run(install_package_deps(str(tmp_path), _TIMEOUT_MS))
+    assert result is False

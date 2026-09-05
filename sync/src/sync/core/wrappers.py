@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import BaseModel, Field, TypeAdapter, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from sync.core.secret_template import strip_jsonc
 from sync.core.tool_launchers import TOOL_LAUNCHERS, tool_launcher_default_args
@@ -19,6 +19,7 @@ from sync.runtime.errors import err, is_errno, panic_message, warn
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
+    from typing import NoReturn
 
     from sync.core.harness import Harness, SyncEnv
     from sync.core.managed_tools import PreparedManagedTool
@@ -258,13 +259,23 @@ def reconcile_wrapper_files(
     )
 
 
+def _missing_version_error() -> NoReturn:
+    """Raise for wrapper state without a version field."""
+    message = "wrapper state missing version"
+    raise ValueError(message)
+
+
 def read_wrapper_state(state_path: str) -> WrapperState:
     """Read and validate the persisted wrapper state file."""
     try:
         content = Path(state_path).read_text(encoding="utf-8")
     except FileNotFoundError:
         return WrapperState(version=1, entries=[])
-    except OSError as error:
+    except (UnicodeDecodeError, OSError) as error:
+        if isinstance(error, UnicodeDecodeError):
+            message = panic_message(error)
+            warn(f"wrapper state parse failed, ignoring {state_path} ({message})")
+            return WrapperState(version=1, entries=[])
         message = f"read {state_path} ({panic_message(error)})"
         raise RuntimeError(message) from error
 
@@ -276,14 +287,10 @@ def read_wrapper_state(state_path: str) -> WrapperState:
         return WrapperState(version=1, entries=[])
 
     try:
-        raw_dict = TypeAdapter(dict[str, object]).validate_python(parsed)
-        entries_raw = raw_dict.get("entries", [])
-        raw_entries = TypeAdapter(list[object]).validate_python(entries_raw)
-        entries = [
-            entry
-            for entry in raw_entries
-            if isinstance(entry, str) and Path(entry).is_absolute()
-        ]
+        if not isinstance(parsed, dict) or "version" not in parsed:
+            _missing_version_error()
+        state = WrapperState.model_validate(parsed, strict=True)
+        entries = [entry for entry in state.entries if Path(entry).is_absolute()]
         unique_entries = sorted(set(entries))
         return WrapperState(version=1, entries=unique_entries)
     except (ValidationError, TypeError, ValueError):
@@ -298,11 +305,12 @@ def write_wrapper_state(state_path: str, state: WrapperState) -> None:
     try:
         if state_file.exists() and state_file.read_text(encoding="utf-8") == content:
             return
+    except UnicodeDecodeError:
+        pass
     except OSError as error:
         if not is_errno(error, "ENOENT"):
             message = f"read {state_path} ({panic_message(error)})"
             raise RuntimeError(message) from error
-
     temp_path = Path(f"{state_path}.{os.getpid()}.tmp")
     try:
         with temp_path.open("w", encoding="utf-8") as f:
@@ -335,12 +343,13 @@ def write_managed_wrapper(
             if (lstat.st_mode & PERM_MASK) != WRAPPER_FILE_MODE:
                 target.chmod(WRAPPER_FILE_MODE)
             return "owned"
+    except UnicodeDecodeError:
+        return "conflict"
     except FileNotFoundError:
         pass
     except OSError as error:
         message = f"inspect wrapper {target_path} ({panic_message(error)})"
         raise RuntimeError(message) from error
-
     target.parent.mkdir(parents=True, exist_ok=True)
     temp_path = Path(f"{target_path}.{os.getpid()}.tmp")
     try:
@@ -367,7 +376,7 @@ def is_managed_wrapper(target_path: str) -> bool:
         if stat.S_ISLNK(lstat.st_mode) or not stat.S_ISREG(lstat.st_mode):
             return False
         return WRAPPER_MARKER in target.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return False
 
 

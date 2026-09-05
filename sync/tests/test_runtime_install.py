@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import shutil
@@ -10,6 +11,7 @@ import socket
 from pathlib import Path
 
 from sync.core.harness import SyncEnv
+from sync.core.index import run_sync
 from sync.core.jobs import (
     prune_unreferenced_releases,
     remove_legacy_runtime_install,
@@ -287,3 +289,40 @@ def test_remove_legacy_runtime_install_removes_legacy_directory(
     ok = remove_legacy_runtime_install(runtime_home)
     assert ok is True
     assert not legacy.exists()
+
+
+def test_run_sync_removes_the_legacy_mutable_runtime_after_current_link_and_wrappers(
+    tmp_path: Path,
+) -> None:
+    """run_sync removes legacy mutable runtime directory e2e."""
+    home = make_home(tmp_path, gateway_host=False)
+    legacy = Path(home) / ".local" / "share" / "agents" / "sync"
+    (legacy / "src").mkdir(parents=True, exist_ok=True)
+    (legacy / "src" / "cli.py").write_text('print("legacy")\n', encoding="utf-8")
+    seed_source_root(home)
+
+    sync_env = SyncEnv.from_home(home, TEST_TIMEOUT_MS, platform="linux")
+    ok = asyncio.run(run_sync(sync_env))
+    assert ok is True
+    assert not legacy.exists()
+    current_link = Path(home) / ".local" / "share" / "agents" / "sync-current"
+    assert current_link.exists()
+
+
+def test_runtime_install_fails_loudly_when_source_subdir_is_unreadable(
+    tmp_path: Path,
+) -> None:
+    """Test that runtime installation fails when source directory is unreadable."""
+    home = make_home(tmp_path)
+    source_root = seed_source_root(home)
+    unreadable_dir = Path(source_root) / "src" / "unreadable"
+    unreadable_dir.mkdir(parents=True, exist_ok=True)
+    (unreadable_dir / "file.py").write_text("content\n", encoding="utf-8")
+    unreadable_dir.chmod(0o000)
+    try:
+        _, job = get_runtime_install_job(home)
+        ok = run_jobs_with_preserve([job])
+        assert ok is False
+        assert not Path(job.current_link).exists()
+    finally:
+        unreadable_dir.chmod(0o755)

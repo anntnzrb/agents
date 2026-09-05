@@ -3,12 +3,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import TYPE_CHECKING
 
 import pytest
 
 from sync.packages.index import (
+    PackageBootstrapTarget,
+    bootstrap_package_target,
     package_cache_dir,
     patch_runtime_settings,
     read_package_manifest,
@@ -39,9 +42,7 @@ def test_read_package_manifest_trims_and_deduplicates_package_sources(
       "packages": [
         "  https://github.com/owner/repo1  ",
         "https://github.com/owner/repo2",
-        "https://github.com/owner/repo1",
-        "",
-        "   "
+        "https://github.com/owner/repo1"
       ]
     }
     """
@@ -61,6 +62,57 @@ def test_read_package_manifest_raises_on_invalid_json(
     manifest_path.write_text("invalid json content {", encoding="utf-8")
     with pytest.raises(ValueError, match="invalid JSON"):
         read_package_manifest(str(manifest_path))
+
+
+def test_read_package_manifest_rejects_missing_packages_key(
+    tmp_path: Path,
+) -> None:
+    """read_package_manifest raises ValueError when packages key is missing."""
+    manifest_path = tmp_path / "packages.json"
+    manifest_path.write_text('{"theme": "dark"}\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="packages"):
+        read_package_manifest(str(manifest_path))
+
+
+def test_read_package_manifest_rejects_empty_string_entries(
+    tmp_path: Path,
+) -> None:
+    """read_package_manifest raises ValueError on empty or whitespace entries."""
+    manifest_path = tmp_path / "packages.json"
+    manifest_path.write_text(
+        '{"packages": ["https://github.com/owner/repo", ""]}\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="package source must not be empty"):
+        read_package_manifest(str(manifest_path))
+
+    manifest_path.write_text(
+        '{"packages": ["   "]}\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="package source must not be empty"):
+        read_package_manifest(str(manifest_path))
+
+
+def test_bootstrap_package_target_fails_and_leaves_settings_untouched(
+    tmp_path: Path,
+) -> None:
+    """bootstrap_package_target fails without modifying runtime settings."""
+    manifest_path = tmp_path / "packages.json"
+    manifest_path.write_text('{"packages": [""]}\n', encoding="utf-8")
+    settings_path = tmp_path / "settings.json"
+    original_settings = '{"theme": "nord"}\n'
+    settings_path.write_text(original_settings, encoding="utf-8")
+
+    target = PackageBootstrapTarget(
+        manifest_path=str(manifest_path),
+        runtime_settings_path=str(settings_path),
+        cache_root=str(tmp_path / "cache"),
+        timeout_ms=5000,
+    )
+    success = asyncio.run(bootstrap_package_target(target))
+    assert success is False
+    assert settings_path.read_text(encoding="utf-8") == original_settings
 
 
 def test_patch_runtime_settings_replaces_symlink_with_regular_file(

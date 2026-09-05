@@ -702,6 +702,7 @@ def test_integration_process_lock_contention_and_release_on_exit(
     assert after_release_result.exit_code == 0, (
         after_release_result.stderr or after_release_result.stdout
     )
+    assert (home / ".codex" / "AGENTS.md").is_file()
 
 
 def test_integration_cached_launch_fallback_when_offline(

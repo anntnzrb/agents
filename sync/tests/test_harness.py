@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from sync.core.harness import RootEnvReadError, SyncEnv, load_root_env
+from sync.cli import EXIT_USAGE, main
+from sync.core.harness import (
+    RootEnvReadError,
+    SyncEnv,
+    assert_path_component,
+    load_root_env,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -83,3 +89,19 @@ def test_load_root_env_returns_tagged_error_when_reading_fails(
 
     assert exc_info.value.path == str(bad_env_path)
     assert "failed to read root environment file" in str(exc_info.value)
+
+
+def test_assert_path_component_rejects_trailing_newline() -> None:
+    """Test that assert_path_component rejects names with trailing newlines."""
+    with pytest.raises(ValueError, match=r"invalid harness id: codex\n"):
+        assert_path_component("codex\n", "harness id")
+
+
+def test_cli_launch_empty_name_returns_usage_error(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Test that sync launch with an empty string name returns usage error."""
+    exit_code = main(["launch", ""])
+    assert exit_code == EXIT_USAGE
+    captured = capsys.readouterr()
+    assert "sync: usage: launch NAME -- [ARGS...]" in captured.err

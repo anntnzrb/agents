@@ -5,9 +5,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 from sync.packages.validate import (
     extract_import_specifiers,
     missing_package_roots,
+    package_has_build_script,
     package_is_healthy,
 )
 
@@ -151,3 +154,74 @@ def test_extract_import_specifiers_ignores_property_accesses() -> None:
     assert "ignored-nested-pkg" not in specifiers
 
     assert extract_import_specifiers("const broken = {{{;") == []
+
+
+def test_extract_import_specifiers_ignores_regex_literals() -> None:
+    """extract_import_specifiers ignores require/import inside regex literals."""
+    code = (
+        'const a = /require\\("phantom-require"\\)/g;\n'
+        'const b = /import\\("phantom-import"\\)/i;\n'
+        "const c = /[/]/;\n"
+        'const d = /\\/require\\("phantom-escaped"\\)/;\n'
+        'const e = !/require\\("phantom-negated"\\)/.test(s);\n'
+        'const f = [ /require\\("phantom-array"\\)/ ];\n'
+        'const g = { pattern: /require\\("phantom-obj"\\)/ };\n'
+        'const h = cond ? /require\\("phantom-ternary1"\\)/ : '
+        '/require\\("phantom-ternary2"\\)/;\n'
+        'const numDiv = 5 / require("real-after-div");\n'
+        'const real = require("real-package");\n'
+    )
+    specifiers = extract_import_specifiers(code)
+    assert specifiers == ["real-after-div", "real-package"]
+    assert "phantom-require" not in specifiers
+    assert "phantom-import" not in specifiers
+    assert "phantom-escaped" not in specifiers
+    assert "phantom-negated" not in specifiers
+    assert "phantom-array" not in specifiers
+    assert "phantom-obj" not in specifiers
+    assert "phantom-ternary1" not in specifiers
+    assert "phantom-ternary2" not in specifiers
+
+
+def test_package_is_healthy_propagates_corrupt_package_json(
+    tmp_path: Path,
+) -> None:
+    """package_is_healthy propagates parse error with path diagnostics."""
+    pkg_json = tmp_path / "package.json"
+    pkg_json.write_text("{corrupt json", encoding="utf-8")
+    with pytest.raises(ValueError, match=f"parse {pkg_json}"):
+        package_is_healthy(str(tmp_path))
+
+
+def test_package_has_build_script_propagates_corrupt_package_json(
+    tmp_path: Path,
+) -> None:
+    """package_has_build_script propagates parse error with path diagnostics."""
+    pkg_json = tmp_path / "package.json"
+    pkg_json.write_text("{corrupt json", encoding="utf-8")
+    with pytest.raises(ValueError, match=f"parse {pkg_json}"):
+        package_has_build_script(str(tmp_path))
+
+
+def test_missing_package_roots_propagates_unreadable_source_file(
+    tmp_path: Path,
+) -> None:
+    """missing_package_roots propagates read error with path diagnostics."""
+    skills_dir = tmp_path / "skills"
+    skills_dir.mkdir(parents=True, exist_ok=True)
+    bad_file = skills_dir / "invalid.ts"
+    bad_file.write_bytes(b"\xff\xfe\x00\x00")
+    with pytest.raises(ValueError, match=f"read {bad_file}"):
+        missing_package_roots(str(tmp_path))
+
+
+def test_package_is_healthy_propagates_unreadable_source_file(
+    tmp_path: Path,
+) -> None:
+    """package_is_healthy propagates read error with path diagnostics."""
+    skills_dir = tmp_path / "skills"
+    skills_dir.mkdir(parents=True, exist_ok=True)
+    bad_file = skills_dir / "invalid.ts"
+    bad_file.write_bytes(b"\xff\xfe\x00\x00")
+    with pytest.raises(ValueError, match=f"read {bad_file}"):
+        package_is_healthy(str(tmp_path))

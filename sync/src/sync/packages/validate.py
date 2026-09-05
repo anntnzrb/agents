@@ -60,6 +60,43 @@ VALID_PACKAGE_ROOT_PATTERN: re.Pattern[str] = re.compile(
     r"^(@[a-z0-9_.-]+/)?[a-z0-9_.-]+$",
     re.IGNORECASE,
 )
+_REGEX_PRECEDING_PUNCT: frozenset[str] = frozenset(
+    {
+        "(",
+        "[",
+        "{",
+        ";",
+        ",",
+        ":",
+        "?",
+        "=",
+        "!",
+        "+",
+        "-",
+        "*",
+        "%",
+        "&",
+        "|",
+        "^",
+        "~",
+        "<",
+        ">",
+    }
+)
+
+_REGEX_PRECEDING_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "return",
+        "case",
+        "yield",
+        "await",
+        "typeof",
+        "void",
+        "delete",
+        "throw",
+        "default",
+    }
+)
 
 _SOURCE_EXTENSIONS: tuple[str, ...] = (
     ".ts",
@@ -81,18 +118,15 @@ def package_is_healthy(target_dir: str) -> bool:
 
     package_json_path = str(Path(target_dir) / "package.json")
     if _is_file(package_json_path):
-        try:
-            package_json = _read_json_file(package_json_path)
-            if isinstance(package_json, dict):
-                raw_pkg = cast("dict[str, object]", package_json)
-                pi = raw_pkg.get("pi")
-                if isinstance(pi, dict):
-                    raw_pi = cast("dict[str, object]", pi)
-                    validated = _validate_pi_manifest(target_dir, raw_pi)
-                    if validated is not None:
-                        return validated
-        except (ValueError, OSError):
-            return False
+        package_json = _read_json_file(package_json_path)
+        if isinstance(package_json, dict):
+            raw_pkg = cast("dict[str, object]", package_json)
+            pi = raw_pkg.get("pi")
+            if isinstance(pi, dict):
+                raw_pi = cast("dict[str, object]", pi)
+                validated = _validate_pi_manifest(target_dir, raw_pi)
+                if validated is not None:
+                    return validated
 
     return any(_exists(str(Path(target_dir) / key)) for key in RESOURCE_KEYS)
 
@@ -103,10 +137,7 @@ def package_has_build_script(target_dir: str) -> bool:
     if not _is_file(package_json_path):
         return False
 
-    try:
-        package_json = _read_json_file(package_json_path)
-    except (ValueError, OSError):
-        return False
+    package_json = _read_json_file(package_json_path)
 
     if not isinstance(package_json, dict):
         return False
@@ -119,10 +150,7 @@ def missing_package_roots(target_dir: str) -> list[str]:
     """Scan JS/TS source files and return names of missing node_modules dependencies."""
     missing: set[str] = set()
     for file_path in _package_source_files(target_dir):
-        try:
-            content = _read_file(file_path)
-        except ValueError:
-            continue
+        content = _read_file(file_path)
         for specifier in extract_import_specifiers(content):
             package_root = _package_root_from_specifier(specifier)
             if not package_root or _package_root_is_builtin(package_root):
@@ -331,6 +359,68 @@ def _handle_template_brace(
     return idx
 
 
+def _is_regex_start(tokens: list[tuple[str, str]]) -> bool:
+    if not tokens:
+        return True
+    prev_type, prev_val = tokens[-1]
+    if prev_type == "PUNCT":
+        return prev_val in _REGEX_PRECEDING_PUNCT
+    if prev_type == "IDENT":
+        return prev_val in _REGEX_PRECEDING_KEYWORDS
+    return False
+
+
+def _scan_regex(content: str, idx: int) -> int:
+    length = len(content)
+    idx += 1
+    in_char_class = False
+
+    while idx < length:
+        ch = content[idx]
+        if ch == "\n":
+            return idx
+        if ch == "\\":
+            idx += 2
+            continue
+        if ch == "[" and not in_char_class:
+            in_char_class = True
+            idx += 1
+            continue
+        if ch == "]" and in_char_class:
+            in_char_class = False
+            idx += 1
+            continue
+        if ch == "/" and not in_char_class:
+            idx += 1
+            while idx < length and content[idx].isalpha():
+                idx += 1
+            return idx
+        idx += 1
+    return idx
+
+
+def _scan_number(content: str, idx: int) -> tuple[str, int]:
+    start = idx
+    length = len(content)
+    while idx < length and (content[idx].isalnum() or content[idx] == "."):
+        idx += 1
+    return (content[start:idx], idx)
+
+
+def _handle_slash(
+    content: str,
+    idx: int,
+    tokens: list[tuple[str, str]],
+) -> int:
+    length = len(content)
+    if idx + 1 < length and content[idx + 1] in ("/", "*"):
+        return _skip_comment(content, idx)
+    if _is_regex_start(tokens):
+        return _scan_regex(content, idx)
+    tokens.append(("PUNCT", "/"))
+    return idx + 1
+
+
 def _tokenize_source(content: str) -> list[tuple[str, str]]:
     tokens: list[tuple[str, str]] = []
     idx = 0
@@ -340,8 +430,8 @@ def _tokenize_source(content: str) -> list[tuple[str, str]]:
     while idx < length:
         ch = content[idx]
 
-        if ch == "/" and idx + 1 < length and content[idx + 1] in ("/", "*"):
-            idx = _skip_comment(content, idx)
+        if ch == "/":
+            idx = _handle_slash(content, idx, tokens)
             continue
 
         if ch in ("'", '"'):
@@ -361,9 +451,14 @@ def _tokenize_source(content: str) -> list[tuple[str, str]]:
             idx += 1
             continue
 
-        if ch in "(){}[];,.*:":
+        if ch in "(){}[];,.*:=!<>+-&|^%?~":
             tokens.append(("PUNCT", ch))
             idx += 1
+            continue
+
+        if ch.isdigit():
+            num, idx = _scan_number(content, idx)
+            tokens.append(("NUMBER", num))
             continue
 
         if ch.isalpha() or ch in "_$":
@@ -426,7 +521,7 @@ def _is_pattern_entry(value: str) -> bool:
 def _read_file(path: str) -> str:
     try:
         return Path(path).read_text(encoding="utf-8")
-    except OSError as error:
+    except (OSError, UnicodeDecodeError) as error:
         message = f"read {path} ({error})"
         raise ValueError(message) from error
 

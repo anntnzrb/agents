@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from sync.core.secret_template import strip_jsonc, sync_text_file
 from sync.packages.process import (
@@ -59,7 +59,7 @@ class PackageManifest(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="ignore")
 
-    packages: list[str] = Field(default_factory=list)
+    packages: list[str]
 
     @field_validator("packages", mode="before")
     @classmethod
@@ -75,7 +75,10 @@ class PackageManifest(BaseModel):
                 message = "package source must be a string"
                 raise TypeError(message)
             trimmed = item.strip()
-            if trimmed and trimmed not in seen:
+            if not trimmed:
+                message = "package source must not be empty"
+                raise ValueError(message)
+            if trimmed not in seen:
                 seen.add(trimmed)
                 result.append(trimmed)
         return result

@@ -125,9 +125,12 @@ def _hash_file_content(
 
 def _walk_tree(root: str, current: str, hasher: _TreeHasher) -> None:
     try:
-        entries = sorted(os.scandir(current), key=lambda e: e.name)
-    except OSError:
-        return
+        with os.scandir(current) as it:
+            entries = sorted(it, key=lambda e: e.name)
+    except OSError as error:
+        if error.errno == errno.ENOENT:
+            return
+        raise
 
     for entry in entries:
         if should_skip_entry(entry.name):
@@ -154,7 +157,7 @@ def prepare_extension_hook_state(
 ) -> PreparedExtensionHookState:
     """Evaluate current extension source fingerprint against recorded state."""
     fingerprint = fingerprint_tree(hook.source_root)
-    previous_state = _load_extension_hook_state(hook.state_path)
+    previous_state = load_extension_hook_state(hook.state_path)
     if previous_state is None or previous_state.fingerprint != fingerprint:
         return PreparedExtensionHookState(
             fingerprint=fingerprint,
@@ -262,12 +265,12 @@ def _exists(target_path: str) -> bool:
         return False
 
 
-def _load_extension_hook_state(path: str) -> _LoadedExtensionHookState | None:
+def load_extension_hook_state(path: str) -> _LoadedExtensionHookState | None:
     try:
         raw_content = Path(path).read_text(encoding="utf-8")
     except FileNotFoundError:
         return None
-    except OSError as error:
+    except (OSError, UnicodeDecodeError) as error:
         warn(f"hook state read failed, ignoring {path} ({error})")
         return None
 
