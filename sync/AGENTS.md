@@ -45,11 +45,33 @@ This is the isolated sync application.
 
 ## Validation
 
-Run from repo root when sync code or tests change:
+Sync contributor gates are enforced via Python/uv tooling and automated git hooks (`pre-commit` and `pre-push`). Git hooks never rewrite tracked source files and run under POSIX `sh` with `set -eu`. Every hook invocation reconciles dependencies with `uv sync --frozen` before executing gates with `--no-sync`.
 
-- `uv run --project sync sync --help`
-- `cd ./sync && uv sync --frozen && uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest -n auto`
-- `cd ./sync && uv run pytest tests/test_integration.py -q -o addopts=""`
+### Validation Commands
+
+From repo root:
+- Quick CLI smoke test: `uv run --project sync sync --help`
+- Run all sync gates: `(cd sync && uv sync --frozen && uv run --no-sync ruff check . && uv run --no-sync ruff format --check . && uv run --no-sync pyright && uv run --no-sync pytest -n auto)`
+
+From `sync/` directory:
+- Bootstrap/reconcile venv: `uv sync --frozen`
+- Lint: `uv run --no-sync ruff check .`
+- Format check: `uv run --no-sync ruff format --check .`
+- Type check: `uv run --no-sync pyright`
+- Test suite: `uv run --no-sync pytest -n auto`
+- All-in-one gate: `uv sync --frozen && uv run --no-sync ruff check . && uv run --no-sync ruff format --check . && uv run --no-sync pyright && uv run --no-sync pytest -n auto`
+
+### Hook Contracts
+
+- **`pre-commit`**: Runs `git diff --cached --check`, then changes into `sync/` and executes `uv sync --frozen`, `uv run --no-sync ruff check .`, `uv run --no-sync ruff format --check .`, and `uv run --no-sync pyright`.
+- **`pre-push`**: Executes the same Python gates (`uv sync --frozen`, Ruff lint/format check, Pyright) followed by `uv run --no-sync pytest -n auto`. No separate duplicate integration run is needed because `pytest -n auto` covers the full suite including integration tests.
+
+### Code Quality and Typing Policies
+
+- Use strict typing; validate external data at boundaries and avoid `Any`.
+- Keep lint, formatting, and type checks clean using the committed configuration in `pyproject.toml`.
+- Fix underlying problems rather than weakening gates or adding unjustified suppressions.
+- Use TDD for behavior changes; keep tests deterministic, isolated, and focused on observable contracts.
 
 ## Stop Rules
 
