@@ -6,15 +6,16 @@ from __future__ import annotations
 import io
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import httpx
 
-from skills.current.webpaste.scripts.cli import (
+from cli import (
     EXIT_SUCCESS,
     EXIT_USAGE_ERROR,
     Err,
     Ok,
+    Result,
     detect_language,
     get_content_type,
     main,
@@ -27,39 +28,39 @@ if TYPE_CHECKING:
 
 
 def test_result_combinators() -> None:
-    """Test map and and_then chaining on Result."""
+    """Test map and and_then chaining on Ok results."""
     ok_res = Ok(10)
-    mapped = ok_res.map(lambda x: x * 2)
-    match mapped:
-        case Ok(v):
-            expected_val = 20
-            if v != expected_val:
-                msg = f"expected {expected_val}, got {v}"
-                raise AssertionError(msg)
-        case Err(_):
-            msg = "unexpected Err"
-            raise AssertionError(msg)
+    mapped: Result[int, str] = ok_res.map(lambda x: x * 2)
+    if isinstance(mapped, Err):
+        msg = "unexpected Err"
+        raise AssertionError(msg)
+    if mapped.value != 20:
+        msg = f"expected 20, got {mapped.value}"
+        raise AssertionError(msg)
 
-    chained = ok_res.and_then(lambda x: Ok(f"num: {x}"))
-    match chained:
-        case Ok(v):
-            if v != "num: 10":
-                msg = f"expected 'num: 10', got {v}"
-                raise AssertionError(msg)
-        case Err(_):
-            msg = "unexpected Err"
-            raise AssertionError(msg)
+    chained: Result[str, str] = ok_res.and_then(lambda x: Ok(f"num: {x}"))
+    if isinstance(chained, Err):
+        msg = "unexpected Err"
+        raise AssertionError(msg)
+    if chained.value != "num: 10":
+        msg = f"expected 'num: 10', got {chained.value}"
+        raise AssertionError(msg)
 
+
+def test_err_combinators() -> None:
+    """Test map pass-through on Err results."""
     err_res: Err[str] = Err("initial error")
-    err_mapped = err_res.map(lambda x: f"transformed {x}")
-    match err_mapped:
-        case Err(e):
-            if e != "initial error":
-                msg = f"expected 'initial error', got {e}"
-                raise AssertionError(msg)
-        case Ok(_):
-            msg = "unexpected Ok on Err map"
-            raise AssertionError(msg)
+
+    def _transform(value: object) -> str:
+        return f"transformed {value}"
+
+    err_mapped: Result[str, str] = err_res.map(_transform)
+    if isinstance(err_mapped, Ok):
+        msg = "unexpected Ok on Err map"
+        raise AssertionError(msg)
+    if err_mapped.error != "initial error":
+        msg = f"expected 'initial error', got {err_mapped.error}"
+        raise AssertionError(msg)
 
 
 def test_normalize_language() -> None:
@@ -153,7 +154,7 @@ def test_get_content_type() -> None:
 def test_read_input_result(tmp_path: Path) -> None:
     """Test read_input with file and stdin inputs."""
     sample = tmp_path / "hello.rs"
-    sample.write_text("fn main() {}")
+    _ = sample.write_text("fn main() {}")
 
     res_ok = read_input(str(sample), is_atty=True)
     match res_ok:
@@ -181,7 +182,7 @@ def test_upload_success_mock(
 ) -> None:
     """Test successful file upload with mocked server response."""
     sample_file = tmp_path / "test.py"
-    sample_file.write_text("print('hello world')\n")
+    _ = sample_file.write_text("print('hello world')\n")
 
     def mock_post(_self: httpx.Client, url: str, **_kwargs: object) -> httpx.Response:
         if "/post" not in url:
@@ -231,7 +232,7 @@ def test_upload_raw_url_output(
 ) -> None:
     """Test --raw-url outputs direct bytebin raw link."""
     sample_file = tmp_path / "test.txt"
-    sample_file.write_text("raw text")
+    _ = sample_file.write_text("raw text")
 
     def mock_post(_self: httpx.Client, url: str, **_kwargs: object) -> httpx.Response:
         request = httpx.Request("POST", url)
@@ -254,7 +255,7 @@ def test_upload_json_output(
 ) -> None:
     """Test JSON formatted output on successful upload."""
     sample_file = tmp_path / "test.json"
-    sample_file.write_text('{"a": 1}')
+    _ = sample_file.write_text('{"a": 1}')
 
     def mock_post(_self: httpx.Client, url: str, **_kwargs: object) -> httpx.Response:
         request = httpx.Request("POST", url)
@@ -267,7 +268,7 @@ def test_upload_json_output(
         msg = f"expected exit code 0, got {ret}"
         raise AssertionError(msg)
     captured = capsys.readouterr()
-    data = json.loads(captured.out)
+    data = cast("dict[str, str]", json.loads(captured.out))
     if data["key"] != "json456" or data["url"] != "https://pastes.dev/json456":
         msg = f"unexpected json data: {data}"
         raise AssertionError(msg)
