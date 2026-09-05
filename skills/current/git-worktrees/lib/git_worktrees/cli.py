@@ -7,10 +7,16 @@ import dataclasses
 import json
 import re
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from contextlib import suppress
 from enum import Enum
 from pathlib import Path
-from typing import Never
+from typing import TYPE_CHECKING, Never, TypeGuard, cast
+
+if TYPE_CHECKING:
+    from git_worktrees.controller import Controller
+    from git_worktrees.errors import DomainError
+    from git_worktrees.models import AcquireRequest, Mode, SetupCommand
 
 from git_worktrees.paths import default_root
 
@@ -30,50 +36,73 @@ class CliError(Exception):
         details: Mapping[str, object] | None = None,
         exit_code: int = 2,
     ) -> None:
+        """Store the machine-readable code, message, and exit code."""
         super().__init__(message)
-        self.code = code
-        self.message = message
-        self.details = dict(details or {})
-        self.exit_code = exit_code
+        self.code: str = code
+        self.message: str = message
+        self.details: Mapping[str, object] = dict(details or {})
+        self.exit_code: int = exit_code
 
 
 class ProtocolArgumentParser(argparse.ArgumentParser):
     """Argparse parser which keeps ordinary parse errors inside the protocol."""
 
-    def error(self, message: str) -> Never:
+    # typing.override needs 3.12+; this ignore marks the intentional override.
+    def error(self, message: str) -> Never:  # pyright: ignore[reportImplicitOverride]
+        """Map parse failures into the protocol envelope."""
         raise CliError("usage_error", message)
 
-    def exit(self, status: int = 0, message: str | None = None) -> Never:
+    # typing.override needs 3.12+; this ignore marks the intentional override.
+    def exit(  # pyright: ignore[reportImplicitOverride]
+        self, status: int = 0, message: str | None = None
+    ) -> Never:
+        """Map parser exits into the protocol envelope."""
         if status == 0:
             raise SystemExit(0)
         raise CliError("usage_error", (message or "invalid command line").strip())
 
 
+def _is_nonempty_list(value: object) -> TypeGuard[list[object]]:
+    """Check for a nonempty list (elements validated by callers)."""
+    return bool(value) and isinstance(value, list)
+
+
+def _is_str_dict(value: object) -> TypeGuard[dict[str, object]]:
+    """Check for a plain string-keyed dict."""
+    return isinstance(value, dict)
+
+
 def _json_argv(value: str) -> tuple[str, ...]:
     try:
-        decoded = json.loads(value)
+        decoded = cast("object", json.loads(value))
     except json.JSONDecodeError as error:
-        raise argparse.ArgumentTypeError("must be a JSON array of strings") from error
-    if not isinstance(decoded, list) or not decoded or any(
-        not isinstance(item, str) or not item for item in decoded
-    ):
-        raise argparse.ArgumentTypeError(
-            "must be a nonempty JSON array of nonempty strings"
-        )
-    return tuple(decoded)
+        msg = "must be a JSON array of strings"
+        raise argparse.ArgumentTypeError(msg) from error
+    msg = "must be a nonempty JSON array of nonempty strings"
+    if not _is_nonempty_list(decoded):
+        raise argparse.ArgumentTypeError(msg)
+    items: list[str] = []
+    for item in decoded:
+        if not isinstance(item, str) or not item:
+            raise argparse.ArgumentTypeError(msg)
+        items.append(item)
+    return tuple(items)
 
 
 def _positive_integer(value: str) -> int:
+    """Parse a positive integer CLI value."""
+    msg = "must be a positive integer"
     try:
         number = int(value)
     except ValueError as error:
-        raise argparse.ArgumentTypeError("must be a positive integer") from error
+        raise argparse.ArgumentTypeError(msg) from error
     if number <= 0:
-        raise argparse.ArgumentTypeError("must be a positive integer")
+        raise argparse.ArgumentTypeError(msg)
     return number
 
 
 def build_parser() -> tuple[ProtocolArgumentParser, frozenset[str]]:
+    """Construct the git-worktrees argument parser."""
     parser = ProtocolArgumentParser(
         prog="git-worktrees",
         description="Local raw-Git worktree lifecycle controller.",
@@ -81,25 +110,27 @@ def build_parser() -> tuple[ProtocolArgumentParser, frozenset[str]]:
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
-    commands.add_parser("schema", help="Describe the JSON protocol.")
+    _ = commands.add_parser("schema", help="Describe the JSON protocol.")
 
-    inspect = commands.add_parser("inspect", help="Inspect a repository without mutation.")
-    inspect.add_argument("--repo", required=True, metavar="PATH")
+    inspect = commands.add_parser(
+        "inspect", help="Inspect a repository without mutation."
+    )
+    _ = inspect.add_argument("--repo", required=True, metavar="PATH")
 
     acquire = commands.add_parser("acquire", help="Acquire a managed worktree lease.")
-    acquire.add_argument("--repo", required=True, metavar="PATH")
-    acquire.add_argument("--owner", required=True, metavar="ID")
-    acquire.add_argument("--session-actor", required=True, metavar="ID")
-    acquire.add_argument("--task", required=True, metavar="TEXT")
-    acquire.add_argument("--name", required=True, metavar="SLUG")
-    acquire.add_argument(
+    _ = acquire.add_argument("--repo", required=True, metavar="PATH")
+    _ = acquire.add_argument("--owner", required=True, metavar="ID")
+    _ = acquire.add_argument("--session-actor", required=True, metavar="ID")
+    _ = acquire.add_argument("--task", required=True, metavar="TEXT")
+    _ = acquire.add_argument("--name", required=True, metavar="SLUG")
+    _ = acquire.add_argument(
         "--mode",
         required=True,
         choices=("new-branch", "existing-branch", "detached-ephemeral"),
     )
-    acquire.add_argument("--base", metavar="REV")
-    acquire.add_argument("--branch", metavar="BRANCH")
-    acquire.add_argument(
+    _ = acquire.add_argument("--base", metavar="REV")
+    _ = acquire.add_argument("--branch", metavar="BRANCH")
+    _ = acquire.add_argument(
         "--setup-argv",
         action="append",
         default=[],
@@ -107,7 +138,7 @@ def build_parser() -> tuple[ProtocolArgumentParser, frozenset[str]]:
         metavar="JSON_ARRAY",
         help="Repeatable nonempty JSON argv array; no shell is used.",
     )
-    acquire.add_argument(
+    _ = acquire.add_argument(
         "--setup-timeout-seconds",
         type=_positive_integer,
         default=DEFAULT_SETUP_TIMEOUT_SECONDS,
@@ -115,23 +146,23 @@ def build_parser() -> tuple[ProtocolArgumentParser, frozenset[str]]:
     )
 
     status = commands.add_parser("status", help="Report a managed lease.")
-    status.add_argument("--lease-id", required=True, metavar="ID")
+    _ = status.add_argument("--lease-id", required=True, metavar="ID")
 
     handoff = commands.add_parser("handoff", help="Create a worker handoff.")
-    handoff.add_argument("--lease-id", required=True, metavar="ID")
-    handoff.add_argument("--owner-token", required=True, metavar="TOKEN")
-    handoff.add_argument("--actor", required=True, metavar="ID")
-    handoff.add_argument("--session-actor", required=True, metavar="ID")
+    _ = handoff.add_argument("--lease-id", required=True, metavar="ID")
+    _ = handoff.add_argument("--owner-token", required=True, metavar="TOKEN")
+    _ = handoff.add_argument("--actor", required=True, metavar="ID")
+    _ = handoff.add_argument("--session-actor", required=True, metavar="ID")
 
     complete = commands.add_parser("complete-handoff", help="Close a worker handoff.")
-    complete.add_argument("--lease-id", required=True, metavar="ID")
-    complete.add_argument("--handoff-token", required=True, metavar="TOKEN")
-    complete.add_argument("--quiescent", action="store_true", required=True)
+    _ = complete.add_argument("--lease-id", required=True, metavar="ID")
+    _ = complete.add_argument("--handoff-token", required=True, metavar="TOKEN")
+    _ = complete.add_argument("--quiescent", action="store_true", required=True)
 
     release = commands.add_parser("release", help="Release a managed worktree lease.")
-    release.add_argument("--lease-id", required=True, metavar="ID")
-    release.add_argument("--owner-token", required=True, metavar="TOKEN")
-    release.add_argument("--quiescent", action="store_true", required=True)
+    _ = release.add_argument("--lease-id", required=True, metavar="ID")
+    _ = release.add_argument("--owner-token", required=True, metavar="TOKEN")
+    _ = release.add_argument("--quiescent", action="store_true", required=True)
     return parser, frozenset(commands.choices)
 
 
@@ -144,56 +175,91 @@ def _require_nonblank(value: str, argument: str) -> None:
         )
 
 
+def _arg_str(args: argparse.Namespace, field: str) -> str:
+    """Extract a required str option from parsed args."""
+    return cast("str", getattr(args, field))
+
+
+def _arg_optional_str(args: argparse.Namespace, field: str) -> str | None:
+    """Extract an optional str option from parsed args."""
+    return cast("str | None", getattr(args, field))
+
+
+def _arg_bool(args: argparse.Namespace, field: str) -> bool:
+    """Extract a required bool flag from parsed args."""
+    return cast("bool", getattr(args, field))
+
+
+def _arg_int(args: argparse.Namespace, field: str) -> int:
+    """Extract a required int option from parsed args."""
+    return cast("int", getattr(args, field))
+
+
+def _arg_setup_argv(args: argparse.Namespace, field: str) -> list[tuple[str, ...]]:
+    """Extract the setup argv list from parsed args."""
+    return cast("list[tuple[str, ...]]", getattr(args, field))
+
+
+def _arg_mode(args: argparse.Namespace, field: str) -> Mode:
+    """Extract a worktree mode literal from parsed args."""
+    return cast("Mode", getattr(args, field))
+
+
 def _validate_arguments(args: argparse.Namespace) -> None:
-    command = args.command
+    command = _arg_str(args, "command")
     if command == "schema":
         return
     if command == "inspect":
-        _require_nonblank(args.repo, "--repo")
+        _require_nonblank(_arg_str(args, "repo"), "--repo")
         return
     if command == "acquire":
         for argument in ("--repo", "--owner", "--session-actor", "--task", "--name"):
-            _require_nonblank(getattr(args, argument[2:].replace("-", "_")), argument)
-        if not NAME_PATTERN.fullmatch(args.name):
+            _require_nonblank(_arg_str(args, argument[2:].replace("-", "_")), argument)
+        if not NAME_PATTERN.fullmatch(_arg_str(args, "name")):
             raise CliError(
                 "usage_error",
                 "--name must be a lower-case ASCII slug",
                 {"argument": "--name", "pattern": NAME_PATTERN.pattern},
             )
-        if args.mode == "new-branch":
-            if not args.base:
+        mode = _arg_str(args, "mode")
+        base = _arg_optional_str(args, "base")
+        branch = _arg_optional_str(args, "branch")
+        if mode == "new-branch":
+            if not base:
                 raise CliError("usage_error", "new-branch mode requires --base")
-            if args.branch is not None:
+            if branch is not None:
                 raise CliError("usage_error", "new-branch mode forbids --branch")
-        elif args.mode == "existing-branch":
-            if not args.branch:
+        elif mode == "existing-branch":
+            if not branch:
                 raise CliError("usage_error", "existing-branch mode requires --branch")
-            if args.base is not None:
+            if base is not None:
                 raise CliError("usage_error", "existing-branch mode forbids --base")
         else:
-            if not args.base:
+            if not base:
                 raise CliError("usage_error", "detached-ephemeral mode requires --base")
-            if args.branch is not None:
-                raise CliError("usage_error", "detached-ephemeral mode forbids --branch")
-        if args.base is not None:
-            _require_nonblank(args.base, "--base")
-        if args.branch is not None:
-            _require_nonblank(args.branch, "--branch")
+            if branch is not None:
+                raise CliError(
+                    "usage_error", "detached-ephemeral mode forbids --branch"
+                )
+        if base is not None:
+            _require_nonblank(base, "--base")
+        if branch is not None:
+            _require_nonblank(branch, "--branch")
         return
     if command == "status":
-        _require_nonblank(args.lease_id, "--lease-id")
+        _require_nonblank(_arg_str(args, "lease_id"), "--lease-id")
         return
     if command == "handoff":
         for argument in ("--lease-id", "--owner-token", "--actor", "--session-actor"):
-            _require_nonblank(getattr(args, argument[2:].replace("-", "_")), argument)
+            _require_nonblank(_arg_str(args, argument[2:].replace("-", "_")), argument)
         return
     if command == "complete-handoff":
-        _require_nonblank(args.lease_id, "--lease-id")
-        _require_nonblank(args.handoff_token, "--handoff-token")
+        _require_nonblank(_arg_str(args, "lease_id"), "--lease-id")
+        _require_nonblank(_arg_str(args, "handoff_token"), "--handoff-token")
         return
     if command == "release":
-        _require_nonblank(args.lease_id, "--lease-id")
-        _require_nonblank(args.owner_token, "--owner-token")
+        _require_nonblank(_arg_str(args, "lease_id"), "--lease-id")
+        _require_nonblank(_arg_str(args, "owner_token"), "--owner-token")
 
 
 def _schema_result() -> dict[str, object]:
@@ -238,7 +304,12 @@ def _schema_result() -> dict[str, object]:
             },
             "status": {
                 "arguments": {"lease_id": "ID"},
-                "result": {"lease": "durable lease", "observation": "fresh safety state", "blockers": "release blockers", "safe_to_release": "boolean"},
+                "result": {
+                    "lease": "durable lease",
+                    "observation": "fresh safety state",
+                    "blockers": "release blockers",
+                    "safe_to_release": "boolean",
+                },
             },
             "handoff": {
                 "arguments": {
@@ -247,14 +318,24 @@ def _schema_result() -> dict[str, object]:
                     "actor": "ID",
                     "session_actor": "ID",
                 },
-                "result": {"capabilities": {"handoff_token": "opaque token returned once"}},
+                "result": {
+                    "capabilities": {"handoff_token": "opaque token returned once"}
+                },
             },
             "complete-handoff": {
-                "arguments": {"lease_id": "ID", "handoff_token": "TOKEN", "quiescent": True},
+                "arguments": {
+                    "lease_id": "ID",
+                    "handoff_token": "TOKEN",
+                    "quiescent": True,
+                },
                 "result": {"handoff": "completed"},
             },
             "release": {
-                "arguments": {"lease_id": "ID", "owner_token": "TOKEN", "quiescent": True},
+                "arguments": {
+                    "lease_id": "ID",
+                    "owner_token": "TOKEN",
+                    "quiescent": True,
+                },
                 "result": {"lease": "released tombstone"},
             },
         },
@@ -268,9 +349,22 @@ def _schema_result() -> dict[str, object]:
     }
 
 
-def _core_api() -> tuple[object, object, object, object, object, object, object, object, object]:
-    """Import the core lazily so even import failures retain the JSON protocol."""
+_CoreApi = tuple[
+    "type[AcquireRequest]",
+    "type[Controller]",
+    "type[DomainError]",
+    "type[SetupCommand]",
+    Callable[..., object],
+    Callable[..., object],
+    Callable[..., object],
+    Callable[..., object],
+    Callable[..., object],
+    Callable[..., object],
+]
 
+
+def _core_api() -> _CoreApi:
+    """Import the core lazily so even import failures retain the JSON protocol."""
     from git_worktrees import (
         AcquireRequest,
         Controller,
@@ -299,7 +393,8 @@ def _core_api() -> tuple[object, object, object, object, object, object, object,
 
 
 def _dispatch(args: argparse.Namespace) -> object:
-    if args.command == "schema":
+    command = _arg_str(args, "command")
+    if command == "schema":
         return _schema_result()
 
     (
@@ -315,50 +410,49 @@ def _dispatch(args: argparse.Namespace) -> object:
         status_operation,
     ) = _core_api()
 
-    if args.command == "inspect":
-        return inspect_operation(Path(args.repo), controller_type())
+    if command == "inspect":
+        return inspect_operation(Path(_arg_str(args, "repo")), controller_type())
 
     controller = controller_type()
-    if args.command == "acquire":
-        setup_commands = tuple(
-            setup_command_type(argv=argv) for argv in args.setup_argv
-        )
+    if command == "acquire":
+        setup_argv = _arg_setup_argv(args, "setup_argv")
+        setup_commands = tuple(setup_command_type(argv=argv) for argv in setup_argv)
         request = acquire_request_type(
-            repo=Path(args.repo),
-            owner=args.owner,
-            session_actor=args.session_actor,
-            task=args.task,
-            name=args.name,
-            mode=args.mode,
-            base=args.base,
-            branch=args.branch,
+            repo=Path(_arg_str(args, "repo")),
+            owner=_arg_str(args, "owner"),
+            session_actor=_arg_str(args, "session_actor"),
+            task=_arg_str(args, "task"),
+            name=_arg_str(args, "name"),
+            mode=_arg_mode(args, "mode"),
+            base=_arg_optional_str(args, "base"),
+            branch=_arg_optional_str(args, "branch"),
             setup=setup_commands,
-            setup_timeout_seconds=args.setup_timeout_seconds,
+            setup_timeout_seconds=_arg_int(args, "setup_timeout_seconds"),
         )
         return acquire_operation(controller, request)
-    if args.command == "status":
-        return status_operation(controller, args.lease_id)
-    if args.command == "handoff":
+    if command == "status":
+        return status_operation(controller, _arg_str(args, "lease_id"))
+    if command == "handoff":
         return handoff_operation(
             controller,
-            args.lease_id,
-            args.owner_token,
-            args.actor,
-            args.session_actor,
+            _arg_str(args, "lease_id"),
+            _arg_str(args, "owner_token"),
+            _arg_str(args, "actor"),
+            _arg_str(args, "session_actor"),
         )
-    if args.command == "complete-handoff":
+    if command == "complete-handoff":
         return complete_handoff_operation(
             controller,
-            args.lease_id,
-            args.handoff_token,
-            args.quiescent,
+            _arg_str(args, "lease_id"),
+            _arg_str(args, "handoff_token"),
+            _arg_bool(args, "quiescent"),
         )
-    if args.command == "release":
+    if command == "release":
         return release_operation(
             controller,
-            args.lease_id,
-            args.owner_token,
-            args.quiescent,
+            _arg_str(args, "lease_id"),
+            _arg_str(args, "owner_token"),
+            _arg_bool(args, "quiescent"),
         )
     raise CliError("usage_error", "unknown command")
 
@@ -369,18 +463,20 @@ def _json_value(value: object) -> object:
     if isinstance(value, Path):
         return str(value)
     if isinstance(value, Enum):
-        return _json_value(value.value)
+        return _json_value(cast("object", value.value))
     if isinstance(value, Mapping):
-        return {str(key): _json_value(item) for key, item in value.items()}
+        fields = cast("Mapping[object, object]", value)
+        return {str(key): _json_value(item) for key, item in fields.items()}
     if isinstance(value, (list, tuple)):
-        return [_json_value(item) for item in value]
+        items = cast("Sequence[object]", value)
+        return [_json_value(item) for item in items]
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     return str(value)
 
 
 def _emit(payload: Mapping[str, object]) -> None:
-    sys.stdout.write(json.dumps(_json_value(payload), separators=(",", ":")) + "\n")
+    _ = sys.stdout.write(json.dumps(_json_value(payload), separators=(",", ":")) + "\n")
 
 
 def _success(command: str, result: object) -> dict[str, object]:
@@ -422,12 +518,13 @@ def _requested_command(argv: Sequence[str], commands: frozenset[str]) -> str:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run the git-worktrees CLI and return a process exit code."""
     arguments = list(sys.argv[1:] if argv is None else argv)
     parser, commands = build_parser()
     command = _requested_command(arguments, commands)
     try:
         args = parser.parse_args(arguments)
-        command = args.command
+        command = _arg_str(args, "command")
         _validate_arguments(args)
         result = _dispatch(args)
     except SystemExit as error:
@@ -443,24 +540,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     except FileNotFoundError:
         error = CliError("git_missing", "Git executable was not found", exit_code=127)
         return _emit_error_and_exit(command, error)
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - protocol safety net
         domain_error_type: type[BaseException] | None = None
-        try:
+        with suppress(Exception):
             domain_error_type = _core_api()[2]
-        except Exception:
-            pass
         if domain_error_type is not None and isinstance(error, domain_error_type):
-            details = getattr(error, "details", {})
-            exit_code = getattr(error, "exit_code", 2)
+            details = cast("object", getattr(error, "details", {}))
+            exit_code = cast("object", getattr(error, "exit_code", 2))
             protocol_error = CliError(
                 getattr(error, "code", "controller_error"),
                 getattr(error, "message", str(error)),
-                details if isinstance(details, Mapping) else {},
+                details if _is_str_dict(details) else {},
                 exit_code if isinstance(exit_code, int) else 2,
             )
         else:
             protocol_error = CliError(
-                "runtime_error", "The worktree controller failed unexpectedly", exit_code=4
+                "runtime_error",
+                "The worktree controller failed unexpectedly",
+                exit_code=4,
             )
         return _emit_error_and_exit(command, protocol_error)
     _emit(_success(command, result))

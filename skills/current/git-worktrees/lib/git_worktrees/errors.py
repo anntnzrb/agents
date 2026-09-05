@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 @dataclass(slots=True)
@@ -12,13 +15,15 @@ class DomainError(Exception):
 
     code: str
     message: str
-    details: Mapping[str, object] = field(default_factory=dict)
+    details: Mapping[str, object] = field(default_factory=dict[str, object])
     exit_code: int = 2
 
     def __post_init__(self) -> None:
+        """Initialize the base exception."""
         Exception.__init__(self, self.message)
 
     def as_dict(self) -> dict[str, object]:
+        """Serialize to a plain dict."""
         return {
             "code": self.code,
             "message": self.message,
@@ -27,20 +32,38 @@ class DomainError(Exception):
 
 
 class InputError(DomainError):
-    def __init__(self, code: str, message: str, details: Mapping[str, object] | None = None) -> None:
+    """An input validation error."""
+
+    def __init__(
+        self, code: str, message: str, details: Mapping[str, object] | None = None
+    ) -> None:
+        """Initialize with a code, message, and details."""
         super().__init__(code, message, {} if details is None else details, 2)
 
 
 class RefusalError(DomainError):
-    def __init__(self, code: str, message: str, details: Mapping[str, object] | None = None) -> None:
+    """An operation refusal with an exit code."""
+
+    def __init__(
+        self, code: str, message: str, details: Mapping[str, object] | None = None
+    ) -> None:
+        """Initialize with a code, message, and details."""
         super().__init__(code, message, {} if details is None else details, 3)
 
 
 class GitError(DomainError):
-    def __init__(self, code: str, message: str, details: Mapping[str, object] | None = None) -> None:
+    """A git subprocess failure."""
+
+    def __init__(
+        self, code: str, message: str, details: Mapping[str, object] | None = None
+    ) -> None:
+        """Initialize with a code, message, and details."""
         super().__init__(code, message, {} if details is None else details, 4)
 
 
 class GitMissingError(DomainError):
+    """A missing git executable."""
+
     def __init__(self) -> None:
+        """Initialize the missing-git error."""
         super().__init__("git_missing", "Git executable was not found", {}, 127)

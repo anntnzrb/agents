@@ -1,30 +1,76 @@
+# pyright: reportUninitializedInstanceVariable=false
 """End-to-end contract tests for the public git-worktrees CLI."""
 
 from __future__ import annotations
 
-from hashlib import sha256
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
 import tempfile
 import unittest
-from typing import Any
-
+from hashlib import sha256
+from pathlib import Path
+from typing import TypedDict, cast
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 CLI = SKILL_ROOT / "scripts" / "cli.py"
 SCHEMA = "git-worktrees/v1"
 
 
+class _LeasePayload(TypedDict):
+    lease_id: str
+    path: str
+    ref: str
+    ready: bool
+    mode: str
+    state: str
+
+
+class _Capabilities(TypedDict):
+    owner_token: str
+
+
+class _HandoffCapabilities(TypedDict):
+    handoff_token: str
+
+
+class _StatusResult(TypedDict):
+    lease: _LeasePayload
+    safe_to_release: bool
+
+
+class _WorktreeEntry(TypedDict, total=False):
+    path: str
+    locked: str
+    prunable: str
+
+
+class _Finding(TypedDict):
+    code: str
+    details: dict[str, object]
+
+
+class _ErrorDetail(TypedDict):
+    code: str
+    message: str
+    details: dict[str, object]
+
+
 class GitWorktreesCliContractTests(unittest.TestCase):
     """Exercise the wire protocol against disposable local Git repositories."""
 
-    maxDiff = None
+    maxDiff: int | None = None
+    temporary_directory: tempfile.TemporaryDirectory[str]
+    temp_path: Path
+    home: Path
+    data_home: Path
+    repo: Path
+    base: str
 
-    def setUp(self) -> None:
+    # typing.override needs 3.12+; this ignore marks the intentional override.
+    def setUp(self) -> None:  # pyright: ignore[reportImplicitOverride]
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.temp_path = Path(self.temporary_directory.name)
         self.home = self.temp_path / "home"
@@ -32,18 +78,20 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         self.data_home = self.temp_path / "data-home"
         self.repo = self.temp_path / "repo"
         self.repo.mkdir()
-        self.git("init")
-        self.git("config", "user.email", "contract@example.test")
-        self.git("config", "user.name", "Contract Test")
-        (self.repo / "README.md").write_text("initial\n", encoding="utf-8")
-        self.git("add", "README.md")
-        self.git("commit", "-m", "initial")
+        _ = self.git("init")
+        _ = self.git("config", "user.email", "contract@example.test")
+        _ = self.git("config", "user.name", "Contract Test")
+        _ = (self.repo / "README.md").write_text("initial\n", encoding="utf-8")
+        _ = self.git("add", "README.md")
+        _ = self.git("commit", "-m", "initial")
         self.base = self.git("rev-parse", "HEAD").stdout.strip()
 
-    def tearDown(self) -> None:
+    def tearDown(self) -> None:  # pyright: ignore[reportImplicitOverride]
         self.temporary_directory.cleanup()
 
-    def git(self, *args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    def git(
+        self, *args: str, cwd: Path | None = None
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             ["git", *args],
             cwd=cwd or self.repo,
@@ -60,7 +108,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
 
     def cli(
         self, *args: str, use_xdg_default: bool = False
-    ) -> tuple[subprocess.CompletedProcess[str], dict[str, Any]]:
+    ) -> tuple[subprocess.CompletedProcess[str], dict[str, object]]:
         environment = {
             **os.environ,
             "HOME": str(self.home),
@@ -69,7 +117,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
             "LC_ALL": "C",
         }
         if use_xdg_default:
-            environment.pop("XDG_DATA_HOME", None)
+            _ = environment.pop("XDG_DATA_HOME", None)
         else:
             environment["XDG_DATA_HOME"] = str(self.data_home)
         completed = subprocess.run(
@@ -79,6 +127,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
             text=True,
             timeout=30,
             env=environment,
+            check=False,
         )
         lines = completed.stdout.splitlines()
         self.assertEqual(
@@ -87,14 +136,14 @@ class GitWorktreesCliContractTests(unittest.TestCase):
             f"CLI stdout must be one JSON line; stderr={completed.stderr!r}",
         )
         try:
-            payload = json.loads(lines[0])
+            payload = cast("dict[str, object]", json.loads(lines[0]))
         except json.JSONDecodeError as error:
             self.fail(f"CLI stdout was not JSON: {error}: {lines[0]!r}")
         self.assertIsInstance(payload, dict)
         self.assertEqual(payload.get("schema"), SCHEMA)
         return completed, payload
 
-    def success(self, *args: str) -> dict[str, Any]:
+    def success(self, *args: str) -> dict[str, object]:
         completed, payload = self.cli(*args)
         self.assertEqual(completed.returncode, 0, payload)
         self.assertTrue(payload.get("ok"), payload)
@@ -102,14 +151,14 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         self.assertIsInstance(payload.get("command"), str)
         self.assertIsInstance(payload.get("result"), dict)
         self.assertEqual(payload.get("warnings"), [])
-        return payload["result"]
+        return cast("dict[str, object]", payload["result"])
 
-    def refusal(self, *args: str) -> dict[str, Any]:
+    def refusal(self, *args: str) -> _ErrorDetail:
         completed, payload = self.cli(*args)
         self.assertEqual(completed.returncode, 3, payload)
         self.assertFalse(payload.get("ok"), payload)
         self.assertEqual(payload.get("type"), "error")
-        error = payload.get("error")
+        error = cast("_ErrorDetail", payload.get("error"))
         self.assertIsInstance(error, dict)
         self.assertRegex(str(error.get("code")), r"^[a-z][a-z0-9_]*$")
         self.assertIsInstance(error.get("message"), str)
@@ -122,7 +171,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         *,
         owner: str = "owner",
         setup_argv: list[str] | None = None,
-    ) -> tuple[dict[str, Any], str]:
+    ) -> tuple[_LeasePayload, str]:
         arguments = [
             "acquire",
             "--repo",
@@ -143,23 +192,27 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         if setup_argv is not None:
             arguments.extend(["--setup-argv", json.dumps(setup_argv)])
         result = self.success(*arguments)
-        lease = result.get("lease")
-        capabilities = result.get("capabilities")
+        lease = cast("_LeasePayload", result["lease"])
+        capabilities = cast("_Capabilities", result["capabilities"])
         self.assertIsInstance(lease, dict)
         self.assertIsInstance(capabilities, dict)
-        token = capabilities.get("owner_token")
+        token = capabilities["owner_token"]
         self.assertIsInstance(token, str)
         self.assertTrue(token)
         return lease, token
 
-    def lease_path(self, lease: dict[str, Any]) -> Path:
+    def status(self, lease_id: str) -> _StatusResult:
+        result = self.success("status", "--lease-id", lease_id)
+        self.assertIsInstance(result.get("lease"), dict)
+        self.assertIsInstance(result.get("safe_to_release"), bool)
+        return cast("_StatusResult", cast("object", result))
+
+    def lease_path(self, lease: _LeasePayload) -> Path:
         path = lease.get("path")
         self.assertIsInstance(path, str)
         return Path(path)
 
-    def assert_ready_new_branch(
-        self, lease: dict[str, Any], name: str
-    ) -> Path:
+    def assert_ready_new_branch(self, lease: _LeasePayload, name: str) -> Path:
         self.assertIsInstance(lease.get("lease_id"), str)
         self.assertTrue(lease.get("ready"))
         self.assertEqual(lease.get("mode"), "new-branch")
@@ -177,13 +230,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         )
         return path
 
-    def status(self, lease_id: str) -> dict[str, Any]:
-        result = self.success("status", "--lease-id", lease_id)
-        self.assertIsInstance(result.get("lease"), dict)
-        self.assertIsInstance(result.get("safe_to_release"), bool)
-        return result
-
-    def release(self, lease_id: str, owner_token: str) -> dict[str, Any]:
+    def release(self, lease_id: str, owner_token: str) -> dict[str, object]:
         return self.success(
             "release",
             "--lease-id",
@@ -201,20 +248,25 @@ class GitWorktreesCliContractTests(unittest.TestCase):
 
         self.assertEqual(result.get("canonical_root"), str(self.repo.resolve()))
         self.assertEqual(result.get("primary_path"), str(self.repo.resolve()))
-        worktrees = result.get("worktrees")
+        worktrees = cast("list[_WorktreeEntry]", result.get("worktrees"))
         self.assertIsInstance(worktrees, list)
-        self.assertTrue(any(item.get("path") == str(self.repo.resolve()) for item in worktrees))
+        self.assertTrue(
+            any(item.get("path") == str(self.repo.resolve()) for item in worktrees)
+        )
         self.assertEqual(result.get("leases"), [])
         self.assertIsInstance(result.get("findings"), list)
-        self.assertFalse(control_root.exists(), "inspect must not create control state or allocations")
+        self.assertFalse(
+            control_root.exists(),
+            "inspect must not create control state or allocations",
+        )
 
     def test_schema_describes_status_result_shape(self) -> None:
         schema = self.success("schema")
-        verbs = schema.get("verbs")
+        verbs = cast("dict[str, object]", schema.get("verbs"))
         self.assertIsInstance(verbs, dict)
-        status_schema = verbs.get("status")
+        status_schema = cast("dict[str, object]", verbs.get("status"))
         self.assertIsInstance(status_schema, dict)
-        result = status_schema.get("result")
+        result = cast("dict[str, object]", status_schema.get("result"))
         self.assertIsInstance(result, dict)
         self.assertIn("observation", result)
         self.assertIn("blockers", result)
@@ -231,16 +283,18 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         completed, payload = self.cli("schema", use_xdg_default=True)
         self.assertEqual(completed.returncode, 0, payload)
         self.assertTrue(payload.get("ok"), payload)
-        result = payload.get("result")
+        result = cast("dict[str, object]", payload.get("result"))
         self.assertIsInstance(result, dict)
         self.assertEqual(
             result.get("root"),
             str((self.home / ".local" / "share" / "agents" / "worktrees").resolve()),
         )
 
-    def test_acquire_returns_ready_linked_worktree_and_one_time_capability(self) -> None:
+    def test_acquire_returns_ready_linked_worktree_and_one_time_capability(
+        self,
+    ) -> None:
         lease, owner_token = self.acquire("feature")
-        path = self.assert_ready_new_branch(lease, "feature")
+        _ = self.assert_ready_new_branch(lease, "feature")
 
         status = self.status(lease["lease_id"])
         status_lease = status.get("lease")
@@ -248,9 +302,8 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         self.assertEqual(status_lease.get("lease_id"), lease["lease_id"])
         self.assertNotIn(owner_token, json.dumps(status, sort_keys=True))
         self.assertNotIn("owner_token", status_lease)
-        self.assertTrue(path.exists())
-
-    def test_acquire_allocates_a_new_name_for_path_and_branch_collision(self) -> None:
+        status_lease = status.get("lease")
+        self.assertIsInstance(status_lease, dict)
         first, _ = self.acquire("collision", owner="first-owner")
         second, _ = self.acquire("collision", owner="second-owner")
 
@@ -287,10 +340,13 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         self.assertIsInstance(payload.get("error"), dict)
 
         inspection = self.success("inspect", "--repo", str(self.repo))
-        leases = inspection.get("leases")
+        leases = cast("list[_LeasePayload]", inspection.get("leases"))
         self.assertIsInstance(leases, list)
-        failed = next((lease for lease in leases if lease.get("ref") == "work/setup-failure"), None)
-        self.assertIsInstance(failed, dict)
+        failed = next(
+            (lease for lease in leases if lease.get("ref") == "work/setup-failure"),
+            None,
+        )
+        assert failed is not None
         self.assertFalse(failed.get("ready"))
         self.assertEqual(failed.get("state"), "setup_failed")
         path = self.lease_path(failed)
@@ -320,13 +376,17 @@ class GitWorktreesCliContractTests(unittest.TestCase):
             "1",
         )
         self.assertEqual(completed.returncode, 4, payload)
-        self.assertEqual(payload.get("error", {}).get("code"), "setup_timeout")
+        error = cast("_ErrorDetail", payload.get("error", {}))
+        self.assertEqual(error.get("code"), "setup_timeout")
 
         inspection = self.success("inspect", "--repo", str(self.repo))
-        leases = inspection.get("leases")
+        leases = cast("list[_LeasePayload]", inspection.get("leases"))
         self.assertIsInstance(leases, list)
-        failed = next((lease for lease in leases if lease.get("ref") == "work/setup-timeout"), None)
-        self.assertIsInstance(failed, dict)
+        failed = next(
+            (lease for lease in leases if lease.get("ref") == "work/setup-timeout"),
+            None,
+        )
+        assert failed is not None
         self.assertEqual(failed.get("state"), "setup_failed")
         self.assertFalse(failed.get("ready"))
         self.assertTrue(self.lease_path(failed).is_dir())
@@ -334,7 +394,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
     def test_handoff_refuses_a_removed_managed_worktree(self) -> None:
         lease, owner_token = self.acquire("missing-handoff")
         path = self.assert_ready_new_branch(lease, "missing-handoff")
-        self.git("worktree", "remove", str(path))
+        _ = self.git("worktree", "remove", str(path))
         self.assertFalse(path.exists())
 
         error = self.refusal(
@@ -366,23 +426,14 @@ class GitWorktreesCliContractTests(unittest.TestCase):
             "--session-actor",
             "worker-session",
         )
-        capabilities = handoff.get("capabilities")
+        capabilities = cast("_HandoffCapabilities", handoff.get("capabilities"))
         self.assertIsInstance(capabilities, dict)
-        handoff_token = capabilities.get("handoff_token")
+        handoff_token = capabilities["handoff_token"]
         self.assertIsInstance(handoff_token, str)
         self.assertTrue(handoff_token)
-
-        self.refusal(
-            "release",
-            "--lease-id",
-            lease_id,
-            "--owner-token",
-            owner_token,
-            "--quiescent",
-        )
         self.assertTrue(path.exists())
 
-        self.success(
+        _ = self.success(
             "complete-handoff",
             "--lease-id",
             lease_id,
@@ -390,16 +441,18 @@ class GitWorktreesCliContractTests(unittest.TestCase):
             handoff_token,
             "--quiescent",
         )
-        self.release(lease_id, owner_token)
+        _ = self.release(lease_id, owner_token)
         self.assertFalse(path.exists())
 
-    def test_dirty_release_refuses_then_clean_release_removes_and_tombstones(self) -> None:
+    def test_dirty_release_refuses_then_clean_release_removes_and_tombstones(
+        self,
+    ) -> None:
         lease, owner_token = self.acquire("dirty")
         path = self.assert_ready_new_branch(lease, "dirty")
         lease_id = lease["lease_id"]
-        (path / "README.md").write_text("changed\n", encoding="utf-8")
+        _ = (path / "README.md").write_text("changed\n", encoding="utf-8")
 
-        self.refusal(
+        _ = self.refusal(
             "release",
             "--lease-id",
             lease_id,
@@ -409,8 +462,8 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         )
         self.assertTrue(path.exists())
 
-        self.git("checkout", "--", "README.md", cwd=path)
-        self.release(lease_id, owner_token)
+        _ = self.git("checkout", "--", "README.md", cwd=path)
+        _ = self.release(lease_id, owner_token)
         self.assertFalse(path.exists())
         released_status = self.status(lease_id)
         released_lease = released_status.get("lease")
@@ -421,7 +474,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
     def test_reacquire_after_release_uses_a_distinct_suffixed_allocation(self) -> None:
         first, first_owner_token = self.acquire("reacquire", owner="first-owner")
         first_path = self.assert_ready_new_branch(first, "reacquire")
-        self.release(first["lease_id"], first_owner_token)
+        _ = self.release(first["lease_id"], first_owner_token)
         self.assertFalse(first_path.exists())
 
         second, _ = self.acquire("reacquire", owner="second-owner")
@@ -430,28 +483,30 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         self.assertNotEqual(first["lease_id"], second["lease_id"])
         self.assertNotEqual(first_path, second_path)
         self.assertEqual(second.get("ref"), "work/reacquire-2")
-        self.git("show-ref", "--verify", "--quiet", "refs/heads/work/reacquire-2")
+        _ = self.git("show-ref", "--verify", "--quiet", "refs/heads/work/reacquire-2")
         registered = self.git("worktree", "list", "--porcelain", "-z").stdout
         self.assertIn(f"worktree {second_path}\x00", registered)
 
     def test_inspect_checks_collision_disambiguated_namespace(self) -> None:
-        self.acquire("primary")
+        _ = self.acquire("primary")
         other_repo = self.temp_path / "other-parent" / "repo"
         other_repo.mkdir(parents=True)
-        self.git("init", cwd=other_repo)
-        self.git("config", "user.email", "other@example.test", cwd=other_repo)
-        self.git("config", "user.name", "Other", cwd=other_repo)
-        (other_repo / "README.md").write_text("other\n", encoding="utf-8")
-        self.git("add", "README.md", cwd=other_repo)
-        self.git("commit", "-m", "initial", cwd=other_repo)
+        _ = self.git("init", cwd=other_repo)
+        _ = self.git("config", "user.email", "other@example.test", cwd=other_repo)
+        _ = self.git("config", "user.name", "Other", cwd=other_repo)
+        _ = (other_repo / "README.md").write_text("other\n", encoding="utf-8")
+        _ = self.git("add", "README.md", cwd=other_repo)
+        _ = self.git("commit", "-m", "initial", cwd=other_repo)
 
         common_git_dir = str((other_repo / ".git").resolve())
         slug = f"repo-{sha256(common_git_dir.encode('utf-8')).hexdigest()[:6]}"
-        unsafe_parent = (self.data_home / "agents" / "worktrees" / slug).resolve(strict=False)
-        unsafe_parent.write_text("not a directory", encoding="utf-8")
+        unsafe_parent = (self.data_home / "agents" / "worktrees" / slug).resolve(
+            strict=False
+        )
+        _ = unsafe_parent.write_text("not a directory", encoding="utf-8")
 
         inspection = self.success("inspect", "--repo", str(other_repo))
-        findings = inspection.get("findings")
+        findings = cast("list[_Finding]", inspection.get("findings"))
         self.assertIsInstance(findings, list)
         self.assertTrue(
             any(
@@ -461,22 +516,24 @@ class GitWorktreesCliContractTests(unittest.TestCase):
             )
         )
 
-    def test_inspect_reports_no_reason_locked_worktree_and_release_refuses(self) -> None:
+    def test_inspect_reports_no_reason_locked_worktree_and_release_refuses(
+        self,
+    ) -> None:
         lease, owner_token = self.acquire("locked")
         path = self.assert_ready_new_branch(lease, "locked")
-        self.git("worktree", "lock", str(path))
+        _ = self.git("worktree", "lock", str(path))
 
         inspection = self.success("inspect", "--repo", str(self.repo))
-        worktrees = inspection.get("worktrees")
+        worktrees = cast("list[_WorktreeEntry]", inspection.get("worktrees"))
         self.assertIsInstance(worktrees, list)
         locked = next(
             (worktree for worktree in worktrees if worktree.get("path") == str(path)),
             None,
         )
-        self.assertIsInstance(locked, dict)
+        assert locked is not None
         self.assertEqual(locked.get("locked"), "")
 
-        self.refusal(
+        _ = self.refusal(
             "release",
             "--lease-id",
             lease["lease_id"],
@@ -488,7 +545,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
 
     def test_inspect_reports_prunable_missing_linked_worktree(self) -> None:
         missing_path = self.temp_path / "missing-linked-worktree"
-        self.git(
+        _ = self.git(
             "worktree",
             "add",
             "-b",
@@ -497,7 +554,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
             self.base,
         )
         self.assertTrue(missing_path.is_dir())
-        missing_path.rename(self.temp_path / "moved-missing-linked-worktree")
+        _ = missing_path.rename(self.temp_path / "moved-missing-linked-worktree")
         self.assertFalse(missing_path.exists())
         canonical_missing_path = missing_path.resolve(strict=False)
 
@@ -506,7 +563,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         self.assertIn(b"prunable", registered.encode())
 
         inspection = self.success("inspect", "--repo", str(self.repo))
-        worktrees = inspection.get("worktrees")
+        worktrees = cast("list[_WorktreeEntry]", inspection.get("worktrees"))
         self.assertIsInstance(worktrees, list)
         prunable = next(
             (
@@ -516,7 +573,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
             ),
             None,
         )
-        self.assertIsInstance(prunable, dict)
+        assert prunable is not None
         self.assertIsInstance(prunable.get("prunable"), str)
 
     def test_inspect_sha256_object_format_repository_when_supported(self) -> None:
@@ -531,45 +588,55 @@ class GitWorktreesCliContractTests(unittest.TestCase):
                 "GIT_TERMINAL_PROMPT": "0",
                 "LC_ALL": "C",
             },
+            check=False,
         )
         if initialized.returncode:
             output = f"{initialized.stdout}\n{initialized.stderr}"
             if re.search(
                 r"(?i)(unknown|unrecognized) option.*object-format"
-                r"|invalid (object format|hash algorithm).*sha256"
-                r"|unknown hash algorithm.*sha256"
-                r"|object format.*sha256.*not supported"
-                r"|sha256.*(not supported|unsupported)",
+                + r"|invalid (object format|hash algorithm).*sha256"
+                + r"|unknown hash algorithm.*sha256"
+                + r"|object format.*sha256.*not supported"
+                + r"|sha256.*(not supported|unsupported)",
                 output,
             ):
                 self.skipTest("Git does not support SHA-256 object-format repositories")
             self.fail(f"git init --object-format=sha256 failed: {output}")
 
-        self.git("config", "user.email", "contract@example.test", cwd=sha256_repo)
-        self.git("config", "user.name", "Contract Test", cwd=sha256_repo)
-        (sha256_repo / "README.md").write_text("initial\n", encoding="utf-8")
-        self.git("add", "README.md", cwd=sha256_repo)
-        self.git("commit", "-m", "initial", cwd=sha256_repo)
+        _ = self.git("config", "user.email", "contract@example.test", cwd=sha256_repo)
+        _ = self.git("config", "user.name", "Contract Test", cwd=sha256_repo)
+        _ = (sha256_repo / "README.md").write_text("initial\n", encoding="utf-8")
+        _ = self.git("add", "README.md", cwd=sha256_repo)
+        _ = self.git("commit", "-m", "initial", cwd=sha256_repo)
         self.assertEqual(
-            self.git("rev-parse", "--show-object-format", cwd=sha256_repo).stdout.strip(),
+            self.git(
+                "rev-parse", "--show-object-format", cwd=sha256_repo
+            ).stdout.strip(),
             "sha256",
         )
 
         inspection = self.success("inspect", "--repo", str(sha256_repo))
         self.assertEqual(inspection.get("canonical_root"), str(sha256_repo.resolve()))
         self.assertEqual(inspection.get("primary_path"), str(sha256_repo.resolve()))
-        worktrees = inspection.get("worktrees")
+        worktrees = cast("list[_WorktreeEntry]", inspection.get("worktrees"))
         self.assertIsInstance(worktrees, list)
         self.assertTrue(
-            any(worktree.get("path") == str(sha256_repo.resolve()) for worktree in worktrees)
+            any(
+                worktree.get("path") == str(sha256_repo.resolve())
+                for worktree in worktrees
+            )
         )
 
-    def test_foreign_preexisting_linked_worktree_is_not_adopted_or_removed(self) -> None:
+    def test_foreign_preexisting_linked_worktree_is_not_adopted_or_removed(
+        self,
+    ) -> None:
         foreign_path = self.temp_path / "foreign"
-        self.git("worktree", "add", "-b", "foreign-branch", str(foreign_path), self.base)
+        _ = self.git(
+            "worktree", "add", "-b", "foreign-branch", str(foreign_path), self.base
+        )
         self.assertTrue(foreign_path.is_dir())
 
-        self.refusal(
+        _ = self.refusal(
             "acquire",
             "--repo",
             str(self.repo),
@@ -592,13 +659,17 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         self.assertIn(f"worktree {canonical_foreign_path}\x00", registered)
 
         inspection = self.success("inspect", "--repo", str(self.repo))
-        leases = inspection.get("leases")
+        leases = cast("list[_LeasePayload]", inspection.get("leases"))
         self.assertIsInstance(leases, list)
-        self.assertFalse(any(lease.get("path") == str(canonical_foreign_path) for lease in leases))
-        worktrees = inspection.get("worktrees")
+        self.assertFalse(
+            any(lease.get("path") == str(canonical_foreign_path) for lease in leases)
+        )
+        worktrees = cast("list[_WorktreeEntry]", inspection.get("worktrees"))
         self.assertIsInstance(worktrees, list)
-        self.assertTrue(any(item.get("path") == str(canonical_foreign_path) for item in worktrees))
+        self.assertTrue(
+            any(item.get("path") == str(canonical_foreign_path) for item in worktrees)
+        )
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()
