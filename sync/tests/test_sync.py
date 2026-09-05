@@ -1760,6 +1760,10 @@ def test_run_sync_prunes_older_complete_releases(
     (old_complete_dir / "src" / "sync" / "cli.py").write_text(
         "print('old')\n", encoding="utf-8"
     )
+    (old_complete_dir / ".venv" / "bin").mkdir(parents=True, exist_ok=True)
+    (old_complete_dir / ".venv" / "bin" / "python").write_text(
+        "#!/bin/sh\nexit 0\n", encoding="utf-8"
+    )
     (old_complete_dir / ".release-complete").touch()
 
     unrecognized_dir = releases_root / "unrecognized-custom-dir"
@@ -1795,6 +1799,10 @@ def test_run_sync_preserves_previous_releases_if_wrapper_reconciliation_fails(
     (old_complete_dir / "src" / "sync").mkdir(parents=True, exist_ok=True)
     (old_complete_dir / "src" / "sync" / "cli.py").write_text(
         "print('old')\n", encoding="utf-8"
+    )
+    (old_complete_dir / ".venv" / "bin").mkdir(parents=True, exist_ok=True)
+    (old_complete_dir / ".venv" / "bin" / "python").write_text(
+        "#!/bin/sh\nexit 0\n", encoding="utf-8"
     )
     (old_complete_dir / ".release-complete").touch()
 

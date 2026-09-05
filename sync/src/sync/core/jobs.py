@@ -192,7 +192,7 @@ def _execute_uv_sync(stage: str, release_id: str, timeout_ms: int) -> None:
     uv_bin = shutil.which("uv") or "uv"
     try:
         install = subprocess.run(  # noqa: S603
-            [uv_bin, "sync", "--frozen", "--no-dev"],
+            [uv_bin, "sync", "--frozen", "--no-dev", "--no-editable"],
             cwd=stage,
             capture_output=True,
             text=True,
@@ -209,7 +209,7 @@ def _execute_uv_sync(stage: str, release_id: str, timeout_ms: int) -> None:
             exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
         )
         install = subprocess.CompletedProcess(
-            [uv_bin, "sync", "--frozen", "--no-dev"],
+            [uv_bin, "sync", "--frozen", "--no-dev", "--no-editable"],
             returncode=-1,
             stdout=stdout,
             stderr=stderr,
@@ -380,6 +380,9 @@ def _is_complete_release(release_dir: str) -> bool:
         cli_py = release_path / "src" / "sync" / "cli.py"
         cli_root_py = release_path / "src" / "cli.py"
         if not (cli_py.is_file() or cli_root_py.is_file()):
+            return False
+        venv_python = release_path / ".venv" / "bin" / "python"
+        if not venv_python.is_file():
             return False
         marker = release_path / ".release-complete"
         venv_dir = release_path / ".venv"

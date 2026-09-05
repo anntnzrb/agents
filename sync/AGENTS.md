@@ -37,7 +37,7 @@ This is the isolated sync application.
 
 - A manual sync creates or reconciles wrappers before returning.
 - Sync installs its runtime under `~/.local/share/agents/sync-releases/<releaseId>/` with a `sync-current` symlink to the latest release.
-- Generated wrappers call `python3 ~/.local/share/agents/sync-current/src/sync/cli.py launch <harness> -- ...`; launch performs a best-effort sync when the SSOT is available, then resolves and runs the cached npm binary.
+- Generated wrappers call `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli launch <harness> -- ...`; launch performs a best-effort sync when the SSOT is available, then resolves and runs the cached npm binary.
 - Runtime consumers must read installed state under `~/.local/share/agents/`, not files under the SSOT.
 - Launch-time sync failures are warnings; cached harness launch remains available.
 - Wrapper ownership is marker- and state-based. Stale generated wrappers are removed only when still owned; unmanaged conflicts are preserved.

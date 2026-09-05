@@ -10,7 +10,7 @@ A gateway host has an OS hostname that matches `server.hostname` in `tools/clipr
 | --- | --- |
 | `uv run --project sync sync` | Runs a normal reconciliation |
 | `uv run --project sync sync sync` | Runs the same normal reconciliation |
-| `python3 ~/.local/share/agents/sync-current/src/sync/cli.py launch <name> -- <arguments>` | Syncs when the source is available, prepares the harness or tool package, and launches it |
+| `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli launch <name> -- <arguments>` | Syncs when the source is available, prepares the harness or tool package, and launches it |
 
 Unknown commands and invalid arguments exit with status `2`. A manual sync exits with status `1` after a fatal reconciliation error.
 

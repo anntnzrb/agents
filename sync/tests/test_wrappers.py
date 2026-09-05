@@ -118,19 +118,20 @@ def test_wrapper_destinations_render_unix_launchers(tmp_path: Path) -> None:
     assert codex.content.startswith("#!/bin/sh\n")
     assert WRAPPER_MARKER in codex.content
     assert "launch 'codex'" in codex.content
+    assert "-m sync.cli" in codex.content
     assert "exit 127" in codex.content
     assert "sync runtime is missing" in codex.content
-    expected_cli_path = str(
+    expected_venv_python = str(
         tmp_path
         / ".local"
         / "share"
         / "agents"
         / "sync-current"
-        / "src"
-        / "sync"
-        / "cli.py"
+        / ".venv"
+        / "bin"
+        / "python"
     )
-    assert expected_cli_path in codex.content
+    assert expected_venv_python in codex.content
     assert str(tmp_path / ".config" / "agents") not in codex.content
 
     # Golden comparison for codex launch wrapper

@@ -137,7 +137,7 @@ def render_launch_wrapper(
     env: Mapping[str, str] | None = None,
 ) -> str:
     """Render a POSIX shell script wrapper for launching a harness or tool."""
-    sync_script = str(Path(runtime_home) / "sync-current" / "src" / "sync" / "cli.py")
+    venv_python = str(Path(runtime_home) / "sync-current" / ".venv" / "bin" / "python")
     args_str = " ".join(shell_quote(arg) for arg in default_args)
     env_lines = (
         [f"export {key}={shell_quote(value)}" for key, value in env.items()]
@@ -145,13 +145,15 @@ def render_launch_wrapper(
         else []
     )
     launch_suffix = f" {args_str}" if args_str else ""
-    quoted_script = shell_quote(sync_script)
+    quoted_venv = shell_quote(venv_python)
     quoted_source = shell_quote(source_name)
+    exec_prefix = f"exec {quoted_venv} -m sync.cli launch {quoted_source} --"
+    exec_cmd = f'{exec_prefix}{launch_suffix} "$@"'
     lines = [
         "#!/bin/sh",
         f"# {WRAPPER_MARKER}",
         "set -eu",
-        f"if [ ! -f {quoted_script} ]; then",
+        f"if [ ! -x {quoted_venv} ]; then",
         (
             "  echo 'agents: sync runtime is missing; "
             "run sync from the agents repository' >&2"
@@ -159,7 +161,7 @@ def render_launch_wrapper(
         "  exit 127",
         "fi",
         *env_lines,
-        f'exec python3 {quoted_script} launch {quoted_source} --{launch_suffix} "$@"',
+        exec_cmd,
         "",
     ]
     return "\n".join(lines)

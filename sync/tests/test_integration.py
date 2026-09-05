@@ -898,36 +898,46 @@ def test_integration_wrapper_forwards_arguments_to_faked_runtime(
     assert sync_result.exit_code == 0, sync_result.stderr or sync_result.stdout
 
     wrapper = home / ".local" / "bin" / "codex"
-    installed_cli = (
-        home
-        / ".local"
-        / "share"
-        / "agents"
-        / "sync-current"
-        / "src"
-        / "sync"
-        / "cli.py"
-    )
+    release_dir = (home / ".local" / "share" / "agents" / "sync-current").resolve()
+    venv_python = release_dir / ".venv" / "bin" / "python"
     assert wrapper.is_file(), str(wrapper)
-    assert installed_cli.is_file(), str(installed_cli)
+    assert venv_python.exists(), str(venv_python)
 
     wrapper_text = wrapper.read_text(encoding="utf-8")
     assert "agents-managed-wrapper:v1" in wrapper_text
     assert ".local/share/agents/sync-current" in wrapper_text
+    assert ".venv/bin/python" in wrapper_text
+    assert "-m sync.cli" in wrapper_text
     assert str(SYNC_ROOT) not in wrapper_text
     assert ".config/agents/sync" not in wrapper_text
 
-    fake_runtime = (
-        "import sys\n"
-        "args = sys.argv[1:]\n"
-        "print('mode=' + args[0])\n"
-        "print('sourceName=' + args[1])\n"
-        "print('separator=' + args[2])\n"
-        "for i, arg in enumerate(args[3:]):\n"
-        "    print(f'arg[{i}]={arg}')\n"
-        "sys.exit(42)\n"
+    # Replace the seeded venv symlink with a fake venv python that echoes the
+    # module invocation, isolating this test from the shared release venv.
+    venv_dir = release_dir / ".venv"
+    if venv_dir.is_symlink() or venv_dir.exists():
+        if venv_dir.is_symlink():
+            venv_dir.unlink()
+        else:
+            shutil.rmtree(venv_dir, ignore_errors=True)
+    fake_bin = venv_dir / "bin"
+    fake_bin.mkdir(parents=True, exist_ok=True)
+    fake_python = fake_bin / "python"
+    fake_python.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = "-m" ]; then shift 2; fi\n'
+        'echo "mode=$1"\n'
+        'echo "sourceName=$2"\n'
+        'echo "separator=$3"\n'
+        "shift 3\n"
+        "i=0\n"
+        'for arg in "$@"; do\n'
+        '  echo "arg[$i]=$arg"\n'
+        "  i=$((i + 1))\n"
+        "done\n"
+        "exit 42\n",
+        encoding="utf-8",
     )
-    installed_cli.write_text(fake_runtime, encoding="utf-8")
+    fake_python.chmod(0o755)
 
     result = run_wrapper(
         wrapper,

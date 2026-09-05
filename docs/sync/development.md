@@ -183,7 +183,7 @@ Sync is compliant if and only if it satisfies all of the following black-box beh
 
 ### 8. Wrapper runtime isolation and diagnostic hints
 
-- Generated launch wrappers in `~/.local/bin/<harness>` delegate execution to the managed sync runtime (`~/.local/share/agents/sync-current/src/sync/cli.py`).
+- Generated launch wrappers in `~/.local/bin/<harness>` delegate execution to the managed sync runtime (`~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli`).
 - If the sync runtime is missing or removed, invoking the wrapper must immediately exit with status code `127` and output `agents: sync runtime is missing; run sync from the agents repository` to stderr.
 
 ### 9. Environment variable precedence cascade
