@@ -19,8 +19,9 @@ from typing import Final, Literal, TypeGuard
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from sync.core.secret_template import strip_jsonc, sync_text_file
 from sync.runtime.errors import is_errno, panic_message
+from sync.runtime.fs import sync_text_file
+from sync.runtime.jsonc import strip_jsonc
 
 INVALID_LISTEN_HOST_PATTERN: Final[re.Pattern[str]] = re.compile(r"[\s/?#@]")
 INVALID_SERVER_HOSTNAME_PATTERN: Final[re.Pattern[str]] = re.compile(r"[\s/?#@:]")

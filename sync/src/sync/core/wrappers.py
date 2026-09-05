@@ -13,9 +13,10 @@ from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
-from sync.core.secret_template import strip_jsonc
 from sync.core.tool_launchers import TOOL_LAUNCHERS, tool_launcher_default_args
 from sync.runtime.errors import err, is_errno, panic_message, warn
+from sync.runtime.fs import sync_text_file
+from sync.runtime.jsonc import strip_jsonc
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -303,27 +304,17 @@ def read_wrapper_state(state_path: str) -> WrapperState:
 def write_wrapper_state(state_path: str, state: WrapperState) -> None:
     """Atomically write wrapper state as 2-space indented JSON with trailing newline."""
     content = f"{json.dumps(state.model_dump(), indent=2)}\n"
-    state_file = Path(state_path)
     try:
-        if state_file.exists() and state_file.read_text(encoding="utf-8") == content:
-            return
-    except UnicodeDecodeError:
-        pass
+        existing = Path(state_path).lstat()
+        mode = existing.st_mode & 0o777 if stat.S_ISREG(existing.st_mode) else 0o600
     except OSError as error:
         if not is_errno(error, "ENOENT"):
             message = f"read {state_path} ({panic_message(error)})"
             raise RuntimeError(message) from error
-    temp_path = Path(f"{state_path}.{os.getpid()}.tmp")
+        mode = 0o600
     try:
-        with temp_path.open("w", encoding="utf-8") as f:
-            f.write(content)
-            f.flush()
-            os.fsync(f.fileno())
-        temp_path.replace(state_file)
+        sync_text_file(state_path, content, mode)
     except OSError as error:
-        with contextlib.suppress(OSError):
-            if temp_path.exists():
-                temp_path.unlink()
         message = f"replace {state_path} ({panic_message(error)})"
         raise RuntimeError(message) from error
 

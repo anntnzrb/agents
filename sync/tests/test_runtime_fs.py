@@ -13,11 +13,7 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
-from sync.core.secret_template import (
-    render_secret_template,
-    strip_jsonc,
-    sync_secret_template,
-)
+from sync.core.secret_template import render_secret_template, sync_secret_template
 from sync.runtime.fs import (
     CachedSourceContent,
     copy_tree,
@@ -28,6 +24,7 @@ from sync.runtime.fs import (
     sync_managed_children,
     sync_managed_tree,
 )
+from sync.runtime.jsonc import strip_jsonc
 
 IS_ROOT = hasattr(os, "getuid") and os.getuid() == 0
 PRIVATE_FILE_MODE: int = 0o600

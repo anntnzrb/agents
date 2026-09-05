@@ -15,9 +15,9 @@ from typing import TYPE_CHECKING, Protocol, TypedDict
 
 from pydantic import TypeAdapter, ValidationError
 
-from sync.core.secret_template import strip_jsonc
 from sync.runtime.errors import warn
-from sync.runtime.fs import is_ignored_sync_entry
+from sync.runtime.fs import is_ignored_sync_entry, sync_text_file
+from sync.runtime.jsonc import strip_jsonc
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -307,13 +307,10 @@ def load_extension_hook_state(path: str) -> _LoadedExtensionHookState | None:
 
 
 def _write_hook_state_file(path: str, state: Mapping[str, object]) -> None:
-    target_path = Path(path)
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = Path(f"{path}.{os.getpid()}.tmp")
     payload = f"{json.dumps(state, indent=2)}\n"
     try:
-        temp_path.write_text(payload, encoding="utf-8")
-        temp_path.replace(target_path)
-    except BaseException:
-        temp_path.unlink(missing_ok=True)
-        raise
+        existing = Path(path).lstat()
+        mode = existing.st_mode & 0o777 if stat.S_ISREG(existing.st_mode) else 0o600
+    except OSError:
+        mode = 0o600
+    sync_text_file(path, payload, mode)

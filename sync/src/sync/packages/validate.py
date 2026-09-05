@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from typing import cast
 
-from sync.core.secret_template import strip_jsonc
+from sync.runtime.jsonc import strip_jsonc
 
 RESOURCE_KEYS: tuple[str, ...] = ("extensions", "skills", "prompts", "themes")
 

@@ -190,17 +190,6 @@ CLIPROXY_ENDPOINT_TEMPLATE_PATHS: dict[str, tuple[str, ...]] = {
 DEFAULT_PACKAGE_CACHE_SUBDIR = ".local/share/agents/pi-packages"
 
 
-def is_safe_managed_entry_name(entry_name: str) -> bool:
-    """Return True if entry_name is a valid single top-level filename or dirname."""
-    return (
-        len(entry_name) > 0
-        and not Path(entry_name).is_absolute()
-        and "/" not in entry_name
-        and "\\" not in entry_name
-        and entry_name not in {".", ".."}
-    )
-
-
 def _dir_entry_names(root: str) -> list[str]:
     path = Path(root)
     if not path.is_dir():
@@ -531,6 +520,5 @@ __all__ = [
     "SyncPlan",
     "SyncRuntimeInstallJob",
     "build_sync_plan",
-    "is_safe_managed_entry_name",
     "top_level_entry_names",
 ]

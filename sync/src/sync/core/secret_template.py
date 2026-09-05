@@ -1,14 +1,11 @@
 # Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
-"""Secret template rendering and atomic file synchronization."""
+"""Secret template rendering."""
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import re
-import stat
-import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -16,104 +13,13 @@ from pydantic import TypeAdapter, ValidationError
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
-    from typing import NoReturn
 
-from sync.runtime.errors import is_errno, panic_message
+from sync.runtime.errors import panic_message
+from sync.runtime.fs import sync_private_text_file
+from sync.runtime.jsonc import strip_jsonc
 
-OUTPUT_MODE = 0o600
 _PLACEHOLDER_PATTERN = re.compile(r"\$\{([^{}]+)\}")
 _SECRET_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
-_MAX_TEMP_ATTEMPTS = 16
-
-
-def _consume_line_comment(content: str, i: int, n: int, result: list[str]) -> int:
-    while i < n:
-        if content[i] == "\n":
-            result.append("\n")
-            return i + 1
-        i += 1
-    return i
-
-
-def _consume_block_comment(content: str, i: int, n: int, result: list[str]) -> int:
-    while i < n:
-        if content[i] == "\n":
-            result.append("\n")
-            i += 1
-        elif content[i : i + 2] == "*/":
-            return i + 2
-        else:
-            i += 1
-    return i
-
-
-def _consume_string(content: str, i: int, n: int, result: list[str]) -> int:
-    result.append('"')
-    i += 1
-    while i < n:
-        ch = content[i]
-        result.append(ch)
-        if ch == "\\":
-            i += 1
-            if i < n:
-                result.append(content[i])
-                i += 1
-            continue
-        if ch == '"':
-            return i + 1
-        i += 1
-    return i
-
-
-def _strip_jsonc_comments(content: str) -> str:
-    result: list[str] = []
-    i = 0
-    n = len(content)
-
-    while i < n:
-        ch = content[i]
-        if ch == '"':
-            i = _consume_string(content, i, n, result)
-        elif content[i : i + 2] == "//":
-            i = _consume_line_comment(content, i + 2, n, result)
-        elif content[i : i + 2] == "/*":
-            i = _consume_block_comment(content, i + 2, n, result)
-        else:
-            result.append(ch)
-            i += 1
-
-    return "".join(result)
-
-
-def _strip_trailing_commas(content: str) -> str:
-    result: list[str] = []
-    i = 0
-    n = len(content)
-
-    while i < n:
-        ch = content[i]
-        if ch == '"':
-            i = _consume_string(content, i, n, result)
-        elif ch == ",":
-            j = i + 1
-            while j < n and content[j] in " \t\r\n":
-                j += 1
-            if j < n and content[j] in "}]":
-                i += 1
-            else:
-                result.append(",")
-                i += 1
-        else:
-            result.append(ch)
-            i += 1
-
-    return "".join(result)
-
-
-def strip_jsonc(content: str) -> str:
-    """Strip comments (// and /* */) and trailing commas from JSONC content."""
-    cleaned = _strip_jsonc_comments(content)
-    return _strip_trailing_commas(cleaned)
 
 
 def render_secret_template(
@@ -159,59 +65,6 @@ def sync_secret_template(
         raise RuntimeError(message) from error
 
 
-def sync_private_text_file(
-    dst: str | os.PathLike[str],
-    content: str,
-) -> None:
-    """Write text file atomically with 0600 mode."""
-    sync_text_file(dst, content, OUTPUT_MODE)
-
-
-def _raise_zero_write(temp_path: str) -> NoReturn:
-    """Raise for a zero-byte os.write during atomic file sync."""
-    message = f"write {temp_path} (zero bytes written)"
-    raise OSError(message)
-
-
-def sync_text_file(
-    dst: str | os.PathLike[str],
-    content: str,
-    mode: int = OUTPUT_MODE,
-) -> None:
-    """Write text file atomically with mode, skipping if content and mode match."""
-    dst_str = os.fspath(dst)
-    if _matches_output(dst_str, content, mode):
-        return
-
-    parent_dir = Path(dst_str).parent
-    parent_dir.mkdir(parents=True, exist_ok=True)
-
-    fd, temp_path = _create_temp_file(dst_str, mode)
-    closed = False
-    try:
-        content_bytes = content.encode("utf-8")
-        view = memoryview(content_bytes)
-        total_written = 0
-        total_bytes = len(content_bytes)
-        while total_written < total_bytes:
-            written = os.write(fd, view[total_written:])
-            if written == 0:
-                _raise_zero_write(temp_path)
-            total_written += written
-        os.fchmod(fd, mode)
-        os.fsync(fd)
-        os.close(fd)
-        closed = True
-        Path(temp_path).replace(dst_str)
-    except Exception:
-        if not closed:
-            with contextlib.suppress(OSError):
-                os.close(fd)
-        with contextlib.suppress(OSError):
-            Path(temp_path).unlink()
-        raise
-
-
 def _read_text(path: str, label: str) -> str:
     try:
         return Path(path).read_text(encoding="utf-8")
@@ -248,41 +101,3 @@ def _read_secrets(path: str) -> dict[str, str]:
             raise ValueError(message)
         secrets[key] = value
     return secrets
-
-
-def _matches_output(path: str, content: str, mode: int) -> bool:
-    try:
-        metadata = os.lstat(path)
-        if (
-            not stat.S_ISREG(metadata.st_mode)
-            or stat.S_ISLNK(metadata.st_mode)
-            or (metadata.st_mode & 0o777) != mode
-        ):
-            return False
-        return Path(path).read_text(encoding="utf-8") == content
-    except OSError:
-        return False
-
-
-def _create_temp_file(path: str, mode: int) -> tuple[int, str]:
-    now_ms = int(time.time() * 1000)
-    nonce = format(now_ms, "x")
-    pid = os.getpid()
-    base_name = Path(path).name or "config"
-    dir_name = Path(path).parent
-
-    for attempt in range(_MAX_TEMP_ATTEMPTS):
-        temp_path = str(dir_name / f".{base_name}.{pid}.{nonce}-{attempt}.tmp")
-        try:
-            fd = os.open(
-                temp_path,
-                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
-                mode,
-            )
-        except OSError as error:
-            if not is_errno(error, "EEXIST"):
-                raise
-        else:
-            return fd, temp_path
-    message = f"create temporary config near {path} (name collision)"
-    raise RuntimeError(message)

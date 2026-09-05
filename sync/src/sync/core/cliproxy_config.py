@@ -15,8 +15,9 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from sync.core.cliproxy_deployment import CliProxyDeployment
-from sync.core.secret_template import strip_jsonc, sync_private_text_file
 from sync.runtime.errors import panic_message
+from sync.runtime.fs import sync_private_text_file
+from sync.runtime.jsonc import strip_jsonc
 
 POOL_NAME_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z][a-z0-9-]*$")
 POOL_MARKER: Final[str] = "x-credential-pool"

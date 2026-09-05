@@ -29,8 +29,8 @@ from sync.core.cliproxy_deployment import (
     CliProxyDeployment,
     cliproxy_models_url,
 )
-from sync.core.secret_template import strip_jsonc
 from sync.runtime.errors import panic_message
+from sync.runtime.jsonc import strip_jsonc
 
 TOOL_NAME = "cliproxyapi"
 RELEASE_FILE = "release.json"

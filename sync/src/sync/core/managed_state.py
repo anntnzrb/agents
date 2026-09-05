@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import json
-import os
+import stat
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from pydantic import TypeAdapter, ValidationError
 
 if TYPE_CHECKING:
+    import os
     from collections.abc import Iterable, Sequence
 
     from sync.core.plan import SyncPlan
@@ -26,13 +27,12 @@ from sync.core.harness import (
 from sync.core.harness_adapters import HARNESS_ADAPTERS
 from sync.core.plan import build_sync_plan, top_level_entry_names
 from sync.runtime.errors import err, panic_message, warn
-from sync.runtime.fs import rm_entry
+from sync.runtime.fs import is_safe_managed_entry_name, rm_entry, sync_text_file
 
 __all__ = [
     "ManagedHarnessPlan",
     "ManagedSyncPlan",
     "clean_managed_entries",
-    "is_safe_managed_entry_name",
     "load_recorded_entry_names",
     "plan_managed_entries",
     "plan_managed_entries_for_sync_plan",
@@ -58,17 +58,6 @@ class ManagedSyncPlan:
     """Full synchronization plan for managed entries across all harnesses."""
 
     harnesses: list[ManagedHarnessPlan]
-
-
-def is_safe_managed_entry_name(entry_name: str) -> bool:
-    """Check whether entry name is a safe top-level relative name."""
-    return (
-        len(entry_name) > 0
-        and not Path(entry_name).is_absolute()
-        and "/" not in entry_name
-        and "\\" not in entry_name
-        and entry_name not in {".", ".."}
-    )
 
 
 def unique_sorted(names: Iterable[str]) -> list[str]:
@@ -123,25 +112,12 @@ def write_recorded_entry_names(
     """Write sorted unique managed entry names to JSON file atomically."""
     path_str = str(path)
     payload = f"{json.dumps(unique_sorted(entry_names), indent=2)}\n"
-    target_path = Path(path_str)
     try:
-        if (
-            target_path.is_file()
-            and not target_path.is_symlink()
-            and target_path.read_text(encoding="utf-8") == payload
-        ):
-            return
+        existing = Path(path_str).lstat()
+        mode = existing.st_mode & 0o777 if stat.S_ISREG(existing.st_mode) else 0o600
     except OSError:
-        pass
-
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = Path(f"{path_str}.{os.getpid()}.tmp")
-    try:
-        temp_path.write_text(payload, encoding="utf-8")
-        temp_path.replace(target_path)
-    except BaseException:
-        temp_path.unlink(missing_ok=True)
-        raise
+        mode = 0o600
+    sync_text_file(path_str, payload, mode)
 
 
 def plan_managed_entries_for_sync_plan(

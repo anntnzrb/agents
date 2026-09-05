@@ -3,15 +3,19 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import stat
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import NoReturn
+
 from sync.runtime.errors import is_errno
 
 IGNORED_SYNC_NAMES: frozenset[str] = frozenset(
@@ -26,6 +30,19 @@ IGNORED_SYNC_NAMES: frozenset[str] = frozenset(
         ".git",
     }
 )
+OUTPUT_MODE = 0o600
+_MAX_TEMP_ATTEMPTS = 16
+
+
+def is_safe_managed_entry_name(entry_name: str) -> bool:
+    """Check whether entry name is a safe top-level relative name."""
+    return (
+        len(entry_name) > 0
+        and not Path(entry_name).is_absolute()
+        and "/" not in entry_name
+        and "\\" not in entry_name
+        and entry_name not in {".", ".."}
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -395,3 +412,94 @@ def sync_managed_children(
         _normalize_preserve_paths(preserve_paths),
         source_content_cache,
     )
+
+
+def _matches_output(path: str, content: str, mode: int) -> bool:
+    try:
+        metadata = os.lstat(path)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or stat.S_ISLNK(metadata.st_mode)
+            or (metadata.st_mode & 0o777) != mode
+        ):
+            return False
+        return Path(path).read_text(encoding="utf-8") == content
+    except (OSError, UnicodeDecodeError):
+        return False
+
+
+def _create_temp_file(path: str, mode: int) -> tuple[int, str]:
+    now_ms = int(time.time() * 1000)
+    nonce = format(now_ms, "x")
+    pid = os.getpid()
+    base_name = Path(path).name or "config"
+    dir_name = Path(path).parent
+
+    for attempt in range(_MAX_TEMP_ATTEMPTS):
+        temp_path = str(dir_name / f".{base_name}.{pid}.{nonce}-{attempt}.tmp")
+        try:
+            fd = os.open(
+                temp_path,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                mode,
+            )
+        except OSError as error:
+            if not is_errno(error, "EEXIST"):
+                raise
+        else:
+            return fd, temp_path
+    message = f"create temporary config near {path} (name collision)"
+    raise RuntimeError(message)
+
+
+def _raise_zero_write(temp_path: str) -> NoReturn:
+    """Raise for a zero-byte os.write during atomic file sync."""
+    message = f"write {temp_path} (zero bytes written)"
+    raise OSError(message)
+
+
+def sync_text_file(
+    dst: str | os.PathLike[str],
+    content: str,
+    mode: int = OUTPUT_MODE,
+) -> None:
+    """Write text file atomically with mode, skipping if content and mode match."""
+    dst_str = os.fspath(dst)
+    if _matches_output(dst_str, content, mode):
+        return
+
+    parent_dir = Path(dst_str).parent
+    parent_dir.mkdir(parents=True, exist_ok=True)
+
+    fd, temp_path = _create_temp_file(dst_str, mode)
+    closed = False
+    try:
+        content_bytes = content.encode("utf-8")
+        view = memoryview(content_bytes)
+        total_written = 0
+        total_bytes = len(content_bytes)
+        while total_written < total_bytes:
+            written = os.write(fd, view[total_written:])
+            if written == 0:
+                _raise_zero_write(temp_path)
+            total_written += written
+        os.fchmod(fd, mode)
+        os.fsync(fd)
+        os.close(fd)
+        closed = True
+        Path(temp_path).replace(dst_str)
+    except Exception:
+        if not closed:
+            with contextlib.suppress(OSError):
+                os.close(fd)
+        with contextlib.suppress(OSError):
+            Path(temp_path).unlink()
+        raise
+
+
+def sync_private_text_file(
+    dst: str | os.PathLike[str],
+    content: str,
+) -> None:
+    """Write text file atomically with 0600 mode."""
+    sync_text_file(dst, content, OUTPUT_MODE)

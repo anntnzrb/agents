@@ -26,11 +26,9 @@ from sync.core.managed_state import (
     top_level_entry_names,
 )
 from sync.core.plan import ExtensionDepsHookPlan
-from sync.core.secret_template import (
-    render_secret_template,
-    strip_jsonc,
-    sync_text_file,
-)
+from sync.core.secret_template import render_secret_template
+from sync.runtime.fs import sync_text_file
+from sync.runtime.jsonc import strip_jsonc
 
 _MISSING_SHA256: Final[str] = (
     "ffa63583dfa6706b87d284b86b0d693a161e4840aad2c5cf6b5d27c3b9621f7d"
