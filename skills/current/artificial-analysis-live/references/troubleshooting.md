@@ -2,6 +2,14 @@
 
 Use when credentials, extraction, freshness, caching, or upstream requests fail.
 
+## Missing credentials or uncertain effort variants
+
+- Without an authorized API key, use the existing public `coding` or `evaluation` route when its scope answers the question. Snapshot readers still require an existing snapshot; label explicit historical input accordingly.
+- For variant discovery, inspect the official models catalog or model page with the available URL reader. If structured catalog data is available, associate release and effort records through their containing objects or explicit identifiers, never nearest-text windows.
+- Treat catalog shapes and effort ladders as unversioned. Preserve the published model identifier, effort label, source URL, and retrieval date. Do not assume a bare slug means maximum or default effort.
+- One discovered effort means one observed entry, not proof that other efforts do not exist. If the source cannot establish completeness or model identity, report the gap rather than synthesizing a comparison.
+- Keep catalog discovery separate from benchmark scores. Do not infer authenticated API equivalence, recover numbers from garbled reader text, or search unrelated files for credentials.
+
 ## Fresh fetch or capability command failure after upstream change
 
 Signals: `extraction_error` with missing sections; capability command returns no rows after page change.
