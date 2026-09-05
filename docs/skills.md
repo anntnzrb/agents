@@ -13,20 +13,50 @@ Use `skills/current/` for skills that sync publishes to enabled harnesses. Use `
 
 Keep development credentials in the root ignored `.env` file (`.env.example` at the repository root lists the shared template variables).
 
-## Validate Python files
+## Validate Python skills (standard)
 
-For a skill with Python code, run the formatting and lint checks:
+All new skills and changed Python skills use the central code-gate runner in `skill-creator`. The runner executes Ruff format-check, Ruff strict linting (ALL with the sync exclusion set), Basedpyright in standard type-checking mode, and optionally pytest. Dependency environments for Basedpyright and pytest are derived automatically from the PEP 723 block in `scripts/cli.py`.
+
+Run static checks (Ruff format-check, Ruff lint, Basedpyright):
 
 ```bash
-uvx ruff format skills/current/<name>
-uvx ruff check --select ALL --ignore COM812,D203,D213 skills/current/<name>
+uv run --script skills/current/skill-creator/scripts/cli.py gates skills/current/<name>
 ```
 
-Run the smallest relevant test and type-check commands listed by the skill. For migrated library code, run the smallest relevant pytest/ruff/pyright gate with explicit `uv run --with ...` deps.
+Run static checks and the skill's test suite:
 
-## Validate TypeScript and Bun files
+```bash
+uv run --script skills/current/skill-creator/scripts/cli.py gates skills/current/<name> --tests
+```
 
-For a skill with TypeScript or Bun code, run the local test suite and compiler checks:
+Each Python skill provides a `pyproject.toml` containing tool configuration only (no runtime dependencies):
+
+```toml
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["A002", "ANN401", "BLE001", "COM812", "D203", "D213", "EM101", "EM102", "ERA001", "PERF401", "PLR0911", "PLR0912", "S101", "SLF001", "TRY003", "TRY301"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**/*.py" = ["T201"]
+"tests/**/*.py" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
+include = ["scripts", "lib", "tests"]
+pythonVersion = "3.12"
+pythonPlatform = "All"
+```
+
+## Validate TypeScript and Bun skills (legacy / grandfathered)
+
+TypeScript is grandfathered for existing skills (`market-hunter`, `omp-search`, `x-research`). New skills MUST use Python and `uv`. For changes to existing TypeScript skills, run the local test suite and compiler checks:
 
 ```bash
 bun test skills/current/<name>
@@ -34,7 +64,6 @@ bunx tsc --project skills/current/<name>/tsconfig.json --noEmit
 ```
 
 Run tests from the skill directory or repository root. Verify that TypeScript diagnostics return zero errors before handoff.
-
 ## Validate an executable skill
 
 Executable skills use `scripts/cli.py` (Python) or `scripts/cli.ts` (TypeScript and Bun) as their public entrypoint. Check the command after changing executable behavior:
