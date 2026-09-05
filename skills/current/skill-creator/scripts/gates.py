@@ -31,7 +31,7 @@ def _run_step(step: Sequence[str], cwd: Path) -> int:
     """Run one gate step with inherited stdio in cwd; return its exit code."""
     print(f"+ {' '.join(step)}")
     # Fixed argv, no shell: every step is a hardcoded command list below.
-    completed = subprocess.run(list(step), check=False, shell=False, cwd=cwd)  # noqa: S603
+    completed = subprocess.run(list(step), check=False, shell=False, cwd=cwd)
     return completed.returncode
 
 

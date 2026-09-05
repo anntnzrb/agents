@@ -43,8 +43,7 @@ def _call_claude(prompt: str, model: str | None, timeout: int = 300) -> str:
     # programmatic subprocess usage is safe. Same pattern as run_eval.py.
     # Fixed argv, no shell: the prompt travels over stdin, not the command line.
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-
-    result = subprocess.run(  # noqa: S603
+    result = subprocess.run(
         cmd,
         input=prompt,
         capture_output=True,

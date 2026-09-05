@@ -239,7 +239,7 @@ def run_single_query(query: str, config: QueryConfig) -> bool:
         env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
 
         # Fixed argv, no shell: query/model come from local eval files.
-        process = subprocess.Popen(  # noqa: S603
+        process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,

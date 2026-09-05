@@ -348,8 +348,8 @@ def _kill_port(port: int) -> None:
     """Kill any process listening on the given port."""
     try:
         # Fixed argv, no shell: checking local port usage via system lsof.
-        result = subprocess.run(  # noqa: S603
-            ["lsof", "-ti", f":{port}"],  # noqa: S607
+        result = subprocess.run(
+            ["lsof", "-ti", f":{port}"],
             capture_output=True,
             text=True,
             check=False,
