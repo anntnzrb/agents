@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, cast
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from sync.core.secret_template import strip_jsonc, sync_text_file
 from sync.packages.process import (
     install_inferred_import_packages as install_inferred_import_packages_impl,
 )
@@ -34,6 +33,8 @@ from sync.packages.validate import (
     package_is_healthy,
 )
 from sync.runtime.errors import err, is_errno, panic_message
+from sync.runtime.fs import sync_text_file
+from sync.runtime.jsonc import strip_jsonc
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -226,10 +227,11 @@ async def bootstrap_package_target(target: PackageBootstrapTarget) -> bool:
             err(f"package bootstrap failed for {source}: {panic_message(error)}")
             success = False
 
-    try:
-        patch_runtime_settings(target.runtime_settings_path, installed_paths)
-    except (OSError, ValueError) as error:
-        err(f"package settings patch failed: {panic_message(error)}")
-        success = False
+    if success:
+        try:
+            patch_runtime_settings(target.runtime_settings_path, installed_paths)
+        except (OSError, ValueError) as error:
+            err(f"package settings patch failed: {panic_message(error)}")
+            success = False
 
     return success

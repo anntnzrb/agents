@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -153,4 +154,38 @@ def test_patch_runtime_settings_preserves_mode_of_existing_regular_file(
     patch_runtime_settings(str(settings_path), [])
 
     assert settings_path.is_file()
+    assert settings_path.stat().st_mode & 0o777 == _EXPECTED_MODE
+
+
+def test_bootstrap_partial_failure_leaves_settings_untouched(tmp_path: Path) -> None:
+    """Partial bootstrap failure must not publish a reduced package list."""
+    manifest_path = tmp_path / "packages.json"
+    manifest_path.write_text(
+        '{"packages": ["https://github.com/owner/a", "https://github.com/owner/b"]}\n',
+        encoding="utf-8",
+    )
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text('{"theme": "nord"}\n', encoding="utf-8")
+    settings_path.chmod(_EXPECTED_MODE)
+    before_bytes = settings_path.read_bytes()
+    cached = str(tmp_path / "cache" / "a")
+    target = PackageBootstrapTarget(
+        manifest_path=str(manifest_path),
+        runtime_settings_path=str(settings_path),
+        cache_root=str(tmp_path / "cache"),
+        timeout_ms=5000,
+    )
+
+    async def _succeed_once(source: str, _cache_root: str, _timeout_ms: int) -> str:
+        if source.endswith("/a"):
+            return cached
+        message = "boom"
+        raise RuntimeError(message)
+
+    with patch(
+        "sync.packages.index.ensure_package", AsyncMock(side_effect=_succeed_once)
+    ):
+        success = asyncio.run(bootstrap_package_target(target))
+    assert success is False
+    assert settings_path.read_bytes() == before_bytes
     assert settings_path.stat().st_mode & 0o777 == _EXPECTED_MODE
