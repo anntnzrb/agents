@@ -4,11 +4,11 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from html import unescape
-from typing import Any
+from typing import cast
 
-from .contracts import Catalog, ParsedDocument
+from .contracts import Catalog, Diagnostic, ParsedDocument
 from .diagnostics import make
 from .identity import canonical_url, stable_id
 
@@ -24,14 +24,16 @@ def _text(value: object) -> str | None:
 
 def _walk(value: object, path: str = "$") -> Iterable[tuple[Mapping[str, object], str]]:
     if isinstance(value, Mapping):
-        yield value, path
-        for key, child in value.items():
+        mapping = cast("Mapping[str, object]", value)
+        yield mapping, path
+        for key, child in mapping.items():
             if isinstance(child, (Mapping, list)):
-                yield from _walk(child, f"{path}.{key}")
+                yield from _walk(cast("object", child), f"{path}.{key}")
     elif isinstance(value, list):
-        for index, child in enumerate(value):
+        seq = cast("Sequence[object]", value)
+        for index, child in enumerate(seq):
             if isinstance(child, (Mapping, list)):
-                yield from _walk(child, f"{path}[{index}]")
+                yield from _walk(cast("object", child), f"{path}[{index}]")
 
 
 def _is_model(item: Mapping[str, object]) -> bool:
@@ -103,7 +105,7 @@ def _url_from(item: Mapping[str, object]) -> str | None:
 
 def _benchmark_entry(
     item: Mapping[str, object], path: str, source_url: str
-) -> dict[str, Any] | None:
+) -> dict[str, object] | None:
     name = (
         _text(item.get("benchmark"))
         or _text(item.get("benchmarkName"))
@@ -181,7 +183,7 @@ def _benchmark_entry(
         and not isinstance(task_value, bool)
         else None
     )
-    entry: dict[str, Any] = {
+    entry: dict[str, object] = {
         "source": "vals",
         "benchmark_id": benchmark_id,
         "source_id": source_id,
@@ -221,7 +223,7 @@ def _benchmark_entry(
 
 def _model_entry(
     item: Mapping[str, object], path: str, source_url: str
-) -> dict[str, Any] | None:
+) -> dict[str, object] | None:
     name = (
         _text(item.get("model"))
         or _text(item.get("model_name"))
@@ -280,7 +282,7 @@ def _model_entry(
 
 def _add_benchmark(
     catalog: Catalog,
-    entry: dict[str, Any] | None,
+    entry: dict[str, object] | None,
     seen: set[str],
     *,
     active: bool = False,
@@ -299,7 +301,9 @@ def _add_benchmark(
         catalog.all_detail_anchors.append(entry)
 
 
-def _add_model(catalog: Catalog, model: dict[str, Any] | None, seen: set[str]) -> None:
+def _add_model(
+    catalog: Catalog, model: dict[str, object] | None, seen: set[str]
+) -> None:
     if not model:
         return
     model_id = str(model["model_id"])
@@ -319,9 +323,12 @@ def _discover_root_benchmarks(
         value = root.get(key)
         if not isinstance(value, list):
             continue
-        for index, item in enumerate(value):
+        items_seq = cast("Sequence[object]", value)
+        for index, item in enumerate(items_seq):
             if isinstance(item, Mapping):
-                entry = _benchmark_entry(item, f"$.{key}[{index}]", source_url)
+                entry = _benchmark_entry(
+                    cast("Mapping[str, object]", item), f"$.{key}[{index}]", source_url
+                )
                 _add_benchmark(catalog, entry, seen_benchmarks, active=True)
 
 
@@ -331,9 +338,10 @@ def _discover_root_versions(
     versions = root.get("versions") or root.get("version_selector_entries")
     if not isinstance(versions, list):
         return
-    for index, item in enumerate(versions):
+    versions_seq = cast("Sequence[object]", versions)
+    for index, item in enumerate(versions_seq):
         if isinstance(item, Mapping):
-            version = dict(item)
+            version: dict[str, object] = dict(cast("Mapping[str, object]", item))
             version["source_path"] = f"$.versions[{index}]"
             version["discovered_from"] = source_url
             catalog.version_selector_entries.append(version)
@@ -359,9 +367,10 @@ def _discover_root_metadata(
 ) -> None:
     if not isinstance(root, Mapping):
         return
-    _discover_root_benchmarks(root, source_url, catalog, seen_benchmarks)
-    _discover_root_versions(root, source_url, catalog)
-    _preserve_root_populations(root, catalog)
+    root_map = cast("Mapping[str, object]", root)
+    _discover_root_benchmarks(root_map, source_url, catalog, seen_benchmarks)
+    _discover_root_versions(root_map, source_url, catalog)
+    _preserve_root_populations(root_map, catalog)
 
 
 def _discover_html_links(
@@ -394,29 +403,40 @@ def _discover_html_links(
 def _catalog_diagnostics(catalog: Catalog, source_url: str) -> None:
     for entry in catalog.entries:
         if entry.get("metric_semantics_status") == "unknown":
+            diag = make(
+                "UNKNOWN_SCORE_SEMANTICS",
+                ("Benchmark metadata does not publish a recognized score definition."),
+                stage="discover",
+                severity="warning",
+                details={
+                    "benchmark_id": entry.get("benchmark_id"),
+                    "display_name": entry.get("display_name"),
+                },
+            )
             catalog.diagnostics.append(
-                make(
-                    "UNKNOWN_SCORE_SEMANTICS",
-                    (
-                        "Benchmark metadata does not publish a recognized "
-                        "score definition."
-                    ),
-                    stage="discover",
-                    severity="warning",
-                    details={
-                        "benchmark_id": entry.get("benchmark_id"),
-                        "display_name": entry.get("display_name"),
-                    },
+                Diagnostic(
+                    code=str(diag["code"]),
+                    severity=str(diag["severity"]),
+                    stage=str(diag["stage"]),
+                    message=str(diag["message"]),
+                    details=cast("dict[str, object]", diag.get("details", {})),
                 )
             )
     if not catalog.entries and not catalog.models:
+        diag = make(
+            "PARTIAL_EXTRACTION",
+            "No benchmark or model catalog entries were discovered.",
+            stage="discover",
+            severity="error",
+            details={"source_url": source_url},
+        )
         catalog.diagnostics.append(
-            make(
-                "PARTIAL_EXTRACTION",
-                "No benchmark or model catalog entries were discovered.",
-                stage="discover",
-                severity="error",
-                details={"source_url": source_url},
+            Diagnostic(
+                code=str(diag["code"]),
+                severity=str(diag["severity"]),
+                stage=str(diag["stage"]),
+                message=str(diag["message"]),
+                details=cast("dict[str, object]", diag.get("details", {})),
             )
         )
 
@@ -446,7 +466,9 @@ def discover(document: ParsedDocument) -> Catalog:
     return catalog
 
 
-def select_benchmark(catalog: Catalog, selector: str | None) -> dict[str, Any] | None:
+def select_benchmark(
+    catalog: Catalog, selector: str | None
+) -> dict[str, object] | None:
     """Resolve one exact benchmark selector."""
     if not selector:
         return None
@@ -469,7 +491,7 @@ def select_benchmark(catalog: Catalog, selector: str | None) -> dict[str, Any] |
     return None
 
 
-def select_model(catalog: Catalog, selector: str | None) -> dict[str, Any] | None:
+def select_model(catalog: Catalog, selector: str | None) -> dict[str, object] | None:
     """Resolve one exact model selector."""
     if not selector:
         return None

@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import copy
 import hashlib
-import json
 import math
 from collections.abc import Callable, Iterable, Mapping, MutableSequence
+from typing import cast
 
 from .diagnostics import Diagnostic
 
@@ -94,13 +94,6 @@ def _safe_equal(left: object, right: object) -> bool:
         return left == right
     except (TypeError, ValueError):
         return False
-
-
-def _json_key(value: object) -> str:
-    try:
-        return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
-    except (TypeError, ValueError, OverflowError):
-        return repr(value)
 
 
 def _append_diagnostic(
@@ -210,8 +203,8 @@ def normalize_mapping(  # noqa: PLR0913
     if raw_fields:
         existing = result.get("raw_fields")
         if isinstance(existing, dict):
-            existing = dict(existing) | raw_fields
-            result["raw_fields"] = existing
+            merged = cast("dict[str, object]", existing)
+            result["raw_fields"] = dict(merged) | raw_fields
         else:
             result["raw_fields"] = raw_fields
 
@@ -301,15 +294,18 @@ canonical_endpoint_identity = endpoint_identity
 
 def _comparable(value: object) -> object:
     if isinstance(value, Mapping):
+        mapping = cast("Mapping[str, object]", value)
         return {
             key: _comparable(item)
-            for key, item in value.items()
+            for key, item in mapping.items()
             if key not in {"raw_metadata", "source"}
         }
     if isinstance(value, list):
-        return [_comparable(item) for item in value]
+        items = cast("list[object]", cast("object", value))
+        return [_comparable(item) for item in items]
     if isinstance(value, tuple):
-        return tuple(_comparable(item) for item in value)
+        entries = cast("tuple[object, ...]", cast("object", value))
+        return tuple(_comparable(item) for item in entries)
     return value
 
 

@@ -1,11 +1,15 @@
+"""Value scoring for Amazon search results."""
+
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from decimal import Decimal
-from typing import Literal, TypedDict
+from typing import TYPE_CHECKING, Literal, TypedDict
 
-from .models import ProductDetail, SearchResult
+if TYPE_CHECKING:
+    from decimal import Decimal
+
+    from .models import ProductDetail, SearchResult
 
 ScoringMode = Literal["agent_value"]
 
@@ -23,7 +27,22 @@ _GENERIC_BRAND_TOKENS = {
 }
 
 
+_MIN_RATING_EXCELLENT = 4.7
+_MIN_RATING_HIGH = 4.6
+_MIN_RATING_GOOD = 4.5
+_MIN_RATING_FAIR = 4.4
+_MIN_RATING_POOR = 4.3
+
+_MIN_REVIEWS_MASSIVE = 10_000
+_MIN_REVIEWS_LARGE = 3_000
+_MIN_REVIEWS_MEDIUM = 1_000
+_MIN_REVIEWS_SMALL = 300
+_MIN_REVIEWS_FEW = 100
+
+
 class ResultScorePayload(TypedDict):
+    """Serialized result-score payload."""
+
     score: float
     reasons: list[str]
     signal_scores: dict[str, float]
@@ -32,12 +51,15 @@ class ResultScorePayload(TypedDict):
 
 @dataclass(frozen=True, slots=True)
 class ResultScore:
+    """Scored value signals for one search result."""
+
     score: float
     reasons: tuple[str, ...]
     signal_scores: dict[str, float]
     brand_source: str | None
 
     def to_dict(self) -> ResultScorePayload:
+        """Serialize to a plain payload dict."""
         return {
             "score": self.score,
             "reasons": list(self.reasons),
@@ -52,6 +74,7 @@ def score_results(
     query: str | None = None,
     details_by_asin: dict[str, ProductDetail] | None = None,
 ) -> tuple[list[SearchResult], dict[str, ResultScore]]:
+    """Score results by rating, reviews, price, badges, and brand."""
     details_by_asin = details_by_asin or {}
     priced = [result.price for result in results if result.price is not None]
     min_price = min(priced) if priced else None
@@ -149,15 +172,15 @@ def _score_rating(result: SearchResult) -> float:
     rating = float(result.rating) if result.rating is not None else None
     if rating is None:
         return -25.0
-    if rating >= 4.7:
+    if rating >= _MIN_RATING_EXCELLENT:
         return 22.0
-    if rating >= 4.6:
+    if rating >= _MIN_RATING_HIGH:
         return 19.0
-    if rating >= 4.5:
+    if rating >= _MIN_RATING_GOOD:
         return 16.0
-    if rating >= 4.4:
+    if rating >= _MIN_RATING_FAIR:
         return 10.0
-    if rating >= 4.3:
+    if rating >= _MIN_RATING_POOR:
         return 4.0
     return -20.0
 
@@ -166,15 +189,15 @@ def _score_review_count(result: SearchResult) -> float:
     count = result.review_count
     if count is None:
         return -10.0
-    if count >= 10_000:
+    if count >= _MIN_REVIEWS_MASSIVE:
         return 18.0
-    if count >= 3_000:
+    if count >= _MIN_REVIEWS_LARGE:
         return 14.0
-    if count >= 1_000:
+    if count >= _MIN_REVIEWS_MEDIUM:
         return 10.0
-    if count >= 300:
+    if count >= _MIN_REVIEWS_SMALL:
         return 6.0
-    if count >= 100:
+    if count >= _MIN_REVIEWS_FEW:
         return 2.0
     return -8.0
 

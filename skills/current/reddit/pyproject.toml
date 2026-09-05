@@ -1,0 +1,52 @@
+[project]
+name = "reddit"
+version = "0.1.0"
+description = "Browse and search Reddit via the public JSON API"
+readme = "SKILL.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = ["basedpyright>=1.21", "ruff>=0.8", "pytest>=8"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+src = ["scripts", "tests"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["COM812", "ISC001", "ISC003", "D203", "D213", "CPY001", "FBT001", "FBT002",
+          "TD002", "TD003", "FIX002"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "ANN", "ARG", "ARG001", "ARG005", "PLC0415",
+  "PLR2004", "PLR0913", "SLF001", "D", "TRY003", "TRY004", "EM101", "EM102",
+  "E402", "S603", "S607"]
+"scripts/**/*.py" = ["T201", "INP001", "E402", "I001", "S310"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+[tool.basedpyright]
+typeCheckingMode = "all"
+pythonVersion = "3.12"
+pythonPlatform = "All"
+include = ["scripts", "tests"]
+extraPaths = ["scripts"]
+reportUnusedCallResult = "error"
+reportUnnecessaryTypeIgnoreComment = "error"
+reportPrivateUsage = "error"
+reportUnusedVariable = "error"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-config", "--strict-markers"]
+filterwarnings = ["error"]

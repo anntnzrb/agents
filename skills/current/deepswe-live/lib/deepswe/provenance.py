@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping, Sequence
+from typing import Final, cast
 
 from .diagnostics import redact
 
@@ -13,20 +14,23 @@ _UNSET = object()
 
 def _read(value: object, *names: str) -> object | None:
     if isinstance(value, Mapping):
+        mapping = cast("Mapping[str, object]", value)
         for name in names:
-            if name in value:
-                return value[name]
+            if name in mapping:
+                return mapping[name]
         return None
     if value is not None:
         for name in names:
             candidate = getattr(value, name, None)
             if candidate is not None:
-                return candidate
+                return cast("object", candidate)
     return None
 
 
 def _mapping(value: object) -> Mapping[str, object] | None:
-    return value if isinstance(value, Mapping) else None
+    if not isinstance(value, Mapping):
+        return None
+    return cast("Mapping[str, object]", value)
 
 
 def _text(value: object) -> str | None:
@@ -305,7 +309,9 @@ def artifact_evidence(  # noqa: C901, PLR0912, PLR0913, PLR0915
     if selected_stale_reason is not None:
         result["stale_reason"] = selected_stale_reason
     redacted = redact(result)
-    return dict(redacted) if isinstance(redacted, Mapping) else result
+    if not isinstance(redacted, Mapping):
+        return result
+    return dict(cast("Mapping[str, object]", redacted))
 
 
 def value_evidence(  # noqa: PLR0913
@@ -368,36 +374,48 @@ def value_evidence(  # noqa: PLR0913
     if input_paths is not None:
         result["input_paths"] = list(input_paths)
 
-    for key in (
-        "url",
-        "source_url",
-        "fetched_at",
-        "observed_at",
-        "generated_at",
-        "etag",
-        "ETag",
-        "last_modified",
-        "Last-Modified",
-        "validators",
-        "artifact_sha256",
-        "sha256",
-        "byte_length",
-        "raw_bytes_ref",
-        "artifact_id",
-        "freshness",
-        "freshness_mode",
-        "stale",
-        "historical",
-        "cache_reused",
-        "source_path",
-        "benchmark",
-        "benchmark_version",
-        "artifact",
-    ):
+    _copy_artifact_keys(result, artifact_projection)
+    redacted = redact(result)
+    if not isinstance(redacted, Mapping):
+        return result
+    return dict(cast("Mapping[str, object]", redacted))
+
+
+_ARTIFACT_COPY_KEYS: Final[tuple[str, ...]] = (
+    "url",
+    "source_url",
+    "fetched_at",
+    "observed_at",
+    "generated_at",
+    "etag",
+    "ETag",
+    "last_modified",
+    "Last-Modified",
+    "validators",
+    "artifact_sha256",
+    "sha256",
+    "byte_length",
+    "raw_bytes_ref",
+    "artifact_id",
+    "freshness",
+    "freshness_mode",
+    "stale",
+    "historical",
+    "cache_reused",
+    "source_path",
+    "benchmark",
+    "benchmark_version",
+    "artifact",
+)
+
+
+def _copy_artifact_keys(
+    result: dict[str, object], artifact_projection: Mapping[str, object]
+) -> None:
+    """Copy transport keys absent from the result mapping."""
+    for key in _ARTIFACT_COPY_KEYS:
         if key in artifact_projection and key not in result:
             result[key] = artifact_projection[key]
-    redacted = redact(result)
-    return dict(redacted) if isinstance(redacted, Mapping) else result
 
 
 __all__ = ["artifact_evidence", "sha256_bytes", "value_evidence"]

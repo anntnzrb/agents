@@ -9,6 +9,10 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from .cache import CacheStore, sha256_bytes
 from .contracts import (
@@ -57,7 +61,7 @@ def load_context(  # noqa: PLR0913
     table_url: str | None = None,
     categories_url: str | None = None,
     cost_url: str | None = None,
-    opener: object | None = None,
+    opener: Callable[..., object] | None = None,
 ) -> ReleaseContext:
     """Load context for the LiveBench adapter."""
     if snapshot is not None:
@@ -71,7 +75,7 @@ def load_context(  # noqa: PLR0913
         )
     discovery = discover_releases(
         snapshot=None, cache=CacheStore(cache_dir), timeout=timeout, opener=opener
-    )  # type: ignore[arg-type]
+    )
     explicit = {
         key: value
         for key, value in {
@@ -96,7 +100,7 @@ def load_context(  # noqa: PLR0913
         try:
             artifacts[target.artifact_kind] = fetch_target(
                 target, store, timeout=timeout, allow_stale=allow_stale, opener=opener
-            )  # type: ignore[arg-type]
+            )
         except FetchError as exc:
             if (
                 target.artifact_kind == "cost_table"
@@ -172,7 +176,7 @@ def normalize_rows(  # noqa: PLR0915
         provider = _explicit(row, "provider")
         variant = _explicit(row, "variant", "model_variant")
         key = (slug, provider, variant)
-        cost_by_identity.setdefault(key, row)
+        _ = cost_by_identity.setdefault(key, row)
         cost_by_model.setdefault(slug, []).append(row)
     rows: list[dict[str, object]] = []
     mapped_tasks = {task for tasks in parsed.categories.values() for task in tasks}
@@ -513,6 +517,114 @@ def build_releases_data(discovery: ReleaseDiscovery) -> dict[str, object]:
     }
 
 
+def _filter_models(
+    rows: list[dict[str, object]],
+    context_rows: Sequence[dict[str, object]],
+    model: str | None,
+    models: Sequence[str],
+    release_id: str,
+) -> list[dict[str, object]]:
+    if model:
+        filtered = select_models(rows, [model])
+        if not filtered:
+            raise_expected(
+                "MODEL_NOT_FOUND",
+                "No exact model or variant matched the selector.",
+                {"selector": model, "release": release_id},
+            )
+        return filtered
+    if models:
+        filtered = select_models(rows, list(models))
+        missing = [
+            selector
+            for selector in models
+            if not select_models(context_rows, [selector])
+        ]
+        if missing:
+            raise_expected(
+                "MODEL_NOT_FOUND",
+                "One or more exact model selectors did not match.",
+                {"selectors": missing, "release": release_id},
+            )
+        return filtered
+    return rows
+
+
+def _filter_category(
+    rows: list[dict[str, object]],
+    category: str | None,
+    catalog: Mapping[str, object],
+    release_id: str,
+) -> list[dict[str, object]]:
+    if category is None:
+        return rows
+    key = canonical_token(category)
+    categories_obj = catalog.get("categories")
+    categories_map: Mapping[str, object] = (
+        cast("Mapping[str, object]", categories_obj)
+        if isinstance(categories_obj, Mapping)
+        else {}
+    )
+    matches: list[str] = []
+    for name, metadata in categories_map.items():
+        if name == key:
+            matches.append(name)
+        elif isinstance(metadata, Mapping):
+            meta_dict = cast("Mapping[str, object]", metadata)
+            if meta_dict.get("raw_label") == category:
+                matches.append(name)
+    if not matches:
+        raise_expected(
+            "UNKNOWN_CATEGORY",
+            "The requested category is not present in this release.",
+            {"selector": category, "release": release_id},
+        )
+    return [project_category(row, key) for row in rows]
+
+
+def _build_projection_scope(
+    context: ReleaseContext,
+    model: str | None,
+    models: Sequence[str],
+    category: str | None,
+) -> dict[str, object]:
+    task_count_val: object = None
+    task_count_pop: object = None
+    task_count_kind: object = None
+    category_count_val: object = None
+    category_count_pop: object = None
+    category_count_kind: object = None
+    tc_entry = context.catalog.get("task_count")
+    if isinstance(tc_entry, Mapping):
+        tc_map = cast("Mapping[str, object]", tc_entry)
+        task_count_val = tc_map.get("value")
+        task_count_pop = tc_map.get("population")
+        task_count_kind = tc_map.get("kind")
+    cc_entry = context.catalog.get("category_count")
+    if isinstance(cc_entry, Mapping):
+        cc_map = cast("Mapping[str, object]", cc_entry)
+        category_count_val = cc_map.get("value")
+        category_count_pop = cc_map.get("population")
+        category_count_kind = cc_map.get("kind")
+    return {
+        "source": "livebench",
+        "release": context.release.as_dict(),
+        "model_variant": None,
+        "score_definition": OVERALL_DEFINITION,
+        "task_count": task_count_val,
+        "task_count_population": task_count_pop,
+        "task_count_kind": task_count_kind,
+        "category_count": category_count_val,
+        "category_count_population": category_count_pop,
+        "category_count_kind": category_count_kind,
+        "filters_applied": {
+            "model": model,
+            "models": list(models),
+            "category": category,
+        },
+    }
+
+
 def project_data(
     context: ReleaseContext,
     *,
@@ -523,60 +635,11 @@ def project_data(
 ) -> dict[str, object]:
     """Project data for the LiveBench adapter."""
     rows = list(context.rows)
-    if model:
-        rows = select_models(rows, [model])
-        if not rows:
-            raise_expected(
-                "MODEL_NOT_FOUND",
-                "No exact model or variant matched the selector.",
-                {"selector": model, "release": context.release.release_id},
-            )
-    if models:
-        rows = select_models(rows, list(models))
-        missing = [
-            selector
-            for selector in models
-            if not select_models(context.rows, [selector])
-        ]
-        if missing:
-            raise_expected(
-                "MODEL_NOT_FOUND",
-                "One or more exact model selectors did not match.",
-                {"selectors": missing, "release": context.release.release_id},
-            )
-    if category is not None:
-        key = canonical_token(category)
-        matches = [
-            name
-            for name, metadata in context.catalog["categories"].items()
-            if name == key or metadata.get("raw_label") == category
-        ]
-        if not matches:
-            raise_expected(
-                "UNKNOWN_CATEGORY",
-                "The requested category is not present in this release.",
-                {"selector": category, "release": context.release.release_id},
-            )
-        rows = [project_category(row, key) for row in rows]
+    rows = _filter_models(rows, context.rows, model, models, context.release.release_id)
+    rows = _filter_category(rows, category, context.catalog, context.release.release_id)
     if include_rank:
         rank_rows(rows)
-    scope = {
-        "source": "livebench",
-        "release": context.release.as_dict(),
-        "model_variant": None,
-        "score_definition": OVERALL_DEFINITION,
-        "task_count": context.catalog["task_count"]["value"],
-        "task_count_population": context.catalog["task_count"]["population"],
-        "task_count_kind": context.catalog["task_count"]["kind"],
-        "category_count": context.catalog["category_count"]["value"],
-        "category_count_population": context.catalog["category_count"]["population"],
-        "category_count_kind": context.catalog["category_count"]["kind"],
-        "filters_applied": {
-            "model": model,
-            "models": list(models),
-            "category": category,
-        },
-    }
+    scope = _build_projection_scope(context, model, models, category)
     warnings = diagnostics_dict(context.diagnostics)
     return {
         "scope": scope,
@@ -622,14 +685,13 @@ def project_category(row: dict[str, object], key: str) -> dict[str, object]:
     """Project category for the LiveBench adapter."""
     projected = dict(row)
     categories = row.get("categories")
-    projected["selected_category"] = (
-        categories.get(key) if isinstance(categories, Mapping) else None
-    )
-    projected["categories"] = (
-        {key: categories[key]}
-        if isinstance(categories, Mapping) and key in categories
-        else {}
-    )
+    if isinstance(categories, Mapping):
+        cat_map = cast("Mapping[str, object]", categories)
+        projected["selected_category"] = cat_map.get(key)
+        projected["categories"] = {key: cat_map[key]} if key in cat_map else {}
+    else:
+        projected["selected_category"] = None
+        projected["categories"] = {}
     return projected
 
 
@@ -638,11 +700,12 @@ def rank_rows(rows: list[dict[str, object]]) -> None:
     eligible: list[tuple[float, dict[str, object]]] = []
     for row in rows:
         overall = row.get("overall")
-        value = (
-            overall.get("normalized_value") if isinstance(overall, Mapping) else None
-        )
-        blocked = row.get("comparison_eligibility") == "blocked" or row.get(
-            "_duplicate_conflict"
+        value: object = None
+        if isinstance(overall, Mapping):
+            overall_map = cast("Mapping[str, object]", overall)
+            value = overall_map.get("normalized_value")
+        blocked = row.get("comparison_eligibility") == "blocked" or bool(
+            row.get("_duplicate_conflict")
         )
         if (
             isinstance(value, (int, float))
@@ -707,16 +770,19 @@ def _numeric_diagnostics(
         subtasks = row.get("subtasks")
         if not isinstance(subtasks, list):
             continue
-        for subtask in subtasks:
+        for subtask in cast("list[object]", subtasks):
             if not isinstance(subtask, Mapping):
                 continue
+            subtask_map = cast("Mapping[str, object]", subtask)
             path = (
-                str(subtask.get("source_path")) if subtask.get("source_path") else None
+                str(subtask_map.get("source_path"))
+                if subtask_map.get("source_path") is not None
+                else None
             )
-            codes = subtask.get("diagnostic_codes")
+            codes = subtask_map.get("diagnostic_codes")
             if not isinstance(codes, list):
                 continue
-            for raw_code in codes:
+            for raw_code in cast("list[object]", codes):
                 code = str(raw_code)
                 key = (code, path)
                 if code not in known_codes or key in seen_values:
@@ -787,7 +853,7 @@ def overlap_metadata() -> list[dict[str, object]]:
 def catalog_data(context: ReleaseContext) -> dict[str, object]:
     """Catalog data for the LiveBench adapter."""
     data = project_data(context)
-    data["rows"] = context.catalog["models"]
+    data["rows"] = context.catalog.get("models")
     data["value_status"] = "published"
     return data
 
@@ -813,7 +879,7 @@ def snapshot_manifest(
         }
         for kind, artifact in context.parsed.artifacts.items()
     }
-    manifest = {
+    manifest: dict[str, object] = {
         "schema_version": "1",
         "source": "livebench",
         "snapshot_id": (
@@ -827,7 +893,7 @@ def snapshot_manifest(
     }
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(
+        _ = output.write_text(
             json.dumps(manifest, separators=(",", ":"), ensure_ascii=False),
             encoding="utf-8",
         )
@@ -858,10 +924,12 @@ def _score_semantics(
 ) -> tuple[str | None, str | None]:
     definitions = raw_fields.get("definitions")
     if isinstance(definitions, Mapping) and task in definitions:
-        definition = definitions[task]
+        definitions_map = cast("Mapping[str, object]", definitions)
+        definition = definitions_map.get(task)
         if isinstance(definition, Mapping):
-            unit = definition.get("unit")
-            description = definition.get("definition")
+            def_map = cast("Mapping[str, object]", definition)
+            unit = def_map.get("unit")
+            description = def_map.get("definition")
             return (
                 str(unit) if unit is not None else None,
                 str(description) if description is not None else None,
@@ -877,28 +945,26 @@ def _attach_snapshot_metadata(
     for key in ("source_metadata", "definitions", "raw_metadata"):
         value = payload.get(key)
         if isinstance(value, Mapping):
-            parsed_assets.raw_fields[key] = dict(value)
+            parsed_assets.raw_fields[key] = {
+                str(k): v for k, v in cast("Mapping[object, object]", value).items()
+            }
 
 
-def _load_snapshot(path: Path, requested_release: str | None) -> ReleaseContext | None:
-    try:
-        body = path.read_bytes()
-        parsed = json.loads(body.decode("utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        return None
-    if not isinstance(parsed, Mapping):
-        return None
+def _extract_snapshot_identity(
+    parsed: Mapping[str, object], requested_release: str | None
+) -> tuple[str, str]:
     release_obj = parsed.get("release") or parsed.get("resolved_release")
     if isinstance(release_obj, Mapping):
+        release_map = cast("Mapping[str, object]", release_obj)
         release_id = str(
-            release_obj.get("id")
-            or release_obj.get("release_id")
+            release_map.get("id")
+            or release_map.get("release_id")
             or parsed.get("release_id")
             or "fixture-release"
         )
         release_date = (
-            str(release_obj.get("date"))
-            if release_obj.get("date") is not None
+            str(release_map.get("date"))
+            if release_map.get("date") is not None
             else release_id
         )
     else:
@@ -914,110 +980,169 @@ def _load_snapshot(path: Path, requested_release: str | None) -> ReleaseContext 
             "Snapshot release does not match the requested release.",
             {"requested_release": requested_release, "snapshot_release": release_id},
         )
-    # Direct normalized fixture records are accepted for deterministic
-    # source-local tests.
-    if (
-        isinstance(parsed.get("score_rows"), list)
-        and isinstance(parsed.get("categories"), Mapping)
-        and not isinstance(parsed.get("artifacts") or parsed.get("assets"), Mapping)
-    ):
-        score_rows = [
-            dict(row) for row in parsed["score_rows"] if isinstance(row, Mapping)
+    return release_id, release_date
+
+
+def _load_direct_fixture(
+    path: Path,
+    release_id: str,
+    release_date: str,
+    parsed: Mapping[str, object],
+) -> ReleaseContext:
+    score_rows_raw = parsed.get("score_rows")
+    score_rows: list[dict[str, object]] = (
+        [
+            {str(k): v for k, v in cast("Mapping[object, object]", row).items()}
+            for row in cast("list[object]", score_rows_raw)
+            if isinstance(row, Mapping)
         ]
-        cost_rows = (
-            [
-                dict(row)
-                for row in parsed.get("cost_rows", [])
-                if isinstance(row, Mapping)
-            ]
-            if isinstance(parsed.get("cost_rows", []), list)
-            else []
-        )
-        categories = {
-            str(key): [str(task) for task in value]
-            for key, value in parsed["categories"].items()
-            if isinstance(value, Sequence) and not isinstance(value, (str, bytes))
+        if isinstance(score_rows_raw, list)
+        else []
+    )
+    cost_rows_raw = parsed.get("cost_rows")
+    cost_rows: list[dict[str, object]] = (
+        [
+            {str(k): v for k, v in cast("Mapping[object, object]", row).items()}
+            for row in cast("list[object]", cost_rows_raw)
+            if isinstance(row, Mapping)
+        ]
+        if isinstance(cost_rows_raw, list)
+        else []
+    )
+    categories_raw = parsed.get("categories")
+    categories: dict[str, list[str]] = (
+        {
+            str(cat_k): [str(task) for task in cat_v]
+            for cat_k, cat_v in cast("Mapping[object, object]", categories_raw).items()
+            if isinstance(cat_v, Sequence) and not isinstance(cat_v, (str, bytes))
         }
-        assets = _fixture_artifacts(path, release_id, score_rows, cost_rows, categories)
-        parsed_assets = parse_release_assets(
+        if isinstance(categories_raw, Mapping)
+        else {}
+    )
+    assets = _fixture_artifacts(path, release_id, score_rows, cost_rows, categories)
+    parsed_assets = parse_release_assets(
+        release_id,
+        assets["score_table"],
+        assets["category_map"],
+        assets.get("cost_table"),
+    )
+    _attach_snapshot_metadata(parsed_assets, parsed)
+    diagnostics = [
+        make_diagnostic(
+            "HISTORICAL_SNAPSHOT",
+            "An explicit historical snapshot is being used.",
+            severity="warning",
+            stage="discover",
+            details={"path": str(path)},
+        )
+    ]
+    diagnostics.extend(validate_assets(parsed_assets))
+    rows = normalize_rows(
+        parsed_assets, _fixture_release(release_id, release_date, path)
+    )
+    diagnostics.extend(_row_diagnostics(rows))
+    if rows and all(row.get("_duplicate_conflict") for row in rows):
+        raise_expected(
+            "COMPARISON_INCOMPARABLE",
+            "Conflicting duplicate identities left no usable model rows.",
+            {"release_id": release_id},
+        )
+    discovery = _fixture_discovery(path, release_id, parsed)
+    release = _fixture_release(release_id, release_date, path)
+    return ReleaseContext(
+        discovery,
+        release,
+        parsed_assets,
+        rows,
+        build_catalog(parsed_assets, release, rows),
+        diagnostics,
+    )
+
+
+def _load_ref_fixture(
+    path: Path,
+    release_id: str,
+    release_date: str,
+    parsed: Mapping[str, object],
+    artifacts_map: Mapping[str, object],
+) -> ReleaseContext:
+    assets = _fixture_artifacts_from_refs(path, release_id, artifacts_map)
+    if "score_table" not in assets or "category_map" not in assets:
+        raise_expected(
+            "SOURCE_UNAVAILABLE",
+            "Snapshot release asset is missing or unreadable.",
+            {
+                "release_id": release_id,
+                "attempted_assets": list(artifacts_map.keys()),
+            },
+        )
+    parsed_assets = parse_release_assets(
+        release_id,
+        assets["score_table"],
+        assets["category_map"],
+        assets.get("cost_table"),
+    )
+    _attach_snapshot_metadata(parsed_assets, parsed)
+    release = _fixture_release(release_id, release_date, path)
+    diagnostics = [
+        make_diagnostic(
+            "HISTORICAL_SNAPSHOT",
+            "An explicit historical snapshot is being used.",
+            severity="warning",
+            stage="discover",
+            details={"path": str(path)},
+        )
+    ]
+    diagnostics.extend(validate_assets(parsed_assets))
+    rows = normalize_rows(parsed_assets, release)
+    diagnostics.extend(_row_diagnostics(rows))
+    if rows and all(row.get("_duplicate_conflict") for row in rows):
+        raise_expected(
+            "COMPARISON_INCOMPARABLE",
+            "Conflicting duplicate identities left no usable model rows.",
+            {"release_id": release_id},
+        )
+    return ReleaseContext(
+        _fixture_discovery(path, release_id, parsed),
+        release,
+        parsed_assets,
+        rows,
+        build_catalog(parsed_assets, release, rows),
+        diagnostics,
+    )
+
+
+def _load_snapshot(path: Path, requested_release: str | None) -> ReleaseContext | None:
+    try:
+        body = path.read_bytes()
+        parsed_obj: object = cast("object", json.loads(body.decode("utf-8")))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(parsed_obj, Mapping):
+        return None
+    parsed = cast("Mapping[str, object]", parsed_obj)
+    release_id, release_date = _extract_snapshot_identity(parsed, requested_release)
+    score_rows_raw = parsed.get("score_rows")
+    categories_raw = parsed.get("categories")
+    artifacts_raw = parsed.get("artifacts") or parsed.get("assets")
+    if (
+        isinstance(score_rows_raw, list)
+        and isinstance(categories_raw, Mapping)
+        and not isinstance(artifacts_raw, Mapping)
+    ):
+        return _load_direct_fixture(
+            path,
             release_id,
-            assets["score_table"],
-            assets["category_map"],
-            assets.get("cost_table"),
+            release_date,
+            parsed,
         )
-        _attach_snapshot_metadata(parsed_assets, parsed)
-        diagnostics = [
-            make_diagnostic(
-                "HISTORICAL_SNAPSHOT",
-                "An explicit historical snapshot is being used.",
-                severity="warning",
-                stage="discover",
-                details={"path": str(path)},
-            )
-        ]
-        diagnostics.extend(validate_assets(parsed_assets))
-        rows = normalize_rows(
-            parsed_assets, _fixture_release(release_id, release_date, path)
-        )
-        diagnostics.extend(_row_diagnostics(rows))
-        if rows and all(row.get("_duplicate_conflict") for row in rows):
-            raise_expected(
-                "COMPARISON_INCOMPARABLE",
-                "Conflicting duplicate identities left no usable model rows.",
-                {"release_id": release_id},
-            )
-        discovery = _fixture_discovery(path, release_id, parsed)
-        release = _fixture_release(release_id, release_date, path)
-        return ReleaseContext(
-            discovery,
-            release,
-            parsed_assets,
-            rows,
-            build_catalog(parsed_assets, release, rows),
-            diagnostics,
-        )
-    artifacts = parsed.get("artifacts") or parsed.get("assets")
-    if isinstance(artifacts, Mapping):
-        assets = _fixture_artifacts_from_refs(path, release_id, artifacts)
-        if "score_table" not in assets or "category_map" not in assets:
-            raise_expected(
-                "SOURCE_UNAVAILABLE",
-                "Snapshot release asset is missing or unreadable.",
-                {"release_id": release_id, "attempted_assets": list(artifacts)},
-            )
-        parsed_assets = parse_release_assets(
+    if isinstance(artifacts_raw, Mapping):
+        return _load_ref_fixture(
+            path,
             release_id,
-            assets["score_table"],
-            assets["category_map"],
-            assets.get("cost_table"),
-        )
-        _attach_snapshot_metadata(parsed_assets, parsed)
-        release = _fixture_release(release_id, release_date, path)
-        diagnostics = [
-            make_diagnostic(
-                "HISTORICAL_SNAPSHOT",
-                "An explicit historical snapshot is being used.",
-                severity="warning",
-                stage="discover",
-                details={"path": str(path)},
-            )
-        ]
-        diagnostics.extend(validate_assets(parsed_assets))
-        rows = normalize_rows(parsed_assets, release)
-        diagnostics.extend(_row_diagnostics(rows))
-        if rows and all(row.get("_duplicate_conflict") for row in rows):
-            raise_expected(
-                "COMPARISON_INCOMPARABLE",
-                "Conflicting duplicate identities left no usable model rows.",
-                {"release_id": release_id},
-            )
-        return ReleaseContext(
-            _fixture_discovery(path, release_id, parsed),
-            release,
-            parsed_assets,
-            rows,
-            build_catalog(parsed_assets, release, rows),
-            diagnostics,
+            release_date,
+            parsed,
+            cast("Mapping[str, object]", artifacts_raw),
         )
     return None
 
@@ -1041,8 +1166,12 @@ def _fixture_discovery(
     path: Path, release_id: str, payload: Mapping[str, object]
 ) -> ReleaseDiscovery:
     entries = payload.get("releases")
-    releases = (
-        [dict(item) for item in entries if isinstance(item, Mapping)]
+    releases: list[dict[str, object]] = (
+        [
+            {str(k): v for k, v in cast("Mapping[object, object]", item).items()}
+            for item in cast("list[object]", entries)
+            if isinstance(item, Mapping)
+        ]
         if isinstance(entries, list)
         else [{"id": release_id, "date": release_id}]
     )
@@ -1139,7 +1268,7 @@ def _fixture_artifact(
 def _fixture_artifacts_from_refs(
     path: Path,
     release_id: str,
-    refs: Mapping[object, object],
+    refs: Mapping[str, object],
 ) -> dict[str, RawArtifact]:
     result: dict[str, RawArtifact] = {}
     aliases = {
@@ -1159,10 +1288,14 @@ def _fixture_artifacts_from_refs(
         content_type = "application/json" if kind == "category_map" else "text/csv"
         source_url = f"fixture://{path}#{kind}"
         if isinstance(ref, Mapping):
-            if ref.get("body") is not None:
-                body = str(ref["body"]).encode("utf-8")
-            elif ref.get("path") is not None or ref.get("raw_bytes_ref") is not None:
-                raw_path = ref.get("path") or ref.get("raw_bytes_ref")
+            ref_map = cast("Mapping[str, object]", ref)
+            if ref_map.get("body") is not None:
+                body = str(ref_map["body"]).encode("utf-8")
+            elif (
+                ref_map.get("path") is not None
+                or ref_map.get("raw_bytes_ref") is not None
+            ):
+                raw_path = ref_map.get("path") or ref_map.get("raw_bytes_ref")
                 ref_path = Path(str(raw_path))
                 try:
                     body = (
@@ -1172,8 +1305,10 @@ def _fixture_artifacts_from_refs(
                     )
                 except OSError:
                     body = None
-            source_url = str(ref.get("url") or ref.get("source_url") or source_url)
-            content_type = str(ref.get("content_type") or content_type)
+            source_url = str(
+                ref_map.get("url") or ref_map.get("source_url") or source_url
+            )
+            content_type = str(ref_map.get("content_type") or content_type)
         elif isinstance(ref, str):
             ref_path = Path(ref)
             try:
@@ -1191,7 +1326,7 @@ def _fixture_artifacts_from_refs(
         if body is None:
             continue
         ref_release = (
-            str(ref.get("release_id") or release_id)
+            str(cast("Mapping[str, object]", ref).get("release_id") or release_id)
             if isinstance(ref, Mapping)
             else release_id
         )

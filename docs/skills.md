@@ -15,14 +15,18 @@ Keep development credentials in the root ignored `.env` file (`.env.example` at 
 
 ## Validate Python files
 
-For a skill with Python code, run the formatting and lint checks:
+Every Python skill carries a standalone `pyproject.toml` (no workspace, no shared config, no parent-directory dependencies) and passes all six gates from its own directory:
 
 ```bash
-uvx ruff format skills/current/<name>
-uvx ruff check --select ALL --ignore COM812,D203,D213 skills/current/<name>
+uvx ruff format --check .
+uvx ruff check .
+uv run --group dev basedpyright
+uv run --group dev pytest
 ```
 
-Run the smallest relevant test and type-check commands listed by the skill. For migrated library code, run the smallest relevant pytest/ruff/pyright gate with explicit `uv run --with ...` deps.
+Start from `skills/current/python/references/advanced/pyproject-strict.md`: pinned dev tools (`basedpyright`, `ruff`, `pytest`), ruff `ALL` with narrow ignores, basedpyright `all` with unused-result/variable/private-usage as errors, pytest strict config with `filterwarnings` as errors. Keep `requires-python` and the ruff target / basedpyright version in sync with the skill's declared floor. Per-file ignores stay narrow (tests get assertion flexibility, scripts get CLI flexibility); production code gets no blanket suppression. A `noqa` or `pyright: ignore` needs a trailing reason naming why the checker cannot express the invariant. Never exclude production modules, propagate `Any` past a boundary, or silence a diagnostic without re-running the skill's tests.
+
+Gates five and six are the executable check below (run `--help` plus one safe invocation from the skill directory) and the metadata check (`quick-validate` from `skill-creator`, plus `git diff --check`).
 
 ## Validate TypeScript and Bun files
 
@@ -77,8 +81,8 @@ The next sync removes the managed copy from harness homes. Sync does not publish
 
 ## Skill package policy
 
-### Python skills
 - Public entrypoint: `scripts/cli.py`, invoked as `uv run --script <skill-dir>/scripts/cli.py ...`.
+- Standalone `pyproject.toml` per skill with pinned dev tools; see Validate Python files.
 - Put reusable code in `lib/<module>/`; make `scripts/cli.py` add `lib/` to `sys.path`.
 - Declare inline dependencies in `scripts/cli.py` using PyPA inline script metadata (PEP 723 `# /// script` block).
 

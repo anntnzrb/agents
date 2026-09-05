@@ -1,3 +1,5 @@
+"""Kiwi and agent-browser providers for flight-live."""
+
 from __future__ import annotations
 
 import json
@@ -7,10 +9,14 @@ import subprocess
 from collections.abc import Mapping
 from datetime import date, timedelta
 from functools import lru_cache
+from typing import TYPE_CHECKING, cast
 from urllib.parse import quote_plus, urlencode
 from urllib.request import Request, urlopen
 
 from .models import FlightLiveError, MissingExecutableError, PlannerOffer, ResolvedPlace
+
+if TYPE_CHECKING:
+    import http.client
 
 _IATA_RE = re.compile(r"^[A-Za-z]{3}$")
 
@@ -18,7 +24,7 @@ _KIWI_LOCATIONS_URL = "https://api.skypicker.com/locations"
 _AGENT_BROWSER_FLAKE = "github:numtide/llm-agents.nix#agent-browser"
 
 _KIWI_PRICE_BUTTON_RE = re.compile(
-    r'button\s+"\s*([A-Za-z]{3,9}\s+\d{1,2})\s*[-–]\s*([A-Za-z]{3,9}\s+\d{1,2})\s*\$\s*([0-9][0-9,]*(?:\.\d{1,2})?)',
+    r'button\s+"\s*([A-Za-z]{3,9}\s+\d{1,2})\s*[-–]\s*([A-Za-z]{3,9}\s+\d{1,2})\s*\$\s*([0-9][0-9,]*(?:\.\d{1,2})?)',  # noqa: RUF001 - pattern intentionally matches hyphen and en-dash
     re.IGNORECASE,
 )
 
@@ -48,6 +54,9 @@ _MONTHS = {
     "dec": 12,
     "december": 12,
 }
+_MONTH_DAY_PARTS = 2
+_SEASON_ROLLOVER_MONTHS = 7
+_HTTP_ERROR_STATUS = 400
 
 
 def resolve_place(
@@ -56,11 +65,12 @@ def resolve_place(
     locale: str,
     client: object | None = None,
 ) -> ResolvedPlace:
+    """Resolve a place query to an IATA code via the Kiwi API."""
     del client
     clean = " ".join(query.strip().split())
     if clean == "":
-        raise FlightLiveError("Place query must be non-empty")
-
+        message = "Place query must be non-empty"
+        raise FlightLiveError(message)
     place = _lookup_kiwi_place(clean, locale=locale)
     return ResolvedPlace(
         query=clean,
@@ -70,7 +80,7 @@ def resolve_place(
     )
 
 
-def fetch_kiwi_web_calendar(
+def fetch_kiwi_web_calendar(  # noqa: PLR0913 - public provider surface mirrors the search domain; tests pin the signature
     *,
     origin: str,
     destination: str,
@@ -83,6 +93,7 @@ def fetch_kiwi_web_calendar(
     stay_min: int | None,
     stay_max: int | None,
 ) -> list[PlannerOffer]:
+    """Fetch planner offers across the departure window via agent-browser scraping."""
     _ensure_agent_browser_available()
 
     origin_place = _lookup_kiwi_place(origin, locale=locale)
@@ -137,7 +148,7 @@ def fetch_kiwi_web_calendar(
     )
 
 
-def build_kiwi_results_url(
+def build_kiwi_results_url(  # noqa: PLR0913 - public provider surface mirrors the search domain; tests pin the signature
     *,
     origin_slug: str,
     destination_slug: str,
@@ -146,6 +157,7 @@ def build_kiwi_results_url(
     currency: str,
     market: str,
 ) -> str:
+    """Build a Kiwi search-results URL from slugs, dates, and market settings."""
     market_part = market.strip().lower()[:2] if market.strip() else "us"
     query = urlencode(
         {
@@ -164,15 +176,16 @@ def build_kiwi_results_url(
 
 
 def scrape_kiwi_snapshot_text(url: str) -> str:
+    """Scrape a Kiwi results page to snapshot text via agent-browser."""
     _ensure_agent_browser_available()
 
-    _safe_close_agent_browser()
+    _ = _safe_close_agent_browser()
     try:
-        _run_agent_browser(["open", url], timeout=150)
-        _run_agent_browser(["wait", "--load", "networkidle"], timeout=150)
+        _ = _run_agent_browser(["open", url], timeout=150)
+        _ = _run_agent_browser(["wait", "--load", "networkidle"], timeout=150)
         return _run_agent_browser(["snapshot", "-i"], timeout=150)
     finally:
-        _safe_close_agent_browser()
+        _ = _safe_close_agent_browser()
 
 
 def parse_kiwi_price_buttons(
@@ -183,6 +196,7 @@ def parse_kiwi_price_buttons(
     month_hint: date,
     include_return: bool,
 ) -> list[PlannerOffer]:
+    """Parse scraped price buttons into planner offers."""
     offers: list[PlannerOffer] = []
 
     for raw_line in snapshot_text.splitlines():
@@ -227,7 +241,7 @@ def parse_kiwi_price_buttons(
 
 def _parse_month_day(value: str, *, month_hint: date) -> date | None:
     parts = value.strip().replace(",", "").split()
-    if len(parts) != 2:
+    if len(parts) != _MONTH_DAY_PARTS:
         return None
 
     month = _MONTHS.get(parts[0].lower())
@@ -249,9 +263,9 @@ def _parse_month_day(value: str, *, month_hint: date) -> date | None:
 def _infer_year(*, month: int, month_hint: date) -> int:
     year = month_hint.year
     delta = month - month_hint.month
-    if delta <= -7:
+    if delta <= -_SEASON_ROLLOVER_MONTHS:
         return year + 1
-    if delta >= 7:
+    if delta >= _SEASON_ROLLOVER_MONTHS:
         return year - 1
     return year
 
@@ -297,24 +311,29 @@ def _lookup_kiwi_place(term: str, *, locale: str) -> dict[str, str]:
 
     payload = _http_get_json(_KIWI_LOCATIONS_URL, params=params)
     if not isinstance(payload, Mapping):
-        raise FlightLiveError("Kiwi locations endpoint returned non-object payload")
-
-    locations = payload.get("locations")
-    if not isinstance(locations, list) or len(locations) == 0:
-        raise FlightLiveError(f"Could not resolve location on Kiwi: {term}")
-
-    first = locations[0]
-    if not isinstance(first, Mapping):
-        raise FlightLiveError(f"Could not parse location payload for: {term}")
+        message = "Kiwi locations endpoint returned non-object payload"
+        raise FlightLiveError(message)
+    data = cast("Mapping[str, object]", payload)
+    locations = data.get("locations")
+    if not isinstance(locations, list) or not locations:
+        message = f"Could not resolve location on Kiwi: {term}"
+        raise FlightLiveError(message)
+    first_raw = cast("object", locations[0])
+    if not isinstance(first_raw, Mapping):
+        message = f"Could not parse location payload for: {term}"
+        raise FlightLiveError(message)
+    first = cast("Mapping[str, object]", first_raw)
 
     code = first.get("code")
     if not isinstance(code, str) or _IATA_RE.fullmatch(code) is None:
-        raise FlightLiveError(f"Could not resolve IATA code for: {term}")
+        message = f"Could not resolve IATA code for: {term}"
+        raise FlightLiveError(message)
 
     city = first.get("city")
     city_slug: str | None = None
     if isinstance(city, Mapping):
-        raw_city_slug = city.get("slug")
+        city_data = cast("Mapping[str, object]", city)
+        raw_city_slug = city_data.get("slug")
         if isinstance(raw_city_slug, str) and raw_city_slug.strip() != "":
             city_slug = raw_city_slug.strip()
 
@@ -323,7 +342,8 @@ def _lookup_kiwi_place(term: str, *, locale: str) -> dict[str, str]:
         if isinstance(fallback_slug, str) and fallback_slug.strip() != "":
             city_slug = fallback_slug.strip()
         else:
-            raise FlightLiveError(f"Could not resolve URL slug for: {term}")
+            message = f"Could not resolve URL slug for: {term}"
+            raise FlightLiveError(message)
 
     name = first.get("name")
     resolved_name = name if isinstance(name, str) and name.strip() != "" else term
@@ -338,14 +358,16 @@ def _lookup_kiwi_place(term: str, *, locale: str) -> dict[str, str]:
 @lru_cache(maxsize=1)
 def _ensure_agent_browser_available() -> None:
     if shutil.which("nix") is None:
-        raise MissingExecutableError(
+        message = (
             "Kiwi web scraper requires `nix` in PATH. Install Nix, then run: "
-            "nix run github:numtide/llm-agents.nix#agent-browser -- --version",
+            + "nix run github:numtide/llm-agents.nix#agent-browser -- --version"
         )
+        raise MissingExecutableError(message)
 
+    version_cmd = ["nix", "run", _AGENT_BROWSER_FLAKE, "--", "--version"]
     try:
-        result = subprocess.run(
-            ["nix", "run", _AGENT_BROWSER_FLAKE, "--", "--version"],
+        result = subprocess.run(  # noqa: S603 - controlled nix/agent-browser toolchain invocation
+            version_cmd,
             check=False,
             shell=False,
             capture_output=True,
@@ -353,28 +375,37 @@ def _ensure_agent_browser_available() -> None:
             timeout=90,
         )
     except FileNotFoundError as exc:
-        raise MissingExecutableError(
-            "`nix` executable is missing. Install Nix and retry.",
-        ) from exc
+        message = "`nix` executable is missing. Install Nix and retry."
+        raise MissingExecutableError(message) from exc
     except subprocess.TimeoutExpired as exc:
-        raise FlightLiveError(
-            "Timed out while validating agent-browser via nix. Check network/Nix setup, then retry.",
-        ) from exc
+        message = (
+            "Timed out while validating agent-browser via nix. "
+            + "Check network/Nix setup, then retry."
+        )
+        raise FlightLiveError(message) from exc
 
     if result.returncode != 0:
         stderr = (result.stderr or "").strip()[:240]
-        raise FlightLiveError(
+        message = (
             "agent-browser is unavailable through nix wrapper. "
-            "Run `nix run github:numtide/llm-agents.nix#agent-browser -- --version` manually. "
-            f"stderr: {stderr or 'no stderr'}",
+            + "Run `nix run github:numtide/llm-agents.nix#agent-browser "
+            + "-- --version` manually. "
+            + f"stderr: {stderr or 'no stderr'}"
         )
+        raise FlightLiveError(message)
 
 
 def _safe_close_agent_browser() -> None:
     try:
-        _run_agent_browser(["close"], timeout=45)
+        _ = _run_agent_browser(["close"], timeout=45)
     except FlightLiveError:
         return
+
+
+def _maybe_close_browser(args: list[str]) -> None:
+    """Close the browser unless the issued command already closes it."""
+    if len(args) == 0 or args[0] != "close":
+        _ = _safe_close_agent_browser()
 
 
 def _run_agent_browser(args: list[str], *, timeout: int) -> str:
@@ -383,7 +414,7 @@ def _run_agent_browser(args: list[str], *, timeout: int) -> str:
     last_error: FlightLiveError | None = None
     for attempt in range(2):
         try:
-            completed = subprocess.run(
+            completed = subprocess.run(  # noqa: S603 - controlled nix/agent-browser toolchain invocation
                 cmd,
                 check=True,
                 shell=False,
@@ -391,44 +422,50 @@ def _run_agent_browser(args: list[str], *, timeout: int) -> str:
                 text=True,
                 timeout=timeout,
             )
-            return completed.stdout
         except FileNotFoundError as exc:
-            raise MissingExecutableError(
-                "`nix` executable is missing. Install Nix and retry.",
-            ) from exc
+            message = "`nix` executable is missing. Install Nix and retry."
+            raise MissingExecutableError(message) from exc
         except subprocess.TimeoutExpired:
             last_error = FlightLiveError(
-                "agent-browser command timed out. Retry with a narrower date window or better connectivity.",
+                "agent-browser command timed out. "
+                + "Retry with a narrower date window or better connectivity."
             )
         except subprocess.CalledProcessError as exc:
-            stderr = (exc.stderr or "").strip()[:320]
-            stdout = (exc.stdout or "").strip()[:320]
-            diagnostic = stderr or stdout or "no output"
+            raw_stderr = cast("object", exc.stderr)
+            raw_stdout = cast("object", exc.stdout)
+            stderr_text = (
+                raw_stderr.strip()[:320] if isinstance(raw_stderr, str) else ""
+            )
+            stdout_text = (
+                raw_stdout.strip()[:320] if isinstance(raw_stdout, str) else ""
+            )
+            diagnostic = stderr_text or stdout_text or "no output"
             transient = "Daemon process exited during startup" in diagnostic
             last_error = FlightLiveError(
                 "agent-browser execution failed via nix wrapper. "
-                "Check `nix run github:numtide/llm-agents.nix#agent-browser -- --version` and network access. "
-                f"command={' '.join(args)}; output: {diagnostic}",
+                + "Check `nix run github:numtide/llm-agents.nix#agent-browser "
+                + "-- --version` and network access. "
+                + f"command={' '.join(args)}; output: {diagnostic}"
             )
             if not transient or attempt == 1:
                 break
-            if len(args) == 0 or args[0] != "close":
-                _safe_close_agent_browser()
-            continue
-
+            _maybe_close_browser(args)
+        else:
+            return completed.stdout
         if attempt == 0:
-            if len(args) == 0 or args[0] != "close":
-                _safe_close_agent_browser()
+            _maybe_close_browser(args)
             continue
 
     if last_error is not None:
         raise last_error
-    raise FlightLiveError("agent-browser execution failed with unknown error")
+    message = "agent-browser execution failed with unknown error"
+    raise FlightLiveError(message)
 
 
 def _http_get_json(url: str, *, params: Mapping[str, object]) -> object:
+    """Fetch a JSON document from a provider endpoint."""
     query = urlencode({key: str(value) for key, value in params.items()})
-    request = Request(
+    request = Request(  # noqa: S310 - Kiwi API client; URL is a module constant plus encoded params
         f"{url}?{query}",
         headers={
             "User-Agent": "flight-live/0.1",
@@ -437,18 +474,22 @@ def _http_get_json(url: str, *, params: Mapping[str, object]) -> object:
     )
 
     try:
-        with urlopen(request, timeout=20) as response:  # noqa: S310
-            status = getattr(response, "status", 200)
+        with urlopen(  # noqa: S310 - Kiwi API client over https
+            request, timeout=20
+        ) as raw_response:  # pyright: ignore[reportAny] - typeshed types urlopen() as Any
+            response = cast("http.client.HTTPResponse", raw_response)
+            status = cast("int", getattr(response, "status", 200))
             body = response.read().decode("utf-8", errors="replace")
     except OSError as exc:
-        raise FlightLiveError(f"Network error calling provider {url}: {exc}") from exc
+        message = f"Network error calling provider {url}: {exc}"
+        raise FlightLiveError(message) from exc
 
-    if status >= 400:
-        raise FlightLiveError(
-            f"HTTP {status} from provider {url}: {body[:200].strip()}",
-        )
+    if status >= _HTTP_ERROR_STATUS:
+        message = f"HTTP {status} from provider {url}: {body[:200].strip()}"
+        raise FlightLiveError(message)
 
     try:
-        return json.loads(body)
+        return cast("object", json.loads(body))
     except json.JSONDecodeError as exc:
-        raise FlightLiveError(f"Invalid JSON from provider {url}") from exc
+        message = f"Invalid JSON from provider {url}"
+        raise FlightLiveError(message) from exc

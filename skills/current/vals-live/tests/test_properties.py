@@ -1,14 +1,21 @@
 # Copyright 2026 Vals-live contributors.
-# ruff: noqa: D102,S101,INP001
 """Exercise generated records and unknown-field properties."""
 
 import json
 import unittest
+from typing import cast
 
 from vals_live.contracts import ParsedDocument, RawArtifact
 from vals_live.discovery import discover
 from vals_live.extraction import extract_document
 from vals_live.normalization import normalize_document_records
+
+
+def _metric_value(row: dict[str, object], metric: str) -> dict[str, object]:
+    """Return the value object of one metric field."""
+    metrics = cast("dict[str, object]", row["metrics"])
+    field = cast("dict[str, object]", metrics[metric])
+    return cast("dict[str, object]", field["value"])
 
 
 class PropertyStyleTests(unittest.TestCase):
@@ -48,7 +55,8 @@ class PropertyStyleTests(unittest.TestCase):
         catalog = discover(document)
         assert catalog.entries[0]["source_id"] == "unicode-β"
         rows, diagnostics = normalize_document_records(document)
-        assert rows[0]["raw_fields"]["future_metric"] == {
+        raw = cast("dict[str, object]", rows[0]["raw_fields"])
+        assert raw["future_metric"] == {
             "value": "17",
             "unit": "count",
         }
@@ -101,8 +109,8 @@ class PropertyStyleTests(unittest.TestCase):
         second_rows, _ = normalize_document_records(second)
         assert first_rows[0]["model_variant_id"] == second_rows[0]["model_variant_id"]
         assert (
-            first_rows[0]["metrics"]["score"]["value"]["normalized_value"]
-            == second_rows[0]["metrics"]["score"]["value"]["normalized_value"]
+            _metric_value(first_rows[0], "score")["normalized_value"]
+            == _metric_value(second_rows[0], "score")["normalized_value"]
         )
 
     def test_dynamic_category_key_survives(self) -> None:
@@ -121,7 +129,8 @@ class PropertyStyleTests(unittest.TestCase):
             }
         )
         rows, _ = normalize_document_records(document)
-        assert rows[0]["raw_fields"]["t"] == {
+        raw = cast("dict[str, object]", rows[0]["raw_fields"])
+        assert raw["t"] == {
             "value": "1%",
             "unit": "percent",
             "definition": "t",
@@ -129,4 +138,4 @@ class PropertyStyleTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

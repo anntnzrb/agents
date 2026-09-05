@@ -2,7 +2,6 @@
 # requires-python = ">=3.12"
 # dependencies = []
 # ///
-# ruff: noqa: CPY001, E402
 """Run the LiveBench CLI without installing the skill package."""
 
 from __future__ import annotations

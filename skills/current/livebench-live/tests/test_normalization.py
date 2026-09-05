@@ -21,12 +21,12 @@ def test_explicit_percent_preserves_raw_and_normalizes() -> None:
         "2026-08-09T00:00:00Z",
         "0" * 64,
         0,
-        None,
-        "snapshot",
-        False,
-        True,
-        False,
-        None,
+        raw_bytes_ref=None,
+        freshness_mode="snapshot",
+        stale=False,
+        historical=True,
+        cache_reused=False,
+        generated_at=None,
     )
     value, diagnostics = numeric_value(
         "72.4%", path="csv[row=0,column=task]", artifact=artifact, semantics="known"

@@ -8,7 +8,7 @@ import os
 import sqlite3
 from contextlib import closing
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import quote
 
 from .model import Harness, Message, Session, make_session, timestamp_from_epoch_ms
@@ -68,16 +68,28 @@ def _connect(path: Path) -> sqlite3.Connection:
     return connection
 
 
+def _rows(cursor: sqlite3.Cursor) -> Iterable[sqlite3.Row]:
+    """Iterate a row-factory cursor with precise element types."""
+    yield from cast("Iterable[sqlite3.Row]", cursor)
+
+
+def _record(row: sqlite3.Row) -> dict[str, object]:
+    """Materialize one row with a single boundary cast."""
+    # Row.__iter__ yields values, so .keys() is required for column names.
+    return {key: cast("object", row[key]) for key in row.keys()}  # noqa: SIM118
+
+
 def _columns(connection: sqlite3.Connection) -> dict[str, frozenset[str]]:
     tables = {
-        str(row[0])
-        for row in connection.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        str(_record(row)["name"])
+        for row in _rows(
+            connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
         )
     }
     return {
         table: frozenset(
-            str(row[1]) for row in connection.execute(_TABLE_INFO_QUERIES[table])
+            str(_record(row)["name"])
+            for row in _rows(connection.execute(_TABLE_INFO_QUERIES[table]))
         )
         for table in tables.intersection(_TABLE_INFO_QUERIES)
     }
@@ -147,7 +159,7 @@ def _t3_sessions(path: Path, connection: sqlite3.Connection) -> list[Session]:
     )
     sessions: list[Session] = []
     current_id: object = None
-    metadata: sqlite3.Row | None = None
+    metadata: dict[str, object] | None = None
     messages: list[Message] = []
 
     def append_current() -> None:
@@ -169,7 +181,8 @@ def _t3_sessions(path: Path, connection: sqlite3.Connection) -> list[Session]:
         if session is not None:
             sessions.append(session)
 
-    for row in rows:
+    for raw in _rows(rows):
+        row = _record(raw)
         if row["thread_id"] != current_id:
             append_current()
             current_id = row["thread_id"]
@@ -185,22 +198,27 @@ def _json_object(value: object) -> dict[str, object] | None:
     if not isinstance(value, str):
         return None
     try:
-        decoded = json.loads(value)
+        decoded = cast("object", json.loads(value))
     except (json.JSONDecodeError, UnicodeDecodeError):
         return None
     if not isinstance(decoded, dict):
         return None
-    return {str(key): item for key, item in decoded.items()}
+    raw = cast("dict[object, object]", decoded)
+    return {str(key): item for key, item in raw.items()}
 
 
 def _text_blocks(value: object) -> str:
     if not isinstance(value, list):
         return ""
+    blocks = cast("list[object]", value)
     parts: list[str] = []
-    for item in value:
-        if not isinstance(item, dict) or item.get("type") != "text":
+    for block in blocks:
+        if not isinstance(block, dict):
             continue
-        text = item.get("text")
+        mapping = cast("dict[str, object]", block)
+        if mapping.get("type") != "text":
+            continue
+        text = mapping.get("text")
         if isinstance(text, str) and text.strip():
             parts.append(text)
     return "\n".join(parts)
@@ -210,10 +228,13 @@ def _current_messages(
     connection: sqlite3.Connection, session_id: object
 ) -> list[Message]:
     messages: list[Message] = []
-    for row in connection.execute(
-        "SELECT type, data FROM session_message WHERE session_id = ? ORDER BY seq",
-        (session_id,),
+    for raw in _rows(
+        connection.execute(
+            "SELECT type, data FROM session_message WHERE session_id = ? ORDER BY seq",
+            (session_id,),
+        )
     ):
+        row = _record(raw)
         role = row["type"]
         data = _json_object(row["data"])
         if data is None:
@@ -252,7 +273,8 @@ def _legacy_messages(
         if message := _message(role, "\n".join(parts)):
             messages.append(message)
 
-    for row in rows:
+    for raw in _rows(rows):
+        row = _record(raw)
         if row["message_id"] != current_id:
             append_current()
             current_id = row["message_id"]
@@ -273,10 +295,15 @@ def _opencode_sessions(path: Path, connection: sqlite3.Connection) -> list[Sessi
     has_current = _has_schema(columns, _OPEN_CODE_CURRENT_SCHEMA)
     has_legacy = _has_schema(columns, _OPEN_CODE_LEGACY_SCHEMA)
     sessions: list[Session] = []
-    for row in connection.execute(
-        "SELECT id, directory, title, time_created, time_updated, "
-        "time_archived FROM session"
+    for raw in _rows(
+        connection.execute(
+            """
+            SELECT id, directory, title, time_created, time_updated, time_archived
+            FROM session
+            """
+        )
     ):
+        row = _record(raw)
         session_id = row["id"]
         messages = _current_messages(connection, session_id) if has_current else []
         if not messages and has_current:

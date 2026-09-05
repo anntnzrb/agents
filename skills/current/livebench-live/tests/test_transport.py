@@ -1,13 +1,18 @@
 # Copyright (c) 2026
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import pytest
-from fakes.transport import QueueOpener, Response
+from tests.fakes.transport import QueueOpener, Response
+
 from livebench.cache import CacheStore
 from livebench.contracts import SourceTarget
 from livebench.transport import FetchError, fetch_target
+
+if TYPE_CHECKING:
+    from pathlib import Path
+    from urllib.request import Request
 
 
 def test_200_then_304_reuses_exact_cache(tmp_path: Path) -> None:
@@ -29,11 +34,9 @@ def test_200_then_304_reuses_exact_cache(tmp_path: Path) -> None:
     second = fetch_target(target, CacheStore(tmp_path), opener=opener)
     assert first.body == second.body
     assert second.cache_reused
-    assert opener.requests[1].headers["If-none-match"] == '"e1"'
-    assert (
-        opener.requests[1].headers["If-modified-since"]
-        == "Sun, 09 Aug 2026 00:00:00 GMT"
-    )
+    request = cast("Request", opener.requests[1])
+    assert request.headers["If-none-match"] == '"e1"'
+    assert request.headers["If-modified-since"] == "Sun, 09 Aug 2026 00:00:00 GMT"
 
 
 def test_404_does_not_fallback(tmp_path: Path) -> None:
@@ -44,7 +47,7 @@ def test_404_does_not_fallback(tmp_path: Path) -> None:
         "https://livebench.ai/",
     )
     with pytest.raises(FetchError, match="HTTP 404"):
-        fetch_target(
+        _ = fetch_target(
             target,
             CacheStore(tmp_path),
             opener=QueueOpener(Response(b"", status=404, final_url=target.url)),

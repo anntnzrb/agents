@@ -1,9 +1,9 @@
 # Copyright 2026 Vals-live contributors.
-# ruff: noqa: D102,S101,INP001
 """Exercise deterministic catalog change classification."""
 
 import json
 import unittest
+from typing import cast
 
 from _path import FIXTURES
 from vals_live.catalog_diff import diff
@@ -13,7 +13,10 @@ class CatalogDiffTests(unittest.TestCase):
     """Verify conservative added/removed/renamed classifications."""
 
     def load(self, name: str) -> object:
-        return json.loads((FIXTURES / "catalog" / name).read_text(encoding="utf-8"))
+        return cast(
+            "object",
+            json.loads((FIXTURES / "catalog" / name).read_text(encoding="utf-8")),
+        )
 
     def test_add_remove_rename_metadata_schema(self) -> None:
         result = diff(self.load("baseline.json"), self.load("changed.json"))
@@ -43,4 +46,4 @@ class CatalogDiffTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

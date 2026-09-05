@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.10"
 # ///
-"""Autonomous Odoo 17 stack controller, test runner, linter/formatter, and PostgreSQL inspector."""
+"""Autonomous Odoo 17 stack controller, test runner, and PostgreSQL inspector."""
 
 from __future__ import annotations
 
@@ -16,13 +16,13 @@ import shutil
 import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, TypedDict, cast
 
-# ==============================================================================
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
 # CONFIGURATION & CONSTANTS
 # ==============================================================================
 
@@ -33,12 +33,12 @@ PROFILE_DIR = SCRIPT_DIR.parent / "profiles"
 CONFIG_DIR = SCRIPT_DIR.parent / "config"
 RUFF_CONFIG_PATH = CONFIG_DIR / "ruff.toml"
 
-# Network & Ports (Cero Magic Numbers)
+# Network & Ports (Zero Magic Numbers)
 DEFAULT_HTTP_PORT = int(os.environ.get("ODOO_HTTP_PORT", "8069"))
 DEFAULT_POSTGRES_PORT = int(os.environ.get("POSTGRES_PORT", "5432"))
 DEFAULT_DB_HOST = "127.0.0.1"
 DEFAULT_DB_USER = "odoo"
-DEFAULT_DB_PASS = "odoo"
+DEFAULT_DB_PASS = "odoo"  # noqa: S105 - default dev password for local container
 DEFAULT_DB_NAME = "erptech_0817"
 
 # Container Topology (Local Podman Pod)
@@ -85,9 +85,20 @@ SOURCE_ADDONS_GLOB = "odoo-*/odoo/addons"
 # Security & AST Redaction
 SECRET_TOKENS = ("passwd", "password", "token", "secret", "key")
 WRITE_HINTS = {
-    "create", "write", "unlink", "commit", "rollback",
-    "execute", "save", "update", "delete", "insert",
-    "drop", "alter", "truncate", "flush"
+    "create",
+    "write",
+    "unlink",
+    "commit",
+    "rollback",
+    "execute",
+    "save",
+    "update",
+    "delete",
+    "insert",
+    "drop",
+    "alter",
+    "truncate",
+    "flush",
 }
 
 
@@ -95,57 +106,171 @@ WRITE_HINTS = {
 # DATA MODELS & ERROR TYPES
 # ==============================================================================
 
+
 class CliError(Exception):
     """Clean domain error with exit code."""
-    def __init__(self, message: str, code: int = 1):
+
+    code: int
+
+    def __init__(self, message: str, code: int = 1) -> None:
+        """Initialize domain error with exit code."""
         super().__init__(message)
         self.code = code
 
 
 @dataclass
 class WorkflowProfile:
+    """Workflow profile configuration."""
+
     database: str
-    modules: List[str]
-    test_modules: List[str] = field(default_factory=list)
-    lint_modules: List[str] = field(default_factory=list)
+    modules: list[str]
+    test_modules: list[str] = field(default_factory=list)
+    lint_modules: list[str] = field(default_factory=list)
 
 
 @dataclass
 class WorkspaceContext:
+    """Resolved workspace context with paths and configuration."""
+
     root: Path
     config_path: Path
     config: configparser.ConfigParser
-    addons_paths: List[Path]
+    addons_paths: list[Path]
     effective_db_name: str
     runtime: Path
 
 
+class ActionInfo(TypedDict):
+    """Metadata for an AST-discovered model action."""
+
+    name: str
+    line: int
+    doc: str
+    is_write: bool
+
+
+class ModelInfo(TypedDict):
+    """Metadata for an AST-discovered Odoo model."""
+
+    module: str
+    class_name: str
+    model_name: str
+    inherit: str | list[str] | None
+    fields: dict[str, str]
+    actions: list[ActionInfo]
+    file: str
+    line: int
+
+
+class ControllerInfo(TypedDict):
+    """Metadata for an AST-discovered controller route."""
+
+    module: str
+    class_name: str
+    method: str
+    route: str
+    auth: str
+    methods: list[str]
+    file: str
+    line: int
+
+
 # ==============================================================================
-# RECURSIVE AST & SQL EXTRACTOR (ZERO REGEX)
+# RECURSIVE AST & SQL EXTRACTOR
 # ==============================================================================
+
 
 class _OdooASTVisitor(ast.NodeVisitor):
-    def __init__(self, module_name: str, file_path: str):
+    module_name: str
+    file_path: str
+    models: list[ModelInfo]
+    controllers: list[ControllerInfo]
+    _current_cls: str | None
+    _current_model_name: str | None
+    _current_inherit: str | list[str] | None
+    _current_fields: dict[str, str]
+    _current_actions: list[ActionInfo]
+    _current_is_controller: bool
+
+    def __init__(self, module_name: str, file_path: str) -> None:
+        """Initialize AST visitor for an Odoo addon."""
+        super().__init__()
         self.module_name = module_name
         self.file_path = file_path
-        self.models: List[Dict[str, Any]] = []
-        self.controllers: List[Dict[str, Any]] = []
-        self._current_cls: Optional[str] = None
-        self._current_model_name: Optional[str] = None
-        self._current_inherit: Optional[Union[str, List[str]]] = None
-        self._current_fields: Dict[str, str] = {}
-        self._current_actions: List[Dict[str, Any]] = []
+        self.models = []
+        self.controllers = []
+        self._current_cls = None
+        self._current_model_name = None
+        self._current_inherit = None
+        self._current_fields = {}
+        self._current_actions = []
         self._current_is_controller = False
 
-    def _eval_literal(self, node: ast.AST) -> Any:
+    def _eval_literal(self, node: ast.AST) -> object:
         try:
-            return ast.literal_eval(node)
-        except Exception:
+            val: object = cast("object", ast.literal_eval(node))
+        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
             if isinstance(node, ast.Constant):
-                return node.value
+                return cast("object", node.value)
             return None
+        else:
+            return val
 
-    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+    def _is_controller_class(self, node: ast.ClassDef) -> bool:
+        for base in node.bases:
+            name = getattr(base, "id", None) or getattr(base, "attr", None)
+            if name in ("Controller", "Home"):
+                return True
+        return False
+
+    def _extract_field_type(self, stmt: ast.Assign) -> str | None:
+        if not isinstance(stmt.value, ast.Call):
+            return None
+        func = stmt.value.func
+        fname = getattr(func, "attr", None) or getattr(func, "id", None)
+        if not isinstance(fname, str):
+            return None
+        valid_fields = {
+            "Char",
+            "Integer",
+            "Many2one",
+            "One2many",
+            "Many2many",
+            "Boolean",
+            "Float",
+            "Text",
+            "Html",
+            "Selection",
+            "Binary",
+            "Datetime",
+            "Date",
+            "Json",
+        }
+        if fname and (fname[0].isupper() or fname in valid_fields):
+            return fname
+        return None
+
+    def _process_assign(self, stmt: ast.Assign) -> None:
+        for target in stmt.targets:
+            if not isinstance(target, ast.Name):
+                continue
+            if target.id == "_name":
+                val = self._eval_literal(stmt.value)
+                self._current_model_name = str(val) if val is not None else None
+            elif target.id == "_inherit":
+                val = self._eval_literal(stmt.value)
+                if isinstance(val, str):
+                    self._current_inherit = val
+                elif isinstance(val, list):
+                    items = cast("list[object]", val)
+                    self._current_inherit = [str(item) for item in items]
+            else:
+                field_type = self._extract_field_type(stmt)
+                if field_type is not None:
+                    self._current_fields[target.id] = field_type
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:  # pyright: ignore[reportImplicitOverride]
+        """Inspect class definitions for Odoo models and controllers."""
         prev_cls = self._current_cls
         prev_model = self._current_model_name
         prev_inherit = self._current_inherit
@@ -158,42 +283,34 @@ class _OdooASTVisitor(ast.NodeVisitor):
         self._current_inherit = None
         self._current_fields = {}
         self._current_actions = []
-        self._current_is_controller = False
-
-        # Classify by base class names
-        for base in node.bases:
-            name = getattr(base, "id", None) or getattr(base, "attr", None)
-            if name in ("Controller", "Home"):
-                self._current_is_controller = True
+        self._current_is_controller = self._is_controller_class(node)
 
         for stmt in node.body:
             if isinstance(stmt, ast.Assign):
-                for target in stmt.targets:
-                    if isinstance(target, ast.Name):
-                        if target.id == "_name":
-                            self._current_model_name = self._eval_literal(stmt.value)
-                        elif target.id == "_inherit":
-                            self._current_inherit = self._eval_literal(stmt.value)
-                        elif isinstance(stmt.value, ast.Call):
-                            func = stmt.value.func
-                            fname = getattr(func, "attr", None) or getattr(func, "id", None)
-                            if fname and (fname[0].isupper() or fname in ("Char", "Integer", "Many2one", "One2many", "Many2many", "Boolean", "Float", "Text", "Html", "Selection", "Binary", "Datetime", "Date", "Json")):
-                                self._current_fields[target.id] = fname
+                self._process_assign(stmt)
             elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 self._inspect_method(stmt)
 
-        effective_model = self._current_model_name or (self._current_inherit if isinstance(self._current_inherit, str) else None)
+        effective_model: str | None = None
+        inherit_val: object = getattr(self, "_current_inherit", None)
+        if self._current_model_name:
+            effective_model = self._current_model_name
+        elif isinstance(inherit_val, str):
+            effective_model = inherit_val
+
         if effective_model:
-            self.models.append({
-                "module": self.module_name,
-                "class_name": node.name,
-                "model_name": effective_model,
-                "inherit": self._current_inherit,
-                "fields": self._current_fields,
-                "actions": self._current_actions,
-                "file": self.file_path,
-                "line": node.lineno,
-            })
+            self.models.append(
+                ModelInfo(
+                    module=self.module_name,
+                    class_name=node.name,
+                    model_name=effective_model,
+                    inherit=self._current_inherit,
+                    fields=self._current_fields,
+                    actions=self._current_actions,
+                    file=self.file_path,
+                    line=node.lineno,
+                )
+            )
 
         self.generic_visit(node)
 
@@ -204,65 +321,92 @@ class _OdooASTVisitor(ast.NodeVisitor):
         self._current_actions = prev_actions
         self._current_is_controller = prev_ctrl
 
-    def _inspect_method(self, node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> None:
-        routes: List[str] = []
+    def _extract_route_info(
+        self, dec: ast.AST
+    ) -> tuple[list[str], str, list[str]] | None:
+        if not isinstance(dec, ast.Call):
+            return None
+        func_name = getattr(dec.func, "attr", None) or getattr(dec.func, "id", None)
+        if func_name != "route":
+            return None
+
+        routes: list[str] = []
         auth = "user"
-        methods: List[str] = ["GET", "POST"]
+        methods: list[str] = ["GET", "POST"]
 
+        for arg in dec.args:
+            val = self._eval_literal(arg)
+            if isinstance(val, str):
+                routes.append(val)
+            elif isinstance(val, (list, tuple)):
+                items = cast("list[object] | tuple[object, ...]", val)
+                routes.extend(x for x in items if isinstance(x, str))
+
+        for kw in dec.keywords:
+            if kw.arg == "auth":
+                auth_val = self._eval_literal(kw.value)
+                auth = str(auth_val) if auth_val is not None else "user"
+            elif kw.arg == "methods":
+                m = self._eval_literal(kw.value)
+                if isinstance(m, (list, tuple)):
+                    m_items = cast("list[object] | tuple[object, ...]", m)
+                    methods = [str(x) for x in m_items]
+
+        return routes, auth, methods
+
+    def _inspect_method(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
         for dec in node.decorator_list:
-            if isinstance(dec, ast.Call):
-                func_name = getattr(dec.func, "attr", None) or getattr(dec.func, "id", None)
-                if func_name == "route":
-                    for arg in dec.args:
-                        val = self._eval_literal(arg)
-                        if isinstance(val, str):
-                            routes.append(val)
-                        elif isinstance(val, (list, tuple)):
-                            routes.extend(x for x in val if isinstance(x, str))
-                    for kw in dec.keywords:
-                        if kw.arg == "auth":
-                            auth = str(self._eval_literal(kw.value) or "user")
-                        elif kw.arg == "methods":
-                            m = self._eval_literal(kw.value)
-                            if isinstance(m, (list, tuple)):
-                                methods = [str(x) for x in m]
-
-        if routes:
-            for r in routes:
-                self.controllers.append({
-                    "module": self.module_name,
-                    "class_name": self._current_cls or "Unknown",
-                    "method": node.name,
-                    "route": r,
-                    "auth": auth,
-                    "methods": methods,
-                    "file": self.file_path,
-                    "line": node.lineno,
-                })
-            return
+            route_info = self._extract_route_info(dec)
+            if route_info is not None:
+                routes, auth, methods = route_info
+                for r in routes:
+                    self.controllers.append(
+                        ControllerInfo(
+                            module=self.module_name,
+                            class_name=self._current_cls or "Unknown",
+                            method=node.name,
+                            route=r,
+                            auth=auth,
+                            methods=methods,
+                            file=self.file_path,
+                            line=node.lineno,
+                        )
+                    )
+                return
 
         if not node.name.startswith("_") or node.name.startswith("action_"):
             doc = ast.get_docstring(node) or ""
             is_write = any(h in node.name.lower() for h in WRITE_HINTS)
-            self._current_actions.append({
-                "name": node.name,
-                "line": node.lineno,
-                "doc": doc.strip().split("\n")[0] if doc else "",
-                "is_write": is_write,
-            })
+            self._current_actions.append(
+                ActionInfo(
+                    name=node.name,
+                    line=node.lineno,
+                    doc=doc.strip().split("\n")[0] if doc else "",
+                    is_write=is_write,
+                )
+            )
 
 
 # ==============================================================================
 # SUBPROCESS & PODMAN EXECUTOR
 # ==============================================================================
 
-def _run(cmd: Sequence[str], *, cwd: Optional[Path] = None, check: bool = True, capture: bool = True, env: Optional[Dict[str, str]] = None) -> subprocess.CompletedProcess[str]:
+
+def _run(
+    cmd: Sequence[str],
+    *,
+    cwd: Path | None = None,
+    check: bool = True,
+    capture: bool = True,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Execute a subprocess command with environment and error wrapping."""
     full_env = os.environ.copy()
     if env:
         full_env.update(env)
-    
+
     try:
-        res = subprocess.run(
+        return subprocess.run(  # noqa: S603 - controlled toolchain invocation
             cmd,
             cwd=cwd,
             check=check,
@@ -271,26 +415,35 @@ def _run(cmd: Sequence[str], *, cwd: Optional[Path] = None, check: bool = True, 
             stderr=subprocess.PIPE if capture else None,
             env=full_env,
         )
-        return res
     except subprocess.CalledProcessError as err:
-        stderr_msg = err.stderr.strip() if err.stderr else ""
-        stdout_msg = err.stdout.strip() if err.stdout else ""
+        raw_stderr: object = getattr(err, "stderr", None)
+        raw_stdout: object = getattr(err, "stdout", None)
+        stderr_msg = raw_stderr.strip() if isinstance(raw_stderr, str) else ""
+        stdout_msg = raw_stdout.strip() if isinstance(raw_stdout, str) else ""
         combined = f"{stderr_msg}\n{stdout_msg}".strip()
-        raise CliError(f"command failed (exit code {err.returncode}): {' '.join(cmd)}\n{combined}", code=err.returncode)
-    except FileNotFoundError:
-        raise CliError(f"binary not found: {cmd[0]}", code=127)
+        msg = (
+            f"command failed (exit code {err.returncode}): {' '.join(cmd)}\n{combined}"
+        )
+        raise CliError(msg, code=err.returncode) from err
+    except FileNotFoundError as err:
+        msg = f"binary not found: {cmd[0]}"
+        raise CliError(msg, code=127) from err
 
 
 def _ensure_podman() -> None:
+    """Validate that podman binary is available in PATH."""
     if not shutil.which("podman"):
-        raise CliError("Podman binary not found. Please install podman.", code=127)
+        msg = "Podman binary not found. Please install podman."
+        raise CliError(msg, code=127)
 
 
 # ==============================================================================
 # RUNTIME, WORKSPACE & PROFILE DISCOVERY
 # ==============================================================================
 
+
 def _resolve_runtime() -> Path:
+    """Resolve Odoo runtime directory path."""
     env_runtime = os.environ.get("ODOO_RUNTIME_PATH")
     if env_runtime:
         p = Path(env_runtime).resolve()
@@ -303,18 +456,24 @@ def _resolve_runtime() -> Path:
 
 
 def _resolve_addons() -> Path:
+    """Resolve custom addons directory path."""
     env_addons = os.environ.get("ODOO_ADDONS_PATH")
     if env_addons:
         p = Path(env_addons).resolve()
         if p.is_dir():
             return p
-    for candidate in (Path.home() / "repos/etech/odoo/addons", Path.cwd() / "addons", Path.cwd()):
+    for candidate in (
+        Path.home() / "repos/etech/odoo/addons",
+        Path.cwd() / "addons",
+        Path.cwd(),
+    ):
         if candidate.is_dir():
             return candidate
     return Path.cwd()
 
 
-def _resolve_source_addons(runtime: Path) -> List[Path]:
+def _resolve_source_addons(runtime: Path) -> list[Path]:
+    """Resolve upstream source addons paths."""
     source_dir = runtime / ODOO_SOURCE_SUBPATH
     if not source_dir.is_dir():
         return []
@@ -322,21 +481,23 @@ def _resolve_source_addons(runtime: Path) -> List[Path]:
     return [m for m in matches if m.is_dir()]
 
 
-def _parse_manifest(manifest_path: Path) -> Dict[str, Any]:
+def _parse_manifest(manifest_path: Path) -> dict[str, object]:
+    """Parse an Odoo __manifest__.py file safely using AST literal evaluation."""
     if not manifest_path.is_file():
         return {}
     try:
         content = manifest_path.read_text(encoding="utf-8")
-        parsed = ast.literal_eval(content)
+        parsed: object = cast("object", ast.literal_eval(content))
         if isinstance(parsed, dict):
-            return parsed
-    except Exception:
+            return cast("dict[str, object]", parsed)
+    except (ValueError, TypeError, SyntaxError, OSError):
         pass
     return {}
 
 
-def _discover_all_modules(addons_dir: Path) -> Dict[str, Dict[str, Any]]:
-    modules: Dict[str, Dict[str, Any]] = {}
+def _discover_all_modules(addons_dir: Path) -> dict[str, dict[str, object]]:
+    """Discover all installable Odoo modules in the given directory."""
+    modules: dict[str, dict[str, object]] = {}
     if not addons_dir.is_dir():
         return modules
 
@@ -362,13 +523,14 @@ def _discover_all_modules(addons_dir: Path) -> Dict[str, Dict[str, Any]]:
 
 
 def _resolve_workspace() -> WorkspaceContext:
+    """Resolve current workspace context, config, and addons paths."""
     runtime = _resolve_runtime()
     addons = _resolve_addons()
     config_path = runtime / ODOO_CONFIG_SUBPATH
 
     config = configparser.ConfigParser()
     if config_path.is_file():
-        config.read(config_path)
+        _ = config.read(config_path)
 
     raw_db = config.get("options", "db_name", fallback=DEFAULT_DB_NAME)
     if raw_db in ("False", "None", ""):
@@ -390,48 +552,82 @@ def _resolve_workspace() -> WorkspaceContext:
 
 
 def _load_workflow_profile(profile: str, workflow: str) -> WorkflowProfile:
+    """Load and parse workflow profile from JSON configuration."""
     pfile = PROFILE_DIR / f"{profile}.json"
     if not pfile.is_file():
-        raise CliError(f"workflow profile not found: {pfile}")
-    
-    data = json.loads(pfile.read_text(encoding="utf-8"))
-    wf = data.get("workflows", {}).get(workflow)
-    if not wf:
-        available = list(data.get("workflows", {}).keys())
-        raise CliError(f"workflow {workflow!r} not found in profile {profile!r}. Available workflows: {available}")
-    
-    db = wf.get("database")
-    if not db or db == "False":
-        db = DEFAULT_DB_NAME
+        msg = f"workflow profile not found: {pfile}"
+        raise CliError(msg)
 
-    mods = list(wf.get("modules", []))
+    data_raw: object = cast("object", json.loads(pfile.read_text(encoding="utf-8")))
+    data = cast("dict[str, object]", data_raw) if isinstance(data_raw, dict) else {}
+    workflows_obj = data.get("workflows")
+    workflows = (
+        cast("dict[str, object]", workflows_obj)
+        if isinstance(workflows_obj, dict)
+        else {}
+    )
+    wf_obj = workflows.get(workflow)
+    if not isinstance(wf_obj, dict):
+        available = list(workflows.keys())
+        msg = (
+            f"workflow {workflow!r} not found in profile {profile!r}. "
+            f"Available workflows: {available}"
+        )
+        raise CliError(msg)
+
+    wf = cast("dict[str, object]", wf_obj)
+    db_val = wf.get("database")
+    db = str(db_val) if db_val and str(db_val) != "False" else DEFAULT_DB_NAME
+
+    raw_mods: object = wf.get("modules")
+    mods = (
+        [str(m) for m in cast("list[object]", raw_mods)]
+        if isinstance(raw_mods, list)
+        else []
+    )
     for dep in ("admin_units", "contact_extension"):
         if dep not in mods and (_resolve_addons() / dep).is_dir():
             mods.append(dep)
 
-    lint_mods = wf.get("lint_modules", wf.get("test_modules", wf.get("modules", [])))
+    raw_tests: object = wf.get("test_modules")
+    test_mods = (
+        [str(m) for m in cast("list[object]", raw_tests)]
+        if isinstance(raw_tests, list)
+        else mods
+    )
+
+    raw_lint_val: object = wf.get("lint_modules")
+    if isinstance(raw_lint_val, list):
+        lint_mods = [str(m) for m in cast("list[object]", raw_lint_val)]
+    elif raw_tests is not None:
+        lint_mods = test_mods
+    else:
+        lint_mods = mods
 
     return WorkflowProfile(
         database=db,
         modules=mods,
-        test_modules=wf.get("test_modules", mods),
+        test_modules=test_mods,
         lint_modules=lint_mods,
     )
 
 
-def _resolve_target_paths(target: str, profile_name: str = "etech", *, for_lint: bool = False) -> List[Path]:
+def _resolve_target_paths(
+    target: str, profile_name: str = "etech", *, for_lint: bool = False
+) -> list[Path]:
+    """Resolve target module paths from single module name or profile workflow."""
     addons = _resolve_addons()
-    
+
     # 1. Single module direct directory check
     mod_path = addons / target
     if mod_path.is_dir():
         return [mod_path]
-    
+
     # 2. Workflow resolution in profile
     try:
         profile = _load_workflow_profile(profile_name, target)
         mods_to_use = profile.lint_modules if for_lint else profile.test_modules
-        resolved: List[Path] = []
+        resolved: list[Path] = []
         for m in mods_to_use:
             p = addons / m
             if p.is_dir():
@@ -440,127 +636,226 @@ def _resolve_target_paths(target: str, profile_name: str = "etech", *, for_lint:
             return resolved
     except CliError:
         pass
-    
-    raise CliError(f"Target {target!r} is neither a local addon directory in {addons} nor a valid workflow in profile {profile_name!r}")
+
+    msg = (
+        f"Target {target!r} is neither a local addon directory in {addons} "
+        f"nor a valid workflow in profile {profile_name!r}"
+    )
+    raise CliError(msg)
 
 
 # ==============================================================================
 # POSTGRESQL INTROSPECTION & POD INTERACTION
 # ==============================================================================
 
+
 def _exec_sql(sql: str, *, db: str = DEFAULT_DB_NAME) -> str:
+    """Execute SQL statement via podman psql container."""
     _ensure_podman()
     cmd = [
-        "podman", "exec", "-i", DEFAULT_DB_CONTAINER,
-        "psql", "-U", DEFAULT_DB_USER, "-d", db, "-q", "-X",
-        "-c", sql
+        "podman",
+        "exec",
+        "-i",
+        DEFAULT_DB_CONTAINER,
+        "psql",
+        "-U",
+        DEFAULT_DB_USER,
+        "-d",
+        db,
+        "-q",
+        "-X",
+        "-c",
+        sql,
     ]
     res = _run(cmd, check=True)
     return res.stdout
 
 
-def _exec_sql_json(sql: str, *, db: str = DEFAULT_DB_NAME) -> List[Dict[str, Any]]:
-    wrapped = f"SELECT json_agg(t) FROM ({sql}) t;"
+def _exec_sql_json(sql: str, *, db: str = DEFAULT_DB_NAME) -> list[dict[str, object]]:
+    """Execute SQL query returning rows as a JSON list of dictionaries."""
+    wrapped = f"SELECT json_agg(t) FROM ({sql}) t;"  # noqa: S608 - internal JSON aggregation wrapper
     raw = _exec_sql(wrapped, db=db).strip()
     match = re.search(r"(\[.*\])", raw, re.DOTALL)
     if match:
         try:
-            return json.loads(match.group(1))
-        except Exception:
+            parsed: object = cast("object", json.loads(match.group(1)))
+            if isinstance(parsed, list):
+                items = cast("list[object]", parsed)
+                return [
+                    cast("dict[str, object]", item)
+                    for item in items
+                    if isinstance(item, dict)
+                ]
+        except (json.JSONDecodeError, ValueError):
             pass
     return []
+
+
+# ==============================================================================
+# TYPED ARGPARSE HELPERS
+# ==============================================================================
+
+
+def _require_str(args: argparse.Namespace, key: str, default: str = "") -> str:
+    """Extract required string from argparse namespace."""
+    val: object = getattr(args, key, default)
+    return str(val) if val is not None else default
+
+
+def _optional_str(args: argparse.Namespace, key: str) -> str | None:
+    """Extract optional string from argparse namespace."""
+    val: object = getattr(args, key, None)
+    return str(val) if val is not None else None
+
+
+def _require_bool(args: argparse.Namespace, key: str, default: bool = False) -> bool:
+    """Extract boolean flag from argparse namespace."""
+    val: object = getattr(args, key, default)
+    return bool(val)
+
+
+def _require_int(args: argparse.Namespace, key: str, default: int = 0) -> int:
+    """Extract integer value from argparse namespace."""
+    val: object = getattr(args, key, default)
+    return int(val) if isinstance(val, (int, str)) else default
 
 
 # ==============================================================================
 # PODMAN RUNTIME ENGINE (START, STOP, DEV, TEST)
 # ==============================================================================
 
-def _get_pod_status(pod_name: str = DEFAULT_POD_NAME) -> Optional[str]:
+
+def _get_pod_status(pod_name: str = DEFAULT_POD_NAME) -> str | None:
+    """Check status of podman pod."""
     _ensure_podman()
-    res = _run(["podman", "pod", "ps", "--filter", f"name={pod_name}", "--format", "{{.Status}}"], check=False)
+    res = _run(
+        [
+            "podman",
+            "pod",
+            "ps",
+            "--filter",
+            f"name={pod_name}",
+            "--format",
+            "{{.Status}}",
+        ],
+        check=False,
+    )
     out = res.stdout.strip()
-    return out if out else None
+    return out or None
 
 
 def _ensure_runtime_pod(ctx: WorkspaceContext, *, recreate: bool = False) -> None:
+    """Ensure podman pod and postgres database container are initialized and running."""
     _ensure_podman()
     status = _get_pod_status()
     if recreate and status:
-        _stop_all(ctx)
+        _stop_all()
         status = None
 
     if not status:
         # Create shared network Pod
-        _run([
-            "podman", "pod", "create",
-            "--name", DEFAULT_POD_NAME,
-            "-p", f"{DEFAULT_HTTP_PORT}:8069",
-            "-p", f"127.0.0.1:{DEFAULT_POSTGRES_PORT}:5432",
-        ])
+        _ = _run(
+            [
+                "podman",
+                "pod",
+                "create",
+                "--name",
+                DEFAULT_POD_NAME,
+                "-p",
+                f"{DEFAULT_HTTP_PORT}:8069",
+                "-p",
+                f"127.0.0.1:{DEFAULT_POSTGRES_PORT}:5432",
+            ]
+        )
 
     # Ensure Database Container
-    db_status = _run(["podman", "ps", "-a", "--filter", f"name={DEFAULT_DB_CONTAINER}", "--format", "{{.Status}}"], check=False).stdout.strip()
+    db_status = _run(
+        [
+            "podman",
+            "ps",
+            "-a",
+            "--filter",
+            f"name={DEFAULT_DB_CONTAINER}",
+            "--format",
+            "{{.Status}}",
+        ],
+        check=False,
+    ).stdout.strip()
     if not db_status:
         db_dir = ctx.runtime / ODOO_DATA_DB_SUBPATH
         db_dir.mkdir(parents=True, exist_ok=True)
-        _run([
-            "podman", "run", "-d",
-            "--pod", DEFAULT_POD_NAME,
-            "--name", DEFAULT_DB_CONTAINER,
-            "-e", f"POSTGRES_USER={DEFAULT_DB_USER}",
-            "-e", f"POSTGRES_PASSWORD={DEFAULT_DB_PASS}",
-            "-e", f"POSTGRES_DB={DEFAULT_DB_NAME}",
-            "-v", f"{db_dir}:/var/lib/postgresql/data/pgdata:Z",
-            "-e", "PGDATA=/var/lib/postgresql/data/pgdata/pgroot",
-            DEFAULT_POSTGRES_IMAGE,
-        ])
+        _ = _run(
+            [
+                "podman",
+                "run",
+                "-d",
+                "--pod",
+                DEFAULT_POD_NAME,
+                "--name",
+                DEFAULT_DB_CONTAINER,
+                "-e",
+                f"POSTGRES_USER={DEFAULT_DB_USER}",
+                "-e",
+                f"POSTGRES_PASSWORD={DEFAULT_DB_PASS}",
+                "-e",
+                f"POSTGRES_DB={DEFAULT_DB_NAME}",
+                "-v",
+                f"{db_dir}:/var/lib/postgresql/data/pgdata:Z",
+                "-e",
+                "PGDATA=/var/lib/postgresql/data/pgdata/pgroot",
+                DEFAULT_POSTGRES_IMAGE,
+            ]
+        )
         time.sleep(2)
     elif "Up" not in db_status:
-        _run(["podman", "start", DEFAULT_DB_CONTAINER])
+        _ = _run(["podman", "start", DEFAULT_DB_CONTAINER])
         time.sleep(1)
 
 
-def _wait_for_http(url: str, timeout_sec: int = 30) -> bool:
-    start = time.time()
-    while time.time() - start < timeout_sec:
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "odooctl-probe"})
-            with urllib.request.urlopen(req, timeout=2) as resp:
-                if resp.status in (200, 303, 404):
-                    return True
-        except (urllib.error.HTTPError, urllib.error.URLError):
-            pass
-        time.sleep(0.5)
-    return False
-
-
-def _stop_all(ctx: WorkspaceContext) -> None:
+def _stop_all() -> None:
+    """Stop and remove all Odoo stack containers and the pod."""
     _ensure_podman()
     for name in (DEFAULT_WEB_CONTAINER, DEFAULT_DB_CONTAINER):
-        _run(["podman", "rm", "-f", name], check=False)
-    _run(["podman", "pod", "rm", "-f", DEFAULT_POD_NAME], check=False)
+        _ = _run(["podman", "rm", "-f", name], check=False)
+    _ = _run(["podman", "pod", "rm", "-f", DEFAULT_POD_NAME], check=False)
 
 
 def cmd_stop(args: argparse.Namespace) -> int:
-    ctx = _resolve_workspace()
-    _stop_all(ctx)
-    if args.json:
-        print(json.dumps({"status": "stopped", "pod": DEFAULT_POD_NAME, "containers": [DEFAULT_WEB_CONTAINER, DEFAULT_DB_CONTAINER]}))
+    """Stop all running Odoo and Postgres containers and remove the pod."""
+    _ = _resolve_workspace()
+    _stop_all()
+    json_mode = _require_bool(args, "json")
+    if json_mode:
+        print(
+            json.dumps(
+                {
+                    "status": "stopped",
+                    "pod": DEFAULT_POD_NAME,
+                    "containers": [DEFAULT_WEB_CONTAINER, DEFAULT_DB_CONTAINER],
+                }
+            )
+        )
     else:
         print(f"Odoo stack ({DEFAULT_POD_NAME}) stopped and cleaned up.")
     return 0
 
 
 def cmd_dev(args: argparse.Namespace) -> int:
+    """Start Odoo 17 dev server in foreground with hot reload enabled."""
     ctx = _resolve_workspace()
-    profile = _load_workflow_profile(args.profile, args.workflow)
-    
-    _ensure_runtime_pod(ctx)
-    
-    # Remove prior web container if hanging
-    _run(["podman", "rm", "-f", DEFAULT_WEB_CONTAINER], check=False)
+    profile_name = _require_str(args, "profile", "etech")
+    workflow = _require_str(args, "workflow", "crm")
+    profile = _load_workflow_profile(profile_name, workflow)
 
-    source_dir = list(ctx.runtime.glob("source/odoo-*"))[0]
+    _ensure_runtime_pod(ctx)
+
+    # Remove prior web container if hanging
+    _ = _run(["podman", "rm", "-f", DEFAULT_WEB_CONTAINER], check=False)
+
+    source_matches = list(ctx.runtime.glob("source/odoo-*"))
+    source_dir = (
+        source_matches[0] if source_matches else ctx.runtime / "source/odoo-17.0"
+    )
     addons_mount = ctx.root
     config_mount = ctx.runtime / "config"
     data_web = ctx.runtime / "data/web"
@@ -569,43 +864,70 @@ def cmd_dev(args: argparse.Namespace) -> int:
     modules_str = ",".join(profile.modules)
 
     cmd = [
-        "podman", "run", "-it" if sys.stdin.isatty() else "-i",
-        "--pod", DEFAULT_POD_NAME,
-        "--name", DEFAULT_WEB_CONTAINER,
-        "-e", "PYTHONPATH=/mnt/odoo-src",
-        "-e", f"HOST={DEFAULT_DB_HOST}",
-        "-e", f"PORT={DEFAULT_POSTGRES_PORT}",
-        "-e", f"USER={DEFAULT_DB_USER}",
-        "-e", f"PASSWORD={DEFAULT_DB_PASS}",
-        "-v", f"{source_dir}:/mnt/odoo-src:ro,z",
-        "-v", f"{addons_mount}:/mnt/custom-addons:z",
-        "-v", f"{config_mount}:/etc/odoo:ro,z",
-        "-v", f"{data_web}:/var/lib/odoo:z",
+        "podman",
+        "run",
+        "-it" if sys.stdin.isatty() else "-i",
+        "--pod",
+        DEFAULT_POD_NAME,
+        "--name",
+        DEFAULT_WEB_CONTAINER,
+        "-e",
+        "PYTHONPATH=/mnt/odoo-src",
+        "-e",
+        f"HOST={DEFAULT_DB_HOST}",
+        "-e",
+        f"PORT={DEFAULT_POSTGRES_PORT}",
+        "-e",
+        f"USER={DEFAULT_DB_USER}",
+        "-e",
+        f"PASSWORD={DEFAULT_DB_PASS}",
+        "-v",
+        f"{source_dir}:/mnt/odoo-src:ro,z",
+        "-v",
+        f"{addons_mount}:/mnt/custom-addons:z",
+        "-v",
+        f"{config_mount}:/etc/odoo:ro,z",
+        "-v",
+        f"{data_web}:/var/lib/odoo:z",
         DEFAULT_ODOO_IMAGE,
-        "python3", "-m", "odoo",
-        "-c", "/etc/odoo/odoo.conf",
-        "-d", profile.database,
-        "--db_host", DEFAULT_DB_HOST,
-        "--db_port", str(DEFAULT_POSTGRES_PORT),
-        "--db_user", DEFAULT_DB_USER,
-        "--db_password", DEFAULT_DB_PASS,
+        "python3",
+        "-m",
+        "odoo",
+        "-c",
+        "/etc/odoo/odoo.conf",
+        "-d",
+        profile.database,
+        "--db_host",
+        DEFAULT_DB_HOST,
+        "--db_port",
+        str(DEFAULT_POSTGRES_PORT),
+        "--db_user",
+        DEFAULT_DB_USER,
+        "--db_password",
+        DEFAULT_DB_PASS,
         DEV_MODE_FLAGS,
     ]
 
     if modules_str:
         cmd.extend(["-i", modules_str, "-u", modules_str])
     try:
-        print(f"Starting Odoo 17 dev server on http://localhost:{DEFAULT_HTTP_PORT} (db: {profile.database})")
+        banner = (
+            f"Starting Odoo 17 dev server on http://localhost:{DEFAULT_HTTP_PORT} "
+            f"(db: {profile.database})"
+        )
+        print(banner)
         print(f"Modules: {modules_str}")
         print("Press Ctrl+C to stop.\n")
-        subprocess.run(cmd, check=False)
+        _ = subprocess.run(  # noqa: S603 - controlled podman dev execution
+            cmd, check=False
+        )
     finally:
-        _run(["podman", "rm", "-f", DEFAULT_WEB_CONTAINER], check=False)
+        _ = _run(["podman", "rm", "-f", DEFAULT_WEB_CONTAINER], check=False)
     return 0
 
 
-def _evaluate_odoo_test_result(exit_code: int, output: str) -> Tuple[bool, List[str]]:
-    """Accurately evaluate Odoo 17 test run result without false positives on expected log errors."""
+def _evaluate_odoo_test_result(exit_code: int, output: str) -> tuple[bool, list[str]]:
+    """Accurately evaluate Odoo test run result against failure signatures."""
     summary_lines = [
         line
         for line in output.splitlines()
@@ -620,8 +942,12 @@ def _evaluate_odoo_test_result(exit_code: int, output: str) -> Tuple[bool, List[
     has_test_failures = (
         exit_code != 0
         or "At least one test failed" in output
-        or any(re.search(r"\b[1-9]\d*\s+failed\b", line) for line in output.splitlines())
-        or any(re.search(r"\b[1-9]\d*\s+failures?\b", line) for line in output.splitlines())
+        or any(
+            re.search(r"\b[1-9]\d*\s+failed\b", line) for line in output.splitlines()
+        )
+        or any(
+            re.search(r"\b[1-9]\d*\s+failures?\b", line) for line in output.splitlines()
+        )
         or any(
             re.search(r"\b[1-9]\d*\s+errors?\b", line)
             for line in output.splitlines()
@@ -636,197 +962,274 @@ def _evaluate_odoo_test_result(exit_code: int, output: str) -> Tuple[bool, List[
     return has_passed, summary_lines
 
 
-def cmd_test(args: argparse.Namespace) -> int:
-    ctx = _resolve_workspace()
-
-    # 1. Resolve Target Modules
-    target = args.target
-    profile_name = args.profile
-
-    db_to_use = ctx.effective_db_name
-    test_tags: List[str] = []
-
-    # Check if target is a module directory
-    mod_path = ctx.root / target
-    if mod_path.is_dir():
-        test_tags.append(f"/{target}")
-        update_mods = [target]
-    else:
-        profile = _load_workflow_profile(profile_name, target)
-        db_to_use = profile.database
-        update_mods = profile.test_modules
-        for m in profile.test_modules:
-            test_tags.append(f"/{m}")
-
-    _ensure_runtime_pod(ctx)
-
-    # Clean up any stale test containers from previous interrupted runs
+def _cleanup_stale_test_containers() -> None:
+    """Clean up any leftover test containers from previously interrupted runs."""
     stale_check = _run(
         ["podman", "ps", "-a", "--filter", "name=odoo-test-", "--format", "{{.Names}}"],
         check=False,
     )
     for stale in stale_check.stdout.splitlines():
-        stale = stale.strip()
-        if stale and stale.startswith("odoo-test-"):
-            _run(["podman", "rm", "-f", stale], check=False)
+        stale_name = stale.strip()
+        if stale_name.startswith("odoo-test-"):
+            _ = _run(["podman", "rm", "-f", stale_name], check=False)
 
-    source_dir = list(ctx.runtime.glob("source/odoo-*"))[0]
+
+def _resolve_test_targets(
+    ctx: WorkspaceContext, target: str, profile_name: str
+) -> tuple[str, list[str], list[str]]:
+    """Resolve database, test tags, and update modules for test execution."""
+    mod_path = ctx.root / target
+    if mod_path.is_dir():
+        return ctx.effective_db_name, [f"/{target}"], [target]
+
+    profile = _load_workflow_profile(profile_name, target)
+    test_tags = [f"/{m}" for m in profile.test_modules]
+    return profile.database, test_tags, profile.test_modules
+
+
+def _build_test_cmd(
+    ctx: WorkspaceContext,
+    container_name: str,
+    db_to_use: str,
+    tags_str: str,
+    update_str: str,
+) -> list[str]:
+    """Construct podman run command for unit test runner."""
+    source_matches = list(ctx.runtime.glob("source/odoo-*"))
+    source_dir = (
+        source_matches[0] if source_matches else ctx.runtime / "source/odoo-17.0"
+    )
     addons_mount = ctx.root
     config_mount = ctx.runtime / "config"
     data_web = ctx.runtime / "data/web"
     data_web.mkdir(parents=True, exist_ok=True)
 
-    tags_str = ",".join(test_tags)
-    update_str = ",".join(update_mods)
-
-    container_test_name = f"odoo-test-{int(time.time())}"
-
     cmd = [
-        "podman", "run", "--rm", "-i",
-        "--pod", DEFAULT_POD_NAME,
-        "--name", container_test_name,
-        "-e", "PYTHONPATH=/mnt/odoo-src",
-        "-e", f"HOST={DEFAULT_DB_HOST}",
-        "-e", f"PORT={DEFAULT_POSTGRES_PORT}",
-        "-e", f"USER={DEFAULT_DB_USER}",
-        "-e", f"PASSWORD={DEFAULT_DB_PASS}",
-        "-v", f"{source_dir}:/mnt/odoo-src:ro,z",
-        "-v", f"{addons_mount}:/mnt/custom-addons:z",
-        "-v", f"{config_mount}:/etc/odoo:ro,z",
-        "-v", f"{data_web}:/var/lib/odoo:z",
+        "podman",
+        "run",
+        "--rm",
+        "-i",
+        "--pod",
+        DEFAULT_POD_NAME,
+        "--name",
+        container_name,
+        "-e",
+        "PYTHONPATH=/mnt/odoo-src",
+        "-e",
+        f"HOST={DEFAULT_DB_HOST}",
+        "-e",
+        f"PORT={DEFAULT_POSTGRES_PORT}",
+        "-e",
+        f"USER={DEFAULT_DB_USER}",
+        "-e",
+        f"PASSWORD={DEFAULT_DB_PASS}",
+        "-v",
+        f"{source_dir}:/mnt/odoo-src:ro,z",
+        "-v",
+        f"{addons_mount}:/mnt/custom-addons:z",
+        "-v",
+        f"{config_mount}:/etc/odoo:ro,z",
+        "-v",
+        f"{data_web}:/var/lib/odoo:z",
         DEFAULT_ODOO_IMAGE,
-        "python3", "-m", "odoo",
-        "-c", "/etc/odoo/odoo.conf",
-        "-d", db_to_use,
-        "--db_host", DEFAULT_DB_HOST,
-        "--db_port", str(DEFAULT_POSTGRES_PORT),
-        "--db_user", DEFAULT_DB_USER,
-        "--db_password", DEFAULT_DB_PASS,
+        "python3",
+        "-m",
+        "odoo",
+        "-c",
+        "/etc/odoo/odoo.conf",
+        "-d",
+        db_to_use,
+        "--db_host",
+        DEFAULT_DB_HOST,
+        "--db_port",
+        str(DEFAULT_POSTGRES_PORT),
+        "--db_user",
+        DEFAULT_DB_USER,
+        "--db_password",
+        DEFAULT_DB_PASS,
         "--test-enable",
         f"--test-tags={tags_str}",
         "--stop-after-init",
         "--log-level=test",
     ]
-
     if update_str:
         cmd.extend(["-i", update_str, "-u", update_str])
+    return cmd
 
-    header_msg = f"Running isolated Odoo unit tests for {target} (tags: {tags_str}, db: {db_to_use})...\n"
-    if args.json:
-        sys.stderr.write(header_msg)
-        sys.stderr.flush()
-    else:
-        sys.stdout.write(header_msg)
-        sys.stdout.flush()
 
-    output_lines: List[str] = []
-    exit_code = 1
+def _stream_test_output(proc: subprocess.Popen[str], *, json_mode: bool) -> list[str]:
+    """Stream process stdout to appropriate descriptor and collect lines."""
+    output_lines: list[str] = []
+    if proc.stdout is not None:
+        raw_stream = cast("object", proc.stdout)
+        iterator = cast("Iterable[object]", raw_stream)
+        for raw_line in iterator:
+            line = str(raw_line)
+            output_lines.append(line)
+            if json_mode:
+                _ = sys.stderr.write(line)
+                _ = sys.stderr.flush()
+            else:
+                _ = sys.stdout.write(line)
+                _ = sys.stdout.flush()
+    return output_lines
+
+
+def _run_test_process(
+    cmd: list[str], container_test_name: str, *, json_mode: bool
+) -> tuple[int, str]:
+    """Execute test container process with live output streaming and cleanup."""
     try:
-        proc = subprocess.Popen(
+        proc = subprocess.Popen(  # noqa: S603 - controlled podman test execution
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
         )
-        if proc.stdout:
-            for line in proc.stdout:
-                output_lines.append(line)
-                if args.json:
-                    sys.stderr.write(line)
-                    sys.stderr.flush()
-                else:
-                    sys.stdout.write(line)
-                    sys.stdout.flush()
+        output_lines = _stream_test_output(proc, json_mode=json_mode)
         exit_code = proc.wait()
     except KeyboardInterrupt:
-        if args.json:
-            sys.stderr.write(f"\n[INTERRUPT] Cancelling test container {container_test_name}...\n")
-            sys.stderr.flush()
+        msg = f"\n[INTERRUPT] Cancelling test container {container_test_name}...\n"
+        if json_mode:
+            _ = sys.stderr.write(msg)
+            _ = sys.stderr.flush()
         else:
-            sys.stdout.write(f"\n[INTERRUPT] Cancelling test container {container_test_name}...\n")
-            sys.stdout.flush()
-        _run(["podman", "stop", "-t", "2", container_test_name], check=False)
+            _ = sys.stdout.write(msg)
+            _ = sys.stdout.flush()
+        _ = _run(["podman", "stop", "-t", "2", container_test_name], check=False)
         raise
     finally:
-        _run(["podman", "rm", "-f", container_test_name], check=False)
+        _ = _run(["podman", "rm", "-f", container_test_name], check=False)
 
-    output = "".join(output_lines)
+    return exit_code, "".join(output_lines)
+
+
+def cmd_test(args: argparse.Namespace) -> int:
+    """Run isolated Odoo 17 unit tests for a module or workflow."""
+    ctx = _resolve_workspace()
+    target = _require_str(args, "target", "crm")
+    profile_name = _require_str(args, "profile", "etech")
+    json_mode = _require_bool(args, "json")
+
+    db_to_use, test_tags, update_mods = _resolve_test_targets(ctx, target, profile_name)
+    _ensure_runtime_pod(ctx)
+    _cleanup_stale_test_containers()
+
+    tags_str = ",".join(test_tags)
+    update_str = ",".join(update_mods)
+    container_test_name = f"odoo-test-{int(time.time())}"
+
+    cmd = _build_test_cmd(ctx, container_test_name, db_to_use, tags_str, update_str)
+
+    header_msg = (
+        f"Running isolated Odoo unit tests for {target} "
+        f"(tags: {tags_str}, db: {db_to_use})...\n"
+    )
+    if json_mode:
+        _ = sys.stderr.write(header_msg)
+        _ = sys.stderr.flush()
+    else:
+        _ = sys.stdout.write(header_msg)
+        _ = sys.stdout.flush()
+
+    exit_code, output = _run_test_process(cmd, container_test_name, json_mode=json_mode)
     is_success, summary_lines = _evaluate_odoo_test_result(exit_code, output)
 
-    if args.json:
-        print(json.dumps({
-            "target": target,
-            "database": db_to_use,
-            "exit_code": exit_code,
-            "success": is_success,
-            "summary": summary_lines,
-            "output": output,
-        }))
+    if json_mode:
+        print(
+            json.dumps(
+                {
+                    "target": target,
+                    "database": db_to_use,
+                    "exit_code": exit_code,
+                    "success": is_success,
+                    "summary": summary_lines,
+                    "output": output,
+                }
+            )
+        )
+    elif is_success:
+        print("\n[OK] All Odoo unit tests passed successfully.")
     else:
-        if is_success:
-            print("\n[OK] All Odoo unit tests passed successfully.")
-        else:
-            print("\n[FAIL] Test run failed.")
+        print("\n[FAIL] Test run failed.")
 
     return 0 if is_success else (exit_code if exit_code != 0 else 1)
 
+
 def cmd_lint(args: argparse.Namespace) -> int:
-    target_paths = _resolve_target_paths(args.target, args.profile, for_lint=True)
-    
-    cmd = [
-        "uvx", "ruff", "check",
-    ]
+    """Run Ruff linter on profile lint_modules or target."""
+    target = _require_str(args, "target", "crm")
+    profile = _require_str(args, "profile", "etech")
+    fix = _require_bool(args, "fix")
+    json_mode = _require_bool(args, "json")
+    target_paths = _resolve_target_paths(target, profile, for_lint=True)
+
+    cmd = ["uvx", "ruff", "check"]
     if RUFF_CONFIG_PATH.is_file():
         cmd.extend(["--config", str(RUFF_CONFIG_PATH)])
-    
-    if args.fix:
+
+    if fix:
         cmd.append("--fix")
-    
-    if args.json:
+
+    if json_mode:
         cmd.extend(["--output-format", "json"])
 
     cmd.extend([str(p) for p in target_paths])
 
-    proc = subprocess.run(cmd, check=False)
+    proc = subprocess.run(  # noqa: S603 - controlled ruff execution
+        cmd, check=False
+    )
     return proc.returncode
 
 
 def cmd_fmt(args: argparse.Namespace) -> int:
-    target_paths = _resolve_target_paths(args.target, args.profile, for_lint=True)
-    
-    cmd = [
-        "uvx", "ruff", "format",
-    ]
+    """Run Ruff formatter on profile lint_modules or target."""
+    target = _require_str(args, "target", "crm")
+    profile = _require_str(args, "profile", "etech")
+    check_mode = _require_bool(args, "check")
+    target_paths = _resolve_target_paths(target, profile, for_lint=True)
+
+    cmd = ["uvx", "ruff", "format"]
     if RUFF_CONFIG_PATH.is_file():
         cmd.extend(["--config", str(RUFF_CONFIG_PATH)])
 
-    if args.check:
+    if check_mode:
         cmd.append("--check")
 
     cmd.extend([str(p) for p in target_paths])
 
-    proc = subprocess.run(cmd, check=False)
+    proc = subprocess.run(  # noqa: S603 - controlled ruff execution
+        cmd, check=False
+    )
     return proc.returncode
 
 
 def cmd_logs(args: argparse.Namespace) -> int:
+    """Tail logs of the active Odoo container."""
     _ensure_podman()
-    cmd = ["podman", "logs", f"--tail={args.tail}"]
-    if args.follow:
+    tail = _require_int(args, "tail", 100)
+    follow = _require_bool(args, "follow")
+    cmd = ["podman", "logs", f"--tail={tail}"]
+    if follow:
         cmd.append("-f")
     cmd.append(DEFAULT_WEB_CONTAINER)
-    return subprocess.run(cmd, check=False).returncode
+    proc = subprocess.run(  # noqa: S603 - controlled podman logs execution
+        cmd, check=False
+    )
+    return proc.returncode
 
 
 # ==============================================================================
 # INTROSPECTION & DIAGNOSTIC SUBCOMMANDS
 # ==============================================================================
 
+
 def cmd_env_inspect(args: argparse.Namespace) -> int:
+    """Inspect workspace, runtime, and container environment."""
     ctx = _resolve_workspace()
-    source_mods = [sa.name for sa in ctx.addons_paths if sa != ctx.root]
     local_mods = _discover_all_modules(ctx.root)
+    json_mode = _require_bool(args, "json")
 
     data = {
         "status": "ready",
@@ -839,7 +1242,7 @@ def cmd_env_inspect(args: argparse.Namespace) -> int:
         "podman_pod": DEFAULT_POD_NAME,
         "pod_status": _get_pod_status() or "stopped",
     }
-    if args.json:
+    if json_mode:
         print(json.dumps(data, indent=2))
     else:
         print(f"Odoo Runtime:        {data['runtime_path']}")
@@ -851,94 +1254,133 @@ def cmd_env_inspect(args: argparse.Namespace) -> int:
 
 
 def cmd_addons_list(args: argparse.Namespace) -> int:
+    """List all discoverable custom addons in workspace."""
     ctx = _resolve_workspace()
     mods = _discover_all_modules(ctx.root)
-    if args.json:
+    json_mode = _require_bool(args, "json")
+    if json_mode:
         print(json.dumps(mods, indent=2))
     else:
         for name, info in sorted(mods.items()):
-            print(f"{name:30} {info.get('version', ''):15} {info.get('summary', '')}")
+            summary = str(info.get("summary", ""))
+            version = str(info.get("version", ""))
+            print(f"{name:30} {version:15} {summary}")
     return 0
 
 
-def cmd_module_inspect(args: argparse.Namespace) -> int:
-    ctx = _resolve_workspace()
-    mod_dir = ctx.root / args.module
-    if not mod_dir.is_dir():
-        raise CliError(f"Module not found: {mod_dir}")
+def _parse_python_tree(pyfile: Path) -> ast.AST | None:
+    """Parse python source file into AST, ignoring syntax and OS errors."""
+    try:
+        return ast.parse(pyfile.read_text(encoding="utf-8"), filename=str(pyfile))
+    except (SyntaxError, ValueError, OSError):
+        return None
 
-    visitor = _OdooASTVisitor(args.module, str(mod_dir))
+
+def cmd_module_inspect(args: argparse.Namespace) -> int:
+    """AST inspect models, fields, and controllers of an addon."""
+    ctx = _resolve_workspace()
+    module = _require_str(args, "module")
+    json_mode = _require_bool(args, "json")
+    mod_dir = ctx.root / module
+    if not mod_dir.is_dir():
+        msg = f"Module not found: {mod_dir}"
+        raise CliError(msg)
+
+    visitor = _OdooASTVisitor(module, str(mod_dir))
     for pyfile in mod_dir.rglob("*.py"):
         if any(ign in pyfile.parts for ign in IGNORED_ADDON_DIRS):
             continue
-        try:
-            tree = ast.parse(pyfile.read_text(encoding="utf-8"), filename=str(pyfile))
+        tree = _parse_python_tree(pyfile)
+        if tree is not None:
             visitor.file_path = str(pyfile.relative_to(ctx.root))
             visitor.visit(tree)
-        except Exception:
-            pass
 
     manifest = _parse_manifest(mod_dir / "__manifest__.py")
     res = {
-        "module": args.module,
+        "module": module,
         "manifest": manifest,
         "models": visitor.models,
         "controllers": visitor.controllers,
     }
-    if args.json:
+    if json_mode:
         print(json.dumps(res, indent=2))
     else:
-        print(f"=== Module: {args.module} ===")
+        print(f"=== Module: {module} ===")
         print(f"Summary: {manifest.get('summary', '')}")
         print(f"Models:  {len(visitor.models)}")
         for m in visitor.models:
-            print(f"  - {m['model_name']} ({m['class_name']}) -> {len(m['fields'])} fields, {len(m['actions'])} actions")
+            model_line = (
+                f"  - {m['model_name']} ({m['class_name']}) -> "
+                f"{len(m['fields'])} fields, {len(m['actions'])} actions"
+            )
+            print(model_line)
         print(f"Routes:  {len(visitor.controllers)}")
         for c in visitor.controllers:
-            print(f"  - {c['route']} [{','.join(c['methods'])}] -> {c['class_name']}.{c['method']}")
+            routes_str = ",".join(c["methods"])
+            route_line = (
+                f"  - {c['route']} [{routes_str}] -> {c['class_name']}.{c['method']}"
+            )
+            print(route_line)
     return 0
 
 
 def cmd_route_list(args: argparse.Namespace) -> int:
+    """List all exposed HTTP routes in workspace or target module."""
     ctx = _resolve_workspace()
-    routes: List[Dict[str, Any]] = []
+    module = _optional_str(args, "module")
+    json_mode = _require_bool(args, "json")
+    routes: list[ControllerInfo] = []
 
-    target_dirs = [ctx.root / args.module] if args.module else [d for d in ctx.root.iterdir() if d.is_dir() and d.name not in IGNORED_ADDON_DIRS]
+    target_dirs = (
+        [ctx.root / module]
+        if module
+        else [
+            d
+            for d in ctx.root.iterdir()
+            if d.is_dir() and d.name not in IGNORED_ADDON_DIRS
+        ]
+    )
 
     for mdir in target_dirs:
         visitor = _OdooASTVisitor(mdir.name, str(mdir))
         for pyfile in mdir.rglob("*.py"):
-            try:
-                tree = ast.parse(pyfile.read_text(encoding="utf-8"), filename=str(pyfile))
+            tree = _parse_python_tree(pyfile)
+            if tree is not None:
                 visitor.file_path = str(pyfile.relative_to(ctx.root))
                 visitor.visit(tree)
-            except Exception:
-                pass
         routes.extend(visitor.controllers)
 
-    if args.json:
+    if json_mode:
         print(json.dumps(routes, indent=2))
     else:
         for r in sorted(routes, key=lambda x: x["route"]):
-            print(f"{r['route']:40} {r['auth']:10} {r['module']:20} {r['class_name']}.{r['method']}")
+            route_str = r["route"]
+            auth_str = r["auth"]
+            mod_str = r["module"]
+            target_str = f"{r['class_name']}.{r['method']}"
+            print(f"{route_str:40} {auth_str:10} {mod_str:20} {target_str}")
     return 0
 
 
 def cmd_db_summary(args: argparse.Namespace) -> int:
+    """Show PostgreSQL database summary statistics and installed module count."""
     ctx = _resolve_workspace()
-    db = args.db or ctx.effective_db_name
+    db = _optional_str(args, "db") or ctx.effective_db_name
+    json_mode = _require_bool(args, "json")
     _ensure_runtime_pod(ctx)
 
-    sql = f"""
-    SELECT 
+    sql = """
+    SELECT
         current_database() AS database,
         pg_size_pretty(pg_database_size(current_database())) AS size,
-        (SELECT count(*) FROM information_schema.tables WHERE table_schema='public') AS tables_count,
-        (SELECT count(*) FROM ir_module_module WHERE state='installed') AS installed_modules_count
+        (SELECT count(*) FROM information_schema.tables WHERE table_schema='public')
+            AS tables_count,
+        (SELECT count(*) FROM ir_module_module WHERE state='installed')
+            AS installed_modules_count
     """
     rows = _exec_sql_json(sql, db=db)
     summary = rows[0] if rows else {}
-    if args.json:
+    if json_mode:
         print(json.dumps(summary, indent=2))
     else:
         print(f"Database:          {summary.get('database')}")
@@ -949,12 +1391,15 @@ def cmd_db_summary(args: argparse.Namespace) -> int:
 
 
 def cmd_db_tables(args: argparse.Namespace) -> int:
+    """List largest database tables by total relation size."""
     ctx = _resolve_workspace()
-    db = args.db or ctx.effective_db_name
+    db = _optional_str(args, "db") or ctx.effective_db_name
+    limit = _require_int(args, "limit", 20)
+    json_mode = _require_bool(args, "json")
     _ensure_runtime_pod(ctx)
 
     sql = f"""
-    SELECT 
+    SELECT
         relname AS table_name,
         n_live_tup AS row_estimate,
         pg_size_pretty(pg_total_relation_size(c.oid)) AS total_size
@@ -963,29 +1408,40 @@ def cmd_db_tables(args: argparse.Namespace) -> int:
     JOIN pg_stat_user_tables s ON s.relid = c.oid
     WHERE n.nspname = 'public'
     ORDER BY pg_total_relation_size(c.oid) DESC
-    LIMIT {args.limit};
-    """
+    LIMIT {limit};
+    """  # noqa: S608 - static introspection query with numeric limit
     rows = _exec_sql_json(sql, db=db)
-    if args.json:
+    if json_mode:
         print(json.dumps(rows, indent=2))
     else:
         for r in rows:
-            print(f"{r['table_name']:40} {r['row_estimate']:10} rows  {r['total_size']:10}")
+            tbl = str(r.get("table_name", ""))
+            est = str(r.get("row_estimate", ""))
+            sz = str(r.get("total_size", ""))
+            print(f"{tbl:40} {est:10} rows  {sz:10}")
     return 0
 
 
 def cmd_db_query(args: argparse.Namespace) -> int:
+    """Execute arbitrary SQL query with write-safety check."""
     ctx = _resolve_workspace()
-    db = args.db or ctx.effective_db_name
+    db = _optional_str(args, "db") or ctx.effective_db_name
     _ensure_runtime_pod(ctx)
 
-    raw_sql = args.sql.strip()
+    raw_sql = _require_str(args, "sql").strip()
+    unsafe = _require_bool(args, "unsafe")
+    json_mode = _require_bool(args, "json")
+
     # Simple write safety check
     first_word = raw_sql.split()[0].upper() if raw_sql else ""
-    if not args.unsafe and first_word not in ("SELECT", "EXPLAIN", "SHOW", "WITH"):
-        raise CliError(f"Write query blocked by safety policy ({first_word}). Pass --unsafe to override.")
+    if not unsafe and first_word not in ("SELECT", "EXPLAIN", "SHOW", "WITH"):
+        msg = (
+            f"Write query blocked by safety policy ({first_word}). "
+            "Pass --unsafe to override."
+        )
+        raise CliError(msg)
 
-    if args.json:
+    if json_mode:
         rows = _exec_sql_json(raw_sql, db=db)
         print(json.dumps(rows, indent=2))
     else:
@@ -995,28 +1451,36 @@ def cmd_db_query(args: argparse.Namespace) -> int:
 
 
 def cmd_db_clone(args: argparse.Namespace) -> int:
+    """Clone a PostgreSQL database template to a new target database."""
     ctx = _resolve_workspace()
     _ensure_runtime_pod(ctx)
 
-    source = args.source
-    target = args.target
+    source = _require_str(args, "source")
+    target = _require_str(args, "target")
+    force = _require_bool(args, "force")
+    json_mode = _require_bool(args, "json")
 
     print(f"Cloning database {source!r} -> {target!r}...")
-    
+
     # 1. Terminate existing connections to source and target
-    _exec_sql(f"""
-        SELECT pg_terminate_backend(pid) FROM pg_stat_activity 
+    term_sql = f"""
+        SELECT pg_terminate_backend(pid) FROM pg_stat_activity
         WHERE datname IN ('{source}', '{target}') AND pid <> pg_backend_pid();
-    """, db="postgres")
+    """  # noqa: S608 - maintenance connection termination
+    _ = _exec_sql(term_sql, db="postgres")
 
     # 2. Drop target if requested
-    if args.force:
-        _exec_sql(f"DROP DATABASE IF EXISTS \"{target}\";", db="postgres")
+    if force:
+        drop_sql = f'DROP DATABASE IF EXISTS "{target}";'
+        _ = _exec_sql(drop_sql, db="postgres")
 
     # 3. Create database as template copy
-    _exec_sql(f"CREATE DATABASE \"{target}\" WITH TEMPLATE \"{source}\" OWNER {DEFAULT_DB_USER};", db="postgres")
+    create_sql = (
+        f'CREATE DATABASE "{target}" WITH TEMPLATE "{source}" OWNER {DEFAULT_DB_USER};'
+    )
+    _ = _exec_sql(create_sql, db="postgres")
 
-    if args.json:
+    if json_mode:
         print(json.dumps({"status": "cloned", "source": source, "target": target}))
     else:
         print(f"[OK] Database successfully cloned: {target}")
@@ -1027,80 +1491,168 @@ def cmd_db_clone(args: argparse.Namespace) -> int:
 # MAIN ENTRYPOINT & CLI PARSER
 # ==============================================================================
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
-    parent_parser = argparse.ArgumentParser(add_help=False)
-    parent_parser.add_argument("--json", action="store_true", help="Emit raw JSON output for agent pipelines")
-    parent_parser.add_argument("--profile", default="etech", help="Workflow profile name (default: etech)")
 
+def _build_parser() -> argparse.ArgumentParser:
+    """Construct CLI argument parser and subcommands for odooctl."""
+    parent_parser = argparse.ArgumentParser(add_help=False)
+    _ = parent_parser.add_argument(
+        "--json", action="store_true", help="Emit raw JSON output for agent pipelines"
+    )
+    _ = parent_parser.add_argument(
+        "--profile", default="etech", help="Workflow profile name (default: etech)"
+    )
+
+    app_desc = (
+        "Autonomous Odoo 17 stack controller, test runner, and PostgreSQL inspector."
+    )
     parser = argparse.ArgumentParser(
         prog="odooctl",
-        description="Autonomous Odoo 17 stack controller, test runner, and PostgreSQL inspector.",
+        description=app_desc,
         parents=[parent_parser],
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # Dev Command
-    p_dev = subparsers.add_parser("dev", parents=[parent_parser], help="Start Odoo 17 dev server with hot-reload in foreground")
-    p_dev.add_argument("workflow", default="crm", nargs="?", help="Workflow profile key (default: crm)")
+    p_dev = subparsers.add_parser(
+        "dev",
+        parents=[parent_parser],
+        help="Start Odoo 17 dev server with hot-reload in foreground",
+    )
+    _ = p_dev.add_argument(
+        "workflow", default="crm", nargs="?", help="Workflow profile key (default: crm)"
+    )
 
     # Test Command
-    p_test = subparsers.add_parser("test", parents=[parent_parser], help="Run isolated Odoo 17 unit tests")
-    p_test.add_argument("target", default="crm", nargs="?", help="Module name or workflow profile key (default: crm)")
+    p_test = subparsers.add_parser(
+        "test", parents=[parent_parser], help="Run isolated Odoo 17 unit tests"
+    )
+    _ = p_test.add_argument(
+        "target",
+        default="crm",
+        nargs="?",
+        help="Module name or workflow profile key (default: crm)",
+    )
 
     # Lint Command
-    p_lint = subparsers.add_parser("lint", parents=[parent_parser], help="Run Ruff linter on profile lint_modules")
-    p_lint.add_argument("target", default="crm", nargs="?", help="Module name or workflow profile key (default: crm)")
-    p_lint.add_argument("--fix", action="store_true", help="Auto-fix safe lint violations")
+    p_lint = subparsers.add_parser(
+        "lint", parents=[parent_parser], help="Run Ruff linter on profile lint_modules"
+    )
+    _ = p_lint.add_argument(
+        "target",
+        default="crm",
+        nargs="?",
+        help="Module name or workflow profile key (default: crm)",
+    )
+    _ = p_lint.add_argument(
+        "--fix", action="store_true", help="Auto-fix safe lint violations"
+    )
 
     # Fmt Command
-    p_fmt = subparsers.add_parser("fmt", parents=[parent_parser], help="Run Ruff formatter on profile lint_modules")
-    p_fmt.add_argument("target", default="crm", nargs="?", help="Module name or workflow profile key (default: crm)")
-    p_fmt.add_argument("--check", action="store_true", help="Check formatting without modifying files")
+    p_fmt = subparsers.add_parser(
+        "fmt",
+        parents=[parent_parser],
+        help="Run Ruff formatter on profile lint_modules",
+    )
+    _ = p_fmt.add_argument(
+        "target",
+        default="crm",
+        nargs="?",
+        help="Module name or workflow profile key (default: crm)",
+    )
+    _ = p_fmt.add_argument(
+        "--check", action="store_true", help="Check formatting without modifying files"
+    )
 
     # Stop Command
-    subparsers.add_parser("stop", parents=[parent_parser], help="Stop and tear down the Odoo Podman pod and containers")
+    _ = subparsers.add_parser(
+        "stop",
+        parents=[parent_parser],
+        help="Stop and tear down the Odoo Podman pod and containers",
+    )
 
     # Logs Command
-    p_logs = subparsers.add_parser("logs", parents=[parent_parser], help="Tail logs of the active Odoo container")
-    p_logs.add_argument("-f", "--follow", action="store_true", help="Follow log output")
-    p_logs.add_argument("-n", "--tail", default=100, type=int, help="Number of lines to show")
+    p_logs = subparsers.add_parser(
+        "logs", parents=[parent_parser], help="Tail logs of the active Odoo container"
+    )
+    _ = p_logs.add_argument(
+        "-f", "--follow", action="store_true", help="Follow log output"
+    )
+    _ = p_logs.add_argument(
+        "-n", "--tail", default=100, type=int, help="Number of lines to show"
+    )
 
     # Env Inspect
-    subparsers.add_parser("env", parents=[parent_parser], help="Inspect workspace, runtime, and container environment")
+    _ = subparsers.add_parser(
+        "env",
+        parents=[parent_parser],
+        help="Inspect workspace, runtime, and container environment",
+    )
 
     # Addons
-    subparsers.add_parser("addons", parents=[parent_parser], help="List all discoverable custom addons")
+    _ = subparsers.add_parser(
+        "addons", parents=[parent_parser], help="List all discoverable custom addons"
+    )
 
     # Module Inspect
-    p_mod = subparsers.add_parser("module", parents=[parent_parser], help="AST inspect models, fields, and controllers of an addon")
-    p_mod.add_argument("module", help="Module directory name")
+    p_mod = subparsers.add_parser(
+        "module",
+        parents=[parent_parser],
+        help="AST inspect models, fields, and controllers of an addon",
+    )
+    _ = p_mod.add_argument("module", help="Module directory name")
 
     # Routes
-    p_routes = subparsers.add_parser("routes", parents=[parent_parser], help="List all exposed HTTP routes")
-    p_routes.add_argument("module", nargs="?", help="Filter by specific module")
+    p_routes = subparsers.add_parser(
+        "routes", parents=[parent_parser], help="List all exposed HTTP routes"
+    )
+    _ = p_routes.add_argument("module", nargs="?", help="Filter by specific module")
 
     # DB Summary
-    p_dbsum = subparsers.add_parser("db-summary", parents=[parent_parser], help="PostgreSQL vitals, size, and module count")
-    p_dbsum.add_argument("--db", help="Target database name")
+    p_dbsum = subparsers.add_parser(
+        "db-summary",
+        parents=[parent_parser],
+        help="PostgreSQL vitals, size, and module count",
+    )
+    _ = p_dbsum.add_argument("--db", help="Target database name")
 
     # DB Tables
-    p_dbtables = subparsers.add_parser("db-tables", parents=[parent_parser], help="List largest tables by disk usage")
-    p_dbtables.add_argument("--db", help="Target database name")
-    p_dbtables.add_argument("--limit", type=int, default=20, help="Max tables to return")
+    p_dbtables = subparsers.add_parser(
+        "db-tables", parents=[parent_parser], help="List largest tables by disk usage"
+    )
+    _ = p_dbtables.add_argument("--db", help="Target database name")
+    _ = p_dbtables.add_argument(
+        "--limit", type=int, default=20, help="Max tables to return"
+    )
 
     # DB Query
-    p_query = subparsers.add_parser("db-query", parents=[parent_parser], help="Execute SQL query against PostgreSQL")
-    p_query.add_argument("sql", help="SQL query string")
-    p_query.add_argument("--db", help="Target database name")
-    p_query.add_argument("--unsafe", action="store_true", help="Allow DDL/DML mutation queries")
+    p_query = subparsers.add_parser(
+        "db-query", parents=[parent_parser], help="Execute SQL query against PostgreSQL"
+    )
+    _ = p_query.add_argument("sql", help="SQL query string")
+    _ = p_query.add_argument("--db", help="Target database name")
+    _ = p_query.add_argument(
+        "--unsafe", action="store_true", help="Allow DDL/DML mutation queries"
+    )
 
     # DB Clone
-    p_clone = subparsers.add_parser("db-clone", parents=[parent_parser], help="Clone template database using PostgreSQL engine")
-    p_clone.add_argument("source", help="Source database name")
-    p_clone.add_argument("target", help="Target database name")
-    p_clone.add_argument("--force", action="store_true", help="Drop target if already exists")
+    p_clone = subparsers.add_parser(
+        "db-clone",
+        parents=[parent_parser],
+        help="Clone template database using PostgreSQL engine",
+    )
+    _ = p_clone.add_argument("source", help="Source database name")
+    _ = p_clone.add_argument("target", help="Target database name")
+    _ = p_clone.add_argument(
+        "--force", action="store_true", help="Drop target if already exists"
+    )
 
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """CLI entrypoint and command dispatcher for odooctl."""
+    parser = _build_parser()
     args = parser.parse_args(argv)
 
     cmd_map = {
@@ -1120,7 +1672,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "db-clone": cmd_db_clone,
     }
 
-    handler = cmd_map.get(args.command)
+    command_name = _require_str(args, "command")
+    handler = cmd_map.get(command_name)
     if not handler:
         parser.print_help()
         return 1
@@ -1128,7 +1681,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         return handler(args)
     except CliError as err:
-        if args.json:
+        json_mode = _require_bool(args, "json")
+        if json_mode:
             print(json.dumps({"error": str(err), "code": err.code}))
         else:
             print(f"Error: {err}", file=sys.stderr)

@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import mimetypes
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
-from typing import NoReturn
+from typing import NoReturn, Protocol, cast, runtime_checkable
 from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urlsplit
 from urllib.request import Request
@@ -41,16 +41,36 @@ def _raise_fetch(
     raise error
 
 
+@runtime_checkable
+class _HttpResponse(Protocol):
+    """Minimal readable HTTP response surface."""
+
+    status: int
+
+    def read(self) -> bytes: ...
+    def __enter__(self) -> object: ...
+    def __exit__(self, *args: object) -> bool | None: ...
+
+
+@runtime_checkable
+class _HeadersLike(Protocol):
+    """Headers-like object exposing string pairs via items()."""
+
+    def items(self) -> Iterable[tuple[str, str]]: ...
+
+
 def _headers(response: object) -> dict[str, str]:
-    raw = getattr(response, "headers", None)
+    raw = cast("object", getattr(response, "headers", None))
     if raw is None:
         return {}
-    try:
-        items = raw.items()
-    except AttributeError:
+    if not isinstance(raw, _HeadersLike):
         return {}
     result: dict[str, str] = {}
-    for key, value in items:
+    try:
+        pairs = raw.items()
+    except AttributeError:
+        return {}
+    for key, value in pairs:
         name = str(key)
         lowered = name.casefold()
         if lowered in {"authorization", "cookie", "set-cookie", "x-api-key"}:
@@ -60,15 +80,15 @@ def _headers(response: object) -> dict[str, str]:
 
 
 def _status(response: object) -> int:
-    value = getattr(response, "status", None)
+    value = cast("object", getattr(response, "status", None))
     if value is None:
-        getter = getattr(response, "getcode", None)
+        getter = cast("object", getattr(response, "getcode", None))
         value = getter() if callable(getter) else 200
-    return int(value)
+    return int(cast("int | str", value))
 
 
 def _final_url(response: object, requested: str) -> str:
-    getter = getattr(response, "geturl", None)
+    getter = cast("object", getattr(response, "geturl", None))
     value = getter() if callable(getter) else requested
     return str(value)
 
@@ -109,7 +129,7 @@ def fetch_target(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
                 {"attempted_url": target.url, "error": str(exc)},
             )
         digest = sha256_bytes(body)
-        metadata = {
+        metadata: dict[str, object] = {
             "source_url": target.url,
             "discovered_from": target.discovered_from,
             "release_id": target.release_id,
@@ -148,16 +168,18 @@ def fetch_target(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
     request = Request(target.url, headers=request_headers)  # noqa: S310
     open_fn = opener or urlopen
     try:
-        response = open_fn(request, timeout=timeout)
-        with response:  # type: ignore[union-attr]
+        response = cast("_HttpResponse", open_fn(request, timeout=timeout))
+        with response:
             status = _status(response)
             response_headers = _headers(response)
             final_url = _final_url(response, target.url)
-            body = response.read()  # type: ignore[union-attr]
+            body = response.read()
     except HTTPError as exc:
-        status = int(exc.code)
+        status = exc.code
+        geturl = cast("object", getattr(exc, "geturl", None))
+        raw_url = geturl() if callable(geturl) else None
+        final_url = str(raw_url) if raw_url else target.url
         response_headers = _headers(exc)
-        final_url = str(exc.geturl() or target.url)
         body = b""
         if status in {HTTP_UNAUTHORIZED, HTTP_FORBIDDEN}:
             _raise_fetch(
@@ -254,7 +276,8 @@ def _header_value(metadata: Mapping[str, object], name: str) -> str | None:
         return direct
     headers = metadata.get("headers")
     if isinstance(headers, Mapping):
-        value = headers.get(name) or headers.get(name.casefold())
+        header_map = cast("Mapping[str, object]", headers)
+        value = header_map.get(name) or header_map.get(name.casefold())
         if isinstance(value, str) and value:
             return value
     return None
@@ -289,13 +312,15 @@ def _reuse_304(
                 "response_etag": response_etag,
             },
         )
+    prior_headers = prior.get("headers", {})
+    merged_headers: dict[str, object] = dict(response_headers)
+    if isinstance(prior_headers, dict):
+        merged_headers.update(cast("dict[str, object]", prior_headers))
     metadata = dict(prior)
     metadata.update(
         {
             "status_code": HTTP_NOT_MODIFIED,
-            "headers": dict(response_headers) | dict(prior.get("headers", {}))
-            if isinstance(prior.get("headers"), dict)
-            else dict(response_headers),
+            "headers": merged_headers,
             "fetched_at": observed,
             "observed_at": observed,
             "freshness_mode": "revalidated",
@@ -318,7 +343,7 @@ def _stale_artifact(
     metadata = dict(prior)
     metadata.update(
         {
-            "status_code": status or int(prior.get("status_code", 200)),
+            "status_code": status or int(cast("int", prior.get("status_code", 200))),
             "fetched_at": observed,
             "observed_at": observed,
             "freshness_mode": "stale-cache",
@@ -336,11 +361,11 @@ def _artifact_from_metadata(
 ) -> RawArtifact:
     digest = sha256_bytes(body)
     raw_headers = metadata.get("headers")
-    headers = (
-        {str(key): str(value) for key, value in raw_headers.items()}
-        if isinstance(raw_headers, Mapping)
-        else {}
-    )
+    if isinstance(raw_headers, Mapping):
+        header_map = cast("Mapping[str, object]", raw_headers)
+        headers = {str(key): str(value) for key, value in header_map.items()}
+    else:
+        headers = {}
     return RawArtifact(
         artifact_id=f"livebench:{target.release_id}:{target.artifact_kind}:sha256:{digest}",
         source="livebench",
@@ -349,7 +374,7 @@ def _artifact_from_metadata(
         source_url=target.url,
         discovered_from=target.discovered_from,
         body=body,
-        status_code=int(metadata.get("status_code", 200)),
+        status_code=int(cast("int", metadata.get("status_code", 200))),
         content_type=str(metadata.get("content_type"))
         if metadata.get("content_type")
         else None,

@@ -4,11 +4,17 @@ from __future__ import annotations
 import json
 import os
 from io import StringIO
-from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import pytest
-from _path import LIB_DIR as _LIB_DIR  # noqa: F401
+from tests._path import LIB_DIR
+
 from livebench.cli import main
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+_ = LIB_DIR
 
 
 @pytest.mark.live_smoke
@@ -20,11 +26,13 @@ def test_live_smoke_records_dynamic_evidence(tmp_path: Path) -> None:
     status = main(
         ["releases", "--cache-dir", str(tmp_path)], stdout=stdout, stderr=StringIO()
     )
-    payload = json.loads(stdout.getvalue())
+    payload = cast("dict[str, object]", json.loads(stdout.getvalue()))
     assert status == 0
     assert payload["ok"] is True
+    data = cast("dict[str, object]", payload["data"])
+    provenance = cast("dict[str, object]", data["provenance"])
     assert (
-        payload["data"]["provenance"]["source_url"]
-        if "source_url" in payload["data"]["provenance"]
-        else payload["data"]["provenance"]["authority_url"]
+        provenance["source_url"]
+        if "source_url" in provenance
+        else provenance["authority_url"]
     )

@@ -3,22 +3,33 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any
+from collections.abc import Mapping, Sequence
+from typing import cast
 
 from .identity import canonical_url
 
 
-def _entries(snapshot: object) -> list[dict[str, Any]]:
+def _entries(snapshot: object) -> list[dict[str, object]]:
     if isinstance(snapshot, list):
-        return [dict(item) for item in snapshot if isinstance(item, Mapping)]
+        snapshot_seq = cast("Sequence[object]", snapshot)
+        return [
+            dict(cast("Mapping[str, object]", item))
+            for item in snapshot_seq
+            if isinstance(item, Mapping)
+        ]
     if isinstance(snapshot, Mapping):
+        snapshot_map = cast("Mapping[str, object]", snapshot)
         for key in ("entries", "catalog", "rows", "benchmarks", "data"):
-            value = snapshot.get(key)
+            value = snapshot_map.get(key)
             if isinstance(value, list):
-                return [dict(item) for item in value if isinstance(item, Mapping)]
+                value_seq = cast("Sequence[object]", value)
+                return [
+                    dict(cast("Mapping[str, object]", item))
+                    for item in value_seq
+                    if isinstance(item, Mapping)
+                ]
             if isinstance(value, Mapping) and key == "data":
-                nested = _entries(value)
+                nested = _entries(cast("object", value))
                 if nested:
                     return nested
     return []
@@ -41,12 +52,12 @@ def _key(entry: Mapping[str, object]) -> str:
     return f"{_identity(entry)[0]}:{_identity(entry)[1]}"
 
 
-def diff(left: object, right: object) -> dict[str, Any]:
+def diff(left: object, right: object) -> dict[str, object]:
     """Classify deterministic catalog additions, renames, and schema changes."""
     before = _entries(left)
     after = _entries(right)
-    left_map = {_key(item): item for item in before}
-    right_map = {_key(item): item for item in after}
+    left_map: dict[str, dict[str, object]] = {_key(item): item for item in before}
+    right_map: dict[str, dict[str, object]] = {_key(item): item for item in after}
     added = [right_map[key] for key in sorted(right_map.keys() - left_map.keys())]
     removed = [left_map[key] for key in sorted(left_map.keys() - right_map.keys())]
     renamed: list[dict[str, object]] = []
@@ -86,14 +97,16 @@ def diff(left: object, right: object) -> dict[str, Any]:
             )
             if old.get(field) != new.get(field)
         )
-        old_fields = (
-            set((old.get("raw_fields") or {}).keys())
-            if isinstance(old.get("raw_fields"), Mapping)
+        raw_old = old.get("raw_fields")
+        old_fields: set[str] = (
+            {str(k) for k in cast("Mapping[object, object]", raw_old)}
+            if isinstance(raw_old, Mapping)
             else set(old.keys())
         )
-        new_fields = (
-            set((new.get("raw_fields") or {}).keys())
-            if isinstance(new.get("raw_fields"), Mapping)
+        raw_new = new.get("raw_fields")
+        new_fields: set[str] = (
+            {str(k) for k in cast("Mapping[object, object]", raw_new)}
+            if isinstance(raw_new, Mapping)
             else set(new.keys())
         )
         schema_changes.extend(
@@ -136,13 +149,14 @@ def diff(left: object, right: object) -> dict[str, Any]:
 
 def _snapshot_id(value: object) -> str | None:
     if isinstance(value, Mapping):
+        val_map = cast("Mapping[str, object]", value)
         for key in ("snapshot_id", "id", "sha256"):
-            candidate = value.get(key)
+            candidate = val_map.get(key)
             if isinstance(candidate, str):
                 return candidate
-        provenance = value.get("provenance")
-        if isinstance(provenance, Mapping) and isinstance(
-            provenance.get("sha256"), str
-        ):
-            return str(provenance["sha256"])
+        provenance = val_map.get("provenance")
+        if isinstance(provenance, Mapping):
+            prov_map = cast("Mapping[str, object]", provenance)
+            if isinstance(prov_map.get("sha256"), str):
+                return str(prov_map["sha256"])
     return None

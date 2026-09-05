@@ -1,5 +1,4 @@
 # Copyright 2026 Vals-live contributors.
-# ruff: noqa: INP001
 import sys
 from pathlib import Path
 

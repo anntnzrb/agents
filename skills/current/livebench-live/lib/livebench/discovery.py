@@ -7,7 +7,7 @@ import json
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urljoin
 
 if TYPE_CHECKING:
@@ -151,35 +151,42 @@ def _discover_snapshot(path: Path) -> ReleaseDiscovery:
         )
     digest = sha256_bytes(body)
     try:
-        parsed = json.loads(body.decode("utf-8"))
+        parsed = cast("object", json.loads(body.decode("utf-8")))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise_expected(
             "SNAPSHOT_INVALID",
             "Release snapshot must be valid JSON.",
             {"path": str(path), "error": str(exc)},
         )
-    if isinstance(parsed, Mapping) and parsed.get("releases") is not None:
-        raw_entries = parsed
-        authority_url = str(parsed.get("authority_url") or f"fixture://{path}")
+    parsed_map: Mapping[str, object] | None = (
+        cast("Mapping[str, object]", parsed) if isinstance(parsed, Mapping) else None
+    )
+    if parsed_map is not None and parsed_map.get("releases") is not None:
+        raw_entries: object = parsed_map
+        authority_url = str(parsed_map.get("authority_url") or f"fixture://{path}")
+        templates_value = parsed_map.get("asset_templates", {})
         templates = (
-            {str(k): str(v) for k, v in dict(parsed.get("asset_templates", {})).items()}
-            if isinstance(parsed.get("asset_templates"), Mapping)
+            {
+                str(k): str(v)
+                for k, v in cast("Mapping[str, object]", templates_value).items()
+            }
+            if isinstance(templates_value, Mapping)
             else {}
         )
     else:
-        raw_entries = {"releases": parsed}
+        raw_entries = {"releases": cast("object", parsed)}
         authority_url = f"fixture://{path}"
         templates = {}
     entries = parse_release_list(raw_entries)
     for entry in entries:
         identifier = str(entry["id"])
-        entry.setdefault(
+        _ = entry.setdefault(
             "assets",
             _release_entry(identifier, templates).get("assets", {}),
         )
     latest = (
-        str(parsed.get("latest"))
-        if isinstance(parsed, Mapping) and parsed.get("latest")
+        str(parsed_map.get("latest"))
+        if parsed_map is not None and parsed_map.get("latest")
         else str(entries[-1]["id"])
     )
     if latest not in {str(entry["id"]) for entry in entries}:
@@ -214,7 +221,7 @@ def _release_ids(bundle: str) -> list[str]:
     candidates: list[tuple[int, int, list[str]]] = []
     assignment = re.compile(
         r"\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*="
-        r"\s*(\[[^\]]{0,1200}\])",
+        + r"\s*(\[[^\]]{0,1200}\])",
         re.DOTALL,
     )
     for match in assignment.finditer(bundle):

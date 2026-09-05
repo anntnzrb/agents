@@ -21,13 +21,13 @@ def main(argv: list[str] | None = None) -> int:
     previous = sys.argv[:]
     sys.argv = ["cli.py", *args]
     try:
-        runpy.run_module(TARGET_MODULE, run_name="__main__")
+        _ = runpy.run_module(TARGET_MODULE, run_name="__main__")
     except SystemExit as exc:
         if exc.code is None:
             return 0
         if isinstance(exc.code, int):
             return exc.code
-        sys.stderr.write(f"{exc.code}\n")
+        _ = sys.stderr.write(f"{exc.code}\n")
         return 1
     finally:
         sys.argv = previous

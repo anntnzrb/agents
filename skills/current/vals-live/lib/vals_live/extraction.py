@@ -7,8 +7,10 @@ import csv
 import io
 import json
 import re
+from collections.abc import Mapping
 from html import unescape
 from html.parser import HTMLParser
+from typing import cast, override
 
 from .contracts import ParsedDocument, RawArtifact
 from .diagnostics import make
@@ -29,6 +31,9 @@ _MIN_CSV_LINES = 2
 class ExtractionError(RuntimeError):
     """Represent structured extraction failure details."""
 
+    code: str
+    details: dict[str, object]
+
     def __init__(
         self, code: str, message: str, details: dict[str, object] | None = None
     ) -> None:
@@ -40,17 +45,20 @@ class ExtractionError(RuntimeError):
 
 def _decode_astro(value: object) -> object:
     if isinstance(value, list):
-        if len(value) == _ASTRO_PAIR_LENGTH and isinstance(value[0], int):
-            return _decode_astro(value[1])
-        return [_decode_astro(item) for item in value]
-    if isinstance(value, dict):
-        return {str(key): _decode_astro(item) for key, item in value.items()}
+        items = cast("list[object]", value)
+        if len(items) == _ASTRO_PAIR_LENGTH and isinstance(items[0], int):
+            return _decode_astro(items[1])
+        return [_decode_astro(item) for item in items]
+    if isinstance(value, Mapping):
+        mapping = cast("Mapping[object, object]", value)
+        return {str(key): _decode_astro(item) for key, item in mapping.items()}
     return value
 
 
 def _parse_json(text: str) -> object | None:
     try:
-        return _decode_astro(json.loads(text))
+        raw: object = cast("object", json.loads(text))
+        return _decode_astro(raw)
     except (TypeError, ValueError, json.JSONDecodeError):
         return None
 
@@ -71,6 +79,7 @@ class _HTMLPayloadParser(HTMLParser):
         self._cell_tag: str | None = None
         self.text_parts: list[str] = []
 
+    @override
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attrs_map = {key.lower(): value or "" for key, value in attrs}
         for key, value in attrs_map.items():
@@ -93,6 +102,7 @@ class _HTMLPayloadParser(HTMLParser):
         if lowered not in {"script", "style"}:
             self.text_parts.append(" ")
 
+    @override
     def handle_endtag(self, tag: str) -> None:
         lowered = tag.lower()
         if lowered == "script" and self._script_attrs is not None:
@@ -124,6 +134,7 @@ class _HTMLPayloadParser(HTMLParser):
                 self.tables.append(self._table_rows)
             self._table_rows = None
 
+    @override
     def handle_data(self, data: str) -> None:
         if self._script_attrs is not None or self._island_attrs is not None:
             self._script_text.append(data)
@@ -155,7 +166,8 @@ def _rsc_payloads(text: str) -> list[tuple[str, object]]:
     for index, match in enumerate(_RSC_PUSH.finditer(text)):
         raw = match.group(1)
         try:
-            decoded = json.loads(raw)
+            raw_decoded: object = cast("object", json.loads(raw))
+            decoded: object = raw_decoded
         except (ValueError, json.JSONDecodeError):
             decoded = raw[1:-1].replace('\\"', '"').replace("\\n", "\n")
         parsed = (
@@ -180,19 +192,21 @@ def _annotate(
 ) -> ParsedDocument:
     if diagnostics:
         document.diagnostics.extend(diagnostics)
-        document.unknown_fields.setdefault("malformed_candidates", []).extend(
-            candidates
+        malformed = document.unknown_fields.setdefault("malformed_candidates", [])
+        if isinstance(malformed, list):
+            cast("list[object]", malformed).extend(candidates)
+        extraction_diags = document.unknown_fields.setdefault(
+            "extraction_diagnostics", []
         )
-        document.unknown_fields.setdefault("extraction_diagnostics", []).extend(
-            diagnostics
-        )
+        if isinstance(extraction_diags, list):
+            cast("list[object]", extraction_diags).extend(diagnostics)
     return document
 
 
 def _malformed_json(
     artifact: RawArtifact, text: str
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-    candidate = {"field": "$", "path": "$", "raw": text}
+    candidate: dict[str, object] = {"field": "$", "path": "$", "raw": text}
     diagnostic = make(
         "MALFORMED_PAYLOAD",
         (
@@ -331,7 +345,9 @@ def _html_fallback(
     rsc = _rsc_payloads(text)
     if rsc:
         root: object = {"frames": [value for _, value in rsc]}
-        paths = [{"field": "frame", "path": path, "raw": value} for path, value in rsc]
+        paths: list[dict[str, object]] = [
+            {"field": "frame", "path": path, "raw": value} for path, value in rsc
+        ]
         return _annotate(
             ParsedDocument(root, "rsc", "rsc", paths, artifact),
             diagnostics,
@@ -340,33 +356,35 @@ def _html_fallback(
     for index, rows in enumerate(parser.tables):
         mapped = _table_rows_to_dict(rows)
         if mapped:
+            table_paths: list[dict[str, object]] = [
+                {"field": key, "path": f"table[{index}].{key}", "raw": None}
+                for key in mapped[0]
+            ]
             document = ParsedDocument(
                 mapped,
                 "html",
                 "html_table",
-                [
-                    {"field": key, "path": f"table[{index}].{key}", "raw": None}
-                    for key in mapped[0]
-                ],
+                table_paths,
                 artifact,
             )
             return _annotate(document, diagnostics, malformed_candidates)
-    data_attrs = [
+    data_attrs: list[dict[str, str]] = [
         {"field": key, "value": value} for key, value in parser.data_attributes
     ]
     if data_attrs:
+        attr_paths: list[dict[str, object]] = [
+            {
+                "field": item["field"],
+                "path": f"@{item['field']}",
+                "raw": item["value"],
+            }
+            for item in data_attrs
+        ]
         document = ParsedDocument(
             {"data_attributes": data_attrs},
             "html",
             "data_attribute",
-            [
-                {
-                    "field": item["field"],
-                    "path": f"@{item['field']}",
-                    "raw": item["value"],
-                }
-                for item in data_attrs
-            ],
+            attr_paths,
             artifact,
         )
         return _annotate(document, diagnostics, malformed_candidates)

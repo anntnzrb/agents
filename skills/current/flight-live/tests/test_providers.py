@@ -4,9 +4,10 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+
 from flight_live.models import FlightLiveError
 from flight_live.providers import (
-    _ensure_agent_browser_available,
+    _ensure_agent_browser_available,  # pyright: ignore[reportPrivateUsage] - tests exercise the nix-guard directly
     fetch_kiwi_web_calendar,
     parse_kiwi_price_buttons,
 )
@@ -31,16 +32,18 @@ def test_parse_kiwi_price_buttons() -> None:
     assert offers[0].source == "kiwi_web_scrape"
 
 
-def test_fetch_kiwi_calendar_with_monkeypatched_sources(monkeypatch) -> None:
+def test_fetch_kiwi_calendar_with_monkeypatched_sources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     snapshot = (_FIXTURES / "kiwi_snapshot_sample.txt").read_text(encoding="utf-8")
 
-    monkeypatch.setattr(
-        "flight_live.providers._ensure_agent_browser_available",
-        lambda: None,
-    )
+    def fake_scrape(url: str) -> str:
+        del url
+        return snapshot
+
     monkeypatch.setattr(
         "flight_live.providers.scrape_kiwi_snapshot_text",
-        lambda url: snapshot,
+        fake_scrape,
     )
 
     def fake_lookup(term: str, *, locale: str) -> dict[str, str]:
@@ -78,9 +81,15 @@ def test_fetch_kiwi_calendar_with_monkeypatched_sources(monkeypatch) -> None:
     assert all(item.source == "kiwi_web_scrape" for item in offers)
 
 
-def test_provider_hard_error_when_nix_missing(monkeypatch) -> None:
+def test_provider_hard_error_when_nix_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _ensure_agent_browser_available.cache_clear()
-    monkeypatch.setattr("flight_live.providers.shutil.which", lambda _: None)
+
+    def fake_which(_: str) -> None:
+        return None
+
+    monkeypatch.setattr("flight_live.providers.shutil.which", fake_which)
 
     with pytest.raises(FlightLiveError, match="requires `nix` in PATH"):
         _ensure_agent_browser_available()

@@ -1,9 +1,9 @@
 # Copyright 2026 Vals-live contributors.
-# ruff: noqa: D102,S101,INP001
 """Exercise metric identity and conservative normalization."""
 
 import json
 import unittest
+from typing import cast
 
 from _path import FIXTURES
 from vals_live.contracts import ParsedDocument, RawArtifact
@@ -43,10 +43,11 @@ class NormalizationTests(unittest.TestCase):
             definition="percent",
         )
         assert result["raw_value"] == "72.4%"
-        assert result["normalized_value"] == 72.4  # noqa: PLR2004
+        assert result["normalized_value"] == 72.4
         assert result["unit"] == "percent"
         assert result["normalization"] == "removed_percent_sign"
-        assert result["source_evidence"]["source_path"] == "$.score"
+        evidence = cast("dict[str, object]", result["source_evidence"])
+        assert evidence["source_path"] == "$.score"
         assert not diagnostics
 
     def test_ambiguous_bare_number_is_blocked(self) -> None:
@@ -60,7 +61,7 @@ class NormalizationTests(unittest.TestCase):
         )
         assert result["normalized_value"] is None
         assert result["metric_semantics_status"] == "ambiguous"
-        assert "NUMERIC_AMBIGUITY" in result["blocked_reasons"]
+        assert "NUMERIC_AMBIGUITY" in cast("list[object]", result["blocked_reasons"])
         assert diagnostics[0]["code"] == "NUMERIC_AMBIGUITY"
 
     def test_placeholder_and_out_of_range(self) -> None:
@@ -102,16 +103,14 @@ class NormalizationTests(unittest.TestCase):
     def test_unknown_field_round_trip(self) -> None:
         document = self.document("pages/unknown-score.json")
         _catalog, rows, diagnostics, _metadata = parse(document)
-        assert rows[0]["raw_fields"]["novel_quality_index"] == {
-            "value": "17",
-            "unit": "count",
-        }
+        raw = cast("dict[str, object]", rows[0]["raw_fields"])
+        assert raw["novel_quality_index"] == {"value": "17", "unit": "count"}
         assert any(item["code"] == "UNKNOWN_SCORE_SEMANTICS" for item in diagnostics)
 
     def test_variant_identity(self) -> None:
         document = self.document("models/new-variant.json")
         _catalog, rows, _diagnostics, _metadata = parse(document)
-        assert len({row["model_variant_id"] for row in rows}) == 2  # noqa: PLR2004
+        assert len({row["model_variant_id"] for row in rows}) == 2
 
     def test_all_numbered_json_cases_are_loadable(self) -> None:
         for path in (FIXTURES / "values").glob("*.json"):
@@ -119,4 +118,4 @@ class NormalizationTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

@@ -20,9 +20,28 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
-# Methods that only perform SELECT operations or inspect system metadata
+# typing.Union is deprecated in favor of X | Y, but a recursive alias needs
+# quoted forward references while X | "Y" is a runtime TypeError (TC010);
+# the type statement needs Python 3.12+ and this skill supports 3.10.
+from typing import (
+    TYPE_CHECKING,
+    TypeAlias,
+    Union,  # pyright: ignore[reportDeprecated] - see note above
+    cast,
+)
+
+if TYPE_CHECKING:
+    import http.client
+    from collections.abc import Callable
+
+JsonValue: TypeAlias = Union[  # pyright: ignore[reportDeprecated] - see note above
+    bool, int, float, str, "list[JsonValue]", "dict[str, JsonValue]", None
+]
+JsonObject: TypeAlias = dict[str, JsonValue]
+JsonRecord: TypeAlias = dict[str, JsonValue]
+
+_MIN_QUOTED_LENGTH = 2
 READONLY_ALLOWLIST: frozenset[str] = frozenset(
     {
         "search",
@@ -83,9 +102,13 @@ def parse_env_file(path: Path) -> bool:
         value = value.strip()
         if not key:
             continue
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        if (
+            len(value) >= _MIN_QUOTED_LENGTH
+            and value[0] == value[-1]
+            and value[0] in {"'", '"'}
+        ):
             value = value[1:-1]
-        os.environ.setdefault(key, value)
+        _ = os.environ.setdefault(key, value)
     return True
 
 
@@ -122,7 +145,7 @@ class OdooRpcConfig:
     verify_ssl: bool = True
 
     @classmethod
-    def from_env(
+    def from_env(  # noqa: PLR0913 - parameters mirror the documented CLI/config surface one-to-one
         cls,
         *,
         url: str | None = None,
@@ -133,78 +156,77 @@ class OdooRpcConfig:
         verify_ssl: bool | None = None,
     ) -> OdooRpcConfig:
         """Resolve and validate configuration from CLI arguments and environment."""
-        resolved_url = url or os.environ.get("ODOO_RPC_URL")
-        if not resolved_url:
-            raise ValueError(
-                "Missing Odoo RPC URL. Set ODOO_RPC_URL in your environment/.env or pass --url."
-            )
+        resolved_url = _require_field("Odoo RPC URL", url, "ODOO_RPC_URL", "--url")
         if not resolved_url.endswith("/jsonrpc"):
             resolved_url = f"{resolved_url.rstrip('/')}/jsonrpc"
-
-        resolved_db = database or os.environ.get("ODOO_RPC_DB")
-        if not resolved_db:
-            raise ValueError(
-                "Missing Odoo RPC database. Set ODOO_RPC_DB in your environment/.env or pass --db."
-            )
-
-        resolved_user = user or os.environ.get("ODOO_RPC_USER")
-        if not resolved_user:
-            raise ValueError(
-                "Missing Odoo RPC user. Set ODOO_RPC_USER in your environment/.env or pass --user."
-            )
-
-        # Token resolution
-        resolved_token = token or os.environ.get("ODOO_RPC_TOKEN")
-        if not resolved_token:
-            candidate_token_paths: list[Path] = []
-            if token_path:
-                candidate_token_paths.append(Path(token_path).expanduser())
-            if os.environ.get("ODOO_RPC_TOKEN_PATH"):
-                candidate_token_paths.append(
-                    Path(os.environ["ODOO_RPC_TOKEN_PATH"]).expanduser()
-                )
-            default_token_path = Path("~/.erp-token").expanduser()
-            candidate_token_paths.append(default_token_path)
-
-            for path in candidate_token_paths:
-                if path.is_file():
-                    try:
-                        resolved_token = path.read_text(encoding="utf-8").strip()
-                        if resolved_token:
-                            break
-                    except OSError:
-                        continue
-
-        if not resolved_token:
-            raise ValueError(
-                "Missing Odoo RPC token. Specify ODOO_RPC_TOKEN, provide ODOO_RPC_TOKEN_PATH, "
-                "or pass --token / --token-path."
-            )
-
-        # SSL resolution: default True
-        if verify_ssl is not None:
-            resolved_verify_ssl = verify_ssl
-        else:
-            env_ssl = os.environ.get("ODOO_RPC_VERIFY_SSL", "true").strip().lower()
-            resolved_verify_ssl = env_ssl not in ("0", "false", "no", "off")
-
         return cls(
             url=resolved_url,
-            database=resolved_db,
-            user=resolved_user,
-            token=resolved_token,
-            verify_ssl=resolved_verify_ssl,
+            database=_require_field(
+                "Odoo RPC database", database, "ODOO_RPC_DB", "--db"
+            ),
+            user=_require_field("Odoo RPC user", user, "ODOO_RPC_USER", "--user"),
+            token=_resolve_token(token, token_path),
+            verify_ssl=_resolve_verify_ssl(verify_ssl),
         )
+
+
+def _require_field(label: str, flag: str | None, env_name: str, cli: str) -> str:
+    """Resolve one required string from a CLI flag with environment fallback."""
+    value = flag or os.environ.get(env_name)
+    if not value:
+        message = (
+            f"Missing {label}. Set {env_name} in your environment/.env "
+            + f"or pass {cli}."
+        )
+        raise ValueError(message)
+    return value
+
+
+def _resolve_token(token: str | None, token_path: Path | str | None) -> str:
+    """Resolve the API token from a flag, environment, or token files."""
+    resolved = token or os.environ.get("ODOO_RPC_TOKEN")
+    if not resolved:
+        candidate_token_paths: list[Path] = []
+        if token_path:
+            candidate_token_paths.append(Path(token_path).expanduser())
+        if os.environ.get("ODOO_RPC_TOKEN_PATH"):
+            candidate_token_paths.append(
+                Path(os.environ["ODOO_RPC_TOKEN_PATH"]).expanduser()
+            )
+        candidate_token_paths.append(Path("~/.erp-token").expanduser())
+        for path in candidate_token_paths:
+            if path.is_file():
+                try:
+                    resolved = path.read_text(encoding="utf-8").strip()
+                    if resolved:
+                        break
+                except OSError:
+                    continue
+    if not resolved:
+        message = (
+            "Missing Odoo RPC token. Specify ODOO_RPC_TOKEN, "
+            + "provide ODOO_RPC_TOKEN_PATH, or pass --token / --token-path."
+        )
+        raise ValueError(message)
+    return resolved
+
+
+def _resolve_verify_ssl(verify_ssl: bool | None) -> bool:
+    """Resolve SSL verification with a default-true environment fallback."""
+    if verify_ssl is not None:
+        return verify_ssl
+    env_ssl = os.environ.get("ODOO_RPC_VERIFY_SSL", "true").strip().lower()
+    return env_ssl not in ("0", "false", "no", "off")
 
 
 def json_rpc(
     url: str,
     service: str,
     method: str,
-    *args: Any,
+    *args: JsonValue,
     verify_ssl: bool = True,
     timeout: float = 30.0,
-) -> Any:
+) -> JsonValue:
     """Execute a single JSON-RPC 2.0 call against Odoo."""
     payload = {
         "jsonrpc": "2.0",
@@ -235,7 +257,7 @@ def json_rpc(
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
 
-    req = urllib.request.Request(
+    req = urllib.request.Request(  # noqa: S310 - the skill is an Odoo RPC client; the URL comes from validated OdooRpcConfig
         url,
         data=json.dumps(payload).encode("utf-8"),
         headers={
@@ -245,21 +267,31 @@ def json_rpc(
     )
 
     try:
-        with urllib.request.urlopen(req, context=ctx, timeout=timeout) as resp:
+        with urllib.request.urlopen(  # noqa: S310 - the skill is an Odoo RPC client; the URL comes from validated OdooRpcConfig
+            req, context=ctx, timeout=timeout
+        ) as raw_resp:  # pyright: ignore[reportAny] - typeshed types urlopen() as Any; narrowed to HTTPResponse on the next line
+            resp = cast("http.client.HTTPResponse", raw_resp)
             raw = resp.read().decode("utf-8")
-            res = json.loads(raw)
+            decoded = cast("object", json.loads(raw))
+            if not isinstance(decoded, dict):
+                message = f"Unexpected JSON-RPC response: {raw!r}"
+                raise TypeError(message)
+            res = cast("dict[object, object]", decoded)
             if "error" in res:
-                raise RuntimeError(f"Odoo RPC Error: {res['error']}")
-            return res.get("result")
+                failure = f"Odoo RPC Error: {res['error']}"
+                raise RuntimeError(failure)
+            return cast("JsonValue", res.get("result"))
     except urllib.error.HTTPError as e:
         error_body = ""
         try:
             error_body = e.read().decode("utf-8", errors="replace")
         except (OSError, UnicodeDecodeError):
             error_body = "<unreadable>"
-        raise RuntimeError(f"HTTP {e.code}: {e.reason} ({error_body})") from e
+        http_failure = f"HTTP {e.code}: {e.reason} ({error_body})"
+        raise RuntimeError(http_failure) from e
     except urllib.error.URLError as e:
-        raise ConnectionError(f"Failed to connect to {url}: {e.reason}") from e
+        connection_failure = f"Failed to connect to {url}: {e.reason}"
+        raise ConnectionError(connection_failure) from e
 
 
 class OdooRpcClient:
@@ -271,12 +303,14 @@ class OdooRpcClient:
         *,
         allow_write: bool = False,
     ) -> None:
-        self.config = config or OdooRpcConfig.from_env()
-        self.allow_write = allow_write
+        """Build a client with an explicit config or environment defaults."""
+        self.config: OdooRpcConfig = config or OdooRpcConfig.from_env()
+        self.allow_write: bool = allow_write
         self._uid: int | None = None
 
     @property
     def uid(self) -> int:
+        """Return the cached authenticated user id."""
         if self._uid is None:
             res = json_rpc(
                 self.config.url,
@@ -289,9 +323,11 @@ class OdooRpcClient:
                 verify_ssl=self.config.verify_ssl,
             )
             if not res or not isinstance(res, int):
-                raise PermissionError(
-                    f"Authentication failed at {self.config.url} for user {self.config.user}"
+                auth_failure = (
+                    f"Authentication failed at {self.config.url} "
+                    + f"for user {self.config.user}"
                 )
+                raise PermissionError(auth_failure)
             self._uid = res
         return self._uid
 
@@ -299,24 +335,28 @@ class OdooRpcClient:
         self,
         model: str,
         method: str,
-        args: list[Any] | None = None,
-        kwargs: dict[str, Any] | None = None,
-    ) -> Any:
+        args: list[JsonValue] | None = None,
+        kwargs: JsonObject | None = None,
+    ) -> JsonValue:
         """Execute a model method after checking method permission policies."""
         if method in READONLY_ALLOWLIST:
             # Safe read-only / introspection methods are always allowed
             pass
         elif method in MUTATION_ALLOWLIST:
             if not self.allow_write:
-                raise PermissionError(
-                    f"MUTATION BLOCKED: Method '{method}' modifies data but --write was not specified. "
-                    "Pass --write to authorize state mutations."
+                blocked = (
+                    f"MUTATION BLOCKED: Method '{method}' modifies data "
+                    + "but --write was not specified. "
+                    + "Pass --write to authorize state mutations."
                 )
+                raise PermissionError(blocked)
         else:
-            raise PermissionError(
-                f"METHOD FORBIDDEN: Method '{method}' is neither in the safe allowlist nor the mutation allowlist: "
-                f"{sorted(READONLY_ALLOWLIST | MUTATION_ALLOWLIST)}"
+            forbidden = (
+                f"METHOD FORBIDDEN: Method '{method}' is neither in the safe "
+                + "allowlist nor the mutation allowlist: "
+                + f"{sorted(READONLY_ALLOWLIST | MUTATION_ALLOWLIST)}"
             )
+            raise PermissionError(forbidden)
 
         return json_rpc(
             self.config.url,
@@ -334,64 +374,86 @@ class OdooRpcClient:
 
     # --- Read & Query Operations ---
 
-    def search_read(
+    def search_read(  # noqa: PLR0913, PLR0917 - mirrors Odoo's search_read signature position-for-position
         self,
         model: str,
-        domain: list[Any] | None = None,
+        domain: list[JsonValue] | None = None,
         fields: list[str] | None = None,
         limit: int | None = None,
         offset: int = 0,
         order: str | None = None,
-    ) -> list[dict[str, Any]]:
-        kwargs: dict[str, Any] = {"offset": offset}
+    ) -> list[JsonRecord]:
+        """Search records and read their fields in one call."""
+        kwargs: JsonObject = {"offset": offset}
         if fields:
-            kwargs["fields"] = fields
+            kwargs["fields"] = cast("JsonValue", fields)
         if limit is not None:
             kwargs["limit"] = limit
         if order:
             kwargs["order"] = order
-        return self.execute(model, "search_read", [domain or []], kwargs)
+        return cast(
+            "list[JsonRecord]",
+            self.execute(model, "search_read", [domain or []], kwargs),
+        )
 
-    def search_count(self, model: str, domain: list[Any] | None = None) -> int:
-        return self.execute(model, "search_count", [domain or []])
+    def search_count(self, model: str, domain: list[JsonValue] | None = None) -> int:
+        """Count records matching a domain."""
+        return cast("int", self.execute(model, "search_count", [domain or []]))
 
     def read(
         self,
         model: str,
         ids: list[int],
         fields: list[str] | None = None,
-    ) -> list[dict[str, Any]]:
-        kwargs = {"fields": fields} if fields else {}
-        return self.execute(model, "read", [ids], kwargs)
+    ) -> list[JsonRecord]:
+        """Read field values for record ids."""
+        kwargs: JsonObject = {"fields": cast("JsonValue", fields)} if fields else {}
+        return cast(
+            "list[JsonRecord]",
+            self.execute(model, "read", [cast("JsonValue", ids)], kwargs),
+        )
 
     def fields_get(
         self,
         model: str,
         allfields: list[str] | None = None,
         attributes: list[str] | None = None,
-    ) -> dict[str, Any]:
-        args = [allfields] if allfields is not None else []
-        kwargs = {"attributes": attributes} if attributes else {}
-        return self.execute(model, "fields_get", args, kwargs)
+    ) -> JsonObject:
+        """Inspect model field definitions."""
+        args = [cast("JsonValue", allfields)] if allfields is not None else []
+        kwargs: JsonObject = (
+            {"attributes": cast("JsonValue", attributes)} if attributes else {}
+        )
+        return cast("JsonObject", self.execute(model, "fields_get", args, kwargs))
 
     def get_view(
         self,
         model: str,
         view_id: int | None = None,
         view_type: str = "form",
-    ) -> dict[str, Any]:
-        kwargs = {"view_type": view_type}
+    ) -> JsonObject:
+        """Inspect a rendered view architecture."""
+        kwargs: JsonObject = {"view_type": view_type}
         if view_id is not None:
             kwargs["view_id"] = view_id
-        return self.execute(model, "get_view", [], kwargs)
+        return cast("JsonObject", self.execute(model, "get_view", [], kwargs))
 
     def get_views(
         self,
         model: str,
-        views: list[list[Any]],
-        options: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        return self.execute(model, "get_views", [views], {"options": options or {}})
+        views: list[list[JsonValue]],
+        options: JsonObject | None = None,
+    ) -> JsonObject:
+        """Inspect rendered view architectures."""
+        return cast(
+            "JsonObject",
+            self.execute(
+                model,
+                "get_views",
+                [cast("JsonValue", views)],
+                {"options": options or {}},
+            ),
+        )
 
     # --- Safe Introspection Operations ---
 
@@ -399,22 +461,34 @@ class OdooRpcClient:
         self,
         model: str,
         ids: list[int],
-    ) -> list[dict[str, Any]]:
-        return self.execute(model, "get_metadata", [ids])
+    ) -> list[JsonRecord]:
+        """Fetch record metadata for ids."""
+        return cast(
+            "list[JsonRecord]",
+            self.execute(model, "get_metadata", [cast("JsonValue", ids)]),
+        )
 
     def get_external_id(
         self,
         model: str,
         ids: list[int],
     ) -> dict[int, str]:
-        return self.execute(model, "get_external_id", [ids])
+        """Fetch XML external ids for record ids."""
+        return cast(
+            "dict[int, str]",
+            self.execute(model, "get_external_id", [cast("JsonValue", ids)]),
+        )
 
     def default_get(
         self,
         model: str,
         fields: list[str],
-    ) -> dict[str, Any]:
-        return self.execute(model, "default_get", [fields])
+    ) -> JsonObject:
+        """Fetch default values for fields."""
+        return cast(
+            "JsonObject",
+            self.execute(model, "default_get", [cast("JsonValue", fields)]),
+        )
 
     def check_access_rights(
         self,
@@ -422,29 +496,40 @@ class OdooRpcClient:
         operation: str = "read",
         raise_exception: bool = False,
     ) -> bool:
-        return self.execute(
-            model,
-            "check_access_rights",
-            [operation],
-            {"raise_exception": raise_exception},
+        """Check model access rights for an operation."""
+        return cast(
+            "bool",
+            self.execute(
+                model,
+                "check_access_rights",
+                [operation],
+                {"raise_exception": raise_exception},
+            ),
         )
 
     def user_has_groups(
         self,
         groups: str,
     ) -> bool:
-        return self.execute("res.users", "user_has_groups", [groups])
+        """Check whether the current user has a group."""
+        return cast("bool", self.execute("res.users", "user_has_groups", [groups]))
 
     def onchange(
         self,
         model: str,
         ids: list[int],
-        values: dict[str, Any],
+        values: JsonObject,
         field_name: str,
-        field_onchange: dict[str, Any],
-    ) -> dict[str, Any]:
-        return self.execute(
-            model, "onchange", [ids, values, field_name, field_onchange]
+        field_onchange: JsonObject,
+    ) -> JsonObject:
+        """Simulate an onchange for a field."""
+        return cast(
+            "JsonObject",
+            self.execute(
+                model,
+                "onchange",
+                [cast("JsonValue", ids), values, field_name, field_onchange],
+            ),
         )
 
     # --- State Mutation Operations (Guarded by --write) ---
@@ -452,54 +537,72 @@ class OdooRpcClient:
     def create(
         self,
         model: str,
-        vals: dict[str, Any] | list[dict[str, Any]],
+        vals: JsonObject | list[JsonRecord],
     ) -> int | list[int]:
-        return self.execute(model, "create", [vals])
+        """Create records from field values."""
+        return cast(
+            "int | list[int]", self.execute(model, "create", [cast("JsonValue", vals)])
+        )
 
     def write(
         self,
         model: str,
         ids: list[int],
-        vals: dict[str, Any],
+        vals: JsonObject,
     ) -> bool:
-        return self.execute(model, "write", [ids, vals])
+        """Update records with field values."""
+        return cast(
+            "bool",
+            self.execute(model, "write", [cast("JsonValue", ids), vals]),
+        )
 
     def unlink(
         self,
         model: str,
         ids: list[int],
     ) -> bool:
-        return self.execute(model, "unlink", [ids])
+        """Delete records by id."""
+        return cast("bool", self.execute(model, "unlink", [cast("JsonValue", ids)]))
 
     def copy(
         self,
         model: str,
         record_id: int,
-        default: dict[str, Any] | None = None,
+        default: JsonObject | None = None,
     ) -> int:
-        kwargs = {"default": default} if default else {}
-        return self.execute(model, "copy", [record_id], kwargs)
+        """Duplicate a record with optional default overrides."""
+        kwargs: JsonObject = {"default": default} if default else {}
+        return cast("int", self.execute(model, "copy", [record_id], kwargs))
 
     def action_archive(
         self,
         model: str,
         ids: list[int],
     ) -> bool:
-        return self.execute(model, "action_archive", [ids])
+        """Archive records by id."""
+        return cast(
+            "bool", self.execute(model, "action_archive", [cast("JsonValue", ids)])
+        )
 
     def action_unarchive(
         self,
         model: str,
         ids: list[int],
     ) -> bool:
-        return self.execute(model, "action_unarchive", [ids])
+        """Unarchive records by id."""
+        return cast(
+            "bool", self.execute(model, "action_unarchive", [cast("JsonValue", ids)])
+        )
 
     def toggle_active(
         self,
         model: str,
         ids: list[int],
     ) -> bool:
-        return self.execute(model, "toggle_active", [ids])
+        """Toggle the active flag on records."""
+        return cast(
+            "bool", self.execute(model, "toggle_active", [cast("JsonValue", ids)])
+        )
 
 
 # Backward-compatible alias
@@ -507,256 +610,472 @@ OdooReadOnlyClient = OdooRpcClient
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the Odoo RPC command-line parser."""
     parser = argparse.ArgumentParser(
         description="Odoo JSON-RPC Client (Safe Querying & Guarded Mutations)",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     # Global connection & execution overrides
-    parser.add_argument("--url", help="Odoo JSON-RPC endpoint URL")
-    parser.add_argument("--db", help="Odoo database name")
-    parser.add_argument("--user", help="Odoo user login")
-    parser.add_argument("--token", help="Odoo API token or password")
-    parser.add_argument("--token-path", help="Path to token file")
-    parser.add_argument(
+    _ = parser.add_argument("--url", help="Odoo JSON-RPC endpoint URL")
+    _ = parser.add_argument("--db", help="Odoo database name")
+    _ = parser.add_argument("--user", help="Odoo user login")
+    _ = parser.add_argument("--token", help="Odoo API token or password")
+    _ = parser.add_argument("--token-path", help="Path to token file")
+    _ = parser.add_argument(
         "--insecure", action="store_true", help="Disable SSL certificate verification"
     )
-    parser.add_argument("--env-file", help="Path to specific .env configuration file")
-    parser.add_argument(
+    _ = parser.add_argument(
+        "--env-file", help="Path to specific .env configuration file"
+    )
+    _ = parser.add_argument(
         "--write",
         action="store_true",
         help="Authorize state mutations (create, write, unlink, archive, copy)",
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
+    _add_query_parsers(subparsers.add_parser)
+    _add_introspection_parsers(subparsers.add_parser)
+    _add_mutation_parsers(subparsers.add_parser)
+    return parser
 
+
+def _add_query_parsers(
+    add_parser: Callable[..., argparse.ArgumentParser],
+) -> None:
+    """Register read-query subcommands."""
     # --- Query Commands ---
-    sr_parser = subparsers.add_parser("search_read", help="Execute search_read query")
-    sr_parser.add_argument("model", help="Model name (e.g. crm.lead)")
-    sr_parser.add_argument(
+    sr_parser = add_parser("search_read", help="Execute search_read query")
+    _ = sr_parser.add_argument("model", help="Model name (e.g. crm.lead)")
+    _ = sr_parser.add_argument(
         "domain",
         nargs="?",
         default="[]",
         help='Domain as JSON array (e.g. \'[["active", "=", true]]\')',
     )
-    sr_parser.add_argument(
+    _ = sr_parser.add_argument(
         "--fields", nargs="*", default=None, help="Field names to retrieve"
     )
-    sr_parser.add_argument(
+    _ = sr_parser.add_argument(
         "--limit", type=int, default=10, help="Maximum records to return"
     )
-    sr_parser.add_argument("--offset", type=int, default=0, help="Record offset")
-    sr_parser.add_argument("--order", default=None, help="Sort order (e.g. 'id desc')")
+    _ = sr_parser.add_argument("--offset", type=int, default=0, help="Record offset")
+    _ = sr_parser.add_argument(
+        "--order", default=None, help="Sort order (e.g. 'id desc')"
+    )
 
-    count_parser = subparsers.add_parser("count", help="Count matching records")
-    count_parser.add_argument("model", help="Model name")
-    count_parser.add_argument(
+    count_parser = add_parser("count", help="Count matching records")
+    _ = count_parser.add_argument("model", help="Model name")
+    _ = count_parser.add_argument(
         "domain", nargs="?", default="[]", help="Domain as JSON array"
     )
 
-    read_parser = subparsers.add_parser("read", help="Read records by ID")
-    read_parser.add_argument("model", help="Model name")
-    read_parser.add_argument("ids", help="Record IDs as JSON array (e.g. '[1, 2, 3]')")
-    read_parser.add_argument(
+    read_parser = add_parser("read", help="Read records by ID")
+    _ = read_parser.add_argument("model", help="Model name")
+    _ = read_parser.add_argument(
+        "ids", help="Record IDs as JSON array (e.g. '[1, 2, 3]')"
+    )
+    _ = read_parser.add_argument(
         "--fields", nargs="*", default=None, help="Field names to retrieve"
     )
 
-    fg_parser = subparsers.add_parser(
-        "fields_get", help="Inspect model fields definition"
-    )
-    fg_parser.add_argument("model", help="Model name")
-    fg_parser.add_argument(
+    fg_parser = add_parser("fields_get", help="Inspect model fields definition")
+    _ = fg_parser.add_argument("model", help="Model name")
+    _ = fg_parser.add_argument(
         "--fields", nargs="*", default=None, help="Specific fields to inspect"
     )
 
-    gv_parser = subparsers.add_parser(
-        "get_view", help="Inspect rendered view architecture"
+    gv_parser = add_parser("get_view", help="Inspect rendered view architecture")
+    _ = gv_parser.add_argument("model", help="Model name")
+    _ = gv_parser.add_argument(
+        "--view-id", type=int, default=None, help="Specific view ID"
     )
-    gv_parser.add_argument("model", help="Model name")
-    gv_parser.add_argument("--view-id", type=int, default=None, help="Specific view ID")
-    gv_parser.add_argument(
+    _ = gv_parser.add_argument(
         "--view-type", default="form", help="View type (form, list/tree, search)"
     )
 
+
+def _add_introspection_parsers(
+    add_parser: Callable[..., argparse.ArgumentParser],
+) -> None:
+    """Register safe-introspection subcommands."""
     # --- Safe Introspection Commands ---
-    meta_parser = subparsers.add_parser(
+    meta_parser = add_parser(
         "metadata", help="Get record metadata (create_date, write_date, XML IDs)"
     )
-    meta_parser.add_argument("model", help="Model name")
-    meta_parser.add_argument("ids", help="Record IDs as JSON array (e.g. '[1, 2]')")
+    _ = meta_parser.add_argument("model", help="Model name")
+    _ = meta_parser.add_argument("ids", help="Record IDs as JSON array (e.g. '[1, 2]')")
 
-    ext_parser = subparsers.add_parser(
-        "external_id", help="Retrieve XML External IDs for records"
-    )
-    ext_parser.add_argument("model", help="Model name")
-    ext_parser.add_argument("ids", help="Record IDs as JSON array (e.g. '[1, 2]')")
+    ext_parser = add_parser("external_id", help="Retrieve XML External IDs for records")
+    _ = ext_parser.add_argument("model", help="Model name")
+    _ = ext_parser.add_argument("ids", help="Record IDs as JSON array (e.g. '[1, 2]')")
 
-    def_parser = subparsers.add_parser(
-        "default_get", help="Retrieve default values for fields"
-    )
-    def_parser.add_argument("model", help="Model name")
-    def_parser.add_argument(
+    def_parser = add_parser("default_get", help="Retrieve default values for fields")
+    _ = def_parser.add_argument("model", help="Model name")
+    _ = def_parser.add_argument(
         "fields", nargs="+", help="Field names to inspect default values for"
     )
 
-    access_parser = subparsers.add_parser(
-        "check_access", help="Check model access rights"
-    )
-    access_parser.add_argument("model", help="Model name")
-    access_parser.add_argument(
+    access_parser = add_parser("check_access", help="Check model access rights")
+    _ = access_parser.add_argument("model", help="Model name")
+    _ = access_parser.add_argument(
         "--operation", default="read", choices=["read", "write", "create", "unlink"]
     )
 
-    group_parser = subparsers.add_parser(
-        "user_has_groups", help="Check if current user has group"
+    group_parser = add_parser("user_has_groups", help="Check if current user has group")
+    _ = group_parser.add_argument(
+        "groups", help="Group XML ID (e.g. 'base.group_system')"
     )
-    group_parser.add_argument("groups", help="Group XML ID (e.g. 'base.group_system')")
 
+
+def _add_mutation_parsers(
+    add_parser: Callable[..., argparse.ArgumentParser],
+) -> None:
+    """Register guarded state-mutation subcommands."""
     # --- State Mutation Commands (Require --write) ---
-    create_parser = subparsers.add_parser(
-        "create", help="Create new record(s) (requires --write)"
-    )
-    create_parser.add_argument("model", help="Model name")
-    create_parser.add_argument(
+    create_parser = add_parser("create", help="Create new record(s) (requires --write)")
+    _ = create_parser.add_argument("model", help="Model name")
+    _ = create_parser.add_argument(
         "values", help="Field values as JSON object or array of objects"
     )
 
-    update_parser = subparsers.add_parser(
+    update_parser = add_parser(
         "write", aliases=["update"], help="Update existing records (requires --write)"
     )
-    update_parser.add_argument("model", help="Model name")
-    update_parser.add_argument("ids", help="Record IDs as JSON array (e.g. '[1, 2]')")
-    update_parser.add_argument("values", help="Field values to update as JSON object")
+    _ = update_parser.add_argument("model", help="Model name")
+    _ = update_parser.add_argument(
+        "ids", help="Record IDs as JSON array (e.g. '[1, 2]')"
+    )
+    _ = update_parser.add_argument(
+        "values", help="Field values to update as JSON object"
+    )
 
-    unlink_parser = subparsers.add_parser(
+    unlink_parser = add_parser(
         "unlink", aliases=["delete"], help="Delete records (requires --write)"
     )
-    unlink_parser.add_argument("model", help="Model name")
-    unlink_parser.add_argument("ids", help="Record IDs as JSON array (e.g. '[1, 2]')")
-
-    copy_parser = subparsers.add_parser(
-        "copy", help="Duplicate a record (requires --write)"
+    _ = unlink_parser.add_argument("model", help="Model name")
+    _ = unlink_parser.add_argument(
+        "ids", help="Record IDs as JSON array (e.g. '[1, 2]')"
     )
-    copy_parser.add_argument("model", help="Model name")
-    copy_parser.add_argument("id", type=int, help="Record ID to duplicate")
-    copy_parser.add_argument(
+
+    copy_parser = add_parser("copy", help="Duplicate a record (requires --write)")
+    _ = copy_parser.add_argument("model", help="Model name")
+    _ = copy_parser.add_argument("id", type=int, help="Record ID to duplicate")
+    _ = copy_parser.add_argument(
         "--default", default=None, help="Default override values as JSON object"
     )
 
-    archive_parser = subparsers.add_parser(
+    archive_parser = add_parser(
         "archive", help="Archive records by setting active=False (requires --write)"
     )
-    archive_parser.add_argument("model", help="Model name")
-    archive_parser.add_argument("ids", help="Record IDs as JSON array")
+    _ = archive_parser.add_argument("model", help="Model name")
+    _ = archive_parser.add_argument("ids", help="Record IDs as JSON array")
 
-    unarchive_parser = subparsers.add_parser(
+    unarchive_parser = add_parser(
         "unarchive", help="Unarchive records by setting active=True (requires --write)"
     )
-    unarchive_parser.add_argument("model", help="Model name")
-    unarchive_parser.add_argument("ids", help="Record IDs as JSON array")
+    _ = unarchive_parser.add_argument("model", help="Model name")
+    _ = unarchive_parser.add_argument("ids", help="Record IDs as JSON array")
 
-    return parser
+
+def _optional_str(args: argparse.Namespace, field: str) -> str | None:
+    """Narrow an optional string flag to a typed value."""
+    value = cast("object", getattr(args, field))
+    return value if isinstance(value, str) else None
+
+
+def _optional_str_list(args: argparse.Namespace, field: str) -> list[str] | None:
+    """Narrow an optional string-list flag to a typed value."""
+    value = cast("object", getattr(args, field))
+    if value is None:
+        return None
+    items = cast("list[object]", value)
+    return [item for item in items if isinstance(item, str)]
+
+
+def _optional_int(args: argparse.Namespace, field: str, default: int) -> int:
+    """Narrow an optional integer flag to a typed value."""
+    value = cast("object", getattr(args, field))
+    return value if isinstance(value, int) else default
+
+
+def _optional_flag(args: argparse.Namespace, field: str) -> bool:
+    """Narrow an optional boolean flag to a typed value."""
+    value = cast("object", getattr(args, field))
+    return value if isinstance(value, bool) else False
+
+
+def _required_str(args: argparse.Namespace, field: str) -> str:
+    """Narrow a required string argument to a typed value."""
+    value = cast("object", getattr(args, field))
+    if not isinstance(value, str):
+        message = f"Missing required argument: {field}."
+        raise TypeError(message)
+    return value
+
+
+def _required_int(args: argparse.Namespace, field: str) -> int:
+    """Narrow a required integer argument to a typed value."""
+    value = cast("object", getattr(args, field))
+    if not isinstance(value, int) or isinstance(value, bool):
+        message = f"Invalid integer argument: {field}."
+        raise TypeError(message)
+    return value
+
+
+def _json_list(text: str, label: str) -> list[JsonValue]:
+    """Parse a CLI JSON-array argument."""
+    try:
+        value = cast("object", json.loads(text))
+    except json.JSONDecodeError as exc:
+        message = f"Invalid {label} JSON: {exc}."
+        raise ValueError(message) from exc
+    if not isinstance(value, list):
+        message = f"Invalid {label} JSON: expected an array."
+        raise TypeError(message)
+    return cast("list[JsonValue]", value)
+
+
+def _json_object_arg(text: str, label: str) -> JsonObject:
+    """Parse a CLI JSON-object argument."""
+    try:
+        value = cast("object", json.loads(text))
+    except json.JSONDecodeError as exc:
+        message = f"Invalid {label} JSON: {exc}."
+        raise ValueError(message) from exc
+    if not isinstance(value, dict):
+        message = f"Invalid {label} JSON: expected an object."
+        raise TypeError(message)
+    return cast("JsonObject", value)
+
+
+def _json_vals(text: str, label: str) -> JsonObject | list[JsonRecord]:
+    """Parse a CLI JSON argument that may be an object or an array of objects."""
+    try:
+        value = cast("object", json.loads(text))
+    except json.JSONDecodeError as exc:
+        message = f"Invalid {label} JSON: {exc}."
+        raise ValueError(message) from exc
+    if isinstance(value, dict):
+        return cast("JsonObject", value)
+    if isinstance(value, list):
+        items = cast("list[object]", value)
+        return [cast("JsonRecord", item) for item in items]
+    message = f"Invalid {label} JSON: expected an object or an array."
+    raise TypeError(message)
+
+
+def _id_list(text: str, label: str) -> list[int]:
+    """Parse a CLI JSON-array-of-ids argument."""
+    return [cast("int", item) for item in _json_list(text, label)]
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the Odoo RPC command-line interface."""
     parser = build_parser()
     args = parser.parse_args(argv)
-
-    load_env(args.env_file)
-
+    load_env(_optional_str(args, "env_file"))
+    command = _required_str(args, "command")
+    if command not in _ALL_COMMANDS:
+        _ = sys.stderr.write(f"Error: Unknown command: {command}.\n")
+        return 1
     try:
         config = OdooRpcConfig.from_env(
-            url=args.url,
-            database=args.db,
-            user=args.user,
-            token=args.token,
-            token_path=args.token_path,
-            verify_ssl=False if args.insecure else None,
+            url=_optional_str(args, "url"),
+            database=_optional_str(args, "db"),
+            user=_optional_str(args, "user"),
+            token=_optional_str(args, "token"),
+            token_path=_optional_str(args, "token_path"),
+            verify_ssl=False if _optional_flag(args, "insecure") else None,
         )
-        client = OdooRpcClient(config, allow_write=args.write)
-
-        # Query & Inspection
-        if args.command == "search_read":
-            domain = json.loads(args.domain)
-            res = client.search_read(
-                args.model,
-                domain=domain,
-                fields=args.fields,
-                limit=args.limit,
-                offset=args.offset,
-                order=args.order,
-            )
-            print(json.dumps(res, indent=2, ensure_ascii=False))
-        elif args.command == "count":
-            domain = json.loads(args.domain)
-            res = client.search_count(args.model, domain=domain)
-            print(json.dumps({"count": res}))
-        elif args.command == "read":
-            ids = json.loads(args.ids)
-            res = client.read(args.model, ids=ids, fields=args.fields)
-            print(json.dumps(res, indent=2, ensure_ascii=False))
-        elif args.command == "fields_get":
-            res = client.fields_get(args.model, allfields=args.fields)
-            print(json.dumps(res, indent=2, ensure_ascii=False))
-        elif args.command == "get_view":
-            res = client.get_view(
-                args.model, view_id=args.view_id, view_type=args.view_type
-            )
-            print(json.dumps(res, indent=2, ensure_ascii=False))
-        elif args.command == "metadata":
-            ids = json.loads(args.ids)
-            res = client.get_metadata(args.model, ids=ids)
-            print(json.dumps(res, indent=2, ensure_ascii=False))
-        elif args.command == "external_id":
-            ids = json.loads(args.ids)
-            res = client.get_external_id(args.model, ids=ids)
-            print(json.dumps(res, indent=2, ensure_ascii=False))
-        elif args.command == "default_get":
-            res = client.default_get(args.model, fields=args.fields)
-            print(json.dumps(res, indent=2, ensure_ascii=False))
-        elif args.command == "check_access":
-            res = client.check_access_rights(args.model, operation=args.operation)
-            print(json.dumps({"allowed": res}))
-        elif args.command == "user_has_groups":
-            res = client.user_has_groups(args.groups)
-            print(json.dumps({"has_group": res}))
-
-        # Mutations (guarded by client.allow_write / --write)
-        elif args.command == "create":
-            vals = json.loads(args.values)
-            res = client.create(args.model, vals=vals)
-            print(json.dumps({"created_id": res}))
-        elif args.command in ("write", "update"):
-            ids = json.loads(args.ids)
-            vals = json.loads(args.values)
-            res = client.write(args.model, ids=ids, vals=vals)
-            print(json.dumps({"updated": res}))
-        elif args.command in ("unlink", "delete"):
-            ids = json.loads(args.ids)
-            res = client.unlink(args.model, ids=ids)
-            print(json.dumps({"deleted": res}))
-        elif args.command == "copy":
-            default_vals = json.loads(args.default) if args.default else None
-            res = client.copy(args.model, record_id=args.id, default=default_vals)
-            print(json.dumps({"copied_id": res}))
-        elif args.command == "archive":
-            ids = json.loads(args.ids)
-            res = client.action_archive(args.model, ids=ids)
-            print(json.dumps({"archived": res}))
-        elif args.command == "unarchive":
-            ids = json.loads(args.ids)
-            res = client.action_unarchive(args.model, ids=ids)
-            print(json.dumps({"unarchived": res}))
-
-        return 0
+        client = OdooRpcClient(config, allow_write=_optional_flag(args, "write"))
+        if command in _READ_COMMANDS:
+            _run_read_commands(client, args, command)
+        elif command in _INSPECTION_COMMANDS:
+            _run_inspection_commands(client, args, command)
+        else:
+            _run_mutation_commands(client, args, command)
     except (
         ValueError,
+        TypeError,
         RuntimeError,
         PermissionError,
         ConnectionError,
         json.JSONDecodeError,
-    ) as e:
-        sys.stderr.write(f"Error: {e}\n")
+    ) as exc:
+        _ = sys.stderr.write(f"Error: {exc}\n")
         return 1
+    else:
+        return 0
+
+
+_READ_COMMANDS = frozenset({"search_read", "count", "read"})
+_INSPECTION_COMMANDS = frozenset(
+    {
+        "fields_get",
+        "get_view",
+        "metadata",
+        "external_id",
+        "default_get",
+        "check_access",
+        "user_has_groups",
+    }
+)
+_MUTATION_COMMANDS = frozenset(
+    {
+        "create",
+        "write",
+        "update",
+        "unlink",
+        "delete",
+        "copy",
+        "archive",
+        "unarchive",
+    }
+)
+_ALL_COMMANDS = _READ_COMMANDS | _INSPECTION_COMMANDS | _MUTATION_COMMANDS
+
+
+def _emit(payload: object) -> None:
+    """Print a JSON payload with the command's documented shape."""
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
+
+
+def _emit_compact(payload: object) -> None:
+    """Print a single-line JSON payload."""
+    print(json.dumps(payload))
+
+
+def _required_str_list(args: argparse.Namespace, field: str) -> list[str]:
+    """Narrow a required string-list argument to a typed value."""
+    value = cast("object", getattr(args, field))
+    if not isinstance(value, list):
+        message = f"Missing required argument: {field}."
+        raise TypeError(message)
+    items = cast("list[object]", value)
+    return [item for item in items if isinstance(item, str)]
+
+
+def _optional_int_or_none(args: argparse.Namespace, field: str) -> int | None:
+    """Narrow an optional integer-or-null flag to a typed value."""
+    value = cast("object", getattr(args, field))
+    return value if isinstance(value, int) else None
+
+
+def _run_read_commands(
+    client: OdooRpcClient, args: argparse.Namespace, command: str
+) -> None:
+    """Run search/count/read subcommands."""
+    model = _required_str(args, "model")
+    if command == "search_read":
+        res = client.search_read(
+            model,
+            domain=_json_list(_required_str(args, "domain"), "domain"),
+            fields=_optional_str_list(args, "fields"),
+            limit=_optional_int(args, "limit", 10),
+            offset=_optional_int(args, "offset", 0),
+            order=_optional_str(args, "order"),
+        )
+        _emit(res)
+    elif command == "count":
+        res = client.search_count(
+            model, domain=_json_list(_required_str(args, "domain"), "domain")
+        )
+        _emit_compact({"count": res})
+    elif command == "read":
+        res = client.read(
+            model,
+            ids=_id_list(_required_str(args, "ids"), "ids"),
+            fields=_optional_str_list(args, "fields"),
+        )
+        _emit(res)
+    else:
+        message = f"Unknown read command: {command}."
+        raise ValueError(message)
+
+
+def _run_inspection_commands(
+    client: OdooRpcClient, args: argparse.Namespace, command: str
+) -> None:
+    """Run safe-introspection subcommands."""
+    model = _required_str(args, "model")
+    if command == "fields_get":
+        _emit(client.fields_get(model, allfields=_optional_str_list(args, "fields")))
+    elif command == "get_view":
+        _emit(
+            client.get_view(
+                model,
+                view_id=_optional_int_or_none(args, "view_id"),
+                view_type=_required_str(args, "view_type"),
+            )
+        )
+    elif command == "metadata":
+        _emit(
+            client.get_metadata(model, ids=_id_list(_required_str(args, "ids"), "ids"))
+        )
+    elif command == "external_id":
+        _emit(
+            client.get_external_id(
+                model, ids=_id_list(_required_str(args, "ids"), "ids")
+            )
+        )
+    elif command == "default_get":
+        _emit(client.default_get(model, fields=_required_str_list(args, "fields")))
+    elif command == "check_access":
+        _emit_compact(
+            {
+                "allowed": client.check_access_rights(
+                    model, operation=_required_str(args, "operation")
+                )
+            }
+        )
+    elif command == "user_has_groups":
+        _emit_compact(
+            {"has_group": client.user_has_groups(_required_str(args, "groups"))}
+        )
+    else:
+        message = f"Unknown inspection command: {command}."
+        raise ValueError(message)
+
+
+def _run_mutation_commands(
+    client: OdooRpcClient, args: argparse.Namespace, command: str
+) -> None:
+    """Run guarded state-mutation subcommands."""
+    model = _required_str(args, "model")
+    if command == "create":
+        vals = _json_vals(_required_str(args, "values"), "values")
+        _emit_compact({"created_id": client.create(model, vals=vals)})
+    elif command in ("write", "update"):
+        ids = _id_list(_required_str(args, "ids"), "ids")
+        vals = _json_object_arg(_required_str(args, "values"), "values")
+        _emit_compact({"updated": client.write(model, ids=ids, vals=vals)})
+    elif command in ("unlink", "delete"):
+        ids = _id_list(_required_str(args, "ids"), "ids")
+        _emit_compact({"deleted": client.unlink(model, ids=ids)})
+    elif command == "copy":
+        default_text = _optional_str(args, "default")
+        default_vals = (
+            _json_object_arg(default_text, "default") if default_text else None
+        )
+        _emit_compact(
+            {
+                "copied_id": client.copy(
+                    model,
+                    record_id=_required_int(args, "id"),
+                    default=default_vals,
+                )
+            }
+        )
+    elif command == "archive":
+        ids = _id_list(_required_str(args, "ids"), "ids")
+        _emit_compact({"archived": client.action_archive(model, ids=ids)})
+    elif command == "unarchive":
+        ids = _id_list(_required_str(args, "ids"), "ids")
+        _emit_compact({"unarchived": client.action_unarchive(model, ids=ids)})
+    else:
+        message = f"Unknown mutation command: {command}."
+        raise ValueError(message)
 
 
 if __name__ == "__main__":

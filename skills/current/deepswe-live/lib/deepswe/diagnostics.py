@@ -7,6 +7,7 @@ import json
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from typing import cast
 
 # Diagnostic codes are intentionally local to DeepSWE.  Command error codes
 # remain the lower-case strings used by the existing CLI.
@@ -38,20 +39,20 @@ SEVERITIES = ("warning", "blocker", "error")
 # particular, ``token_count`` and the string value ``tokens`` are not secrets.
 _SECRET_KEY = re.compile(
     r"^(?:authorization|proxy[-_]?authorization|cookie|set[-_]?cookie|"
-    r"x[-_]?api[-_]?key|api[-_]?key|access[-_]?token|refresh[-_]?token|"
-    r"auth[-_]?token|token|password|passwd|secret|client[-_]?secret|"
-    r"credential|credentials)$",
+    + r"x[-_]?api[-_]?key|api[-_]?key|access[-_]?token|refresh[-_]?token|"
+    + r"auth[-_]?token|token|password|passwd|secret|client[-_]?secret|"
+    + r"credential|credentials)$",
     re.IGNORECASE,
 )
 _SECRET_VALUE = re.compile(
     r"(?ix)(?:\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]+|"
-    r"\b(?:sk(?:-proj)?|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9._-]{8,}|"
-    r"-----BEGIN [^-\r\n]*PRIVATE KEY-----)",
+    + r"\b(?:sk(?:-proj)?|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9._-]{8,}|"
+    + r"-----BEGIN [^-\r\n]*PRIVATE KEY-----)",
 )
 _SECRET_QUERY = re.compile(
     r"(?i)([?&](?:api[-_]?key|access[-_]?token|auth[-_]?token|"
-    r"client[-_]?secret|token|secret|password|authorization|credential)="
-    r"[^&#\s]*)"
+    + r"client[-_]?secret|token|secret|password|authorization|credential)="
+    + r"[^&#\s]*)"
 )
 
 
@@ -62,8 +63,9 @@ def redact(value: object) -> object:
     It deliberately leaves ordinary metric strings and numeric values untouched.
     """
     if isinstance(value, Mapping):
+        mapping = cast("Mapping[str, object]", value)
         result: dict[str, object] = {}
-        for key, item in value.items():
+        for key, item in mapping.items():
             name = str(key)
             if _SECRET_KEY.fullmatch(name):
                 result[name] = "<redacted>"
@@ -71,7 +73,8 @@ def redact(value: object) -> object:
                 result[name] = redact(item)
         return result
     if isinstance(value, (list, tuple, set, frozenset)):
-        return [redact(item) for item in value]
+        items = cast("list[object]", cast("object", value))
+        return [redact(item) for item in items]
     if isinstance(value, str):
         if _SECRET_VALUE.search(value):
             return "<redacted>"
@@ -92,7 +95,9 @@ class Diagnostic:
     message: str = ""
     source_path: str | None = None
     artifact_id: str | None = None
-    details: Mapping[str, object] = field(default_factory=dict)
+    details: Mapping[str, object] = field(
+        default_factory=lambda: cast("dict[str, object]", {})
+    )
 
     def __post_init__(self) -> None:
         """Normalize and validate this diagnostic."""
@@ -108,9 +113,6 @@ class Diagnostic:
         if not stage:
             msg = "diagnostic stage must be non-empty"
             raise ValueError(msg)
-        if not isinstance(self.details, Mapping):
-            msg = "diagnostic details must be a mapping"
-            raise TypeError(msg)
         object.__setattr__(self, "code", code)
         object.__setattr__(self, "severity", severity)
         object.__setattr__(self, "stage", stage)
@@ -169,7 +171,11 @@ def _normalise(item: Diagnostic | Mapping[str, object]) -> dict[str, object]:
     source_path_value = raw.pop("source_path", None)
     artifact_id_value = raw.pop("artifact_id", None)
     details_value = raw.pop("details", {})
-    details = dict(details_value) if isinstance(details_value, Mapping) else {}
+    details = (
+        dict(cast("Mapping[str, object]", details_value))
+        if isinstance(details_value, Mapping)
+        else {}
+    )
     result: dict[str, object] = {
         "code": code,
         "severity": severity,
@@ -211,14 +217,13 @@ def merge_diagnostics(
     unique: dict[str, dict[str, object]] = {}
     for group in groups:
         if isinstance(group, (Diagnostic, Mapping)):
-            items: Iterable[Diagnostic | Mapping[str, object]] = (group,)
+            single = cast("Diagnostic | Mapping[str, object]", group)
+            items: Iterable[Diagnostic | Mapping[str, object]] = (single,)
         else:
             items = group
         for item in items:
-            if not isinstance(item, (Diagnostic, Mapping)):
-                continue
             normalized = _normalise(item)
-            unique.setdefault(_canonical(normalized), normalized)
+            _ = unique.setdefault(_canonical(normalized), normalized)
 
     def sort_key(item: dict[str, object]) -> tuple[str, ...]:
         return (

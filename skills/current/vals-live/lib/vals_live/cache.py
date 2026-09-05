@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
-from typing import NoReturn, Protocol, Self
+from typing import NoReturn, Protocol, Self, cast
 from urllib import request as urllib_request
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
@@ -28,7 +28,7 @@ HTTP_SUCCESS_LIMIT = 300
 
 def urlopen(request: Request, *, timeout: float = 30.0) -> object:
     """Indirection used by deterministic transport fakes."""
-    return urllib_request.urlopen(request, timeout=timeout)  # noqa: S310
+    return cast("object", urllib_request.urlopen(request, timeout=timeout))  # noqa: S310
 
 
 class ResponseLike(Protocol):
@@ -78,6 +78,9 @@ class CacheEntry:
 class CacheError(RuntimeError):
     """Represent a structured transport/cache failure."""
 
+    code: str
+    details: dict[str, object]
+
     def __init__(
         self, code: str, message: str, details: Mapping[str, object] | None = None
     ) -> None:
@@ -121,7 +124,8 @@ def _header(headers: object, name: str) -> str | None:
         if value is not None:
             return str(value)
     if isinstance(headers, Mapping):
-        for key, value in headers.items():
+        headers_map = cast("Mapping[object, object]", headers)
+        for key, value in headers_map.items():
             if str(key).lower() == wanted:
                 return str(value)
     return None
@@ -153,10 +157,10 @@ def _atomic_bytes(path: Path, body: bytes) -> None:
     fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
         with os.fdopen(fd, "wb") as handle:
-            handle.write(body)
+            _ = handle.write(body)
             handle.flush()
             os.fsync(handle.fileno())
-        Path(temp_name).replace(path)
+        _ = Path(temp_name).replace(path)
     finally:
         with contextlib.suppress(FileNotFoundError):
             Path(temp_name).unlink()
@@ -176,6 +180,10 @@ def _atomic_json(path: Path, value: Mapping[str, object]) -> None:
 
 class CacheStore:
     """Append-only cache. Existing bytes are never replaced or evicted."""
+
+    root: Path
+    artifacts: Path
+    index: Path
 
     def __init__(self, root: str | os.PathLike[str] | None = None) -> None:
         """Initialize cache directories without creating them yet."""
@@ -236,27 +244,33 @@ class CacheStore:
         """Load and validate an artifact index entry."""
         index_path = self.index / f"{_key(url, release)}.json"
         try:
-            pointer = json.loads(index_path.read_text(encoding="utf-8"))
-            if not isinstance(pointer, dict):
+            pointer_raw: object = cast(
+                "object", json.loads(index_path.read_text(encoding="utf-8"))
+            )
+            if not isinstance(pointer_raw, Mapping):
                 return None
+            pointer = cast("Mapping[str, object]", pointer_raw)
             body_path = Path(str(pointer["body_path"]))
             meta_path = Path(str(pointer["metadata_path"]))
             body = body_path.read_bytes()
-            metadata_raw = json.loads(meta_path.read_text(encoding="utf-8"))
-            if not isinstance(metadata_raw, dict):
+            metadata_raw: object = cast(
+                "object", json.loads(meta_path.read_text(encoding="utf-8"))
+            )
+            if not isinstance(metadata_raw, Mapping):
                 return None
+            meta_map = cast("Mapping[str, object]", metadata_raw)
             digest = sha256(body).hexdigest()
-            if digest != str(metadata_raw.get("sha256")) or digest != str(
+            if digest != str(meta_map.get("sha256")) or digest != str(
                 pointer.get("sha256")
             ):
                 return None
             if (
-                str(metadata_raw.get("source_url")) != url
-                or metadata_raw.get("release") != release
+                str(meta_map.get("source_url")) != url
+                or meta_map.get("release") != release
             ):
                 return None
             return CacheEntry(
-                url, release, digest, body_path, meta_path, dict(metadata_raw), body
+                url, release, digest, body_path, meta_path, dict(meta_map), body
             )
         except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
             return None
@@ -265,7 +279,7 @@ class CacheStore:
         self, entries: list[CacheEntry], *, release: str | None, source_url: str
     ) -> Path:
         """Write a content-addressed snapshot manifest."""
-        payload = {
+        payload: dict[str, object] = {
             "schema_version": "1",
             "source": "vals",
             "source_url": source_url,
@@ -391,9 +405,14 @@ def _fetch_options(kwargs: Mapping[str, object]) -> _FetchOptions:
     headers_value = kwargs.get("headers")
     if headers_value is not None and not isinstance(headers_value, Mapping):
         _option_error("fetch() headers must be a mapping or None")
-    headers = (
-        {str(key): str(value) for key, value in headers_value.items()}
+    headers_map = (
+        cast("Mapping[object, object]", headers_value)
         if isinstance(headers_value, Mapping)
+        else None
+    )
+    headers = (
+        {str(key): str(value) for key, value in headers_map.items()}
+        if headers_map is not None
         else None
     )
     return _FetchOptions(
@@ -414,7 +433,7 @@ def _cached_artifact(
     final_url: str | None = None,
 ) -> RawArtifact:
     metadata = context.cached.metadata if context.cached else {}
-    reason = (
+    reason: dict[str, object] | None = (
         {
             "code": stale_reason.code,
             "message": str(stale_reason),
@@ -431,11 +450,17 @@ def _cached_artifact(
             {"attempted_url": context.url},
         )
     options = context.options
+    status_raw = metadata.get("status_code")
+    status_val = (
+        int(status_raw)
+        if isinstance(status_raw, (int, str))
+        else (status_code or HTTP_OK)
+    )
     return RawArtifact(
         context.url,
         options.discovered_from,
         cached.body,
-        status_code=int(metadata.get("status_code") or status_code or HTTP_OK),
+        status_code=status_val,
         content_type=str(metadata.get("content_type") or "application/octet-stream"),
         final_url=str(metadata.get("final_url") or final_url or context.url),
         etag=str(metadata.get("etag")) if metadata.get("etag") else None,
@@ -461,12 +486,10 @@ def _fetch_once(context: _FetchContext) -> RawArtifact:
         context.url, headers=dict(context.request_headers), method="GET"
     )
     opened = urlopen(request, timeout=options.timeout)
-    response_context = (
-        opened if hasattr(opened, "__enter__") else _ResponseContext(opened)
-    )
+    response_context = _ResponseContext(opened)
     with response_context as response:
         status = _status(response)
-        response_headers = getattr(response, "headers", None)
+        response_headers: object = getattr(response, "headers", None)
         final_url = _final_url(response, context.url)
         if status == HTTP_NOT_MODIFIED:
             cached = context.cached
@@ -520,7 +543,7 @@ def _fetch_once(context: _FetchContext) -> RawArtifact:
             release=options.release,
             sha256=sha256(body).hexdigest(),
         )
-        context.store.put(artifact)
+        _ = context.store.put(artifact)
         return artifact
 
 
@@ -550,6 +573,8 @@ def fetch(url: str, **kwargs: object) -> RawArtifact:
             return _cached_artifact(context, stale_reason=exc)
         raise
     except (HTTPError, URLError, OSError, TimeoutError) as exc:
+        if isinstance(exc, HTTPError):
+            _ = exc.close()
         status = getattr(exc, "code", None)
         code = "SOURCE_AUTH_REQUIRED" if status in (401, 403) else "SOURCE_UNAVAILABLE"
         details: dict[str, object] = {"attempted_url": url}
@@ -566,13 +591,21 @@ def fetch(url: str, **kwargs: object) -> RawArtifact:
 
 
 class _ResponseContext:
+    response: object
+
     def __init__(self, response: object) -> None:
         self.response = response
 
     def __enter__(self) -> object:
+        enter = getattr(self.response, "__enter__", None)
+        if callable(enter):
+            return enter()
         return self.response
 
     def __exit__(self, *args: object) -> None:
+        exit_m = getattr(self.response, "__exit__", None)
+        if callable(exit_m):
+            _ = exit_m(*args)
         close = getattr(self.response, "close", None)
         if callable(close):
-            close()
+            _ = close()

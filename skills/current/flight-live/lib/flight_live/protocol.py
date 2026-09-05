@@ -1,8 +1,9 @@
+"""Assembled search payloads, insights, and decisions for flight-live."""
+
 from __future__ import annotations
 
-from collections.abc import Sequence
 from statistics import mean
-from typing import NotRequired, TypedDict
+from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 from .models import (
     FlightLiveError,
@@ -11,6 +12,10 @@ from .models import (
     ResolvedPlace,
     SearchRequest,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
 from .providers import fetch_kiwi_web_calendar, resolve_place
 from .scoring import rank_options
 
@@ -18,9 +23,12 @@ PROTOCOL_VERSION = "1"
 LLM_JSON_TYPE = "flight-live.search_results"
 SCHEMA_TYPE = "flight-live.schema"
 SCHEMA_NAME = "flight-live"
+_WEEKEND_PREMIUM_PCT = 8
 
 
 class ResolvedPlacePayload(TypedDict):
+    """Resolved place payload in a search response."""
+
     query: str
     iata: str
     name: str | None
@@ -28,12 +36,16 @@ class ResolvedPlacePayload(TypedDict):
 
 
 class SummaryPayload(TypedDict):
+    """Summary counts payload in a search response."""
+
     planner_received: int
     after_filters: int
     returned: int
 
 
 class InsightsPayload(TypedDict):
+    """Insights payload in a search response."""
+
     weekend_avg_price: NotRequired[float]
     weekday_avg_price: NotRequired[float]
     weekend_premium_pct: NotRequired[float]
@@ -41,12 +53,16 @@ class InsightsPayload(TypedDict):
 
 
 class DecisionPayload(TypedDict):
+    """Decision payload in a search response."""
+
     recommendation: str
     actions: list[str]
     avoid: list[str]
 
 
 class SearchPayload(TypedDict):
+    """Top-level search payload contract."""
+
     type: str
     version: str
     ok: bool
@@ -61,8 +77,10 @@ class SearchPayload(TypedDict):
 
 
 def search_flights(request: SearchRequest) -> SearchPayload:
+    """Run the full search pipeline and assemble the payload."""
     if request.depart_end < request.depart_start:
-        raise FlightLiveError("depart-end must be >= depart-start")
+        message = "depart-end must be >= depart-start"
+        raise FlightLiveError(message)
 
     resolved_origin = resolve_place(request.origin, locale=request.locale)
     resolved_destination = resolve_place(request.destination, locale=request.locale)
@@ -89,7 +107,8 @@ def search_flights(request: SearchRequest) -> SearchPayload:
     warnings: list[str] = []
     if not filtered:
         warnings.append(
-            "No planner offers after filters. Widen date window, relax nonstop, or remove budget cap.",
+            "No planner offers after filters. Widen date window, relax nonstop, "
+            + "or remove budget cap."
         )
 
     insights = _build_insights(filtered)
@@ -108,7 +127,7 @@ def search_flights(request: SearchRequest) -> SearchPayload:
     )
 
 
-def build_llm_payload(
+def build_llm_payload(  # noqa: PLR0913 - payload assembly; parameters map one-to-one to payload sections
     *,
     request: SearchRequest,
     resolved_origin: ResolvedPlace,
@@ -120,6 +139,7 @@ def build_llm_payload(
     insights: InsightsPayload,
     decision: DecisionPayload,
 ) -> SearchPayload:
+    """Assemble the LLM-facing search payload from pipeline outputs."""
     payload: SearchPayload = {
         "type": LLM_JSON_TYPE,
         "version": PROTOCOL_VERSION,
@@ -166,15 +186,20 @@ def build_llm_payload(
 
 
 def serialize_results(payload: SearchPayload) -> list[dict[str, object]]:
+    """Project the result rows out of a search payload."""
     return payload["results"]
 
 
 def get_schema_document() -> dict[str, object]:
+    """Return the static RPC schema document."""
     return {
         "type": SCHEMA_TYPE,
         "version": PROTOCOL_VERSION,
         "name": SCHEMA_NAME,
-        "description": "Read-only agent-first flight search via Kiwi web scraping + public location resolver.",
+        "description": (
+            "Read-only agent-first flight search via Kiwi web scraping + "
+            + "public location resolver."
+        ),
         "capabilities": {
             "read_only": True,
             "modes": ["cli", "rpc"],
@@ -410,21 +435,23 @@ def _build_decision(
 
     best = ranked[0]
     actions = [
-        f"Target departures near {best.depart_date.isoformat()} for lowest score-adjusted fare.",
+        "Target departures near "
+        + f"{best.depart_date.isoformat()} for lowest score-adjusted fare.",
         "Probe ±2 days around top option to check for lower local minima.",
     ]
 
     avoid = ["Friday/Saturday/Sunday departures unless they remain cheapest."]
 
     premium = insights.get("weekend_premium_pct")
-    if isinstance(premium, float) and premium > 8:
+    if isinstance(premium, float) and premium > _WEEKEND_PREMIUM_PCT:
         actions.append(
             "Prefer Tuesday-Thursday departures; observed weekend premium is high.",
         )
 
     recommendation = (
-        f"Best current candidate: {best.origin}->{best.destination} on {best.depart_date.isoformat()}"
-        f" at ~{best.effective_price:.2f} {best.currency}."
+        f"Best current candidate: {best.origin}->{best.destination} "
+        + f"on {best.depart_date.isoformat()}"
+        + f" at ~{best.effective_price:.2f} {best.currency}."
     )
 
     return {

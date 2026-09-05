@@ -3,19 +3,18 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, cast
 
 from .diagnostics import redact
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from .contracts import RawArtifact
 
 
 def artifact_provenance(
     artifact: RawArtifact, *, parser: str = "vals.extraction", parser_version: str = "1"
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Project transport and parser lineage for one artifact."""
     mode = (
         "snapshot"
@@ -26,7 +25,7 @@ def artifact_provenance(
             else ("revalidated" if artifact.cache_reused else "fresh")
         )
     )
-    return redact(
+    raw = redact(
         {
             "source_url": artifact.source_url,
             "discovered_from": artifact.discovered_from,
@@ -55,13 +54,16 @@ def artifact_provenance(
             },
         }
     )
+    if isinstance(raw, Mapping):
+        return {str(k): v for k, v in cast("Mapping[object, object]", raw).items()}
+    return {}
 
 
-def value_evidence(artifact: RawArtifact, **kwargs: object) -> dict[str, Any]:
+def value_evidence(artifact: RawArtifact, **kwargs: object) -> dict[str, object]:
     """Project field-level evidence and normalization lineage."""
     field_value = kwargs.get("field")
     field = field_value if isinstance(field_value, str) else None
-    result = {
+    result: dict[str, object] = {
         "source_url": artifact.source_url,
         "discovered_from": artifact.discovered_from,
         "extraction_method": str(kwargs.get("extraction_method", "vals.extraction")),
@@ -80,10 +82,15 @@ def value_evidence(artifact: RawArtifact, **kwargs: object) -> dict[str, Any]:
         "artifact_sha256": artifact.sha256,
         "artifact_id": artifact.artifact_id,
     }
-    return redact(result)  # type: ignore[return-value]
+    raw = redact(result)
+    if isinstance(raw, Mapping):
+        return {str(k): v for k, v in cast("Mapping[object, object]", raw).items()}
+    return {}
 
 
-def attach_provenance(row: Mapping[str, Any], artifact: RawArtifact) -> dict[str, Any]:
+def attach_provenance(
+    row: Mapping[str, object], artifact: RawArtifact
+) -> dict[str, object]:
     """Attach artifact provenance to a normalized row."""
     result = dict(row)
     result["provenance"] = artifact_provenance(artifact)

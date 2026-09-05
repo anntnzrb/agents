@@ -7,8 +7,8 @@ import math
 import re
 from collections.abc import Iterable, Mapping
 from decimal import Decimal, InvalidOperation
-from enum import Enum
-from typing import Final
+from enum import StrEnum
+from typing import Final, cast
 
 from .contracts import (
     ComparisonEligibility,
@@ -19,7 +19,7 @@ from .contracts import (
 )
 
 
-class PlaceholderKind(str, Enum):
+class PlaceholderKind(StrEnum):
     """Recognized non-values retained as missing evidence."""
 
     EMPTY = "empty"
@@ -52,11 +52,11 @@ _PLACEHOLDER_TEXT: Final[dict[str, PlaceholderKind]] = {
 _NUMBER_RE = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$")
 _NUMBER_AND_UNIT_RE = re.compile(
     r"^(?P<number>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?"
-    r")\s*(?P<unit>[A-Za-zµμ%][A-Za-z0-9µμ/_-]*)$"
+    + r")\s*(?P<unit>[A-Za-zµμ%][A-Za-z0-9µμ/_-]*)$"
 )
 _RANGE_RE = re.compile(
     r"^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)\s*(?:-|\N{EN DASH}|\N{EM DASH}|\bto\b)\s*"
-    r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)\s*$",
+    + r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)\s*$",
 )
 
 _THOUSANDS_RE = re.compile(r"^[+-]?\d{1,3}(?:,\d{3})+(?:\.\d*)?(?:[eE][+-]?\d+)?$")
@@ -93,6 +93,7 @@ def _marker_is_chart_zero(marker: object) -> bool:
             return False
         return "chart" in lowered and ("zero" in lowered or "placeholder" in lowered)
     if isinstance(marker, Mapping):
+        mapping = cast("Mapping[str, object]", marker)
         return any(
             str(key).casefold().replace("-", "_")
             in {
@@ -102,7 +103,7 @@ def _marker_is_chart_zero(marker: object) -> bool:
                 "is_placeholder",
             }
             and _explicit_true(item)
-            for key, item in marker.items()
+            for key, item in mapping.items()
         )
     return False
 
@@ -116,7 +117,11 @@ def classify_placeholder(
     """Classify textual placeholders and explicitly source-marked chart zeroes."""
     if chart_zero is True or _marker_is_chart_zero(source_marker):
         try:
-            is_zero = float(raw_value) == 0.0 and not isinstance(raw_value, bool)
+            is_zero = (
+                isinstance(raw_value, (int, float, str, Decimal))
+                and float(raw_value) == 0.0
+                and not isinstance(raw_value, bool)
+            )
         except (OverflowError, TypeError, ValueError):
             is_zero = False
         if is_zero:
@@ -143,7 +148,7 @@ def _status(value: ValueStatus | str | None, default: ValueStatus) -> ValueStatu
     return default if value is None else ValueStatus(value)
 
 
-def _normalise_unit(unit: str | None) -> str | None:
+def _normalise_unit(unit: object) -> str | None:
     if unit is None:
         return None
     if not isinstance(unit, str):

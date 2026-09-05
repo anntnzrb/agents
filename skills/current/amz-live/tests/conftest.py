@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+_ = sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "search_results_fragment.html"
 SPONSORED_FIXTURE_PATH = (

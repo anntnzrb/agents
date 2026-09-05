@@ -4,7 +4,6 @@ The functions in this module deliberately do not fetch, aggregate, or otherwise
 reinterpret benchmark data.  Leaderboard rows are copied and selected for
 ranking; values calculated by this module are kept in ``derived``.
 """
-# ruff: noqa: CPY001, EM101, EM102, TRY003
 
 from __future__ import annotations
 
@@ -12,15 +11,15 @@ import json
 from collections.abc import Mapping, Sequence
 from math import isfinite
 from numbers import Real
-from typing import TypeAlias
+from typing import cast
 
 from .diagnostics import merge_diagnostics
 from .identity import classify_duplicates
 from .normalization import normalize_rows
 
-JsonValue: TypeAlias = object
-JsonRow: TypeAlias = dict[str, JsonValue]
-RowsLike: TypeAlias = Sequence[Mapping[str, JsonValue]] | Mapping[str, JsonValue] | None
+type JsonValue = object
+type JsonRow = dict[str, JsonValue]
+type RowsLike = Sequence[Mapping[str, JsonValue]] | Mapping[str, JsonValue] | None
 
 _IDENTITY_FIELDS: tuple[str, ...] = (
     "model",
@@ -69,18 +68,24 @@ LEGACY_IDENTITY_COMPONENT_COUNT = 3
 def _rows(value: object, *, normalize: bool = True) -> list[JsonRow]:
     """Return shallow row copies from either rows or a common artifact wrapper."""
     if isinstance(value, Mapping):
-        if "rows" in value:
-            value = value.get("rows")
+        mapping = cast("Mapping[str, object]", value)
+        if "rows" in mapping:
+            value = mapping.get("rows")
         else:
             for key in ("leaderboard", "trials", "payload", "data"):
-                nested = value.get(key)
+                nested = mapping.get(key)
                 if isinstance(nested, Mapping) and "rows" in nested:
-                    value = nested.get("rows")
+                    nested_mapping = cast("Mapping[str, object]", nested)
+                    value = nested_mapping.get("rows")
                     break
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         return []
-
-    rows = [dict(row) for row in value if isinstance(row, Mapping)]
+    entries = cast("list[object]", cast("object", value))
+    rows = [
+        dict(cast("Mapping[str, object]", row))
+        for row in entries
+        if isinstance(row, Mapping)
+    ]
     if not normalize:
         return rows
     return normalize_rows(rows, source_path="$.rows")
@@ -92,8 +97,11 @@ def _evidence(
     metrics = row.get("metrics")
     if not isinstance(metrics, Mapping):
         return None
-    value = metrics.get(metric)
-    return value if isinstance(value, Mapping) else None
+    mapping = cast("Mapping[str, object]", metrics)
+    value = mapping.get(metric)
+    if not isinstance(value, Mapping):
+        return None
+    return cast("Mapping[str, JsonValue]", value)
 
 
 def _metric_value(
@@ -115,14 +123,15 @@ def _metric_blockers(row: Mapping[str, JsonValue], metric: str) -> list[JsonValu
     if isinstance(reasons, Sequence) and not isinstance(
         reasons, (str, bytes, bytearray)
     ):
-        return list(reasons)
+        items = cast("list[object]", cast("object", reasons))
+        return list(items)
     reason = evidence.get("comparison_eligibility")
     return [reason or "COMPARISON_INCOMPARABLE"]
 
 
 def _number(value: object) -> Real | None:
     """Return finite JSON-like numbers, treating null and booleans as unavailable."""
-    if not isinstance(value, Real) or isinstance(value, bool):
+    if isinstance(value, bool) or not isinstance(value, Real):
         return None
     try:
         if not isfinite(float(value)):
@@ -159,7 +168,7 @@ def _limit(value: object) -> int | None:
     return value
 
 
-def _order(value: str) -> str:
+def _order(value: object) -> str:
     """Normalize the explicit ascending/descending order accepted by rankings."""
     if not isinstance(value, str):
         message = "order must be a string"
@@ -173,7 +182,7 @@ def _order(value: str) -> str:
     raise ValueError(message)
 
 
-def _metric_name(value: str) -> str:
+def _metric_name(value: object) -> str:
     if not isinstance(value, str) or not value.strip():
         message = "metric must be a non-empty string"
         raise ValueError(message)
@@ -184,8 +193,9 @@ def _normalize_pareto_axes(
     axes: Sequence[str | Mapping[str, object]] | None,
 ) -> list[tuple[str, str]]:
     values = DEFAULT_PARETO_AXES if axes is None else axes
-    if not isinstance(values, Sequence) or isinstance(values, (str, bytes)):
-        raise TypeError("pareto_axes must be a sequence")
+    if isinstance(values, (str, bytes)):
+        message = "pareto_axes must be a sequence"
+        raise TypeError(message)
     normalized: list[tuple[str, str]] = []
     for value in values:
         if isinstance(value, str):
@@ -203,12 +213,15 @@ def _normalize_pareto_axes(
             metric = value.get("metric")
             order = value.get("order")
         else:
-            raise TypeError("Pareto axes must be strings, pairs, or mappings")
+            message = "Pareto axes must be strings, pairs, or mappings"
+            raise TypeError(message)
         if not isinstance(metric, str) or not isinstance(order, str):
-            raise TypeError("Pareto axes require metric and order strings")
+            message = "Pareto axes require metric and order strings"
+            raise TypeError(message)
         normalized.append((_metric_name(metric), _order(order)))
     if not normalized:
-        raise ValueError("pareto_axes must not be empty")
+        message = "pareto_axes must not be empty"
+        raise ValueError(message)
     return normalized
 
 
@@ -221,7 +234,10 @@ def _value_at_path(row: Mapping[str, JsonValue], path: str) -> object:
     for part in path.split("."):
         if not isinstance(current, Mapping):
             return None
-        current = current.get(part)
+        entries = cast(  # pyright: ignore[reportUnnecessaryCast]
+            "Mapping[str, object]", current
+        )
+        current = entries.get(part)
     return current
 
 
@@ -229,7 +245,8 @@ def _normalize_efficiency_specs(
     specs: Sequence[str | Mapping[str, object]],
 ) -> list[tuple[str, str, str]]:
     if isinstance(specs, (str, bytes)):
-        raise TypeError("efficiency_specs must be a sequence")
+        message = "efficiency_specs must be a sequence"
+        raise TypeError(message)
     normalized: list[tuple[str, str, str]] = []
     names: set[str] = set()
     for spec in specs:
@@ -244,17 +261,17 @@ def _normalize_efficiency_specs(
                 message = "efficiency specs must use name=numerator/denominator"
                 raise ValueError(message)
             numerator, denominator = operands
-        elif isinstance(spec, Mapping):
+        else:
             name = spec.get("name")
             numerator = spec.get("numerator")
             denominator = spec.get("denominator")
-        else:
-            raise TypeError("efficiency specs must be strings or mappings")
         if not all(isinstance(value, str) for value in (name, numerator, denominator)):
-            raise TypeError("efficiency specs require name, numerator, and denominator")
+            message = "efficiency specs require name, numerator, and denominator"
+            raise TypeError(message)
         clean_name = _metric_name(name)
         if clean_name in names:
-            raise ValueError(f"duplicate efficiency name: {clean_name}")
+            message = f"duplicate efficiency name: {clean_name}"
+            raise ValueError(message)
         names.add(clean_name)
         normalized.append(
             (clean_name, _metric_name(numerator), _metric_name(denominator))
@@ -277,7 +294,8 @@ def _ci_width(
     )
     if lo is None or hi is None:
         return None
-    return hi - lo
+    difference = hi - lo
+    return difference if isinstance(difference, Real) else None
 
 
 def _decorate(
@@ -290,7 +308,11 @@ def _decorate(
     """Copy a published row and append only module-derived fields under ``derived``."""
     item = dict(row)
     existing = item.get("derived")
-    derived: JsonRow = dict(existing) if isinstance(existing, Mapping) else {}
+    derived: JsonRow = (
+        dict(cast("Mapping[str, object]", existing))
+        if isinstance(existing, Mapping)
+        else {}
+    )
     derived["value_status"] = "derived"
     derived["ci_width"] = _ci_width(row, strict_semantics=strict_semantics)
     if rank is not None or strict_semantics:
@@ -345,41 +367,40 @@ def _safe_duplicate_identity(value: object) -> str:
     if not isinstance(value, str):
         return "<anonymous>"
     try:
-        parsed = json.loads(value)
+        parsed = cast("object", json.loads(value))
     except (TypeError, ValueError):
         return "<anonymous>"
-    if isinstance(parsed, list) and len(parsed) == IDENTITY_COMPONENT_COUNT:
-        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
-    if (
-        isinstance(parsed, list)
-        and len(parsed) == LEGACY_IDENTITY_COMPONENT_COUNT
-        and parsed[:2] != ["published_id", "row"]
-    ):
-        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
+    if isinstance(parsed, list):
+        entries = cast("list[object]", cast("object", parsed))
+        if len(entries) == IDENTITY_COMPONENT_COUNT:
+            return json.dumps(entries, ensure_ascii=False, separators=(",", ":"))
+        if len(entries) == LEGACY_IDENTITY_COMPONENT_COUNT and entries[:2] != [
+            "published_id",
+            "row",
+        ]:
+            return json.dumps(entries, ensure_ascii=False, separators=(",", ":"))
     return "<anonymous>"
 
 
 def _duplicate_facts(
     rows: Sequence[Mapping[str, JsonValue]],
-) -> tuple[set[int], list[dict[str, JsonValue]], list[dict[str, object]]]:
+) -> tuple[set[int], dict[str, list[dict[str, object]]], list[dict[str, object]]]:
     """Classify duplicate identities without exposing row bodies."""
     report = classify_duplicates(rows)
     conflicting_indexes: set[int] = set()
     diagnostics: list[dict[str, object]] = []
     for bucket in ("identical", "conflicting"):
         groups = report.get(bucket, [])
-        if not isinstance(groups, Sequence):
-            continue
         for group in groups:
-            if not isinstance(group, Mapping):
-                continue
             indexes = group.get("row_indexes")
-            row_indexes = (
-                sorted(int(index) for index in indexes)
-                if isinstance(indexes, Sequence)
-                and not isinstance(indexes, (str, bytes, bytearray))
-                else []
-            )
+            row_indexes: list[int] = []
+            if isinstance(indexes, Sequence) and not isinstance(
+                indexes, (str, bytes, bytearray)
+            ):
+                index_list = cast("list[object]", cast("object", indexes))
+                row_indexes = sorted(
+                    index for index in index_list if isinstance(index, int)
+                )
             if bucket == "conflicting":
                 conflicting_indexes.update(row_indexes)
             diagnostics.append(
@@ -415,8 +436,8 @@ def rank_rows(  # noqa: C901, PLR0912, PLR0913
     min_attempted: Real | None = None,
     min_tasks: Real | None = None,
     limit: int | None = 10,
-    strict_semantics: bool = False,
-    strict_duplicates: bool = False,
+    strict_semantics: object = False,
+    strict_duplicates: object = False,
 ) -> dict[str, JsonValue]:
     """Rank published rows, optionally requiring semantic eligibility."""
     metric_name = _metric_name(metric)
@@ -426,9 +447,11 @@ def rank_rows(  # noqa: C901, PLR0912, PLR0913
     tasks_threshold = _threshold(min_tasks)
     result_limit = _limit(limit)
     if not isinstance(strict_semantics, bool):
-        raise TypeError("strict_semantics must be a boolean")
+        message = "strict_semantics must be a boolean"
+        raise TypeError(message)
     if not isinstance(strict_duplicates, bool):
-        raise TypeError("strict_duplicates must be a boolean")
+        message = "strict_duplicates must be a boolean"
+        raise TypeError(message)
     strict_mode = strict_semantics or strict_duplicates
     source_rows = _rows(rows)
     conflicting_indexes, duplicate_report, duplicate_diagnostics = _duplicate_facts(
@@ -508,11 +531,12 @@ def rank_rows(  # noqa: C901, PLR0912, PLR0913
             bucket: [
                 {
                     "identity": _safe_duplicate_identity(group.get("identity")),
-                    "row_indexes": list(group.get("row_indexes", [])),
-                    "count": len(group.get("row_indexes", [])),
+                    "row_indexes": list(
+                        cast("list[object]", group.get("row_indexes", []))
+                    ),
+                    "count": len(cast("list[object]", group.get("row_indexes", []))),
                 }
                 for group in groups
-                if isinstance(group, Mapping)
             ]
             for bucket, groups in duplicate_report.items()
             if bucket in {"identical", "conflicting"}
@@ -527,9 +551,9 @@ def rank_rows(  # noqa: C901, PLR0912, PLR0913
 def filter_trials(
     rows: RowsLike,
     *,
-    source: str | None = "deep-swe",
-    eval_scope: str | None = "full",
-    included_only: bool = True,
+    source: object = "deep-swe",
+    eval_scope: object = "full",
+    included_only: object = True,
     limit: int | None = None,
 ) -> dict[str, JsonValue]:
     """Apply the explicit, null-safe default trial inclusion filter.
@@ -652,24 +676,21 @@ def _dominates(
         _metric_value(right, metric, strict_semantics=strict_semantics)
         for metric, _ in axes
     ]
-    if any(value is None for value in (*left_values, *right_values)):
-        return False
-    comparisons = [
-        left_value >= right_value if order == "desc" else left_value <= right_value
-        for (left_value, right_value), (_, order) in zip(
-            zip(left_values, right_values, strict=True),
-            axes,
-            strict=True,
-        )
-    ]
-    strict = [
-        left_value > right_value if order == "desc" else left_value < right_value
-        for (left_value, right_value), (_, order) in zip(
-            zip(left_values, right_values, strict=True),
-            axes,
-            strict=True,
-        )
-    ]
+    comparisons: list[bool] = []
+    strict: list[bool] = []
+    for (left_value, right_value), (_, order) in zip(
+        zip(left_values, right_values, strict=True),
+        axes,
+        strict=True,
+    ):
+        if left_value is None or right_value is None:
+            return False
+        if order == "desc":
+            comparisons.append(left_value >= right_value)
+            strict.append(left_value > right_value)
+        else:
+            comparisons.append(left_value <= right_value)
+            strict.append(left_value < right_value)
     return all(comparisons) and any(strict)
 
 
@@ -719,7 +740,11 @@ def derive_efficiency(
     for row in _rows(rows):
         item = dict(row)
         existing = item.get("derived")
-        derived: JsonRow = dict(existing) if isinstance(existing, Mapping) else {}
+        derived: JsonRow = (
+            dict(cast("Mapping[str, object]", existing))
+            if isinstance(existing, Mapping)
+            else {}
+        )
         efficiency: JsonRow = {}
         for name, numerator_field, denominator_field in normalized_specs:
             numerator = (
@@ -787,7 +812,7 @@ def build_report(  # noqa: PLR0913
     limit: int | None = 10,
     pareto_axes: Sequence[str | Mapping[str, object]] | None = None,
     efficiency_specs: Sequence[str | Mapping[str, object]] | None = None,
-    strict_semantics: bool = False,
+    strict_semantics: object = False,
 ) -> dict[str, JsonValue]:
     """Build a decision report without re-aggregating published rows."""
     pass_threshold = _threshold(min_pass_at_1)
@@ -795,7 +820,8 @@ def build_report(  # noqa: PLR0913
     tasks_threshold = _threshold(min_tasks)
     result_limit = _limit(limit)
     if not isinstance(strict_semantics, bool):
-        raise TypeError("strict_semantics must be a boolean")
+        message = "strict_semantics must be a boolean"
+        raise TypeError(message)
     source_rows = _rows(payload)
     normalized_axes = _normalize_pareto_axes(pareto_axes)
 
@@ -818,10 +844,16 @@ def build_report(  # noqa: PLR0913
     )
     pareto = pareto_rows(
         eligible,
-        normalized_axes,
+        pareto_axes,
         strict_semantics=strict_semantics,
     )
 
+    filters = _filters(
+        min_pass_at_1=pass_threshold,
+        min_attempted=attempted_threshold,
+        min_tasks=tasks_threshold,
+        limit=result_limit,
+    )
     report: dict[str, JsonValue] = {
         "value_status": "derived",
         "recommendations": recommendations,
@@ -831,35 +863,29 @@ def build_report(  # noqa: PLR0913
         "counts": {
             "input": len(source_rows),
             "eligible": len(eligible),
-            "recommendations": int(recommendations["count"]),
+            "recommendations": cast("int", recommendations["count"]),
             "pareto": len(pareto),
         },
-        "filters_applied": _filters(
-            min_pass_at_1=pass_threshold,
-            min_attempted=attempted_threshold,
-            min_tasks=tasks_threshold,
-            limit=result_limit,
-        ),
+        "filters_applied": filters,
     }
     if strict_semantics:
         report["strict_semantics"] = True
-        report["filters_applied"]["strict_semantics"] = True
+        filters["strict_semantics"] = True
     if pareto_axes is not None:
         report["pareto_axes"] = _axis_metadata(normalized_axes)
-        report["filters_applied"]["pareto_axes"] = _axis_metadata(normalized_axes)
     if efficiency_specs is not None:
         report["efficiency"] = derive_efficiency(
             source_rows,
             efficiency_specs,
             strict_semantics=strict_semantics,
         )
-        report["filters_applied"]["efficiency"] = list(efficiency_specs)
+        filters["efficiency"] = list(efficiency_specs)
     if isinstance(payload, Mapping):
         for key in ("scope", "provenance", "generated_at", "raw_metadata"):
             value = payload.get(key)
             if value is not None:
                 if isinstance(value, Mapping):
-                    copied = dict(value)
+                    copied = dict(cast("Mapping[str, object]", value))
                     if key == "scope":
                         copied["value_status"] = "derived"
                     report[key] = copied

@@ -1,15 +1,15 @@
 """Explicitly gated live smoke for rotated process credentials only."""
 
-# ruff: noqa: CPY001, INP001, S101, S603, S607, D103
 from __future__ import annotations
 
 import json
 import os
 import subprocess
 from pathlib import Path
+from typing import cast
 
-import _path  # noqa: F401
 import pytest
+
 from artificial_analysis.diagnostics import redact_query
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -35,7 +35,7 @@ def _run_cli(args: list[str], *, env: dict[str, str]) -> dict[str, object]:
     assert completed.returncode == 0
     lines = completed.stdout.splitlines()
     assert len(lines) == 1
-    payload = json.loads(lines[0])
+    payload = cast("dict[str, object]", json.loads(lines[0]))
     assert isinstance(payload, dict)
     return payload
 
@@ -44,7 +44,7 @@ def test_live_fetch_reader_and_coding_smoke_are_shape_only(tmp_path: Path) -> No
     process_key = os.environ["ARTIFICIAL_ANALYSIS_API_KEY"]
     env = dict(os.environ)
     env["ARTIFICIAL_ANALYSIS_API_KEY"] = process_key
-    env.pop("ARTIFICIAL_ANALYSIS_ENV_FILE", None)
+    _ = env.pop("ARTIFICIAL_ANALYSIS_ENV_FILE", None)
     snapshot = tmp_path / "snapshot.json"
     endpoints = tmp_path / "endpoints.txt"
     source_url = tmp_path / "source-url.txt"
@@ -69,27 +69,31 @@ def test_live_fetch_reader_and_coding_smoke_are_shape_only(tmp_path: Path) -> No
     )
     assert fetch["ok"] is True
     assert fetch["version"] == "1"
-    data = fetch["data"]
+    data = cast("dict[str, object]", fetch["data"])
     assert isinstance(data, dict)
-    assert data["freshness"]["mode"] in {"fresh", "cache-revalidated"}
-    assert data["freshness"]["stale"] is False
+    freshness = cast("dict[str, object]", data["freshness"])
+    assert freshness["mode"] in {"fresh", "cache-revalidated"}
+    assert freshness["stale"] is False
 
     stats = _run_cli(["stats", "--snapshot", str(snapshot)], env=env)
     assert stats["ok"] is True
-    stats_data = stats["data"]
+    stats_data = cast("dict[str, object]", stats["data"])
     assert isinstance(stats_data, dict)
-    assert isinstance(stats_data["counts"], dict)
+    counts = cast("dict[str, object]", stats_data["counts"])
+    assert isinstance(counts, dict)
 
     coding = _run_cli(
         ["coding", "--limit", "1", "--output-json", str(tmp_path / "coding.json")],
         env=env,
     )
     assert coding["ok"] is True
-    coding_data = coding["data"]
+    coding_data = cast("dict[str, object]", coding["data"])
     assert isinstance(coding_data, dict)
-    assert isinstance(coding_data["rows"], list)
+    rows = cast("list[object]", coding_data["rows"])
+    assert isinstance(rows, list)
 
-    evidence = {
+    sources = cast("dict[str, dict[str, object]]", data["sources"])
+    evidence: dict[str, object] = {
         "fetch": {
             "freshness": data["freshness"],
             "sources": {
@@ -101,15 +105,14 @@ def test_live_fetch_reader_and_coding_smoke_are_shape_only(tmp_path: Path) -> No
                     "sha256": source.get("sha256"),
                     "byte_length": source.get("byte_length"),
                 }
-                for name, source in data["sources"].items()
-                if isinstance(source, dict)
+                for name, source in sources.items()
             },
         },
-        "stats_shape": sorted(stats_data["counts"]),
+        "stats_shape": sorted(counts),
         "coding_shape": sorted(coding_data),
     }
     evidence_path = tmp_path / "live-smoke-evidence.json"
-    evidence_path.write_text(json.dumps(evidence, sort_keys=True), encoding="utf-8")
+    _ = evidence_path.write_text(json.dumps(evidence, sort_keys=True), encoding="utf-8")
     serialized = evidence_path.read_text(encoding="utf-8")
     assert process_key not in serialized
     assert "authorization" not in serialized.casefold()

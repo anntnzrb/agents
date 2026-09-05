@@ -1,14 +1,14 @@
 """Offline tests for the DeepSWE Phase 1 contract helpers."""
-# ruff: noqa: CPY001, D103, INP001, PLR2004, S101
 
 from __future__ import annotations
 
 import hashlib
 import json
 import math
+from typing import cast
 
-import _path  # noqa: F401
 import pytest
+
 from deepswe.contracts import (
     COMPARISON_ELIGIBILITY_STATUSES,
     ELIGIBILITY_STATES,
@@ -43,9 +43,9 @@ def test_success_and_error_keep_the_legacy_integer_v1_shape() -> None:
 def test_compact_json_is_finite_and_keeps_safe_strings() -> None:
     assert compact_json({"b": "metric NaN", "a": 1.5}) == ('{"b":"metric NaN","a":1.5}')
     with pytest.raises(ValueError, match="Out of range"):
-        compact_json({"value": math.nan})
+        _ = compact_json({"value": math.nan})
     with pytest.raises(ValueError, match="Out of range"):
-        compact_json({"values": [math.inf, -math.inf]})
+        _ = compact_json({"values": [math.inf, -math.inf]})
 
 
 def test_scope_value_and_independent_state_sets_are_explicit() -> None:
@@ -153,4 +153,4 @@ def test_missing_and_unparsed_evidence_preserve_raw_values_without_zero() -> Non
 def test_evidence_is_json_serializable_when_values_are_finite() -> None:
     evidence = value_evidence(raw_value=3, normalized_value=3, unit="count")
     encoded = compact_json(evidence)
-    assert json.loads(encoded)["normalized_value"] == 3
+    assert cast("dict[str, object]", json.loads(encoded))["normalized_value"] == 3

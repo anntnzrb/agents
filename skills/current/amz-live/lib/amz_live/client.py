@@ -1,8 +1,14 @@
+"""Sync HTTP client for live Amazon search pages."""
+
 from __future__ import annotations
 
-from collections.abc import Mapping
-from types import TracebackType
-from typing import Self
+from typing import TYPE_CHECKING, Self
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from types import TracebackType
+
+import http
 
 import httpx
 
@@ -52,16 +58,18 @@ class AmazonSearchClient:
         headers: Mapping[str, str] | None = None,
         client: httpx.Client | None = None,
     ) -> None:
-        self.base_url = base_url.rstrip("/")
-        self._owns_client = client is None
+        """Configure base URL, timeout, headers, and transport."""
+        self.base_url: str = base_url.rstrip("/")
+        self._owns_client: bool = client is None
         merged_headers = {**DEFAULT_HEADERS, **(dict(headers) if headers else {})}
-        self._client = client or httpx.Client(
+        self._client: httpx.Client = client or httpx.Client(
             headers=merged_headers,
             timeout=timeout,
             follow_redirects=True,
         )
 
     def __enter__(self) -> Self:
+        """Enter the client context."""
         return self
 
     def __exit__(
@@ -70,14 +78,17 @@ class AmazonSearchClient:
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> bool:
+        """Close the owned client on context exit."""
         self.close()
         return False
 
     def close(self) -> None:
+        """Close the owned HTTP client."""
         if self._owns_client:
             self._client.close()
 
     def fetch_html(self, url: str) -> str:
+        """Fetch a page body, using the in-memory cache."""
         cached = _HTML_CACHE.get(url)
         if cached is not None:
             return cached
@@ -85,26 +96,32 @@ class AmazonSearchClient:
         try:
             response = self._client.get(url)
         except httpx.HTTPError as exc:
-            raise AmazonClientError(f"Amazon request failed: {exc}") from exc
+            msg = f"Amazon request failed: {exc}"
+            raise AmazonClientError(msg) from exc
 
         self._raise_for_bad_response(response)
         _HTML_CACHE[url] = response.text
         return response.text
 
     def fetch_search_page(self, query: SearchQuery) -> str:
+        """Fetch the search-results page for a query."""
         url = build_search_url(query, base_url=self.base_url)
         return self.fetch_html(url)
 
     def fetch_product_page(self, url: str) -> str:
+        """Fetch a product-detail page by URL."""
         return self.fetch_html(url)
 
     def search(self, query: SearchQuery) -> list[SearchResult]:
+        """Search one page and parse the results."""
         html = self.fetch_search_page(query)
         return parse_search_results(html, base_url=self.base_url)
 
     def search_pages(self, query: SearchQuery, *, pages: int = 1) -> list[SearchResult]:
+        """Search multiple pages and deduplicate by ASIN."""
         if pages < 1:
-            raise ValueError("pages must be >= 1")
+            msg = "pages must be >= 1"
+            raise ValueError(msg)
 
         deduped: dict[str, SearchResult] = {}
         for page_number in range(query.page, query.page + pages):
@@ -115,7 +132,7 @@ class AmazonSearchClient:
                 zip_code=query.zip_code,
             )
             for result in self.search(page_query):
-                deduped.setdefault(result.asin, result)
+                _ = deduped.setdefault(result.asin, result)
         return list(deduped.values())
 
     def _raise_for_bad_response(self, response: httpx.Response) -> None:
@@ -123,20 +140,25 @@ class AmazonSearchClient:
         url = str(response.url)
         lowered_url = url.casefold()
 
-        if response.status_code == 503 or any(marker in body for marker in _ANTI_BOT_MARKERS):
-            raise AmazonAntiBotError(
+        if response.status_code == http.HTTPStatus.SERVICE_UNAVAILABLE or any(
+            marker in body for marker in _ANTI_BOT_MARKERS
+        ):
+            msg = (
                 f"Amazon blocked the request with a captcha or 503: {url}. "
-                "Slow down, try later, or use --html for local debug.",
+                "Slow down, try later, or use --html for local debug."
             )
+            raise AmazonAntiBotError(msg)
 
         if any(marker in lowered_url for marker in _ANTI_BOT_URL_MARKERS):
-            raise AmazonAntiBotError(
+            msg = (
                 f"Amazon redirected to a captcha or robot-check page: {url}. "
-                "Slow down, try later, or use --html for local debug.",
+                "Slow down, try later, or use --html for local debug."
             )
+            raise AmazonAntiBotError(msg)
 
-        if response.status_code >= 400:
-            raise AmazonClientError(f"Amazon returned HTTP {response.status_code}: {url}")
+        if response.status_code >= http.HTTPStatus.BAD_REQUEST:
+            msg = f"Amazon returned HTTP {response.status_code}: {url}"
+            raise AmazonClientError(msg)
 
 
 def search(
@@ -147,6 +169,7 @@ def search(
     amazon_sort: str | None = None,
     base_url: str = AMAZON_BASE_URL,
 ) -> list[SearchResult]:
+    """Search live Amazon pages and return parsed results."""
     query = SearchQuery(keywords, page=page, amazon_sort=amazon_sort)
     client = AmazonSearchClient(base_url=base_url)
     try:

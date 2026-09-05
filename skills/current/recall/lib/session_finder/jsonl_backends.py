@@ -44,15 +44,18 @@ def _objects(lines: Iterable[str]) -> Iterator[dict[str, JsonValue]]:
             if start < 0:
                 break
             try:
-                value, end = _JSON_DECODER.raw_decode(line, start)
+                decoded: tuple[object, int] = _JSON_DECODER.raw_decode(line, start)
             except (json.JSONDecodeError, RecursionError):
                 offset = start + 1
                 continue
+            value, end = decoded
             offset = end
-            if isinstance(value, dict) and all(isinstance(key, str) for key in value):
-                # Decoder is untyped; nested values are validated lazily.
-                yield cast("dict[str, JsonValue]", value)
-                break
+            if isinstance(value, dict):
+                raw = cast("dict[object, object]", value)
+                if all(isinstance(key, str) for key in raw):
+                    # Decoder is untyped; nested values are validated lazily.
+                    yield cast("dict[str, JsonValue]", value)
+                    break
 
 
 def _flatten_text(value: object) -> str:
@@ -60,13 +63,15 @@ def _flatten_text(value: object) -> str:
     if isinstance(value, str):
         return value
     if isinstance(value, list):
+        items = cast("list[object]", value)
         return "\n".join(
-            part for item in value if (part := _flatten_text(item)).strip()
+            part for item in items if (part := _flatten_text(item)).strip()
         )
     if not isinstance(value, dict):
         return ""
+    mapping = cast("dict[str, object]", value)
     for key in ("text", "content", "message", "value"):
-        if key in value and (text := _flatten_text(value[key])).strip():
+        if key in mapping and (text := _flatten_text(mapping[key])).strip():
             return text
     return ""
 
@@ -93,10 +98,13 @@ def _files(root: Path, patterns: tuple[str, ...]) -> Iterator[Path]:
 
 def _read_json(path: Path) -> dict[str, JsonValue]:
     try:
-        value: object = json.loads(path.read_text(encoding="utf-8"))
+        value = cast("object", json.loads(path.read_text(encoding="utf-8")))
     except (OSError, UnicodeError, json.JSONDecodeError):
         return {}
-    return value if isinstance(value, dict) else {}
+    if not isinstance(value, dict):
+        return {}
+    # Decoder is untyped; nested values are validated lazily.
+    return cast("dict[str, JsonValue]", value)
 
 
 def _pi_root() -> tuple[Path, str]:
@@ -334,13 +342,14 @@ def _codex_names(home: Path) -> dict[str, str]:
 def _codex_content(content: object) -> str:
     if not isinstance(content, list):
         return ""
-    texts = []
-    for block in content:
-        if isinstance(block, dict) and block.get("type") in {
-            "input_text",
-            "output_text",
-        }:
-            text = block.get("text")
+    blocks = cast("list[object]", content)
+    texts: list[str] = []
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        mapping = cast("dict[str, object]", block)
+        if mapping.get("type") in {"input_text", "output_text"}:
+            text = mapping.get("text")
             if isinstance(text, str) and text.strip():
                 texts.append(text)
     return "\n".join(texts)

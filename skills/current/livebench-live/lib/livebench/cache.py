@@ -8,6 +8,10 @@ import json
 import os
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 from .contracts import RawArtifact, SourceTarget, utc_now
 from .diagnostics import redact
@@ -51,7 +55,7 @@ class CacheStore:
 
     def __init__(self, root: Path | None = None) -> None:
         """Initialize this instance."""
-        self.root = (root or default_cache_dir()).expanduser()
+        self.root: Path = (root or default_cache_dir()).expanduser()
 
     def _target_dir(self, target: SourceTarget) -> Path:
         return (
@@ -69,33 +73,35 @@ class CacheStore:
         """Load for the LiveBench adapter."""
         index_path = self._index_path(target)
         try:
-            index = json.loads(index_path.read_text(encoding="utf-8"))
+            index = cast("object", json.loads(index_path.read_text(encoding="utf-8")))
         except (FileNotFoundError, OSError, json.JSONDecodeError):
             return None
         if not isinstance(index, dict):
             return None
-        body_path = Path(str(index.get("raw_bytes_ref", "")))
-        meta_path = Path(str(index.get("metadata_path", "")))
+        index_map = cast("dict[str, object]", index)
+        body_path = Path(str(index_map.get("raw_bytes_ref", "")))
+        meta_path = Path(str(index_map.get("metadata_path", "")))
         if not body_path.is_absolute():
             body_path = self.root / body_path
         if not meta_path.is_absolute():
             meta_path = self.root / meta_path
         try:
             body = body_path.read_bytes()
-            metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+            metadata = cast("object", json.loads(meta_path.read_text(encoding="utf-8")))
         except (FileNotFoundError, OSError, json.JSONDecodeError):
             return None
         if not isinstance(metadata, dict):
             return None
+        meta_map = cast("dict[str, object]", metadata)
         if (
-            metadata.get("source_url") != target.url
-            or metadata.get("release_id") != target.release_id
+            meta_map.get("source_url") != target.url
+            or meta_map.get("release_id") != target.release_id
         ):
             return None
-        expected_hash = str(metadata.get("sha256", ""))
+        expected_hash = str(meta_map.get("sha256", ""))
         if not expected_hash or sha256_bytes(body) != expected_hash:
             return None
-        return body, metadata
+        return body, meta_map
 
     def save(
         self, target: SourceTarget, body: bytes, metadata: dict[str, object]
@@ -109,7 +115,7 @@ class CacheStore:
         meta_path = artifacts_dir / f"{target.artifact_kind}-{digest}.meta.json"
         if not body_path.exists():
             _atomic_write_bytes(body_path, body)
-        safe_meta = dict(redact(metadata))
+        safe_meta = dict(cast("Mapping[str, object]", redact(metadata)))
         safe_meta.update(
             {
                 "sha256": digest,
@@ -162,11 +168,16 @@ class CacheStore:
             source_url=target.url,
             discovered_from=target.discovered_from,
             body=raw_body,
-            status_code=int(meta.get("status_code", 200)),
+            status_code=int(cast("int", meta.get("status_code", 200))),
             content_type=str(meta.get("content_type"))
             if meta.get("content_type")
             else None,
-            headers={str(k): str(v) for k, v in dict(meta.get("headers", {})).items()}
+            headers={
+                str(k): str(v)
+                for k, v in cast(
+                    "Mapping[str, object]", meta.get("headers", {})
+                ).items()
+            }
             if isinstance(meta.get("headers"), dict)
             else {},
             fetched_at=str(meta.get("fetched_at", utc_now())),
@@ -192,10 +203,10 @@ def _atomic_write_bytes(path: Path, body: bytes) -> None:
         dir=path.parent, prefix=f".{path.name}.", delete=False
     ) as handle:
         temp = Path(handle.name)
-        handle.write(body)
+        _ = handle.write(body)
         handle.flush()
         os.fsync(handle.fileno())
-    temp.replace(path)
+    _ = temp.replace(path)
 
 
 def _atomic_write_text(path: Path, body: str) -> None:

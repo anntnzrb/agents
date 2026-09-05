@@ -1,5 +1,4 @@
 """Opt-in live transport smoke test; offline CI skips this module."""
-# ruff: noqa: CPY001, INP001, S101, S603, PLR2004
 
 from __future__ import annotations
 
@@ -8,8 +7,8 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import cast
 
-import _path  # noqa: F401
 import pytest
 
 
@@ -42,19 +41,24 @@ def test_known_version_live_fetch_is_metrics_only(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     assert len(result.stdout.splitlines()) == 1
-    envelope = json.loads(result.stdout)
+    envelope = cast("dict[str, object]", json.loads(result.stdout))
     assert envelope["ok"] is True
     assert envelope["schema_version"] == 1
-    data = envelope["data"]
-    assert data["scope"]["benchmark"] == "DeepSWE"
-    assert data["scope"]["benchmark_version"] == "v1.1"
-    assert data["scope"]["value_status"] == "published"
-    provenance = data["provenance"]
+    data = cast("dict[str, object]", envelope["data"])
+    scope = cast("dict[str, object]", data["scope"])
+    assert scope["benchmark"] == "DeepSWE"
+    assert scope["benchmark_version"] == "v1.1"
+    assert scope["value_status"] == "published"
+    provenance = cast("dict[str, object]", data["provenance"])
+    assert isinstance(provenance["url"], str)
     assert provenance["url"].endswith("/v1.1/leaderboard-live.json")
     assert provenance["fetched_at"]
-    artifact = data["artifacts"]["leaderboard-live.json"]
+    artifacts = cast("dict[str, object]", data["artifacts"])
+    artifact = cast("dict[str, object]", artifacts["leaderboard-live.json"])
     assert artifact["benchmark_version"] == "v1.1"
+    assert isinstance(artifact["sha256"], str)
     assert len(artifact["sha256"]) == 64
+    assert isinstance(artifact["length"], (int, float))
     assert artifact["length"] > 0
     encoded = json.dumps(envelope).lower()
     assert "task-body" not in encoded

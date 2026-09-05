@@ -5,7 +5,10 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import TextIO
+from typing import TYPE_CHECKING, NoReturn, TextIO, cast, override
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 from .commands import CommandError, dispatch
 from .contracts import compact, failure, success
@@ -31,37 +34,42 @@ class UsageError(RuntimeError):
 
 
 class _Parser(argparse.ArgumentParser):
-    def error(self, message: str) -> None:
+    @override
+    def error(self, message: str) -> NoReturn:
         raise UsageError(message)
 
-    def exit(self, _status: int = 0, message: str | None = None) -> None:
+    @override
+    def exit(
+        self, status: int | str | None = 0, message: str | None = None
+    ) -> NoReturn:
+        del status
         raise UsageError((message or "").strip() or "help requested")
 
 
 def _common(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
+    _ = parser.add_argument(
         "--help",
         action="store_true",
         default=argparse.SUPPRESS,
         help="Show this help as a JSON usage response.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--snapshot",
         default=argparse.SUPPRESS,
         help="Use this explicit historical source snapshot.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--allow-stale",
         action="store_true",
         default=argparse.SUPPRESS,
         help="Serve a matching cache artifact only after refresh failure.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--cache-dir",
         default=argparse.SUPPRESS,
         help="Override the platform/XDG cache directory.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--release",
         default=argparse.SUPPRESS,
         help="Exact source-defined Vals version or snapshot identity.",
@@ -93,29 +101,31 @@ def build_parser() -> argparse.ArgumentParser:
         child = sub.add_parser(name, add_help=False, help=help_text)
         _common(child)
         if name == "model":
-            child.add_argument("--model", required=True)
+            _ = child.add_argument("--model", required=True)
         elif name == "benchmark":
-            child.add_argument("--benchmark", required=True)
+            _ = child.add_argument("--benchmark", required=True)
         elif name == "compare":
-            child.add_argument(
+            _ = child.add_argument(
                 "--models", required=True, help="Comma-separated exact model IDs/names."
             )
-            child.add_argument(
+            _ = child.add_argument(
                 "--benchmarks",
                 default=None,
                 help="Comma-separated exact benchmark IDs/names.",
             )
         elif name == "catalog-diff":
-            child.add_argument("--left", default=None)
-            child.add_argument("--right", default=None)
-            child.add_argument("paths", nargs="*")
+            _ = child.add_argument("--left", default=None)
+            _ = child.add_argument("--right", default=None)
+            _ = child.add_argument("paths", nargs="*")
     return parser
 
 
 def _args(argv: list[str] | None) -> argparse.Namespace:
     parser = build_parser()
     values = parser.parse_args(argv)
-    if not values.command and not getattr(values, "help", False):
+    if not cast("object", values.command) and not cast(
+        "object", getattr(values, "help", False)
+    ):
         msg = "a command is required"
         raise UsageError(msg)
     # Defaults belong here so subparser SUPPRESS does not erase global options.
@@ -131,10 +141,10 @@ def _args(argv: list[str] | None) -> argparse.Namespace:
         ("benchmarks", None),
         ("left", None),
         ("right", None),
-        ("paths", []),
+        ("paths", list[str]()),
     ):
         if not hasattr(values, name):
-            setattr(values, name, value)
+            setattr(values, name, cast("object", value))
     return values
 
 
@@ -163,8 +173,14 @@ def main(
     command = "unknown"
     try:
         args = _args(argv)
-        command = str(args.command) if args.command else "help"
-        payload = _help_payload(args.command) if args.help else dispatch(args)
+        raw_command = cast("object", args.command)
+        command = str(raw_command) if raw_command else "help"
+        wants_help = cast("object", args.help)
+        payload = (
+            _help_payload(cast("str | None", raw_command))
+            if wants_help
+            else dispatch(args)
+        )
         print(compact(payload), file=out)
         return 0 if payload.get("ok", False) else 1
     except UsageError as exc:
@@ -172,15 +188,21 @@ def main(
         print(compact(payload), file=out)
         return 2
     except CommandError as exc:
-        payload = failure(command, exc.code, str(exc), redact(exc.details))
+        payload = failure(
+            command,
+            exc.code,
+            str(exc),
+            cast("Mapping[str, object] | None", redact(exc.details)),
+        )
         print(compact(payload), file=out)
         return 2 if exc.code == "SNAPSHOT_INVALID" else 1
     except _INTERNAL_ERRORS as exc:
+        redacted = redact({"exception_type": type(exc).__name__, "reason": str(exc)})
         payload = failure(
             command,
             "INTERNAL_ERROR",
             "The Vals command failed unexpectedly.",
-            redact({"exception_type": type(exc).__name__, "reason": str(exc)}),
+            cast("Mapping[str, object]", redacted),
         )
         print(compact(payload), file=out)
         return 1

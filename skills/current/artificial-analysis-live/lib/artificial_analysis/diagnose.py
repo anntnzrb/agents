@@ -7,11 +7,10 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from pathlib import Path
-
 from .diagnostics import redact, redact_query
 
 _SUPPORTED_SCHEMA_VERSIONS = frozenset({1, 2})
@@ -42,9 +41,11 @@ def _safe_text(value: str) -> str:
 
 def _safe(value: object) -> object:
     if isinstance(value, Mapping):
-        return {str(key): _safe(item) for key, item in value.items()}
+        mapping = cast("Mapping[str, object]", value)
+        return {str(key): _safe(item) for key, item in mapping.items()}
     if isinstance(value, list):
-        return [_safe(item) for item in value]
+        items = cast("list[object]", value)
+        return [_safe(item) for item in items]
     if (
         isinstance(value, float)
         and not value.is_integer()
@@ -56,6 +57,10 @@ def _safe(value: object) -> object:
     if isinstance(value, (int, float, bool)) or value is None:
         return value
     return _safe_text(str(value))
+
+
+def _safe_dict(value: Mapping[str, object]) -> dict[str, object]:
+    return {str(key): _safe(item) for key, item in value.items()}
 
 
 def _path(path: Path | None) -> str | None:
@@ -94,12 +99,14 @@ def _diagnostic(  # noqa: PLR0913
 
 def _read_object(path: Path) -> tuple[dict[str, object] | None, str | None]:
     try:
-        parsed = json.loads(path.read_text(encoding="utf-8"))
+        raw = path.read_text(encoding="utf-8")
+        parsed = cast("object", json.loads(raw))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         return None, type(exc).__name__
     if not isinstance(parsed, dict):
         return None, "not_object"
-    return parsed, None
+    parsed_dict = cast("dict[str, object]", parsed)
+    return {str(k): v for k, v in parsed_dict.items()}, None
 
 
 def _metadata(value: Mapping[str, object]) -> dict[str, object]:
@@ -187,39 +194,45 @@ def _cache_report(  # noqa: C901, PLR0912
                 else:
                     entries: list[dict[str, object]] = []
                     for source_key in sorted(parsed, key=str):
-                        entry = parsed[source_key]
-                        if isinstance(entry, Mapping):
+                        entry_raw = parsed[source_key]
+                        if isinstance(entry_raw, Mapping):
+                            entry = cast("Mapping[str, object]", entry_raw)
+                            raw_path = entry.get("raw_path")
                             entries.append(
                                 {
                                     "source_key": _safe_text(str(source_key)),
                                     "sha256": entry.get("sha256"),
                                     "length": entry.get("length"),
-                                    "raw_path": _safe_text(str(entry.get("raw_path")))
-                                    if entry.get("raw_path") is not None
-                                    else None,
-                                    "legacy_unverified": entry.get("legacy_unverified")
-                                    is True,
+                                    "raw_path": (
+                                        _safe_text(str(raw_path))
+                                        if raw_path is not None
+                                        else None
+                                    ),
+                                    "legacy_unverified": (
+                                        entry.get("legacy_unverified") is True
+                                    ),
                                 },
                             )
                     row["entries"] = _safe(entries)
         file_rows.append(row)
     report["files"] = file_rows
-    metadata_rows = [
+    metadata_rows: list[object] = [
         row.get("metadata")
         for row in file_rows
         if row.get("name") == "providers-cache.json"
     ]
-    cache_metadata = (
-        metadata_rows[0]
-        if metadata_rows and isinstance(metadata_rows[0], Mapping)
+    raw_cache_meta = metadata_rows[0] if metadata_rows else None
+    cache_metadata: Mapping[str, object] = (
+        cast("Mapping[str, object]", raw_cache_meta)
+        if isinstance(raw_cache_meta, Mapping)
         else {}
     )
+    etag = cache_metadata.get("etag")
+    last_modified = cache_metadata.get("last_modified")
     report["validator"] = {
-        "etag": cache_metadata.get("etag"),
-        "last_modified": cache_metadata.get("last_modified"),
-        "present": bool(
-            cache_metadata.get("etag") or cache_metadata.get("last_modified")
-        ),
+        "etag": etag,
+        "last_modified": last_modified,
+        "present": bool(etag or last_modified),
     }
     artifacts_dir = cache_dir / "artifacts"
     if artifacts_dir.is_dir():
@@ -244,7 +257,7 @@ def _cache_report(  # noqa: C901, PLR0912
                     source_path=artifacts_dir,
                 ),
             )
-    return _safe(report)  # type: ignore[return-value]
+    return _safe_dict(report)
 
 
 def _snapshot_report(
@@ -292,7 +305,9 @@ def _snapshot_report(
         )
         return report, None
     meta = parsed.get("meta")
-    meta_mapping = meta if isinstance(meta, Mapping) else {}
+    meta_mapping: Mapping[str, object] = (
+        cast("Mapping[str, object]", meta) if isinstance(meta, Mapping) else {}
+    )
     schema_version = meta_mapping.get("schema_version")
     if not isinstance(schema_version, int) or isinstance(schema_version, bool):
         schema_version = 1
@@ -317,12 +332,16 @@ def _snapshot_report(
             ),
         )
     freshness = meta_mapping.get("freshness")
-    freshness_mapping = dict(freshness) if isinstance(freshness, Mapping) else {}
+    freshness_mapping: dict[str, object] = (
+        {str(k): v for k, v in cast("Mapping[object, object]", freshness).items()}
+        if isinstance(freshness, Mapping)
+        else {}
+    )
     mode = freshness_mapping.get("mode")
     if not isinstance(mode, str) or not mode:
         mode = "snapshot"
         freshness_mapping["mode"] = mode
-    freshness_mapping.setdefault("historical", True)
+    _ = freshness_mapping.setdefault("historical", True)
     parser_version = meta_mapping.get("parser_version")
     if not isinstance(parser_version, str) or not parser_version:
         diagnostics.append(
@@ -344,23 +363,33 @@ def _snapshot_report(
                 source_path=snapshot_path,
             ),
         )
+    models_val = parsed.get("models")
+    hosts_val = parsed.get("hosts")
+    hosts_models_val = parsed.get("hosts_models")
+    models_list = (
+        cast("list[object]", models_val) if isinstance(models_val, list) else None
+    )
+    hosts_list = (
+        cast("list[object]", hosts_val) if isinstance(hosts_val, list) else None
+    )
+    hosts_models_list = (
+        cast("list[object]", hosts_models_val)
+        if isinstance(hosts_models_val, list)
+        else None
+    )
     report.update(
         {
             "counts": {
-                "models": len(parsed.get("models", []))
-                if isinstance(parsed.get("models"), list)
-                else 0,
-                "hosts": len(parsed.get("hosts", []))
-                if isinstance(parsed.get("hosts"), list)
-                else 0,
-                "hosts_models": len(parsed.get("hosts_models", []))
-                if isinstance(parsed.get("hosts_models"), list)
-                else 0,
+                "models": len(models_list) if models_list is not None else 0,
+                "hosts": len(hosts_list) if hosts_list is not None else 0,
+                "hosts_models": (
+                    len(hosts_models_list) if hosts_models_list is not None else 0
+                ),
             },
             "meta": _metadata(meta_mapping),
         },
     )
-    return _safe(report), parsed  # type: ignore[return-value]
+    return _safe_dict(report), parsed
 
 
 def diagnose(
@@ -370,66 +399,66 @@ def diagnose(
     diagnostics: list[dict[str, object]] = []
     snapshot_report, snapshot = _snapshot_report(snapshot_path, diagnostics)
     cache_report = _cache_report(cache_dir, diagnostics)
-    meta = snapshot.get("meta") if isinstance(snapshot, Mapping) else {}
-    meta_mapping = meta if isinstance(meta, Mapping) else {}
-    schema_version = meta_mapping.get("schema_version", 1)
+    raw_meta = snapshot.get("meta") if isinstance(snapshot, Mapping) else None
+    meta_mapping: Mapping[str, object] = (
+        cast("Mapping[str, object]", raw_meta) if isinstance(raw_meta, Mapping) else {}
+    )
+    raw_schema_version = meta_mapping.get("schema_version", 1)
+    schema_version = (
+        raw_schema_version
+        if isinstance(raw_schema_version, int)
+        and not isinstance(raw_schema_version, bool)
+        else 1
+    )
     parser_version = meta_mapping.get("parser_version")
-    freshness = meta_mapping.get("freshness")
-    if not isinstance(freshness, Mapping):
-        freshness = {"mode": "snapshot", "historical": True, "stale": False}
+    raw_freshness = meta_mapping.get("freshness")
+    freshness: Mapping[str, object] = (
+        cast("Mapping[str, object]", raw_freshness)
+        if isinstance(raw_freshness, Mapping)
+        else {"mode": "snapshot", "historical": True, "stale": False}
+    )
     for diagnostic_source in (
         snapshot.get("diagnostics") if isinstance(snapshot, Mapping) else None,
         meta_mapping.get("diagnostics"),
     ):
         if isinstance(diagnostic_source, list):
-            for item in diagnostic_source:
+            source_list = cast("list[object]", diagnostic_source)
+            for item in source_list:
                 if isinstance(item, Mapping):
-                    safe_item = _safe(item)
-                    if isinstance(safe_item, dict):
-                        diagnostics.append(
-                            {str(key): value for key, value in safe_item.items()}
-                        )
+                    safe_item = _safe_dict(cast("Mapping[str, object]", item))
+                    diagnostics.append(safe_item)
     report: dict[str, object] = {
         "snapshot": snapshot_report,
         "cache": cache_report,
         "schema": {
             "version": schema_version,
             "supported_versions": sorted(_SUPPORTED_SCHEMA_VERSIONS),
-            "readable": snapshot is not None
-            and schema_version in _SUPPORTED_SCHEMA_VERSIONS,
+            "readable": (
+                snapshot is not None and schema_version in _SUPPORTED_SCHEMA_VERSIONS
+            ),
         },
         "parser": {
             "name": meta_mapping.get("parser"),
             "version": parser_version,
         },
-        "freshness": _safe(freshness),
+        "freshness": _safe_dict(freshness),
         "artifacts": {
             "snapshot": snapshot_report.get("sha256"),
             "cache": cache_report.get("artifacts", []),
         },
         "diagnostics": sorted(
-            (_safe(item) for item in diagnostics),
+            [_safe_dict(item) for item in diagnostics],
             key=lambda item: (
-                (
-                    str(item.get("code", "")),
-                    str(item.get("stage", "")),
-                    str(item.get("message", "")),
-                )
-                if isinstance(item, Mapping)
-                else str(item)
+                str(item.get("code", "")),
+                str(item.get("stage", "")),
+                str(item.get("message", "")),
             ),
         ),
     }
-    diagnostic_rows = report["diagnostics"]
-    error_count = sum(
-        1
-        for item in diagnostic_rows
-        if isinstance(item, Mapping) and item.get("severity") == "error"
-    )
+    diagnostic_rows = cast("list[dict[str, object]]", report["diagnostics"])
+    error_count = sum(1 for item in diagnostic_rows if item.get("severity") == "error")
     warning_count = sum(
-        1
-        for item in diagnostic_rows
-        if isinstance(item, Mapping) and item.get("severity") == "warning"
+        1 for item in diagnostic_rows if item.get("severity") == "warning"
     )
     report["health"] = {
         "status": "error" if error_count else "warning" if warning_count else "ok",
@@ -437,7 +466,7 @@ def diagnose(
         "warnings": warning_count,
         "checks": len(diagnostic_rows),
     }
-    return _safe(report)  # type: ignore[return-value]
+    return _safe_dict(report)
 
 
 __all__ = ["diagnose"]

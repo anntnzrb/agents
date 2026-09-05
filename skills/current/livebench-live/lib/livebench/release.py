@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlsplit
 
 from .contracts import ResolvedRelease, SourceTarget, raise_expected
@@ -48,14 +48,13 @@ def resolve_release(
         ):
             # Exact caller-supplied official URLs are permitted for an
             # unadvertised release.
-            entry = {
+            entry: dict[str, object] = {
                 "id": requested,
                 "date": requested if len(requested) == 10 else None,  # noqa: PLR2004
                 "assets": dict(explicit_asset_urls),
                 "source_defined": True,
                 "explicit_asset_plan": True,
             }
-            discovery.releases.append(entry)
             matches = [entry]
         if not matches:
             raise_expected(
@@ -108,9 +107,11 @@ def plan_targets(  # noqa: PLR0913
         ),
         None,
     )
-    assets = entry.get("assets", {}) if isinstance(entry, Mapping) else {}
-    if not isinstance(assets, Mapping):
-        assets = {}
+    assets: Mapping[str, object] = {}
+    if isinstance(entry, Mapping):
+        assets_value = entry.get("assets", {})
+        if isinstance(assets_value, Mapping):
+            assets = cast("Mapping[str, object]", assets_value)
     table = table_url or _asset(assets, "table")
     category = (
         categories_url or _asset(assets, "category") or _asset(assets, "categories")
@@ -156,7 +157,7 @@ def plan_targets(  # noqa: PLR0913
     ]
 
 
-def _asset(assets: Mapping[object, object], key: str) -> str | None:
+def _asset(assets: Mapping[str, object], key: str) -> str | None:
     value = assets.get(key)
     if value is None:
         return None

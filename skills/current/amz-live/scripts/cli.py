@@ -5,13 +5,15 @@
 #   "selectolax>=0.3.26",
 # ]
 # ///
+"""Thin PEP 723 entrypoint for the amz-live CLI."""
+
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(SKILL_DIR / "lib"))
+_ = sys.path.insert(0, str(SKILL_DIR / "lib"))
 
 from amz_live.cli import main
 

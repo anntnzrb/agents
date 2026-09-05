@@ -18,7 +18,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, assert_never
+from typing import TYPE_CHECKING, Final, TypedDict, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -55,11 +55,11 @@ class Err[E]:
 
     error: E
 
-    def map[U](self, _fn: Callable[[object], U]) -> Err[E]:
+    def map[U](self, _fn: Callable[..., U]) -> Err[E]:
         """Pass error through unchanged on map."""
         return self
 
-    def and_then[U](self, _fn: Callable[[object], Result[U, E]]) -> Err[E]:
+    def and_then[U](self, _fn: Callable[..., Result[U, E]]) -> Err[E]:
         """Pass error through unchanged on and_then."""
         return self
 
@@ -88,6 +88,12 @@ class UploadPayload:
     output_json: bool
     output_raw: bool
     output_raw_url: bool
+
+
+class UploadResponse(TypedDict):
+    """Wire shape of the bytebin upload response."""
+
+    key: str
 
 
 # Canonical language IDs recognized by lucko/paste Monaco editor
@@ -358,54 +364,54 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=EPILOG_EXAMPLES,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "file",
         nargs="?",
         default=None,
         help="Path to file to upload (reads from stdin if omitted or '-')",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-l",
         "--lang",
         help="Explicit language identifier or alias (e.g. python, py, ts, diff, json)",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--json",
         action="store_true",
         help="Output structured JSON payload (key, url, and raw_url)",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--raw",
         action="store_true",
         help="Output only the paste key",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--raw-url",
         action="store_true",
         help="Output direct raw content URL",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--get",
         metavar="KEY",
         help="Fetch content of an existing paste by key",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--base-url",
         default=DEFAULT_BASE_URL,
         help=f"Base API URL (default: {DEFAULT_BASE_URL})",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--user-agent",
         default=DEFAULT_USER_AGENT,
         help=f"User-Agent header string (default: {DEFAULT_USER_AGENT})",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--timeout",
         type=float,
         default=DEFAULT_TIMEOUT,
         help=f"Request timeout in seconds (default: {DEFAULT_TIMEOUT})",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--no-gzip",
         action="store_true",
         help="Disable gzip payload compression",
@@ -455,7 +461,7 @@ def execute_fetch(
                 return Err(
                     AppError(f"paste not found for key: {key}", EXIT_NETWORK_ERROR)
                 )
-            resp.raise_for_status()
+            _ = resp.raise_for_status()
             text = resp.text
             return Ok(text if text.endswith("\n") else text + "\n")
     except httpx.HTTPStatusError as exc:
@@ -513,8 +519,8 @@ def execute_upload(payload: UploadPayload) -> Result[str, AppError]:
     try:
         with httpx.Client(timeout=payload.timeout) as client:
             resp = client.post(post_url, headers=headers, content=body)
-            resp.raise_for_status()
-            data = resp.json()
+            _ = resp.raise_for_status()
+            data = cast("UploadResponse", resp.json())
             key = data.get("key")
             if not key:
                 return Err(
@@ -533,26 +539,62 @@ def execute_upload(payload: UploadPayload) -> Result[str, AppError]:
         return Err(AppError(f"Network error: {exc}", EXIT_NETWORK_ERROR))
 
 
+def _config_str(args: argparse.Namespace, field: str) -> str:
+    """Extract a required str option from parsed args."""
+    return cast("str", getattr(args, field))
+
+
+def _optional_str(args: argparse.Namespace, field: str) -> str | None:
+    """Extract an optional str option from parsed args."""
+    return cast("str | None", getattr(args, field))
+
+
+def _config_float(args: argparse.Namespace, field: str) -> float:
+    """Extract a required float option from parsed args."""
+    return cast("float", getattr(args, field))
+
+
+def _config_bool(args: argparse.Namespace, field: str) -> bool:
+    """Extract a required bool flag from parsed args."""
+    return cast("bool", getattr(args, field))
+
+
 def run_pipeline(args: argparse.Namespace, *, is_atty: bool) -> Result[str, AppError]:
     """Execute upload or fetch workflow."""
-    if args.get:
-        return execute_fetch(args.base_url, args.get, args.user_agent, args.timeout)
+    get_key = _optional_str(args, "get")
+    if get_key:
+        return execute_fetch(
+            _config_str(args, "base_url"),
+            get_key,
+            _config_str(args, "user_agent"),
+            _config_float(args, "timeout"),
+        )
 
-    input_res = read_input(args.file, is_atty=is_atty)
+    file_arg = _optional_str(args, "file")
+    lang = _optional_str(args, "lang")
+    base_url = _config_str(args, "base_url")
+    user_agent = _config_str(args, "user_agent")
+    timeout = _config_float(args, "timeout")
+    use_gzip = not _config_bool(args, "no_gzip")
+    output_json = _config_bool(args, "json")
+    output_raw = _config_bool(args, "raw")
+    output_raw_url = _config_bool(args, "raw_url")
+
+    input_res = read_input(file_arg, is_atty=is_atty)
 
     def to_payload(pair: tuple[bytes, Path | None]) -> UploadPayload:
         content, path = pair
-        language = detect_language(path, content, args.lang)
+        language = detect_language(path, content, lang)
         return UploadPayload(
             content=content,
             language=language,
-            base_url=args.base_url,
-            user_agent=args.user_agent,
-            timeout=args.timeout,
-            use_gzip=not args.no_gzip,
-            output_json=args.json,
-            output_raw=args.raw,
-            output_raw_url=args.raw_url,
+            base_url=base_url,
+            user_agent=user_agent,
+            timeout=timeout,
+            use_gzip=use_gzip,
+            output_json=output_json,
+            output_raw=output_raw,
+            output_raw_url=output_raw_url,
         )
 
     return input_res.map(to_payload).and_then(execute_upload)
@@ -566,15 +608,11 @@ def main(argv: list[str] | None = None) -> int:
     is_atty = sys.stdin.isatty()
     res = run_pipeline(args, is_atty=is_atty)
 
-    match res:
-        case Ok(out):
-            sys.stdout.write(out)
-            return EXIT_SUCCESS
-        case Err(err):
-            sys.stderr.write(f"Error: {err.message}\n")
-            return err.exit_code
-        case _ as unreachable:
-            assert_never(unreachable)
+    if isinstance(res, Ok):
+        _ = sys.stdout.write(res.value)
+        return EXIT_SUCCESS
+    _ = sys.stderr.write(f"Error: {res.error.message}\n")
+    return res.error.exit_code
 
 
 if __name__ == "__main__":

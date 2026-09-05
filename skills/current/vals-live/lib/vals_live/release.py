@@ -3,12 +3,12 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from .identity import release_identity
 
 
-def resolve(root: object, raw: bytes, requested: str | None = None) -> dict[str, Any]:
+def resolve(
+    root: object, raw: bytes, requested: str | None = None
+) -> dict[str, object]:
     """Resolve an exact requested release or content snapshot identity."""
     source_release, snapshot = release_identity(root, raw)
     if (

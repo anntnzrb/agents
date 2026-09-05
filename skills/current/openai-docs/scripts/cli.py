@@ -18,11 +18,11 @@ COMMANDS = {
 
 
 def _print_help() -> None:
-    print("usage: cli.py {codex-manual,latest-model} [args...]")  # noqa: T201
-    print(  # noqa: T201
+    print("usage: cli.py {codex-manual,latest-model} [args...]")
+    print(
         "  uv run --script <skill-dir>/scripts/cli.py codex-manual",
     )
-    print(  # noqa: T201
+    print(
         "  uv run --script <skill-dir>/scripts/cli.py latest-model",
     )
 
@@ -36,13 +36,13 @@ def main(argv: list[str] | None = None) -> int:
 
     script = COMMANDS.get(args[0])
     if script is None:
-        print(f"unknown command: {args[0]}", file=sys.stderr)  # noqa: T201
+        print(f"unknown command: {args[0]}", file=sys.stderr)
         _print_help()
         return 2
 
     node = shutil.which("node")
     if node is None:
-        print("node executable not found", file=sys.stderr)  # noqa: T201
+        print("node executable not found", file=sys.stderr)
         return 127
 
     result = subprocess.run(  # noqa: S603

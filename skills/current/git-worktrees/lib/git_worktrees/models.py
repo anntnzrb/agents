@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Literal, TypedDict
+from typing import TYPE_CHECKING, Literal, TypedDict
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 Mode = Literal["new-branch", "existing-branch", "detached-ephemeral"]
 LeaseState = Literal["reserved", "ready", "create_failed", "setup_failed", "released"]
 
 
 class WorktreeSnapshot(TypedDict):
+    """Porcelain worktree snapshot."""
+
     path: str
     head: str
     ref: str | None
@@ -22,6 +25,8 @@ class WorktreeSnapshot(TypedDict):
 
 @dataclass(frozen=True, slots=True)
 class GitWorktree:
+    """A worktree attached to a repository."""
+
     path: Path
     head: str
     ref: str | None
@@ -30,6 +35,7 @@ class GitWorktree:
     prunable: str | None
 
     def snapshot(self) -> WorktreeSnapshot:
+        """Serialize to a plain snapshot dict."""
         return {
             "path": str(self.path),
             "head": self.head,
@@ -42,6 +48,8 @@ class GitWorktree:
 
 @dataclass(frozen=True, slots=True)
 class Repository:
+    """A repository with its worktrees."""
+
     common_git_dir: Path
     primary_path: Path
     worktrees: tuple[GitWorktree, ...]
@@ -49,11 +57,15 @@ class Repository:
 
 @dataclass(frozen=True, slots=True)
 class SetupCommand:
+    """A setup command to run in a worktree."""
+
     argv: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class AcquireRequest:
+    """A worktree acquisition request."""
+
     repo: Path
     owner: str
     session_actor: str
@@ -68,6 +80,8 @@ class AcquireRequest:
 
 @dataclass(frozen=True, slots=True)
 class Lease:
+    """A managed worktree lease."""
+
     lease_id: str
     common_git_dir: Path
     primary_path: Path
@@ -87,6 +101,7 @@ class Lease:
     failure: str | None
 
     def public(self) -> dict[str, object]:
+        """Serialize the public lease fields."""
         return {
             "lease_id": self.lease_id,
             "canonical_root": str(self.primary_path),
@@ -112,6 +127,8 @@ class Lease:
 
 @dataclass(frozen=True, slots=True)
 class Handoff:
+    """A lease handoff between actors."""
+
     handoff_id: str
     lease_id: str
     actor: str
@@ -121,6 +138,7 @@ class Handoff:
     completed_at: str | None
 
     def public(self) -> dict[str, object]:
+        """Serialize the public handoff fields."""
         return {
             "handoff_id": self.handoff_id,
             "lease_id": self.lease_id,

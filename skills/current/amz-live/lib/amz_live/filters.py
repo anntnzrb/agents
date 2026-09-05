@@ -1,9 +1,14 @@
+"""Rating, price, and text filters for Amazon search results."""
+
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
-from .models import SearchResult
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
+    from .models import SearchResult
 
 
 def filter_results(
@@ -17,9 +22,10 @@ def filter_results(
     exclude: Sequence[str] | None = None,
     limit: int | None = None,
 ) -> list[SearchResult]:
+    """Filter search results by rating, price, badge, text, and limit."""
     if limit is not None and limit < 0:
-        raise ValueError("limit must be >= 0")
-
+        msg = "limit must be >= 0"
+        raise ValueError(msg)
     min_rating_value = _coerce_decimal(min_rating)
     max_price_value = _coerce_decimal(max_price)
     badge_value = _normalize_term(badge)

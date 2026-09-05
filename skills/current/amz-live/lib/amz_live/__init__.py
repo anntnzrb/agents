@@ -1,3 +1,5 @@
+"""Amazon live search skill package."""
+
 from .client import AmazonSearchClient, search
 from .detail_parser import parse_product_detail
 from .filters import filter_results

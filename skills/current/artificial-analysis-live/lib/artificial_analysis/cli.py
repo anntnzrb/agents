@@ -1,4 +1,4 @@
-# ruff: noqa: ANN401, C901, CPY001, D103, FBT003, PERF401, PLR0911, PLR0912, PLR0915
+# ruff: noqa: C901, D103, FBT003, PERF401, PLR0911, PLR0912, PLR0915
 """Command-line and RPC interfaces for Artificial Analysis snapshots."""
 
 from __future__ import annotations
@@ -16,12 +16,13 @@ import sys
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlsplit
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
     from typing import NoReturn, TextIO
+
 from .contracts import compact_json
 from .diagnose import diagnose
 from .diagnostics import redact, redact_query
@@ -59,6 +60,8 @@ from .rsc import (
 )
 from .values import parse_numeric
 
+type _Subparsers = argparse._SubParsersAction[argparse.ArgumentParser]  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+
 PROTOCOL_VERSION = "1"
 
 DEFAULT_ARTIFACT_DIR = Path(tempfile.gettempdir()) / "artifacts" / "artificial-analysis"
@@ -70,6 +73,21 @@ DEFAULT_SNAPSHOT_MAX_AGE = timedelta(hours=24)
 MIN_QUOTED_VALUE_LENGTH = 2
 SCHEMA_V2 = 2
 NOT_MODIFIED = 304
+
+
+def _as_dict(val: object) -> dict[str, object]:
+    if isinstance(val, dict):
+        d: dict[str, object] = {}
+        for k, v in val.items():  # pyright: ignore[reportUnknownVariableType]
+            d[str(k)] = v  # pyright: ignore[reportUnknownArgumentType]
+        return d
+    return {}
+
+
+def _as_list(val: object) -> list[object]:
+    if isinstance(val, list):
+        return list(val)  # pyright: ignore[reportUnknownArgumentType]
+    return []
 
 
 def _finite_number(value: object) -> bool:
@@ -100,7 +118,7 @@ def _evidence_record(  # noqa: PLR0913
     blocked_reasons: tuple[str, ...] = (),
     formula: str | None = None,
     input_paths: tuple[str, ...] = (),
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Project ``values.parse_numeric`` into the additive CLI evidence shape."""
     parsed = parse_numeric(
         raw_value,
@@ -115,16 +133,21 @@ def _evidence_record(  # noqa: PLR0913
         parser_version="1",
         sha256=artifact_hash,
     )
-    evidence = parsed.to_dict()
+    evidence: dict[str, object] = parsed.to_dict()
     if value_status == "derived" and evidence.get("normalized_value") is None:
         # ``parse_numeric`` classifies a null/raw-unparseable value as missing
         # or unparsed.  A declared derived path still describes provenance as
         # derived; only its usability is unavailable.
-        reasons = [
-            reason
-            for reason in evidence.get("blocked_reasons", [])
-            if reason not in {"missing_value", "unparsed_value"}
-        ]
+        raw_reasons = evidence.get("blocked_reasons")
+        reasons: list[object] = (
+            [
+                reason
+                for reason in _as_list(raw_reasons)  # pyright: ignore[reportUnknownArgumentType]
+                if reason not in {"missing_value", "unparsed_value"}
+            ]
+            if isinstance(raw_reasons, list)
+            else []
+        )
         if "MISSING_REQUIRED_INPUT" not in reasons:
             reasons.append("MISSING_REQUIRED_INPUT")
         evidence["value_status"] = "derived"
@@ -133,6 +156,12 @@ def _evidence_record(  # noqa: PLR0913
     # Keep the values.py names and expose the concise contract aliases.  This
     # lets old consumers use source_field/value_status while new consumers can
     # inspect field/status without a translation table.
+    raw_blockers = evidence.get("blocked_reasons")
+    blockers_list: list[object] = (
+        [str(r) for r in _as_list(raw_blockers)]  # pyright: ignore[reportUnknownArgumentType]
+        if isinstance(raw_blockers, (list, tuple))
+        else []
+    )
     evidence.update(
         {
             "raw": evidence.get("raw_value"),
@@ -143,7 +172,7 @@ def _evidence_record(  # noqa: PLR0913
             "status": evidence.get("value_status"),
             "semantics": evidence.get("metric_semantics_status"),
             "eligibility": evidence.get("comparison_eligibility"),
-            "blockers": list(evidence.get("blocked_reasons") or []),
+            "blockers": blockers_list,
         },
     )
     if formula is not None:
@@ -152,53 +181,49 @@ def _evidence_record(  # noqa: PLR0913
     return evidence
 
 
-def _lookup_path(row: dict[str, Any], path: str) -> object:
+def _lookup_path(row: dict[str, object], path: str) -> object:
     current: object = row
     for part in path.split("."):
         if not isinstance(current, dict):
             return None
-        current = current.get(part)
+        current = _as_dict(current).get(part)  # pyright: ignore[reportUnknownArgumentType]
     return current
 
 
-def _source_hash_from_payload(payload: dict[str, Any]) -> str | None:
+def _source_hash_from_payload(payload: dict[str, object]) -> str | None:
     for container_key in ("source", "meta"):
-        container = payload.get(container_key)
-        if not isinstance(container, dict):
-            continue
+        container = _as_dict(payload.get(container_key))
         for key in ("sha256", "artifact_hash", "source_hash"):
             value = container.get(key)
             if isinstance(value, str) and value:
                 return value
-        nested = container.get("source")
-        if isinstance(nested, dict):
-            value = nested.get("sha256")
-            if isinstance(value, str) and value:
-                return value
+        nested = _as_dict(container.get("source"))
+        value = nested.get("sha256")
+        if isinstance(value, str) and value:
+            return value
     return None
 
 
 def _attach_row_evidence(  # noqa: PLR0913
-    row: dict[str, Any],
+    row: dict[str, object],
     *,
     metric_paths: tuple[str, ...] = (),
     source_prefix: str = "$",
     artifact_hash: str | None = None,
-    derived_paths: dict[str, tuple[str, tuple[str, ...]]] | None = None,
+    derived_paths: dict[str, tuple[str, tuple[str, ...]] | None] | None = None,
     raw_values: dict[str, object] | None = None,
     unknown_paths: tuple[str, ...] = (),
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Attach evidence for source and derived scalars without changing values."""
-    evidence = row.get("metric_evidence")
-    metric_evidence = dict(evidence) if isinstance(evidence, dict) else {}
-    derived_paths = derived_paths or {}
-    raw_values = raw_values or {}
+    metric_evidence: dict[str, object] = _as_dict(row.get("metric_evidence"))
+    resolved_derived_paths = derived_paths or {}
+    resolved_raw_values = raw_values or {}
     unknown_set = set(unknown_paths)
 
     def add(path: str, value: object, *, unknown: bool = False) -> None:
         if path in metric_evidence:
             return
-        formula_and_inputs = derived_paths.get(path)
+        formula_and_inputs = resolved_derived_paths.get(path)
         if formula_and_inputs is not None:
             formula, input_paths = formula_and_inputs
             metric_evidence[path] = _evidence_record(
@@ -213,7 +238,7 @@ def _attach_row_evidence(  # noqa: PLR0913
             )
             return
         metric_evidence[path] = _evidence_record(
-            raw_values.get(path, value),
+            resolved_raw_values.get(path, value),
             source_path=f"{source_prefix}.{path}",
             source_field=path.rsplit(".", 1)[-1],
             artifact_hash=artifact_hash,
@@ -229,7 +254,7 @@ def _attach_row_evidence(  # noqa: PLR0913
 
     def walk(node: object, prefix: str) -> None:
         if isinstance(node, dict):
-            for key, value in node.items():
+            for key, value in _as_dict(node).items():  # pyright: ignore[reportUnknownArgumentType]
                 if key in {"metric_evidence", "raw_metadata"}:
                     continue
                 path = f"{prefix}.{key}" if prefix else key
@@ -240,12 +265,12 @@ def _attach_row_evidence(  # noqa: PLR0913
                         unknown=prefix.startswith(("raw_fields", "unknowns")),
                     )
                 elif isinstance(value, dict):
-                    walk(value, path)
+                    walk(value, path)  # pyright: ignore[reportUnknownArgumentType]
                 elif isinstance(value, list):
-                    for index, item in enumerate(value):
+                    for index, item in enumerate(_as_list(value)):  # pyright: ignore[reportUnknownArgumentType]
                         walk(item, f"{path}[{index}]")
         elif isinstance(node, list):
-            for index, item in enumerate(node):
+            for index, item in enumerate(_as_list(node)):  # pyright: ignore[reportUnknownArgumentType]
                 walk(item, f"{prefix}[{index}]")
 
     walk(row, "")
@@ -254,17 +279,17 @@ def _attach_row_evidence(  # noqa: PLR0913
 
 
 def _attach_payload_evidence(
-    payload: dict[str, Any],
+    payload: dict[str, object],
     *,
     artifact_hash: str | None = None,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Attach evidence for payload-level derived scalar fields."""
-    existing = payload.get("metric_evidence")
-    metric_evidence = dict(existing) if isinstance(existing, dict) else {}
+    resolved_hash = artifact_hash or _source_hash_from_payload(payload)
+    metric_evidence: dict[str, object] = _as_dict(payload.get("metric_evidence"))
 
     def walk(node: object, prefix: str) -> None:
         if isinstance(node, dict):
-            for key, value in node.items():
+            for key, value in _as_dict(node).items():  # pyright: ignore[reportUnknownArgumentType]
                 if key in {"metric_evidence", "raw_metadata"}:
                     continue
                 path = f"{prefix}.{key}" if prefix else key
@@ -274,13 +299,13 @@ def _attach_payload_evidence(
                             value,
                             source_path=f"$.{path}",
                             source_field=key,
-                            artifact_hash=artifact_hash,
+                            artifact_hash=resolved_hash,
                             value_status="derived",
                         )
                 elif isinstance(value, (dict, list)):
-                    walk(value, path)
+                    walk(value, path)  # pyright: ignore[reportUnknownArgumentType]
         elif isinstance(node, list):
-            for index, item in enumerate(node):
+            for index, item in enumerate(_as_list(node)):  # pyright: ignore[reportUnknownArgumentType]
                 walk(item, f"{prefix}[{index}]")
 
     walk(payload, "")
@@ -288,25 +313,30 @@ def _attach_payload_evidence(
     return payload
 
 
-def _snapshot_overlap(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
+def _snapshot_overlap(
+    snapshot: dict[str, object] | None = None,
+) -> dict[str, object]:
     """Expose declarations without inventing overlap from source similarity."""
     if not isinstance(snapshot, dict):
         return overlap_metadata()
-    meta = snapshot.get("meta") if isinstance(snapshot.get("meta"), dict) else {}
-    source = snapshot.get("overlap")
-    if not isinstance(source, dict):
-        source = meta.get("overlap") if isinstance(meta.get("overlap"), dict) else {}
+    meta = _as_dict(snapshot.get("meta"))
+    source_val = snapshot.get("overlap")
+    source: dict[str, object] = (
+        _as_dict(source_val)  # pyright: ignore[reportUnknownArgumentType]
+        if isinstance(source_val, dict)
+        else _as_dict(meta.get("overlap"))
+    )
     declarations = source.get("declared_joins", source.get("overlap_claims"))
     left = source.get("left")
     right = source.get("right")
-    dependencies = source.get("dependencies", meta.get("dependencies", []))
-    independence = source.get("independence", meta.get("independence", []))
+    dependencies = _as_list(source.get("dependencies", meta.get("dependencies", [])))
+    independence = _as_list(source.get("independence", meta.get("independence", [])))
     return overlap_metadata(
         left=left,
         right=right,
         declarations=declarations,
-        dependencies=dependencies if isinstance(dependencies, list) else [],
-        independence=independence if isinstance(independence, list) else [],
+        dependencies=dependencies,
+        independence=independence,
     )
 
 
@@ -384,7 +414,7 @@ def _load_dotenv() -> None:
         return
     for path in _dotenv_candidates():
         for key, value in _parse_env_file(path).items():
-            os.environ.setdefault(key, value)
+            _ = os.environ.setdefault(key, value)
         if os.environ.get(MODEL_API_KEY_ENV):
             return
 
@@ -405,13 +435,13 @@ def _add_cli_error_flags(
     parser: argparse.ArgumentParser, *, suppress_defaults: bool = False
 ) -> None:
     default = argparse.SUPPRESS if suppress_defaults else False
-    parser.add_argument(
+    _ = parser.add_argument(
         "--json-errors",
         action="store_true",
         default=default,
         help="Emit one compact JSON error object on stdout.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--legacy-errors",
         action="store_true",
         default=default,
@@ -427,7 +457,7 @@ def build_parser() -> argparse.ArgumentParser:
             "AI-first extractor for Artificial Analysis provider endpoint data."
         ),
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--mode",
         choices=("cli", "rpc"),
         default="cli",
@@ -451,7 +481,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _add_fetch_parser(subparsers: argparse._SubParsersAction) -> None:
+def _add_fetch_parser(subparsers: _Subparsers) -> None:
     fetch_parser = subparsers.add_parser(
         "fetch",
         help=(
@@ -459,29 +489,33 @@ def _add_fetch_parser(subparsers: argparse._SubParsersAction) -> None:
             "a snapshot."
         ),
     )
-    fetch_parser.add_argument("--output-json", type=Path, default=DEFAULT_OUTPUT_JSON)
-    fetch_parser.add_argument(
+    _ = fetch_parser.add_argument(
+        "--output-json", type=Path, default=DEFAULT_OUTPUT_JSON
+    )
+    _ = fetch_parser.add_argument(
         "--output-endpoints",
         type=Path,
         default=DEFAULT_OUTPUT_ENDPOINTS,
     )
-    fetch_parser.add_argument("--output-url", type=Path, default=DEFAULT_OUTPUT_URL)
-    fetch_parser.add_argument("--cache-dir", type=Path, default=_default_cache_dir())
-    fetch_parser.add_argument("--timeout-seconds", type=float, default=60.0)
-    fetch_parser.add_argument("--min-endpoints", type=int, default=700)
-    fetch_parser.add_argument("--min-providers", type=int, default=40)
-    fetch_parser.add_argument(
+    _ = fetch_parser.add_argument("--output-url", type=Path, default=DEFAULT_OUTPUT_URL)
+    _ = fetch_parser.add_argument(
+        "--cache-dir", type=Path, default=_default_cache_dir()
+    )
+    _ = fetch_parser.add_argument("--timeout-seconds", type=float, default=60.0)
+    _ = fetch_parser.add_argument("--min-endpoints", type=int, default=700)
+    _ = fetch_parser.add_argument("--min-providers", type=int, default=40)
+    _ = fetch_parser.add_argument(
         "--stale-policy",
         choices=("error", "allow-last-good"),
         default="error",
         help="Refresh failure policy; stale fallback is opt-in.",
     )
-    fetch_parser.add_argument(
+    _ = fetch_parser.add_argument(
         "--allow-stale",
         action="store_true",
         help="Alias for --stale-policy allow-last-good.",
     )
-    fetch_parser.add_argument(
+    _ = fetch_parser.add_argument(
         "--strict",
         action="store_true",
         help="Alias for --stale-policy error.",
@@ -489,29 +523,29 @@ def _add_fetch_parser(subparsers: argparse._SubParsersAction) -> None:
     fetch_parser.set_defaults(handler=_handle_fetch)
 
 
-def _add_stats_parser(subparsers: argparse._SubParsersAction) -> None:
+def _add_stats_parser(subparsers: _Subparsers) -> None:
     stats_parser = subparsers.add_parser(
         "stats",
         help="Show snapshot counts and top providers.",
     )
-    stats_parser.add_argument(
+    _ = stats_parser.add_argument(
         "snapshot",
         nargs="?",
         type=Path,
         default=DEFAULT_OUTPUT_JSON,
     )
-    stats_parser.add_argument("--top", type=int, default=10)
+    _ = stats_parser.add_argument("--top", type=int, default=10)
     stats_parser.set_defaults(handler=_handle_stats)
 
 
-def _add_diff_parser(subparsers: argparse._SubParsersAction) -> None:
+def _add_diff_parser(subparsers: _Subparsers) -> None:
     diff_parser = subparsers.add_parser(
         "diff",
         help="Diff endpoint and provider changes between snapshots.",
     )
-    diff_parser.add_argument("old_snapshot", type=Path)
-    diff_parser.add_argument("new_snapshot", type=Path)
-    diff_parser.add_argument(
+    _ = diff_parser.add_argument("old_snapshot", type=Path)
+    _ = diff_parser.add_argument("new_snapshot", type=Path)
+    _ = diff_parser.add_argument(
         "--schema-aware",
         action="store_true",
         help="Include deterministic model, metric, schema, and diagnostic changes.",
@@ -519,55 +553,55 @@ def _add_diff_parser(subparsers: argparse._SubParsersAction) -> None:
     diff_parser.set_defaults(handler=_handle_diff)
 
 
-def _add_diagnose_parser(subparsers: argparse._SubParsersAction) -> None:
+def _add_diagnose_parser(subparsers: _Subparsers) -> None:
     diagnose_parser = subparsers.add_parser(
         "diagnose",
         help="Inspect local snapshot/cache health without fetching.",
     )
-    diagnose_parser.add_argument("snapshot", nargs="?", type=Path)
-    diagnose_parser.add_argument("--snapshot", dest="snapshot_path", type=Path)
-    diagnose_parser.add_argument("--cache-dir", type=Path, default=None)
+    _ = diagnose_parser.add_argument("snapshot", nargs="?", type=Path)
+    _ = diagnose_parser.add_argument("--snapshot", dest="snapshot_path", type=Path)
+    _ = diagnose_parser.add_argument("--cache-dir", type=Path, default=None)
     diagnose_parser.set_defaults(handler=_handle_diagnose)
 
 
 def _add_model_filters(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
+    _ = parser.add_argument(
         "--model",
         type=str,
         default=None,
         help="Model slug/name contains filter.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--creator",
         type=str,
         default=None,
         help="Creator/lab name contains filter.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--open-weights-only",
         action="store_true",
         help="Return only open-weights models.",
     )
 
 
-def _add_harness_parser(subparsers: argparse._SubParsersAction) -> None:
+def _add_harness_parser(subparsers: _Subparsers) -> None:
     harness_parser = subparsers.add_parser(
         "harness",
         help="Rank unique models by Harness = 50%% Agentic Index + 50%% Coding Index.",
     )
-    harness_parser.add_argument(
+    _ = harness_parser.add_argument(
         "snapshot",
         nargs="?",
         type=Path,
         default=DEFAULT_OUTPUT_JSON,
     )
     _add_model_filters(harness_parser)
-    harness_parser.add_argument("--limit", type=int, default=50)
+    _ = harness_parser.add_argument("--limit", type=int, default=50)
     harness_parser.set_defaults(handler=_handle_harness)
 
 
 def _add_order(parser: argparse.ArgumentParser, *, default: str) -> None:
-    parser.add_argument(
+    _ = parser.add_argument(
         "--order",
         type=str,
         default=default,
@@ -575,7 +609,7 @@ def _add_order(parser: argparse.ArgumentParser, *, default: str) -> None:
     )
 
 
-def _add_coding_parser(subparsers: argparse._SubParsersAction) -> None:
+def _add_coding_parser(subparsers: _Subparsers) -> None:
     coding_parser = subparsers.add_parser(
         "coding",
         help=(
@@ -583,14 +617,14 @@ def _add_coding_parser(subparsers: argparse._SubParsersAction) -> None:
             "output token composition."
         ),
     )
-    coding_parser.add_argument(
+    _ = coding_parser.add_argument(
         "--output-json",
         type=Path,
         default=DEFAULT_CODING_OUTPUT_JSON,
     )
-    coding_parser.add_argument("--timeout-seconds", type=float, default=60.0)
+    _ = coding_parser.add_argument("--timeout-seconds", type=float, default=60.0)
     _add_model_filters(coding_parser)
-    coding_parser.add_argument(
+    _ = coding_parser.add_argument(
         "--sort-by",
         type=str,
         default="coding",
@@ -604,8 +638,8 @@ def _add_coding_parser(subparsers: argparse._SubParsersAction) -> None:
         ),
     )
     _add_order(coding_parser, default="auto")
-    coding_parser.add_argument("--limit", type=int, default=50)
-    coding_parser.add_argument(
+    _ = coding_parser.add_argument("--limit", type=int, default=50)
+    _ = coding_parser.add_argument(
         "--include-benchmark-counts",
         action="store_true",
         help="Include per-benchmark token counts for Coding Index components.",
@@ -613,31 +647,33 @@ def _add_coding_parser(subparsers: argparse._SubParsersAction) -> None:
     coding_parser.set_defaults(handler=_handle_coding)
 
 
-def _add_evaluation_parser(subparsers: argparse._SubParsersAction) -> None:
+def _add_evaluation_parser(subparsers: _Subparsers) -> None:
     evaluation_parser = subparsers.add_parser(
         "evaluation",
         help="Extract model rows from a dedicated Artificial Analysis evaluation page.",
     )
-    evaluation_parser.add_argument("url", nargs="?", help="public evaluation page URL")
-    evaluation_parser.add_argument(
+    _ = evaluation_parser.add_argument(
+        "url", nargs="?", help="public evaluation page URL"
+    )
+    _ = evaluation_parser.add_argument(
         "--input",
         type=Path,
         help="read a saved HTML/RSC response instead of fetching a URL",
     )
-    evaluation_parser.add_argument("--output-json", type=Path)
-    evaluation_parser.add_argument("--timeout-seconds", type=float, default=60.0)
-    evaluation_parser.add_argument("--min-rows", type=int, default=1)
-    evaluation_parser.add_argument("--sort-by", type=str)
-    evaluation_parser.add_argument(
+    _ = evaluation_parser.add_argument("--output-json", type=Path)
+    _ = evaluation_parser.add_argument("--timeout-seconds", type=float, default=60.0)
+    _ = evaluation_parser.add_argument("--min-rows", type=int, default=1)
+    _ = evaluation_parser.add_argument("--sort-by", type=str)
+    _ = evaluation_parser.add_argument(
         "--order",
         choices=("auto", "asc", "desc"),
         default="auto",
     )
-    evaluation_parser.add_argument("--limit", type=int)
+    _ = evaluation_parser.add_argument("--limit", type=int)
     evaluation_parser.set_defaults(handler=_handle_evaluation)
 
 
-def _add_reasoning_parser(subparsers: argparse._SubParsersAction) -> None:
+def _add_reasoning_parser(subparsers: _Subparsers) -> None:
     reasoning_parser = subparsers.add_parser(
         "reasoning",
         help=(
@@ -645,14 +681,14 @@ def _add_reasoning_parser(subparsers: argparse._SubParsersAction) -> None:
             "thinking token split)."
         ),
     )
-    reasoning_parser.add_argument(
+    _ = reasoning_parser.add_argument(
         "snapshot",
         nargs="?",
         type=Path,
         default=DEFAULT_OUTPUT_JSON,
     )
     _add_model_filters(reasoning_parser)
-    reasoning_parser.add_argument(
+    _ = reasoning_parser.add_argument(
         "--class",
         type=str,
         default=None,
@@ -666,12 +702,12 @@ def _add_reasoning_parser(subparsers: argparse._SubParsersAction) -> None:
         ),
         help="Filter by reasoning selectivity classification.",
     )
-    reasoning_parser.add_argument(
+    _ = reasoning_parser.add_argument(
         "--selective-only",
         action="store_true",
         help="Return only selective thinkers (classification starts with selective).",
     )
-    reasoning_parser.add_argument(
+    _ = reasoning_parser.add_argument(
         "--sort-by",
         type=str,
         default="harness",
@@ -686,8 +722,8 @@ def _add_reasoning_parser(subparsers: argparse._SubParsersAction) -> None:
         ),
     )
     _add_order(reasoning_parser, default="auto")
-    reasoning_parser.add_argument("--limit", type=int, default=50)
-    reasoning_parser.add_argument(
+    _ = reasoning_parser.add_argument("--limit", type=int, default=50)
+    _ = reasoning_parser.add_argument(
         "--benchmarks",
         action="store_true",
         help="Include per-benchmark reasoning share breakdown in each row.",
@@ -695,36 +731,36 @@ def _add_reasoning_parser(subparsers: argparse._SubParsersAction) -> None:
     reasoning_parser.set_defaults(handler=_handle_reasoning)
 
 
-def _add_query_parser(subparsers: argparse._SubParsersAction) -> None:
+def _add_query_parser(subparsers: _Subparsers) -> None:
     query_parser = subparsers.add_parser(
         "query",
         help="Query model/provider benchmark rows from a snapshot.",
     )
-    query_parser.add_argument(
+    _ = query_parser.add_argument(
         "snapshot",
         nargs="?",
         type=Path,
         default=DEFAULT_OUTPUT_JSON,
     )
-    query_parser.add_argument(
+    _ = query_parser.add_argument(
         "--model",
         type=str,
         default=None,
         help="Model slug/name contains filter.",
     )
-    query_parser.add_argument(
+    _ = query_parser.add_argument(
         "--provider",
         type=str,
         default=None,
         help="Provider slug/name contains filter.",
     )
-    query_parser.add_argument(
+    _ = query_parser.add_argument(
         "--endpoint",
         type=str,
         default=None,
         help="Endpoint slug contains filter.",
     )
-    query_parser.add_argument(
+    _ = query_parser.add_argument(
         "--sort-by",
         type=str,
         default="intelligence",
@@ -741,39 +777,39 @@ def _add_query_parser(subparsers: argparse._SubParsersAction) -> None:
         ),
     )
     _add_order(query_parser, default="auto")
-    query_parser.add_argument("--limit", type=int, default=20)
+    _ = query_parser.add_argument("--limit", type=int, default=20)
     query_parser.set_defaults(handler=_handle_query)
 
 
-def _add_qa_parser(subparsers: argparse._SubParsersAction) -> None:
+def _add_qa_parser(subparsers: _Subparsers) -> None:
     qa_parser = subparsers.add_parser(
         "qa",
         help="Minimal NL question command that maps intent to query filters/sort.",
     )
-    qa_parser.add_argument(
+    _ = qa_parser.add_argument(
         "question",
         type=str,
         help="Natural-language question about models/providers.",
     )
-    qa_parser.add_argument(
+    _ = qa_parser.add_argument(
         "snapshot",
         nargs="?",
         type=Path,
         default=DEFAULT_OUTPUT_JSON,
     )
-    qa_parser.add_argument(
+    _ = qa_parser.add_argument(
         "--model",
         type=str,
         default=None,
         help="Override inferred model filter.",
     )
-    qa_parser.add_argument(
+    _ = qa_parser.add_argument(
         "--provider",
         type=str,
         default=None,
         help="Override inferred provider filter.",
     )
-    qa_parser.add_argument(
+    _ = qa_parser.add_argument(
         "--sort-by",
         type=str,
         default=None,
@@ -790,14 +826,14 @@ def _add_qa_parser(subparsers: argparse._SubParsersAction) -> None:
         ),
         help="Override inferred sort metric.",
     )
-    qa_parser.add_argument(
+    _ = qa_parser.add_argument(
         "--order",
         type=str,
         default=None,
         choices=("asc", "desc"),
         help="Override inferred order.",
     )
-    qa_parser.add_argument(
+    _ = qa_parser.add_argument(
         "--limit",
         type=int,
         default=None,
@@ -806,7 +842,7 @@ def _add_qa_parser(subparsers: argparse._SubParsersAction) -> None:
     qa_parser.set_defaults(handler=_handle_qa)
 
 
-def _add_schema_parser(subparsers: argparse._SubParsersAction) -> None:
+def _add_schema_parser(subparsers: _Subparsers) -> None:
     schema_parser = subparsers.add_parser(
         "schema",
         help="Print machine-readable capability schema.",
@@ -855,8 +891,8 @@ def _normalize_argv(argv: Sequence[str] | None) -> list[str]:
     return [*global_prefix, "fetch", *values[index:]]
 
 
-def _emit_json(payload: dict[str, Any], *, stdout: TextIO) -> None:
-    stdout.write(
+def _emit_json(payload: dict[str, object], *, stdout: TextIO) -> None:
+    _ = stdout.write(
         json.dumps(
             payload,
             ensure_ascii=False,
@@ -892,16 +928,16 @@ def _emit_cli_error(
     }
     if details is not None:
         error["details"] = redact(details)
-    payload: dict[str, Any] = {
+    payload: dict[str, object] = {
         "ok": False,
         "version": PROTOCOL_VERSION,
         "command": command,
         "error": error,
     }
-    stdout.write(compact_json(payload) + "\n")
+    _ = stdout.write(compact_json(payload) + "\n")
 
 
-def _envelope(command: str, data: dict[str, Any]) -> dict[str, Any]:
+def _envelope(command: str, data: dict[str, object]) -> dict[str, object]:
     return {
         "ok": True,
         "version": PROTOCOL_VERSION,
@@ -910,12 +946,12 @@ def _envelope(command: str, data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _ensure_default_snapshot_fresh(path: Path, snapshot: dict[str, Any]) -> None:
+def _ensure_default_snapshot_fresh(path: Path, snapshot: dict[str, object]) -> None:
     if path != DEFAULT_OUTPUT_JSON:
         return
 
-    meta = snapshot.get("meta")
-    fetched_at = meta.get("fetched_at") if isinstance(meta, dict) else None
+    meta = _as_dict(snapshot.get("meta"))
+    fetched_at = meta.get("fetched_at")
     if not isinstance(fetched_at, str) or not fetched_at:
         message = (
             f"Default snapshot missing meta.fetched_at: {path}. "
@@ -943,64 +979,71 @@ def _ensure_default_snapshot_fresh(path: Path, snapshot: dict[str, Any]) -> None
         _raise_extraction_error(message)
 
 
-def _load_reader_snapshot(path: Path) -> dict[str, Any]:
+def _load_reader_snapshot(path: Path) -> dict[str, object]:
     snapshot = load_snapshot(path)
     _ensure_default_snapshot_fresh(path, snapshot)
     return snapshot
 
 
-def _schema_version(snapshot: dict[str, Any]) -> int:
-    meta = snapshot.get("meta")
-    return (
-        meta.get("schema_version")
-        if isinstance(meta, dict) and isinstance(meta.get("schema_version"), int)
-        else 1
-    )
+def _schema_version(snapshot: dict[str, object]) -> int:
+    meta = _as_dict(snapshot.get("meta"))
+    version = meta.get("schema_version")
+    return version if isinstance(version, int) else 1
 
 
-def _canonical_models(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def _canonical_models(
+    snapshot: dict[str, object],
+) -> dict[str, dict[str, object]]:
     if _schema_version(snapshot) < SCHEMA_V2:
         return {}
-    models = snapshot.get("models")
-    if not isinstance(models, list):
+    models_val = snapshot.get("models")
+    if not isinstance(models_val, list):
         _raise_extraction_error("Schema-v2 snapshot missing models list")
-    return {
-        slug: item
-        for item in models
-        if isinstance(item, dict) and isinstance(slug := item.get("slug"), str) and slug
-    }
+    result: dict[str, dict[str, object]] = {}
+    for item in _as_list(models_val):  # pyright: ignore[reportUnknownArgumentType]
+        if isinstance(item, dict):
+            item_d = _as_dict(item)  # pyright: ignore[reportUnknownArgumentType]
+            slug = item_d.get("slug")
+            if isinstance(slug, str) and slug:
+                result[slug] = item_d
+    return result
 
 
-def _model_rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+def _model_rows(snapshot: dict[str, object]) -> list[dict[str, object]]:
     canonical = _canonical_models(snapshot)
     if canonical:
         return list(canonical.values())
-    hosts_models = snapshot.get("hosts_models")
-    if not isinstance(hosts_models, list):
+    hosts_models_val = snapshot.get("hosts_models")
+    if not isinstance(hosts_models_val, list):
         _raise_extraction_error("Snapshot missing hosts_models list")
-    return [
-        model
-        for item in hosts_models
-        if isinstance(item, dict)
-        and isinstance(model := item.get("model"), dict)
-        and isinstance(model.get("slug"), str)
-    ]
+    result: list[dict[str, object]] = []
+    for item in _as_list(hosts_models_val):  # pyright: ignore[reportUnknownArgumentType]  # pyright: ignore[reportUnknownArgumentType]
+        if isinstance(item, dict):
+            item_d = _as_dict(item)  # pyright: ignore[reportUnknownArgumentType]
+            model_val = item_d.get("model")
+            if isinstance(model_val, dict):
+                model_d = _as_dict(model_val)  # pyright: ignore[reportUnknownArgumentType]
+                if isinstance(model_d.get("slug"), str):
+                    result.append(model_d)
+    return result
 
 
-def _creator(model: dict[str, Any]) -> dict[str, Any]:
+def _creator(model: dict[str, object]) -> dict[str, object]:
     creator = model.get("creator")
     if isinstance(creator, dict):
-        return creator
+        return _as_dict(creator)  # pyright: ignore[reportUnknownArgumentType]
     legacy_creator = model.get("model_creators")
-    return legacy_creator if isinstance(legacy_creator, dict) else {}
+    return _as_dict(legacy_creator) if isinstance(legacy_creator, dict) else {}  # pyright: ignore[reportUnknownArgumentType]
 
 
 def _artifact_record_metadata(record: dict[str, object]) -> dict[str, object]:
     nested = record.get("metadata")
-    return nested if isinstance(nested, dict) else {}
+    return _as_dict(nested) if isinstance(nested, dict) else {}  # pyright: ignore[reportUnknownArgumentType]
 
 
-def _cached_source_info(cache_dir: Path) -> tuple[bytes, dict[str, object]] | None:
+def _cached_source_info(
+    cache_dir: Path,
+) -> tuple[bytes, dict[str, object]] | None:
     cached = load_cached_artifact(cache_dir, source_key=BASE_URL)
     if cached is not None:
         return cached
@@ -1009,7 +1052,9 @@ def _cached_source_info(cache_dir: Path) -> tuple[bytes, dict[str, object]] | No
 
 def _result_headers(result: object) -> dict[str, str]:
     headers = getattr(result, "headers", None)
-    return headers if isinstance(headers, dict) else {}
+    if not isinstance(headers, dict):
+        return {}
+    return {str(k): str(v) for k, v in _as_dict(headers).items()}  # pyright: ignore[reportUnknownArgumentType]
 
 
 def _result_header(result: object, name: str) -> str | None:
@@ -1019,8 +1064,8 @@ def _result_header(result: object, name: str) -> str | None:
         return value
     folded_name = name.casefold()
     for key, candidate in headers.items():
-        if isinstance(key, str) and key.casefold() == folded_name:
-            return candidate if isinstance(candidate, str) and candidate else None
+        if key.casefold() == folded_name and candidate:
+            return candidate
     return None
 
 
@@ -1197,10 +1242,10 @@ def _stale_allowed(args: argparse.Namespace) -> bool:
 
 
 def _mark_stale_payload(
-    fallback_payload: dict[str, Any],
+    fallback_payload: dict[str, object],
     *,
     reason: str,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     payload = copy.deepcopy(fallback_payload)
     meta = payload.setdefault("meta", {})
     if not isinstance(meta, dict):
@@ -1216,10 +1261,97 @@ def _mark_stale_payload(
     return payload
 
 
-def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
+def _ns_path(args: object, name: str, default: Path) -> Path:
+    val = getattr(args, name, default)
+    if isinstance(val, Path):
+        return val
+    if isinstance(val, str):
+        return Path(val)
+    return default
+
+
+def _ns_optional_path(
+    args: object, name: str, default: Path | None = None
+) -> Path | None:
+    val = getattr(args, name, default)
+    if val is None:
+        return None
+    if isinstance(val, Path):
+        return val
+    if isinstance(val, str):
+        return Path(val) if val else None
+    return default
+
+
+def _ns_str(args: object, name: str, default: str = "") -> str:
+    val = getattr(args, name, default)
+    return val if isinstance(val, str) else default
+
+
+def _ns_optional_str(args: object, name: str, default: str | None = None) -> str | None:
+    val = getattr(args, name, default)
+    return val if isinstance(val, str) else default
+
+
+def _ns_int(args: object, name: str, default: int = 0) -> int:
+    val = getattr(args, name, default)
+    if isinstance(val, int) and not isinstance(val, bool):
+        return val
+    if isinstance(val, float):
+        return int(val)
+    if isinstance(val, (str, bytes, bytearray)):
+        try:
+            return int(val)
+        except ValueError:
+            return default
+    return default
+
+
+def _ns_optional_int(args: object, name: str, default: int | None = None) -> int | None:
+    val = getattr(args, name, default)
+    if val is None:
+        return None
+    if isinstance(val, int) and not isinstance(val, bool):
+        return val
+    if isinstance(val, float):
+        return int(val)
+    if isinstance(val, (str, bytes, bytearray)):
+        try:
+            return int(val)
+        except ValueError:
+            return default
+    return default
+
+
+def _ns_float(args: object, name: str, default: float = 0.0) -> float:
+    val = getattr(args, name, default)
+    if isinstance(val, (int, float)) and not isinstance(val, bool):
+        return float(val)
+    if isinstance(val, (str, bytes, bytearray)):
+        try:
+            return float(val)
+        except ValueError:
+            return default
+    return default
+
+
+def _ns_bool(args: object, name: str, default: bool = False) -> bool:
+    val = getattr(args, name, default)
+    return bool(val)
+
+
+def _fetch_payload(args: argparse.Namespace) -> dict[str, object]:
     api_key = _required_api_key()
-    cache_meta = load_cache_metadata(args.cache_dir)
-    cached = _cached_source_info(args.cache_dir)
+    cache_dir = _ns_path(args, "cache_dir", _default_cache_dir())
+    output_json = _ns_path(args, "output_json", DEFAULT_OUTPUT_JSON)
+    output_endpoints = _ns_path(args, "output_endpoints", DEFAULT_OUTPUT_ENDPOINTS)
+    output_url = _ns_path(args, "output_url", DEFAULT_OUTPUT_URL)
+    timeout_seconds = _ns_float(args, "timeout_seconds", 60.0)
+    min_endpoints = _ns_int(args, "min_endpoints", 700)
+    min_providers = _ns_int(args, "min_providers", 40)
+
+    cache_meta = load_cache_metadata(cache_dir)
+    cached = _cached_source_info(cache_dir)
     cached_record = cached[1] if cached is not None else None
     sent_etag = _validator_from(cache_meta, cached_record, "etag")
     sent_last_modified = _validator_from(cache_meta, cached_record, "last_modified")
@@ -1235,7 +1367,7 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
 
     try:
         result = fetch_rsc(
-            timeout_seconds=args.timeout_seconds,
+            timeout_seconds=timeout_seconds,
             if_none_match=sent_etag,
             if_modified_since=sent_last_modified,
         )
@@ -1252,20 +1384,23 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
         response_etag = _result_etag(result) or sent_etag
         response_last_modified = _result_last_modified(result) or sent_last_modified
         official_result = _materialize_fetch_result(
-            fetch_models(api_key, timeout_seconds=args.timeout_seconds),
+            fetch_models(api_key, timeout_seconds=timeout_seconds),
             fallback_url=(
                 os.environ.get("ARTIFICIAL_ANALYSIS_API_BASE_URL") or MODEL_API_URL
             ),
         )
         body = result.body
         frames = parse_json_frames(body)
-        models, hosts, hosts_models = extract_lists(frames)
+        raw_models, raw_hosts, raw_hosts_models = extract_lists(frames)
+        models = _as_list(raw_models)
+        hosts = _as_list(raw_hosts)
+        hosts_models = _as_list(raw_hosts_models)
         official_models = normalize_official_models(official_result.body)
         slugs = endpoint_slugs(hosts_models)
         sanity_check(
             slugs=slugs,
-            min_endpoints=args.min_endpoints,
-            min_providers=args.min_providers,
+            min_endpoints=min_endpoints,
+            min_providers=min_providers,
         )
         payload = build_snapshot_payload(
             models=models,
@@ -1283,23 +1418,23 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
         if not _stale_allowed(args):
             raise
         fallback_reason = str(exc)
-        fallback_payload = load_last_good_snapshot(args.cache_dir)
+        fallback_payload = load_last_good_snapshot(cache_dir)
         fallback_source = "cache:last-good"
-        if fallback_payload is None and args.output_json.exists():
+        if fallback_payload is None and output_json.exists():
             try:
-                fallback_payload = load_snapshot(args.output_json)
+                fallback_payload = load_snapshot(output_json)
             except ExtractionError:
                 fallback_payload = None
             else:
-                fallback_source = f"file:{args.output_json}"
+                fallback_source = f"file:{output_json}"
         if fallback_payload is None:
             message = f"Fresh fetch failed and no last-good snapshot exists ({exc})."
             _raise_extraction_error(message, exc)
         slugs = snapshot_slugs(fallback_payload)
         sanity_check(
             slugs=slugs,
-            min_endpoints=args.min_endpoints,
-            min_providers=args.min_providers,
+            min_endpoints=min_endpoints,
+            min_providers=min_providers,
         )
         payload = _mark_stale_payload(fallback_payload, reason=fallback_reason)
         freshness = "stale-last-good"
@@ -1307,9 +1442,9 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
 
     full_url = build_full_url(slugs)
     write_outputs(
-        output_json=args.output_json,
-        output_endpoints=args.output_endpoints,
-        output_url=args.output_url,
+        output_json=output_json,
+        output_endpoints=output_endpoints,
+        output_url=output_url,
         payload=payload,
         slugs=slugs,
         full_url=full_url,
@@ -1317,7 +1452,7 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
 
     if not fallback_used and result is not None:
         save_cache(
-            cache_dir=args.cache_dir,
+            cache_dir=cache_dir,
             fetched_at=_result_fetched_at(result),
             status_code=result.status_code,
             etag=response_etag,
@@ -1327,12 +1462,12 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
             final_url=_result_final_url(result),
             headers=_result_headers(result),
         )
-        save_last_good_snapshot(args.cache_dir, payload)
+        _ = save_last_good_snapshot(cache_dir, payload)
 
     rsc_source: dict[str, object] = {
         "url": redact_query(BASE_URL),
         "final_url": (
-            redact_query(_result_final_url(result, BASE_URL))
+            redact_query(_result_final_url(result, BASE_URL) or BASE_URL)
             if result is not None
             else None
         ),
@@ -1357,14 +1492,15 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
                 _result_final_url(
                     official_result,
                     os.environ.get("ARTIFICIAL_ANALYSIS_API_BASE_URL") or MODEL_API_URL,
-                ),
+                )
+                or api_url,
             )
             if official_result is not None
             else None
         ),
-        "status_code": official_result.status_code
-        if official_result is not None
-        else None,
+        "status_code": (
+            official_result.status_code if official_result is not None else None
+        ),
         "etag_received": (
             _result_etag(official_result) if official_result is not None else None
         ),
@@ -1390,20 +1526,23 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
         "freshness": freshness if fallback_used else "fresh",
     }
 
+    meta_payload = _as_dict(payload.get("meta"))
+    counts_payload = _as_dict(meta_payload.get("counts"))
+
     return {
         "sources": {"rsc": rsc_source, "official_api": official_source},
-        "counts": payload.get("meta", {}).get("counts", {}),
+        "counts": counts_payload,
         "freshness": {
             "mode": freshness,
             "stale": freshness == "stale-last-good",
             "fallback": fallback_used,
         },
         "outputs": {
-            "json": str(args.output_json),
-            "endpoints": str(args.output_endpoints),
-            "url": str(args.output_url),
+            "json": str(output_json),
+            "endpoints": str(output_endpoints),
+            "url": str(output_url),
         },
-        "cache": {"dir": str(args.cache_dir)},
+        "cache": {"dir": str(cache_dir)},
         "fallback": {
             "used": fallback_used,
             "source": fallback_source,
@@ -1414,26 +1553,26 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def _stats_payload(args: argparse.Namespace) -> dict[str, Any]:
-    snapshot = _load_reader_snapshot(args.snapshot)
+def _stats_payload(args: argparse.Namespace) -> dict[str, object]:
+    snapshot_path = _ns_path(args, "snapshot", DEFAULT_OUTPUT_JSON)
+    top_limit = _ns_int(args, "top", 10)
+    snapshot = _load_reader_snapshot(snapshot_path)
     slugs = snapshot_slugs(snapshot)
     providers = _provider_counts_from_snapshot(snapshot)
     top = sorted(providers.items(), key=lambda item: (-item[1], item[0]))[
-        : max(args.top, 0)
+        : max(top_limit, 0)
     ]
 
-    payload: dict[str, Any] = {
-        "snapshot": str(args.snapshot),
+    models_val = _as_list(snapshot.get("models"))
+    hosts_val = _as_list(snapshot.get("hosts"))
+    hosts_models_val = _as_list(snapshot.get("hosts_models"))
+
+    payload: dict[str, object] = {
+        "snapshot": str(snapshot_path),
         "counts": {
-            "models": len(snapshot.get("models", []))
-            if isinstance(snapshot.get("models"), list)
-            else 0,
-            "hosts": len(snapshot.get("hosts", []))
-            if isinstance(snapshot.get("hosts"), list)
-            else 0,
-            "hosts_models": len(snapshot.get("hosts_models", []))
-            if isinstance(snapshot.get("hosts_models"), list)
-            else 0,
+            "models": len(models_val),
+            "hosts": len(hosts_val),
+            "hosts_models": len(hosts_models_val),
             "endpoint_slugs": len(slugs),
             "providers": len(providers),
         },
@@ -1445,9 +1584,11 @@ def _stats_payload(args: argparse.Namespace) -> dict[str, Any]:
     return _attach_payload_evidence(payload)
 
 
-def _diff_payload(args: argparse.Namespace) -> dict[str, Any]:
-    old_snapshot = load_snapshot(args.old_snapshot)
-    new_snapshot = load_snapshot(args.new_snapshot)
+def _diff_payload(args: argparse.Namespace) -> dict[str, object]:
+    old_snapshot_path = _ns_path(args, "old_snapshot", DEFAULT_OUTPUT_JSON)
+    new_snapshot_path = _ns_path(args, "new_snapshot", DEFAULT_OUTPUT_JSON)
+    old_snapshot = load_snapshot(old_snapshot_path)
+    new_snapshot = load_snapshot(new_snapshot_path)
 
     old_slugs = set(snapshot_slugs(old_snapshot))
     new_slugs = set(snapshot_slugs(new_snapshot))
@@ -1458,7 +1599,7 @@ def _diff_payload(args: argparse.Namespace) -> dict[str, Any]:
     old_provider_counts = _provider_counts_from_snapshot(old_snapshot)
     new_provider_counts = _provider_counts_from_snapshot(new_snapshot)
 
-    provider_deltas: list[dict[str, Any]] = []
+    provider_deltas: list[dict[str, object]] = []
     for provider in sorted(set(old_provider_counts) | set(new_provider_counts)):
         before = old_provider_counts.get(provider, 0)
         after = new_provider_counts.get(provider, 0)
@@ -1473,9 +1614,9 @@ def _diff_payload(args: argparse.Namespace) -> dict[str, Any]:
                 },
             )
 
-    payload: dict[str, Any] = {
-        "old_snapshot": _safe_error_text(args.old_snapshot),
-        "new_snapshot": _safe_error_text(args.new_snapshot),
+    payload: dict[str, object] = {
+        "old_snapshot": _safe_error_text(old_snapshot_path),
+        "new_snapshot": _safe_error_text(new_snapshot_path),
         "counts": {
             "old_endpoints": len(old_slugs),
             "new_endpoints": len(new_slugs),
@@ -1493,42 +1634,55 @@ def _diff_payload(args: argparse.Namespace) -> dict[str, Any]:
     return _attach_payload_evidence(payload)
 
 
-def _diagnose_payload(args: argparse.Namespace) -> dict[str, Any]:
-    snapshot_path = getattr(args, "snapshot_path", None) or getattr(
-        args, "snapshot", None
+def _diagnose_payload(args: argparse.Namespace) -> dict[str, object]:
+    snapshot_path = _ns_optional_path(args, "snapshot_path") or _ns_optional_path(
+        args, "snapshot"
     )
-    cache_dir = getattr(args, "cache_dir", None)
+    cache_dir = _ns_optional_path(args, "cache_dir")
     return diagnose(snapshot_path=snapshot_path, cache_dir=cache_dir)
 
 
-def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
+def _coding_payload(args: argparse.Namespace) -> dict[str, object]:
+    timeout_seconds = _ns_float(args, "timeout_seconds", 60.0)
+    output_json = _ns_path(args, "output_json", DEFAULT_CODING_OUTPUT_JSON)
+    model_arg = _ns_optional_str(args, "model")
+    creator_arg = _ns_optional_str(args, "creator")
+    open_weights_only = _ns_bool(args, "open_weights_only", False)
+    sort_by_arg = _ns_str(args, "sort_by", "coding")
+    order_arg = _ns_str(args, "order", "auto")
+    limit_arg = _ns_int(args, "limit", 50)
+    include_benchmark_counts = _ns_bool(args, "include_benchmark_counts", False)
+
     result = _materialize_fetch_result(
-        fetch_rsc(url=CODING_CAPABILITY_URL, timeout_seconds=args.timeout_seconds),
+        fetch_rsc(url=CODING_CAPABILITY_URL, timeout_seconds=timeout_seconds),
         fallback_url=CODING_CAPABILITY_URL,
     )
     frames = parse_json_frames(result.body)
     models = _extract_default_data_models(frames)
 
-    model_filter = (
-        args.model.lower() if isinstance(args.model, str) and args.model else None
-    )
-    creator_filter = (
-        args.creator.lower() if isinstance(args.creator, str) and args.creator else None
-    )
+    model_filter = model_arg.lower() if model_arg else None
+    creator_filter = creator_arg.lower() if creator_arg else None
 
-    rows: list[dict[str, Any]] = []
+    rows: list[dict[str, object]] = []
     for model_index, model in enumerate(models):
-        if not isinstance(model, dict) or model.get("deleted"):
+        if not isinstance(model, dict):
+            continue
+        model_dict = _as_dict(model)  # pyright: ignore[reportUnknownArgumentType]
+        if model_dict.get("deleted"):
             continue
 
-        model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
-        model_name = model.get("name") if isinstance(model.get("name"), str) else None
-        short_name = _first_string(model, "short_name", "shortName") or model_name
-        creator = _first_dict(model, "model_creators", "modelCreator")
+        model_slug = (
+            model_dict.get("slug") if isinstance(model_dict.get("slug"), str) else None
+        )
+        model_name = (
+            model_dict.get("name") if isinstance(model_dict.get("name"), str) else None
+        )
+        short_name = _first_string(model_dict, "short_name", "shortName") or model_name
+        creator = _first_dict(model_dict, "model_creators", "modelCreator")
         creator_name = (
             _first_string(creator, "name") if isinstance(creator, dict) else None
         )
-        coding_score = _first_number(model, "coding_index", "headlineValue")
+        coding_score = _first_number(model_dict, "coding_index", "headlineValue")
 
         if model_filter and not _matches_any(
             model_filter,
@@ -1543,29 +1697,15 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
             ],
         ):
             continue
-        is_open_weights = _first_bool(model, "is_open_weights", "isOpenWeights")
-        if args.open_weights_only and is_open_weights is not True:
+        is_open_weights = _first_bool(model_dict, "is_open_weights", "isOpenWeights")
+        if open_weights_only and is_open_weights is not True:
             continue
 
-        token_counts = (
-            model.get("tokenCounts")
-            if isinstance(model.get("tokenCounts"), dict)
-            else {}
-        )
-        task_output = (
-            model.get("outputTokensPerTask")
-            if isinstance(model.get("outputTokensPerTask"), dict)
-            else {}
-        )
-        eval_cost = (
-            model.get("evalCost") if isinstance(model.get("evalCost"), dict) else {}
-        )
-        task_cost = (
-            model.get("costPerTask")
-            if isinstance(model.get("costPerTask"), dict)
-            else {}
-        )
-        is_current = "headlineValue" in model
+        token_counts = _as_dict(model_dict.get("tokenCounts"))
+        task_output = _as_dict(model_dict.get("outputTokensPerTask"))
+        eval_cost = _as_dict(model_dict.get("evalCost"))
+        task_cost = _as_dict(model_dict.get("costPerTask"))
+        is_current = "headlineValue" in model_dict
 
         answer_tokens = _number_alias(token_counts, "answerTokens", "answer")
         reasoning_tokens = _number_alias(token_counts, "reasoningTokens", "reasoning")
@@ -1590,14 +1730,32 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
         answer_share = (
             published_answer_share
             if _finite_number(published_answer_share)
-            else _share(answer_tokens, output_tokens)
+            else _share(
+                float(answer_tokens)
+                if _finite_number(answer_tokens)
+                and isinstance(answer_tokens, (int, float))
+                else None,
+                float(output_tokens)
+                if _finite_number(output_tokens)
+                and isinstance(output_tokens, (int, float))
+                else None,
+            )
         )
         reasoning_share = (
             published_reasoning_share
             if _finite_number(published_reasoning_share)
-            else _share(reasoning_tokens, output_tokens)
+            else _share(
+                float(reasoning_tokens)
+                if _finite_number(reasoning_tokens)
+                and isinstance(reasoning_tokens, (int, float))
+                else None,
+                float(output_tokens)
+                if _finite_number(output_tokens)
+                and isinstance(output_tokens, (int, float))
+                else None,
+            )
         )
-        coding_token_counts = {
+        coding_token_counts: dict[str, object] = {
             "scope": "coding_index_only",
             "definition": (
                 "Tokens used to run the Coding Index evaluation. "
@@ -1611,7 +1769,7 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
             "answer_share_of_output": answer_share,
             "reasoning_share_of_output": reasoning_share,
         }
-        coding_eval_cost = {
+        coding_eval_cost: dict[str, object] = {
             "scope": "coding_index_evaluation_api",
             "currency": "USD",
             "definition": (
@@ -1623,7 +1781,7 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
             "answer_cost": _number_alias(eval_cost, "answerCost", "answer"),
             "reasoning_cost": _number_alias(eval_cost, "reasoningCost", "reasoning"),
         }
-        coding_task_metrics = {
+        coding_task_metrics: dict[str, object] = {
             "scope": "coding_index_task",
             "currency": "USD",
             "definition": (
@@ -1668,34 +1826,40 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
                 ),
                 "answer_cost": _number_alias(task_cost, "answer", "answerCost"),
             },
-            "time_per_task_seconds": _number_or_none(model.get("timePerTaskSeconds")),
+            "time_per_task_seconds": _number_or_none(
+                model_dict.get("timePerTaskSeconds")
+            ),
         }
 
-        row: dict[str, Any] = {
+        row: dict[str, object] = {
             "model_slug": model_slug,
             "model_name": model_name,
             "short_name": short_name,
             "creator": creator_name,
             "coding": coding_score,
-            "terminalbench_hard": model.get("terminalbench_hard"),
-            "scicode": model.get("scicode"),
-            "is_reasoning": _first_bool(model, "isReasoning", "reasoning_model"),
-            "reasoning_model": _first_bool(model, "reasoning_model", "isReasoning"),
-            "deprecated": model.get("deprecated"),
+            "terminalbench_hard": model_dict.get("terminalbench_hard"),
+            "scicode": model_dict.get("scicode"),
+            "is_reasoning": _first_bool(model_dict, "isReasoning", "reasoning_model"),
+            "reasoning_model": _first_bool(
+                model_dict, "reasoning_model", "isReasoning"
+            ),
+            "deprecated": model_dict.get("deprecated"),
             "is_open_weights": is_open_weights,
-            "release_date": _first_string(model, "release_date", "releaseDate"),
-            "context_window_tokens": model.get("context_window_tokens"),
+            "release_date": _first_string(model_dict, "release_date", "releaseDate"),
+            "context_window_tokens": model_dict.get("context_window_tokens"),
             "coding_token_counts": coding_token_counts,
             "coding_eval_cost": coding_eval_cost,
             "coding_task_metrics": coding_task_metrics,
         }
-        if args.include_benchmark_counts:
-            row["coding_component_token_counts"] = _coding_component_token_counts(model)
+        if include_benchmark_counts:
+            row["coding_component_token_counts"] = _coding_component_token_counts(
+                model_dict
+            )
         for preserved_key in ("raw_fields", "unknowns"):
-            preserved = model.get(preserved_key)
+            preserved = model_dict.get(preserved_key)
             if isinstance(preserved, (dict, list)):
-                row[preserved_key] = copy.deepcopy(preserved)
-        _attach_row_evidence(
+                row[preserved_key] = copy.deepcopy(preserved)  # pyright: ignore[reportUnknownArgumentType]
+        _ = _attach_row_evidence(
             row,
             metric_paths=(
                 "coding",
@@ -1728,10 +1892,12 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
             source_prefix=f"$.models[{model_index}]",
             artifact_hash=_result_sha256(result),
             raw_values={
-                "coding": model.get("headlineValue", model.get("coding_index")),
-                "terminalbench_hard": model.get("terminalbench_hard"),
-                "scicode": model.get("scicode"),
-                "context_window_tokens": model.get("context_window_tokens"),
+                "coding": model_dict.get(
+                    "headlineValue", model_dict.get("coding_index")
+                ),
+                "terminalbench_hard": model_dict.get("terminalbench_hard"),
+                "scicode": model_dict.get("scicode"),
+                "context_window_tokens": model_dict.get("context_window_tokens"),
             },
             derived_paths={
                 "coding_token_counts.answer_share_of_output": (
@@ -1758,23 +1924,24 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
 
     sort_key_map = {
         "coding": "coding",
-        "input_tokens": "coding_token_counts.input_tokens",
+        "output_tokens": "coding_token_counts.output_tokens",
         "answer_tokens": "coding_token_counts.answer_tokens",
         "reasoning_tokens": "coding_token_counts.reasoning_tokens",
-        "output_tokens": "coding_token_counts.output_tokens",
+        "input_tokens": "coding_token_counts.input_tokens",
         "cost": "coding_eval_cost.total_cost",
     }
-    reverse = _resolve_reverse(sort_key=args.sort_by, order=args.order)
+    reverse = _resolve_reverse(sort_key=sort_by_arg, order=order_arg)
+    target_sort_path = sort_key_map.get(sort_by_arg, "coding")
     rows.sort(
         key=lambda row: _nested_sort_metric(
             row,
-            sort_key_map[args.sort_by],
+            target_sort_path,
             reverse=reverse,
         ),
     )
-    limited = rows[: max(args.limit, 0)]
+    limited = rows[: max(limit_arg, 0)]
 
-    coding_payload = {
+    coding_payload: dict[str, object] = {
         "meta": {
             "source_url": CODING_CAPABILITY_URL,
             "final_url": _result_final_url(result, CODING_CAPABILITY_URL),
@@ -1788,20 +1955,20 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
         "rows": rows,
         "overlap": overlap_metadata(),
     }
-    _attach_payload_evidence(coding_payload, artifact_hash=_result_sha256(result))
+    _ = _attach_payload_evidence(coding_payload, artifact_hash=_result_sha256(result))
     atomic_write(
-        args.output_json,
+        output_json,
         json.dumps(coding_payload, ensure_ascii=False).encode("utf-8"),
     )
 
-    payload: dict[str, Any] = {
+    payload: dict[str, object] = {
         "source": {
             "url": CODING_CAPABILITY_URL,
             "status_code": result.status_code,
             "fetched_at": _result_fetched_at(result),
             "sha256": _result_sha256(result),
         },
-        "output_json": str(args.output_json),
+        "output_json": str(output_json),
         "definition": {
             "scope": "coding_index_only",
             "warning": (
@@ -1812,13 +1979,13 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
             "output_tokens": "answer_tokens + reasoning_tokens",
         },
         "applied_filters": {
-            "model": args.model,
-            "creator": args.creator,
-            "open_weights_only": args.open_weights_only,
-            "sort_by": args.sort_by,
-            "order": args.order,
-            "limit": args.limit,
-            "include_benchmark_counts": args.include_benchmark_counts,
+            "model": model_arg,
+            "creator": creator_arg,
+            "open_weights_only": open_weights_only,
+            "sort_by": sort_by_arg,
+            "order": order_arg,
+            "limit": limit_arg,
+            "include_benchmark_counts": include_benchmark_counts,
         },
         "counts": {
             "matched_models": len(rows),
@@ -1832,56 +1999,65 @@ def _coding_payload(args: argparse.Namespace) -> dict[str, Any]:
     return _attach_payload_evidence(payload, artifact_hash=_result_sha256(result))
 
 
-def _evaluation_payload(args: argparse.Namespace) -> dict[str, Any]:
-    if args.input is not None and args.url is not None:
+def _evaluation_payload(args: argparse.Namespace) -> dict[str, object]:
+    input_path = _ns_optional_path(args, "input")
+    url_arg = _ns_optional_str(args, "url")
+    output_json_path = _ns_optional_path(args, "output_json")
+    timeout_seconds = _ns_float(args, "timeout_seconds", 60.0)
+    min_rows = _ns_int(args, "min_rows", 1)
+    sort_by = _ns_optional_str(args, "sort_by")
+    order = _ns_str(args, "order", "auto")
+    limit_arg = _ns_optional_int(args, "limit")
+
+    if input_path is not None and url_arg is not None:
         _raise_cli_usage_error("evaluation accepts either url or --input, not both")
-    if args.input is None and not isinstance(args.url, str):
+    if input_path is None and not isinstance(url_arg, str):
         _raise_cli_usage_error("evaluation requires a URL or --input")
-    if args.min_rows < 1:
+    if min_rows < 1:
         _raise_cli_usage_error("min_rows must be positive")
-    if args.limit is not None and args.limit < 0:
+    if limit_arg is not None and limit_arg < 0:
         _raise_cli_usage_error("limit must be non-negative")
 
     result: FetchResult | None = None
-    if args.input is not None:
+    if input_path is not None:
         try:
-            body = args.input.read_text(encoding="utf-8")
+            body = input_path.read_text(encoding="utf-8")
         except OSError as exc:
-            message = f"Cannot read evaluation input: {args.input}"
+            message = f"Cannot read evaluation input: {input_path}"
             raise CliUsageError(message) from exc
-        source_url = args.input.resolve().as_uri()
+        source_url = input_path.resolve().as_uri()
         source_status = 200
         fetched_at = datetime.now(UTC).isoformat()
-        content_type = "local"
+        content_type: str | None = "local"
         freshness = "snapshot"
-        final_url = source_url
+        final_url: str | None = source_url
         etag = None
         last_modified = None
         digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
-        byte_length = len(body.encode("utf-8"))
+        byte_length: int | None = len(body.encode("utf-8"))
     else:
-        if not isinstance(args.url, str):
+        if not isinstance(url_arg, str):
             _raise_cli_usage_error("evaluation requires --url when --input is absent")
-        if urlsplit(args.url).scheme.casefold() != "https":
+        if urlsplit(url_arg).scheme.casefold() != "https":
             _raise_cli_usage_error("evaluation public URL must use HTTPS")
         result = _materialize_fetch_result(
-            fetch_page(args.url, timeout_seconds=args.timeout_seconds),
-            fallback_url=args.url,
+            fetch_page(url_arg, timeout_seconds=timeout_seconds),
+            fallback_url=url_arg,
         )
         body = result.body
-        source_url = redact_query(args.url)
+        source_url = redact_query(url_arg)
         source_status = result.status_code
         fetched_at = _result_fetched_at(result)
         content_type = _result_header(result, "content-type")
         freshness = "fresh"
-        final_url = redact_query(_result_final_url(result, args.url))
+        final_url = redact_query(_result_final_url(result, url_arg) or url_arg)
         etag = _result_etag(result)
         last_modified = _result_last_modified(result)
         digest = _result_sha256(result)
         byte_length = _result_byte_length(result)
 
     frames = parse_next_payload(body)
-    rows = extract_evaluation_rows(frames, min_rows=args.min_rows)
+    rows = extract_evaluation_rows(frames, min_rows=min_rows)
     for row_index, row in enumerate(rows):
         row["value_status"] = "published"
         metric_paths = tuple(
@@ -1906,7 +2082,7 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, Any]:
             "mean",
             "median",
         }
-        _attach_row_evidence(
+        _ = _attach_row_evidence(
             row,
             metric_paths=metric_paths,
             source_prefix=f"$.rows[{row_index}]",
@@ -1916,17 +2092,17 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, Any]:
                 key for key in metric_paths if key.casefold() not in known_metric_fields
             ),
         )
-    if args.sort_by:
-        reverse = args.order in {"auto", "desc"}
+    if sort_by:
+        reverse = order in {"auto", "desc"}
         rows.sort(
             key=lambda row: _nested_sort_metric(
                 row,
-                args.sort_by,
+                sort_by,
                 reverse=reverse,
             ),
         )
-    limited = rows if args.limit is None else rows[: args.limit]
-    source = {
+    limited = rows if limit_arg is None else rows[:limit_arg]
+    source: dict[str, object] = {
         "url": source_url,
         "final_url": final_url,
         "status_code": source_status,
@@ -1938,13 +2114,13 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, Any]:
         "byte_length": byte_length,
         "freshness": freshness,
     }
-    filters = {
-        "min_rows": args.min_rows,
-        "sort_by": args.sort_by,
-        "order": args.order,
-        "limit": args.limit,
+    filters: dict[str, object] = {
+        "min_rows": min_rows,
+        "sort_by": sort_by,
+        "order": order,
+        "limit": limit_arg,
     }
-    payload: dict[str, Any] = {
+    payload: dict[str, object] = {
         "meta": {
             "source": source,
             "filters_applied": filters,
@@ -1954,8 +2130,8 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, Any]:
         "overlap": overlap_metadata(),
         "derived": {
             "sort": {
-                "formula": f"sort by {args.sort_by}" if args.sort_by else None,
-                "input_paths": [f"$.rows[*].{args.sort_by}"] if args.sort_by else [],
+                "formula": f"sort by {sort_by}" if sort_by else None,
+                "input_paths": [f"$.rows[*].{sort_by}"] if sort_by else [],
             },
             "limit": {
                 "formula": "rows[:limit]",
@@ -1963,14 +2139,14 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, Any]:
             },
         },
     }
-    _attach_payload_evidence(payload, artifact_hash=digest)
-    if args.output_json is not None:
+    _ = _attach_payload_evidence(payload, artifact_hash=digest)
+    if output_json_path is not None:
         atomic_write(
-            args.output_json,
+            output_json_path,
             json.dumps(payload, ensure_ascii=False).encode("utf-8"),
         )
 
-    result_payload: dict[str, Any] = {
+    result_payload: dict[str, object] = {
         "value_status": "published",
         "source": source,
         "filters_applied": filters,
@@ -1980,7 +2156,7 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, Any]:
             "matched_rows": len(rows),
             "returned_rows": len(limited),
         },
-        "output_json": str(args.output_json) if args.output_json else None,
+        "output_json": str(output_json_path) if output_json_path else None,
         "rows": limited,
         "overlap": overlap_metadata(),
         "derived": payload["derived"],
@@ -1988,20 +2164,25 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, Any]:
     return _attach_payload_evidence(result_payload, artifact_hash=digest)
 
 
-def _extract_default_data_models(frames: list[tuple[str, Any]]) -> list[Any]:
-    candidates: list[list[Any]] = []
+def _extract_default_data_models(
+    frames: list[tuple[str, object]],
+) -> list[object]:
+    candidates: list[list[object]] = []
 
     def scan(node: object) -> None:
         if isinstance(node, dict):
-            default_data = node.get("defaultData")
-            if _looks_like_coding_capability_rows(default_data):
-                candidates.append(default_data)
-            for value in node.values():
+            dict_node = _as_dict(node)  # pyright: ignore[reportUnknownArgumentType]
+            default_data = dict_node.get("defaultData")
+            if _looks_like_coding_capability_rows(default_data) and isinstance(
+                default_data, list
+            ):
+                candidates.append(_as_list(default_data))  # pyright: ignore[reportUnknownArgumentType]
+            for value in dict_node.values():
                 scan(value)
         elif isinstance(node, list):
-            if _looks_like_coding_capability_rows(node):
-                candidates.append(node)
-            for item in node:
+            if _looks_like_coding_capability_rows(node):  # pyright: ignore[reportUnknownArgumentType]
+                candidates.append(_as_list(node))  # pyright: ignore[reportUnknownArgumentType]
+            for item in _as_list(node):  # pyright: ignore[reportUnknownArgumentType]
                 scan(item)
 
     for _, frame in frames:
@@ -2017,22 +2198,27 @@ def _extract_default_data_models(frames: list[tuple[str, Any]]) -> list[Any]:
 def _looks_like_coding_capability_rows(value: object) -> bool:
     if not isinstance(value, list):
         return False
-    sample = [item for item in value[:25] if isinstance(item, dict)]
+    value_list: list[object] = _as_list(value)  # pyright: ignore[reportUnknownArgumentType]
+    sample: list[dict[str, object]] = []
+    for item in value_list[:25]:
+        if isinstance(item, dict):
+            sample.append(_as_dict(item))  # pyright: ignore[reportUnknownArgumentType]
     if not sample:
         return False
-    hits = sum(
-        1
-        for item in sample
-        if isinstance(item.get("slug"), str)
-        and (
-            isinstance(item.get("coding_index"), int | float)
-            or isinstance(item.get("headlineValue"), int | float)
-        )
-    )
+    hits = 0
+    for item_dict in sample:
+        slug = item_dict.get("slug")
+        ci = item_dict.get("coding_index")
+        hv = item_dict.get("headlineValue")
+        if isinstance(slug, str) and (
+            (isinstance(ci, (int, float)) and not isinstance(ci, bool))
+            or (isinstance(hv, (int, float)) and not isinstance(hv, bool))
+        ):
+            hits += 1
     return hits >= max(1, len(sample) // 2)
 
 
-def _first_string(mapping: dict[str, Any], *keys: str) -> str | None:
+def _first_string(mapping: dict[str, object], *keys: str) -> str | None:
     for key in keys:
         value = mapping.get(key)
         if isinstance(value, str):
@@ -2040,15 +2226,15 @@ def _first_string(mapping: dict[str, Any], *keys: str) -> str | None:
     return None
 
 
-def _first_number(mapping: dict[str, Any], *keys: str) -> int | float | None:
+def _first_number(mapping: dict[str, object], *keys: str) -> int | float | None:
     for key in keys:
         value = mapping.get(key)
-        if _finite_number(value):
+        if _finite_number(value) and isinstance(value, (int, float)):
             return value
     return None
 
 
-def _first_bool(mapping: dict[str, Any], *keys: str) -> bool | None:
+def _first_bool(mapping: dict[str, object], *keys: str) -> bool | None:
     for key in keys:
         value = mapping.get(key)
         if isinstance(value, bool):
@@ -2056,34 +2242,38 @@ def _first_bool(mapping: dict[str, Any], *keys: str) -> bool | None:
     return None
 
 
-def _first_dict(mapping: dict[str, Any], *keys: str) -> dict[str, Any] | None:
+def _first_dict(mapping: dict[str, object], *keys: str) -> dict[str, object] | None:
     for key in keys:
         value = mapping.get(key)
         if isinstance(value, dict):
-            return value
+            return _as_dict(value)  # pyright: ignore[reportUnknownArgumentType]
     return None
 
 
-def _number_alias(mapping: dict[str, Any], *keys: str) -> int | float | None:
+def _number_alias(mapping: dict[str, object], *keys: str) -> int | float | None:
     return _first_number(mapping, *keys)
 
 
 def _number_or_none(value: object) -> int | float | None:
-    return value if _finite_number(value) else None
+    return value if _finite_number(value) and isinstance(value, (int, float)) else None
 
 
 def _share(part: float | None, total: float | None) -> float | None:
-    if not _finite_number(part) or not _finite_number(total) or float(total) == 0:
+    if (
+        part is None
+        or total is None
+        or not _finite_number(part)
+        or not _finite_number(total)
+        or total == 0
+    ):
         return None
-    return round(float(part) / float(total), 6)
+    return round(part / total, 6)
 
 
-def _coding_component_token_counts(model: dict[str, Any]) -> dict[str, Any]:
-    eval_counts = (
-        model.get("eval_token_counts")
-        if isinstance(model.get("eval_token_counts"), dict)
-        else {}
-    )
+def _coding_component_token_counts(
+    model: dict[str, object],
+) -> dict[str, object]:
+    eval_counts = _as_dict(model.get("eval_token_counts"))
     return {
         key: eval_counts.get(key)
         for key in ("terminalbench_hard", "scicode")
@@ -2092,39 +2282,46 @@ def _coding_component_token_counts(model: dict[str, Any]) -> dict[str, Any]:
 
 
 def _nested_sort_metric(
-    row: dict[str, Any],
+    row: dict[str, object],
     path: str,
     *,
     reverse: bool,
 ) -> tuple[int, float]:
     current: object = _lookup_path(row, path)
-    metric_evidence = row.get("metric_evidence")
-    evidence = metric_evidence.get(path) if isinstance(metric_evidence, dict) else None
-    if isinstance(evidence, dict):
-        if (
-            evidence.get("comparison_eligibility", evidence.get("eligibility"))
-            != "eligible"
-        ):
+    evidence = _as_dict(row.get("metric_evidence"))
+    target_evidence = evidence.get(path)
+    if isinstance(target_evidence, dict):
+        target_dict = _as_dict(target_evidence)  # pyright: ignore[reportUnknownArgumentType]
+        eligibility = target_dict.get(
+            "comparison_eligibility", target_dict.get("eligibility")
+        )
+        if eligibility != "eligible":
             return (1, 0.0)
-        current = evidence.get("normalized_value", evidence.get("normalized"))
-    if _finite_number(current):
+        current = target_dict.get("normalized_value", target_dict.get("normalized"))
+    if _finite_number(current) and isinstance(current, (int, float)):
         normalized = -float(current) if reverse else float(current)
         return (0, normalized)
     return (1, 0.0)
 
 
-def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
-    snapshot = _load_reader_snapshot(args.snapshot)
+def _matches_any(needle: str, values: Sequence[object]) -> bool:
+    return any(isinstance(value, str) and needle in value.lower() for value in values)
+
+
+def _harness_payload(args: argparse.Namespace) -> dict[str, object]:
+    snapshot_path = _ns_path(args, "snapshot", DEFAULT_OUTPUT_JSON)
+    model_arg = _ns_optional_str(args, "model")
+    creator_arg = _ns_optional_str(args, "creator")
+    open_weights_only = _ns_bool(args, "open_weights_only", False)
+    limit_arg = _ns_int(args, "limit", 50)
+
+    snapshot = _load_reader_snapshot(snapshot_path)
     models = _model_rows(snapshot)
 
-    model_filter = (
-        args.model.lower() if isinstance(args.model, str) and args.model else None
-    )
-    creator_filter = (
-        args.creator.lower() if isinstance(args.creator, str) and args.creator else None
-    )
+    model_filter = model_arg.lower() if model_arg else None
+    creator_filter = creator_arg.lower() if creator_arg else None
 
-    rows: list[dict[str, Any]] = []
+    rows: list[dict[str, object]] = []
     skipped_missing = 0
 
     for model in models:
@@ -2144,35 +2341,47 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
             continue
         if creator_filter and not _matches_any(
             creator_filter,
-            [creator_name, creator.get("slug")],
+            [
+                creator_name,
+                creator.get("slug") if isinstance(creator.get("slug"), str) else None,
+            ],
         ):
             continue
-        if args.open_weights_only and model.get("is_open_weights") is not True:
+        if open_weights_only and model.get("is_open_weights") is not True:
             continue
 
         agentic = model.get("agentic_index")
         coding = model.get("coding_index")
-        if not _finite_number(agentic) or not _finite_number(coding):
+        if (
+            not _finite_number(agentic)
+            or not _finite_number(coding)
+            or not isinstance(agentic, (int, float))
+            or not isinstance(coding, (int, float))
+        ):
             skipped_missing += 1
             continue
 
-        computed_harness = round((float(agentic) + float(coding)) / 2.0, 4)
-        computed_gap = round(float(agentic) - float(coding), 4)
+        agentic_f = float(agentic)
+        coding_f = float(coding)
+        computed_harness = round((agentic_f + coding_f) / 2.0, 4)
+        computed_gap = round(agentic_f - coding_f, 4)
         published_harness = model.get("harness")
         published_gap = model.get("execution_gap")
-        row: dict[str, Any] = {
+        row: dict[str, object] = {
             "rank": 0,
             "model_slug": model_slug,
             "model_name": model_name,
             "creator": creator_name,
-            "harness": published_harness
-            if _finite_number(published_harness)
-            else computed_harness,
+            "harness": (
+                published_harness
+                if _finite_number(published_harness)
+                else computed_harness
+            ),
             "agentic": agentic,
             "coding": coding,
-            "execution_gap": published_gap
-            if _finite_number(published_gap)
-            else computed_gap,
+            "execution_gap": (
+                published_gap if _finite_number(published_gap) else computed_gap
+            ),
             "intelligence": model.get("intelligence_index"),
             "release_date": model.get("release_date"),
             "reasoning_model": model.get("reasoning_model"),
@@ -2194,8 +2403,8 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
         for preserved_key in ("raw_fields", "unknowns"):
             preserved = model.get(preserved_key)
             if isinstance(preserved, (dict, list)):
-                row[preserved_key] = copy.deepcopy(preserved)
-        _attach_row_evidence(
+                row[preserved_key] = copy.deepcopy(preserved)  # pyright: ignore[reportUnknownArgumentType]
+        _ = _attach_row_evidence(
             row,
             metric_paths=(
                 "rank",
@@ -2240,12 +2449,16 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
         )
         rows.append(row)
 
-    rows.sort(
-        key=lambda row: (-float(row["harness"]), str(row.get("model_slug") or "")),
-    )
+    def _harness_sort_key(r: dict[str, object]) -> tuple[float, str]:
+        h = r.get("harness")
+        h_val = float(h) if _finite_number(h) and isinstance(h, (int, float)) else 0.0
+        s_val = str(r.get("model_slug") or "")
+        return (-h_val, s_val)
+
+    rows.sort(key=_harness_sort_key)
     for index, row in enumerate(rows, start=1):
         row["rank"] = index
-        _attach_row_evidence(
+        _ = _attach_row_evidence(
             row,
             metric_paths=("rank",),
             source_prefix=f"$.rows[{index - 1}]",
@@ -2254,9 +2467,9 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
             },
         )
 
-    limited = rows[: max(args.limit, 0)]
-    payload: dict[str, Any] = {
-        "snapshot": str(args.snapshot),
+    limited = rows[: max(limit_arg, 0)]
+    payload: dict[str, object] = {
+        "snapshot": str(snapshot_path),
         "definition": {
             "name": "Harness",
             "formula": "0.5 * Agentic Index + 0.5 * Coding Index",
@@ -2271,10 +2484,10 @@ def _harness_payload(args: argparse.Namespace) -> dict[str, Any]:
             "independence": [],
         },
         "applied_filters": {
-            "model": args.model,
-            "creator": args.creator,
-            "open_weights_only": args.open_weights_only,
-            "limit": args.limit,
+            "model": model_arg,
+            "creator": creator_arg,
+            "open_weights_only": open_weights_only,
+            "limit": limit_arg,
         },
         "counts": {
             "ranked_models": len(rows),
@@ -2304,10 +2517,10 @@ REASONING_UNIFORM_SHARE = 0.80
 
 
 def _aggregate_only_reasoning_profile(
-    model: dict[str, Any],
-) -> dict[str, Any] | None:
-    iitc = model.get("intelligence_index_token_counts")
-    if not isinstance(iitc, dict):
+    model: dict[str, object],
+) -> dict[str, object] | None:
+    iitc = _as_dict(model.get("intelligence_index_token_counts"))
+    if not iitc:
         return None
     answer = _number_or_none(iitc.get("answer"))
     reasoning = _number_or_none(iitc.get("reasoning"))
@@ -2316,16 +2529,20 @@ def _aggregate_only_reasoning_profile(
         not _finite_number(answer)
         or not _finite_number(reasoning)
         or not _finite_number(output)
+        or not isinstance(reasoning, (int, float))
+        or not isinstance(output, (int, float))
         or float(output) <= 0
     ):
         return None
+    reasoning_f = float(reasoning)
+    output_f = float(output)
     return {
         "reasoning_floor": None,
         "reasoning_floor_benchmark": None,
         "reasoning_ceiling": None,
         "reasoning_ceiling_benchmark": None,
         "selectivity_score": None,
-        "weighted_reasoning_share": round(reasoning / output, 4),
+        "weighted_reasoning_share": round(reasoning_f / output_f, 4),
         "classification": None,
         "benchmark_count": 0,
         "warning": (
@@ -2335,30 +2552,36 @@ def _aggregate_only_reasoning_profile(
 
 
 def _reasoning_shares(
-    canonical: dict[str, Any],
+    canonical: dict[str, object],
 ) -> tuple[list[tuple[float, str]], int, int]:
     shares: list[tuple[float, str]] = []
-    total_answer = 0
-    total_reasoning = 0
+    total_answer = 0.0
+    total_reasoning = 0.0
     for bench_name, vals in canonical.items():
         if not isinstance(vals, dict):
             continue
-        answer = vals.get("answer")
+        vals_dict = _as_dict(vals)  # pyright: ignore[reportUnknownArgumentType]
+        answer = vals_dict.get("answer")
         if answer is None:
-            answer = vals.get("answer_tokens")
-        reasoning = vals.get("reasoning")
+            answer = vals_dict.get("answer_tokens")
+        reasoning = vals_dict.get("reasoning")
         if reasoning is None:
-            reasoning = vals.get("reasoning_tokens")
+            reasoning = vals_dict.get("reasoning_tokens")
         if (
             not _finite_number(answer)
             or not _finite_number(reasoning)
+            or not isinstance(answer, (int, float))
+            or not isinstance(reasoning, (int, float))
             or float(answer) + float(reasoning) <= 0
         ):
             continue
-        share = float(reasoning) / (float(answer) + float(reasoning))
-        shares.append((share, bench_name))
-        total_answer += answer
-        total_reasoning += reasoning
+        ans_f = float(answer)
+        reas_f = float(reasoning)
+        share = reas_f / (ans_f + reas_f)
+        shares.append((share, str(bench_name)))
+        total_answer += ans_f
+        total_reasoning += reas_f
+    return shares, int(total_answer), int(total_reasoning)
 
 
 def _reasoning_classification(
@@ -2385,11 +2608,14 @@ def _reasoning_classification(
     return "unclassified"
 
 
-def _compute_reasoning_profile(model: dict[str, Any]) -> dict[str, Any] | None:
+def _compute_reasoning_profile(
+    model: dict[str, object],
+) -> dict[str, object] | None:
     """Compute reasoning selectivity profile from canonical evaluation counts."""
-    canonical = model.get("canonical_eval_token_counts")
-    if not isinstance(canonical, dict) or not canonical:
+    raw_canonical = model.get("canonical_eval_token_counts")
+    if not isinstance(raw_canonical, dict) or not raw_canonical:
         return _aggregate_only_reasoning_profile(model)
+    canonical = _as_dict(raw_canonical)  # pyright: ignore[reportUnknownArgumentType]
 
     shares, total_answer, total_reasoning = _reasoning_shares(canonical)
     if not shares:
@@ -2398,7 +2624,7 @@ def _compute_reasoning_profile(model: dict[str, Any]) -> dict[str, Any] | None:
     total_output = total_answer + total_reasoning
     floor = min(shares, key=lambda share: share[0])
     ceiling = max(shares, key=lambda share: share[0])
-    weighted_share = total_reasoning / total_output if total_output else 0
+    weighted_share = total_reasoning / total_output if total_output else 0.0
     selectivity = ceiling[0] - floor[0]
     return {
         "reasoning_floor": round(floor[0], 4),
@@ -2416,43 +2642,66 @@ def _compute_reasoning_profile(model: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def _reasoning_benchmarks(model: dict[str, Any]) -> list[dict[str, Any]]:
+def _reasoning_benchmarks(
+    model: dict[str, object],
+) -> list[dict[str, object]]:
     """Extract per-benchmark reasoning share breakdown."""
     canonical = model.get("canonical_eval_token_counts")
     if not isinstance(canonical, dict):
         return []
-    result: list[dict[str, Any]] = []
-    for bench_name, vals in canonical.items():
+    result: list[dict[str, object]] = []
+    for bench_name, vals in _as_dict(canonical).items():  # pyright: ignore[reportUnknownArgumentType]
         if not isinstance(vals, dict):
             continue
-        a = vals.get("answer")
+        vals_dict = _as_dict(vals)  # pyright: ignore[reportUnknownArgumentType]  # pyright: ignore[reportUnknownArgumentType]
+        a = vals_dict.get("answer")
         if a is None:
-            a = vals.get("answer_tokens")
-        r = vals.get("reasoning")
+            a = vals_dict.get("answer_tokens")
+        r = vals_dict.get("reasoning")
         if r is None:
-            r = vals.get("reasoning_tokens")
-        if not _finite_number(a) or not _finite_number(r) or float(a) + float(r) <= 0:
+            r = vals_dict.get("reasoning_tokens")
+        if (
+            not _finite_number(a)
+            or not _finite_number(r)
+            or not isinstance(a, (int, float))
+            or not isinstance(r, (int, float))
+            or float(a) + float(r) <= 0
+        ):
             continue
-        output = float(a) + float(r)
+        a_f = float(a)
+        r_f = float(r)
+        output = a_f + r_f
         result.append(
             {
-                "benchmark": bench_name,
-                "answer_tokens": int(a),
-                "reasoning_tokens": int(r),
+                "benchmark": str(bench_name),
+                "answer_tokens": int(a_f),
+                "reasoning_tokens": int(r_f),
                 "output_tokens": int(output),
-                "reasoning_share": round(float(r) / output, 4),
+                "reasoning_share": round(r_f / output, 4),
             },
         )
-    result.sort(key=lambda b: b["reasoning_share"])
+
+    def _bench_sort_key(b: dict[str, object]) -> float:
+        val = b.get("reasoning_share")
+        if _finite_number(val) and isinstance(val, (int, float)):
+            return float(val)
+        return 0.0
+
+    result.sort(key=_bench_sort_key)
     return result
 
 
 def _reasoning_row(
-    model: dict[str, Any],
+    model: dict[str, object],
     args: argparse.Namespace,
     model_filter: str | None,
     creator_filter: str | None,
-) -> tuple[dict[str, Any] | None, bool]:
+) -> tuple[dict[str, object] | None, bool]:
+    open_weights_only = _ns_bool(args, "open_weights_only", False)
+    classification_arg = _ns_optional_str(args, "classification")
+    selective_only = _ns_bool(args, "selective_only", False)
+    benchmarks = _ns_bool(args, "benchmarks", False)
+
     model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
     if not model_slug or model.get("deleted") or model.get("deprecated"):
         return None, False
@@ -2464,26 +2713,38 @@ def _reasoning_row(
         return None, False
     if creator_filter and not _matches_any(
         creator_filter,
-        [creator_name, creator.get("slug")],
+        [
+            creator_name,
+            creator.get("slug") if isinstance(creator.get("slug"), str) else None,
+        ],
     ):
         return None, False
-    if args.open_weights_only and model.get("is_open_weights") is not True:
+    if open_weights_only and model.get("is_open_weights") is not True:
         return None, False
 
     profile = _compute_reasoning_profile(model)
     if profile is None:
         return None, True
     classification = profile.get("classification")
-    if args.classification and classification != args.classification:
+    if classification_arg and classification != classification_arg:
         return None, False
-    if args.selective_only and not classification.startswith("selective"):
+    if selective_only and (
+        not isinstance(classification, str)
+        or not classification.startswith("selective")
+    ):
         return None, False
 
     agentic = model.get("agentic_index")
     coding = model.get("coding_index")
     computed_harness = (
-        round((float(agentic) + float(coding)) / 2.0, 4)
-        if _finite_number(agentic) and _finite_number(coding)
+        round(
+            (float(agentic) + float(coding)) / 2.0,
+            4,
+        )
+        if _finite_number(agentic)
+        and _finite_number(coding)
+        and isinstance(agentic, (int, float))
+        and isinstance(coding, (int, float))
         else None
     )
     published_harness = model.get("harness")
@@ -2498,7 +2759,7 @@ def _reasoning_row(
         "input_paths": ["$.canonical_eval_token_counts"],
         "values": profile,
     }
-    row: dict[str, Any] = {
+    row: dict[str, object] = {
         "model_slug": model_slug,
         "model_name": model_name,
         "creator": creator_name,
@@ -2520,12 +2781,12 @@ def _reasoning_row(
             "reasoning_profile": derived_profile,
         },
     }
-    if args.benchmarks:
+    if benchmarks:
         row["per_benchmark"] = _reasoning_benchmarks(model)
     for preserved_key in ("raw_fields", "unknowns"):
         preserved = model.get(preserved_key)
         if isinstance(preserved, (dict, list)):
-            row[preserved_key] = copy.deepcopy(preserved)
+            row[preserved_key] = copy.deepcopy(preserved)  # pyright: ignore[reportUnknownArgumentType]
     derived_paths: dict[str, tuple[str, tuple[str, ...]] | None] = {
         "harness": (
             "0.5 * agentic + 0.5 * coding",
@@ -2547,16 +2808,18 @@ def _reasoning_row(
             "derived from canonical_eval_token_counts",
             ("$.canonical_eval_token_counts",),
         )
-    if args.benchmarks:
-        for index, benchmark in enumerate(row.get("per_benchmark", [])):
-            if isinstance(benchmark, dict):
-                for key, value in benchmark.items():
-                    if _numeric_scalar(value):
-                        derived_paths[f"per_benchmark[{index}].{key}"] = (
-                            "reasoning_tokens / (answer_tokens + reasoning_tokens)",
-                            ("$.canonical_eval_token_counts",),
-                        )
-    _attach_row_evidence(
+    if benchmarks:
+        raw_benchmarks = row.get("per_benchmark")
+        if isinstance(raw_benchmarks, list):
+            for index, benchmark in enumerate(_as_list(raw_benchmarks)):  # pyright: ignore[reportUnknownArgumentType]
+                if isinstance(benchmark, dict):
+                    for key, value in _as_dict(benchmark).items():  # pyright: ignore[reportUnknownArgumentType]
+                        if _numeric_scalar(value):
+                            derived_paths[f"per_benchmark[{index}].{key}"] = (
+                                "reasoning_tokens / (answer_tokens + reasoning_tokens)",
+                                ("$.canonical_eval_token_counts",),
+                            )
+    _ = _attach_row_evidence(
         row,
         metric_paths=(
             "harness",
@@ -2578,18 +2841,25 @@ def _reasoning_row(
     return row, False
 
 
-def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
-    snapshot = _load_reader_snapshot(args.snapshot)
+def _reasoning_payload(args: argparse.Namespace) -> dict[str, object]:
+    snapshot_path = _ns_path(args, "snapshot", DEFAULT_OUTPUT_JSON)
+    model_arg = _ns_optional_str(args, "model")
+    creator_arg = _ns_optional_str(args, "creator")
+    open_weights_only = _ns_bool(args, "open_weights_only", False)
+    classification_arg = _ns_optional_str(args, "classification")
+    selective_only = _ns_bool(args, "selective_only", False)
+    sort_by_arg = _ns_str(args, "sort_by", "harness")
+    order_arg = _ns_str(args, "order", "auto")
+    limit_arg = _ns_int(args, "limit", 50)
+    benchmarks = _ns_bool(args, "benchmarks", False)
+
+    snapshot = _load_reader_snapshot(snapshot_path)
     models = _model_rows(snapshot)
 
-    model_filter = (
-        args.model.lower() if isinstance(args.model, str) and args.model else None
-    )
-    creator_filter = (
-        args.creator.lower() if isinstance(args.creator, str) and args.creator else None
-    )
+    model_filter = model_arg.lower() if model_arg else None
+    creator_filter = creator_arg.lower() if creator_arg else None
 
-    rows: list[dict[str, Any]] = []
+    rows: list[dict[str, object]] = []
     skipped_missing = 0
 
     for model in models:
@@ -2616,11 +2886,11 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
         "agentic": ("agentic", True),
         "coding": ("coding", True),
     }
-    sort_path, desc_default = sort_key_map.get(args.sort_by, ("harness", True))
+    sort_path, desc_default = sort_key_map.get(sort_by_arg, ("harness", True))
     reverse = desc_default
-    if args.order == "asc":
+    if order_arg == "asc":
         reverse = False
-    elif args.order == "desc":
+    elif order_arg == "desc":
         reverse = True
 
     rows.sort(
@@ -2630,10 +2900,10 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
             reverse=reverse,
         ),
     )
-    limited = rows[: max(args.limit, 0)]
+    limited = rows[: max(limit_arg, 0)]
     for index, row in enumerate(limited, start=1):
         row["rank"] = index
-        _attach_row_evidence(
+        _ = _attach_row_evidence(
             row,
             metric_paths=("rank",),
             source_prefix=f"$.rows[{index - 1}]",
@@ -2645,8 +2915,8 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
             },
         )
 
-    payload: dict[str, Any] = {
-        "snapshot": str(args.snapshot),
+    payload: dict[str, object] = {
+        "snapshot": str(snapshot_path),
         "definition": {
             "name": "Reasoning Selectivity",
             "scope": (
@@ -2675,14 +2945,15 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
             "independence": [],
         },
         "applied_filters": {
-            "model": args.model,
-            "creator": args.creator,
-            "open_weights_only": args.open_weights_only,
-            "classification": args.classification,
-            "selective_only": args.selective_only,
-            "sort_by": args.sort_by,
-            "order": args.order,
-            "limit": args.limit,
+            "model": model_arg,
+            "creator": creator_arg,
+            "open_weights_only": open_weights_only,
+            "classification": classification_arg,
+            "selective_only": selective_only,
+            "sort_by": sort_by_arg,
+            "order": order_arg,
+            "limit": limit_arg,
+            "benchmarks": benchmarks,
         },
         "counts": {
             "ranked_models": len(rows),
@@ -2697,19 +2968,20 @@ def _reasoning_payload(args: argparse.Namespace) -> dict[str, Any]:
 
 def _query_row(
     item: object,
-    canonical_models: dict[str, dict[str, Any]],
+    canonical_models: dict[str, dict[str, object]],
     model_filter: str | None,
     provider_filter: str | None,
     endpoint_filter: str | None,
-) -> dict[str, Any] | None:
+) -> dict[str, object] | None:
     if not isinstance(item, dict):
         return None
-    endpoint_slug = item.get("slug")
+    item_dict = _as_dict(item)  # pyright: ignore[reportUnknownArgumentType]
+    endpoint_slug = item_dict.get("slug")
     if not isinstance(endpoint_slug, str) or "_" not in endpoint_slug:
         return None
-    host = item.get("host") if isinstance(item.get("host"), dict) else {}
+    host = _as_dict(item_dict.get("host"))
     if canonical_models:
-        endpoint_model_slug = item.get("model_slug")
+        endpoint_model_slug = item_dict.get("model_slug")
         model = (
             canonical_models.get(endpoint_model_slug)
             if isinstance(endpoint_model_slug, str)
@@ -2718,7 +2990,7 @@ def _query_row(
         if model is None:
             return None
     else:
-        model = item.get("model") if isinstance(item.get("model"), dict) else {}
+        model = _as_dict(item_dict.get("model"))
 
     model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
     model_name = model.get("name") if isinstance(model.get("name"), str) else None
@@ -2734,14 +3006,8 @@ def _query_row(
     if endpoint_filter and endpoint_filter not in endpoint_slug.lower():
         return None
 
-    timescale = (
-        item.get("timescaleData") if isinstance(item.get("timescaleData"), dict) else {}
-    )
-    e2e = (
-        item.get("end_to_end_response_time_metrics")
-        if isinstance(item.get("end_to_end_response_time_metrics"), dict)
-        else {}
-    )
+    timescale = _as_dict(item_dict.get("timescaleData"))
+    e2e = _as_dict(item_dict.get("end_to_end_response_time_metrics"))
     computed_harness = _harness_score(model)
     published_harness = model.get("harness")
     harness = (
@@ -2749,12 +3015,12 @@ def _query_row(
     )
     blended_field = (
         "price_1m_blended_7_to_2_to_1"
-        if "price_1m_blended_7_to_2_to_1" in item
+        if "price_1m_blended_7_to_2_to_1" in item_dict
         else "price_1m_blended_3_to_1"
     )
-    row: dict[str, Any] = {
+    row: dict[str, object] = {
         "endpoint_slug": endpoint_slug,
-        "endpoint_name": item.get("name"),
+        "endpoint_name": item_dict.get("name"),
         "model_slug": model_slug,
         "model_name": model_name,
         "provider_slug": provider_slug,
@@ -2774,14 +3040,14 @@ def _query_row(
         "release_date": model.get("release_date"),
         "reasoning_model": model.get("reasoning_model"),
         "is_open_weights": model.get("is_open_weights"),
-        "price_input": item.get("price_1m_input_tokens"),
-        "price_output": item.get("price_1m_output_tokens"),
-        "price_blended": item.get(blended_field),
+        "price_input": item_dict.get("price_1m_input_tokens"),
+        "price_output": item_dict.get("price_1m_output_tokens"),
+        "price_blended": item_dict.get(blended_field),
         "speed": timescale.get("median_output_speed"),
         "ttfc": timescale.get("median_time_to_first_chunk"),
         "e2e": e2e.get("total_time"),
-        "context_window_tokens": item.get("context_window_tokens"),
-        "host_api_id": item.get("host_api_id"),
+        "context_window_tokens": item_dict.get("context_window_tokens"),
+        "host_api_id": item_dict.get("host_api_id"),
         "derived": {
             "harness": {
                 "value": computed_harness,
@@ -2791,12 +3057,12 @@ def _query_row(
         },
     }
     for preserved_key in ("raw_fields", "unknowns"):
-        for source in (item, model):
+        for source in (item_dict, model):
             preserved = source.get(preserved_key)
             if isinstance(preserved, (dict, list)):
-                row[preserved_key] = copy.deepcopy(preserved)
+                row[preserved_key] = copy.deepcopy(preserved)  # pyright: ignore[reportUnknownArgumentType]
                 break
-    _attach_row_evidence(
+    _ = _attach_row_evidence(
         row,
         metric_paths=(
             "harness",
@@ -2832,13 +3098,13 @@ def _query_row(
             "scicode": model.get("scicode"),
             "tau2": model.get("tau_2", model.get("tau2")),
             "terminalbench_hard": model.get("terminalbench_hard"),
-            "price_input": item.get("price_1m_input_tokens"),
-            "price_output": item.get("price_1m_output_tokens"),
-            "price_blended": item.get(blended_field),
+            "price_input": item_dict.get("price_1m_input_tokens"),
+            "price_output": item_dict.get("price_1m_output_tokens"),
+            "price_blended": item_dict.get(blended_field),
             "speed": timescale.get("median_output_speed"),
             "ttfc": timescale.get("median_time_to_first_chunk"),
             "e2e": e2e.get("total_time"),
-            "context_window_tokens": item.get("context_window_tokens"),
+            "context_window_tokens": item_dict.get("context_window_tokens"),
         },
         derived_paths={
             "harness": (
@@ -2856,28 +3122,27 @@ def _query_row(
     return row
 
 
-def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
-    snapshot = _load_reader_snapshot(args.snapshot)
-    hosts_models = snapshot.get("hosts_models")
-    if not isinstance(hosts_models, list):
+def _query_payload(args: argparse.Namespace) -> dict[str, object]:
+    snapshot_path = _ns_path(args, "snapshot", DEFAULT_OUTPUT_JSON)
+    model_arg = _ns_optional_str(args, "model")
+    provider_arg = _ns_optional_str(args, "provider")
+    endpoint_arg = _ns_optional_str(args, "endpoint")
+    sort_key = _ns_str(args, "sort_by", "intelligence")
+    order_arg = _ns_str(args, "order", "auto")
+    limit_arg = _ns_int(args, "limit", 20)
+
+    snapshot = _load_reader_snapshot(snapshot_path)
+    hosts_models_val = snapshot.get("hosts_models")
+    if not isinstance(hosts_models_val, list):
         _raise_extraction_error("Snapshot missing hosts_models list")
+    hosts_models = _as_list(hosts_models_val)  # pyright: ignore[reportUnknownArgumentType]  # pyright: ignore[reportUnknownArgumentType]
     canonical_models = _canonical_models(snapshot)
 
-    model_filter = (
-        args.model.lower() if isinstance(args.model, str) and args.model else None
-    )
-    provider_filter = (
-        args.provider.lower()
-        if isinstance(args.provider, str) and args.provider
-        else None
-    )
-    endpoint_filter = (
-        args.endpoint.lower()
-        if isinstance(args.endpoint, str) and args.endpoint
-        else None
-    )
+    model_filter = model_arg.lower() if model_arg else None
+    provider_filter = provider_arg.lower() if provider_arg else None
+    endpoint_filter = endpoint_arg.lower() if endpoint_arg else None
 
-    rows: list[dict[str, Any]] = []
+    rows: list[dict[str, object]] = []
     for item in hosts_models:
         if row := _query_row(
             item,
@@ -2888,10 +3153,9 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
         ):
             rows.append(row)
 
-    sort_key = args.sort_by
-    reverse = _resolve_reverse(sort_key=sort_key, order=args.order)
+    reverse = _resolve_reverse(sort_key=sort_key, order=order_arg)
     rows.sort(key=lambda row: _sort_metric(row, sort_key, reverse=reverse))
-    limited = rows[: max(args.limit, 0)]
+    limited = rows[: max(limit_arg, 0)]
     provider_counts = _provider_counts_from_rows(rows)
     model_counts: dict[str, int] = {}
     for row in rows:
@@ -2899,15 +3163,15 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
         if isinstance(model_slug, str):
             model_counts[model_slug] = model_counts.get(model_slug, 0) + 1
 
-    payload: dict[str, Any] = {
-        "snapshot": str(args.snapshot),
+    payload: dict[str, object] = {
+        "snapshot": str(snapshot_path),
         "applied_filters": {
-            "model": args.model,
-            "provider": args.provider,
-            "endpoint": args.endpoint,
+            "model": model_arg,
+            "provider": provider_arg,
+            "endpoint": endpoint_arg,
             "sort_by": sort_key,
-            "order": args.order,
-            "limit": args.limit,
+            "order": order_arg,
+            "limit": limit_arg,
         },
         "counts": {
             "matched_endpoints": len(rows),
@@ -2935,16 +3199,20 @@ def _query_payload(args: argparse.Namespace) -> dict[str, Any]:
     return _attach_payload_evidence(payload)
 
 
-def _harness_score(model: dict[str, Any]) -> float | None:
+def _harness_score(model: dict[str, object]) -> float | None:
     agentic = model.get("agentic_index")
     coding = model.get("coding_index")
-    if _finite_number(agentic) and _finite_number(coding):
-        return round((float(agentic) + float(coding)) / 2.0, 4)
+    if (
+        _finite_number(agentic)
+        and _finite_number(coding)
+        and isinstance(agentic, (int, float))
+        and isinstance(coding, (int, float))
+    ):
+        return round(
+            (float(agentic) + float(coding)) / 2.0,
+            4,
+        )
     return None
-
-
-def _matches_any(needle: str, values: list[str | None]) -> bool:
-    return any(isinstance(value, str) and needle in value.lower() for value in values)
 
 
 def _resolve_reverse(*, sort_key: str, order: str) -> bool:
@@ -2956,30 +3224,29 @@ def _resolve_reverse(*, sort_key: str, order: str) -> bool:
 
 
 def _sort_metric(
-    row: dict[str, Any],
+    row: dict[str, object],
     metric: str,
     *,
     reverse: bool,
 ) -> tuple[int, float]:
     value: object = row.get(metric)
-    metric_evidence = row.get("metric_evidence")
-    evidence = (
-        metric_evidence.get(metric) if isinstance(metric_evidence, dict) else None
-    )
-    if isinstance(evidence, dict):
-        if (
-            evidence.get("comparison_eligibility", evidence.get("eligibility"))
-            != "eligible"
-        ):
+    evidence = _as_dict(row.get("metric_evidence"))
+    target_evidence = evidence.get(metric)
+    if isinstance(target_evidence, dict):
+        target_dict = _as_dict(target_evidence)  # pyright: ignore[reportUnknownArgumentType]
+        eligibility = target_dict.get(
+            "comparison_eligibility", target_dict.get("eligibility")
+        )
+        if eligibility != "eligible":
             return (1, 0.0)
-        value = evidence.get("normalized_value", evidence.get("normalized"))
-    if _finite_number(value):
+        value = target_dict.get("normalized_value", target_dict.get("normalized"))
+    if _finite_number(value) and isinstance(value, (int, float)):
         normalized = -float(value) if reverse else float(value)
         return (0, normalized)
     return (1, 0.0)
 
 
-def _provider_counts_from_rows(rows: list[dict[str, Any]]) -> dict[str, int]:
+def _provider_counts_from_rows(rows: list[dict[str, object]]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for row in rows:
         provider = row.get("provider_slug")
@@ -2992,47 +3259,59 @@ def _provider_counts_from_rows(rows: list[dict[str, Any]]) -> dict[str, int]:
     return counts
 
 
-def _provider_counts_from_snapshot(snapshot: dict[str, Any]) -> dict[str, int]:
-    hosts_models = snapshot.get("hosts_models")
-    if not isinstance(hosts_models, list):
+def _provider_counts_from_snapshot(snapshot: dict[str, object]) -> dict[str, int]:
+    hosts_models_val = snapshot.get("hosts_models")
+    if not isinstance(hosts_models_val, list):
         _raise_extraction_error("Snapshot missing hosts_models list")
 
     counts: dict[str, int] = {}
-    for item in hosts_models:
+    for item in _as_list(hosts_models_val):  # pyright: ignore[reportUnknownArgumentType]  # pyright: ignore[reportUnknownArgumentType]
         if not isinstance(item, dict):
             continue
+        item_dict = _as_dict(item)  # pyright: ignore[reportUnknownArgumentType]
         provider: str | None = None
-        host = item.get("host")
-        if isinstance(host, dict) and isinstance(host.get("slug"), str):
-            provider = host["slug"]
-        elif isinstance(item.get("slug"), str) and "_" in item["slug"]:
-            provider = item["slug"].split("_", 1)[0]
+        host = _as_dict(item_dict.get("host"))
+        if isinstance(host.get("slug"), str):
+            provider = str(host["slug"])
+        elif isinstance(item_dict.get("slug"), str) and "_" in str(
+            item_dict.get("slug")
+        ):
+            provider = str(item_dict["slug"]).split("_", 1)[0]
 
         if provider:
             counts[provider] = counts.get(provider, 0) + 1
     return counts
 
 
-def _qa_payload(args: argparse.Namespace) -> dict[str, Any]:
-    question = args.question.strip()
+def _qa_payload(args: argparse.Namespace) -> dict[str, object]:
+    question_arg = _ns_str(args, "question")
+    question = question_arg.strip()
     if not question:
         _raise_cli_usage_error("qa requires a non-empty question")
 
-    snapshot = _load_reader_snapshot(args.snapshot)
-    hosts_models = snapshot.get("hosts_models")
-    if not isinstance(hosts_models, list):
-        _raise_extraction_error("Snapshot missing hosts_models list")
+    snapshot_path = _ns_path(args, "snapshot", DEFAULT_OUTPUT_JSON)
+    model_arg = _ns_optional_str(args, "model")
+    provider_arg = _ns_optional_str(args, "provider")
+    sort_by_arg = _ns_optional_str(args, "sort_by")
+    order_arg = _ns_optional_str(args, "order")
+    limit_arg = _ns_optional_int(args, "limit")
 
-    inferred_model = args.model or _infer_model(question, _model_rows(snapshot))
-    inferred_provider = args.provider or _infer_provider(question, hosts_models)
+    snapshot = _load_reader_snapshot(snapshot_path)
+    hosts_models_val = snapshot.get("hosts_models")
+    if not isinstance(hosts_models_val, list):
+        _raise_extraction_error("Snapshot missing hosts_models list")
+    hosts_models = _as_list(hosts_models_val)  # pyright: ignore[reportUnknownArgumentType]  # pyright: ignore[reportUnknownArgumentType]
+
+    inferred_model = model_arg or _infer_model(question, _model_rows(snapshot))
+    inferred_provider = provider_arg or _infer_provider(question, hosts_models)
     inferred_sort_by, inferred_order = _infer_sort(question)
 
-    sort_by = args.sort_by or inferred_sort_by
-    order = args.order or inferred_order
-    limit = args.limit if isinstance(args.limit, int) else _infer_limit(question)
+    sort_by = sort_by_arg or inferred_sort_by
+    order = order_arg or inferred_order
+    limit = limit_arg if isinstance(limit_arg, int) else _infer_limit(question)
 
     query_ns = argparse.Namespace(
-        snapshot=args.snapshot,
+        snapshot=snapshot_path,
         model=inferred_model,
         provider=inferred_provider,
         endpoint=None,
@@ -3043,7 +3322,7 @@ def _qa_payload(args: argparse.Namespace) -> dict[str, Any]:
 
     query_result = _query_payload(query_ns)
 
-    payload: dict[str, Any] = {
+    payload: dict[str, object] = {
         "question": question,
         "parsed_intent": {
             "model": inferred_model,
@@ -3068,7 +3347,7 @@ def _normalize_for_match(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
 
 
-def _infer_model(question: str, models: list[dict[str, Any]]) -> str | None:
+def _infer_model(question: str, models: list[dict[str, object]]) -> str | None:
     question_norm = _normalize_for_match(question)
     best: tuple[int, str] | None = None
 
@@ -3088,14 +3367,15 @@ def _infer_model(question: str, models: list[dict[str, Any]]) -> str | None:
     return best[1] if best is not None else None
 
 
-def _infer_provider(question: str, hosts_models: list[Any]) -> str | None:
+def _infer_provider(question: str, hosts_models: list[object]) -> str | None:
     question_norm = _normalize_for_match(question)
     best: tuple[int, str] | None = None
 
     for item in hosts_models:
         if not isinstance(item, dict):
             continue
-        host = item.get("host") if isinstance(item.get("host"), dict) else {}
+        item_dict = _as_dict(item)  # pyright: ignore[reportUnknownArgumentType]
+        host = _as_dict(item_dict.get("host"))
         candidates = [host.get("slug"), host.get("name")]
         for candidate in candidates:
             if not isinstance(candidate, str):
@@ -3196,12 +3476,18 @@ def _handle_coding(args: argparse.Namespace) -> int:
 
 
 def _handle_evaluation(args: argparse.Namespace) -> int:
-    _emit_json(_envelope("evaluation", _evaluation_payload(args)), stdout=sys.stdout)
+    _emit_json(
+        _envelope("evaluation", _evaluation_payload(args)),
+        stdout=sys.stdout,
+    )
     return 0
 
 
 def _handle_reasoning(args: argparse.Namespace) -> int:
-    _emit_json(_envelope("reasoning", _reasoning_payload(args)), stdout=sys.stdout)
+    _emit_json(
+        _envelope("reasoning", _reasoning_payload(args)),
+        stdout=sys.stdout,
+    )
     return 0
 
 
@@ -3220,7 +3506,7 @@ def _handle_schema(_: argparse.Namespace) -> int:
     return 0
 
 
-def _capability_schema() -> dict[str, Any]:
+def _capability_schema() -> dict[str, object]:
     return {
         "name": "artificial-analysis",
         "description": (
@@ -3234,9 +3520,9 @@ def _capability_schema() -> dict[str, Any]:
             "official_api": {
                 "url": MODEL_API_URL,
                 "credential_env": MODEL_API_KEY_ENV,
-                "required_for": ["fetch"],
             },
         },
+        "required_for": ["fetch"],
         "commands": {
             "fetch": {
                 "description": (
@@ -3247,16 +3533,16 @@ def _capability_schema() -> dict[str, Any]:
                 "outputs": ["full-data.json", "endpoints.txt", "full-url.txt"],
                 "flags": {
                     "output_json": (
-                        "Path (default <temp-dir>/artifacts/"
-                        "artificial-analysis/full-data.json)"
+                        "Path (default <temp-dir>/artifacts/artificial-analysis/"
+                        + "full-data.json)"
                     ),
                     "output_endpoints": (
-                        "Path (default <temp-dir>/artifacts/"
-                        "artificial-analysis/endpoints.txt)"
+                        "Path (default <temp-dir>/artifacts/artificial-analysis/"
+                        + "endpoints.txt)"
                     ),
                     "output_url": (
-                        "Path (default <temp-dir>/artifacts/"
-                        "artificial-analysis/full-url.txt)"
+                        "Path (default <temp-dir>/artifacts/artificial-analysis/"
+                        + "full-url.txt)"
                     ),
                     "cache_dir": "Path to ETag/Last-Modified/payload cache",
                     "timeout_seconds": "float network timeout",
@@ -3269,7 +3555,7 @@ def _capability_schema() -> dict[str, Any]:
             },
             "stats": {
                 "description": "Read a snapshot and return counts + top providers.",
-                "args": ["snapshot(optional)"],
+                "args": ["snapshot (optional)"],
                 "flags": {"top": "int top N providers (default 10)"},
             },
             "diff": {
@@ -3287,7 +3573,7 @@ def _capability_schema() -> dict[str, Any]:
                     "Inspect explicit local snapshot/cache paths without network "
                     "access and return redacted health diagnostics."
                 ),
-                "args": ["snapshot(optional)"],
+                "args": ["snapshot (optional)"],
                 "flags": {
                     "snapshot": "Path to a local snapshot",
                     "cache_dir": "Path to a local cache",
@@ -3299,7 +3585,7 @@ def _capability_schema() -> dict[str, Any]:
                     "Rank unique models by Harness = 50% Agentic Index + 50% "
                     "Coding Index."
                 ),
-                "args": ["snapshot(optional)"],
+                "args": ["snapshot (optional)"],
                 "flags": {
                     "model": "str contains filter on model slug/name",
                     "creator": "str contains filter on creator/lab slug/name",
@@ -3318,8 +3604,7 @@ def _capability_schema() -> dict[str, Any]:
                     "creator": "str contains filter on creator/lab name",
                     "open_weights_only": "bool only include open-weights models",
                     "sort_by": (
-                        "coding|output_tokens|answer_tokens|reasoning_tokens|"
-                        "input_tokens|cost"
+                        "coding|output_tokens|answer_tokens|reasoning_tokens|input_tokens|cost"
                     ),
                     "order": "auto|asc|desc",
                     "limit": "int max rows (default 50)",
@@ -3336,10 +3621,10 @@ def _capability_schema() -> dict[str, Any]:
                     "Extract generic model rows from a dedicated Artificial "
                     "Analysis evaluation page or saved HTML/RSC response."
                 ),
-                "args": ["url(optional when input is supplied)"],
+                "args": ["url (optional when input is supplied)"],
                 "flags": {
                     "input": "Path to saved HTML/RSC response",
-                    "output_json": "Optional path for the full extracted row set",
+                    "output_json": ("Optional path for the full extracted row set"),
                     "timeout_seconds": "float network timeout",
                     "min_rows": "minimum recognizable rows (default 1)",
                     "sort_by": "optional dotted numeric field path",
@@ -3353,7 +3638,7 @@ def _capability_schema() -> dict[str, Any]:
                     "Profile models by reasoning selectivity using per-benchmark "
                     "canonical eval token counts."
                 ),
-                "args": ["snapshot(optional)"],
+                "args": ["snapshot (optional)"],
                 "flags": {
                     "model": "str contains filter on model slug/name",
                     "creator": "str contains filter on creator/lab name",
@@ -3378,7 +3663,7 @@ def _capability_schema() -> dict[str, Any]:
                 "description": (
                     "Filter/sort endpoint benchmark rows by model/provider/endpoint."
                 ),
-                "args": ["snapshot(optional)"],
+                "args": ["snapshot (optional)"],
                 "flags": {
                     "model": "str contains filter on model slug/name",
                     "provider": "str contains filter on provider slug/name",
@@ -3396,7 +3681,7 @@ def _capability_schema() -> dict[str, Any]:
                     "Minimal NL intent parser that maps a question to query "
                     "filters/sort and returns query output."
                 ),
-                "args": ["question", "snapshot(optional)"],
+                "args": ["question", "snapshot (optional)"],
                 "flags": {
                     "model": "override inferred model",
                     "provider": "override inferred provider",
@@ -3444,12 +3729,12 @@ def _error_response(
     code: str,
     message: object,
     details: object | None = None,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     error: dict[str, object] = {
         "code": code,
         "message": _safe_error_text(message),
     }
-    if details:
+    if details is not None:
         error["details"] = redact(details)
     return {
         "id": redact(request_id),
@@ -3461,10 +3746,10 @@ def _error_response(
 
 
 def _success_response(
-    request_id: Any,
+    request_id: object,
     command: str,
-    data: dict[str, Any],
-) -> dict[str, Any]:
+    data: dict[str, object],
+) -> dict[str, object]:
     return {
         "id": request_id,
         "type": "response",
@@ -3474,7 +3759,7 @@ def _success_response(
     }
 
 
-def _arg_value(args: dict[str, Any], key: str, default: Any) -> Any:
+def _arg_value(args: dict[str, object], key: str, default: object = None) -> object:
     if key in args:
         return args[key]
     camel = "".join(
@@ -3483,142 +3768,216 @@ def _arg_value(args: dict[str, Any], key: str, default: Any) -> Any:
     return args.get(camel, default)
 
 
-def _fetch_namespace(args: dict[str, Any]) -> argparse.Namespace:
+def _dict_str(args: dict[str, object], key: str, default: str = "") -> str:
+    val = _arg_value(args, key, default)
+    return val if isinstance(val, str) else default
+
+
+def _dict_optional_str(
+    args: dict[str, object], key: str, default: str | None = None
+) -> str | None:
+    val = _arg_value(args, key, default)
+    return val if isinstance(val, str) else default
+
+
+def _dict_path(args: dict[str, object], key: str, default: Path) -> Path:
+    val = _arg_value(args, key, default)
+    if isinstance(val, Path):
+        return val
+    if isinstance(val, str):
+        return Path(val)
+    return default
+
+
+def _dict_optional_path(
+    args: dict[str, object], key: str, default: Path | None = None
+) -> Path | None:
+    val = _arg_value(args, key, default)
+    if val is None:
+        return None
+    if isinstance(val, Path):
+        return val
+    if isinstance(val, str):
+        return Path(val) if val else None
+    return default
+
+
+def _dict_int(args: dict[str, object], key: str, default: int = 0) -> int:
+    val = _arg_value(args, key, default)
+    if isinstance(val, int) and not isinstance(val, bool):
+        return val
+    if isinstance(val, float):
+        return int(val)
+    if isinstance(val, (str, bytes, bytearray)):
+        try:
+            return int(val)
+        except ValueError:
+            return default
+    return default
+
+
+def _dict_optional_int(
+    args: dict[str, object], key: str, default: int | None = None
+) -> int | None:
+    val = _arg_value(args, key, default)
+    if val is None:
+        return None
+    if isinstance(val, int) and not isinstance(val, bool):
+        return val
+    if isinstance(val, float):
+        return int(val)
+    if isinstance(val, (str, bytes, bytearray)):
+        try:
+            return int(val)
+        except ValueError:
+            return default
+    return default
+
+
+def _dict_float(args: dict[str, object], key: str, default: float = 0.0) -> float:
+    val = _arg_value(args, key, default)
+    if isinstance(val, (int, float)) and not isinstance(val, bool):
+        return float(val)
+    if isinstance(val, (str, bytes, bytearray)):
+        try:
+            return float(val)
+        except ValueError:
+            return default
+    return default
+
+
+def _dict_bool(args: dict[str, object], key: str, default: bool = False) -> bool:
+    val = _arg_value(args, key, default)
+    return bool(val)
+
+
+def _fetch_namespace(args: dict[str, object]) -> argparse.Namespace:
     return argparse.Namespace(
-        output_json=Path(_arg_value(args, "output_json", str(DEFAULT_OUTPUT_JSON))),
-        output_endpoints=Path(
-            _arg_value(args, "output_endpoints", str(DEFAULT_OUTPUT_ENDPOINTS)),
-        ),
-        output_url=Path(_arg_value(args, "output_url", str(DEFAULT_OUTPUT_URL))),
-        cache_dir=Path(_arg_value(args, "cache_dir", str(_default_cache_dir()))),
-        timeout_seconds=float(_arg_value(args, "timeout_seconds", 60.0)),
-        min_endpoints=int(_arg_value(args, "min_endpoints", 700)),
-        min_providers=int(_arg_value(args, "min_providers", 40)),
-        stale_policy=str(_arg_value(args, "stale_policy", "error")),
-        allow_stale=bool(_arg_value(args, "allow_stale", False)),
-        strict=bool(_arg_value(args, "strict", False)),
+        output_json=_dict_path(args, "output_json", DEFAULT_OUTPUT_JSON),
+        output_endpoints=_dict_path(args, "output_endpoints", DEFAULT_OUTPUT_ENDPOINTS),
+        output_url=_dict_path(args, "output_url", DEFAULT_OUTPUT_URL),
+        cache_dir=_dict_path(args, "cache_dir", _default_cache_dir()),
+        timeout_seconds=_dict_float(args, "timeout_seconds", 60.0),
+        min_endpoints=_dict_int(args, "min_endpoints", 700),
+        min_providers=_dict_int(args, "min_providers", 40),
+        stale_policy=_dict_str(args, "stale_policy", "error"),
+        allow_stale=_dict_bool(args, "allow_stale", False),
+        strict=_dict_bool(args, "strict", False),
     )
 
 
-def _stats_namespace(args: dict[str, Any]) -> argparse.Namespace:
+def _stats_namespace(args: dict[str, object]) -> argparse.Namespace:
     return argparse.Namespace(
-        snapshot=Path(_arg_value(args, "snapshot", str(DEFAULT_OUTPUT_JSON))),
-        top=int(_arg_value(args, "top", 10)),
+        snapshot=_dict_path(args, "snapshot", DEFAULT_OUTPUT_JSON),
+        top=_dict_int(args, "top", 10),
     )
 
 
-def _harness_namespace(args: dict[str, Any]) -> argparse.Namespace:
+def _harness_namespace(args: dict[str, object]) -> argparse.Namespace:
     return argparse.Namespace(
-        snapshot=Path(_arg_value(args, "snapshot", str(DEFAULT_OUTPUT_JSON))),
-        model=_arg_value(args, "model", None),
-        creator=_arg_value(args, "creator", None),
-        open_weights_only=bool(_arg_value(args, "open_weights_only", False)),
-        limit=int(_arg_value(args, "limit", 50)),
+        snapshot=_dict_path(args, "snapshot", DEFAULT_OUTPUT_JSON),
+        model=_dict_optional_str(args, "model"),
+        creator=_dict_optional_str(args, "creator"),
+        open_weights_only=_dict_bool(args, "open_weights_only", False),
+        limit=_dict_int(args, "limit", 50),
     )
 
 
-def _coding_namespace(args: dict[str, Any]) -> argparse.Namespace:
+def _coding_namespace(args: dict[str, object]) -> argparse.Namespace:
     return argparse.Namespace(
-        output_json=Path(
-            _arg_value(args, "output_json", str(DEFAULT_CODING_OUTPUT_JSON)),
-        ),
-        timeout_seconds=float(_arg_value(args, "timeout_seconds", 60.0)),
-        model=_arg_value(args, "model", None),
-        creator=_arg_value(args, "creator", None),
-        open_weights_only=bool(_arg_value(args, "open_weights_only", False)),
-        sort_by=str(_arg_value(args, "sort_by", "coding")),
-        order=str(_arg_value(args, "order", "auto")),
-        limit=int(_arg_value(args, "limit", 50)),
-        include_benchmark_counts=bool(
-            _arg_value(args, "include_benchmark_counts", False),
-        ),
+        output_json=_dict_path(args, "output_json", DEFAULT_CODING_OUTPUT_JSON),
+        timeout_seconds=_dict_float(args, "timeout_seconds", 60.0),
+        model=_dict_optional_str(args, "model"),
+        creator=_dict_optional_str(args, "creator"),
+        open_weights_only=_dict_bool(args, "open_weights_only", False),
+        sort_by=_dict_str(args, "sort_by", "coding"),
+        order=_dict_str(args, "order", "auto"),
+        limit=_dict_int(args, "limit", 50),
+        include_benchmark_counts=_dict_bool(args, "include_benchmark_counts", False),
     )
 
 
-def _evaluation_namespace(args: dict[str, Any]) -> argparse.Namespace:
-    input_value = _arg_value(args, "input", None)
+def _evaluation_namespace(args: dict[str, object]) -> argparse.Namespace:
+    input_path = _dict_optional_path(args, "input")
+    output_json_path = _dict_optional_path(args, "output_json")
     return argparse.Namespace(
-        url=_arg_value(args, "url", None),
-        input=Path(input_value) if input_value is not None else None,
-        output_json=(
-            Path(_arg_value(args, "output_json", ""))
-            if _arg_value(args, "output_json", None) is not None
-            else None
-        ),
-        timeout_seconds=float(_arg_value(args, "timeout_seconds", 60.0)),
-        min_rows=int(_arg_value(args, "min_rows", 1)),
-        sort_by=_arg_value(args, "sort_by", None),
-        order=str(_arg_value(args, "order", "auto")),
-        limit=(
-            int(_arg_value(args, "limit", 0))
-            if _arg_value(args, "limit", None) is not None
-            else None
-        ),
+        url=_dict_optional_str(args, "url"),
+        input=input_path,
+        output_json=output_json_path,
+        timeout_seconds=_dict_float(args, "timeout_seconds", 60.0),
+        min_rows=_dict_int(args, "min_rows", 1),
+        sort_by=_dict_optional_str(args, "sort_by"),
+        order=_dict_str(args, "order", "auto"),
+        limit=_dict_optional_int(args, "limit"),
     )
 
 
-def _reasoning_namespace(args: dict[str, Any]) -> argparse.Namespace:
+def _reasoning_namespace(args: dict[str, object]) -> argparse.Namespace:
     return argparse.Namespace(
-        snapshot=Path(_arg_value(args, "snapshot", str(DEFAULT_OUTPUT_JSON))),
-        model=_arg_value(args, "model", None),
-        creator=_arg_value(args, "creator", None),
-        open_weights_only=bool(_arg_value(args, "open_weights_only", False)),
-        classification=_arg_value(args, "class", None),
-        selective_only=bool(_arg_value(args, "selective_only", False)),
-        sort_by=str(_arg_value(args, "sort_by", "harness")),
-        order=str(_arg_value(args, "order", "auto")),
-        limit=int(_arg_value(args, "limit", 50)),
-        benchmarks=bool(_arg_value(args, "benchmarks", False)),
+        snapshot=_dict_path(args, "snapshot", DEFAULT_OUTPUT_JSON),
+        model=_dict_optional_str(args, "model"),
+        creator=_dict_optional_str(args, "creator"),
+        open_weights_only=_dict_bool(args, "open_weights_only", False),
+        classification=_dict_optional_str(args, "class"),
+        selective_only=_dict_bool(args, "selective_only", False),
+        sort_by=_dict_str(args, "sort_by", "harness"),
+        order=_dict_str(args, "order", "auto"),
+        limit=_dict_int(args, "limit", 50),
+        benchmarks=_dict_bool(args, "benchmarks", False),
     )
 
 
-def _diff_namespace(args: dict[str, Any]) -> argparse.Namespace:
-    old_snapshot = _arg_value(args, "old_snapshot", None)
-    new_snapshot = _arg_value(args, "new_snapshot", None)
+def _diff_namespace(args: dict[str, object]) -> argparse.Namespace:
+    old_snapshot = _dict_optional_str(args, "old_snapshot")
+    new_snapshot = _dict_optional_str(args, "new_snapshot")
     if not old_snapshot or not new_snapshot:
         _raise_cli_usage_error("diff requires old_snapshot and new_snapshot")
     return argparse.Namespace(
-        old_snapshot=Path(str(old_snapshot)),
-        new_snapshot=Path(str(new_snapshot)),
-        schema_aware=bool(_arg_value(args, "schema_aware", False)),
+        old_snapshot=Path(old_snapshot),
+        new_snapshot=Path(new_snapshot),
+        schema_aware=_dict_bool(args, "schema_aware", False),
     )
 
 
-def _diagnose_namespace(args: dict[str, Any]) -> argparse.Namespace:
-    snapshot = _arg_value(args, "snapshot", _arg_value(args, "snapshot_path", None))
-    cache_dir = _arg_value(args, "cache_dir", _arg_value(args, "cache", None))
+def _diagnose_namespace(args: dict[str, object]) -> argparse.Namespace:
+    snapshot = _dict_optional_path(args, "snapshot") or _dict_optional_path(
+        args, "snapshot_path"
+    )
+    cache_dir = _dict_optional_path(args, "cache_dir") or _dict_optional_path(
+        args, "cache"
+    )
     return argparse.Namespace(
-        snapshot=Path(str(snapshot)) if snapshot is not None else None,
+        snapshot=snapshot,
         snapshot_path=None,
-        cache_dir=Path(str(cache_dir)) if cache_dir is not None else None,
+        cache_dir=cache_dir,
     )
 
 
-def _query_namespace(args: dict[str, Any]) -> argparse.Namespace:
+def _query_namespace(args: dict[str, object]) -> argparse.Namespace:
     return argparse.Namespace(
-        snapshot=Path(_arg_value(args, "snapshot", str(DEFAULT_OUTPUT_JSON))),
-        model=_arg_value(args, "model", None),
-        provider=_arg_value(args, "provider", None),
-        endpoint=_arg_value(args, "endpoint", None),
-        sort_by=str(_arg_value(args, "sort_by", "intelligence")),
-        order=str(_arg_value(args, "order", "auto")),
-        limit=int(_arg_value(args, "limit", 20)),
+        snapshot=_dict_path(args, "snapshot", DEFAULT_OUTPUT_JSON),
+        model=_dict_optional_str(args, "model"),
+        provider=_dict_optional_str(args, "provider"),
+        endpoint=_dict_optional_str(args, "endpoint"),
+        sort_by=_dict_str(args, "sort_by", "intelligence"),
+        order=_dict_str(args, "order", "auto"),
+        limit=_dict_int(args, "limit", 20),
     )
 
 
-def _qa_namespace(args: dict[str, Any]) -> argparse.Namespace:
-    question = _arg_value(args, "question", None)
-    if not isinstance(question, str) or not question.strip():
+def _qa_namespace(args: dict[str, object]) -> argparse.Namespace:
+    question = _dict_optional_str(args, "question")
+    if not question or not question.strip():
         _raise_cli_usage_error("qa requires question")
 
     return argparse.Namespace(
         question=question,
-        snapshot=Path(_arg_value(args, "snapshot", str(DEFAULT_OUTPUT_JSON))),
-        model=_arg_value(args, "model", None),
-        provider=_arg_value(args, "provider", None),
-        sort_by=_arg_value(args, "sort_by", None),
-        order=_arg_value(args, "order", None),
-        limit=_arg_value(args, "limit", None),
+        snapshot=_dict_path(args, "snapshot", DEFAULT_OUTPUT_JSON),
+        model=_dict_optional_str(args, "model"),
+        provider=_dict_optional_str(args, "provider"),
+        sort_by=_dict_optional_str(args, "sort_by"),
+        order=_dict_optional_str(args, "order"),
+        limit=_dict_optional_int(args, "limit"),
     )
 
 
@@ -3632,7 +3991,7 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
             continue
 
         try:
-            request = json.loads(line)
+            request_obj = cast("object", json.loads(line))
         except json.JSONDecodeError:
             _emit_json(
                 _error_response(
@@ -3644,8 +4003,7 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                 stdout=output_stream,
             )
             continue
-
-        if not isinstance(request, dict):
+        if not isinstance(request_obj, dict):
             _emit_json(
                 _error_response(
                     None,
@@ -3657,9 +4015,10 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
             )
             continue
 
-        request_id = request.get("id")
-        command = request.get("type") or request.get("command")
-        if not isinstance(command, str):
+        request_dict: dict[str, object] = _as_dict(request_obj)  # pyright: ignore[reportUnknownArgumentType]
+        request_id = request_dict.get("id")
+        command_val = request_dict.get("type") or request_dict.get("command")
+        if not isinstance(command_val, str):
             _emit_json(
                 _error_response(
                     request_id,
@@ -3670,9 +4029,10 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                 stdout=output_stream,
             )
             continue
+        command = command_val
 
-        args_payload = request.get("args", {})
-        if not isinstance(args_payload, dict):
+        args_raw = request_dict.get("args", {})
+        if not isinstance(args_raw, dict):
             _emit_json(
                 _error_response(
                     request_id,
@@ -3683,6 +4043,7 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                 stdout=output_stream,
             )
             continue
+        args_payload: dict[str, object] = _as_dict(args_raw)  # pyright: ignore[reportUnknownArgumentType]
         try:
             if command == "ping":
                 response = _success_response(
@@ -3795,7 +4156,7 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                 "internal_error",
                 "Response serialization failed.",
             )
-            output_stream.write(compact_json(fallback) + "\n")
+            _ = output_stream.write(compact_json(fallback) + "\n")
 
     return 0
 
@@ -3877,8 +4238,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         getattr(args, "legacy_errors", False),
     )
     command = str(getattr(args, "command", command) or command)
-    handler = getattr(args, "handler", None)
-    if handler is None:
+    handler_obj = getattr(args, "handler", None)
+    if not callable(handler_obj):
         if json_errors:
             _emit_cli_error(
                 command=command,
@@ -3888,12 +4249,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         else:
             parser.print_usage(sys.stderr)
-            sys.stderr.write(f"{parser.prog}: error: missing command\n")
+            _ = sys.stderr.write(f"{parser.prog}: error: missing command\n")
         return 2
 
     error_message: object
     try:
-        return int(handler(args))
+        handler_fn: Callable[[argparse.Namespace], object] = handler_obj
+        result = handler_fn(args)
+        return int(result) if isinstance(result, int) else 0
     except CliUsageError as caught:
         error_message = caught
         code = "usage_error"
@@ -3916,7 +4279,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             command=command, code=code, message=error_message, stdout=sys.stdout
         )
     else:
-        sys.stderr.write(f"error: {_safe_error_text(error_message)}\n")
+        _ = sys.stderr.write(f"error: {_safe_error_text(error_message)}\n")
     return status
 
 

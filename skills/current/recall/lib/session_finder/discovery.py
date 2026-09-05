@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .jsonl_backends import discover_jsonl_sessions
-from .model import Harness, Record, rank
+from .model import Harness, Record, Session, rank
 from .sqlite_backends import discover_sqlite_sessions, validate_sqlite_root
 
 ALL_HARNESSES: tuple[Harness, ...] = ("omp", "pi", "codex", "t3code", "opencode")
@@ -95,7 +95,7 @@ def search(config: SearchConfig, query: list[str], limit: int) -> list[Record]:
         message = "query must not be empty"
         raise ConfigurationError(message)
     selected = set(config.harnesses)
-    sessions = []
+    sessions: list[Session] = []
     sessions.extend(discover_jsonl_sessions(selected, config.roots))
     sessions.extend(discover_sqlite_sessions(selected, config.roots))
     return rank(sessions, terms, limit)

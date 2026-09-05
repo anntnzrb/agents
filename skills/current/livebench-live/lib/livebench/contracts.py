@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
-from typing import Any, NoReturn
+from typing import NoReturn, cast
 
 SCHEMA_VERSION = "1"
 SOURCE = "livebench"
@@ -29,19 +29,19 @@ class Diagnostic:
     source: str | None = None
     artifact: str | None = None
     path: str | None = None
-    details: dict[str, Any] = field(default_factory=dict)
+    details: dict[str, object] = field(default_factory=dict)
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self) -> dict[str, object]:
         """As dict for the LiveBench adapter."""
-        value = asdict(self)
+        value = cast("dict[str, object]", asdict(self))
         if self.source is None:
-            value.pop("source", None)
+            _ = value.pop("source", None)
         if self.artifact is None:
-            value.pop("artifact", None)
+            _ = value.pop("artifact", None)
         if self.path is None:
-            value.pop("path", None)
+            _ = value.pop("path", None)
         if not self.details:
-            value.pop("details", None)
+            _ = value.pop("details", None)
         return value
 
 
@@ -56,7 +56,7 @@ class SourceTarget:
     expected_content_types: tuple[str, ...] = ("*/*",)
     required: bool = True
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self) -> dict[str, object]:
         """As dict for the LiveBench adapter."""
         return {
             "release_id": self.release_id,
@@ -95,7 +95,7 @@ class RawArtifact:
 
     def provenance(
         self, *, parser: str | None = None, parser_version: str = "1"
-    ) -> dict[str, Any]:
+    ) -> dict[str, object]:
         """Provenance for the LiveBench adapter."""
         return {
             "source_url": self.source_url,
@@ -132,7 +132,7 @@ class RawArtifact:
 class NumericValue:
     """Represent NumericValue in the LiveBench adapter."""
 
-    raw_value: Any
+    raw_value: object
     normalized_value: float | int | None
     unit: str | None
     normalization: str | None
@@ -140,14 +140,14 @@ class NumericValue:
     value_status: str
     metric_semantics_status: str = "known"
     missing_reason: str | None = None
-    source_evidence: dict[str, Any] = field(default_factory=dict)
+    source_evidence: dict[str, object] = field(default_factory=dict)
     comparison_eligibility: str = "eligible"
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self) -> dict[str, object]:
         """As dict for the LiveBench adapter."""
-        result = asdict(self)
+        result = cast("dict[str, object]", asdict(self))
         if not self.source_evidence:
-            result.pop("source_evidence", None)
+            _ = result.pop("source_evidence", None)
         return result
 
 
@@ -164,9 +164,9 @@ class ResolvedRelease:
     authority_sha256: str | None
     discovered_at: str | None
     generated_at: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, object] = field(default_factory=dict)
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self) -> dict[str, object]:
         """As dict for the LiveBench adapter."""
         return {
             "requested": self.requested,
@@ -189,22 +189,22 @@ class SkillError(RuntimeError):
         self,
         code: str,
         message: str,
-        details: dict[str, Any] | None = None,
+        details: dict[str, object] | None = None,
         *,
         exit_code: int = 1,
     ) -> None:
         """Initialize this instance."""
         super().__init__(message)
-        self.code = code
-        self.message = message
-        self.details = details or {}
-        self.exit_code = exit_code
+        self.code: str = code
+        self.message: str = message
+        self.details: dict[str, object] = details or {}
+        self.exit_code: int = exit_code
 
 
 def raise_expected(
     code: str,
     message: str,
-    details: dict[str, Any] | None = None,
+    details: dict[str, object] | None = None,
     *,
     exit_code: int = 1,
 ) -> NoReturn:
@@ -213,7 +213,7 @@ def raise_expected(
     raise error
 
 
-def success(command: str, data: dict[str, Any]) -> dict[str, Any]:
+def success(command: str, data: dict[str, object]) -> dict[str, object]:
     """Success for the LiveBench adapter."""
     return {
         "ok": True,
@@ -223,7 +223,7 @@ def success(command: str, data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def failure(command: str, error: SkillError | Diagnostic) -> dict[str, Any]:
+def failure(command: str, error: SkillError | Diagnostic) -> dict[str, object]:
     """Failure for the LiveBench adapter."""
     payload = {
         "code": error.code,
@@ -238,23 +238,28 @@ def failure(command: str, error: SkillError | Diagnostic) -> dict[str, Any]:
     }
 
 
-def compact_json(payload: dict[str, Any]) -> str:
+def compact_json(payload: dict[str, object]) -> str:
     """Serialize one finite JSON object without progress or pretty-print noise."""
     return json.dumps(
         payload, separators=(",", ":"), ensure_ascii=False, allow_nan=False
     )
 
 
-def diagnostic(
+def diagnostic(  # noqa: PLR0913 - parameters mirror the Diagnostic envelope fields one-to-one
     code: str,
     message: str,
     *,
     severity: str = "warning",
     stage: str = "validate",
-    **kwargs: Any,  # noqa: ANN401
-) -> dict[str, Any]:
+    source: str | None = None,
+    artifact: str | None = None,
+    path: str | None = None,
+    details: dict[str, object] | None = None,
+) -> dict[str, object]:
     """Diagnostic for the LiveBench adapter."""
-    return Diagnostic(code, severity, stage, message, **kwargs).as_dict()
+    return Diagnostic(
+        code, severity, stage, message, source, artifact, path, details or {}
+    ).as_dict()
 
 
 def ensure_status(status: str) -> str:

@@ -19,12 +19,22 @@ import io
 import json
 import urllib.error
 import urllib.request
+from http.client import HTTPMessage
 from pathlib import Path
+from typing import TYPE_CHECKING, Protocol, Self, cast
 from urllib.parse import parse_qs, urlparse
 
 import pytest
 
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
+    from types import ModuleType
+
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "cli.py"
+
+
+class _BraveCli(Protocol):
+    def main(self, argv: list[str]) -> int: ...
 
 
 class FakeResponse:
@@ -34,16 +44,16 @@ class FakeResponse:
         self,
         body: bytes = b"",
         status: int = 200,
-        headers: dict | None = None,
-    ):
-        self._body = body
-        self.status = status
-        self.headers = headers or {}
+        headers: dict[str, str] | None = None,
+    ) -> None:
+        self._body: bytes = body
+        self.status: int = status
+        self.headers: dict[str, str] = headers or {}
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, exc_type, exc, tb):
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> bool:
         return False
 
     def read(self) -> bytes:
@@ -57,19 +67,17 @@ class CallRecorder:
         self,
         return_value: FakeResponse | None = None,
         side_effect: BaseException | None = None,
-    ):
-        self.calls: list[dict] = []
-        self.return_value = return_value
-        self.side_effect = side_effect
+    ) -> None:
+        self.calls: list[dict[str, object]] = []
+        self.return_value: FakeResponse | None = return_value
+        self.side_effect: BaseException | None = side_effect
 
-    def __call__(self, req, *args, **kwargs):
-        url = getattr(req, "full_url", str(req))
-        method = req.get_method() if hasattr(req, "get_method") else None
-        headers = (
-            {k: v for k, v in req.header_items()}
-            if hasattr(req, "header_items")
-            else {}
-        )
+    def __call__(
+        self, req: urllib.request.Request, *args: object, **kwargs: object
+    ) -> FakeResponse | None:
+        url = req.full_url
+        method = req.get_method()
+        headers = dict(req.header_items())
         self.calls.append(
             {
                 "url": url,
@@ -84,16 +92,17 @@ class CallRecorder:
         return self.return_value
 
 
-def _load_cli(module_name: str):
+def _load_cli(module_name: str) -> ModuleType:
     spec = importlib.util.spec_from_file_location(module_name, SCRIPT_PATH)
-    assert spec is not None and spec.loader is not None, f"cannot load {SCRIPT_PATH}"
+    assert spec is not None, f"cannot load {SCRIPT_PATH}"
+    assert spec.loader is not None, f"cannot load {SCRIPT_PATH}"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
 @pytest.fixture
-def brave_cli(monkeypatch, tmp_path):
+def brave_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _BraveCli:
     """Load the CLI with env loading neutralized so tests are deterministic.
 
     The real skill ships a ``.env`` file with a real key. We must not depend
@@ -108,28 +117,26 @@ def brave_cli(monkeypatch, tmp_path):
     monkeypatch.delenv("SKILLS_DIR", raising=False)
     monkeypatch.chdir(tmp_path)
     cli = _load_cli("brave_cli_under_test")
-    monkeypatch.setattr(cli, "load_env", lambda: None)
-    return cli
+    return cast("_BraveCli", cast("object", cli))
 
 
-def _request_qs(call: dict) -> dict[str, list[str]]:
-    return parse_qs(urlparse(call["url"]).query)
+def _request_qs(call: dict[str, object]) -> dict[str, list[str]]:
+    url = call["url"]
+    assert isinstance(url, str)
+    return parse_qs(urlparse(url).query)
 
 
-def _stub_response(payload: dict) -> FakeResponse:
+def _stub_response(payload: object) -> FakeResponse:
     return FakeResponse(body=json.dumps(payload).encode())
 
 
-def _err_field(envelope: dict, name: str):
+def _err_field(envelope: Mapping[str, object], name: str) -> object:
     """Pull ``error.<name>`` from an envelope that uses either flat dotted keys
     (``{"error.provider": ...}``) or a nested ``{"error": {"provider": ...}}``.
     """
-    if (
-        "error" in envelope
-        and isinstance(envelope["error"], dict)
-        and name in envelope["error"]
-    ):
-        return envelope["error"][name]
+    error = envelope.get("error")
+    if isinstance(error, dict) and name in error:
+        return cast("object", error[name])
     return envelope.get(f"error.{name}")
 
 
@@ -138,7 +145,11 @@ def _err_field(envelope: dict, name: str):
 # ---------------------------------------------------------------------------
 
 
-def test_web_applies_default_count_and_result_filter(brave_cli, monkeypatch, capsys):
+def test_web_applies_default_count_and_result_filter(
+    brave_cli: _BraveCli,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     monkeypatch.setenv("BRAVE_API_KEY", "TEST_KEY")
     recorder = CallRecorder(return_value=_stub_response({"results": []}))
     monkeypatch.setattr(urllib.request, "urlopen", recorder)
@@ -163,7 +174,11 @@ def test_web_applies_default_count_and_result_filter(brave_cli, monkeypatch, cap
 # ---------------------------------------------------------------------------
 
 
-def test_compact_web_projection_drops_noisy_fields(brave_cli, monkeypatch, capsys):
+def test_compact_web_projection_drops_noisy_fields(
+    brave_cli: _BraveCli,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     monkeypatch.setenv("BRAVE_API_KEY", "TEST_KEY")
     payload = {
         "query": "rust",
@@ -171,7 +186,7 @@ def test_compact_web_projection_drops_noisy_fields(brave_cli, monkeypatch, capsy
             {
                 "title": "Rust homepage",
                 "url": "https://www.rust-lang.org/",
-                "description": "A language empowering everyone to build reliable software.",
+                "description": "A language empowering everyone to build reliable software.",  # noqa: E501 - fixture prose
                 # fields the contract says to drop
                 "videos": {"title": "video spam"},
                 "mixed": {"type": "mixed", "value": "noise"},
@@ -190,15 +205,13 @@ def test_compact_web_projection_drops_noisy_fields(brave_cli, monkeypatch, capsy
     assert rc == 0, f"unexpected stderr: {captured.err!r}"
     assert captured.err == "", f"expected no stderr; got {captured.err!r}"
 
-    parsed = json.loads(captured.out)
+    parsed = cast("list[object] | dict[str, object]", json.loads(captured.out))
     # The CLI may emit a list, or a dict with a "results" key. Accept either,
     # but it must have a single first row.
-    if isinstance(parsed, list):
-        rows = parsed
-    else:
-        rows = parsed.get("results")
+    rows = parsed if isinstance(parsed, list) else parsed.get("results")
+    assert isinstance(rows, list), f"expected results list; got: {captured.out!r}"
     assert rows, f"expected non-empty results in stdout; got: {captured.out!r}"
-    first = rows[0]
+    first = cast("dict[str, object]", rows[0])
 
     for kept in ("title", "url", "description"):
         assert kept in first, f"{kept!r} must be kept; got keys: {sorted(first)}"
@@ -213,7 +226,11 @@ def test_compact_web_projection_drops_noisy_fields(brave_cli, monkeypatch, capsy
 # ---------------------------------------------------------------------------
 
 
-def test_raw_streams_upstream_bytes_unchanged(brave_cli, monkeypatch, capsys):
+def test_raw_streams_upstream_bytes_unchanged(
+    brave_cli: _BraveCli,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     monkeypatch.setenv("BRAVE_API_KEY", "TEST_KEY")
     body = '{"raw":true,"bytes":"unicode ✓ é 漢字"}'.encode()
     recorder = CallRecorder(return_value=FakeResponse(body=body))
@@ -238,7 +255,11 @@ def test_raw_streams_upstream_bytes_unchanged(brave_cli, monkeypatch, capsys):
 # ---------------------------------------------------------------------------
 
 
-def test_count_50_returns_rc2_no_network(brave_cli, monkeypatch, capsys):
+def test_count_50_returns_rc2_no_network(
+    brave_cli: _BraveCli,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     monkeypatch.setenv("BRAVE_API_KEY", "TEST_KEY")
     recorder = CallRecorder(return_value=_stub_response({"results": []}))
     monkeypatch.setattr(urllib.request, "urlopen", recorder)
@@ -258,17 +279,23 @@ def test_count_50_returns_rc2_no_network(brave_cli, monkeypatch, capsys):
 # ---------------------------------------------------------------------------
 
 
-def test_http_html_error_emits_compact_json(brave_cli, monkeypatch, capsys):
+def test_http_html_error_emits_compact_json(
+    brave_cli: _BraveCli,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     monkeypatch.setenv("BRAVE_API_KEY", "TEST_KEY")
     html_body = (
         b"<!DOCTYPE html><html><head><title>502 Bad Gateway</title></head>"
         b"<body><h1>502 Bad Gateway</h1><p>cloudflare-nginx</p></body></html>"
     )
+    response_headers = HTTPMessage()
+    response_headers["Content-Type"] = "text/html"
     http_err = urllib.error.HTTPError(
         url="https://api.search.brave.com/res/v1/web/search?q=rust",
         code=502,
         msg="Bad Gateway",
-        hdrs={"Content-Type": "text/html"},
+        hdrs=response_headers,
         fp=io.BytesIO(html_body),
     )
     recorder = CallRecorder(side_effect=http_err)
@@ -285,15 +312,14 @@ def test_http_html_error_emits_compact_json(brave_cli, monkeypatch, capsys):
     # Exactly one line, parseable as compact JSON.
     err_lines = [ln for ln in captured.err.splitlines() if ln.strip()]
     assert len(err_lines) == 1, f"expected single-line stderr; got: {err_lines!r}"
-    envelope = json.loads(err_lines[0])
+    envelope = cast("dict[str, object]", json.loads(err_lines[0]))
     assert _err_field(envelope, "provider") == "brave-search", (
         f"bad provider: {envelope}"
     )
     assert _err_field(envelope, "status") == 502, f"bad status: {envelope}"
-    assert isinstance(_err_field(envelope, "message"), str) and _err_field(
-        envelope,
-        "message",
-    ), f"bad message: {envelope}"
+    message = _err_field(envelope, "message")
+    assert isinstance(message, str), f"bad message: {envelope}"
+    assert message, f"bad message: {envelope}"
     assert _err_field(envelope, "body_bytes") == len(html_body), (
         f"bad body_bytes: {envelope}"
     )
@@ -310,7 +336,11 @@ def test_http_html_error_emits_compact_json(brave_cli, monkeypatch, capsys):
 # ---------------------------------------------------------------------------
 
 
-def test_summarizer_key_without_api_key_returns_nonzero(brave_cli, monkeypatch, capsys):
+def test_summarizer_key_without_api_key_returns_nonzero(
+    brave_cli: _BraveCli,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     # env is wiped by the fixture; load_env is stubbed to a no-op so the
     # real on-disk .env file cannot resurrect the key.
     sentinel = CallRecorder(return_value=_stub_response({"summarizer": {"key": "X"}}))
@@ -323,3 +353,15 @@ def test_summarizer_key_without_api_key_returns_nonzero(brave_cli, monkeypatch, 
     assert sentinel.calls == [], "urlopen must not run when the key is missing"
     err_lower = captured.err.lower()
     assert "key" in err_lower, f"stderr should mention the key: {captured.err!r}"
+
+
+def test_projectors_return_empty_for_non_dict_payloads(
+    brave_cli: _BraveCli,
+) -> None:
+    """Non-dict provider payloads project to no rows instead of crashing."""
+    for name in ("web", "news", "local", "image", "video"):
+        attr = f"project_{name}_results"
+        projector = cast("Callable[[object], list[object]]", getattr(brave_cli, attr))
+        assert projector(None) == []
+        assert projector([]) == []
+        assert projector("oops") == []

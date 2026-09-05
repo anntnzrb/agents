@@ -10,18 +10,23 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field, fields, is_dataclass
 from decimal import Decimal
-from enum import Enum
-from typing import Final, NoReturn
+from enum import Enum, StrEnum
+from typing import TYPE_CHECKING, Final, NoReturn, cast, overload
+from urllib.parse import quote, unquote_plus, urlsplit, urlunsplit
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # Keep these values in sync with the established Artificial Analysis protocol.
 PROTOCOL_VERSION: Final[str] = "1"
 SNAPSHOT_SCHEMA_VERSION: Final[int] = 2
 
 
-class ValueStatus(str, Enum):
+class ValueStatus(StrEnum):
     """Whether a value exists and where its value came from."""
 
     PUBLISHED = "published"
@@ -30,7 +35,7 @@ class ValueStatus(str, Enum):
     UNPARSED = "unparsed"
 
 
-class MetricSemanticsStatus(str, Enum):
+class MetricSemanticsStatus(StrEnum):
     """Whether a numeric value has an unambiguous metric meaning."""
 
     KNOWN = "known"
@@ -38,7 +43,7 @@ class MetricSemanticsStatus(str, Enum):
     AMBIGUOUS = "ambiguous"
 
 
-class ComparisonEligibility(str, Enum):
+class ComparisonEligibility(StrEnum):
     """Whether an evidence value may participate in a comparison."""
 
     ELIGIBLE = "eligible"
@@ -121,7 +126,9 @@ class SourceEvidence:
 
     def to_dict(self) -> dict[str, object]:
         """Return the stable provenance fields for serialization."""
-        status = self.status.value if isinstance(self.status, Enum) else self.status
+        status: object = self.status
+        if isinstance(status, Enum):
+            status = cast("object", status.value)
         return {
             "source_url": self.source_url,
             "final_url": self.final_url,
@@ -245,6 +252,179 @@ class NumericEvidence:
         return result
 
 
+REDACTED: Final[str] = "[REDACTED]"
+
+# Metrics contain the word token legitimately.  Only credential-shaped token
+# keys are sensitive; these metric forms stay observable in diagnostics.
+_SAFE_TOKEN_KEY_PARTS: Final[frozenset[str]] = frozenset(
+    {
+        "answer",
+        "cache",
+        "count",
+        "input",
+        "output",
+        "reasoning",
+        "task",
+        "total",
+        "cost",
+        "latency",
+        "rate",
+        "per",
+        "tokens",
+    }
+)
+_PRIVATE_KEY_RE = re.compile(
+    r"-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----", re.IGNORECASE
+)
+_BEARER_RE = re.compile(r"(\bbearer\s+)([^\s,;]+)", re.IGNORECASE)
+_BASIC_RE = re.compile(r"(\bbasic\s+)([^\s,;]+)", re.IGNORECASE)
+_CREDENTIAL_ASSIGNMENT_RE = re.compile(
+    r"(\b(?:api[-_ ]?key|access[-_ ]?token|refresh[-_ ]?token|auth[-_ ]?token|"
+    + r"password|secret|bearer|token|private[-_ ]?key)\s*[=:]\s*)([^\s&;,]+)",
+    re.IGNORECASE,
+)
+
+
+def _key_parts(key: object) -> tuple[str, ...]:
+    """Split a mapping key into normalized alphanumeric parts."""
+    normalized = re.sub(r"[^a-z0-9]+", "_", str(key).casefold()).strip("_")
+    return tuple(part for part in normalized.split("_") if part)
+
+
+def _sensitive_key(key: object) -> bool:
+    """Decide whether a mapping key is credential-shaped."""
+    parts = _key_parts(key)
+    sensitive = False
+    if parts:
+        joined = "_".join(parts)
+        sensitive = any(
+            marker in joined
+            for marker in (
+                "private_key",
+                "privatekey",
+                "password",
+                "passwd",
+                "secret",
+                "credential",
+            )
+        )
+        if not sensitive:
+            sensitive = any(
+                marker in parts
+                for marker in (
+                    "authorization",
+                    "proxy_authorization",
+                    "cookie",
+                    "set_cookie",
+                    "bearer",
+                )
+            )
+        if not sensitive and "api" in parts:
+            sensitive = any(part in parts for part in ("key", "keys"))
+        if not sensitive:
+            sensitive = joined in {
+                "token",
+                "access_token",
+                "refresh_token",
+                "id_token",
+                "auth_token",
+                "session_token",
+                "csrf_token",
+                "oauth_token",
+            }
+        if not sensitive and ("token" in parts or "tokens" in parts):
+            # A metric key such as output_tokens or token_count is not a secret.
+            sensitive = not set(parts) & _SAFE_TOKEN_KEY_PARTS
+    return sensitive
+
+
+def _redact_query_text(query: str) -> str:
+    """Redact sensitive query values while preserving safe query text."""
+    if not query:
+        return query
+    pieces: list[str] = []
+    changed = False
+    for piece in query.split("&"):
+        key, separator, _ = piece.partition("=")
+        if _sensitive_key(unquote_plus(key)):
+            replacement = quote(REDACTED, safe="[]") if separator else REDACTED
+            pieces.append(f"{key}{separator}{replacement}")
+            changed = True
+        else:
+            pieces.append(piece)
+    return "&".join(pieces) if changed else query
+
+
+@overload
+def redact_query(value: str) -> str: ...
+@overload
+def redact_query(value: object) -> object: ...
+def redact_query(value: object) -> object:
+    """Redact credential-bearing query parameters in a URL or query string."""
+    if not isinstance(value, str):
+        return value
+    if "://" in value or value.startswith(("/", "?", "#")):
+        parsed = urlsplit(value)
+        redacted_query = _redact_query_text(parsed.query)
+        redacted_fragment = _redact_query_text(parsed.fragment)
+        if redacted_query == parsed.query and redacted_fragment == parsed.fragment:
+            return value
+        return urlunsplit(
+            (
+                parsed.scheme,
+                parsed.netloc,
+                parsed.path,
+                redacted_query,
+                redacted_fragment,
+            )
+        )
+    # A bare query is useful in diagnostics too, but do not reinterpret prose
+    # containing a question mark as a query unless it has key=value syntax.
+    if "=" not in value:
+        return value
+    return _redact_query_text(value)
+
+
+def _redact_string(value: str) -> str:
+    """Redact credentials inside one string value."""
+    value = redact_query(value)
+    if _PRIVATE_KEY_RE.search(value):
+        return REDACTED
+    value = _BEARER_RE.sub(lambda match: f"{match.group(1)}{REDACTED}", value)
+    value = _BASIC_RE.sub(lambda match: f"{match.group(1)}{REDACTED}", value)
+    return _CREDENTIAL_ASSIGNMENT_RE.sub(
+        lambda match: f"{match.group(1)}{REDACTED}",
+        value,
+    )
+
+
+def redact(value: object, *, _sensitive: bool = False) -> object:
+    """Recursively redact credential keys and values without hiding metrics."""
+    if _sensitive:
+        value = REDACTED
+    elif isinstance(value, Mapping):
+        mapping = cast("Mapping[str, object]", value)
+        value = {
+            key: redact(item, _sensitive=_sensitive_key(key))
+            for key, item in mapping.items()
+        }
+    elif isinstance(value, list):
+        items = cast("list[object]", cast("object", value))
+        value = [redact(item) for item in items]
+    elif isinstance(value, tuple):
+        entries = cast("tuple[object, ...]", cast("object", value))
+        value = tuple(redact(item) for item in entries)
+    elif isinstance(value, set):
+        members = cast("set[object]", cast("object", value))
+        value = {redact(item) for item in members}
+    elif isinstance(value, frozenset):
+        members = cast("frozenset[object]", cast("object", value))
+        value = frozenset(redact(item) for item in members)
+    elif isinstance(value, str):
+        value = _redact_string(value)
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class Diagnostic:
     """One stable source-local diagnostic record."""
@@ -259,10 +439,6 @@ class Diagnostic:
 
     def to_dict(self) -> dict[str, object]:
         """Return a redacted, stable diagnostic mapping."""
-        # Import lazily: diagnostics.py imports the contract constants and
-        # must remain independent from every other skill.
-        from .diagnostics import redact  # noqa: PLC0415
-
         result: dict[str, object] = {
             "code": self.code,
             "severity": self.severity,
@@ -284,20 +460,24 @@ class Diagnostic:
 
 def _plain_json(value: object) -> object:
     """Project common Python values to finite, JSON-compatible values."""
+    to_dict = cast("Callable[[], object] | None", getattr(value, "to_dict", None))
     if isinstance(value, Enum):
-        value = _plain_json(value.value)
-    elif hasattr(value, "to_dict") and callable(value.to_dict):
-        value = _plain_json(value.to_dict())
+        value = _plain_json(cast("object", value.value))
+    elif callable(to_dict):
+        value = _plain_json(to_dict())
     elif is_dataclass(value) and not isinstance(value, type):
         value = _plain_json(
             {item.name: getattr(value, item.name) for item in fields(value)}
         )
     elif isinstance(value, Mapping):
-        value = _plain_mapping(value)
+        value = _plain_mapping(cast("Mapping[object, object]", value))
     elif isinstance(value, (list, tuple)):
-        value = [_plain_json(item) for item in value]
+        items = cast("list[object]", cast("object", value))
+        value = [_plain_json(item) for item in items]
     elif isinstance(value, (set, frozenset)):
-        value = _plain_set(value)
+        value = _plain_set(
+            cast("set[object] | frozenset[object]", cast("object", value))
+        )
     elif isinstance(value, Decimal):
         value = _plain_decimal(value)
     elif isinstance(value, float) and not math.isfinite(value):

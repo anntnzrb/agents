@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
+from typing import cast
 
 CODES = {
     "SOURCE_UNAVAILABLE",
@@ -41,8 +42,8 @@ _SECRET_KEYS = re.compile(
 )
 _SECRET_VALUES = re.compile(
     r"(?i)(bearer\s+[^\s,;]+|"
-    r"sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{10,}|"
-    r"-----BEGIN .*PRIVATE KEY-----)"
+    + r"sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{10,}|"
+    + r"-----BEGIN .*PRIVATE KEY-----)"
 )
 _SECRET_QUERY = re.compile(
     r"(?i)([?&](?:api[-_]?key|access_token|token|secret|password|authorization|credential)=[^&#\s]+)"
@@ -52,18 +53,19 @@ _SECRET_QUERY = re.compile(
 def redact(value: object) -> object:
     """Recursively remove credentials from diagnostic/provenance data."""
     if isinstance(value, Mapping):
+        mapping = cast("Mapping[object, object]", value)
         out: dict[str, object] = {}
-        for key, item in value.items():
+        for key, item in mapping.items():
             name = str(key)
             if _SECRET_KEYS.search(name):
                 out[name] = "<redacted>"
             else:
                 out[name] = redact(item)
         return out
-    if isinstance(value, list):
-        return [redact(item) for item in value]
-    if isinstance(value, tuple):
-        return [redact(item) for item in value]
+    if isinstance(value, (list, tuple)):
+        seq = cast("Sequence[object]", value)
+        items = [redact(item) for item in seq]
+        return tuple(items) if isinstance(value, tuple) else items
     if isinstance(value, str):
         if _SECRET_VALUES.search(value):
             return "<redacted>"
@@ -82,7 +84,11 @@ def make(code: str, message: str, **kwargs: object) -> dict[str, object]:
     artifact_value = kwargs.get("artifact_id")
     artifact_id = artifact_value if isinstance(artifact_value, str) else None
     details_value = kwargs.get("details")
-    details = details_value if isinstance(details_value, Mapping) else {}
+    details_map: Mapping[object, object] = (
+        cast("Mapping[object, object]", details_value)
+        if isinstance(details_value, Mapping)
+        else {}
+    )
     if code not in CODES:
         code = "SCHEMA_DRIFT"
     result: dict[str, object] = {
@@ -90,7 +96,7 @@ def make(code: str, message: str, **kwargs: object) -> dict[str, object]:
         "severity": severity,
         "stage": stage,
         "message": message,
-        "details": redact(dict(details)),
+        "details": redact({str(k): v for k, v in details_map.items()}),
     }
     if source_path is not None:
         result["source_path"] = source_path
@@ -115,9 +121,13 @@ def merge(*groups: Iterable[Mapping[str, object]]) -> list[dict[str, object]]:
     seen: set[tuple[object, ...]] = set()
     for group in groups:
         for item in group:
-            normalized = redact(dict(item))
-            if not isinstance(normalized, dict):
+            normalized_raw = redact(dict(item))
+            if not isinstance(normalized_raw, Mapping):
                 continue
+            normalized = {
+                str(k): v
+                for k, v in cast("Mapping[object, object]", normalized_raw).items()
+            }
             key = (
                 normalized.get("code"),
                 normalized.get("stage"),

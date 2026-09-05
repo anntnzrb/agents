@@ -1,9 +1,7 @@
 """Exact-declaration overlap contracts."""
 
-# ruff: noqa: CPY001, INP001, S101, D103
 from __future__ import annotations
 
-import _path  # noqa: F401
 from artificial_analysis.overlap import (
     OVERLAP_DOUBLE_COUNTING_RISK,
     declarative_dependencies,

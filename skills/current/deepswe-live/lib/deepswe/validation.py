@@ -12,11 +12,10 @@ import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final, NoReturn, cast
 
 if TYPE_CHECKING:
     from pathlib import Path
-from typing import Final
 
 from .diagnostics import merge_diagnostics, redact, warning
 from .provenance import artifact_evidence
@@ -32,10 +31,10 @@ SUPPORTED_ARTIFACT_SCHEMAS: Final[frozenset[int]] = frozenset({LEGACY_ARTIFACT_S
 # while this module remains importable without importing sources.py.
 _VERSION_RE = re.compile(
     r"^v(?P<major>0|[1-9][0-9]*)\."
-    r"(?P<minor>0|[1-9][0-9]*)"
-    r"(?:\.(?P<patch>0|[1-9][0-9]*))?"
-    r"(?:-(?P<pre>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
-    r"(?:\+(?P<build>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$"
+    + r"(?P<minor>0|[1-9][0-9]*)"
+    + r"(?:\.(?P<patch>0|[1-9][0-9]*))?"
+    + r"(?:-(?P<pre>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
+    + r"(?:\+(?P<build>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$"
 )
 _MAJOR_ONLY_RE = re.compile(r"^v?[0-9]+$")
 _VERSION_COMPONENT_RE = re.compile(
@@ -117,7 +116,7 @@ _SCHEMA_KEYS: Final[tuple[str, ...]] = (
 class PayloadValidationError(ValueError):
     """A stable, expected failure while validating one JSON artifact."""
 
-    def __init__(  # noqa: D107
+    def __init__(
         self,
         message: str,
         *,
@@ -125,10 +124,11 @@ class PayloadValidationError(ValueError):
         path: str | Path | None = None,
         details: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize with message, code, path, and details."""
         super().__init__(message)
-        self.code = code
-        self.path = None if path is None else str(path)
-        self.details = dict(details or {})
+        self.code: str = code
+        self.path: str | None = None if path is None else str(path)
+        self.details: dict[str, object] = dict(details) if details is not None else {}
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,7 +159,7 @@ def _fail(
     path: str | Path | None = None,
     field: str | None = None,
     value: object = None,
-) -> None:
+) -> NoReturn:
     details: dict[str, object] = {}
     if field is not None:
         details["field"] = field
@@ -254,7 +254,8 @@ def _declared_version(
 def _schema_number(key: str, value: object, *, path: str | Path | None) -> int:
     candidate = value
     if isinstance(candidate, Mapping):
-        candidate = candidate.get("version", candidate.get("schema_version"))
+        mapping = cast("Mapping[str, object]", candidate)
+        candidate = mapping.get("version", mapping.get("schema_version"))
     if isinstance(candidate, bool):
         candidate = None
     if isinstance(candidate, int):
@@ -309,7 +310,7 @@ def _validate_shape(  # noqa: C901
             code="invalid_artifact_shape",
             path=path,
         )
-    root: dict[str, object] = dict(payload)
+    root = cast("dict[str, object]", payload)
     if "rows" not in root or not isinstance(root["rows"], list):
         _fail(
             f"artifact {_label(path)} must contain a rows array",
@@ -317,7 +318,7 @@ def _validate_shape(  # noqa: C901
             path=path,
             field="rows",
         )
-    rows_value = root["rows"]
+    rows_value = cast("list[object]", cast("object", root["rows"]))
     rows: list[Mapping[str, object]] = []
     for index, row in enumerate(rows_value):
         if not isinstance(row, Mapping):
@@ -328,7 +329,7 @@ def _validate_shape(  # noqa: C901
                 field=f"rows[{index}]",
                 value=row,
             )
-        rows.append(row)
+        rows.append(cast("Mapping[str, object]", row))
     for key in _COUNT_KEYS:
         if key not in root:
             continue
@@ -421,7 +422,7 @@ def inspect_payload(  # noqa: C901
         if left is not None and right is not None and left != right:
             _fail(
                 f"artifact {_label(path)} {label} version {left!r} "
-                f"does not match expected {right}",
+                + f"does not match expected {right}",
                 code="version_mismatch",
                 path=path,
             )
@@ -544,8 +545,16 @@ def diagnose_payload(
         path=path,
     )
     rows_value = facts.payload.get("rows")
-    rows = rows_value if isinstance(rows_value, list) else []
-    row_mappings = [row for row in rows if isinstance(row, Mapping)]
+    rows_list = (
+        cast("list[object]", cast("object", rows_value))
+        if isinstance(rows_value, list)
+        else []
+    )
+    row_mappings: list[Mapping[str, object]] = [
+        cast("Mapping[str, object]", row)
+        for row in rows_list
+        if isinstance(row, Mapping)
+    ]
     diagnostics: list[Mapping[str, object]] = []
     if facts.unknown_top_level_fields or facts.unknown_row_fields:
         diagnostics.append(
@@ -599,7 +608,9 @@ def diagnose_payload(
         "evidence": evidence,
     }
     redacted = redact(result)
-    return dict(redacted) if isinstance(redacted, Mapping) else result
+    if not isinstance(redacted, Mapping):
+        return result
+    return dict(cast("Mapping[str, object]", redacted))
 
 
 __all__ = [

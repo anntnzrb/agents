@@ -1,3 +1,12 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pytest
+
+    from amz_live.models import SearchResult
+
 from urllib.parse import parse_qs, urlparse
 
 from amz_live.client import AmazonSearchClient
@@ -23,17 +32,17 @@ def test_build_search_url_encodes_keywords_into_canonical_search_url() -> None:
     }
 
 
-def test_search_pages_preserves_zip_code_across_pages(monkeypatch) -> None:
+def test_search_pages_preserves_zip_code_across_pages(monkeypatch: pytest.MonkeyPatch) -> None:
     seen_zip_codes: list[str | None] = []
 
-    def fake_search(self, query: SearchQuery):
+    def fake_search(_self: AmazonSearchClient, query: SearchQuery) -> list[SearchResult]:
         seen_zip_codes.append(query.zip_code)
         return []
 
     monkeypatch.setattr(AmazonSearchClient, "search", fake_search)
 
     with AmazonSearchClient() as client:
-        client.search_pages(SearchQuery("usb c pd charger", zip_code="33101"), pages=2)
+        _ = client.search_pages(SearchQuery("usb c pd charger", zip_code="33101"), pages=2)
 
     assert seen_zip_codes == ["33101", "33101"]
 

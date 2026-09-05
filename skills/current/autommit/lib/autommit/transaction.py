@@ -5,11 +5,13 @@ from __future__ import annotations
 import json
 import os
 import secrets
-from collections.abc import Generator
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Literal, cast
+from typing import TYPE_CHECKING, Literal, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from pathlib import Path
 
 from expression import Error, Nothing, Ok, Option, Result, Some
 
@@ -21,6 +23,8 @@ LOCK_FILENAME = "operation.lock"
 MAX_JSON_BYTES = 16 * 1024
 MAX_LOCK_BYTES = 4 * 1024
 MAX_STRING_LENGTH = 4 * 1024
+_MIN_PRINTABLE_ORD = 32
+_DELETE_ORD = 127
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,7 +77,7 @@ def _ensure_directory(common_dir: Path) -> Result[Path, AutommitError]:
 
 def _regular_file(path: Path, kind: str) -> Result[bool, AutommitError]:
     if not path.exists() and not path.is_symlink():
-        return Ok(False)
+        return Ok(value=False)
     if path.is_symlink() or not path.is_file():
         return Error(
             AutommitError(
@@ -82,7 +86,7 @@ def _regular_file(path: Path, kind: str) -> Result[bool, AutommitError]:
                 4,
             )
         )
-    return Ok(True)
+    return Ok(value=True)
 
 
 def _bounded_string(value: object, field: str) -> Result[str, AutommitError]:
@@ -90,7 +94,10 @@ def _bounded_string(value: object, field: str) -> Result[str, AutommitError]:
         not isinstance(value, str)
         or not value.strip()
         or len(value) > MAX_STRING_LENGTH
-        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+        or any(
+            ord(character) < _MIN_PRINTABLE_ORD or ord(character) == _DELETE_ORD
+            for character in value
+        )
     ):
         return Error(
             AutommitError(
@@ -200,7 +207,7 @@ def read_receipt(
                             )
                         )
                     try:
-                        value = json.loads(data.decode("utf-8"))
+                        value = cast("object", json.loads(data.decode("utf-8")))
                     except (UnicodeDecodeError, json.JSONDecodeError) as error:
                         return Error(
                             AutommitError(
@@ -309,12 +316,12 @@ def write_receipt(common_dir: Path, receipt: Receipt) -> Result[None, AutommitEr
                                     0o600,
                                 )
                                 with os.fdopen(descriptor, "wb") as handle:
-                                    handle.write(serialized)
+                                    _ = handle.write(serialized)
                                     handle.flush()
                                     os.fsync(handle.fileno())
                                 match _regular_file(receipt_path, "receipt"):
                                     case Result(tag="ok"):
-                                        temporary.replace(receipt_path)
+                                        _ = temporary.replace(receipt_path)
                                         return _sync_directory(directory)
                                     case Result(error=err):
                                         return Error(err)
@@ -387,7 +394,7 @@ def operation_lock(common_dir: Path) -> Generator[None, None, None]:
                 raise RefusalError(
                     "operation_locked",
                     f"Autommit operation already in progress (lock: {lock_path}). "
-                    "Inspect its PID; stale locks are never removed automatically.",
+                    + "Inspect its PID; stale locks are never removed automatically.",
                 ) from error
             except OSError as error:
                 raise AutommitError(
@@ -395,7 +402,7 @@ def operation_lock(common_dir: Path) -> Generator[None, None, None]:
                 ) from error
             try:
                 with os.fdopen(descriptor, "wb") as handle:
-                    handle.write(serialized)
+                    _ = handle.write(serialized)
                     handle.flush()
                     os.fsync(handle.fileno())
                 yield
@@ -403,10 +410,13 @@ def operation_lock(common_dir: Path) -> Generator[None, None, None]:
                 try:
                     match _regular_file(lock_path, "operation lock"):
                         case Result(tag="ok", ok=True):
-                            current = json.loads(lock_path.read_text(encoding="utf-8"))
+                            current = cast(
+                                "object",
+                                json.loads(lock_path.read_text(encoding="utf-8")),
+                            )
                             if current == owner:
                                 lock_path.unlink()
-                                _sync_directory(directory)
+                                _ = _sync_directory(directory)
                         case _:
                             pass
                 except (

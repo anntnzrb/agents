@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
+from typing import cast
 
 from .contracts import Diagnostic
 
@@ -64,11 +65,14 @@ def redact(value: object, *, key: str | None = None) -> object:
     if isinstance(value, str):
         return redact_text(value)
     if isinstance(value, Mapping):
-        return {str(k): redact(v, key=str(k)) for k, v in value.items()}
+        mapping = cast("Mapping[str, object]", value)
+        return {str(k): redact(v, key=str(k)) for k, v in mapping.items()}
     if isinstance(value, list):
-        return [redact(item) for item in value]
+        items = cast("list[object]", cast("object", value))
+        return [redact(item) for item in items]
     if isinstance(value, tuple):
-        return [redact(item) for item in value]
+        entries = cast("tuple[object, ...]", cast("object", value))
+        return [redact(item) for item in entries]
     return value
 
 
@@ -87,9 +91,9 @@ def make_diagnostic(  # noqa: PLR0913
     if code not in CODES:
         # Unknown upstream signals are still visible but remain uppercase and stable.
         code = code.upper().replace("-", "_")
-    safe_details = redact(dict(details or {}))
-    if not isinstance(safe_details, dict):
-        safe_details = {}
+    source_details: dict[str, object] = dict(details) if details is not None else {}
+    safe = redact(source_details)
+    safe_details = cast("dict[str, object]", safe) if isinstance(safe, dict) else {}
     return Diagnostic(
         code,
         severity,

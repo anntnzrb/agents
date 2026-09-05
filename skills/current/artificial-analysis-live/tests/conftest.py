@@ -1,6 +1,5 @@
 """Safety fixtures for deterministic Artificial Analysis tests."""
 
-# ruff: noqa: CPY001, INP001, SLF001
 from __future__ import annotations
 
 import os
@@ -9,11 +8,23 @@ import sys
 import urllib.request
 from pathlib import Path
 
+LIB_DIR = Path(__file__).resolve().parents[1] / "lib"
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+from typing import TYPE_CHECKING, cast
+
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def _live_smoke_enabled(request: pytest.FixtureRequest) -> bool:
-    path = getattr(request.node, "path", None)
+    path = getattr(cast("object", request.node), "path", None)
     return (
         os.environ.get("RUN_LIVE_SMOKE") == "1"
         and isinstance(path, Path)
@@ -48,7 +59,9 @@ def deny_network_and_real_dotenv(
     if cli_module is None or not hasattr(cli_module, "_dotenv_candidates"):
         return
     skill_env = Path(__file__).resolve().parents[1] / ".env"
-    original_candidates = cli_module._dotenv_candidates
+    original_candidates = cast(
+        "Callable[..., list[Path]]", cli_module._dotenv_candidates
+    )
 
     def safe_candidates(*args: object, **kwargs: object) -> list[Path]:
         return [

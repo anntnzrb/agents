@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from collections.abc import Iterable, Mapping
-from typing import Any
+from collections.abc import Iterable, Mapping, Sequence
+from typing import cast
 
 from .diagnostics import make
 
@@ -25,9 +25,10 @@ def _record_key(row: Mapping[str, object]) -> tuple[object, ...]:
 def _metric_signature(row: Mapping[str, object]) -> str:
     def stable(value: object) -> object:
         if isinstance(value, Mapping):
+            value_map = cast("Mapping[object, object]", value)
             return {
                 str(key): stable(item)
-                for key, item in value.items()
+                for key, item in value_map.items()
                 if str(key)
                 not in {
                     "source_evidence",
@@ -37,8 +38,9 @@ def _metric_signature(row: Mapping[str, object]) -> str:
                     "observed_at",
                 }
             }
-        if isinstance(value, list):
-            return [stable(item) for item in value]
+        if isinstance(value, (list, tuple)):
+            seq = cast("Sequence[object]", value)
+            return [stable(item) for item in seq]
         return value
 
     return json.dumps(
@@ -51,8 +53,8 @@ def _metric_signature(row: Mapping[str, object]) -> str:
 
 
 def validate_records(
-    rows: list[dict[str, Any]], *, expected_release: str | None = None
-) -> tuple[list[dict[str, Any]], list[dict[str, object]], set[int]]:
+    rows: list[dict[str, object]], *, expected_release: str | None = None
+) -> tuple[list[dict[str, object]], list[dict[str, object]], set[int]]:
     """Validate release, identity, and duplicate-row invariants."""
     diagnostics: list[dict[str, object]] = []
     duplicate_excluded: set[int] = set()
@@ -146,14 +148,18 @@ def _metric_value(row: Mapping[str, object], field: str) -> Mapping[str, object]
     metrics = row.get("metrics")
     if not isinstance(metrics, Mapping):
         return None
-    item = metrics.get(field)
+    metrics_map = cast("Mapping[str, object]", metrics)
+    item = metrics_map.get(field)
     if not isinstance(item, Mapping):
         return None
-    value = item.get("value")
-    return value if isinstance(value, Mapping) else None
+    item_map = cast("Mapping[str, object]", item)
+    value = item_map.get("value")
+    return cast("Mapping[str, object]", value) if isinstance(value, Mapping) else None
 
 
-def comparison_gate(rows: Iterable[Mapping[str, object]], field: str) -> dict[str, Any]:
+def comparison_gate(
+    rows: Iterable[Mapping[str, object]], field: str
+) -> dict[str, object]:
     """Evaluate whether rows are comparable for one metric field."""
     rows_list = list(rows)
     values = [_metric_value(row, field) for row in rows_list]
@@ -208,33 +214,45 @@ def comparison_gate(rows: Iterable[Mapping[str, object]], field: str) -> dict[st
     }
 
 
+def _sort_score(item: tuple[int, dict[str, object]], field: str) -> float:
+    metric = _metric_value(item[1], field)
+    if metric is not None:
+        val = metric.get("normalized_value")
+        if isinstance(val, (int, float)):
+            return float(val)
+    return 0.0
+
+
 def rank_rows(
-    rows: list[dict[str, Any]], *, field: str, excluded: set[int] | None = None
-) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    rows: list[dict[str, object]], *, field: str, excluded: set[int] | None = None
+) -> tuple[list[dict[str, object]], dict[str, object]]:
     """Rank eligible rows while preserving blocked rows and reasons."""
     excluded = excluded or set()
     eligible_rows = [row for index, row in enumerate(rows) if index not in excluded]
     gate = comparison_gate(eligible_rows, field)
     for row in rows:
-        rank = row.setdefault("rankings", {})
-        rank[field] = None
+        rank_raw = row.setdefault("rankings", {})
+        if isinstance(rank_raw, dict):
+            rank_map = cast("dict[str, object]", rank_raw)
+            rank_map[field] = None
     if gate["status"] != "eligible":
         return rows, gate
     ordered = sorted(
         enumerate(eligible_rows),
-        key=lambda item: float(
-            (_metric_value(item[1], field) or {}).get("normalized_value", 0.0)
-        ),
+        key=lambda item: _sort_score(item, field),
         reverse=True,
     )
     for rank_number, (_, row) in enumerate(ordered, start=1):
-        row.setdefault("rankings", {})[field] = rank_number
+        rank_raw = row.setdefault("rankings", {})
+        if isinstance(rank_raw, dict):
+            rank_map = cast("dict[str, object]", rank_raw)
+            rank_map[field] = rank_number
     return rows, gate
 
 
 def overlap_metadata() -> tuple[list[dict[str, object]], str]:
     """Return declared dependencies and the composite independence class."""
-    dependencies = [
+    dependencies: list[dict[str, object]] = [
         {
             "source": "artificial-analysis",
             "index_name": "Coding Agent Index",

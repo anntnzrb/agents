@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.12"
 # ///
-# ruff: noqa: CPY001, FBT001, S607
+# ruff: noqa: S607
 """Filter Artificial Analysis model snapshot for agent/dev model selection.
 
 The v2 snapshot stores canonical model metrics in ``models`` and endpoint
@@ -34,12 +34,18 @@ import sys
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Literal, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
 
-Json = dict[str, Any]
-OpenWeight = Literal["all", "true", "false"]
-SortKey = Literal["tbench", "omni", "ifbench", "name"]
-OutputFormat = Literal["markdown", "tsv", "json"]
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+type JsonValue = (
+    bool | int | float | str | list[JsonValue] | dict[str, JsonValue] | None
+)
+type Json = dict[str, JsonValue]
+type OpenWeight = Literal["all", "true", "false"]
+type SortKey = Literal["tbench", "omni", "ifbench", "name"]
+type OutputFormat = Literal["markdown", "tsv", "json"]
 
 
 class Row(TypedDict):
@@ -89,24 +95,33 @@ def model_omni(model: Json) -> float:
     return -999.0
 
 
+def _bool_or_none(value: object) -> bool | None:
+    """Return the value if it is a boolean, else None."""
+    return value if isinstance(value, bool) else None
+
+
+def _str_or_none(value: object) -> str | None:
+    """Return the value if it is a string, else None."""
+    return value if isinstance(value, str) else None
+
+
 def model_row(model: Json) -> Row:
     """Convert a canonical model payload to the filter row shape."""
     row: Row = {
         "slug": str(model.get("slug") or ""),
         "name": str(model.get("name") or ""),
-        "open_weights": model.get("is_open_weights")
-        if isinstance(model.get("is_open_weights"), bool)
-        else None,
+        "open_weights": _bool_or_none(model.get("is_open_weights")),
         "omni": model_omni(model),
         "tbench": number(model.get("terminalbench_hard")),
         "ifbench": number(model.get("ifbench")),
-        "license": model.get("license_name")
-        if isinstance(model.get("license_name"), str)
-        else None,
+        "license": _str_or_none(model.get("license_name")),
     }
-    for key in ("raw_fields", "raw_metadata", "evidence"):
-        if key in model:
-            row[key] = model[key]
+    if "raw_fields" in model:
+        row["raw_fields"] = model["raw_fields"]
+    if "raw_metadata" in model:
+        row["raw_metadata"] = model["raw_metadata"]
+    if "evidence" in model:
+        row["evidence"] = model["evidence"]
     return row
 
 
@@ -145,17 +160,32 @@ def ensure_default_snapshot_fresh(snapshot: Path, raw: Json) -> None:
 LAST_LOAD_DIAGNOSTICS: list[Json] = []
 
 
-def load_rows(  # noqa: C901, PLR0912
+def _build_canonical(models: JsonValue) -> dict[str, Json]:
+    """Index canonical models by slug."""
+    canonical: dict[str, Json] = {}
+    if not isinstance(models, list):
+        return canonical
+    for model in models:
+        if not isinstance(model, dict):
+            continue
+        slug = model.get("slug")
+        if not isinstance(slug, str):
+            continue
+        canonical[slug] = model
+    return canonical
+
+
+def load_rows(  # noqa: C901
     snapshot: Path,
     *,
     diagnostics: list[Json] | None = None,
 ) -> list[Row]:
     """Load canonical model rows joined from v1 or schema-v2 endpoints."""
-    raw_value = json.loads(snapshot.read_text())
+    raw_value = cast("object", json.loads(snapshot.read_text()))
     if not isinstance(raw_value, dict):
         message = f"snapshot must be an object: {snapshot}"
         raise TypeError(message)
-    raw: Json = raw_value
+    raw = cast("Json", raw_value)
     ensure_default_snapshot_fresh(snapshot, raw)
     hosts_models = raw.get("hosts_models")
     if not isinstance(hosts_models, list):
@@ -170,14 +200,9 @@ def load_rows(  # noqa: C901, PLR0912
     )
 
     local_diagnostics: list[Json] = []
-    canonical: dict[str, Json] = {}
-    models = raw.get("models")
-    if isinstance(models, list):
-        for model in models:
-            if isinstance(model, dict) and isinstance(model.get("slug"), str):
-                canonical[model["slug"]] = model
-
+    canonical = _build_canonical(raw.get("models"))
     by_slug: dict[str, Row] = {}
+
     for index, endpoint in enumerate(hosts_models):
         if not isinstance(endpoint, dict):
             continue
@@ -200,12 +225,12 @@ def load_rows(  # noqa: C901, PLR0912
                     },
                 )
                 continue
-            if isinstance(nested_model, dict) and isinstance(
-                nested_model.get("slug"), str
-            ):
-                model_slug = nested_model["slug"]
-            else:
+            nested_slug = (
+                nested_model.get("slug") if isinstance(nested_model, dict) else None
+            )
+            if not isinstance(nested_slug, str):
                 continue
+            model_slug = nested_slug
         model = canonical.get(model_slug)
         if model is None and not require_canonical_join:
             model = nested_model if isinstance(nested_model, dict) else None
@@ -316,24 +341,26 @@ def fmt(value: object) -> str:
 
 def emit_markdown(rows: list[Row]) -> None:
     """Write rows as a Markdown fixed-view table."""
-    sys.stdout.write("| Rank | Model | Open | Omni | TBench | IFBench | License |\n")
-    sys.stdout.write("|---:|---|---|---:|---:|---:|---|\n")
+    _ = sys.stdout.write(
+        "| Rank | Model | Open | Omni | TBench | IFBench | License |\n"
+    )
+    _ = sys.stdout.write("|---:|---|---|---:|---:|---:|---|\n")
     for idx, row in enumerate(rows, start=1):
         line = (
             f"| {idx} | {row['name']} | {fmt(row['open_weights'])} | "
             f"{fmt(row['omni'])} | {fmt(row['tbench'])} | "
             f"{fmt(row['ifbench'])} | {row['license'] or '-'} |\n"
         )
-        sys.stdout.write(line)
-    sys.stderr.write(
+        _ = sys.stdout.write(line)
+    _ = sys.stderr.write(
         "Note: text output is a fixed view; use --format json for "
-        "raw/evidence fields.\n",
+        + "raw/evidence fields.\n",
     )
 
 
 def emit_tsv(rows: list[Row]) -> None:
     """Write rows as tab-separated fixed-view values."""
-    sys.stdout.write("Rank\tModel\tOpen\tOmni\tTBench\tIFBench\tLicense\n")
+    _ = sys.stdout.write("Rank\tModel\tOpen\tOmni\tTBench\tIFBench\tLicense\n")
     for idx, row in enumerate(rows, start=1):
         line = "\t".join(
             [
@@ -346,28 +373,32 @@ def emit_tsv(rows: list[Row]) -> None:
                 row["license"] or "-",
             ],
         )
-        sys.stdout.write(f"{line}\n")
-    sys.stderr.write(
+        _ = sys.stdout.write(f"{line}\n")
+    _ = sys.stderr.write(
         "Note: text output is a fixed view; use --format json for "
-        "raw/evidence fields.\n",
+        + "raw/evidence fields.\n",
     )
 
 
 def _finite_json(value: object) -> object:
+    """Replace non-finite floats so json.dumps(allow_nan=False) succeeds."""
     if isinstance(value, float):
         return value if math.isfinite(value) else None
     if isinstance(value, dict):
-        return {str(key): _finite_json(item) for key, item in value.items()}
+        mapping = cast("Mapping[str, object]", value)
+        return {str(key): _finite_json(item) for key, item in mapping.items()}
     if isinstance(value, list):
-        return [_finite_json(item) for item in value]
+        items = cast("list[object]", cast("object", value))
+        return [_finite_json(item) for item in items]
     if isinstance(value, tuple):
-        return [_finite_json(item) for item in value]
+        entries = cast("tuple[object, ...]", cast("object", value))
+        return [_finite_json(item) for item in entries]
     return value
 
 
 def emit_json(rows: list[Row]) -> None:
     """Write rows as formatted finite JSON."""
-    sys.stdout.write(
+    _ = sys.stdout.write(
         json.dumps(_finite_json(rows), indent=2, sort_keys=True, allow_nan=False)
         + "\n",
     )
@@ -375,7 +406,7 @@ def emit_json(rows: list[Row]) -> None:
 
 def fetch_snapshot(skill_cli: Path) -> None:
     """Fetch a fresh snapshot through the skill CLI."""
-    subprocess.run(  # noqa: S603 (trusted local skill CLI)
+    _ = subprocess.run(  # noqa: S603 (trusted local skill CLI)
         ["uv", "run", "--script", str(skill_cli), "fetch"],
         check=True,
         stdout=subprocess.DEVNULL,
@@ -387,29 +418,29 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Filter Artificial Analysis models for coding-agent use.",
     )
-    parser.add_argument("--snapshot", type=Path, default=DEFAULT_SNAPSHOT)
-    parser.add_argument(
+    _ = parser.add_argument("--snapshot", type=Path, default=DEFAULT_SNAPSHOT)
+    _ = parser.add_argument(
         "--fetch",
         action="store_true",
         help="refresh AA snapshot before filtering",
     )
-    parser.add_argument("--skill-cli", type=Path, default=DEFAULT_SKILL_CLI)
-    parser.add_argument(
+    _ = parser.add_argument("--skill-cli", type=Path, default=DEFAULT_SKILL_CLI)
+    _ = parser.add_argument(
         "--open-weight",
         choices=["all", "true", "false"],
         default="all",
     )
-    parser.add_argument("--min-omni", type=float, default=-20.0)
-    parser.add_argument("--min-tbench", type=float, default=0.30)
-    parser.add_argument("--min-ifbench", type=float, default=0.55)
-    parser.add_argument(
+    _ = parser.add_argument("--min-omni", type=float, default=-20.0)
+    _ = parser.add_argument("--min-tbench", type=float, default=0.30)
+    _ = parser.add_argument("--min-ifbench", type=float, default=0.55)
+    _ = parser.add_argument(
         "--sort-by",
         choices=["tbench", "omni", "ifbench", "name"],
         default="tbench",
     )
-    parser.add_argument("--asc", action="store_true", help="sort ascending")
-    parser.add_argument("--limit", type=int, default=0, help="0 means no limit")
-    parser.add_argument(
+    _ = parser.add_argument("--asc", action="store_true", help="sort ascending")
+    _ = parser.add_argument("--limit", type=int, default=0, help="0 means no limit")
+    _ = parser.add_argument(
         "--format",
         choices=["markdown", "tsv", "json"],
         default="markdown",
@@ -420,36 +451,83 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     """Run filtering and return the process exit status."""
     args = parse_args()
-    if args.fetch:
-        fetch_snapshot(args.skill_cli)
-    if not args.snapshot.exists():
-        sys.stderr.write(
-            f"snapshot not found: {args.snapshot}. Run with --fetch first.\n",
+    if _flag(args, "fetch"):
+        fetch_snapshot(_req_path(args, "skill_cli"))
+    snapshot = _req_path(args, "snapshot")
+    if not snapshot.exists():
+        _ = sys.stderr.write(
+            f"snapshot not found: {snapshot}. Run with --fetch first.\n",
         )
         return 2
 
     diagnostics: list[Json] = []
-    rows = load_rows(args.snapshot, diagnostics=diagnostics)
+    rows = load_rows(snapshot, diagnostics=diagnostics)
     for diagnostic in diagnostics:
-        sys.stderr.write(json.dumps(diagnostic, sort_keys=True) + "\n")
+        _ = sys.stderr.write(json.dumps(diagnostic, sort_keys=True) + "\n")
     filtered = apply_filter(
         rows,
-        open_weight=args.open_weight,
-        min_omni=args.min_omni,
-        min_tbench=args.min_tbench,
-        min_ifbench=args.min_ifbench,
+        open_weight=cast("OpenWeight", _req_str(args, "open_weight")),
+        min_omni=_req_float(args, "min_omni"),
+        min_tbench=_req_float(args, "min_tbench"),
+        min_ifbench=_req_float(args, "min_ifbench"),
     )
-    sorted_rows = sort_rows(filtered, args.sort_by, not args.asc)
-    if args.limit > 0:
-        sorted_rows = sorted_rows[: args.limit]
+    sorted_rows = sort_rows(
+        filtered, cast("SortKey", _req_str(args, "sort_by")), not _flag(args, "asc")
+    )
+    limit = _req_int(args, "limit")
+    if limit > 0:
+        sorted_rows = sorted_rows[:limit]
 
-    if args.format == "json":
+    output_format = cast("OutputFormat", _req_str(args, "format"))
+    if output_format == "json":
         emit_json(sorted_rows)
-    elif args.format == "tsv":
+    elif output_format == "tsv":
         emit_tsv(sorted_rows)
     else:
         emit_markdown(sorted_rows)
     return 0
+
+
+def _req_str(args: argparse.Namespace, field: str) -> str:
+    """Narrow a required string argument to a typed value."""
+    value = cast("object", getattr(args, field))
+    if not isinstance(value, str):
+        message = f"Missing required argument: {field}."
+        raise TypeError(message)
+    return value
+
+
+def _req_path(args: argparse.Namespace, field: str) -> Path:
+    """Narrow a required path argument to a typed value."""
+    value = cast("object", getattr(args, field))
+    if not isinstance(value, Path):
+        message = f"Missing required argument: {field}."
+        raise TypeError(message)
+    return value
+
+
+def _req_float(args: argparse.Namespace, field: str) -> float:
+    """Narrow a required float argument to a typed value."""
+    value = cast("object", getattr(args, field))
+    if not isinstance(value, float):
+        message = f"Invalid float argument: {field}."
+        raise TypeError(message)
+    return value
+
+
+def _req_int(args: argparse.Namespace, field: str) -> int:
+    """Narrow a required integer argument to a typed value."""
+    value = cast("object", getattr(args, field))
+    if not isinstance(value, int) or isinstance(value, bool):
+        message = f"Invalid integer argument: {field}."
+        raise TypeError(message)
+    return value
+
+
+def _flag(args: argparse.Namespace, field: str) -> bool:
+    """Narrow a boolean flag to a typed value."""
+    value = cast("object", getattr(args, field))
+    return value if isinstance(value, bool) else False
 
 
 if __name__ == "__main__":
