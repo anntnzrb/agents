@@ -1,4 +1,5 @@
 #!/usr/bin/env -S uv run --script
+# Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
 """Generate and serve a review page for eval results.
 
 Reads the workspace directory, discovers runs (directories with outputs/),
@@ -6,14 +7,17 @@ embeds all output data into a self-contained HTML page, and serves it via
 a tiny HTTP server. Feedback auto-saves to feedback.json in the workspace.
 
 Usage:
-    python generate_review.py <workspace-path> [--port PORT] [--skill-name NAME]
-    python generate_review.py <workspace-path> --previous-feedback /path/to/old/feedback.json
+    python generate_review.py <workspace-path> [--port PORT]
+        [--skill-name NAME]
+    python generate_review.py <workspace-path>
+        --previous-feedback /path/to/old/feedback.json
 
 No dependencies beyond the Python stdlib are required.
 """
 
 import argparse
 import base64
+import contextlib
 import json
 import mimetypes
 import os
@@ -23,6 +27,7 @@ import subprocess
 import sys
 import time
 import webbrowser
+from dataclasses import dataclass
 from functools import partial
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -66,13 +71,18 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
 # MIME type overrides for common types
 MIME_OVERRIDES = {
     ".svg": "image/svg+xml",
-    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+    ".docx": (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ),
+    ".pptx": (
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ),
 }
 
 
 def get_mime_type(path: Path) -> str:
+    """Determine MIME type for a file path, checking overrides first."""
     ext = path.suffix.lower()
     if ext in MIME_OVERRIDES:
         return MIME_OVERRIDES[ext]
@@ -105,73 +115,74 @@ def _find_runs_recursive(root: Path, current: Path, runs: list[dict]) -> None:
             _find_runs_recursive(root, child, runs)
 
 
-def build_run(root: Path, run_dir: Path) -> dict | None:
-    """Build a run dict with prompt, outputs, and grading data."""
-    prompt = ""
-    eval_id = None
-
-    # Try eval_metadata.json
+def _read_eval_metadata(run_dir: Path) -> tuple[str, object | None]:
+    """Extract (prompt, eval_id) from eval_metadata.json when present."""
     for candidate in [
         run_dir / "eval_metadata.json",
         run_dir.parent / "eval_metadata.json",
     ]:
         if candidate.exists():
-            try:
+            with contextlib.suppress(json.JSONDecodeError, OSError):
                 metadata = json.loads(candidate.read_text())
                 prompt = metadata.get("prompt", "")
                 eval_id = metadata.get("eval_id")
-            except (json.JSONDecodeError, OSError):
-                pass
-            if prompt:
-                break
-
-    # Fall back to transcript.md
-    if not prompt:
-        for candidate in [
-            run_dir / "transcript.md",
-            run_dir / "outputs" / "transcript.md",
-        ]:
-            if candidate.exists():
-                try:
-                    text = candidate.read_text()
-                    match = re.search(r"## Eval Prompt\n\n([\s\S]*?)(?=\n##|$)", text)
-                    if match:
-                        prompt = match.group(1).strip()
-                except OSError:
-                    pass
                 if prompt:
-                    break
+                    return prompt, eval_id
+    return "", None
 
-    if not prompt:
-        prompt = "(No prompt found)"
 
-    run_id = str(run_dir.relative_to(root)).replace("/", "-").replace("\\", "-")
+def _read_transcript_prompt(run_dir: Path) -> str:
+    """Extract the eval prompt from transcript.md when present."""
+    for candidate in [
+        run_dir / "transcript.md",
+        run_dir / "outputs" / "transcript.md",
+    ]:
+        if candidate.exists():
+            with contextlib.suppress(OSError):
+                text = candidate.read_text()
+                match = re.search(r"## Eval Prompt\n\n([\s\S]*?)(?=\n##|$)", text)
+                if match:
+                    return match.group(1).strip()
+    return ""
 
-    # Collect output files
-    outputs_dir = run_dir / "outputs"
-    output_files: list[dict] = []
-    if outputs_dir.is_dir():
-        for f in sorted(outputs_dir.iterdir()):
-            if f.is_file() and f.name not in METADATA_FILES:
-                output_files.append(embed_file(f))
 
-    # Load grading if present
-    grading = None
+def _read_grading(run_dir: Path) -> dict | None:
+    """Read grading.json from the run or its parent directory."""
     for candidate in [run_dir / "grading.json", run_dir.parent / "grading.json"]:
         if candidate.exists():
-            try:
+            with contextlib.suppress(json.JSONDecodeError, OSError):
                 grading = json.loads(candidate.read_text())
-            except (json.JSONDecodeError, OSError):
-                pass
-            if grading:
-                break
+                if grading:
+                    return grading
+    return None
 
+
+def _collect_outputs(run_dir: Path) -> list[dict]:
+    """Collect and embed all non-metadata outputs from the run."""
+    outputs_dir = run_dir / "outputs"
+    if not outputs_dir.is_dir():
+        return []
+    return [
+        embed_file(f)
+        for f in sorted(outputs_dir.iterdir())
+        if f.is_file() and f.name not in METADATA_FILES
+    ]
+
+
+def build_run(root: Path, run_dir: Path) -> dict | None:
+    """Build a run dict with prompt, outputs, and grading data."""
+    prompt, eval_id = _read_eval_metadata(run_dir)
+    if not prompt:
+        prompt = _read_transcript_prompt(run_dir)
+    if not prompt:
+        prompt = "(No prompt found)"
+    run_id = str(run_dir.relative_to(root)).replace("/", "-").replace("\\", "-")
     return {
         "id": run_id,
         "prompt": prompt,
         "eval_id": eval_id,
-        "outputs": output_files,
-        "grading": grading,
+        "outputs": _collect_outputs(run_dir),
+        "grading": _read_grading(run_dir),
     }
 
 
@@ -336,24 +347,27 @@ def generate_html(
 def _kill_port(port: int) -> None:
     """Kill any process listening on the given port."""
     try:
-        result = subprocess.run(
-            ["lsof", "-ti", f":{port}"],
+        # Fixed argv, no shell: checking local port usage via system lsof.
+        result = subprocess.run(  # noqa: S603
+            ["lsof", "-ti", f":{port}"],  # noqa: S607
             capture_output=True,
             text=True,
+            check=False,
             timeout=5,
         )
         for pid_str in result.stdout.strip().split("\n"):
             if pid_str.strip():
-                try:
+                with contextlib.suppress(ProcessLookupError, ValueError):
                     os.kill(int(pid_str.strip()), signal.SIGTERM)
-                except (ProcessLookupError, ValueError):
-                    pass
         if result.stdout.strip():
             time.sleep(0.5)
     except subprocess.TimeoutExpired:
         pass
     except FileNotFoundError:
-        print("Note: lsof not found, cannot check if port is in use", file=sys.stderr)
+        print(
+            "Note: lsof not found, cannot check if port is in use",
+            file=sys.stderr,
+        )
 
 
 class ReviewHandler(BaseHTTPRequestHandler):
@@ -370,26 +384,26 @@ class ReviewHandler(BaseHTTPRequestHandler):
         feedback_path: Path,
         previous: dict[str, dict],
         benchmark_path: Path | None,
-        *args,
-        **kwargs,
-    ):
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        """Initialize review handler with workspace state."""
         self.workspace = workspace
         self.skill_name = skill_name
         self.feedback_path = feedback_path
         self.previous = previous
         self.benchmark_path = benchmark_path
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
 
     def do_GET(self) -> None:
-        if self.path == "/" or self.path == "/index.html":
+        """Handle GET requests for HTML and feedback data."""
+        if self.path in {"/", "/index.html"}:
             # Regenerate HTML on each request (re-scans workspace for new outputs)
             runs = find_runs(self.workspace)
             benchmark = None
             if self.benchmark_path and self.benchmark_path.exists():
-                try:
+                with contextlib.suppress(json.JSONDecodeError, OSError):
                     benchmark = json.loads(self.benchmark_path.read_text())
-                except (json.JSONDecodeError, OSError):
-                    pass
             html = generate_html(runs, self.skill_name, self.previous, benchmark)
             content = html.encode("utf-8")
             self.send_response(200)
@@ -410,32 +424,98 @@ class ReviewHandler(BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self) -> None:
-        if self.path == "/api/feedback":
-            length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(length)
-            try:
-                data = json.loads(body)
-                if not isinstance(data, dict) or "reviews" not in data:
-                    raise ValueError("Expected JSON object with 'reviews' key")
-                self.feedback_path.write_text(json.dumps(data, indent=2) + "\n")
-                resp = b'{"ok":true}'
-                self.send_response(200)
-            except (json.JSONDecodeError, OSError, ValueError) as e:
-                resp = json.dumps({"error": str(e)}).encode()
-                self.send_response(500)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(resp)))
-            self.end_headers()
-            self.wfile.write(resp)
-        else:
+        """Handle POST feedback updates from the viewer."""
+        if self.path != "/api/feedback":
             self.send_error(404)
+            return
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length)
+        try:
+            data = json.loads(body)
+            if not isinstance(data, dict) or "reviews" not in data:
+                msg = "Expected JSON object with 'reviews' key"
+                raise ValueError(msg)
+            self.feedback_path.write_text(json.dumps(data, indent=2) + "\n")
+            resp = b'{"ok":true}'
+            self.send_response(200)
+        except (json.JSONDecodeError, OSError, ValueError) as e:
+            resp = json.dumps({"error": str(e)}).encode()
+            self.send_response(500)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(resp)))
+        self.end_headers()
+        self.wfile.write(resp)
 
     def log_message(self, format: str, *args: object) -> None:
-        # Suppress request logging to keep terminal clean
-        pass
+        """Suppress request logging to keep terminal clean."""
+
+
+@dataclass(frozen=True, slots=True)
+class ServerConfig:
+    """Configuration for running the review HTTP server."""
+
+    workspace: Path
+    skill_name: str
+    feedback_path: Path
+    previous: dict[str, dict]
+    previous_workspace: Path | None
+    benchmark_path: Path | None
+    port: int
+
+
+def _print_server_banner(url: str, config: ServerConfig) -> None:
+    """Print the startup banner for the review HTTP server."""
+    print("\n  Eval Viewer")
+    print("  ─────────────────────────────────")
+    print(f"  URL:       {url}")
+    print(f"  Workspace: {config.workspace}")
+    print(f"  Feedback:  {config.feedback_path}")
+    if config.previous_workspace:
+        count = len(config.previous)
+        print(f"  Previous:  {config.previous_workspace} ({count} runs)")
+    if config.benchmark_path:
+        print(f"  Benchmark: {config.benchmark_path}")
+    print("\n  Press Ctrl+C to stop.\n")
+
+
+def _serve(config: ServerConfig) -> None:
+    """Start the review HTTP server and open the browser."""
+    _kill_port(config.port)
+    handler = partial(
+        ReviewHandler,
+        config.workspace,
+        config.skill_name,
+        config.feedback_path,
+        config.previous,
+        config.benchmark_path,
+    )
+    try:
+        server = HTTPServer(("127.0.0.1", config.port), handler)
+    except OSError:
+        # Port still in use after kill attempt — find a free one
+        server = HTTPServer(("127.0.0.1", 0), handler)
+        config = ServerConfig(
+            workspace=config.workspace,
+            skill_name=config.skill_name,
+            feedback_path=config.feedback_path,
+            previous=config.previous,
+            previous_workspace=config.previous_workspace,
+            benchmark_path=config.benchmark_path,
+            port=server.server_address[1],
+        )
+
+    url = f"http://localhost:{config.port}"
+    _print_server_banner(url, config)
+    webbrowser.open(url)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nStopped.")
+        server.server_close()
 
 
 def main() -> None:
+    """Generate and serve the review page, or write standalone HTML."""
     parser = argparse.ArgumentParser(description="Generate and serve eval review")
     parser.add_argument("workspace", type=Path, help="Path to workspace directory")
     parser.add_argument(
@@ -456,7 +536,10 @@ def main() -> None:
         "--previous-workspace",
         type=Path,
         default=None,
-        help="Path to previous iteration's workspace (shows old outputs and feedback as context)",
+        help=(
+            "Path to previous iteration's workspace"
+            " (shows old outputs and feedback as context)"
+        ),
     )
     parser.add_argument(
         "--benchmark",
@@ -493,10 +576,8 @@ def main() -> None:
     benchmark_path = args.benchmark.resolve() if args.benchmark else None
     benchmark = None
     if benchmark_path and benchmark_path.exists():
-        try:
+        with contextlib.suppress(json.JSONDecodeError, OSError):
             benchmark = json.loads(benchmark_path.read_text())
-        except (json.JSONDecodeError, OSError):
-            pass
 
     if args.static:
         html = generate_html(runs, skill_name, previous, benchmark)
@@ -504,44 +585,17 @@ def main() -> None:
         args.static.write_text(html)
         print(f"\n  Static viewer written to: {args.static}\n")
         sys.exit(0)
-
-    # Kill any existing process on the target port
-    port = args.port
-    _kill_port(port)
-    handler = partial(
-        ReviewHandler,
-        workspace,
-        skill_name,
-        feedback_path,
-        previous,
-        benchmark_path,
+    _serve(
+        ServerConfig(
+            workspace=workspace,
+            skill_name=skill_name,
+            feedback_path=feedback_path,
+            previous=previous,
+            previous_workspace=args.previous_workspace,
+            benchmark_path=benchmark_path,
+            port=args.port,
+        )
     )
-    try:
-        server = HTTPServer(("127.0.0.1", port), handler)
-    except OSError:
-        # Port still in use after kill attempt — find a free one
-        server = HTTPServer(("127.0.0.1", 0), handler)
-        port = server.server_address[1]
-
-    url = f"http://localhost:{port}"
-    print("\n  Eval Viewer")
-    print("  ─────────────────────────────────")
-    print(f"  URL:       {url}")
-    print(f"  Workspace: {workspace}")
-    print(f"  Feedback:  {feedback_path}")
-    if previous:
-        print(f"  Previous:  {args.previous_workspace} ({len(previous)} runs)")
-    if benchmark_path:
-        print(f"  Benchmark: {benchmark_path}")
-    print("\n  Press Ctrl+C to stop.\n")
-
-    webbrowser.open(url)
-
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nStopped.")
-        server.server_close()
 
 
 if __name__ == "__main__":

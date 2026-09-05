@@ -127,9 +127,8 @@ def validate_skill(skill_path: str | Path) -> tuple[bool, str]:
     """Validate a skill directory, returning (is_valid, message)."""
     skill_md = Path(skill_path) / "SKILL.md"
     loaded, frontmatter = _load_frontmatter(skill_md)
-    if not loaded:
+    if not loaded or not isinstance(frontmatter, dict):
         return False, str(frontmatter)
-
     unexpected = set(frontmatter.keys()) - ALLOWED_PROPERTIES
     if unexpected:
         keys = ", ".join(sorted(unexpected))
@@ -159,9 +158,9 @@ def validate_skill(skill_path: str | Path) -> tuple[bool, str]:
 
 if __name__ == "__main__":
     if len(sys.argv) != EXPECTED_ARG_COUNT:
-        print("Usage: uv run --script scripts/cli.py quick-validate <skill_directory>")  # noqa: T201
+        print("Usage: uv run --script scripts/cli.py quick-validate <skill_directory>")
         sys.exit(1)
 
     valid, message = validate_skill(sys.argv[1])
-    print(message)  # noqa: T201
+    print(message)
     sys.exit(0 if valid else 1)

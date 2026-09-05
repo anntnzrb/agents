@@ -1,4 +1,5 @@
 #!/usr/bin/env -S uv run --script
+# Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
 """Aggregate individual run results into benchmark summary statistics.
 
 Reads grading.json files from run directories and produces:
@@ -38,8 +39,9 @@ import argparse
 import json
 import math
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Final
 
 
 def calculate_stats(values: list[float]) -> dict:
@@ -64,39 +66,106 @@ def calculate_stats(values: list[float]) -> dict:
     }
 
 
+def _resolve_search_dir(benchmark_dir: Path) -> Path | None:
+    """Find the directory holding eval-N/ runs, supporting both layouts."""
+    runs_dir = benchmark_dir / "runs"
+    if runs_dir.exists():
+        return runs_dir
+    if list(benchmark_dir.glob("eval-*")):
+        return benchmark_dir
+    print(
+        f"No eval directories found in {benchmark_dir} or {benchmark_dir / 'runs'}",
+    )
+    return None
+
+
+def _read_eval_id(eval_dir: Path, eval_idx: int) -> object:
+    """Read the eval id from metadata, falling back to name or index."""
+    metadata_path = eval_dir / "eval_metadata.json"
+    if metadata_path.exists():
+        try:
+            with metadata_path.open() as mf:
+                return json.load(mf).get("eval_id", eval_idx)
+        except (json.JSONDecodeError, OSError):
+            return eval_idx
+    try:
+        return int(eval_dir.name.split("-")[1])
+    except ValueError:
+        return eval_idx
+
+
+def _read_run(run_dir: Path, eval_id: object) -> dict | None:
+    """Read one run directory; None when grading data is missing/invalid."""
+    run_number = int(run_dir.name.split("-")[1])
+    grading_file = run_dir / "grading.json"
+    if not grading_file.exists():
+        print(f"Warning: grading.json not found in {run_dir}")
+        return None
+    try:
+        with grading_file.open() as f:
+            grading = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"Warning: Invalid JSON in {grading_file}: {e}")
+        return None
+    result = {
+        "eval_id": eval_id,
+        "run_number": run_number,
+        "pass_rate": grading.get("summary", {}).get("pass_rate", 0.0),
+        "passed": grading.get("summary", {}).get("passed", 0),
+        "failed": grading.get("summary", {}).get("failed", 0),
+        "total": grading.get("summary", {}).get("total", 0),
+    }
+    # Extract timing — check grading.json first, then sibling timing.json
+    timing = grading.get("timing", {})
+    result["time_seconds"] = timing.get("total_duration_seconds", 0.0)
+    timing_file = run_dir / "timing.json"
+    if result["time_seconds"] == 0.0 and timing_file.exists():
+        try:
+            with timing_file.open() as tf:
+                timing_data = json.load(tf)
+            result["time_seconds"] = timing_data.get("total_duration_seconds", 0.0)
+            result["tokens"] = timing_data.get("total_tokens", 0)
+        except json.JSONDecodeError:
+            pass
+    # Extract metrics if available
+    metrics = grading.get("execution_metrics", {})
+    result["tool_calls"] = metrics.get("total_tool_calls", 0)
+    if not result.get("tokens"):
+        result["tokens"] = metrics.get("output_chars", 0)
+    result["errors"] = metrics.get("errors_encountered", 0)
+    # Extract expectations — viewer requires fields: text, passed, evidence
+    raw_expectations = grading.get("expectations", [])
+    for exp in raw_expectations:
+        if "text" not in exp or "passed" not in exp:
+            print(
+                f"Warning: expectation in {grading_file} missing"
+                f" required fields (text, passed, evidence): {exp}",
+            )
+    result["expectations"] = raw_expectations
+    # Extract notes from user_notes_summary
+    notes_summary = grading.get("user_notes_summary", {})
+    notes = []
+    notes.extend(notes_summary.get("uncertainties", []))
+    notes.extend(notes_summary.get("needs_review", []))
+    notes.extend(notes_summary.get("workarounds", []))
+    result["notes"] = notes
+    return result
+
+
 def load_run_results(benchmark_dir: Path) -> dict:
     """Load all run results from a benchmark directory.
 
     Returns dict keyed by config name (e.g. "with_skill"/"without_skill",
     or "new_skill"/"old_skill"), each containing a list of run results.
     """
-    # Support both layouts: eval dirs directly under benchmark_dir, or under runs/
-    runs_dir = benchmark_dir / "runs"
-    if runs_dir.exists():
-        search_dir = runs_dir
-    elif list(benchmark_dir.glob("eval-*")):
-        search_dir = benchmark_dir
-    else:
-        print(
-            f"No eval directories found in {benchmark_dir} or {benchmark_dir / 'runs'}",
-        )
+    search_dir = _resolve_search_dir(benchmark_dir)
+    if search_dir is None:
         return {}
 
     results: dict[str, list] = {}
 
     for eval_idx, eval_dir in enumerate(sorted(search_dir.glob("eval-*"))):
-        metadata_path = eval_dir / "eval_metadata.json"
-        if metadata_path.exists():
-            try:
-                with open(metadata_path) as mf:
-                    eval_id = json.load(mf).get("eval_id", eval_idx)
-            except (json.JSONDecodeError, OSError):
-                eval_id = eval_idx
-        else:
-            try:
-                eval_id = int(eval_dir.name.split("-")[1])
-            except ValueError:
-                eval_id = eval_idx
+        eval_id = _read_eval_id(eval_dir, eval_idx)
 
         # Discover config directories dynamically rather than hardcoding names
         for config_dir in sorted(eval_dir.iterdir()):
@@ -110,73 +179,26 @@ def load_run_results(benchmark_dir: Path) -> dict:
                 results[config] = []
 
             for run_dir in sorted(config_dir.glob("run-*")):
-                run_number = int(run_dir.name.split("-")[1])
-                grading_file = run_dir / "grading.json"
-
-                if not grading_file.exists():
-                    print(f"Warning: grading.json not found in {run_dir}")
-                    continue
-
-                try:
-                    with open(grading_file) as f:
-                        grading = json.load(f)
-                except json.JSONDecodeError as e:
-                    print(f"Warning: Invalid JSON in {grading_file}: {e}")
-                    continue
-
-                # Extract metrics
-                result = {
-                    "eval_id": eval_id,
-                    "run_number": run_number,
-                    "pass_rate": grading.get("summary", {}).get("pass_rate", 0.0),
-                    "passed": grading.get("summary", {}).get("passed", 0),
-                    "failed": grading.get("summary", {}).get("failed", 0),
-                    "total": grading.get("summary", {}).get("total", 0),
-                }
-
-                # Extract timing — check grading.json first, then sibling timing.json
-                timing = grading.get("timing", {})
-                result["time_seconds"] = timing.get("total_duration_seconds", 0.0)
-                timing_file = run_dir / "timing.json"
-                if result["time_seconds"] == 0.0 and timing_file.exists():
-                    try:
-                        with open(timing_file) as tf:
-                            timing_data = json.load(tf)
-                        result["time_seconds"] = timing_data.get(
-                            "total_duration_seconds",
-                            0.0,
-                        )
-                        result["tokens"] = timing_data.get("total_tokens", 0)
-                    except json.JSONDecodeError:
-                        pass
-
-                # Extract metrics if available
-                metrics = grading.get("execution_metrics", {})
-                result["tool_calls"] = metrics.get("total_tool_calls", 0)
-                if not result.get("tokens"):
-                    result["tokens"] = metrics.get("output_chars", 0)
-                result["errors"] = metrics.get("errors_encountered", 0)
-
-                # Extract expectations — viewer requires fields: text, passed, evidence
-                raw_expectations = grading.get("expectations", [])
-                for exp in raw_expectations:
-                    if "text" not in exp or "passed" not in exp:
-                        print(
-                            f"Warning: expectation in {grading_file} missing required fields (text, passed, evidence): {exp}",
-                        )
-                result["expectations"] = raw_expectations
-
-                # Extract notes from user_notes_summary
-                notes_summary = grading.get("user_notes_summary", {})
-                notes = []
-                notes.extend(notes_summary.get("uncertainties", []))
-                notes.extend(notes_summary.get("needs_review", []))
-                notes.extend(notes_summary.get("workarounds", []))
-                result["notes"] = notes
-
-                results[config].append(result)
+                result = _read_run(run_dir, eval_id)
+                if result is not None:
+                    results[config].append(result)
 
     return results
+
+
+_MIN_DELTA_CONFIGS: Final[int] = 2
+
+
+def _mean_diff(primary: dict, baseline: dict, metric: str) -> float:
+    """Return the difference of mean metric values between two summaries."""
+    primary_mean = primary.get(metric, {}).get("mean", 0)
+    baseline_mean = baseline.get(metric, {}).get("mean", 0)
+    return primary_mean - baseline_mean
+
+
+def _pct_range(mean: float, stddev: float) -> str:
+    """Format a mean ± stddev cell as whole-percent values."""
+    return f"{mean * 100:.0f}% ± {stddev * 100:.0f}%"
 
 
 def aggregate_results(results: dict) -> dict:
@@ -209,25 +231,16 @@ def aggregate_results(results: dict) -> dict:
         }
 
     # Calculate delta between the first two configs (if two exist)
-    if len(configs) >= 2:
+    if len(configs) >= _MIN_DELTA_CONFIGS:
         primary = run_summary.get(configs[0], {})
         baseline = run_summary.get(configs[1], {})
     else:
         primary = run_summary.get(configs[0], {}) if configs else {}
         baseline = {}
 
-    delta_pass_rate = primary.get("pass_rate", {}).get("mean", 0) - baseline.get(
-        "pass_rate",
-        {},
-    ).get("mean", 0)
-    delta_time = primary.get("time_seconds", {}).get("mean", 0) - baseline.get(
-        "time_seconds",
-        {},
-    ).get("mean", 0)
-    delta_tokens = primary.get("tokens", {}).get("mean", 0) - baseline.get(
-        "tokens",
-        {},
-    ).get("mean", 0)
+    delta_pass_rate = _mean_diff(primary, baseline, "pass_rate")
+    delta_time = _mean_diff(primary, baseline, "time_seconds")
+    delta_tokens = _mean_diff(primary, baseline, "tokens")
 
     run_summary["delta"] = {
         "pass_rate": f"{delta_pass_rate:+.2f}",
@@ -272,15 +285,15 @@ def generate_benchmark(
             )
 
     # Determine eval IDs from results
-    eval_ids = sorted(set(r["eval_id"] for config in results.values() for r in config))
+    eval_ids = sorted({r["eval_id"] for config in results.values() for r in config})
 
-    benchmark = {
+    return {
         "metadata": {
             "skill_name": skill_name or "<skill-name>",
             "skill_path": skill_path or "<path/to/skill>",
             "executor_model": "<model-name>",
             "analyzer_model": "<model-name>",
-            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "evals_run": eval_ids,
             "runs_per_configuration": 3,
         },
@@ -288,8 +301,6 @@ def generate_benchmark(
         "run_summary": run_summary,
         "notes": [],  # To be filled by analyzer
     }
-
-    return benchmark
 
 
 def generate_markdown(benchmark: dict) -> str:
@@ -299,17 +310,19 @@ def generate_markdown(benchmark: dict) -> str:
 
     # Determine config names (excluding "delta")
     configs = [k for k in run_summary if k != "delta"]
-    config_a = configs[0] if len(configs) >= 1 else "config_a"
-    config_b = configs[1] if len(configs) >= 2 else "config_b"
+    config_a = configs[0] if configs else "config_a"
+    config_b = configs[1] if len(configs) >= _MIN_DELTA_CONFIGS else "config_b"
     label_a = config_a.replace("_", " ").title()
     label_b = config_b.replace("_", " ").title()
 
     lines = [
         f"# Skill Benchmark: {metadata['skill_name']}",
-        "",
         f"**Model**: {metadata['executor_model']}",
         f"**Date**: {metadata['timestamp']}",
-        f"**Evals**: {', '.join(map(str, metadata['evals_run']))} ({metadata['runs_per_configuration']} runs each per configuration)",
+        (
+            f"**Evals**: {', '.join(map(str, metadata['evals_run']))}"
+            f" ({metadata['runs_per_configuration']} runs each per configuration)"
+        ),
         "",
         "## Summary",
         "",
@@ -324,23 +337,25 @@ def generate_markdown(benchmark: dict) -> str:
     # Format pass rate
     a_pr = a_summary.get("pass_rate", {})
     b_pr = b_summary.get("pass_rate", {})
-    lines.append(
-        f"| Pass Rate | {a_pr.get('mean', 0) * 100:.0f}% ± {a_pr.get('stddev', 0) * 100:.0f}% | {b_pr.get('mean', 0) * 100:.0f}% ± {b_pr.get('stddev', 0) * 100:.0f}% | {delta.get('pass_rate', '—')} |",
-    )
+    a_rate = _pct_range(a_pr.get("mean", 0), a_pr.get("stddev", 0))
+    b_rate = _pct_range(b_pr.get("mean", 0), b_pr.get("stddev", 0))
+    pass_delta = delta.get("pass_rate", "—")
+    lines.append(f"| Pass Rate | {a_rate} | {b_rate} | {pass_delta} |")
 
     # Format time
     a_time = a_summary.get("time_seconds", {})
     b_time = b_summary.get("time_seconds", {})
-    lines.append(
-        f"| Time | {a_time.get('mean', 0):.1f}s ± {a_time.get('stddev', 0):.1f}s | {b_time.get('mean', 0):.1f}s ± {b_time.get('stddev', 0):.1f}s | {delta.get('time_seconds', '—')}s |",
-    )
+    a_dur = f"{a_time.get('mean', 0):.1f}s ± {a_time.get('stddev', 0):.1f}s"
+    b_dur = f"{b_time.get('mean', 0):.1f}s ± {b_time.get('stddev', 0):.1f}s"
+    time_delta = delta.get("time_seconds", "—")
+    lines.append(f"| Time | {a_dur} | {b_dur} | {time_delta}s |")
 
     # Format tokens
     a_tokens = a_summary.get("tokens", {})
     b_tokens = b_summary.get("tokens", {})
-    lines.append(
-        f"| Tokens | {a_tokens.get('mean', 0):.0f} ± {a_tokens.get('stddev', 0):.0f} | {b_tokens.get('mean', 0):.0f} ± {b_tokens.get('stddev', 0):.0f} | {delta.get('tokens', '—')} |",
-    )
+    a_tok = f"{a_tokens.get('mean', 0):.0f} ± {a_tokens.get('stddev', 0):.0f}"
+    b_tok = f"{b_tokens.get('mean', 0):.0f} ± {b_tokens.get('stddev', 0):.0f}"
+    lines.append(f"| Tokens | {a_tok} | {b_tok} | {delta.get('tokens', '—')} |")
 
     # Notes section
     if benchmark.get("notes"):
@@ -351,7 +366,8 @@ def generate_markdown(benchmark: dict) -> str:
     return "\n".join(lines)
 
 
-def main():
+def main() -> None:
+    """Aggregate benchmark run results from command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Aggregate benchmark run results into summary statistics",
     )
@@ -374,7 +390,9 @@ def main():
         "--output",
         "-o",
         type=Path,
-        help="Output path for benchmark.json (default: <benchmark_dir>/benchmark.json)",
+        help=(
+            "Output path for benchmark.json (default: <benchmark_dir>/benchmark.json)"
+        ),
     )
 
     args = parser.parse_args()
@@ -391,13 +409,13 @@ def main():
     output_md = output_json.with_suffix(".md")
 
     # Write benchmark.json
-    with open(output_json, "w") as f:
+    with output_json.open("w") as f:
         json.dump(benchmark, f, indent=2)
     print(f"Generated: {output_json}")
 
     # Write benchmark.md
     markdown = generate_markdown(benchmark)
-    with open(output_md, "w") as f:
+    with output_md.open("w") as f:
         f.write(markdown)
     print(f"Generated: {output_md}")
 
