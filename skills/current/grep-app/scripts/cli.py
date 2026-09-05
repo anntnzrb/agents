@@ -3,6 +3,8 @@
 # dependencies = []
 # ///
 
+"""Search public code via the grep.app API."""
+
 from __future__ import annotations
 
 import os
@@ -10,11 +12,14 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import urllib.response
+from typing import cast
 
 USAGE = "usage: grep-app <search|regex> ..."
 
 
 def pairs(items: list[str]) -> list[tuple[str, str]]:
+    """Split key=value arguments into pairs."""
     out: list[tuple[str, str]] = []
     for item in items:
         if "=" in item:
@@ -26,14 +31,15 @@ def pairs(items: list[str]) -> list[tuple[str, str]]:
 
 
 def request_get(base_url: str, params: list[tuple[str, str]]) -> int:
+    """GET a URL with encoded params and stream the body to stdout."""
     url = base_url
     if params:
         url = f"{url}?{urllib.parse.urlencode(params)}"
     req = urllib.request.Request(url)
     try:
-        with urllib.request.urlopen(req, timeout=60) as response:
-            sys.stdout.buffer.write(response.read())
-        return 0
+        opened = cast("object", urllib.request.urlopen(req, timeout=60))
+        with cast("urllib.response.addinfourl", opened) as response:
+            _ = sys.stdout.buffer.write(response.read())
     except urllib.error.HTTPError as exc:
         text = exc.read().decode("utf-8", errors="replace") or f"HTTP {exc.code}"
         print(text, file=sys.stderr)
@@ -41,9 +47,12 @@ def request_get(base_url: str, params: list[tuple[str, str]]) -> int:
     except urllib.error.URLError as exc:
         print(f"Grep.app network error: {exc.reason}", file=sys.stderr)
         return 1
+    else:
+        return 0
 
 
 def main(argv: list[str]) -> int:
+    """Route grep-app search and regex commands."""
     if argv and argv[0] in {"-h", "--help"}:
         print(USAGE)
         return 0
