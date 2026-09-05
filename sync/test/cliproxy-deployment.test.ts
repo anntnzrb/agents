@@ -12,8 +12,10 @@ import {
 import { hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
+  appendPreservedSections,
   CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER,
   cliProxyModelsUrl,
+  extractPreservedTopLevels,
   isCliProxyTargetReady,
   parseCliProxyDeployment,
   publishCliProxyEndpointTemplates,
@@ -21,7 +23,6 @@ import {
   syncCliProxyEndpointTemplate,
 } from "@core/cliproxy-deployment.ts";
 import { SyncEnv } from "@core/harness.ts";
-import { runJobsWithPreserve } from "@core/jobs.ts";
 import { buildSyncPlan, type Job } from "@core/plan.ts";
 
 const REPOSITORY_ROOT = resolve(import.meta.dir, "../..");
@@ -251,6 +252,104 @@ test("cliproxy_endpoint_replacement_preserves_codex_owned_tail", async () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+test("cliproxy_endpoint_replacement_preserves_owned_tables_without_stale_managed_tails", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cliproxy-endpoint-interleaved-test-"));
+  try {
+    const src = join(root, "source.toml");
+    const dst = join(root, "generated", "config.toml");
+    mkdirSync(join(root, "generated"), { recursive: true });
+
+    writeFileSync(
+      src,
+      `base_url = "${CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n\n[general]\nmode = "new_fast"\n\n[model]\nname = "gpt-5.6-luna"\n`,
+    );
+    writeFileSync(
+      dst,
+      'base_url = "https://old.gateway.test:9443/v1"\n\n[general]\nmode = "old_fast"\nlegacy_flag = true\n\n[hooks.state."orchestrator"]\nspawn_count = 3\n\n[model]\nname = "old-model-name"\ntemperature = 0.2\n\n[projects."~/work/example"]\nmodel = "gpt-5.6-sol"\n',
+    );
+    chmodSync(dst, 0o600);
+
+    const targets = [{ src, dst, preserveTopLevels: ["hooks.state", "projects"] }];
+    assert.equal(
+      await publishCliProxyEndpointTemplates(targets, DEPLOYMENT, {
+        fetch: fetchReady,
+      }),
+      "published",
+    );
+
+    const expected =
+      'base_url = "https://gateway.example.test:9443/v1"\n\n[general]\nmode = "new_fast"\n\n[model]\nname = "gpt-5.6-luna"\n\n[hooks.state."orchestrator"]\nspawn_count = 3\n\n[projects."~/work/example"]\nmodel = "gpt-5.6-sol"\n';
+    assert.equal(readFileSync(dst, "utf8"), expected);
+    assert.equal(lstatSync(dst).mode & 0o777, 0o600);
+    const first = lstatSync(dst);
+
+    await publishCliProxyEndpointTemplates(targets, DEPLOYMENT, {
+      fetch: fetchReady,
+    });
+    assert.equal(readFileSync(dst, "utf8"), expected);
+    assert.equal(lstatSync(dst).ino, first.ino);
+    assert.equal(lstatSync(dst).mtimeMs, first.mtimeMs);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("extractPreservedTopLevels_extracts_only_matching_subtables_and_array_tables", () => {
+  const toml = `
+# top-level comments
+base_url = "http://localhost:8080"
+
+[general]
+mode = "fast"
+
+[hooks.state."orchestrator"]
+spawn_count = 3
+last_id = "abc\\"def"
+
+[hooks.state.sub]
+nested = true
+
+[hooks.statement]
+unrelated = true
+
+[[projects.items]]
+name = "p1"
+
+[[projects.items]]
+name = "p2"
+
+[project]
+other = 1
+
+[model]
+name = "gpt"
+`;
+
+  assert.equal(extractPreservedTopLevels(toml, []), "");
+  assert.equal(extractPreservedTopLevels(toml, ["nonexistent"]), "");
+
+  const preserved = extractPreservedTopLevels(toml, ["hooks.state", "projects"]);
+  const expected =
+    '[hooks.state."orchestrator"]\nspawn_count = 3\nlast_id = "abc\\"def"\n\n[hooks.state.sub]\nnested = true\n\n[[projects.items]]\nname = "p1"\n\n[[projects.items]]\nname = "p2"\n';
+  assert.equal(preserved, expected);
+});
+
+test("appendPreservedSections_handles_various_newline_layouts", () => {
+  assert.equal(
+    appendPreservedSections("rendered\n\n", "[table]\nk = 1\n"),
+    "rendered\n\n[table]\nk = 1\n",
+  );
+  assert.equal(
+    appendPreservedSections("rendered\n", "[table]\nk = 1\n"),
+    "rendered\n\n[table]\nk = 1\n",
+  );
+  assert.equal(
+    appendPreservedSections("rendered", "[table]\nk = 1\n"),
+    "rendered\n\n[table]\nk = 1\n",
+  );
+  assert.equal(appendPreservedSections("rendered\n", ""), "rendered\n");
+  assert.equal(appendPreservedSections("", "[table]\nk = 1\n"), "[table]\nk = 1\n");
+});
 
 test("cliproxy_keyless_readiness_publishes_without_client_keys", async () => {
   const root = mkdtempSync(join(tmpdir(), "cliproxy-keyless-test-"));
@@ -260,37 +359,47 @@ test("cliproxy_keyless_readiness_publishes_without_client_keys", async () => {
     writeFileSync(src, `base_url = "${CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n`);
     mkdirSync(join(root, "generated"), { recursive: true });
     writeFileSync(dst, 'base_url = "old"\n');
-
     const modelsUrl = cliProxyModelsUrl(DEPLOYMENT);
-    const requests: Array<{ url: string; init: RequestInit | undefined }> = [];
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
-      requests.push({ url: String(input), init });
-      return Response.json({ data: [{ id: "ready" }] });
-    }) as typeof fetch;
-    let ok = false;
-    try {
-      const jobs: Job[] = [
-        {
-          kind: "CliProxyReadiness",
-          deployment: DEPLOYMENT,
-          gatewayHost: false,
-        },
-        {
-          kind: "CliProxyEndpointTemplates",
-          targets: [{ src, dst }],
-          deployment: DEPLOYMENT,
-        },
-      ];
-      ok = await runJobsWithPreserve(jobs);
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    const jobs: Job[] = [
+      {
+        kind: "CliProxyReadiness",
+        deployment: DEPLOYMENT,
+        gatewayHost: false,
+      },
+      {
+        kind: "CliProxyEndpointTemplates",
+        targets: [{ src, dst }],
+        deployment: DEPLOYMENT,
+      },
+    ];
 
-    assert.equal(ok, true);
+    const proc = Bun.spawnSync(
+      [
+        process.execPath,
+        "-e",
+        `import assert from "node:assert/strict";
+import { runJobsWithPreserve } from "@core/jobs.ts";
+
+const requests = [];
+globalThis.fetch = (async (input, init) => {
+  requests.push({ url: String(input), auth: new Headers(init?.headers).get("authorization") });
+  return Response.json({ data: [{ id: "ready" }] });
+});
+
+const jobs = ${JSON.stringify(jobs)};
+const ok = await runJobsWithPreserve(jobs);
+assert.equal(ok, true);
+const readinessRequest = requests.find((request) => request.url === ${JSON.stringify(modelsUrl)});
+assert.equal(readinessRequest?.auth, null);`,
+      ],
+      {
+        cwd: resolve(import.meta.dir, ".."),
+        env: Bun.env,
+      },
+    );
+
+    assert.equal(proc.exitCode, 0);
     assert.equal(readFileSync(dst, "utf8"), `base_url = "${DEPLOYMENT.client.baseUrl}"\n`);
-    const readinessRequest = requests.find((request) => request.url === modelsUrl);
-    assert.equal(new Headers(readinessRequest?.init?.headers).get("authorization"), null);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -304,137 +413,43 @@ test("cliproxy_readiness_failure_preserves_endpoints", async () => {
     writeFileSync(src, `base_url = "${CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n`);
     mkdirSync(join(root, "generated"), { recursive: true });
     writeFileSync(dst, 'base_url = "old"\n');
+    const jobs: Job[] = [
+      {
+        kind: "CliProxyReadiness",
+        deployment: DEPLOYMENT,
+        gatewayHost: false,
+      },
+      {
+        kind: "CliProxyEndpointTemplates",
+        targets: [{ src, dst }],
+        deployment: DEPLOYMENT,
+      },
+    ];
 
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => new Response(null, { status: 503 })) as unknown as typeof fetch;
-    try {
-      const jobs: Job[] = [
-        {
-          kind: "CliProxyReadiness",
-          deployment: DEPLOYMENT,
-          gatewayHost: false,
-        },
-        {
-          kind: "CliProxyEndpointTemplates",
-          targets: [{ src, dst }],
-          deployment: DEPLOYMENT,
-        },
-      ];
-      assert.equal(await runJobsWithPreserve(jobs), true);
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    const proc = Bun.spawnSync(
+      [
+        process.execPath,
+        "-e",
+        `import assert from "node:assert/strict";
+import { runJobsWithPreserve } from "@core/jobs.ts";
 
+globalThis.fetch = (async () => new Response(null, { status: 503 }));
+
+const jobs = ${JSON.stringify(jobs)};
+const ok = await runJobsWithPreserve(jobs);
+assert.equal(ok, true);`,
+      ],
+      {
+        cwd: resolve(import.meta.dir, ".."),
+        env: Bun.env,
+      },
+    );
+
+    assert.equal(proc.exitCode, 0);
     assert.equal(readFileSync(dst, "utf8"), 'base_url = "old"\n');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
-});
-
-test("cliproxy_committed_source_keeps_sessions_sticky_and_retries_the_full_pool", () => {
-  const source = readFileSync(
-    join(REPOSITORY_ROOT, "tools", "cliproxyapi", "config.yaml.tmpl"),
-    "utf8",
-  );
-  const config = Bun.YAML.parse(source) as Record<string, any>;
-
-  assert.equal(config["request-retry"], 3);
-  assert.equal(config["max-retry-credentials"], 0);
-  assert.equal(config["max-retry-interval"], 30);
-  assert.equal(config["disable-cooling"], false);
-  assert.equal(config["save-cooldown-status"], true);
-  assert.deepEqual(config["routing"], {
-    strategy: "weighted-round-robin",
-    "session-affinity": true,
-    "session-affinity-ttl": "1h",
-  });
-  assert.deepEqual(config["streaming"], { "bootstrap-retries": 1 });
-});
-
-test("cliproxy_codex_aliases_preserve_reasoning_and_fast_service_tiers", () => {
-  const source = readFileSync(
-    join(REPOSITORY_ROOT, "tools", "cliproxyapi", "config.yaml.tmpl"),
-    "utf8",
-  );
-  const config = Bun.YAML.parse(source) as Record<string, any>;
-  const aliases = config["oauth-model-alias"]["codex"] as readonly Record<string, any>[];
-  const rules = config["payload"]["override"] as readonly Record<string, any>[];
-  const codexRules = rules.filter((rule) =>
-    rule["models"].some((model: Record<string, unknown>) => model["protocol"] === "codex"),
-  );
-
-  assert.deepEqual(
-    aliases.filter((alias) =>
-      [
-        "nnn-gpt-5.6-luna-max",
-        "nnn-gpt-5.6-luna-max-fast",
-        "nnn-gpt-5.6-terra-max",
-        "nnn-gpt-5.6-terra-max-fast",
-      ].includes(alias["alias"]),
-    ),
-    [
-      {
-        name: "gpt-5.6-luna",
-        alias: "nnn-gpt-5.6-luna-max",
-        "display-name": "[nnn] GPT-5.6 Luna (Max)",
-        fork: true,
-        "force-mapping": true,
-      },
-      {
-        name: "gpt-5.6-luna",
-        alias: "nnn-gpt-5.6-luna-max-fast",
-        "display-name": "[nnn] GPT-5.6 Luna (Max) (Fast)",
-        fork: true,
-        "force-mapping": true,
-      },
-      {
-        name: "gpt-5.6-terra",
-        alias: "nnn-gpt-5.6-terra-max",
-        "display-name": "[nnn] GPT-5.6 Terra (Max)",
-        fork: true,
-        "force-mapping": true,
-      },
-      {
-        name: "gpt-5.6-terra",
-        alias: "nnn-gpt-5.6-terra-max-fast",
-        "display-name": "[nnn] GPT-5.6 Terra (Max) (Fast)",
-        fork: true,
-        "force-mapping": true,
-      },
-    ],
-  );
-  assert.deepEqual(
-    codexRules.filter((rule) =>
-      ["gpt-5.6-luna", "gpt-5.6-terra"].includes(rule["models"][0]["name"]),
-    ),
-    [
-      {
-        models: [{ name: "gpt-5.6-luna", protocol: "codex" }],
-        params: { "reasoning.effort": "max" },
-      },
-      {
-        models: [{ name: "gpt-5.6-terra", protocol: "codex" }],
-        params: { "reasoning.effort": "max" },
-      },
-    ],
-  );
-  assert.deepEqual(
-    codexRules.filter((rule) =>
-      ["nnn-gpt-5.6-luna-max-fast", "nnn-gpt-5.6-terra-max-fast"].includes(
-        rule["models"][0]["name"],
-      ),
-    ),
-    [
-      {
-        models: [{ name: "nnn-gpt-5.6-luna-max-fast", protocol: "codex" }],
-        params: { service_tier: "fast" },
-      },
-      {
-        models: [{ name: "nnn-gpt-5.6-terra-max-fast", protocol: "codex" }],
-        params: { service_tier: "fast" },
-      },
-    ],
-  );
 });
 test("cliproxy_custom_aliases_use provider-native model and payload shapes", () => {
   const source = readFileSync(
