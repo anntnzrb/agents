@@ -19,14 +19,18 @@ import { buildSyncPlan } from "@core/plan.ts";
 
 const makeHome = (options: { gatewayHost?: boolean } = {}): string => {
   const home = mkdtempSync(join(tmpdir(), "runtime-install-test-"));
-  const tools = join(home, ".config", "agents", "tools", "cliproxyapi");
-  mkdirSync(tools, { recursive: true });
+  const tools = join(home, ".config", "agents", "tools");
+  mkdirSync(join(tools, "cliproxyapi"), { recursive: true });
+  mkdirSync(join(tools, "mcporter"), { recursive: true });
+  mkdirSync(join(tools, "summarize"), { recursive: true });
   const deployment = {
     server: { hostname: options.gatewayHost === false ? "test-gateway" : hostname() },
     listen: { host: "127.0.0.1", port: 9443 },
     client: { baseUrl: "http://127.0.0.1:9443/v1" },
   };
-  writeFileSync(join(tools, "deployment.json"), `${JSON.stringify(deployment)}\n`);
+  writeFileSync(join(tools, "cliproxyapi", "deployment.json"), `${JSON.stringify(deployment)}\n`);
+  writeFileSync(join(tools, "mcporter", "mcporter.jsonc"), "{}\n");
+  writeFileSync(join(tools, "summarize", "config.json"), "{}\n");
   return home;
 };
 const seedSourceRoot = (home: string, cliContent = 'console.log("ok");\n'): string => {
