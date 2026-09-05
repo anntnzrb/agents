@@ -1,5 +1,4 @@
 # Copyright (c) 2026
-# ruff: noqa: PLR2004, S101, S603
 """Executable contracts for the multi-harness session finder."""
 
 from __future__ import annotations
@@ -11,7 +10,7 @@ import os
 import sqlite3
 import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, cast
 
 import zstandard
 
@@ -45,7 +44,7 @@ def _jsonl(rows: Iterable[Mapping[str, object]]) -> bytes:
 def write_jsonl(path: Path, rows: Iterable[Mapping[str, object]]) -> Path:
     """Write deterministic JSONL fixture rows."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(_jsonl(rows))
+    _ = path.write_bytes(_jsonl(rows))
     return path.resolve()
 
 
@@ -56,14 +55,14 @@ def write_gzip(path: Path, rows: Iterable[Mapping[str, object]]) -> Path:
         path.open("wb") as stream,
         gzip.GzipFile(filename="", mode="wb", fileobj=stream, mtime=0) as compressed,
     ):
-        compressed.write(_jsonl(rows))
+        _ = compressed.write(_jsonl(rows))
     return path.resolve()
 
 
 def write_zstd(path: Path, rows: Iterable[Mapping[str, object]]) -> Path:
     """Write a deterministic zstd JSONL fixture."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(zstandard.ZstdCompressor().compress(_jsonl(rows)))
+    _ = path.write_bytes(zstandard.ZstdCompressor().compress(_jsonl(rows)))
     return path.resolve()
 
 
@@ -89,8 +88,8 @@ def clean_env(tmp_path: Path) -> dict[str, str]:
             "UV_QUIET": "1",
         }
     )
-    env.pop("PI_CODING_AGENT_SESSION_DIR", None)
-    env.pop("OPENCODE_DB", None)
+    _ = env.pop("PI_CODING_AGENT_SESSION_DIR", None)
+    _ = env.pop("OPENCODE_DB", None)
     return env
 
 
@@ -120,15 +119,17 @@ def records(result: subprocess.CompletedProcess[str]) -> list[dict[str, object]]
     assert result.stderr == ""
     assert result.stdout.endswith("\n")
     assert "\n" not in result.stdout[:-1]
-    value: object = json.loads(result.stdout)
+    value = cast("object", json.loads(result.stdout))
     assert isinstance(value, list)
+    items = cast("list[object]", value)
     assert all(
-        isinstance(item, dict) and all(isinstance(key, str) for key in item)
-        for item in value
+        isinstance(item, dict)
+        and all(isinstance(key, str) for key in cast("dict[object, object]", item))
+        for item in items
     )
     return [
-        {str(key): item for key, item in record.items()}
-        for record in value
+        {str(key): item for key, item in cast("dict[object, object]", record).items()}
+        for record in items
         if isinstance(record, dict)
     ]
 
@@ -151,9 +152,10 @@ def assert_record_shape(record: Mapping[str, object]) -> None:
     assert isinstance(record["archived"], bool)
     assert isinstance(record["score"], int)
     argv = record["resume_argv"]
-    assert argv is None or (
-        isinstance(argv, list) and all(isinstance(item, str) for item in argv)
-    )
+    assert argv is None or isinstance(argv, list)
+    if argv is not None:
+        strings = cast("list[object]", argv)
+        assert all(isinstance(item, str) for item in strings)
 
 
 def omp_rows(
@@ -260,7 +262,7 @@ def create_t3(path: Path) -> sqlite3.Connection:
     """Create the exact required T3 projection schema."""
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path)
-    connection.executescript(
+    _ = connection.executescript(
         """
         CREATE TABLE projection_projects (
           project_id TEXT PRIMARY KEY,
@@ -292,7 +294,7 @@ def create_opencode(path: Path) -> sqlite3.Connection:
     """Create current and legacy OpenCode transcript schemas."""
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path)
-    connection.executescript(
+    _ = connection.executescript(
         """
         CREATE TABLE session (
           id TEXT PRIMARY KEY,
@@ -346,18 +348,18 @@ def test_all_harnesses_exact_contract_timestamps_and_argv(tmp_path: Path) -> Non
         codex_rows("codex-id", user="codex needle"),
     )
     set_mtime(codex, 1_767_398_400)
-    write_jsonl(
+    _ = write_jsonl(
         codex_home / "session_index.jsonl",
         [{"id": "codex-id", "thread_name": "Codex needle"}],
     )
 
     t3 = tmp_path / "t3.sqlite"
     with create_t3(t3) as connection:
-        connection.execute(
+        _ = connection.execute(
             "INSERT INTO projection_projects VALUES (?, ?)",
             ("project", "/workspace/t3"),
         )
-        connection.execute(
+        _ = connection.execute(
             "INSERT INTO projection_threads VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 "t3-id",
@@ -370,14 +372,15 @@ def test_all_harnesses_exact_contract_timestamps_and_argv(tmp_path: Path) -> Non
                 None,
             ),
         )
-        connection.execute(
+        _ = connection.execute(
             "INSERT INTO projection_thread_messages VALUES (?, ?, ?, ?, ?)",
             ("m1", "t3-id", "user", "t3 user", "2026-04-05T06:08:00Z"),
         )
+    connection.close()
 
     opencode = tmp_path / "opencode.db"
     with create_opencode(opencode) as connection:
-        connection.execute(
+        _ = connection.execute(
             "INSERT INTO session VALUES (?, ?, ?, ?, ?, ?)",
             (
                 "oc-id",
@@ -388,10 +391,11 @@ def test_all_harnesses_exact_contract_timestamps_and_argv(tmp_path: Path) -> Non
                 None,
             ),
         )
-        connection.execute(
+        _ = connection.execute(
             "INSERT INTO session_message VALUES (?, ?, ?, ?)",
             ("oc-id", 1, "user", json.dumps({"text": "opencode user"})),
         )
+    connection.close()
 
     result = run_cli(
         tmp_path,
@@ -453,7 +457,7 @@ def test_archives_compression_and_transcript_selection(tmp_path: Path) -> None:
         codex_home / "archived_sessions" / "rollout-cold.jsonl.zst",
         codex_rows("codex-cold", user="## My request for Codex: archiveonly"),
     )
-    write_jsonl(
+    _ = write_jsonl(
         codex_home / "session_index.jsonl",
         [{"id": "codex-cold", "thread_name": "cold codex"}],
     )
@@ -580,13 +584,19 @@ def test_pi_settings_precedence_and_explicit_override(tmp_path: Path) -> None:
     global_root = tmp_path / "global-sessions"
     project_root = tmp_path / "project-sessions"
     explicit_root = tmp_path / "explicit-sessions"
-    write_jsonl(global_root / "g.jsonl", pi_rows("global", name="needle", user="x"))
-    write_jsonl(project_root / "p.jsonl", pi_rows("project", name="needle", user="x"))
-    write_jsonl(explicit_root / "e.jsonl", pi_rows("explicit", name="needle", user="x"))
+    _ = write_jsonl(global_root / "g.jsonl", pi_rows("global", name="needle", user="x"))
+    _ = write_jsonl(
+        project_root / "p.jsonl", pi_rows("project", name="needle", user="x")
+    )
+    _ = write_jsonl(
+        explicit_root / "e.jsonl", pi_rows("explicit", name="needle", user="x")
+    )
     agent.mkdir(parents=True)
-    (agent / "settings.json").write_text(json.dumps({"sessionDir": str(global_root)}))
+    _ = (agent / "settings.json").write_text(
+        json.dumps({"sessionDir": str(global_root)})
+    )
     (project / ".pi").mkdir()
-    (project / ".pi" / "settings.json").write_text(
+    _ = (project / ".pi" / "settings.json").write_text(
         json.dumps({"sessionDir": str(project_root)})
     )
 
@@ -661,7 +671,7 @@ def test_identity_and_candidate_deduplication(tmp_path: Path) -> None:
 def test_shared_jsonl_single_owner_and_conflicting_roots(tmp_path: Path) -> None:
     """Give one JSONL one owner and reject conflicting explicit ownership."""
     shared = tmp_path / "shared"
-    write_jsonl(shared / "pi.jsonl", pi_rows("pi-owner", name="needle", user="x"))
+    _ = write_jsonl(shared / "pi.jsonl", pi_rows("pi-owner", name="needle", user="x"))
     found = records(
         run_cli(tmp_path, ("needle",), "--root", f"pi={shared}", "--limit", "20")
     )
@@ -686,7 +696,9 @@ def test_t3_archived_deleted_order_and_read_only(tmp_path: Path) -> None:
     """Include archives, exclude tombstones, order messages, and never write."""
     database = tmp_path / "state.sqlite"
     with create_t3(database) as connection:
-        connection.execute("INSERT INTO projection_projects VALUES ('p', '/workspace')")
+        _ = connection.execute(
+            "INSERT INTO projection_projects VALUES ('p', '/workspace')"
+        )
         for values in (
             (
                 "active",
@@ -719,10 +731,10 @@ def test_t3_archived_deleted_order_and_read_only(tmp_path: Path) -> None:
                 "2026-01-06T00:00:00Z",
             ),
         ):
-            connection.execute(
+            _ = connection.execute(
                 "INSERT INTO projection_threads VALUES (?, ?, ?, ?, ?, ?, ?, ?)", values
             )
-        connection.executemany(
+        _ = connection.executemany(
             "INSERT INTO projection_thread_messages VALUES (?, ?, ?, ?, ?)",
             [
                 ("z", "archived", "assistant", "second", "2026-01-02T02:00:00Z"),
@@ -730,6 +742,7 @@ def test_t3_archived_deleted_order_and_read_only(tmp_path: Path) -> None:
                 ("x", "active", "user", "needle", "2026-01-01T01:00:00Z"),
             ],
         )
+    connection.close()
     before = hashlib.sha256(database.read_bytes()).digest()
     found = records(
         run_cli(
@@ -760,7 +773,7 @@ def test_opencode_current_legacy_fallback_and_argv(tmp_path: Path) -> None:
     """Prefer current rows and fall back per session to legacy rows."""
     database = tmp_path / "opencode.db"
     with create_opencode(database) as connection:
-        connection.executemany(
+        _ = connection.executemany(
             "INSERT INTO session VALUES (?, ?, ?, ?, ?, ?)",
             [
                 (
@@ -781,7 +794,7 @@ def test_opencode_current_legacy_fallback_and_argv(tmp_path: Path) -> None:
                 ),
             ],
         )
-        connection.executemany(
+        _ = connection.executemany(
             "INSERT INTO session_message VALUES (?, ?, ?, ?)",
             [
                 (
@@ -793,11 +806,11 @@ def test_opencode_current_legacy_fallback_and_argv(tmp_path: Path) -> None:
                 ("current", 1, "user", json.dumps({"text": "needle current"})),
             ],
         )
-        connection.execute(
+        _ = connection.execute(
             "INSERT INTO message VALUES (?, ?, ?, ?)",
             ("mirror", "current", 1, json.dumps({"role": "user"})),
         )
-        connection.execute(
+        _ = connection.execute(
             "INSERT INTO part VALUES (?, ?, ?, ?)",
             (
                 "mirror-part",
@@ -806,11 +819,11 @@ def test_opencode_current_legacy_fallback_and_argv(tmp_path: Path) -> None:
                 json.dumps({"type": "text", "text": "mirroronly"}),
             ),
         )
-        connection.execute(
+        _ = connection.execute(
             "INSERT INTO message VALUES (?, ?, ?, ?)",
             ("legacy-message", "legacy", 2, json.dumps({"role": "user"})),
         )
-        connection.execute(
+        _ = connection.execute(
             "INSERT INTO part VALUES (?, ?, ?, ?)",
             (
                 "legacy-part",
@@ -819,6 +832,7 @@ def test_opencode_current_legacy_fallback_and_argv(tmp_path: Path) -> None:
                 json.dumps({"type": "text", "text": "archiveonly needle"}),
             ),
         )
+    connection.close()
     before = hashlib.sha256(database.read_bytes()).digest()
     found = records(
         run_cli(
@@ -850,7 +864,7 @@ def test_opencode_current_legacy_fallback_and_argv(tmp_path: Path) -> None:
 def test_filters_empty_results_and_root_validation(tmp_path: Path) -> None:
     """Filters isolate harnesses; missing and incompatible explicit roots are errors."""
     omp_root = tmp_path / "omp"
-    write_jsonl(omp_root / "x.jsonl", omp_rows("omp", title="needle", user="x"))
+    _ = write_jsonl(omp_root / "x.jsonl", omp_rows("omp", title="needle", user="x"))
     assert records(run_cli(tmp_path, ("absent",), "--root", f"omp={omp_root}")) == []
     assert records(run_cli(tmp_path, ("needle",), "--harness", "codex")) == []
 
@@ -867,7 +881,7 @@ def test_filters_empty_results_and_root_validation(tmp_path: Path) -> None:
     incompatible = tmp_path / "bad.sqlite"
     sqlite3.connect(incompatible).close()
     corrupt = tmp_path / "corrupt.sqlite"
-    corrupt.write_bytes(b"not sqlite")
+    _ = corrupt.write_bytes(b"not sqlite")
     for harness, path in (("t3code", incompatible), ("opencode", corrupt)):
         result = run_cli(tmp_path, ("needle",), "--root", f"{harness}={path}")
         assert result.returncode == 2
@@ -882,12 +896,12 @@ def test_malformed_artifacts_and_incompatible_defaults_are_skipped(
     env = clean_env(tmp_path)
     omp_root = Path(env["XDG_DATA_HOME"]) / "omp" / "sessions"
     omp_root.mkdir(parents=True)
-    (omp_root / "bad.jsonl").write_text("{broken\n")
-    write_jsonl(omp_root / "good.jsonl", omp_rows("good", title="needle", user="x"))
+    _ = (omp_root / "bad.jsonl").write_text("{broken\n")
+    _ = write_jsonl(omp_root / "good.jsonl", omp_rows("good", title="needle", user="x"))
 
     t3_default = Path(env["T3CODE_HOME"]) / "userdata" / "state.sqlite"
     t3_default.parent.mkdir(parents=True)
-    t3_default.write_bytes(b"corrupt")
+    _ = t3_default.write_bytes(b"corrupt")
     opencode_default = Path(env["XDG_DATA_HOME"]) / "opencode" / "opencode.db"
     opencode_default.parent.mkdir(parents=True)
     sqlite3.connect(opencode_default).close()
