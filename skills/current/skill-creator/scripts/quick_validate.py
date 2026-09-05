@@ -9,6 +9,7 @@
 import re
 import sys
 from pathlib import Path
+from typing import cast
 
 import yaml
 
@@ -27,26 +28,26 @@ ALLOWED_PROPERTIES = {
 }
 
 
-def _load_frontmatter(skill_md: Path) -> tuple[bool, str | dict[str, object]]:
-    """Load and parse the SKILL.md frontmatter as a dictionary."""
+def _load_frontmatter(skill_md: Path) -> tuple[dict[str, object] | None, str]:
+    """Load and parse the SKILL.md frontmatter, returning (mapping, error)."""
     if not skill_md.exists():
-        return False, "SKILL.md not found"
+        return None, "SKILL.md not found"
 
     content = skill_md.read_text(encoding="utf-8")
     if not content.startswith("---"):
-        return False, "No YAML frontmatter found"
+        return None, "No YAML frontmatter found"
 
     match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
     if not match:
-        return False, "Invalid frontmatter format"
+        return None, "Invalid frontmatter format"
 
     try:
-        frontmatter = yaml.safe_load(match.group(1))
+        frontmatter = cast("object", yaml.safe_load(match.group(1)))
     except yaml.YAMLError as exc:
-        return False, f"Invalid YAML in frontmatter: {exc}"
+        return None, f"Invalid YAML in frontmatter: {exc}"
     if not isinstance(frontmatter, dict):
-        return False, "Frontmatter must be a YAML dictionary"
-    return True, frontmatter
+        return None, "Frontmatter must be a YAML dictionary"
+    return cast("dict[str, object]", frontmatter), ""
 
 
 def _validate_name(name: object) -> tuple[bool, str]:
@@ -126,9 +127,9 @@ def _validate_compatibility(compatibility: object) -> tuple[bool, str]:
 def validate_skill(skill_path: str | Path) -> tuple[bool, str]:
     """Validate a skill directory, returning (is_valid, message)."""
     skill_md = Path(skill_path) / "SKILL.md"
-    loaded, frontmatter = _load_frontmatter(skill_md)
-    if not loaded:
-        return False, str(frontmatter)
+    frontmatter, error = _load_frontmatter(skill_md)
+    if frontmatter is None:
+        return False, error
 
     unexpected = set(frontmatter.keys()) - ALLOWED_PROPERTIES
     if unexpected:
@@ -159,9 +160,9 @@ def validate_skill(skill_path: str | Path) -> tuple[bool, str]:
 
 if __name__ == "__main__":
     if len(sys.argv) != EXPECTED_ARG_COUNT:
-        print("Usage: uv run --script scripts/cli.py quick-validate <skill_directory>")  # noqa: T201
+        print("Usage: uv run --script scripts/cli.py quick-validate <skill_directory>")
         sys.exit(1)
 
     valid, message = validate_skill(sys.argv[1])
-    print(message)  # noqa: T201
+    print(message)
     sys.exit(0 if valid else 1)

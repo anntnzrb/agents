@@ -9,7 +9,8 @@ def parse_skill_md(skill_path: Path) -> tuple[str, str, str]:
     lines = content.split("\n")
 
     if lines[0].strip() != "---":
-        raise ValueError("SKILL.md missing frontmatter (no opening ---)")
+        message = "SKILL.md missing frontmatter (no opening ---)"
+        raise ValueError(message)
 
     end_idx = None
     for i, line in enumerate(lines[1:], start=1):
@@ -18,7 +19,8 @@ def parse_skill_md(skill_path: Path) -> tuple[str, str, str]:
             break
 
     if end_idx is None:
-        raise ValueError("SKILL.md missing frontmatter (no closing ---)")
+        message = "SKILL.md missing frontmatter (no closing ---)"
+        raise ValueError(message)
 
     name = ""
     description = ""
