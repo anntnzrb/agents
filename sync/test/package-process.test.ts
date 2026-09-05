@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+
+const SYNC_ROOT = resolve(import.meta.dir, "..");
+
 import { installPackageDeps } from "@packages/process.ts";
 import { packageIsHealthy } from "@packages/validate.ts";
 
@@ -47,22 +50,33 @@ exit 1
 `,
       );
 
-      const originalPath = process.env["PATH"];
-      process.env["PATH"] = `${bin}:${originalPath ?? ""}`;
-      try {
-        mkdirSync(join(root, "skills"), { recursive: true });
-        writeFileSync(join(root, "skills", "main.ts"), 'import "some-pkg";\n');
-        expect(await installPackageDeps(root, 5000)).toBe(true);
+      mkdirSync(join(root, "skills"), { recursive: true });
+      writeFileSync(join(root, "skills", "main.ts"), 'import "some-pkg";\n');
 
-        const calls = readFileSync(log, "utf8")
-          .split("\n")
-          .filter((line) => line.length > 0);
-        expect(calls.length).toBe(1);
-        expect(calls[0]).toContain("add --no-save some-pkg");
-        expect(packageIsHealthy(root)).toBe(true);
-      } finally {
-        process.env["PATH"] = originalPath ?? "";
-      }
+      const proc = Bun.spawnSync(
+        [
+          process.execPath,
+          "-e",
+          `import { installPackageDeps } from "@packages/process.ts";
+const ok = await installPackageDeps(${JSON.stringify(root)}, 5000);
+process.exit(ok ? 0 : 1);`,
+        ],
+        {
+          cwd: SYNC_ROOT,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env["PATH"] ?? ""}`,
+          },
+        },
+      );
+      expect(proc.exitCode).toBe(0);
+
+      const calls = readFileSync(log, "utf8")
+        .split("\n")
+        .filter((line) => line.length > 0);
+      expect(calls.length).toBe(1);
+      expect(calls[0]).toContain("add --no-save some-pkg");
+      expect(packageIsHealthy(root)).toBe(true);
     });
   });
 });

@@ -10,25 +10,22 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { homedir, hostname, tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 /**
  * Tests redirect HOME to a throwaway directory so sync writes nowhere real.
- * That also hides the machine's uv and bun caches, so every child process
- * re-downloads a CPython toolchain (~4s) and re-resolves npm tarballs (~2.5s)
- * over the network. Point the cache-bearing variables back at the real user
- * caches: they are read-mostly, content-addressed, and never written by the
- * fixtures under test.
+ * Cache variables redirect to an isolated temporary cache directory to prevent
+ * test processes from writing to real user directories or competing for locks.
  */
-const REAL_HOME = homedir();
+const SHARED_CACHE_DIR = mkdtempSync(join(tmpdir(), "agents-test-cache-"));
 
 export const sharedToolCacheEnv: Readonly<Record<string, string>> = {
-  UV_CACHE_DIR: process.env["UV_CACHE_DIR"] ?? join(REAL_HOME, ".cache", "uv"),
+  UV_CACHE_DIR: process.env["UV_CACHE_DIR"] ?? join(SHARED_CACHE_DIR, "uv"),
   UV_PYTHON_INSTALL_DIR:
-    process.env["UV_PYTHON_INSTALL_DIR"] ?? join(REAL_HOME, ".local", "share", "uv", "python"),
+    process.env["UV_PYTHON_INSTALL_DIR"] ?? join(SHARED_CACHE_DIR, "uv-python"),
   BUN_INSTALL_CACHE_DIR:
-    process.env["BUN_INSTALL_CACHE_DIR"] ?? join(REAL_HOME, ".bun", "install", "cache"),
+    process.env["BUN_INSTALL_CACHE_DIR"] ?? join(SHARED_CACHE_DIR, "bun-install"),
 };
 
 const SYNC_ROOT = resolve(import.meta.dir, "..", "..");
@@ -68,6 +65,7 @@ afterAll(() => {
   if (release !== undefined) {
     rmSync(release.templateHome, { recursive: true, force: true });
   }
+  rmSync(SHARED_CACHE_DIR, { recursive: true, force: true });
 });
 
 function buildSharedRelease(): SharedRelease {
@@ -93,7 +91,7 @@ function buildSharedRelease(): SharedRelease {
     })}\n`,
   );
 
-  const built = Bun.spawnSync(["bun", join(SYNC_ROOT, "src", "cli.ts")], {
+  const built = Bun.spawnSync([process.execPath, join(SYNC_ROOT, "src", "cli.ts")], {
     cwd: SYNC_ROOT,
     stdin: "ignore",
     stdout: "pipe",

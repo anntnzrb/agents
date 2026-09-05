@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { installExtensionDeps } from "@extensions/install.ts";
+import { join, resolve } from "node:path";
+
+const SYNC_ROOT = resolve(import.meta.dir, "..");
 
 function withTempDir<T>(fn: (root: string) => T | Promise<T>): Promise<T> {
   const root = mkdtempSync(join(tmpdir(), "extensions-install-test-"));
@@ -44,20 +45,29 @@ exit 1
         `${JSON.stringify({ name: "ext", dependencies: { chalk: "^5" } })}\n`,
       );
 
-      const originalPath = process.env["PATH"];
-      process.env["PATH"] = `${bin}:${originalPath ?? ""}`;
-      try {
-        const result = await installExtensionDeps(root, root, 5000);
-        expect(result).toBe(true);
+      const proc = Bun.spawnSync(
+        [
+          process.execPath,
+          "-e",
+          `import { installExtensionDeps } from "@extensions/install.ts";
+const ok = await installExtensionDeps(${JSON.stringify(root)}, ${JSON.stringify(root)}, 5000);
+process.exit(ok ? 0 : 1);`,
+        ],
+        {
+          cwd: SYNC_ROOT,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env["PATH"] ?? ""}`,
+          },
+        },
+      );
+      expect(proc.exitCode).toBe(0);
 
-        const calls = readFileSync(log, "utf8")
-          .split("\n")
-          .filter((line) => line.length > 0);
-        expect(calls.length).toBe(1);
-        expect(calls[0]).toContain(`${ext} install`);
-      } finally {
-        process.env["PATH"] = originalPath ?? "";
-      }
+      const calls = readFileSync(log, "utf8")
+        .split("\n")
+        .filter((line) => line.length > 0);
+      expect(calls.length).toBe(1);
+      expect(calls[0]).toContain(`${ext} install`);
     });
   });
 });
