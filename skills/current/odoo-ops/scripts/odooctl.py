@@ -604,13 +604,45 @@ def cmd_dev(args: argparse.Namespace) -> int:
     return 0
 
 
+def _evaluate_odoo_test_result(exit_code: int, output: str) -> Tuple[bool, List[str]]:
+    """Accurately evaluate Odoo 17 test run result without false positives on expected log errors."""
+    summary_lines = [
+        line
+        for line in output.splitlines()
+        if "odoo.tests.result:" in line
+        or "odoo.modules.loading: Module" in line
+        or "At least one test failed" in line
+        or " FAIL: " in line
+        or " ERROR: " in line
+        or "odoo.tests.stats:" in line
+    ]
+
+    has_test_failures = (
+        exit_code != 0
+        or "At least one test failed" in output
+        or any(re.search(r"\b[1-9]\d*\s+failed\b", line) for line in output.splitlines())
+        or any(re.search(r"\b[1-9]\d*\s+failures?\b", line) for line in output.splitlines())
+        or any(
+            re.search(r"\b[1-9]\d*\s+errors?\b", line)
+            for line in output.splitlines()
+            if "odoo.tests.result:" in line or "odoo.modules.loading:" in line
+        )
+    )
+    has_passed = (
+        exit_code == 0
+        and not has_test_failures
+        and ("0 failed, 0 error(s)" in output or "0 failures, 0 errors" in output)
+    )
+    return has_passed, summary_lines
+
+
 def cmd_test(args: argparse.Namespace) -> int:
     ctx = _resolve_workspace()
-    
+
     # 1. Resolve Target Modules
     target = args.target
     profile_name = args.profile
-    
+
     db_to_use = ctx.effective_db_name
     test_tags: List[str] = []
 
@@ -628,10 +660,21 @@ def cmd_test(args: argparse.Namespace) -> int:
 
     _ensure_runtime_pod(ctx)
 
+    # Clean up any stale test containers from previous interrupted runs
+    stale_check = _run(
+        ["podman", "ps", "-a", "--filter", "name=odoo-test-", "--format", "{{.Names}}"],
+        check=False,
+    )
+    for stale in stale_check.stdout.splitlines():
+        stale = stale.strip()
+        if stale and stale.startswith("odoo-test-"):
+            _run(["podman", "rm", "-f", stale], check=False)
+
     source_dir = list(ctx.runtime.glob("source/odoo-*"))[0]
     addons_mount = ctx.root
     config_mount = ctx.runtime / "config"
     data_web = ctx.runtime / "data/web"
+    data_web.mkdir(parents=True, exist_ok=True)
 
     tags_str = ",".join(test_tags)
     update_str = ",".join(update_mods)
@@ -667,31 +710,66 @@ def cmd_test(args: argparse.Namespace) -> int:
 
     if update_str:
         cmd.extend(["-i", update_str, "-u", update_str])
-    print(f"Running isolated Odoo unit tests for {target} (tags: {tags_str}, db: {db_to_use})...\n")
-    proc = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    output = proc.stdout
 
-    # Parse and format output
+    header_msg = f"Running isolated Odoo unit tests for {target} (tags: {tags_str}, db: {db_to_use})...\n"
     if args.json:
-        has_failed = "ERROR" in output or "FAIL" in output or proc.returncode != 0
-        summary_lines = [l for l in output.splitlines() if "odoo.tests.result:" in l or "FAILED" in l or "ERROR" in l]
+        sys.stderr.write(header_msg)
+        sys.stderr.flush()
+    else:
+        sys.stdout.write(header_msg)
+        sys.stdout.flush()
+
+    output_lines: List[str] = []
+    exit_code = 1
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+        if proc.stdout:
+            for line in proc.stdout:
+                output_lines.append(line)
+                if args.json:
+                    sys.stderr.write(line)
+                    sys.stderr.flush()
+                else:
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
+        exit_code = proc.wait()
+    except KeyboardInterrupt:
+        if args.json:
+            sys.stderr.write(f"\n[INTERRUPT] Cancelling test container {container_test_name}...\n")
+            sys.stderr.flush()
+        else:
+            sys.stdout.write(f"\n[INTERRUPT] Cancelling test container {container_test_name}...\n")
+            sys.stdout.flush()
+        _run(["podman", "stop", "-t", "2", container_test_name], check=False)
+        raise
+    finally:
+        _run(["podman", "rm", "-f", container_test_name], check=False)
+
+    output = "".join(output_lines)
+    is_success, summary_lines = _evaluate_odoo_test_result(exit_code, output)
+
+    if args.json:
         print(json.dumps({
             "target": target,
             "database": db_to_use,
-            "exit_code": proc.returncode,
-            "success": not has_failed,
+            "exit_code": exit_code,
+            "success": is_success,
             "summary": summary_lines,
             "output": output,
         }))
     else:
-        print(output)
-        if proc.returncode == 0 and "odoo.tests.result:" in output and "0 failed, 0 error(s)" in output:
+        if is_success:
             print("\n[OK] All Odoo unit tests passed successfully.")
-        elif proc.returncode != 0:
+        else:
             print("\n[FAIL] Test run failed.")
 
-    return proc.returncode
-
+    return 0 if is_success else (exit_code if exit_code != 0 else 1)
 
 def cmd_lint(args: argparse.Namespace) -> int:
     target_paths = _resolve_target_paths(args.target, args.profile, for_lint=True)
