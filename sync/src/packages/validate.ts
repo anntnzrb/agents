@@ -103,9 +103,6 @@ export function missingPackageRoots(dir: string): string[] {
   }
   return [...missing].toSorted();
 }
-
-export const validatePackageForTests = (dir: string): boolean => packageIsHealthy(dir);
-
 function validatePiManifest(dir: string, pi: Record<string, unknown>): boolean | null {
   let hasEntries = false;
   for (const key of RESOURCE_KEYS) {
@@ -180,14 +177,32 @@ function packageSourceFiles(root: string): string[] {
 
 const importScanner = new Bun.Transpiler({ loader: "ts" });
 
+/**
+ * Extracts runtime import specifiers from JavaScript or TypeScript source code.
+ *
+ * Uses `Bun.Transpiler` to scan the AST for ESM `import` statements, `export ... from`
+ * statements, and dynamic `import()` calls. CommonJS `require("...")` calls are
+ * pre-normalized to `import("...")` so the scanner treats them as dynamic imports.
+ *
+ * Parsing behavior and guarantees:
+ * - Comment immunity: Single-line (`//`) and multiline block (`/* ... *\/`) comments are ignored.
+ * - String/template immunity: Specifiers inside string literals or template literals are ignored.
+ * - Type-only imports: Type-only imports (`import type { ... }`) are erased during transpilation.
+ * - Specifier extraction: All runtime specifiers are returned as-is (package names, scoped packages,
+ *   local relative paths, built-in schemes like `node:`/`bun:`, and `data:` URIs).
+ */
 export function extractImportSpecifiers(content: string): string[] {
   // Bun.Transpiler.scan tracks ESM imports and dynamic `import()` calls, but not
-  // CommonJS `require()` calls. Normalize `require("...")` calls so the scanner
-  // treats them as dynamic imports and ignores comments and strings for us.
-  const normalized = content.replace(/\brequire\s*\(/g, "import(");
-  return importScanner.scan(normalized).imports.map(({ path }) => path);
+  // CommonJS `require()` calls. Normalize top-level/standalone `require("...")` calls
+  // (excluding property access like `obj.require(...)`) so the scanner treats them
+  // as dynamic imports while ignoring comments and strings.
+  const normalized = content.replace(/(?<![.\w$])require\s*\(/g, "import(");
+  try {
+    return importScanner.scan(normalized).imports.map(({ path }) => path);
+  } catch {
+    return [];
+  }
 }
-
 const VALID_PACKAGE_ROOT_PATTERN = /^(@[a-z0-9_.-]+\/)?[a-z0-9_.-]+$/i;
 
 function packageRootFromSpecifier(specifier: string): string | null {
