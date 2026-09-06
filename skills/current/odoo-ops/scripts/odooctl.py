@@ -1094,7 +1094,7 @@ def _build_test_cmd(
         "--log-level=test",
     ]
     if update_str:
-        cmd.extend(["-i", update_str, "-u", update_str])
+        cmd.extend(["-u", update_str])
     return cmd
 
 
