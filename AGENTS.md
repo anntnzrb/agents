@@ -6,8 +6,8 @@
 - `skills/current/`: SSOT for shared skills synced to every harness
 - `skills/legacy/`: archived skills; repo-only, not synced
 - `tools/`: repo-only managed-tool sources
-- `sync/`: isolated TypeScript sync application; owns all JS/TS app config, launcher wrappers, dependencies, and `sync/test/`
-- `sync/test/`: tests sync behavior only; harness names and paths MAY appear as fixtures or adapter boundaries, but tests MUST NOT import harness implementations or assert harness-local behavior; skill and harness changes MUST NOT add tests here
+- `sync/`: isolated Python (uv) sync application; owns all sync configuration, launcher wrappers, dependencies, and `sync/tests/`
+- `sync/tests/`: tests sync behavior only; harness names and paths MAY appear as fixtures or adapter boundaries, but tests MUST NOT import harness implementations or assert harness-local behavior; skill and harness changes MUST NOT add tests here
 - `docs/`: repository setup, operation, and workflow documentation indexed by `docs/index.md`
 - `docs/sync/`: sync application documentation; adapter boundaries MAY be described, but harness-local behavior and configuration belong under `harnesses/`
 - Harness-specific tests and documentation stay beside their owning source under `harnesses/`
@@ -36,8 +36,8 @@ Route documentation by owner:
 
 Boundaries:
 
-- A skill change MUST NOT add tests under `sync/test/` or documentation under `docs/sync/`. The skill's own files carry its documentation and validation commands.
-- A change under `harnesses/` MUST NOT update `docs/` or `sync/test/`. Adapter-contract changes in `sync/src/core/harness-adapters.ts` are sync changes; they follow the sync workflow and MAY update `docs/sync/`.
+- A skill change MUST NOT add tests under `sync/tests/` or documentation under `docs/sync/`. The skill's own files carry its documentation and validation commands.
+- A change under `harnesses/` MUST NOT update `docs/` or `sync/tests/`. Adapter-contract changes in `sync/src/sync/core/harness_adapters.py` are sync changes; they follow the sync workflow and MAY update `docs/sync/`.
 
 For changes routed to `docs/`:
 
@@ -52,8 +52,8 @@ Documentation-only changes must still preserve navigation and factual accuracy. 
 
 ## Sync Contract
 
-- Public sync entrypoint: `sync/src/cli.ts`
-- Invoke it with an explicit Bun runner, e.g. `bun ./sync/src/cli.ts` from repo root
+- Public sync entrypoint: `sync/src/sync/cli.py` (`sync` console script)
+- Invoke it via `uv`, e.g. `uv run --project sync sync` from repository root
 - NEVER add `bin/` shell trampolines for sync
 - Use TDD
 

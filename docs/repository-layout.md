@@ -12,7 +12,7 @@ The repository separates committed sources, local inputs, generated targets, and
 | `skills/legacy/` | Archived skills excluded from sync |
 | `harnesses/<harness>/` | Harness-owned configuration, implementation, adjacent tests, and local documentation |
 | `tools/` | Managed-tool sources |
-| `sync/` | The Bun and TypeScript sync application |
+| `sync/` | The Python (uv) sync application |
 | `docs/` | Repository workflow documentation indexed by `docs/index.md`; sync application documentation under `docs/sync/` |
 | `secrets.local.example.json` | Schema and placeholder values for local CLIProxyAPI secrets |
 | `.env.example` | Template and guidance for shared harness environment variables |
