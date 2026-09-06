@@ -325,9 +325,20 @@ class OdooXmlViewLinter:
                 if field_name in seen_fields:
                     prev_line, prev_node = seen_fields[field_name]
                     prev_inv = prev_node.attrib.get("invisible")
+                    groups_val = field_node.attrib.get("groups", "").strip()
+                    prev_groups_val = prev_node.attrib.get("groups", "").strip()
+                    is_mutually_exclusive_groups = bool(
+                        groups_val
+                        and prev_groups_val
+                        and (
+                            groups_val == f"!{prev_groups_val}"
+                            or prev_groups_val == f"!{groups_val}"
+                        )
+                    )
+
                     # If at least one is unconditional (e.g. invisible="1" or no invisible attribute)
                     # or both have the exact same condition, flag as duplicate collision
-                    is_duplicate_collision = (
+                    is_duplicate_collision = not is_mutually_exclusive_groups and (
                         (inv is None and prev_inv is None)
                         or (inv == "1" and prev_inv is None)
                         or (prev_inv == "1" and inv is None)
